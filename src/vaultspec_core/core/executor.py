@@ -217,8 +217,15 @@ def _execute_adopt_directory(target: Path, step: ResolutionStep) -> None:
 
 def _execute_repair_gitignore(target: Path, _step: ResolutionStep) -> None:
     """Repair the managed gitignore block."""
+    from .guards import is_dev_repo
+
     # TODO: Refine gitignore management to include more artifact types.
-    entries = get_recommended_entries(target)
+    # When *target* is the vaultspec-core source repository, the
+    # recommended entry shape changes (no bare `.vaultspec/` line) so
+    # the canonical rules content stays version-controlled.  This is the
+    # automated-repair counterpart to the explicit `--dev` flag on
+    # install/uninstall/sync.  See GitHub issue #88.
+    entries = get_recommended_entries(target, dev=is_dev_repo(target))
     ensure_gitignore_block(target, entries, state=ManagedState.PRESENT)
 
 
