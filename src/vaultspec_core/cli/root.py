@@ -206,6 +206,18 @@ def cmd_install(
             help="Skip a component (core or provider name). Repeatable.",
         ),
     ] = None,
+    dev: Annotated[
+        bool,
+        typer.Option(
+            "--dev",
+            help=(
+                "Authorise install in the vaultspec-core source repository "
+                "or one of its worktrees.  Without this flag the source-repo "
+                "guard refuses the write to protect canonical .vaultspec/ "
+                "content."
+            ),
+        ),
+    ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Deploy the vaultspec framework to the target directory.
@@ -213,6 +225,7 @@ def cmd_install(
     Scaffolds the workspace structure and syncs all managed resources.
     Use --upgrade to update builtin rules without re-scaffolding.
     Use --skip to exclude components on retry (e.g. --skip core --skip claude).
+    Use --dev to operate inside the vaultspec-core source repo or worktree.
 
     Examples:\n
       vaultspec-core install                       # install all providers in cwd\n
@@ -222,6 +235,7 @@ def cmd_install(
       vaultspec-core install --upgrade             # update firmware + re-sync\n
       vaultspec-core install claude --dry-run      # preview what would be created\n
       vaultspec-core install --skip claude         # install all except claude\n
+      vaultspec-core install --dev                 # authorise source-repo install\n
     """
     from vaultspec_core.core.commands import install_run
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -269,6 +283,7 @@ def cmd_install(
             dry_run=dry_run,
             force=force,
             skip=set(skip),
+            dev=dev,
         )
     except VaultSpecError as exc:
         _handle_error(exc)
@@ -355,6 +370,17 @@ def cmd_uninstall(
             help="Skip a component (core or provider name). Repeatable.",
         ),
     ] = None,
+    dev: Annotated[
+        bool,
+        typer.Option(
+            "--dev",
+            help=(
+                "Authorise uninstall in the vaultspec-core source repository "
+                "or one of its worktrees.  Without this flag the source-repo "
+                "guard refuses the write."
+            ),
+        ),
+    ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Remove the vaultspec framework from the target directory.
@@ -363,6 +389,7 @@ def cmd_uninstall(
     The .vault/ documentation corpus is preserved by default.
     Use a provider name to remove only that provider's artifacts.
     Use --skip to exclude components (e.g. --skip claude --skip codex).
+    Use --dev to operate inside the vaultspec-core source repo or worktree.
 
     Examples:\n
       vaultspec-core uninstall                    # remove framework, keep .vault/\n
@@ -371,6 +398,7 @@ def cmd_uninstall(
       vaultspec-core uninstall --remove-vault     # also remove .vault/ docs\n
       vaultspec-core uninstall --dry-run          # preview what would be removed\n
       vaultspec-core uninstall --skip codex       # remove all except codex\n
+      vaultspec-core uninstall --dev              # authorise source-repo uninstall\n
     """
     from vaultspec_core.core.commands import uninstall_run
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -399,6 +427,7 @@ def cmd_uninstall(
             dry_run=dry_run,
             force=force,
             skip=set(skip),
+            dev=dev,
         )
     except VaultSpecError as exc:
         _handle_error(exc)
@@ -466,6 +495,17 @@ def cmd_sync(
             help="Skip a component (core or provider name). Repeatable.",
         ),
     ] = None,
+    dev: Annotated[
+        bool,
+        typer.Option(
+            "--dev",
+            help=(
+                "Authorise sync in the vaultspec-core source repository "
+                "or one of its worktrees.  Without this flag the source-repo "
+                "guard refuses the write."
+            ),
+        ),
+    ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Sync rules, skills, agents, configs, and system prompts.
@@ -480,6 +520,7 @@ def cmd_sync(
     Defaults to syncing all providers. Pass a provider name to sync only
     that provider (e.g. 'vaultspec-core sync claude').
     Use --skip to exclude providers (e.g. --skip claude --skip codex).
+    Use --dev to operate inside the vaultspec-core source repo or worktree.
     """
     skip = list(skip or [])
     apply_target(target, split_source=True)
@@ -514,7 +555,9 @@ def cmd_sync(
     from vaultspec_core.core.exceptions import VaultSpecError
 
     try:
-        results = sync_provider(provider, dry_run=dry_run, force=force, skip=set(skip))
+        results = sync_provider(
+            provider, dry_run=dry_run, force=force, skip=set(skip), dev=dev
+        )
     except VaultSpecError as exc:
         _handle_error(exc)
         return

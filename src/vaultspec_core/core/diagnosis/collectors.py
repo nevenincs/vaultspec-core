@@ -384,6 +384,7 @@ def collect_gitignore_state(target: Path) -> GitignoreSignal:
         reflecting the observed state.
     """
     from ..gitignore import _find_markers, get_recommended_entries
+    from ..guards import is_dev_repo
 
     gi_path = target / ".gitignore"
     if not gi_path.exists():
@@ -418,7 +419,14 @@ def collect_gitignore_state(target: Path) -> GitignoreSignal:
         if entry in unignored or entry.rstrip("/") in unignored:
             return GitignoreSignal.CORRUPTED
 
-    recommended = get_recommended_entries(target)
+    # The diagnosis is read-only (no `--dev` flag from any caller), but the
+    # *expected* shape of the managed block depends on whether *target* is
+    # the vaultspec-core source repo: in that mode the canonical
+    # `.vaultspec/rules/` content must NOT be ignored, so the recommended
+    # entry set diverges.  Auto-detect via `is_dev_repo` so `spec doctor`
+    # in a vaultspec source worktree reports COMPLETE rather than a
+    # spurious PARTIAL.  See GitHub issue #88.
+    recommended = get_recommended_entries(target, dev=is_dev_repo(target))
 
     # Check if all recommended entries are present in the block.
     # We allow extra entries (idempotency is handled by ensure_gitignore_block).
