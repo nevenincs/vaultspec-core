@@ -24,6 +24,8 @@ import importlib
 import subprocess
 import sys
 import textwrap
+import threading
+import time
 from typing import TYPE_CHECKING
 
 import pytest
@@ -194,6 +196,92 @@ class TestDegradedPyYAML:
             f"stdout={result.stdout!r}\nstderr={result.stderr!r}"
         )
         assert result.stdout.strip().endswith("ok")
+
+
+class TestConcurrentRegistration:
+    """Two threads first-calling _yaml_dump must not race the registration.
+
+    ``yaml.add_representer`` mutates a class-level dict on PyYAML's
+    Dumper.  In CPython that single statement is GIL-serialised, but the
+    fix uses a real lock so the contract is "register exactly once" on
+    every runtime (non-CPython, free-threaded builds, instrumented
+    interpreters).  Surfaced by Gemini-Code-Assist on PR #86.
+    """
+
+    def test_double_checked_lock_runs_critical_section_once(self) -> None:
+        helpers = _reload_helpers()
+
+        # Replace yaml.add_representer with a counting wrapper so we can
+        # observe how many threads actually entered the critical section.
+        # The replacement is only swapped onto the helpers module's view
+        # of yaml; pytest's monkeypatch is not used here because we need
+        # the swap to persist for the life of the threads we spawn.
+        calls: list[float] = []
+        real_add = helpers.yaml.add_representer
+
+        def counting_add(cls, fn):  # type: ignore[no-untyped-def]
+            # Sleep briefly so that, without a lock, a second thread that
+            # has already cleared the fast-path check has a real chance
+            # to enter the critical section before the first thread
+            # flips the flag.
+            calls.append(time.perf_counter())
+            time.sleep(0.05)
+            return real_add(cls, fn)
+
+        helpers.yaml.add_representer = counting_add
+        try:
+            barrier = threading.Barrier(8)
+            errors: list[BaseException] = []
+
+            def worker() -> None:
+                try:
+                    barrier.wait(timeout=5)
+                    helpers._yaml_dump({"k": "multi\nline"})
+                except BaseException as exc:
+                    errors.append(exc)
+
+            threads = [threading.Thread(target=worker) for _ in range(8)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join(timeout=10)
+        finally:
+            helpers.yaml.add_representer = real_add
+
+        assert not errors, f"thread workers raised: {errors!r}"
+        assert helpers._literal_representer_registered is True
+        assert len(calls) == 1, (
+            f"yaml.add_representer was entered {len(calls)} times under "
+            "concurrent first-use; the lock must serialize the critical "
+            "section to exactly one entry."
+        )
+
+    def test_concurrent_first_dump_produces_block_scalar(self) -> None:
+        helpers = _reload_helpers()
+
+        barrier = threading.Barrier(8)
+        results: list[str] = []
+        errors: list[BaseException] = []
+
+        def worker() -> None:
+            try:
+                barrier.wait(timeout=5)
+                results.append(helpers._yaml_dump({"body": "a\nb"}))
+            except BaseException as exc:
+                errors.append(exc)
+
+        threads = [threading.Thread(target=worker) for _ in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=10)
+
+        assert not errors
+        assert len(results) == 8
+        for out in results:
+            assert "body: |" in out, (
+                f"thread produced output without block scalar: {out!r}"
+            )
 
 
 @pytest.fixture(autouse=True)
