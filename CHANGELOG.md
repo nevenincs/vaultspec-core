@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.15](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.14...vaultspec-core-v0.1.15) (2026-04-27)
+
+
+### Bug Fixes
+
+* **#85:** lazy YAML representer + uv-native audit gate ([#86](https://github.com/wgergely/vaultspec-core/issues/86)) ([d03f47e](https://github.com/wgergely/vaultspec-core/commit/d03f47ec3caad94805a24af23ebd8ac0d735ab40))
+
 ## [0.1.14](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.13...vaultspec-core-v0.1.14) (2026-04-21)
 
 
