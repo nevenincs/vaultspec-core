@@ -865,7 +865,9 @@ def _resolve_version_warning(
             plan.warnings.append(
                 f"Manifest was written by vaultspec-core {manifest_version}, "
                 f"but running version is {running_version}. "
-                f"Consider upgrading: pip install --upgrade vaultspec-core"
+                f"Consider upgrading: uv tool upgrade vaultspec-core "
+                f"(or `uv sync --upgrade-package vaultspec-core` if used "
+                f"as a project dependency)"
             )
     except Exception:
         logger.debug("Version comparison failed", exc_info=True)

@@ -43,10 +43,6 @@ tmp/
 *.manifest
 *.spec
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
 # Unit test / coverage reports
 htmlcov/
 .tox/
@@ -101,13 +97,6 @@ ipython_config.py
 #   For a library or package, you might want to ignore these files since the Python version
 #   is managed by the consumer of your package.
 # .python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or even
-#   fail to install, on other platforms.
-#Pipfile.lock
 
 # poetry
 #   Similar to Pipenv, see https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
@@ -219,7 +208,11 @@ src/vaultspec_core/builtins/*
 .vault/data/
 .vault/logs/
 .vaultspec/
+.vaultspec/*.lock
 .vaultspec/_snapshots/
+/.gitignore.lock
+/.mcp.json.lock
+/.pre-commit-config.yaml.lock
 AGENTS.md
 CLAUDE.md
 GEMINI.md

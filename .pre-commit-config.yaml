@@ -63,3 +63,9 @@ repos:
     always_run: true
     language: system
     pass_filenames: false
+  - id: block-manual-changelog
+    name: Block manual CHANGELOG.md edits (release-please-managed)
+    entry: python -c "import sys; sys.exit('CHANGELOG.md is auto-managed by release-please. Do not edit manually - land your change as a conventional commit (feat:/fix:/perf:/...) and release-please will regenerate CHANGELOG.md on the next release PR.')"
+    language: system
+    files: '^CHANGELOG\.md$'
+    pass_filenames: false

@@ -76,12 +76,101 @@ def test_justfile_exposes_approved_targets() -> None:
     assert "docker-ghcr" in justfile
 
 
-def test_dependency_audit_uses_lockfile_export_without_root_project() -> None:
+def test_dependency_audit_uses_uv_native_scanner() -> None:
     justfile = _read("justfile")
-    # Export and audit commands use platform-conditional logic
-    assert "uv export --frozen --group dev" in justfile
-    assert "--no-emit-project --output-file" in justfile
-    assert "uv run pip-audit --strict -r" in justfile
+    # The supply-chain gate must run uv's native auditor against the
+    # frozen lockfile, with all groups in scope, so dev-only deps cannot
+    # smuggle in vulnerabilities. The legacy pip-audit toolchain (and the
+    # transitive `pip` it dragged in) must not reappear.
+    assert "uv audit" in justfile
+    assert "--preview-features audit" in justfile
+    assert "--frozen" in justfile
+    assert "--all-groups" in justfile
+    assert "pip-audit" not in justfile
+    assert "uv run pip-audit" not in justfile
+
+
+def test_pyproject_has_no_pip_named_dev_tools() -> None:
+    pyproject = _read("pyproject.toml")
+    # uv-managed projects do not need pip-named tooling. pip-audit drags in
+    # `pip` itself as a transitive dependency, which historically introduced
+    # the only vulnerability `uv audit` reported on this project.  The
+    # contract: no pip-named dev tool may appear in either dev surface
+    # (the optional-dependencies dev extra or the dependency-groups dev
+    # group); use `uv audit` and uv-native commands instead.
+    assert "pip-audit" not in pyproject
+    assert "pip-tools" not in pyproject
+    assert '"pip"' not in pyproject  # bare pip pin
+    assert "pipenv" not in pyproject
+
+
+def test_changelog_is_release_please_managed() -> None:
+    """CHANGELOG.md must be the un-edited release-please artifact.
+
+    Manual edits to CHANGELOG.md drift away from the lockstep
+    commit-history -> changelog mapping that release-please maintains and
+    silently break the next release PR.  Hand-written headers from older
+    Keep-a-Changelog templates (`### Added`, `### Changed`, `### Removed`,
+    `### Deprecated`, `### Security`, `[Unreleased]`) are the canonical
+    fingerprint of manual content; their absence proves that
+    release-please is the only writer.
+
+    The pre-commit hook ``block-manual-changelog`` blocks fresh
+    hand-edits at commit time; this test catches drift that lands by
+    other means (rebase, force-push, tooling regression).
+    """
+    changelog = _read("CHANGELOG.md")
+
+    forbidden_keep_a_changelog = (
+        "### Added",
+        "### Changed",
+        "### Removed",
+        "### Deprecated",
+        "### Security",
+        "## [Unreleased]",
+        "## Unreleased",
+    )
+    leaked = [marker for marker in forbidden_keep_a_changelog if marker in changelog]
+    assert not leaked, (
+        f"CHANGELOG.md contains manual Keep-a-Changelog markers {leaked}; "
+        "release-please does not emit those headings.  Remove them and "
+        "let release-please regenerate the file."
+    )
+
+    # Every release entry must follow the release-please header shape:
+    # `## [vX.Y.Z](compare-link) (yyyy-mm-dd)`.  A bare `## X.Y.Z` (no
+    # compare link, no date) is a hand-written entry.
+    release_headers = re.findall(r"(?m)^## .+$", changelog)
+    bad = [h for h in release_headers if not re.match(r"^## \[\d", h)]
+    assert not bad, (
+        f"CHANGELOG.md has non-release-please section headers: {bad}.  "
+        "Every release header must be `## [vX.Y.Z](compare) (date)` as "
+        "emitted by release-please-action."
+    )
+
+
+def test_pre_commit_blocks_manual_changelog_edits() -> None:
+    """The pre-commit gate against manual CHANGELOG.md edits must be wired.
+
+    Without this hook nothing prevents a developer from staging a
+    handwritten changelog entry alongside a code change; the gate is
+    what makes "release-please owns CHANGELOG.md" actually enforceable
+    on the local commit path.
+    """
+    config = _load_yaml(".pre-commit-config.yaml")
+    hook_ids = {
+        hook.get("id")
+        for repo in config.get("repos", [])
+        for hook in repo.get("hooks", [])
+    }
+    assert "block-manual-changelog" in hook_ids, (
+        "Missing pre-commit hook `block-manual-changelog`; CHANGELOG.md "
+        "must be writable only by release-please-action in CI."
+    )
+
+    raw = _read(".pre-commit-config.yaml")
+    # The hook only fires for CHANGELOG.md (release-please artifact).
+    assert "^CHANGELOG\\.md$" in raw
 
 
 def test_lint_all_runs_every_validation_surface() -> None:

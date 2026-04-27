@@ -130,7 +130,7 @@ jobs:
         run: just prod vault check all
 
   dependency-audit:
-    name: Dependency Audit (pip-audit)
+    name: Dependency Audit (uv audit)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
