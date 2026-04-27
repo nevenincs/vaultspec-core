@@ -117,7 +117,36 @@ def _literal_representer(dumper: yaml.Dumper, data: _LiteralStr) -> yaml.ScalarN
     return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
 
 
-yaml.add_representer(_LiteralStr, _literal_representer)
+_literal_representer_registered = False
+_literal_representer_lock = threading.Lock()
+
+
+def _ensure_literal_representer() -> None:
+    """Register :func:`_literal_representer` with PyYAML on first use.
+
+    Performing this registration lazily (rather than at module import)
+    prevents a partially broken or missing PyYAML install from taking the
+    framework down during ``import vaultspec_core.core``: every CLI entry
+    point and downstream package depends on that import succeeding so
+    ``spec doctor`` and ``install --upgrade`` can diagnose and repair a
+    degraded environment.  See GitHub issue #85.
+
+    Uses double-checked locking so that two threads calling
+    :func:`_yaml_dump` concurrently for the first time both observe a
+    registered representer without either of them entering the critical
+    section twice.  ``yaml.add_representer`` mutates a class-level
+    ``Dumper.yaml_representers`` dict, and although the GIL serialises
+    each individual dict assignment in CPython, the lock is the right
+    contract for non-CPython runtimes and free-threaded builds.
+    """
+    global _literal_representer_registered
+    if _literal_representer_registered:
+        return
+    with _literal_representer_lock:
+        if _literal_representer_registered:
+            return
+        yaml.add_representer(_LiteralStr, _literal_representer)
+        _literal_representer_registered = True
 
 
 def _yaml_dump(data: dict[str, Any]) -> str:
@@ -130,6 +159,7 @@ def _yaml_dump(data: dict[str, Any]) -> str:
         YAML string representation with multi-line string values rendered as
         literal block scalars (``|``).
     """
+    _ensure_literal_representer()
     prepared = {}
     for k, v in data.items():
         if isinstance(v, str) and "\n" in v:
