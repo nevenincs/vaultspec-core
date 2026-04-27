@@ -206,15 +206,20 @@ _dev-audit-help:
   @echo "  deps      Run uv audit on locked dependencies"
 
 # uv audit is the uv-native vulnerability scanner; --preview-features audit
-# silences its experimental warning.  The wrapper greps for the clean-summary
-# line ("Found no known vulnerabilit..." or "Found 0 ...") because uv 0.10.x
-# exits 0 even when advisories are present; drop the wrapper once
-# `uv audit --strict` (or equivalent) ships and exits non-zero on findings.
+# silences its experimental warning.  The audit's default scope already
+# includes the project plus the default dependency groups (dev), which is
+# all groups in this project, so we don't pass --all-groups: that flag was
+# accepted by uv 0.10.x but rejected by 0.11.x where the in-flight audit
+# CLI tightened to single-group selection.  The wrapper greps for the
+# clean-summary line ("Found no known vulnerabilit..." or "Found 0 ...")
+# because uv 0.10.x/0.11.x exit 0 even when advisories are present; drop
+# the wrapper once `uv audit --strict` (or equivalent) ships and exits
+# non-zero on findings.
 _dev-audit-deps:
   @{{ if os() == "windows" { \
-    "$out = uv audit --preview-features audit --frozen --all-groups 2>&1 | Out-String; Write-Host $out; if ($out -notmatch 'Found (no|0) known vulnerabilit') { exit 1 }" \
+    "$out = uv audit --preview-features audit --frozen 2>&1 | Out-String; Write-Host $out; if ($out -notmatch 'Found (no|0) known vulnerabilit') { exit 1 }" \
   } else { \
-    "out=$(uv audit --preview-features audit --frozen --all-groups 2>&1); printf '%s\\n' \"$out\"; printf '%s\\n' \"$out\" | grep -Eq 'Found (no|0) known vulnerabilit' || exit 1" \
+    "out=$(uv audit --preview-features audit --frozen 2>&1); printf '%s\\n' \"$out\"; printf '%s\\n' \"$out\" | grep -Eq 'Found (no|0) known vulnerabilit' || exit 1" \
   } }}
 
 # ---------------------------------------------------------------------------

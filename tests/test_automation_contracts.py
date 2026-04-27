@@ -79,13 +79,16 @@ def test_justfile_exposes_approved_targets() -> None:
 def test_dependency_audit_uses_uv_native_scanner() -> None:
     justfile = _read("justfile")
     # The supply-chain gate must run uv's native auditor against the
-    # frozen lockfile, with all groups in scope, so dev-only deps cannot
-    # smuggle in vulnerabilities. The legacy pip-audit toolchain (and the
-    # transitive `pip` it dragged in) must not reappear.
+    # frozen lockfile.  The default scope already covers the project plus
+    # the default dependency groups (dev), so we deliberately do not pin
+    # any group-selection flag here: --all-groups was accepted by uv
+    # 0.10.x but rejected by 0.11.x, and breaking CI on a uv minor bump
+    # is exactly the brittleness this audit is meant to prevent.  The
+    # legacy pip-audit toolchain (and the transitive `pip` it dragged
+    # in) must not reappear.
     assert "uv audit" in justfile
     assert "--preview-features audit" in justfile
     assert "--frozen" in justfile
-    assert "--all-groups" in justfile
     assert "pip-audit" not in justfile
     assert "uv run pip-audit" not in justfile
 
