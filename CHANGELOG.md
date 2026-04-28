@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.16](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.15...vaultspec-core-v0.1.16) (2026-04-27)
+
+
+### Bug Fixes
+
+* **#88:** drop env-var bypass, gate dev-mode on explicit --dev flag ([#89](https://github.com/wgergely/vaultspec-core/issues/89)) ([2277331](https://github.com/wgergely/vaultspec-core/commit/2277331774361507cc5a9859bf8ae2fc97b6bf0b))
+
 ## [0.1.15](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.14...vaultspec-core-v0.1.15) (2026-04-27)
 
 
