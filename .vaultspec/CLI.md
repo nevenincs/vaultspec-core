@@ -227,7 +227,7 @@ ______________________________________________________________________
 vaultspec-core vault feature index [OPTIONS]
 ```
 
-Generate or update `<feature>.index.md` files at the vault root. Each index links to every document sharing that feature tag, making implicit feature clusters explicit in the graph.
+Generate or update `<feature>.index.md` files in `.vault/index/`. Each index links to every document sharing that feature tag, making implicit feature clusters explicit in the graph. Indexes carry the `#index` directory tag plus the feature tag and are auto-managed.
 
 #### Options
 
