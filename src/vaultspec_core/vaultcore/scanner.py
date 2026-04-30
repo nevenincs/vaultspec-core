@@ -111,7 +111,6 @@ def get_doc_type(path: pathlib.Path, root_dir: pathlib.Path) -> DocType | None:
 
     cfg = get_config()
     docs_dir = root_dir / cfg.docs_dir
-    index_dir_name = cfg.index_dir
     try:
         rel_path = path.relative_to(docs_dir)
         if len(rel_path.parts) < 2:
@@ -123,10 +122,11 @@ def get_doc_type(path: pathlib.Path, root_dir: pathlib.Path) -> DocType | None:
                 return DocType.INDEX
             logger.debug("File has fewer than 2 path parts: %s", rel_path)
             return None
-        first = rel_path.parts[0]
-        if first == index_dir_name and path.name.endswith(".index.md"):
-            return DocType.INDEX
-        doc_type = DocType(first)
+        # ``DocType("index")`` resolves to :attr:`DocType.INDEX`, so the
+        # canonical ``index/`` subfolder is classified by the same enum
+        # lookup that handles every other typed subdirectory; no special
+        # case is required here.
+        doc_type = DocType(rel_path.parts[0])
         logger.debug("Determined doc type %s for %s", doc_type, path.name)
         return doc_type
     except (ValueError, KeyError) as e:
