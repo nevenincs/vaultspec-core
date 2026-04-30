@@ -51,6 +51,7 @@ class TestVaultSpecConfig:
         cfg = get_config()
         assert cfg.target_dir == Path.cwd()
         assert cfg.docs_dir == ".vault"
+        assert cfg.index_dir == "index"
         assert cfg.framework_dir == ".vaultspec"
         assert cfg.io_buffer_size == 8192
         assert cfg.terminal_output_limit == 1_000_000
@@ -58,6 +59,7 @@ class TestVaultSpecConfig:
     def test_storage_defaults(self, clean_config):
         cfg = get_config()
         assert cfg.docs_dir == ".vault"
+        assert cfg.index_dir == "index"
         assert cfg.framework_dir == ".vaultspec"
         assert cfg.antigravity_dir == ".agents"
 
@@ -66,9 +68,36 @@ class TestVaultSpecConfig:
         cfg = VaultSpecConfig()
         for attr in [
             "docs_dir",
+            "index_dir",
             "framework_dir",
         ]:
             assert isinstance(getattr(cfg, attr), str)
+
+    def test_index_dir_from_environment(self):
+        old_index = os.environ.get("VAULTSPEC_INDEX_DIR")
+        os.environ["VAULTSPEC_INDEX_DIR"] = "custom_index"
+        try:
+            cfg = VaultSpecConfig.from_environment()
+            assert cfg.index_dir == "custom_index"
+        finally:
+            if old_index is None:
+                os.environ.pop("VAULTSPEC_INDEX_DIR", None)
+            else:
+                os.environ["VAULTSPEC_INDEX_DIR"] = old_index
+
+    def test_index_dir_override_precedence(self):
+        old = os.environ.get("VAULTSPEC_INDEX_DIR")
+        os.environ["VAULTSPEC_INDEX_DIR"] = "env_index"
+        try:
+            cfg = VaultSpecConfig.from_environment(
+                overrides={"index_dir": "manual_index"}
+            )
+            assert cfg.index_dir == "manual_index"
+        finally:
+            if old is None:
+                os.environ.pop("VAULTSPEC_INDEX_DIR", None)
+            else:
+                os.environ["VAULTSPEC_INDEX_DIR"] = old
 
     def test_from_environment(self):
         old_docs = os.environ.get("VAULTSPEC_DOCS_DIR")

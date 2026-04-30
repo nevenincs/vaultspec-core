@@ -89,28 +89,44 @@ def list_features(root_dir: pathlib.Path) -> set[str]:
 
 
 def get_doc_type(path: pathlib.Path, root_dir: pathlib.Path) -> DocType | None:
-    """Determine the DocType of a vault file based on its parent directory.
+    """Determine the :class:`DocType` of a vault file from its parent directory.
+
+    Index files are recognised in two ways. The canonical case is a file
+    inside the configured index subdirectory (``docs_dir/index_dir/``).
+    The legacy case is a root-level ``<feature>.index.md`` file at
+    ``docs_dir/`` itself; this is preserved as a backwards-compatible
+    classification path so vaults that have not yet run the migration
+    still report sensibly.
 
     Args:
         path: Absolute path to the vault document.
         root_dir: Project root used to resolve the docs directory prefix.
 
     Returns:
-        The ``DocType`` inferred from the first path component relative to the
-        docs directory, or ``None`` if the path does not match any known type.
+        The :class:`DocType` inferred from the first path component
+        relative to the docs directory, or ``None`` if the path does not
+        match any known type.
     """
     from ..config import get_config
 
-    docs_dir = root_dir / get_config().docs_dir
+    cfg = get_config()
+    docs_dir = root_dir / cfg.docs_dir
+    index_dir_name = cfg.index_dir
     try:
         rel_path = path.relative_to(docs_dir)
         if len(rel_path.parts) < 2:
-            # Root-level files: check for feature index pattern
+            # Root-level legacy index files are still recognised so that
+            # unmigrated vaults classify them correctly until
+            # ``vault check structure --fix`` relocates them.
             if path.name.endswith(".index.md"):
+                logger.debug("Legacy root-level index file detected: %s", path.name)
                 return DocType.INDEX
             logger.debug("File has fewer than 2 path parts: %s", rel_path)
             return None
-        doc_type = DocType(rel_path.parts[0])
+        first = rel_path.parts[0]
+        if first == index_dir_name and path.name.endswith(".index.md"):
+            return DocType.INDEX
+        doc_type = DocType(first)
         logger.debug("Determined doc type %s for %s", doc_type, path.name)
         return doc_type
     except (ValueError, KeyError) as e:

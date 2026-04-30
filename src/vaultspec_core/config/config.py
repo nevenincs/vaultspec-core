@@ -86,6 +86,8 @@ class VaultSpecConfig:
         target_dir: The root directory for the workspace (where .vault/ and
             .vaultspec/ live).
         docs_dir: Documentation vault directory name.
+        index_dir: Subdirectory of :attr:`docs_dir` that holds auto-generated
+            feature index files (``<feature>.index.md``).
         framework_dir: Framework directory name.
         claude_dir: Claude tool directory name.
         gemini_dir: Gemini tool directory name.
@@ -99,6 +101,7 @@ class VaultSpecConfig:
 
     # -- Storage ---------------------------------------------------------------
     docs_dir: str = DirName.VAULT.value
+    index_dir: str = DirName.INDEX.value
     framework_dir: str = DirName.VAULTSPEC.value
 
     # -- Tool directories ------------------------------------------------------
@@ -338,6 +341,16 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
         var_type=str,
         default=DirName.VAULT.value,
         description="Documentation vault directory name.",
+    ),
+    ConfigVariable(
+        env_name="VAULTSPEC_INDEX_DIR",
+        attr_name="index_dir",
+        var_type=str,
+        default=DirName.INDEX.value,
+        description=(
+            "Subdirectory of docs_dir for auto-generated feature index files "
+            "(<feature>.index.md)."
+        ),
     ),
     ConfigVariable(
         env_name="VAULTSPEC_FRAMEWORK_DIR",

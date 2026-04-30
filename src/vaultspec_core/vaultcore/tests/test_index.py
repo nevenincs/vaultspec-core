@@ -82,6 +82,14 @@ class TestGenerateFeatureIndex:
         assert path.exists()
         assert path.name == "f.index.md"
 
+    def test_index_lives_in_index_subfolder(self, tmp_path):
+        nodes = [
+            _node(tmp_path, "d1", "research", "f", "2026-03-01", "R"),
+        ]
+        path = _gen(tmp_path, "f", nodes)
+        assert path.parent == tmp_path / ".vault" / "index"
+        assert path.parent.is_dir()
+
     def test_index_has_correct_frontmatter(self, tmp_path):
         nodes = [
             _node(tmp_path, "d1", "research", "f", "2026-03-01", "R"),
@@ -92,15 +100,16 @@ class TestGenerateFeatureIndex:
         assert "'#f'" in content
         assert "2026-03-23" in content
 
-    def test_index_has_single_feature_tag(self, tmp_path):
+    def test_index_carries_index_directory_tag(self, tmp_path):
         nodes = [
             _node(tmp_path, "x", "adr", "my-feat", "2026-03-01", "X"),
         ]
         path = _gen(tmp_path, "my-feat", nodes)
         content = path.read_text(encoding="utf-8")
-        assert content.count("  - '#") == 1
+        assert "'#index'" in content
         assert "'#my-feat'" in content
-        assert "'#adr'" not in content
+        # Frontmatter contains exactly two #-prefixed tag lines: #index and #<feature>
+        assert content.count("  - '#") == 2
 
     def test_related_contains_all_feature_docs(self, tmp_path):
         nodes = [

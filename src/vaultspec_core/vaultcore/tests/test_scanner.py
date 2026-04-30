@@ -86,3 +86,23 @@ class TestGetDocType:
         audit_files = list((vault_project.root / ".vault" / "audit").glob("*.md"))
         assert audit_files, "Synthetic vault must produce at least one audit doc"
         assert get_doc_type(audit_files[0], vault_project.root) == DocType.AUDIT
+
+    def test_index_subfolder_returns_index(self, vault_project: CorpusManifest):
+        index_dir = vault_project.root / ".vault" / "index"
+        index_dir.mkdir(parents=True, exist_ok=True)
+        index_path = index_dir / "alpha-engine.index.md"
+        index_path.write_text(
+            "---\ngenerated: true\ntags:\n  - '#index'\n  - '#alpha-engine'\n"
+            "date: '2026-04-30'\nrelated: []\n---\n\n# alpha-engine index\n",
+            encoding="utf-8",
+        )
+        assert get_doc_type(index_path, vault_project.root) == DocType.INDEX
+
+    def test_legacy_root_index_returns_index(self, vault_project: CorpusManifest):
+        legacy_path = vault_project.root / ".vault" / "alpha-engine.index.md"
+        legacy_path.write_text(
+            "---\ngenerated: true\ntags:\n  - '#alpha-engine'\n"
+            "date: '2026-04-30'\nrelated: []\n---\n\n# alpha-engine index\n",
+            encoding="utf-8",
+        )
+        assert get_doc_type(legacy_path, vault_project.root) == DocType.INDEX

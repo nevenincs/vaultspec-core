@@ -147,7 +147,13 @@ class FileName(StrEnum):
 
 
 class DirName(StrEnum):
-    """Reserved directory names within the workspace."""
+    """Reserved directory names within the workspace.
+
+    The names prefixed with ``.`` are top-level workspace directories
+    (``.vault``, ``.vaultspec``, provider directories). :attr:`INDEX` is
+    a child directory under :attr:`VAULT` that holds auto-generated
+    feature index files.
+    """
 
     VAULT = ".vault"
     VAULTSPEC = ".vaultspec"
@@ -155,6 +161,7 @@ class DirName(StrEnum):
     GEMINI = ".gemini"
     ANTIGRAVITY = ".agents"
     CODEX = ".codex"
+    INDEX = "index"
 
 
 class ManagedState(StrEnum):

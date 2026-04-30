@@ -1,9 +1,9 @@
 """Generate and update feature index documents.
 
-A feature index is a living ``<feature>.index.md`` file in the vault root
-that makes the implicit feature-tag binding explicit in the document graph.
-It lists all documents sharing a feature tag and links to them via
-``related:`` frontmatter.
+A feature index is a living ``<feature>.index.md`` file under
+``<docs_dir>/<index_dir>/`` that makes the implicit feature-tag binding
+explicit in the document graph. It lists all documents sharing a feature
+tag and links to them via ``related:`` frontmatter.
 """
 
 from __future__ import annotations
@@ -31,9 +31,12 @@ def generate_feature_index(
 ) -> Path:
     """Create or update a feature index file for *feature*.
 
-    The index file lives at ``<docs_dir>/<feature>.index.md`` and contains
-    a ``related:`` field linking to every document tagged with the feature,
-    plus a body listing documents grouped by type.
+    The index file lives at ``<docs_dir>/<index_dir>/<feature>.index.md``
+    and contains a ``related:`` field linking to every document tagged
+    with the feature, plus a body listing documents grouped by type. The
+    rendered frontmatter carries the standard two-tag shape
+    (``#index`` directory tag plus ``#<feature>`` feature tag) and the
+    ``generated: true`` marker.
 
     Args:
         root_dir: Project root directory.
@@ -47,8 +50,10 @@ def generate_feature_index(
     """
     from ..config import get_config
 
-    docs_dir = root_dir / get_config().docs_dir
-    index_path = docs_dir / f"{feature}.index.md"
+    cfg = get_config()
+    docs_dir = root_dir / cfg.docs_dir
+    index_dir = docs_dir / cfg.index_dir
+    index_path = index_dir / f"{feature}.index.md"
     date = date_str or datetime.now().strftime("%Y-%m-%d")
 
     # Build related links from all feature nodes (excluding self)
@@ -86,6 +91,7 @@ def generate_feature_index(
         f"---\n"
         f"generated: true\n"
         f"tags:\n"
+        f"  - '#index'\n"
         f"  - '#{feature}'\n"
         f"date: '{date}'\n"
         f"{related_block}\n"
@@ -102,7 +108,7 @@ def generate_feature_index(
 
     from ..core.helpers import atomic_write
 
-    docs_dir.mkdir(parents=True, exist_ok=True)
+    index_dir.mkdir(parents=True, exist_ok=True)
     atomic_write(index_path, content)
     logger.info("Generated feature index: %s", index_path)
     return index_path
