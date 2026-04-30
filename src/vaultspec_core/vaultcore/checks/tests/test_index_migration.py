@@ -142,6 +142,30 @@ class TestEnsureIndexDirectoryTag:
         without_crlf = after.replace("\r\n", "")
         assert "\n" not in without_crlf
 
+    def test_does_not_treat_index_substring_as_already_present(self):
+        # A tag like ``#index-notes`` contains the literal string
+        # ``#index`` but is a different tag. A naive substring check
+        # would set ``has_index_tag = True`` and skip the mandatory
+        # insertion. The tag detection must compare the captured
+        # value exactly.
+        before = (
+            "---\n"
+            "generated: true\n"
+            "tags:\n"
+            "  - '#index-notes'\n"
+            "  - '#my-feat'\n"
+            "date: '2026-04-30'\n"
+            "related: []\n"
+            "---\n\n"
+            "# body\n"
+        )
+        after, changed = _ensure_index_directory_tag(before)
+        assert changed is True, (
+            "#index-notes is a different tag; #index must still be inserted"
+        )
+        assert "  - '#index'\n" in after
+        assert "  - '#index-notes'\n" in after
+
     def test_preserves_lf_newline_convention(self):
         before = (
             "---\n"

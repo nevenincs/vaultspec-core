@@ -444,6 +444,13 @@ def _rewrite_incoming_refs(
 
 _INDEX_TAG = "#index"
 
+# Match a YAML block-sequence tag entry and capture the tag value
+# (with or without surrounding quotes). Anchored to the line start so
+# stray free-text occurrences in the body never match. The trailing
+# ``\s*$`` is intentional - tags entries that carry inline comments
+# would not validate under the project's frontmatter rules.
+_TAG_ENTRY_RE = re.compile(r"""^\s*-\s*['"]?(#[\w-]+)['"]?\s*$""")
+
 
 def _ensure_index_directory_tag(content: str) -> tuple[str, bool]:
     """Insert ``#index`` into the YAML ``tags:`` block if missing.
@@ -492,7 +499,12 @@ def _ensure_index_directory_tag(content: str) -> tuple[str, bool]:
                 bullet = line.lstrip()
                 if bullet.startswith("-"):
                     tag_indent = line[: len(line) - len(bullet)]
-                    if _INDEX_TAG in line:
+                    # Compare the captured tag value exactly so a
+                    # tag like ``#index-notes`` does not falsely
+                    # signal that the directory tag ``#index`` is
+                    # already present.
+                    tag_match = _TAG_ENTRY_RE.match(line)
+                    if tag_match and tag_match.group(1) == _INDEX_TAG:
                         has_index_tag = True
                 continue
             # End of tags block: plant before this non-tag line.
