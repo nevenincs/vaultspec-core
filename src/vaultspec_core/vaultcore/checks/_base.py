@@ -106,9 +106,16 @@ def is_generated_index(path: Path) -> bool:
     """Return ``True`` if *path* is a generated feature index file.
 
     Index files follow the ``<feature>.index.md`` naming convention and
-    live in the vault root.  They are exempt from most checkers because
-    they have a non-standard frontmatter shape (single feature tag, no
-    directory tag, ``generated: true``).
+    live under ``<docs_dir>/<index_dir>/`` (canonical) or, in
+    unmigrated vaults, at the docs root. They are exempt from most
+    checkers because they have a non-standard frontmatter shape
+    (``generated: true``, ``#index`` directory tag plus the feature
+    tag).
+
+    The check is intentionally filename-only and folder-agnostic: a
+    file dropped into the wrong directory by mistake is surfaced as a
+    misplaced-index ERROR by ``vault check structure`` rather than
+    being silently exempted by the other checkers.
 
     Args:
         path: Absolute or relative path to test.
