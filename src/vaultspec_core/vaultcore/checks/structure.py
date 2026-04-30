@@ -506,7 +506,12 @@ def _ensure_index_directory_tag(content: str) -> tuple[str, bool]:
         # will surface an ERROR diagnostic.
         return content, False
 
-    new_line = f"{tag_indent}- '{_INDEX_TAG}'\n"
+    # Preserve the source file's newline convention. Mixed CRLF/LF
+    # inside one file is what we want to avoid - if the document is
+    # CRLF, the inserted tag line must end with \r\n, otherwise the
+    # frontmatter ends up with one stray \n line in a sea of \r\n.
+    newline = "\r\n" if "\r\n" in content else "\n"
+    new_line = f"{tag_indent}- '{_INDEX_TAG}'{newline}"
     new_lines = [*lines[:insert_idx], new_line, *lines[insert_idx:]]
     return "".join(new_lines), True
 
@@ -517,16 +522,26 @@ def _migrate_legacy_root_indexes(
     *,
     fix: bool,
 ) -> None:
-    """Detect and optionally relocate root-level legacy index files.
+    """Detect and optionally relocate misplaced feature index files.
 
-    When *fix* is ``False``, emits one ERROR diagnostic per legacy file
-    with ``fixable=True`` so operators see what ``--fix`` would change.
+    Scans the entire docs tree for ``*.index.md`` files that do not live
+    in the canonical ``<docs_dir>/<index_dir>/`` subfolder. Files at the
+    docs root are the common legacy case; files dropped into a typed
+    subdirectory (``adr/<feature>.index.md``, ``plan/...``) would
+    otherwise create a "blind spot" because the filename-based
+    :func:`is_generated_index` exempts them from frontmatter and
+    body-link validation - so they would be neither flagged nor fixed
+    without this migration.
 
-    When *fix* is ``True``, moves each legacy ``<feature>.index.md`` from
-    the docs root into ``<docs_dir>/<index_dir>/`` and inserts the
-    ``#index`` directory tag into the YAML frontmatter if missing. The
-    move is atomic (rename); if the target already exists, the migration
-    surfaces an ERROR and leaves the legacy file in place.
+    When *fix* is ``False``, emits one ERROR diagnostic per misplaced
+    file with ``fixable=True`` so operators see what ``--fix`` would
+    change.
+
+    When *fix* is ``True``, moves each misplaced ``<feature>.index.md``
+    into ``<docs_dir>/<index_dir>/`` and inserts the ``#index`` directory
+    tag into the YAML frontmatter if missing. The move is atomic
+    (rename); if the target already exists, the migration surfaces an
+    ERROR and leaves the misplaced file in place.
 
     Args:
         root_dir: Project root directory.
@@ -544,8 +559,8 @@ def _migrate_legacy_root_indexes(
     index_dir = docs_dir / cfg.index_dir
     legacy_files = sorted(
         item
-        for item in docs_dir.iterdir()
-        if item.is_file() and item.name.endswith(".index.md")
+        for item in docs_dir.rglob("*.index.md")
+        if item.is_file() and item.parent != index_dir
     )
     if not legacy_files:
         return
@@ -553,13 +568,19 @@ def _migrate_legacy_root_indexes(
     for legacy in legacy_files:
         rel = legacy.relative_to(root_dir)
         target = index_dir / legacy.name
+        is_root_level = legacy.parent == docs_dir
+        misplacement_label = (
+            f"{cfg.docs_dir}/ root"
+            if is_root_level
+            else str(legacy.parent.relative_to(root_dir)).replace("\\", "/")
+        )
 
         if not fix:
             result.diagnostics.append(
                 CheckDiagnostic(
                     path=rel,
                     message=(
-                        f"Legacy feature index at {cfg.docs_dir}/ root: "
+                        f"Misplaced feature index at {misplacement_label}: "
                         f"'{legacy.name}'. Move to "
                         f"{cfg.docs_dir}/{cfg.index_dir}/."
                     ),
@@ -588,7 +609,12 @@ def _migrate_legacy_root_indexes(
             continue
 
         try:
-            content = legacy.read_text(encoding="utf-8")
+            # Read as bytes so CRLF survives the decode; ``read_text``
+            # silently translates newlines via Python's universal-newline
+            # handling and would clobber the file's line ending
+            # convention before we ever see it.
+            raw = legacy.read_bytes()
+            content = raw.decode("utf-8")
         except (OSError, UnicodeDecodeError) as exc:
             result.diagnostics.append(
                 CheckDiagnostic(
@@ -623,12 +649,13 @@ def _migrate_legacy_root_indexes(
             continue
 
         result.fixed_count += 1
+        legacy_rel = str(legacy.relative_to(root_dir)).replace("\\", "/")
         result.diagnostics.append(
             CheckDiagnostic(
                 path=target.relative_to(root_dir),
                 message=(
-                    f"Relocated legacy index from "
-                    f"{cfg.docs_dir}/{legacy.name} to "
+                    f"Relocated misplaced index from "
+                    f"{legacy_rel} to "
                     f"{cfg.docs_dir}/{cfg.index_dir}/{legacy.name}"
                     + (" (added #index tag)" if changed else "")
                 ),
@@ -636,7 +663,7 @@ def _migrate_legacy_root_indexes(
             )
         )
         logger.info(
-            "Migrated legacy index %s -> %s",
+            "Migrated misplaced index %s -> %s",
             legacy,
             target,
         )
@@ -652,9 +679,10 @@ def check_structure(
 
     Detects unsupported subdirectories in ``.vault/``, files placed directly
     in the ``.vault/`` root, filenames deviating from the
-    ``YYYY-MM-DD-<feature>-<type>.md`` convention, and legacy root-level
-    feature index files. With ``fix=True``, renames mis-suffixed files,
-    inserts missing date prefixes, and relocates legacy
+    ``YYYY-MM-DD-<feature>-<type>.md`` convention, and misplaced feature
+    index files (any ``<feature>.index.md`` outside the configured
+    ``index/`` subfolder). With ``fix=True``, renames mis-suffixed files,
+    inserts missing date prefixes, and relocates misplaced
     ``<feature>.index.md`` files into the configured index subfolder.
 
     Args:
@@ -679,6 +707,13 @@ def check_structure(
         _migrate_legacy_root_indexes(root_dir, result, fix=True)
 
     for msg in VaultConstants.validate_vault_structure(root_dir):
+        # The migration helper below emits one actionable per-file
+        # diagnostic for each misplaced index. The aggregate validator
+        # also produces a pathless message for root-level index files;
+        # drop those so operators see exactly one diagnostic per offence
+        # rather than two messages saying the same thing.
+        if "Legacy feature index" in msg:
+            continue
         result.diagnostics.append(
             CheckDiagnostic(
                 path=None,

@@ -121,6 +121,43 @@ class TestEnsureIndexDirectoryTag:
         assert changed is False
         assert after == content
 
+    def test_preserves_crlf_newline_convention(self):
+        before = (
+            "---\r\n"
+            "generated: true\r\n"
+            "tags:\r\n"
+            "  - '#my-feat'\r\n"
+            "date: '2026-04-30'\r\n"
+            "related: []\r\n"
+            "---\r\n\r\n"
+            "# body\r\n"
+        )
+        after, changed = _ensure_index_directory_tag(before)
+        assert changed is True
+        # The inserted line must end with CRLF, not LF, so the file does
+        # not get mixed line endings.
+        assert "\r\n  - '#index'\r\n" in after
+        # No bare LF must appear outside of CRLF pairs.
+        # (Strip CRLFs first; what remains should have no leftover \n.)
+        without_crlf = after.replace("\r\n", "")
+        assert "\n" not in without_crlf
+
+    def test_preserves_lf_newline_convention(self):
+        before = (
+            "---\n"
+            "generated: true\n"
+            "tags:\n"
+            "  - '#my-feat'\n"
+            "date: '2026-04-30'\n"
+            "related: []\n"
+            "---\n"
+        )
+        after, changed = _ensure_index_directory_tag(before)
+        assert changed is True
+        # No CRLF pair should appear in an originally-LF file.
+        assert "\r\n" not in after
+        assert "\n  - '#index'\n" in after
+
 
 class TestCheckStructureDetectsLegacyIndex:
     def test_reports_error_without_fix(self, tmp_path):
@@ -245,3 +282,141 @@ class TestCheckStructureDetectsLegacyIndex:
         assert legacy_diags == [], (
             "canonical subfolder index must not trigger legacy diagnostics"
         )
+
+    def test_no_duplicate_diagnostic_without_fix(self, tmp_path):
+        # A root-level legacy index used to be reported twice: once by
+        # the aggregate validator (pathless) and once by the per-file
+        # migration helper. Operators saw two messages saying the same
+        # thing. The check_structure pass must surface exactly one
+        # actionable per-file ERROR diagnostic.
+        _vault_with_minimal_skeleton(tmp_path)
+        _write_legacy_index(tmp_path, "alpha")
+
+        graph = VaultGraph(tmp_path)
+        result = check_structure(tmp_path, snapshot=graph.to_snapshot(), fix=False)
+
+        legacy_errors = [
+            d
+            for d in result.diagnostics
+            if d.severity == Severity.ERROR
+            and (
+                "Legacy feature index" in d.message
+                or "Misplaced feature index" in d.message
+            )
+        ]
+        assert len(legacy_errors) == 1, (
+            f"expected exactly one legacy/misplaced diagnostic per offence, "
+            f"got {len(legacy_errors)}: {[d.message for d in legacy_errors]}"
+        )
+        assert legacy_errors[0].path is not None, (
+            "the surviving diagnostic must be the actionable per-file message, "
+            "not the pathless aggregate"
+        )
+        assert legacy_errors[0].fixable is True
+
+
+class TestMigrateMisplacedIndexInSubdir:
+    def test_reports_misplaced_index_in_typed_subdir(self, tmp_path):
+        # An index file misplaced into a typed subdirectory (e.g.
+        # ``adr/<feature>.index.md``) was previously a blind spot: the
+        # filename-based exemption skipped it for frontmatter and
+        # body-link checks while the migration helper only scanned the
+        # docs root. The structure check must now flag it as a fixable
+        # ERROR regardless of which subdir it lives in.
+        _vault_with_minimal_skeleton(tmp_path)
+        misplaced = tmp_path / ".vault" / "adr" / "beta.index.md"
+        misplaced.write_text(
+            "---\ngenerated: true\ntags:\n  - '#beta'\n"
+            "date: '2026-04-30'\nrelated: []\n---\n\n# beta\n",
+            encoding="utf-8",
+        )
+
+        graph = VaultGraph(tmp_path)
+        result = check_structure(tmp_path, snapshot=graph.to_snapshot(), fix=False)
+
+        misplaced_diags = [
+            d
+            for d in result.diagnostics
+            if d.path is not None and d.path.name == misplaced.name
+        ]
+        assert any(d.severity == Severity.ERROR for d in misplaced_diags)
+        assert any(d.fixable for d in misplaced_diags)
+        assert misplaced.exists()
+
+    def test_fix_relocates_misplaced_index_from_typed_subdir(self, tmp_path):
+        _vault_with_minimal_skeleton(tmp_path)
+        misplaced = tmp_path / ".vault" / "plan" / "gamma.index.md"
+        misplaced.write_text(
+            "---\ngenerated: true\ntags:\n  - '#gamma'\n"
+            "date: '2026-04-30'\nrelated: []\n---\n\n# gamma\n",
+            encoding="utf-8",
+        )
+        target = tmp_path / ".vault" / "index" / "gamma.index.md"
+
+        graph = VaultGraph(tmp_path)
+        result = check_structure(tmp_path, snapshot=graph.to_snapshot(), fix=True)
+
+        assert not misplaced.exists()
+        assert target.exists()
+        text = target.read_text(encoding="utf-8")
+        assert "'#index'" in text
+        assert "'#gamma'" in text
+        assert result.fixed_count >= 1
+
+    def test_fix_preserves_crlf_content_during_migration(self, tmp_path):
+        # A misplaced index with CRLF line endings must keep CRLF after
+        # the migration inserts the #index tag. Mixed LF/CRLF inside
+        # the same frontmatter block is the regression we are guarding
+        # against.
+        _vault_with_minimal_skeleton(tmp_path)
+        misplaced = tmp_path / ".vault" / "delta.index.md"
+        misplaced.write_bytes(
+            b"---\r\n"
+            b"generated: true\r\n"
+            b"tags:\r\n"
+            b"  - '#delta'\r\n"
+            b"date: '2026-04-30'\r\n"
+            b"related: []\r\n"
+            b"---\r\n\r\n"
+            b"# delta\r\n"
+        )
+        target = tmp_path / ".vault" / "index" / "delta.index.md"
+
+        graph = VaultGraph(tmp_path)
+        check_structure(tmp_path, snapshot=graph.to_snapshot(), fix=True)
+
+        raw = target.read_bytes()
+        assert b"\r\n  - '#index'\r\n" in raw
+        # No stray LF outside of CRLF pairs anywhere in the migrated file.
+        without_crlf = raw.replace(b"\r\n", b"")
+        assert b"\n" not in without_crlf
+
+    def test_fix_collision_in_subdir_misplacement(self, tmp_path):
+        _vault_with_minimal_skeleton(tmp_path)
+        misplaced = tmp_path / ".vault" / "research" / "epsilon.index.md"
+        misplaced.write_text(
+            "---\ngenerated: true\ntags:\n  - '#epsilon'\n"
+            "date: '2026-04-30'\nrelated: []\n---\n\n# misplaced\n",
+            encoding="utf-8",
+        )
+        target_dir = tmp_path / ".vault" / "index"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target = target_dir / "epsilon.index.md"
+        target.write_text(
+            "---\ngenerated: true\ntags:\n  - '#index'\n  - '#epsilon'\n"
+            "date: '2026-04-30'\nrelated: []\n---\n\n# pre-existing\n",
+            encoding="utf-8",
+        )
+        canonical_before = target.read_text(encoding="utf-8")
+
+        graph = VaultGraph(tmp_path)
+        result = check_structure(tmp_path, snapshot=graph.to_snapshot(), fix=True)
+
+        collision_errors = [
+            d
+            for d in result.diagnostics
+            if d.severity == Severity.ERROR and "already" in d.message
+        ]
+        assert collision_errors
+        assert misplaced.exists()
+        assert target.read_text(encoding="utf-8") == canonical_before

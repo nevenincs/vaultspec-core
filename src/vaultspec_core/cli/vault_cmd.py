@@ -93,7 +93,7 @@ def cmd_add(
     """
     apply_target(target)
     import re
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     from vaultspec_core.console import get_console
     from vaultspec_core.core.types import get_context as _get_ctx
@@ -129,8 +129,9 @@ def cmd_add(
         )
         raise typer.Exit(code=1)
 
-    # Default date to today
-    date_str = date or datetime.now().strftime("%Y-%m-%d")
+    # Default date to today (UTC so vault doc dates stay deterministic
+    # across runners regardless of the operator's local timezone).
+    date_str = date or datetime.now(UTC).strftime("%Y-%m-%d")
 
     # Validate extra tags format
     extra_tags: list[str] | None = None

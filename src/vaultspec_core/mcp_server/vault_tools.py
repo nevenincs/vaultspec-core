@@ -230,7 +230,10 @@ def register_tools(mcp: FastMCP) -> None:
         )
 
         doc_type_str = type or "research"
-        today = date or datetime.date.today().isoformat()
+        # Default to UTC-derived date so MCP-driven creation matches
+        # the CLI ``vault add`` path and stays stable regardless of the
+        # MCP host's local timezone.
+        today = date or datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d")
         title_raw = (title or feature).strip().lower().replace(" ", "-")
         title_clean = re.sub(r"[/\\]", "-", title_raw).replace("..", "")
         if not re.match(r"^[a-z0-9][a-z0-9-]*$", title_clean):
