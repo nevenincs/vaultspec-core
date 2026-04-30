@@ -902,10 +902,10 @@ def cmd_feature_index(
 ) -> None:
     """Generate or update feature index documents.
 
-    Creates a <feature>.index.md in the vault root for each feature tag
-    (or a specific one with --feature). The index links to all documents
-    sharing that feature tag, making implicit feature clusters explicit
-    in the graph.
+    Writes a ``<feature>.index.md`` into ``.vault/index/`` for each
+    feature tag (or a specific one with ``--feature``). Each index links
+    to all documents sharing that feature tag, making implicit feature
+    clusters explicit in the graph.
     """
     apply_target(target)
     from vaultspec_core.console import get_console

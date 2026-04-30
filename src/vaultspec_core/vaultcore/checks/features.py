@@ -39,7 +39,14 @@ def _index_exists_for(
     feat_name: str,
     snapshot: VaultSnapshot,
 ) -> bool:
-    """Return ``True`` if a ``<feat_name>.index.md`` exists in the snapshot."""
+    """Return ``True`` when an index file for *feat_name* exists.
+
+    The check is filename-based and folder-agnostic so both legacy
+    root-level indexes and the canonical ``index/`` subfolder layout
+    satisfy the predicate. The migration auto-fix relocates legacy
+    files; until it runs they still count as existing for staleness
+    purposes.
+    """
     return any(doc_path.name == f"{feat_name}.index.md" for doc_path in snapshot)
 
 
@@ -164,9 +171,9 @@ def check_features(
                 CheckDiagnostic(
                     path=None,
                     message=(
-                        f"Feature '{feat_name}' has no feature index. "
-                        f"Run vault feature index to generate "
-                        f"{feat_name}.index.md"
+                        f"Feature '{feat_name}' has no feature index. Run "
+                        "vault feature index to generate "
+                        f"index/{feat_name}.index.md"
                     ),
                     severity=Severity.WARNING,
                     fix_description=(f"vault feature index -f {feat_name}"),

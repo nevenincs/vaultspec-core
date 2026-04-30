@@ -26,11 +26,24 @@ _ROOT = Path("/fake/root")
 
 def _index_snapshot(
     feature: str = "my-feat",
+    *,
+    legacy: bool = False,
 ) -> VaultSnapshot:
-    """Build a snapshot containing one generated index file."""
-    doc_path = _ROOT / ".vault" / f"{feature}.index.md"
+    """Build a snapshot containing one generated index file.
+
+    Args:
+        feature: Feature name (without ``#`` prefix).
+        legacy: When ``True``, place the index at the docs root (legacy
+            location). Otherwise place it under ``index/`` (canonical).
+    """
+    if legacy:
+        doc_path = _ROOT / ".vault" / f"{feature}.index.md"
+        tags = [f"#{feature}"]
+    else:
+        doc_path = _ROOT / ".vault" / "index" / f"{feature}.index.md"
+        tags = ["#index", f"#{feature}"]
     metadata = DocumentMetadata(
-        tags=[f"#{feature}"],
+        tags=tags,
         date="2026-03-23",
         related=["[[doc-a]]", "[[doc-b]]"],
     )
@@ -66,12 +79,23 @@ class TestIsGeneratedIndex:
         p = Path("/project/.vault/my-feat.index.md")
         assert is_generated_index(p)
 
+    def test_detects_under_index_subfolder(self):
+        p = Path("/project/.vault/index/my-feat.index.md")
+        assert is_generated_index(p)
+
 
 class TestFrontmatterSkipsIndex:
     def test_index_file_not_flagged(self):
         from ..frontmatter import check_frontmatter
 
         snapshot = _index_snapshot()
+        result = check_frontmatter(_ROOT, snapshot=snapshot)
+        assert result.is_clean
+
+    def test_legacy_root_index_also_skipped(self):
+        from ..frontmatter import check_frontmatter
+
+        snapshot = _index_snapshot(legacy=True)
         result = check_frontmatter(_ROOT, snapshot=snapshot)
         assert result.is_clean
 
@@ -117,6 +141,13 @@ class TestBodyLinksSkipsIndex:
         result = check_body_links(_ROOT, snapshot=snapshot)
         assert result.is_clean
 
+    def test_legacy_root_index_wiki_links_not_flagged(self):
+        from ..body_links import check_body_links
+
+        snapshot = _index_snapshot(legacy=True)
+        result = check_body_links(_ROOT, snapshot=snapshot)
+        assert result.is_clean
+
 
 class TestFeaturesDetectsMissingIndex:
     def test_warns_when_no_index_exists(self):
@@ -139,6 +170,19 @@ class TestFeaturesDetectsMissingIndex:
         snapshot: VaultSnapshot = {
             **_normal_snapshot(),
             **_index_snapshot(),
+        }
+        result = check_features(_ROOT, snapshot=snapshot)
+        missing_diags = [
+            d for d in result.diagnostics if "no feature index" in d.message
+        ]
+        assert len(missing_diags) == 0
+
+    def test_no_warning_when_legacy_root_index_exists(self):
+        from ..features import check_features
+
+        snapshot: VaultSnapshot = {
+            **_normal_snapshot(),
+            **_index_snapshot(legacy=True),
         }
         result = check_features(_ROOT, snapshot=snapshot)
         missing_diags = [
