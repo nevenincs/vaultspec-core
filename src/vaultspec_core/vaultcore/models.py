@@ -86,10 +86,10 @@ class DocumentMetadata:
         #  Directory Tag (Type)
         dir_tags = [t for t in self.tags if DocType.from_tag(t)]
         if len(dir_tags) != 1:
+            allowed = ", ".join(sorted(dt.tag for dt in DocType))
             msg = (
                 "Vault violation: Exactly one directory tag required "
-                "(#adr, #audit, #exec, #plan, #reference, #research). "
-                f"Found: {dir_tags}"
+                f"({allowed}). Found: {dir_tags}"
             )
             errors.append(msg)
 

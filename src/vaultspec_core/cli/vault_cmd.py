@@ -111,11 +111,20 @@ def cmd_add(
     try:
         dt = DocType(doc_type)
     except ValueError:
-        valid = ", ".join(d.value for d in DocType)
+        # Index is auto-generated and is not user-creatable; surface
+        # it explicitly as a non-option here so the error message
+        # matches the rest of the docs surface.
+        valid = ", ".join(d.value for d in DocType if d is not DocType.INDEX)
         console.print(
             f"[red]Unknown document type '{doc_type}'. Valid types: {valid}[/red]"
         )
         raise typer.Exit(code=1) from None
+    if dt is DocType.INDEX:
+        console.print(
+            "[red]'index' documents are auto-generated. "
+            "Use 'vault feature index' instead of 'vault add index'.[/red]"
+        )
+        raise typer.Exit(code=1)
 
     # Validate feature tag
     feat = feature.lstrip("#").strip()

@@ -115,7 +115,11 @@ class TestAddSubcommand:
     def test_add_valid_doc_types_accepted(
         self, runner, tmp_path: Path, synthetic_project
     ):
-        """Test all valid DocType choices are accepted.
+        """Test all user-creatable DocType choices are accepted.
+
+        ``DocType.INDEX`` is auto-generated and not user-creatable; the
+        ``vault add`` surface rejects it with an explicit error so this
+        test exercises only the authored types.
 
         Uses real templates via seed_builtins - never shadow template files.
         """
@@ -144,6 +148,8 @@ class TestAddSubcommand:
         init_paths(tmp_path)
 
         for dt in DocType:
+            if dt is DocType.INDEX:
+                continue
             result = runner.invoke(
                 app,
                 [
@@ -159,6 +165,46 @@ class TestAddSubcommand:
             assert result.exit_code == 0, (
                 f"DocType {dt.value} rejected (output: {result.output})"
             )
+
+    def test_add_index_type_is_rejected(
+        self, runner, tmp_path: Path, synthetic_project
+    ):
+        """``vault add index`` must redirect users to ``vault feature index``.
+
+        Index files are auto-generated; allowing ``vault add`` to write
+        one would put the file at the wrong filename
+        (``<date>-<feature>-index.md`` instead of
+        ``<feature>.index.md``) and bypass the generator's bookkeeping.
+        """
+        from vaultspec_core.builtins import seed_builtins
+        from vaultspec_core.core.types import init_paths
+
+        rules_dir = tmp_path / ".vaultspec" / "rules"
+        rules_dir.mkdir(parents=True)
+        seed_builtins(rules_dir, force=True)
+        for dt in DocType:
+            (tmp_path / ".vault" / dt.value).mkdir(parents=True, exist_ok=True)
+        init_paths(tmp_path)
+
+        result = runner.invoke(
+            app,
+            [
+                "--target",
+                str(tmp_path),
+                "vault",
+                "add",
+                "index",
+                "--feature",
+                "rejected-feature",
+            ],
+        )
+        assert result.exit_code != 0
+        assert "auto-generated" in result.output
+        assert "vault feature index" in result.output
+        # No .vault/index/<...>.md file should have been written.
+        index_dir = tmp_path / ".vault" / "index"
+        if index_dir.is_dir():
+            assert not any(index_dir.iterdir())
 
     def test_add_created_doc_passes_validation(self, runner, synthetic_project):
         """Created documents must pass the project's own frontmatter validation."""
