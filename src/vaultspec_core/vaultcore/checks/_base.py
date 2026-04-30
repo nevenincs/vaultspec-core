@@ -107,15 +107,27 @@ def is_generated_index(path: Path) -> bool:
 
     Index files follow the ``<feature>.index.md`` naming convention and
     live under ``<docs_dir>/<index_dir>/`` (canonical) or, in
-    unmigrated vaults, at the docs root. They are exempt from most
-    checkers because they have a non-standard frontmatter shape
-    (``generated: true``, ``#index`` directory tag plus the feature
-    tag).
+    unmigrated vaults, at the docs root.
+
+    Post-#91 indexes carry the standard two-tag shape (``#index``
+    directory tag plus the feature tag) and run through frontmatter
+    validation like every other document, so ``frontmatter`` no longer
+    consults this predicate. The exemption is still used by checkers
+    whose semantics genuinely differ for indexes:
+
+    - ``body-links`` skips them because their body legitimately lists
+      vault documents as a generated inventory (wiki-links in body
+      text are intentional, not violations).
+    - ``orphans`` skips them because indexes have only outgoing links
+      by design and would otherwise always register as orphans.
+    - ``features`` and ``structure`` use the predicate to distinguish
+      generated indexes from authored documents during their own
+      bookkeeping rather than to bypass validation.
 
     The check is intentionally filename-only and folder-agnostic: a
     file dropped into the wrong directory by mistake is surfaced as a
     misplaced-index ERROR by ``vault check structure`` rather than
-    being silently exempted by the other checkers.
+    being silently exempted.
 
     Args:
         path: Absolute or relative path to test.

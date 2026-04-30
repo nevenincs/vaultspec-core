@@ -1,8 +1,16 @@
 """Tests verifying all checkers handle generated index files correctly.
 
-Index files (``<feature>.index.md``) have non-standard frontmatter:
-single feature tag, no directory tag, ``generated: true``.  Every
-checker must either skip them or handle them gracefully.
+Post-#91 index files (``<feature>.index.md``) carry the standard
+two-tag shape (``#index`` directory tag plus the feature tag) and the
+``generated: true`` content marker. Frontmatter validation runs on
+them like every other document. Other checkers continue to special-
+case indexes for semantic reasons that have nothing to do with
+frontmatter shape:
+
+- ``body-links`` skips them because their body legitimately contains
+  wiki-links to feature docs (the auto-generated inventory).
+- ``orphans`` skips them because indexes have only outgoing links by
+  design.
 """
 
 from __future__ import annotations
@@ -84,20 +92,34 @@ class TestIsGeneratedIndex:
         assert is_generated_index(p)
 
 
-class TestFrontmatterSkipsIndex:
-    def test_index_file_not_flagged(self):
+class TestFrontmatterIndexValidation:
+    """Indexes carry the standard two-tag shape post-#91 and run
+    through frontmatter validation like every other document.
+    """
+
+    def test_canonical_index_frontmatter_passes(self):
+        # A canonical post-migration index has two tags
+        # (#index + #feature), valid date, and well-formed related
+        # entries; the frontmatter checker must report it clean.
         from ..frontmatter import check_frontmatter
 
         snapshot = _index_snapshot()
         result = check_frontmatter(_ROOT, snapshot=snapshot)
         assert result.is_clean
 
-    def test_legacy_root_index_also_skipped(self):
+    def test_legacy_root_index_frontmatter_flagged(self):
+        # An unmigrated legacy root-level index carries only one tag
+        # (the feature tag, missing #index). The exemption used to
+        # silence this; per ADR alignment indexes are no longer
+        # exempt and the missing directory tag must surface.
         from ..frontmatter import check_frontmatter
 
         snapshot = _index_snapshot(legacy=True)
         result = check_frontmatter(_ROOT, snapshot=snapshot)
-        assert result.is_clean
+        assert not result.is_clean
+        # The actionable diagnostic is the "exactly one directory tag"
+        # message - the legacy file has zero, not one.
+        assert any("directory tag" in d.message.lower() for d in result.diagnostics)
 
     def test_normal_doc_still_checked(self):
         from ..frontmatter import check_frontmatter

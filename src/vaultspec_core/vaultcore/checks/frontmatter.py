@@ -18,7 +18,6 @@ from ._base import (
     Severity,
     VaultSnapshot,
     extract_feature_tags,
-    is_generated_index,
 )
 
 if TYPE_CHECKING:
@@ -146,7 +145,11 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
     rendered = leading_whitespace + "\n".join(lines)
     # Restore the source file's newline convention. Internal LFs that
     # came from the body group also need promoting so the file does
-    # not end up with mixed endings.
+    # not end up with mixed endings. ``atomic_write`` writes bytes
+    # (via ``Path.write_bytes`` of the UTF-8-encoded payload), so the
+    # ``\r\n`` sequences below land on disk byte-for-byte; switching to
+    # ``Path.write_text`` would re-enable Python's universal-newline
+    # translation on Windows and corrupt CRLF runs into ``\r\r\n``.
     new_content = (
         rendered if source_newline == "\n" else rendered.replace("\n", source_newline)
     )
@@ -197,10 +200,11 @@ def check_frontmatter(
     result = CheckResult(check_name="frontmatter", supports_fix=True)
 
     for doc_path, (metadata, _body) in snapshot.items():
-        # Skip generated index files (non-standard frontmatter shape)
-        if is_generated_index(doc_path):
-            continue
-
+        # Indexes used to carry a non-standard one-tag frontmatter and
+        # were exempted here; post-#91 they carry the standard two-tag
+        # shape (``#index`` directory tag plus the feature tag) and run
+        # through the same validator as every other document. The ADR
+        # commits to "no more exemptions" at the frontmatter layer.
         if doc_type_filter:
             dt = get_doc_type(doc_path, root_dir)
             if dt and dt.value != doc_type_filter:
