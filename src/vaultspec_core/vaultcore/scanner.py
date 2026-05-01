@@ -130,8 +130,10 @@ def get_doc_type(path: pathlib.Path, root_dir: pathlib.Path) -> DocType | None:
         rel_path = path.relative_to(docs_dir)
         if len(rel_path.parts) < 2:
             # Root-level legacy index files are still recognised so that
-            # unmigrated vaults classify them correctly until
-            # ``vault check structure --fix`` relocates them.
+            # unmigrated vaults classify them correctly until the
+            # schema migration registry relocates them (lazily on the
+            # next vault command, or explicitly via
+            # ``vaultspec-core migrations run``).
             if path.name.endswith(".index.md"):
                 logger.debug("Legacy root-level index file detected: %s", path.name)
                 return DocType.INDEX

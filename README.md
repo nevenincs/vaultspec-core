@@ -132,6 +132,18 @@ Valid document types: `adr`, `audit`, `exec`, `plan`, `reference`, `research`. G
 
 ______________________________________________________________________
 
+## Schema migrations
+
+When a release of `vaultspec-core` changes the on-disk shape of `.vault/`, the new layout is delivered through a versioned migration registry rather than a recurring pre-commit hook. Each registered migration runs once per upgrade and never again. Three triggers cover every consumer path:
+
+- `vaultspec-core install --upgrade` runs every pending migration after re-seeding builtins.
+- Any `vault` subcommand (e.g. `vault add`, `vault feature index`, `vault check`) lazily applies pending migrations before its primary action, so consumers who never run `install --upgrade` still observe the new layout.
+- `vaultspec-core migrations status` and `vaultspec-core migrations run` give explicit control for operators who prefer manual application.
+
+The registry compares each migration's `target_version` against the workspace manifest's `vaultspec_version`; entries whose target exceeds the manifest run in version order, then the manifest version is bumped on success. A migration that raises leaves the manifest version unchanged, so the next invocation re-attempts.
+
+______________________________________________________________________
+
 ## Further reading
 
 | Guide                                      | What it covers                                        |
