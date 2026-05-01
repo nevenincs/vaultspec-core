@@ -330,17 +330,18 @@ class TestGeminiCliLoadsRenderedAgents:
     """Live load test: invoke real `gemini` CLI against rendered agents.
 
     For each source agent under `.vaultspec/rules/agents/`:
-      1. render via `transform_agent(Tool.GEMINI, ...)`
-      2. write the result into a tmp `.gemini/agents/` directory
-      3. invoke `gemini -p "<probe>"` with the tmp dir as CWD - this
-         triggers full session startup, which is the only path that
-         actually validates local agent definitions; ``--version``,
-         ``mcp list``, ``extensions list`` etc. exit before the
-         agentLoader runs.
-      4. assert no `Agent loading error` / `Invalid tool name` lines
+      1. render via :func:`vaultspec_core.core.agents.transform_agent`
+      2. write the result into a tmp ``.gemini/agents/`` directory
+      3. invoke ``gemini --skip-trust skills list`` with the tmp dir as
+         CWD - in current gemini-cli, headless ``-p`` mode short-circuits
+         project-agent loading, so this surface is what actually walks
+         ``.gemini/agents/*.md`` and emits validation errors. The
+         ``--skip-trust`` flag opts the workspace into the loader without
+         requiring per-workspace trust persistence.
+      4. assert no ``Agent loading error`` / ``Invalid tool name`` lines
          appear in the combined stdout/stderr.
 
-    The `@pytest.mark.gemini` marker is the opt-in gate; the test
+    The ``@pytest.mark.gemini`` marker is the opt-in gate; the test
     asserts the binary is present once the marker selects it.
 
     The probe also verifies the bogus agent path actually fails: a
@@ -351,14 +352,12 @@ class TestGeminiCliLoadsRenderedAgents:
     that does not actually load agents.
     """
 
-    _PROBE_PROMPT = "respond with only the word READY"
-
     def _invoke_gemini(self, gemini_bin: str, cwd: Path) -> tuple[str, list[str]]:
         env = os.environ.copy()
         env["NO_COLOR"] = "1"
         env["CI"] = "1"
         result = subprocess.run(
-            [gemini_bin, "-p", self._PROBE_PROMPT],
+            [gemini_bin, "--skip-trust", "skills", "list"],
             cwd=cwd,
             env=env,
             capture_output=True,
