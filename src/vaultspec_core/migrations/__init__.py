@@ -307,6 +307,12 @@ def run_pending_migrations(
         return []
 
     manifest_path = workspace / ".vaultspec" / MANIFEST_FILENAME
+    if not manifest_path.exists():
+        # Non-vaultspec directory or freshly-scaffolded workspace
+        # without a manifest yet. Skip the lock acquisition entirely
+        # so the cost on these paths is one ``Path.exists`` syscall.
+        return []
+
     with advisory_lock(manifest_path):
         manifest = read_manifest_data(workspace)
         if not manifest.vaultspec_version:
