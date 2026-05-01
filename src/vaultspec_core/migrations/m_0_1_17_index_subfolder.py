@@ -56,11 +56,13 @@ def migrate(workspace: Path) -> MigrationResult:
        not need rewriting the file is moved with
        :meth:`pathlib.Path.replace` for a single-syscall rename.
 
-    A target-side collision (canonical file already exists) is logged
-    and the legacy file is left in place. The migration does not
-    raise on collisions because subsequent registry entries should be
-    free to run; collisions are surfaced via the structure checker's
-    detection branch.
+    A target-side collision (canonical file already exists) is a
+    non-recoverable failure: relocating would either silently
+    overwrite the canonical file or leave the legacy orphaned. The
+    migration raises :class:`MigrationError` so the driver does not
+    bump the manifest version, and the operator is forced to resolve
+    the collision manually (pick the authoritative file, delete the
+    other) before re-running ``vaultspec-core migrations run``.
 
     Args:
         workspace: Workspace root directory.
