@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from vaultspec_core.config import reset_config
+from vaultspec_core.migrations import MigrationError
 from vaultspec_core.migrations.m_0_1_17_index_subfolder import migrate
 
 if TYPE_CHECKING:
@@ -188,7 +189,11 @@ class TestMisplacedInTypedSubdir:
 
 
 class TestCollision:
-    def test_target_collision_leaves_legacy_in_place(self, tmp_path: Path):
+    def test_target_collision_raises_and_leaves_files_intact(self, tmp_path: Path):
+        # A target-side file already exists. The migration must raise
+        # MigrationError so the driver does not bump the manifest
+        # version, and both files must remain on disk for the operator
+        # to resolve manually.
         _vault_skeleton(tmp_path)
         legacy = _legacy_root_index(tmp_path, "epsilon")
         idx_dir = tmp_path / ".vault" / "index"
@@ -200,9 +205,8 @@ class TestCollision:
         )
         target.write_text(canonical_before, encoding="utf-8")
 
-        result = migrate(tmp_path)
+        with pytest.raises(MigrationError, match="collision"):
+            migrate(tmp_path)
 
         assert legacy.exists()
         assert target.read_text(encoding="utf-8") == canonical_before
-        assert result.counts["collisions"] == 1
-        assert result.counts["moved"] == 0

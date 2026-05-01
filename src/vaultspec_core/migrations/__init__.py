@@ -52,6 +52,7 @@ __all__ = [
     "MIGRATION_LOGGER",
     "REGISTRY",
     "Migration",
+    "MigrationError",
     "MigrationResult",
     "MigrationStatus",
     "list_pending",
@@ -59,6 +60,18 @@ __all__ = [
     "reset_workspace_cache",
     "run_pending_migrations",
 ]
+
+
+class MigrationError(RuntimeError):
+    """Raised by a migration when a non-recoverable failure prevents progress.
+
+    The driver does not catch this; the exception propagates to the
+    caller so the manifest version bump is suppressed and the next
+    invocation re-attempts from the same starting version. Operators
+    must resolve the underlying condition (e.g. a target-side
+    collision) manually before re-running.
+    """
+
 
 MIGRATION_LOGGER = "vaultspec_core.migrations"
 logger = logging.getLogger(MIGRATION_LOGGER)
@@ -279,10 +292,14 @@ def run_pending_migrations(
         order. Empty when the workspace has no manifest or every
         registered migration is already covered.
     """
+    # Resolve once so symlinked or relative invocations of the same
+    # workspace share a cache entry rather than racing on equivalent
+    # paths.
+    cache_key = workspace.resolve()
     cached_version: tuple[int, ...] | None = None
     if use_cache:
         with _workspace_cache_lock:
-            cached_version = _workspace_cache.get(workspace)
+            cached_version = _workspace_cache.get(cache_key)
 
     if cached_version is not None and not any(
         parse_version_tuple(m.target_version) > cached_version for m in REGISTRY
@@ -300,9 +317,14 @@ def run_pending_migrations(
         if not pending:
             if use_cache:
                 with _workspace_cache_lock:
-                    _workspace_cache[workspace] = current
+                    _workspace_cache[cache_key] = current
             return []
 
+        # Incremental bumps: after each migration succeeds, write the
+        # manifest version up to that migration's target. If a later
+        # migration in the chain raises, the manifest already reflects
+        # the work that did succeed, so the next invocation skips the
+        # already-applied entries and re-attempts only the failing one.
         results: list[MigrationResult] = []
         for migration in pending:
             logger.info(
@@ -314,30 +336,27 @@ def run_pending_migrations(
             logger.info("vaultspec migration: %s", result.summary)
             results.append(result)
 
-        # Bump to whichever is higher: the running package version, or
-        # the highest-target migration we just applied. The latter case
-        # only arises in tests that synthesise migrations whose target
-        # exceeds the running version; the former is the production
-        # path where every released migration's target is <= the
-        # running version.
+            fresh = read_manifest_data(workspace)
+            if parse_version_tuple(migration.target_version) > parse_version_tuple(
+                fresh.vaultspec_version
+            ):
+                fresh.vaultspec_version = migration.target_version
+                write_manifest_data(workspace, fresh)
+
+        # Final bump to the running package version when it exceeds
+        # the highest-target migration we just applied. In production
+        # the running version always equals or exceeds the most recent
+        # registered target; the dual case is exercised only in tests
+        # that synthesise migrations targeting a future version.
         running = _running_version()
-        running_parts = parse_version_tuple(running)
-        highest_pending_parts = max(
-            (parse_version_tuple(m.target_version) for m in pending),
-            default=(),
-        )
-        new_version = (
-            running
-            if running_parts >= highest_pending_parts
-            else pending[-1].target_version
-        )
-
         fresh = read_manifest_data(workspace)
-        fresh.vaultspec_version = new_version
-        write_manifest_data(workspace, fresh)
+        if parse_version_tuple(running) > parse_version_tuple(fresh.vaultspec_version):
+            fresh.vaultspec_version = running
+            write_manifest_data(workspace, fresh)
 
+        final_version = read_manifest_data(workspace).vaultspec_version
         if use_cache:
             with _workspace_cache_lock:
-                _workspace_cache[workspace] = parse_version_tuple(new_version)
+                _workspace_cache[cache_key] = parse_version_tuple(final_version)
 
         return results

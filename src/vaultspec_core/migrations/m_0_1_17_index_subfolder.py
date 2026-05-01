@@ -26,7 +26,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from ..core.helpers import atomic_write
-from . import Migration, MigrationResult
+from . import Migration, MigrationError, MigrationResult
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -66,15 +66,22 @@ def migrate(workspace: Path) -> MigrationResult:
         workspace: Workspace root directory.
 
     Returns:
-        :class:`MigrationResult` with ``counts`` carrying ``moved``,
-        ``tagged``, and ``collisions``.
+        :class:`MigrationResult` with ``counts`` carrying ``moved`` and
+        ``tagged``.
+
+    Raises:
+        MigrationError: When a target-side file already exists, a legacy
+            file cannot be read, or the relocation syscall fails. The
+            driver propagates the exception unchanged so the manifest
+            version is not bumped and the next invocation retries from
+            the same starting version.
     """
     from ..config import get_config
     from ..vaultcore.checks.structure import _ensure_index_directory_tag
 
     cfg = get_config()
     docs_dir = workspace / cfg.docs_dir
-    counts = {"moved": 0, "tagged": 0, "collisions": 0, "errors": 0}
+    counts = {"moved": 0, "tagged": 0}
     if not docs_dir.is_dir():
         return MigrationResult(
             name="index_subfolder",
@@ -104,26 +111,25 @@ def migrate(workspace: Path) -> MigrationResult:
         target = index_dir / legacy.name
 
         if target.exists():
-            counts["collisions"] += 1
-            logger.warning(
-                "Migration index_subfolder: collision on %s; "
-                "canonical %s already exists. Leaving legacy in place.",
-                legacy,
-                target,
+            # A canonical-side file already exists; relocating would
+            # silently overwrite or leave the legacy orphaned. Raise so
+            # the driver does not bump the manifest version and the
+            # operator is forced to resolve the collision before
+            # retrying. Resolution is manual: pick the authoritative
+            # file, delete the other, then run ``migrations run``.
+            raise MigrationError(
+                f"index_subfolder: collision on {legacy}; canonical "
+                f"{target} already exists. Resolve the collision "
+                "manually before re-running migrations."
             )
-            continue
 
         try:
             raw = legacy.read_bytes()
             content = raw.decode("utf-8")
         except (OSError, UnicodeDecodeError) as exc:
-            counts["errors"] += 1
-            logger.warning(
-                "Migration index_subfolder: failed to read %s: %s",
-                legacy,
-                exc,
-            )
-            continue
+            raise MigrationError(
+                f"index_subfolder: failed to read {legacy}: {exc}"
+            ) from exc
 
         new_content, changed = _ensure_index_directory_tag(content)
         try:
@@ -134,13 +140,9 @@ def migrate(workspace: Path) -> MigrationResult:
             else:
                 legacy.replace(target)
         except OSError as exc:
-            counts["errors"] += 1
-            logger.warning(
-                "Migration index_subfolder: failed to relocate %s: %s",
-                legacy,
-                exc,
-            )
-            continue
+            raise MigrationError(
+                f"index_subfolder: failed to relocate {legacy}: {exc}"
+            ) from exc
 
         counts["moved"] += 1
         logger.info("Migration index_subfolder: %s -> %s", legacy, target)
@@ -152,10 +154,6 @@ def migrate(workspace: Path) -> MigrationResult:
     )
     if counts["tagged"]:
         summary += f" (added #index tag to {counts['tagged']})"
-    if counts["collisions"]:
-        summary += f"; skipped {counts['collisions']} on collision"
-    if counts["errors"]:
-        summary += f"; {counts['errors']} errors"
 
     return MigrationResult(
         name="index_subfolder",

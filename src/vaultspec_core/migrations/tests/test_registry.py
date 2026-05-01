@@ -239,6 +239,79 @@ class TestVersionGating:
         assert counter["calls"] == 0
 
 
+class TestIncrementalVersionBump:
+    def test_partial_failure_records_completed_target(
+        self, workspace: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        # Two migrations: 0.2.0 succeeds, 0.3.0 raises. After the
+        # exception the manifest version must reflect 0.2.0 (the
+        # successful step) so the next invocation only re-runs 0.3.0.
+        m_first, first_counter = _noop("first", "0.2.0")
+        m_second = _raising("second", "0.3.0")
+        _install_registry(monkeypatch, [m_first, m_second])
+
+        with pytest.raises(RuntimeError, match="second intentionally failed"):
+            run_pending_migrations(workspace)
+
+        recorded = read_manifest_data(workspace).vaultspec_version
+        from vaultspec_core.core.helpers import parse_version_tuple
+
+        assert parse_version_tuple(recorded) >= parse_version_tuple("0.2.0")
+        assert parse_version_tuple(recorded) < parse_version_tuple("0.3.0")
+        assert first_counter["calls"] == 1
+
+        # Second invocation: replace the broken entry with a working
+        # one and confirm the first migration is NOT re-run because
+        # the manifest already records its completion.
+        m_second_fixed, second_counter = _noop("second_fixed", "0.3.0")
+        _install_registry(monkeypatch, [m_first, m_second_fixed])
+        run_pending_migrations(workspace)
+        assert first_counter["calls"] == 1, (
+            "successful first migration must not be re-run after a "
+            "failure of a later entry"
+        )
+        assert second_counter["calls"] == 1
+
+
+class TestCacheKeyNormalisation:
+    def test_relative_and_resolved_paths_share_cache(
+        self,
+        workspace: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ):
+        # Up-to-date workspace; first call populates the cache. A
+        # second call via an equivalent but differently-spelled path
+        # (e.g. relative) must hit the cache rather than performing
+        # another manifest read.
+        data = read_manifest_data(workspace)
+        data.vaultspec_version = "9.9.9"
+        write_manifest_data(workspace, data)
+        m, counter = _noop("alpha", "0.2.0")
+        _install_registry(monkeypatch, [m])
+
+        # First call resolves the path; cache populated.
+        run_pending_migrations(workspace, use_cache=True)
+        assert counter["calls"] == 0
+
+        # Mutate the manifest behind the registry's back to a stale
+        # version. If the cache key were path-sensitive, the second
+        # call via the unresolved path would miss the cache and
+        # observe the stale version, running the migration. With
+        # resolve()-keyed cache, both spellings hit the same entry
+        # and the migration stays skipped.
+        unresolved = workspace / "."
+        data2 = read_manifest_data(workspace)
+        data2.vaultspec_version = "0.0.1"
+        write_manifest_data(workspace, data2)
+
+        run_pending_migrations(unresolved, use_cache=True)
+        assert counter["calls"] == 0, (
+            "cache hit via equivalent path must short-circuit before "
+            "the manifest read; migration must not run"
+        )
+
+
 class TestFailureDoesNotBumpVersion:
     def test_raising_migration_propagates(
         self, workspace: Path, monkeypatch: pytest.MonkeyPatch
