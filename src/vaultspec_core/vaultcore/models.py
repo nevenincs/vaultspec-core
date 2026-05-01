@@ -249,7 +249,8 @@ class VaultConstants:
                         f"Vault violation: Legacy feature index '{item.name}' "
                         f"at {docs_dir_name}/ root. Index files now live in "
                         f"{docs_dir_name}/{index_dir_name}/. Run "
-                        "'vault check structure --fix' to relocate."
+                        "'vaultspec-core migrations run' to apply the "
+                        "registered schema migration."
                     )
                     errors.append(msg)
                     continue

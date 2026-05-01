@@ -1,0 +1,170 @@
+"""Relocate root-level ``<feature>.index.md`` files into ``.vault/index/``.
+
+Introduced in vaultspec-core 0.1.17 as the structural counterpart to
+the index-folder feature (PR #92, issue #91). Pre-0.1.17 vaults wrote
+generated indexes directly under the docs root; the new layout dedicates
+``<docs_dir>/<index_dir>/`` to them. This migration walks the docs tree,
+relocates every ``*.index.md`` whose parent is not the configured index
+subfolder, and inserts the ``#index`` directory tag into each migrated
+file's frontmatter when missing.
+
+The body is a near-verbatim port of the original
+``_migrate_legacy_root_indexes`` helper shipped inside
+``vaultspec_core.vaultcore.checks.structure``. CRLF line endings,
+exact-match ``#index`` tag detection, and atomic-write semantics are
+preserved.
+
+See also:
+    :mod:`vaultspec_core.migrations` for the registry driver.
+    :mod:`vaultspec_core.vaultcore.checks.structure` for the warning
+    branch that detects pending migrations without mutating.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING
+
+from ..core.helpers import atomic_write
+from . import Migration, MigrationResult
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+__all__ = ["MIGRATION", "migrate"]
+
+logger = logging.getLogger(__name__)
+
+
+def migrate(workspace: Path) -> MigrationResult:
+    """Move legacy root-level index files into the configured index subfolder.
+
+    Walks ``<workspace>/<docs_dir>/`` for every ``*.index.md`` file
+    whose parent directory is not the configured index subfolder
+    (``<docs_dir>/<index_dir>/``). For each such file:
+
+    1. Reads the file as bytes so the line-ending convention survives
+       the decode (Python's universal-newline handling on
+       :func:`pathlib.Path.read_text` would clobber CRLF before the
+       caller could see it).
+    2. Calls
+       :func:`vaultspec_core.vaultcore.checks.structure._ensure_index_directory_tag`
+       to insert ``#index`` into the YAML ``tags:`` block when missing,
+       preserving the file's existing newline convention.
+    3. Atomically writes the rewritten content to the canonical
+       location and unlinks the legacy source. When the tag block did
+       not need rewriting the file is moved with
+       :meth:`pathlib.Path.replace` for a single-syscall rename.
+
+    A target-side collision (canonical file already exists) is logged
+    and the legacy file is left in place. The migration does not
+    raise on collisions because subsequent registry entries should be
+    free to run; collisions are surfaced via the structure checker's
+    detection branch.
+
+    Args:
+        workspace: Workspace root directory.
+
+    Returns:
+        :class:`MigrationResult` with ``counts`` carrying ``moved``,
+        ``tagged``, and ``collisions``.
+    """
+    from ..config import get_config
+    from ..vaultcore.checks.structure import _ensure_index_directory_tag
+
+    cfg = get_config()
+    docs_dir = workspace / cfg.docs_dir
+    counts = {"moved": 0, "tagged": 0, "collisions": 0, "errors": 0}
+    if not docs_dir.is_dir():
+        return MigrationResult(
+            name="index_subfolder",
+            target_version="0.1.17",
+            summary="no .vault/ directory; nothing to migrate",
+            counts=counts,
+        )
+
+    index_dir = docs_dir / cfg.index_dir
+    legacy_files = sorted(
+        item
+        for item in docs_dir.rglob("*.index.md")
+        if item.is_file() and item.parent != index_dir
+    )
+    if not legacy_files:
+        return MigrationResult(
+            name="index_subfolder",
+            target_version="0.1.17",
+            summary="no legacy indexes found; nothing to migrate",
+            counts=counts,
+        )
+
+    for legacy in legacy_files:
+        target = index_dir / legacy.name
+
+        if target.exists():
+            counts["collisions"] += 1
+            logger.warning(
+                "Migration index_subfolder: collision on %s; "
+                "canonical %s already exists. Leaving legacy in place.",
+                legacy,
+                target,
+            )
+            continue
+
+        try:
+            raw = legacy.read_bytes()
+            content = raw.decode("utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            counts["errors"] += 1
+            logger.warning(
+                "Migration index_subfolder: failed to read %s: %s",
+                legacy,
+                exc,
+            )
+            continue
+
+        new_content, changed = _ensure_index_directory_tag(content)
+        try:
+            index_dir.mkdir(parents=True, exist_ok=True)
+            if changed:
+                atomic_write(target, new_content)
+                legacy.unlink()
+                counts["tagged"] += 1
+            else:
+                legacy.replace(target)
+        except OSError as exc:
+            counts["errors"] += 1
+            logger.warning(
+                "Migration index_subfolder: failed to relocate %s: %s",
+                legacy,
+                exc,
+            )
+            continue
+
+        counts["moved"] += 1
+        logger.info("Migration index_subfolder: %s -> %s", legacy, target)
+
+    summary = (
+        f"relocated {counts['moved']} feature index "
+        f"{'file' if counts['moved'] == 1 else 'files'} into "
+        f"{cfg.docs_dir}/{cfg.index_dir}/"
+    )
+    if counts["tagged"]:
+        summary += f" (added #index tag to {counts['tagged']})"
+    if counts["collisions"]:
+        summary += f"; skipped {counts['collisions']} on collision"
+    if counts["errors"]:
+        summary += f"; {counts['errors']} errors"
+
+    return MigrationResult(
+        name="index_subfolder",
+        target_version="0.1.17",
+        summary=summary,
+        counts=counts,
+    )
+
+
+MIGRATION = Migration(
+    target_version="0.1.17",
+    name="index_subfolder",
+    migrate=migrate,
+)

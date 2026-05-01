@@ -937,13 +937,30 @@ def install_run(
         if "precommit" not in skip:
             _scaffold_precommit(path)
 
+        # Run pending schema migrations before re-reading the manifest.
+        # The driver writes its own vaultspec_version bump; the local
+        # read+write below preserves that bump because it always reloads
+        # the on-disk manifest after the driver returns.
+        from ..migrations import run_pending_migrations
+
+        run_pending_migrations(path)
+
         # Update manifest timestamps and version
         import datetime
+
+        from .helpers import parse_version_tuple
 
         mdata = read_manifest_data(path)
         if not mdata.installed_at:
             mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
-        mdata.vaultspec_version = _get_package_version()
+        # Never downgrade the recorded version: a registered migration
+        # whose target_version exceeds the running package's version
+        # has already bumped the manifest to that target, and rewriting
+        # to the running version here would silently re-flag the
+        # migration as pending on the next run.
+        running = _get_package_version()
+        if parse_version_tuple(running) > parse_version_tuple(mdata.vaultspec_version):
+            mdata.vaultspec_version = running
 
         # Re-opt-in gitignore management on --upgrade --force
         if force:

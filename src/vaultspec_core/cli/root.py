@@ -770,11 +770,13 @@ def cmd_check_providers() -> None:
 
 def _register_subcommands() -> None:
     """Mount sub-apps with deferred imports to avoid circular dependencies."""
+    from .migrations_cmd import migrations_app
     from .spec_cmd import spec_app
     from .vault_cmd import vault_app
 
     app.add_typer(vault_app, name="vault")
     app.add_typer(spec_app, name="spec")
+    app.add_typer(migrations_app, name="migrations")
 
 
 _register_subcommands()
