@@ -76,6 +76,57 @@ class TestFrameworkPresence:
         _write_manifest(tmp_path, ["claude"])
         assert collect_framework_presence(tmp_path) == FrameworkSignal.PRESENT
 
+    def test_dev_repo_present_without_manifest(self, tmp_path: Path) -> None:
+        """Source-repo workspace reports PRESENT without ``providers.json``.
+
+        Reproduces the GitHub issue #93 layout: ``pyproject.toml`` declares
+        ``name = "vaultspec-core"``, the canonical package source layout
+        exists at ``src/vaultspec_core/__init__.py``, and ``.vaultspec/``
+        is the canonical content (no install-artifact ``providers.json``).
+        """
+        from vaultspec_core.core.guards import _cached_is_dev_repo
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "vaultspec-core"\nversion = "0.0.0"\n',
+            encoding="utf-8",
+        )
+        pkg = tmp_path / "src" / "vaultspec_core"
+        pkg.mkdir(parents=True)
+        (pkg / "__init__.py").write_text("", encoding="utf-8")
+        (tmp_path / ".vaultspec").mkdir()
+
+        _cached_is_dev_repo.cache_clear()
+        try:
+            assert collect_framework_presence(tmp_path) == FrameworkSignal.PRESENT
+        finally:
+            _cached_is_dev_repo.cache_clear()
+
+    def test_consumer_pyproject_match_alone_still_corrupted(
+        self, tmp_path: Path
+    ) -> None:
+        """A pyproject name match without the package layout is CORRUPTED.
+
+        Locks the multi-signal contract: a consumer that ships a stale or
+        hand-crafted ``pyproject.toml`` declaring ``name = "vaultspec-core"``
+        must not trigger the dev-repo branch unless the canonical
+        ``src/vaultspec_core/__init__.py`` layout is also present.  Without
+        the layout the workspace is a genuinely broken consumer install
+        and must continue to report CORRUPTED.
+        """
+        from vaultspec_core.core.guards import _cached_is_dev_repo
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "vaultspec-core"\nversion = "0.0.0"\n',
+            encoding="utf-8",
+        )
+        (tmp_path / ".vaultspec").mkdir()
+
+        _cached_is_dev_repo.cache_clear()
+        try:
+            assert collect_framework_presence(tmp_path) == FrameworkSignal.CORRUPTED
+        finally:
+            _cached_is_dev_repo.cache_clear()
+
 
 # ---------------------------------------------------------------------------
 # collect_manifest_coherence
