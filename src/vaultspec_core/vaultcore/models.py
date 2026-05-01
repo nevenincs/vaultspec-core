@@ -86,10 +86,10 @@ class DocumentMetadata:
         #  Directory Tag (Type)
         dir_tags = [t for t in self.tags if DocType.from_tag(t)]
         if len(dir_tags) != 1:
+            allowed = ", ".join(sorted(dt.tag for dt in DocType))
             msg = (
                 "Vault violation: Exactly one directory tag required "
-                "(#adr, #audit, #exec, #plan, #reference, #research). "
-                f"Found: {dir_tags}"
+                f"({allowed}). Found: {dir_tags}"
             )
             errors.append(msg)
 
@@ -149,19 +149,27 @@ class VaultConstants:
 
         return get_config().docs_dir
 
-    # Supported directories within .vault/ (INDEX lives at root, not a subdir)
-    SUPPORTED_DIRECTORIES: ClassVar[set[str]] = {
-        dt.value for dt in DocType if dt != DocType.INDEX
-    }
+    @staticmethod
+    def _get_index_dir() -> str:
+        """Return the configured index subdirectory name (e.g. ``index``).
+
+        Returns:
+            Directory name string such as ``"index"``.
+        """
+        from ..config import get_config
+
+        return get_config().index_dir
+
+    # Supported directories within .vault/ (one per DocType, including INDEX
+    # which now lives in its own subfolder rather than at the vault root).
+    SUPPORTED_DIRECTORIES: ClassVar[set[str]] = {dt.value for dt in DocType}
 
     # Non-document directories that are legitimate .vault/ content
     # (e.g. data stores, log output) but not document types.
     AUXILIARY_DIRECTORIES: ClassVar[set[str]] = {"data", "logs"}
 
-    # Supported directory tags (INDEX has no directory tag)
-    SUPPORTED_TAGS: ClassVar[set[str]] = {
-        dt.tag for dt in DocType if dt != DocType.INDEX
-    }
+    # Supported directory tags (one per DocType, including #index).
+    SUPPORTED_TAGS: ClassVar[set[str]] = {dt.tag for dt in DocType}
 
     @classmethod
     def is_supported_directory(cls, dirname: str) -> bool:
@@ -199,13 +207,23 @@ class VaultConstants:
     def validate_vault_structure(cls, root_dir: Path) -> list[str]:
         """Ensure the docs directory only contains recognised subdirectories.
 
+        The vault root must contain only the seven canonical document
+        subdirectories (one per :class:`DocType`, including the
+        :class:`DocType.INDEX` subfolder), the auxiliary data/log
+        directories, and an optional ``readme.md``. Files at the docs
+        root are violations: ``<feature>.index.md`` files at the root are
+        legacy artifacts that should be relocated into the index
+        subfolder.
+
         Args:
             root_dir: Project root containing the docs directory.
 
         Returns:
-            List of violation message strings; empty when the structure is valid.
+            List of violation message strings; empty when the structure is
+            valid.
         """
         docs_dir_name = cls._get_docs_dir()
+        index_dir_name = cls._get_index_dir()
         docs_dir = root_dir / docs_dir_name
         if not docs_dir.exists():
             return []
@@ -224,15 +242,22 @@ class VaultConstants:
                     )
                     errors.append(msg)
             elif item.is_file():
-                # Allow readme and generated feature index files in root
-                if item.name.lower() != "readme.md" and not item.name.endswith(
-                    ".index.md"
-                ):
+                if item.name.lower() == "readme.md":
+                    continue
+                if item.name.endswith(".index.md"):
                     msg = (
-                        f"Vault violation: File found in {docs_dir_name}/ root: "
-                        f"'{item.name}'. Files should be in subdirectories."
+                        f"Vault violation: Legacy feature index '{item.name}' "
+                        f"at {docs_dir_name}/ root. Index files now live in "
+                        f"{docs_dir_name}/{index_dir_name}/. Run "
+                        "'vault check structure --fix' to relocate."
                     )
                     errors.append(msg)
+                    continue
+                msg = (
+                    f"Vault violation: File found in {docs_dir_name}/ root: "
+                    f"'{item.name}'. Files should be in subdirectories."
+                )
+                errors.append(msg)
 
         return errors
 
@@ -242,7 +267,9 @@ class VaultConstants:
     ) -> list[str]:
         """Validate a filename against the vault naming convention.
 
-        Expected pattern: ``yyyy-mm-dd-<feature>-<type>.md``.
+        Expected pattern: ``yyyy-mm-dd-<feature>-<type>.md`` for the six
+        authored document types, and ``<feature>.index.md`` (no date
+        prefix) for the auto-generated :class:`DocType.INDEX` files.
 
         Args:
             filename: Bare filename (no directory component) to validate.
@@ -257,6 +284,18 @@ class VaultConstants:
         if not filename.endswith(".md"):
             msg = f"Vault violation: Filename '{filename}' must have .md extension."
             errors.append(msg)
+            return errors
+
+        # Index files use a separate naming convention: <feature>.index.md
+        # (no date prefix, no document-type suffix).
+        if doc_type == DocType.INDEX or filename.endswith(".index.md"):
+            index_pattern = r"^[a-z0-9-]+\.index\.md$"
+            if not re.match(index_pattern, filename):
+                msg = (
+                    f"Vault violation: Index filename '{filename}' deviates "
+                    "from standard <feature>.index.md pattern."
+                )
+                errors.append(msg)
             return errors
 
         # Basic pattern: 2026-02-07-feature-name-adr.md

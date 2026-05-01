@@ -67,7 +67,12 @@ def check_links(
 
         if fix:
             try:
-                content = doc_path.read_text(encoding="utf-8")
+                # Read as bytes and decode without universal newlines so
+                # CRLF endings survive the regex substitution; the
+                # pattern is line-internal and does not touch newlines,
+                # so reading bytes is sufficient to preserve the source
+                # convention.
+                content = doc_path.read_bytes().decode("utf-8")
             except (OSError, UnicodeDecodeError):
                 continue
             fixed_content = _MD_LINK_PATTERN.sub(

@@ -40,9 +40,15 @@ def _add_related_link(doc_path: Path, link_name: str) -> bool:
         ``True`` if the file was modified, ``False`` otherwise.
     """
     try:
-        content = doc_path.read_text(encoding="utf-8")
+        # Read as bytes and decode without universal newlines so the
+        # source CRLF/LF convention is observable; we restore it on the
+        # written output below.
+        raw_content = doc_path.read_bytes().decode("utf-8")
     except (OSError, UnicodeDecodeError):
         return False
+
+    source_newline = "\r\n" if "\r\n" in raw_content else "\n"
+    content = raw_content.replace("\r\n", "\n")
 
     link = f"[[{link_name}]]"
 
@@ -80,7 +86,10 @@ def _add_related_link(doc_path: Path, link_name: str) -> bool:
         # Add related: field before closing ---
         new_yaml = yaml_block + f'\nrelated:\n  - "{link}"'
 
-    new_content = f"{leading_ws}---\n{new_yaml}\n---\n{body}"
+    rendered = f"{leading_ws}---\n{new_yaml}\n---\n{body}"
+    new_content = (
+        rendered if source_newline == "\n" else rendered.replace("\n", source_newline)
+    )
     bak = doc_path.with_suffix(doc_path.suffix + ".bak")
     bak.write_bytes(doc_path.read_bytes())
     try:

@@ -10,8 +10,10 @@ order: 3
   vaultpsec-\* skills and agent personas.
 
 - **MUST read before starting a new pipeline phase** relevant `.vault/` documents.
-  Check for any previous audit or adr overlap. All records are stored in
-  `.vault/` in `adr/`, `audit/`, `exec/`, `plan/`, `reference/` and `research/`.
+  Check for any previous audit or adr overlap. All authored records live in
+  `.vault/` under `adr/`, `audit/`, `exec/`, `plan/`, `reference/`, and
+  `research/`. Auto-generated feature indexes live in `.vault/index/` and
+  are managed by `vault feature index`; do not author them by hand.
 
 All significant work must follow this pipeline:
 

@@ -128,7 +128,7 @@ vaultspec-core vault check all --fix
 vaultspec-core vault graph --feature search-api
 ```
 
-Valid document types: `adr`, `audit`, `exec`, `plan`, `reference`, `research`. See the [CLI reference](./.vaultspec/CLI.md#vault-commands) for the full command surface.
+Valid document types: `adr`, `audit`, `exec`, `plan`, `reference`, `research`. Generated feature indexes live in `.vault/index/` and are managed by `vault feature index`. See the [CLI reference](./.vaultspec/CLI.md#vault-commands) for the full command surface.
 
 ______________________________________________________________________
 

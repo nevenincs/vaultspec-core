@@ -18,7 +18,6 @@ from ._base import (
     Severity,
     VaultSnapshot,
     extract_feature_tags,
-    is_generated_index,
 )
 
 if TYPE_CHECKING:
@@ -32,9 +31,20 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
     from ..scanner import get_doc_type
 
     try:
-        content = doc_path.read_text(encoding="utf-8")
+        # Read as bytes so the source CRLF/LF convention is observable;
+        # ``read_text`` collapses everything to ``\n`` via universal
+        # newlines, which would silently strip CRLF before we ever see
+        # it and bake LF back into a previously-CRLF file.
+        raw = doc_path.read_bytes()
+        raw_content = raw.decode("utf-8")
     except (OSError, UnicodeDecodeError):
         return None
+
+    source_newline = "\r\n" if "\r\n" in raw_content else "\n"
+    # Normalize to LF for the regex/manipulation passes; we restore the
+    # source newline convention on the rendered output below so files
+    # that arrived as CRLF leave as CRLF.
+    content = raw_content.replace("\r\n", "\n")
 
     match = re.match(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", content.lstrip(), re.DOTALL)
     if not match:
@@ -132,7 +142,17 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
     if body:
         lines.append(body)
 
-    new_content = leading_whitespace + "\n".join(lines)
+    rendered = leading_whitespace + "\n".join(lines)
+    # Restore the source file's newline convention. Internal LFs that
+    # came from the body group also need promoting so the file does
+    # not end up with mixed endings. ``atomic_write`` writes bytes
+    # (via ``Path.write_bytes`` of the UTF-8-encoded payload), so the
+    # ``\r\n`` sequences below land on disk byte-for-byte; switching to
+    # ``Path.write_text`` would re-enable Python's universal-newline
+    # translation on Windows and corrupt CRLF runs into ``\r\r\n``.
+    new_content = (
+        rendered if source_newline == "\n" else rendered.replace("\n", source_newline)
+    )
     bak = doc_path.with_suffix(doc_path.suffix + ".bak")
     bak.write_bytes(doc_path.read_bytes())
     try:
@@ -180,10 +200,11 @@ def check_frontmatter(
     result = CheckResult(check_name="frontmatter", supports_fix=True)
 
     for doc_path, (metadata, _body) in snapshot.items():
-        # Skip generated index files (non-standard frontmatter shape)
-        if is_generated_index(doc_path):
-            continue
-
+        # Indexes used to carry a non-standard one-tag frontmatter and
+        # were exempted here; post-#91 they carry the standard two-tag
+        # shape (``#index`` directory tag plus the feature tag) and run
+        # through the same validator as every other document. The ADR
+        # commits to "no more exemptions" at the frontmatter layer.
         if doc_type_filter:
             dt = get_doc_type(doc_path, root_dir)
             if dt and dt.value != doc_type_filter:

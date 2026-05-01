@@ -93,7 +93,7 @@ def cmd_add(
     """
     apply_target(target)
     import re
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     from vaultspec_core.console import get_console
     from vaultspec_core.core.types import get_context as _get_ctx
@@ -111,11 +111,20 @@ def cmd_add(
     try:
         dt = DocType(doc_type)
     except ValueError:
-        valid = ", ".join(d.value for d in DocType)
+        # Index is auto-generated and is not user-creatable; surface
+        # it explicitly as a non-option here so the error message
+        # matches the rest of the docs surface.
+        valid = ", ".join(d.value for d in DocType if d is not DocType.INDEX)
         console.print(
             f"[red]Unknown document type '{doc_type}'. Valid types: {valid}[/red]"
         )
         raise typer.Exit(code=1) from None
+    if dt is DocType.INDEX:
+        console.print(
+            "[red]'index' documents are auto-generated. "
+            "Use 'vault feature index' instead of 'vault add index'.[/red]"
+        )
+        raise typer.Exit(code=1)
 
     # Validate feature tag
     feat = feature.lstrip("#").strip()
@@ -129,8 +138,9 @@ def cmd_add(
         )
         raise typer.Exit(code=1)
 
-    # Default date to today
-    date_str = date or datetime.now().strftime("%Y-%m-%d")
+    # Default date to today (UTC so vault doc dates stay deterministic
+    # across runners regardless of the operator's local timezone).
+    date_str = date or datetime.now(UTC).strftime("%Y-%m-%d")
 
     # Validate extra tags format
     extra_tags: list[str] | None = None
@@ -902,10 +912,10 @@ def cmd_feature_index(
 ) -> None:
     """Generate or update feature index documents.
 
-    Creates a <feature>.index.md in the vault root for each feature tag
-    (or a specific one with --feature). The index links to all documents
-    sharing that feature tag, making implicit feature clusters explicit
-    in the graph.
+    Writes a ``<feature>.index.md`` into ``.vault/index/`` for each
+    feature tag (or a specific one with ``--feature``). Each index links
+    to all documents sharing that feature tag, making implicit feature
+    clusters explicit in the graph.
     """
     apply_target(target)
     from vaultspec_core.console import get_console

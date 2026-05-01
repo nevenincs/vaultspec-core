@@ -377,20 +377,35 @@ def _apply_stale_index(
     _rng: random.Random,
     manifest: CorpusManifest,
 ) -> None:
-    """Emit a feature.index.md whose related count disagrees with actual files."""
+    """Emit a ``<feature>.index.md`` whose related count disagrees with files.
+
+    The pathology lands in the canonical ``index/`` subfolder so the
+    synthetic corpus matches the post-migration vault layout, and carries
+    the standard ``#index`` directory tag plus the feature tag.
+
+    The subfolder name is sourced from :class:`DirName` so this generator
+    stays in sync with whatever ``index_dir`` the runtime config resolves
+    to (the config default is :attr:`DirName.INDEX`; the env override
+    knob ``VAULTSPEC_INDEX_DIR`` only affects production runs and is not
+    consulted from synthetic fixtures).
+    """
+    from ..core.enums import DirName
+
     feature = "stale-feature"
     stem = f"{feature}.index"
-    path = vault_dir / "plan" / f"{stem}.md"
+    index_dir = vault_dir / DirName.INDEX.value
+    index_dir.mkdir(parents=True, exist_ok=True)
+    path = index_dir / f"{stem}.md"
     # Claim 99 related entries but write only 1
     fm = (
-        '---\ntags:\n  - "#plan"\n  - "#stale-feature"\n'
+        '---\ngenerated: true\ntags:\n  - "#index"\n  - "#stale-feature"\n'
         'date: 2026-01-01\nrelated:\n  - "[[nonexistent-plan-001]]"\n---\n'
     )
     body = "# stale-feature index\n\nThis index has a stale count.\n"
     path.write_text(fm + "\n" + body, encoding="utf-8")
     doc = GeneratedDoc(
-        doc_id=f"plan/{stem}",
-        doc_type="plan",
+        doc_id=f"{DirName.INDEX.value}/{stem}",
+        doc_type=DirName.INDEX.value,
         feature=feature,
         needle="NEEDLE_STALE_INDEX",
         date="2026-01-01",

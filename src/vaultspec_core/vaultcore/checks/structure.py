@@ -442,6 +442,245 @@ def _rewrite_incoming_refs(
             logger.warning("Failed to rewrite %s: %s", md_path, exc)
 
 
+_INDEX_TAG = "#index"
+
+# Match a YAML block-sequence tag entry and capture the tag value
+# (with or without surrounding quotes). Anchored to the line start so
+# stray free-text occurrences in the body never match. The trailing
+# ``\s*$`` is intentional - tags entries that carry inline comments
+# would not validate under the project's frontmatter rules.
+_TAG_ENTRY_RE = re.compile(r"""^\s*-\s*['"]?(#[\w-]+)['"]?\s*$""")
+
+
+def _ensure_index_directory_tag(content: str) -> tuple[str, bool]:
+    """Insert ``#index`` into the YAML ``tags:`` block if missing.
+
+    Args:
+        content: Full file content (frontmatter plus body).
+
+    Returns:
+        A two-tuple ``(new_content, changed)`` where *changed* indicates
+        whether the content needed rewriting. The function only mutates
+        the YAML block sequence under ``tags:`` and leaves the rest of
+        the file unchanged.
+    """
+    lines = content.splitlines(keepends=True)
+    in_frontmatter = False
+    in_tags = False
+    fence_count = 0
+    insert_idx: int | None = None
+    has_index_tag = False
+    tag_indent: str = "  "
+
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped == "---":
+            fence_count += 1
+            if fence_count == 1:
+                in_frontmatter = True
+                continue
+            # Closing fence: stop scanning; if we were in tags, plant
+            # before the fence.
+            if in_tags and insert_idx is None:
+                insert_idx = idx
+            break
+
+        if not in_frontmatter:
+            continue
+
+        if stripped.startswith("tags:"):
+            in_tags = True
+            continue
+
+        if in_tags:
+            if line.startswith((" ", "\t", "-")):
+                # Match an existing list entry to capture indent style
+                # and detect the index tag.
+                bullet = line.lstrip()
+                if bullet.startswith("-"):
+                    tag_indent = line[: len(line) - len(bullet)]
+                    # Compare the captured tag value exactly so a
+                    # tag like ``#index-notes`` does not falsely
+                    # signal that the directory tag ``#index`` is
+                    # already present.
+                    tag_match = _TAG_ENTRY_RE.match(line)
+                    if tag_match and tag_match.group(1) == _INDEX_TAG:
+                        has_index_tag = True
+                continue
+            # End of tags block: plant before this non-tag line.
+            in_tags = False
+            insert_idx = idx
+
+    if has_index_tag:
+        return content, False
+    if insert_idx is None:
+        # Either no frontmatter or no tags: leave content alone, caller
+        # will surface an ERROR diagnostic.
+        return content, False
+
+    # Preserve the source file's newline convention. Mixed CRLF/LF
+    # inside one file is what we want to avoid - if the document is
+    # CRLF, the inserted tag line must end with \r\n, otherwise the
+    # frontmatter ends up with one stray \n line in a sea of \r\n.
+    newline = "\r\n" if "\r\n" in content else "\n"
+    new_line = f"{tag_indent}- '{_INDEX_TAG}'{newline}"
+    new_lines = [*lines[:insert_idx], new_line, *lines[insert_idx:]]
+    return "".join(new_lines), True
+
+
+def _migrate_legacy_root_indexes(
+    root_dir: Path,
+    result: CheckResult,
+    *,
+    fix: bool,
+) -> None:
+    """Detect and optionally relocate misplaced feature index files.
+
+    Scans the entire docs tree for ``*.index.md`` files that do not live
+    in the canonical ``<docs_dir>/<index_dir>/`` subfolder. Files at the
+    docs root are the common legacy case; files dropped into a typed
+    subdirectory (``adr/<feature>.index.md``, ``plan/...``) would
+    otherwise create a "blind spot" because the filename-based
+    :func:`is_generated_index` exempts them from frontmatter and
+    body-link validation - so they would be neither flagged nor fixed
+    without this migration.
+
+    When *fix* is ``False``, emits one ERROR diagnostic per misplaced
+    file with ``fixable=True`` so operators see what ``--fix`` would
+    change.
+
+    When *fix* is ``True``, moves each misplaced ``<feature>.index.md``
+    into ``<docs_dir>/<index_dir>/`` and inserts the ``#index`` directory
+    tag into the YAML frontmatter if missing. The move is atomic
+    (rename); if the target already exists, the migration surfaces an
+    ERROR and leaves the misplaced file in place.
+
+    Args:
+        root_dir: Project root directory.
+        result: :class:`CheckResult` to accumulate diagnostics into.
+        fix: When ``True``, perform the relocation in place; otherwise
+            only report.
+    """
+    from ...config import get_config
+
+    cfg = get_config()
+    docs_dir = root_dir / cfg.docs_dir
+    if not docs_dir.is_dir():
+        return
+
+    index_dir = docs_dir / cfg.index_dir
+    legacy_files = sorted(
+        item
+        for item in docs_dir.rglob("*.index.md")
+        if item.is_file() and item.parent != index_dir
+    )
+    if not legacy_files:
+        return
+
+    for legacy in legacy_files:
+        rel = legacy.relative_to(root_dir)
+        target = index_dir / legacy.name
+        is_root_level = legacy.parent == docs_dir
+        misplacement_label = (
+            f"{cfg.docs_dir}/ root"
+            if is_root_level
+            else str(legacy.parent.relative_to(root_dir)).replace("\\", "/")
+        )
+
+        if not fix:
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=rel,
+                    message=(
+                        f"Misplaced feature index at {misplacement_label}: "
+                        f"'{legacy.name}'. Move to "
+                        f"{cfg.docs_dir}/{cfg.index_dir}/."
+                    ),
+                    severity=Severity.ERROR,
+                    fixable=True,
+                    fix_description=(
+                        f"Run with --fix to relocate to "
+                        f"{cfg.docs_dir}/{cfg.index_dir}/{legacy.name}"
+                    ),
+                )
+            )
+            continue
+
+        if target.exists():
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=rel,
+                    message=(
+                        f"Cannot relocate legacy index '{legacy.name}': "
+                        f"target {target.relative_to(root_dir)} already "
+                        "exists. Resolve the collision manually."
+                    ),
+                    severity=Severity.ERROR,
+                )
+            )
+            continue
+
+        try:
+            # Read as bytes so CRLF survives the decode; ``read_text``
+            # silently translates newlines via Python's universal-newline
+            # handling and would clobber the file's line ending
+            # convention before we ever see it.
+            raw = legacy.read_bytes()
+            content = raw.decode("utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=rel,
+                    message=f"Failed to read legacy index for migration: {exc}",
+                    severity=Severity.ERROR,
+                )
+            )
+            continue
+
+        new_content, changed = _ensure_index_directory_tag(content)
+        try:
+            index_dir.mkdir(parents=True, exist_ok=True)
+            if changed:
+                # Write the rewritten content directly to the new
+                # location, then unlink the legacy file. This makes the
+                # migration atomic from the operator's perspective: the
+                # canonical file is fully in place before the legacy
+                # disappears.
+                atomic_write(target, new_content)
+                legacy.unlink()
+            else:
+                legacy.replace(target)
+        except OSError as exc:
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=rel,
+                    message=f"Failed to relocate legacy index: {exc}",
+                    severity=Severity.ERROR,
+                )
+            )
+            continue
+
+        result.fixed_count += 1
+        legacy_rel = str(legacy.relative_to(root_dir)).replace("\\", "/")
+        result.diagnostics.append(
+            CheckDiagnostic(
+                path=target.relative_to(root_dir),
+                message=(
+                    f"Relocated misplaced index from "
+                    f"{legacy_rel} to "
+                    f"{cfg.docs_dir}/{cfg.index_dir}/{legacy.name}"
+                    + (" (added #index tag)" if changed else "")
+                ),
+                severity=Severity.INFO,
+            )
+        )
+        logger.info(
+            "Migrated misplaced index %s -> %s",
+            legacy,
+            target,
+        )
+
+
 def check_structure(
     root_dir: Path,
     *,
@@ -451,14 +690,18 @@ def check_structure(
     """Check vault directory structure and filename conventions.
 
     Detects unsupported subdirectories in ``.vault/``, files placed directly
-    in the ``.vault/`` root, and filenames deviating from the
-    ``YYYY-MM-DD-<feature>-<type>.md`` convention.
+    in the ``.vault/`` root, filenames deviating from the
+    ``YYYY-MM-DD-<feature>-<type>.md`` convention, and misplaced feature
+    index files (any ``<feature>.index.md`` outside the configured
+    ``index/`` subfolder). With ``fix=True``, renames mis-suffixed files,
+    inserts missing date prefixes, and relocates misplaced
+    ``<feature>.index.md`` files into the configured index subfolder.
 
     Args:
         root_dir: Project root directory.
         snapshot: Pre-built snapshot mapping document paths to parsed data.
-        fix: When ``True``, renames files with wrong type suffixes or
-            missing date prefixes.
+        fix: When ``True``, performs auto-renames, frontmatter rewrites,
+            and legacy-index relocations.
 
     Returns:
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
@@ -470,7 +713,19 @@ def check_structure(
     result = CheckResult(check_name="structure", supports_fix=True)
     all_renames: list[tuple[str, str]] = []
 
+    # When --fix is on, perform legacy index migration first so the
+    # validate_vault_structure pass observes the post-migration tree.
+    if fix:
+        _migrate_legacy_root_indexes(root_dir, result, fix=True)
+
     for msg in VaultConstants.validate_vault_structure(root_dir):
+        # The migration helper below emits one actionable per-file
+        # diagnostic for each misplaced index. The aggregate validator
+        # also produces a pathless message for root-level index files;
+        # drop those so operators see exactly one diagnostic per offence
+        # rather than two messages saying the same thing.
+        if "Legacy feature index" in msg:
+            continue
         result.diagnostics.append(
             CheckDiagnostic(
                 path=None,
@@ -478,6 +733,12 @@ def check_structure(
                 severity=Severity.ERROR,
             )
         )
+
+    if not fix:
+        # Surface the actionable per-file legacy diagnostics (not just
+        # the aggregate validate_vault_structure message) so operators
+        # see what --fix would touch.
+        _migrate_legacy_root_indexes(root_dir, result, fix=False)
 
     for doc_path in snapshot:
         # Skip generated index files (non-standard naming convention)

@@ -30,6 +30,10 @@ The workflow persists the following documents:
 - `.vault/exec/yyyy-mm-dd-<feature>/...-summary.md`:
   The `<Phase Summary>`.
 
+- `.vault/index/<feature>.index.md`:
+  The auto-generated `<Feature Index>` linking every document for a
+  feature. Managed by `vault feature index`; do not author by hand.
+
 Where appropriate, use the following skills:
 
 - `vaultspec-research`
@@ -76,6 +80,12 @@ Artifacts lower in the hierarchy should reference those above them.
   - *Example:*
     `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-phase1-summary.md`
 
+- **Feature Indexes** (`.vault/index/{feature}.index.md`)
+
+  - *Auto-generated* by `vault feature index`; never authored by hand.
+  - *Filename:* `{feature}.index.md` (no date prefix).
+  - *Example:* `.vault/index/editor-demo.index.md`
+
 ## Must follow
 
 - We **ALWAYS** use **Obsidian-style Wiki Links** for internal documentation.
@@ -100,19 +110,22 @@ Artifacts lower in the hierarchy should reference those above them.
 ## Tag Taxonomy
 
 **ALLOWED TAGS - DO NOT REMOVE - REFERENCE:**
-`#adr` `#audit` `#exec` `#plan` `#reference` `#research` `#{feature}`
+`#adr` `#audit` `#exec` `#index` `#plan` `#reference` `#research`
+`#{feature}`
 
 Every document in `.vault/` MUST include **EXACTLY TWO** tags in the
 frontmatter `tags:` field:
 
 - **Directory Tag**: Based on the `.vault/` subfolder location
-  (`#adr`, `#audit`, `#exec`, `#plan`, `#reference`, `#research`)
+  (`#adr`, `#audit`, `#exec`, `#index`, `#plan`, `#reference`,
+  `#research`)
 
 - **Feature Tag**: Groups related documents across the feature lifecycle
   (kebab-case, e.g., `#editor-demo`)
 
 **CRITICAL:** No structural tags like `#step`, `#summary`, `#phase*`, or
-`#design` are allowed. Only the 6 tags listed above.
+`#design` are allowed. Only the 7 directory tags above plus the
+`#{feature}` slot.
 
 ### Directory Tags (Required for ALL documents)
 
@@ -123,6 +136,7 @@ The directory tag is determined by the file's location in `.vault/`:
 | `.vault/adr/`       | `#adr`       | Architecture Decision Records         |
 | `.vault/audit/`     | `#audit`     | Audit reports and assessments         |
 | `.vault/exec/`      | `#exec`      | Execution records (steps & summaries) |
+| `.vault/index/`     | `#index`     | Auto-generated feature indexes        |
 | `.vault/plan/`      | `#plan`      | Implementation plans                  |
 | `.vault/reference/` | `#reference` | Reference audits and blueprints       |
 | `.vault/research/`  | `#research`  | Research and brainstorming            |
@@ -137,7 +151,7 @@ one feature tag; additional tags are allowed):
 
 # REQUIRED TAGS (minimum 2): one directory tag + one feature tag
 
-# DIRECTORY TAGS: #adr #audit #exec #plan #reference #research
+# DIRECTORY TAGS: #adr #audit #exec #index #plan #reference #research
 
 tags:
 
@@ -158,6 +172,7 @@ related:
 - Exec summary: `tags: ["#exec", "#editor-demo"]`
 - Research: `tags: ["#research", "#text-layout"]`
 - Reference: `tags: ["#reference", "#text-layout"]`
+- Feature index (auto-generated): `tags: ["#index", "#editor-demo"]`
 
 ### Feature Tags
 

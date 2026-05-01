@@ -116,7 +116,9 @@ def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, st
             ensure_dir(d)
         created.append((_rel(target, d), "core (.vaultspec)"))
 
-    for subdir in ["adr", "audit", "exec", "plan", "reference", "research"]:
+    from vaultspec_core.vaultcore.models import DocType
+
+    for subdir in sorted(dt.value for dt in DocType):
         d = vault_dir / subdir
         if not dry_run:
             ensure_dir(d)

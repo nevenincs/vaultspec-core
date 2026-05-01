@@ -97,10 +97,15 @@ def _remove_related_entries(path: Path, targets: list[str]) -> int:
     frontmatter. Returns the number of entries removed.
     """
     try:
-        content = path.read_text(encoding="utf-8")
+        # Read as bytes and decode without universal newlines so the
+        # source CRLF/LF convention can be preserved when we re-emit
+        # the file.
+        raw_content = path.read_bytes().decode("utf-8")
     except (OSError, UnicodeDecodeError):
         return 0
 
+    source_newline = "\r\n" if "\r\n" in raw_content else "\n"
+    content = raw_content.replace("\r\n", "\n")
     lines = content.split("\n")
     target_set = {t.lower() for t in targets}
 
@@ -143,7 +148,7 @@ def _remove_related_entries(path: Path, targets: list[str]) -> int:
         new_lines.append(line)
 
     if removed:
-        new_content = "\n".join(new_lines)
+        new_content = source_newline.join(new_lines)
         bak = path.with_suffix(path.suffix + ".bak")
         bak.write_bytes(path.read_bytes())
         try:
