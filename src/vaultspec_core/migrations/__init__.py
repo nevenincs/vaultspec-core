@@ -265,12 +265,17 @@ def run_pending_migrations(
     Concurrency. The whole read-decide-migrate-bump cycle runs under
     :func:`vaultspec_core.core.helpers.advisory_lock` against the
     workspace's ``providers.json``. Concurrent invocations from
-    different processes serialise on the OS-level file lock; concurrent
-    invocations from the same process serialise on a per-path
-    threading lock. Migration bodies must not call back into the
-    manifest writer because the lock is non-reentrant; the first entry
-    (``index_subfolder``) only mutates ``.vault/`` content, which is
-    the documented contract for every entry that follows.
+    different processes serialise on the OS-level file lock;
+    concurrent invocations from the same process serialise on a
+    per-path threading lock. The driver itself only calls
+    :func:`read_manifest_data` and :func:`write_manifest_data`,
+    neither of which acquires the lock - the lock is acquired here
+    so the read-modify-write cycle stays atomic across concurrent
+    invocations. Migration bodies must not invoke any wrapper that
+    re-enters the lock (e.g. :func:`add_providers`,
+    :func:`remove_provider`, or :func:`write_manifest`); the first
+    entry (``index_subfolder``) only mutates ``.vault/`` content,
+    which is the documented contract for every entry that follows.
 
     Performance. The lazy-trigger caller passes ``use_cache=True``;
     after the first up-to-date observation per workspace per process,
@@ -331,6 +336,12 @@ def run_pending_migrations(
         # migration in the chain raises, the manifest already reflects
         # the work that did succeed, so the next invocation skips the
         # already-applied entries and re-attempts only the failing one.
+        # The local ``manifest`` mirrors the on-disk state so we do not
+        # need to re-read between iterations; ``write_manifest_data``
+        # auto-bumps ``serial`` on each call but does not mutate
+        # ``manifest`` itself, so we sync the bumped serial back from
+        # disk only at the end (in practice the value is informational;
+        # nothing in this loop reads it).
         results: list[MigrationResult] = []
         for migration in pending:
             logger.info(
@@ -342,12 +353,10 @@ def run_pending_migrations(
             logger.info("vaultspec migration: %s", result.summary)
             results.append(result)
 
-            fresh = read_manifest_data(workspace)
-            if parse_version_tuple(migration.target_version) > parse_version_tuple(
-                fresh.vaultspec_version
-            ):
-                fresh.vaultspec_version = migration.target_version
-                write_manifest_data(workspace, fresh)
+            target_parts = parse_version_tuple(migration.target_version)
+            if target_parts > parse_version_tuple(manifest.vaultspec_version):
+                manifest.vaultspec_version = migration.target_version
+                write_manifest_data(workspace, manifest)
 
         # Final bump to the running package version when it exceeds
         # the highest-target migration we just applied. In production
@@ -355,14 +364,16 @@ def run_pending_migrations(
         # registered target; the dual case is exercised only in tests
         # that synthesise migrations targeting a future version.
         running = _running_version()
-        fresh = read_manifest_data(workspace)
-        if parse_version_tuple(running) > parse_version_tuple(fresh.vaultspec_version):
-            fresh.vaultspec_version = running
-            write_manifest_data(workspace, fresh)
+        if parse_version_tuple(running) > parse_version_tuple(
+            manifest.vaultspec_version
+        ):
+            manifest.vaultspec_version = running
+            write_manifest_data(workspace, manifest)
 
-        final_version = read_manifest_data(workspace).vaultspec_version
         if use_cache:
             with _workspace_cache_lock:
-                _workspace_cache[cache_key] = parse_version_tuple(final_version)
+                _workspace_cache[cache_key] = parse_version_tuple(
+                    manifest.vaultspec_version
+                )
 
         return results
