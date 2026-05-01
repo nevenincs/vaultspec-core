@@ -54,10 +54,11 @@ def cmd_migrations_status(
     )
 
     root_dir = get_context().target_dir
-    status, _pending_names = migration_status(root_dir)
-    manifest_version = read_manifest_data(root_dir).vaultspec_version
+    mdata = read_manifest_data(root_dir)
+    manifest_version = mdata.vaultspec_version
+    status, _pending_names = migration_status(root_dir, manifest=mdata)
 
-    pending = list_pending(root_dir)
+    pending = list_pending(root_dir, manifest=mdata)
 
     if json_output:
         payload = {

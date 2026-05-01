@@ -97,6 +97,9 @@ def migrate(workspace: Path) -> MigrationResult:
             counts=counts,
         )
 
+    # Create the destination once; every relocation lands here.
+    index_dir.mkdir(parents=True, exist_ok=True)
+
     for legacy in legacy_files:
         target = index_dir / legacy.name
 
@@ -124,7 +127,6 @@ def migrate(workspace: Path) -> MigrationResult:
 
         new_content, changed = _ensure_index_directory_tag(content)
         try:
-            index_dir.mkdir(parents=True, exist_ok=True)
             if changed:
                 atomic_write(target, new_content)
                 legacy.unlink()

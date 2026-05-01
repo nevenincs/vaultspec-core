@@ -530,19 +530,28 @@ def _ensure_index_directory_tag(content: str) -> tuple[str, bool]:
 
 def _detect_legacy_root_indexes(
     root_dir: Path,
+    snapshot: VaultSnapshot,
     result: CheckResult,
 ) -> None:
     """Warn about misplaced feature index files without mutating.
 
-    Scans the docs tree for ``*.index.md`` files that do not live in
-    the canonical ``<docs_dir>/<index_dir>/`` subfolder and emits one
-    warning per file pointing the operator at
+    Walks *snapshot* for ``*.index.md`` files whose parent directory is
+    not the canonical ``<docs_dir>/<index_dir>/`` subfolder and emits
+    one warning per file pointing the operator at
     ``vaultspec-core migrations run``. Mutation lives in the migration
     registry (see :mod:`vaultspec_core.migrations`) and runs lazily on
     every vault command, so this checker stays read-only.
 
+    Reading from the pre-built snapshot rather than a fresh
+    :func:`pathlib.Path.rglob` walk avoids a redundant filesystem scan
+    inside the ``vault-fix`` pre-commit hook, which already has the
+    full document tree in memory.
+
     Args:
         root_dir: Project root directory.
+        snapshot: Pre-built snapshot mapping document paths to parsed
+            data. The detection only consults the keys, not the parsed
+            metadata, so any well-formed snapshot is acceptable.
         result: :class:`CheckResult` to accumulate diagnostics into.
     """
     from ...config import get_config
@@ -554,9 +563,9 @@ def _detect_legacy_root_indexes(
 
     index_dir = docs_dir / cfg.index_dir
     legacy_files = sorted(
-        item
-        for item in docs_dir.rglob("*.index.md")
-        if item.is_file() and item.parent != index_dir
+        path
+        for path in snapshot
+        if path.name.endswith(".index.md") and path.parent != index_dir
     )
     if not legacy_files:
         return
@@ -642,7 +651,7 @@ def check_structure(
 
     # Migration mutation lives in the registry; the checker only
     # surfaces pending-migration warnings irrespective of --fix.
-    _detect_legacy_root_indexes(root_dir, result)
+    _detect_legacy_root_indexes(root_dir, snapshot, result)
 
     for doc_path in snapshot:
         # Skip generated index files (non-standard naming convention)

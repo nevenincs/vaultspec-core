@@ -36,8 +36,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from ..core.helpers import parse_version_tuple
-from ..core.manifest import read_manifest_data, write_manifest_data
+from ..core.helpers import advisory_lock, parse_version_tuple
+from ..core.manifest import (
+    MANIFEST_FILENAME,
+    ManifestData,
+    read_manifest_data,
+    write_manifest_data,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -155,34 +160,47 @@ def _build_registry() -> list[Migration]:
 REGISTRY: list[Migration] = _build_registry()
 
 
-def list_pending(workspace: Path) -> list[Migration]:
+def list_pending(
+    workspace: Path,
+    *,
+    manifest: ManifestData | None = None,
+) -> list[Migration]:
     """Return every registered migration with a target above the manifest.
 
-    Reads the workspace manifest and filters
-    :data:`REGISTRY` to entries whose ``target_version`` is strictly
-    greater than the manifest's ``vaultspec_version``. A workspace
-    without a manifest (no ``providers.json``) is treated as a
-    not-installed case and produces an empty list; the registry only
+    Filters :data:`REGISTRY` to entries whose ``target_version`` is
+    strictly greater than the manifest's ``vaultspec_version``. A
+    workspace without a manifest (no ``providers.json``) is treated as
+    a not-installed case and produces an empty list; the registry only
     runs against an installed workspace.
 
     Args:
         workspace: Workspace root directory.
+        manifest: Optional pre-read :class:`ManifestData` to avoid a
+            second :func:`read_manifest_data` call when the caller has
+            already loaded it.
 
     Returns:
         List of pending :class:`Migration` instances in version order.
     """
-    manifest = read_manifest_data(workspace)
-    if not manifest.vaultspec_version:
+    mdata = manifest if manifest is not None else read_manifest_data(workspace)
+    if not mdata.vaultspec_version:
         return []
-    current = parse_version_tuple(manifest.vaultspec_version)
+    current = parse_version_tuple(mdata.vaultspec_version)
     return [m for m in REGISTRY if parse_version_tuple(m.target_version) > current]
 
 
-def migration_status(workspace: Path) -> tuple[MigrationStatus, list[str]]:
+def migration_status(
+    workspace: Path,
+    *,
+    manifest: ManifestData | None = None,
+) -> tuple[MigrationStatus, list[str]]:
     """Summarise the registry state for *workspace*.
 
     Args:
         workspace: Workspace root directory.
+        manifest: Optional pre-read :class:`ManifestData` to avoid a
+            second :func:`read_manifest_data` call when the caller has
+            already loaded it.
 
     Returns:
         Two-tuple ``(status, names)`` where *status* is
@@ -191,10 +209,10 @@ def migration_status(workspace: Path) -> tuple[MigrationStatus, list[str]]:
         :attr:`MigrationStatus.UP_TO_DATE` or
         :attr:`MigrationStatus.UNKNOWN`).
     """
-    manifest = read_manifest_data(workspace)
-    if not manifest.vaultspec_version:
+    mdata = manifest if manifest is not None else read_manifest_data(workspace)
+    if not mdata.vaultspec_version:
         return MigrationStatus.UNKNOWN, []
-    pending = list_pending(workspace)
+    pending = list_pending(workspace, manifest=mdata)
     if not pending:
         return MigrationStatus.UP_TO_DATE, []
     return MigrationStatus.PENDING, [m.name for m in pending]
@@ -231,6 +249,23 @@ def run_pending_migrations(
     exception unchanged and prevents the version bump, so the next
     call re-attempts from the same starting version.
 
+    Concurrency. The whole read-decide-migrate-bump cycle runs under
+    :func:`vaultspec_core.core.helpers.advisory_lock` against the
+    workspace's ``providers.json``. Concurrent invocations from
+    different processes serialise on the OS-level file lock; concurrent
+    invocations from the same process serialise on a per-path
+    threading lock. Migration bodies must not call back into the
+    manifest writer because the lock is non-reentrant; the first entry
+    (``index_subfolder``) only mutates ``.vault/`` content, which is
+    the documented contract for every entry that follows.
+
+    Performance. The lazy-trigger caller passes ``use_cache=True``;
+    after the first up-to-date observation per workspace per process,
+    every subsequent call short-circuits before acquiring the
+    file lock or reading the manifest. Up-to-date workspaces pay the
+    cost of a single :func:`dict.get` plus one tuple compare per
+    ``scan_vault`` invocation.
+
     Args:
         workspace: Workspace root directory.
         use_cache: When ``True`` (the lazy-trigger path), short-circuits
@@ -254,52 +289,55 @@ def run_pending_migrations(
     ):
         return []
 
-    manifest = read_manifest_data(workspace)
-    if not manifest.vaultspec_version:
-        return []
+    manifest_path = workspace / ".vaultspec" / MANIFEST_FILENAME
+    with advisory_lock(manifest_path):
+        manifest = read_manifest_data(workspace)
+        if not manifest.vaultspec_version:
+            return []
 
-    current = parse_version_tuple(manifest.vaultspec_version)
-    pending = [m for m in REGISTRY if parse_version_tuple(m.target_version) > current]
-    if not pending:
+        current = parse_version_tuple(manifest.vaultspec_version)
+        pending = list_pending(workspace, manifest=manifest)
+        if not pending:
+            if use_cache:
+                with _workspace_cache_lock:
+                    _workspace_cache[workspace] = current
+            return []
+
+        results: list[MigrationResult] = []
+        for migration in pending:
+            logger.info(
+                "Running migration %s (target_version=%s)",
+                migration.name,
+                migration.target_version,
+            )
+            result = migration.migrate(workspace)
+            logger.info("vaultspec migration: %s", result.summary)
+            results.append(result)
+
+        # Bump to whichever is higher: the running package version, or
+        # the highest-target migration we just applied. The latter case
+        # only arises in tests that synthesise migrations whose target
+        # exceeds the running version; the former is the production
+        # path where every released migration's target is <= the
+        # running version.
+        running = _running_version()
+        running_parts = parse_version_tuple(running)
+        highest_pending_parts = max(
+            (parse_version_tuple(m.target_version) for m in pending),
+            default=(),
+        )
+        new_version = (
+            running
+            if running_parts >= highest_pending_parts
+            else pending[-1].target_version
+        )
+
+        fresh = read_manifest_data(workspace)
+        fresh.vaultspec_version = new_version
+        write_manifest_data(workspace, fresh)
+
         if use_cache:
             with _workspace_cache_lock:
-                _workspace_cache[workspace] = current
-        return []
+                _workspace_cache[workspace] = parse_version_tuple(new_version)
 
-    results: list[MigrationResult] = []
-    for migration in pending:
-        logger.info(
-            "Running migration %s (target_version=%s)",
-            migration.name,
-            migration.target_version,
-        )
-        result = migration.migrate(workspace)
-        logger.info("vaultspec migration: %s", result.summary)
-        results.append(result)
-
-    # Bump to whichever is higher: the running package version, or the
-    # highest-target migration we just applied. The latter case only
-    # arises in tests that synthesise migrations whose target exceeds
-    # the running version; the former is the production path where
-    # every released migration's target is <= the running version.
-    running = _running_version()
-    running_parts = parse_version_tuple(running)
-    highest_pending_parts = max(
-        (parse_version_tuple(m.target_version) for m in pending),
-        default=(),
-    )
-    new_version = (
-        running
-        if running_parts >= highest_pending_parts
-        else pending[-1].target_version
-    )
-
-    fresh = read_manifest_data(workspace)
-    fresh.vaultspec_version = new_version
-    write_manifest_data(workspace, fresh)
-
-    if use_cache:
-        with _workspace_cache_lock:
-            _workspace_cache[workspace] = parse_version_tuple(new_version)
-
-    return results
+        return results
