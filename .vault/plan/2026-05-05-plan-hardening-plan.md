@@ -100,7 +100,7 @@ the hierarchy, the tier model, and points to the convention ADR
 as the authoritative spec.
 
 - [x] `W01.P03.S17` - remove the obsolete "do not include granular code details" rule; `.vaultspec/rules/skills/vaultspec-write/SKILL.md`.
-- [ ] `W01.P03.S18` - add the hierarchy and tier-model paragraph stating Epic > Wave > Phase > Step and the four tiers L1/L2/L3/L4; `.vaultspec/rules/skills/vaultspec-write/SKILL.md`.
+- [x] `W01.P03.S18` - add the hierarchy and tier-model paragraph stating Epic > Wave > Phase > Step and the four tiers L1/L2/L3/L4; `.vaultspec/rules/skills/vaultspec-write/SKILL.md`.
 - [ ] `W01.P03.S19` - update the workflow section to point readers to the convention ADR for the row contract, the embedded hint blocks (in the plan template), and the approved-vocabulary list; `.vaultspec/rules/skills/vaultspec-write/SKILL.md`.
 
 ### Phase `W01.P04` - rewrite the execute skill

@@ -24,6 +24,25 @@ approval.
 
 - If invoked standalone, you must locate or request relevant context.
 
+## Hierarchy and tiers
+
+The plan hierarchy is `Epic > Wave > Phase > Step`. Plans declare
+their complexity tier (`L1`, `L2`, `L3`, or `L4`) in frontmatter;
+the tier determines which structural containers exist:
+
+- `L1`: Steps only.
+- `L2`: Phases above Steps.
+- `L3`: Waves above Phases above Steps.
+- `L4`: Epic above Waves above Phases above Steps; an external
+  project-management association is declared in the Epic intent
+  block.
+
+Full criteria, the row contract, identifier rules, and
+ordering rules are specified in the plan-hardening convention ADR
+and embedded as markdown-comment hint blocks in
+`.vaultspec/rules/templates/plan.md`. The skill defers to those
+canonical sources rather than restating them.
+
 ## Rules
 
 - **Announce:** Explicitly state you are starting the planning phase.
