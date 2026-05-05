@@ -302,6 +302,31 @@ def test_epic_intent_ops_reject_non_l4_plans(tier: str) -> None:
         edit_epic_intent(plan, text="x")
 
 
+def test_move_phase_repairs_orphan_at_l3_into_destination_wave() -> None:
+    """An L3 Phase with no parent Wave is re-parented cleanly by ``move_phase``.
+
+    Regression for M-CLOSEOUT-3: the L3+ defensive code in ``move_phase``
+    handles the malformed case where ``current_wave`` is ``None`` (a Phase
+    in ``plan.phases`` not held by any Wave). The mover should re-parent
+    such an orphan into the destination Wave; this test fabricates the
+    orphan state and asserts the repair lands.
+    """
+    rng = random.Random(51)
+    spec = make_clean_plan("L3", rng=rng, waves=2, phases=1, steps=1)
+    plan = parse_plan(spec.render())
+    # Orphan: detach a Phase from its parent Wave but keep it in plan.phases.
+    orphan = plan.waves[0].phases[0]
+    plan.waves[0].phases.remove(orphan)
+    dest_wave = plan.waves[1]
+
+    move_phase(plan, orphan.canonical_id, to_wave=dest_wave.canonical_id)
+
+    assert orphan in dest_wave.phases
+    assert orphan in plan.phases
+    for step in orphan.steps:
+        assert step.display_path.startswith(dest_wave.canonical_id)
+
+
 def test_move_wave_preserves_relative_order_of_other_phases_and_steps() -> None:
     """Moving a Wave must leave the relative order of other Phases / Steps intact.
 

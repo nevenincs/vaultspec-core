@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from vaultspec_core.plan.commands._errors import PlanCommandError
 from vaultspec_core.plan.frontmatter import Tier
 from vaultspec_core.plan.identifiers import (
     next_available_phase,
@@ -35,11 +36,11 @@ __all__ = [
 ]
 
 
-class PromoteError(ValueError):
+class PromoteError(PlanCommandError, ValueError):
     """Raised when a promotion call references an unsupported target tier."""
 
 
-class DemoteError(ValueError):
+class DemoteError(PlanCommandError, ValueError):
     """Raised when a demotion would lose information without ``--force``."""
 
 

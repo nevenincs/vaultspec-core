@@ -26,60 +26,23 @@ __all__ = ["plan_app"]
 def _render_user_errors[F: Callable[..., None]](func: F) -> F:
     """Render handler-raised typed errors as one-line CLI messages.
 
-    Mutating handlers raise typed exceptions (``StepNotFoundError``,
-    ``MoveStepError``, ``AddPhaseError``, ``EpicIntentError``,
-    ``PromoteError``, ``DemoteError``, etc.) when the user supplies an
-    argument the plan rejects. Without this wrapper Typer renders a
-    Rich-formatted Python traceback to stderr; with it, the message
-    surfaces as ``error: <message>`` and the process exits 1.
+    Every command-handler typed exception inherits from
+    :class:`PlanCommandError`; the decorator catches that single base
+    so adding a new typed error requires no change here as long as it
+    inherits from the marker. The catch surfaces ``error: <message>``
+    on stderr and exits 1.
 
-    Programmer-error exceptions (assertions, ``ValueError`` from internal
-    invariants) are not caught; they propagate so test runs and CI
-    surface the bug.
+    Programmer-error exceptions (assertions, raw ``ValueError`` from
+    internal invariants that did not go through a typed wrapper) are
+    not caught; they propagate so test runs and CI surface the bug.
     """
-    from vaultspec_core.plan.commands.epic_ops import EpicIntentError
-    from vaultspec_core.plan.commands.phase_ops import (
-        AddPhaseError,
-        MovePhaseError,
-        PhaseNotFoundError,
-        PhaseRenumberError,
-    )
-    from vaultspec_core.plan.commands.step_ops import (
-        AddStepError,
-        MoveStepError,
-        StepNotFoundError,
-    )
-    from vaultspec_core.plan.commands.tier_ops import (
-        DemoteError,
-        PromoteError,
-    )
-    from vaultspec_core.plan.commands.wave_ops import (
-        AddWaveError,
-        MoveWaveError,
-        WaveNotFoundError,
-    )
-
-    user_errors: tuple[type[Exception], ...] = (
-        StepNotFoundError,
-        MoveStepError,
-        AddStepError,
-        PhaseNotFoundError,
-        MovePhaseError,
-        AddPhaseError,
-        PhaseRenumberError,
-        WaveNotFoundError,
-        MoveWaveError,
-        AddWaveError,
-        EpicIntentError,
-        PromoteError,
-        DemoteError,
-    )
+    from vaultspec_core.plan.commands._errors import PlanCommandError
 
     @wraps(func)
     def wrapper(*args: object, **kwargs: object) -> None:
         try:
             func(*args, **kwargs)
-        except user_errors as exc:
+        except PlanCommandError as exc:
             typer.echo(f"error: {exc}", err=True)
             raise typer.Exit(1) from exc
 

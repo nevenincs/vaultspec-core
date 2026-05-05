@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from vaultspec_core.plan.commands._errors import PlanCommandError
 from vaultspec_core.plan.frontmatter import Tier
 from vaultspec_core.plan.identifiers import next_available_wave
 from vaultspec_core.plan.parser import Wave
@@ -32,7 +33,7 @@ __all__ = [
 ]
 
 
-class AddWaveError(ValueError):
+class AddWaveError(PlanCommandError, ValueError):
     """Raised when a Wave add or insert call violates tier rules."""
 
 
@@ -97,11 +98,11 @@ def insert_wave(
     return new_wave
 
 
-class WaveNotFoundError(KeyError):
+class WaveNotFoundError(PlanCommandError, KeyError):
     """Raised when a Wave canonical identifier does not exist in the plan."""
 
 
-class MoveWaveError(ValueError):
+class MoveWaveError(PlanCommandError, ValueError):
     """Raised when a Wave move call references a non-existent anchor."""
 
 
@@ -196,8 +197,7 @@ def move_wave(
         if wave is moving:
             break
         new_phase_offset += len(wave.phases)
-        for phase in wave.phases:
-            new_step_offset += len(phase.steps)
+        new_step_offset += sum(len(phase.steps) for phase in wave.phases)
     for index, phase in enumerate(moving_phases):
         plan.phases.insert(new_phase_offset + index, phase)
     for index, step in enumerate(moving_steps):

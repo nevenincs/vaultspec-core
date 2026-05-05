@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from vaultspec_core.plan.commands._errors import PlanCommandError
 from vaultspec_core.plan.frontmatter import Tier
 from vaultspec_core.plan.parser import EpicIntent
 
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
 __all__ = ["EpicIntentError", "edit_epic_intent", "show_epic_intent"]
 
 
-class EpicIntentError(ValueError):
+class EpicIntentError(PlanCommandError, ValueError):
     """Raised when an Epic intent operation runs against a non-L4 plan."""
 
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from vaultspec_core.plan.commands._errors import PlanCommandError
 from vaultspec_core.plan.display_path import phase_display_path
 from vaultspec_core.plan.frontmatter import Tier
 from vaultspec_core.plan.identifiers import next_available_phase
@@ -34,15 +35,15 @@ __all__ = [
 ]
 
 
-class AddPhaseError(ValueError):
+class AddPhaseError(PlanCommandError, ValueError):
     """Raised when an add or insert call violates the parent-resolution rule."""
 
 
-class PhaseNotFoundError(KeyError):
+class PhaseNotFoundError(PlanCommandError, KeyError):
     """Raised when a Phase canonical identifier does not exist in the plan."""
 
 
-class MovePhaseError(ValueError):
+class MovePhaseError(PlanCommandError, ValueError):
     """Raised when a Phase move call violates the move-flag-precedence rule."""
 
 
@@ -71,7 +72,7 @@ def edit_phase(
     return phase
 
 
-class PhaseRenumberError(ValueError):
+class PhaseRenumberError(PlanCommandError, ValueError):
     """Raised when a Phase renumber call references a non-existent or colliding id."""
 
 
@@ -99,6 +100,17 @@ def renumber_phase(plan: Plan, phase_id: str, *, to: str) -> Phase:
         PhaseNotFoundError: When ``phase_id`` does not match a live Phase.
         PhaseRenumberError: When ``to`` collides with a live or retired id,
             or fails the canonical-shape regex.
+
+    Notes:
+        The canonical-shape regex is ``P\\d{2,}``: it accepts width-2,
+        width-3, etc. Per the convention ADR's *padding never narrows*
+        rule, padding may widen as the document grows past 99 ids;
+        ``renumber`` therefore allows targets like ``P100`` even on a
+        plan whose live ids are width-2. The verb does not enforce
+        "widen only when needed" because there are legitimate cases
+        (manual renumber to free a future slot, scripted bulk
+        remediation) where the writer wants to advance the padding
+        explicitly.
     """
     import re
 
@@ -122,6 +134,9 @@ def renumber_phase(plan: Plan, phase_id: str, *, to: str) -> Phase:
         raise PhaseRenumberError(msg)
 
     phase = find_phase(plan, phase_id)
+    # ``_wave_of`` is queried before the canonical_id rewrite so the
+    # parent lookup uses the still-current value. Lookup order matters
+    # because the rename below makes the old id invisible to the helper.
     parent_wave = _wave_of(plan, phase_id)
     parent_wave_id = parent_wave.canonical_id if parent_wave is not None else None
 
@@ -133,7 +148,14 @@ def renumber_phase(plan: Plan, phase_id: str, *, to: str) -> Phase:
             phase_id=to,
             wave_id=parent_wave_id,
         )
-    plan.retired_phase_ids.add(phase_id)
+    # Only retire the old id if no other live Phase still carries it.
+    # When the verb is used to remediate a collision (the documented
+    # primary use case), the colliding twin in another container is
+    # still alive and the id must remain available - retiring it would
+    # mark a live id as retired and lock it out of valid future
+    # next-available allocation.
+    if not any(other.canonical_id == phase_id for other in plan.phases):
+        plan.retired_phase_ids.add(phase_id)
     return phase
 
 

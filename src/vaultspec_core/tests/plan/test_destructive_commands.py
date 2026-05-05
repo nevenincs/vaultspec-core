@@ -140,6 +140,53 @@ def test_renumber_phase_rejects_collision_with_live_id() -> None:
         renumber_phase(plan, plan.phases[0].canonical_id, to=live_other)
 
 
+def test_renumber_phase_in_collision_does_not_retire_still_live_id() -> None:
+    """Renumbering a colliding twin must NOT retire the id used by the survivor.
+
+    Regression for H-CLOSEOUT-1: ``renumber_phase`` was unconditionally
+    adding the old id to ``plan.retired_phase_ids``. In the verb's primary
+    documented use case (remediating an authoring collision where two
+    containers carried the same canonical Phase id), the "old" id is still
+    live in the other container after the rename. Adding it to retired
+    would mark a live id as retired, blocking valid future allocations.
+    """
+    from vaultspec_core.plan.commands.phase_ops import renumber_phase
+
+    rng = random.Random(60)
+    spec = make_clean_plan("L3", rng=rng, waves=2, phases=2, steps=1)
+    plan = parse_plan(spec.render())
+    # Fabricate a duplicated id by direct mutation: give one of W02's
+    # Phases the same canonical id as the first W01 Phase.
+    duplicated_id = plan.waves[0].phases[0].canonical_id
+    target = plan.waves[1].phases[0]
+    target.canonical_id = duplicated_id
+    target.display_path = f"{plan.waves[1].canonical_id}.{duplicated_id}"
+
+    renumber_phase(plan, duplicated_id, to="P99")
+
+    # The renamed phase moved to P99; the duplicated id remains live in W01.
+    assert any(p.canonical_id == "P99" for p in plan.phases)
+    assert any(p.canonical_id == duplicated_id for p in plan.phases)
+    # Retirement set must NOT contain the still-live id.
+    assert duplicated_id not in plan.retired_phase_ids
+
+
+def test_renumber_phase_in_simple_rename_does_retire_old_id() -> None:
+    """Renumbering a unique id (no collision) retires it as expected."""
+    from vaultspec_core.plan.commands.phase_ops import renumber_phase
+
+    rng = random.Random(61)
+    spec = make_clean_plan("L2", rng=rng, phases=2, steps=1)
+    plan = parse_plan(spec.render())
+    unique_old = plan.phases[0].canonical_id
+
+    renumber_phase(plan, unique_old, to="P99")
+
+    assert "P99" in {p.canonical_id for p in plan.phases}
+    # Old id is no longer live anywhere -> should be retired.
+    assert unique_old in plan.retired_phase_ids
+
+
 def test_renumber_phase_rejects_retired_target_id() -> None:
     """Renumber refuses a target id sitting in the retirement set."""
     from vaultspec_core.plan.commands.phase_ops import (

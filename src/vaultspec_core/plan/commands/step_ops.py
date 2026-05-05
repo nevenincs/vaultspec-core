@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from vaultspec_core.plan.commands._errors import PlanCommandError
 from vaultspec_core.plan.display_path import step_display_path
 from vaultspec_core.plan.frontmatter import Tier
 from vaultspec_core.plan.identifiers import next_available_step
@@ -40,15 +41,15 @@ __all__ = [
 ]
 
 
-class AddStepError(ValueError):
+class AddStepError(PlanCommandError, ValueError):
     """Raised when an add or insert call violates the parent-resolution rule."""
 
 
-class StepNotFoundError(KeyError):
+class StepNotFoundError(PlanCommandError, KeyError):
     """Raised when a Step canonical identifier does not exist in the plan."""
 
 
-class MoveStepError(ValueError):
+class MoveStepError(PlanCommandError, ValueError):
     """Raised when a move call violates the move-flag-precedence rule.
 
     Per the CLI ADR's *Move-flag precedence* section, ``--before`` /

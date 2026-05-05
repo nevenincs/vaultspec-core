@@ -245,6 +245,11 @@ def _extract_retirement_ledger(body: str) -> tuple[set[str], set[str], set[str]]
     width (e.g. ``S1``) survives parsing; the identifier-hygiene rule
     flags such tokens via PLAN020 rather than letting them be silently
     dropped from retirement tracking.
+
+    Token matching is case-sensitive: ``s04`` / ``p02`` / ``w01`` do
+    not match the token regexes and are silently ignored. The ledger
+    schema is uppercase by spec; lower-cased tokens indicate hand-edit
+    drift that should be repaired by canonicalising before commit.
     """
     retired_steps: set[str] = set()
     retired_phases: set[str] = set()
