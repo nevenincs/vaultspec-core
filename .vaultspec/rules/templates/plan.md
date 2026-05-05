@@ -51,6 +51,24 @@ related:
      Selection is by complexity criteria, not container counting.
      Writer never invents containers to qualify a tier. -->
 
+<!-- IDENTIFIERS AND ROW CONTRACT:
+     S##, P##, W## are flat, per-document, append-only, immutable.
+     Promotion adds containers without renumbering. Gaps are not
+     reused.
+     Display paths are computed from current grouping:
+       Step path:    L1 S##   L2 P##.S##   L3/L4 W##.P##.S##
+       Phase heading:        L2 P##       L3/L4 W##.P##
+       Wave heading:                      L3/L4 W##
+     Row format:
+       - [ ] `<display-path>` - imperative-verb action; `path/to/file`.
+     Two-state checkboxes only ([ ] open, [x] closed). No per-row
+     reference footers; wiki-links and markdown links are forbidden
+     in plan body. Authorising documents go in the plan's `related:`
+     frontmatter once.
+     ASCII spaced hyphens everywhere; em-dash (U+2014) and en-dash
+     (U+2013) are forbidden. Step rows within a Phase are
+     contiguous. -->
+
 # `{feature}` `{phase}` plan
 
 Brief description of the proposed feature, change, or refactor.
