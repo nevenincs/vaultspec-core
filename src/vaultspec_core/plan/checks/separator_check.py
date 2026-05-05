@@ -1,18 +1,54 @@
-"""Separator-convention detection rule.
+"""Separator-convention detection rule (``PLAN060``).
 
-Implementation arrives in W02.P02.S51.
+The convention ADR's *Separator conventions* section forbids the
+em-dash (U+2014) and en-dash (U+2013) anywhere in plan body, plan
+headings, frontmatter, and markdown-comment hints. Detection is a
+character-level scan; the autofix in
+:mod:`vaultspec_core.plan.fixes.separator_fix` replaces every
+occurrence with an ASCII spaced hyphen.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from vaultspec_core.plan.checks._base import Finding
+from vaultspec_core.plan.checks._base import Finding, Severity
 
 __all__ = ["check_separator"]
 
 
-def check_separator(source_text: str) -> list[Finding]:  # noqa: ARG001
-    """Stub; concrete checks land in W02.P02.S51."""
-    return []
+# Forbidden dash codepoints declared via Unicode-name escape so this
+# source file does not itself trip RUF001 / RUF003 ambiguous-character
+# warnings while keeping the lookup keys as the literal characters.
+_EM_DASH = "\N{EM DASH}"
+_EN_DASH = "\N{EN DASH}"
+
+_FORBIDDEN_DASHES = {
+    _EM_DASH: "em-dash (U+2014)",
+    _EN_DASH: "en-dash (U+2013)",
+}
+
+
+def check_separator(source_text: str) -> list[Finding]:
+    """Yield one Finding per line that contains a forbidden dash character."""
+    findings: list[Finding] = []
+    for index, line in enumerate(source_text.splitlines(), start=1):
+        for char, label in _FORBIDDEN_DASHES.items():
+            if char in line:
+                findings.append(
+                    Finding(
+                        code="PLAN060",
+                        severity=Severity.ERROR,
+                        message=(
+                            f"Line contains forbidden {label}; the "
+                            "convention requires ASCII spaced hyphens."
+                        ),
+                        line_number=index,
+                        fix_hint=(
+                            "Replace the dash with ' - ' (space, ASCII "
+                            "hyphen-minus, space). 'vault plan check "
+                            "--fix' applies this replacement "
+                            "automatically."
+                        ),
+                        autofixable=True,
+                    ),
+                )
+    return findings

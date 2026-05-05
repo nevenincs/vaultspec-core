@@ -215,7 +215,7 @@ ADR and pass tests.
 - [x] `W02.P02.S48` - implement the display-path correctness detection rule against the current ancestor chain; `src/vaultspec_core/plan/checks/display_path_check.py`.
 - [x] `W02.P02.S49` - implement the row-contract detection rule (checkbox shape, separator, action, scope, period); `src/vaultspec_core/plan/checks/row_contract_check.py`.
 - [x] `W02.P02.S50` - implement the approved-structural-vocabulary detection rule scoped to headings, container-identifier code spans, and row-label position; `src/vaultspec_core/plan/checks/vocabulary_check.py`.
-- [ ] `W02.P02.S51` - implement the separator-convention detection rule (no em-dash, no en-dash); `src/vaultspec_core/plan/checks/separator.py`.
+- [x] `W02.P02.S51` - implement the separator-convention detection rule (no em-dash, no en-dash); `src/vaultspec_core/plan/checks/separator_check.py`.
 - [ ] `W02.P02.S52` - implement the `vault plan check --fix` autofix harness with idempotency guarantees; `src/vaultspec_core/plan/commands/check.py`.
 - [ ] `W02.P02.S53` - implement the checkbox-spacing autofix; `src/vaultspec_core/plan/fixes/checkbox.py`.
 - [ ] `W02.P02.S54` - implement the separator-normalisation autofix; `src/vaultspec_core/plan/fixes/separator.py`.
