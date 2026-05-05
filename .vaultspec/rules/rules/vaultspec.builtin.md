@@ -206,6 +206,7 @@ All placeholders use **lowercase, kebab-case** format:
 | Placeholder | Format     | Example                  |
 | :---------- | :--------- | :----------------------- |
 | `{feature}` | kebab-case | `editor-demo`            |
+| `{wave}`    | kebab-case | `wave-1`, `wave-2`       |
 | `{phase}`   | kebab-case | `phase-1`, `phase-2`     |
 | `{topic}`   | kebab-case | `event-handling`         |
 | `{title}`   | kebab-case | `displaymap-integration` |

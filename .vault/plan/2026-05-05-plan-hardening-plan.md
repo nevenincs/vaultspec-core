@@ -138,7 +138,7 @@ across templates. The Phase ends when `{wave}` and `{tier}` are
 present and `{step}` is the sole authorised leaf-row
 placeholder.
 
-- [ ] `W01.P07.S26` - add `{wave}` to the Document Body Placeholders table with its YAML format; `.vaultspec/rules/rules/vaultspec.builtin.md`.
+- [x] `W01.P07.S26` - add `{wave}` to the Document Body Placeholders table with its YAML format; `.vaultspec/rules/rules/vaultspec.builtin.md`.
 - [ ] `W01.P07.S27` - add `{tier}` to the Document Body Placeholders table with its allowed values; `.vaultspec/rules/rules/vaultspec.builtin.md`.
 - [ ] `W01.P07.S28` - remove any legacy leaf-row placeholders so `{step}` is the sole authorised leaf-row placeholder; `.vaultspec/rules/rules/vaultspec.builtin.md`.
 
