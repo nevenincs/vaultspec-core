@@ -151,16 +151,23 @@ templates.
 
 ## Parallelization
 
-Brief opinion on how tasks might be parallelized, if at all.
+State which Steps, Phases, or Waves can be executed in parallel and
+which carry hard ordering. At `L1` and `L2`, parallelism is decided
+per-Step or per-Phase. At `L3` and `L4`, Waves are sequenced by
+default (one Wave must land before the next can begin); Phases
+within a single Wave may be parallelised when they share no hard
+interdependency.
 
 ## Verification
 
-Clear mission success criteria. Focus on feature coverage against the original
-`{adr}`s and `{research}` documents.
+State the mission success criteria for this plan. Each criterion
+should be a verifiable check (test passes, surface conforms,
+reviewer signs off) rather than a free-form assertion.
 
-Research and ideate on how to ensure besides unit testing that we have
-fulfilled our mission.
+The plan is complete when every Step in every Wave is closed
+(`- [x]`). At `L4`, the Epic-completion check additionally requires
+the declared project-management association to report the Epic
+complete.
 
-Example: "Run unit and integration tests (all pass). However, could not
-visually confirm that the feature was functional. Further work is required to
-implement features to enable better testing." Be honest - tests can be cheated!
+For tier-specific verification cadence, see the convention ADR
+authorising this plan via the `related:` frontmatter.

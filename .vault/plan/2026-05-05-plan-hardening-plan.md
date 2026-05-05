@@ -76,7 +76,7 @@ three hint blocks verbatim.
 - [x] `W01.P01.S08` - add the Wave block format example as a commented template; `.vaultspec/rules/templates/plan.md`.
 - [x] `W01.P01.S09` - add the Epic intent block format example as a commented template; `.vaultspec/rules/templates/plan.md`.
 - [x] `W01.P01.S10` - remove the existing flat-bullet escape hatch that previously permitted simpler features to bypass the Step row contract; `.vaultspec/rules/templates/plan.md`.
-- [ ] `W01.P01.S11` - rewrite the Parallelization and Verification sections so they reflect the tier-driven structure rather than free-form prose; `.vaultspec/rules/templates/plan.md`.
+- [x] `W01.P01.S11` - rewrite the Parallelization and Verification sections so they reflect the tier-driven structure rather than free-form prose; `.vaultspec/rules/templates/plan.md`.
 
 ### Phase `W01.P02` - rewrite the writer-agent persona
 
