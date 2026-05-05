@@ -40,11 +40,17 @@ Assume the persona of a delegator.
 
 ### Step Execution & Logging
 
-- Execute the plan step-by-step or in logical batches.
+- Execute the plan one Step at a time. Per the convention ADR's
+  Step row contract, each Step is exactly one prompt-run plus one
+  commit; the executor closes the row (`- [ ]` to `- [x]`) on
+  completion.
 
-- **Coder must write a Step Record** to
+- **One Step Record per completed Step.** The executor writes a
+  Step Record to
   `.vault/exec/yyyy-mm-dd-{feature}/yyyy-mm-dd-{feature}-{phase}-{step}.md`
-  for every completed phase.
+  for every completed Step (not per Phase). The originating
+  Step's canonical identifier (`S##`) is recorded in the Step
+  Record's `step_id:` frontmatter field.
 
 - **Coder or supervisor must MUST read and use the template** at
   `.vaultspec/rules/templates/exec-step.md`.
