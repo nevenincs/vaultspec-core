@@ -195,8 +195,8 @@ covered by unit tests.
 - [x] `W02.P01.S37` - implement hierarchy parsing for Wave, Phase, and Step blocks against the row contract; `src/vaultspec_core/plan/parser.py`.
 - [x] `W02.P01.S38` - implement canonical-identifier extraction and per-document next-available counter; `src/vaultspec_core/plan/identifiers.py`.
 - [x] `W02.P01.S39` - implement display-path computation from current ancestor chain; `src/vaultspec_core/plan/display_path.py`.
-- [ ] `W02.P01.S40` - implement plan-document model serialisation back to markdown preserving document order; `src/vaultspec_core/plan/serialiser.py`.
-- [ ] `W02.P01.S41` - add round-trip parser tests covering L1, L2, L3, and L4 plan shapes; `src/vaultspec_core/tests/plan/test_parser_roundtrip.py`.
+- [x] `W02.P01.S40` - implement plan-document model serialisation back to markdown preserving document order; `src/vaultspec_core/plan/serialiser.py`.
+- [x] `W02.P01.S41` - add round-trip parser tests covering L1, L2, L3, and L4 plan shapes; `src/vaultspec_core/tests/plan/test_serialiser.py`.
 
 ### Phase `W02.P02` - read commands
 
