@@ -47,11 +47,12 @@ Utilize:
 
   - Concise summary of key changes.
 
-- **CLI usage mandate**: Update the originating Step's state via
-  `vault plan step check` (close) or `vault plan step uncheck`
-  (re-open) on completion. Hand-editing the checkbox glyph bypasses
-  the CLI's idempotency guarantees. See the CLI ADR
-  (`2026-05-06-plan-hardening-adr`).
+- **CLI usage mandate**: You MUST update the originating Step's
+  state via `vault plan step check` (close), `vault plan step uncheck`
+  (re-open), or `vault plan step toggle` on completion. Hand-editing
+  the checkbox glyph is forbidden because it bypasses the CLI's
+  idempotency guarantees and is flagged by `vault plan check`. See
+  the CLI ADR (`2026-05-06-plan-hardening-adr`).
 
 ## Standards & Tooling
 
