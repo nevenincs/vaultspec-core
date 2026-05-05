@@ -14,6 +14,8 @@ sub-call inside ``install_run``.
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 
 from vaultspec_core.core.guards import (
@@ -21,6 +23,7 @@ from vaultspec_core.core.guards import (
     _cached_is_dev_repo,
     is_dev_repo,
 )
+from vaultspec_core.core.types import WorkspaceContext, _workspace_ctx
 
 pytestmark = [pytest.mark.unit]
 
@@ -31,6 +34,36 @@ def _clear_cache():
     _cached_is_dev_repo.cache_clear()
     yield
     _cached_is_dev_repo.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_workspace_ctx():
+    """Reset the global :class:`WorkspaceContext` after each test.
+
+    ``install_run`` calls ``init_paths`` internally, which sets a
+    process-global :class:`~contextvars.ContextVar`. Without an
+    explicit reset, the context leaks into every subsequent test in
+    the unit suite and breaks tests that assert "no context exists"
+    (e.g. ``test_collectors.py::TestConfigState::test_missing_no_context``).
+
+    Use the ``ContextVar.set + reset`` token mechanism: set a sentinel
+    value at fixture entry to obtain a token whose later ``reset``
+    restores the var to the state it had BEFORE that ``set`` call.
+    This works regardless of whether the var was previously set
+    (``reset`` puts back the prior value) or unset (``reset`` puts it
+    back into the unset state). The test body is free to overwrite
+    the var; we still hold the token from our entry call.
+
+    The sentinel is typed as :class:`WorkspaceContext` via :func:`cast`
+    to satisfy the strict ContextVar generic; the value is never
+    observed because the test body overwrites it before any read.
+    """
+    sentinel = cast("WorkspaceContext", object())
+    token = _workspace_ctx.set(sentinel)
+    try:
+        yield
+    finally:
+        _workspace_ctx.reset(token)
 
 
 def _materialise_source_layout(root) -> None:
