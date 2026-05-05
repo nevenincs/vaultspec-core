@@ -123,11 +123,25 @@ def test_apply_all_fixes_repairs_em_dash_separator() -> None:
 
 
 def test_apply_all_fixes_is_idempotent_under_random_seeds() -> None:
-    """Applying the harness twice yields the same text on the second run."""
+    """The harness is a no-op on already-canonical text.
+
+    The factory's render shape is not byte-identical to the serialiser's
+    canonical output (different title block, no LINK RULES comment), so the
+    correct invariant to assert is: once a document has been canonicalised
+    by ``serialise_plan(parse_plan(...))``, subsequent ``apply_all_fixes``
+    invocations leave it untouched. This guards against the silent-corruption
+    regression where ``fix_display_paths`` overwrote Phase/Wave intent prose
+    with the ``TODO:`` placeholder on every first pass.
+    """
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
     rng = random.Random(2)
     spec = make_clean_plan("L3", rng=rng, waves=2, phases=2, steps=2)
 
-    once = apply_all_fixes(spec.render())
+    canonical = serialise_plan(parse_plan(spec.render()))
+    once = apply_all_fixes(canonical)
     twice = apply_all_fixes(once)
 
+    assert canonical == once
     assert once == twice

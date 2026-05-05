@@ -136,6 +136,35 @@ def test_l4_plan_emits_epic_intent_block() -> None:
     assert plan.epic_intent.text  # non-empty paragraph
 
 
+@pytest.mark.parametrize("seed", range(8))
+def test_phase_intent_paragraph_round_trips_through_parse(seed: int) -> None:
+    """Phase intent prose must survive the parse step, not be silently dropped.
+
+    Regression for the silent-data-loss flaw where ``_walk_body`` hard-coded
+    ``intent=""`` on every Phase, causing serialiser round-trips to overwrite
+    author-written intent prose with the ``TODO:`` placeholder.
+    """
+    rng = random.Random(seed)
+    spec = make_clean_plan("L2", rng=rng, phases=2, steps=2)
+    plan = parse_plan(spec.render())
+
+    assert all(phase.intent for phase in plan.phases)
+    for parsed, source in zip(plan.phases, spec.phases, strict=False):
+        assert parsed.intent == source.intent.strip()
+
+
+@pytest.mark.parametrize("seed", range(8))
+def test_wave_intent_paragraph_round_trips_through_parse(seed: int) -> None:
+    """Wave intent prose must survive the parse step, not be silently dropped."""
+    rng = random.Random(seed)
+    spec = make_clean_plan("L3", rng=rng, waves=2, phases=2, steps=2)
+    plan = parse_plan(spec.render())
+
+    assert all(wave.intent for wave in plan.waves)
+    for parsed, source in zip(plan.waves, spec.waves, strict=False):
+        assert parsed.intent == source.intent.strip()
+
+
 @pytest.mark.parametrize("tier", ["L1", "L2", "L3"])
 def test_lower_tiers_have_no_epic_intent(tier: str) -> None:
     """L1, L2, L3 plans never carry an Epic intent block."""

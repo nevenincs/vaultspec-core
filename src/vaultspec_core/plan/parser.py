@@ -263,6 +263,11 @@ def _walk_body(body: str) -> tuple[list[Wave], list[Phase], list[Step]]:
     Document-order is preserved: containers are appended as they are
     discovered. The returned ``phases`` and ``steps`` are flattened
     mirrors that convey order across the entire document.
+
+    Intent prose between a Wave or Phase heading and the next
+    structural element (row, sub-heading, or sibling heading) is
+    captured into the corresponding container's ``intent`` field so
+    that round-trips do not silently discard it.
     """
     waves: list[Wave] = []
     phases: list[Phase] = []
@@ -270,6 +275,13 @@ def _walk_body(body: str) -> tuple[list[Wave], list[Phase], list[Step]]:
 
     current_wave: Wave | None = None
     current_phase: Phase | None = None
+    intent_target: Wave | Phase | None = None
+    intent_buffer: list[str] = []
+
+    def _flush_intent() -> None:
+        if intent_target is not None and intent_buffer:
+            intent_target.intent = "\n".join(intent_buffer).strip()
+        intent_buffer.clear()
 
     for index, line in enumerate(body.splitlines(), start=1):
         wave_match = _RE_WAVE_HEADING.match(line)
@@ -277,6 +289,7 @@ def _walk_body(body: str) -> tuple[list[Wave], list[Phase], list[Step]]:
         step_match = _RE_STEP_ROW.match(line)
 
         if wave_match:
+            _flush_intent()
             current_wave = Wave(
                 canonical_id=wave_match.group("id"),
                 title=wave_match.group("title"),
@@ -285,9 +298,11 @@ def _walk_body(body: str) -> tuple[list[Wave], list[Phase], list[Step]]:
             )
             waves.append(current_wave)
             current_phase = None
+            intent_target = current_wave
             continue
 
         if phase_match:
+            _flush_intent()
             path = phase_match.group("path")
             phase_id = path.split(".")[-1]
             current_phase = Phase(
@@ -300,13 +315,27 @@ def _walk_body(body: str) -> tuple[list[Wave], list[Phase], list[Step]]:
             phases.append(current_phase)
             if current_wave is not None:
                 current_wave.phases.append(current_phase)
+            intent_target = current_phase
             continue
 
         if step_match:
+            _flush_intent()
+            intent_target = None
             step = _build_step(step_match, index, line)
             steps.append(step)
             if current_phase is not None:
                 current_phase.steps.append(step)
+            continue
+
+        if intent_target is not None:
+            stripped = line.strip()
+            if stripped.startswith("# ") or stripped.startswith("## "):
+                _flush_intent()
+                intent_target = None
+                continue
+            intent_buffer.append(line)
+
+    _flush_intent()
 
     return waves, phases, steps
 
