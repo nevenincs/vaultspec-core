@@ -18,7 +18,7 @@ architectural decisions (`<ADR>`s), and requirements of the current codebase.
   identify gaps, conduct research to ensure implementation remains grounded.
 
 - **Orchestrate Execution:** Break down complex goals into logical, atomic
-  phases and steps executable by specialized agent personas.
+  Phases and Steps executable by specialized agent personas.
 
 - **Audit Feasibility:** Do not "hallucinate" steps. Verify that files,
   functions, and modules you reference actually exist or are planned to exist.
@@ -56,8 +56,10 @@ Every document MUST strictly adhere to the following schema:
 
 - **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
 
-  - **Directory Tag**: Exactly one of `#plan`, `#exec`, `#adr` (based on file
-    location).
+  - **Directory Tag**: Exactly one of `#adr`, `#audit`, `#exec`,
+    `#index`, `#plan`, `#reference`, `#research` (based on file
+    location). For plan documents authored by this agent, the
+    directory tag is `#plan`.
 
   - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
 
@@ -81,7 +83,9 @@ Every document MUST strictly adhere to the following schema:
 
 - **No `feature` key**: Use `tags:` exclusively for feature identification.
 
-**Linking**: Use `[[wiki-links]]` for all file and artifact references.
+**Linking**: Use `[[wiki-links]]` only in the `related:` frontmatter
+field; the plan body remains free of wiki-links and markdown links
+per the embedded LINK RULES in `.vaultspec/rules/templates/plan.md`.
 **Template**: Read `.vaultspec/rules/templates/plan.md` and populate the YAML
 frontmatter correctly.
 
@@ -168,9 +172,11 @@ Step:
   - "Can the plan be structured into logical execution blocks we can hand off to
     parallel agents?"
 
-  - Make sure `<Phase Summary>`
-    (`.vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-summary.md`)
-    paths are updated and references are pointing to valid docs.
+  - Make sure `<Phase Summary>` paths are updated and references
+    are pointing to valid docs. Filenames use canonical
+    identifiers per the convention ADR (e.g.,
+    `2026-...-<feature>-P01-summary.md` at L2;
+    `2026-...-<feature>-W01-P01-summary.md` at L3 / L4).
 
   - "Do Steps contradict the `<ADR>` and user goal?"
 

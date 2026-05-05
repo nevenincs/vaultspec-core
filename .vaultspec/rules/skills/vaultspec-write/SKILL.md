@@ -86,8 +86,17 @@ Every document MUST strictly adhere to the following schema:
 - **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
 
   - _Constraint:_ No relative paths (`../`), no bare strings, no `@ref`.
+  - _For plan documents:_ `related` carries the AUTHORISING documents
+    (ADR, research, reference, prior plan) for every Step in the plan.
+    Steps inherit this chain; per-row reference footers do not exist.
+    `related` is required when the plan contains at least one Step row.
 
 - **`date`**: MUST use `yyyy-mm-dd` format.
+
+- **`tier`** (plan documents only): MUST be present as an unquoted
+  scalar with value `L1`, `L2`, `L3`, or `L4`. Pre-existing plans
+  without the field default to `L2`; the writer adds the field on
+  first edit.
 
 - **No `feature` key**: Use `tags:` exclusively for feature identification.
 

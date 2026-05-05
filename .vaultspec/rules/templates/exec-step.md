@@ -35,7 +35,13 @@ related:
      step_id frontmatter field below carries the canonical identifier;
      the heading restates the display path as a reading hint. -->
 
-# `{feature}` `{phase}` `{step}`
+# `{feature}` `<display-path>`
+
+<!-- The <display-path> in the heading above is the originating Step's
+     tier-conditional display path:
+       L1       = `{step}`            (e.g., `S01`)
+       L2       = `{phase}.{step}`    (e.g., `P01.S01`)
+       L3 / L4  = `{wave}.{phase}.{step}`  (e.g., `W01.P01.S01`) -->
 
 Brief summary of work done.
 

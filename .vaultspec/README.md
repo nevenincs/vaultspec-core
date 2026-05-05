@@ -40,7 +40,7 @@ Review the ADR carefully. This is where you commit to an approach. Sign off befo
 
 ### Planning
 
-With approved ADRs in hand, call the `vaultspec-write` skill to produce an implementation plan. It reads the ADR and produces a row-per-Step plan grouped by the convention's complexity tier.
+With approved ADRs in hand, call the `vaultspec-write-plan` skill to produce an implementation plan. It reads the ADR and produces a row-per-Step plan grouped by the convention's complexity tier.
 
 > "Write an implementation plan for the search feature based on the ADR"
 

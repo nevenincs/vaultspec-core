@@ -20,7 +20,7 @@ Use this skill:
   `.vault/plan/yyyy-mm-dd-{feature}-{phase}-plan.md`.
 
 - Read and parse the Plan to understand the scope, complexity, and specific
-  steps
+  Steps
 
 - Read and parse all linked document to understand context for code challange.
 
@@ -36,7 +36,8 @@ Assume the persona of a delegator.
 - Always instruct the coders to execute the current plan, and to read grounding
   research, adrs and the `[[...-plan.md]]`.
 
-- Always instruct to "Start with Phase `{X}`."
+- Always instruct to "Start with Phase `P##`." (or the canonical
+  display path, e.g., `W01.P01`, at L3 / L4).
 
 ### Step Execution & Logging
 

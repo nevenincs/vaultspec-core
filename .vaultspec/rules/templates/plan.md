@@ -42,23 +42,12 @@ related:
      (mandatory for new plans; pre-existing plans without the
      field default to L2 and the writer adds the field on first
      edit). The tier selects containers:
-       L1 = Steps only (single session; single concern; one
-            cohesive change; one day or less; no cross-module
-            coupling).
-       L2 = Phases above Steps (1-3 days; all Steps within a single
-            package, subsystem, or configuration domain; multiple
-            Phases each grouping logically related Steps; no hard
-            interdependencies between Phases).
-       L3 = Waves above Phases above Steps (3-10 days; multi-
-            session; hard interdependencies between batches; one
-            batch must land before another can begin; codebase
-            reordering or foundational changes; Steps span two or
-            more boundaries with hard ordering between them).
-       L4 = Epic above Waves above Phases above Steps (multi-week
-            or multi-month; multi-team or multi-agent; tracking
-            required against external project-management artefacts;
-            MVP, business case, or equivalent governance; PM
-            association declared in Epic intent block prose).
+       L1 = Steps only.
+       L2 = Phases above Steps.
+       L3 = Waves above Phases above Steps.
+       L4 = Epic above Waves above Phases above Steps; MUST declare
+            a project-management association in the Epic intent
+            block prose.
      Selection is by complexity criteria, not container counting.
      Writer never invents containers to qualify a tier. -->
 
