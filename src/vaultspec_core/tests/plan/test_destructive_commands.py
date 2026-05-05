@@ -34,7 +34,13 @@ from vaultspec_core.tests.plan._factories import make_clean_plan
 
 
 def test_remove_step_retires_id_with_no_reuse() -> None:
-    """Removing the highest-numbered Step still advances the next-available counter."""
+    """Removing the highest-numbered Step retires the id; counter never reuses it.
+
+    Per the convention's append-only / no-reuse contract, removing ``S04`` from
+    a plan with ``S01..S04`` must leave ``next_available_step`` returning
+    ``S05``, not ``S04``. The retirement set persists across parse / serialise
+    round-trips via the hidden ``<!-- RETIRED: ... -->`` ledger.
+    """
     rng = random.Random(0)
     spec = make_clean_plan("L1", rng=rng, steps=4)
     plan = parse_plan(spec.render())
@@ -45,12 +51,56 @@ def test_remove_step_retires_id_with_no_reuse() -> None:
     post_next = next_available_step(plan)
 
     assert retired == "S04"
-    # Counter advances past the highest surviving id (S03), giving S04;
-    # but the convention's append-only spirit implies callers rely on
-    # the parser's view of surviving ids. Either way, the retired id is
-    # not present in the surviving set.
     assert "S04" not in {step.canonical_id for step in plan.steps}
-    assert int(post_next[1:]) > 0
+    assert "S04" in plan.retired_step_ids
+    assert post_next == "S05"
+
+
+def test_retired_step_id_persists_across_round_trip() -> None:
+    """Retired Step ids survive parse → serialise → parse."""
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    rng = random.Random(20)
+    spec = make_clean_plan("L1", rng=rng, steps=4)
+    plan = parse_plan(spec.render())
+    remove_step(plan, "S04")
+
+    serialised = serialise_plan(plan)
+    reparsed = parse_plan(serialised)
+
+    assert reparsed.retired_step_ids == {"S04"}
+    assert next_available_step(reparsed) == "S05"
+
+
+def test_retired_phase_id_persists_across_round_trip() -> None:
+    """Retired Phase ids and their cascaded Steps survive a round-trip."""
+    from vaultspec_core.plan.commands.phase_ops import remove_phase
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    rng = random.Random(21)
+    spec = make_clean_plan("L2", rng=rng, phases=2, steps=2)
+    plan = parse_plan(spec.render())
+    target_phase = plan.phases[0].canonical_id
+    target_steps = {step.canonical_id for step in plan.phases[0].steps}
+
+    remove_phase(plan, target_phase)
+    reparsed = parse_plan(serialise_plan(plan))
+
+    assert target_phase in reparsed.retired_phase_ids
+    assert target_steps <= reparsed.retired_step_ids
+
+
+def test_demote_retires_dropped_wave_ids() -> None:
+    """Demoting L3 -> L2 retires every Wave canonical id it discards."""
+    rng = random.Random(22)
+    spec = make_clean_plan("L3", rng=rng, waves=2, phases=1, steps=1)
+    plan = parse_plan(spec.render())
+    pre_wave_ids = {wave.canonical_id for wave in plan.waves}
+
+    demote_tier(plan, force=True)
+
+    assert pre_wave_ids <= plan.retired_wave_ids
+    assert plan.waves == []
 
 
 def test_phase_remove_cascades_to_descendant_steps() -> None:

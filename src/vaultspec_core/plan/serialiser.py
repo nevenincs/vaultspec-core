@@ -46,6 +46,10 @@ def serialise_plan(plan: Plan) -> str:
     parts.append("")
     parts.append(_render_link_rules_comment())
     parts.append("")
+    ledger = _render_retirement_ledger(plan)
+    if ledger is not None:
+        parts.append(ledger)
+        parts.append("")
     parts.append(f"# {plan.title}")
     parts.append("")
 
@@ -140,6 +144,28 @@ def _render_wave_block(wave: Wave) -> list[str]:
     for phase in wave.phases:
         lines.extend(_render_phase_block(phase, wave_id=wave.canonical_id))
     return lines
+
+
+def _render_retirement_ledger(plan: Plan) -> str | None:
+    """Render the hidden HTML comment ledger of retired canonical ids.
+
+    Emits ``<!-- RETIRED: <ids> -->`` when the plan has any retired
+    Step / Phase / Wave identifiers; returns ``None`` when nothing has
+    been retired so clean plans round-trip without an empty ledger.
+    Tokens are sorted by container kind (Wave > Phase > Step) and then
+    by numeric suffix so the output is deterministic.
+    """
+    tokens: list[str] = []
+    retirement_sets = (
+        plan.retired_wave_ids,
+        plan.retired_phase_ids,
+        plan.retired_step_ids,
+    )
+    for retired in retirement_sets:
+        tokens.extend(sorted(retired, key=lambda t: int(t[1:])))
+    if not tokens:
+        return None
+    return f"<!-- RETIRED: {', '.join(tokens)} -->"
 
 
 def _placeholder_intent(container: str) -> str:

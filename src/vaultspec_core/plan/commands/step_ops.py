@@ -275,6 +275,7 @@ def remove_step(plan: Plan, step_id: str) -> str:
     if parent_phase is not None:
         parent_phase.steps.remove(step)
     plan.steps.remove(step)
+    plan.retired_step_ids.add(step.canonical_id)
     return step.canonical_id
 
 

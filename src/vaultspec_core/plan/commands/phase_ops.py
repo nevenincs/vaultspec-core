@@ -193,6 +193,8 @@ def remove_phase(plan: Plan, phase_id: str) -> tuple[str, list[str]]:
     plan.phases.remove(phase)
     if parent_wave is not None:
         parent_wave.phases.remove(phase)
+    plan.retired_phase_ids.add(phase.canonical_id)
+    plan.retired_step_ids.update(retired_step_ids)
     return phase.canonical_id, retired_step_ids
 
 

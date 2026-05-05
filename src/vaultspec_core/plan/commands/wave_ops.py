@@ -224,6 +224,9 @@ def remove_wave(plan: Plan, wave_id: str) -> tuple[str, list[str], list[str]]:
             plan.steps.remove(step)
         plan.phases.remove(phase)
     plan.waves.remove(wave)
+    plan.retired_wave_ids.add(wave.canonical_id)
+    plan.retired_phase_ids.update(retired_phase_ids)
+    plan.retired_step_ids.update(retired_step_ids)
     return wave.canonical_id, retired_phase_ids, retired_step_ids
 
 

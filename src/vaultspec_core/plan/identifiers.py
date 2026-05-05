@@ -114,9 +114,9 @@ def validate_identifiers(plan: Plan) -> None:
 def next_available_step(plan: Plan) -> str:
     """Return the next-available ``S##`` identifier for the plan.
 
-    The next-available value is one greater than the maximum existing
-    Step number, ensuring append-only allocation. Gaps in the existing
-    sequence are preserved (never reused).
+    The next-available value is one greater than the maximum of the
+    live and retired Step numbers, ensuring append-only allocation.
+    Gaps left by retirement are preserved (never reused).
 
     Args:
         plan: Parsed :class:`Plan` model.
@@ -128,12 +128,16 @@ def next_available_step(plan: Plan) -> str:
     """
     return _next_available_id(
         existing=[s.canonical_id for s in plan.steps],
+        retired=plan.retired_step_ids,
         prefix="S",
     )
 
 
 def next_available_phase(plan: Plan) -> str:
     """Return the next-available ``P##`` identifier for the plan.
+
+    Skips both live and retired Phase numbers so removed identifiers
+    are never reissued.
 
     Args:
         plan: Parsed :class:`Plan` model.
@@ -143,12 +147,15 @@ def next_available_phase(plan: Plan) -> str:
     """
     return _next_available_id(
         existing=[p.canonical_id for p in plan.phases],
+        retired=plan.retired_phase_ids,
         prefix="P",
     )
 
 
 def next_available_wave(plan: Plan) -> str:
     """Return the next-available ``W##`` identifier for the plan.
+
+    Skips both live and retired Wave numbers.
 
     Args:
         plan: Parsed :class:`Plan` model.
@@ -158,17 +165,26 @@ def next_available_wave(plan: Plan) -> str:
     """
     return _next_available_id(
         existing=[w.canonical_id for w in plan.waves],
+        retired=plan.retired_wave_ids,
         prefix="W",
     )
 
 
-def _next_available_id(*, existing: list[str], prefix: str) -> str:
+def _next_available_id(
+    *,
+    existing: list[str],
+    retired: set[str],
+    prefix: str,
+) -> str:
     """Compute the next-available identifier for the given container kind.
 
     The minimum padding is two digits per the convention; the field
-    widens automatically once the counter exceeds 99.
+    widens automatically once the counter exceeds 99. Both live and
+    retired identifiers contribute to the maximum so gaps left by
+    retirement are never reused.
     """
     numbers = [_extract_number(identifier) for identifier in existing]
+    numbers.extend(_extract_number(identifier) for identifier in retired)
     next_number = (max(numbers) + 1) if numbers else 1
     width = max(2, len(str(next_number)))
     return f"{prefix}{next_number:0{width}d}"

@@ -144,6 +144,14 @@ class Plan:
             For ``L3``/``L4`` plans, mirrors the flattened descendants of
             every Wave in document order.
         steps: All Step rows in document order, regardless of tier.
+        retired_step_ids: Canonical Step ids previously created and then
+            removed; the next-available counter must skip these. Persisted
+            via a hidden HTML comment ledger so retirement survives
+            parse / serialise round-trips.
+        retired_phase_ids: Canonical Phase ids retired via remove or
+            demote; same persistence as ``retired_step_ids``.
+        retired_wave_ids: Canonical Wave ids retired via remove or
+            demote; same persistence as ``retired_step_ids``.
     """
 
     frontmatter: PlanFrontmatter
@@ -152,6 +160,9 @@ class Plan:
     waves: list[Wave] = field(default_factory=list)
     phases: list[Phase] = field(default_factory=list)
     steps: list[Step] = field(default_factory=list)
+    retired_step_ids: set[str] = field(default_factory=set)
+    retired_phase_ids: set[str] = field(default_factory=set)
+    retired_wave_ids: set[str] = field(default_factory=set)
 
 
 class PlanParseError(ValueError):
@@ -204,6 +215,7 @@ def parse_plan(source: str | Path) -> Plan:
     title = _extract_title(body)
     epic_intent = _extract_epic_intent(body)
     waves, phases, steps = _walk_body(body)
+    retired_steps, retired_phases, retired_waves = _extract_retirement_ledger(body)
 
     return Plan(
         frontmatter=frontmatter,
@@ -212,7 +224,41 @@ def parse_plan(source: str | Path) -> Plan:
         waves=waves,
         phases=phases,
         steps=steps,
+        retired_step_ids=retired_steps,
+        retired_phase_ids=retired_phases,
+        retired_wave_ids=retired_waves,
     )
+
+
+_RE_RETIRED_LEDGER = re.compile(
+    r"<!--\s*RETIRED:\s*(?P<body>[^>]*?)\s*-->",
+    re.IGNORECASE,
+)
+
+
+def _extract_retirement_ledger(body: str) -> tuple[set[str], set[str], set[str]]:
+    """Read retired canonical-id sets from the hidden ledger comment.
+
+    The ledger has the form
+    ``<!-- RETIRED: S04, S07, P02, W01 -->`` and may appear anywhere in
+    the document body. Multiple occurrences are unioned. Tokens that
+    do not match ``[SPW]\\d{2,}`` are silently ignored.
+    """
+    retired_steps: set[str] = set()
+    retired_phases: set[str] = set()
+    retired_waves: set[str] = set()
+    for match in _RE_RETIRED_LEDGER.finditer(body):
+        for token in match.group("body").split(","):
+            token = token.strip()
+            if not token:
+                continue
+            if re.fullmatch(r"S\d{2,}", token):
+                retired_steps.add(token)
+            elif re.fullmatch(r"P\d{2,}", token):
+                retired_phases.add(token)
+            elif re.fullmatch(r"W\d{2,}", token):
+                retired_waves.add(token)
+    return retired_steps, retired_phases, retired_waves
 
 
 # ---- Internals --------------------------------------------------------------

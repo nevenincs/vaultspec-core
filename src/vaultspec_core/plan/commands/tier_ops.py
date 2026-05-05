@@ -232,6 +232,8 @@ def _demote_one_step(plan: Plan, *, force: bool) -> None:
             phase.display_path = phase.canonical_id
             for step in phase.steps:
                 step.display_path = f"{phase.canonical_id}.{step.canonical_id}"
+        for wave in plan.waves:
+            plan.retired_wave_ids.add(wave.canonical_id)
         plan.waves = []
         plan.frontmatter.tier = Tier.L2
         return
@@ -244,6 +246,8 @@ def _demote_one_step(plan: Plan, *, force: bool) -> None:
             raise DemoteError(msg)
         for step in plan.steps:
             step.display_path = step.canonical_id
+        for phase in plan.phases:
+            plan.retired_phase_ids.add(phase.canonical_id)
         plan.phases = []
         plan.frontmatter.tier = Tier.L1
         return
