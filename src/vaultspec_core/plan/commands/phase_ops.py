@@ -21,11 +21,169 @@ from vaultspec_core.plan.parser import Phase
 if TYPE_CHECKING:
     from vaultspec_core.plan.parser import Plan
 
-__all__ = ["AddPhaseError", "add_phase", "insert_phase"]
+__all__ = [
+    "AddPhaseError",
+    "MovePhaseError",
+    "PhaseNotFoundError",
+    "add_phase",
+    "edit_phase",
+    "find_phase",
+    "insert_phase",
+    "move_phase",
+]
 
 
 class AddPhaseError(ValueError):
     """Raised when an add or insert call violates the parent-resolution rule."""
+
+
+class PhaseNotFoundError(KeyError):
+    """Raised when a Phase canonical identifier does not exist in the plan."""
+
+
+class MovePhaseError(ValueError):
+    """Raised when a Phase move call violates the move-flag-precedence rule."""
+
+
+def find_phase(plan: Plan, phase_id: str) -> Phase:
+    """Return the Phase with canonical id ``phase_id`` or raise."""
+    for phase in plan.phases:
+        if phase.canonical_id == phase_id:
+            return phase
+    msg = f"Phase {phase_id!r} does not exist in this plan"
+    raise PhaseNotFoundError(msg)
+
+
+def edit_phase(
+    plan: Plan,
+    phase_id: str,
+    *,
+    title: str | None = None,
+    intent: str | None = None,
+) -> Phase:
+    """Edit the Phase's title and / or intent paragraph."""
+    phase = find_phase(plan, phase_id)
+    if title is not None:
+        phase.title = title
+    if intent is not None:
+        phase.intent = intent
+    return phase
+
+
+def move_phase(
+    plan: Plan,
+    phase_id: str,
+    *,
+    to_wave: str | None = None,
+    before: str | None = None,
+    after: str | None = None,
+) -> Phase:
+    """Re-parent and / or re-position a Phase.
+
+    Mirrors :func:`step_ops.move_step` precedence:
+
+    - ``--to-wave`` alone re-parents and appends.
+    - ``--before`` / ``--after`` alone re-position within the current
+      Wave; the anchor must share the moving Phase's parent.
+    - Combining both re-parents AND positions; the anchor must reside
+      in the destination Wave post-move.
+    """
+    if before is not None and after is not None:
+        msg = "move_phase accepts at most one of --before / --after"
+        raise MovePhaseError(msg)
+    if to_wave is None and before is None and after is None:
+        msg = "move_phase requires --to-wave, --before, or --after"
+        raise MovePhaseError(msg)
+
+    moving = find_phase(plan, phase_id)
+    current_wave = _wave_of(plan, phase_id)
+    dest_wave = (
+        _resolve_wave_by_id(plan, to_wave) if to_wave is not None else current_wave
+    )
+
+    anchor_id = before if before is not None else after
+    anchor_wave = _wave_of(plan, anchor_id) if anchor_id is not None else None
+    if anchor_id is not None and dest_wave is not None and anchor_wave is not dest_wave:
+        msg = (
+            f"anchor Phase {anchor_id!r} is not in destination wave "
+            f"{dest_wave.canonical_id!r}; cross-parent move requires the "
+            "anchor to reside in the destination Wave"
+        )
+        raise MovePhaseError(msg)
+
+    if current_wave is not None:
+        current_wave.phases.remove(moving)
+    plan.phases.remove(moving)
+
+    if dest_wave is None:
+        if anchor_id is None:
+            plan.phases.append(moving)
+        else:
+            anchor_index = next(
+                i
+                for i, phase in enumerate(plan.phases)
+                if phase.canonical_id == anchor_id
+            )
+            position = anchor_index if before is not None else anchor_index + 1
+            plan.phases.insert(position, moving)
+    else:
+        if anchor_id is None:
+            dest_wave.phases.append(moving)
+        else:
+            anchor_index = next(
+                i
+                for i, phase in enumerate(dest_wave.phases)
+                if phase.canonical_id == anchor_id
+            )
+            position = anchor_index if before is not None else anchor_index + 1
+            dest_wave.phases.insert(position, moving)
+        # Rebuild plan.phases as the document-order union of all Wave phases.
+        plan.phases.clear()
+        for wave in plan.waves:
+            plan.phases.extend(wave.phases)
+
+    parent_wave_id = dest_wave.canonical_id if dest_wave is not None else None
+    moving.display_path = phase_display_path(
+        phase_id=moving.canonical_id,
+        wave_id=parent_wave_id,
+    )
+    # Recompute child Step display paths.
+    for step in moving.steps:
+        step.display_path = _recompute_step_display_path(
+            step_id=step.canonical_id,
+            phase_id=moving.canonical_id,
+            wave_id=parent_wave_id,
+        )
+    return moving
+
+
+def _wave_of(plan: Plan, phase_id: str | None):
+    """Return the Wave that owns ``phase_id`` or ``None`` for L2 plans."""
+    if phase_id is None:
+        return None
+    for wave in plan.waves:
+        for phase in wave.phases:
+            if phase.canonical_id == phase_id:
+                return wave
+    return None
+
+
+def _resolve_wave_by_id(plan: Plan, wave_id: str):
+    """Return the Wave with canonical id ``wave_id`` or raise."""
+    for wave in plan.waves:
+        if wave.canonical_id == wave_id:
+            return wave
+    msg = f"wave {wave_id!r} does not exist in this plan"
+    raise MovePhaseError(msg)
+
+
+def _recompute_step_display_path(
+    *, step_id: str, phase_id: str, wave_id: str | None
+) -> str:
+    """Recompute a Step display path; isolated to keep the import local."""
+    from vaultspec_core.plan.display_path import step_display_path
+
+    return step_display_path(step_id=step_id, phase_id=phase_id, wave_id=wave_id)
 
 
 def add_phase(

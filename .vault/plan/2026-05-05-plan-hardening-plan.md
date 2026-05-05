@@ -251,12 +251,12 @@ recomputes display paths correctly.
 - [x] `W02.P04.S68` - implement `vault plan step uncheck` (idempotent open); `src/vaultspec_core/plan/commands/step_ops.py`.
 - [x] `W02.P04.S69` - implement `vault plan step edit` with `--action` and `--scope`; `src/vaultspec_core/plan/commands/step_ops.py`.
 - [x] `W02.P04.S70` - implement `vault plan step move` with the move-flag-precedence rule; `src/vaultspec_core/plan/commands/step_ops.py`.
-- [ ] `W02.P04.S71` - implement `vault plan phase edit` with `--title` and `--intent`; `src/vaultspec_core/plan/commands/phase_edit.py`.
-- [ ] `W02.P04.S72` - implement `vault plan phase move` with the move-flag-precedence rule; `src/vaultspec_core/plan/commands/phase_move.py`.
-- [ ] `W02.P04.S73` - implement `vault plan wave edit` with `--title` and `--intent`; `src/vaultspec_core/plan/commands/wave_edit.py`.
-- [ ] `W02.P04.S74` - implement `vault plan wave move` with `--before`/`--after` and descendant display-path recomputation; `src/vaultspec_core/plan/commands/wave_move.py`.
-- [ ] `W02.P04.S75` - implement `vault plan epic intent --show` and `--edit`; `src/vaultspec_core/plan/commands/epic_intent.py`.
-- [ ] `W02.P04.S76` - add unit tests for state and re-parenting commands covering identifier-preservation invariants; `src/vaultspec_core/tests/plan/test_state_commands.py`.
+- [x] `W02.P04.S71` - implement `vault plan phase edit` with `--title` and `--intent`; `src/vaultspec_core/plan/commands/phase_ops.py`.
+- [x] `W02.P04.S72` - implement `vault plan phase move` with the move-flag-precedence rule; `src/vaultspec_core/plan/commands/phase_ops.py`.
+- [x] `W02.P04.S73` - implement `vault plan wave edit` with `--title` and `--intent`; `src/vaultspec_core/plan/commands/wave_ops.py`.
+- [x] `W02.P04.S74` - implement `vault plan wave move` with `--before`/`--after` and descendant display-path recomputation; `src/vaultspec_core/plan/commands/wave_ops.py`.
+- [x] `W02.P04.S75` - implement `vault plan epic intent --show` and `--edit`; `src/vaultspec_core/plan/commands/epic_ops.py`.
+- [x] `W02.P04.S76` - add unit tests for state and re-parenting commands covering identifier-preservation invariants; `src/vaultspec_core/tests/plan/test_state_commands.py`.
 
 ### Phase `W02.P05` - destructive commands
 

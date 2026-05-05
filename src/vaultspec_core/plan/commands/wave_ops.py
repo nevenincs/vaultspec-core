@@ -19,7 +19,16 @@ from vaultspec_core.plan.parser import Wave
 if TYPE_CHECKING:
     from vaultspec_core.plan.parser import Plan
 
-__all__ = ["AddWaveError", "add_wave", "insert_wave"]
+__all__ = [
+    "AddWaveError",
+    "MoveWaveError",
+    "WaveNotFoundError",
+    "add_wave",
+    "edit_wave",
+    "find_wave",
+    "insert_wave",
+    "move_wave",
+]
 
 
 class AddWaveError(ValueError):
@@ -83,6 +92,118 @@ def insert_wave(
     position = anchor_index if before is not None else anchor_index + 1
     plan.waves.insert(position, new_wave)
     return new_wave
+
+
+class WaveNotFoundError(KeyError):
+    """Raised when a Wave canonical identifier does not exist in the plan."""
+
+
+class MoveWaveError(ValueError):
+    """Raised when a Wave move call references a non-existent anchor."""
+
+
+def find_wave(plan: Plan, wave_id: str) -> Wave:
+    """Return the Wave with canonical id ``wave_id`` or raise."""
+    for wave in plan.waves:
+        if wave.canonical_id == wave_id:
+            return wave
+    msg = f"Wave {wave_id!r} does not exist in this plan"
+    raise WaveNotFoundError(msg)
+
+
+def edit_wave(
+    plan: Plan,
+    wave_id: str,
+    *,
+    title: str | None = None,
+    intent: str | None = None,
+) -> Wave:
+    """Edit the Wave's title and / or intent paragraph."""
+    wave = find_wave(plan, wave_id)
+    if title is not None:
+        wave.title = title
+    if intent is not None:
+        wave.intent = intent
+    return wave
+
+
+def move_wave(
+    plan: Plan,
+    wave_id: str,
+    *,
+    before: str | None = None,
+    after: str | None = None,
+) -> Wave:
+    """Re-position a Wave in document order.
+
+    Wave move accepts only ``--before`` / ``--after`` because the
+    Epic frame is implicit; there is no ``--to-epic``. Descendant
+    Phase and Step display paths are recomputed against the new
+    position.
+    """
+    if before is None and after is None:
+        msg = "move_wave requires either --before or --after"
+        raise MoveWaveError(msg)
+    if before is not None and after is not None:
+        msg = "move_wave accepts at most one of --before / --after"
+        raise MoveWaveError(msg)
+
+    moving = find_wave(plan, wave_id)
+    anchor_id = before if before is not None else after
+    assert anchor_id is not None
+    anchor_index = next(
+        (i for i, wave in enumerate(plan.waves) if wave.canonical_id == anchor_id),
+        -1,
+    )
+    if anchor_index < 0:
+        msg = f"anchor Wave {anchor_id!r} does not exist in this plan"
+        raise MoveWaveError(msg)
+
+    plan.waves.remove(moving)
+    if anchor_index >= len(plan.waves):
+        position = len(plan.waves)
+    else:
+        position = (
+            plan.waves.index(plan.waves[anchor_index])
+            if before is not None
+            else plan.waves.index(plan.waves[anchor_index]) + 1
+        )
+    # Re-resolve anchor index since plan.waves changed; safe: anchor_id != wave_id.
+    new_anchor_index = next(
+        (i for i, wave in enumerate(plan.waves) if wave.canonical_id == anchor_id),
+        -1,
+    )
+    position = new_anchor_index if before is not None else new_anchor_index + 1
+    plan.waves.insert(position, moving)
+
+    # Rebuild plan.phases / plan.steps as the document-order union.
+    plan.phases.clear()
+    plan.steps.clear()
+    for wave in plan.waves:
+        for phase in wave.phases:
+            plan.phases.append(phase)
+            for step in phase.steps:
+                plan.steps.append(step)
+
+    # Recompute descendant display paths (Wave id has not changed but
+    # Phase / Step paths embed it explicitly).
+    from vaultspec_core.plan.display_path import (
+        phase_display_path,
+        step_display_path,
+    )
+
+    for phase in moving.phases:
+        phase.display_path = phase_display_path(
+            phase_id=phase.canonical_id,
+            wave_id=moving.canonical_id,
+        )
+        for step in phase.steps:
+            step.display_path = step_display_path(
+                step_id=step.canonical_id,
+                phase_id=phase.canonical_id,
+                wave_id=moving.canonical_id,
+            )
+    return moving
 
 
 def _require_wave_supporting_tier(plan: Plan) -> None:
