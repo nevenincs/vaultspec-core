@@ -18,9 +18,14 @@ __all__ = ["fix_separator"]
 _EM_DASH = "\N{EM DASH}"
 _EN_DASH = "\N{EN DASH}"
 
-_RE_EM_OR_EN = re.compile(rf"\s*[{_EM_DASH}{_EN_DASH}]\s*")
+_RE_EM_OR_EN = re.compile(rf"[ \t]*[{_EM_DASH}{_EN_DASH}][ \t]*")
 
 
 def fix_separator(source_text: str) -> str:
-    """Replace forbidden dashes with ``' - '`` (ASCII spaced hyphen)."""
+    """Replace forbidden dashes with ``' - '`` (ASCII spaced hyphen).
+
+    The replacement collapses adjacent in-line whitespace (spaces and
+    tabs) but never consumes newlines; YAML frontmatter lists and
+    multi-line structures are preserved.
+    """
     return _RE_EM_OR_EN.sub(" - ", source_text)
