@@ -119,7 +119,7 @@ Phase Summary scaffolding. The Phase ends when both templates
 state their relationship to the originating plan via the
 canonical Step identifier.
 
-- [ ] `W01.P05.S22` - add a heading hint that the file represents one Step from the plan, identified by its canonical `S##` and ancestor display path; `.vaultspec/rules/templates/exec-step.md`.
+- [x] `W01.P05.S22` - add a heading hint that the file represents one Step from the plan, identified by its canonical `S##` and ancestor display path; `.vaultspec/rules/templates/exec-step.md`.
 - [ ] `W01.P05.S23` - add the `step_id` frontmatter field per the Wave-1 contract anchor of the convention ADR; `.vaultspec/rules/templates/exec-step.md`.
 - [ ] `W01.P05.S24` - add wording that the summary rolls up every Step Record for one Phase; `.vaultspec/rules/templates/exec-summary.md`.
 

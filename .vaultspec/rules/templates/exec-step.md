@@ -24,6 +24,13 @@ related:
      - NEVER reference file paths in the body. If you must name a source file,
        class, or function, use inline backtick code: `src/module.py`. -->
 
+<!-- STEP RECORD:
+     This file represents one Step from the originating plan. Identified
+     by its canonical leaf identifier (S##) and ancestor display path
+     (e.g., S03 at L1, P02.S03 at L2, W01.P02.S03 at L3 / L4). The
+     step_id frontmatter field below carries the canonical identifier;
+     the heading restates the display path as a reading hint. -->
+
 # `{feature}` `{phase}` `{step}`
 
 Brief summary of work done.
