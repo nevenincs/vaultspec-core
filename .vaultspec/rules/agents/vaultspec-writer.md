@@ -102,6 +102,32 @@ not by counting containers; the writer never invents a container
 to qualify a tier. Full criteria are in the HIERARCHY AND TIERS
 hint block embedded at the top of `.vaultspec/rules/templates/plan.md`.
 
+### Approved structural vocabulary
+
+The plan body uses these structural nouns and only these:
+
+| Noun  | Role                                                                    |
+| :---- | :---------------------------------------------------------------------- |
+| Epic  | An `L4` plan's outermost container. Bound to an external PM artefact.   |
+| Wave  | A shippable batch within an `L3` or `L4` plan; sequenced.               |
+| Phase | A logically cohesive group of Steps within an `L2`, `L3`, or `L4` plan. |
+| Step  | An atomic checkable work item: one row, one prompt-run, one commit.     |
+
+### Tier selection criteria (apply at plan-creation time)
+
+- `L1`: single session; single concern; one cohesive change; one day
+  or less; no cross-module coupling. Steps only.
+- `L2`: all Steps within a single package, subsystem, or
+  configuration domain; 1-3 days; multiple Phases; no hard
+  interdependencies between Phases.
+- `L3`: hard interdependencies between Phase groups; 3-10 days;
+  multi-session; codebase reordering or foundational changes;
+  Steps span two or more package or subsystem boundaries with
+  hard ordering. Waves above Phases above Steps.
+- `L4`: multi-week or multi-month; multi-team or multi-agent;
+  external project-management artefact (milestone, project board,
+  roadmap entry) declared in the `## Epic intent` block prose.
+
 The writer MUST resist its own compression bias. When N actions are
 self-similar across N concerns, emit N rows; never collapse into
 "for each X, do Y" or equivalent phrasing. Repetition is correctness.
