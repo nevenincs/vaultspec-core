@@ -167,6 +167,13 @@ def move_wave(
         msg = f"anchor Wave {anchor_id!r} does not exist in this plan"
         raise MoveWaveError(msg)
 
+    # Snapshot the moving Wave's descendant Phase + Step objects BEFORE
+    # mutating any list. We will splice them out of the flat mirrors and
+    # re-insert at the new flat position, leaving every other entry's
+    # order untouched.
+    moving_phases = list(moving.phases)
+    moving_steps = [step for phase in moving_phases for step in phase.steps]
+
     plan.waves.remove(moving)
     new_anchor_index = next(
         i for i, wave in enumerate(plan.waves) if wave.canonical_id == anchor_id
@@ -174,19 +181,27 @@ def move_wave(
     position = new_anchor_index if before is not None else new_anchor_index + 1
     plan.waves.insert(position, moving)
 
-    # Rebuild plan.phases / plan.steps as the document-order union.
-    # The mirrors are mutated in place via clear() + append: external
-    # holders of the list reference observe the rebuild, but holders of
-    # individual Phase / Step objects (the canonical references) are
-    # unaffected. Callers that need a stable list snapshot must copy
-    # via list(plan.steps) before calling move_wave.
-    plan.phases.clear()
-    plan.steps.clear()
+    # Splice moving's descendant slice out of the flat mirrors, then
+    # re-insert at the position implied by the new Wave order. This
+    # preserves the relative order of every other Phase / Step that the
+    # writer or future callers might have arranged independently.
+    for phase in moving_phases:
+        plan.phases.remove(phase)
+    for step in moving_steps:
+        plan.steps.remove(step)
+
+    new_phase_offset = 0
+    new_step_offset = 0
     for wave in plan.waves:
+        if wave is moving:
+            break
+        new_phase_offset += len(wave.phases)
         for phase in wave.phases:
-            plan.phases.append(phase)
-            for step in phase.steps:
-                plan.steps.append(step)
+            new_step_offset += len(phase.steps)
+    for index, phase in enumerate(moving_phases):
+        plan.phases.insert(new_phase_offset + index, phase)
+    for index, step in enumerate(moving_steps):
+        plan.steps.insert(new_step_offset + index, step)
 
     # Recompute descendant display paths (Wave id has not changed but
     # Phase / Step paths embed it explicitly).
@@ -228,6 +243,10 @@ def remove_wave(plan: Plan, wave_id: str) -> tuple[str, list[str], list[str]]:
         for step in list(phase.steps):
             plan.steps.remove(step)
         plan.phases.remove(phase)
+    # Clear the removed Wave's own phases list so callers that still hold
+    # the Wave reference (e.g. for reporting or undo) see a consistent
+    # detached state rather than zombie membership.
+    wave.phases.clear()
     plan.waves.remove(wave)
     plan.retired_wave_ids.add(wave.canonical_id)
     plan.retired_phase_ids.update(retired_phase_ids)

@@ -51,15 +51,22 @@ def current_tier(plan: Plan) -> Tier:
     return plan.frontmatter.tier
 
 
+_PHASE_TITLE_TODO = "TODO: Phase title"
+_PHASE_INTENT_TODO = "TODO: Phase intent paragraph required."
+_WAVE_TITLE_TODO = "TODO: Wave title"
+_WAVE_INTENT_TODO = "TODO: Wave intent paragraph required."
+_EPIC_INTENT_TODO = "TODO: Epic intent paragraph required."
+
+
 def promote_tier(
     plan: Plan,
     *,
     target: Tier | None = None,
-    phase_title: str = "TODO: Phase title",
-    phase_intent: str = "TODO: Phase intent paragraph required.",
-    wave_title: str = "TODO: Wave title",
-    wave_intent: str = "TODO: Wave intent paragraph required.",
-    epic_intent: str = "TODO: Epic intent paragraph required.",
+    phase_title: str | None = None,
+    phase_intent: str | None = None,
+    wave_title: str | None = None,
+    wave_intent: str | None = None,
+    epic_intent: str | None = None,
 ) -> Tier:
     """Promote the plan to ``target`` (or one tier up when omitted).
 
@@ -69,8 +76,12 @@ def promote_tier(
     are instantiated with the next-available identifier in the target
     container's sequence.
 
-    Title and intent arguments fill new containers; missing values
-    fall back to ``TODO:`` sentinels that ``vault plan check`` flags.
+    Title and intent arguments fill new containers. Pass ``None`` (the
+    default) to signal "use the canonical ``TODO:`` placeholder", which
+    ``vault plan check`` flags as an authorial gap. Pass a real string
+    to populate the new container immediately. Programmatic callers can
+    therefore distinguish "no value supplied" from "value happens to
+    equal the placeholder string".
 
     Args:
         plan: Parsed :class:`Plan`. Mutated in place.
@@ -97,14 +108,22 @@ def promote_tier(
         msg = f"target tier {target_tier.value} is not above current {current.value}"
         raise PromoteError(msg)
 
+    resolved_phase_title = phase_title if phase_title is not None else _PHASE_TITLE_TODO
+    resolved_phase_intent = (
+        phase_intent if phase_intent is not None else _PHASE_INTENT_TODO
+    )
+    resolved_wave_title = wave_title if wave_title is not None else _WAVE_TITLE_TODO
+    resolved_wave_intent = wave_intent if wave_intent is not None else _WAVE_INTENT_TODO
+    resolved_epic_intent = epic_intent if epic_intent is not None else _EPIC_INTENT_TODO
+
     while plan.frontmatter.tier is not target_tier:
         _promote_one_step(
             plan,
-            phase_title=phase_title,
-            phase_intent=phase_intent,
-            wave_title=wave_title,
-            wave_intent=wave_intent,
-            epic_intent=epic_intent,
+            phase_title=resolved_phase_title,
+            phase_intent=resolved_phase_intent,
+            wave_title=resolved_wave_title,
+            wave_intent=resolved_wave_intent,
+            epic_intent=resolved_epic_intent,
         )
     return plan.frontmatter.tier
 

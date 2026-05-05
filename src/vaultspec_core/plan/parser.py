@@ -296,7 +296,11 @@ def _extract_epic_intent(body: str) -> EpicIntent | None:
         if _RE_EPIC_INTENT.match(line):
             text_lines: list[str] = []
             for follow in lines[index + 1 :]:
-                if follow.startswith("## ") or follow.startswith("# "):
+                if (
+                    follow.startswith("# ")
+                    or follow.startswith("## ")
+                    or follow.startswith("### ")
+                ):
                     break
                 if _RE_RETIRED_LEDGER.search(follow):
                     continue

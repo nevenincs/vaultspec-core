@@ -76,7 +76,7 @@ def query_steps(plan: Plan, query_filter: QueryFilter) -> QueryResult:
     """
     if (
         query_filter.tier_match is not None
-        and query_filter.tier_match is not plan.frontmatter.tier
+        and query_filter.tier_match != plan.frontmatter.tier
     ):
         return QueryResult(
             plan_tier=plan.frontmatter.tier,

@@ -211,12 +211,21 @@ def move_phase(
             )
             position = anchor_index if before is not None else anchor_index + 1
             dest_wave.phases.insert(position, moving)
-        # Rebuild plan.phases as the document-order union of all Wave phases.
-        # Mirror is mutated in place; external list-reference holders see
-        # the rebuild, but Phase object references stay valid.
-        plan.phases.clear()
+        # Compute moving's new flat position by walking the Wave order;
+        # insert at that index rather than rebuilding plan.phases from
+        # scratch. This preserves the relative order of every other
+        # Phase that the writer or future callers might have arranged
+        # independently.
+        new_flat_index = 0
         for wave in plan.waves:
-            plan.phases.extend(wave.phases)
+            for phase in wave.phases:
+                if phase is moving:
+                    break
+                new_flat_index += 1
+            else:
+                continue
+            break
+        plan.phases.insert(new_flat_index, moving)
 
     parent_wave_id = dest_wave.canonical_id if dest_wave is not None else None
     moving.display_path = phase_display_path(
@@ -258,6 +267,9 @@ def remove_phase(plan: Plan, phase_id: str) -> tuple[str, list[str]]:
 
     for step in list(phase.steps):
         plan.steps.remove(step)
+    # Detach the removed Phase's steps list so callers that still hold the
+    # Phase reference observe an empty container rather than zombie members.
+    phase.steps.clear()
     plan.phases.remove(phase)
     if parent_wave is not None:
         parent_wave.phases.remove(phase)

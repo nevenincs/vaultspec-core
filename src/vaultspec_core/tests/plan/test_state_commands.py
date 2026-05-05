@@ -302,6 +302,47 @@ def test_epic_intent_ops_reject_non_l4_plans(tier: str) -> None:
         edit_epic_intent(plan, text="x")
 
 
+def test_move_wave_preserves_relative_order_of_other_phases_and_steps() -> None:
+    """Moving a Wave must leave the relative order of other Phases / Steps intact.
+
+    Regression for the deferred H5 finding: ``move_wave`` previously rebuilt
+    ``plan.phases`` and ``plan.steps`` via ``clear() + extend(...)``. The
+    refactored implementation splices only the moving Wave's descendant
+    slice, so any object NOT in the moving Wave keeps its relative position.
+    """
+    rng = random.Random(50)
+    spec = make_clean_plan("L3", rng=rng, waves=3, phases=2, steps=2)
+    plan = parse_plan(spec.render())
+
+    moving_wave_id = plan.waves[2].canonical_id
+    static_phase_ids = [
+        phase.canonical_id
+        for wave in plan.waves
+        if wave.canonical_id != moving_wave_id
+        for phase in wave.phases
+    ]
+    static_step_ids = [
+        step.canonical_id
+        for wave in plan.waves
+        if wave.canonical_id != moving_wave_id
+        for phase in wave.phases
+        for step in phase.steps
+    ]
+
+    move_wave(plan, moving_wave_id, before=plan.waves[0].canonical_id)
+
+    post_static_phases = [
+        phase.canonical_id
+        for phase in plan.phases
+        if phase.canonical_id in static_phase_ids
+    ]
+    post_static_steps = [
+        step.canonical_id for step in plan.steps if step.canonical_id in static_step_ids
+    ]
+    assert post_static_phases == static_phase_ids
+    assert post_static_steps == static_step_ids
+
+
 def test_move_step_rejects_self_anchor() -> None:
     """``move_step`` must refuse to move a Step relative to itself.
 
