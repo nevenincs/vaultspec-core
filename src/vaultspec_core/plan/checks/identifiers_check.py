@@ -16,6 +16,7 @@ Validates canonical identifiers against the convention ADR's
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 from vaultspec_core.plan.checks._base import Finding, Severity
@@ -27,8 +28,24 @@ if TYPE_CHECKING:
 __all__ = ["check_identifiers"]
 
 
-def check_identifiers(plan: Plan) -> list[Finding]:
-    """Detect padding violations, duplicates, and non-monotonic ids."""
+_RE_UNDERPADDED_HEADING_ID = re.compile(
+    r"^(?P<lead>#{2,3} +(?:Wave|Phase) +)`(?P<token>[WP]\d)`",
+)
+
+
+def check_identifiers(plan: Plan, source_text: str = "") -> list[Finding]:
+    """Detect padding violations, duplicates, and non-monotonic ids.
+
+    Args:
+        plan: Parsed :class:`Plan`. The model's container lists drive
+            the duplicate / non-monotonic checks.
+        source_text: Raw markdown body. Required for the parallel
+            heading scan that catches single-digit Wave / Phase
+            identifiers. The strict parser regex requires a two-digit
+            minimum and would otherwise drop these headings silently,
+            denying the model the line numbers needed to fire
+            ``PLAN020`` for them.
+    """
     inventory = extract_inventory(plan)
     findings: list[Finding] = []
 
@@ -64,7 +81,45 @@ def check_identifiers(plan: Plan) -> list[Finding]:
     )
 
     findings.extend(_detect_non_monotonic(inventory.steps, kind="Step"))
+    findings.extend(_detect_underpadded_headings(source_text))
 
+    return findings
+
+
+def _detect_underpadded_headings(source_text: str) -> list[Finding]:
+    """Yield PLAN020 findings for single-digit Wave / Phase heading ids.
+
+    The parser regex requires a ``\\d{2,}`` minimum and silently drops
+    such headings; the rule scans the raw text so the violation is
+    still surfaced to the writer.
+    """
+    findings: list[Finding] = []
+    for index, raw_line in enumerate(source_text.splitlines(), start=1):
+        match = _RE_UNDERPADDED_HEADING_ID.match(raw_line)
+        if match is None:
+            continue
+        token = match.group("token")
+        kind = "Wave" if token.startswith("W") else "Phase"
+        findings.append(
+            Finding(
+                code="PLAN020",
+                severity=Severity.ERROR,
+                message=(
+                    f"{kind} heading identifier '{token}' violates the "
+                    "two-digit minimum padding rule and is silently "
+                    "dropped by the parser."
+                ),
+                line_number=index,
+                fix_hint=(
+                    "Pad the numeric tail to at least two digits "
+                    "(e.g. 'W1' -> 'W01'). Hand-edits to widen padding "
+                    "are forbidden once a plan is in flight; "
+                    "re-create the container via the appropriate "
+                    "'vault plan {wave|phase} add' command."
+                ),
+                autofixable=False,
+            ),
+        )
     return findings
 
 

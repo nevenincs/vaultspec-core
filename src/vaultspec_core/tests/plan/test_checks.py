@@ -121,9 +121,91 @@ def test_identifier_check_flags_duplicate_step_id() -> None:
     )
     plan = parse_plan(body)
 
-    findings = check_identifiers(plan)
+    findings = check_identifiers(plan, body)
 
     assert any(finding.code == "PLAN021" for finding in findings)
+
+
+def test_identifier_check_flags_underpadded_phase_heading() -> None:
+    """A single-digit Phase heading id raises PLAN020 even when the parser drops it.
+
+    Regression for the H4 finding: the parser regex requires ``\\d{2,}`` so
+    ``### Phase `P1` - title`` is silently dropped from the model. The
+    identifier check must scan the raw text to surface the violation.
+    """
+    body = (
+        "---\n"
+        "tags:\n"
+        "  - '#plan'\n"
+        "  - '#padding'\n"
+        "date: '2026-05-05'\n"
+        "tier: L2\n"
+        "related:\n"
+        "  - '[[2026-05-05-padding-adr]]'\n"
+        "---\n"
+        "\n"
+        "# `padding` plan\n"
+        "\n"
+        "Plan with a single-digit Phase id.\n"
+        "\n"
+        "### Phase `P1` - illegal padding\n"
+        "\n"
+        "Phase intent.\n"
+        "\n"
+        "- [ ] `P01.S01` - first; `src/a.py`.\n"
+    )
+    plan = parse_plan(body)
+
+    findings = check_identifiers(plan, body)
+
+    assert any(
+        finding.code == "PLAN020" and "P1" in finding.message for finding in findings
+    )
+
+
+def test_vocabulary_check_flags_epic_intent_with_wrong_noun() -> None:
+    """``## Initiative intent`` raises PLAN050 even without a backticked id.
+
+    Regression for the H3 finding: the original heading regex required a
+    backtick after the noun, so the bare ``## Initiative intent`` shape was
+    invisible to the rule. The check now matches the bare ``intent``
+    structural position too.
+    """
+    body = (
+        "---\n"
+        "tags:\n"
+        "  - '#plan'\n"
+        "  - '#bad-epic'\n"
+        "date: '2026-05-05'\n"
+        "tier: L4\n"
+        "related:\n"
+        "  - '[[2026-05-05-bad-epic-adr]]'\n"
+        "---\n"
+        "\n"
+        "# `bad-epic` plan\n"
+        "\n"
+        "## Initiative intent\n"
+        "\n"
+        "Some prose for the (mis-named) Epic block.\n"
+        "\n"
+        "## Wave `W01` - first wave\n"
+        "\n"
+        "Wave intent.\n"
+        "\n"
+        "### Phase `W01.P01` - first phase\n"
+        "\n"
+        "Phase intent.\n"
+        "\n"
+        "- [ ] `W01.P01.S01` - first; `src/a.py`.\n"
+    )
+    canonical = body.replace("## Initiative intent", "## Epic intent")
+
+    findings = check_vocabulary(parse_plan(canonical), body)
+
+    assert any(
+        finding.code == "PLAN050" and "Initiative" in finding.message
+        for finding in findings
+    )
 
 
 # ---- Row-contract rule ------------------------------------------------------

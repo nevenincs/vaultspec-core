@@ -28,8 +28,19 @@ _RE_VALID_STEP_HEAD = re.compile(
 _RE_HAS_BACKTICK_SCOPE = re.compile(r";\s*`[^`]+`\s*\.?\s*$")
 
 
-def check_row_contract(plan: Plan, source_text: str) -> list[Finding]:  # noqa: ARG001
-    """Yield findings for lines that look like Step rows but break the contract."""
+def check_row_contract(plan: Plan, source_text: str) -> list[Finding]:
+    """Yield findings for lines that look like Step rows but break the contract.
+
+    Args:
+        plan: Parsed :class:`Plan`. Required by the harness signature; not
+            used directly because the row-contract failures (malformed
+            checkbox, missing separator, missing scope) describe lines
+            the parser silently skipped, so they never reached
+            ``plan.steps`` to begin with.
+        source_text: Raw markdown body, scanned line-by-line for
+            row-shaped lines that fail one of the contract regexes.
+    """
+    del plan
     findings: list[Finding] = []
     for index, raw_line in enumerate(source_text.splitlines(), start=1):
         line = raw_line.rstrip()

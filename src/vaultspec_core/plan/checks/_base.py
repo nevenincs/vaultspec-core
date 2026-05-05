@@ -78,7 +78,7 @@ def collect_all(plan: Plan, source_text: str) -> list[Finding]:
     findings: list[Finding] = []
     findings.extend(check_frontmatter(plan))
     findings.extend(check_hierarchy(plan))
-    findings.extend(check_identifiers(plan))
+    findings.extend(check_identifiers(plan, source_text))
     findings.extend(check_display_path(plan))
     findings.extend(check_row_contract(plan, source_text))
     findings.extend(check_vocabulary(plan, source_text))
