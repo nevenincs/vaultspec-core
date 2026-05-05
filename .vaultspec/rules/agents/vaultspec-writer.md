@@ -67,19 +67,31 @@ Every document MUST strictly adhere to the following schema:
 **Template**: Read `.vaultspec/rules/templates/plan.md` and populate the YAML
 frontmatter correctly.
 
-### Step Template
+### Step row contract
 
-Use this exact template for step items in the "Steps" section:
+Every Step is exactly one Markdown bulleted checkbox row, never a
+multi-field block. The row format and tier-conditional display path
+are specified in the canonical hint blocks embedded in
+`.vaultspec/rules/templates/plan.md`. The writer reads those hint
+blocks at plan-creation time and emits rows that match.
+
+The row format (verbatim):
 
 ```markdown
-
-- Name: <brief name of the step>
-- Step summary: <Step Record> (`.vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-<step>.md`)
-- Executing agent: <name of the agent persona
-  responsible for executing the step.>
-
-- References: <links to related tasks, <ADR>s, <Research> docs using [[wiki-links]]>
+- [ ] `<display-path>` - imperative-verb action; `path/to/file.ext`.
 ```
+
+The Step's canonical identifier (`S##`) is append-only and immutable;
+the `<display-path>` rendering is tier-conditional and computed from
+the Step's current ancestor chain. There is no per-row reference
+footer; authorising documents (ADR, research, reference, prior plan)
+go once in the plan's `related:` frontmatter and every Step inherits
+that chain.
+
+The execution-log artefact retains the name `<Step Record>` and is
+mapped one-to-one to a Step. The originating Step's canonical `S##`
+is recorded in the Step Record's `step_id:` frontmatter field per the
+convention ADR's Wave-1 contract anchors.
 
 ## Notes
 

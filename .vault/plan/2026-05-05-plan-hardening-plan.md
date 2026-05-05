@@ -86,7 +86,7 @@ authors a plan. The Phase ends when the persona binds the agent
 to the convention without duplicating the embedded hint blocks
 that live in the plan template.
 
-- [ ] `W01.P02.S12` - replace the existing Step Template section with the Step row contract from the convention ADR; `.vaultspec/rules/agents/vaultspec-writer.md`.
+- [x] `W01.P02.S12` - replace the existing Step Template section with the Step row contract from the convention ADR; `.vaultspec/rules/agents/vaultspec-writer.md`.
 - [ ] `W01.P02.S13` - replace the obsolete phasing rule (the more-than-3-contexts or 200-lines threshold) with the hierarchy and tier model and the no-compression mandate; `.vaultspec/rules/agents/vaultspec-writer.md`.
 - [ ] `W01.P02.S14` - add the approved structural vocabulary table and the tier-selection criteria as binding guidance the writer applies at plan-creation time; `.vaultspec/rules/agents/vaultspec-writer.md`.
 - [ ] `W01.P02.S15` - add a paragraph stating the writer references the plan template's three hint blocks rather than duplicating them; `.vaultspec/rules/agents/vaultspec-writer.md`.
