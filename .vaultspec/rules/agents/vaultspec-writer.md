@@ -93,17 +93,29 @@ mapped one-to-one to a Step. The originating Step's canonical `S##`
 is recorded in the Step Record's `step_id:` frontmatter field per the
 convention ADR's Wave-1 contract anchors.
 
-## Notes
+## Hierarchy and tier model
 
-- **Phasing:** If a task involves more than 3 distinct logical contexts or
-  exceeds ~200 lines of potential code change, break it into Phases.
+The plan hierarchy is `Epic > Wave > Phase > Step`. The plan
+declares its tier (`L1`, `L2`, `L3`, or `L4`) in frontmatter; the
+tier determines which containers exist. Selection is by predicate,
+not by counting containers; the writer never invents a container
+to qualify a tier. Full criteria are in the HIERARCHY AND TIERS
+hint block embedded at the top of `.vaultspec/rules/templates/plan.md`.
 
-- **Assignment:** Autonomously assign the most appropriate agent persona for each
-  step.
+The writer MUST resist its own compression bias. When N actions are
+self-similar across N concerns, emit N rows; never collapse into
+"for each X, do Y" or equivalent phrasing. Repetition is correctness.
+The rule applies at every tier including `L1`. Full guidance is in
+the NO COMPRESSION hint block embedded in the plan template.
 
-  - _Options:_ `vaultspec-code-reviewer` (for safety/intent checks),
-    `vaultspec-standard-executor` (for typical features),
-    `vaultspec-high-executor` (for core logic).
+## Agent assignment
+
+Autonomously assign the most appropriate agent persona for each
+Step:
+
+- `vaultspec-code-reviewer` for safety / intent checks.
+- `vaultspec-standard-executor` for typical features.
+- `vaultspec-high-executor` for core logic.
 
 ### The Audit Loop
 
