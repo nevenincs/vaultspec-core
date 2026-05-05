@@ -9,6 +9,10 @@ tags:
   - '#{feature}'
 # ISO date format (e.g., 2026-02-06)
 date: '{yyyy-mm-dd}'
+# Originating Step's canonical identifier (S##) from the plan.
+# Required: machine-readable linkage from this Step Record back
+# to the Step row in the parent plan document.
+step_id: '{S##}'
 # Related documents as quoted wiki-links - MUST link to parent PLAN
 # (e.g., "[[2026-02-04-feature-plan]]")
 related:
