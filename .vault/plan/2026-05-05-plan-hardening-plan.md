@@ -233,11 +233,11 @@ independence per the convention ADR.
 
 - [x] `W02.P03.S59` - implement `vault plan step add` with `--phase` parent resolution; `src/vaultspec_core/plan/commands/step_ops.py`.
 - [x] `W02.P03.S60` - implement `vault plan step insert` with `--before`/`--after` document-order placement; `src/vaultspec_core/plan/commands/step_ops.py`.
-- [ ] `W02.P03.S61` - implement `vault plan phase add` with `--wave` parent resolution; `src/vaultspec_core/plan/commands/phase_add.py`.
-- [ ] `W02.P03.S62` - implement `vault plan phase insert` with `--before`/`--after`; `src/vaultspec_core/plan/commands/phase_insert.py`.
-- [ ] `W02.P03.S63` - implement `vault plan wave add`; `src/vaultspec_core/plan/commands/wave_add.py`.
-- [ ] `W02.P03.S64` - implement `vault plan wave insert` with `--before`/`--after`; `src/vaultspec_core/plan/commands/wave_insert.py`.
-- [ ] `W02.P03.S65` - add unit tests for additive commands covering identifier-immutability invariants; `src/vaultspec_core/tests/plan/test_additive_commands.py`.
+- [x] `W02.P03.S61` - implement `vault plan phase add` with `--wave` parent resolution; `src/vaultspec_core/plan/commands/phase_ops.py`.
+- [x] `W02.P03.S62` - implement `vault plan phase insert` with `--before`/`--after`; `src/vaultspec_core/plan/commands/phase_ops.py`.
+- [x] `W02.P03.S63` - implement `vault plan wave add`; `src/vaultspec_core/plan/commands/wave_ops.py`.
+- [x] `W02.P03.S64` - implement `vault plan wave insert` with `--before`/`--after`; `src/vaultspec_core/plan/commands/wave_ops.py`.
+- [x] `W02.P03.S65` - add unit tests for additive commands covering identifier-immutability invariants; `src/vaultspec_core/tests/plan/test_additive_commands.py`.
 
 ### Phase `W02.P04` - state and re-parenting commands
 
