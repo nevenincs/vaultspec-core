@@ -9,8 +9,16 @@ tags:
   - '#{feature}'
 # ISO date format (e.g., 2026-02-06)
 date: '{yyyy-mm-dd}'
-# Related documents as quoted wiki-links
-# (e.g., "[[2026-02-04-feature-adr]]")
+# Complexity tier (mandatory for new plans).
+# Allowed: L1 (Steps only), L2 (Phases above Steps),
+# L3 (Waves above Phases above Steps), L4 (Epic above Waves
+# above Phases above Steps; PM association required).
+# Pre-existing plans without this field default to L2.
+tier: L2
+# Related documents as quoted wiki-links.
+# Carries the AUTHORISING documents (ADR, research, reference,
+# prior plan) for every Step in this plan; Steps inherit this
+# chain; per-row reference footers do not exist.
 related:
   - '[[{yyyy-mm-dd-*}]]'
 ---

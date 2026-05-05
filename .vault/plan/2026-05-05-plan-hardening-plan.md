@@ -70,7 +70,7 @@ three hint blocks verbatim.
 - [x] `W01.P01.S02` - embed the HIERARCHY AND TIERS markdown comment hint block verbatim from the convention ADR; `.vaultspec/rules/templates/plan.md`.
 - [x] `W01.P01.S03` - embed the IDENTIFIERS AND ROW CONTRACT markdown comment hint block verbatim from the convention ADR; `.vaultspec/rules/templates/plan.md`.
 - [x] `W01.P01.S04` - embed the NO COMPRESSION markdown comment hint block verbatim from the convention ADR; `.vaultspec/rules/templates/plan.md`.
-- [ ] `W01.P01.S05` - add the `tier:` frontmatter field with the values and legacy-default rule from the Frontmatter contract section of the convention ADR; `.vaultspec/rules/templates/plan.md`.
+- [x] `W01.P01.S05` - add the `tier:` frontmatter field with the values and legacy-default rule from the Frontmatter contract section of the convention ADR; `.vaultspec/rules/templates/plan.md`.
 - [ ] `W01.P01.S06` - update the LINK RULES comment block to clarify that `related:` carries authorising documents and the body remains free of wiki-links and markdown links; `.vaultspec/rules/templates/plan.md`.
 - [ ] `W01.P01.S07` - add the Phase block format example as a commented template; `.vaultspec/rules/templates/plan.md`.
 - [ ] `W01.P01.S08` - add the Wave block format example as a commented template; `.vaultspec/rules/templates/plan.md`.
