@@ -300,3 +300,50 @@ def test_epic_intent_ops_reject_non_l4_plans(tier: str) -> None:
         show_epic_intent(plan)
     with pytest.raises(EpicIntentError, match="L4"):
         edit_epic_intent(plan, text="x")
+
+
+def test_move_step_rejects_self_anchor() -> None:
+    """``move_step`` must refuse to move a Step relative to itself.
+
+    Regression for the silent-corruption flaw where the anchor lookup ran
+    after the moving Step had already been removed from the list, returning
+    a stale or invalid index.
+    """
+    from vaultspec_core.plan.parser import parse_plan
+
+    rng = random.Random(101)
+    spec = make_clean_plan("L2", rng=rng, phases=1, steps=3)
+    plan = parse_plan(spec.render())
+
+    with pytest.raises(MoveStepError, match="relative to itself"):
+        move_step(plan, "S01", before="S01")
+    with pytest.raises(MoveStepError, match="relative to itself"):
+        move_step(plan, "S02", after="S02")
+
+
+def test_move_phase_rejects_self_anchor() -> None:
+    """``move_phase`` must refuse to move a Phase relative to itself."""
+    from vaultspec_core.plan.parser import parse_plan
+
+    rng = random.Random(102)
+    spec = make_clean_plan("L3", rng=rng, waves=1, phases=2, steps=1)
+    plan = parse_plan(spec.render())
+
+    with pytest.raises(MovePhaseError, match="relative to itself"):
+        move_phase(plan, "P01", before="P01")
+    with pytest.raises(MovePhaseError, match="relative to itself"):
+        move_phase(plan, "P02", after="P02")
+
+
+def test_move_wave_rejects_self_anchor() -> None:
+    """``move_wave`` must refuse to move a Wave relative to itself."""
+    from vaultspec_core.plan.parser import parse_plan
+
+    rng = random.Random(103)
+    spec = make_clean_plan("L3", rng=rng, waves=3, phases=1, steps=1)
+    plan = parse_plan(spec.render())
+
+    with pytest.raises(MoveWaveError, match="relative to itself"):
+        move_wave(plan, "W01", before="W01")
+    with pytest.raises(MoveWaveError, match="relative to itself"):
+        move_wave(plan, "W02", after="W02")

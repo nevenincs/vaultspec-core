@@ -147,7 +147,9 @@ def insert_step(
         raise AddStepError(msg)
 
     anchor_id = before if before is not None else after
-    assert anchor_id is not None  # exactly-one check above ensures this
+    if anchor_id is None:
+        msg = "insert_step received None anchor after exactly-one validation"
+        raise AddStepError(msg)
     anchor_phase, anchor_index = _locate_step_in_phase(plan, anchor_id)
     canonical_id = next_available_step(plan)
     wave_id = _wave_id_of(plan, anchor_phase) if anchor_phase is not None else None
@@ -318,6 +320,12 @@ def move_step(
         raise MoveStepError(msg)
     if to_phase is None and before is None and after is None:
         msg = "move_step requires --to-phase, --before, or --after"
+        raise MoveStepError(msg)
+    if before == step_id or after == step_id:
+        msg = (
+            f"cannot move Step {step_id!r} relative to itself; "
+            "anchor must be a different Step"
+        )
         raise MoveStepError(msg)
 
     moving = find_step(plan, step_id)

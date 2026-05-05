@@ -95,6 +95,13 @@ def move_phase(
     if to_wave is None and before is None and after is None:
         msg = "move_phase requires --to-wave, --before, or --after"
         raise MovePhaseError(msg)
+    self_anchor = before == phase_id or after == phase_id
+    if self_anchor:
+        msg = (
+            f"cannot move Phase {phase_id!r} relative to itself; "
+            "anchor must be a different Phase"
+        )
+        raise MovePhaseError(msg)
 
     moving = find_phase(plan, phase_id)
     current_wave = _wave_of(plan, phase_id)
@@ -277,7 +284,9 @@ def insert_phase(
         raise AddPhaseError(msg)
 
     anchor_id = before if before is not None else after
-    assert anchor_id is not None
+    if anchor_id is None:
+        msg = "insert_phase received None anchor after exactly-one validation"
+        raise AddPhaseError(msg)
     anchor_wave, anchor_index = _locate_phase(plan, anchor_id)
     canonical_id = next_available_phase(plan)
     parent_wave_id = anchor_wave.canonical_id if anchor_wave is not None else None

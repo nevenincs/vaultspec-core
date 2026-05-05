@@ -73,7 +73,9 @@ def insert_wave(
         raise AddWaveError(msg)
 
     anchor_id = before if before is not None else after
-    assert anchor_id is not None
+    if anchor_id is None:
+        msg = "insert_wave received None anchor after exactly-one validation"
+        raise AddWaveError(msg)
 
     anchor_index = next(
         (i for i, wave in enumerate(plan.waves) if wave.canonical_id == anchor_id),
@@ -149,30 +151,25 @@ def move_wave(
         msg = "move_wave accepts at most one of --before / --after"
         raise MoveWaveError(msg)
 
-    moving = find_wave(plan, wave_id)
     anchor_id = before if before is not None else after
-    assert anchor_id is not None
-    anchor_index = next(
-        (i for i, wave in enumerate(plan.waves) if wave.canonical_id == anchor_id),
-        -1,
-    )
-    if anchor_index < 0:
+    if anchor_id is None:
+        msg = "move_wave received None anchor after exactly-one validation"
+        raise MoveWaveError(msg)
+    if anchor_id == wave_id:
+        msg = (
+            f"cannot move Wave {wave_id!r} relative to itself; "
+            "anchor must be a different Wave"
+        )
+        raise MoveWaveError(msg)
+
+    moving = find_wave(plan, wave_id)
+    if not any(wave.canonical_id == anchor_id for wave in plan.waves):
         msg = f"anchor Wave {anchor_id!r} does not exist in this plan"
         raise MoveWaveError(msg)
 
     plan.waves.remove(moving)
-    if anchor_index >= len(plan.waves):
-        position = len(plan.waves)
-    else:
-        position = (
-            plan.waves.index(plan.waves[anchor_index])
-            if before is not None
-            else plan.waves.index(plan.waves[anchor_index]) + 1
-        )
-    # Re-resolve anchor index since plan.waves changed; safe: anchor_id != wave_id.
     new_anchor_index = next(
-        (i for i, wave in enumerate(plan.waves) if wave.canonical_id == anchor_id),
-        -1,
+        i for i, wave in enumerate(plan.waves) if wave.canonical_id == anchor_id
     )
     position = new_anchor_index if before is not None else new_anchor_index + 1
     plan.waves.insert(position, moving)
