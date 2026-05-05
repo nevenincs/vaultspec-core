@@ -231,8 +231,8 @@ existing content. The Phase ends when every additive command
 preserves identifier immutability and document-order
 independence per the convention ADR.
 
-- [ ] `W02.P03.S59` - implement `vault plan step add` with `--phase` parent resolution; `src/vaultspec_core/plan/commands/step_add.py`.
-- [ ] `W02.P03.S60` - implement `vault plan step insert` with `--before`/`--after` document-order placement; `src/vaultspec_core/plan/commands/step_insert.py`.
+- [x] `W02.P03.S59` - implement `vault plan step add` with `--phase` parent resolution; `src/vaultspec_core/plan/commands/step_ops.py`.
+- [x] `W02.P03.S60` - implement `vault plan step insert` with `--before`/`--after` document-order placement; `src/vaultspec_core/plan/commands/step_ops.py`.
 - [ ] `W02.P03.S61` - implement `vault plan phase add` with `--wave` parent resolution; `src/vaultspec_core/plan/commands/phase_add.py`.
 - [ ] `W02.P03.S62` - implement `vault plan phase insert` with `--before`/`--after`; `src/vaultspec_core/plan/commands/phase_insert.py`.
 - [ ] `W02.P03.S63` - implement `vault plan wave add`; `src/vaultspec_core/plan/commands/wave_add.py`.
