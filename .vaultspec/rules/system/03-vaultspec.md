@@ -26,6 +26,18 @@ All significant work must follow this pipeline:
 | 4 Execute   | vaultspec-execute        | .vault/exec/.../steps  | Approved plan     |
 | 5 Verify    | vaultspec-code-review    | .vault/exec/.../review | Completed step(s) |
 
+Plan documents structure work with the hierarchy
+`Epic > Wave > Phase > Step` and declare a complexity tier
+(`L1`, `L2`, `L3`, or `L4`) in frontmatter. The tier determines
+which structural containers exist: `L1` is Steps only; `L2`
+adds Phases; `L3` adds Waves; `L4` adds an Epic frame and
+requires an external project-management association declared
+in the Epic intent block. The leaf row at every tier is named
+`Step`; the execution-log artefact retains the name
+`<Step Record>` and maps one-to-one to a Step. Full conventions
+live in the plan-hardening convention ADR and in the markdown-
+comment hint blocks embedded in `.vaultspec/rules/templates/plan.md`.
+
 Supporting skills, invoke when appropriate:
 
 | Curate | vaultspec-curate | Maintain .vault/ hygiene - links, tags |

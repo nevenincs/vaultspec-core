@@ -129,7 +129,7 @@ The system rules describe the vaultspec pipeline at the highest
 level. The Phase ends when the pipeline description names Wave,
 the four tiers, and points to the convention ADR.
 
-- [ ] `W01.P06.S25` - extend the pipeline-description prose with the Wave concept and the four-tier model; `.vaultspec/rules/system/03-vaultspec.md`.
+- [x] `W01.P06.S25` - extend the pipeline-description prose with the Wave concept and the four-tier model; `.vaultspec/rules/system/03-vaultspec.md`.
 
 ### Phase `W01.P07` - extend the built-in rules and placeholder taxonomy
 
