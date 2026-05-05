@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from vaultspec_core.plan.frontmatter import Tier
     from vaultspec_core.plan.parser import Plan
 
-__all__ = ["PlanStatus", "collect_status"]
+__all__ = ["PlanStatus", "collect_status", "status_to_json_dict"]
 
 
 @dataclass
@@ -71,3 +71,31 @@ def collect_status(plan: Plan) -> PlanStatus:
         completion_percent=round(completion, 1),
         has_epic_intent=plan.epic_intent is not None,
     )
+
+
+def status_to_json_dict(status: PlanStatus) -> dict[str, object]:
+    """Convert a :class:`PlanStatus` to a JSON-serialisable dict.
+
+    The schema is fixed for downstream tools (CI dashboards, IDE
+    integrations) so changes to it are a contract change. Field names
+    are snake_case; the ``tier`` enum is rendered as its string value.
+
+    Args:
+        status: Snapshot returned by :func:`collect_status`.
+
+    Returns:
+        Dict with keys ``tier``, ``legacy_tier_default``,
+        ``wave_count``, ``phase_count``, ``step_count``,
+        ``steps_completed``, ``completion_percent``,
+        ``has_epic_intent``.
+    """
+    return {
+        "tier": status.tier.value,
+        "legacy_tier_default": status.legacy_tier_default,
+        "wave_count": status.wave_count,
+        "phase_count": status.phase_count,
+        "step_count": status.step_count,
+        "steps_completed": status.steps_completed,
+        "completion_percent": status.completion_percent,
+        "has_epic_intent": status.has_epic_intent,
+    }

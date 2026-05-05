@@ -207,7 +207,7 @@ commands return the human and JSON forms specified in the CLI
 ADR and pass tests.
 
 - [x] `W02.P02.S42` - implement the `vault plan status` command's plan-snapshot collection; `src/vaultspec_core/plan/status.py`.
-- [ ] `W02.P02.S43` - implement the `vault plan status --json` schema and emitter (schema authored in this Wave's plan-management module); `src/vaultspec_core/plan/commands/status.py`.
+- [x] `W02.P02.S43` - implement the `vault plan status --json` schema and emitter; `src/vaultspec_core/plan/status.py`.
 - [ ] `W02.P02.S44` - implement the `vault plan check` command's finding-collection harness with severity levels and the finding-object schema; `src/vaultspec_core/plan/commands/check.py`.
 - [ ] `W02.P02.S45` - implement the frontmatter detection rule (presence of `tier`, presence of `related` for non-trivial plans); `src/vaultspec_core/plan/checks/frontmatter.py`.
 - [ ] `W02.P02.S46` - implement the hierarchy-correspondence detection rule (declared tier matches heading shape); `src/vaultspec_core/plan/checks/hierarchy.py`.
