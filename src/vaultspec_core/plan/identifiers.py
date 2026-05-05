@@ -29,6 +29,10 @@ __all__ = [
 
 
 _CONTAINER_PATTERN = re.compile(r"^([SPW])(\d{2,})$")
+# Lenient pattern accepts single-digit tails too; ``_violates_padding`` then
+# distinguishes width-1 (drift) from canonical width-2+. Used by
+# ``_extract_number`` so callers do not crash on legacy hand-edited ids.
+_CONTAINER_LENIENT_PATTERN = re.compile(r"^([SPW])(\d+)$")
 
 
 class DuplicateIdentifierError(ValueError):
@@ -191,8 +195,19 @@ def _next_available_id(
 
 
 def _extract_number(identifier: str) -> int:
-    """Extract the numeric tail from an identifier; raises on malformed input."""
-    match = _CONTAINER_PATTERN.match(identifier)
+    """Extract the numeric tail from an identifier.
+
+    Accepts the canonical two-or-more-digit form and the legacy
+    single-digit form so a hand-edited plan carrying ``S1``/``P1``/``W1``
+    does not crash ``next_available_*``. Single-digit ids are flagged
+    separately by ``_violates_padding`` and surfaced as PLAN020 errors;
+    this function's job is purely numeric extraction.
+
+    Raises:
+        ValueError: When ``identifier`` does not match the lenient
+            ``[SPW]\\d+`` shape (e.g. lowercase, non-numeric tail).
+    """
+    match = _CONTAINER_LENIENT_PATTERN.match(identifier)
     if match is None:
         msg = f"Identifier {identifier!r} does not match the canonical S/P/W##... shape"
         raise ValueError(msg)
