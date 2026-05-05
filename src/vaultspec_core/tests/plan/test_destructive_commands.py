@@ -103,6 +103,39 @@ def test_demote_retires_dropped_wave_ids() -> None:
     assert plan.waves == []
 
 
+def test_retirement_ledger_is_not_absorbed_into_phase_intent() -> None:
+    """A ledger comment placed inside an intent block must not pollute intent text.
+
+    Regression for the H-NEW-1 finding: ``_walk_body`` previously appended
+    every non-heading non-row line into the active intent buffer, including
+    a hand-edited or stray ``<!-- RETIRED: ... -->`` block. The next
+    serialise pass would then re-emit the canonical ledger AND the absorbed
+    duplicate inside the intent paragraph, polluting authored prose and
+    accumulating on every round-trip.
+    """
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    rng = random.Random(50)
+    spec = make_clean_plan("L2", rng=rng, phases=1, steps=2)
+    rendered = spec.render()
+    # Inject a ledger comment INSIDE the Phase intent block (after heading,
+    # before first Step row).
+    polluted = rendered.replace(
+        "Phase P01 delivers a coherent slice of the work.",
+        "Phase P01 delivers a coherent slice of the work.\n<!-- RETIRED: S99 -->",
+    )
+
+    plan = parse_plan(polluted)
+
+    # Intent must not contain the ledger marker.
+    assert "RETIRED:" not in plan.phases[0].intent
+    # But the ledger token must still be parsed into the retirement set.
+    assert "S99" in plan.retired_step_ids
+    # Round-trip emits exactly one ledger comment, not two.
+    serialised = serialise_plan(plan)
+    assert serialised.count("<!-- RETIRED:") == 1
+
+
 def test_phase_remove_cascades_to_descendant_steps() -> None:
     """Removing a Phase retires every descendant Step canonical id."""
     rng = random.Random(1)

@@ -13,12 +13,75 @@ JSON output.
 
 import json
 import sys
+from collections.abc import Callable
+from functools import wraps
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, cast
 
 import typer
 
 __all__ = ["plan_app"]
+
+
+def _render_user_errors[F: Callable[..., None]](func: F) -> F:
+    """Render handler-raised typed errors as one-line CLI messages.
+
+    Mutating handlers raise typed exceptions (``StepNotFoundError``,
+    ``MoveStepError``, ``AddPhaseError``, ``EpicIntentError``,
+    ``PromoteError``, ``DemoteError``, etc.) when the user supplies an
+    argument the plan rejects. Without this wrapper Typer renders a
+    Rich-formatted Python traceback to stderr; with it, the message
+    surfaces as ``error: <message>`` and the process exits 1.
+
+    Programmer-error exceptions (assertions, ``ValueError`` from internal
+    invariants) are not caught; they propagate so test runs and CI
+    surface the bug.
+    """
+    from vaultspec_core.plan.commands.epic_ops import EpicIntentError
+    from vaultspec_core.plan.commands.phase_ops import (
+        AddPhaseError,
+        MovePhaseError,
+        PhaseNotFoundError,
+    )
+    from vaultspec_core.plan.commands.step_ops import (
+        AddStepError,
+        MoveStepError,
+        StepNotFoundError,
+    )
+    from vaultspec_core.plan.commands.tier_ops import (
+        DemoteError,
+        PromoteError,
+    )
+    from vaultspec_core.plan.commands.wave_ops import (
+        AddWaveError,
+        MoveWaveError,
+        WaveNotFoundError,
+    )
+
+    user_errors: tuple[type[Exception], ...] = (
+        StepNotFoundError,
+        MoveStepError,
+        AddStepError,
+        PhaseNotFoundError,
+        MovePhaseError,
+        AddPhaseError,
+        WaveNotFoundError,
+        MoveWaveError,
+        AddWaveError,
+        EpicIntentError,
+        PromoteError,
+        DemoteError,
+    )
+
+    @wraps(func)
+    def wrapper(*args: object, **kwargs: object) -> None:
+        try:
+            func(*args, **kwargs)
+        except user_errors as exc:
+            typer.echo(f"error: {exc}", err=True)
+            raise typer.Exit(1) from exc
+
+    return cast("F", wrapper)
 
 
 plan_app = typer.Typer(
@@ -187,6 +250,7 @@ def cmd_query(
 
 
 @step_app.command("toggle")
+@_render_user_errors
 def cmd_step_toggle(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -202,6 +266,7 @@ def cmd_step_toggle(
 
 
 @step_app.command("check")
+@_render_user_errors
 def cmd_step_check(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -217,6 +282,7 @@ def cmd_step_check(
 
 
 @step_app.command("uncheck")
+@_render_user_errors
 def cmd_step_uncheck(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -235,6 +301,7 @@ def cmd_step_uncheck(
 
 
 @step_app.command("add")
+@_render_user_errors
 def cmd_step_add(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     action: Annotated[str, typer.Option("--action", help="Imperative-verb statement")],
@@ -259,6 +326,7 @@ def cmd_step_add(
 
 
 @step_app.command("insert")
+@_render_user_errors
 def cmd_step_insert(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     action: Annotated[str, typer.Option("--action", help="Imperative-verb statement")],
@@ -284,6 +352,7 @@ def cmd_step_insert(
 
 
 @step_app.command("edit")
+@_render_user_errors
 def cmd_step_edit(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -305,6 +374,7 @@ def cmd_step_edit(
 
 
 @step_app.command("move")
+@_render_user_errors
 def cmd_step_move(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -330,6 +400,7 @@ def cmd_step_move(
 
 
 @step_app.command("remove")
+@_render_user_errors
 def cmd_step_remove(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -349,6 +420,7 @@ def cmd_step_remove(
 
 
 @phase_app.command("add")
+@_render_user_errors
 def cmd_phase_add(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     title: Annotated[str, typer.Option("--title", help="Phase heading title")],
@@ -369,6 +441,7 @@ def cmd_phase_add(
 
 
 @phase_app.command("insert")
+@_render_user_errors
 def cmd_phase_insert(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     title: Annotated[str, typer.Option("--title", help="Phase heading title")],
@@ -394,6 +467,7 @@ def cmd_phase_insert(
 
 
 @phase_app.command("edit")
+@_render_user_errors
 def cmd_phase_edit(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     phase_id: Annotated[str, typer.Argument(help="Phase canonical id (P##)")],
@@ -415,6 +489,7 @@ def cmd_phase_edit(
 
 
 @phase_app.command("move")
+@_render_user_errors
 def cmd_phase_move(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     phase_id: Annotated[str, typer.Argument(help="Phase canonical id (P##)")],
@@ -440,6 +515,7 @@ def cmd_phase_move(
 
 
 @phase_app.command("remove")
+@_render_user_errors
 def cmd_phase_remove(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     phase_id: Annotated[str, typer.Argument(help="Phase canonical id (P##)")],
@@ -462,6 +538,7 @@ def cmd_phase_remove(
 
 
 @wave_app.command("add")
+@_render_user_errors
 def cmd_wave_add(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     title: Annotated[str, typer.Option("--title", help="Wave heading title")],
@@ -479,6 +556,7 @@ def cmd_wave_add(
 
 
 @wave_app.command("insert")
+@_render_user_errors
 def cmd_wave_insert(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     title: Annotated[str, typer.Option("--title", help="Wave heading title")],
@@ -504,6 +582,7 @@ def cmd_wave_insert(
 
 
 @wave_app.command("edit")
+@_render_user_errors
 def cmd_wave_edit(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     wave_id: Annotated[str, typer.Argument(help="Wave canonical id (W##)")],
@@ -525,6 +604,7 @@ def cmd_wave_edit(
 
 
 @wave_app.command("move")
+@_render_user_errors
 def cmd_wave_move(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     wave_id: Annotated[str, typer.Argument(help="Wave canonical id (W##)")],
@@ -547,6 +627,7 @@ def cmd_wave_move(
 
 
 @wave_app.command("remove")
+@_render_user_errors
 def cmd_wave_remove(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     wave_id: Annotated[str, typer.Argument(help="Wave canonical id (W##)")],
@@ -590,6 +671,7 @@ def cmd_epic_intent_show(
 
 
 @epic_intent_app.command("edit")
+@_render_user_errors
 def cmd_epic_intent_edit(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     text: Annotated[
@@ -625,6 +707,7 @@ def cmd_tier_show(
 
 
 @tier_app.command("promote")
+@_render_user_errors
 def cmd_tier_promote(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     target: Annotated[
@@ -676,6 +759,7 @@ def cmd_tier_promote(
 
 
 @tier_app.command("demote")
+@_render_user_errors
 def cmd_tier_demote(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     target: Annotated[

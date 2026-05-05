@@ -232,7 +232,6 @@ def parse_plan(source: str | Path) -> Plan:
 
 _RE_RETIRED_LEDGER = re.compile(
     r"<!--\s*RETIRED:\s*(?P<body>[^>]*?)\s*-->",
-    re.IGNORECASE,
 )
 
 
@@ -286,7 +285,8 @@ def _extract_epic_intent(body: str) -> EpicIntent | None:
     """Return the ``## Epic intent`` block when present, ``None`` otherwise.
 
     The intent text spans every paragraph from the line after the heading
-    until the next ``##``-or-greater heading.
+    until the next ``##``-or-greater heading. The hidden retirement-ledger
+    comment is filtered out so it is not absorbed into authored prose.
     """
     lines = body.splitlines()
     for index, line in enumerate(lines):
@@ -295,6 +295,8 @@ def _extract_epic_intent(body: str) -> EpicIntent | None:
             for follow in lines[index + 1 :]:
                 if follow.startswith("## ") or follow.startswith("# "):
                     break
+                if _RE_RETIRED_LEDGER.search(follow):
+                    continue
                 text_lines.append(follow)
             return EpicIntent(
                 text="\n".join(text_lines).strip(),
@@ -378,6 +380,8 @@ def _walk_body(body: str) -> tuple[list[Wave], list[Phase], list[Step]]:
             if stripped.startswith("# ") or stripped.startswith("## "):
                 _flush_intent()
                 intent_target = None
+                continue
+            if _RE_RETIRED_LEDGER.search(line):
                 continue
             intent_buffer.append(line)
 

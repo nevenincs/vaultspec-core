@@ -176,6 +176,29 @@ def test_step_remove_retires_id_through_cli(tmp_path, runner: CliRunner) -> None
     assert next_available_step(plan) == "S05"
 
 
+def test_step_remove_unknown_id_emits_clean_error(tmp_path, runner: CliRunner) -> None:
+    """A typed handler error renders as ``error: ...`` plus exit 1, not a traceback.
+
+    Regression for the H-NEW-2 finding: every mutating wrapper now applies the
+    ``_render_user_errors`` decorator that converts ``StepNotFoundError`` and
+    its peers into user-grade CLI messages.
+    """
+    rng = random.Random(9)
+    spec = make_clean_plan("L1", rng=rng, steps=2)
+    plan_path = tmp_path / "test-plan.md"
+    plan_path.write_text(spec.render(), encoding="utf-8")
+
+    result = runner.invoke(
+        app, ["vault", "plan", "step", "remove", str(plan_path), "S99"]
+    )
+
+    assert result.exit_code == 1
+    combined = result.stdout + (result.stderr or "")
+    assert "error:" in combined
+    assert "S99" in combined
+    assert "Traceback" not in combined
+
+
 def test_tier_promote_advances_one_step(tmp_path, runner: CliRunner) -> None:
     """``vault plan tier promote`` advances the tier and synthesises a Phase wrapper."""
     from vaultspec_core.plan.parser import parse_plan
