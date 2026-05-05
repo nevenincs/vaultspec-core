@@ -246,11 +246,11 @@ commands move rows between containers. The Phase ends when
 state mutations preserve canonical identifiers and re-parenting
 recomputes display paths correctly.
 
-- [ ] `W02.P04.S66` - implement `vault plan step toggle`; `src/vaultspec_core/plan/commands/step_toggle.py`.
-- [ ] `W02.P04.S67` - implement `vault plan step check` (idempotent close); `src/vaultspec_core/plan/commands/step_check.py`.
-- [ ] `W02.P04.S68` - implement `vault plan step uncheck` (idempotent open); `src/vaultspec_core/plan/commands/step_uncheck.py`.
-- [ ] `W02.P04.S69` - implement `vault plan step edit` with `--action` and `--scope`; `src/vaultspec_core/plan/commands/step_edit.py`.
-- [ ] `W02.P04.S70` - implement `vault plan step move` with the move-flag-precedence rule; `src/vaultspec_core/plan/commands/step_move.py`.
+- [x] `W02.P04.S66` - implement `vault plan step toggle`; `src/vaultspec_core/plan/commands/step_ops.py`.
+- [x] `W02.P04.S67` - implement `vault plan step check` (idempotent close); `src/vaultspec_core/plan/commands/step_ops.py`.
+- [x] `W02.P04.S68` - implement `vault plan step uncheck` (idempotent open); `src/vaultspec_core/plan/commands/step_ops.py`.
+- [x] `W02.P04.S69` - implement `vault plan step edit` with `--action` and `--scope`; `src/vaultspec_core/plan/commands/step_ops.py`.
+- [x] `W02.P04.S70` - implement `vault plan step move` with the move-flag-precedence rule; `src/vaultspec_core/plan/commands/step_ops.py`.
 - [ ] `W02.P04.S71` - implement `vault plan phase edit` with `--title` and `--intent`; `src/vaultspec_core/plan/commands/phase_edit.py`.
 - [ ] `W02.P04.S72` - implement `vault plan phase move` with the move-flag-precedence rule; `src/vaultspec_core/plan/commands/phase_move.py`.
 - [ ] `W02.P04.S73` - implement `vault plan wave edit` with `--title` and `--intent`; `src/vaultspec_core/plan/commands/wave_edit.py`.

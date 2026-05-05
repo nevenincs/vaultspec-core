@@ -24,11 +24,38 @@ from vaultspec_core.plan.parser import Step
 if TYPE_CHECKING:
     from vaultspec_core.plan.parser import Plan
 
-__all__ = ["AddStepError", "add_step", "insert_step"]
+__all__ = [
+    "AddStepError",
+    "MoveStepError",
+    "StepNotFoundError",
+    "add_step",
+    "check_step",
+    "edit_step",
+    "find_step",
+    "insert_step",
+    "move_step",
+    "toggle_step",
+    "uncheck_step",
+]
 
 
 class AddStepError(ValueError):
     """Raised when an add or insert call violates the parent-resolution rule."""
+
+
+class StepNotFoundError(KeyError):
+    """Raised when a Step canonical identifier does not exist in the plan."""
+
+
+class MoveStepError(ValueError):
+    """Raised when a move call violates the move-flag-precedence rule.
+
+    Per the CLI ADR's *Move-flag precedence* section, ``--before`` /
+    ``--after`` require the anchor to share the moving Step's current
+    parent Phase; cross-parent moves require ``--to-phase``. A
+    combination ``--to-phase P## --before/--after S##`` is legal only
+    when the anchor resides in the destination Phase post-move.
+    """
 
 
 def add_step(
@@ -156,7 +183,221 @@ def insert_step(
     return new_step
 
 
+# ---- State commands ---------------------------------------------------------
+
+
+def find_step(plan: Plan, step_id: str) -> Step:
+    """Return the Step with canonical id ``step_id`` or raise.
+
+    Raises:
+        StepNotFoundError: When ``step_id`` is not present in the plan.
+    """
+    for step in plan.steps:
+        if step.canonical_id == step_id:
+            return step
+    msg = f"Step {step_id!r} does not exist in this plan"
+    raise StepNotFoundError(msg)
+
+
+def toggle_step(plan: Plan, step_id: str) -> Step:
+    """Flip the Step's checkbox state. Non-idempotent by design."""
+    step = find_step(plan, step_id)
+    step.checked = not step.checked
+    return step
+
+
+def check_step(plan: Plan, step_id: str) -> Step:
+    """Mark the Step closed. Idempotent: already-closed Steps are unchanged."""
+    step = find_step(plan, step_id)
+    step.checked = True
+    return step
+
+
+def uncheck_step(plan: Plan, step_id: str) -> Step:
+    """Mark the Step open. Idempotent: already-open Steps are unchanged."""
+    step = find_step(plan, step_id)
+    step.checked = False
+    return step
+
+
+def edit_step(
+    plan: Plan,
+    step_id: str,
+    *,
+    action: str | None = None,
+    scope: str | None = None,
+) -> Step:
+    """Edit the Step's action statement and / or scope clause.
+
+    Args:
+        plan: Parsed :class:`Plan`. Mutated in place.
+        step_id: Canonical id of the Step to edit.
+        action: New imperative-verb action; ``None`` leaves it unchanged.
+        scope: New file or area scope; ``None`` leaves it unchanged.
+
+    Raises:
+        StepNotFoundError: When ``step_id`` is not present.
+    """
+    step = find_step(plan, step_id)
+    if action is not None:
+        step.action = action
+    if scope is not None:
+        step.scope = scope
+    return step
+
+
+# ---- Re-parenting / re-positioning ------------------------------------------
+
+
+def move_step(
+    plan: Plan,
+    step_id: str,
+    *,
+    to_phase: str | None = None,
+    before: str | None = None,
+    after: str | None = None,
+) -> Step:
+    """Re-parent and / or re-position a Step.
+
+    Behaviour per the CLI ADR's *Move-flag precedence* rule:
+
+    - ``--to-phase`` alone re-parents the Step to the named Phase and
+      appends it at the tail of the new parent.
+    - ``--before`` / ``--after`` alone re-position within the current
+      parent; the anchor must share the moving Step's parent Phase.
+    - ``--to-phase`` plus ``--before`` / ``--after`` re-parents AND
+      positions; the anchor must reside in the destination Phase
+      post-move.
+
+    Args:
+        plan: Parsed :class:`Plan`. Mutated in place.
+        step_id: Canonical id of the Step to move.
+        to_phase: Destination Phase canonical id.
+        before: Anchor Step id the moved row should precede.
+        after: Anchor Step id the moved row should follow.
+
+    Returns:
+        The moved :class:`Step` with its display path recomputed.
+
+    Raises:
+        StepNotFoundError: When ``step_id`` does not exist.
+        MoveStepError: When the flag combination violates precedence.
+    """
+    if before is not None and after is not None:
+        msg = "move_step accepts at most one of --before / --after"
+        raise MoveStepError(msg)
+    if to_phase is None and before is None and after is None:
+        msg = "move_step requires --to-phase, --before, or --after"
+        raise MoveStepError(msg)
+
+    moving = find_step(plan, step_id)
+    current_phase = _phase_of(plan, step_id)
+
+    # Determine destination Phase.
+    if to_phase is not None:
+        dest_phase = _resolve_phase_by_id(plan, to_phase)
+    else:
+        dest_phase = current_phase
+
+    # Anchor checks.
+    anchor_id = before if before is not None else after
+    anchor_phase = _phase_of(plan, anchor_id) if anchor_id is not None else None
+    if (
+        anchor_id is not None
+        and dest_phase is not None
+        and anchor_phase is not dest_phase
+    ):
+        msg = (
+            f"anchor Step {anchor_id!r} is not in destination phase "
+            f"{dest_phase.canonical_id!r}; cross-parent move requires "
+            "the anchor to reside in the destination Phase"
+        )
+        raise MoveStepError(msg)
+
+    # Detach from current parent.
+    if current_phase is not None:
+        current_phase.steps.remove(moving)
+
+    # Compute insertion index.
+    if dest_phase is None:
+        # L1 plan: re-position within plan.steps.
+        plan.steps.remove(moving)
+        if anchor_id is None:
+            plan.steps.append(moving)
+        else:
+            anchor_index = next(
+                i for i, step in enumerate(plan.steps) if step.canonical_id == anchor_id
+            )
+            position = anchor_index if before is not None else anchor_index + 1
+            plan.steps.insert(position, moving)
+    else:
+        if anchor_id is None:
+            dest_phase.steps.append(moving)
+        else:
+            anchor_index = next(
+                i
+                for i, step in enumerate(dest_phase.steps)
+                if step.canonical_id == anchor_id
+            )
+            position = anchor_index if before is not None else anchor_index + 1
+            dest_phase.steps.insert(position, moving)
+        # Refresh the flat plan.steps mirror to keep document order coherent.
+        plan.steps.remove(moving)
+        # Re-insert at the position matching the destination phase row order.
+        flat_index = _compute_flat_position(plan, moving)
+        plan.steps.insert(flat_index, moving)
+
+    # Recompute display path against new ancestor chain.
+    wave_id = _wave_id_of(plan, dest_phase) if dest_phase is not None else None
+    parent_id = dest_phase.canonical_id if dest_phase is not None else None
+    moving.display_path = step_display_path(
+        step_id=moving.canonical_id,
+        phase_id=parent_id,
+        wave_id=wave_id,
+    )
+    return moving
+
+
 # ---- Internals --------------------------------------------------------------
+
+
+def _phase_of(plan: Plan, step_id: str):
+    """Return the Phase that owns ``step_id`` or ``None`` for L1 plans."""
+    if plan.frontmatter.tier is Tier.L1:
+        for step in plan.steps:
+            if step.canonical_id == step_id:
+                return None
+        return None
+    for phase in plan.phases:
+        for step in phase.steps:
+            if step.canonical_id == step_id:
+                return phase
+    return None
+
+
+def _resolve_phase_by_id(plan: Plan, phase_id: str):
+    """Return the Phase with canonical id ``phase_id`` or raise."""
+    for phase in plan.phases:
+        if phase.canonical_id == phase_id:
+            return phase
+    msg = f"phase {phase_id!r} does not exist in this plan"
+    raise MoveStepError(msg)
+
+
+def _compute_flat_position(plan: Plan, moving: Step) -> int:
+    """Return the index in ``plan.steps`` matching the moving Step's new spot.
+
+    The flat ``plan.steps`` mirrors the document-order union of every
+    Phase's ``steps`` list. After re-attaching to ``dest_phase``, this
+    helper finds the position the Phase's index implies.
+    """
+    flat_position = 0
+    for phase in plan.phases:
+        for step in phase.steps:
+            if step is moving:
+                return flat_position
+            flat_position += 1
+    return len(plan.steps)
 
 
 def _resolve_phase_for_add(plan: Plan, *, phase_id: str | None):
