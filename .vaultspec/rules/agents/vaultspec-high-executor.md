@@ -106,3 +106,11 @@ violations - either by delegating to it or by including it in the supervised
 team workflow.
 
 **DO NOT** mark the Step as complete until the review passes.
+
+## CLI usage mandate
+
+Update Step state via `vault plan step check` / `step uncheck` /
+`step toggle` rather than hand-editing the checkbox glyph. The
+CLI guarantees idempotent transitions and refreshes the display
+path consistently. See the CLI ADR
+(`2026-05-06-plan-hardening-adr`).

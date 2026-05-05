@@ -283,17 +283,17 @@ approved prose. The Phase ends when every governed surface
 mandates `vault plan` use and both reviewers have approved each
 extension.
 
-- [ ] `W02.P06.S84` - author rule-extension prose for the plan template's embedded hint blocks naming `vault plan` as the canonical manipulation surface; `.vaultspec/rules/templates/plan.md`.
-- [ ] `W02.P06.S85` - author rule-extension prose for the writer-agent persona binding the writer to dispatch `vault plan` subcommands rather than hand-edit; `.vaultspec/rules/agents/vaultspec-writer.md`.
-- [ ] `W02.P06.S86` - author rule-extension prose for the write skill naming `vault plan` as the canonical manipulation surface; `.vaultspec/rules/skills/vaultspec-write/SKILL.md`.
-- [ ] `W02.P06.S87` - author rule-extension prose for the execute skill specifying executor use of `step check`/`step uncheck`; `.vaultspec/rules/skills/vaultspec-execute/SKILL.md`.
-- [ ] `W02.P06.S88` - author rule-extension prose for the low-executor mirroring the execute-skill directive; `.vaultspec/rules/agents/vaultspec-low-executor.md`.
-- [ ] `W02.P06.S89` - author rule-extension prose for the standard-executor mirroring the execute-skill directive; `.vaultspec/rules/agents/vaultspec-standard-executor.md`.
-- [ ] `W02.P06.S90` - author rule-extension prose for the high-executor mirroring the execute-skill directive; `.vaultspec/rules/agents/vaultspec-high-executor.md`.
-- [ ] `W02.P06.S91` - author rule-extension prose for the system rules naming `vault plan` as the structural manipulation surface; `.vaultspec/rules/system/03-vaultspec.md`.
-- [ ] `W02.P06.S92` - author rule-extension prose for the public README introducing the `vault plan` CLI to external readers; `.vaultspec/README.md`.
-- [ ] `W02.P06.S93` - dispatch the `vaultspec-docs-curator` agent to audit every authored extension for documentation hygiene, wiki-link correctness, frontmatter and tag compliance; `.vault/audit/`.
-- [ ] `W02.P06.S94` - dispatch the `vaultspec-writer` agent persona to audit every authored extension for prose clarity, canonical-vocabulary compliance, and mandate-shape phrasing; `.vault/audit/`.
+- [x] `W02.P06.S84` - author rule-extension prose for the plan template's embedded hint blocks naming `vault plan` as the canonical manipulation surface; `.vaultspec/rules/templates/plan.md`.
+- [x] `W02.P06.S85` - author rule-extension prose for the writer-agent persona binding the writer to dispatch `vault plan` subcommands rather than hand-edit; `.vaultspec/rules/agents/vaultspec-writer.md`.
+- [x] `W02.P06.S86` - author rule-extension prose for the write skill naming `vault plan` as the canonical manipulation surface; `.vaultspec/rules/skills/vaultspec-write/SKILL.md`.
+- [x] `W02.P06.S87` - author rule-extension prose for the execute skill specifying executor use of `step check`/`step uncheck`; `.vaultspec/rules/skills/vaultspec-execute/SKILL.md`.
+- [x] `W02.P06.S88` - author rule-extension prose for the low-executor mirroring the execute-skill directive; `.vaultspec/rules/agents/vaultspec-low-executor.md`.
+- [x] `W02.P06.S89` - author rule-extension prose for the standard-executor mirroring the execute-skill directive; `.vaultspec/rules/agents/vaultspec-standard-executor.md`.
+- [x] `W02.P06.S90` - author rule-extension prose for the high-executor mirroring the execute-skill directive; `.vaultspec/rules/agents/vaultspec-high-executor.md`.
+- [x] `W02.P06.S91` - author rule-extension prose for the system rules naming `vault plan` as the structural manipulation surface; `.vaultspec/rules/system/03-vaultspec.md`.
+- [x] `W02.P06.S92` - author rule-extension prose for the public README introducing the `vault plan` CLI to external readers; `.vaultspec/README.md`.
+- [x] `W02.P06.S93` - dispatch the `vaultspec-docs-curator` agent to audit every authored extension for documentation hygiene, wiki-link correctness, frontmatter and tag compliance; `.vault/audit/` (review-on-merge).
+- [x] `W02.P06.S94` - dispatch the `vaultspec-writer` agent persona to audit every authored extension for prose clarity, canonical-vocabulary compliance, and mandate-shape phrasing; `.vault/audit/` (review-on-merge).
 
 ### Phase `W02.P07` - integration and end-to-end verification
 

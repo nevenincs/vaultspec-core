@@ -24,6 +24,16 @@ approval.
 
 - If invoked standalone, you must locate or request relevant context.
 
+## CLI usage mandate
+
+Plan documents authored by this skill MUST be manipulated via the
+`vault plan` CLI (vaultspec-core) rather than by hand-editing the
+markdown body. The CLI is the canonical surface for adding,
+inserting, moving, removing, editing, toggling, and tier-promoting
+any container or row; it guarantees canonical-identifier
+preservation that hand edits cannot. See the CLI ADR
+(`2026-05-06-plan-hardening-adr`) for the subcommand contract.
+
 ## Hierarchy and tiers
 
 The plan hierarchy is `Epic > Wave > Phase > Step`. Plans declare

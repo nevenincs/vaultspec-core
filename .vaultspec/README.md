@@ -79,6 +79,8 @@ Lands the new search-index API; `W02` depends on this Wave.
 
 The plan lands in `.vault/plan/` and defines what gets built, in what order, and with what acceptance criteria. Review the scope - confirm the tier matches the work's actual complexity, every Step is one row, and nothing overreaches the ADR's boundaries. Approve before execution begins.
 
+Use the `vault plan` CLI (vaultspec-core) to manipulate plan documents after creation: `vault plan step add/insert/move/remove/check/uncheck/toggle/edit`, `vault plan phase`/`wave` equivalents, `vault plan epic intent`, and `vault plan tier promote/demote`. The CLI guarantees canonical-identifier preservation and gap-no-reuse semantics that hand edits cannot. See the CLI ADR (`2026-05-06-plan-hardening-adr`) for the full surface and `vault plan check` for the validator that backs it.
+
 ### Execution
 
 Once the plan is approved, you have options for how to execute it.

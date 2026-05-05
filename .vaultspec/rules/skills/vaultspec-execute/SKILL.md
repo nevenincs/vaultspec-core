@@ -115,3 +115,10 @@ following schema:
   Epic-completion progress are reported against that external
   artefact (milestone, project board, roadmap entry) at Wave
   boundaries.
+
+- **CLI usage mandate**: Executors MUST update Step state via
+  `vault plan step check` (close), `vault plan step uncheck`
+  (re-open), or `vault plan step toggle` rather than hand-editing
+  the checkbox glyph. The CLI guarantees idempotent state
+  transitions and consistent display-path recomputation; hand
+  edits bypass these guarantees and are flagged by `vault plan check`. See the CLI ADR (`2026-05-06-plan-hardening-adr`).

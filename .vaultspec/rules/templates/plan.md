@@ -74,6 +74,20 @@ related:
      X, do Y" / "across all callers, do Z" / "in every module,
      replace W". The rule applies at every tier including L1. -->
 
+<!-- VAULT PLAN CLI:
+     The `vault plan` CLI (vaultspec-core) is the canonical surface
+     for structural manipulation of this plan document. Writers and
+     executors MUST use `vault plan step add/insert/move/remove/
+     check/uncheck/toggle/edit`, `vault plan phase add/move/remove/
+     edit`, `vault plan wave add/move/remove/edit`, `vault plan epic
+     intent`, and `vault plan tier promote/demote` for every
+     identifier-affecting change rather than hand-editing the row
+     grammar. Hand edits are tolerated by the parser but flagged by
+     `vault plan check`; canonical-identifier preservation is
+     guaranteed only when the CLI performs the mutation. See the
+     CLI ADR (2026-05-06-plan-hardening-adr) for the full
+     subcommand surface. -->
+
 # `{feature}` `{phase}` plan
 
 Brief description of the proposed feature, change, or refactor.
