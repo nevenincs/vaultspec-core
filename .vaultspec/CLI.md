@@ -287,6 +287,80 @@ Run health checks on `.vault/`. Exits with code `1` if errors are found.
 
 `yes` = fully supported, `partial` = only the sub-checks that accept `--fix` will apply fixes (`all` dispatches to every check), `no` = flag rejected with error. `structure` does not support `--feature` filtering.
 
+### vault plan
+
+```bash
+vaultspec-core vault plan COMMAND [OPTIONS] PATH ...
+```
+
+Inspect and manipulate plan documents per the plan-hardening convention. Plans declare a complexity tier (`L1`, `L2`, `L3`, `L4`) in frontmatter and are structured as `Epic > Wave > Phase > Step`. Every mutating operation goes through this surface so canonical identifiers (`S##`, `P##`, `W##`) remain append-only and gap-no-reuse; hand-edits to checkbox glyphs or display paths are flagged by `vault plan check`.
+
+#### Read commands
+
+| Sub-command | Description                                                                              |
+| ----------- | ---------------------------------------------------------------------------------------- |
+| `status`    | Report plan health, structure, and completion. `--json` emits a machine-readable payload |
+| `check`     | Validate convention compliance; with `--fix`, apply autofixable transformations          |
+| `query`     | Filter Step rows by `--phase`/`--wave` scope and `--open`/`--closed` predicate           |
+
+`vault plan check` exits `1` when at least one ERROR-severity finding is present.
+
+#### Step commands
+
+| Sub-command | Description                                                                       |
+| ----------- | --------------------------------------------------------------------------------- |
+| `add`       | Append a Step at the next-available `S##`. Requires `--action` and `--scope`      |
+| `insert`    | Insert at a named position with `--before`/`--after`; parent inferred from anchor |
+| `edit`      | Replace `--action` and / or `--scope` without changing the canonical identifier   |
+| `move`      | Re-parent (`--to-phase`) and / or re-position (`--before`/`--after`)              |
+| `remove`    | Retire the Step's canonical id permanently; the next-available counter skips it   |
+| `check`     | Mark the Step closed (`[x]`); idempotent                                          |
+| `uncheck`   | Mark the Step open (`[ ]`); idempotent                                            |
+| `toggle`    | Flip the Step's checkbox state                                                    |
+
+#### Phase commands
+
+| Sub-command | Description                                                                   |
+| ----------- | ----------------------------------------------------------------------------- |
+| `add`       | Append a Phase at the next-available `P##`. Requires `--title` and `--intent` |
+| `insert`    | Insert at a named position with `--before`/`--after`                          |
+| `edit`      | Replace `--title` and / or `--intent` in place                                |
+| `move`      | Re-parent (`--to-wave`) and / or re-position (`--before`/`--after`)           |
+| `remove`    | Retire the Phase plus every descendant Step (cascading retirement)            |
+
+#### Wave commands
+
+Identical shape to Phase, but the parent is implicit (Epic frame): only `--before`/`--after` re-position; there is no `--to-epic`. Wave operations require `L3` or `L4`.
+
+#### Epic intent (L4 only)
+
+| Sub-command   | Description                                                                 |
+| ------------- | --------------------------------------------------------------------------- |
+| `intent show` | Print the Epic intent paragraph                                             |
+| `intent edit` | Replace the Epic intent paragraph; `--text` must declare the PM association |
+
+#### Tier commands
+
+| Sub-command | Description                                                                                                                                                                            |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `show`      | Print the plan's declared tier                                                                                                                                                         |
+| `promote`   | Advance the tier transitively (e.g. L1 -> L4 in one call). Synthesised containers use `--phase-title`/`--phase-intent`/`--wave-title`/`--wave-intent`/`--epic-intent` for placeholders |
+| `demote`    | Step the tier down. Refuses with an error when the collapsing layer holds more than one container; pass `--force` to retire the dropped ids and proceed                                |
+
+#### Move-flag precedence
+
+`step move` and `phase move` accept the re-parent flag (`--to-phase` / `--to-wave`) and the position flags (`--before` / `--after`) independently or together:
+
+- Re-parent flag alone re-parents and appends to the destination tail.
+- Position flag alone re-positions within the current parent; the anchor must share that parent.
+- Both flags re-parent AND position; the anchor must reside in the destination post-move.
+
+A self-referential move (`step move S01 --before S01`) is rejected with the relevant `Move{Step,Phase,Wave}Error`.
+
+#### Identifier retirement
+
+`remove`, multi-step demotion, and Wave / Phase removal all add the retired canonical id to a hidden `<!-- RETIRED: ... -->` ledger embedded in the plan body. `next_available_*` consults this ledger so retired identifiers are never reused, even across `parse / serialise` round-trips invoked by `--fix`.
+
 ## Spec Commands
 
 Group command: `vaultspec-core spec COMMAND`
