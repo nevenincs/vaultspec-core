@@ -29,8 +29,13 @@ Utilize:
 - **DECIDE AUTONOMOUSLY**: Make technically sound implementation choices based
   on existing project conventions and established reference patterns.
 
-- **DOCUMENT CONCISELY**: For every step, **UPDATE** or **CREATE** `<Step Record>`
-  (`.vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-<step>.md`).
+- **DOCUMENT CONCISELY**: The executor reads the originating Step
+  row from the plan document, executes that Step (one prompt-run
+  plus one commit per the convention ADR's Step row contract), and
+  writes one `<Step Record>` per Step at
+  `.vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-<step>.md`.
+  The originating Step's canonical identifier (`S##`) is recorded
+  in the Step Record's `step_id:` frontmatter field.
 
 ## Standards & Tooling
 
