@@ -107,3 +107,10 @@ following schema:
 
 - **Traceability**: All changes must be mapped to their respective Step
   Records.
+
+- **L4 plans**: When executing an `L4` plan, the execute skill
+  respects the project-management association declared in the
+  plan's `## Epic intent` block prose. Wave-completion and
+  Epic-completion progress are reported against that external
+  artefact (milestone, project board, roadmap entry) at Wave
+  boundaries.

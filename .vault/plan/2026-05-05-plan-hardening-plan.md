@@ -110,7 +110,7 @@ Phase ends when the skill maps to one Step Record per Step (not
 per Phase) and respects the L4 PM-association rule.
 
 - [x] `W01.P04.S20` - reconcile the existing "Step Record per completed phase" wording to "one Step Record per completed Step"; `.vaultspec/rules/skills/vaultspec-execute/SKILL.md`.
-- [ ] `W01.P04.S21` - add a paragraph stating that at L4 the execute skill respects the project-management association declared in the Epic intent block; `.vaultspec/rules/skills/vaultspec-execute/SKILL.md`.
+- [x] `W01.P04.S21` - add a paragraph stating that at L4 the execute skill respects the project-management association declared in the Epic intent block; `.vaultspec/rules/skills/vaultspec-execute/SKILL.md`.
 
 ### Phase `W01.P05` - rewrite the exec-step and exec-summary templates
 
