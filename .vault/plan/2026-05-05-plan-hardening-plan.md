@@ -74,7 +74,7 @@ three hint blocks verbatim.
 - [x] `W01.P01.S06` - update the LINK RULES comment block to clarify that `related:` carries authorising documents and the body remains free of wiki-links and markdown links; `.vaultspec/rules/templates/plan.md`.
 - [x] `W01.P01.S07` - add the Phase block format example as a commented template; `.vaultspec/rules/templates/plan.md`.
 - [x] `W01.P01.S08` - add the Wave block format example as a commented template; `.vaultspec/rules/templates/plan.md`.
-- [ ] `W01.P01.S09` - add the Epic intent block format example as a commented template; `.vaultspec/rules/templates/plan.md`.
+- [x] `W01.P01.S09` - add the Epic intent block format example as a commented template; `.vaultspec/rules/templates/plan.md`.
 - [ ] `W01.P01.S10` - remove the existing flat-bullet escape hatch that previously permitted simpler features to bypass the Step row contract; `.vaultspec/rules/templates/plan.md`.
 - [ ] `W01.P01.S11` - rewrite the Parallelization and Verification sections so they reflect the tier-driven structure rather than free-form prose; `.vaultspec/rules/templates/plan.md`.
 

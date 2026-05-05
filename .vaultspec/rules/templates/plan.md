@@ -134,6 +134,21 @@ templates.
 
      The Wave intent paragraph is mandatory. -->
 
+<!-- EPIC INTENT BLOCK FORMAT (L4 only):
+     ## Epic intent
+
+     One paragraph stating the strategic goal, the external project-
+     management association (milestone name, project board identifier,
+     roadmap entry), the timeline horizon, and the teams or agents
+     involved.
+
+     ## Wave `W01` - ...
+     ## Wave `W02` - ...
+
+     The ## Epic intent block is mandatory at L4 and absent at L1, L2,
+     L3. The plan title (the level-one # heading at the top of the
+     document) is the Epic title; no separate Epic heading is emitted. -->
+
 Use tasks for simpler features:
 
 - `{Task 1}`
