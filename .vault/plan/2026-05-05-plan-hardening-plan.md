@@ -191,7 +191,7 @@ canonical identifiers, document order, and frontmatter exactly,
 covered by unit tests.
 
 - [x] `W02.P01.S35` - create the `vaultspec_core.plan` package with module skeleton, `__init__.py`, and public surface exports; `src/vaultspec_core/plan/__init__.py`.
-- [ ] `W02.P01.S36` - implement frontmatter parsing for `tier`, `related`, `tags`, `date`; `src/vaultspec_core/plan/frontmatter.py`.
+- [x] `W02.P01.S36` - implement frontmatter parsing for `tier`, `related`, `tags`, `date`; `src/vaultspec_core/plan/frontmatter.py`.
 - [ ] `W02.P01.S37` - implement hierarchy parsing for Wave, Phase, and Step blocks against the row contract; `src/vaultspec_core/plan/parser.py`.
 - [ ] `W02.P01.S38` - implement canonical-identifier extraction and per-document next-available counter; `src/vaultspec_core/plan/identifiers.py`.
 - [ ] `W02.P01.S39` - implement display-path computation from current ancestor chain; `src/vaultspec_core/plan/display_path.py`.
