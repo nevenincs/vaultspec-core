@@ -123,6 +123,17 @@ templates.
      At L3/L4 the Phase heading uses the ancestor-aware path
      (### Phase `W01.P02` - ...). The intent sentence is mandatory. -->
 
+<!-- WAVE BLOCK FORMAT (L3, L4):
+     ## Wave `W01` - language-only convention rollout
+
+     One paragraph stating what this Wave delivers, which downstream
+     Wave depends on it, and which authorising documents back it.
+
+     ### Phase `W01.P01` - ...
+     ### Phase `W01.P02` - ...
+
+     The Wave intent paragraph is mandatory. -->
+
 Use tasks for simpler features:
 
 - `{Task 1}`
