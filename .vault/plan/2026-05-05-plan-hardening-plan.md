@@ -199,7 +199,7 @@ ADR and pass tests.
 - [x] `W02.P02.S55` - implement the trailing-whitespace autofix; `src/vaultspec_core/plan/fixes/whitespace_fix.py`.
 - [x] `W02.P02.S56` - implement the display-path-recomputation autofix covering Step rows, Phase headings, and Wave headings; `src/vaultspec_core/plan/fixes/display_path_fix.py`.
 - [x] `W02.P02.S57` - implement the `vault plan query` command with selectors and predicates; `src/vaultspec_core/plan/query.py`.
-- [x] `W02.P02.S58` - add unit tests for `status`, `check`, `query`, and `fixes`; `src/vaultspec_core/tests/plan/test_status.py`, `test_checks.py`, `test_query.py`, `test_fixes.py`.
+- [x] `W02.P02.S58` - add unit tests for the status, check, query, and fixes modules; `src/vaultspec_core/tests/plan/`.
 
 ### Phase `W02.P03` - additive write commands
 
@@ -269,8 +269,8 @@ extension.
 - [x] `W02.P06.S90` - author rule-extension prose for the high-executor mirroring the execute-skill directive; `.vaultspec/rules/agents/vaultspec-high-executor.md`.
 - [x] `W02.P06.S91` - author rule-extension prose for the system rules naming `vault plan` as the structural manipulation surface; `.vaultspec/rules/system/03-vaultspec.md`.
 - [x] `W02.P06.S92` - author rule-extension prose for the public README introducing the `vault plan` CLI to external readers; `.vaultspec/README.md`.
-- [x] `W02.P06.S93` - dispatch the `vaultspec-docs-curator` agent to audit every authored extension for documentation hygiene, wiki-link correctness, frontmatter and tag compliance; `.vault/audit/` (review-on-merge)\`.
-- [x] `W02.P06.S94` - dispatch the `vaultspec-writer` agent persona to audit every authored extension for prose clarity, canonical-vocabulary compliance, and mandate-shape phrasing; `.vault/audit/` (review-on-merge)\`.
+- [x] `W02.P06.S93` - dispatch the vaultspec-docs-curator agent to audit every authored extension for documentation hygiene, wiki-link correctness, and frontmatter compliance (review-on-merge); `.vault/audit/`.
+- [x] `W02.P06.S94` - dispatch the vaultspec-writer agent persona to audit every authored extension for prose clarity, canonical-vocabulary compliance, and mandate-shape phrasing (review-on-merge); `.vault/audit/`.
 
 ### Phase `W02.P07` - integration and end-to-end verification
 
