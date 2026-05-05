@@ -166,7 +166,7 @@ The team-coordination and curate skills mention Phase, Wave, or
 Step in passing. The Phase ends when both skills' vocabulary is
 reconciled with the canonical hierarchy. No semantic change.
 
-- [ ] `W01.P10.S33` - reconcile any Phase, Wave, or Step references to match the canonical hierarchy in the convention ADR; `.vaultspec/rules/skills/vaultspec-team/SKILL.md`.
+- [x] `W01.P10.S33` - reconcile any Phase, Wave, or Step references to match the canonical hierarchy in the convention ADR; `.vaultspec/rules/skills/vaultspec-team/SKILL.md`.
 - [ ] `W01.P10.S34` - reconcile any Phase, Wave, or Step references to match the canonical hierarchy in the convention ADR; `.vaultspec/rules/skills/vaultspec-curate/SKILL.md`.
 
 ## Wave `W02` - vault plan CLI implementation
