@@ -211,7 +211,7 @@ All placeholders use **lowercase, kebab-case** format:
 | `{phase}`   | kebab-case | `phase-1`, `phase-2`     |
 | `{topic}`   | kebab-case | `event-handling`         |
 | `{title}`   | kebab-case | `displaymap-integration` |
-| `{step}`    | kebab-case | `task-1-window-setup`    |
+| `{step}`    | kebab-case | `s01-window-setup`       |
 
 ### General Rules
 
