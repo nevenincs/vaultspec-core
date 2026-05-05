@@ -41,6 +41,15 @@ architectural decisions (`<ADR>`s), and requirements of the current codebase.
 You must use the template at `.vaultspec/rules/templates/plan.md` and persist `<Plan>`
 to `.vault/plan/yyyy-mm-dd-<feature>-<phase>-plan.md`.
 
+The plan template embeds three canonical markdown-comment hint
+blocks (HIERARCHY AND TIERS, IDENTIFIERS AND ROW CONTRACT, NO
+COMPRESSION) verbatim from the convention ADR. The writer reads
+those blocks at plan-creation time and conforms to them; this
+persona file does NOT duplicate the hint blocks, it references
+them. Any future revision to the convention edits the convention
+ADR first; the plan template re-syncs from the ADR; this persona
+remains a thin pointer.
+
 ### Frontmatter & Tagging Mandate
 
 Every document MUST strictly adhere to the following schema:
