@@ -93,13 +93,20 @@ Every document MUST strictly adhere to the following schema:
 
 ## Workflow
 
-- **Research**: Ensure vaultspec research agents has answered questions.
+- **Research**: Ensure vaultspec research agents have answered questions.
 
-- **Linking**: Ensure the Plan uses `[[wiki-links]]`.
+- **Linking**: Ensure the Plan uses `[[wiki-links]]` only in the
+  `related:` frontmatter field. The plan body must remain free of
+  wiki-links and markdown links per the embedded LINK RULES in the
+  plan template.
 
-- **Drafting**: If working with sug-agents use `vaultspec-writer` agent persona.
-  Instruct it to "Create an implementation plan for `{feature}` based on
-  `[[...-adr.md]]`. Use the template at `.vaultspec/rules/templates/plan.md`."
+- **Drafting**: If working with sub-agents, load the
+  `vaultspec-writer` agent persona. Instruct it to "Create an
+  implementation plan for `{feature}` based on `[[...-adr.md]]`.
+  Use the template at `.vaultspec/rules/templates/plan.md` and
+  conform to the embedded HIERARCHY AND TIERS, IDENTIFIERS AND ROW
+  CONTRACT, and NO COMPRESSION hint blocks. Declare the plan's
+  tier (`L1`/`L2`/`L3`/`L4`) in frontmatter."
 
 - **Review**: Present the saved Plan summary to the user before executing.
 
