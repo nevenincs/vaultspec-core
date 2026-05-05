@@ -149,12 +149,6 @@ templates.
      L3. The plan title (the level-one # heading at the top of the
      document) is the Epic title; no separate Epic heading is emitted. -->
 
-Use tasks for simpler features:
-
-- `{Task 1}`
-- `{Task 2}`
-- `{Task 3}`
-
 ## Parallelization
 
 Brief opinion on how tasks might be parallelized, if at all.
