@@ -67,7 +67,7 @@ matches the convention ADR's specified shape and embeds the
 three hint blocks verbatim.
 
 - [x] `W01.P01.S01` - replace the existing Tasks section with the hierarchy and tier-driven structure scaffold; `.vaultspec/rules/templates/plan.md`.
-- [ ] `W01.P01.S02` - embed the HIERARCHY AND TIERS markdown comment hint block verbatim from the convention ADR; `.vaultspec/rules/templates/plan.md`.
+- [x] `W01.P01.S02` - embed the HIERARCHY AND TIERS markdown comment hint block verbatim from the convention ADR; `.vaultspec/rules/templates/plan.md`.
 - [ ] `W01.P01.S03` - embed the IDENTIFIERS AND ROW CONTRACT markdown comment hint block verbatim from the convention ADR; `.vaultspec/rules/templates/plan.md`.
 - [ ] `W01.P01.S04` - embed the NO COMPRESSION markdown comment hint block verbatim from the convention ADR; `.vaultspec/rules/templates/plan.md`.
 - [ ] `W01.P01.S05` - add the `tier:` frontmatter field with the values and legacy-default rule from the Frontmatter contract section of the convention ADR; `.vaultspec/rules/templates/plan.md`.
