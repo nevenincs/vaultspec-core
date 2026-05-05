@@ -216,11 +216,11 @@ ADR and pass tests.
 - [x] `W02.P02.S49` - implement the row-contract detection rule (checkbox shape, separator, action, scope, period); `src/vaultspec_core/plan/checks/row_contract_check.py`.
 - [x] `W02.P02.S50` - implement the approved-structural-vocabulary detection rule scoped to headings, container-identifier code spans, and row-label position; `src/vaultspec_core/plan/checks/vocabulary_check.py`.
 - [x] `W02.P02.S51` - implement the separator-convention detection rule (no em-dash, no en-dash); `src/vaultspec_core/plan/checks/separator_check.py`.
-- [ ] `W02.P02.S52` - implement the `vault plan check --fix` autofix harness with idempotency guarantees; `src/vaultspec_core/plan/commands/check.py`.
-- [ ] `W02.P02.S53` - implement the checkbox-spacing autofix; `src/vaultspec_core/plan/fixes/checkbox.py`.
-- [ ] `W02.P02.S54` - implement the separator-normalisation autofix; `src/vaultspec_core/plan/fixes/separator.py`.
-- [ ] `W02.P02.S55` - implement the trailing-whitespace autofix; `src/vaultspec_core/plan/fixes/whitespace.py`.
-- [ ] `W02.P02.S56` - implement the display-path-recomputation autofix covering Step rows, Phase headings, and Wave headings; `src/vaultspec_core/plan/fixes/display_path.py`.
+- [x] `W02.P02.S52` - implement the `vault plan check --fix` autofix harness with idempotency guarantees; `src/vaultspec_core/plan/fixes/_harness.py`.
+- [x] `W02.P02.S53` - implement the checkbox-spacing autofix; `src/vaultspec_core/plan/fixes/checkbox_fix.py`.
+- [x] `W02.P02.S54` - implement the separator-normalisation autofix; `src/vaultspec_core/plan/fixes/separator_fix.py`.
+- [x] `W02.P02.S55` - implement the trailing-whitespace autofix; `src/vaultspec_core/plan/fixes/whitespace_fix.py`.
+- [x] `W02.P02.S56` - implement the display-path-recomputation autofix covering Step rows, Phase headings, and Wave headings; `src/vaultspec_core/plan/fixes/display_path_fix.py`.
 - [ ] `W02.P02.S57` - implement the `vault plan query` command with selectors and predicates; `src/vaultspec_core/plan/commands/query.py`.
 - [ ] `W02.P02.S58` - add unit tests for `status`, `check`, and `query`; `src/vaultspec_core/tests/plan/test_read_commands.py`.
 
