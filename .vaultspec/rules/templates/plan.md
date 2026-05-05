@@ -34,19 +34,22 @@ Describe what work needs to be done at a high level. Reference `{adr}`s,
 `{research}`, `{reference}`, and other plan or reference files where
 appropriate so implementation remains grounded in architectural decisions.
 
-## Tasks
+## Steps
 
-Use numbered phases for complex features:
+The plan's tier (declared in frontmatter as `tier: L1`, `L2`, `L3`, or
+`L4`) determines the structure under this section:
+
+- `L1`: a flat list of Step rows (no Phase, Wave, or Epic).
+- `L2`: one or more `### Phase` blocks each containing Step rows.
+- `L3`: one or more `## Wave` blocks each containing Phase blocks.
+- `L4`: a `## Epic intent` block, followed by Wave blocks.
+
+Replace this scaffold with the tier-appropriate structure for your plan.
+Format examples for each block type are embedded below as commented
+templates.
 
 <!-- IMPORTANT: This document must be updated between execution runs to
      track progress. -->
-
-- `{Phase 1}`
-  1. `{Step 1.1}`
-  1. `{Step 1.2}`
-- `{Phase 2}`
-  1. `{Step 2.1}`
-  1. `{Step 2.2}`
 
 Use tasks for simpler features:
 
