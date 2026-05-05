@@ -60,7 +60,7 @@ Supporting skills, invoke when appropriate:
 ## Agents
 
 Agent personas are defined in `.vaultspec/rules/agents/`. Two mechanisms are
-available depending on task complexity:
+available depending on plan complexity:
 
 - **Parallel sub-agents** for focused, managed work
 - **Agent teams** for self-orchestrating complex challanges using the team dispatch

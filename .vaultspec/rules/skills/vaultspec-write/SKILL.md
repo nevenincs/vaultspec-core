@@ -1,7 +1,7 @@
 ---
 name: vaultspec-write-plan
 description: >-
-  Use this skill to write implementation plans, task flows. It must be
+  Use this skill to write implementation plans, Step flows. It must be
   explicitly called after a vaultspec-adr skill has yielded an approved ADR
   document.
 ---
@@ -12,7 +12,7 @@ Use this skill to:
 
 - Write the required implementation plan grounded with research and ADRs.
 - plan **non-trivial work, such as new features, complex auditing, or refactoring**.
-- when user explicitly asked to "write task" or "write plan".
+- when user explicitly asked to "write plan" or "draft Steps".
 
 This skill **MUST always** be called after `vaultspec-adr` concludes with architectural
 approval.

@@ -1,5 +1,5 @@
 ---
-description: Medium-tier implementation specialist for standard feature work, component development, and logic updates. Use for typical coding tasks and well-defined task execution.
+description: Medium-tier implementation specialist for standard feature work, component development, and logic updates. Use for typical coding Steps and well-defined Step execution.
 tier: MEDIUM
 mode: read-write
 tools: [Glob, Grep, Read, Write, Edit, Bash]
@@ -105,4 +105,4 @@ Code review is mandatory before completion. Ensure the
 violations - either by delegating to it or by including it in the supervised
 team workflow.
 
-**DO NOT** mark the task as complete until the review passes.
+**DO NOT** mark the Step as complete until the review passes.

@@ -68,7 +68,7 @@ Artifacts lower in the hierarchy should reference those above them.
   - *Location:* Inside feature-specific folder
   - *Filename:* `{yyyy-mm-dd-feature-phase-step}.md`
   - *Example:*
-    `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-phase1-task1.md`
+    `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-phase1-s01.md`
 
 - **Summaries**
   (`.vault/exec/{yyyy-mm-dd-feature}/{yyyy-mm-dd-feature-phase-summary}.md`)

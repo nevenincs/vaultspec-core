@@ -30,7 +30,7 @@ Assume the persona of a delegator.
 
 - Use parallel sub-agents, or autonomous agent team to execute complex plans.
 
-- Use appropriate executor agent persona. When the task
+- Use appropriate executor agent persona. When the work
   needs multiple specialists, coordinate them.
 
 - Always instruct the coders to execute the current plan, and to read grounding

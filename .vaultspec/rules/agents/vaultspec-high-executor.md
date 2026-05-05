@@ -1,5 +1,5 @@
 ---
-description: High-tier implementation specialist for complex architectural changes, core logic refactors, and advanced feature implementation. Use for tasks requiring high reasoning depth and sophisticated design decisions.
+description: High-tier implementation specialist for complex architectural changes, core logic refactors, and advanced feature implementation. Use for Steps requiring high reasoning depth and sophisticated design decisions.
 tier: HIGH
 mode: read-write
 tools: [Glob, Grep, Read, Write, Edit, Bash]
@@ -105,4 +105,4 @@ Code review is mandatory before completion. Ensure the
 violations - either by delegating to it or by including it in the supervised
 team workflow.
 
-**DO NOT** mark the task as complete until the review passes.
+**DO NOT** mark the Step as complete until the review passes.
