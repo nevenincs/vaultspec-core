@@ -33,8 +33,11 @@ approval.
 - Ensure no knowledge gap remains prior to writing plan. Call vaultspec- research skills
   if more information is needed.
 
-- **Abstraction:** Do **NOT** include granular code details. The plan should outline
-  the PHASES, STEPS but not the code. Focus on **what** and **where**.
+- **Granularity:** Every Step is one Markdown bulleted checkbox row
+  naming exactly one file or one cohesive area in inline backticks
+  per the Step row contract embedded in the plan template. No
+  per-row reference footers; authorising documents go once in the
+  plan's `related:` frontmatter.
 
 - **Persistence:**
 
