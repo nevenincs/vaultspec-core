@@ -150,7 +150,7 @@ mapping.
 
 - [x] `W01.P08.S29` - state that the executor reads the originating Step row from the plan and writes one Step Record per Step; `.vaultspec/rules/agents/vaultspec-low-executor.md`.
 - [x] `W01.P08.S30` - state that the executor reads the originating Step row from the plan and writes one Step Record per Step; `.vaultspec/rules/agents/vaultspec-standard-executor.md`.
-- [ ] `W01.P08.S31` - state that the executor reads the originating Step row from the plan and writes one Step Record per Step; `.vaultspec/rules/agents/vaultspec-high-executor.md`.
+- [x] `W01.P08.S31` - state that the executor reads the originating Step row from the plan and writes one Step Record per Step; `.vaultspec/rules/agents/vaultspec-high-executor.md`.
 
 ### Phase `W01.P09` - rewrite the public README
 
