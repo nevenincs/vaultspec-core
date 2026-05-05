@@ -112,6 +112,17 @@ templates.
 <!-- IMPORTANT: This document must be updated between execution runs to
      track progress. -->
 
+<!-- PHASE BLOCK FORMAT (L2, L3, L4):
+     ### Phase `P02` - rewrite the writer-agent contract
+
+     One sentence stating what this Phase delivers.
+
+     - [ ] `P02.S01` - imperative-verb action; `path/to/file`.
+     - [ ] `P02.S02` - imperative-verb action; `path/to/file`.
+
+     At L3/L4 the Phase heading uses the ancestor-aware path
+     (### Phase `W01.P02` - ...). The intent sentence is mandatory. -->
+
 Use tasks for simpler features:
 
 - `{Task 1}`
