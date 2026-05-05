@@ -28,13 +28,20 @@ Utilize:
 - **Autonomous Decisions**: Make technically sound implementation choices based
   on existing project conventions and established reference patterns.
 
-- **Concise Documentation**: For every step, **UPDATE** or **CREATE** `<Step Record>`
-  (`.vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-<step>.md`).
+- **Concise Documentation**: The executor reads the originating
+  Step row from the plan document, executes that Step (one
+  prompt-run plus one commit per the convention ADR's Step row
+  contract), and writes one `<Step Record>` per Step at
+  `.vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-<step>.md`.
+  The originating Step's canonical identifier (`S##`) is recorded
+  in the Step Record's `step_id:` frontmatter field.
 
   - **Template**: You MUST read and use the template at
     `.vaultspec/rules/templates/exec-step.md`.
 
-  - **Linking**: Use `[[wiki-links]]`.
+  - **Linking**: Use `[[wiki-links]]` only in the `related:`
+    frontmatter; the body remains free of wiki-links and markdown
+    links.
 
   - Modified files listed.
 
