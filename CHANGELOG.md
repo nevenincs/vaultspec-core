@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.17](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.16...vaultspec-core-v0.1.17) (2026-05-05)
+
+
+### Features
+
+* **#91:** migrate feature indexes into .vault/index/ subfolder ([#92](https://github.com/wgergely/vaultspec-core/issues/92)) ([a71e979](https://github.com/wgergely/vaultspec-core/commit/a71e97977aef00a3709987ffbf4c8e217f066a39))
+* **plan-hardening:** row-per-Step plan convention + vault plan CLI ([#102](https://github.com/wgergely/vaultspec-core/issues/102)) ([7298100](https://github.com/wgergely/vaultspec-core/commit/7298100d22324195db99436bc2aa705b96007335))
+
+
+### Bug Fixes
+
+* **#93:** drop spec-check false positive on source repo ([#94](https://github.com/wgergely/vaultspec-core/issues/94)) ([f1eae92](https://github.com/wgergely/vaultspec-core/commit/f1eae92bd253ecaa639ae12e2dfa68722fc1d8ec))
+* **#98,#99:** repair two pre-existing test failures on source repo ([#100](https://github.com/wgergely/vaultspec-core/issues/100)) ([903b525](https://github.com/wgergely/vaultspec-core/commit/903b525bb987851a24900f805fb88afd8902d397))
+
 ## [0.1.16](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.15...vaultspec-core-v0.1.16) (2026-04-27)
 
 
