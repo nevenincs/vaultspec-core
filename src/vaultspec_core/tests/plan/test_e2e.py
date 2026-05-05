@@ -123,3 +123,72 @@ def test_help_lists_plan_subcommands(runner: CliRunner) -> None:
     output = result.stdout
     for verb in ("status", "check", "query", "step", "phase", "wave", "epic", "tier"):
         assert verb in output, f"help text missing {verb!r}: {output}"
+
+
+def test_step_add_appends_new_canonical_id(tmp_path, runner: CliRunner) -> None:
+    """``vault plan step add`` allocates the next-available S## and persists it."""
+    from vaultspec_core.plan.parser import parse_plan
+
+    rng = random.Random(6)
+    spec = make_clean_plan("L1", rng=rng, steps=2)
+    plan_path = tmp_path / "test-plan.md"
+    plan_path.write_text(spec.render(), encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "vault",
+            "plan",
+            "step",
+            "add",
+            str(plan_path),
+            "--action",
+            "draft the connector module",
+            "--scope",
+            "src/lib/connector.py",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    plan = parse_plan(plan_path)
+    assert [step.canonical_id for step in plan.steps] == ["S01", "S02", "S03"]
+    assert plan.steps[-1].action == "draft the connector module"
+
+
+def test_step_remove_retires_id_through_cli(tmp_path, runner: CliRunner) -> None:
+    """``vault plan step remove`` retires the id; round-trip preserves retirement."""
+    from vaultspec_core.plan.identifiers import next_available_step
+    from vaultspec_core.plan.parser import parse_plan
+
+    rng = random.Random(7)
+    spec = make_clean_plan("L1", rng=rng, steps=4)
+    plan_path = tmp_path / "test-plan.md"
+    plan_path.write_text(spec.render(), encoding="utf-8")
+
+    result = runner.invoke(
+        app, ["vault", "plan", "step", "remove", str(plan_path), "S04"]
+    )
+
+    assert result.exit_code == 0, result.stdout
+    plan = parse_plan(plan_path)
+    assert "S04" not in {step.canonical_id for step in plan.steps}
+    assert "S04" in plan.retired_step_ids
+    assert next_available_step(plan) == "S05"
+
+
+def test_tier_promote_advances_one_step(tmp_path, runner: CliRunner) -> None:
+    """``vault plan tier promote`` advances the tier and synthesises a Phase wrapper."""
+    from vaultspec_core.plan.parser import parse_plan
+
+    rng = random.Random(8)
+    spec = make_clean_plan("L1", rng=rng, steps=2)
+    plan_path = tmp_path / "test-plan.md"
+    plan_path.write_text(spec.render(), encoding="utf-8")
+
+    result = runner.invoke(app, ["vault", "plan", "tier", "promote", str(plan_path)])
+
+    assert result.exit_code == 0, result.stdout
+    plan = parse_plan(plan_path)
+    assert plan.frontmatter.tier.value == "L2"
+    assert [phase.canonical_id for phase in plan.phases] == ["P01"]
+    assert [step.canonical_id for step in plan.steps] == ["S01", "S02"]

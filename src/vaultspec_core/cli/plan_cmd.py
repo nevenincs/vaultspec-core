@@ -231,6 +231,384 @@ def cmd_step_uncheck(
     path.write_text(serialise_plan(plan), encoding="utf-8")
 
 
+# ---- Step add / insert / edit / move / remove ------------------------------
+
+
+@step_app.command("add")
+def cmd_step_add(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    action: Annotated[str, typer.Option("--action", help="Imperative-verb statement")],
+    scope: Annotated[str, typer.Option("--scope", help="`path/to/file` scope clause")],
+    phase_id: Annotated[
+        str | None,
+        typer.Option(
+            "--phase",
+            help="Parent Phase id (required at L2+, omitted at L1)",
+        ),
+    ] = None,
+) -> None:
+    """Append a new Step at the next-available canonical id."""
+    from vaultspec_core.plan.commands.step_ops import add_step
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    step = add_step(plan, action=action, scope=scope, phase_id=phase_id)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Added Step `{step.display_path}`.")
+
+
+@step_app.command("insert")
+def cmd_step_insert(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    action: Annotated[str, typer.Option("--action", help="Imperative-verb statement")],
+    scope: Annotated[str, typer.Option("--scope", help="`path/to/file` scope clause")],
+    before: Annotated[
+        str | None,
+        typer.Option("--before", help="Anchor Step id; the new row precedes it"),
+    ] = None,
+    after: Annotated[
+        str | None,
+        typer.Option("--after", help="Anchor Step id; the new row follows it"),
+    ] = None,
+) -> None:
+    """Insert a Step at a named position relative to an existing anchor."""
+    from vaultspec_core.plan.commands.step_ops import insert_step
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    step = insert_step(plan, action=action, scope=scope, before=before, after=after)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Inserted Step `{step.display_path}`.")
+
+
+@step_app.command("edit")
+def cmd_step_edit(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
+    action: Annotated[
+        str | None, typer.Option("--action", help="New imperative-verb statement")
+    ] = None,
+    scope: Annotated[
+        str | None, typer.Option("--scope", help="New `path/to/file` scope clause")
+    ] = None,
+) -> None:
+    """Edit the Step's action and / or scope without changing its identifier."""
+    from vaultspec_core.plan.commands.step_ops import edit_step
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    edit_step(plan, step_id, action=action, scope=scope)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+
+
+@step_app.command("move")
+def cmd_step_move(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
+    to_phase: Annotated[
+        str | None, typer.Option("--to-phase", help="Re-parent under this Phase id")
+    ] = None,
+    before: Annotated[
+        str | None, typer.Option("--before", help="Place before this anchor Step")
+    ] = None,
+    after: Annotated[
+        str | None, typer.Option("--after", help="Place after this anchor Step")
+    ] = None,
+) -> None:
+    """Re-parent and / or re-position a Step per the move-flag precedence rule."""
+    from vaultspec_core.plan.commands.step_ops import move_step
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    step = move_step(plan, step_id, to_phase=to_phase, before=before, after=after)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Moved Step `{step.display_path}`.")
+
+
+@step_app.command("remove")
+def cmd_step_remove(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
+) -> None:
+    """Remove a Step; its identifier is retired and never reused."""
+    from vaultspec_core.plan.commands.step_ops import remove_step
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    retired = remove_step(plan, step_id)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Retired Step `{retired}`.")
+
+
+# ---- Phase add / insert / edit / move / remove -----------------------------
+
+
+@phase_app.command("add")
+def cmd_phase_add(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    title: Annotated[str, typer.Option("--title", help="Phase heading title")],
+    intent: Annotated[str, typer.Option("--intent", help="Phase intent paragraph")],
+    wave_id: Annotated[
+        str | None, typer.Option("--wave", help="Parent Wave id (L3+ only)")
+    ] = None,
+) -> None:
+    """Append a new Phase at the next-available canonical id."""
+    from vaultspec_core.plan.commands.phase_ops import add_phase
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    phase = add_phase(plan, title=title, intent=intent, wave_id=wave_id)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Added Phase `{phase.display_path}`.")
+
+
+@phase_app.command("insert")
+def cmd_phase_insert(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    title: Annotated[str, typer.Option("--title", help="Phase heading title")],
+    intent: Annotated[str, typer.Option("--intent", help="Phase intent paragraph")],
+    before: Annotated[
+        str | None,
+        typer.Option("--before", help="Anchor Phase id; new Phase precedes it"),
+    ] = None,
+    after: Annotated[
+        str | None,
+        typer.Option("--after", help="Anchor Phase id; new Phase follows it"),
+    ] = None,
+) -> None:
+    """Insert a Phase at a named position; parent Wave inferred from anchor."""
+    from vaultspec_core.plan.commands.phase_ops import insert_phase
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    phase = insert_phase(plan, title=title, intent=intent, before=before, after=after)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Inserted Phase `{phase.display_path}`.")
+
+
+@phase_app.command("edit")
+def cmd_phase_edit(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    phase_id: Annotated[str, typer.Argument(help="Phase canonical id (P##)")],
+    title: Annotated[
+        str | None, typer.Option("--title", help="New Phase heading title")
+    ] = None,
+    intent: Annotated[
+        str | None, typer.Option("--intent", help="New Phase intent paragraph")
+    ] = None,
+) -> None:
+    """Edit the Phase's title and / or intent paragraph in place."""
+    from vaultspec_core.plan.commands.phase_ops import edit_phase
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    edit_phase(plan, phase_id, title=title, intent=intent)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+
+
+@phase_app.command("move")
+def cmd_phase_move(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    phase_id: Annotated[str, typer.Argument(help="Phase canonical id (P##)")],
+    to_wave: Annotated[
+        str | None, typer.Option("--to-wave", help="Re-parent under this Wave id")
+    ] = None,
+    before: Annotated[
+        str | None, typer.Option("--before", help="Place before this anchor Phase")
+    ] = None,
+    after: Annotated[
+        str | None, typer.Option("--after", help="Place after this anchor Phase")
+    ] = None,
+) -> None:
+    """Re-parent and / or re-position a Phase."""
+    from vaultspec_core.plan.commands.phase_ops import move_phase
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    phase = move_phase(plan, phase_id, to_wave=to_wave, before=before, after=after)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Moved Phase `{phase.display_path}`.")
+
+
+@phase_app.command("remove")
+def cmd_phase_remove(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    phase_id: Annotated[str, typer.Argument(help="Phase canonical id (P##)")],
+) -> None:
+    """Remove a Phase; descendant Step ids cascade-retire."""
+    from vaultspec_core.plan.commands.phase_ops import remove_phase
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    retired_phase, retired_steps = remove_phase(plan, phase_id)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(
+        f"Retired Phase `{retired_phase}`; cascaded Steps: "
+        f"{', '.join(retired_steps) if retired_steps else '(none)'}."
+    )
+
+
+# ---- Wave add / insert / edit / move / remove ------------------------------
+
+
+@wave_app.command("add")
+def cmd_wave_add(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    title: Annotated[str, typer.Option("--title", help="Wave heading title")],
+    intent: Annotated[str, typer.Option("--intent", help="Wave intent paragraph")],
+) -> None:
+    """Append a new Wave at the next-available canonical id (L3+ only)."""
+    from vaultspec_core.plan.commands.wave_ops import add_wave
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    wave = add_wave(plan, title=title, intent=intent)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Added Wave `{wave.canonical_id}`.")
+
+
+@wave_app.command("insert")
+def cmd_wave_insert(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    title: Annotated[str, typer.Option("--title", help="Wave heading title")],
+    intent: Annotated[str, typer.Option("--intent", help="Wave intent paragraph")],
+    before: Annotated[
+        str | None,
+        typer.Option("--before", help="Anchor Wave id; new Wave precedes it"),
+    ] = None,
+    after: Annotated[
+        str | None,
+        typer.Option("--after", help="Anchor Wave id; new Wave follows it"),
+    ] = None,
+) -> None:
+    """Insert a Wave at a named position relative to an existing anchor."""
+    from vaultspec_core.plan.commands.wave_ops import insert_wave
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    wave = insert_wave(plan, title=title, intent=intent, before=before, after=after)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Inserted Wave `{wave.canonical_id}`.")
+
+
+@wave_app.command("edit")
+def cmd_wave_edit(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    wave_id: Annotated[str, typer.Argument(help="Wave canonical id (W##)")],
+    title: Annotated[
+        str | None, typer.Option("--title", help="New Wave heading title")
+    ] = None,
+    intent: Annotated[
+        str | None, typer.Option("--intent", help="New Wave intent paragraph")
+    ] = None,
+) -> None:
+    """Edit the Wave's title and / or intent paragraph in place."""
+    from vaultspec_core.plan.commands.wave_ops import edit_wave
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    edit_wave(plan, wave_id, title=title, intent=intent)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+
+
+@wave_app.command("move")
+def cmd_wave_move(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    wave_id: Annotated[str, typer.Argument(help="Wave canonical id (W##)")],
+    before: Annotated[
+        str | None, typer.Option("--before", help="Place before this anchor Wave")
+    ] = None,
+    after: Annotated[
+        str | None, typer.Option("--after", help="Place after this anchor Wave")
+    ] = None,
+) -> None:
+    """Re-position a Wave in document order."""
+    from vaultspec_core.plan.commands.wave_ops import move_wave
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    wave = move_wave(plan, wave_id, before=before, after=after)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Moved Wave `{wave.canonical_id}`.")
+
+
+@wave_app.command("remove")
+def cmd_wave_remove(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    wave_id: Annotated[str, typer.Argument(help="Wave canonical id (W##)")],
+) -> None:
+    """Remove a Wave; descendant Phase and Step ids cascade-retire."""
+    from vaultspec_core.plan.commands.wave_ops import remove_wave
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    retired_wave, retired_phases, retired_steps = remove_wave(plan, wave_id)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(
+        f"Retired Wave `{retired_wave}`; cascaded Phases: "
+        f"{', '.join(retired_phases) if retired_phases else '(none)'}; "
+        f"cascaded Steps: "
+        f"{', '.join(retired_steps) if retired_steps else '(none)'}."
+    )
+
+
+# ---- Epic intent (L4 only) -------------------------------------------------
+
+
+epic_intent_app = typer.Typer(
+    help="Show or edit the L4 plan's Epic intent paragraph.",
+    no_args_is_help=True,
+)
+epic_app.add_typer(epic_intent_app, name="intent")
+
+
+@epic_intent_app.command("show")
+def cmd_epic_intent_show(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+) -> None:
+    """Print the Epic intent paragraph (L4 plans only)."""
+    from vaultspec_core.plan.commands.epic_ops import show_epic_intent
+    from vaultspec_core.plan.parser import parse_plan
+
+    plan = parse_plan(path)
+    typer.echo(show_epic_intent(plan))
+
+
+@epic_intent_app.command("edit")
+def cmd_epic_intent_edit(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    text: Annotated[
+        str,
+        typer.Option(
+            "--text", help="New Epic intent paragraph (must declare PM association)"
+        ),
+    ],
+) -> None:
+    """Replace the Epic intent paragraph (L4 plans only)."""
+    from vaultspec_core.plan.commands.epic_ops import edit_epic_intent
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    edit_epic_intent(plan, text=text)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+
+
 # ---- Tier commands ----------------------------------------------------------
 
 
@@ -244,3 +622,85 @@ def cmd_tier_show(
 
     plan = parse_plan(path)
     typer.echo(current_tier(plan).value)
+
+
+@tier_app.command("promote")
+def cmd_tier_promote(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    target: Annotated[
+        str | None,
+        typer.Option(
+            "--target",
+            help="Target tier (L2/L3/L4); defaults to one tier above current",
+        ),
+    ] = None,
+    phase_title: Annotated[
+        str, typer.Option("--phase-title", help="Title for the synthesised P01")
+    ] = "TODO: Phase title",
+    phase_intent: Annotated[
+        str, typer.Option("--phase-intent", help="Intent for the synthesised P01")
+    ] = "TODO: Phase intent paragraph required.",
+    wave_title: Annotated[
+        str, typer.Option("--wave-title", help="Title for the synthesised W01")
+    ] = "TODO: Wave title",
+    wave_intent: Annotated[
+        str, typer.Option("--wave-intent", help="Intent for the synthesised W01")
+    ] = "TODO: Wave intent paragraph required.",
+    epic_intent: Annotated[
+        str,
+        typer.Option(
+            "--epic-intent",
+            help="Epic intent paragraph (must declare PM association)",
+        ),
+    ] = "TODO: Epic intent paragraph required.",
+) -> None:
+    """Promote the plan tier transitively (L1 -> ... -> L4)."""
+    from vaultspec_core.plan.commands.tier_ops import promote_tier
+    from vaultspec_core.plan.frontmatter import Tier
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    target_tier = Tier(target) if target is not None else None
+    new_tier = promote_tier(
+        plan,
+        target=target_tier,
+        phase_title=phase_title,
+        phase_intent=phase_intent,
+        wave_title=wave_title,
+        wave_intent=wave_intent,
+        epic_intent=epic_intent,
+    )
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Tier promoted to {new_tier.value}.")
+
+
+@tier_app.command("demote")
+def cmd_tier_demote(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    target: Annotated[
+        str | None,
+        typer.Option(
+            "--target",
+            help="Target tier (L1/L2/L3); defaults to one tier below current",
+        ),
+    ] = None,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Override the multi-child collapse refusal; descendant ids retire",
+        ),
+    ] = False,
+) -> None:
+    """Demote the plan tier; refuses multi-child collapse without ``--force``."""
+    from vaultspec_core.plan.commands.tier_ops import demote_tier
+    from vaultspec_core.plan.frontmatter import Tier
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    target_tier = Tier(target) if target is not None else None
+    new_tier = demote_tier(plan, target=target_tier, force=force)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Tier demoted to {new_tier.value}.")
