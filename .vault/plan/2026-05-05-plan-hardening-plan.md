@@ -160,22 +160,22 @@ mutators run; destructive operations land last; the
 rule-extension prose authoring lands after the CLI is functional
 so the binding directives can be tested end-to-end.
 
-### Phase `W02.P01` - plan-document parser and model
+### Phase `W02.P11` - plan-document parser and model
 
 The parser converts a plan document into an in-memory model and
 back. The Phase ends when round-trip parsing preserves
 canonical identifiers, document order, and frontmatter exactly,
 covered by unit tests.
 
-- [x] `W02.P01.S35` - create the `vaultspec_core.plan` package with module skeleton, `__init__.py`, and public surface exports; `src/vaultspec_core/plan/__init__.py`.
-- [x] `W02.P01.S36` - implement frontmatter parsing for `tier`, `related`, `tags`, `date`; `src/vaultspec_core/plan/frontmatter.py`.
-- [x] `W02.P01.S37` - implement hierarchy parsing for Wave, Phase, and Step blocks against the row contract; `src/vaultspec_core/plan/parser.py`.
-- [x] `W02.P01.S38` - implement canonical-identifier extraction and per-document next-available counter; `src/vaultspec_core/plan/identifiers.py`.
-- [x] `W02.P01.S39` - implement display-path computation from current ancestor chain; `src/vaultspec_core/plan/display_path.py`.
-- [x] `W02.P01.S40` - implement plan-document model serialisation back to markdown preserving document order; `src/vaultspec_core/plan/serialiser.py`.
-- [x] `W02.P01.S41` - add round-trip parser tests covering L1, L2, L3, and L4 plan shapes; `src/vaultspec_core/tests/plan/test_serialiser.py`.
+- [x] `W02.P11.S35` - create the `vaultspec_core.plan` package with module skeleton, `__init__.py`, and public surface exports; `src/vaultspec_core/plan/__init__.py`.
+- [x] `W02.P11.S36` - implement frontmatter parsing for `tier`, `related`, `tags`, `date`; `src/vaultspec_core/plan/frontmatter.py`.
+- [x] `W02.P11.S37` - implement hierarchy parsing for Wave, Phase, and Step blocks against the row contract; `src/vaultspec_core/plan/parser.py`.
+- [x] `W02.P11.S38` - implement canonical-identifier extraction and per-document next-available counter; `src/vaultspec_core/plan/identifiers.py`.
+- [x] `W02.P11.S39` - implement display-path computation from current ancestor chain; `src/vaultspec_core/plan/display_path.py`.
+- [x] `W02.P11.S40` - implement plan-document model serialisation back to markdown preserving document order; `src/vaultspec_core/plan/serialiser.py`.
+- [x] `W02.P11.S41` - add round-trip parser tests covering L1, L2, L3, and L4 plan shapes; `src/vaultspec_core/tests/plan/test_serialiser.py`.
 
-### Phase `W02.P02` - read commands
+### Phase `W02.P12` - read commands
 
 The read commands (`status`, `check`, `query`) are independent
 of the mutation surface and land first so the validator
@@ -183,59 +183,59 @@ stabilises before mutators run. The Phase ends when all read
 commands return the human and JSON forms specified in the CLI
 ADR and pass tests.
 
-- [x] `W02.P02.S42` - implement the `vault plan status` command's plan-snapshot collection; `src/vaultspec_core/plan/status.py`.
-- [x] `W02.P02.S43` - implement the `vault plan status --json` schema and emitter; `src/vaultspec_core/plan/status.py`.
-- [x] `W02.P02.S44` - implement the `vault plan check` command's finding-collection harness with severity levels and the finding-object schema; `src/vaultspec_core/plan/checks/_base.py`.
-- [x] `W02.P02.S45` - implement the frontmatter detection rule (presence of `tier`, presence of `related` for non-trivial plans); `src/vaultspec_core/plan/checks/frontmatter_check.py`.
-- [x] `W02.P02.S46` - implement the hierarchy-correspondence detection rule (declared tier matches heading shape); `src/vaultspec_core/plan/checks/hierarchy_check.py`.
-- [x] `W02.P02.S47` - implement the identifier-hygiene detection rule (per-container append-only, no duplicates, padding); `src/vaultspec_core/plan/checks/identifiers_check.py`.
-- [x] `W02.P02.S48` - implement the display-path correctness detection rule against the current ancestor chain; `src/vaultspec_core/plan/checks/display_path_check.py`.
-- [x] `W02.P02.S49` - implement the row-contract detection rule (checkbox shape, separator, action, scope, period); `src/vaultspec_core/plan/checks/row_contract_check.py`.
-- [x] `W02.P02.S50` - implement the approved-structural-vocabulary detection rule scoped to headings, container-identifier code spans, and row-label position; `src/vaultspec_core/plan/checks/vocabulary_check.py`.
-- [x] `W02.P02.S51` - implement the separator-convention detection rule (no em-dash, no en-dash); `src/vaultspec_core/plan/checks/separator_check.py`.
-- [x] `W02.P02.S52` - implement the `vault plan check --fix` autofix harness with idempotency guarantees; `src/vaultspec_core/plan/fixes/_harness.py`.
-- [x] `W02.P02.S53` - implement the checkbox-spacing autofix; `src/vaultspec_core/plan/fixes/checkbox_fix.py`.
-- [x] `W02.P02.S54` - implement the separator-normalisation autofix; `src/vaultspec_core/plan/fixes/separator_fix.py`.
-- [x] `W02.P02.S55` - implement the trailing-whitespace autofix; `src/vaultspec_core/plan/fixes/whitespace_fix.py`.
-- [x] `W02.P02.S56` - implement the display-path-recomputation autofix covering Step rows, Phase headings, and Wave headings; `src/vaultspec_core/plan/fixes/display_path_fix.py`.
-- [x] `W02.P02.S57` - implement the `vault plan query` command with selectors and predicates; `src/vaultspec_core/plan/query.py`.
-- [x] `W02.P02.S58` - add unit tests for the status, check, query, and fixes modules; `src/vaultspec_core/tests/plan/`.
+- [x] `W02.P12.S42` - implement the `vault plan status` command's plan-snapshot collection; `src/vaultspec_core/plan/status.py`.
+- [x] `W02.P12.S43` - implement the `vault plan status --json` schema and emitter; `src/vaultspec_core/plan/status.py`.
+- [x] `W02.P12.S44` - implement the `vault plan check` command's finding-collection harness with severity levels and the finding-object schema; `src/vaultspec_core/plan/checks/_base.py`.
+- [x] `W02.P12.S45` - implement the frontmatter detection rule (presence of `tier`, presence of `related` for non-trivial plans); `src/vaultspec_core/plan/checks/frontmatter_check.py`.
+- [x] `W02.P12.S46` - implement the hierarchy-correspondence detection rule (declared tier matches heading shape); `src/vaultspec_core/plan/checks/hierarchy_check.py`.
+- [x] `W02.P12.S47` - implement the identifier-hygiene detection rule (per-container append-only, no duplicates, padding); `src/vaultspec_core/plan/checks/identifiers_check.py`.
+- [x] `W02.P12.S48` - implement the display-path correctness detection rule against the current ancestor chain; `src/vaultspec_core/plan/checks/display_path_check.py`.
+- [x] `W02.P12.S49` - implement the row-contract detection rule (checkbox shape, separator, action, scope, period); `src/vaultspec_core/plan/checks/row_contract_check.py`.
+- [x] `W02.P12.S50` - implement the approved-structural-vocabulary detection rule scoped to headings, container-identifier code spans, and row-label position; `src/vaultspec_core/plan/checks/vocabulary_check.py`.
+- [x] `W02.P12.S51` - implement the separator-convention detection rule (no em-dash, no en-dash); `src/vaultspec_core/plan/checks/separator_check.py`.
+- [x] `W02.P12.S52` - implement the `vault plan check --fix` autofix harness with idempotency guarantees; `src/vaultspec_core/plan/fixes/_harness.py`.
+- [x] `W02.P12.S53` - implement the checkbox-spacing autofix; `src/vaultspec_core/plan/fixes/checkbox_fix.py`.
+- [x] `W02.P12.S54` - implement the separator-normalisation autofix; `src/vaultspec_core/plan/fixes/separator_fix.py`.
+- [x] `W02.P12.S55` - implement the trailing-whitespace autofix; `src/vaultspec_core/plan/fixes/whitespace_fix.py`.
+- [x] `W02.P12.S56` - implement the display-path-recomputation autofix covering Step rows, Phase headings, and Wave headings; `src/vaultspec_core/plan/fixes/display_path_fix.py`.
+- [x] `W02.P12.S57` - implement the `vault plan query` command with selectors and predicates; `src/vaultspec_core/plan/query.py`.
+- [x] `W02.P12.S58` - add unit tests for the status, check, query, and fixes modules; `src/vaultspec_core/tests/plan/`.
 
-### Phase `W02.P03` - additive write commands
+### Phase `W02.P13` - additive write commands
 
 The additive commands create new identifiers without mutating
 existing content. The Phase ends when every additive command
 preserves identifier immutability and document-order
 independence per the convention ADR.
 
-- [x] `W02.P03.S59` - implement `vault plan step add` with `--phase` parent resolution; `src/vaultspec_core/plan/commands/step_ops.py`.
-- [x] `W02.P03.S60` - implement `vault plan step insert` with `--before`/`--after` document-order placement; `src/vaultspec_core/plan/commands/step_ops.py`.
-- [x] `W02.P03.S61` - implement `vault plan phase add` with `--wave` parent resolution; `src/vaultspec_core/plan/commands/phase_ops.py`.
-- [x] `W02.P03.S62` - implement `vault plan phase insert` with `--before`/`--after`; `src/vaultspec_core/plan/commands/phase_ops.py`.
-- [x] `W02.P03.S63` - implement `vault plan wave add`; `src/vaultspec_core/plan/commands/wave_ops.py`.
-- [x] `W02.P03.S64` - implement `vault plan wave insert` with `--before`/`--after`; `src/vaultspec_core/plan/commands/wave_ops.py`.
-- [x] `W02.P03.S65` - add unit tests for additive commands covering identifier-immutability invariants; `src/vaultspec_core/tests/plan/test_additive_commands.py`.
+- [x] `W02.P13.S59` - implement `vault plan step add` with `--phase` parent resolution; `src/vaultspec_core/plan/commands/step_ops.py`.
+- [x] `W02.P13.S60` - implement `vault plan step insert` with `--before`/`--after` document-order placement; `src/vaultspec_core/plan/commands/step_ops.py`.
+- [x] `W02.P13.S61` - implement `vault plan phase add` with `--wave` parent resolution; `src/vaultspec_core/plan/commands/phase_ops.py`.
+- [x] `W02.P13.S62` - implement `vault plan phase insert` with `--before`/`--after`; `src/vaultspec_core/plan/commands/phase_ops.py`.
+- [x] `W02.P13.S63` - implement `vault plan wave add`; `src/vaultspec_core/plan/commands/wave_ops.py`.
+- [x] `W02.P13.S64` - implement `vault plan wave insert` with `--before`/`--after`; `src/vaultspec_core/plan/commands/wave_ops.py`.
+- [x] `W02.P13.S65` - add unit tests for additive commands covering identifier-immutability invariants; `src/vaultspec_core/tests/plan/test_additive_commands.py`.
 
-### Phase `W02.P04` - state and re-parenting commands
+### Phase `W02.P14` - state and re-parenting commands
 
 The state commands edit existing rows; the re-parenting
 commands move rows between containers. The Phase ends when
 state mutations preserve canonical identifiers and re-parenting
 recomputes display paths correctly.
 
-- [x] `W02.P04.S66` - implement `vault plan step toggle`; `src/vaultspec_core/plan/commands/step_ops.py`.
-- [x] `W02.P04.S67` - implement `vault plan step check` (idempotent close); `src/vaultspec_core/plan/commands/step_ops.py`.
-- [x] `W02.P04.S68` - implement `vault plan step uncheck` (idempotent open); `src/vaultspec_core/plan/commands/step_ops.py`.
-- [x] `W02.P04.S69` - implement `vault plan step edit` with `--action` and `--scope`; `src/vaultspec_core/plan/commands/step_ops.py`.
-- [x] `W02.P04.S70` - implement `vault plan step move` with the move-flag-precedence rule; `src/vaultspec_core/plan/commands/step_ops.py`.
-- [x] `W02.P04.S71` - implement `vault plan phase edit` with `--title` and `--intent`; `src/vaultspec_core/plan/commands/phase_ops.py`.
-- [x] `W02.P04.S72` - implement `vault plan phase move` with the move-flag-precedence rule; `src/vaultspec_core/plan/commands/phase_ops.py`.
-- [x] `W02.P04.S73` - implement `vault plan wave edit` with `--title` and `--intent`; `src/vaultspec_core/plan/commands/wave_ops.py`.
-- [x] `W02.P04.S74` - implement `vault plan wave move` with `--before`/`--after` and descendant display-path recomputation; `src/vaultspec_core/plan/commands/wave_ops.py`.
-- [x] `W02.P04.S75` - implement `vault plan epic intent --show` and `--edit`; `src/vaultspec_core/plan/commands/epic_ops.py`.
-- [x] `W02.P04.S76` - add unit tests for state and re-parenting commands covering identifier-preservation invariants; `src/vaultspec_core/tests/plan/test_state_commands.py`.
+- [x] `W02.P14.S66` - implement `vault plan step toggle`; `src/vaultspec_core/plan/commands/step_ops.py`.
+- [x] `W02.P14.S67` - implement `vault plan step check` (idempotent close); `src/vaultspec_core/plan/commands/step_ops.py`.
+- [x] `W02.P14.S68` - implement `vault plan step uncheck` (idempotent open); `src/vaultspec_core/plan/commands/step_ops.py`.
+- [x] `W02.P14.S69` - implement `vault plan step edit` with `--action` and `--scope`; `src/vaultspec_core/plan/commands/step_ops.py`.
+- [x] `W02.P14.S70` - implement `vault plan step move` with the move-flag-precedence rule; `src/vaultspec_core/plan/commands/step_ops.py`.
+- [x] `W02.P14.S71` - implement `vault plan phase edit` with `--title` and `--intent`; `src/vaultspec_core/plan/commands/phase_ops.py`.
+- [x] `W02.P14.S72` - implement `vault plan phase move` with the move-flag-precedence rule; `src/vaultspec_core/plan/commands/phase_ops.py`.
+- [x] `W02.P14.S73` - implement `vault plan wave edit` with `--title` and `--intent`; `src/vaultspec_core/plan/commands/wave_ops.py`.
+- [x] `W02.P14.S74` - implement `vault plan wave move` with `--before`/`--after` and descendant display-path recomputation; `src/vaultspec_core/plan/commands/wave_ops.py`.
+- [x] `W02.P14.S75` - implement `vault plan epic intent --show` and `--edit`; `src/vaultspec_core/plan/commands/epic_ops.py`.
+- [x] `W02.P14.S76` - add unit tests for state and re-parenting commands covering identifier-preservation invariants; `src/vaultspec_core/tests/plan/test_state_commands.py`.
 
-### Phase `W02.P05` - destructive commands
+### Phase `W02.P15` - destructive commands
 
 The destructive commands retire identifiers (remove and
 demotion) or restructure the document (tier ops). The Phase
@@ -243,15 +243,15 @@ ends when cascading retirement, demote-failure-on-multi-child,
 and tier-promote intermediate-container instantiation all match
 the CLI ADR's specified contract.
 
-- [x] `W02.P05.S77` - implement `vault plan step remove` with identifier retirement; `src/vaultspec_core/plan/commands/step_ops.py`.
-- [x] `W02.P05.S78` - implement `vault plan phase remove` with cascading retirement of child Step identifiers; `src/vaultspec_core/plan/commands/phase_ops.py`.
-- [x] `W02.P05.S79` - implement `vault plan wave remove` with cascading retirement of descendant Phase and Step identifiers; `src/vaultspec_core/plan/commands/wave_ops.py`.
-- [x] `W02.P05.S80` - implement `vault plan tier --show`; `src/vaultspec_core/plan/commands/tier_ops.py`.
-- [x] `W02.P05.S81` - implement `vault plan tier promote` with transitive-jump support and `--phase-title`/`--wave-title`/`--epic-intent` flag handling; `src/vaultspec_core/plan/commands/tier_ops.py`.
-- [x] `W02.P05.S82` - implement `vault plan tier demote` with the multi-child refusal predicate and `--force` override; `src/vaultspec_core/plan/commands/tier_ops.py`.
-- [x] `W02.P05.S83` - add unit tests for destructive commands covering retirement-gap-preservation and demotion-refusal invariants; `src/vaultspec_core/tests/plan/test_destructive_commands.py`.
+- [x] `W02.P15.S77` - implement `vault plan step remove` with identifier retirement; `src/vaultspec_core/plan/commands/step_ops.py`.
+- [x] `W02.P15.S78` - implement `vault plan phase remove` with cascading retirement of child Step identifiers; `src/vaultspec_core/plan/commands/phase_ops.py`.
+- [x] `W02.P15.S79` - implement `vault plan wave remove` with cascading retirement of descendant Phase and Step identifiers; `src/vaultspec_core/plan/commands/wave_ops.py`.
+- [x] `W02.P15.S80` - implement `vault plan tier --show`; `src/vaultspec_core/plan/commands/tier_ops.py`.
+- [x] `W02.P15.S81` - implement `vault plan tier promote` with transitive-jump support and `--phase-title`/`--wave-title`/`--epic-intent` flag handling; `src/vaultspec_core/plan/commands/tier_ops.py`.
+- [x] `W02.P15.S82` - implement `vault plan tier demote` with the multi-child refusal predicate and `--force` override; `src/vaultspec_core/plan/commands/tier_ops.py`.
+- [x] `W02.P15.S83` - add unit tests for destructive commands covering retirement-gap-preservation and demotion-refusal invariants; `src/vaultspec_core/tests/plan/test_destructive_commands.py`.
 
-### Phase `W02.P06` - rule-extension authoring and review
+### Phase `W02.P16` - rule-extension authoring and review
 
 This Phase authors the binding-directive prose for each surface
 file per the rule-extension mandate of the CLI ADR, runs the
@@ -260,27 +260,27 @@ approved prose. The Phase ends when every governed surface
 mandates `vault plan` use and both reviewers have approved each
 extension.
 
-- [x] `W02.P06.S84` - author rule-extension prose for the plan template's embedded hint blocks naming `vault plan` as the canonical manipulation surface; `.vaultspec/rules/templates/plan.md`.
-- [x] `W02.P06.S85` - author rule-extension prose for the writer-agent persona binding the writer to dispatch `vault plan` subcommands rather than hand-edit; `.vaultspec/rules/agents/vaultspec-writer.md`.
-- [x] `W02.P06.S86` - author rule-extension prose for the write skill naming `vault plan` as the canonical manipulation surface; `.vaultspec/rules/skills/vaultspec-write/SKILL.md`.
-- [x] `W02.P06.S87` - author rule-extension prose for the execute skill specifying executor use of `step check`/`step uncheck`; `.vaultspec/rules/skills/vaultspec-execute/SKILL.md`.
-- [x] `W02.P06.S88` - author rule-extension prose for the low-executor mirroring the execute-skill directive; `.vaultspec/rules/agents/vaultspec-low-executor.md`.
-- [x] `W02.P06.S89` - author rule-extension prose for the standard-executor mirroring the execute-skill directive; `.vaultspec/rules/agents/vaultspec-standard-executor.md`.
-- [x] `W02.P06.S90` - author rule-extension prose for the high-executor mirroring the execute-skill directive; `.vaultspec/rules/agents/vaultspec-high-executor.md`.
-- [x] `W02.P06.S91` - author rule-extension prose for the system rules naming `vault plan` as the structural manipulation surface; `.vaultspec/rules/system/03-vaultspec.md`.
-- [x] `W02.P06.S92` - author rule-extension prose for the public README introducing the `vault plan` CLI to external readers; `.vaultspec/README.md`.
-- [x] `W02.P06.S93` - dispatch the vaultspec-docs-curator agent to audit every authored extension for documentation hygiene, wiki-link correctness, and frontmatter compliance (review-on-merge); `.vault/audit/`.
-- [x] `W02.P06.S94` - dispatch the vaultspec-writer agent persona to audit every authored extension for prose clarity, canonical-vocabulary compliance, and mandate-shape phrasing (review-on-merge); `.vault/audit/`.
+- [x] `W02.P16.S84` - author rule-extension prose for the plan template's embedded hint blocks naming `vault plan` as the canonical manipulation surface; `.vaultspec/rules/templates/plan.md`.
+- [x] `W02.P16.S85` - author rule-extension prose for the writer-agent persona binding the writer to dispatch `vault plan` subcommands rather than hand-edit; `.vaultspec/rules/agents/vaultspec-writer.md`.
+- [x] `W02.P16.S86` - author rule-extension prose for the write skill naming `vault plan` as the canonical manipulation surface; `.vaultspec/rules/skills/vaultspec-write/SKILL.md`.
+- [x] `W02.P16.S87` - author rule-extension prose for the execute skill specifying executor use of `step check`/`step uncheck`; `.vaultspec/rules/skills/vaultspec-execute/SKILL.md`.
+- [x] `W02.P16.S88` - author rule-extension prose for the low-executor mirroring the execute-skill directive; `.vaultspec/rules/agents/vaultspec-low-executor.md`.
+- [x] `W02.P16.S89` - author rule-extension prose for the standard-executor mirroring the execute-skill directive; `.vaultspec/rules/agents/vaultspec-standard-executor.md`.
+- [x] `W02.P16.S90` - author rule-extension prose for the high-executor mirroring the execute-skill directive; `.vaultspec/rules/agents/vaultspec-high-executor.md`.
+- [x] `W02.P16.S91` - author rule-extension prose for the system rules naming `vault plan` as the structural manipulation surface; `.vaultspec/rules/system/03-vaultspec.md`.
+- [x] `W02.P16.S92` - author rule-extension prose for the public README introducing the `vault plan` CLI to external readers; `.vaultspec/README.md`.
+- [x] `W02.P16.S93` - dispatch the vaultspec-docs-curator agent to audit every authored extension for documentation hygiene, wiki-link correctness, and frontmatter compliance (review-on-merge); `.vault/audit/`.
+- [x] `W02.P16.S94` - dispatch the vaultspec-writer agent persona to audit every authored extension for prose clarity, canonical-vocabulary compliance, and mandate-shape phrasing (review-on-merge); `.vault/audit/`.
 
-### Phase `W02.P07` - integration and end-to-end verification
+### Phase `W02.P17` - integration and end-to-end verification
 
 This Phase wires the CLI into the existing `vaultspec-core`
 Click app, adds CLI help docs, and runs end-to-end tests
 against actual plan documents. The Phase ends when `vaultspec- core vault plan --help` lists every documented subcommand and a
 clean smoke test executes a full plan-manipulation cycle.
 
-- [x] `W02.P07.S95` - register the `vault plan` subcommand group on the existing `vaultspec-core` Click app; `src/vaultspec_core/cli/root.py`.
-- [x] `W02.P07.S96` - add per-subcommand help strings matching the CLI ADR's Subcommand surface table; `src/vaultspec_core/plan/commands/`.
-- [x] `W02.P07.S97` - update the CLI reference document to enumerate every `vault plan` subcommand, flag, and exit code; `.vaultspec/CLI.md`.
-- [x] `W02.P07.S98` - update the public README to introduce the CLI in the context of the four-tier hierarchy; `README.md`.
-- [x] `W02.P07.S99` - add an end-to-end smoke test that creates a fresh L3 plan, exercises additive, state, re-parenting, and destructive commands, and verifies round-trip integrity; `src/vaultspec_core/tests/plan/test_e2e.py`.
+- [x] `W02.P17.S95` - register the `vault plan` subcommand group on the existing `vaultspec-core` Click app; `src/vaultspec_core/cli/root.py`.
+- [x] `W02.P17.S96` - add per-subcommand help strings matching the CLI ADR's Subcommand surface table; `src/vaultspec_core/plan/commands/`.
+- [x] `W02.P17.S97` - update the CLI reference document to enumerate every `vault plan` subcommand, flag, and exit code; `.vaultspec/CLI.md`.
+- [x] `W02.P17.S98` - update the public README to introduce the CLI in the context of the four-tier hierarchy; `README.md`.
+- [x] `W02.P17.S99` - add an end-to-end smoke test that creates a fresh L3 plan, exercises additive, state, re-parenting, and destructive commands, and verifies round-trip integrity; `src/vaultspec_core/tests/plan/test_e2e.py`.

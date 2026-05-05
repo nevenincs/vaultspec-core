@@ -71,6 +71,72 @@ def edit_phase(
     return phase
 
 
+class PhaseRenumberError(ValueError):
+    """Raised when a Phase renumber call references a non-existent or colliding id."""
+
+
+def renumber_phase(plan: Plan, phase_id: str, *, to: str) -> Phase:
+    """Reassign a Phase's canonical id to ``to`` and recompute paths.
+
+    The convention forbids retroactively widening an existing live id but
+    permits remediating a collision between containers whose ids were
+    duplicated by an authoring error (e.g. a writer treating P## as
+    Wave-scoped rather than per-document). This verb is the audited
+    surface for that remediation.
+
+    Args:
+        plan: Parsed :class:`Plan`. Mutated in place.
+        phase_id: Existing canonical id to rename.
+        to: New canonical id; must be in ``[SPW]\\d{2,}`` shape, not already
+            in use by another live Phase, and not present in
+            ``plan.retired_phase_ids``.
+
+    Returns:
+        The renamed :class:`Phase` with its display path recomputed and
+        every descendant Step's display path recomputed too.
+
+    Raises:
+        PhaseNotFoundError: When ``phase_id`` does not match a live Phase.
+        PhaseRenumberError: When ``to`` collides with a live or retired id,
+            or fails the canonical-shape regex.
+    """
+    import re
+
+    from vaultspec_core.plan.display_path import phase_display_path, step_display_path
+
+    if not re.fullmatch(r"P\d{2,}", to):
+        msg = f"target id {to!r} does not match the canonical ``P\\d{{2,}}`` shape"
+        raise PhaseRenumberError(msg)
+    live_ids = {p.canonical_id for p in plan.phases}
+    if to in live_ids:
+        msg = (
+            f"target id {to!r} collides with a live Phase; choose an id "
+            "outside the live and retired sets"
+        )
+        raise PhaseRenumberError(msg)
+    if to in plan.retired_phase_ids:
+        msg = (
+            f"target id {to!r} is retired; the convention forbids "
+            "reusing retired identifiers"
+        )
+        raise PhaseRenumberError(msg)
+
+    phase = find_phase(plan, phase_id)
+    parent_wave = _wave_of(plan, phase_id)
+    parent_wave_id = parent_wave.canonical_id if parent_wave is not None else None
+
+    phase.canonical_id = to
+    phase.display_path = phase_display_path(phase_id=to, wave_id=parent_wave_id)
+    for step in phase.steps:
+        step.display_path = step_display_path(
+            step_id=step.canonical_id,
+            phase_id=to,
+            wave_id=parent_wave_id,
+        )
+    plan.retired_phase_ids.add(phase_id)
+    return phase
+
+
 def move_phase(
     plan: Plan,
     phase_id: str,

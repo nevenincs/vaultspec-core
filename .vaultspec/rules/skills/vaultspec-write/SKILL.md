@@ -33,7 +33,7 @@ identifier-affecting change. The verbs are:
 
 - `vault plan step add | insert | edit | move | remove`
 - `vault plan step check | uncheck | toggle` (state)
-- `vault plan phase add | insert | edit | move | remove`
+- `vault plan phase add | insert | edit | move | renumber | remove`
 - `vault plan wave add | insert | edit | move | remove`
 - `vault plan epic intent show | edit` (L4 only)
 - `vault plan tier show | promote | demote`

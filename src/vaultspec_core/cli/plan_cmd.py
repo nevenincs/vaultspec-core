@@ -42,6 +42,7 @@ def _render_user_errors[F: Callable[..., None]](func: F) -> F:
         AddPhaseError,
         MovePhaseError,
         PhaseNotFoundError,
+        PhaseRenumberError,
     )
     from vaultspec_core.plan.commands.step_ops import (
         AddStepError,
@@ -65,6 +66,7 @@ def _render_user_errors[F: Callable[..., None]](func: F) -> F:
         PhaseNotFoundError,
         MovePhaseError,
         AddPhaseError,
+        PhaseRenumberError,
         WaveNotFoundError,
         MoveWaveError,
         AddWaveError,
@@ -518,6 +520,30 @@ def cmd_phase_move(
     phase = move_phase(plan, phase_id, to_wave=to_wave, before=before, after=after)
     path.write_text(serialise_plan(plan), encoding="utf-8")
     typer.echo(f"Moved Phase `{phase.display_path}`.")
+
+
+@phase_app.command("renumber")
+@_render_user_errors
+def cmd_phase_renumber(
+    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    phase_id: Annotated[str, typer.Argument(help="Existing Phase canonical id (P##)")],
+    to: Annotated[
+        str,
+        typer.Option(
+            "--to",
+            help="New canonical id (P##); must not collide with live or retired ids",
+        ),
+    ],
+) -> None:
+    """Reassign a Phase's canonical id; descendant Step display paths recompute."""
+    from vaultspec_core.plan.commands.phase_ops import renumber_phase
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    plan = parse_plan(path)
+    phase = renumber_phase(plan, phase_id, to=to)
+    path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Renumbered Phase `{phase_id}` to `{phase.canonical_id}`.")
 
 
 @phase_app.command("remove")

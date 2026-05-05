@@ -103,6 +103,61 @@ def test_demote_retires_dropped_wave_ids() -> None:
     assert plan.waves == []
 
 
+def test_renumber_phase_reassigns_canonical_id_and_recomputes_paths() -> None:
+    """``renumber_phase`` rewrites canonical id, display path, and Step paths."""
+    from vaultspec_core.plan.commands.phase_ops import renumber_phase
+
+    rng = random.Random(40)
+    spec = make_clean_plan("L3", rng=rng, waves=2, phases=2, steps=2)
+    plan = parse_plan(spec.render())
+    # W02's first phase carries canonical id P03 (W01 had P01, P02).
+    target_phase = plan.waves[1].phases[0]
+    pre_steps_under_target = [step.canonical_id for step in target_phase.steps]
+
+    renumber_phase(plan, plan.waves[1].phases[0].canonical_id, to="P99")
+
+    target_phase = plan.waves[1].phases[0]
+    assert target_phase.canonical_id == "P99"
+    assert target_phase.display_path == "W02.P99"
+    for step in target_phase.steps:
+        assert step.display_path.startswith("W02.P99.")
+    assert [step.canonical_id for step in target_phase.steps] == pre_steps_under_target
+
+
+def test_renumber_phase_rejects_collision_with_live_id() -> None:
+    """Renumber refuses a target id already in use by another live Phase."""
+    from vaultspec_core.plan.commands.phase_ops import (
+        PhaseRenumberError,
+        renumber_phase,
+    )
+
+    rng = random.Random(41)
+    spec = make_clean_plan("L2", rng=rng, phases=3, steps=1)
+    plan = parse_plan(spec.render())
+    live_other = plan.phases[1].canonical_id
+
+    with pytest.raises(PhaseRenumberError, match="collides"):
+        renumber_phase(plan, plan.phases[0].canonical_id, to=live_other)
+
+
+def test_renumber_phase_rejects_retired_target_id() -> None:
+    """Renumber refuses a target id sitting in the retirement set."""
+    from vaultspec_core.plan.commands.phase_ops import (
+        PhaseRenumberError,
+        remove_phase,
+        renumber_phase,
+    )
+
+    rng = random.Random(42)
+    spec = make_clean_plan("L2", rng=rng, phases=3, steps=1)
+    plan = parse_plan(spec.render())
+    retired = plan.phases[2].canonical_id
+    remove_phase(plan, retired)
+
+    with pytest.raises(PhaseRenumberError, match="retired"):
+        renumber_phase(plan, plan.phases[0].canonical_id, to=retired)
+
+
 def test_retirement_ledger_is_not_absorbed_into_phase_intent() -> None:
     """A ledger comment placed inside an intent block must not pollute intent text.
 

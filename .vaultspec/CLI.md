@@ -326,7 +326,10 @@ Inspect and manipulate plan documents per the plan-hardening convention. Plans d
 | `insert`    | Insert at a named position with `--before`/`--after`                          |
 | `edit`      | Replace `--title` and / or `--intent` in place                                |
 | `move`      | Re-parent (`--to-wave`) and / or re-position (`--before`/`--after`)           |
+| `renumber`  | Remediate a duplicated id via `--to <P##>`; refuses live / retired collisions |
 | `remove`    | Retire the Phase plus every descendant Step (cascading retirement)            |
+
+`phase renumber` is the audited remediation surface for collisions inherited from legacy plans (e.g. a writer who treated `P##` as Wave-scoped rather than per-document). The verb retires the old id (so it cannot be reused) and recomputes every descendant Step's display path against the new parent canonical id.
 
 #### Wave commands
 
