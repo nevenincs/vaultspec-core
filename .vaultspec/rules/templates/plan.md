@@ -69,6 +69,11 @@ related:
      (U+2013) are forbidden. Step rows within a Phase are
      contiguous. -->
 
+<!-- NO COMPRESSION:
+     N self-similar actions = N rows. Never collapse into "for each
+     X, do Y" / "across all callers, do Z" / "in every module,
+     replace W". The rule applies at every tier including L1. -->
+
 # `{feature}` `{phase}` plan
 
 Brief description of the proposed feature, change, or refactor.
