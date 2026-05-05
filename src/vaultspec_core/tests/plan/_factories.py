@@ -10,6 +10,15 @@ the validator's detection rules.
 Plans rendered by these factories are byte-for-byte reproducible
 under a fixed seed plus fixed parameters; the randomness only
 affects which titles, file scopes, and corruption sites are chosen.
+
+The ``corrupt_*`` operators are load-bearing across many tests:
+each one is both a fixture generator and a contract pin documenting
+which malformed shapes the parser is expected to silently skip
+(padding violation, mangled checkbox, em-dash separator, lowercase
+identifier) versus gracefully tolerate (dropped trailing period).
+A change to a parser regex that affects this contract should fail
+the corresponding ``corrupt_*`` test, surfacing the invariant
+break loudly rather than silently re-classifying a row.
 """
 
 from __future__ import annotations
