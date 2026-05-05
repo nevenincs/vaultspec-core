@@ -82,7 +82,49 @@ def check_identifiers(plan: Plan, source_text: str = "") -> list[Finding]:
 
     findings.extend(_detect_non_monotonic(inventory.steps, kind="Step"))
     findings.extend(_detect_underpadded_headings(source_text))
+    findings.extend(_detect_underpadded_retired_ids(plan))
 
+    return findings
+
+
+def _detect_underpadded_retired_ids(plan: Plan) -> list[Finding]:
+    """Yield PLAN020 findings for retirement-ledger tokens below two digits.
+
+    The ledger captures retired canonical ids via the lenient ``[SPW]\\d+``
+    pattern so a sub-canonical width survives parsing rather than being
+    silently dropped. Surface every such token as an ``ERROR`` so the
+    writer can either widen the live id (which is forbidden retroactively
+    and therefore implies removing the row) or correct the ledger.
+    """
+    findings: list[Finding] = []
+    retired_by_kind = (
+        ("Wave", plan.retired_wave_ids),
+        ("Phase", plan.retired_phase_ids),
+        ("Step", plan.retired_step_ids),
+    )
+    for kind, retired in retired_by_kind:
+        for token in sorted(retired):
+            if len(token) - 1 >= 2:
+                continue
+            findings.append(
+                Finding(
+                    code="PLAN020",
+                    severity=Severity.ERROR,
+                    message=(
+                        f"Retirement ledger carries sub-canonical {kind} "
+                        f"identifier '{token}'; canonical width is two "
+                        "digits or more."
+                    ),
+                    line_number=0,
+                    fix_hint=(
+                        "Either widen the token in the hidden "
+                        "<!-- RETIRED: ... --> ledger to canonical width "
+                        "(e.g. 'S1' -> 'S01') or remove it entirely if "
+                        "the corresponding live row never existed."
+                    ),
+                    autofixable=False,
+                ),
+            )
     return findings
 
 

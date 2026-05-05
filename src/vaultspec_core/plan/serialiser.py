@@ -50,7 +50,7 @@ def serialise_plan(plan: Plan) -> str:
     if ledger is not None:
         parts.append(ledger)
         parts.append("")
-    parts.append(f"# {plan.title}")
+    parts.append(f"# {plan.title or '(untitled plan)'}")
     parts.append("")
 
     if plan.frontmatter.tier is Tier.L4 and plan.epic_intent is not None:
@@ -154,6 +154,11 @@ def _render_retirement_ledger(plan: Plan) -> str | None:
     been retired so clean plans round-trip without an empty ledger.
     Tokens are sorted by container kind (Wave > Phase > Step) and then
     by numeric suffix so the output is deterministic.
+
+    Position is canonical, not preserved: the ledger is always emitted
+    immediately above the title heading, regardless of where the source
+    document carried it. Multiple ledger comments in the source are
+    unioned by the parser and emitted as a single canonical block.
     """
     tokens: list[str] = []
     retirement_sets = (

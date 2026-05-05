@@ -240,8 +240,11 @@ def _extract_retirement_ledger(body: str) -> tuple[set[str], set[str], set[str]]
 
     The ledger has the form
     ``<!-- RETIRED: S04, S07, P02, W01 -->`` and may appear anywhere in
-    the document body. Multiple occurrences are unioned. Tokens that
-    do not match ``[SPW]\\d{2,}`` are silently ignored.
+    the document body. Multiple occurrences are unioned. Tokens are
+    captured under the lenient ``[SPW]\\d+`` shape so a sub-canonical
+    width (e.g. ``S1``) survives parsing; the identifier-hygiene rule
+    flags such tokens via PLAN020 rather than letting them be silently
+    dropped from retirement tracking.
     """
     retired_steps: set[str] = set()
     retired_phases: set[str] = set()
@@ -251,11 +254,11 @@ def _extract_retirement_ledger(body: str) -> tuple[set[str], set[str], set[str]]
             token = token.strip()
             if not token:
                 continue
-            if re.fullmatch(r"S\d{2,}", token):
+            if re.fullmatch(r"S\d+", token):
                 retired_steps.add(token)
-            elif re.fullmatch(r"P\d{2,}", token):
+            elif re.fullmatch(r"P\d+", token):
                 retired_phases.add(token)
-            elif re.fullmatch(r"W\d{2,}", token):
+            elif re.fullmatch(r"W\d+", token):
                 retired_waves.add(token)
     return retired_steps, retired_phases, retired_waves
 

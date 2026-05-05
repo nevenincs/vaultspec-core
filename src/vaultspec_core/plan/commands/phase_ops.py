@@ -146,6 +146,8 @@ def move_phase(
             position = anchor_index if before is not None else anchor_index + 1
             dest_wave.phases.insert(position, moving)
         # Rebuild plan.phases as the document-order union of all Wave phases.
+        # Mirror is mutated in place; external list-reference holders see
+        # the rebuild, but Phase object references stay valid.
         plan.phases.clear()
         for wave in plan.waves:
             plan.phases.extend(wave.phases)

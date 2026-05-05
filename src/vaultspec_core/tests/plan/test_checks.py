@@ -126,6 +126,52 @@ def test_identifier_check_flags_duplicate_step_id() -> None:
     assert any(finding.code == "PLAN021" for finding in findings)
 
 
+def test_identifier_check_flags_underpadded_retired_ledger_token() -> None:
+    """A sub-canonical id in the retirement ledger raises PLAN020.
+
+    Regression for M-NEW-3: the ledger's lenient token regex captures
+    ``[SPW]\\d+``; the identifier-hygiene rule must surface tokens with
+    width below the two-digit canonical minimum so they cannot be
+    silently absorbed.
+    """
+    body = (
+        "---\n"
+        "tags:\n"
+        "  - '#plan'\n"
+        "  - '#legacy-ledger'\n"
+        "date: '2026-05-05'\n"
+        "tier: L1\n"
+        "related:\n"
+        "  - '[[2026-05-05-legacy-ledger-adr]]'\n"
+        "---\n"
+        "\n"
+        "<!-- RETIRED: S1, P05 -->\n"
+        "\n"
+        "# `legacy-ledger` plan\n"
+        "\n"
+        "Plan with a sub-canonical retired Step id.\n"
+        "\n"
+        "- [ ] `S02` - first; `src/a.py`.\n"
+    )
+    plan = parse_plan(body)
+
+    findings = check_identifiers(plan, body)
+
+    assert any(
+        finding.code == "PLAN020"
+        and "ledger" in finding.message
+        and "S1" in finding.message
+        for finding in findings
+    )
+    # Canonical-width retired token (P05) must NOT trigger the rule.
+    assert not any(
+        finding.code == "PLAN020"
+        and "ledger" in finding.message
+        and "P05" in finding.message
+        for finding in findings
+    )
+
+
 def test_identifier_check_flags_underpadded_phase_heading() -> None:
     """A single-digit Phase heading id raises PLAN020 even when the parser drops it.
 

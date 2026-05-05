@@ -428,7 +428,10 @@ def _compute_flat_position(plan: Plan, moving: Step) -> int:
 
     The flat ``plan.steps`` mirrors the document-order union of every
     Phase's ``steps`` list. After re-attaching to ``dest_phase``, this
-    helper finds the position the Phase's index implies.
+    helper finds the position the Phase's index implies. The moving Step
+    must be present in some Phase's ``steps`` list before this function
+    is called; the loop falls through only when that invariant is
+    violated and surfaces the bug rather than masking it.
     """
     flat_position = 0
     for phase in plan.phases:
@@ -436,7 +439,12 @@ def _compute_flat_position(plan: Plan, moving: Step) -> int:
             if step is moving:
                 return flat_position
             flat_position += 1
-    return len(plan.steps)
+    msg = (
+        f"flat-mirror invariant violated: moving Step "
+        f"{moving.canonical_id!r} not present in any Phase after "
+        "re-attach. This indicates a bug in the move handler chain."
+    )
+    raise RuntimeError(msg)
 
 
 def _resolve_phase_for_add(plan: Plan, *, phase_id: str | None):

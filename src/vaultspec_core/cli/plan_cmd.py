@@ -261,8 +261,10 @@ def cmd_step_toggle(
     from vaultspec_core.plan.serialiser import serialise_plan
 
     plan = parse_plan(path)
-    toggle_step(plan, step_id)
+    step = toggle_step(plan, step_id)
     path.write_text(serialise_plan(plan), encoding="utf-8")
+    new_state = "closed" if step.checked else "open"
+    typer.echo(f"Toggled Step `{step.canonical_id}` to {new_state}.")
 
 
 @step_app.command("check")
@@ -279,6 +281,7 @@ def cmd_step_check(
     plan = parse_plan(path)
     check_step(plan, step_id)
     path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Closed Step `{step_id}`.")
 
 
 @step_app.command("uncheck")
@@ -295,6 +298,7 @@ def cmd_step_uncheck(
     plan = parse_plan(path)
     uncheck_step(plan, step_id)
     path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Re-opened Step `{step_id}`.")
 
 
 # ---- Step add / insert / edit / move / remove ------------------------------
@@ -371,6 +375,7 @@ def cmd_step_edit(
     plan = parse_plan(path)
     edit_step(plan, step_id, action=action, scope=scope)
     path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Edited Step `{step_id}`.")
 
 
 @step_app.command("move")
@@ -486,6 +491,7 @@ def cmd_phase_edit(
     plan = parse_plan(path)
     edit_phase(plan, phase_id, title=title, intent=intent)
     path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Edited Phase `{phase_id}`.")
 
 
 @phase_app.command("move")
@@ -601,6 +607,7 @@ def cmd_wave_edit(
     plan = parse_plan(path)
     edit_wave(plan, wave_id, title=title, intent=intent)
     path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo(f"Edited Wave `{wave_id}`.")
 
 
 @wave_app.command("move")
@@ -689,6 +696,7 @@ def cmd_epic_intent_edit(
     plan = parse_plan(path)
     edit_epic_intent(plan, text=text)
     path.write_text(serialise_plan(plan), encoding="utf-8")
+    typer.echo("Edited Epic intent.")
 
 
 # ---- Tier commands ----------------------------------------------------------

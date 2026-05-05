@@ -175,6 +175,11 @@ def move_wave(
     plan.waves.insert(position, moving)
 
     # Rebuild plan.phases / plan.steps as the document-order union.
+    # The mirrors are mutated in place via clear() + append: external
+    # holders of the list reference observe the rebuild, but holders of
+    # individual Phase / Step objects (the canonical references) are
+    # unaffected. Callers that need a stable list snapshot must copy
+    # via list(plan.steps) before calling move_wave.
     plan.phases.clear()
     plan.steps.clear()
     for wave in plan.waves:
