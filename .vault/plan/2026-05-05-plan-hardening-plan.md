@@ -221,7 +221,7 @@ ADR and pass tests.
 - [x] `W02.P02.S54` - implement the separator-normalisation autofix; `src/vaultspec_core/plan/fixes/separator_fix.py`.
 - [x] `W02.P02.S55` - implement the trailing-whitespace autofix; `src/vaultspec_core/plan/fixes/whitespace_fix.py`.
 - [x] `W02.P02.S56` - implement the display-path-recomputation autofix covering Step rows, Phase headings, and Wave headings; `src/vaultspec_core/plan/fixes/display_path_fix.py`.
-- [ ] `W02.P02.S57` - implement the `vault plan query` command with selectors and predicates; `src/vaultspec_core/plan/commands/query.py`.
+- [x] `W02.P02.S57` - implement the `vault plan query` command with selectors and predicates; `src/vaultspec_core/plan/query.py`.
 - [ ] `W02.P02.S58` - add unit tests for `status`, `check`, and `query`; `src/vaultspec_core/tests/plan/test_read_commands.py`.
 
 ### Phase `W02.P03` - additive write commands
