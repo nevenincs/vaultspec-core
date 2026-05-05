@@ -40,11 +40,44 @@ Review the ADR carefully. This is where you commit to an approach. Sign off befo
 
 ### Planning
 
-With approved ADRs in hand, call the `vaultspec-write` skill to produce an implementation plan. It reads the ADR and breaks the decision into phased, concrete steps.
+With approved ADRs in hand, call the `vaultspec-write` skill to produce an implementation plan. It reads the ADR and produces a row-per-Step plan grouped by the convention's complexity tier.
 
 > "Write an implementation plan for the search feature based on the ADR"
 
-The plan lands in `.vault/plan/` and defines what gets built, in what order, and with what acceptance criteria. Review the scope - confirm the phases make sense, nothing is missing, and nothing overreaches the ADR's boundaries. Approve before execution begins.
+Plans use the four-level hierarchy `Epic > Wave > Phase > Step`. Each plan declares its complexity tier in frontmatter as `tier: L1`, `L2`, `L3`, or `L4`. The tier determines which structural containers exist:
+
+- `L1` (single session, single concern) emits Steps only.
+- `L2` (cohesive multi-Step work in one package or subsystem) groups Steps under Phases.
+- `L3` (hard interdependencies between batches) wraps Phases in Waves.
+- `L4` (multi-week, multi-team) adds an Epic frame and an external project-management association.
+
+`Step` is the canonical leaf-row noun at every tier. Each Step is one Markdown bulleted checkbox row pairing one prompt-run with one commit. Identifiers (`S##`, `P##`, `W##`) are flat, append-only, and immutable across plan revisions; the compound dot-notation (`W01.P02.S03`) is a display path computed from the current grouping, not the canonical ID.
+
+Worked example (L2 plan, one Phase, three Steps):
+
+```markdown
+### Phase `P01` - rewrite the search index
+
+One sentence stating what this Phase delivers.
+
+- [ ] `P01.S01` - extract the tokenizer; `src/search/tokenizer.py`.
+- [ ] `P01.S02` - replace inline scoring with the new ranker; `src/search/ranker.py`.
+- [ ] `P01.S03` - update the index-rebuild command; `src/cli/reindex.py`.
+```
+
+Worked example (L3 plan, one Wave fragment showing Phase nesting):
+
+```markdown
+## Wave `W01` - foundational rewrite
+
+Lands the new search-index API; `W02` depends on this Wave.
+
+### Phase `W01.P01` - rewrite the search index
+- [ ] `W01.P01.S01` - extract the tokenizer; `src/search/tokenizer.py`.
+- [ ] `W01.P01.S02` - replace inline scoring; `src/search/ranker.py`.
+```
+
+The plan lands in `.vault/plan/` and defines what gets built, in what order, and with what acceptance criteria. Review the scope - confirm the tier matches the work's actual complexity, every Step is one row, and nothing overreaches the ADR's boundaries. Approve before execution begins.
 
 ### Execution
 

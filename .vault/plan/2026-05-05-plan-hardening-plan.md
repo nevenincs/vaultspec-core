@@ -158,7 +158,7 @@ The README is the public-facing introduction. The Phase ends
 when the Planning subsection describes the four-tier hierarchy
 with worked examples for L2 and L3.
 
-- [ ] `W01.P09.S32` - rewrite the Planning subsection around the four-tier hierarchy, embed worked examples for an L2 plan and an L3 plan, and note that Step is the canonical leaf-row noun mapping one-to-one to the existing Step Record artefact name; `.vaultspec/README.md`.
+- [x] `W01.P09.S32` - rewrite the Planning subsection around the four-tier hierarchy, embed worked examples for an L2 plan and an L3 plan, and note that Step is the canonical leaf-row noun mapping one-to-one to the existing Step Record artefact name; `.vaultspec/README.md`.
 
 ### Phase `W01.P10` - reconcile adjacent skills
 
