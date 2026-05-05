@@ -28,6 +28,7 @@ __all__ = [
     "find_wave",
     "insert_wave",
     "move_wave",
+    "remove_wave",
 ]
 
 
@@ -204,6 +205,29 @@ def move_wave(
                 wave_id=moving.canonical_id,
             )
     return moving
+
+
+def remove_wave(plan: Plan, wave_id: str) -> tuple[str, list[str], list[str]]:
+    """Remove a Wave and cascade-retire every descendant Phase and Step id.
+
+    Returns:
+        ``(retired_wave_id, retired_phase_ids, retired_step_ids)``.
+
+    Raises:
+        WaveNotFoundError: When ``wave_id`` does not exist.
+    """
+    wave = find_wave(plan, wave_id)
+    retired_phase_ids = [phase.canonical_id for phase in wave.phases]
+    retired_step_ids = [
+        step.canonical_id for phase in wave.phases for step in phase.steps
+    ]
+
+    for phase in list(wave.phases):
+        for step in list(phase.steps):
+            plan.steps.remove(step)
+        plan.phases.remove(phase)
+    plan.waves.remove(wave)
+    return wave.canonical_id, retired_phase_ids, retired_step_ids
 
 
 def _require_wave_supporting_tier(plan: Plan) -> None:

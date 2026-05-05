@@ -30,6 +30,7 @@ __all__ = [
     "find_phase",
     "insert_phase",
     "move_phase",
+    "remove_phase",
 ]
 
 
@@ -155,6 +156,37 @@ def move_phase(
             wave_id=parent_wave_id,
         )
     return moving
+
+
+def remove_phase(plan: Plan, phase_id: str) -> tuple[str, list[str]]:
+    """Remove a Phase and cascade-retire every descendant Step identifier.
+
+    Per the CLI ADR's *Cascading retirement* rule, removing a parent
+    container retires every descendant canonical identifier. The
+    Step Records on disk are NOT deleted by this function; the
+    convention surfaces them as orphans for ``vault check`` to flag.
+
+    Args:
+        plan: Parsed :class:`Plan`. Mutated in place.
+        phase_id: Canonical id of the Phase to remove.
+
+    Returns:
+        A tuple of ``(retired_phase_id, retired_step_ids)``; the Step
+        list is in document order.
+
+    Raises:
+        PhaseNotFoundError: When ``phase_id`` does not exist.
+    """
+    phase = find_phase(plan, phase_id)
+    parent_wave = _wave_of(plan, phase_id)
+    retired_step_ids = [step.canonical_id for step in phase.steps]
+
+    for step in list(phase.steps):
+        plan.steps.remove(step)
+    plan.phases.remove(phase)
+    if parent_wave is not None:
+        parent_wave.phases.remove(phase)
+    return phase.canonical_id, retired_step_ids
 
 
 def _wave_of(plan: Plan, phase_id: str | None):

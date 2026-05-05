@@ -266,13 +266,13 @@ ends when cascading retirement, demote-failure-on-multi-child,
 and tier-promote intermediate-container instantiation all match
 the CLI ADR's specified contract.
 
-- [ ] `W02.P05.S77` - implement `vault plan step remove` with identifier retirement; `src/vaultspec_core/plan/commands/step_remove.py`.
-- [ ] `W02.P05.S78` - implement `vault plan phase remove` with cascading retirement of child Step identifiers; `src/vaultspec_core/plan/commands/phase_remove.py`.
-- [ ] `W02.P05.S79` - implement `vault plan wave remove` with cascading retirement of descendant Phase and Step identifiers; `src/vaultspec_core/plan/commands/wave_remove.py`.
-- [ ] `W02.P05.S80` - implement `vault plan tier --show`; `src/vaultspec_core/plan/commands/tier_show.py`.
-- [ ] `W02.P05.S81` - implement `vault plan tier promote` with transitive-jump support and `--phase-title`/`--wave-title`/`--epic-intent` flag handling; `src/vaultspec_core/plan/commands/tier_promote.py`.
-- [ ] `W02.P05.S82` - implement `vault plan tier demote` with the multi-child refusal predicate and `--force` override; `src/vaultspec_core/plan/commands/tier_demote.py`.
-- [ ] `W02.P05.S83` - add unit tests for destructive commands covering retirement-gap-preservation and demotion-refusal invariants; `src/vaultspec_core/tests/plan/test_destructive_commands.py`.
+- [x] `W02.P05.S77` - implement `vault plan step remove` with identifier retirement; `src/vaultspec_core/plan/commands/step_ops.py`.
+- [x] `W02.P05.S78` - implement `vault plan phase remove` with cascading retirement of child Step identifiers; `src/vaultspec_core/plan/commands/phase_ops.py`.
+- [x] `W02.P05.S79` - implement `vault plan wave remove` with cascading retirement of descendant Phase and Step identifiers; `src/vaultspec_core/plan/commands/wave_ops.py`.
+- [x] `W02.P05.S80` - implement `vault plan tier --show`; `src/vaultspec_core/plan/commands/tier_ops.py`.
+- [x] `W02.P05.S81` - implement `vault plan tier promote` with transitive-jump support and `--phase-title`/`--wave-title`/`--epic-intent` flag handling; `src/vaultspec_core/plan/commands/tier_ops.py`.
+- [x] `W02.P05.S82` - implement `vault plan tier demote` with the multi-child refusal predicate and `--force` override; `src/vaultspec_core/plan/commands/tier_ops.py`.
+- [x] `W02.P05.S83` - add unit tests for destructive commands covering retirement-gap-preservation and demotion-refusal invariants; `src/vaultspec_core/tests/plan/test_destructive_commands.py`.
 
 ### Phase `W02.P06` - rule-extension authoring and review
 

@@ -34,6 +34,7 @@ __all__ = [
     "find_step",
     "insert_step",
     "move_step",
+    "remove_step",
     "toggle_step",
     "uncheck_step",
 ]
@@ -244,6 +245,35 @@ def edit_step(
     if scope is not None:
         step.scope = scope
     return step
+
+
+# ---- Destructive ------------------------------------------------------------
+
+
+def remove_step(plan: Plan, step_id: str) -> str:
+    """Remove the Step with canonical id ``step_id``; identifier is retired.
+
+    The convention's append-only / no-reuse rule guarantees the
+    retired identifier is never re-allocated; the
+    :func:`vaultspec_core.plan.identifiers.next_available_step` counter
+    advances past it on subsequent allocations.
+
+    Args:
+        plan: Parsed :class:`Plan`. Mutated in place.
+        step_id: Canonical id of the Step to remove.
+
+    Returns:
+        The retired canonical identifier.
+
+    Raises:
+        StepNotFoundError: When ``step_id`` does not exist.
+    """
+    step = find_step(plan, step_id)
+    parent_phase = _phase_of(plan, step_id)
+    if parent_phase is not None:
+        parent_phase.steps.remove(step)
+    plan.steps.remove(step)
+    return step.canonical_id
 
 
 # ---- Re-parenting / re-positioning ------------------------------------------
