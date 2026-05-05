@@ -212,7 +212,7 @@ ADR and pass tests.
 - [x] `W02.P02.S45` - implement the frontmatter detection rule (presence of `tier`, presence of `related` for non-trivial plans); `src/vaultspec_core/plan/checks/frontmatter_check.py`.
 - [x] `W02.P02.S46` - implement the hierarchy-correspondence detection rule (declared tier matches heading shape); `src/vaultspec_core/plan/checks/hierarchy_check.py`.
 - [x] `W02.P02.S47` - implement the identifier-hygiene detection rule (per-container append-only, no duplicates, padding); `src/vaultspec_core/plan/checks/identifiers_check.py`.
-- [ ] `W02.P02.S48` - implement the display-path correctness detection rule against the current ancestor chain; `src/vaultspec_core/plan/checks/display_path.py`.
+- [x] `W02.P02.S48` - implement the display-path correctness detection rule against the current ancestor chain; `src/vaultspec_core/plan/checks/display_path_check.py`.
 - [ ] `W02.P02.S49` - implement the row-contract detection rule (checkbox shape, separator, action, scope, period); `src/vaultspec_core/plan/checks/row_contract.py`.
 - [ ] `W02.P02.S50` - implement the approved-structural-vocabulary detection rule scoped to headings, container-identifier code spans, and row-label position; `src/vaultspec_core/plan/checks/vocabulary.py`.
 - [ ] `W02.P02.S51` - implement the separator-convention detection rule (no em-dash, no en-dash); `src/vaultspec_core/plan/checks/separator.py`.
