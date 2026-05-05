@@ -1,49 +1,26 @@
 ---
-# REQUIRED TAGS (minimum 2): one directory tag + one feature tag
-# DIRECTORY TAGS: #adr #audit #exec #index #plan #reference #research
-# Directory tag (hardcoded - DO NOT CHANGE - based on .vault/plan/ location)
-# Feature tag (replace plan-hardening with your feature name, e.g., #editor-demo)
-# Additional tags may be appended below the required pair
 tags:
   - '#plan'
   - '#plan-hardening'
-# ISO date format (e.g., 2026-02-06)
 date: '2026-05-05'
 tier: L3
-# Related documents as quoted wiki-links
-# (e.g., "[[2026-02-04-feature-adr]]")
 related:
   - '[[2026-05-05-plan-hardening-adr]]'
   - '[[2026-05-06-plan-hardening-adr]]'
   - '[[2026-05-05-plan-hardening-research]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 <!-- LINK RULES:
-     - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
-     - NEVER use [[wiki-links]] or markdown links in the document body.
-     - NEVER reference file paths in the body. If you must name a source file,
-       class, or function, use inline backtick code: `src/module.py`. -->
+     - [[wiki-links]] are ONLY for .vault/ documents in the
+       related: field above.
+     - The related: field carries the AUTHORISING documents
+       (ADR, research, reference, prior plan) for every Step in
+       this plan. Steps inherit this chain; per-row reference
+       footers do not exist.
+     - NEVER use [[wiki-links]] or markdown links in the
+       document body. -->
 
 # `plan-hardening` plan
-
-Two-wave rollout of the `#plan-hardening` feature. Wave 1 lands
-the natural-language firmware across the `.vaultspec/` rule
-surface; Wave 2 lands the `vault plan` CLI and the rule-extension
-prose that mandates CLI use. The convention authority is
-`2026-05-05-plan-hardening-adr.md`; the CLI authority is
-`2026-05-06-plan-hardening-adr.md`. Wave 1 is sequenced before
-Wave 2: the CLI is meaningless without the firmware it
-manipulates.
-
-This plan is `L3` because Wave 2 has a hard dependency on Wave
-1 landing first (CLI cannot enforce a contract that does not
-yet exist in the firmware), Steps span two or more package and
-rule-file boundaries with hard ordering between them, and the
-total effort exceeds three days of agent work across multiple
-sessions.
 
 ## Wave `W01` - language firmware rollout
 
@@ -292,8 +269,8 @@ extension.
 - [x] `W02.P06.S90` - author rule-extension prose for the high-executor mirroring the execute-skill directive; `.vaultspec/rules/agents/vaultspec-high-executor.md`.
 - [x] `W02.P06.S91` - author rule-extension prose for the system rules naming `vault plan` as the structural manipulation surface; `.vaultspec/rules/system/03-vaultspec.md`.
 - [x] `W02.P06.S92` - author rule-extension prose for the public README introducing the `vault plan` CLI to external readers; `.vaultspec/README.md`.
-- [x] `W02.P06.S93` - dispatch the `vaultspec-docs-curator` agent to audit every authored extension for documentation hygiene, wiki-link correctness, frontmatter and tag compliance; `.vault/audit/` (review-on-merge).
-- [x] `W02.P06.S94` - dispatch the `vaultspec-writer` agent persona to audit every authored extension for prose clarity, canonical-vocabulary compliance, and mandate-shape phrasing; `.vault/audit/` (review-on-merge).
+- [x] `W02.P06.S93` - dispatch the `vaultspec-docs-curator` agent to audit every authored extension for documentation hygiene, wiki-link correctness, frontmatter and tag compliance; `.vault/audit/` (review-on-merge)\`.
+- [x] `W02.P06.S94` - dispatch the `vaultspec-writer` agent persona to audit every authored extension for prose clarity, canonical-vocabulary compliance, and mandate-shape phrasing; `.vault/audit/` (review-on-merge)\`.
 
 ### Phase `W02.P07` - integration and end-to-end verification
 
@@ -302,29 +279,8 @@ Click app, adds CLI help docs, and runs end-to-end tests
 against actual plan documents. The Phase ends when `vaultspec- core vault plan --help` lists every documented subcommand and a
 clean smoke test executes a full plan-manipulation cycle.
 
-- [ ] `W02.P07.S95` - register the `vault plan` subcommand group on the existing `vaultspec-core` Click app; `src/vaultspec_core/cli/root.py`.
-- [ ] `W02.P07.S96` - add per-subcommand help strings matching the CLI ADR's Subcommand surface table; `src/vaultspec_core/plan/commands/`.
-- [ ] `W02.P07.S97` - update the CLI reference document to enumerate every `vault plan` subcommand, flag, and exit code; `.vaultspec/CLI.md`.
-- [ ] `W02.P07.S98` - update the public README to introduce the CLI in the context of the four-tier hierarchy; `README.md`.
-- [ ] `W02.P07.S99` - add an end-to-end smoke test that creates a fresh L3 plan, exercises additive, state, re-parenting, and destructive commands, and verifies round-trip integrity; `src/vaultspec_core/tests/plan/test_e2e.py`.
-
-## Verification
-
-The plan is complete when every Step in both Waves is closed,
-both reviewers (`vaultspec-docs-curator` and `vaultspec-writer`)
-have approved every Wave 2 rule-extension, and the end-to-end
-smoke test passes. Verification at each Wave boundary:
-
-- Wave 1: `vault check all` reports a clean vault; the writer
-  agent persona, the plan template, and the executor personas
-  describe the convention without contradiction; the
-  social-enforcement surfaces are coherent.
-- Wave 2: `vaultspec-core vault plan --help` lists every
-  subcommand documented in the CLI ADR; the end-to-end smoke
-  test passes; the rule-extension prose has cleared both
-  reviewer agents.
-
-The convention ADR's row contract is itself the verification
-artefact for plan-shape compliance: any plan document this
-plan-management module produces must satisfy `vault plan check` cleanly. This plan document satisfies that constraint
-upon Wave 2 landing.
+- [x] `W02.P07.S95` - register the `vault plan` subcommand group on the existing `vaultspec-core` Click app; `src/vaultspec_core/cli/root.py`.
+- [x] `W02.P07.S96` - add per-subcommand help strings matching the CLI ADR's Subcommand surface table; `src/vaultspec_core/plan/commands/`.
+- [x] `W02.P07.S97` - update the CLI reference document to enumerate every `vault plan` subcommand, flag, and exit code; `.vaultspec/CLI.md`.
+- [x] `W02.P07.S98` - update the public README to introduce the CLI in the context of the four-tier hierarchy; `README.md`.
+- [x] `W02.P07.S99` - add an end-to-end smoke test that creates a fresh L3 plan, exercises additive, state, re-parenting, and destructive commands, and verifies round-trip integrity; `src/vaultspec_core/tests/plan/test_e2e.py`.
