@@ -190,7 +190,7 @@ back. The Phase ends when round-trip parsing preserves
 canonical identifiers, document order, and frontmatter exactly,
 covered by unit tests.
 
-- [ ] `W02.P01.S35` - create the `vaultspec_core.plan` package with module skeleton, `__init__.py`, and public surface exports; `src/vaultspec_core/plan/__init__.py`.
+- [x] `W02.P01.S35` - create the `vaultspec_core.plan` package with module skeleton, `__init__.py`, and public surface exports; `src/vaultspec_core/plan/__init__.py`.
 - [ ] `W02.P01.S36` - implement frontmatter parsing for `tier`, `related`, `tags`, `date`; `src/vaultspec_core/plan/frontmatter.py`.
 - [ ] `W02.P01.S37` - implement hierarchy parsing for Wave, Phase, and Step blocks against the row contract; `src/vaultspec_core/plan/parser.py`.
 - [ ] `W02.P01.S38` - implement canonical-identifier extraction and per-document next-available counter; `src/vaultspec_core/plan/identifiers.py`.
