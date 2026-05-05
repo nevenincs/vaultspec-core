@@ -932,7 +932,7 @@ def install_run(
             snapshot_builtins(fw_dir)
 
         sync_target = provider if provider not in ("all", "core") else "all"
-        sync_provider(sync_target, force=True, skip=skip)
+        sync_provider(sync_target, force=True, skip=skip, dev=dev)
 
         if "precommit" not in skip:
             _scaffold_precommit(path)
@@ -991,7 +991,7 @@ def install_run(
 
     sync_target = provider if provider not in ("all", "core") else "all"
     try:
-        sync_provider(sync_target, skip=skip)
+        sync_provider(sync_target, skip=skip, dev=dev)
     except (VaultSpecError, OSError) as exc:
         logger.warning("Sync failed during install: %s", exc)
         post_errors.append(f"sync: {exc}")

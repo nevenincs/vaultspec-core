@@ -1,5 +1,5 @@
 ---
-description: High-tier implementation specialist for complex architectural changes, core logic refactors, and advanced feature implementation. Use for tasks requiring high reasoning depth and sophisticated design decisions.
+description: High-tier implementation specialist for complex architectural changes, core logic refactors, and advanced feature implementation. Use for Steps requiring high reasoning depth and sophisticated design decisions.
 tier: HIGH
 mode: read-write
 tools: [Glob, Grep, Read, Write, Edit, Bash]
@@ -29,8 +29,13 @@ Utilize:
 - **DECIDE AUTONOMOUSLY**: Make technically sound implementation choices based
   on existing project conventions and established reference patterns.
 
-- **DOCUMENT CONCISELY**: For every step, **UPDATE** or **CREATE** `<Step Record>`
-  (`.vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-<step>.md`).
+- **DOCUMENT CONCISELY**: The executor reads the originating Step
+  row from the plan document, executes that Step (one prompt-run
+  plus one commit per the convention ADR's Step row contract), and
+  writes one `<Step Record>` per Step at
+  `.vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-<step>.md`.
+  The originating Step's canonical identifier (`S##`) is recorded
+  in the Step Record's `step_id:` frontmatter field.
 
 ## Standards & Tooling
 
@@ -100,4 +105,13 @@ Code review is mandatory before completion. Ensure the
 violations - either by delegating to it or by including it in the supervised
 team workflow.
 
-**DO NOT** mark the task as complete until the review passes.
+**DO NOT** mark the Step as complete until the review passes.
+
+## CLI usage mandate
+
+You MUST update Step state via `vault plan step check` (close),
+`vault plan step uncheck` (re-open), or `vault plan step toggle`
+rather than hand-editing the checkbox glyph. Hand-editing is
+forbidden because it bypasses the CLI's idempotency guarantees and
+display-path recomputation, and is flagged by `vault plan check`.
+See the CLI ADR (`2026-05-06-plan-hardening-adr`).

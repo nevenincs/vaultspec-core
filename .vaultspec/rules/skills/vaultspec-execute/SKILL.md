@@ -20,7 +20,7 @@ Use this skill:
   `.vault/plan/yyyy-mm-dd-{feature}-{phase}-plan.md`.
 
 - Read and parse the Plan to understand the scope, complexity, and specific
-  steps
+  Steps
 
 - Read and parse all linked document to understand context for code challange.
 
@@ -30,21 +30,28 @@ Assume the persona of a delegator.
 
 - Use parallel sub-agents, or autonomous agent team to execute complex plans.
 
-- Use appropriate executor agent persona. When the task
+- Use appropriate executor agent persona. When the work
   needs multiple specialists, coordinate them.
 
 - Always instruct the coders to execute the current plan, and to read grounding
   research, adrs and the `[[...-plan.md]]`.
 
-- Always instruct to "Start with Phase `{X}`."
+- Always instruct to "Start with Phase `P##`." (or the canonical
+  display path, e.g., `W01.P01`, at L3 / L4).
 
 ### Step Execution & Logging
 
-- Execute the plan step-by-step or in logical batches.
+- Execute the plan one Step at a time. Per the convention ADR's
+  Step row contract, each Step is exactly one prompt-run plus one
+  commit; the executor closes the row (`- [ ]` to `- [x]`) on
+  completion.
 
-- **Coder must write a Step Record** to
+- **One Step Record per completed Step.** The executor writes a
+  Step Record to
   `.vault/exec/yyyy-mm-dd-{feature}/yyyy-mm-dd-{feature}-{phase}-{step}.md`
-  for every completed phase.
+  for every completed Step (not per Phase). The originating
+  Step's canonical identifier (`S##`) is recorded in the Step
+  Record's `step_id:` frontmatter field.
 
 - **Coder or supervisor must MUST read and use the template** at
   `.vaultspec/rules/templates/exec-step.md`.
@@ -101,3 +108,17 @@ following schema:
 
 - **Traceability**: All changes must be mapped to their respective Step
   Records.
+
+- **L4 plans**: When executing an `L4` plan, the execute skill
+  respects the project-management association declared in the
+  plan's `## Epic intent` block prose. Wave-completion and
+  Epic-completion progress are reported against that external
+  artefact (milestone, project board, roadmap entry) at Wave
+  boundaries.
+
+- **CLI usage mandate**: Executors MUST update Step state via
+  `vault plan step check` (close), `vault plan step uncheck`
+  (re-open), or `vault plan step toggle` rather than hand-editing
+  the checkbox glyph. The CLI guarantees idempotent state
+  transitions and consistent display-path recomputation; hand
+  edits bypass these guarantees and are flagged by `vault plan check`. See the CLI ADR (`2026-05-06-plan-hardening-adr`).

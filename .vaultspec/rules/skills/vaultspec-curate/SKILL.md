@@ -37,7 +37,7 @@ full vault audit of `.vault/`. Validate frontmatter,
 wiki-links, naming conventions, template compliance, and directory structure.
 Fix violations in-place and produce an audit report."
 
-For targeted audits, scope the task accordingly
+For targeted audits, scope the audit accordingly
 (e.g., "Audit only `.vault/exec/...`").
 
 ### Review the Audit Report

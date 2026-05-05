@@ -61,24 +61,32 @@ Artifacts lower in the hierarchy should reference those above them.
   - *Depends on:* ADRs, research, audits, (previous or related feature plans)
 
 - **Execution Records**
-  (`.vault/exec/{yyyy-mm-dd-feature}/{yyyy-mm-dd-feature-phase-step}.md`)
+  (`.vault/exec/{yyyy-mm-dd-feature}/{yyyy-mm-dd-feature-{phase}-{step}}.md`)
 
   - *Depends on:* Plans.
   - *References:* The Plan being executed.
-  - *Location:* Inside feature-specific folder
-  - *Filename:* `{yyyy-mm-dd-feature-phase-step}.md`
-  - *Example:*
-    `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-phase1-task1.md`
+  - *Location:* Inside feature-specific folder.
+  - *Filename:* `{yyyy-mm-dd-feature-{phase}-{step}}.md` where `{phase}`
+    and `{step}` are the canonical container identifiers (`P##`, `S##`)
+    from the plan, zero-padded to a minimum of two digits. At `L1`
+    the `{phase}` segment is omitted; at `L3`/`L4` a `{wave}` segment
+    (`W##`) is prepended.
+  - *Examples:*
+    - L1: `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-S01.md`
+    - L2: `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-P01-S01.md`
+    - L3 / L4: `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-W01-P01-S01.md`
 
 - **Summaries**
-  (`.vault/exec/{yyyy-mm-dd-feature}/{yyyy-mm-dd-feature-phase-summary}.md`)
+  (`.vault/exec/{yyyy-mm-dd-feature}/{yyyy-mm-dd-feature-{phase}-summary}.md`)
 
   - *Depends on:* Execution Logs.
   - *References:* The Plan and key Artifacts produced.
-  - *Location:* Inside feature-specific folder
-  - *Filename:* `{yyyy-mm-dd-feature-phase-summary}.md`
-  - *Example:*
-    `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-phase1-summary.md`
+  - *Location:* Inside feature-specific folder.
+  - *Filename:* `{yyyy-mm-dd-feature-{phase}-summary}.md` where `{phase}`
+    is the canonical Phase identifier (`P##`).
+  - *Examples:*
+    - L2: `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-P01-summary.md`
+    - L3 / L4: `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-W01-P01-summary.md`
 
 - **Feature Indexes** (`.vault/index/{feature}.index.md`)
 
@@ -198,36 +206,55 @@ be replaced. Follow these conventions:
 | `{feature}`      | lowercase, kebab-case | `editor-demo`             |
 | `{yyyy-mm-dd}`   | lowercase, ISO 8601   | `2026-02-06`              |
 | `{yyyy-mm-dd-*}` | lowercase pattern     | `2026-02-04-feature-plan` |
+| `{tier}`         | uppercase enum        | `L1`, `L2`, `L3`, `L4`    |
 
 ### Document Body Placeholders
 
-All placeholders use **lowercase, kebab-case** format:
+Container identifiers (`{wave}`, `{phase}`, `{step}`) use the canonical
+uppercase zero-padded form from the convention ADR. Other placeholders
+use lowercase kebab-case.
 
-| Placeholder | Format     | Example                  |
-| :---------- | :--------- | :----------------------- |
-| `{feature}` | kebab-case | `editor-demo`            |
-| `{phase}`   | kebab-case | `phase-1`, `phase-2`     |
-| `{topic}`   | kebab-case | `event-handling`         |
-| `{title}`   | kebab-case | `displaymap-integration` |
-| `{step}`    | kebab-case | `task-1-window-setup`    |
+| Placeholder | Format              | Example                  |
+| :---------- | :------------------ | :----------------------- |
+| `{feature}` | kebab-case          | `editor-demo`            |
+| `{wave}`    | uppercase canonical | `W01`, `W02`             |
+| `{phase}`   | uppercase canonical | `P01`, `P02`             |
+| `{step}`    | uppercase canonical | `S01`, `S02`             |
+| `{topic}`   | kebab-case          | `event-handling`         |
+| `{title}`   | kebab-case          | `displaymap-integration` |
 
 ### General Rules
 
 - **YAML frontmatter**: Always lowercase, kebab-case
 
-- **Document titles/headings**: Always lowercase, kebab-case
-  (e.g., `# editor-demo phase-1 plan`)
+- **Document titles/headings**: kebab-case for narrative segments;
+  canonical uppercase identifiers for `{wave}`, `{phase}`, `{step}`
+  segments
+  (e.g., `# editor-demo W01 plan`, `# editor-demo W01.P01 - phase title`).
 
-- **File names**: lowercase, kebab-case with patterns:
+- **File names**: lowercase kebab-case for narrative segments
+  (`{feature}`, `{type}`); canonical uppercase identifiers for
+  `{wave}`, `{phase}`, `{step}` segments. Patterns:
 
   - Top-level docs: `yyyy-mm-dd-{feature}-{type}.md`
     (e.g., `2026-02-04-editor-demo-plan.md`)
 
-  - Exec steps: `yyyy-mm-dd-{feature}-{phase}-{step}.md`
-    inside `.vault/exec/yyyy-mm-dd-{feature}/` folder
+  - Exec Steps (L1): `yyyy-mm-dd-{feature}-{step}.md`
+    (e.g., `2026-02-04-editor-demo-S01.md`)
 
-  - Exec summaries: `yyyy-mm-dd-{feature}-{phase}-summary.md`
-    inside feature folder
+  - Exec Steps (L2): `yyyy-mm-dd-{feature}-{phase}-{step}.md`
+    (e.g., `2026-02-04-editor-demo-P01-S01.md`)
+
+  - Exec Steps (L3 / L4): `yyyy-mm-dd-{feature}-{wave}-{phase}-{step}.md`
+    (e.g., `2026-02-04-editor-demo-W01-P01-S01.md`)
+    inside `.vault/exec/yyyy-mm-dd-{feature}/` folder.
+
+  - Exec Summaries (L2): `yyyy-mm-dd-{feature}-{phase}-summary.md`
+    (e.g., `2026-02-04-editor-demo-P01-summary.md`)
+
+  - Exec Summaries (L3 / L4): `yyyy-mm-dd-{feature}-{wave}-{phase}-summary.md`
+    (e.g., `2026-02-04-editor-demo-W01-P01-summary.md`)
+    inside the feature folder.
 
 - **Replace ALL placeholders**: No template should be committed with `{...}`
   placeholders remaining

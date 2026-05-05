@@ -207,9 +207,9 @@ src/vaultspec_core/builtins/*
 .vault/.trash/
 .vault/data/
 .vault/logs/
-.vaultspec/
 .vaultspec/*.lock
 .vaultspec/_snapshots/
+.vaultspec/providers.json
 /.gitignore.lock
 /.mcp.json.lock
 /.pre-commit-config.yaml.lock
