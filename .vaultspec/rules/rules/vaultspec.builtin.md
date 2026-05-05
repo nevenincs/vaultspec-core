@@ -198,6 +198,7 @@ be replaced. Follow these conventions:
 | `{feature}`      | lowercase, kebab-case | `editor-demo`             |
 | `{yyyy-mm-dd}`   | lowercase, ISO 8601   | `2026-02-06`              |
 | `{yyyy-mm-dd-*}` | lowercase pattern     | `2026-02-04-feature-plan` |
+| `{tier}`         | uppercase enum        | `L1`, `L2`, `L3`, `L4`    |
 
 ### Document Body Placeholders
 
