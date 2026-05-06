@@ -41,6 +41,7 @@ from .helpers import (
     atomic_write,
     ensure_dir,
     package_version,
+    parse_version_tuple,
 )
 from .manifest import (
     ManifestData,
@@ -54,6 +55,19 @@ from .manifest import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _stamp_manifest_version_no_downgrade(mdata: ManifestData) -> None:
+    """Set ``mdata.vaultspec_version`` to the running package version.
+
+    Never downgrade: a registered migration whose ``target_version``
+    exceeds the running package's version may have just bumped the
+    manifest above the running release, and rewriting it back would
+    silently re-flag the migration as pending on the next run.
+    """
+    running = package_version()
+    if parse_version_tuple(running) > parse_version_tuple(mdata.vaultspec_version):
+        mdata.vaultspec_version = running
 
 
 # Valid provider arguments for install/uninstall commands.
@@ -927,36 +941,32 @@ def install_run(
 
             snapshot_builtins(fw_dir)
 
+        # Run pending schema migrations BEFORE the sync. ``sync_provider``
+        # ends with ``mdata.vaultspec_version = package_version()``, which
+        # would otherwise mask any migration whose ``target_version``
+        # equals the running release: ``run_pending_migrations`` would
+        # read the just-bumped version and find nothing pending. Running
+        # the driver first preserves the pre-upgrade manifest version so
+        # the registry sees the real "needs migration" state, applies
+        # the pending entries, and then ``sync_provider`` re-bumps to
+        # the running version on its way out.
+        from ..migrations import run_pending_migrations
+
+        run_pending_migrations(path)
+
         sync_target = provider if provider not in ("all", "core") else "all"
         sync_provider(sync_target, force=True, skip=skip, dev=dev)
 
         if "precommit" not in skip:
             _scaffold_precommit(path)
 
-        # Run pending schema migrations before re-reading the manifest.
-        # The driver writes its own vaultspec_version bump; the local
-        # read+write below preserves that bump because it always reloads
-        # the on-disk manifest after the driver returns.
-        from ..migrations import run_pending_migrations
-
-        run_pending_migrations(path)
-
         # Update manifest timestamps and version
         import datetime
-
-        from .helpers import parse_version_tuple
 
         mdata = read_manifest_data(path)
         if not mdata.installed_at:
             mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
-        # Never downgrade the recorded version: a registered migration
-        # whose target_version exceeds the running package's version
-        # has already bumped the manifest to that target, and rewriting
-        # to the running version here would silently re-flag the
-        # migration as pending on the next run.
-        running = package_version()
-        if parse_version_tuple(running) > parse_version_tuple(mdata.vaultspec_version):
-            mdata.vaultspec_version = running
+        _stamp_manifest_version_no_downgrade(mdata)
 
         # Re-opt-in gitignore management on --upgrade --force
         if force:
@@ -1708,7 +1718,7 @@ def sync_provider(
                     continue
                 mdata.provider_state.setdefault(name, {})
                 mdata.provider_state[name]["last_synced"] = now
-            mdata.vaultspec_version = package_version()
+            _stamp_manifest_version_no_downgrade(mdata)
             write_manifest_data(ctx.target_dir, mdata)
 
         return results
@@ -1760,7 +1770,7 @@ def sync_provider(
                 continue
             mdata.provider_state.setdefault(name, {})
             mdata.provider_state[name]["last_synced"] = now
-        mdata.vaultspec_version = package_version()
+        _stamp_manifest_version_no_downgrade(mdata)
         write_manifest_data(ctx.target_dir, mdata)
 
     return results

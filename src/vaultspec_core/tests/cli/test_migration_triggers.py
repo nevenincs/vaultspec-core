@@ -102,6 +102,34 @@ class TestInstallUpgradeTrigger:
         version = read_manifest_data(tmp_path).vaultspec_version
         assert parse_version_tuple(version) >= parse_version_tuple("0.1.17")
 
+    def test_upgrade_runs_migrations_before_sync_provider(self, tmp_path: Path):
+        # Regression for the order trap: ``sync_provider`` ends by writing
+        # ``mdata.vaultspec_version = package_version()`` to the manifest.
+        # If migrations ran *after* sync, the driver would read the
+        # already-bumped version and skip every entry whose
+        # ``target_version`` equals the current release. The upgrade
+        # branch must run the registry before the sync so the registry
+        # sees the real pre-upgrade manifest version.
+        #
+        # We rewind to a version one tick below the migration target and
+        # plant a legacy artefact that only the registry knows how to
+        # migrate. If the order regresses, ``sync_provider`` bumps the
+        # version first and the artefact survives.
+        factory = WorkspaceFactory(tmp_path).install("core")
+        legacy = _plant_legacy_index(tmp_path, "beta")
+        _rewind_manifest(tmp_path, "0.1.16")
+        target = tmp_path / ".vault" / "index" / "beta.index.md"
+        assert not target.exists()
+
+        factory.install("core", upgrade=True)
+
+        assert not legacy.exists(), (
+            "sync_provider must not bump vaultspec_version before "
+            "run_pending_migrations gets a chance to read the "
+            "pre-upgrade manifest"
+        )
+        assert target.exists(), "migrated file must land in .vault/index/"
+
 
 class TestScannerLazyTrigger:
     def test_vault_add_migrates_first(self, tmp_path: Path):
