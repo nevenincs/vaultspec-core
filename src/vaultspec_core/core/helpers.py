@@ -327,6 +327,24 @@ def kill_process_tree(pid: int) -> None:
         subprocess.run(["kill", "-9", str(pid)], capture_output=True)
 
 
+def package_version() -> str:
+    """Return the running ``vaultspec-core`` package version string.
+
+    Wraps :func:`importlib.metadata.version` and falls back to
+    ``"unknown"`` so callers still complete when running from a
+    development tree without installed metadata. The fallback parses
+    via :func:`parse_version_tuple` to the empty tuple, which sorts
+    strictly below any real version - safe for "is the workspace below
+    the running version?" comparisons.
+    """
+    try:
+        from importlib.metadata import version
+
+        return version("vaultspec-core")
+    except Exception:
+        return "unknown"
+
+
 def parse_version_tuple(version_str: str) -> tuple[int, ...]:
     """Parse a PEP 440 version string into a comparable integer tuple.
 

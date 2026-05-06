@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from ..core.helpers import advisory_lock, parse_version_tuple
+from ..core.helpers import advisory_lock, package_version, parse_version_tuple
 from ..core.manifest import (
     MANIFEST_FILENAME,
     ManifestData,
@@ -231,21 +231,6 @@ def migration_status(
     return MigrationStatus.PENDING, [m.name for m in pending]
 
 
-def _running_version() -> str:
-    """Return the running ``vaultspec-core`` package version.
-
-    Wraps :func:`importlib.metadata.version` and falls back to
-    ``"unknown"`` so the driver still completes when running from a
-    development tree without metadata.
-    """
-    try:
-        from importlib.metadata import version
-
-        return version("vaultspec-core")
-    except Exception:
-        return "unknown"
-
-
 def run_pending_migrations(
     workspace: Path,
     *,
@@ -306,8 +291,12 @@ def run_pending_migrations(
         with _workspace_cache_lock:
             cached_version = _workspace_cache.get(cache_key)
 
-    if cached_version is not None and not any(
-        parse_version_tuple(m.target_version) > cached_version for m in REGISTRY
+    # REGISTRY is sorted ascending by target_version, so only the tail
+    # entry matters: if its target is at or below the cached version,
+    # every earlier entry is too. Empty registries trivially short-circuit.
+    if cached_version is not None and (
+        not REGISTRY
+        or parse_version_tuple(REGISTRY[-1].target_version) <= cached_version
     ):
         return []
 
@@ -336,12 +325,11 @@ def run_pending_migrations(
         # migration in the chain raises, the manifest already reflects
         # the work that did succeed, so the next invocation skips the
         # already-applied entries and re-attempts only the failing one.
-        # The local ``manifest`` mirrors the on-disk state so we do not
-        # need to re-read between iterations; ``write_manifest_data``
-        # auto-bumps ``serial`` on each call but does not mutate
-        # ``manifest`` itself, so we sync the bumped serial back from
-        # disk only at the end (in practice the value is informational;
-        # nothing in this loop reads it).
+        # ``pending`` is pre-filtered to entries strictly above the
+        # current manifest version and REGISTRY is sorted ascending,
+        # so each iteration's target is monotonically greater than the
+        # previous on-disk version - no per-iteration version check is
+        # required to guard the bump.
         results: list[MigrationResult] = []
         for migration in pending:
             logger.info(
@@ -353,17 +341,15 @@ def run_pending_migrations(
             logger.info("vaultspec migration: %s", result.summary)
             results.append(result)
 
-            target_parts = parse_version_tuple(migration.target_version)
-            if target_parts > parse_version_tuple(manifest.vaultspec_version):
-                manifest.vaultspec_version = migration.target_version
-                write_manifest_data(workspace, manifest)
+            manifest.vaultspec_version = migration.target_version
+            write_manifest_data(workspace, manifest)
 
         # Final bump to the running package version when it exceeds
         # the highest-target migration we just applied. In production
         # the running version always equals or exceeds the most recent
         # registered target; the dual case is exercised only in tests
         # that synthesise migrations targeting a future version.
-        running = _running_version()
+        running = package_version()
         if parse_version_tuple(running) > parse_version_tuple(
             manifest.vaultspec_version
         ):

@@ -35,7 +35,13 @@ from .gitignore import (
     ensure_gitignore_block,
     get_recommended_entries,
 )
-from .helpers import _rmtree_robust, advisory_lock, atomic_write, ensure_dir
+from .helpers import (
+    _rmtree_robust,
+    advisory_lock,
+    atomic_write,
+    ensure_dir,
+    package_version,
+)
 from .manifest import (
     ManifestData,
     add_providers,
@@ -48,16 +54,6 @@ from .manifest import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _get_package_version() -> str:
-    """Return the installed vaultspec-core version string."""
-    try:
-        from importlib.metadata import version
-
-        return version("vaultspec-core")
-    except Exception:
-        return "unknown"
 
 
 # Valid provider arguments for install/uninstall commands.
@@ -958,7 +954,7 @@ def install_run(
         # has already bumped the manifest to that target, and rewriting
         # to the running version here would silently re-flag the
         # migration as pending on the next run.
-        running = _get_package_version()
+        running = package_version()
         if parse_version_tuple(running) > parse_version_tuple(mdata.vaultspec_version):
             mdata.vaultspec_version = running
 
@@ -1080,7 +1076,7 @@ def install_run(
         PrecommitSignal.NO_HOOKS,
     )
 
-    mdata.vaultspec_version = _get_package_version()
+    mdata.vaultspec_version = package_version()
     mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
     for name in provider_names:
         mdata.provider_state.setdefault(name, {})
@@ -1712,7 +1708,7 @@ def sync_provider(
                     continue
                 mdata.provider_state.setdefault(name, {})
                 mdata.provider_state[name]["last_synced"] = now
-            mdata.vaultspec_version = _get_package_version()
+            mdata.vaultspec_version = package_version()
             write_manifest_data(ctx.target_dir, mdata)
 
         return results
@@ -1764,7 +1760,7 @@ def sync_provider(
                 continue
             mdata.provider_state.setdefault(name, {})
             mdata.provider_state[name]["last_synced"] = now
-        mdata.vaultspec_version = _get_package_version()
+        mdata.vaultspec_version = package_version()
         write_manifest_data(ctx.target_dir, mdata)
 
     return results
