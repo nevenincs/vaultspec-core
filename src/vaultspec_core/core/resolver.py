@@ -26,6 +26,7 @@ from .diagnosis.signals import (
     ResolutionAction,
 )
 from .enums import CliAction
+from .helpers import parse_version_tuple
 
 logger = logging.getLogger(__name__)
 
@@ -859,8 +860,8 @@ def _resolve_version_warning(
 
     # Compare using tuple of parsed version segments
     try:
-        running_parts = _parse_version_tuple(running_version)
-        manifest_parts = _parse_version_tuple(manifest_version)
+        running_parts = parse_version_tuple(running_version)
+        manifest_parts = parse_version_tuple(manifest_version)
         if manifest_parts > running_parts:
             plan.warnings.append(
                 f"Manifest was written by vaultspec-core {manifest_version}, "
@@ -871,24 +872,6 @@ def _resolve_version_warning(
             )
     except Exception:
         logger.debug("Version comparison failed", exc_info=True)
-
-
-def _parse_version_tuple(version_str: str) -> tuple[int, ...]:
-    """Parse a PEP 440 version string into a comparable integer tuple.
-
-    Strips any pre/post/dev suffixes and splits on dots.
-
-    Args:
-        version_str: Version string like ``"0.1.4"`` or ``"1.2.3rc1"``.
-
-    Returns:
-        Tuple of integer version segments.
-    """
-    import re
-
-    # Strip pre-release / post-release suffixes
-    clean = re.split(r"[^0-9.]", version_str)[0].rstrip(".")
-    return tuple(int(x) for x in clean.split("."))
 
 
 if TYPE_CHECKING:

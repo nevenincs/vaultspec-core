@@ -54,6 +54,13 @@ class WorkspaceDiagnosis:
         providers: Per-tool :class:`ProviderDiagnosis` map.
         builtin_version: Version state of built-in resource snapshots.
         gitignore: Observed state of gitignore entries.
+        migration_status: Schema-migration status string. ``"up_to_date"``
+            when the manifest version covers every registered migration,
+            ``"pending"`` when one or more migrations have a target
+            version above the manifest, ``"unknown"`` when the workspace
+            has no manifest.
+        pending_migrations: List of pending migration names; empty
+            unless ``migration_status`` is ``"pending"``.
     """
 
     framework: FrameworkSignal
@@ -63,6 +70,8 @@ class WorkspaceDiagnosis:
     gitattributes: GitattributesSignal = GitattributesSignal.NO_FILE
     mcp: ConfigSignal = ConfigSignal.MISSING
     precommit: PrecommitSignal = PrecommitSignal.NO_FILE
+    migration_status: str = "up_to_date"
+    pending_migrations: list[str] = field(default_factory=list)
 
 
 def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
@@ -173,6 +182,15 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         diag.builtin_version = collect_builtin_version_state(target)
     except Exception:
         logger.warning("Builtin version collector failed", exc_info=True)
+
+    try:
+        from ...migrations import migration_status
+
+        status, pending_names = migration_status(target)
+        diag.migration_status = status.value
+        diag.pending_migrations = list(pending_names)
+    except Exception:
+        logger.warning("Migration status collector failed", exc_info=True)
 
     if scope == "framework":
         # Build minimal provider entries from manifest data only

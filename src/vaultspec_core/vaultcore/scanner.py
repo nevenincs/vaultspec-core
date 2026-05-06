@@ -29,7 +29,13 @@ if TYPE_CHECKING:
 def scan_vault(root_dir: pathlib.Path) -> Iterator[pathlib.Path]:
     """Yield all markdown files under the configured docs directory.
 
-    Skips hidden ``.obsidian`` subtrees.
+    Skips hidden ``.obsidian`` subtrees. Runs the lazy migration
+    trigger before walking the tree: any registered schema migration
+    whose target version exceeds the manifest's ``vaultspec_version``
+    is applied first, so callers always observe the post-migration
+    layout. The trigger short-circuits via a per-process workspace
+    cache, so the manifest read happens once per workspace per CLI
+    invocation rather than once per scan.
 
     Args:
         root_dir: Project root that contains the docs directory.
@@ -38,6 +44,15 @@ def scan_vault(root_dir: pathlib.Path) -> Iterator[pathlib.Path]:
         Absolute paths to each ``.md`` file found.
     """
     from ..config import get_config
+    from ..migrations import run_pending_migrations
+
+    try:
+        run_pending_migrations(root_dir, use_cache=True)
+    except Exception:
+        # A migration failure must not silently corrupt the scan; log
+        # and propagate so the surrounding command surfaces it.
+        logger.exception("Pending migration failed for %s", root_dir)
+        raise
 
     docs_dir = root_dir / get_config().docs_dir
     if not docs_dir.exists():
@@ -115,8 +130,10 @@ def get_doc_type(path: pathlib.Path, root_dir: pathlib.Path) -> DocType | None:
         rel_path = path.relative_to(docs_dir)
         if len(rel_path.parts) < 2:
             # Root-level legacy index files are still recognised so that
-            # unmigrated vaults classify them correctly until
-            # ``vault check structure --fix`` relocates them.
+            # unmigrated vaults classify them correctly until the
+            # schema migration registry relocates them (lazily on the
+            # next vault command, or explicitly via
+            # ``vaultspec-core migrations run``).
             if path.name.endswith(".index.md"):
                 logger.debug("Legacy root-level index file detected: %s", path.name)
                 return DocType.INDEX

@@ -528,38 +528,31 @@ def _ensure_index_directory_tag(content: str) -> tuple[str, bool]:
     return "".join(new_lines), True
 
 
-def _migrate_legacy_root_indexes(
+def _detect_legacy_root_indexes(
     root_dir: Path,
+    snapshot: VaultSnapshot,
     result: CheckResult,
-    *,
-    fix: bool,
 ) -> None:
-    """Detect and optionally relocate misplaced feature index files.
+    """Warn about misplaced feature index files without mutating.
 
-    Scans the entire docs tree for ``*.index.md`` files that do not live
-    in the canonical ``<docs_dir>/<index_dir>/`` subfolder. Files at the
-    docs root are the common legacy case; files dropped into a typed
-    subdirectory (``adr/<feature>.index.md``, ``plan/...``) would
-    otherwise create a "blind spot" because the filename-based
-    :func:`is_generated_index` exempts them from frontmatter and
-    body-link validation - so they would be neither flagged nor fixed
-    without this migration.
+    Walks *snapshot* for ``*.index.md`` files whose parent directory is
+    not the canonical ``<docs_dir>/<index_dir>/`` subfolder and emits
+    one warning per file pointing the operator at
+    ``vaultspec-core migrations run``. Mutation lives in the migration
+    registry (see :mod:`vaultspec_core.migrations`) and runs lazily on
+    every vault command, so this checker stays read-only.
 
-    When *fix* is ``False``, emits one ERROR diagnostic per misplaced
-    file with ``fixable=True`` so operators see what ``--fix`` would
-    change.
-
-    When *fix* is ``True``, moves each misplaced ``<feature>.index.md``
-    into ``<docs_dir>/<index_dir>/`` and inserts the ``#index`` directory
-    tag into the YAML frontmatter if missing. The move is atomic
-    (rename); if the target already exists, the migration surfaces an
-    ERROR and leaves the misplaced file in place.
+    Reading from the pre-built snapshot rather than a fresh
+    :func:`pathlib.Path.rglob` walk avoids a redundant filesystem scan
+    inside the ``vault-fix`` pre-commit hook, which already has the
+    full document tree in memory.
 
     Args:
         root_dir: Project root directory.
+        snapshot: Pre-built snapshot mapping document paths to parsed
+            data. The detection only consults the keys, not the parsed
+            metadata, so any well-formed snapshot is acceptable.
         result: :class:`CheckResult` to accumulate diagnostics into.
-        fix: When ``True``, perform the relocation in place; otherwise
-            only report.
     """
     from ...config import get_config
 
@@ -570,114 +563,37 @@ def _migrate_legacy_root_indexes(
 
     index_dir = docs_dir / cfg.index_dir
     legacy_files = sorted(
-        item
-        for item in docs_dir.rglob("*.index.md")
-        if item.is_file() and item.parent != index_dir
+        path
+        for path in snapshot
+        if path.name.endswith(".index.md") and path.parent != index_dir
     )
     if not legacy_files:
         return
 
     for legacy in legacy_files:
         rel = legacy.relative_to(root_dir)
-        target = index_dir / legacy.name
         is_root_level = legacy.parent == docs_dir
         misplacement_label = (
             f"{cfg.docs_dir}/ root"
             if is_root_level
             else str(legacy.parent.relative_to(root_dir)).replace("\\", "/")
         )
-
-        if not fix:
-            result.diagnostics.append(
-                CheckDiagnostic(
-                    path=rel,
-                    message=(
-                        f"Misplaced feature index at {misplacement_label}: "
-                        f"'{legacy.name}'. Move to "
-                        f"{cfg.docs_dir}/{cfg.index_dir}/."
-                    ),
-                    severity=Severity.ERROR,
-                    fixable=True,
-                    fix_description=(
-                        f"Run with --fix to relocate to "
-                        f"{cfg.docs_dir}/{cfg.index_dir}/{legacy.name}"
-                    ),
-                )
-            )
-            continue
-
-        if target.exists():
-            result.diagnostics.append(
-                CheckDiagnostic(
-                    path=rel,
-                    message=(
-                        f"Cannot relocate legacy index '{legacy.name}': "
-                        f"target {target.relative_to(root_dir)} already "
-                        "exists. Resolve the collision manually."
-                    ),
-                    severity=Severity.ERROR,
-                )
-            )
-            continue
-
-        try:
-            # Read as bytes so CRLF survives the decode; ``read_text``
-            # silently translates newlines via Python's universal-newline
-            # handling and would clobber the file's line ending
-            # convention before we ever see it.
-            raw = legacy.read_bytes()
-            content = raw.decode("utf-8")
-        except (OSError, UnicodeDecodeError) as exc:
-            result.diagnostics.append(
-                CheckDiagnostic(
-                    path=rel,
-                    message=f"Failed to read legacy index for migration: {exc}",
-                    severity=Severity.ERROR,
-                )
-            )
-            continue
-
-        new_content, changed = _ensure_index_directory_tag(content)
-        try:
-            index_dir.mkdir(parents=True, exist_ok=True)
-            if changed:
-                # Write the rewritten content directly to the new
-                # location, then unlink the legacy file. This makes the
-                # migration atomic from the operator's perspective: the
-                # canonical file is fully in place before the legacy
-                # disappears.
-                atomic_write(target, new_content)
-                legacy.unlink()
-            else:
-                legacy.replace(target)
-        except OSError as exc:
-            result.diagnostics.append(
-                CheckDiagnostic(
-                    path=rel,
-                    message=f"Failed to relocate legacy index: {exc}",
-                    severity=Severity.ERROR,
-                )
-            )
-            continue
-
-        result.fixed_count += 1
-        legacy_rel = str(legacy.relative_to(root_dir)).replace("\\", "/")
         result.diagnostics.append(
             CheckDiagnostic(
-                path=target.relative_to(root_dir),
+                path=rel,
                 message=(
-                    f"Relocated misplaced index from "
-                    f"{legacy_rel} to "
-                    f"{cfg.docs_dir}/{cfg.index_dir}/{legacy.name}"
-                    + (" (added #index tag)" if changed else "")
+                    f"Misplaced feature index at {misplacement_label}: "
+                    f"'{legacy.name}'. Pending schema migration to "
+                    f"{cfg.docs_dir}/{cfg.index_dir}/."
                 ),
-                severity=Severity.INFO,
+                severity=Severity.WARNING,
+                fixable=False,
+                fix_description=(
+                    "Run 'vaultspec-core migrations run' to apply the "
+                    "registered schema migration. Vault commands trigger "
+                    "the same migration lazily on first use."
+                ),
             )
-        )
-        logger.info(
-            "Migrated misplaced index %s -> %s",
-            legacy,
-            target,
         )
 
 
@@ -693,15 +609,19 @@ def check_structure(
     in the ``.vault/`` root, filenames deviating from the
     ``YYYY-MM-DD-<feature>-<type>.md`` convention, and misplaced feature
     index files (any ``<feature>.index.md`` outside the configured
-    ``index/`` subfolder). With ``fix=True``, renames mis-suffixed files,
-    inserts missing date prefixes, and relocates misplaced
-    ``<feature>.index.md`` files into the configured index subfolder.
+    ``index/`` subfolder). With ``fix=True``, renames mis-suffixed files
+    and inserts missing date prefixes.
+
+    Misplaced feature indexes are surfaced as warnings only; the
+    actual relocation lives in the schema migration registry
+    (:mod:`vaultspec_core.migrations`) which runs lazily on every
+    vault command and explicitly via ``vaultspec-core migrations run``.
 
     Args:
         root_dir: Project root directory.
         snapshot: Pre-built snapshot mapping document paths to parsed data.
-        fix: When ``True``, performs auto-renames, frontmatter rewrites,
-            and legacy-index relocations.
+        fix: When ``True``, performs auto-renames and frontmatter
+            rewrites.
 
     Returns:
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
@@ -713,14 +633,9 @@ def check_structure(
     result = CheckResult(check_name="structure", supports_fix=True)
     all_renames: list[tuple[str, str]] = []
 
-    # When --fix is on, perform legacy index migration first so the
-    # validate_vault_structure pass observes the post-migration tree.
-    if fix:
-        _migrate_legacy_root_indexes(root_dir, result, fix=True)
-
     for msg in VaultConstants.validate_vault_structure(root_dir):
-        # The migration helper below emits one actionable per-file
-        # diagnostic for each misplaced index. The aggregate validator
+        # The detection helper below emits one actionable per-file
+        # WARNING for each misplaced index. The aggregate validator
         # also produces a pathless message for root-level index files;
         # drop those so operators see exactly one diagnostic per offence
         # rather than two messages saying the same thing.
@@ -734,11 +649,9 @@ def check_structure(
             )
         )
 
-    if not fix:
-        # Surface the actionable per-file legacy diagnostics (not just
-        # the aggregate validate_vault_structure message) so operators
-        # see what --fix would touch.
-        _migrate_legacy_root_indexes(root_dir, result, fix=False)
+    # Migration mutation lives in the registry; the checker only
+    # surfaces pending-migration warnings irrespective of --fix.
+    _detect_legacy_root_indexes(root_dir, snapshot, result)
 
     for doc_path in snapshot:
         # Skip generated index files (non-standard naming convention)

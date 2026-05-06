@@ -25,6 +25,7 @@ Use the `vaultspec-core` CLI for every read, write, and audit of `.vault/`, and 
 | Inspect the assembled system prompt                   | `spec system show`                          |
 | Propagate edits under `.vaultspec/rules/...`          | `sync` (or `spec <resource> sync`)          |
 | Diagnose overall workspace health                     | `spec doctor`                               |
+| Inspect or run pending schema migrations              | `migrations status` / `migrations run`      |
 
 `<resource>` is one of `rules`, `skills`, `agents`, `hooks`, or `mcps` for `list`; one of `rules`, `skills`, `agents`, `mcps`, or `system` for `sync`.
 

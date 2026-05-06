@@ -1,10 +1,13 @@
-"""Tests for the legacy root-level index file migration.
+"""Tests for the legacy root-level index detection in ``check_structure``.
 
-The structure checker detects ``<feature>.index.md`` files at the docs
-root and, with ``fix=True``, relocates them into the configured index
-subfolder, inserting the ``#index`` directory tag if missing. These
-tests use real filesystem fixtures (no mocks) and assert behaviour
-against the on-disk tree before and after migration.
+After the migration registry took over the mutation, ``check_structure``
+warns about misplaced ``<feature>.index.md`` files but never relocates
+them. The relocation is exercised in
+``src/vaultspec_core/migrations/tests/test_index_subfolder.py``.
+
+These tests use real filesystem fixtures (no mocks) and assert the
+detection-only behaviour against the on-disk tree before any migration
+runs.
 """
 
 from __future__ import annotations
@@ -29,6 +32,22 @@ def _reset_cfg():
     reset_config()
     yield
     reset_config()
+
+
+@pytest.fixture(autouse=True)
+def _reset_migration_cache():
+    """Clear the per-process registry cache so each test starts clean.
+
+    ``scan_vault`` short-circuits the migration check after the first
+    successful read for a given workspace path. Without this reset the
+    second test reusing the same workspace path would observe stale
+    state.
+    """
+    from ....migrations import reset_workspace_cache
+
+    reset_workspace_cache()
+    yield
+    reset_workspace_cache()
 
 
 def _write_legacy_index(
@@ -183,8 +202,10 @@ class TestEnsureIndexDirectoryTag:
         assert "\n  - '#index'\n" in after
 
 
-class TestCheckStructureDetectsLegacyIndex:
-    def test_reports_error_without_fix(self, tmp_path):
+class TestCheckStructureWarnsLegacyIndex:
+    """Detection-only branch: the checker must not mutate the workspace."""
+
+    def test_warns_on_legacy_root_index(self, tmp_path):
         _vault_with_minimal_skeleton(tmp_path)
         legacy = _write_legacy_index(tmp_path, "alpha")
 
@@ -196,91 +217,32 @@ class TestCheckStructureDetectsLegacyIndex:
             for d in result.diagnostics
             if d.path is not None and d.path.name == legacy.name
         ]
-        assert any(d.severity == Severity.ERROR for d in legacy_diags), (
-            "structure check must flag legacy root-level index as ERROR"
+        assert any(d.severity == Severity.WARNING for d in legacy_diags), (
+            "structure check must surface a pending-migration warning"
         )
-        assert any(d.fixable for d in legacy_diags), (
-            "legacy index ERROR must be marked fixable"
+        assert all(not d.fixable for d in legacy_diags), (
+            "the warning must not advertise itself as --fix-able; "
+            "migration moved to the registry"
         )
-        assert legacy.exists(), "non-fix mode must not move the legacy file"
+        assert legacy.exists(), "structure check must never mutate"
 
-    def test_fix_relocates_to_index_subfolder(self, tmp_path):
+    def test_warns_in_fix_mode_too(self, tmp_path):
+        # --fix is for ongoing-hygiene fixes only. Legacy indexes
+        # always surface as warnings; mutation is the registry's job.
         _vault_with_minimal_skeleton(tmp_path)
         legacy = _write_legacy_index(tmp_path, "alpha")
-        target = tmp_path / ".vault" / "index" / "alpha.index.md"
 
         graph = VaultGraph(tmp_path)
         result = check_structure(tmp_path, snapshot=graph.to_snapshot(), fix=True)
 
-        assert not legacy.exists(), "fix must remove the legacy root-level file"
-        assert target.exists(), "fix must place the file in <docs_dir>/<index_dir>/"
-        assert result.fixed_count >= 1
-
-    def test_fix_inserts_index_directory_tag(self, tmp_path):
-        _vault_with_minimal_skeleton(tmp_path)
-        _write_legacy_index(tmp_path, "alpha", include_index_tag=False)
-        target = tmp_path / ".vault" / "index" / "alpha.index.md"
-
-        graph = VaultGraph(tmp_path)
-        check_structure(tmp_path, snapshot=graph.to_snapshot(), fix=True)
-
-        text = target.read_text(encoding="utf-8")
-        assert "'#index'" in text
-        assert "'#alpha'" in text
-
-    def test_fix_idempotent(self, tmp_path):
-        _vault_with_minimal_skeleton(tmp_path)
-        _write_legacy_index(tmp_path, "alpha")
-
-        graph = VaultGraph(tmp_path)
-        check_structure(tmp_path, snapshot=graph.to_snapshot(), fix=True)
-        target = tmp_path / ".vault" / "index" / "alpha.index.md"
-        contents_after_first = target.read_text(encoding="utf-8")
-
-        # Second pass with no legacy file present should be a no-op for
-        # the migration step.
-        graph2 = VaultGraph(tmp_path)
-        result_second = check_structure(
-            tmp_path, snapshot=graph2.to_snapshot(), fix=True
-        )
-
-        relocations = [
-            d
-            for d in result_second.diagnostics
-            if d.path is not None
-            and d.path.name == "alpha.index.md"
-            and "Relocated" in d.message
-        ]
-        assert relocations == [], (
-            "second --fix run must not perform any new relocations"
-        )
-        assert target.read_text(encoding="utf-8") == contents_after_first
-
-    def test_fix_collision_reports_error(self, tmp_path):
-        _vault_with_minimal_skeleton(tmp_path)
-        legacy = _write_legacy_index(tmp_path, "alpha")
-        target_dir = tmp_path / ".vault" / "index"
-        target_dir.mkdir(parents=True, exist_ok=True)
-        target = target_dir / "alpha.index.md"
-        target.write_text(
-            "---\ngenerated: true\ntags:\n  - '#index'\n  - '#alpha'\n"
-            "date: '2026-04-30'\nrelated: []\n---\n\n# pre-existing\n",
-            encoding="utf-8",
-        )
-        canonical_before = target.read_text(encoding="utf-8")
-
-        graph = VaultGraph(tmp_path)
-        result = check_structure(tmp_path, snapshot=graph.to_snapshot(), fix=True)
-
-        collision_errors = [
+        legacy_diags = [
             d
             for d in result.diagnostics
-            if d.severity == Severity.ERROR and "already" in d.message
+            if d.path is not None and d.path.name == legacy.name
         ]
-        assert collision_errors, "collision must surface an ERROR diagnostic"
-        assert legacy.exists(), "legacy file must remain when target collides"
-        assert target.read_text(encoding="utf-8") == canonical_before, (
-            "canonical file must remain untouched on collision"
+        assert any(d.severity == Severity.WARNING for d in legacy_diags)
+        assert legacy.exists(), (
+            "--fix must not relocate the legacy file; migration moved to the registry"
         )
 
     def test_canonical_index_under_subfolder_is_not_flagged(self, tmp_path):
@@ -301,52 +263,44 @@ class TestCheckStructureDetectsLegacyIndex:
             d
             for d in result.diagnostics
             if "Legacy feature index" in d.message
-            or "legacy index" in d.message.lower()
+            or "Pending schema migration" in d.message
         ]
         assert legacy_diags == [], (
-            "canonical subfolder index must not trigger legacy diagnostics"
+            "canonical subfolder index must not trigger pending-migration diagnostics"
         )
 
-    def test_no_duplicate_diagnostic_without_fix(self, tmp_path):
-        # A root-level legacy index used to be reported twice: once by
-        # the aggregate validator (pathless) and once by the per-file
-        # migration helper. Operators saw two messages saying the same
-        # thing. The check_structure pass must surface exactly one
-        # actionable per-file ERROR diagnostic.
+    def test_no_duplicate_diagnostic(self, tmp_path):
+        # A root-level legacy index must surface exactly one
+        # actionable per-file warning. The aggregate
+        # validate_vault_structure ``Legacy feature index`` message
+        # is suppressed in favour of the per-file detection.
         _vault_with_minimal_skeleton(tmp_path)
         _write_legacy_index(tmp_path, "alpha")
 
         graph = VaultGraph(tmp_path)
         result = check_structure(tmp_path, snapshot=graph.to_snapshot(), fix=False)
 
-        legacy_errors = [
+        legacy_diags = [
             d
             for d in result.diagnostics
-            if d.severity == Severity.ERROR
-            and (
-                "Legacy feature index" in d.message
-                or "Misplaced feature index" in d.message
-            )
+            if "Legacy feature index" in d.message
+            or "Misplaced feature index" in d.message
+            or "Pending schema migration" in d.message
         ]
-        assert len(legacy_errors) == 1, (
+        assert len(legacy_diags) == 1, (
             f"expected exactly one legacy/misplaced diagnostic per offence, "
-            f"got {len(legacy_errors)}: {[d.message for d in legacy_errors]}"
+            f"got {len(legacy_diags)}: {[d.message for d in legacy_diags]}"
         )
-        assert legacy_errors[0].path is not None, (
+        assert legacy_diags[0].path is not None, (
             "the surviving diagnostic must be the actionable per-file message, "
             "not the pathless aggregate"
         )
-        assert legacy_errors[0].fixable is True
 
-
-class TestMigrateMisplacedIndexInSubdir:
-    def test_reports_misplaced_index_in_typed_subdir(self, tmp_path):
+    def test_warns_on_misplaced_index_in_typed_subdir(self, tmp_path):
         # An index file misplaced into a typed subdirectory (e.g.
-        # ``adr/<feature>.index.md``) was previously a blind spot: the
-        # filename-based exemption skipped it for frontmatter and
-        # body-link checks while the migration helper only scanned the
-        # docs root. The structure check must now flag it as a fixable
-        # ERROR regardless of which subdir it lives in.
+        # ``adr/<feature>.index.md``) was previously a blind spot
+        # before #91. The detection must flag it as a pending
+        # migration regardless of which subdir it lives in.
         _vault_with_minimal_skeleton(tmp_path)
         misplaced = tmp_path / ".vault" / "adr" / "beta.index.md"
         misplaced.write_text(
@@ -363,84 +317,5 @@ class TestMigrateMisplacedIndexInSubdir:
             for d in result.diagnostics
             if d.path is not None and d.path.name == misplaced.name
         ]
-        assert any(d.severity == Severity.ERROR for d in misplaced_diags)
-        assert any(d.fixable for d in misplaced_diags)
+        assert any(d.severity == Severity.WARNING for d in misplaced_diags)
         assert misplaced.exists()
-
-    def test_fix_relocates_misplaced_index_from_typed_subdir(self, tmp_path):
-        _vault_with_minimal_skeleton(tmp_path)
-        misplaced = tmp_path / ".vault" / "plan" / "gamma.index.md"
-        misplaced.write_text(
-            "---\ngenerated: true\ntags:\n  - '#gamma'\n"
-            "date: '2026-04-30'\nrelated: []\n---\n\n# gamma\n",
-            encoding="utf-8",
-        )
-        target = tmp_path / ".vault" / "index" / "gamma.index.md"
-
-        graph = VaultGraph(tmp_path)
-        result = check_structure(tmp_path, snapshot=graph.to_snapshot(), fix=True)
-
-        assert not misplaced.exists()
-        assert target.exists()
-        text = target.read_text(encoding="utf-8")
-        assert "'#index'" in text
-        assert "'#gamma'" in text
-        assert result.fixed_count >= 1
-
-    def test_fix_preserves_crlf_content_during_migration(self, tmp_path):
-        # A misplaced index with CRLF line endings must keep CRLF after
-        # the migration inserts the #index tag. Mixed LF/CRLF inside
-        # the same frontmatter block is the regression we are guarding
-        # against.
-        _vault_with_minimal_skeleton(tmp_path)
-        misplaced = tmp_path / ".vault" / "delta.index.md"
-        misplaced.write_bytes(
-            b"---\r\n"
-            b"generated: true\r\n"
-            b"tags:\r\n"
-            b"  - '#delta'\r\n"
-            b"date: '2026-04-30'\r\n"
-            b"related: []\r\n"
-            b"---\r\n\r\n"
-            b"# delta\r\n"
-        )
-        target = tmp_path / ".vault" / "index" / "delta.index.md"
-
-        graph = VaultGraph(tmp_path)
-        check_structure(tmp_path, snapshot=graph.to_snapshot(), fix=True)
-
-        raw = target.read_bytes()
-        assert b"\r\n  - '#index'\r\n" in raw
-        # No stray LF outside of CRLF pairs anywhere in the migrated file.
-        without_crlf = raw.replace(b"\r\n", b"")
-        assert b"\n" not in without_crlf
-
-    def test_fix_collision_in_subdir_misplacement(self, tmp_path):
-        _vault_with_minimal_skeleton(tmp_path)
-        misplaced = tmp_path / ".vault" / "research" / "epsilon.index.md"
-        misplaced.write_text(
-            "---\ngenerated: true\ntags:\n  - '#epsilon'\n"
-            "date: '2026-04-30'\nrelated: []\n---\n\n# misplaced\n",
-            encoding="utf-8",
-        )
-        target_dir = tmp_path / ".vault" / "index"
-        target_dir.mkdir(parents=True, exist_ok=True)
-        target = target_dir / "epsilon.index.md"
-        target.write_text(
-            "---\ngenerated: true\ntags:\n  - '#index'\n  - '#epsilon'\n"
-            "date: '2026-04-30'\nrelated: []\n---\n\n# pre-existing\n",
-            encoding="utf-8",
-        )
-        canonical_before = target.read_text(encoding="utf-8")
-
-        graph = VaultGraph(tmp_path)
-        result = check_structure(tmp_path, snapshot=graph.to_snapshot(), fix=True)
-
-        collision_errors = [
-            d
-            for d in result.diagnostics
-            if d.severity == Severity.ERROR and "already" in d.message
-        ]
-        assert collision_errors
-        assert misplaced.exists()
-        assert target.read_text(encoding="utf-8") == canonical_before

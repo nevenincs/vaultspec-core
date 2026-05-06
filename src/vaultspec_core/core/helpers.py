@@ -325,3 +325,48 @@ def kill_process_tree(pid: int) -> None:
         # Simple fallback for Unix; in production use psutil if available
         subprocess.run(["pkill", "-9", "-P", str(pid)], capture_output=True)
         subprocess.run(["kill", "-9", str(pid)], capture_output=True)
+
+
+def package_version() -> str:
+    """Return the running ``vaultspec-core`` package version string.
+
+    Wraps :func:`importlib.metadata.version` and falls back to
+    ``"unknown"`` so callers still complete when running from a
+    development tree without installed metadata. The fallback parses
+    via :func:`parse_version_tuple` to the empty tuple, which sorts
+    strictly below any real version - safe for "is the workspace below
+    the running version?" comparisons.
+    """
+    try:
+        from importlib.metadata import version
+
+        return version("vaultspec-core")
+    except Exception:
+        return "unknown"
+
+
+def parse_version_tuple(version_str: str) -> tuple[int, ...]:
+    """Parse a PEP 440 version string into a comparable integer tuple.
+
+    Strips any pre/post/dev suffixes and splits on dots. An empty string
+    parses to ``()`` so the empty-manifest case sorts strictly below any
+    real version.
+
+    Args:
+        version_str: Version string like ``"0.1.4"`` or ``"1.2.3rc1"``.
+
+    Returns:
+        Tuple of integer version segments.
+
+    Raises:
+        ValueError: If the cleaned string contains a non-integer segment
+            (e.g. ``"1.x"``).
+    """
+    import re
+
+    if not version_str:
+        return ()
+    clean = re.split(r"[^0-9.]", version_str)[0].rstrip(".")
+    if not clean:
+        return ()
+    return tuple(int(x) for x in clean.split("."))

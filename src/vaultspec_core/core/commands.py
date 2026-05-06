@@ -35,7 +35,14 @@ from .gitignore import (
     ensure_gitignore_block,
     get_recommended_entries,
 )
-from .helpers import _rmtree_robust, advisory_lock, atomic_write, ensure_dir
+from .helpers import (
+    _rmtree_robust,
+    advisory_lock,
+    atomic_write,
+    ensure_dir,
+    package_version,
+    parse_version_tuple,
+)
 from .manifest import (
     ManifestData,
     add_providers,
@@ -50,14 +57,17 @@ from .manifest import (
 logger = logging.getLogger(__name__)
 
 
-def _get_package_version() -> str:
-    """Return the installed vaultspec-core version string."""
-    try:
-        from importlib.metadata import version
+def _stamp_manifest_version_no_downgrade(mdata: ManifestData) -> None:
+    """Set ``mdata.vaultspec_version`` to the running package version.
 
-        return version("vaultspec-core")
-    except Exception:
-        return "unknown"
+    Never downgrade: a registered migration whose ``target_version``
+    exceeds the running package's version may have just bumped the
+    manifest above the running release, and rewriting it back would
+    silently re-flag the migration as pending on the next run.
+    """
+    running = package_version()
+    if parse_version_tuple(running) > parse_version_tuple(mdata.vaultspec_version):
+        mdata.vaultspec_version = running
 
 
 # Valid provider arguments for install/uninstall commands.
@@ -931,6 +941,19 @@ def install_run(
 
             snapshot_builtins(fw_dir)
 
+        # Run pending schema migrations BEFORE the sync. ``sync_provider``
+        # ends with ``mdata.vaultspec_version = package_version()``, which
+        # would otherwise mask any migration whose ``target_version``
+        # equals the running release: ``run_pending_migrations`` would
+        # read the just-bumped version and find nothing pending. Running
+        # the driver first preserves the pre-upgrade manifest version so
+        # the registry sees the real "needs migration" state, applies
+        # the pending entries, and then ``sync_provider`` re-bumps to
+        # the running version on its way out.
+        from ..migrations import run_pending_migrations
+
+        run_pending_migrations(path)
+
         sync_target = provider if provider not in ("all", "core") else "all"
         sync_provider(sync_target, force=True, skip=skip, dev=dev)
 
@@ -943,7 +966,7 @@ def install_run(
         mdata = read_manifest_data(path)
         if not mdata.installed_at:
             mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
-        mdata.vaultspec_version = _get_package_version()
+        _stamp_manifest_version_no_downgrade(mdata)
 
         # Re-opt-in gitignore management on --upgrade --force
         if force:
@@ -1063,7 +1086,7 @@ def install_run(
         PrecommitSignal.NO_HOOKS,
     )
 
-    mdata.vaultspec_version = _get_package_version()
+    mdata.vaultspec_version = package_version()
     mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
     for name in provider_names:
         mdata.provider_state.setdefault(name, {})
@@ -1695,7 +1718,7 @@ def sync_provider(
                     continue
                 mdata.provider_state.setdefault(name, {})
                 mdata.provider_state[name]["last_synced"] = now
-            mdata.vaultspec_version = _get_package_version()
+            _stamp_manifest_version_no_downgrade(mdata)
             write_manifest_data(ctx.target_dir, mdata)
 
         return results
@@ -1747,7 +1770,7 @@ def sync_provider(
                 continue
             mdata.provider_state.setdefault(name, {})
             mdata.provider_state[name]["last_synced"] = now
-        mdata.vaultspec_version = _get_package_version()
+        _stamp_manifest_version_no_downgrade(mdata)
         write_manifest_data(ctx.target_dir, mdata)
 
     return results

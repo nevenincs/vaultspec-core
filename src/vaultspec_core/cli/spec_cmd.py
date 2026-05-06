@@ -1340,6 +1340,24 @@ def cmd_doctor(
         mcp_detail,
     )
 
+    # Migration row - sourced from the registry collector.
+    mig_state = diag.migration_status
+    if mig_state == "up_to_date":
+        mig_status_label, mig_style = ("ok", "green")
+        mig_detail = "all registered migrations applied"
+    elif mig_state == "pending":
+        mig_status_label, mig_style = ("warn", "yellow")
+        pending = ", ".join(diag.pending_migrations)
+        mig_detail = f"pending: {pending}"
+    else:
+        mig_status_label, mig_style = ("info", "dim")
+        mig_detail = "no manifest; not installed"
+    table.add_row(
+        "migration",
+        f"[{mig_style}]{mig_status_label}[/{mig_style}]",
+        mig_detail,
+    )
+
     # Pre-commit row
     pc_status, pc_style = _signal_status(
         diag.precommit,
@@ -1451,6 +1469,9 @@ def _doctor_exit_code(
     if diag.builtin_version == BuiltinVersionSignal.DELETED:
         has_error = True
     elif diag.builtin_version == BuiltinVersionSignal.MODIFIED:
+        has_warn = True
+
+    if diag.migration_status == "pending":
         has_warn = True
 
     for prov in diag.providers.values():

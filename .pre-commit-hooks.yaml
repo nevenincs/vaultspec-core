@@ -1,8 +1,13 @@
 # Consolidated hooks (scaffolded by default)
 #
-# vault-fix: runs all vault checkers with --fix, auto-repairing safe issues
-# (naming, frontmatter, links, dangling, references, schema) and blocking
-# on remaining errors (body-links).
+# vault-fix: runs all vault checkers with --fix, auto-repairing safe
+# ongoing-hygiene issues (naming, frontmatter, links, dangling,
+# references) and blocking on remaining errors (body-links). Schema
+# migrations are NOT performed by this hook - they are owned by the
+# vaultspec_core.migrations registry, which runs once per upgrade (or
+# lazily on the first vault command after an upgrade) and never
+# re-runs. Use 'vaultspec-core migrations status' / 'migrations run'
+# for explicit control.
 #
 # spec-check: runs the workspace doctor, diagnosing framework, provider,
 # and tooling health.

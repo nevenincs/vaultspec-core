@@ -467,6 +467,52 @@ Manage MCP server definitions and the synced `.mcp.json` entries deployed into p
 | `remove`    | `NAME [--force]`                        | Remove an MCP server definition (`--force` skips confirmation) |
 | `sync`      | `[--dry-run] [--force]`                 | Sync MCP definitions to `.mcp.json`                            |
 
+## Migration Commands
+
+Group command: `vaultspec-core migrations COMMAND`
+
+Every migration sub-command also accepts the global `--target / -t DIR` and `--json` flags.
+
+The migration registry runs every entry whose target version exceeds the workspace manifest's `vaultspec_version`, then bumps the manifest version on success. Migrations are idempotent and run lazily on every vault command, on `install --upgrade`, or explicitly through `migrations run`.
+
+### migrations status
+
+```bash
+vaultspec-core migrations status [OPTIONS]
+```
+
+List registered migrations and which entries are pending against the current workspace manifest. Read-only; never mutates.
+
+#### Options
+
+| Option         | Short | Default | Description                                             |
+| -------------- | ----- | ------- | ------------------------------------------------------- |
+| `--target DIR` | `-t`  | cwd     | Inspect a workspace other than the current directory.   |
+| `--json`       | -     | off     | Emit status, registered list, and pending list as JSON. |
+
+Exit codes: `0` when up to date or workspace has no manifest, `1` when migrations are pending.
+
+______________________________________________________________________
+
+### migrations run
+
+```bash
+vaultspec-core migrations run [OPTIONS]
+```
+
+Apply every pending migration in version order and bump the manifest's `vaultspec_version`. A migration that raises stops the run and leaves the manifest unchanged so the next invocation re-attempts.
+
+#### Options
+
+| Option         | Short | Default | Description                                           |
+| -------------- | ----- | ------- | ----------------------------------------------------- |
+| `--target DIR` | `-t`  | cwd     | Migrate a workspace other than the current directory. |
+| `--json`       | -     | off     | Emit per-entry summaries and counts as JSON.          |
+
+Exit codes: `0` on success (including the no-pending no-op), `1` if any migration raised.
+
+______________________________________________________________________
+
 ## Environment Variables
 
 All variables are prefixed `VAULTSPEC_`. Environment variables override defaults but are overridden by the `--target` flag.
