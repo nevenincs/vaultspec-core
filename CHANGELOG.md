@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.18](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.17...vaultspec-core-v0.1.18) (2026-05-06)
+
+
+### Features
+
+* **#95:** versioned migration registry; auto-migrate on upgrade and graph load ([#96](https://github.com/wgergely/vaultspec-core/issues/96)) ([2549554](https://github.com/wgergely/vaultspec-core/commit/2549554cf4bd6c886119da0310682166eecf2b88))
+
 ## [0.1.17](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.16...vaultspec-core-v0.1.17) (2026-05-05)
 
 
