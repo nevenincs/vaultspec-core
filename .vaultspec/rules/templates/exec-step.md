@@ -9,6 +9,10 @@ tags:
   - '#{feature}'
 # ISO date format (e.g., 2026-02-06)
 date: '{yyyy-mm-dd}'
+# Originating Step's canonical identifier (S##) from the plan.
+# Required: machine-readable linkage from this Step Record back
+# to the Step row in the parent plan document.
+step_id: '{S##}'
 # Related documents as quoted wiki-links - MUST link to parent PLAN
 # (e.g., "[[2026-02-04-feature-plan]]")
 related:
@@ -24,7 +28,20 @@ related:
      - NEVER reference file paths in the body. If you must name a source file,
        class, or function, use inline backtick code: `src/module.py`. -->
 
-# `{feature}` `{phase}` `{step}`
+<!-- STEP RECORD:
+     This file represents one Step from the originating plan. Identified
+     by its canonical leaf identifier (S##) and ancestor display path
+     (e.g., S03 at L1, P02.S03 at L2, W01.P02.S03 at L3 / L4). The
+     step_id frontmatter field below carries the canonical identifier;
+     the heading restates the display path as a reading hint. -->
+
+# `{feature}` `<display-path>`
+
+<!-- The <display-path> in the heading above is the originating Step's
+     tier-conditional display path:
+       L1       = `{step}`            (e.g., `S01`)
+       L2       = `{phase}.{step}`    (e.g., `P01.S01`)
+       L3 / L4  = `{wave}.{phase}.{step}`  (e.g., `W01.P01.S01`) -->
 
 Brief summary of work done.
 

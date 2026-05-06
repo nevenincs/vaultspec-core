@@ -40,11 +40,50 @@ Review the ADR carefully. This is where you commit to an approach. Sign off befo
 
 ### Planning
 
-With approved ADRs in hand, call the `vaultspec-write` skill to produce an implementation plan. It reads the ADR and breaks the decision into phased, concrete steps.
+With approved ADRs in hand, call the `vaultspec-write-plan` skill to produce an implementation plan. It reads the ADR and produces a row-per-Step plan grouped by the convention's complexity tier.
 
 > "Write an implementation plan for the search feature based on the ADR"
 
-The plan lands in `.vault/plan/` and defines what gets built, in what order, and with what acceptance criteria. Review the scope - confirm the phases make sense, nothing is missing, and nothing overreaches the ADR's boundaries. Approve before execution begins.
+Plans use the four-level hierarchy `Epic > Wave > Phase > Step`. Each plan declares its complexity tier in frontmatter as `tier: L1`, `L2`, `L3`, or `L4`. The tier determines which structural containers exist:
+
+- `L1` (single session, single concern) emits Steps only.
+- `L2` (cohesive multi-Step work in one package or subsystem) groups Steps under Phases.
+- `L3` (hard interdependencies between batches) wraps Phases in Waves.
+- `L4` (multi-week, multi-team) adds an Epic frame and an external project-management association.
+
+`Step` is the canonical leaf-row noun at every tier. Each Step is one Markdown bulleted checkbox row pairing one prompt-run with one commit. Identifiers (`S##`, `P##`, `W##`) are flat, append-only, and immutable across plan revisions; the compound dot-notation (`W01.P02.S03`) is a display path computed from the current grouping, not the canonical ID.
+
+Worked example (L2 plan, one Phase, three Steps):
+
+```markdown
+### Phase `P01` - rewrite the search index
+
+One sentence stating what this Phase delivers.
+
+- [ ] `P01.S01` - extract the tokenizer; `src/search/tokenizer.py`.
+- [ ] `P01.S02` - replace inline scoring with the new ranker; `src/search/ranker.py`.
+- [ ] `P01.S03` - update the index-rebuild command; `src/cli/reindex.py`.
+```
+
+Worked example (L3 plan, one Wave fragment showing Phase nesting):
+
+```markdown
+## Wave `W01` - foundational rewrite
+
+Lands the new search-index API; `W02` depends on this Wave.
+
+### Phase `W01.P01` - rewrite the search index
+- [ ] `W01.P01.S01` - extract the tokenizer; `src/search/tokenizer.py`.
+- [ ] `W01.P01.S02` - replace inline scoring; `src/search/ranker.py`.
+```
+
+The plan lands in `.vault/plan/` and defines what gets built, in what order, and with what acceptance criteria. Review the scope - confirm the tier matches the work's actual complexity, every Step is one row, and nothing overreaches the ADR's boundaries. Approve before execution begins.
+
+Once the plan exists, every structural change goes through the `vault plan` CLI rather than the editor. The CLI is the only surface that keeps canonical identifiers append-only and gap-no-reuse: when you remove a Step its `S##` is retired permanently, recorded in a hidden ledger, and the next Step you add gets the next available number, never the retired one. Hand-editing a checkbox or display path bypasses these guarantees and `vault plan check` will flag it.
+
+A typical flow looks like this. The executor closes a row with `vaultspec-core vault plan step check <plan> S07`, writes the matching Step Record, then commits. To add a new row at the tail of an existing Phase, `vault plan step add <plan> --action "draft the connector module" --scope src/lib/connector.py --phase P02` allocates the next available `S##` and writes the row in canonical shape. To re-parent a Step to a different Phase, `vault plan step move <plan> S05 --to-phase P03 --before S08` re-positions the row and recomputes its display path from the new parent chain. When complexity grows, `vault plan tier promote <plan> --target L3` advances the tier transitively, synthesising the missing Phase and Wave wrappers around the existing Steps without touching their canonical ids.
+
+`vault plan status`, `vault plan query`, and `vault plan check` are the read-only views: status reports completion percent and tier, query filters Step rows by container scope and open / closed state, and check validates the plan against the seven detection rules in the convention ADR. Run `vault plan check --fix` before commit to apply autofixable transformations idempotently. The full subcommand surface is documented in the [CLI reference](./CLI.md); the contract behind it is the CLI ADR (`2026-05-06-plan-hardening-adr`).
 
 ### Execution
 

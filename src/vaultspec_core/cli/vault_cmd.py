@@ -46,6 +46,10 @@ check_app = typer.Typer(
 )
 vault_app.add_typer(check_app, name="check")
 
+from vaultspec_core.cli.plan_cmd import plan_app  # noqa: E402
+
+vault_app.add_typer(plan_app, name="plan")
+
 
 # ---- vault add ---------------------------------------------------------------
 

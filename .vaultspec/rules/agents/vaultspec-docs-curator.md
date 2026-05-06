@@ -77,8 +77,8 @@ Every document MUST strictly adhere to the following schema:
 
 - **Tag Minimum:** Every document MUST have **at least TWO** tags (one directory, one feature). Additional tags are allowed.
 
-- **Invalid Tags:** Flag structural tags (`#step`, `#phase1`) or malformed tags
-  (CamelCase, spaces).
+- **Invalid Tags:** Flag structural tags (`#step`, `#P01`, `#W01`) or
+  malformed tags (CamelCase, spaces).
 
 - **Syntax Violations:** Flag unquoted tags, single-string tags, or non-list
   formats.
@@ -102,11 +102,21 @@ deviates:
 - **Standard Patterns:** `yyyy-mm-dd-<feature>-<type>.md` (e.g.,
   `2026-02-07-grid-layout-adr.md`).
 
-- **Execution Records:** MUST include full prefix even inside subdirectories:
-  `yyyy-mm-dd-<feature>-<phase>-<step>.md`.
+- **Execution Records:** MUST include the full prefix even inside
+  subdirectories. The container segments (`{wave}`, `{phase}`,
+  `{step}`) use the canonical uppercase identifiers (`W##`, `P##`,
+  `S##`) per the convention ADR. Tier-conditional patterns:
 
-  - *Violation:* `step-1.md` or `summary.md` are INVALID.
-  - *Correction:* `2026-02-07-grid-layout-phase1-step1.md`.
+  - L1: `yyyy-mm-dd-<feature>-S##.md`
+
+  - L2: `yyyy-mm-dd-<feature>-P##-S##.md`
+
+  - L3 / L4: `yyyy-mm-dd-<feature>-W##-P##-S##.md`
+
+  - *Violation:* `step-1.md`, `phase1-step1.md`, `s01.md` (lowercase),
+    or `summary.md` are INVALID.
+
+  - *Correction:* `2026-02-07-grid-layout-W01-P01-S01.md`.
 
 - **Directory Placement:** Flag files at the wrong level (e.g., exec logs in
   `.vault/exec/` root instead of a feature folder).

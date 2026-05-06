@@ -24,9 +24,16 @@ related:
      - NEVER reference file paths in the body. If you must name a source file,
        class, or function, use inline backtick code: `src/module.py`. -->
 
+<!-- PHASE SUMMARY:
+     This file rolls up every <Step Record> belonging to one Phase
+     of the originating plan. Each Step (S##) in the Phase produces
+     one <Step Record> in `.vault/exec/`; this summary aggregates
+     them, lists modified / created files across the Phase, and
+     reports verification status. -->
+
 # `{feature}` `{phase}` summary
 
-Brief summary of overall progress.
+Brief summary of overall progress across every Step in this Phase.
 
 - Modified: `{file1}`
 - Created: `{file2}`
@@ -39,4 +46,5 @@ High-level description of work accomplished.
 
 Brief description of overall verification and auditing.
 
-Link any audit reports related to `{phase}` summary or `{task}` summary.
+Link any audit reports related to `{phase}` summary or individual
+`{step}` summaries.
