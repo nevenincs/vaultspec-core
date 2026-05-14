@@ -154,6 +154,32 @@ class TestScannerLazyTrigger:
         )
         assert target.exists()
 
+    def test_vault_add_ignores_generated_index_collision(self, tmp_path: Path):
+        factory = WorkspaceFactory(tmp_path).install("core")
+        legacy = _plant_legacy_index(tmp_path, "alpha")
+        target = tmp_path / ".vault" / "index" / "alpha.index.md"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        canonical_before = (
+            "---\ngenerated: true\ntags:\n  - '#index'\n  - '#alpha'\n"
+            "date: '2026-04-30'\nrelated: []\n---\n\n# canonical alpha\n"
+        )
+        target.write_text(canonical_before, encoding="utf-8")
+        _rewind_manifest(tmp_path, "0.1.0")
+
+        result = factory.run(
+            "vault",
+            "add",
+            "adr",
+            "-f",
+            "delta",
+            "--title",
+            "collision-does-not-block",
+        )
+
+        assert result.exit_code == 0, result.stdout
+        assert not legacy.exists()
+        assert target.read_text(encoding="utf-8") == canonical_before
+
     def test_feature_index_no_split_brain(self, tmp_path: Path):
         # Headline bug: vault feature index in a legacy workspace used
         # to write the new index while leaving the legacy at the root.
@@ -184,6 +210,33 @@ class TestScannerLazyTrigger:
         assert len(all_indexes) == 1, (
             f"expected exactly one alpha.index.md, found: {all_indexes}"
         )
+
+    def test_feature_index_regenerates_after_collision_cleanup(self, tmp_path: Path):
+        factory = WorkspaceFactory(tmp_path).install("core")
+        legacy = _plant_legacy_index(tmp_path, "alpha")
+        canonical = tmp_path / ".vault" / "index" / "alpha.index.md"
+        canonical.parent.mkdir(parents=True, exist_ok=True)
+        canonical.write_text(
+            "---\ngenerated: true\ntags:\n  - '#index'\n  - '#alpha'\n"
+            "date: '2026-04-30'\nrelated: []\n---\n\n# stale canonical\n",
+            encoding="utf-8",
+        )
+        adr_dir = tmp_path / ".vault" / "adr"
+        adr_dir.mkdir(parents=True, exist_ok=True)
+        (adr_dir / "2026-04-30-alpha-adr.md").write_text(
+            "---\ntags:\n  - '#adr'\n  - '#alpha'\n"
+            "date: '2026-04-30'\nrelated: []\n---\n\n# alpha adr\n",
+            encoding="utf-8",
+        )
+        _rewind_manifest(tmp_path, "0.1.0")
+
+        result = factory.run("vault", "feature", "index", "-f", "alpha")
+
+        assert result.exit_code == 0, result.stdout
+        assert not legacy.exists()
+        text = canonical.read_text(encoding="utf-8")
+        assert "# `alpha` feature index" in text
+        assert "2026-04-30-alpha-adr" in text
 
 
 class TestVaultCheckWarnsWithoutMutation:

@@ -13,8 +13,9 @@ Triggers:
 - :func:`vaultspec_core.core.commands.install_run` runs the driver in
   the upgrade branch so explicit upgrades migrate immediately.
 - :func:`vaultspec_core.vaultcore.scanner.scan_vault` runs the driver
-  lazily so any vault command (e.g. ``vault add``,
-  ``vault feature index``) migrates a stale workspace before it acts.
+  lazily so any ``vaultspec-core vault ...`` command, for example
+  ``vaultspec-core vault add`` or ``vaultspec-core vault feature index``,
+  migrates a stale workspace before it acts.
 - The ``vaultspec-core migrations`` CLI subcommand exposes
   ``status`` and ``run`` for explicit operator control.
 
@@ -67,9 +68,9 @@ class MigrationError(RuntimeError):
 
     The driver does not catch this; the exception propagates to the
     caller so the manifest version bump is suppressed and the next
-    invocation re-attempts from the same starting version. Operators
-    must resolve the underlying condition (e.g. a target-side
-    collision) manually before re-running.
+    invocation re-attempts from the same starting version. Migration
+    bodies should reserve this for real I/O or data-safety failures,
+    not recoverable drift in generated artifacts.
     """
 
 
@@ -273,8 +274,9 @@ def run_pending_migrations(
         workspace: Workspace root directory.
         use_cache: When ``True`` (the lazy-trigger path), short-circuits
             on a per-process cache of workspaces previously seen
-            up-to-date. Explicit triggers (CLI ``migrations run``,
-            ``install --upgrade``) pass ``False`` so they always
+            up-to-date. Explicit triggers
+            (``vaultspec-core migrations run`` and
+            ``vaultspec-core install --upgrade``) pass ``False`` so they always
             consult the manifest.
 
     Returns:

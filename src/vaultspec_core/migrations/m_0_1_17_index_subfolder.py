@@ -56,34 +56,31 @@ def migrate(workspace: Path) -> MigrationResult:
        not need rewriting the file is moved with
        :meth:`pathlib.Path.replace` for a single-syscall rename.
 
-    A target-side collision (canonical file already exists) is a
-    non-recoverable failure: relocating would either silently
-    overwrite the canonical file or leave the legacy orphaned. The
-    migration raises :class:`MigrationError` so the driver does not
-    bump the manifest version, and the operator is forced to resolve
-    the collision manually (pick the authoritative file, delete the
-    other) before re-running ``vaultspec-core migrations run``.
+    A target-side collision (canonical file already exists) is resolved
+    by deleting the misplaced generated index. Feature indexes are
+    derived artifacts, so the migration must never force manual
+    conflict resolution for their content.
 
     Args:
         workspace: Workspace root directory.
 
     Returns:
         :class:`MigrationResult` with ``counts`` carrying ``moved`` and
-        ``tagged``.
+        ``tagged`` relocations plus ``removed`` generated duplicates.
 
     Raises:
-        MigrationError: When a target-side file already exists, a legacy
-            file cannot be read, or the relocation syscall fails. The
-            driver propagates the exception unchanged so the manifest
-            version is not bumped and the next invocation retries from
-            the same starting version.
+        MigrationError: When a legacy file cannot be read or the
+            relocation syscall fails. The driver propagates the
+            exception unchanged so the manifest version is not bumped
+            and the next invocation retries from the same starting
+            version.
     """
     from ..config import get_config
     from ..vaultcore.checks.structure import _ensure_index_directory_tag
 
     cfg = get_config()
     docs_dir = workspace / cfg.docs_dir
-    counts = {"moved": 0, "tagged": 0}
+    counts = {"moved": 0, "tagged": 0, "removed": 0}
     if not docs_dir.is_dir():
         return MigrationResult(
             name="index_subfolder",
@@ -113,17 +110,21 @@ def migrate(workspace: Path) -> MigrationResult:
         target = index_dir / legacy.name
 
         if target.exists():
-            # A canonical-side file already exists; relocating would
-            # silently overwrite or leave the legacy orphaned. Raise so
-            # the driver does not bump the manifest version and the
-            # operator is forced to resolve the collision before
-            # retrying. Resolution is manual: pick the authoritative
-            # file, delete the other, then run ``migrations run``.
-            raise MigrationError(
-                f"index_subfolder: collision on {legacy}; canonical "
-                f"{target} already exists. Resolve the collision "
-                "manually before re-running migrations."
+            try:
+                legacy.unlink()
+            except OSError as exc:
+                raise MigrationError(
+                    f"index_subfolder: failed to remove generated legacy "
+                    f"index {legacy}: {exc}"
+                ) from exc
+            counts["removed"] += 1
+            logger.info(
+                "Migration index_subfolder: removed generated legacy index %s; "
+                "canonical %s already exists",
+                legacy,
+                target,
             )
+            continue
 
         try:
             raw = legacy.read_bytes()
@@ -149,13 +150,20 @@ def migrate(workspace: Path) -> MigrationResult:
         counts["moved"] += 1
         logger.info("Migration index_subfolder: %s -> %s", legacy, target)
 
+    moved_count = counts["moved"]
     summary = (
-        f"relocated {counts['moved']} feature index "
-        f"{'file' if counts['moved'] == 1 else 'files'} into "
+        f"relocated {moved_count} feature index "
+        f"{'file' if moved_count == 1 else 'files'} into "
         f"{cfg.docs_dir}/{cfg.index_dir}/"
     )
     if counts["tagged"]:
         summary += f" (added #index tag to {counts['tagged']})"
+    if counts["removed"]:
+        removed_count = counts["removed"]
+        summary += (
+            f" (removed {removed_count} generated "
+            f"{'duplicate' if removed_count == 1 else 'duplicates'})"
+        )
 
     return MigrationResult(
         name="index_subfolder",
