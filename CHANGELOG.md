@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.19](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.18...vaultspec-core-v0.1.19) (2026-05-14)
+
+
+### Features
+
+* **plan:** repair duplicate steps and support alpha suffix insertion ([7ad950a](https://github.com/wgergely/vaultspec-core/commit/7ad950ab2fcd21ddf8338aa9c35d9f3295cd6257))
+
+
+### Bug Fixes
+
+* **doctor:** suppress false provider drift diagnostics ([32a8144](https://github.com/wgergely/vaultspec-core/commit/32a8144cc6a59a2ad9ecaddf4bb8fceb8b277820))
+* **migrations:** remove generated index duplicates ([e3e1a7d](https://github.com/wgergely/vaultspec-core/commit/e3e1a7d3d929c37fe97bd47629a0536931e801a6))
+* **precommit:** make all-files hooks respect release-please changelog ([6bd8f96](https://github.com/wgergely/vaultspec-core/commit/6bd8f969a6afbb18b0a1691b1410fde92aab160f))
+
 ## [0.1.18](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.17...vaultspec-core-v0.1.18) (2026-05-06)
 
 
