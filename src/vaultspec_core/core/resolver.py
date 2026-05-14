@@ -546,7 +546,7 @@ def _resolve_builtin_version(
         CliAction.INSTALL,
         CliAction.UNINSTALL,
     ):
-        # Modified builtins during install: install --upgrade will re-seed.
+        # Modified builtins during install: vaultspec-core install --upgrade re-seeds.
         # Modified builtins during uninstall: they'll be removed anyway.
         return
 
@@ -554,7 +554,7 @@ def _resolve_builtin_version(
         CliAction.INSTALL,
         CliAction.UNINSTALL,
     ):
-        # Deleted during install: install --upgrade will re-seed.
+        # Deleted during install: vaultspec-core install --upgrade re-seeds.
         # Deleted during uninstall: nothing left to remove.
         return
 
@@ -567,6 +567,14 @@ def _resolve_builtin_version(
 # ---------------------------------------------------------------------------
 # Config rules
 # ---------------------------------------------------------------------------
+
+
+_ROOT_CONFIG_LABELS = {
+    "claude": "CLAUDE.md",
+    "gemini": "GEMINI.md",
+    "antigravity": "GEMINI.md",
+    "codex": "AGENTS.md",
+}
 
 
 def _resolve_config(
@@ -594,7 +602,10 @@ def _resolve_config(
             ResolutionStep(
                 action=ResolutionAction.SYNC,
                 target=f"{tool_name}:config",
-                reason=f"Config file missing for '{tool_name}'",
+                reason=(
+                    f"Root config {_ROOT_CONFIG_LABELS.get(tool_name, 'config file')} "
+                    f"missing for provider '{tool_name}'"
+                ),
             )
         )
         return
@@ -605,7 +616,11 @@ def _resolve_config(
                 ResolutionStep(
                     action=ResolutionAction.SYNC,
                     target=f"{tool_name}:config",
-                    reason=f"Overwriting user-authored config for '{tool_name}'",
+                    reason=(
+                        "Overwriting user-authored root config "
+                        f"{_ROOT_CONFIG_LABELS.get(tool_name, 'config file')} "
+                        f"for provider '{tool_name}'"
+                    ),
                 )
             )
         else:

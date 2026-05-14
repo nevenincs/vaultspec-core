@@ -98,3 +98,51 @@ class TestDoctorCommand:
         result = factory.run("spec", "doctor", "--json")
         data = json.loads(result.output)
         assert data["framework"] == "present"
+
+    def test_single_provider_install_does_not_report_skipped_provider_drift(
+        self, tmp_path: Path
+    ) -> None:
+        factory = WorkspaceFactory(tmp_path)
+        factory.install("claude")
+
+        result = factory.run("spec", "doctor")
+
+        assert result.exit_code == 0
+        assert "config: missing" not in result.output
+        assert "file(s) need attention" not in result.output
+
+    def test_core_only_install_does_not_report_provider_drift(
+        self, tmp_path: Path
+    ) -> None:
+        factory = WorkspaceFactory(tmp_path)
+        factory.install("core")
+
+        result = factory.run("spec", "doctor")
+
+        assert result.exit_code == 0
+        assert "config: missing" not in result.output
+        assert "file(s) need attention" not in result.output
+
+    def test_skipped_mcp_is_not_rendered_as_unknown(self, tmp_path: Path) -> None:
+        factory = WorkspaceFactory(tmp_path)
+        factory.install(skip={"mcp"})
+
+        result = factory.run("spec", "doctor")
+
+        assert result.exit_code == 0
+        assert "unknown (partial_mcp)" not in result.output
+        assert ".mcp.json missing or incomplete" in result.output
+
+    @pytest.mark.parametrize("provider", ["gemini", "codex"])
+    def test_shared_agents_dir_does_not_report_antigravity_untracked(
+        self, tmp_path: Path, provider: str
+    ) -> None:
+        factory = WorkspaceFactory(tmp_path)
+        factory.install(provider)
+
+        result = factory.run("spec", "doctor")
+
+        assert result.exit_code == 0
+        assert "manifest: untracked" not in result.output
+        assert "antigravity" in result.output.lower()
+        assert "file(s) need attention" not in result.output

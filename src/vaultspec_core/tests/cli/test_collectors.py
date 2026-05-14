@@ -154,6 +154,38 @@ class TestManifestCoherence:
         result = collect_manifest_coherence(tmp_path)
         assert result["claude"] == ManifestEntrySignal.NOT_INSTALLED
 
+    def test_shared_agents_dir_owned_by_gemini_is_not_antigravity_untracked(
+        self, tmp_path: Path
+    ) -> None:
+        _write_manifest(tmp_path, ["gemini"])
+        (tmp_path / ".gemini").mkdir()
+        (tmp_path / ".agents").mkdir()
+
+        result = collect_manifest_coherence(tmp_path)
+
+        assert result["gemini"] == ManifestEntrySignal.COHERENT
+        assert result["antigravity"] == ManifestEntrySignal.NOT_INSTALLED
+
+    def test_shared_agents_dir_owned_by_codex_is_not_antigravity_untracked(
+        self, tmp_path: Path
+    ) -> None:
+        _write_manifest(tmp_path, ["codex"])
+        (tmp_path / ".codex").mkdir()
+        (tmp_path / ".agents").mkdir()
+
+        result = collect_manifest_coherence(tmp_path)
+
+        assert result["codex"] == ManifestEntrySignal.COHERENT
+        assert result["antigravity"] == ManifestEntrySignal.NOT_INSTALLED
+
+    def test_unowned_agents_dir_is_untracked_antigravity(self, tmp_path: Path) -> None:
+        _write_manifest(tmp_path, [])
+        (tmp_path / ".agents").mkdir()
+
+        result = collect_manifest_coherence(tmp_path)
+
+        assert result["antigravity"] == ManifestEntrySignal.UNTRACKED
+
 
 # ---------------------------------------------------------------------------
 # collect_provider_dir_state
@@ -395,6 +427,7 @@ class TestDiagnose:
         assert result.providers[Tool.CLAUDE].dir_state == ProviderDirSignal.MISSING
         claude = result.providers[Tool.CLAUDE]
         assert claude.manifest_entry == ManifestEntrySignal.COHERENT
+        assert claude.config == ConfigSignal.OK
 
     def test_sync_scope(self, tmp_path: Path) -> None:
         """Sync scope collects provider dir and config but not content."""
@@ -437,6 +470,7 @@ class TestDiagnose:
         for prov in result.providers.values():
             # Content integrity is not collected when corrupted
             assert prov.content == {}
+            assert prov.config == ConfigSignal.OK
 
 
 # ---------------------------------------------------------------------------

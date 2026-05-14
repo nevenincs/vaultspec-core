@@ -34,6 +34,9 @@ _TOOL_DIR: dict[str, str] = {
     "antigravity": ".agents",
     "codex": ".codex",
 }
+_SHARED_DIR_OWNERS: dict[str, set[str]] = {
+    ".agents": {"antigravity", "gemini", "codex"},
+}
 
 _tool_dir_validated = False
 
@@ -68,7 +71,7 @@ def collect_framework_presence(target: Path) -> FrameworkSignal:
     written by :func:`~vaultspec_core.core.commands.install_run` on
     consumer projects.  Consult
     :func:`~vaultspec_core.core.guards._cached_is_dev_repo` before
-    declaring corruption so ``spec doctor`` does not false-positive on
+    declaring corruption so ``vaultspec-core spec doctor`` does not false-positive on
     the source repo or any of its worktrees.  See GitHub issue #93.
 
     Args:
@@ -127,11 +130,15 @@ def collect_manifest_coherence(target: Path) -> dict[str, ManifestEntrySignal]:
 
         in_manifest = tool.value in manifest.installed
         dir_exists = (target / dir_name).is_dir()
+        shared_owners = _SHARED_DIR_OWNERS.get(dir_name, set())
+        shared_owner_installed = bool(shared_owners & manifest.installed)
 
         if in_manifest and dir_exists:
             result[tool.value] = ManifestEntrySignal.COHERENT
         elif in_manifest and not dir_exists:
             result[tool.value] = ManifestEntrySignal.ORPHANED
+        elif not in_manifest and dir_exists and shared_owner_installed:
+            result[tool.value] = ManifestEntrySignal.NOT_INSTALLED
         elif not in_manifest and dir_exists:
             result[tool.value] = ManifestEntrySignal.UNTRACKED
         else:
@@ -435,7 +442,8 @@ def collect_gitignore_state(target: Path) -> GitignoreSignal:
     # *expected* shape of the managed block depends on whether *target* is
     # the vaultspec-core source repo: in that mode the canonical
     # `.vaultspec/rules/` content must NOT be ignored, so the recommended
-    # entry set diverges.  Auto-detect via `is_dev_repo` so `spec doctor`
+    # entry set diverges.  Auto-detect via `is_dev_repo` so
+    # `vaultspec-core spec doctor`
     # in a vaultspec source worktree reports COMPLETE rather than a
     # spurious PARTIAL.  See GitHub issue #88.
     recommended = get_recommended_entries(target, dev=is_dev_repo(target))

@@ -134,7 +134,7 @@ class TestProviderDiagnosis:
         assert diag.dir_state == ProviderDirSignal.COMPLETE
         assert diag.manifest_entry == ManifestEntrySignal.COHERENT
         assert diag.content == {}
-        assert diag.config == ConfigSignal.MISSING
+        assert diag.config == ConfigSignal.OK
 
     def test_construction_full(self):
         content = {"rules.md": ContentSignal.DIVERGED}

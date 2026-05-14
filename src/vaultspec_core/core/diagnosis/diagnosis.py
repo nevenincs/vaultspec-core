@@ -42,7 +42,10 @@ class ProviderDiagnosis:
     dir_state: ProviderDirSignal
     manifest_entry: ManifestEntrySignal
     content: dict[str, ContentSignal] = field(default_factory=dict)
-    config: ConfigSignal = ConfigSignal.MISSING
+    # Neutral by default because framework-only and corrupted-framework
+    # diagnosis paths do not collect provider config state. Callers that
+    # actually inspect configs must pass the collected signal explicitly.
+    config: ConfigSignal = ConfigSignal.OK
 
 
 @dataclass
@@ -206,6 +209,14 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
     # Layer 3: scope is "full" or "sync" - collect per-provider details
     for tool in Tool:
         entry = manifest_map.get(tool.value, ManifestEntrySignal.NOT_INSTALLED)
+
+        if entry == ManifestEntrySignal.NOT_INSTALLED:
+            diag.providers[tool] = ProviderDiagnosis(
+                tool=tool,
+                dir_state=ProviderDirSignal.MISSING,
+                manifest_entry=entry,
+            )
+            continue
 
         try:
             dir_state = collect_provider_dir_state(target, tool.value)

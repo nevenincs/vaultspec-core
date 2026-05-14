@@ -49,6 +49,7 @@ class TestCleanWorkspaceTransparent:
     def test_install_clean_exits_zero(self, tmp_path: Path, runner: CliRunner):
         result = runner.invoke(app, ["-t", str(tmp_path), "install"])
         assert result.exit_code == 0
+        assert "Config file missing" not in result.output
 
     def test_sync_after_install_exits_zero(
         self, installed_workspace: Path, runner: CliRunner
@@ -56,6 +57,26 @@ class TestCleanWorkspaceTransparent:
         result = runner.invoke(app, ["-t", str(installed_workspace), "sync"])
         assert result.exit_code == 0
         assert "conflict" not in result.output.lower()
+        assert "Config file missing" not in result.output
+
+    @pytest.mark.parametrize("provider", ["gemini", "codex"])
+    def test_sync_after_shared_agents_provider_install_has_no_false_untracked(
+        self, tmp_path: Path, runner: CliRunner, provider: str
+    ):
+        (tmp_path / ".gitignore").write_text("# project ignores\n", encoding="utf-8")
+        install_run(
+            path=tmp_path,
+            provider=provider,
+            upgrade=False,
+            dry_run=False,
+            force=False,
+        )
+
+        result = runner.invoke(app, ["-t", str(tmp_path), "sync"])
+
+        assert result.exit_code == 0
+        assert "untracked" not in result.output.lower()
+        assert "file(s) need attention" not in result.output
 
 
 # ---- (b) Corrupted manifest - install blocked / --force proceeds -------------
@@ -177,6 +198,16 @@ class TestUpgradeAction:
             app, ["-t", str(installed_workspace), "install", "--upgrade"]
         )
         assert result.exit_code == 0
+
+    def test_upgrade_installed_does_not_report_unchecked_config_missing(
+        self, installed_workspace: Path, runner: CliRunner
+    ):
+        result = runner.invoke(
+            app, ["-t", str(installed_workspace), "install", "--upgrade"]
+        )
+        assert result.exit_code == 0
+        assert "Config file missing" not in result.output
+        assert "detected, will be addressed by upgrade" not in result.output
 
 
 # ---- (g) Dry-run with warnings ----------------------------------------------

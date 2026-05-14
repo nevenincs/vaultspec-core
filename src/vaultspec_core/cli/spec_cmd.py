@@ -1,12 +1,15 @@
 """Spec command group  - manage framework resources in ``.vaultspec/``.
 
-Sub-groups: ``spec rules`` (:data:`rules_app`), ``spec skills`` (:data:`skills_app`),
-``spec agents`` (:data:`agents_app`), ``spec system`` (:data:`system_app`),
-``spec hooks`` (:data:`hooks_app`), ``spec mcps`` (:data:`mcps_app`).
-Top-level command: ``spec doctor`` for workspace health diagnosis.
+Sub-groups: ``vaultspec-core spec rules`` (:data:`rules_app`),
+``vaultspec-core spec skills`` (:data:`skills_app`),
+``vaultspec-core spec agents`` (:data:`agents_app`),
+``vaultspec-core spec system`` (:data:`system_app`),
+``vaultspec-core spec hooks`` (:data:`hooks_app`), and
+``vaultspec-core spec mcps`` (:data:`mcps_app`).
+Top-level command: ``vaultspec-core spec doctor`` for workspace health diagnosis.
 Delegates to :mod:`vaultspec_core.core`
 CRUD functions via lazy imports to avoid circular-import issues. Mounted onto
-:data:`.root.app` as the ``spec`` sub-group.
+:data:`.root.app` as the ``spec`` command group.
 """
 
 import logging
@@ -1324,6 +1327,8 @@ def cmd_doctor(
         {
             ConfigSignal.OK: ("ok", "green"),
             ConfigSignal.MISSING: ("warn", "yellow"),
+            ConfigSignal.PARTIAL_MCP: ("info", "dim"),
+            ConfigSignal.USER_MCP: ("info", "dim"),
             ConfigSignal.FOREIGN: ("info", "dim"),
             ConfigSignal.REGISTRY_DRIFT: ("warn", "yellow"),
         },
@@ -1331,6 +1336,8 @@ def cmd_doctor(
     mcp_detail = {
         ConfigSignal.OK: ".mcp.json present",
         ConfigSignal.MISSING: ".mcp.json not found",
+        ConfigSignal.PARTIAL_MCP: ".mcp.json missing or incomplete",
+        ConfigSignal.USER_MCP: ".mcp.json includes user-managed entries",
         ConfigSignal.FOREIGN: ".mcp.json present (no vaultspec entry)",
         ConfigSignal.REGISTRY_DRIFT: ".mcp.json entries differ from registry",
     }.get(diag.mcp, str(diag.mcp))

@@ -294,6 +294,7 @@ class TestConfigRules:
         plan = resolve(diag, CliAction.SYNC, provider="claude")
         targets = [s.target for s in plan.steps]
         assert any("config" in t for t in targets)
+        assert any("CLAUDE.md" in s.reason for s in plan.steps)
 
     def test_foreign_sync_no_force_warns(self):
         prov = _make_provider(config=ConfigSignal.FOREIGN)
@@ -307,6 +308,7 @@ class TestConfigRules:
         plan = resolve(diag, CliAction.SYNC, provider="claude", force=True)
         targets = [s.target for s in plan.steps]
         assert any("config" in t for t in targets)
+        assert any("CLAUDE.md" in s.reason for s in plan.steps)
 
 
 # ---------------------------------------------------------------------------
