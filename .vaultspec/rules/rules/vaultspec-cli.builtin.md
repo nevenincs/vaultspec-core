@@ -8,24 +8,24 @@ This workspace is vaultspec-managed. See `vaultspec.builtin.md` for vault struct
 
 ## Mandate
 
-Use the `vaultspec-core` CLI for every read, write, and audit of `.vault/`, and for every sync touching `.vaultspec/`. Do not edit `.vault/` documents or any generated provider directory (`.claude/`, `.gemini/`, `.agents/`, `.codex/`) directly. The CLI is the only surface that enforces templates, tag taxonomy, wiki-link resolution, schema dependencies, and provider sync; bypassing it produces drift that `vault check` and `spec doctor` will flag.
+Use the `vaultspec-core` CLI for every read, write, and audit of `.vault/`, and for every sync touching `.vaultspec/`. Do not edit `.vault/` documents or any generated provider directory (`.claude/`, `.gemini/`, `.agents/`, `.codex/`) directly. The CLI is the only surface that enforces templates, tag taxonomy, wiki-link resolution, schema dependencies, and provider sync; bypassing it produces drift that `vaultspec-core vault check` and `vaultspec-core spec doctor` will flag.
 
 ## Commands
 
-| Task                                                  | Run                                         |
-| ----------------------------------------------------- | ------------------------------------------- |
-| Create a `.vault/` document                           | `vault add <type> --feature <tag>`          |
-| List or filter vault documents                        | `vault list [--feature <tag>] [--type <t>]` |
-| Show statistics, invalid, or orphan documents         | `vault stats [--invalid] [--orphaned]`      |
-| Visualize the vault dependency graph                  | `vault graph [--feature <tag>]`             |
-| Audit drift, broken links, or missing references      | `vault check all [--fix]`                   |
-| Confirm required documents exist for a feature        | `vault check features --feature <tag>`      |
-| Archive a completed feature                           | `vault feature archive <tag>`               |
-| List registered rules, skills, agents, hooks, or MCPs | `spec <resource> list`                      |
-| Inspect the assembled system prompt                   | `spec system show`                          |
-| Propagate edits under `.vaultspec/rules/...`          | `sync` (or `spec <resource> sync`)          |
-| Diagnose overall workspace health                     | `spec doctor`                               |
-| Inspect or run pending schema migrations              | `migrations status` / `migrations run`      |
+| Task                                                  | Run                                                                  |
+| ----------------------------------------------------- | -------------------------------------------------------------------- |
+| Create a `.vault/` document                           | `vaultspec-core vault add <type> --feature <tag>`                    |
+| List or filter vault documents                        | `vaultspec-core vault list [--feature <tag>] [--type <t>]`           |
+| Show statistics, invalid, or orphan documents         | `vaultspec-core vault stats [--invalid] [--orphaned]`                |
+| Visualize the vault dependency graph                  | `vaultspec-core vault graph [--feature <tag>]`                       |
+| Audit drift, broken links, or missing references      | `vaultspec-core vault check all [--fix]`                             |
+| Confirm required documents exist for a feature        | `vaultspec-core vault check features --feature <tag>`                |
+| Archive a completed feature                           | `vaultspec-core vault feature archive <tag>`                         |
+| List registered rules, skills, agents, hooks, or MCPs | `vaultspec-core spec <resource> list`                                |
+| Inspect the assembled system prompt                   | `vaultspec-core spec system show`                                    |
+| Propagate edits under `.vaultspec/rules/...`          | `vaultspec-core sync` (or `vaultspec-core spec <resource> sync`)     |
+| Diagnose overall workspace health                     | `vaultspec-core spec doctor`                                         |
+| Inspect or run pending schema migrations              | `vaultspec-core migrations status` / `vaultspec-core migrations run` |
 
 `<resource>` is one of `rules`, `skills`, `agents`, `hooks`, or `mcps` for `list`; one of `rules`, `skills`, `agents`, `mcps`, or `system` for `sync`.
 
@@ -42,13 +42,13 @@ Use the `vaultspec-core` CLI for every read, write, and audit of `.vault/`, and 
 
 Permitted:
 
-- Edit body prose of a `.vault/` document scaffolded by `vault add`.
+- Edit body prose of a `.vault/` document scaffolded by `vaultspec-core vault add`.
 - Edit source files under `.vaultspec/rules/rules/`, `.vaultspec/rules/skills/`, `.vaultspec/rules/agents/`, `.vaultspec/rules/hooks/`, or `.vaultspec/rules/mcps/`, then run `vaultspec-core sync`.
 
 Forbidden:
 
 - Hand-writing frontmatter, filenames, or new `.vault/` documents.
-- Editing files inside generated provider directories; `sync` regenerates them.
+- Editing files inside generated provider directories; `vaultspec-core sync` regenerates them.
 
 ## References
 

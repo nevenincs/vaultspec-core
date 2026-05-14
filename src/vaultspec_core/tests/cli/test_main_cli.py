@@ -57,7 +57,7 @@ class TestNamespaceRouting:
     """Verify that namespace commands route to the correct sub-CLI."""
 
     def test_vault_namespace_help(self, runner, synthetic_project):
-        """``vaultspec vault --help`` exits 0 and shows subcommands."""
+        """``vaultspec-core vault --help`` exits 0 and shows subcommands."""
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "vault", "--help"]
         )
@@ -66,7 +66,7 @@ class TestNamespaceRouting:
         assert "check" in result.output
 
     def test_spec_namespace_help(self, runner, synthetic_project):
-        """``vaultspec spec --help`` exits 0 and shows subcommands."""
+        """``vaultspec-core spec --help`` exits 0 and shows subcommands."""
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "spec", "--help"]
         )
@@ -79,7 +79,7 @@ class TestSpecCliFallthrough:
     """Verify commands under the spec group are routed correctly."""
 
     def test_rules_help(self, runner, synthetic_project):
-        """``vaultspec spec rules --help`` exits 0 and shows rules subcommands."""
+        """``vaultspec-core spec rules --help`` exits 0 and shows rules subcommands."""
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "spec", "rules", "--help"]
         )
@@ -87,14 +87,14 @@ class TestSpecCliFallthrough:
         assert "list" in result.output
 
     def test_skills_help(self, runner, synthetic_project):
-        """``vaultspec spec skills --help`` exits 0."""
+        """``vaultspec-core spec skills --help`` exits 0."""
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "spec", "skills", "--help"]
         )
         assert result.exit_code == 0
 
     def test_vault_check_all_runs(self, runner, synthetic_project):
-        """``vaultspec vault check all`` exits 0 and shows check results."""
+        """``vaultspec-core vault check all`` exits 0 and shows check results."""
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "vault", "check", "all"]
         )

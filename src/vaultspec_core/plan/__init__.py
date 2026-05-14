@@ -1,10 +1,10 @@
-"""Plan-document parser, model, and operations for the ``vault plan`` CLI.
+"""Plan-document parser, model, and operations for ``vaultspec-core vault plan``.
 
 Implements the natural-language convention defined in
 ``.vault/adr/2026-05-05-plan-hardening-adr.md`` (Wave 1) and the CLI
 surface defined in ``.vault/adr/2026-05-06-plan-hardening-adr.md``
 (Wave 2). The package is consumed by :mod:`vaultspec_core.cli.vault_cmd`
-to back the ``vault plan`` subcommand group.
+to back the ``vaultspec-core vault plan`` command group.
 
 Public surface (re-exported here as it lands across Wave 2 Phases):
 
@@ -19,9 +19,9 @@ Public surface (re-exported here as it lands across Wave 2 Phases):
 - ``serialiser`` (W02.P01.S40): in-memory model -> markdown emission
   preserving document order.
 - ``commands`` (W02.P02 onward): CLI command handlers.
-- ``checks`` (W02.P02): detection rules for ``vault plan check``.
+- ``checks`` (W02.P02): detection rules for ``vaultspec-core vault plan check``.
 - ``fixes`` (W02.P02): idempotent autofix transformations for
-  ``vault plan check --fix``.
+  ``vaultspec-core vault plan check --fix``.
 """
 
 from __future__ import annotations

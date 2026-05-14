@@ -1,10 +1,11 @@
 """Vault command group  - create, query, graph, check, and audit ``.vault/`` records.
 
-Sub-groups: ``vault feature`` (:data:`feature_app`), ``vault graph``
-(:data:`graph_app`), ``vault check`` (:data:`check_app`). Delegates to
+Sub-groups: ``vaultspec-core vault feature`` (:data:`feature_app`),
+``vaultspec-core vault graph`` (:data:`graph_app`), and
+``vaultspec-core vault check`` (:data:`check_app`). Delegates to
 :mod:`vaultspec_core.vaultcore.query`, :mod:`vaultspec_core.vaultcore.hydration`,
 :mod:`vaultspec_core.vaultcore.checks`, and :mod:`vaultspec_core.graph` for
-all backend logic. Mounted onto :data:`.root.app` as the ``vault`` sub-group.
+all backend logic. Mounted onto :data:`.root.app` as the ``vault`` command group.
 """
 
 from __future__ import annotations
@@ -126,7 +127,8 @@ def cmd_add(
     if dt is DocType.INDEX:
         console.print(
             "[red]'index' documents are auto-generated. "
-            "Use 'vault feature index' instead of 'vault add index'.[/red]"
+            "Use 'vaultspec-core vault feature index' instead of "
+            "'vaultspec-core vault add index'.[/red]"
         )
         raise typer.Exit(code=1)
 
@@ -348,7 +350,8 @@ def cmd_list(
         if doc_type in ("features", "feature"):
             console.print(
                 f"[yellow]'{doc_type}' is not a document type. "
-                f"Use [bold]vault feature list[/bold] to list features.[/yellow]"
+                "Use [bold]vaultspec-core vault feature list[/bold] "
+                "to list features.[/yellow]"
             )
             raise typer.Exit(code=1)
         console.print(
@@ -540,7 +543,7 @@ def _reject_fix(check_name: str, fix: bool) -> None:
 
         console = get_console()
         console.print(
-            f"[red]Error: 'vault check {check_name}'"
+            f"[red]Error: 'vaultspec-core vault check {check_name}'"
             " has no auto-fix capabilities.[/red]"
         )
         raise typer.Exit(code=1)

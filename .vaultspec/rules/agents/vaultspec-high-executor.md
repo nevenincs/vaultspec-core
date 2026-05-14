@@ -109,9 +109,11 @@ team workflow.
 
 ## CLI usage mandate
 
-You MUST update Step state via `vault plan step check` (close),
-`vault plan step uncheck` (re-open), or `vault plan step toggle`
-rather than hand-editing the checkbox glyph. Hand-editing is
+You MUST update Step state via `vaultspec-core vault plan step check`
+(close), `vaultspec-core vault plan step uncheck` (re-open), or
+`vaultspec-core vault plan step toggle` rather than hand-editing the
+checkbox glyph. Hand-editing is
 forbidden because it bypasses the CLI's idempotency guarantees and
-display-path recomputation, and is flagged by `vault plan check`.
-See the CLI ADR (`2026-05-06-plan-hardening-adr`).
+display-path recomputation, and is flagged by
+`vaultspec-core vault plan check`. See the CLI ADR
+(`2026-05-06-plan-hardening-adr`).

@@ -2,8 +2,8 @@
 
 Running ``apply_all_fixes`` repeatedly is idempotent: once every
 autofixable violation is resolved, subsequent invocations make no
-changes. The harness is the implementation of ``vault plan check
---fix`` once the CLI command lands in W02.P07.
+changes. The harness is the implementation of
+``vaultspec-core vault plan check --fix`` once the CLI command lands in W02.P07.
 """
 
 from __future__ import annotations

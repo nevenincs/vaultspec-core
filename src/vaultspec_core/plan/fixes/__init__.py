@@ -1,4 +1,4 @@
-"""Idempotent autofix transformations for ``vault plan check --fix``.
+"""Idempotent autofix transformations for ``vaultspec-core vault plan check --fix``.
 
 Every autofix preserves canonical identifiers exactly; no autofix
 mutates an ``S##``, ``P##``, or ``W##`` token. The autofix list is

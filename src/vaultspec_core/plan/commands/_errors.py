@@ -1,6 +1,6 @@
 """Marker base class shared by every command-handler typed exception.
 
-Every typed exception raised by a ``vault plan`` command handler
+Every typed exception raised by a ``vaultspec-core vault plan`` command handler
 (``StepNotFoundError``, ``MoveStepError``, ``AddPhaseError``,
 ``PhaseRenumberError``, ``EpicIntentError``, ``Promote / DemoteError``,
 ``Move{Step,Phase,Wave}Error``, etc.) inherits from

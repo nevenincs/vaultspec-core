@@ -130,8 +130,9 @@ def check_features(
                     ),
                     severity=Severity.WARNING,
                     fix_description=(
-                        f"Consider: vault add plan -f {feat_name} && "
-                        f"vault add adr -f {feat_name}"
+                        "Consider: "
+                        f"vaultspec-core vault add plan -f {feat_name} && "
+                        f"vaultspec-core vault add adr -f {feat_name}"
                     ),
                 )
             )
@@ -146,7 +147,9 @@ def check_features(
                         f"architectural decision."
                     ),
                     severity=Severity.WARNING,
-                    fix_description=(f"Consider: vault add adr -f {feat_name}"),
+                    fix_description=(
+                        f"Consider: vaultspec-core vault add adr -f {feat_name}"
+                    ),
                 )
             )
 
@@ -160,7 +163,9 @@ def check_features(
                         f"justify architectural decisions."
                     ),
                     severity=Severity.INFO,
-                    fix_description=(f"Consider: vault add research -f {feat_name}"),
+                    fix_description=(
+                        f"Consider: vaultspec-core vault add research -f {feat_name}"
+                    ),
                 )
             )
 
@@ -172,11 +177,13 @@ def check_features(
                     path=None,
                     message=(
                         f"Feature '{feat_name}' has no feature index. Run "
-                        "vault feature index to generate "
+                        "vaultspec-core vault feature index to generate "
                         f"index/{feat_name}.index.md"
                     ),
                     severity=Severity.WARNING,
-                    fix_description=(f"vault feature index -f {feat_name}"),
+                    fix_description=(
+                        f"vaultspec-core vault feature index -f {feat_name}"
+                    ),
                 )
             )
         else:
@@ -191,10 +198,12 @@ def check_features(
                             f"Feature '{feat_name}' index is stale: "
                             f"related: has {index_count} links but "
                             f"feature has {actual_count} documents. "
-                            f"Run vault feature index to rebuild"
+                            "Run vaultspec-core vault feature index to rebuild"
                         ),
                         severity=Severity.WARNING,
-                        fix_description=(f"vault feature index -f {feat_name}"),
+                        fix_description=(
+                            f"vaultspec-core vault feature index -f {feat_name}"
+                        ),
                     )
                 )
 

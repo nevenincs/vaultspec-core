@@ -1,7 +1,8 @@
 """Unified query engine for .vault/ document operations.
 
 Composes :mod:`.scanner` and :mod:`.parser` into a single query surface
-used by CLI commands (``vault stats``, ``vault list``, ``vault feature list``).
+used by CLI commands (``vaultspec-core vault stats``,
+``vaultspec-core vault list``, ``vaultspec-core vault feature list``).
 Exports :class:`VaultDocument`, :func:`list_documents`, :func:`get_stats`,
 :func:`list_feature_details`, and :func:`archive_feature`.
 """

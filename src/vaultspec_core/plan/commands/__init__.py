@@ -1,4 +1,4 @@
-"""Command handlers backing the ``vault plan`` CLI verbs.
+"""Command handlers backing the ``vaultspec-core vault plan`` CLI verbs.
 
 Each handler is a pure function that takes a parsed :class:`Plan` and
 returns a mutated :class:`Plan` plus the canonical identifier of any

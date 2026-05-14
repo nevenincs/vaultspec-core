@@ -1,4 +1,4 @@
-"""Plan-document query implementation backing ``vault plan query``.
+"""Plan-document query implementation backing ``vaultspec-core vault plan query``.
 
 Per the CLI ADR's *query* section, the query language has two layers:
 

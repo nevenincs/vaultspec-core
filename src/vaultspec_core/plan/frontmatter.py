@@ -64,7 +64,8 @@ class PlanFrontmatter:
         date: ISO ``yyyy-mm-dd`` date string from the frontmatter.
         legacy_tier_default: ``True`` when ``tier`` was missing in the
             source document and defaulted to ``L2``; the writer agent or
-            ``vault plan check --fix`` should add the field on first edit.
+            ``vaultspec-core vault plan check --fix`` should add the field on
+            first edit.
     """
 
     tier: Tier

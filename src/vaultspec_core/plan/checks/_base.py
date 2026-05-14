@@ -3,7 +3,7 @@
 A :class:`Finding` is the canonical diagnostic unit emitted by every
 detection rule. The :func:`collect_all` harness composes the seven
 detection rules from the convention ADR's *check* surface into one
-report; ``vault plan check`` exits non-zero when any
+report; ``vaultspec-core vault plan check`` exits non-zero when any
 :class:`Severity.ERROR` finding is present.
 """
 
@@ -20,7 +20,7 @@ __all__ = ["Finding", "Severity", "collect_all", "has_errors"]
 
 
 class Severity(StrEnum):
-    """Severity ladder for ``vault plan check`` findings."""
+    """Severity ladder for ``vaultspec-core vault plan check`` findings."""
 
     ERROR = "error"
     WARNING = "warning"
@@ -40,7 +40,7 @@ class Finding:
             observed; ``0`` when the finding is document-wide.
         fix_hint: Short suggestion for resolving the violation, shown
             alongside the message in human output.
-        autofixable: ``True`` when ``vault plan check --fix`` can
+        autofixable: ``True`` when ``vaultspec-core vault plan check --fix`` can
             resolve the finding without writer intervention.
     """
 

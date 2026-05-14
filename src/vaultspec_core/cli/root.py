@@ -667,7 +667,7 @@ def cmd_sync(
                 console.print(f"  [yellow]•[/yellow] {path}")
             console.print(
                 "\n  Run [bold]vaultspec-core install --upgrade[/bold] "
-                "to update, then [bold]sync[/bold] again."
+                "to update, then [bold]vaultspec-core sync[/bold] again."
             )
 
         # Collect and display warnings from all sync passes
@@ -699,7 +699,7 @@ def cmd_sync(
             console.print(
                 "\n[bold yellow]Warning:[/bold yellow] Sync produced 0 files. "
                 "The .vaultspec/rules/ source directories may be empty.\n"
-                "  Run [bold]vaultspec-core install . --upgrade[/bold] "
+                "  Run [bold]vaultspec-core install --upgrade[/bold] "
                 "to re-seed builtin content."
             )
 

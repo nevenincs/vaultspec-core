@@ -32,7 +32,8 @@ The workflow persists the following documents:
 
 - `.vault/index/<feature>.index.md`:
   The auto-generated `<Feature Index>` linking every document for a
-  feature. Managed by `vault feature index`; do not author by hand.
+  feature. Managed by `vaultspec-core vault feature index`; do not author
+  by hand.
 
 Where appropriate, use the following skills:
 
@@ -90,7 +91,7 @@ Artifacts lower in the hierarchy should reference those above them.
 
 - **Feature Indexes** (`.vault/index/{feature}.index.md`)
 
-  - *Auto-generated* by `vault feature index`; never authored by hand.
+  - *Auto-generated* by `vaultspec-core vault feature index`; never authored by hand.
   - *Filename:* `{feature}.index.md` (no date prefix).
   - *Example:* `.vault/index/editor-demo.index.md`
 

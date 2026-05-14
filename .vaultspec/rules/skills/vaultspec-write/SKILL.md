@@ -27,22 +27,22 @@ approval.
 ## CLI usage mandate
 
 Plan documents authored by this skill MUST be manipulated via the
-`vault plan` CLI (vaultspec-core) rather than by hand-editing the
+`vaultspec-core vault plan` CLI rather than by hand-editing the
 markdown body. The CLI is the canonical surface for every
 identifier-affecting change. The verbs are:
 
-- `vault plan step add | insert | edit | move | remove`
-- `vault plan step check | uncheck | toggle` (state)
-- `vault plan phase add | insert | edit | move | renumber | remove`
-- `vault plan wave add | insert | edit | move | remove`
-- `vault plan epic intent show | edit` (L4 only)
-- `vault plan tier show | promote | demote`
+- `vaultspec-core vault plan step add | insert | edit | move | remove`
+- `vaultspec-core vault plan step check | uncheck | toggle` (state)
+- `vaultspec-core vault plan phase add | insert | edit | move | renumber | remove`
+- `vaultspec-core vault plan wave add | insert | edit | move | remove`
+- `vaultspec-core vault plan epic intent show | edit` (L4 only)
+- `vaultspec-core vault plan tier show | promote | demote`
 
 The CLI guarantees canonical-identifier preservation, gap-no-reuse
 via a hidden retirement ledger, and display-path consistency that
 hand edits cannot. See the CLI ADR
 (`2026-05-06-plan-hardening-adr`) for the full subcommand
-contract and `vault plan check` for the validator that backs it.
+contract and `vaultspec-core vault plan check` for the validator that backs it.
 
 ## Hierarchy and tiers
 

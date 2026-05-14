@@ -2,7 +2,7 @@
 
 Compares each row's stored display path against the value computed
 from its current ancestor chain. Drift typically means a Step or
-Phase was hand-moved without re-rendering; ``vault plan check --fix``
+Phase was hand-moved without re-rendering; ``vaultspec-core vault plan check --fix``
 recomputes the paths idempotently.
 """
 
@@ -39,8 +39,9 @@ def check_display_path(plan: Plan) -> list[Finding]:
                     ),
                     line_number=step.line_number,
                     fix_hint=(
-                        "Run 'vault plan check --fix' to recompute the "
-                        "display path against the current grouping."
+                        "Run 'vaultspec-core vault plan check --fix' to "
+                        "recompute the display path against the current "
+                        "grouping."
                     ),
                     autofixable=True,
                 ),
@@ -61,8 +62,8 @@ def check_display_path(plan: Plan) -> list[Finding]:
                     ),
                     line_number=phase.line_number,
                     fix_hint=(
-                        "Run 'vault plan check --fix' to recompute the "
-                        "Phase heading path."
+                        "Run 'vaultspec-core vault plan check --fix' to "
+                        "recompute the Phase heading path."
                     ),
                     autofixable=True,
                 ),

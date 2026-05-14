@@ -44,9 +44,9 @@ def check_separator(source_text: str) -> list[Finding]:
                         line_number=index,
                         fix_hint=(
                             "Replace the dash with ' - ' (space, ASCII "
-                            "hyphen-minus, space). 'vault plan check "
-                            "--fix' applies this replacement "
-                            "automatically."
+                            "hyphen-minus, space). "
+                            "'vaultspec-core vault plan check --fix' "
+                            "applies this replacement automatically."
                         ),
                         autofixable=True,
                     ),

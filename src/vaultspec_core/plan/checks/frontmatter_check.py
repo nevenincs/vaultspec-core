@@ -5,7 +5,7 @@ Validates frontmatter contract from the convention ADR's
 
 - ``PLAN001 missing-tier`` (warning): plan lacks a ``tier:`` field;
   the parser applied the legacy ``L2`` default. Auto-fixable by
-  ``vault plan check --fix`` (writes the field on first edit).
+  ``vaultspec-core vault plan check --fix`` (writes the field on first edit).
 - ``PLAN002 missing-related`` (error): plan contains at least one
   Step row but the ``related:`` frontmatter field is absent or empty.
 - ``PLAN003 stub-epic-intent`` (warning): an L4 plan's Epic intent

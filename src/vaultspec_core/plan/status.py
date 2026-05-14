@@ -1,6 +1,6 @@
 """Plan-document status snapshot.
 
-Computes the structural snapshot reported by ``vault plan status``: the
+Computes the structural snapshot reported by ``vaultspec-core vault plan status``: the
 declared tier, container counts, completion percentage, and a flag for
 the legacy-L2 default. The snapshot has both a structured form
 (:class:`PlanStatus`) and a JSON-serialisable dict (built in

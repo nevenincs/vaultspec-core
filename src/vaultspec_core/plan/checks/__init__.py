@@ -1,4 +1,4 @@
-"""Detection rules for ``vault plan check``.
+"""Detection rules for ``vaultspec-core vault plan check``.
 
 Every detection rule is a pure function that takes a parsed
 :class:`vaultspec_core.plan.parser.Plan` (and the original markdown

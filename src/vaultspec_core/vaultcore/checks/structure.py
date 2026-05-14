@@ -171,7 +171,7 @@ def _rewrite_incoming_refs(
     (``- "[[stem]]"`` / ``- '[[stem]]'`` / ``- [[stem]]``) which is the
     form enforced by the vault template and used throughout this
     project.  YAML flow-style lists (``related: ["[[stem]]"]``) are not
-    currently rewritten; ``vault check frontmatter`` enforces block
+    currently rewritten; ``vaultspec-core vault check frontmatter`` enforces block
     style.
 
     Each rewrite bumps :attr:`CheckResult.fixed_count` and appends an
@@ -615,7 +615,8 @@ def check_structure(
     Misplaced feature indexes are surfaced as warnings only; the
     actual relocation lives in the schema migration registry
     (:mod:`vaultspec_core.migrations`) which runs lazily on every
-    vault command and explicitly via ``vaultspec-core migrations run``.
+    ``vaultspec-core vault ...`` command and explicitly via
+    ``vaultspec-core migrations run``.
 
     Args:
         root_dir: Project root directory.

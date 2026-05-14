@@ -48,7 +48,7 @@ _TIER_ORDER = (Tier.L1, Tier.L2, Tier.L3, Tier.L4)
 
 
 def current_tier(plan: Plan) -> Tier:
-    """Return the plan's declared tier (read-only ``vault plan tier --show``)."""
+    """Return the plan's tier for ``vaultspec-core vault plan tier show``."""
     return plan.frontmatter.tier
 
 
@@ -79,7 +79,7 @@ def promote_tier(
 
     Title and intent arguments fill new containers. Pass ``None`` (the
     default) to signal "use the canonical ``TODO:`` placeholder", which
-    ``vault plan check`` flags as an authorial gap. Pass a real string
+    ``vaultspec-core vault plan check`` flags as an authorial gap. Pass a real string
     to populate the new container immediately. Programmatic callers can
     therefore distinguish "no value supplied" from "value happens to
     equal the placeholder string".

@@ -13,7 +13,8 @@ order: 3
   Check for any previous audit or adr overlap. All authored records live in
   `.vault/` under `adr/`, `audit/`, `exec/`, `plan/`, `reference/`, and
   `research/`. Auto-generated feature indexes live in `.vault/index/` and
-  are managed by `vault feature index`; do not author them by hand.
+  are managed by `vaultspec-core vault feature index`; do not author them by
+  hand.
 
 All significant work must follow this pipeline:
 
@@ -38,10 +39,13 @@ in the Epic intent block. The leaf row at every tier is named
 live in the plan-hardening convention ADR and in the markdown-
 comment hint blocks embedded in `.vaultspec/rules/templates/plan.md`.
 
-The `vault plan` CLI (vaultspec-core) is the canonical surface
+The `vaultspec-core vault plan` CLI is the canonical surface
 for structural manipulation of plan documents. Writers and
-executors MUST use the CLI verbs (`step add/insert/move/remove/ check/uncheck/toggle/edit`, `phase`/`wave` equivalents, `epic intent`, `tier promote/demote`) for every identifier-affecting
-change rather than hand-editing the markdown body. The CLI
+executors MUST use the `vaultspec-core vault plan ...` CLI verbs
+(`step add/insert/move/remove/check/uncheck/toggle/edit`,
+`phase`/`wave` equivalents, `epic intent`, `tier promote/demote`)
+for every identifier-affecting change rather than hand-editing the
+markdown body. The CLI
 guarantees canonical-identifier preservation, gap-no-reuse, and
 display-path consistency that hand edits cannot. See the CLI
 ADR (`2026-05-06-plan-hardening-adr`) for the subcommand

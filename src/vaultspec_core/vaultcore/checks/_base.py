@@ -126,7 +126,7 @@ def is_generated_index(path: Path) -> bool:
 
     The check is intentionally filename-only and folder-agnostic: a
     file dropped into the wrong directory by mistake is surfaced as a
-    misplaced-index ERROR by ``vault check structure`` rather than
+    misplaced-index ERROR by ``vaultspec-core vault check structure`` rather than
     being silently exempted.
 
     Args:

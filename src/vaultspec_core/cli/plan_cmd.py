@@ -1,4 +1,4 @@
-"""Typer wiring for ``vault plan ...`` subcommand group.
+"""Typer wiring for ``vaultspec-core vault plan ...`` subcommand group.
 
 Registers the read commands (``status``, ``check``, ``query``) and the
 container-level mutating verbs (``step``/``phase``/``wave`` add/insert/

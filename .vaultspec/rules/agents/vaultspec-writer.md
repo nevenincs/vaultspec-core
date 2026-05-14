@@ -190,11 +190,18 @@ You must autonomously make the most optimal decisions.
 
 ## CLI usage mandate
 
-The writer agent MUST dispatch `vault plan` subcommands for every
-structural manipulation of an authored plan rather than hand-editing
-the markdown body. Use `vault plan step add` / `step insert` /
-`step move` / `step remove` to manage Step rows; `vault plan phase add/move/remove/edit` for Phases; `vault plan wave add/move/remove/ edit` for Waves; `vault plan epic intent --edit` for the L4 Epic
-intent block; `vault plan tier promote/demote` for tier transitions.
+The writer agent MUST dispatch `vaultspec-core vault plan` subcommands
+for every structural manipulation of an authored plan rather than
+hand-editing the markdown body. Use
+`vaultspec-core vault plan step add`,
+`vaultspec-core vault plan step insert`,
+`vaultspec-core vault plan step move`, and
+`vaultspec-core vault plan step remove` to manage Step rows. Use
+`vaultspec-core vault plan phase add/move/remove/edit` for Phases,
+`vaultspec-core vault plan wave add/move/remove/edit` for Waves,
+`vaultspec-core vault plan epic intent edit` for the L4 Epic intent
+block, and `vaultspec-core vault plan tier promote/demote` for tier
+transitions.
 The CLI guarantees canonical-identifier preservation, gap-no-reuse,
 and document-order independence; hand edits do not. See the CLI
 ADR (`2026-05-06-plan-hardening-adr`) for the full subcommand

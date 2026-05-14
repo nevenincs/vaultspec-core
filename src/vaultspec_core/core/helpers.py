@@ -128,7 +128,8 @@ def _ensure_literal_representer() -> None:
     prevents a partially broken or missing PyYAML install from taking the
     framework down during ``import vaultspec_core.core``: every CLI entry
     point and downstream package depends on that import succeeding so
-    ``spec doctor`` and ``install --upgrade`` can diagnose and repair a
+    ``vaultspec-core spec doctor`` and ``vaultspec-core install --upgrade`` can
+    diagnose and repair a
     degraded environment.  See GitHub issue #85.
 
     Uses double-checked locking so that two threads calling
