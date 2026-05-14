@@ -1,4 +1,4 @@
-"""Step-level command handlers backing ``vault plan step ...`` verbs.
+"""Step-level command handlers backing ``vaultspec-core vault plan step ...`` verbs.
 
 Implements:
 
@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "AddStepError",
+    "AmbiguousStepError",
     "MoveStepError",
     "StepNotFoundError",
     "add_step",
@@ -47,6 +48,10 @@ class AddStepError(PlanCommandError, ValueError):
 
 class StepNotFoundError(PlanCommandError, KeyError):
     """Raised when a Step canonical identifier does not exist in the plan."""
+
+
+class AmbiguousStepError(PlanCommandError, ValueError):
+    """Raised when a Step leaf identifier matches multiple live rows."""
 
 
 class MoveStepError(PlanCommandError, ValueError):
@@ -152,6 +157,7 @@ def insert_step(
         msg = "insert_step received None anchor after exactly-one validation"
         raise AddStepError(msg)
     anchor_phase, anchor_index = _locate_step_in_phase(plan, anchor_id)
+    anchor_step = find_step(plan, anchor_id)
     canonical_id = next_available_step(plan)
     wave_id = _wave_id_of(plan, anchor_phase) if anchor_phase is not None else None
     parent_id = anchor_phase.canonical_id if anchor_phase is not None else None
@@ -171,17 +177,13 @@ def insert_step(
 
     if anchor_phase is None:
         # L1 plan: insert into the flat plan.steps list.
-        flat_index = next(
-            i for i, step in enumerate(plan.steps) if step.canonical_id == anchor_id
-        )
+        flat_index = plan.steps.index(anchor_step)
         position = flat_index if before is not None else flat_index + 1
         plan.steps.insert(position, new_step)
     else:
         position = anchor_index if before is not None else anchor_index + 1
         anchor_phase.steps.insert(position, new_step)
-        flat_index = next(
-            i for i, step in enumerate(plan.steps) if step.canonical_id == anchor_id
-        )
+        flat_index = plan.steps.index(anchor_step)
         flat_position = flat_index if before is not None else flat_index + 1
         plan.steps.insert(flat_position, new_step)
     return new_step
@@ -191,14 +193,27 @@ def insert_step(
 
 
 def find_step(plan: Plan, step_id: str) -> Step:
-    """Return the Step with canonical id ``step_id`` or raise.
+    """Return the Step matching ``step_id`` or raise.
+
+    ``step_id`` may be a canonical leaf id (``S##``) or a full display
+    path (``P##.S##`` / ``W##.P##.S##``). Display-path addressing lets
+    repair commands target one row when a degraded plan temporarily
+    contains duplicate Step ids.
 
     Raises:
         StepNotFoundError: When ``step_id`` is not present in the plan.
+        AmbiguousStepError: When a leaf id matches multiple live rows.
     """
-    for step in plan.steps:
-        if step.canonical_id == step_id:
-            return step
+    matches = _matching_steps(plan, step_id)
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        display_paths = ", ".join(step.display_path for step in matches)
+        msg = (
+            f"Step {step_id!r} is ambiguous; use a full display path "
+            f"to select one of: {display_paths}"
+        )
+        raise AmbiguousStepError(msg)
     msg = f"Step {step_id!r} does not exist in this plan"
     raise StepNotFoundError(msg)
 
@@ -272,11 +287,12 @@ def remove_step(plan: Plan, step_id: str) -> str:
         StepNotFoundError: When ``step_id`` does not exist.
     """
     step = find_step(plan, step_id)
-    parent_phase = _phase_of(plan, step_id)
+    parent_phase = _phase_of_step(plan, step)
     if parent_phase is not None:
         parent_phase.steps.remove(step)
     plan.steps.remove(step)
-    plan.retired_step_ids.add(step.canonical_id)
+    if not any(other.canonical_id == step.canonical_id for other in plan.steps):
+        plan.retired_step_ids.add(step.canonical_id)
     return step.canonical_id
 
 
@@ -331,7 +347,7 @@ def move_step(
         raise MoveStepError(msg)
 
     moving = find_step(plan, step_id)
-    current_phase = _phase_of(plan, step_id)
+    current_phase = _phase_of_step(plan, moving)
 
     # Determine destination Phase.
     if to_phase is not None:
@@ -365,20 +381,16 @@ def move_step(
         if anchor_id is None:
             plan.steps.append(moving)
         else:
-            anchor_index = next(
-                i for i, step in enumerate(plan.steps) if step.canonical_id == anchor_id
-            )
+            anchor = find_step(plan, anchor_id)
+            anchor_index = plan.steps.index(anchor)
             position = anchor_index if before is not None else anchor_index + 1
             plan.steps.insert(position, moving)
     else:
         if anchor_id is None:
             dest_phase.steps.append(moving)
         else:
-            anchor_index = next(
-                i
-                for i, step in enumerate(dest_phase.steps)
-                if step.canonical_id == anchor_id
-            )
+            anchor = find_step(plan, anchor_id)
+            anchor_index = dest_phase.steps.index(anchor)
             position = anchor_index if before is not None else anchor_index + 1
             dest_phase.steps.insert(position, moving)
         # Refresh the flat plan.steps mirror to keep document order coherent.
@@ -401,16 +413,20 @@ def move_step(
 # ---- Internals --------------------------------------------------------------
 
 
-def _phase_of(plan: Plan, step_id: str):
+def _phase_of(plan: Plan, step_id: str | None):
     """Return the Phase that owns ``step_id`` or ``None`` for L1 plans."""
+    if step_id is None:
+        return None
+    return _phase_of_step(plan, find_step(plan, step_id))
+
+
+def _phase_of_step(plan: Plan, target: Step):
+    """Return the Phase that owns ``target`` or ``None`` for L1 plans."""
     if plan.frontmatter.tier is Tier.L1:
-        for step in plan.steps:
-            if step.canonical_id == step_id:
-                return None
         return None
     for phase in plan.phases:
         for step in phase.steps:
-            if step.canonical_id == step_id:
+            if step is target:
                 return phase
     return None
 
@@ -481,18 +497,22 @@ def _locate_step_in_phase(plan: Plan, anchor_id: str):
     Raises:
         AddStepError: When the anchor is not present in the plan.
     """
+    anchor = find_step(plan, anchor_id)
     if plan.frontmatter.tier is Tier.L1:
-        for step in plan.steps:
-            if step.canonical_id == anchor_id:
-                return None, 0
-        msg = f"anchor Step {anchor_id!r} does not exist in this plan"
-        raise AddStepError(msg)
+        return None, 0
     for phase in plan.phases:
         for index, step in enumerate(phase.steps):
-            if step.canonical_id == anchor_id:
+            if step is anchor:
                 return phase, index
     msg = f"anchor Step {anchor_id!r} does not exist in this plan"
     raise AddStepError(msg)
+
+
+def _matching_steps(plan: Plan, step_id: str) -> list[Step]:
+    """Return live Steps matching a leaf id or full display path."""
+    if "." in step_id:
+        return [step for step in plan.steps if step.display_path == step_id]
+    return [step for step in plan.steps if step.canonical_id == step_id]
 
 
 def _wave_id_of(plan: Plan, phase) -> str | None:

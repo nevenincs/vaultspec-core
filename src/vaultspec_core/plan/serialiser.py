@@ -17,6 +17,7 @@ the canonical form.
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 from vaultspec_core.plan.display_path import (
@@ -167,10 +168,21 @@ def _render_retirement_ledger(plan: Plan) -> str | None:
         plan.retired_step_ids,
     )
     for retired in retirement_sets:
-        tokens.extend(sorted(retired, key=lambda t: int(t[1:])))
+        tokens.extend(sorted(retired, key=_retired_sort_key))
     if not tokens:
         return None
     return f"<!-- RETIRED: {', '.join(tokens)} -->"
+
+
+def _retired_sort_key(identifier: str) -> tuple[int, int, str]:
+    """Sort retired ids by numeric base, then optional alpha suffix."""
+    match = re.fullmatch(
+        r"(?P<kind>[SPW])(?P<number>\d+)(?P<suffix>[a-z]?)",
+        identifier,
+    )
+    if match is None:
+        return (10**9, 10**9, identifier)
+    return (int(match.group("number")), ord(match.group("suffix") or "`"), identifier)
 
 
 def _placeholder_intent(container: str) -> str:
@@ -178,7 +190,7 @@ def _placeholder_intent(container: str) -> str:
 
     The convention requires an intent paragraph on every Phase and
     Wave; if the source document lacked one, the round-trip emits a
-    minimal placeholder so downstream `vault plan check` flags it as
+    minimal placeholder so downstream `vaultspec-core vault plan check` flags it as
     an authorial gap rather than silently swallowing the missing prose.
     """
     return f"TODO: {container} intent paragraph required by the convention ADR."

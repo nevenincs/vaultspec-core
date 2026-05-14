@@ -215,3 +215,162 @@ def test_tier_promote_advances_one_step(tmp_path, runner: CliRunner) -> None:
     assert plan.frontmatter.tier.value == "L2"
     assert [phase.canonical_id for phase in plan.phases] == ["P01"]
     assert [step.canonical_id for step in plan.steps] == ["S01", "S02"]
+
+
+def test_cli_repairs_manually_duplicated_step_with_display_path(
+    tmp_path,
+    runner: CliRunner,
+) -> None:
+    """Manual duplicate Step ids are repairable through display-path targeting."""
+    from vaultspec_core.plan.parser import parse_plan
+
+    rng = random.Random(10)
+    spec = make_clean_plan("L3", rng=rng, waves=2, phases=1, steps=2)
+    degraded = spec.render().replace("`W02.P02.S03`", "`W02.P02.S01`", 1)
+    plan_path = tmp_path / "degraded-duplicate-plan.md"
+    plan_path.write_text(degraded, encoding="utf-8")
+
+    check_result = runner.invoke(app, ["vault", "plan", "check", str(plan_path)])
+    assert check_result.exit_code == 1
+    assert "PLAN021" in check_result.stdout
+    assert "Traceback" not in check_result.stdout
+
+    ambiguous = runner.invoke(
+        app,
+        ["vault", "plan", "step", "remove", str(plan_path), "S01"],
+    )
+    assert ambiguous.exit_code == 1
+    combined = ambiguous.stdout + (ambiguous.stderr or "")
+    assert "ambiguous" in combined
+    assert "W01.P01.S01" in combined
+    assert "W02.P02.S01" in combined
+
+    repaired = runner.invoke(
+        app,
+        ["vault", "plan", "step", "remove", str(plan_path), "W02.P02.S01"],
+    )
+    assert repaired.exit_code == 0, repaired.stdout
+
+    add_result = runner.invoke(
+        app,
+        [
+            "vault",
+            "plan",
+            "step",
+            "add",
+            str(plan_path),
+            "--phase",
+            "P02",
+            "--action",
+            "restore the degraded work item",
+            "--scope",
+            "tests/manual-repair.md",
+        ],
+    )
+    assert add_result.exit_code == 0, add_result.stdout
+
+    plan = parse_plan(plan_path)
+    assert [step.canonical_id for step in plan.steps].count("S01") == 1
+    assert "S01" not in plan.retired_step_ids
+    assert plan.steps[-1].canonical_id == "S05"
+    assert plan.steps[-1].display_path == "W02.P02.S05"
+
+    final_check = runner.invoke(app, ["vault", "plan", "check", str(plan_path)])
+    assert final_check.exit_code == 0, final_check.stdout
+
+
+def test_cli_stable_insertion_uses_alpha_suffixes_for_waves_and_phases(
+    tmp_path,
+    runner: CliRunner,
+) -> None:
+    """Wave and Phase insertions use lowercase alpha suffixes, never Step suffixes."""
+    from vaultspec_core.plan.parser import parse_plan
+
+    rng = random.Random(11)
+    spec = make_clean_plan("L3", rng=rng, waves=2, phases=1, steps=1)
+    plan_path = tmp_path / "alpha-suffix-plan.md"
+    plan_path.write_text(spec.render(), encoding="utf-8")
+
+    wave_insert = runner.invoke(
+        app,
+        [
+            "vault",
+            "plan",
+            "wave",
+            "insert",
+            str(plan_path),
+            "--after",
+            "W01",
+            "--title",
+            "inserted wave",
+            "--intent",
+            "Inserted Wave keeps surrounding numeric ids stable.",
+        ],
+    )
+    assert wave_insert.exit_code == 0, wave_insert.stdout
+
+    phase_insert = runner.invoke(
+        app,
+        [
+            "vault",
+            "plan",
+            "phase",
+            "insert",
+            str(plan_path),
+            "--after",
+            "P01",
+            "--title",
+            "inserted phase",
+            "--intent",
+            "Inserted Phase keeps surrounding numeric ids stable.",
+        ],
+    )
+    assert phase_insert.exit_code == 0, phase_insert.stdout
+
+    step_add = runner.invoke(
+        app,
+        [
+            "vault",
+            "plan",
+            "step",
+            "add",
+            str(plan_path),
+            "--phase",
+            "P01a",
+            "--action",
+            "exercise the suffixed phase",
+            "--scope",
+            "tests/alpha-suffix.md",
+        ],
+    )
+    assert step_add.exit_code == 0, step_add.stdout
+
+    plan = parse_plan(plan_path)
+    assert [wave.canonical_id for wave in plan.waves] == ["W01", "W01a", "W02"]
+    assert [phase.canonical_id for phase in plan.waves[0].phases] == [
+        "P01",
+        "P01a",
+    ]
+    assert any(step.display_path == "W01.P01a.S03" for step in plan.steps)
+    assert not any(step.canonical_id.endswith("a") for step in plan.steps)
+
+    check_result = runner.invoke(app, ["vault", "plan", "check", str(plan_path)])
+    assert check_result.exit_code == 0, check_result.stdout
+    assert "PLAN023" in check_result.stdout
+
+    phase_remove = runner.invoke(
+        app,
+        ["vault", "plan", "phase", "remove", str(plan_path), "P01a"],
+    )
+    assert phase_remove.exit_code == 0, phase_remove.stdout
+
+    wave_remove = runner.invoke(
+        app,
+        ["vault", "plan", "wave", "remove", str(plan_path), "W01a"],
+    )
+    assert wave_remove.exit_code == 0, wave_remove.stdout
+
+    reparsed = parse_plan(plan_path)
+    assert "P01a" in reparsed.retired_phase_ids
+    assert "W01a" in reparsed.retired_wave_ids
+    assert "S03" in reparsed.retired_step_ids

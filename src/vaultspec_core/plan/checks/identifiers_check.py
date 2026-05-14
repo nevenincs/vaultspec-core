@@ -12,6 +12,9 @@ Validates canonical identifiers against the convention ADR's
   not a hard violation (the writer may have inserted a Step between
   existing rows on purpose, leaving a higher canonical id earlier in
   the document) but the warning surfaces for review.
+- ``PLAN023 alpha-suffix-id`` (warning): a Wave or Phase identifier
+  uses an alpha suffix. Lowercase suffixes are supported for stable
+  insertion; uppercase suffixes should be canonicalised to lowercase.
 """
 
 from __future__ import annotations
@@ -29,8 +32,10 @@ __all__ = ["check_identifiers"]
 
 
 _RE_UNDERPADDED_HEADING_ID = re.compile(
-    r"^(?P<lead>#{2,3} +(?:Wave|Phase) +)`(?P<token>[WP]\d)`",
+    r"^(?P<lead>#{2,3} +(?:Wave|Phase) +)`(?P<token>[WP]\d[A-Za-z]?)`",
 )
+_RE_ALPHA_SUFFIX_CONTAINER_ID = re.compile(r"(?P<token>[WP]\d{2,}[A-Za-z])")
+_RE_ALPHA_SUFFIX_STEP_ID = re.compile(r"`(?P<token>S\d{2,}[A-Za-z])`")
 
 
 def check_identifiers(plan: Plan, source_text: str = "") -> list[Finding]:
@@ -63,8 +68,8 @@ def check_identifiers(plan: Plan, source_text: str = "") -> list[Finding]:
                     "Pad the numeric tail to at least two digits; the "
                     "convention forbids retroactively re-padding existing "
                     "identifiers, so this typically requires removing the "
-                    "violating row and re-creating it via 'vault plan "
-                    "step add'."
+                    "violating row and re-creating it via "
+                    "'vaultspec-core vault plan step add'."
                 ),
                 autofixable=False,
             ),
@@ -82,6 +87,8 @@ def check_identifiers(plan: Plan, source_text: str = "") -> list[Finding]:
 
     findings.extend(_detect_non_monotonic(inventory.steps, kind="Step"))
     findings.extend(_detect_underpadded_headings(source_text))
+    findings.extend(_detect_alpha_suffixes(source_text))
+    findings.extend(_detect_step_alpha_suffixes(source_text))
     findings.extend(_detect_underpadded_retired_ids(plan))
 
     return findings
@@ -104,7 +111,8 @@ def _detect_underpadded_retired_ids(plan: Plan) -> list[Finding]:
     )
     for kind, retired in retired_by_kind:
         for token in sorted(retired):
-            if len(token) - 1 >= 2:
+            match = re.fullmatch(r"[SPW](?P<number>\d+)(?:[a-z])?", token)
+            if match is not None and len(match.group("number")) >= 2:
                 continue
             findings.append(
                 Finding(
@@ -125,6 +133,83 @@ def _detect_underpadded_retired_ids(plan: Plan) -> list[Finding]:
                     autofixable=False,
                 ),
             )
+    return findings
+
+
+def _detect_alpha_suffixes(source_text: str) -> list[Finding]:
+    """Yield PLAN023 warnings for Wave / Phase alpha suffix identifiers."""
+    findings: list[Finding] = []
+    seen: set[str] = set()
+    for index, raw_line in enumerate(source_text.splitlines(), start=1):
+        if not raw_line.startswith(("## Wave ", "### Phase ")):
+            continue
+        for match in _RE_ALPHA_SUFFIX_CONTAINER_ID.finditer(raw_line):
+            token = match.group("token")
+            if token in seen:
+                continue
+            seen.add(token)
+            kind = "Wave" if token.startswith("W") else "Phase"
+            suffix = token[-1]
+            canonical = token[:-1] + suffix.lower()
+            if suffix.islower():
+                message = (
+                    f"{kind} identifier '{token}' uses an alpha suffix for "
+                    "stable insertion."
+                )
+                hint = (
+                    "Alpha suffixes are supported for Wave and Phase ids only; "
+                    "keep the suffix lowercase and do not use alpha suffixes "
+                    "for Step ids."
+                )
+            else:
+                message = (
+                    f"{kind} identifier '{token}' uses an uppercase alpha suffix; "
+                    f"canonical suffix form is '{canonical}'."
+                )
+                hint = (
+                    "Canonicalise the suffix to lowercase. Alpha suffixes are "
+                    "supported for Wave and Phase ids only."
+                )
+            findings.append(
+                Finding(
+                    code="PLAN023",
+                    severity=Severity.WARNING,
+                    message=message,
+                    line_number=index,
+                    fix_hint=hint,
+                    autofixable=False,
+                ),
+            )
+    return findings
+
+
+def _detect_step_alpha_suffixes(source_text: str) -> list[Finding]:
+    """Yield PLAN020 errors for alpha suffixes on Step identifiers."""
+    findings: list[Finding] = []
+    for index, raw_line in enumerate(source_text.splitlines(), start=1):
+        if not raw_line.startswith("- ["):
+            continue
+        match = _RE_ALPHA_SUFFIX_STEP_ID.search(raw_line)
+        if match is None:
+            continue
+        token = match.group("token")
+        findings.append(
+            Finding(
+                code="PLAN020",
+                severity=Severity.ERROR,
+                message=(
+                    f"Step identifier '{token}' uses an alpha suffix; "
+                    "alpha suffixes are supported only for Wave and Phase ids."
+                ),
+                line_number=index,
+                fix_hint=(
+                    "Remove the Step suffix and allocate a numeric Step id "
+                    "through 'vaultspec-core vault plan step add' or "
+                    "'vaultspec-core vault plan step insert'."
+                ),
+                autofixable=False,
+            ),
+        )
     return findings
 
 
@@ -157,7 +242,7 @@ def _detect_underpadded_headings(source_text: str) -> list[Finding]:
                     "(e.g. 'W1' -> 'W01'). Hand-edits to widen padding "
                     "are forbidden once a plan is in flight; "
                     "re-create the container via the appropriate "
-                    "'vault plan {wave|phase} add' command."
+                    "'vaultspec-core vault plan {wave|phase} add' command."
                 ),
                 autofixable=False,
             ),

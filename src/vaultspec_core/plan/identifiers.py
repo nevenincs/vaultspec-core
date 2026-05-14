@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from string import ascii_lowercase
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -22,17 +23,23 @@ __all__ = [
     "PaddingViolation",
     "extract_inventory",
     "next_available_phase",
+    "next_available_phase_suffix",
     "next_available_step",
     "next_available_wave",
+    "next_available_wave_suffix",
     "validate_identifiers",
 ]
 
 
-_CONTAINER_PATTERN = re.compile(r"^([SPW])(\d{2,})$")
+_CONTAINER_PATTERN = re.compile(
+    r"^(?P<kind>[SPW])(?P<number>\d{2,})(?P<suffix>[a-z]?)$",
+)
 # Lenient pattern accepts single-digit tails too; ``_violates_padding`` then
 # distinguishes width-1 (drift) from canonical width-2+. Used by
 # ``_extract_number`` so callers do not crash on legacy hand-edited ids.
-_CONTAINER_LENIENT_PATTERN = re.compile(r"^([SPW])(\d+)$")
+_CONTAINER_LENIENT_PATTERN = re.compile(
+    r"^(?P<kind>[SPW])(?P<number>\d+)(?P<suffix>[A-Za-z]?)$",
+)
 
 
 class DuplicateIdentifierError(ValueError):
@@ -156,6 +163,21 @@ def next_available_phase(plan: Plan) -> str:
     )
 
 
+def next_available_phase_suffix(plan: Plan, base_id: str) -> str:
+    """Return the next ``P##[a-z]`` suffix available for ``base_id``.
+
+    ``base_id`` may be either ``P##`` or an existing suffixed form such
+    as ``P02a``. The suffix search includes live and retired Phase ids
+    so a removed suffixed identifier is not reused.
+    """
+    return _next_available_suffix(
+        existing=[p.canonical_id for p in plan.phases],
+        retired=plan.retired_phase_ids,
+        prefix="P",
+        base_id=base_id,
+    )
+
+
 def next_available_wave(plan: Plan) -> str:
     """Return the next-available ``W##`` identifier for the plan.
 
@@ -171,6 +193,16 @@ def next_available_wave(plan: Plan) -> str:
         existing=[w.canonical_id for w in plan.waves],
         retired=plan.retired_wave_ids,
         prefix="W",
+    )
+
+
+def next_available_wave_suffix(plan: Plan, base_id: str) -> str:
+    """Return the next ``W##[a-z]`` suffix available for ``base_id``."""
+    return _next_available_suffix(
+        existing=[w.canonical_id for w in plan.waves],
+        retired=plan.retired_wave_ids,
+        prefix="W",
+        base_id=base_id,
     )
 
 
@@ -194,6 +226,35 @@ def _next_available_id(
     return f"{prefix}{next_number:0{width}d}"
 
 
+def _next_available_suffix(
+    *,
+    existing: list[str],
+    retired: set[str],
+    prefix: str,
+    base_id: str,
+) -> str:
+    """Return the first unused alpha suffix for ``base_id``.
+
+    Suffixes are intentionally single-letter lowercase identifiers
+    (``a`` through ``z``). When the suffix space is exhausted, callers
+    must choose a different insertion anchor or renumber explicitly.
+    """
+    base = _suffix_base(base_id, prefix=prefix)
+    used = {
+        parsed["suffix"]
+        for identifier in [*existing, *retired]
+        if (parsed := _parse_identifier(identifier)) is not None
+        and parsed["kind"] == prefix
+        and f"{prefix}{parsed['number']}" == base
+        and parsed["suffix"]
+    }
+    for suffix in ascii_lowercase:
+        if suffix not in used:
+            return f"{base}{suffix}"
+    msg = f"all alpha suffixes for {base!r} are already live or retired"
+    raise ValueError(msg)
+
+
 def _extract_number(identifier: str) -> int:
     """Extract the numeric tail from an identifier.
 
@@ -207,11 +268,43 @@ def _extract_number(identifier: str) -> int:
         ValueError: When ``identifier`` does not match the lenient
             ``[SPW]\\d+`` shape (e.g. lowercase, non-numeric tail).
     """
-    match = _CONTAINER_LENIENT_PATTERN.match(identifier)
-    if match is None:
+    parsed = _parse_identifier(identifier)
+    if parsed is None:
         msg = f"Identifier {identifier!r} does not match the canonical S/P/W##... shape"
         raise ValueError(msg)
-    return int(match.group(2))
+    if parsed["kind"] == "S" and parsed["suffix"]:
+        msg = "Step identifiers do not support alpha suffixes"
+        raise ValueError(msg)
+    return int(parsed["number"])
+
+
+def _parse_identifier(identifier: str) -> dict[str, str] | None:
+    """Return parsed identifier fields or ``None`` for unknown shapes."""
+    match = _CONTAINER_LENIENT_PATTERN.match(identifier)
+    if match is None:
+        return None
+    return {
+        "kind": match.group("kind"),
+        "number": match.group("number"),
+        "suffix": match.group("suffix") or "",
+    }
+
+
+def _suffix_base(identifier: str, *, prefix: str) -> str:
+    """Return the numeric base for a suffixed Phase or Wave identifier."""
+    parsed = _parse_identifier(identifier)
+    if (
+        parsed is None
+        or parsed["kind"] != prefix
+        or len(parsed["number"]) < 2
+        or (parsed["suffix"] and not parsed["suffix"].islower())
+    ):
+        msg = (
+            f"base id {identifier!r} does not match the canonical "
+            f"{prefix}\\d{{2,}}[a-z]? shape"
+        )
+        raise ValueError(msg)
+    return f"{prefix}{parsed['number']}"
 
 
 def _raise_on_duplicate(identifiers: list[str], *, kind: str) -> None:
@@ -275,4 +368,8 @@ def _violates_padding(identifier: str) -> bool:
     match = _CONTAINER_PATTERN.match(identifier)
     if match is None:
         return True
-    return len(match.group(2)) < 2
+    kind = match.group("kind")
+    suffix = match.group("suffix")
+    if kind == "S" and suffix:
+        return True
+    return len(match.group("number")) < 2

@@ -16,7 +16,10 @@ from typing import TYPE_CHECKING
 from vaultspec_core.plan.commands._errors import PlanCommandError
 from vaultspec_core.plan.display_path import phase_display_path
 from vaultspec_core.plan.frontmatter import Tier
-from vaultspec_core.plan.identifiers import next_available_phase
+from vaultspec_core.plan.identifiers import (
+    next_available_phase,
+    next_available_phase_suffix,
+)
 from vaultspec_core.plan.parser import Phase
 
 if TYPE_CHECKING:
@@ -116,8 +119,10 @@ def renumber_phase(plan: Plan, phase_id: str, *, to: str) -> Phase:
 
     from vaultspec_core.plan.display_path import phase_display_path, step_display_path
 
-    if not re.fullmatch(r"P\d{2,}", to):
-        msg = f"target id {to!r} does not match the canonical ``P\\d{{2,}}`` shape"
+    if not re.fullmatch(r"P\d{2,}[a-z]?", to):
+        msg = (
+            f"target id {to!r} does not match the canonical ``P\\d{{2,}}[a-z]?`` shape"
+        )
         raise PhaseRenumberError(msg)
     live_ids = {p.canonical_id for p in plan.phases}
     if to in live_ids:
@@ -270,7 +275,7 @@ def remove_phase(plan: Plan, phase_id: str) -> tuple[str, list[str]]:
     Per the CLI ADR's *Cascading retirement* rule, removing a parent
     container retires every descendant canonical identifier. The
     Step Records on disk are NOT deleted by this function; the
-    convention surfaces them as orphans for ``vault check`` to flag.
+    convention surfaces them as orphans for ``vaultspec-core vault check`` to flag.
 
     Args:
         plan: Parsed :class:`Plan`. Mutated in place.
@@ -392,7 +397,14 @@ def insert_phase(
         msg = "insert_phase received None anchor after exactly-one validation"
         raise AddPhaseError(msg)
     anchor_wave, anchor_index = _locate_phase(plan, anchor_id)
-    canonical_id = next_available_phase(plan)
+    suffix_base = _phase_suffix_base(
+        plan,
+        anchor_wave,
+        anchor_index,
+        anchor_id,
+        before=before,
+    )
+    canonical_id = next_available_phase_suffix(plan, suffix_base)
     parent_wave_id = anchor_wave.canonical_id if anchor_wave is not None else None
     new_phase = Phase(
         canonical_id=canonical_id,
@@ -460,3 +472,18 @@ def _locate_phase(plan: Plan, anchor_id: str):
                 return wave, index
     msg = f"anchor Phase {anchor_id!r} does not exist in this plan"
     raise AddPhaseError(msg)
+
+
+def _phase_suffix_base(
+    plan: Plan,
+    anchor_wave,
+    anchor_index: int,
+    anchor_id: str,
+    *,
+    before: str | None,
+) -> str:
+    """Choose the stable-insertion suffix base for a Phase insert."""
+    siblings = anchor_wave.phases if anchor_wave is not None else plan.phases
+    if before is not None and anchor_index > 0:
+        return siblings[anchor_index - 1].canonical_id
+    return anchor_id

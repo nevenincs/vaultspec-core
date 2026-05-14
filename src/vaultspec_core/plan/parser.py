@@ -174,15 +174,16 @@ class PlanParseError(ValueError):
 
 _RE_TITLE = re.compile(r"^# +(?P<title>.+?)\s*$")
 _RE_WAVE_HEADING = re.compile(
-    r"^## +Wave +`(?P<id>W\d{2,})` *- *(?P<title>.+?)\s*$",
+    r"^## +Wave +`(?P<id>W\d{2,}[a-z]?)` *- *(?P<title>.+?)\s*$",
 )
 _RE_EPIC_INTENT = re.compile(r"^## +Epic intent\s*$")
 _RE_PHASE_HEADING = re.compile(
-    r"^### +Phase +`(?P<path>(?:W\d{2,}\.)?P\d{2,})` *- *(?P<title>.+?)\s*$",
+    r"^### +Phase +`(?P<path>(?:W\d{2,}[a-z]?\.)?"
+    r"P\d{2,}[a-z]?)` *- *(?P<title>.+?)\s*$",
 )
 _RE_STEP_ROW = re.compile(
     r"^- +\[(?P<state>[ x])\] +"
-    r"`(?P<path>(?:W\d{2,}\.)?(?:P\d{2,}\.)?S\d{2,})` *- *"
+    r"`(?P<path>(?:W\d{2,}[a-z]?\.)?(?:P\d{2,}[a-z]?\.)?S\d{2,})` *- *"
     r"(?P<rest>.+?)\s*$",
 )
 _RE_FRONTMATTER_FENCE = re.compile(r"^---\s*$")
@@ -261,9 +262,9 @@ def _extract_retirement_ledger(body: str) -> tuple[set[str], set[str], set[str]]
                 continue
             if re.fullmatch(r"S\d+", token):
                 retired_steps.add(token)
-            elif re.fullmatch(r"P\d+", token):
+            elif re.fullmatch(r"P\d+[a-z]?", token):
                 retired_phases.add(token)
-            elif re.fullmatch(r"W\d+", token):
+            elif re.fullmatch(r"W\d+[a-z]?", token):
                 retired_waves.add(token)
     return retired_steps, retired_phases, retired_waves
 

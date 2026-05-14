@@ -14,7 +14,10 @@ from typing import TYPE_CHECKING
 
 from vaultspec_core.plan.commands._errors import PlanCommandError
 from vaultspec_core.plan.frontmatter import Tier
-from vaultspec_core.plan.identifiers import next_available_wave
+from vaultspec_core.plan.identifiers import (
+    next_available_wave,
+    next_available_wave_suffix,
+)
 from vaultspec_core.plan.parser import Wave
 
 if TYPE_CHECKING:
@@ -86,7 +89,8 @@ def insert_wave(
         msg = f"anchor Wave {anchor_id!r} does not exist in this plan"
         raise AddWaveError(msg)
 
-    canonical_id = next_available_wave(plan)
+    suffix_base = _wave_suffix_base(plan, anchor_index, anchor_id, before=before)
+    canonical_id = next_available_wave_suffix(plan, suffix_base)
     new_wave = Wave(
         canonical_id=canonical_id,
         title=title,
@@ -262,3 +266,16 @@ def _require_wave_supporting_tier(plan: Plan) -> None:
             "headings; promote to L3 or L4 first."
         )
         raise AddWaveError(msg)
+
+
+def _wave_suffix_base(
+    plan: Plan,
+    anchor_index: int,
+    anchor_id: str,
+    *,
+    before: str | None,
+) -> str:
+    """Choose the stable-insertion suffix base for a Wave insert."""
+    if before is not None and anchor_index > 0:
+        return plan.waves[anchor_index - 1].canonical_id
+    return anchor_id

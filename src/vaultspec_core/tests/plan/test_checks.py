@@ -209,6 +209,71 @@ def test_identifier_check_flags_underpadded_phase_heading() -> None:
     )
 
 
+def test_identifier_check_warns_on_alpha_suffix_wave_and_phase_ids() -> None:
+    """Alpha-suffixed Wave / Phase ids surface an explicit PLAN023 warning."""
+    body = (
+        "---\n"
+        "tags:\n"
+        "  - '#plan'\n"
+        "  - '#alpha-suffix'\n"
+        "date: '2026-05-05'\n"
+        "tier: L3\n"
+        "related:\n"
+        "  - '[[2026-05-05-alpha-suffix-adr]]'\n"
+        "---\n"
+        "\n"
+        "# `alpha-suffix` plan\n"
+        "\n"
+        "## Wave `W70A` - uppercase suffix\n"
+        "\n"
+        "Wave intent.\n"
+        "\n"
+        "### Phase `W70A.P02B` - uppercase suffix\n"
+        "\n"
+        "Phase intent.\n"
+    )
+    plan = parse_plan(body)
+
+    findings = check_identifiers(plan, body)
+
+    warnings = [finding for finding in findings if finding.code == "PLAN023"]
+    assert len(warnings) == 2
+    assert any(
+        "W70A" in finding.message and "W70a" in finding.message for finding in warnings
+    )
+    assert any(
+        "P02B" in finding.message and "P02b" in finding.message for finding in warnings
+    )
+
+
+def test_identifier_check_rejects_alpha_suffix_step_ids() -> None:
+    """Step ids remain numeric-only even when Wave / Phase suffixes are allowed."""
+    body = (
+        "---\n"
+        "tags:\n"
+        "  - '#plan'\n"
+        "  - '#bad-step-suffix'\n"
+        "date: '2026-05-05'\n"
+        "tier: L1\n"
+        "related:\n"
+        "  - '[[2026-05-05-bad-step-suffix-adr]]'\n"
+        "---\n"
+        "\n"
+        "# `bad-step-suffix` plan\n"
+        "\n"
+        "- [ ] `S02a` - invalid suffixed Step; `src/a.py`.\n"
+    )
+
+    findings = check_identifiers(parse_plan(body), body)
+
+    assert any(
+        finding.code == "PLAN020"
+        and "S02a" in finding.message
+        and "only for Wave and Phase" in finding.message
+        for finding in findings
+    )
+
+
 def test_vocabulary_check_flags_epic_intent_with_wrong_noun() -> None:
     """``## Initiative intent`` raises PLAN050 even without a backticked id.
 
