@@ -38,6 +38,7 @@ repos:
     pass_filenames: true
     types:
     - markdown
+    exclude: '^CHANGELOG\.md$'
   - id: pymarkdown
     name: Lint Markdown style (pymarkdown)
     entry: uv run --no-sync pymarkdown --config .pymarkdown.json scan
@@ -45,6 +46,7 @@ repos:
     pass_filenames: true
     types:
     - markdown
+    exclude: '^CHANGELOG\.md$'
   - id: vault-fix
     name: Vault Doctor (Fix)
     entry: uv run --no-sync vaultspec-core vault check all --fix
@@ -67,7 +69,7 @@ repos:
     pass_filenames: false
   - id: block-manual-changelog
     name: Block manual CHANGELOG.md edits (release-please-managed)
-    entry: python -c "import sys; sys.exit('CHANGELOG.md is auto-managed by release-please. Do not edit manually - land your change as a conventional commit (feat:/fix:/perf:/...) and release-please will regenerate CHANGELOG.md on the next release PR.')"
+    entry: python -c "import subprocess, sys; changed = subprocess.run(['git', 'diff', '--cached', '--name-only', '--', 'CHANGELOG.md'], capture_output=True, text=True, check=False).stdout.strip(); sys.exit('CHANGELOG.md is auto-managed by release-please. Do not edit manually - land your change as a conventional commit (feat:/fix:/perf:/...) and release-please will regenerate CHANGELOG.md on the next release PR.' if changed else 0)"
     language: system
     files: '^CHANGELOG\.md$'
     pass_filenames: false
