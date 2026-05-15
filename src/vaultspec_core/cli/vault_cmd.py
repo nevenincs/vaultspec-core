@@ -746,18 +746,20 @@ def _render_repair_run(run: RepairRun, *, verbose: bool = False) -> None:
         display_items = [
             item for item in run.unresolved if verbose or item.get("severity") != "info"
         ]
+        hidden_info = len(run.unresolved) - len(display_items)
         display_items.sort(
             key=lambda item: severity_rank.get(str(item.get("severity")), 3)
         )
         for item in display_items[:20]:
             path = f"{item['path']}: " if item.get("path") else ""
             console.print(f"  - [{item['severity']}] {path}{item['message']}")
-        if not display_items:
+        if hidden_info:
             console.print(
-                "  INFO diagnostics hidden; rerun with --verbose to show them."
+                f"  ... {hidden_info} INFO diagnostics hidden; "
+                "rerun with --verbose to show them."
             )
         if len(display_items) > 20:
-            console.print(f"  ... {len(display_items) - 20} more")
+            console.print(f"  ... {len(display_items) - 20} more non-INFO diagnostics")
 
 
 def _render_phase_diagnostics(console, phase: dict) -> None:

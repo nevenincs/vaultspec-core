@@ -66,27 +66,27 @@ def _add_related_link(doc_path: Path, link_name: str) -> bool:
 
     empty_related = re.compile(r"^related:\s*\[\s*\]\s*$", re.MULTILINE)
     if empty_related.search(yaml_block):
-        new_yaml = empty_related.sub(f'related:\n  - "{link}"', yaml_block, count=1)
+        new_yaml = empty_related.sub(f"related:\n  - '{link}'", yaml_block, count=1)
     elif re.search(r"^related:", yaml_block, re.MULTILINE):
         # Find the last list item under related: and append after it
         last_item = re.search(r"(^related:.*(?:\n  - .+)*)", yaml_block, re.MULTILINE)
         if last_item:
             new_yaml = (
                 yaml_block[: last_item.end()]
-                + f'\n  - "{link}"'
+                + f"\n  - '{link}'"
                 + yaml_block[last_item.end() :]
             )
         else:
             new_yaml = re.sub(
                 r"(^related:.*$)",
-                rf'\1\n  - "{link}"',
+                rf"\1\n  - '{link}'",
                 yaml_block,
                 count=1,
                 flags=re.MULTILINE,
             )
     else:
         # Add related: field before closing ---
-        new_yaml = yaml_block + f'\nrelated:\n  - "{link}"'
+        new_yaml = yaml_block + f"\nrelated:\n  - '{link}'"
 
     rendered = f"{leading_ws}---\n{new_yaml}\n---\n{body}"
     new_content = (

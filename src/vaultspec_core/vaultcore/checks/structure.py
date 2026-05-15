@@ -121,6 +121,19 @@ def _fix_filename(
 
     filename = doc_path.name
     rel = doc_path.relative_to(root_dir)
+    fixed_messages: list[str] = []
+
+    def _flush_fixed_messages() -> None:
+        fixed_rel = doc_path.relative_to(root_dir)
+        for message in fixed_messages:
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=fixed_rel,
+                    message=message,
+                    severity=Severity.INFO,
+                )
+            )
+        fixed_messages.clear()
 
     expected_suffix = f"-{doc_type.value}.md"
     needs_rename = False
@@ -145,21 +158,17 @@ def _fix_filename(
 
             if _rename_document_path(doc_path, new_path):
                 old_stem = doc_path.stem
+                old_filename = doc_path.name
                 result.fixed_count += 1
                 renames.append((old_stem, new_path.stem))
                 doc_path = new_path
                 rel = doc_path.relative_to(root_dir)
                 filename = new_filename
-                result.diagnostics.append(
-                    CheckDiagnostic(
-                        path=rel,
-                        message=f"Fixed: renamed to {new_filename}",
-                        severity=Severity.INFO,
-                    )
-                )
-                logger.info("Renamed %s -> %s", filename, new_filename)
+                fixed_messages.append(f"Fixed: renamed to {new_filename}")
+                logger.info("Renamed %s -> %s", old_filename, new_filename)
             else:
                 logger.warning("Cannot rename %s: target exists", filename)
+                _flush_fixed_messages()
                 result.diagnostics.append(
                     CheckDiagnostic(
                         path=rel,
@@ -181,20 +190,17 @@ def _fix_filename(
 
         if _rename_document_path(doc_path, new_path):
             old_stem = doc_path.stem
+            old_filename = doc_path.name
             result.fixed_count += 1
             renames.append((old_stem, new_path.stem))
             doc_path = new_path
             rel = doc_path.relative_to(root_dir)
-            result.diagnostics.append(
-                CheckDiagnostic(
-                    path=rel,
-                    message=f"Fixed: renamed to {new_filename}",
-                    severity=Severity.INFO,
-                )
-            )
-            logger.info("Renamed %s -> %s", filename, new_filename)
+            filename = doc_path.name
+            fixed_messages.append(f"Fixed: renamed to {new_filename}")
+            logger.info("Renamed %s -> %s", old_filename, new_filename)
         else:
             logger.warning("Cannot rename %s: target exists", filename)
+            _flush_fixed_messages()
             result.diagnostics.append(
                 CheckDiagnostic(
                     path=rel,
@@ -208,19 +214,16 @@ def _fix_filename(
         old_stem = doc_path.stem
         new_path = doc_path.with_name(lowercase_filename)
         if _rename_document_path(doc_path, new_path):
+            old_filename = doc_path.name
             result.fixed_count += 1
             renames.append((old_stem, new_path.stem))
             doc_path = new_path
             rel = doc_path.relative_to(root_dir)
-            result.diagnostics.append(
-                CheckDiagnostic(
-                    path=rel,
-                    message=f"Fixed: renamed to {lowercase_filename}",
-                    severity=Severity.INFO,
-                )
-            )
-            logger.info("Renamed %s -> %s", filename, lowercase_filename)
+            filename = doc_path.name
+            fixed_messages.append(f"Fixed: renamed to {lowercase_filename}")
+            logger.info("Renamed %s -> %s", old_filename, lowercase_filename)
         else:
+            _flush_fixed_messages()
             result.diagnostics.append(
                 CheckDiagnostic(
                     path=rel,
@@ -229,6 +232,7 @@ def _fix_filename(
                 )
             )
 
+    _flush_fixed_messages()
     return renames, doc_path
 
 

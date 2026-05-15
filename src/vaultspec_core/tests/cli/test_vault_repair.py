@@ -12,7 +12,11 @@ from vaultspec_core.cli import app
 from vaultspec_core.cli.vault_cmd import _render_repair_run
 from vaultspec_core.config import reset_config
 from vaultspec_core.vaultcore.checks import run_all_checks
-from vaultspec_core.vaultcore.repair import RepairRun, run_repair_pipeline
+from vaultspec_core.vaultcore.repair import (
+    RepairRun,
+    _vault_file_fingerprints,
+    run_repair_pipeline,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -426,6 +430,33 @@ class TestVaultRepair:
         )
         assert ".vault/index/state-mutation.index.md" in run.changed_files
 
+    def test_repair_fingerprints_skip_internal_vault_directories(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        root = tmp_path / "dummy-repo"
+        root.mkdir()
+        _write_doc(root, "research", "2026-05-15-visible", "visible")
+        for rel_path in (
+            ".vault/.obsidian/state.md",
+            ".vault/.trash/deleted.md",
+            ".vault/data/cache.md",
+            ".vault/logs/trace.md",
+            ".vault/_archive/old.md",
+        ):
+            path = root / rel_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# internal\n", encoding="utf-8")
+
+        fingerprints = _vault_file_fingerprints(root)
+
+        assert ".vault/research/2026-05-15-visible-research.md" in fingerprints
+        assert all("obsidian" not in path for path in fingerprints)
+        assert all(".trash" not in path for path in fingerprints)
+        assert all("/data/" not in path for path in fingerprints)
+        assert all("/logs/" not in path for path in fingerprints)
+        assert all("_archive" not in path for path in fingerprints)
+
     def test_repair_dry_run_journal_matches_planned_mutation_classes(
         self,
         tmp_path: Path,
@@ -611,3 +642,24 @@ class TestVaultRepair:
         assert output.index("actionable failure") < output.index("warning 0")
         assert "warning 20" not in output
         assert "informational 0" not in output
+        assert "3 INFO diagnostics hidden" in output
+        assert "6 more non-INFO diagnostics" in output
+
+    def test_repair_human_output_counts_hidden_info_when_no_visible_items(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        run = RepairRun(dry_run=False)
+        run.unresolved = [
+            {
+                "severity": "info",
+                "path": None,
+                "message": f"informational {index}",
+            }
+            for index in range(3)
+        ]
+
+        _render_repair_run(run)
+        output = capsys.readouterr().out
+
+        assert "informational 0" not in output
+        assert "3 INFO diagnostics hidden" in output

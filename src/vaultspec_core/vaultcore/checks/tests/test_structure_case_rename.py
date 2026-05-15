@@ -10,7 +10,7 @@ import pytest
 from vaultspec_core.config import reset_config
 
 from ...models import DocumentMetadata
-from ..structure import _rename_document_path, check_structure
+from ..structure import _fix_filename, _rename_document_path, check_structure
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -134,3 +134,28 @@ def test_case_only_rename_uses_short_temp_name_for_long_filenames(
     assert target.exists()
     assert source.name not in {path.name for path in docs.iterdir()}
     assert not list(docs.glob(".vs-*.tmp"))
+
+
+def test_fix_filename_reports_final_path_after_multi_step_rename(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / ".vault" / "research" / "2026-05-15-Repair-Case.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("# Repair case\n", encoding="utf-8")
+
+    from .._base import CheckResult
+
+    result = CheckResult(check_name="structure", supports_fix=True)
+
+    renames, final_path = _fix_filename(source, tmp_path, result)
+
+    assert final_path == (
+        tmp_path / ".vault" / "research" / "2026-05-15-repair-case-research.md"
+    )
+    assert final_path.exists()
+    assert len(renames) == 2
+    assert result.fixed_count == 2
+    assert [diag.path for diag in result.diagnostics] == [
+        final_path.relative_to(tmp_path),
+        final_path.relative_to(tmp_path),
+    ]

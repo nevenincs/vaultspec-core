@@ -565,6 +565,15 @@ def _vault_file_fingerprints(root_dir: Path) -> dict[str, tuple[int, int]]:
     fingerprints: dict[str, tuple[int, int]] = {}
     for path in sorted(docs_dir.rglob("*.md")):
         try:
+            rel_parts = path.relative_to(docs_dir).parts
+        except ValueError:
+            continue
+        if any(
+            part.startswith(".") or part in {"data", "logs", "_archive"}
+            for part in rel_parts[:-1]
+        ):
+            continue
+        try:
             rel = _rel_str(path, root_dir)
         except ValueError:
             rel = str(path)
