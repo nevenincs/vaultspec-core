@@ -59,6 +59,11 @@ def _print_source_mutation_notice(path: Path, *, action: str) -> None:
     )
 
 
+def _resource_path(base_dir: Path, name: str, *, suffix: str = ".md") -> Path:
+    filename = name if name.endswith(suffix) else f"{name}{suffix}"
+    return base_dir / filename
+
+
 spec_app = typer.Typer(
     help=(
         "Manage framework resources: rules, skills, agents, system prompts, and hooks."
@@ -226,7 +231,7 @@ def cmd_rules_remove(
         raise typer.Exit(0)
 
     _print_source_mutation_notice(
-        get_context().rules_src_dir / name,
+        _resource_path(get_context().rules_src_dir, name),
         action="Rule source removed",
     )
 
@@ -415,6 +420,9 @@ def cmd_skills_add(
         typer.echo(json.dumps({"path": str(file_path)}, indent=2))
         raise typer.Exit(0)
 
+    action = "Would create skill source" if dry_run else "Skill source updated"
+    _print_source_mutation_notice(file_path, action=action)
+
 
 @skills_app.command("show")
 def cmd_skills_show(
@@ -501,6 +509,11 @@ def cmd_skills_remove(
         typer.echo(json.dumps({"removed": name}, indent=2))
         raise typer.Exit(0)
 
+    _print_source_mutation_notice(
+        get_context().skills_src_dir / name,
+        action="Skill source removed",
+    )
+
 
 @skills_app.command("rename")
 def cmd_skills_rename(
@@ -537,6 +550,8 @@ def cmd_skills_rename(
             )
         )
         raise typer.Exit(0)
+
+    _print_source_mutation_notice(new_path, action="Skill source renamed")
 
 
 @skills_app.command("sync")
@@ -678,6 +693,9 @@ def cmd_agents_add(
         typer.echo(json.dumps({"path": str(file_path)}, indent=2))
         raise typer.Exit(0)
 
+    action = "Would create agent source" if dry_run else "Agent source updated"
+    _print_source_mutation_notice(file_path, action=action)
+
 
 @agents_app.command("show")
 def cmd_agents_show(
@@ -761,6 +779,11 @@ def cmd_agents_remove(
         typer.echo(json.dumps({"removed": name}, indent=2))
         raise typer.Exit(0)
 
+    _print_source_mutation_notice(
+        _resource_path(get_context().agents_src_dir, name),
+        action="Agent source removed",
+    )
+
 
 @agents_app.command("rename")
 def cmd_agents_rename(
@@ -796,6 +819,8 @@ def cmd_agents_rename(
             )
         )
         raise typer.Exit(0)
+
+    _print_source_mutation_notice(new_path, action="Agent source renamed")
 
 
 @agents_app.command("sync")
@@ -1141,6 +1166,8 @@ def cmd_mcps_add(
         typer.echo(json.dumps({"path": str(file_path)}, indent=2))
         raise typer.Exit(0)
 
+    _print_source_mutation_notice(file_path, action="MCP source updated")
+
 
 @mcps_app.command("remove")
 def cmd_mcps_remove(
@@ -1158,7 +1185,7 @@ def cmd_mcps_remove(
         raise typer.Abort()
 
     try:
-        mcp_remove(name=name)
+        removed_path = mcp_remove(name=name)
     except VaultSpecError as exc:
         _handle_error(exc)
         return
@@ -1168,6 +1195,8 @@ def cmd_mcps_remove(
 
         typer.echo(json.dumps({"removed": name}, indent=2))
         raise typer.Exit(0)
+
+    _print_source_mutation_notice(removed_path, action="MCP source removed")
 
 
 @mcps_app.command("sync")

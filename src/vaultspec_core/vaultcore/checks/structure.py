@@ -226,7 +226,7 @@ def _rewrite_incoming_refs(
 ) -> None:
     """Rewrite ``[[old_stem]]`` -> ``[[new_stem]]`` in ``related:`` frontmatter.
 
-    Walks every ``*.md`` file under ``root_dir / ".vault"`` directly off
+    Walks every ``*.md`` file under the configured docs directory directly off
     the filesystem (the renames have already happened on disk; the
     in-memory :class:`VaultSnapshot` is now stale).  Inspects the YAML
     frontmatter ``related:`` list and rewrites any matching wiki-link
@@ -280,7 +280,9 @@ def _rewrite_incoming_refs(
         if not cycle:
             rename_map[old] = current
 
-    vault_root = root_dir / ".vault"
+    from ...config import get_config
+
+    vault_root = root_dir / get_config().docs_dir
     if not vault_root.is_dir():
         return
 

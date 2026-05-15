@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 import pytest
+
+from vaultspec_core.config import reset_config
 
 from ...models import DocumentMetadata
 from ..structure import check_structure
@@ -67,3 +70,50 @@ def test_fix_lowercases_case_drift_and_rewrites_related(tmp_path: Path) -> None:
     assert result.error_count == 0
     assert any(path.name == lower.name for path in lower.parent.iterdir())
     assert f"[[{new_stem}]]" in plan.read_text(encoding="utf-8")
+
+
+def test_fix_rewrites_related_in_configured_docs_dir(tmp_path: Path) -> None:
+    old_docs_dir = os.environ.get("VAULTSPEC_DOCS_DIR")
+    os.environ["VAULTSPEC_DOCS_DIR"] = "notes"
+    reset_config()
+    try:
+        root = tmp_path
+        upper = root / "notes" / "research" / "2026-05-15-Repair-Case-research.md"
+        lower = root / "notes" / "research" / "2026-05-15-repair-case-research.md"
+        plan = root / "notes" / "plan" / "2026-05-15-repair-case-plan.md"
+        old_stem = "2026-05-15-Repair-Case-research"
+        new_stem = "2026-05-15-repair-case-research"
+
+        _write_doc(upper, ["#research", "#repair-case"], [])
+        _write_doc(plan, ["#plan", "#repair-case"], [old_stem])
+
+        snapshot: VaultSnapshot = {
+            upper: (
+                DocumentMetadata(
+                    tags=["#research", "#repair-case"],
+                    date="2026-05-15",
+                    related=[],
+                ),
+                "",
+            ),
+            plan: (
+                DocumentMetadata(
+                    tags=["#plan", "#repair-case"],
+                    date="2026-05-15",
+                    related=[f"[[{old_stem}]]"],
+                ),
+                "",
+            ),
+        }
+
+        result = check_structure(root, snapshot=snapshot, fix=True)
+
+        assert result.error_count == 0
+        assert lower.exists()
+        assert f"[[{new_stem}]]" in plan.read_text(encoding="utf-8")
+    finally:
+        if old_docs_dir is None:
+            os.environ.pop("VAULTSPEC_DOCS_DIR", None)
+        else:
+            os.environ["VAULTSPEC_DOCS_DIR"] = old_docs_dir
+        reset_config()

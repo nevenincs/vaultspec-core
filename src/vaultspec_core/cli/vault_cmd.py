@@ -728,19 +728,18 @@ def _render_repair_run(run: RepairRun, *, verbose: bool = False) -> None:
     if run.unresolved:
         console.print()
         console.print("[bold]Unresolved work[/bold]")
-        visible = 0
-        for item in run.unresolved[:20]:
-            if item["severity"] == "info" and not verbose:
-                continue
-            visible += 1
+        display_items = [
+            item for item in run.unresolved if verbose or item.get("severity") != "info"
+        ]
+        for item in display_items[:20]:
             path = f"{item['path']}: " if item.get("path") else ""
             console.print(f"  - [{item['severity']}] {path}{item['message']}")
-        if visible == 0:
+        if not display_items:
             console.print(
                 "  INFO diagnostics hidden; rerun with --verbose to show them."
             )
-        if len(run.unresolved) > 20:
-            console.print(f"  ... {len(run.unresolved) - 20} more")
+        if len(display_items) > 20:
+            console.print(f"  ... {len(display_items) - 20} more")
 
 
 def _render_phase_diagnostics(console, phase: dict) -> None:

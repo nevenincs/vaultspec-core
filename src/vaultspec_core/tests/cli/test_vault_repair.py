@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import TYPE_CHECKING
 
 import pytest
 
 from vaultspec_core.cli import app
+from vaultspec_core.cli.vault_cmd import _render_repair_run
+from vaultspec_core.config import reset_config
+from vaultspec_core.vaultcore.repair import RepairRun, run_repair_pipeline
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -19,8 +23,15 @@ if TYPE_CHECKING:
 pytestmark = [pytest.mark.unit]
 
 
-def _write_doc(root: Path, doc_type: str, stem: str, feature: str) -> Path:
-    path = root / ".vault" / doc_type / f"{stem}-{doc_type}.md"
+def _write_doc(
+    root: Path,
+    doc_type: str,
+    stem: str,
+    feature: str,
+    *,
+    docs_dir: str = ".vault",
+) -> Path:
+    path = root / docs_dir / doc_type / f"{stem}-{doc_type}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         "---\n"
@@ -110,6 +121,59 @@ class TestVaultRepair:
         assert ".vault/index/repair-index.index.md" in payload["generated_indexes"]
         assert ".vault/index/repair-index.index.md" in payload["changed_files"]
 
+    def test_repair_tracks_changed_indexes_in_configured_docs_dir(
+        self,
+        factory: WorkspaceFactory,
+    ) -> None:
+        old_docs_dir = os.environ.get("VAULTSPEC_DOCS_DIR")
+        os.environ["VAULTSPEC_DOCS_DIR"] = "notes"
+        reset_config()
+        try:
+            factory.install("core")
+            _write_doc(
+                factory.path,
+                "research",
+                "2026-05-15-repair-custom-docs",
+                "repair-custom-docs",
+                docs_dir="notes",
+            )
+            index_path = (
+                factory.path / "notes" / "index" / "repair-custom-docs.index.md"
+            )
+
+            run = run_repair_pipeline(factory.path, feature="repair-custom-docs")
+
+            assert index_path.exists()
+            assert "notes/index/repair-custom-docs.index.md" in run.generated_indexes
+            assert "notes/index/repair-custom-docs.index.md" in run.changed_files
+        finally:
+            if old_docs_dir is None:
+                os.environ.pop("VAULTSPEC_DOCS_DIR", None)
+            else:
+                os.environ["VAULTSPEC_DOCS_DIR"] = old_docs_dir
+            reset_config()
+
+    def test_dry_run_does_not_plan_index_for_unknown_feature(
+        self,
+        factory: WorkspaceFactory,
+    ) -> None:
+        factory.install("core")
+
+        result = factory.run(
+            "vault",
+            "repair",
+            "--feature",
+            "missing-feature",
+            "--dry-run",
+            "--json",
+        )
+        payload = _json_payload(result.output)
+        index_phase = next(p for p in payload["phases"] if p["phase"] == "index")
+
+        assert result.exit_code == 0
+        assert payload["generated_indexes"] == []
+        assert index_phase["planned"] == []
+
     def test_no_index_skips_generated_artifact_refresh(
         self,
         factory: WorkspaceFactory,
@@ -184,3 +248,29 @@ class TestVaultRepair:
 
         assert "research document" not in default_result.output
         assert "research document" in verbose_result.output
+
+    def test_repair_human_output_filters_info_before_truncating(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        run = RepairRun(dry_run=False)
+        run.unresolved = [
+            {
+                "severity": "info",
+                "path": None,
+                "message": f"informational {index}",
+            }
+            for index in range(25)
+        ]
+        run.unresolved.append(
+            {
+                "severity": "error",
+                "path": ".vault/plan/example.md",
+                "message": "actionable failure",
+            }
+        )
+
+        _render_repair_run(run)
+        output = capsys.readouterr().out
+
+        assert "actionable failure" in output
+        assert "informational 0" not in output

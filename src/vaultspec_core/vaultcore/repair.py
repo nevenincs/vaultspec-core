@@ -314,7 +314,10 @@ def _index_paths(root_dir: Path, feature: str | None) -> list[Path]:
     cfg = get_config()
     index_dir = root_dir / cfg.docs_dir / cfg.index_dir
     graph = VaultGraph(root_dir)
-    features = [feature] if feature else graph.get_features()
+    if feature:
+        features = [feature] if graph.get_feature_nodes(feature) else []
+    else:
+        features = graph.get_features()
     return [index_dir / f"{feat}.index.md" for feat in features if feat]
 
 
@@ -349,7 +352,9 @@ def _finalize(
 
 
 def _vault_file_fingerprints(root_dir: Path) -> dict[str, str]:
-    docs_dir = root_dir / ".vault"
+    from ..config import get_config
+
+    docs_dir = root_dir / get_config().docs_dir
     if not docs_dir.is_dir():
         return {}
     hashes: dict[str, str] = {}

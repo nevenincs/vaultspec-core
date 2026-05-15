@@ -128,3 +128,36 @@ Additional validation commands run for the sync authority follow-up:
 - `uv run ty check src\vaultspec_core\cli\root.py src\vaultspec_core\cli\spec_cmd.py src\vaultspec_core\tests\cli\test_sync.py`
 - `uv run pytest src\vaultspec_core\tests\cli\test_sync.py -q`
 - `uv run pytest src\vaultspec_core\tests\cli\test_sync.py src\vaultspec_core\tests\cli\test_spec_cli.py src\vaultspec_core\tests\cli\test_cli_language_contract.py -q`
+
+## PR review follow-up execution
+
+Actioned Codex review findings posted to PR `112`.
+
+- Modified: `src/vaultspec_core/vaultcore/checks/structure.py`
+- Modified: `src/vaultspec_core/vaultcore/repair.py`
+- Modified: `src/vaultspec_core/cli/vault_cmd.py`
+- Modified: `src/vaultspec_core/cli/root.py`
+- Modified: `src/vaultspec_core/cli/spec_cmd.py`
+- Modified: `src/vaultspec_core/vaultcore/checks/tests/test_structure_case_rename.py`
+- Modified: `src/vaultspec_core/tests/cli/test_vault_repair.py`
+- Modified: `src/vaultspec_core/tests/cli/test_sync.py`
+
+Fixes applied:
+
+- Custom docs directories are now respected when structure repair rewrites
+  incoming `related:` references after filename normalization.
+- Repair changed-file fingerprints now scan the configured docs directory
+  instead of hardcoding `.vault/`.
+- Dry-run index planning now matches mutating behavior and skips unknown
+  feature names with no graph nodes.
+- Human repair output filters INFO diagnostics before truncating the
+  unresolved list, so later errors and warnings remain visible.
+- Provider-scoped top-level sync now renders only the requested provider.
+- Skills, agents, and MCP source mutations now emit the same top-level sync
+  follow-up guidance as rule mutations.
+- Rule removal guidance now reports the canonical `.md` source path.
+
+Additional regression coverage added for custom docs-dir repair, custom
+docs-dir changed-file reporting, dry-run unknown feature planning, unresolved
+diagnostic rendering, provider-scoped sync output, JSON output purity, and
+non-rule source mutation guidance.

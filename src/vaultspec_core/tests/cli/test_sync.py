@@ -1,5 +1,6 @@
 """Tests for sync command behavior."""
 
+import json
 import os
 
 import pytest
@@ -79,6 +80,79 @@ class TestSyncAuthority:
         assert "Provider-facing outputs were not updated" in result.output
         assert "vaultspec-core sync" in result.output
 
+    def test_rules_add_json_stays_machine_readable(self, runner, synthetic_project):
+        """JSON mode should not include human remediation guidance."""
+        result = runner.invoke(
+            app,
+            [
+                "--target",
+                str(synthetic_project),
+                "spec",
+                "rules",
+                "add",
+                "--name",
+                "operator-sync-json",
+                "--content",
+                "Keep JSON parseable.",
+                "--json",
+            ],
+        )
+        payload = json.loads(result.output)
+
+        assert result.exit_code == 0, result.output
+        assert payload["path"].endswith("operator-sync-json.md")
+        assert "Provider-facing outputs" not in result.output
+
+    @pytest.mark.parametrize(
+        ("args", "expected"),
+        [
+            (
+                [
+                    "spec",
+                    "skills",
+                    "add",
+                    "--name",
+                    "operator-skill-guidance",
+                    "--description",
+                    "Skill guidance",
+                ],
+                "Skill source updated",
+            ),
+            (
+                [
+                    "spec",
+                    "agents",
+                    "add",
+                    "--name",
+                    "operator-agent-guidance",
+                    "--description",
+                    "Agent guidance",
+                ],
+                "Agent source updated",
+            ),
+            (
+                [
+                    "spec",
+                    "mcps",
+                    "add",
+                    "--name",
+                    "operator-mcp-guidance",
+                ],
+                "MCP source updated",
+            ),
+        ],
+    )
+    def test_non_rule_source_mutations_point_to_top_level_sync(
+        self, runner, synthetic_project, args, expected
+    ):
+        """All source-side spec mutations should give the same sync cue."""
+        result = runner.invoke(app, ["--target", str(synthetic_project), *args])
+
+        assert result.exit_code == 0, result.output
+        assert expected in result.output
+        assert "Provider-facing outputs were not updated" in result.output
+        assert "vaultspec-core sync" in result.output
+
     def test_narrow_rules_sync_warns_about_resource_scope(
         self, runner, synthetic_project
     ):
@@ -91,6 +165,22 @@ class TestSyncAuthority:
         assert "Resource-scoped sync only" in result.output
         assert "vaultspec-core sync" in result.output
         assert "complete provider-facing refresh" in result.output
+
+    def test_provider_scoped_sync_renders_only_requested_provider(
+        self, runner, synthetic_project
+    ):
+        """`sync claude` output should not imply every provider was refreshed."""
+        result = runner.invoke(
+            app,
+            ["--target", str(synthetic_project), "sync", "claude"],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Syncing 1 enabled providers" in result.output
+        assert "claude" in result.output
+        assert "gemini" not in result.output
+        assert "antigravity" not in result.output
+        assert "codex" not in result.output
 
     def test_rule_add_then_top_level_sync_updates_provider_stubs(
         self, runner, synthetic_project

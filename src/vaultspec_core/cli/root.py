@@ -614,7 +614,19 @@ def cmd_sync(
         from vaultspec_core.core.manifest import installed_tool_configs
         from vaultspec_core.core.types import SyncResult
 
-        active_names = [cfg.name for cfg in installed_tool_configs().values()]
+        active_configs = installed_tool_configs()
+        if provider == "all":
+            active_names = [
+                cfg.name
+                for tool, cfg in active_configs.items()
+                if tool.value not in skip and cfg.name not in skip
+            ]
+        else:
+            active_names = [
+                cfg.name
+                for tool, cfg in active_configs.items()
+                if tool.value == provider or cfg.name == provider
+            ]
 
         # Header
         provider_list = ", ".join(f"[cyan]{n}[/cyan]" for n in active_names)
