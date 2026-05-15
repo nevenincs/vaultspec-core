@@ -185,8 +185,11 @@ class PrecommitHook(StrEnum):
     """Canonical pre-commit hook IDs managed by vaultspec-core.
 
     ``VAULT_FIX`` runs all vault checkers with ``--fix``, auto-repairing
-    safe issues (naming, frontmatter, links, dangling, references, schema)
-    and blocking on remaining errors (body-links).
+    safe issues (naming, frontmatter, annotations, links, dangling,
+    references, schema) and blocking on remaining errors (body-links).
+
+    ``VAULT_SANITIZE_ANNOTATIONS`` runs the explicit annotation sanitizer so
+    generated vault documents do not commit template-only guidance.
 
     ``SPEC_CHECK`` runs the workspace doctor, diagnosing framework,
     provider, and tooling health.
@@ -196,5 +199,6 @@ class PrecommitHook(StrEnum):
     """
 
     VAULT_FIX = "vault-fix"
+    VAULT_SANITIZE_ANNOTATIONS = "vault-sanitize-annotations"
     SPEC_CHECK = "spec-check"
     CHECK_PROVIDER_ARTIFACTS = "check-provider-artifacts"

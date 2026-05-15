@@ -11,6 +11,7 @@ import pytest
 from vaultspec_core.cli import app
 from vaultspec_core.cli.vault_cmd import _render_repair_run
 from vaultspec_core.config import reset_config
+from vaultspec_core.vaultcore.checks import run_all_checks
 from vaultspec_core.vaultcore.repair import RepairRun, run_repair_pipeline
 
 if TYPE_CHECKING:
@@ -50,6 +51,48 @@ def _write_doc(
 def _json_payload(output: str) -> dict:
     start = output.index("{")
     return json.loads(output[start:])
+
+
+def _write_state_mutation_workspace(root: Path) -> None:
+    """Create a tmp vault that requires multiple sequential file mutations."""
+    research = root / ".vault" / "research" / "2026-05-15-State-Mutation-research.md"
+    plan = root / ".vault" / "plan" / "2026-05-15-state-mutation-plan.md"
+    adr = root / ".vault" / "adr" / "2026-05-15-state-mutation-adr.md"
+    for path in (research, plan, adr):
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+    research.write_text(
+        "---\n"
+        "tags:\n"
+        "  - research\n"
+        "  - state-mutation\n"
+        "date: '2026-05-15'\n"
+        "related: []\n"
+        "---\n\n# Research\n",
+        encoding="utf-8",
+    )
+    plan.write_text(
+        "---\n"
+        "tags:\n"
+        "  - '#plan'\n"
+        "  - '#state-mutation'\n"
+        "date: '2026-05-15'\n"
+        "related:\n"
+        "  - '[[2026-05-15-State-Mutation-research.md]]'\n"
+        "  - '[[missing-target]]'\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
+    )
+    adr.write_text(
+        "---\n"
+        "tags:\n"
+        "  - '#adr'\n"
+        "  - '#state-mutation'\n"
+        "date: '2026-05-15'\n"
+        "related: []\n"
+        "---\n\n# ADR\n",
+        encoding="utf-8",
+    )
 
 
 class TestVaultRepair:
@@ -198,6 +241,150 @@ class TestVaultRepair:
         assert "#repair-stale-snapshot" in repaired
         assert payload["fixed_count"] >= 2
 
+    def test_repair_strips_template_annotations(
+        self,
+        factory: WorkspaceFactory,
+    ) -> None:
+        factory.install("core")
+        doc = _write_doc(
+            factory.path,
+            "research",
+            "2026-05-15-repair-annotations",
+            "repair-annotations",
+        )
+        annotated = doc.read_text(encoding="utf-8").replace(
+            "---\n\n# 2026-05-15-repair-annotations\n",
+            "---\n\n<!-- Fill this generated scaffold. -->\n\n"
+            "# 2026-05-15-repair-annotations\n",
+        )
+        doc.write_text(annotated, encoding="utf-8")
+
+        result = factory.run(
+            "vault",
+            "repair",
+            "--feature",
+            "repair-annotations",
+            "--no-index",
+            "--json",
+        )
+        payload = _json_payload(result.output)
+
+        assert result.exit_code == 0, result.output
+        assert payload["fixed_count"] >= 1
+        assert "<!-- Fill this generated scaffold. -->" not in doc.read_text(
+            encoding="utf-8"
+        )
+
+    def test_sanitize_annotations_command_strips_without_index_refresh(
+        self,
+        factory: WorkspaceFactory,
+    ) -> None:
+        factory.install("core")
+        doc = _write_doc(
+            factory.path,
+            "research",
+            "2026-05-15-sanitize-command",
+            "sanitize-command",
+        )
+        doc.write_text(
+            doc.read_text(encoding="utf-8")
+            + "\n<!-- Remove this generated annotation. -->\n",
+            encoding="utf-8",
+        )
+        index_path = factory.path / ".vault" / "index" / "sanitize-command.index.md"
+
+        result = factory.run(
+            "vault",
+            "sanitize",
+            "annotations",
+            "--feature",
+            "sanitize-command",
+            "--json",
+        )
+        payload = json.loads(result.output)
+
+        assert result.exit_code == 0, result.output
+        assert payload["fixed_count"] == 1
+        assert not index_path.exists()
+        assert "<!-- Remove this generated annotation. -->" not in doc.read_text(
+            encoding="utf-8"
+        )
+
+    def test_check_all_fix_synchronizes_graph_after_cascaded_mutations(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        root = tmp_path / "dummy-repo"
+        root.mkdir()
+        _write_state_mutation_workspace(root)
+
+        results = run_all_checks(root, feature="state-mutation", fix=True)
+        postcheck = run_all_checks(root, feature="state-mutation", fix=False)
+
+        lower_research = (
+            root / ".vault" / "research" / "2026-05-15-state-mutation-research.md"
+        )
+        upper_research = (
+            root / ".vault" / "research" / "2026-05-15-State-Mutation-research.md"
+        )
+        plan = root / ".vault" / "plan" / "2026-05-15-state-mutation-plan.md"
+        adr = root / ".vault" / "adr" / "2026-05-15-state-mutation-adr.md"
+
+        assert sum(result.fixed_count for result in results) >= 6
+        research_names = {path.name for path in lower_research.parent.iterdir()}
+        assert lower_research.name in research_names
+        assert upper_research.name not in research_names
+        lower_text = lower_research.read_text(encoding="utf-8")
+        assert "#research" in lower_text
+        assert "#state-mutation" in lower_text
+
+        plan_text = plan.read_text(encoding="utf-8")
+        assert ".md]]" not in plan_text
+        assert "[[missing-target]]" not in plan_text
+        assert "[[2026-05-15-state-mutation-research]]" in plan_text
+        assert "[[2026-05-15-state-mutation-adr]]" in plan_text
+        assert "[[2026-05-15-state-mutation-research]]" in adr.read_text(
+            encoding="utf-8"
+        )
+        assert all(result.error_count == 0 for result in postcheck)
+        postcheck_warnings = [
+            diag.message
+            for result in postcheck
+            for diag in result.diagnostics
+            if diag.severity == "warning"
+        ]
+        assert postcheck_warnings == [
+            "Feature 'state-mutation' has no feature index. Run "
+            "vaultspec-core vault feature index to generate "
+            "index/state-mutation.index.md"
+        ]
+
+    def test_repair_changed_files_tracks_cascaded_tmp_workspace_mutations(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        root = tmp_path / "dummy-repo"
+        root.mkdir()
+        _write_state_mutation_workspace(root)
+
+        run = run_repair_pipeline(
+            root,
+            feature="state-mutation",
+            include_index=True,
+        )
+
+        assert run.error_count == 0
+        assert run.warning_count == 0
+        assert ".vault/plan/2026-05-15-state-mutation-plan.md" in run.changed_files
+        assert ".vault/adr/2026-05-15-state-mutation-adr.md" in run.changed_files
+        assert (
+            ".vault/research/2026-05-15-State-Mutation-research.md" in run.changed_files
+        )
+        assert (
+            ".vault/research/2026-05-15-state-mutation-research.md" in run.changed_files
+        )
+        assert ".vault/index/state-mutation.index.md" in run.changed_files
+
     def test_dry_run_does_not_plan_index_for_unknown_feature(
         self,
         factory: WorkspaceFactory,
@@ -265,6 +452,7 @@ class TestVaultRepair:
         assert [item["check_name"] for item in payload] == [
             "structure",
             "frontmatter",
+            "annotations",
             "links",
             "dangling",
             "body-links",
@@ -294,18 +482,26 @@ class TestVaultRepair:
         assert "research document" not in default_result.output
         assert "research document" in verbose_result.output
 
-    def test_repair_human_output_filters_info_before_truncating(
+    def test_repair_human_output_prioritizes_severity_before_truncating(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
         run = RepairRun(dry_run=False)
         run.unresolved = [
             {
+                "severity": "warning",
+                "path": None,
+                "message": f"warning {index}",
+            }
+            for index in range(25)
+        ]
+        run.unresolved.extend(
+            {
                 "severity": "info",
                 "path": None,
                 "message": f"informational {index}",
             }
-            for index in range(25)
-        ]
+            for index in range(3)
+        )
         run.unresolved.append(
             {
                 "severity": "error",
@@ -318,4 +514,6 @@ class TestVaultRepair:
         output = capsys.readouterr().out
 
         assert "actionable failure" in output
+        assert output.index("actionable failure") < output.index("warning 0")
+        assert "warning 20" not in output
         assert "informational 0" not in output

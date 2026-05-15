@@ -448,6 +448,11 @@ _HOOK_DEFS: dict[PrecommitHook, dict[str, object]] = {
         "entry": f"{CANONICAL_ENTRY_PREFIX} vault check all --fix",
         "types": ["markdown"],
     },
+    PrecommitHook.VAULT_SANITIZE_ANNOTATIONS: {
+        "name": "Vault sanitize annotations",
+        "entry": f"{CANONICAL_ENTRY_PREFIX} vault sanitize annotations",
+        "types": ["markdown"],
+    },
     PrecommitHook.CHECK_PROVIDER_ARTIFACTS: {
         "name": "Check provider artifacts",
         "entry": f"{CANONICAL_ENTRY_PREFIX} check-providers",

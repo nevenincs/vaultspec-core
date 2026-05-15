@@ -176,6 +176,19 @@ def test_pre_commit_blocks_manual_changelog_edits() -> None:
     assert "^CHANGELOG\\.md$" in raw
 
 
+def test_pre_commit_runs_vault_annotation_sanitizer() -> None:
+    config = _load_yaml(".pre-commit-config.yaml")
+    hook_ids = {
+        hook.get("id")
+        for repo in config.get("repos", [])
+        for hook in repo.get("hooks", [])
+    }
+    assert "vault-sanitize-annotations" in hook_ids
+
+    raw = _read(".pre-commit-config.yaml")
+    assert "vault sanitize annotations" in raw
+
+
 def test_lint_all_runs_every_validation_surface() -> None:
     justfile = _read("justfile")
     assert "just _dev-lint-python" in justfile
@@ -203,6 +216,7 @@ def test_fix_surface_covers_all_autofixable_targets() -> None:
     assert "pymarkdown" in justfile
     assert ".pymarkdown.json" in justfile
     assert "vault check all --fix" in justfile
+    assert "vault sanitize annotations" in justfile
 
 
 def test_markdown_lint_uses_pymarkdown() -> None:

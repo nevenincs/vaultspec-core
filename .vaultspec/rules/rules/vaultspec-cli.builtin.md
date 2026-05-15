@@ -19,6 +19,7 @@ Use the `vaultspec-core` CLI for every read, write, and audit of `.vault/`, and 
 | Show statistics, invalid, or orphan documents         | `vaultspec-core vault stats [--invalid] [--orphaned]`                |
 | Visualize the vault dependency graph                  | `vaultspec-core vault graph [--feature <tag>]`                       |
 | Audit drift, broken links, or missing references      | `vaultspec-core vault check all [--fix]`                             |
+| Strip generated template annotations                  | `vaultspec-core vault sanitize annotations [--feature <tag>]`        |
 | Confirm required documents exist for a feature        | `vaultspec-core vault check features --feature <tag>`                |
 | Archive a completed feature                           | `vaultspec-core vault feature archive <tag>`                         |
 | List registered rules, skills, agents, hooks, or MCPs | `vaultspec-core spec <resource> list`                                |

@@ -226,6 +226,7 @@ graph state, and runs a postcheck pass.
 `vaultspec-core vault check all --fix`. The check-level fixer remains available
 for compatibility, but it does not own generated index refresh, post-fix graph
 rebuild, root-cause grouping, or final delta reporting.
+It also runs the annotation sanitizer as part of the fix phase.
 
 #### Options
 
@@ -251,6 +252,26 @@ rebuild, root-cause grouping, or final delta reporting.
 Dry-run mode never writes generated indexes or check fixes. If migrations are
 pending, dry-run reports that state instead of entering the vault scan path that
 would apply lazy migrations on first use.
+
+______________________________________________________________________
+
+### vaultspec-core vault sanitize annotations
+
+```bash
+vaultspec-core vault sanitize annotations [OPTIONS]
+```
+
+Strip generated template annotations from `.vault/` documents. Template
+hydration keeps agent-facing instructions in newly created documents; this
+command removes those instructions only when explicitly requested.
+
+#### Options
+
+| Option          | Short | Default | Description                          |
+| --------------- | ----- | ------- | ------------------------------------ |
+| `--feature TAG` | `-f`  | None    | Sanitize documents for one feature   |
+| `--verbose`     | `-v`  | off     | Show stripped files                  |
+| `--json`        | -     | off     | Emit machine-readable check payloads |
 
 ______________________________________________________________________
 
@@ -327,6 +348,7 @@ Run health checks on `.vault/`. Exits with code `1` if errors are found.
 | Subcommand    | `--fix` | `--feature` | Description                                                      |
 | ------------- | ------- | ----------- | ---------------------------------------------------------------- |
 | `all`         | partial | yes         | Run every check in sequence                                      |
+| `annotations` | yes     | yes         | Find generated template annotations                              |
 | `body-links`  | no      | yes         | Find wiki-links and markdown path links in document body text    |
 | `dangling`    | yes     | yes         | Find `related:` wiki-links that resolve to no document           |
 | `frontmatter` | yes     | yes         | Validate frontmatter against vault schema                        |

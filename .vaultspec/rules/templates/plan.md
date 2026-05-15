@@ -1,27 +1,28 @@
 ---
-# REQUIRED TAGS (minimum 2): one directory tag + one feature tag
-# DIRECTORY TAGS: #adr #audit #exec #index #plan #reference #research
-# Directory tag (hardcoded - DO NOT CHANGE - based on .vault/plan/ location)
-# Feature tag (replace {feature} with your feature name, e.g., #editor-demo)
-# Additional tags may be appended below the required pair
 tags:
   - '#plan'
   - '#{feature}'
-# ISO date format (e.g., 2026-02-06)
 date: '{yyyy-mm-dd}'
-# Complexity tier (mandatory for new plans).
-# Allowed: L1 (Steps only), L2 (Phases above Steps),
-# L3 (Waves above Phases above Steps), L4 (Epic above Waves
-# above Phases above Steps; PM association required).
-# Pre-existing plans without this field default to L2.
 tier: L2
-# Related documents as quoted wiki-links.
-# Carries the AUTHORISING documents (ADR, research, reference,
-# prior plan) for every Step in this plan; Steps inherit this
-# chain; per-row reference footers do not exist.
 related:
   - '[[{yyyy-mm-dd-*}]]'
 ---
+
+<!-- FRONTMATTER RULES:
+     Required tags: one directory tag and one feature tag.
+     Directory tag is hardcoded as #plan for .vault/plan/ documents.
+     Replace {feature} with a kebab-case feature tag, e.g. #editor-demo.
+     Additional tags may be appended below the required pair.
+     Date must use ISO format, e.g. 2026-02-06.
+     tier is mandatory for new plans. Allowed: L1, L2, L3, L4.
+     L1 = Steps only. L2 = Phases above Steps. L3 = Waves above
+     Phases above Steps. L4 = Epic above Waves above Phases above
+     Steps; PM association required. Pre-existing plans without this
+     field default to L2.
+     Related documents must be quoted wiki-links. The related field
+     carries the AUTHORISING documents (ADR, research, reference, prior
+     plan) for every Step in this plan; Steps inherit this chain;
+     per-row reference footers do not exist. -->
 
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->

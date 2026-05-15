@@ -74,6 +74,7 @@ pytestmark = [pytest.mark.unit]
             PrecommitHook,
             {
                 "VAULT_FIX",
+                "VAULT_SANITIZE_ANNOTATIONS",
                 "CHECK_PROVIDER_ARTIFACTS",
                 "SPEC_CHECK",
             },

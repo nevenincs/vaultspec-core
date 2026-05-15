@@ -21,6 +21,7 @@ from ._base import (
     VaultSnapshot,
     render_check_result,
 )
+from .annotations import check_annotations
 from .body_links import check_body_links
 from .dangling import check_dangling
 from .features import check_features
@@ -39,6 +40,7 @@ __all__ = [
     "Severity",
     "VaultDocData",
     "VaultSnapshot",
+    "check_annotations",
     "check_body_links",
     "check_dangling",
     "check_features",
@@ -61,8 +63,8 @@ def run_all_checks(
 ) -> list[CheckResult]:
     """Run all vault health checkers and return their results.
 
-    Executes structure, frontmatter, links, dangling, body-links, orphans,
-    features, references, and schema checks in order. Builds a single
+    Executes structure, frontmatter, annotations, links, dangling, body-links,
+    orphans, features, references, and schema checks in order. Builds a single
     :class:`~vaultspec_core.graph.VaultGraph` and shares it across
     graph-consuming checkers to avoid redundant I/O.
 
@@ -83,6 +85,7 @@ def run_all_checks(
         return [
             check_structure(root_dir, snapshot=snapshot, fix=False),
             check_frontmatter(root_dir, snapshot=snapshot, feature=feature, fix=False),
+            check_annotations(root_dir, feature=feature, fix=False),
             check_links(root_dir, snapshot=snapshot, feature=feature, fix=False),
             check_dangling(root_dir, graph=graph, feature=feature, fix=False),
             check_body_links(root_dir, snapshot=snapshot, feature=feature),
@@ -92,38 +95,55 @@ def run_all_checks(
             check_schema(root_dir, graph=graph, feature=feature, fix=False),
         ]
 
-    # Mutating checks can rename files or rewrite frontmatter. Rebuild graph
-    # state before each checker so later checks never read stale paths.
+    # Mutating checks can rename files or rewrite frontmatter. Refresh graph
+    # state only after a checker reports a mutation.
     results: list[CheckResult] = []
     graph = VaultGraph(root_dir)
-    results.append(check_structure(root_dir, snapshot=graph.to_snapshot(), fix=True))
-    graph = VaultGraph(root_dir)
-    results.append(
-        check_frontmatter(
-            root_dir,
-            snapshot=graph.to_snapshot(),
-            feature=feature,
-            fix=True,
-        )
+
+    result = check_structure(root_dir, snapshot=graph.to_snapshot(), fix=True)
+    results.append(result)
+    if result.fixed_count:
+        graph = VaultGraph(root_dir)
+
+    result = check_frontmatter(
+        root_dir,
+        snapshot=graph.to_snapshot(),
+        feature=feature,
+        fix=True,
     )
-    graph = VaultGraph(root_dir)
-    results.append(
-        check_links(root_dir, snapshot=graph.to_snapshot(), feature=feature, fix=True)
+    results.append(result)
+    if result.fixed_count:
+        graph = VaultGraph(root_dir)
+
+    result = check_annotations(root_dir, feature=feature, fix=True)
+    results.append(result)
+    if result.fixed_count:
+        graph = VaultGraph(root_dir)
+
+    result = check_links(
+        root_dir, snapshot=graph.to_snapshot(), feature=feature, fix=True
     )
-    graph = VaultGraph(root_dir)
-    results.append(check_dangling(root_dir, graph=graph, feature=feature, fix=True))
-    graph = VaultGraph(root_dir)
+    results.append(result)
+    if result.fixed_count:
+        graph = VaultGraph(root_dir)
+
+    result = check_dangling(root_dir, graph=graph, feature=feature, fix=True)
+    results.append(result)
+    if result.fixed_count:
+        graph = VaultGraph(root_dir)
+
     results.append(
         check_body_links(root_dir, snapshot=graph.to_snapshot(), feature=feature)
     )
-    graph = VaultGraph(root_dir)
     results.append(check_orphans(root_dir, graph=graph, feature=feature))
-    graph = VaultGraph(root_dir)
     results.append(
         check_features(root_dir, snapshot=graph.to_snapshot(), feature=feature)
     )
-    graph = VaultGraph(root_dir)
-    results.append(check_references(root_dir, graph=graph, feature=feature, fix=True))
-    graph = VaultGraph(root_dir)
+
+    result = check_references(root_dir, graph=graph, feature=feature, fix=True)
+    results.append(result)
+    if result.fixed_count:
+        graph = VaultGraph(root_dir)
+
     results.append(check_schema(root_dir, graph=graph, feature=feature, fix=True))
     return results

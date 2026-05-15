@@ -54,6 +54,13 @@ repos:
     types:
     - markdown
     pass_filenames: false
+  - id: vault-sanitize-annotations
+    name: Vault sanitize annotations
+    entry: uv run --no-sync vaultspec-core vault sanitize annotations
+    language: system
+    types:
+    - markdown
+    pass_filenames: false
   - id: spec-check
     name: Vault Doctor (Check)
     entry: uv run --no-sync vaultspec-core spec doctor

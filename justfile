@@ -187,6 +187,7 @@ _dev-fix-markdown:
 
 _dev-fix-vault:
   uv run vaultspec-core vault check all --fix
+  uv run vaultspec-core vault sanitize annotations
 
 _dev-fix-all:
   just _dev-fix-python

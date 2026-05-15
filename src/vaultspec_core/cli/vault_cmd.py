@@ -48,6 +48,12 @@ check_app = typer.Typer(
 )
 vault_app.add_typer(check_app, name="check")
 
+sanitize_app = typer.Typer(
+    help="Run explicit vault sanitizers.",
+    no_args_is_help=True,
+)
+vault_app.add_typer(sanitize_app, name="sanitize")
+
 from vaultspec_core.cli.plan_cmd import plan_app  # noqa: E402
 
 vault_app.add_typer(plan_app, name="plan")
@@ -728,9 +734,13 @@ def _render_repair_run(run: RepairRun, *, verbose: bool = False) -> None:
     if run.unresolved:
         console.print()
         console.print("[bold]Unresolved work[/bold]")
+        severity_rank = {"error": 0, "warning": 1, "info": 2}
         display_items = [
             item for item in run.unresolved if verbose or item.get("severity") != "info"
         ]
+        display_items.sort(
+            key=lambda item: severity_rank.get(str(item.get("severity")), 3)
+        )
         for item in display_items[:20]:
             path = f"{item['path']}: " if item.get("path") else ""
             console.print(f"  - [{item['severity']}] {path}{item['message']}")
@@ -833,6 +843,50 @@ def cmd_check_body_links(
     graph = VaultGraph(_get_ctx().target_dir)
     snapshot = graph.to_snapshot()
     result = check_body_links(_get_ctx().target_dir, snapshot=snapshot, feature=feature)
+    _render_and_exit(result, verbose, json_output=json_output)
+
+
+@check_app.command("annotations")
+def cmd_check_annotations(
+    fix: Annotated[
+        bool,
+        typer.Option("--fix", help="Strip generated template annotations"),
+    ] = False,
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Find generated template annotations in vault documents."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.checks import check_annotations
+
+    result = check_annotations(_get_ctx().target_dir, feature=feature, fix=fix)
+    _render_and_exit(result, verbose, json_output=json_output)
+
+
+@sanitize_app.command("annotations")
+def cmd_sanitize_annotations(
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show stripped files")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Strip generated template annotations from vault documents."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.checks import check_annotations
+
+    result = check_annotations(_get_ctx().target_dir, feature=feature, fix=True)
     _render_and_exit(result, verbose, json_output=json_output)
 
 

@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 
 import pytest
 from typer.testing import CliRunner
@@ -9,6 +10,8 @@ from typer.testing import CliRunner
 from vaultspec_core.cli import app
 
 pytestmark = [pytest.mark.unit]
+
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 @pytest.fixture
@@ -176,11 +179,12 @@ class TestSyncAuthority:
         )
 
         assert result.exit_code == 0, result.output
-        assert "Syncing 1 enabled providers" in result.output
-        assert "claude" in result.output
-        assert "gemini" not in result.output
-        assert "antigravity" not in result.output
-        assert "codex" not in result.output
+        output = ANSI_RE.sub("", result.output)
+        assert "Syncing 1 enabled providers" in output
+        assert "claude" in output
+        assert "gemini" not in output
+        assert "antigravity" not in output
+        assert "codex" not in output
 
     def test_rule_add_then_top_level_sync_updates_provider_stubs(
         self, runner, synthetic_project

@@ -118,9 +118,13 @@ After execution, invoke the `vaultspec-code-review` skill to audit the completed
 
 The review produces a `.vault/audit/` record with issues triaged by severity: `LOW`, `MEDIUM`, `HIGH`, and `CRITICAL`. Critical and high-severity issues must be resolved before the feature closes. A clean review means the work is ready to ship.
 
-For ongoing vault maintenance - fixing broken links, validating frontmatter, cleaning up stale references - use the `vaultspec-curate` skill.
+For ongoing vault maintenance - fixing broken links, validating frontmatter, stripping generated template annotations, and cleaning up stale references - use the `vaultspec-curate` skill.
 
 > "Audit the vault for broken links and missing references"
+
+Run `vaultspec-core vault sanitize annotations` when you want to remove the
+agent-facing template guidance from generated `.vault/` documents without
+running the full repair pipeline.
 
 ## Customizing the framework
 

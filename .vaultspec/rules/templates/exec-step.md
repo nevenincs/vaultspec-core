@@ -1,23 +1,22 @@
 ---
-# REQUIRED TAGS (minimum 2): one directory tag + one feature tag
-# DIRECTORY TAGS: #adr #audit #exec #index #plan #reference #research
-# Directory tag (hardcoded - DO NOT CHANGE - based on .vault/exec/ location)
-# Feature tag (replace {feature} with your feature name, e.g., #editor-demo)
-# Additional tags may be appended below the required pair
 tags:
   - '#exec'
   - '#{feature}'
-# ISO date format (e.g., 2026-02-06)
 date: '{yyyy-mm-dd}'
-# Originating Step's canonical identifier (S##) from the plan.
-# Required: machine-readable linkage from this Step Record back
-# to the Step row in the parent plan document.
 step_id: '{S##}'
-# Related documents as quoted wiki-links - MUST link to parent PLAN
-# (e.g., "[[2026-02-04-feature-plan]]")
 related:
   - '[[{yyyy-mm-dd-*-plan}]]'
 ---
+
+<!-- FRONTMATTER RULES:
+     Required tags: one directory tag and one feature tag.
+     Directory tag is hardcoded as #exec for .vault/exec/ documents.
+     Replace {feature} with a kebab-case feature tag, e.g. #editor-demo.
+     Additional tags may be appended below the required pair.
+     Date must use ISO format, e.g. 2026-02-06.
+     step_id is the originating Step's canonical identifier, e.g. S01.
+     Related documents must be quoted wiki-links and must link to the
+     parent plan, e.g. "[[2026-02-04-feature-plan]]". -->
 
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
