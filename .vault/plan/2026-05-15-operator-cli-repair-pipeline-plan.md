@@ -12,15 +12,6 @@ related:
   - '[[2026-05-15-operator-cli-sync-authority-adr]]'
 ---
 
-<!-- LINK RULES:
-     - [[wiki-links]] are ONLY for .vault/ documents in the
-       related: field above.
-     - The related: field carries the AUTHORISING documents
-       (ADR, research, reference, prior plan) for every Step in
-       this plan. Steps inherit this chain; per-row reference
-       footers do not exist.
-     - NEVER use [[wiki-links]] or markdown links in the
-       document body. -->
 
 # operator-cli-repair-pipeline plan: operator CLI repair pipeline
 
@@ -90,3 +81,19 @@ resource-scoped maintenance operations.
 - [x] `P07.S24` - add post-add rule guidance; `src/vaultspec_core/cli/spec_cmd.py`.
 - [x] `P07.S25` - warn on stale provider-facing config after source mutations; `src/vaultspec_core/cli/spec_cmd.py`.
 - [x] `P07.S26` - add end-to-end sync authority regression coverage; `src/vaultspec_core/tests/cli`.
+
+### Phase `P08` - repair partial-failure hardening
+
+Complete the final hardening tranche for repair journaling, partial repair
+reporting, dry-run fidelity, graph refresh discipline, and Windows repair CI
+coverage.
+
+- [x] `P08.S27` - expose `partial_failure` and `journal` in repair JSON; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `P08.S28` - report partial repair status and journal count in human output; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `P08.S29` - carry `partial_failure` and `journal` on repair runs; `src/vaultspec_core/vaultcore/repair.py`.
+- [x] `P08.S30` - trap failures across `preflight`, `check`, `fix`, `index`, and `postcheck`; `src/vaultspec_core/vaultcore/repair.py`.
+- [x] `P08.S31` - record dry-run planned journal entries for fix and generated feature index refresh actions; `src/vaultspec_core/tests/cli/test_vault_repair.py`.
+- [x] `P08.S32` - record applied repair file deltas as journal entries; `src/vaultspec_core/vaultcore/repair.py`.
+- [x] `P08.S33` - centralize graph refresh after mutating checks; `src/vaultspec_core/vaultcore/checks/__init__.py`.
+- [x] `P08.S34` - add related `vault sanitize annotations --dry-run` coverage without conflating it with `vault repair`; `src/vaultspec_core/tests/cli/test_vault_repair.py`.
+- [x] `P08.S35` - add Windows repair CI coverage and enforce the workflow contract; `.github/workflows/ci.yml`.

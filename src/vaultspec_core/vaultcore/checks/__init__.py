@@ -100,10 +100,14 @@ def run_all_checks(
     results: list[CheckResult] = []
     graph = VaultGraph(root_dir)
 
+    def append_and_refresh(result: CheckResult) -> None:
+        nonlocal graph
+        results.append(result)
+        if result.fixed_count:
+            graph = VaultGraph(root_dir)
+
     result = check_structure(root_dir, snapshot=graph.to_snapshot(), fix=True)
-    results.append(result)
-    if result.fixed_count:
-        graph = VaultGraph(root_dir)
+    append_and_refresh(result)
 
     result = check_frontmatter(
         root_dir,
@@ -111,26 +115,18 @@ def run_all_checks(
         feature=feature,
         fix=True,
     )
-    results.append(result)
-    if result.fixed_count:
-        graph = VaultGraph(root_dir)
+    append_and_refresh(result)
 
     result = check_annotations(root_dir, feature=feature, fix=True)
-    results.append(result)
-    if result.fixed_count:
-        graph = VaultGraph(root_dir)
+    append_and_refresh(result)
 
     result = check_links(
         root_dir, snapshot=graph.to_snapshot(), feature=feature, fix=True
     )
-    results.append(result)
-    if result.fixed_count:
-        graph = VaultGraph(root_dir)
+    append_and_refresh(result)
 
     result = check_dangling(root_dir, graph=graph, feature=feature, fix=True)
-    results.append(result)
-    if result.fixed_count:
-        graph = VaultGraph(root_dir)
+    append_and_refresh(result)
 
     results.append(
         check_body_links(root_dir, snapshot=graph.to_snapshot(), feature=feature)
@@ -141,9 +137,7 @@ def run_all_checks(
     )
 
     result = check_references(root_dir, graph=graph, feature=feature, fix=True)
-    results.append(result)
-    if result.fixed_count:
-        graph = VaultGraph(root_dir)
+    append_and_refresh(result)
 
     results.append(check_schema(root_dir, graph=graph, feature=feature, fix=True))
     return results

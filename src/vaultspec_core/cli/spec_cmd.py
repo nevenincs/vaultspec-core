@@ -1273,6 +1273,7 @@ def cmd_doctor(
         GitignoreSignal,
         ManifestEntrySignal,
         PrecommitSignal,
+        VaultContentSignal,
         diagnose,
     )
 
@@ -1443,6 +1444,39 @@ def cmd_doctor(
         mig_detail,
     )
 
+    # Vault content row - read-only annotation signal.
+    vc_status, vc_style = _signal_status(
+        diag.vault_content,
+        {
+            VaultContentSignal.CLEAN: ("ok", "green"),
+            VaultContentSignal.ANNOTATIONS: ("warn", "yellow"),
+            VaultContentSignal.UNREADABLE: ("warn", "yellow"),
+            VaultContentSignal.NO_VAULT: ("info", "dim"),
+        },
+    )
+    vc_details = {
+        VaultContentSignal.CLEAN: "no generated template annotations",
+        VaultContentSignal.ANNOTATIONS: (
+            f"{diag.vault_annotation_count} document(s) contain generated "
+            "template annotations; run vaultspec-core vault sanitize annotations"
+        ),
+        VaultContentSignal.UNREADABLE: (
+            f"{diag.vault_unreadable_count} markdown file(s) unreadable"
+        ),
+        VaultContentSignal.NO_VAULT: "no vault documents found",
+    }
+    vc_detail = vc_details.get(diag.vault_content, str(diag.vault_content))
+    if (
+        diag.vault_content == VaultContentSignal.ANNOTATIONS
+        and diag.vault_unreadable_count
+    ):
+        vc_detail += f"; {diag.vault_unreadable_count} markdown file(s) unreadable"
+    table.add_row(
+        "vault content",
+        f"[{vc_style}]{vc_status}[/{vc_style}]",
+        vc_detail,
+    )
+
     # Pre-commit row
     pc_status, pc_style = _signal_status(
         diag.precommit,
@@ -1531,6 +1565,7 @@ def _doctor_exit_code(
         ManifestEntrySignal,
         PrecommitSignal,
         ProviderDirSignal,
+        VaultContentSignal,
     )
 
     has_error = False
@@ -1557,6 +1592,11 @@ def _doctor_exit_code(
         has_warn = True
 
     if diag.migration_status == "pending":
+        has_warn = True
+    if diag.vault_content in (
+        VaultContentSignal.ANNOTATIONS,
+        VaultContentSignal.UNREADABLE,
+    ):
         has_warn = True
 
     for prov in diag.providers.values():

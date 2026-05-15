@@ -124,7 +124,9 @@ For ongoing vault maintenance - fixing broken links, validating frontmatter, str
 
 Run `vaultspec-core vault sanitize annotations` when you want to remove the
 agent-facing template guidance from generated `.vault/` documents without
-running the full repair pipeline.
+running the full repair pipeline. Use `--dry-run` to preview the cleanup first;
+`vaultspec-core spec doctor` reports a read-only warning when those annotations
+are still present.
 
 ## Customizing the framework
 

@@ -84,6 +84,20 @@ def test_fix_strips_annotations_but_preserves_code_examples(tmp_path: Path) -> N
     assert "<!-- RETIRED: S01 -->" in cleaned
 
 
+def test_dry_run_reports_planned_strips_without_mutating(tmp_path: Path) -> None:
+    doc = _write_doc(
+        tmp_path, "annotation-dry-run", _annotated_doc("annotation-dry-run")
+    )
+    before = doc.read_text(encoding="utf-8")
+
+    result = check_annotations(tmp_path, fix=True, dry_run=True)
+
+    assert result.fixed_count == 0
+    assert result.warning_count == 1
+    assert "Would remove template annotations" in result.diagnostics[0].message
+    assert doc.read_text(encoding="utf-8") == before
+
+
 def test_feature_filter_only_strips_matching_documents(tmp_path: Path) -> None:
     target = _write_doc(
         tmp_path, "matching-feature", _annotated_doc("matching-feature")

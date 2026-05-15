@@ -47,7 +47,9 @@ class RepairRun:
     dry_run: bool
     feature: str | None = None
     include_index: bool = True
+    partial_failure: bool = False
     phases: list[dict[str, Any]] = field(default_factory=list)
+    journal: list[dict[str, Any]] = field(default_factory=list)
     changed_files: list[str] = field(default_factory=list)
     generated_indexes: list[str] = field(default_factory=list)
     planned_fixes: list[dict[str, Any]] = field(default_factory=list)
@@ -58,7 +60,9 @@ class RepairRun:
     @property
     def error_count(self) -> int:
         """Number of postcheck ERROR diagnostics."""
-        return sum(result.error_count for result in self.postcheck)
+        return sum(result.error_count for result in self.postcheck) + int(
+            self.partial_failure
+        )
 
     @property
     def warning_count(self) -> int:
@@ -97,7 +101,25 @@ def run_repair_pipeline(
     run = RepairRun(dry_run=dry_run, feature=feat, include_index=include_index)
     before = _vault_file_fingerprints(root_dir)
 
-    status, pending_names = migration_status(root_dir)
+    try:
+        status, pending_names = migration_status(root_dir)
+    except Exception as exc:
+        run = RepairRun(dry_run=dry_run, feature=feat, include_index=include_index)
+        _record_failure(run, RepairPhase.PREFLIGHT, exc)
+        run.phases.append(
+            {
+                "phase": RepairPhase.PREFLIGHT.value,
+                "migration_status": "unknown",
+                "pending_migrations": [],
+                "platform": _platform_summary(root_dir),
+                "applied_migrations": [],
+                "skipped": False,
+                "failed": True,
+                "error": str(exc),
+            }
+        )
+        _finalize(run, before, _vault_file_fingerprints(root_dir))
+        return run
     preflight: dict[str, Any] = {
         "phase": RepairPhase.PREFLIGHT.value,
         "migration_status": status.value,
@@ -126,7 +148,15 @@ def run_repair_pipeline(
         return run
 
     if not dry_run:
-        applied = run_pending_migrations(root_dir)
+        try:
+            applied = run_pending_migrations(root_dir)
+        except Exception as exc:
+            _record_failure(run, RepairPhase.PREFLIGHT, exc)
+            preflight["failed"] = True
+            preflight["error"] = str(exc)
+            run.phases.append(preflight)
+            _finalize(run, before, _vault_file_fingerprints(root_dir))
+            return run
         preflight["applied_migrations"] = [
             {
                 "name": result.name,
@@ -138,12 +168,28 @@ def run_repair_pipeline(
         ]
     run.phases.append(preflight)
 
-    initial = run_all_checks(root_dir, feature=feat, fix=False)
+    try:
+        initial = run_all_checks(root_dir, feature=feat, fix=False)
+    except Exception as exc:
+        _record_failure(run, RepairPhase.CHECK, exc)
+        run.phases.append(_failed_phase(RepairPhase.CHECK, exc))
+        _finalize(run, before, _vault_file_fingerprints(root_dir))
+        return run
     run.phases.append(_checks_phase(RepairPhase.CHECK, initial))
     run.planned_fixes = _collect_fixable(initial)
     run.root_causes = _group_root_causes(initial)
 
     if dry_run:
+        for item in run.planned_fixes:
+            _record_journal(
+                run,
+                RepairPhase.FIX,
+                action="planned-fix",
+                status="planned",
+                path=item.get("path"),
+                check=item.get("check"),
+                message=item.get("fix_description") or item.get("message"),
+            )
         run.phases.append(
             {
                 "phase": RepairPhase.FIX.value,
@@ -156,6 +202,14 @@ def run_repair_pipeline(
         if include_index:
             planned_indexes = _index_paths(root_dir, feat)
             run.generated_indexes = [_rel_str(p, root_dir) for p in planned_indexes]
+            for path in run.generated_indexes:
+                _record_journal(
+                    run,
+                    RepairPhase.INDEX,
+                    action="refresh-index",
+                    status="planned",
+                    path=path,
+                )
             run.phases.append(
                 {
                     "phase": RepairPhase.INDEX.value,
@@ -173,11 +227,64 @@ def run_repair_pipeline(
         _finalize(run, before, _vault_file_fingerprints(root_dir))
         return run
 
-    fixed = run_all_checks(root_dir, feature=feat, fix=True)
+    phase_before = _vault_file_fingerprints(root_dir)
+    try:
+        fixed = run_all_checks(root_dir, feature=feat, fix=True)
+    except Exception as exc:
+        _record_failure(run, RepairPhase.FIX, exc)
+        run.phases.append(_failed_phase(RepairPhase.FIX, exc))
+        _record_file_deltas(
+            run,
+            RepairPhase.FIX,
+            phase_before,
+            _vault_file_fingerprints(root_dir),
+        )
+        _finalize(run, before, _vault_file_fingerprints(root_dir))
+        return run
     run.phases.append(_checks_phase(RepairPhase.FIX, fixed))
+    _record_file_deltas(
+        run,
+        RepairPhase.FIX,
+        phase_before,
+        _vault_file_fingerprints(root_dir),
+    )
 
     if include_index:
-        generated = _refresh_indexes(root_dir, feat)
+        phase_before = _vault_file_fingerprints(root_dir)
+        try:
+            generated = _refresh_indexes(root_dir, feat)
+        except Exception as exc:
+            _record_failure(run, RepairPhase.INDEX, exc)
+            run.phases.append(
+                {
+                    "phase": RepairPhase.INDEX.value,
+                    "dry_run": False,
+                    "generated": [],
+                    "skipped": False,
+                    "failed": True,
+                    "error": str(exc),
+                }
+            )
+            _record_file_deltas(
+                run,
+                RepairPhase.INDEX,
+                phase_before,
+                _vault_file_fingerprints(root_dir),
+            )
+            failure_unresolved = list(run.unresolved)
+            try:
+                postcheck = run_all_checks(root_dir, feature=feat, fix=False)
+            except Exception as postcheck_exc:
+                _record_failure(run, RepairPhase.POSTCHECK, postcheck_exc)
+                run.phases.append(_failed_phase(RepairPhase.POSTCHECK, postcheck_exc))
+                _finalize(run, before, _vault_file_fingerprints(root_dir))
+                return run
+            run.postcheck = postcheck
+            run.unresolved = failure_unresolved + _collect_unresolved(postcheck)
+            run.root_causes = _group_root_causes(postcheck)
+            run.phases.append(_checks_phase(RepairPhase.POSTCHECK, postcheck))
+            _finalize(run, before, _vault_file_fingerprints(root_dir))
+            return run
         run.generated_indexes = [_rel_str(path, root_dir) for path in generated]
         run.phases.append(
             {
@@ -187,10 +294,22 @@ def run_repair_pipeline(
                 "skipped": False,
             }
         )
+        _record_file_deltas(
+            run,
+            RepairPhase.INDEX,
+            phase_before,
+            _vault_file_fingerprints(root_dir),
+        )
     else:
         run.phases.append(_skipped_index_phase("disabled by --no-index"))
 
-    postcheck = run_all_checks(root_dir, feature=feat, fix=False)
+    try:
+        postcheck = run_all_checks(root_dir, feature=feat, fix=False)
+    except Exception as exc:
+        _record_failure(run, RepairPhase.POSTCHECK, exc)
+        run.phases.append(_failed_phase(RepairPhase.POSTCHECK, exc))
+        _finalize(run, before, _vault_file_fingerprints(root_dir))
+        return run
     run.postcheck = postcheck
     run.unresolved = _collect_unresolved(postcheck)
     run.root_causes = _group_root_causes(postcheck)
@@ -240,6 +359,65 @@ def _diagnostic_payload(check_name: str, diag: CheckDiagnostic) -> dict[str, Any
         "fixable": diag.fixable,
         "fix_description": diag.fix_description,
     }
+
+
+def _failed_phase(phase: RepairPhase, exc: Exception) -> dict[str, Any]:
+    return {
+        "phase": phase.value,
+        "dry_run": False,
+        "failed": True,
+        "error_count": 1,
+        "warning_count": 0,
+        "info_count": 0,
+        "fixed_count": 0,
+        "error": str(exc),
+    }
+
+
+def _record_failure(run: RepairRun, phase: RepairPhase, exc: Exception) -> None:
+    run.partial_failure = True
+    message = f"{phase.value} phase failed: {exc}"
+    run.unresolved.append(
+        {
+            "severity": Severity.ERROR.value,
+            "check": phase.value,
+            "message": message,
+            "path": None,
+            "fixable": False,
+            "fix_description": None,
+        }
+    )
+    _record_journal(
+        run,
+        phase,
+        action="phase",
+        status="failed",
+        message=message,
+    )
+
+
+def _record_journal(
+    run: RepairRun,
+    phase: RepairPhase,
+    *,
+    action: str,
+    status: str,
+    path: str | None = None,
+    check: str | None = None,
+    message: str | None = None,
+) -> None:
+    entry: dict[str, Any] = {
+        "phase": phase.value,
+        "action": action,
+        "status": status,
+    }
+    if path is not None:
+        entry["path"] = path
+    if check is not None:
+        entry["check"] = check
+    if message is not None:
+        entry["message"] = message
+    run.journal.append(entry)
 
 
 def _collect_fixable(results: Iterable[CheckResult]) -> list[dict[str, Any]]:
@@ -329,6 +507,32 @@ def _skipped_index_phase(reason: str) -> dict[str, Any]:
     }
 
 
+def _record_file_deltas(
+    run: RepairRun,
+    phase: RepairPhase,
+    before: dict[str, tuple[int, int]],
+    after: dict[str, tuple[int, int]],
+) -> None:
+    for path in sorted(set(before) | set(after)):
+        old = before.get(path)
+        new = after.get(path)
+        if old == new:
+            continue
+        if old is None:
+            action = "create"
+        elif new is None:
+            action = "delete"
+        else:
+            action = "modify"
+        _record_journal(
+            run,
+            phase,
+            action=action,
+            status="applied",
+            path=path,
+        )
+
+
 def _finalize(
     run: RepairRun,
     before: dict[str, tuple[int, int]],
@@ -342,6 +546,8 @@ def _finalize(
             "changed_files": run.changed_files,
             "generated_indexes": run.generated_indexes,
             "unresolved_count": len(run.unresolved),
+            "partial_failure": run.partial_failure,
+            "journal_count": len(run.journal),
             "root_causes": [
                 {"root_cause": item["root_cause"], "count": item["count"]}
                 for item in run.root_causes

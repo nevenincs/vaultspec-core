@@ -178,12 +178,16 @@ def test_pre_commit_blocks_manual_changelog_edits() -> None:
 
 def test_pre_commit_runs_vault_annotation_sanitizer() -> None:
     config = _load_yaml(".pre-commit-config.yaml")
-    hook_ids = {
-        hook.get("id")
-        for repo in config.get("repos", [])
-        for hook in repo.get("hooks", [])
-    }
+    hooks = [hook for repo in config.get("repos", []) for hook in repo.get("hooks", [])]
+    hook_ids = {hook.get("id") for hook in hooks}
     assert "vault-sanitize-annotations" in hook_ids
+    ordered_ids = [hook.get("id") for hook in hooks]
+    assert ordered_ids.index("vault-fix") < ordered_ids.index(
+        "vault-sanitize-annotations"
+    )
+    assert ordered_ids.index("vault-sanitize-annotations") < ordered_ids.index(
+        "spec-check"
+    )
 
     raw = _read(".pre-commit-config.yaml")
     assert "vault sanitize annotations" in raw
@@ -233,6 +237,7 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
         "workflow-lint",
         "lint-and-type",
         "tests",
+        "windows-vault-repair",
         "vault-audit",
         "dependency-audit",
     }
@@ -248,6 +253,14 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
             "just dev lint markdown",
         },
         "tests": {"just dev deps sync", "just dev test python"},
+        "windows-vault-repair": {
+            "just dev deps sync",
+            (
+                "uv run pytest src/vaultspec_core/tests/cli/test_vault_repair.py "
+                "src/vaultspec_core/vaultcore/checks/tests/"
+                "test_structure_case_rename.py -q"
+            ),
+        },
         "vault-audit": {"just dev deps sync", "just prod vault check all"},
         "dependency-audit": {"just dev deps sync", "just dev audit deps"},
     }

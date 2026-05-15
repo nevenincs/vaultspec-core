@@ -264,12 +264,17 @@ vaultspec-core vault sanitize annotations [OPTIONS]
 Strip generated template annotations from `.vault/` documents. Template
 hydration keeps agent-facing instructions in newly created documents; this
 command removes those instructions only when explicitly requested.
+Use `--dry-run` to see which files would be stripped without mutating the
+vault. The sanitizer removes YAML frontmatter comment directives and standalone
+HTML comment blocks, while preserving fenced examples, inline prose mentions,
+and machine-owned comments such as retired plan markers.
 
 #### Options
 
 | Option          | Short | Default | Description                          |
 | --------------- | ----- | ------- | ------------------------------------ |
 | `--feature TAG` | `-f`  | None    | Sanitize documents for one feature   |
+| `--dry-run`     | -     | off     | Preview annotation removals          |
 | `--verbose`     | `-v`  | off     | Show stripped files                  |
 | `--json`        | -     | off     | Emit machine-readable check payloads |
 
@@ -453,7 +458,7 @@ Spec subcommands that operate on a workspace accept `--target / -t DIR`. `--json
 vaultspec-core spec doctor [OPTIONS]
 ```
 
-Run diagnostic collectors across the framework, providers, builtins, `.gitignore`, and configuration files. Reports findings and exits with the highest severity observed.
+Run diagnostic collectors across the framework, providers, builtins, `.gitignore`, vault content, and configuration files. Reports findings and exits with the highest severity observed. The vault content row is read-only; when generated template annotations are present, doctor reports a warning and points to `vaultspec-core vault sanitize annotations`. Unreadable vault markdown files are reported as warnings and are not modified.
 
 #### Options
 

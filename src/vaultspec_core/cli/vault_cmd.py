@@ -636,7 +636,9 @@ def _repair_payload(run: RepairRun) -> dict:
         "dry_run": run.dry_run,
         "feature": run.feature,
         "include_index": run.include_index,
+        "partial_failure": run.partial_failure,
         "phases": run.phases,
+        "journal": run.journal,
         "changed_files": run.changed_files,
         "generated_indexes": run.generated_indexes,
         "planned_fixes": run.planned_fixes,
@@ -657,6 +659,8 @@ def _render_repair_run(run: RepairRun, *, verbose: bool = False) -> None:
     if run.feature:
         title += f" - #{run.feature}"
     console.print(f"[bold]{title}[/bold]")
+    if run.partial_failure:
+        console.print("[red]  partial repair: at least one phase failed[/red]")
 
     for phase in run.phases:
         name = phase.get("phase", "unknown")
@@ -705,6 +709,10 @@ def _render_repair_run(run: RepairRun, *, verbose: bool = False) -> None:
             unresolved = phase.get("unresolved_count", 0)
             console.print(f"  [bold]summary[/bold]: {len(changed)} changed files")
             console.print(f"    unresolved diagnostics: {unresolved}")
+            if phase.get("partial_failure"):
+                console.print("    [red]partial failure: true[/red]")
+            if phase.get("journal_count"):
+                console.print(f"    journal entries: {phase['journal_count']}")
 
     if run.planned_fixes and run.dry_run:
         console.print()
@@ -875,6 +883,9 @@ def cmd_sanitize_annotations(
     feature: Annotated[
         str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
     ] = None,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview annotation stripping")
+    ] = False,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show stripped files")
     ] = False,
@@ -886,8 +897,10 @@ def cmd_sanitize_annotations(
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.checks import check_annotations
 
-    result = check_annotations(_get_ctx().target_dir, feature=feature, fix=True)
-    _render_and_exit(result, verbose, json_output=json_output)
+    result = check_annotations(
+        _get_ctx().target_dir, feature=feature, fix=True, dry_run=dry_run
+    )
+    _render_and_exit(result, verbose or dry_run, json_output=json_output)
 
 
 @check_app.command("dangling")

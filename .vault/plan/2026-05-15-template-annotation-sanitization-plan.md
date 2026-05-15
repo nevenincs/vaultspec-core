@@ -70,14 +70,28 @@ explicit fix paths.
 - [x] `P04.S24` - test template source frontmatter has no comment directives; `tests/test_template_annotations.py`.
 - [x] `P04.S25` - test pre-commit and fix automation registration; `tests/test_automation_contracts.py`.
 
+### Phase `P05` - harden sanitizer operations
+
+This Phase adds non-mutating observability and stricter contracts around the
+sanitizer policy.
+
+- [x] `P05.S26` - document and test the sanitizer allowlist policy; `src/vaultspec_core/vaultcore/checks/annotations.py`.
+- [x] `P05.S27` - expose `vault sanitize annotations --dry-run`; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `P05.S28` - report generated annotations and unreadable markdown in `spec doctor` without mutating documents; `src/vaultspec_core/core/diagnosis/`.
+- [x] `P05.S29` - harden template source tests against malformed HTML comment syntax and non-data frontmatter; `tests/test_template_annotations.py`.
+- [x] `P05.S30` - lock pre-commit sanitizer ordering after fix and before doctor/check surfaces; `tests/test_automation_contracts.py`.
+- [x] `P05.S31` - update operator documentation for dry-run and doctor visibility; `.vaultspec/CLI.md`.
+
 ## Parallelization
 
 The checker implementation and template syntax cleanup were independent after
 the ADR fixed the lifecycle boundary. Command wiring depended on the checker.
-Pre-commit and documentation updates depended on the command names.
+Pre-commit and documentation updates depended on the command names. The later
+doctor signal stayed independent from the mutating checker by using a read-only
+filesystem collector.
 
 ## Verification
 
-The implementation is complete when focused annotation tests pass, CLI handbook
-drift tests pass, pre-commit contract tests pass, and ruff reports no issues in
-the touched Python surfaces.
+The implementation is complete when focused annotation tests pass, doctor signal
+tests pass, CLI handbook drift tests pass, pre-commit contract tests pass, and
+ruff reports no issues in the touched Python surfaces.

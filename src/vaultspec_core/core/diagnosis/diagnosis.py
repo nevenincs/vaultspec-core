@@ -21,6 +21,7 @@ from .signals import (
     ManifestEntrySignal,
     PrecommitSignal,
     ProviderDirSignal,
+    VaultContentSignal,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,11 @@ class WorkspaceDiagnosis:
             has no manifest.
         pending_migrations: List of pending migration names; empty
             unless ``migration_status`` is ``"pending"``.
+        vault_content: Read-only generated annotation state for ``.vault/``.
+        vault_annotation_count: Count of markdown documents containing
+            generated template annotations.
+        vault_unreadable_count: Count of unreadable markdown documents skipped
+            by the annotation probe.
     """
 
     framework: FrameworkSignal
@@ -75,6 +81,9 @@ class WorkspaceDiagnosis:
     precommit: PrecommitSignal = PrecommitSignal.NO_FILE
     migration_status: str = "up_to_date"
     pending_migrations: list[str] = field(default_factory=list)
+    vault_content: VaultContentSignal = VaultContentSignal.NO_VAULT
+    vault_annotation_count: int = 0
+    vault_unreadable_count: int = 0
 
 
 def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
@@ -108,6 +117,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         collect_mcp_config_state,
         collect_precommit_state,
         collect_provider_dir_state,
+        collect_vault_content_state,
     )
 
     # Layer 1: always collected
@@ -141,12 +151,25 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         logger.warning("Precommit state collector failed", exc_info=True)
         precommit = PrecommitSignal.NO_FILE
 
+    try:
+        vault_content, vault_annotation_count, vault_unreadable_count = (
+            collect_vault_content_state(target)
+        )
+    except Exception:
+        logger.warning("Vault content collector failed", exc_info=True)
+        vault_content = VaultContentSignal.NO_VAULT
+        vault_annotation_count = 0
+        vault_unreadable_count = 0
+
     diag = WorkspaceDiagnosis(
         framework=framework,
         gitignore=gitignore,
         gitattributes=gitattributes,
         mcp=mcp,
         precommit=precommit,
+        vault_content=vault_content,
+        vault_annotation_count=vault_annotation_count,
+        vault_unreadable_count=vault_unreadable_count,
     )
 
     if framework == FrameworkSignal.MISSING:

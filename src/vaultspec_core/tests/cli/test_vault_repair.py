@@ -310,6 +310,47 @@ class TestVaultRepair:
             encoding="utf-8"
         )
 
+    def test_sanitize_annotations_dry_run_does_not_strip(
+        self,
+        factory: WorkspaceFactory,
+    ) -> None:
+        factory.install("core")
+        doc = _write_doc(
+            factory.path,
+            "research",
+            "2026-05-15-sanitize-dry-run",
+            "sanitize-dry-run",
+        )
+        doc.write_text(
+            doc.read_text(encoding="utf-8")
+            + "\n<!-- Preview this generated annotation. -->\n",
+            encoding="utf-8",
+        )
+
+        result = factory.run(
+            "vault",
+            "sanitize",
+            "annotations",
+            "--feature",
+            "sanitize-dry-run",
+            "--dry-run",
+            "--json",
+        )
+        payload = json.loads(result.output)
+
+        assert result.exit_code == 0
+        assert payload["fixed_count"] == 0
+        assert (
+            sum(1 for diag in payload["diagnostics"] if diag["severity"] == "warning")
+            == 1
+        )
+        assert (
+            "Would remove template annotations" in payload["diagnostics"][0]["message"]
+        )
+        assert "<!-- Preview this generated annotation. -->" in doc.read_text(
+            encoding="utf-8"
+        )
+
     def test_check_all_fix_synchronizes_graph_after_cascaded_mutations(
         self,
         tmp_path: Path,
@@ -384,6 +425,59 @@ class TestVaultRepair:
             ".vault/research/2026-05-15-state-mutation-research.md" in run.changed_files
         )
         assert ".vault/index/state-mutation.index.md" in run.changed_files
+
+    def test_repair_dry_run_journal_matches_planned_mutation_classes(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        root = tmp_path / "dummy-repo"
+        root.mkdir()
+        _write_state_mutation_workspace(root)
+
+        run = run_repair_pipeline(
+            root,
+            feature="state-mutation",
+            dry_run=True,
+            include_index=True,
+        )
+
+        assert run.changed_files == []
+        assert not (root / ".vault" / "index" / "state-mutation.index.md").exists()
+        planned_actions = {
+            (entry["phase"], entry["action"], entry["status"]) for entry in run.journal
+        }
+        assert ("fix", "planned-fix", "planned") in planned_actions
+        assert ("index", "refresh-index", "planned") in planned_actions
+
+    def test_repair_reports_partial_failure_when_index_refresh_fails(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        root = tmp_path / "dummy-repo"
+        root.mkdir()
+        _write_state_mutation_workspace(root)
+        index_dir_collision = root / ".vault" / "index"
+        index_dir_collision.write_text("not a directory", encoding="utf-8")
+
+        run = run_repair_pipeline(
+            root,
+            feature="state-mutation",
+            include_index=True,
+        )
+
+        assert run.partial_failure is True
+        assert run.error_count >= 1
+        assert any(
+            entry["phase"] == "index" and entry["status"] == "failed"
+            for entry in run.journal
+        )
+        assert any(item["check"] == "index" for item in run.unresolved)
+        assert any(
+            phase.get("phase") == "index" and phase.get("failed") is True
+            for phase in run.phases
+        )
+        assert run.generated_indexes == []
+        assert index_dir_collision.is_file()
 
     def test_dry_run_does_not_plan_index_for_unknown_feature(
         self,

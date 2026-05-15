@@ -16,7 +16,18 @@ from ._base import (
 if TYPE_CHECKING:
     from pathlib import Path
 
-__all__ = ["AnnotationStats", "check_annotations", "strip_template_annotations"]
+PRESERVED_HTML_COMMENT_PREFIXES = ("RETIRED:",)
+"""Standalone HTML comment prefixes that sanitizer must preserve.
+
+These are machine-owned vault comments, not generated template guidance.
+"""
+
+__all__ = [
+    "PRESERVED_HTML_COMMENT_PREFIXES",
+    "AnnotationStats",
+    "check_annotations",
+    "strip_template_annotations",
+]
 
 
 @dataclass(frozen=True)
@@ -51,6 +62,13 @@ def strip_template_annotations(content: str) -> tuple[str, AnnotationStats]:
     The sanitizer is intentionally explicit-operation-only: template hydration
     leaves annotations intact for agents, while check and repair surfaces call
     this function only when the operator requests a fix.
+
+    Sanitization policy:
+    - remove YAML frontmatter comment-only lines;
+    - remove standalone Markdown HTML comment blocks;
+    - preserve fenced code blocks and inline/prose mentions of comments;
+    - preserve machine-owned comments listed in
+      :data:`PRESERVED_HTML_COMMENT_PREFIXES`.
     """
     normalized = content.replace("\r\n", "\n")
     frontmatter, body, has_frontmatter = _split_frontmatter(normalized)
@@ -74,6 +92,7 @@ def check_annotations(
     *,
     feature: str | None = None,
     fix: bool = False,
+    dry_run: bool = False,
 ) -> CheckResult:
     """Find or remove template annotations from vault documents.
 
@@ -82,6 +101,8 @@ def check_annotations(
         feature: Restrict checks to documents with this feature tag.
         fix: When ``True``, remove YAML comment-only frontmatter lines and
             Markdown HTML comment blocks from matching documents.
+        dry_run: When ``True``, report the files that would be changed without
+            mutating them. Ignored unless ``fix`` is also ``True``.
 
     Returns:
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with check
@@ -110,6 +131,18 @@ def check_annotations(
             continue
 
         rel_path = doc_path.relative_to(root_dir)
+        if fix and dry_run:
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=rel_path,
+                    message=f"Would remove template annotations: {stats.describe()}",
+                    severity=Severity.WARNING,
+                    fixable=True,
+                    fix_description="Run without --dry-run to strip them",
+                )
+            )
+            continue
+
         if fix:
             cleaned = (
                 cleaned_lf
@@ -206,7 +239,7 @@ def _strip_html_comments(markdown: str) -> tuple[str, int]:
             continue
 
         comment_text = stripped[4:].lstrip()
-        if comment_text.startswith("RETIRED:"):
+        if comment_text.startswith(PRESERVED_HTML_COMMENT_PREFIXES):
             output.append(line)
             continue
 

@@ -31,6 +31,9 @@ The sanitizer must preserve non-template machine state, especially the
 The command surface must be visible across direct checks, explicit sanitation,
 repair, pre-commit, and local development fix recipes.
 
+Operators need a non-mutating preview and doctor visibility so annotation drift
+can be found without triggering sanitation or lazy vault mutations.
+
 ## Constraints
 
 The change must not introduce mocks or shadow template logic in tests.
@@ -59,6 +62,10 @@ Add a canonical pre-commit hook and dev fix recipe entry for
 Move template frontmatter guidance out of YAML `# ...` comments and into
 Markdown comment directives after frontmatter.
 
+Expose `vault sanitize annotations --dry-run` and a read-only `spec doctor`
+vault content signal. Doctor reports generated annotations but never strips
+them.
+
 ## Rationale
 
 This keeps the document creation lifecycle intact: generated templates still
@@ -78,3 +85,6 @@ Historical vault documents can be cleaned by running the explicit sanitizer.
 
 Pre-commit can now remove generated annotations before commit, so operators
 should expect staged vault documents to change when annotation guidance remains.
+
+Doctor warnings for annotations are advisory. They point operators to the
+explicit sanitizer instead of mutating documents during diagnosis.
