@@ -9,8 +9,6 @@ related:
   - '[[2026-05-15-operator-cli-repair-pipeline-reference]]'
 ---
 
-
-
 # `operator-cli-repair-pipeline` adr: `explicit vault repair pipeline` | (**status:** `proposed`)
 
 ## Problem Statement

@@ -7,8 +7,6 @@ related:
   - '[[2026-05-15-operator-cli-repair-pipeline-research]]'
 ---
 
-
-
 # `operator-cli-repair-pipeline` audit: `current codebase status and risks`
 
 ## Scope

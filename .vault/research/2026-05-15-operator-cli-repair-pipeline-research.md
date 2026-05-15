@@ -7,8 +7,6 @@ related:
   - '[[2026-05-15-operator-cli-repair-pipeline-reference]]'
 ---
 
-
-
 # `operator-cli-repair-pipeline` research: `repair pipeline design`
 
 Research for redesigning the vault-content repair workflow after direct

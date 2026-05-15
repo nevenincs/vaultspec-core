@@ -12,7 +12,6 @@ related:
   - '[[2026-05-15-operator-cli-sync-authority-adr]]'
 ---
 
-
 # operator-cli-repair-pipeline plan: operator CLI repair pipeline
 
 ## Phases

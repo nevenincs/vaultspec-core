@@ -6,8 +6,6 @@ date: '2026-05-15'
 related: []
 ---
 
-
-
 # `operator-cli-repair-pipeline` reference: `operator repair-pipeline feedback`
 
 This reference captures direct operator feedback from using

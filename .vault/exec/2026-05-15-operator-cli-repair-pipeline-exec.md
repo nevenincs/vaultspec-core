@@ -8,9 +8,6 @@ related:
   - '[[2026-05-15-operator-cli-repair-pipeline-plan]]'
 ---
 
-
-
-
 # operator-cli-repair-pipeline exec: P01.S01
 
 Intake captured direct operator feedback and converted it into a VaultSpec

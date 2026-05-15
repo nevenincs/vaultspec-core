@@ -12,21 +12,21 @@ Use the `vaultspec-core` CLI for every read, write, and audit of `.vault/`, and 
 
 ## Commands
 
-| Task                                                  | Run                                                                  |
-| ----------------------------------------------------- | -------------------------------------------------------------------- |
-| Create a `.vault/` document                           | `vaultspec-core vault add <type> --feature <tag>`                    |
-| List or filter vault documents                        | `vaultspec-core vault list [--feature <tag>] [--type <t>]`           |
-| Show statistics, invalid, or orphan documents         | `vaultspec-core vault stats [--invalid] [--orphaned]`                |
-| Visualize the vault dependency graph                  | `vaultspec-core vault graph [--feature <tag>]`                       |
-| Audit drift, broken links, or missing references      | `vaultspec-core vault check all [--fix]`                             |
+| Task                                                  | Run                                                                       |
+| ----------------------------------------------------- | ------------------------------------------------------------------------- |
+| Create a `.vault/` document                           | `vaultspec-core vault add <type> --feature <tag>`                         |
+| List or filter vault documents                        | `vaultspec-core vault list [--feature <tag>] [--type <t>]`                |
+| Show statistics, invalid, or orphan documents         | `vaultspec-core vault stats [--invalid] [--orphaned]`                     |
+| Visualize the vault dependency graph                  | `vaultspec-core vault graph [--feature <tag>]`                            |
+| Audit drift, broken links, or missing references      | `vaultspec-core vault check all [--fix]`                                  |
 | Strip generated template annotations                  | `vaultspec-core vault sanitize annotations [--feature <tag>] [--dry-run]` |
-| Confirm required documents exist for a feature        | `vaultspec-core vault check features --feature <tag>`                |
-| Archive a completed feature                           | `vaultspec-core vault feature archive <tag>`                         |
-| List registered rules, skills, agents, hooks, or MCPs | `vaultspec-core spec <resource> list`                                |
-| Inspect the assembled system prompt                   | `vaultspec-core spec system show`                                    |
-| Propagate edits under `.vaultspec/rules/...`          | `vaultspec-core sync`                                                |
-| Diagnose overall workspace health                     | `vaultspec-core spec doctor`                                         |
-| Inspect or run pending schema migrations              | `vaultspec-core migrations status` / `vaultspec-core migrations run` |
+| Confirm required documents exist for a feature        | `vaultspec-core vault check features --feature <tag>`                     |
+| Archive a completed feature                           | `vaultspec-core vault feature archive <tag>`                              |
+| List registered rules, skills, agents, hooks, or MCPs | `vaultspec-core spec <resource> list`                                     |
+| Inspect the assembled system prompt                   | `vaultspec-core spec system show`                                         |
+| Propagate edits under `.vaultspec/rules/...`          | `vaultspec-core sync`                                                     |
+| Diagnose overall workspace health                     | `vaultspec-core spec doctor`                                              |
+| Inspect or run pending schema migrations              | `vaultspec-core migrations status` / `vaultspec-core migrations run`      |
 
 `<resource>` is one of `rules`, `skills`, `agents`, `hooks`, or `mcps` for `list`; one of `rules`, `skills`, `agents`, `mcps`, or `system` for resource-scoped maintenance sync. Use top-level `vaultspec-core sync` as the authoritative complete propagation command after source-side changes.
 
