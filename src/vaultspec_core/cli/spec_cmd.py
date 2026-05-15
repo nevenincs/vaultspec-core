@@ -26,6 +26,39 @@ from vaultspec_core.cli._target import TargetOption, apply_target
 
 logger = logging.getLogger(__name__)
 
+COMPLETE_SYNC_COMMAND = "vaultspec-core sync"
+PROVIDER_OUTPUTS = "AGENTS.md, CLAUDE.md, GEMINI.md, .codex/config.toml, .mcp.json"
+
+
+def _print_complete_sync_notice(*, resource: str, mcp: bool = False) -> None:
+    """Warn that a narrow sync is not the complete provider refresh path."""
+    from vaultspec_core.console import get_console
+
+    if mcp:
+        detail = "This updates MCP definitions in .mcp.json only."
+    else:
+        detail = f"This syncs only {resource} resource files."
+
+    get_console().print(
+        "[yellow]Resource-scoped sync only.[/yellow] "
+        f"{detail} Run [bold]{COMPLETE_SYNC_COMMAND}[/bold] for a complete "
+        "provider-facing refresh."
+    )
+
+
+def _print_source_mutation_notice(path: Path, *, action: str) -> None:
+    """Explain that source-side resource changes need top-level sync."""
+    from vaultspec_core.console import get_console
+
+    console = get_console()
+    console.print(f"{action}: {path}")
+    console.print(
+        "[yellow]Provider-facing outputs were not updated.[/yellow] "
+        f"Run [bold]{COMPLETE_SYNC_COMMAND}[/bold] to refresh {PROVIDER_OUTPUTS} "
+        "where applicable."
+    )
+
+
 spec_app = typer.Typer(
     help=(
         "Manage framework resources: rules, skills, agents, system prompts, and hooks."
@@ -89,7 +122,7 @@ def cmd_rules_add(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Add a new custom rule."""
+    """Add a new custom rule source under .vaultspec/."""
     apply_target(target)
     from vaultspec_core.core import rules_add
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -105,6 +138,9 @@ def cmd_rules_add(
 
         typer.echo(json.dumps({"path": str(file_path)}, indent=2))
         raise typer.Exit(0)
+
+    action = "Would create rule source" if dry_run else "Rule source updated"
+    _print_source_mutation_notice(file_path, action=action)
 
 
 @rules_app.command("show")
@@ -189,6 +225,11 @@ def cmd_rules_remove(
         typer.echo(json.dumps({"removed": name}, indent=2))
         raise typer.Exit(0)
 
+    _print_source_mutation_notice(
+        get_context().rules_src_dir / name,
+        action="Rule source removed",
+    )
+
 
 @rules_app.command("rename")
 def cmd_rules_rename(
@@ -225,6 +266,8 @@ def cmd_rules_rename(
         )
         raise typer.Exit(0)
 
+    _print_source_mutation_notice(new_path, action="Rule source renamed")
+
 
 @rules_app.command("sync")
 def cmd_rules_sync(
@@ -236,7 +279,7 @@ def cmd_rules_sync(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Sync rules to tool destinations."""
+    """Sync only rule files; use vaultspec-core sync for complete refresh."""
     apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import rules_sync
@@ -252,6 +295,7 @@ def cmd_rules_sync(
         raise typer.Exit(0)
 
     console = get_console()
+    _print_complete_sync_notice(resource="rule")
     console.print(f"  [bold]{format_summary('Rules', result)}[/bold]")
     for warning in result.warnings:
         console.print(f"  [yellow]•[/yellow] {warning}")
@@ -505,7 +549,7 @@ def cmd_skills_sync(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Sync skills to tool destinations."""
+    """Sync only skill files; use vaultspec-core sync for complete refresh."""
     apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import skills_sync
@@ -521,6 +565,7 @@ def cmd_skills_sync(
         raise typer.Exit(0)
 
     console = get_console()
+    _print_complete_sync_notice(resource="skill")
     console.print(f"  [bold]{format_summary('Skills', result)}[/bold]")
     for warning in result.warnings:
         console.print(f"  [yellow]•[/yellow] {warning}")
@@ -763,7 +808,7 @@ def cmd_agents_sync(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Sync agents to tool destinations."""
+    """Sync only agent files; use vaultspec-core sync for complete refresh."""
     apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import agents_sync
@@ -779,6 +824,7 @@ def cmd_agents_sync(
         raise typer.Exit(0)
 
     console = get_console()
+    _print_complete_sync_notice(resource="agent")
     console.print(f"  [bold]{format_summary('Agents', result)}[/bold]")
     for warning in result.warnings:
         console.print(f"  [yellow]•[/yellow] {warning}")
@@ -885,7 +931,7 @@ def cmd_system_sync(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Sync system prompts to tool destinations."""
+    """Sync only system prompts; use vaultspec-core sync for complete refresh."""
     apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import system_sync
@@ -900,7 +946,9 @@ def cmd_system_sync(
         typer.echo(json.dumps(dataclasses.asdict(result), indent=2, default=str))
         raise typer.Exit(0)
 
-    get_console().print(f"  [bold]{format_summary('System', result)}[/bold]")
+    console = get_console()
+    _print_complete_sync_notice(resource="system prompt")
+    console.print(f"  [bold]{format_summary('System', result)}[/bold]")
 
 
 # =============================================================================
@@ -1132,7 +1180,7 @@ def cmd_mcps_sync(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Sync MCP definitions to .mcp.json."""
+    """Sync only MCP definitions to .mcp.json."""
     apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import mcp_sync
@@ -1148,6 +1196,7 @@ def cmd_mcps_sync(
         raise typer.Exit(0)
 
     console = get_console()
+    _print_complete_sync_notice(resource="MCP", mcp=True)
     console.print(f"  [bold]{format_summary('MCPs', result)}[/bold]")
     for warning in result.warnings:
         console.print(f"  [yellow]•[/yellow] {warning}")

@@ -14,6 +14,7 @@ import logging
 import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from ...core.helpers import atomic_write
 from ._base import (
@@ -30,6 +31,48 @@ if TYPE_CHECKING:
 __all__ = ["check_structure"]
 
 logger = logging.getLogger(__name__)
+
+
+def _paths_refer_to_same_file(src: Path, dst: Path) -> bool:
+    """Return True when *src* and *dst* identify the same on-disk file."""
+    try:
+        return src.samefile(dst)
+    except OSError:
+        return False
+
+
+def _rename_document_path(src: Path, dst: Path) -> bool:
+    """Rename *src* to *dst*, including case-only renames on Windows.
+
+    Case-insensitive filesystems can report that a desired destination
+    exists even when it is just the source file under different casing.
+    In that situation, force the casing update through a temporary
+    same-directory hop so the final name is materialized on disk.
+    """
+    if str(src) == str(dst):
+        return False
+
+    if src.name.lower() == dst.name.lower() and src.name != dst.name:
+        try:
+            exact_names = {path.name for path in src.parent.iterdir()}
+        except OSError:
+            exact_names = set()
+        if dst.name in exact_names:
+            return src.name not in exact_names
+        for _attempt in range(10):
+            tmp = src.with_name(f".{src.name}.vaultspec-rename-{uuid4().hex}.tmp")
+            if tmp.exists():
+                continue
+            src.rename(tmp)
+            tmp.rename(dst)
+            return True
+        return False
+
+    if dst.exists() and not _paths_refer_to_same_file(src, dst):
+        return False
+
+    src.rename(dst)
+    return True
 
 
 def _fix_filename(
@@ -83,9 +126,8 @@ def _fix_filename(
             new_filename = f"{base}{expected_suffix}"
             new_path = doc_path.parent / new_filename
 
-            if not new_path.exists():
+            if _rename_document_path(doc_path, new_path):
                 old_stem = doc_path.stem
-                doc_path.rename(new_path)
                 result.fixed_count += 1
                 renames.append((old_stem, new_path.stem))
                 doc_path = new_path
@@ -120,9 +162,8 @@ def _fix_filename(
         new_filename = f"{today}-{filename}"
         new_path = doc_path.parent / new_filename
 
-        if not new_path.exists():
+        if _rename_document_path(doc_path, new_path):
             old_stem = doc_path.stem
-            doc_path.rename(new_path)
             result.fixed_count += 1
             renames.append((old_stem, new_path.stem))
             doc_path = new_path
@@ -141,6 +182,32 @@ def _fix_filename(
                 CheckDiagnostic(
                     path=rel,
                     message=(f"Cannot rename to {new_filename}: target already exists"),
+                    severity=Severity.ERROR,
+                )
+            )
+
+    lowercase_filename = doc_path.name.lower()
+    if doc_path.name != lowercase_filename:
+        old_stem = doc_path.stem
+        new_path = doc_path.with_name(lowercase_filename)
+        if _rename_document_path(doc_path, new_path):
+            result.fixed_count += 1
+            renames.append((old_stem, new_path.stem))
+            doc_path = new_path
+            rel = doc_path.relative_to(root_dir)
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=rel,
+                    message=f"Fixed: renamed to {lowercase_filename}",
+                    severity=Severity.INFO,
+                )
+            )
+            logger.info("Renamed %s -> %s", filename, lowercase_filename)
+        else:
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=rel,
+                    message=(f"Cannot rename to {lowercase_filename}: target exists"),
                     severity=Severity.ERROR,
                 )
             )

@@ -86,7 +86,10 @@ ______________________________________________________________________
 vaultspec-core sync [PROVIDER] [OPTIONS]
 ```
 
-Sync rules, skills, agents, system prompts, and config from `.vaultspec/` to provider destinations.
+Authoritative complete sync from `.vaultspec/` to enrolled provider outputs:
+rules, skills, agents, system prompts, provider config stubs, and MCP entries.
+After editing or adding framework source files, this is the normal propagation
+command.
 
 #### Arguments
 
@@ -94,7 +97,10 @@ Sync rules, skills, agents, system prompts, and config from `.vaultspec/` to pro
 | ---------- | ------- | ------------------------------------------------- |
 | `PROVIDER` | `all`   | `all`, `claude`, `gemini`, `antigravity`, `codex` |
 
-`core` is not a valid sync target.
+`core` is not a valid sync target because sync reads from `.vaultspec/`.
+Use `vaultspec-core install --upgrade` or `vaultspec-core install --force` for
+framework/provider scaffolding repair, not as the normal propagation path after
+source edits.
 
 #### Options
 
@@ -204,6 +210,50 @@ Outputs a hierarchical tree grouped by feature and type.
 
 ______________________________________________________________________
 
+### vaultspec-core vault repair
+
+```bash
+vaultspec-core vault repair [OPTIONS]
+```
+
+Run the operator repair pipeline for `.vault/` content. This is the guided
+recovery surface for degraded vaults. It reports preflight and migration state,
+runs the health checks, applies supported mechanical fixes unless `--dry-run`
+is set, refreshes generated feature indexes unless `--no-index` is set, rebuilds
+graph state, and runs a postcheck pass.
+
+`vaultspec-core vault repair` is broader than
+`vaultspec-core vault check all --fix`. The check-level fixer remains available
+for compatibility, but it does not own generated index refresh, post-fix graph
+rebuild, root-cause grouping, or final delta reporting.
+
+#### Options
+
+| Option                       | Short | Default | Description                                      |
+| ---------------------------- | ----- | ------- | ------------------------------------------------ |
+| `--dry-run`                  | -     | off     | Preview repair actions without writing           |
+| `--include-index/--no-index` | -     | on      | Refresh generated feature indexes during repair  |
+| `--feature TAG`              | `-f`  | None    | Scope repair and index refresh to one feature    |
+| `--verbose`                  | `-v`  | off     | Show INFO-level diagnostics and detailed paths   |
+| `--json`                     | -     | off     | Emit machine-readable phase and summary payloads |
+
+#### Phases
+
+| Phase       | Purpose                                                               |
+| ----------- | --------------------------------------------------------------------- |
+| `preflight` | Report migration status and platform path behavior                    |
+| `check`     | Run the current vault health suite without mutation                   |
+| `fix`       | Apply supported safe check-level fixes, or report planned fixes       |
+| `index`     | Refresh or preview generated `.vault/index/<feature>.index.md` files  |
+| `postcheck` | Rebuild graph state and rerun checks after mutation                   |
+| `summary`   | Report changed files, generated indexes, unresolved work, root causes |
+
+Dry-run mode never writes generated indexes or check fixes. If migrations are
+pending, dry-run reports that state instead of entering the vault scan path that
+would apply lazy migrations on first use.
+
+______________________________________________________________________
+
 ### vaultspec-core vault feature list
 
 ```bash
@@ -288,6 +338,9 @@ Run health checks on `.vault/`. Exits with code `1` if errors are found.
 | `structure`   | yes     | no          | Check directory structure and filename conventions               |
 
 `yes` = fully supported, `partial` = only the sub-checks that accept `--fix` apply fixes (`all` dispatches to every check), `no` = flag rejected with error. `structure` does not support `--feature` filtering.
+
+Use `vaultspec-core vault repair` when the operator goal is end-to-end recovery
+with generated index refresh, post-fix validation, and a final delta report.
 
 ### vaultspec-core vault plan
 
@@ -403,22 +456,28 @@ vaultspec-core spec agents COMMAND
 
 #### Subcommands
 
-| Subcommand | Signature                           | Description                                                      |
-| ---------- | ----------------------------------- | ---------------------------------------------------------------- |
-| `list`     | -                                   | List all resources                                               |
-| `add`      | `--name NAME [--force] [--dry-run]` | Create a resource. Extra options vary per resource type (below). |
-| `show`     | `NAME`                              | Print resource content to stdout                                 |
-| `edit`     | `NAME`                              | Open in configured editor (`VAULTSPEC_EDITOR`)                   |
-| `remove`   | `NAME [--yes\|--force]` (`-y`)      | Delete a resource. Prompts unless confirmed.                     |
-| `rename`   | `OLD_NAME NEW_NAME`                 | Rename a resource                                                |
-| `sync`     | `[--dry-run] [--force]`             | Sync resources to provider destinations                          |
-| `revert`   | `FILENAME`                          | Revert to snapshotted original                                   |
+| Subcommand | Signature                           | Description                                                                               |
+| ---------- | ----------------------------------- | ----------------------------------------------------------------------------------------- |
+| `list`     | -                                   | List all resources                                                                        |
+| `add`      | `--name NAME [--force] [--dry-run]` | Create a resource. Extra options vary per resource type (below).                          |
+| `show`     | `NAME`                              | Print resource content to stdout                                                          |
+| `edit`     | `NAME`                              | Open in configured editor (`VAULTSPEC_EDITOR`)                                            |
+| `remove`   | `NAME [--yes\|--force]` (`-y`)      | Delete a resource. Prompts unless confirmed.                                              |
+| `rename`   | `OLD_NAME NEW_NAME`                 | Rename a resource                                                                         |
+| `sync`     | `[--dry-run] [--force]`             | Resource-scoped sync; use top-level `vaultspec-core sync` for a complete provider refresh |
+| `revert`   | `FILENAME`                          | Revert to snapshotted original                                                            |
 
 `add` accepts different body-content flags per resource type:
 
 - `vaultspec-core spec rules add` accepts `--content TEXT`.
 - `vaultspec-core spec skills add` accepts `--description TEXT` and `--template TEXT`.
 - `vaultspec-core spec agents add` accepts `--description TEXT`.
+
+`vaultspec-core spec <resource> sync` commands are narrow maintenance
+surfaces. They do not guarantee that provider-facing config stubs such as
+`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, or `.codex/config.toml` have been fully
+refreshed. Run `vaultspec-core sync` after source-side changes when the goal is
+a complete provider-facing workspace.
 
 ______________________________________________________________________
 
@@ -433,7 +492,7 @@ vaultspec-core spec system COMMAND
 | Subcommand | Options                 | Description                                        |
 | ---------- | ----------------------- | -------------------------------------------------- |
 | `show`     | -                       | Display system prompt parts and generation targets |
-| `sync`     | `[--dry-run] [--force]` | Sync system prompts to provider destinations       |
+| `sync`     | `[--dry-run] [--force]` | Resource-scoped system prompt sync                 |
 
 ______________________________________________________________________
 
@@ -459,6 +518,8 @@ vaultspec-core spec mcps COMMAND
 ```
 
 Manage MCP server definitions and the synced `.mcp.json` entries deployed for provider clients.
+MCP sync updates `.mcp.json`; use top-level `vaultspec-core sync` for a
+complete refresh across all provider-facing outputs.
 
 #### Subcommands
 

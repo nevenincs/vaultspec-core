@@ -508,11 +508,12 @@ def cmd_sync(
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
-    """Sync rules, skills, agents, configs, and system prompts.
+    """Sync rules, skills, agents, configs, system prompts, and MCPs.
 
-    By default sync is non-destructive: missing files are added and changed
-    files are updated, but stale destination files and user-authored
-    system/config files are left untouched (with warnings).
+    This is the authoritative complete sync from .vaultspec/ to enrolled
+    provider outputs. By default sync is non-destructive: missing files are
+    added and changed files are updated, but stale destination files and
+    user-authored system/config files are left untouched (with warnings).
 
     Use --force for a complete sync that prunes stale files and overwrites
     user-authored content to match the .vaultspec/ source exactly.

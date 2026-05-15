@@ -23,11 +23,11 @@ Use the `vaultspec-core` CLI for every read, write, and audit of `.vault/`, and 
 | Archive a completed feature                           | `vaultspec-core vault feature archive <tag>`                         |
 | List registered rules, skills, agents, hooks, or MCPs | `vaultspec-core spec <resource> list`                                |
 | Inspect the assembled system prompt                   | `vaultspec-core spec system show`                                    |
-| Propagate edits under `.vaultspec/rules/...`          | `vaultspec-core sync` (or `vaultspec-core spec <resource> sync`)     |
+| Propagate edits under `.vaultspec/rules/...`          | `vaultspec-core sync`                                                |
 | Diagnose overall workspace health                     | `vaultspec-core spec doctor`                                         |
 | Inspect or run pending schema migrations              | `vaultspec-core migrations status` / `vaultspec-core migrations run` |
 
-`<resource>` is one of `rules`, `skills`, `agents`, `hooks`, or `mcps` for `list`; one of `rules`, `skills`, `agents`, `mcps`, or `system` for `sync`.
+`<resource>` is one of `rules`, `skills`, `agents`, `hooks`, or `mcps` for `list`; one of `rules`, `skills`, `agents`, `mcps`, or `system` for resource-scoped maintenance sync. Use top-level `vaultspec-core sync` as the authoritative complete propagation command after source-side changes.
 
 ## Runtime
 
