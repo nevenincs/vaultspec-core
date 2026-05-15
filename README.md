@@ -66,6 +66,9 @@ vaultspec-core install --target ./my-project
 
 This scaffolds `.vaultspec/` and `.vault/` inside the target directory. It seeds builtin resources such as rules, agents, skills, system prompts, templates, hooks, and MCP definitions. It also syncs generated provider resources to the configured provider destinations and writes an `.mcp.json` for MCP-capable clients.
 
+Verify MCP config pickup with `vaultspec-core spec mcps status --json`; if the
+status is not `ok`, run `vaultspec-core sync` and rerun the status command.
+
 To install the framework plus one provider destination:
 
 ```bash

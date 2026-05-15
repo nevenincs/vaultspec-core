@@ -8,8 +8,6 @@ related:
   - '[[2026-02-18-system-prompt-architecture-research]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields outside the YAML frontmatter above -->
-
 # system-prompt restructure plan
 
 Restructure `.vaultspec/system/` files for tool-agnostic composition, add Claude

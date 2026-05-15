@@ -41,6 +41,11 @@ def _paths_refer_to_same_file(src: Path, dst: Path) -> bool:
         return False
 
 
+def _case_rename_temp_path(src: Path) -> Path:
+    """Return a short same-directory temp path for a case-only rename hop."""
+    return src.with_name(f".vs-{uuid4().hex[:12]}.tmp")
+
+
 def _rename_document_path(src: Path, dst: Path) -> bool:
     """Rename *src* to *dst*, including case-only renames on Windows.
 
@@ -60,7 +65,7 @@ def _rename_document_path(src: Path, dst: Path) -> bool:
         if dst.name in exact_names:
             return src.name not in exact_names
         for _attempt in range(10):
-            tmp = src.with_name(f".{src.name}.vaultspec-rename-{uuid4().hex}.tmp")
+            tmp = _case_rename_temp_path(src)
             if tmp.exists():
                 continue
             try:

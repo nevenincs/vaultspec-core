@@ -265,9 +265,10 @@ Strip generated template annotations from `.vault/` documents. Template
 hydration keeps agent-facing instructions in newly created documents; this
 command removes those instructions only when explicitly requested.
 Use `--dry-run` to see which files would be stripped without mutating the
-vault. The sanitizer removes YAML frontmatter comment directives and standalone
-HTML comment blocks, while preserving fenced examples, inline prose mentions,
-and machine-owned comments such as retired plan markers.
+vault. The sanitizer removes YAML frontmatter comment directives, standalone
+HTML comment blocks, and malformed standalone `<-- ... -->` annotation blocks,
+while preserving fenced examples, inline prose mentions, and machine-owned
+comments such as retired plan markers.
 
 #### Options
 
@@ -553,9 +554,14 @@ complete refresh across all provider-facing outputs.
 | Subcommand | Signature                               | Description                                                    |
 | ---------- | --------------------------------------- | -------------------------------------------------------------- |
 | `list`     | -                                       | List all registered MCP server definitions                     |
+| `status`   | `[--json]`                              | Validate MCP definitions against `.mcp.json`                   |
 | `add`      | `--name NAME [--config JSON] [--force]` | Add a new custom MCP server definition                         |
 | `remove`   | `NAME [--force]`                        | Remove an MCP server definition (`--force` skips confirmation) |
 | `sync`     | `[--dry-run] [--force]`                 | Sync MCP definitions to `.mcp.json`                            |
+
+`vaultspec-core spec mcps status` exits `0` only when MCP config status is
+`ok`, otherwise `1`. It checks config health only and does not start or probe
+MCP server processes.
 
 ## Migration commands
 

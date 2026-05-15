@@ -165,6 +165,9 @@ The Model Context Protocol (MCP) server is an alternative integration path for M
 
 `vaultspec-core install` scaffolds an `.mcp.json` that invokes the server with `uv run python -m vaultspec_core.mcp_server.app`. Module invocation avoids binary locking on Windows. See the [MCP reference](./MCP.md) for setup and tool documentation.
 
+Use `vaultspec-core spec mcps status --json` to verify MCP config health after
+install or sync.
+
 ## Related documentation
 
 | Document                          | What it covers                                        |

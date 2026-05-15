@@ -7,9 +7,6 @@ related:
   - '[[2026-04-30-vault-index-folder-plan]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `vault-index-folder` exec: phases 4-9 migration, checkers, template
 
 Implements phases 4 through 9 of `[[2026-04-30-vault-index-folder-plan]]`.

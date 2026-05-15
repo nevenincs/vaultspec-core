@@ -28,6 +28,10 @@ repair paths, not in the creation path.
 The sanitizer must preserve non-template machine state, especially the
 `<!-- RETIRED: ... -->` plan identifier ledger.
 
+Malformed standalone annotation syntax such as `<-- ... -->` must be handled as
+generated guidance too. Inline examples and fenced samples remain document
+content and must be preserved.
+
 The command surface must be visible across direct checks, explicit sanitation,
 repair, pre-commit, and local development fix recipes.
 

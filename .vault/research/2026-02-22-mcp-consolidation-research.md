@@ -10,9 +10,6 @@ related:
   - '[[2026-02-21-module-exports-adr]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `mcp-consolidation` research: unifying the three MCP server modules
 
 The vaultspec MCP server surface is split across three locations that have

@@ -111,6 +111,7 @@ def _run_preflight(
     force: bool = False,
     dry_run: bool = False,
     scope: str = "framework",
+    render: bool = True,
 ) -> None:
     """Run diagnosis and resolution pre-flight.
 
@@ -137,18 +138,23 @@ def _run_preflight(
     if not plan.warnings and not plan.conflicts and not plan.steps:
         return
 
-    from vaultspec_core.console import get_console
+    console = None
+    if render:
+        from vaultspec_core.console import get_console
 
-    console = get_console()
+        console = get_console()
 
     for warning in plan.warnings:
-        console.print(f"  [yellow]![/yellow] {warning}")
+        if console:
+            console.print(f"  [yellow]![/yellow] {warning}")
 
     # Execute preflight-safe resolution steps
     if plan.steps and not plan.blocked:
         exec_result = execute_plan(plan, target, dry_run=dry_run)
 
         for sr in exec_result.results:
+            if not console:
+                continue
             if sr.success:
                 console.print(f"  [green]ok[/green] {sr.step.reason}")
             else:
@@ -160,15 +166,18 @@ def _run_preflight(
     # Show non-preflight steps as informational (deferred to the main command)
     non_preflight = [s for s in plan.steps if s.action not in PREFLIGHT_ACTIONS]
     for step in non_preflight:
-        console.print(
-            f"  [dim]>[/dim] {step.reason} (detected, will be addressed by {action})"
-        )
+        if console:
+            console.print(
+                f"  [dim]>[/dim] {step.reason} "
+                f"(detected, will be addressed by {action})"
+            )
 
     if plan.conflicts:
-        console.print()
-        for conflict in plan.conflicts:
-            console.print(f"  [red]x[/red] {conflict}")
-        console.print()
+        if console:
+            console.print()
+            for conflict in plan.conflicts:
+                console.print(f"  [red]x[/red] {conflict}")
+            console.print()
         if not dry_run:
             raise typer.Exit(code=1)
 
@@ -273,6 +282,7 @@ def cmd_install(
         force=force,
         dry_run=dry_run,
         scope="framework",
+        render=not json_output,
     )
 
     try:
@@ -417,6 +427,7 @@ def cmd_uninstall(
         force=force,
         dry_run=dry_run,
         scope="framework",
+        render=not json_output,
     )
 
     try:
@@ -550,6 +561,7 @@ def cmd_sync(
         force=force,
         dry_run=dry_run,
         scope="sync",
+        render=not json_output,
     )
 
     from vaultspec_core.core.commands import sync_provider

@@ -7,8 +7,6 @@ related:
   - '[[2026-02-17-tech-audit-audit]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields outside the YAML frontmatter above -->
-
 # system-prompt research: architecture and tool-specific behavioral disparity
 
 Research into how Claude Code and Gemini CLI consume system prompts, how

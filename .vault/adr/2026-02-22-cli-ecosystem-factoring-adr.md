@@ -8,9 +8,6 @@ related:
   - '[[2026-02-23-cli-test-coverage-plan]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # cli-ecosystem-factoring adr: module hierarchy restructuring | (**status:** accepted)
 
 ## Problem Statement

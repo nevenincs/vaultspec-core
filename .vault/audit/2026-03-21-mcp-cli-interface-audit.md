@@ -1,20 +1,10 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #mcp-cli-interface
-# Directory tag (hardcoded - DO NOT CHANGE - based on .vault/audit/ location)
-# Feature tag (replace mcp-cli-interface with your feature name, e.g., #editor-demo)
 tags:
   - '#audit'
   - '#mcp-cli-interface'
-# ISO date format (e.g., 2026-02-06)
 date: '2026-03-21'
-# Related documents as quoted wiki-links
-# (e.g., "[[2026-02-04-feature-research]]")
 related: []
 ---
-
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
 
 # `mcp-cli-interface` audit: `mcp-facade-current-state`
 

@@ -10,7 +10,7 @@ import pytest
 from vaultspec_core.config import reset_config
 
 from ...models import DocumentMetadata
-from ..structure import check_structure
+from ..structure import _rename_document_path, check_structure
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -117,3 +117,20 @@ def test_fix_rewrites_related_in_configured_docs_dir(tmp_path: Path) -> None:
         else:
             os.environ["VAULTSPEC_DOCS_DIR"] = old_docs_dir
         reset_config()
+
+
+def test_case_only_rename_uses_short_temp_name_for_long_filenames(
+    tmp_path: Path,
+) -> None:
+    docs = tmp_path / ".vault" / "research"
+    docs.mkdir(parents=True)
+    long_feature = "A" * 190
+    source = docs / f"2026-05-15-{long_feature}-research.md"
+    target = source.with_name(source.name.lower())
+    source.write_text("# Long case-only rename\n", encoding="utf-8")
+
+    assert len(source.name) < 255
+    assert _rename_document_path(source, target) is True
+    assert target.exists()
+    assert source.name not in {path.name for path in docs.iterdir()}
+    assert not list(docs.glob(".vs-*.tmp"))

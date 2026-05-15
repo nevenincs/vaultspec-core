@@ -10,10 +10,6 @@ related:
 
 # clci-release Code Review
 
-<!-- Persistent log of audit findings appended below. -->
-
-<!-- Use: {TOPIC}-### | {LEVEL} | {Summary} \n {DESCRIPTION} format-->
-
 ## Security Review
 
 PINNING-001 | HIGH | `docker://rhysd/actionlint:latest` uses unpinned `:latest` tag

@@ -9,9 +9,6 @@ related:
   - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `mcp-consolidation` adr: `merge server.py, subagent_server/, and mcp_tools/ into mcp_server/` | (**status:** `accepted`)
 
 ## Problem Statement

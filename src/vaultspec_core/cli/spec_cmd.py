@@ -66,7 +66,8 @@ def _resource_path(base_dir: Path, name: str, *, suffix: str = ".md") -> Path:
 
 spec_app = typer.Typer(
     help=(
-        "Manage framework resources: rules, skills, agents, system prompts, and hooks."
+        "Manage framework resources: rules, skills, agents, system prompts, hooks, "
+        "and MCPs."
     ),
     no_args_is_help=True,
 )
@@ -1127,6 +1128,50 @@ def cmd_mcps_list(
         table.add_row(item["name"], item["source"])
 
     console.print(table)
+
+
+@mcps_app.command("status")
+def cmd_mcps_status(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Report focused MCP definition and .mcp.json sync status."""
+    apply_target(target)
+    from rich import box
+    from rich.table import Table
+
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core import mcp_status
+
+    status = mcp_status()
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps(status, indent=2, default=str))
+        raise typer.Exit(0 if status["status"] == "ok" else 1)
+
+    console = get_console()
+    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
+    table.add_column("Field", no_wrap=True)
+    table.add_column("Value")
+    table.add_row("status", str(status["status"]))
+    table.add_row("config", str(status["config_path"]))
+    table.add_row("definitions", ", ".join(status["definitions"]) or "none")
+    table.add_row("configured", ", ".join(status["configured"]) or "none")
+    table.add_row("managed", ", ".join(status["managed"]) or "none")
+    if status["missing"]:
+        table.add_row("missing", ", ".join(status["missing"]))
+    if status["drifted"]:
+        table.add_row("drifted", ", ".join(status["drifted"]))
+    if status["stale_managed"]:
+        table.add_row("stale managed", ", ".join(status["stale_managed"]))
+    console.print(table)
+
+    for warning in status["warnings"]:
+        console.print(f"  [yellow]•[/yellow] {warning}")
+    if status["status"] != "ok":
+        raise typer.Exit(code=1)
 
 
 @mcps_app.command("add")

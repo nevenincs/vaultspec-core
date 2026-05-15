@@ -155,6 +155,122 @@ def mcp_list() -> list[dict[str, str]]:
     return list(items.values())
 
 
+def mcp_status() -> dict[str, Any]:
+    """Return focused status for MCP definitions and the synced config file.
+
+    This is intentionally narrower than ``spec doctor``: it reports only
+    whether source definitions under ``.vaultspec/rules/mcps/`` are represented
+    in the workspace ``.mcp.json`` and whether managed entries have drifted.
+    """
+    parse_warnings: list[str] = []
+    sources = collect_mcp_servers(warnings=parse_warnings)
+    definitions = sorted(sources)
+
+    try:
+        target_dir = _t.get_context().target_dir
+    except LookupError:
+        return {
+            "status": "no_context",
+            "config_path": None,
+            "config_exists": False,
+            "definitions": definitions,
+            "configured": [],
+            "managed": [],
+            "missing": definitions,
+            "drifted": [],
+            "stale_managed": [],
+            "warnings": ["No workspace context available for MCP status."],
+        }
+
+    mcp_json = target_dir / ".mcp.json"
+    configured: list[str] = []
+    managed: list[str] = []
+    missing = definitions.copy()
+    drifted: list[str] = []
+    stale_managed: list[str] = []
+    warnings = list(parse_warnings)
+    status = "ok"
+
+    if not mcp_json.exists():
+        status = "missing_config" if definitions else "no_definitions"
+        warnings.append(".mcp.json is missing; run vaultspec-core sync.")
+        return {
+            "status": status,
+            "config_path": str(mcp_json),
+            "config_exists": False,
+            "definitions": definitions,
+            "configured": configured,
+            "managed": managed,
+            "missing": missing,
+            "drifted": drifted,
+            "stale_managed": stale_managed,
+            "warnings": warnings,
+        }
+
+    try:
+        raw = json.loads(mcp_json.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return {
+            "status": "invalid_config",
+            "config_path": str(mcp_json),
+            "config_exists": True,
+            "definitions": definitions,
+            "configured": configured,
+            "managed": managed,
+            "missing": missing,
+            "drifted": drifted,
+            "stale_managed": stale_managed,
+            "warnings": [*warnings, f"Cannot parse .mcp.json: {exc}"],
+        }
+
+    if not isinstance(raw, dict):
+        return {
+            "status": "invalid_config",
+            "config_path": str(mcp_json),
+            "config_exists": True,
+            "definitions": definitions,
+            "configured": configured,
+            "managed": managed,
+            "missing": missing,
+            "drifted": drifted,
+            "stale_managed": stale_managed,
+            "warnings": [*warnings, ".mcp.json is not a JSON object."],
+        }
+
+    servers = raw.get("mcpServers", {})
+    if not isinstance(servers, dict):
+        status = "invalid_config"
+        warnings.append(".mcp.json field 'mcpServers' is not a JSON object.")
+        servers = {}
+
+    configured = sorted(str(name) for name in servers)
+    raw_managed = raw.get(_MANAGED_KEY, [])
+    if isinstance(raw_managed, list):
+        managed = sorted(str(name) for name in raw_managed if isinstance(name, str))
+
+    missing = [name for name in definitions if name not in servers]
+    for name, (_source_path, config) in sources.items():
+        if name in servers and name in managed and servers[name] != config:
+            drifted.append(name)
+    stale_managed = [name for name in managed if name not in definitions]
+
+    if status == "ok" and (missing or drifted or stale_managed or warnings):
+        status = "partial"
+
+    return {
+        "status": status,
+        "config_path": str(mcp_json),
+        "config_exists": True,
+        "definitions": definitions,
+        "configured": configured,
+        "managed": managed,
+        "missing": missing,
+        "drifted": sorted(drifted),
+        "stale_managed": stale_managed,
+        "warnings": warnings,
+    }
+
+
 def mcp_add(
     name: str,
     config: dict[str, Any] | None = None,

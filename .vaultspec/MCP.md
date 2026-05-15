@@ -47,6 +47,17 @@ See the [CLI reference](./CLI.md) for all `VAULTSPEC_` environment variables.
 
 **Note:** `vaultspec-core install` always scaffolds `.mcp.json` regardless of which provider is selected. MCP configuration is part of the core install and is not tied to any specific provider.
 
+## Verification
+
+Run `vaultspec-core spec mcps status --json` to validate MCP source definitions
+in `.vaultspec/rules/mcps/` against `.mcp.json`. This checks configuration
+health only; it does not start or probe MCP server processes. The command exits
+`0` only when `status` is `ok`, otherwise `1`.
+
+If status is not `ok`, inspect `missing`, `drifted`, `stale_managed`, and
+`warnings`, then run `vaultspec-core sync` and rerun status. Use
+`vaultspec-core spec doctor --json` for broader workspace diagnosis.
+
 ## Tools
 
 ### `find`

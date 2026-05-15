@@ -60,6 +60,53 @@ class TestSyncValidation:
         assert result.exit_code == 0
         assert "MCP" in result.output or "mcp" in result.output
 
+    def test_mcp_status_json_reports_configured_entry(self, runner, synthetic_project):
+        """MCP status should answer the narrow config-health question directly."""
+        result = runner.invoke(
+            app,
+            ["--target", str(synthetic_project), "spec", "mcps", "status", "--json"],
+        )
+
+        payload = json.loads(result.output)
+        assert result.exit_code == 0, result.output
+        assert payload["status"] == "ok"
+        assert payload["config_exists"] is True
+        assert payload["definitions"] == ["vaultspec-core"]
+        assert payload["configured"] == ["vaultspec-core"]
+
+    def test_mcp_status_json_reports_missing_config(self, runner, synthetic_project):
+        """A missing .mcp.json should be visible without running global doctor."""
+        (synthetic_project / ".mcp.json").unlink()
+
+        result = runner.invoke(
+            app,
+            ["--target", str(synthetic_project), "spec", "mcps", "status", "--json"],
+        )
+
+        payload = json.loads(result.output)
+        assert result.exit_code == 1, result.output
+        assert payload["status"] == "missing_config"
+        assert payload["missing"] == ["vaultspec-core"]
+
+    def test_mcp_status_json_reports_managed_config_drift(
+        self, runner, synthetic_project
+    ):
+        """Managed MCP entry drift should be visible before running repair sync."""
+        mcp_path = synthetic_project / ".mcp.json"
+        payload = json.loads(mcp_path.read_text(encoding="utf-8"))
+        payload["mcpServers"]["vaultspec-core"]["args"] = ["run", "broken-server"]
+        mcp_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+        result = runner.invoke(
+            app,
+            ["--target", str(synthetic_project), "spec", "mcps", "status", "--json"],
+        )
+
+        status = json.loads(result.output)
+        assert result.exit_code == 1, result.output
+        assert status["status"] == "partial"
+        assert status["drifted"] == ["vaultspec-core"]
+
 
 class TestSyncAuthority:
     def test_rules_add_points_to_top_level_sync(self, runner, synthetic_project):
@@ -231,3 +278,61 @@ class TestSyncAuthority:
                 f"Sync output:\n{sync_result.output}\n"
                 f"Observed content:\n{content}"
             )
+
+    def test_top_level_sync_force_repairs_only_managed_mcp_state(
+        self, runner, synthetic_project
+    ):
+        """Forced sync repairs managed MCP drift without deleting user servers."""
+        mcp_path = synthetic_project / ".mcp.json"
+        source_path = (
+            synthetic_project
+            / ".vaultspec"
+            / "rules"
+            / "mcps"
+            / "vaultspec-core.builtin.json"
+        )
+        expected_config = json.loads(source_path.read_text(encoding="utf-8"))
+
+        payload = json.loads(mcp_path.read_text(encoding="utf-8"))
+        payload["mcpServers"]["vaultspec-core"]["args"] = ["run", "broken-server"]
+        payload["mcpServers"]["stale-managed"] = {
+            "command": "node",
+            "args": ["old-server.js"],
+        }
+        payload["mcpServers"]["user-server"] = {
+            "command": "node",
+            "args": ["user-server.js"],
+        }
+        payload["_vaultspecManaged"] = ["stale-managed", "vaultspec-core"]
+        mcp_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+        before = runner.invoke(
+            app,
+            ["--target", str(synthetic_project), "spec", "mcps", "status", "--json"],
+        )
+        before_status = json.loads(before.output)
+        assert before.exit_code == 1, before.output
+        assert before_status["drifted"] == ["vaultspec-core"]
+        assert before_status["stale_managed"] == ["stale-managed"]
+
+        sync_result = runner.invoke(
+            app, ["--target", str(synthetic_project), "sync", "--force"]
+        )
+
+        assert sync_result.exit_code == 0, sync_result.output
+        repaired = json.loads(mcp_path.read_text(encoding="utf-8"))
+        assert repaired["mcpServers"]["vaultspec-core"] == expected_config
+        assert "stale-managed" not in repaired["mcpServers"]
+        assert repaired["mcpServers"]["user-server"] == {
+            "command": "node",
+            "args": ["user-server.js"],
+        }
+        assert repaired["_vaultspecManaged"] == ["vaultspec-core"]
+
+        after = runner.invoke(
+            app,
+            ["--target", str(synthetic_project), "spec", "mcps", "status", "--json"],
+        )
+        after_status = json.loads(after.output)
+        assert after.exit_code == 0, after.output
+        assert after_status["status"] == "ok"

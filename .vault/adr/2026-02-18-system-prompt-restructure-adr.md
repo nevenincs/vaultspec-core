@@ -9,8 +9,6 @@ related:
   - '[[2026-02-18-system-prompt-restructure-plan]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields outside the YAML frontmatter above -->
-
 # system-prompt adr: restructure system/ for tool-agnostic composition | (**status:** accepted)
 
 ## Problem Statement

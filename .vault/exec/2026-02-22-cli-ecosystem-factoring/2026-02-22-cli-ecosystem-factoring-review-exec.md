@@ -8,9 +8,6 @@ related:
   - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # cli-ecosystem-factoring code review
 
 **Status:** `REVISION REQUIRED`

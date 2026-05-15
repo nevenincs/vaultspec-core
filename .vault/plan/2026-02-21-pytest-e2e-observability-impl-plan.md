@@ -25,9 +25,6 @@ fixtures are added to existing test classes.
 
 ## Tasks
 
-<!-- IMPORTANT: This document must be updated between execution runs to
-     track progress. -->
-
 - `Phase 1 — Infrastructure`
 
   1. `Update pyproject.toml pytest config` — Add `log_cli`, `log_cli_level`,

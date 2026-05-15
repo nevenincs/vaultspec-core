@@ -7,9 +7,6 @@ related:
   - '[[2026-02-19-workspace-path-decoupling-adr]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `workspace-paths` research: `Path decoupling for embedded and worktree layouts`
 
 The companion project (repository-manager, Rust) will embed VaultSpec as a

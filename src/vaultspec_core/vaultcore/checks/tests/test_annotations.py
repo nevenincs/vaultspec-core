@@ -84,6 +84,109 @@ def test_fix_strips_annotations_but_preserves_code_examples(tmp_path: Path) -> N
     assert "<!-- RETIRED: S01 -->" in cleaned
 
 
+def test_fix_strips_malformed_standalone_annotation_blocks(tmp_path: Path) -> None:
+    doc = _write_doc(
+        tmp_path,
+        "malformed-annotation",
+        (
+            "---\n"
+            "tags:\n"
+            "  - '#research'\n"
+            "  - '#malformed-annotation'\n"
+            "date: '2026-05-15'\n"
+            "related: []\n"
+            "---\n"
+            "\n"
+            "<-- Remove this malformed generated annotation. -->\n"
+            "<-- Remove this malformed generated annotation block.\n"
+            "    It continues here. -->\n"
+            "\n"
+            "Mention `<-- inline malformed example -->` in prose.\n"
+            "```md\n"
+            "<-- code sample stays visible -->\n"
+            "```\n"
+        ),
+    )
+
+    result = check_annotations(tmp_path, fix=True)
+
+    cleaned = doc.read_text(encoding="utf-8")
+    assert result.fixed_count == 1
+    assert "malformed HTML comment block" in result.diagnostics[0].message
+    assert "<-- Remove this malformed" not in cleaned
+    assert "`<-- inline malformed example -->`" in cleaned
+    assert "<-- code sample stays visible -->" in cleaned
+
+
+def test_fix_preserves_comments_inside_longer_markdown_fences(tmp_path: Path) -> None:
+    doc = _write_doc(
+        tmp_path,
+        "long-fence-annotation",
+        (
+            "---\n"
+            "tags:\n"
+            "  - '#research'\n"
+            "  - '#long-fence-annotation'\n"
+            "date: '2026-05-15'\n"
+            "related: []\n"
+            "---\n"
+            "\n"
+            "<!-- Remove generated annotation. -->\n"
+            "````md\n"
+            "<!-- fenced four-backtick sample stays visible -->\n"
+            "```\n"
+            "<!-- still fenced because three backticks do not close it -->\n"
+            "````\n"
+            "~~~~md\n"
+            "<-- fenced tilde sample stays visible -->\n"
+            "~~~\n"
+            "<-- still fenced because three tildes do not close it -->\n"
+            "~~~~\n"
+        ),
+    )
+
+    result = check_annotations(tmp_path, fix=True)
+
+    cleaned = doc.read_text(encoding="utf-8")
+    assert result.fixed_count == 1
+    assert "<!-- Remove generated annotation. -->" not in cleaned
+    assert "<!-- fenced four-backtick sample stays visible -->" in cleaned
+    assert "<!-- still fenced because three backticks do not close it -->" in cleaned
+    assert "<-- fenced tilde sample stays visible -->" in cleaned
+    assert "<-- still fenced because three tildes do not close it -->" in cleaned
+
+
+def test_fix_strips_frontmatter_annotation_blocks(tmp_path: Path) -> None:
+    doc = _write_doc(
+        tmp_path,
+        "frontmatter-annotation",
+        (
+            "---\n"
+            "<!-- Remove generated frontmatter guidance. -->\n"
+            "<-- Remove malformed frontmatter guidance.\n"
+            "    Continuation. -->\n"
+            "tags:\n"
+            "  - '#research'\n"
+            "  - '#frontmatter-annotation'\n"
+            "date: '2026-05-15'\n"
+            "related: []\n"
+            "---\n"
+            "\n"
+            "# Frontmatter annotation\n"
+        ),
+    )
+
+    result = check_annotations(tmp_path, fix=True)
+
+    cleaned = doc.read_text(encoding="utf-8")
+    assert result.fixed_count == 1
+    assert "2 frontmatter comment lines" in result.diagnostics[0].message
+    assert "generated frontmatter guidance" not in cleaned
+    assert "malformed frontmatter guidance" not in cleaned
+    assert "Continuation." not in cleaned
+    assert "# Frontmatter annotation" in cleaned
+
+
 def test_dry_run_reports_planned_strips_without_mutating(tmp_path: Path) -> None:
     doc = _write_doc(
         tmp_path, "annotation-dry-run", _annotated_doc("annotation-dry-run")

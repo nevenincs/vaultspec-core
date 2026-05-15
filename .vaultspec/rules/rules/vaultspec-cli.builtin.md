@@ -23,6 +23,7 @@ Use the `vaultspec-core` CLI for every read, write, and audit of `.vault/`, and 
 | Confirm required documents exist for a feature        | `vaultspec-core vault check features --feature <tag>`                     |
 | Archive a completed feature                           | `vaultspec-core vault feature archive <tag>`                              |
 | List registered rules, skills, agents, hooks, or MCPs | `vaultspec-core spec <resource> list`                                     |
+| Verify MCP config health                              | `vaultspec-core spec mcps status --json`                                  |
 | Inspect the assembled system prompt                   | `vaultspec-core spec system show`                                         |
 | Propagate edits under `.vaultspec/rules/...`          | `vaultspec-core sync`                                                     |
 | Diagnose overall workspace health                     | `vaultspec-core spec doctor`                                              |

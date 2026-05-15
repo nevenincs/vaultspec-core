@@ -10,9 +10,6 @@ related:
   - '[[2026-02-21-module-exports-part3-research]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `module-exports` plan
 
 Add `__all__` declarations to every production module, populate `__init__.py` files with re-exports (eager, selective, or lazy per \[[2026-02-21-module-exports-adr]\]), convert intra-package imports to relative form, and rewrite all consumers to use package-level imports. The refactor touches approximately 384 import statements across the entire `src/vaultspec/` tree and `tests/` directory.
@@ -30,9 +27,6 @@ Each phase follows the same mechanical pattern: (1) add `__all__` to every modul
 Execution order follows the dependency DAG bottom-up so each phase can be verified independently. The specific `__all__` symbol lists are documented in \[[2026-02-21-module-exports-part1-research]\], \[[2026-02-21-module-exports-part2-research]\], and \[[2026-02-21-module-exports-part3-research]\].
 
 ## Tasks
-
-<!-- IMPORTANT: This document must be updated between execution runs to
-     track progress. -->
 
 - **Wave 1** -- Phase 1: Leaf packages `core/`, `vaultcore/`, `hooks/` (1 agent, sequential)
 

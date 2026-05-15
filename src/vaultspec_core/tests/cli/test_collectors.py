@@ -19,6 +19,7 @@ from vaultspec_core.core.diagnosis.collectors import (
     collect_manifest_coherence,
     collect_mcp_config_state,
     collect_provider_dir_state,
+    collect_vault_content_state,
 )
 from vaultspec_core.core.diagnosis.diagnosis import diagnose
 from vaultspec_core.core.diagnosis.signals import (
@@ -29,6 +30,7 @@ from vaultspec_core.core.diagnosis.signals import (
     GitignoreSignal,
     ManifestEntrySignal,
     ProviderDirSignal,
+    VaultContentSignal,
 )
 from vaultspec_core.core.enums import Tool
 from vaultspec_core.core.gitignore import DEFAULT_ENTRIES, MARKER_BEGIN, MARKER_END
@@ -185,6 +187,90 @@ class TestManifestCoherence:
         result = collect_manifest_coherence(tmp_path)
 
         assert result["antigravity"] == ManifestEntrySignal.UNTRACKED
+
+
+# ---------------------------------------------------------------------------
+# collect_vault_content_state
+# ---------------------------------------------------------------------------
+class TestVaultContentState:
+    def test_no_vault(self, tmp_path: Path) -> None:
+        assert collect_vault_content_state(tmp_path) == (
+            VaultContentSignal.NO_VAULT,
+            0,
+            0,
+        )
+
+    def test_clean_vault(self, tmp_path: Path) -> None:
+        doc = tmp_path / ".vault" / "research" / "2026-05-15-clean.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text(
+            "---\n"
+            "tags:\n"
+            "  - '#research'\n"
+            "  - '#clean-vault'\n"
+            "date: '2026-05-15'\n"
+            "related: []\n"
+            "---\n"
+            "\n"
+            "# Clean vault\n",
+            encoding="utf-8",
+        )
+
+        assert collect_vault_content_state(tmp_path) == (
+            VaultContentSignal.CLEAN,
+            0,
+            0,
+        )
+
+    def test_annotations_include_malformed_standalone_syntax(
+        self, tmp_path: Path
+    ) -> None:
+        doc = tmp_path / ".vault" / "research" / "2026-05-15-annotated.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text(
+            "---\n"
+            "tags:\n"
+            "  - '#research'\n"
+            "  - '#annotated-vault'\n"
+            "date: '2026-05-15'\n"
+            "related: []\n"
+            "---\n"
+            "\n"
+            "<-- Malformed generated annotation. -->\n",
+            encoding="utf-8",
+        )
+
+        assert collect_vault_content_state(tmp_path) == (
+            VaultContentSignal.ANNOTATIONS,
+            1,
+            0,
+        )
+
+    def test_skips_internal_and_archive_documents(self, tmp_path: Path) -> None:
+        for rel_path in (
+            ".vault/.obsidian/internal.md",
+            ".vault/_archive/old.md",
+        ):
+            path = tmp_path / rel_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("<-- Ignored generated annotation. -->\n", encoding="utf-8")
+
+        assert collect_vault_content_state(tmp_path) == (
+            VaultContentSignal.CLEAN,
+            0,
+            0,
+        )
+
+    def test_unreadable_vault_markdown(self, tmp_path: Path) -> None:
+        doc = tmp_path / ".vault" / "research" / "2026-05-15-unreadable.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_bytes(b"\xff\xfe\xfa")
+
+        assert collect_vault_content_state(tmp_path) == (
+            VaultContentSignal.UNREADABLE,
+            0,
+            1,
+        )
 
 
 # ---------------------------------------------------------------------------

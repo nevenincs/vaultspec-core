@@ -8,9 +8,6 @@ related:
   - '[[2026-02-21-packaging-restructure-research]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `packaging-restructure` `p1+p2` plan
 
 Migrate the Python codebase from `.vaultspec/lib/` to a proper `src/vaultspec/` namespace package, adopt `uv` + `hatchling` as the build toolchain, rewrite all 149 bare-name imports to `vaultspec.*` prefixed forms, eliminate `_paths.py`, and scaffold a unified `vaultspec-mcp` server that replaces the current `vs-subagent-mcp`.

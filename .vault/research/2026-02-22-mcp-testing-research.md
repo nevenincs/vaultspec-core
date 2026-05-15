@@ -8,9 +8,6 @@ related:
   - '[[2026-02-22-mcp-consolidation-adr]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `mcp-testing` research: in-memory client session tests
 
 Research into adding proper MCP SDK in-memory client session tests for the

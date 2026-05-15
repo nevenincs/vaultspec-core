@@ -75,7 +75,7 @@ explicit fix paths.
 This Phase adds non-mutating observability and stricter contracts around the
 sanitizer policy.
 
-- [x] `P05.S26` - document and test the sanitizer allowlist policy; `src/vaultspec_core/vaultcore/checks/annotations.py`.
+- [x] `P05.S26` - document and test the sanitizer allowlist and malformed-annotation policy; `src/vaultspec_core/vaultcore/checks/annotations.py`.
 - [x] `P05.S27` - expose `vault sanitize annotations --dry-run`; `src/vaultspec_core/cli/vault_cmd.py`.
 - [x] `P05.S28` - report generated annotations and unreadable markdown in `spec doctor` without mutating documents; `src/vaultspec_core/core/diagnosis/`.
 - [x] `P05.S29` - harden template source tests against malformed HTML comment syntax and non-data frontmatter; `tests/test_template_annotations.py`.

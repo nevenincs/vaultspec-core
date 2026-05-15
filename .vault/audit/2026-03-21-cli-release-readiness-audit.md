@@ -10,10 +10,6 @@ related:
 
 # cli-release-readiness Code Review
 
-<!-- Persistent log of audit findings appended below. -->
-
-<!-- Use: {TOPIC}-### | {LEVEL} | {Summary} \n {DESCRIPTION} format-->
-
 ## Justfile Platform & UX
 
 J-01 | HIGH | `npx --yes` downloads unpinned tools on every CI run

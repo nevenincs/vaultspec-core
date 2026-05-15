@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -22,6 +23,8 @@ PRESERVED_HTML_COMMENT_PREFIXES = ("RETIRED:",)
 These are machine-owned vault comments, not generated template guidance.
 """
 
+_FENCE_RE = re.compile(r"^(?P<indent> {0,3})(?P<fence>`{3,}|~{3,})")
+
 __all__ = [
     "PRESERVED_HTML_COMMENT_PREFIXES",
     "AnnotationStats",
@@ -36,11 +39,16 @@ class AnnotationStats:
 
     frontmatter_comments: int = 0
     html_comments: int = 0
+    malformed_html_comments: int = 0
 
     @property
     def total(self) -> int:
         """Return total annotations found."""
-        return self.frontmatter_comments + self.html_comments
+        return (
+            self.frontmatter_comments
+            + self.html_comments
+            + self.malformed_html_comments
+        )
 
     def describe(self) -> str:
         """Return a compact human-readable annotation count."""
@@ -53,6 +61,11 @@ class AnnotationStats:
         if self.html_comments:
             suffix = "" if self.html_comments == 1 else "s"
             parts.append(f"{self.html_comments} HTML comment block{suffix}")
+        if self.malformed_html_comments:
+            suffix = "" if self.malformed_html_comments == 1 else "s"
+            parts.append(
+                f"{self.malformed_html_comments} malformed HTML comment block{suffix}"
+            )
         return ", ".join(parts) if parts else "no annotations"
 
 
@@ -64,8 +77,10 @@ def strip_template_annotations(content: str) -> tuple[str, AnnotationStats]:
     this function only when the operator requests a fix.
 
     Sanitization policy:
-    - remove YAML frontmatter comment-only lines;
-    - remove standalone Markdown HTML comment blocks;
+    - remove YAML frontmatter comment-only lines and standalone frontmatter
+      annotation comment blocks;
+    - remove standalone Markdown HTML comment blocks, including malformed
+      ``<-- ... -->`` template annotations;
     - preserve fenced code blocks and inline/prose mentions of comments;
     - preserve machine-owned comments listed in
       :data:`PRESERVED_HTML_COMMENT_PREFIXES`.
@@ -82,7 +97,8 @@ def strip_template_annotations(content: str) -> tuple[str, AnnotationStats]:
     body, html_comment_count = _strip_html_comments(body)
     stats = AnnotationStats(
         frontmatter_comments=frontmatter_comment_count,
-        html_comments=html_comment_count,
+        html_comments=html_comment_count[0],
+        malformed_html_comments=html_comment_count[1],
     )
     return frontmatter + body, stats
 
@@ -189,38 +205,50 @@ def _strip_frontmatter_comments(frontmatter: str) -> tuple[str, int]:
     lines = frontmatter.splitlines(keepends=True)
     kept: list[str] = []
     removed = 0
+    in_annotation = False
     for line in lines:
-        if line.lstrip().startswith("#"):
+        stripped = line.lstrip()
+        if in_annotation:
+            if "-->" in line:
+                in_annotation = False
+            continue
+        if stripped.startswith("#"):
             removed += 1
+            continue
+        if stripped.startswith(("<!--", "<--")):
+            removed += 1
+            if "-->" not in line:
+                in_annotation = True
             continue
         kept.append(line)
     return "".join(kept), removed
 
 
-def _strip_html_comments(markdown: str) -> tuple[str, int]:
+def _strip_html_comments(markdown: str) -> tuple[str, tuple[int, int]]:
     lines = markdown.splitlines(keepends=True)
     output: list[str] = []
     removed = 0
-    in_fence = False
-    fence_marker: str | None = None
+    malformed_removed = 0
+    fence_char: str | None = None
+    fence_len = 0
     in_comment = False
+    malformed_comment = False
 
     for line in lines:
         stripped = line.lstrip()
-        if not in_comment and (
-            stripped.startswith("```") or stripped.startswith("~~~")
-        ):
-            marker = stripped[:3]
-            if not in_fence:
-                in_fence = True
-                fence_marker = marker
-            elif marker == fence_marker:
-                in_fence = False
-                fence_marker = None
+        fence = _markdown_fence(line)
+        if not in_comment and fence is not None:
+            marker_char, marker_len = fence
+            if fence_char is None:
+                fence_char = marker_char
+                fence_len = marker_len
+            elif marker_char == fence_char and marker_len >= fence_len:
+                fence_char = None
+                fence_len = 0
             output.append(line)
             continue
 
-        if in_fence:
+        if fence_char is not None:
             output.append(line)
             continue
 
@@ -229,24 +257,32 @@ def _strip_html_comments(markdown: str) -> tuple[str, int]:
             if end == -1:
                 continue
             in_comment = False
+            if malformed_comment:
+                malformed_removed += 1
+                malformed_comment = False
+            else:
+                removed += 1
             tail = line[end + 3 :]
             if tail.strip():
                 output.append(tail)
             continue
 
-        if not stripped.startswith("<!--"):
+        is_html_comment = stripped.startswith("<!--")
+        is_malformed_comment = not is_html_comment and stripped.startswith("<--")
+        if not is_html_comment and not is_malformed_comment:
             output.append(line)
             continue
 
-        comment_text = stripped[4:].lstrip()
-        if comment_text.startswith(PRESERVED_HTML_COMMENT_PREFIXES):
+        start_len = 4 if is_html_comment else 3
+        comment_text = stripped[start_len:].lstrip()
+        if is_html_comment and comment_text.startswith(PRESERVED_HTML_COMMENT_PREFIXES):
             output.append(line)
             continue
 
         end = stripped.find("-->")
         if end == -1:
-            removed += 1
             in_comment = True
+            malformed_comment = is_malformed_comment
             continue
 
         tail = stripped[end + 3 :]
@@ -254,6 +290,23 @@ def _strip_html_comments(markdown: str) -> tuple[str, int]:
             output.append(line)
             continue
 
+        if is_malformed_comment:
+            malformed_removed += 1
+        else:
+            removed += 1
+
+    if in_comment and malformed_comment:
+        malformed_removed += 1
+    elif in_comment:
         removed += 1
 
-    return "".join(output), removed
+    return "".join(output), (removed, malformed_removed)
+
+
+def _markdown_fence(line: str) -> tuple[str, int] | None:
+    """Return the opening/closing fence marker char and length, if present."""
+    match = _FENCE_RE.match(line)
+    if match is None:
+        return None
+    marker = match.group("fence")
+    return marker[0], len(marker)

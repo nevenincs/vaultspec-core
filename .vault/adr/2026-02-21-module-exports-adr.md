@@ -10,9 +10,6 @@ related:
   - '[[2026-02-21-packaging-restructure-adr]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `module-exports` adr: `__all__ + __init__ re-exports + relative imports` | (**status:** `accepted`)
 
 ## Problem Statement

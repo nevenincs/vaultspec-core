@@ -8,9 +8,6 @@ related:
   - '[[2026-04-30-vault-index-folder-research]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `vault-index-folder` plan: dedicated index subfolder migration
 
 Implementation plan for `[[2026-04-30-vault-index-folder-adr]]`. Each phase

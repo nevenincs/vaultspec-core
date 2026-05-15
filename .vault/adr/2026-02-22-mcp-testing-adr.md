@@ -8,9 +8,6 @@ related:
   - '[[2026-02-22-mcp-consolidation-adr]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `mcp-testing` adr: `add in-memory client session tests` | (**status:** `accepted`)
 
 ## Problem Statement

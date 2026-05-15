@@ -8,8 +8,6 @@ related:
   - '[[2026-02-18-system-prompt-restructure-adr]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields outside the YAML frontmatter above -->
-
 # system-prompt adr: use append mode for Claude sub-agent system prompts | (**status:** accepted)
 
 ## Problem Statement
