@@ -22,7 +22,7 @@ related:
      - NEVER use [[wiki-links]] or markdown links in the
        document body. -->
 
-# `operator-cli-repair-pipeline` `operator CLI repair pipeline` plan
+# operator-cli-repair-pipeline plan: operator CLI repair pipeline
 
 ## Phases
 

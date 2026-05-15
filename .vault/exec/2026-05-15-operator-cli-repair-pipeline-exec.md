@@ -35,7 +35,7 @@ related:
      step_id frontmatter field below carries the canonical identifier;
      the heading restates the display path as a reading hint. -->
 
-# `operator-cli-repair-pipeline` `P01.S01`
+# operator-cli-repair-pipeline exec: P01.S01
 
 Intake captured direct operator feedback and converted it into a VaultSpec
 pipeline feature. The follow-on implementation added the first working repair

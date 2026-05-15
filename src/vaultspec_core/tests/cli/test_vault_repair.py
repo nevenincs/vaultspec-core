@@ -153,6 +153,51 @@ class TestVaultRepair:
                 os.environ["VAULTSPEC_DOCS_DIR"] = old_docs_dir
             reset_config()
 
+    def test_repair_rebuilds_snapshot_after_structure_rename(
+        self,
+        factory: WorkspaceFactory,
+    ) -> None:
+        factory.install("core")
+        upper = (
+            factory.path
+            / ".vault"
+            / "research"
+            / "2026-05-15-Repair-Stale-Snapshot-research.md"
+        )
+        lower = (
+            factory.path
+            / ".vault"
+            / "research"
+            / "2026-05-15-repair-stale-snapshot-research.md"
+        )
+        upper.parent.mkdir(parents=True, exist_ok=True)
+        upper.write_text(
+            "---\n"
+            "tags:\n"
+            "  - research\n"
+            "  - repair-stale-snapshot\n"
+            "date: '2026-05-15'\n"
+            "related: []\n"
+            "---\n\n# Stale Snapshot\n",
+            encoding="utf-8",
+        )
+
+        result = factory.run(
+            "vault",
+            "repair",
+            "--feature",
+            "repair-stale-snapshot",
+            "--json",
+        )
+        payload = _json_payload(result.output)
+
+        assert result.exit_code == 0, result.output
+        assert lower.exists()
+        repaired = lower.read_text(encoding="utf-8")
+        assert "#research" in repaired
+        assert "#repair-stale-snapshot" in repaired
+        assert payload["fixed_count"] >= 2
+
     def test_dry_run_does_not_plan_index_for_unknown_feature(
         self,
         factory: WorkspaceFactory,

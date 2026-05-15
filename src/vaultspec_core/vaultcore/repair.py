@@ -9,7 +9,6 @@ phases.
 
 from __future__ import annotations
 
-import hashlib
 import pathlib
 import tempfile
 from dataclasses import dataclass, field
@@ -332,8 +331,8 @@ def _skipped_index_phase(reason: str) -> dict[str, Any]:
 
 def _finalize(
     run: RepairRun,
-    before: dict[str, str],
-    after: dict[str, str],
+    before: dict[str, tuple[int, int]],
+    after: dict[str, tuple[int, int]],
 ) -> None:
     run.changed_files = _changed_files(before, after)
     run.phases.append(
@@ -351,26 +350,30 @@ def _finalize(
     )
 
 
-def _vault_file_fingerprints(root_dir: Path) -> dict[str, str]:
+def _vault_file_fingerprints(root_dir: Path) -> dict[str, tuple[int, int]]:
     from ..config import get_config
 
     docs_dir = root_dir / get_config().docs_dir
     if not docs_dir.is_dir():
         return {}
-    hashes: dict[str, str] = {}
+    fingerprints: dict[str, tuple[int, int]] = {}
     for path in sorted(docs_dir.rglob("*.md")):
         try:
             rel = _rel_str(path, root_dir)
         except ValueError:
             rel = str(path)
         try:
-            hashes[rel] = hashlib.sha256(path.read_bytes()).hexdigest()
+            stat = path.stat()
+            fingerprints[rel] = (stat.st_size, stat.st_mtime_ns)
         except OSError:
             continue
-    return hashes
+    return fingerprints
 
 
-def _changed_files(before: dict[str, str], after: dict[str, str]) -> list[str]:
+def _changed_files(
+    before: dict[str, tuple[int, int]],
+    after: dict[str, tuple[int, int]],
+) -> list[str]:
     paths = sorted(set(before) | set(after))
     return [path for path in paths if before.get(path) != after.get(path)]
 

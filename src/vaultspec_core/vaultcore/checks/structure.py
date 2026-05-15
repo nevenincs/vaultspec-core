@@ -63,9 +63,21 @@ def _rename_document_path(src: Path, dst: Path) -> bool:
             tmp = src.with_name(f".{src.name}.vaultspec-rename-{uuid4().hex}.tmp")
             if tmp.exists():
                 continue
-            src.rename(tmp)
-            tmp.rename(dst)
-            return True
+            try:
+                src.rename(tmp)
+            except OSError:
+                return False
+            try:
+                tmp.rename(dst)
+                return True
+            except OSError:
+                try:
+                    tmp.rename(src)
+                except OSError:
+                    logger.warning(
+                        "Failed to roll back case-only rename temp path: %s", tmp
+                    )
+                return False
         return False
 
     if dst.exists() and not _paths_refer_to_same_file(src, dst):

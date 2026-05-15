@@ -77,17 +77,53 @@ def run_all_checks(
     """
     from ...graph import VaultGraph
 
-    graph = VaultGraph(root_dir)
-    snapshot = graph.to_snapshot()
+    if not fix:
+        graph = VaultGraph(root_dir)
+        snapshot = graph.to_snapshot()
+        return [
+            check_structure(root_dir, snapshot=snapshot, fix=False),
+            check_frontmatter(root_dir, snapshot=snapshot, feature=feature, fix=False),
+            check_links(root_dir, snapshot=snapshot, feature=feature, fix=False),
+            check_dangling(root_dir, graph=graph, feature=feature, fix=False),
+            check_body_links(root_dir, snapshot=snapshot, feature=feature),
+            check_orphans(root_dir, graph=graph, feature=feature),
+            check_features(root_dir, snapshot=snapshot, feature=feature),
+            check_references(root_dir, graph=graph, feature=feature, fix=False),
+            check_schema(root_dir, graph=graph, feature=feature, fix=False),
+        ]
 
-    return [
-        check_structure(root_dir, snapshot=snapshot, fix=fix),
-        check_frontmatter(root_dir, snapshot=snapshot, feature=feature, fix=fix),
-        check_links(root_dir, snapshot=snapshot, feature=feature, fix=fix),
-        check_dangling(root_dir, graph=graph, feature=feature, fix=fix),
-        check_body_links(root_dir, snapshot=snapshot, feature=feature),
-        check_orphans(root_dir, graph=graph, feature=feature),
-        check_features(root_dir, snapshot=snapshot, feature=feature),
-        check_references(root_dir, graph=graph, feature=feature, fix=fix),
-        check_schema(root_dir, graph=graph, feature=feature, fix=fix),
-    ]
+    # Mutating checks can rename files or rewrite frontmatter. Rebuild graph
+    # state before each checker so later checks never read stale paths.
+    results: list[CheckResult] = []
+    graph = VaultGraph(root_dir)
+    results.append(check_structure(root_dir, snapshot=graph.to_snapshot(), fix=True))
+    graph = VaultGraph(root_dir)
+    results.append(
+        check_frontmatter(
+            root_dir,
+            snapshot=graph.to_snapshot(),
+            feature=feature,
+            fix=True,
+        )
+    )
+    graph = VaultGraph(root_dir)
+    results.append(
+        check_links(root_dir, snapshot=graph.to_snapshot(), feature=feature, fix=True)
+    )
+    graph = VaultGraph(root_dir)
+    results.append(check_dangling(root_dir, graph=graph, feature=feature, fix=True))
+    graph = VaultGraph(root_dir)
+    results.append(
+        check_body_links(root_dir, snapshot=graph.to_snapshot(), feature=feature)
+    )
+    graph = VaultGraph(root_dir)
+    results.append(check_orphans(root_dir, graph=graph, feature=feature))
+    graph = VaultGraph(root_dir)
+    results.append(
+        check_features(root_dir, snapshot=graph.to_snapshot(), feature=feature)
+    )
+    graph = VaultGraph(root_dir)
+    results.append(check_references(root_dir, graph=graph, feature=feature, fix=True))
+    graph = VaultGraph(root_dir)
+    results.append(check_schema(root_dir, graph=graph, feature=feature, fix=True))
+    return results
