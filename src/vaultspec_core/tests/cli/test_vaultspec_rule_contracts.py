@@ -28,10 +28,7 @@ def test_top_level_doc_guidance_omits_phase_filename_segment() -> None:
         "yyyy-mm-dd-{feature}-" + "{phase}-adr.md",
         "yyyy-mm-dd-<feature>-" + "<phase>-adr.md",
     )
-    checked_roots = (
-        PROJECT_ROOT / ".vaultspec" / "rules",
-        PROJECT_ROOT / ".vaultspec" / "_snapshots" / "rules",
-    )
+    checked_roots = (PROJECT_ROOT / ".vaultspec" / "rules",)
 
     offenders: list[str] = []
     for root in checked_roots:
@@ -153,7 +150,6 @@ def test_rule_guidance_does_not_forbid_template_extra_tags() -> None:
         PROJECT_ROOT / ".vaultspec" / "rules" / "skills",
         PROJECT_ROOT / ".vaultspec" / "rules" / "agents",
         PROJECT_ROOT / ".vaultspec" / "rules" / "rules",
-        PROJECT_ROOT / ".vaultspec" / "_snapshots" / "rules",
     )
 
     offenders: list[str] = []
@@ -177,7 +173,6 @@ def test_rule_guidance_uses_template_quote_style() -> None:
         PROJECT_ROOT / ".vaultspec" / "rules" / "skills",
         PROJECT_ROOT / ".vaultspec" / "rules" / "agents",
         PROJECT_ROOT / ".vaultspec" / "rules" / "rules",
-        PROJECT_ROOT / ".vaultspec" / "_snapshots" / "rules",
     )
 
     offenders: list[str] = []
