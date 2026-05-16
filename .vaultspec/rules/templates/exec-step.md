@@ -9,17 +9,16 @@ related:
 ---
 
 <!-- FRONTMATTER RULES:
-     Required tags: one directory tag and one feature tag.
-     Directory tag is hardcoded as #exec for .vault/exec/ documents.
-     Replace {feature} with a kebab-case feature tag, e.g. #editor-demo.
+     tags: one directory tag (hardcoded #exec) and one feature tag.
+     Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
      Additional tags may be appended below the required pair.
-     Date must use ISO format, e.g. 2026-02-06.
      step_id is the originating Step's canonical identifier, e.g. S01.
-     Related documents must be quoted wiki-links and must link to the
-     parent plan, e.g. "[[2026-02-04-feature-plan]]". -->
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
+     Related: use wiki-links as '[[YYYY-MM-DD-foo-bar-plan]]' and link the
+     parent plan.
+
+     DO NOT add frontmatter fields
+     outside the frontmatter. -->
 
 <!-- LINK RULES:
      - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
@@ -42,16 +41,19 @@ related:
        L2       = `{phase}.{step}`    (e.g., `P01.S01`)
        L3 / L4  = `{wave}.{phase}.{step}`  (e.g., `W01.P01.S01`) -->
 
-Brief summary of work done.
+<!-- Headline summary of work done. Use:
+
+- Agent: <your agent model, effort level>
+- Session id: the session id of the agent, if available.
 
 - Modified: `{file1}`
-- Created: `{file2}`
+- Modified: `{file2}`
+- Created: `{file3}` -->
 
 ## Description
 
-Detailed description of implementation details.
+<!-- Succint line-by-line list of steps executed. Use imperative language, mirroring git commit summary lines. -->
 
-## Tests
+## Notes
 
-Brief description of tests and validation results.
-Link any audit reports related to `{phase}` or `{step}`.
+<!-- Incidents. Data loss. Difficulties (;persistent failiures. Skipped work. Scafolds left in code. Failiures. -->

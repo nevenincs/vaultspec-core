@@ -8,16 +8,14 @@ related:
 ---
 
 <!-- FRONTMATTER RULES:
-     Required tags: one directory tag and one feature tag.
-     Directory tag is hardcoded as #research for .vault/research/ documents.
-     Replace {feature} with a kebab-case feature tag, e.g. #editor-demo.
+     tags: one directory tag (hardcoded #research) and one feature tag.
+     Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
      Additional tags may be appended below the required pair.
-     Date must use ISO format, e.g. 2026-02-06.
-     Related documents must be quoted wiki-links, e.g.
-     "[[2026-02-04-feature-plan]]". -->
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
+     Related: use wiki-links as '[[YYYY-MM-DD-foo-bar]]'.
+
+     DO NOT add frontmatter fields
+     outside the frontmatter. -->
 
 <!-- LINK RULES:
      - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
@@ -27,9 +25,9 @@ related:
 
 # `{feature}` research: `{topic}`
 
-Brief description of what was researched, why, and how it relates to
-`{feature}`.
+<!-- Brief description of what was researched, why, and how it relates to
+`{feature}`. -->
 
 ## Findings
 
-Adapt format based on content.
+<!-- Adapt format based on content. -->

@@ -56,10 +56,11 @@ DO NOT:
 - Assume the learner can fill gaps
 - Ship an untested tutorial
 
-**Exercises must be:** meaningful, completable, logically ordered, and usefully complete.
+**Exercises must be:** meaningful, completable, logically ordered, and usefully
+complete.
 
-**Drift check ->** drifting toward application? It's becoming a How-to Guide.
-Drifting toward theory? It's becoming Explanation.
+**Drift check ->** drifting toward application? It's becoming a How-to Guide. Drifting
+toward theory? It's becoming Explanation.
 
 ______________________________________________________________________
 
@@ -99,8 +100,8 @@ DO NOT:
 | Choices     | None                               | Conditional ("if x, do y")      |
 | Explanation | Ruthlessly minimized               | Absent entirely                 |
 
-**Drift check ->** drifting toward learning? It's becoming a Tutorial.
-Drifting toward theory? It's becoming Reference.
+**Drift check ->** drifting toward learning? It's becoming a Tutorial. Drifting toward
+theory? It's becoming Reference.
 
 ______________________________________________________________________
 
@@ -129,8 +130,8 @@ DO NOT:
 - Organize by user workflow - organize by product architecture
 - Omit items for brevity
 
-**Drift check ->** drifting toward doing? It's becoming a How-to Guide.
-Drifting toward learning/context? It's becoming Explanation.
+**Drift check ->** drifting toward doing? It's becoming a How-to Guide. Drifting toward
+learning/context? It's becoming Explanation.
 
 ______________________________________________________________________
 
@@ -159,8 +160,8 @@ DO NOT:
 - Let scope drift unbounded
 - Undervalue this type - it's the connective tissue of mastery
 
-**Drift check ->** drifting toward doing? It's becoming a Tutorial.
-Drifting toward lookup/application? It's becoming Reference.
+**Drift check ->** drifting toward doing? It's becoming a Tutorial. Drifting toward
+lookup/application? It's becoming Reference.
 
 ______________________________________________________________________
 
@@ -189,7 +190,8 @@ ______________________________________________________________________
 
 ## 7. Quick Decision Matrix
 
-Use this when you're unsure what type of document to write or when reviewing existing docs:
+Use this when you're unsure what type of document to write or when reviewing existing
+docs:
 
 | Signal in your content              | You are writing | Should be in |
 | ----------------------------------- | --------------- | ------------ |

@@ -138,6 +138,7 @@ _dev-lint-toml:
 
 _dev-lint-markdown:
   uv run mdformat --check README.md .vaultspec/ .vault/
+  uv run mdformat --wrap 88 --check README.md .vaultspec/README.md .vaultspec/MCP.md .vaultspec/CLI.md .vaultspec/rules
   uv run pymarkdown --config .pymarkdown.json scan -r README.md .vaultspec/ .vault/
 
 _dev-lint-workflow:
@@ -183,6 +184,7 @@ _dev-fix-toml:
 
 _dev-fix-markdown:
   uv run mdformat README.md .vaultspec/ .vault/
+  uv run mdformat --wrap 88 README.md .vaultspec/README.md .vaultspec/MCP.md .vaultspec/CLI.md .vaultspec/rules
   uv run pymarkdown --config .pymarkdown.json fix -r README.md .vaultspec/ .vault/
 
 _dev-fix-vault:

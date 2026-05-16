@@ -8,16 +8,14 @@ related:
 ---
 
 <!-- FRONTMATTER RULES:
-     Required tags: one directory tag and one feature tag.
-     Directory tag is hardcoded as #audit for .vault/audit/ documents.
-     Replace {feature} with a kebab-case feature tag, e.g. #editor-demo.
+     tags: one directory tag (hardcoded #audit) and one feature tag.
+     Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
      Additional tags may be appended below the required pair.
-     Date must use ISO format, e.g. 2026-02-06.
-     Related documents must be quoted wiki-links, e.g.
-     "[[2026-02-04-feature-plan]]". -->
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
+     Related: use wiki-links as '[[YYYY-MM-DD-foo-bar]]'.
+
+     DO NOT add frontmatter fields
+     outside the frontmatter. -->
 
 <!-- LINK RULES:
      - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
@@ -28,5 +26,7 @@ related:
 # `{feature}` Code Review
 
 <!-- Persistent log of audit findings appended below. -->
+
+## {TOPIC}-### | {LEVEL} | {Summary}
 
 <!-- Use: {TOPIC}-### | {LEVEL} | {Summary} \n {DESCRIPTION} format-->

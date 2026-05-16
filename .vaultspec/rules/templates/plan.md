@@ -3,29 +3,28 @@ tags:
   - '#plan'
   - '#{feature}'
 date: '{yyyy-mm-dd}'
-tier: L2
+tier: L{#}
 related:
   - '[[{yyyy-mm-dd-*}]]'
 ---
 
 <!-- FRONTMATTER RULES:
-     Required tags: one directory tag and one feature tag.
-     Directory tag is hardcoded as #plan for .vault/plan/ documents.
-     Replace {feature} with a kebab-case feature tag, e.g. #editor-demo.
+     tags: one directory tag (hardcoded #plan) and one feature tag.
+     Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
      Additional tags may be appended below the required pair.
-     Date must use ISO format, e.g. 2026-02-06.
      tier is mandatory for new plans. Allowed: L1, L2, L3, L4.
      L1 = Steps only. L2 = Phases above Steps. L3 = Waves above
      Phases above Steps. L4 = Epic above Waves above Phases above
      Steps; PM association required. Pre-existing plans without this
      field default to L2.
-     Related documents must be quoted wiki-links. The related field
+
+     Related: use wiki-links as '[[YYYY-MM-DD-foo-bar]]'. The related field
      carries the AUTHORISING documents (ADR, research, reference, prior
      plan) for every Step in this plan; Steps inherit this chain;
-     per-row reference footers do not exist. -->
+     per-row reference footers do not exist.
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
+     DO NOT add frontmatter fields
+     outside the frontmatter. -->
 
 <!-- LINK RULES:
      - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
@@ -38,7 +37,7 @@ related:
 
 <!-- HIERARCHY AND TIERS:
      Epic > Wave > Phase > Step. Step is the canonical leaf-row
-     noun. Execution-log artefact: <Step Record>.
+     noun. Execution-log artifact: <Step Record>.
      Tier is declared in frontmatter as tier: L1/L2/L3/L4
      (mandatory for new plans; pre-existing plans without the
      field default to L2 and the writer adds the field on first
@@ -93,27 +92,27 @@ related:
 
 # `{feature}` `{phase}` plan
 
-Brief description of the proposed feature, change, or refactor.
+<!-- One-line headline summary plan. -->
 
-## Proposed Changes
+## Description
 
-Describe what work needs to be done at a high level. Reference `{adr}`s,
-`{research}`, `{reference}`, and other plan or reference files where
-appropriate so implementation remains grounded in architectural decisions.
+<!-- Briefly describe the proposed work. Reference `{adr}`s,
+`{research}`, `{reference}`. Supporting documentation must be read prior to
+writing the plan document. -->
 
 ## Steps
 
-The plan's tier (declared in frontmatter as `tier: L1`, `L2`, `L3`, or
+<!-- The plan's tier (declared in frontmatter as `tier: L1`, `L2`, `L3`, or
 `L4`) determines the structure under this section:
 
 - `L1`: a flat list of Step rows (no Phase, Wave, or Epic).
 - `L2`: one or more `### Phase` blocks each containing Step rows.
 - `L3`: one or more `## Wave` blocks each containing Phase blocks.
-- `L4`: a `## Epic intent` block, followed by Wave blocks.
+- `L4`: a `## Epic intent` block, followed by Wave blocks. -->
 
-Replace this scaffold with the tier-appropriate structure for your plan.
+<!-- Replace this scaffold with the tier-appropriate structure for your plan.
 Format examples for each block type are embedded below as commented
-templates.
+templates. -->
 
 <!-- IMPORTANT: This document must be updated between execution runs to
      track progress. -->
@@ -157,16 +156,16 @@ templates.
 
 ## Parallelization
 
-State which Steps, Phases, or Waves can be executed in parallel and
+<!-- State which Steps, Phases, or Waves can be executed in parallel and
 which carry hard ordering. At `L1` and `L2`, parallelism is decided
 per-Step or per-Phase. At `L3` and `L4`, Waves are sequenced by
 default (one Wave must land before the next can begin); Phases
 within a single Wave may be parallelised when they share no hard
-interdependency.
+interdependency. -->
 
 ## Verification
 
-State the mission success criteria for this plan. Each criterion
+<!-- State the mission success criteria for this plan. Each criterion
 should be a verifiable check (test passes, surface conforms,
 reviewer signs off) rather than a free-form assertion.
 
@@ -176,4 +175,4 @@ the declared project-management association to report the Epic
 complete.
 
 For tier-specific verification cadence, see the convention ADR
-authorising this plan via the `related:` frontmatter.
+authorising this plan via the `related:` frontmatter. -->

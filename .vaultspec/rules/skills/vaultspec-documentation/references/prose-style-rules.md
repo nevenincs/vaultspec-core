@@ -19,11 +19,12 @@ not casual. Warm, not sloppy.
   not "A response is sent by the server."
 - **Passive is acceptable** when the actor is unknown, irrelevant, or when you want to
   emphasize the object ("The file is deleted after 30 days.").
-- **Second person ("you") as default.** Address the reader directly. Reserve "we" for the
-  authoring organization with a clear antecedent.
+- **Second person ("you") as default.** Address the reader directly. Reserve "we" for
+  the authoring organization with a clear antecedent.
 - **Imperative for instructions.** "Click Submit," "Run the command," "Add the flag."
   Implied "you." No "please."
-- **Present tense by default.** Describe what the software *does*, not what it *will do*.
+- **Present tense by default.** Describe what the software *does*, not what it *will
+  do*.
 
 ______________________________________________________________________
 
@@ -61,33 +62,33 @@ ______________________________________________________________________
 
 - **One term per concept.** Pick a word and stick to it. Don't alternate between
   "repository," "repo," and "project" for the same thing.
-- **Define acronyms on first use.** Spell out, then parenthetical:
-  "Content Delivery Network (CDN)."
-- **Conditions before instructions.** "If the build fails, run `make clean`" -
-  not "Run `make clean` if the build fails."
+- **Define acronyms on first use.** Spell out, then parenthetical: "Content Delivery
+  Network (CDN)."
+- **Conditions before instructions.** "If the build fails, run `make clean`" - not "Run
+  `make clean` if the build fails."
 - **Specific over vague.** "Takes about 5 minutes" - not "Takes a moment."
 - **No double negatives.** "You can access" - not "You can't not access."
-- **Distinguish similar terms precisely.** Authentication ≠ authorization.
-  Deprecate ≠ remove.
+- **Distinguish similar terms precisely.** Authentication ≠ authorization. Deprecate ≠
+  remove.
 
 ______________________________________________________________________
 
 ## 4. Tone
 
-- **Conversational, not casual.** Sound like a person, not a textbook and not a
-  group chat.
+- **Conversational, not casual.** Sound like a person, not a textbook and not a group
+  chat.
 - **Confident, not arrogant.** State facts. Don't hedge unnecessarily, but don't
   over-promise.
-- **Helpful, not patronizing.** Never call something "easy," "simple," "obvious,"
-  or "trivial." What's easy for one reader is hard for another.
+- **Helpful, not patronizing.** Never call something "easy," "simple," "obvious," or
+  "trivial." What's easy for one reader is hard for another.
 - **Neutral on error.** When things go wrong, describe what happened and what to do
   next. Don't blame the user. Don't be cute about failures.
 - **No exclamation marks** in technical documentation. Save them for release notes or
   marketing, if at all.
 - **No humor that sacrifices clarity.** If a joke adds confusion or doesn't translate,
   cut it.
-- **Use contractions.** "It's," "you'll," "don't," "can't." They sound human.
-  Avoid contracting nouns + verbs where ambiguity arises ("The key's value" - unclear).
+- **Use contractions.** "It's," "you'll," "don't," "can't." They sound human. Avoid
+  contracting nouns + verbs where ambiguity arises ("The key's value" - unclear).
 
 ______________________________________________________________________
 
@@ -103,8 +104,8 @@ ______________________________________________________________________
 - **No periods on headings, subheadings, or list items under 3 words.**
 - **Bold for UI elements.** "Click **Settings**." Code font for code, commands,
   filenames, and parameters.
-- **Meaningful link text.** "See the `[authentication guide](...)`" -
-  not "Click `[here](...)`."
+- **Meaningful link text.** "See the `[authentication guide](...)`" - not "Click
+  `[here](...)`."
 
 ______________________________________________________________________
 
@@ -168,10 +169,9 @@ people using screen readers, keyboard navigation, or translation tools.
 - **No images of text.** Use actual text for code, commands, and terminal output.
 - **Alt text on every image.** Describe the intent, not the decoration. Use empty alt
   for purely decorative images.
-- **No directional references.** "The following table" - not "the table below" or
-  "the right sidebar." Screen readers and reflowed layouts break spatial assumptions.
-- **Describe link destinations.** "Download the configuration file" - not
-  "click here."
+- **No directional references.** "The following table" - not "the table below" or "the
+  right sidebar." Screen readers and reflowed layouts break spatial assumptions.
+- **Describe link destinations.** "Download the configuration file" - not "click here."
 - **Don't rely on color alone** to communicate state. Add a text label.
 - **Unique, descriptive headings.** Never skip heading levels (h1 -> h3).
 - **Left-align text.** No center or full justification.

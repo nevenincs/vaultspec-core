@@ -8,16 +8,15 @@ related:
 ---
 
 <!-- FRONTMATTER RULES:
-     Required tags: one directory tag and one feature tag.
-     Directory tag is hardcoded as #exec for .vault/exec/ documents.
-     Replace {feature} with a kebab-case feature tag, e.g. #editor-demo.
+     tags: one directory tag (hardcoded #exec) and one feature tag.
+     Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
      Additional tags may be appended below the required pair.
-     Date must use ISO format, e.g. 2026-02-06.
-     Related documents must be quoted wiki-links and must link to the
-     parent plan, e.g. "[[2026-02-04-feature-plan]]". -->
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
+     Related: use wiki-links as '[[YYYY-MM-DD-foo-bar-plan]]' and link the
+     parent plan.
+
+     DO NOT add frontmatter fields
+     outside the frontmatter. -->
 
 <!-- LINK RULES:
      - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
@@ -41,11 +40,4 @@ Brief summary of overall progress across every Step in this Phase.
 
 ## Description
 
-High-level description of work accomplished.
-
-## Tests
-
-Brief description of overall verification and auditing.
-
-Link any audit reports related to `{phase}` summary or individual
-`{step}` summaries.
+<!-- High-level description of work accomplished. -->

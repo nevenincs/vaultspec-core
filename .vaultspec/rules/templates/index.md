@@ -15,7 +15,7 @@ related:
 
 # `{feature}` feature index
 
-Auto-generated index of all documents tagged with `#{feature}`.
+<!-- Auto-generated index of all documents tagged with `#{feature}`. -->
 
 ## Documents
 

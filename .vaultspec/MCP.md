@@ -1,6 +1,9 @@
 # vaultspec MCP Server
 
-`vaultspec-mcp` is a [Model Context Protocol](https://modelcontextprotocol.io/) server that exposes vault document discovery and authoring as JSON-RPC tools over stdio transport. It allows any MCP-capable client (e.g. Claude Desktop, editor extensions) to query and create `.vault/` documents in a vaultspec-managed workspace.
+`vaultspec-mcp` is a [Model Context Protocol](https://modelcontextprotocol.io/) server
+that exposes vault document discovery and authoring as JSON-RPC tools over stdio
+transport. It allows any MCP-capable client (e.g. Claude Desktop, editor extensions) to
+query and create `.vault/` documents in a vaultspec-managed workspace.
 
 ## Setup
 
@@ -17,11 +20,17 @@
 }
 ```
 
-The server resolves its workspace from the current working directory by default. IDE-integrated MCP clients (Claude Code, Cursor) set the working directory to the project root, so this works without additional configuration.
+The server resolves its workspace from the current working directory by default.
+IDE-integrated MCP clients (Claude Code, Cursor) set the working directory to the
+project root, so this works without additional configuration.
 
-This invocation uses module-based execution (`python -m`) rather than the `vaultspec-mcp` console script entry point. On Windows, MCP clients lock the `.exe` binary in `.venv/Scripts/`, which blocks `uv sync` and other package operations. Module invocation avoids this entirely.
+This invocation uses module-based execution (`python -m`) rather than the
+`vaultspec-mcp` console script entry point. On Windows, MCP clients lock the `.exe`
+binary in `.venv/Scripts/`, which blocks `uv sync` and other package operations. Module
+invocation avoids this entirely.
 
-For standalone setups where the working directory isn't the workspace, set `VAULTSPEC_TARGET_DIR` to an absolute path:
+For standalone setups where the working directory isn't the workspace, set
+`VAULTSPEC_TARGET_DIR` to an absolute path:
 
 ```json
 {
@@ -45,18 +54,20 @@ For standalone setups where the working directory isn't the workspace, set `VAUL
 
 See the [CLI reference](./CLI.md) for all `VAULTSPEC_` environment variables.
 
-**Note:** `vaultspec-core install` always scaffolds `.mcp.json` regardless of which provider is selected. MCP configuration is part of the core install and is not tied to any specific provider.
+**Note:** `vaultspec-core install` always scaffolds `.mcp.json` regardless of which
+provider is selected. MCP configuration is part of the core install and is not tied to
+any specific provider.
 
 ## Verification
 
-Run `vaultspec-core spec mcps status --json` to validate MCP source definitions
-in `.vaultspec/rules/mcps/` against `.mcp.json`. This checks configuration
-health only; it does not start or probe MCP server processes. The command exits
-`0` only when `status` is `ok`, otherwise `1`.
+Run `vaultspec-core spec mcps status --json` to validate MCP source definitions in
+`.vaultspec/rules/mcps/` against `.mcp.json`. This checks configuration health only; it
+does not start or probe MCP server processes. The command exits `0` only when `status`
+is `ok`, otherwise `1`.
 
-If status is not `ok`, inspect `missing`, `drifted`, `stale_managed`, and
-`warnings`, then run `vaultspec-core sync` and rerun status. Use
-`vaultspec-core spec doctor --json` for broader workspace diagnosis.
+If status is not `ok`, inspect `missing`, `drifted`, `stale_managed`, and `warnings`,
+then run `vaultspec-core sync` and rerun status. Use `vaultspec-core spec doctor --json`
+for broader workspace diagnosis.
 
 ## Tools
 
@@ -64,7 +75,8 @@ If status is not `ok`, inspect `missing`, `drifted`, `stale_managed`, and
 
 Read-only, idempotent. Discovers vault documents or lists features.
 
-**With no arguments**, returns all features with document count and graph weight score (based on incoming link count via `VaultGraph`).
+**With no arguments**, returns all features with document count and graph weight score
+(based on incoming link count via `VaultGraph`).
 
 **With filters**, returns matching documents.
 
@@ -121,7 +133,9 @@ Non-destructive, idempotent. Creates a new vault document from a type template.
 | `related` | `string[] \| null` | `null`       | Related document(s). Accepts path, filename, stem, or `[[wiki-link]]`. Resolved to wiki-link format in frontmatter. |
 | `tags`    | `string[] \| null` | `null`       | Additional freeform tags beyond the required directory and feature tags.                                            |
 
-The tool reads the template at `.vaultspec/rules/templates/{type}.md`, replaces `{feature}`, `{yyyy-mm-dd}`, `{topic}`, and `{title}` placeholders, then writes to `.vault/{type}/{filename}`.
+The tool reads the template at `.vaultspec/rules/templates/{type}.md`, replaces
+`{feature}`, `{yyyy-mm-dd}`, `{topic}`, and `{title}` placeholders, then writes to
+`.vault/{type}/{filename}`.
 
 **Filename format:**
 
@@ -147,11 +161,14 @@ The tool reads the template at `.vaultspec/rules/templates/{type}.md`, replaces 
 }
 ```
 
-Possible failure reasons: invalid `type`, missing template, filename validation error, destination directory not found, file already exists, write failure.
+Possible failure reasons: invalid `type`, missing template, filename validation error,
+destination directory not found, file already exists, write failure.
 
 ## Logging
 
-All server logs are written to **stderr**. **stdout is reserved for the JSON-RPC protocol stream** and must not receive non-protocol output. This separation is enforced at startup by `configure_logging()`.
+All server logs are written to **stderr**. **stdout is reserved for the JSON-RPC
+protocol stream** and must not receive non-protocol output. This separation is enforced
+at startup by `configure_logging()`.
 
 ## See Also
 
@@ -161,4 +178,5 @@ All server logs are written to **stderr**. **stdout is reserved for the JSON-RPC
 | [Framework Manual](./README.md)   | Development workflow, skills, and customization       |
 | [CLI Reference](./CLI.md)         | All commands, flags, and options for `vaultspec-core` |
 
-For bug reports and feature requests, open an issue on the [vaultspec-core issue tracker](https://github.com/wgergely/vaultspec-core/issues).
+For bug reports and feature requests, open an issue on the
+[vaultspec-core issue tracker](https://github.com/wgergely/vaultspec-core/issues).
