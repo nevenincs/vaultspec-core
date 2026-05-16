@@ -53,6 +53,7 @@ _COMMAND_REFERENCE = re.compile(
 )
 _NON_COMMAND_TOKENS = ("[", "<", "--", "-", "...", "{", "#")
 _OPTION_REFERENCE = re.compile(r"(?<![A-Za-z0-9_])(-{1,2}[A-Za-z][A-Za-z0-9_-]*)")
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def _top_level_command_names() -> set[str]:
@@ -360,4 +361,31 @@ def test_cli_handbook_contains_every_live_leaf_signature() -> None:
     assert not missing, (
         "CLI.md must contain the exact live usage signature for every visible "
         "leaf command:\n  - " + "\n  - ".join(missing)
+    )
+
+
+def test_live_help_does_not_teach_bare_cli_commands() -> None:
+    top_level_commands = _top_level_command_names()
+    help_paths = sorted(_registered_command_paths())
+    runner = CliRunner(env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "240"})
+
+    offenders: list[str] = []
+    for command_path in help_paths:
+        result = runner.invoke(app, [*command_path, "--help"])
+        assert result.exit_code == 0, result.output
+        output = _ANSI_ESCAPE.sub("", result.output)
+        for line_no, line in enumerate(output.splitlines(), 1):
+            stripped = " ".join(line.strip().split())
+            if not stripped or stripped.startswith(("Usage:", "Options", "Commands")):
+                continue
+            for match in _INLINE_CODE.finditer(stripped):
+                reference = match.group(1).strip()
+                if _is_bare_cli_reference(reference, top_level_commands):
+                    offenders.append(
+                        f"{' '.join(command_path)} --help:{line_no}: `{reference}`"
+                    )
+
+    assert not offenders, (
+        "Live help prose must include `vaultspec-core` for runnable-looking "
+        "command snippets:\n  - " + "\n  - ".join(offenders)
     )

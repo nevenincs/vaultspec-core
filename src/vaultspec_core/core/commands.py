@@ -652,7 +652,7 @@ def _validate_provider(provider: str) -> None:
         )
 
 
-def _validate_skip(skip: set[str] | None) -> set[str]:
+def _validate_skip(skip: set[str] | None, *, allow_core: bool = True) -> set[str]:
     """Validate and normalise a *skip* set.
 
     Raises:
@@ -663,6 +663,8 @@ def _validate_skip(skip: set[str] | None) -> set[str]:
     # "all" is not a valid skip target  - you'd just not run the command.
     # "mcp" is a valid skip target but is not a provider.
     allowed = (VALID_PROVIDERS - {"all"}) | {"mcp", "precommit"}
+    if not allow_core:
+        allowed.discard("core")
     bad = skip - allowed
     if bad:
         raise ProviderError(
@@ -1569,7 +1571,7 @@ def sync_provider(
             f"Valid: {', '.join(sorted(SYNC_PROVIDERS))}"
         )
 
-    skip = _validate_skip(skip)
+    skip = _validate_skip(skip, allow_core=False)
 
     from .agents import agents_sync
     from .config_gen import config_sync
@@ -1583,10 +1585,9 @@ def sync_provider(
     guard_dev_repo(ctx.target_dir, dev=dev)
 
     def _empty_sync_results() -> list[_t.SyncResult]:
-        result_count = 5 if "mcp" in skip else 6
-        return [_t.SyncResult() for _ in range(result_count)]
+        return [_t.SyncResult() for _ in range(5)]
 
-    def _run_all_syncs() -> list[_t.SyncResult]:
+    def _run_all_syncs(*, include_mcp: bool = True) -> list[_t.SyncResult]:
         results: list[_t.SyncResult] = []
         sync_passes: list[tuple[Callable[[], _t.SyncResult], str]] = [
             (lambda: rules_sync(prune=force, dry_run=dry_run), "rules"),
@@ -1595,7 +1596,7 @@ def sync_provider(
             (lambda: system_sync(dry_run=dry_run, force=force), "system"),
             (lambda: config_sync(dry_run=dry_run, force=force), "config"),
         ]
-        if "mcp" not in skip:
+        if include_mcp and "mcp" not in skip:
             sync_passes.append(
                 (
                     lambda: _mcp_sync(dry_run=dry_run, force=force, prune=force),
@@ -1765,7 +1766,7 @@ def sync_provider(
     ) -> list[_t.SyncResult]:
         _t.set_context(replace(ctx, tool_configs=provider_configs))
         logger.info("Syncing provider: %s ...", provider)
-        results = _run_all_syncs()
+        results = _run_all_syncs(include_mcp=False)
         if not dry_run:
             logger.info("Done.")
         return results

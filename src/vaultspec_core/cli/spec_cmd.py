@@ -1303,12 +1303,6 @@ def cmd_doctor(
     import dataclasses
     import json
 
-    # Initialize workspace context so collectors can read tool configs.
-    try:
-        apply_target(target)
-    except Exception:
-        logger.debug("Could not initialize workspace context", exc_info=True)
-
     from vaultspec_core.core.diagnosis import (
         BuiltinVersionSignal,
         ConfigSignal,
@@ -1332,11 +1326,24 @@ def cmd_doctor(
         )
         raise typer.Exit(code=2)
 
+    previous_logging_disable = logging.root.manager.disable
+    if json_output:
+        logging.disable(logging.CRITICAL)
     try:
-        diag = diagnose(effective, scope="full")
-    except Exception as exc:
-        typer.echo(f"Error: diagnosis failed: {exc}", err=True)
-        raise typer.Exit(code=2) from None
+        # Initialize workspace context so collectors can read tool configs.
+        try:
+            apply_target(target)
+        except Exception:
+            logger.debug("Could not initialize workspace context", exc_info=True)
+
+        try:
+            diag = diagnose(effective, scope="full")
+        except Exception as exc:
+            typer.echo(f"Error: diagnosis failed: {exc}", err=True)
+            raise typer.Exit(code=2) from None
+    finally:
+        if json_output:
+            logging.disable(previous_logging_disable)
 
     if json_output:
         data = dataclasses.asdict(diag)

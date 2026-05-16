@@ -5,6 +5,7 @@ Covers vault add, vault stats, vault check, etc.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -141,7 +142,7 @@ class TestAddSubcommand:
             d = tmp_path / ".vault" / prereq
             (d / f"2026-01-01-f-{prereq}.md").write_text(
                 f"---\ntags:\n  - '#{prereq}'\n  - '#f'\n"
-                f"date: '2026-01-01'\nrelated: []\n---\n# Stub\n",
+                f"date: '2026-01-01'\nrelated: []\n---\n# Prerequisite\n",
                 encoding="utf-8",
             )
 
@@ -295,6 +296,53 @@ class TestAddSubcommand:
         sanitized = expected_path.read_text(encoding="utf-8")
         assert "<!-- FRONTMATTER RULES:" not in sanitized
         assert "<!-- LINK RULES:" not in sanitized
+
+
+class TestVaultJsonOutput:
+    """JSON-mode commands must produce machine-readable stdout only."""
+
+    def test_add_dry_run_json_has_no_human_prefix(self, runner, synthetic_project):
+        result = runner.invoke(
+            app,
+            [
+                "--target",
+                str(synthetic_project),
+                "vault",
+                "add",
+                "research",
+                "--feature",
+                "json-dry-run",
+                "--dry-run",
+                "--json",
+            ],
+        )
+
+        payload = json.loads(result.output)
+        assert result.exit_code == 0, result.output
+        assert result.output.lstrip().startswith("{")
+        assert payload["dry_run"] is True
+        assert payload["type"] == "research"
+
+    def test_graph_empty_json_has_no_human_prefix(self, factory):
+        factory.install("core")
+
+        result = factory.run("vault", "graph", "--json")
+
+        payload = json.loads(result.output)
+        assert result.exit_code == 0, result.output
+        assert result.output.lstrip().startswith("{")
+        assert payload["nodes"] == []
+        assert payload.get("links", payload.get("edges", [])) == []
+
+    def test_feature_index_empty_json_has_no_human_prefix(self, factory):
+        factory.install("core")
+
+        result = factory.run("vault", "feature", "index", "--json")
+
+        payload = json.loads(result.output)
+        assert result.exit_code == 0, result.output
+        assert result.output.lstrip().startswith("{")
+        assert payload == {"generated": []}
 
 
 class TestNoCommand:

@@ -178,6 +178,7 @@ def list_pending(
     workspace: Path,
     *,
     manifest: ManifestData | None = None,
+    registry: list[Migration] | None = None,
 ) -> list[Migration]:
     """Return every registered migration with a target above the manifest.
 
@@ -200,13 +201,18 @@ def list_pending(
     if not mdata.vaultspec_version:
         return []
     current = parse_version_tuple(mdata.vaultspec_version)
-    return [m for m in REGISTRY if parse_version_tuple(m.target_version) > current]
+    entries = sorted(
+        REGISTRY if registry is None else registry,
+        key=lambda m: parse_version_tuple(m.target_version),
+    )
+    return [m for m in entries if parse_version_tuple(m.target_version) > current]
 
 
 def migration_status(
     workspace: Path,
     *,
     manifest: ManifestData | None = None,
+    registry: list[Migration] | None = None,
 ) -> tuple[MigrationStatus, list[str]]:
     """Summarise the registry state for *workspace*.
 
@@ -226,7 +232,7 @@ def migration_status(
     mdata = manifest if manifest is not None else read_manifest_data(workspace)
     if not mdata.vaultspec_version:
         return MigrationStatus.UNKNOWN, []
-    pending = list_pending(workspace, manifest=mdata)
+    pending = list_pending(workspace, manifest=mdata, registry=registry)
     if not pending:
         return MigrationStatus.UP_TO_DATE, []
     return MigrationStatus.PENDING, [m.name for m in pending]
@@ -236,6 +242,7 @@ def run_pending_migrations(
     workspace: Path,
     *,
     use_cache: bool = False,
+    registry: list[Migration] | None = None,
 ) -> list[MigrationResult]:
     """Run every registered migration whose target exceeds the manifest version.
 
@@ -284,6 +291,11 @@ def run_pending_migrations(
         order. Empty when the workspace has no manifest or every
         registered migration is already covered.
     """
+    registry_entries = sorted(
+        REGISTRY if registry is None else registry,
+        key=lambda m: parse_version_tuple(m.target_version),
+    )
+
     # Resolve once so symlinked or relative invocations of the same
     # workspace share a cache entry rather than racing on equivalent
     # paths.
@@ -297,8 +309,8 @@ def run_pending_migrations(
     # entry matters: if its target is at or below the cached version,
     # every earlier entry is too. Empty registries trivially short-circuit.
     if cached_version is not None and (
-        not REGISTRY
-        or parse_version_tuple(REGISTRY[-1].target_version) <= cached_version
+        not registry_entries
+        or parse_version_tuple(registry_entries[-1].target_version) <= cached_version
     ):
         return []
 
@@ -315,7 +327,7 @@ def run_pending_migrations(
             return []
 
         current = parse_version_tuple(manifest.vaultspec_version)
-        pending = list_pending(workspace, manifest=manifest)
+        pending = list_pending(workspace, manifest=manifest, registry=registry_entries)
         if not pending:
             if use_cache:
                 with _workspace_cache_lock:

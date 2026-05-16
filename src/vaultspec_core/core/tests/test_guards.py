@@ -6,6 +6,11 @@ plumbed through :func:`guard_dev_repo`.  These tests pin both the
 removal of the env-var bypass and the new ``dev=`` parameter contract.
 """
 
+import os
+import subprocess
+import sys
+import textwrap
+
 import pytest
 
 from vaultspec_core.core.guards import (
@@ -147,7 +152,7 @@ def test_dev_flag_keyword_only_in_signature() -> None:
 # Env-var bypass removed (issue #88) ----------------------------------
 
 
-def test_env_var_no_longer_bypasses_guard(tmp_path, monkeypatch):
+def test_env_var_no_longer_bypasses_guard(tmp_path):
     """``VAULTSPEC_ALLOW_DEV_WRITES`` must NOT bypass the guard.
 
     The env-var override was the original "yes really" mechanism.  It
@@ -159,11 +164,35 @@ def test_env_var_no_longer_bypasses_guard(tmp_path, monkeypatch):
     """
     _materialise_source_layout(tmp_path)
 
+    script = textwrap.dedent(
+        """
+        import sys
+        from pathlib import Path
+
+        from vaultspec_core.core.guards import DevRepoProtectionError, guard_dev_repo
+
+        try:
+            guard_dev_repo(Path(sys.argv[1]))
+        except DevRepoProtectionError:
+            print("blocked")
+        else:
+            raise AssertionError("env var bypassed guard_dev_repo")
+        """
+    )
     for val in ("1", "true", "yes", "True", "YES"):
-        _cached_is_dev_repo.cache_clear()
-        monkeypatch.setenv("VAULTSPEC_ALLOW_DEV_WRITES", val)
-        with pytest.raises(DevRepoProtectionError, match="source repository"):
-            guard_dev_repo(tmp_path)
+        env = {**os.environ, "VAULTSPEC_ALLOW_DEV_WRITES": val}
+        result = subprocess.run(
+            [sys.executable, "-c", script, str(tmp_path)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
+        )
+        assert result.returncode == 0, (
+            f"guard env-var contract failed for {val!r}: "
+            f"stdout={result.stdout!r} stderr={result.stderr!r}"
+        )
+        assert result.stdout.strip() == "blocked"
 
 
 def test_guards_module_does_not_reference_env_var() -> None:

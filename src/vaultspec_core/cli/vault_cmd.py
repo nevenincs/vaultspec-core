@@ -197,27 +197,35 @@ def cmd_add(
     if has_errors:
         raise typer.Exit(code=1)
 
+    import logging
+
+    previous_logging_disable = logging.root.manager.disable
+    if json_output:
+        logging.disable(logging.CRITICAL)
     try:
-        path = create_vault_doc(
-            root_dir=_get_ctx().target_dir,
-            doc_type=dt,
-            feature=feat,
-            date_str=date_str,
-            title=title,
-            related=resolved_related,
-            extra_tags=extra_tags,
-            force=force,
-            dry_run=dry_run,
-        )
-    except FileNotFoundError as exc:
-        _handle_error(exc)
-        return
-    except Exception as exc:
-        _handle_error(exc)
-        return
+        try:
+            path = create_vault_doc(
+                root_dir=_get_ctx().target_dir,
+                doc_type=dt,
+                feature=feat,
+                date_str=date_str,
+                title=title,
+                related=resolved_related,
+                extra_tags=extra_tags,
+                force=force,
+                dry_run=dry_run,
+            )
+        except FileNotFoundError as exc:
+            _handle_error(exc)
+            return
+        except Exception as exc:
+            _handle_error(exc)
+            return
+    finally:
+        if json_output:
+            logging.disable(previous_logging_disable)
 
     if dry_run:
-        console.print(f"[dim]Would create:[/dim] {path}")
         if json_output:
             import json
 
@@ -232,6 +240,8 @@ def cmd_add(
                     indent=2,
                 )
             )
+        else:
+            console.print(f"[dim]Would create:[/dim] {path}")
         raise typer.Exit(0)
 
     # Post-creation self-validation
@@ -452,10 +462,6 @@ def cmd_graph(
         console.print(f"[red]Error reading vault: {exc}[/red]")
         raise typer.Exit(code=1) from exc
 
-    if not graph.nodes:
-        console.print("[dim]No vault documents found.[/dim]")
-        raise typer.Exit(code=0)
-
     if as_json:
         console.print_json(
             graph.to_json(
@@ -464,6 +470,10 @@ def cmd_graph(
             ),
         )
         return
+
+    if not graph.nodes:
+        console.print("[dim]No vault documents found.[/dim]")
+        raise typer.Exit(code=0)
 
     if metrics:
         _print_metrics(console, graph, feature=feature)
@@ -603,7 +613,7 @@ def cmd_repair(
 ) -> None:
     """Run the operator repair pipeline for vault content.
 
-    The repair pipeline is broader than ``vault check all --fix``: it
+    The repair pipeline is broader than ``vaultspec-core vault check all --fix``: it
     reports preflight and migration state, runs checks, applies safe
     check-level fixes unless ``--dry-run`` is set, refreshes generated
     feature indexes unless ``--no-index`` is set, rebuilds graph state,
@@ -1191,6 +1201,11 @@ def cmd_feature_index(
     features = [feature.lstrip("#")] if feature else graph.get_features()
 
     if not features:
+        if json_output:
+            import json
+
+            typer.echo(json.dumps({"generated": []}, indent=2))
+            raise typer.Exit(0)
         console.print("[dim]No features found in vault.[/dim]")
         return
 

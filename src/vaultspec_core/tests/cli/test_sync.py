@@ -61,6 +61,17 @@ class TestSyncValidation:
         assert result.exit_code == 0
         assert "MCP" in result.output or "mcp" in result.output
 
+    def test_sync_skip_core_is_rejected(self, runner, synthetic_project):
+        """`core` is an install/uninstall component, not a sync skip target."""
+        result = runner.invoke(
+            app,
+            ["--target", str(synthetic_project), "sync", "--skip", "core"],
+        )
+
+        assert result.exit_code != 0
+        assert "core" in result.output
+        assert "Invalid --skip" in result.output
+
     def test_mcp_status_json_reports_configured_entry(self, runner, synthetic_project):
         """MCP status should answer the narrow config-health question directly."""
         result = runner.invoke(
@@ -234,6 +245,36 @@ class TestSyncAuthority:
         assert "antigravity" not in output
         assert "codex" not in output
 
+    def test_provider_scoped_sync_does_not_repair_global_mcp_state(
+        self, runner, synthetic_project
+    ):
+        """Provider-scoped sync must not mutate provider-agnostic MCP config."""
+        mcp_path = synthetic_project / ".mcp.json"
+        payload = json.loads(mcp_path.read_text(encoding="utf-8"))
+        payload["mcpServers"]["vaultspec-core"]["args"] = ["run", "broken-server"]
+        mcp_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        before = mcp_path.read_text(encoding="utf-8")
+
+        result = runner.invoke(
+            app,
+            ["--target", str(synthetic_project), "sync", "claude", "--force"],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert mcp_path.read_text(encoding="utf-8") == before
+
+        repair_result = runner.invoke(
+            app,
+            ["--target", str(synthetic_project), "sync", "--force"],
+        )
+
+        assert repair_result.exit_code == 0, repair_result.output
+        repaired = json.loads(mcp_path.read_text(encoding="utf-8"))
+        assert repaired["mcpServers"]["vaultspec-core"]["args"] != [
+            "run",
+            "broken-server",
+        ]
+
     def test_provider_scoped_sync_respects_skip_for_requested_provider(
         self, runner, synthetic_project
     ):
@@ -291,7 +332,7 @@ class TestSyncAuthority:
         assert result.exit_code == 0, result.output
         assert read_manifest_data(synthetic_project).gitignore_managed is False
 
-    def test_rule_add_then_top_level_sync_updates_provider_stubs(
+    def test_rule_add_then_top_level_sync_updates_provider_outputs(
         self, runner, synthetic_project
     ):
         """Top-level sync must refresh provider stubs after a rule source change."""

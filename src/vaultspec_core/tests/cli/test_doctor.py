@@ -53,9 +53,7 @@ class TestDoctorCommand:
         factory.install().corrupt_manifest()
         result = factory.run("spec", "doctor", "--json")
         assert result.exit_code == 2
-        # The output may contain log warnings before the JSON payload.
-        json_start = result.output.index("{")
-        data = json.loads(result.output[json_start:])
+        data = json.loads(result.output)
         assert data["framework"] == "corrupted"
 
     def test_missing_framework_exit_two(self, tmp_path: Path) -> None:

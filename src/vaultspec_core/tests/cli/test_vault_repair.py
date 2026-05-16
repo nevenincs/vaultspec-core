@@ -53,8 +53,11 @@ def _write_doc(
 
 
 def _json_payload(output: str) -> dict:
-    start = output.index("{")
-    return json.loads(output[start:])
+    assert output.lstrip().startswith("{"), (
+        "JSON-mode CLI output must not include human text before the payload:\n"
+        f"{output}"
+    )
+    return json.loads(output)
 
 
 def _write_state_mutation_workspace(root: Path) -> None:
