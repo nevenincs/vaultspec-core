@@ -43,6 +43,14 @@ class TestConsole:
         assert kwargs["safe_box"] is True
         assert kwargs["legacy_windows"] is False
 
+    def test_unknown_encoding_stream_uses_rich_default_capture(self):
+        """Streams without an encoding should not be wrapped away from capture."""
+        stream = io.StringIO()
+        kwargs = _console_kwargs(stdout=stream, environ={})
+
+        assert kwargs["safe_box"] is False
+        assert "file" not in kwargs
+
     def test_no_color_env_var(self):
         """no_color must be True when NO_COLOR env var is set."""
         kwargs = _console_kwargs(environ={"NO_COLOR": "1"})

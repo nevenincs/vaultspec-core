@@ -21,6 +21,8 @@ def _is_utf8_capable(stdout=None) -> bool:
     """Check if stdout can handle UTF-8 output."""
     stream = sys.stdout if stdout is None else stdout
     encoding = getattr(stream, "encoding", None) or ""
+    if not encoding:
+        return True
     return encoding.lower().replace("-", "") in ("utf8", "utf_8")
 
 
