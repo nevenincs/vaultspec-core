@@ -463,7 +463,7 @@ def cmd_graph(
         raise typer.Exit(code=1) from exc
 
     if as_json:
-        console.print_json(
+        typer.echo(
             graph.to_json(
                 feature=feature,
                 include_body=include_body,
