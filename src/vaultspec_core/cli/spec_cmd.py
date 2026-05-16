@@ -26,9 +26,48 @@ from vaultspec_core.cli._target import TargetOption, apply_target
 
 logger = logging.getLogger(__name__)
 
+COMPLETE_SYNC_COMMAND = "vaultspec-core sync"
+PROVIDER_OUTPUTS = "AGENTS.md, CLAUDE.md, GEMINI.md, .codex/config.toml, .mcp.json"
+
+
+def _print_complete_sync_notice(*, resource: str, mcp: bool = False) -> None:
+    """Warn that a narrow sync is not the complete provider refresh path."""
+    from vaultspec_core.console import get_console
+
+    if mcp:
+        detail = "This updates MCP definitions in .mcp.json only."
+    else:
+        detail = f"This syncs only {resource} resource files."
+
+    get_console().print(
+        "[yellow]Resource-scoped sync only.[/yellow] "
+        f"{detail} Run [bold]{COMPLETE_SYNC_COMMAND}[/bold] for a complete "
+        "provider-facing refresh."
+    )
+
+
+def _print_source_mutation_notice(path: Path, *, action: str) -> None:
+    """Explain that source-side resource changes need top-level sync."""
+    from vaultspec_core.console import get_console
+
+    console = get_console()
+    console.print(f"{action}: {path}")
+    console.print(
+        "[yellow]Provider-facing outputs were not updated.[/yellow] "
+        f"Run [bold]{COMPLETE_SYNC_COMMAND}[/bold] to refresh {PROVIDER_OUTPUTS} "
+        "where applicable."
+    )
+
+
+def _resource_path(base_dir: Path, name: str, *, suffix: str = ".md") -> Path:
+    filename = name if name.endswith(suffix) else f"{name}{suffix}"
+    return base_dir / filename
+
+
 spec_app = typer.Typer(
     help=(
-        "Manage framework resources: rules, skills, agents, system prompts, and hooks."
+        "Manage framework resources: rules, skills, agents, system prompts, hooks, "
+        "and MCPs."
     ),
     no_args_is_help=True,
 )
@@ -89,7 +128,7 @@ def cmd_rules_add(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Add a new custom rule."""
+    """Add a new custom rule source under .vaultspec/."""
     apply_target(target)
     from vaultspec_core.core import rules_add
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -105,6 +144,9 @@ def cmd_rules_add(
 
         typer.echo(json.dumps({"path": str(file_path)}, indent=2))
         raise typer.Exit(0)
+
+    action = "Would create rule source" if dry_run else "Rule source updated"
+    _print_source_mutation_notice(file_path, action=action)
 
 
 @rules_app.command("show")
@@ -189,6 +231,11 @@ def cmd_rules_remove(
         typer.echo(json.dumps({"removed": name}, indent=2))
         raise typer.Exit(0)
 
+    _print_source_mutation_notice(
+        _resource_path(get_context().rules_src_dir, name),
+        action="Rule source removed",
+    )
+
 
 @rules_app.command("rename")
 def cmd_rules_rename(
@@ -225,6 +272,8 @@ def cmd_rules_rename(
         )
         raise typer.Exit(0)
 
+    _print_source_mutation_notice(new_path, action="Rule source renamed")
+
 
 @rules_app.command("sync")
 def cmd_rules_sync(
@@ -236,7 +285,7 @@ def cmd_rules_sync(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Sync rules to tool destinations."""
+    """Sync only rule files; use vaultspec-core sync for complete refresh."""
     apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import rules_sync
@@ -252,6 +301,7 @@ def cmd_rules_sync(
         raise typer.Exit(0)
 
     console = get_console()
+    _print_complete_sync_notice(resource="rule")
     console.print(f"  [bold]{format_summary('Rules', result)}[/bold]")
     for warning in result.warnings:
         console.print(f"  [yellow]•[/yellow] {warning}")
@@ -371,6 +421,9 @@ def cmd_skills_add(
         typer.echo(json.dumps({"path": str(file_path)}, indent=2))
         raise typer.Exit(0)
 
+    action = "Would create skill source" if dry_run else "Skill source updated"
+    _print_source_mutation_notice(file_path, action=action)
+
 
 @skills_app.command("show")
 def cmd_skills_show(
@@ -457,6 +510,11 @@ def cmd_skills_remove(
         typer.echo(json.dumps({"removed": name}, indent=2))
         raise typer.Exit(0)
 
+    _print_source_mutation_notice(
+        get_context().skills_src_dir / name,
+        action="Skill source removed",
+    )
+
 
 @skills_app.command("rename")
 def cmd_skills_rename(
@@ -494,6 +552,8 @@ def cmd_skills_rename(
         )
         raise typer.Exit(0)
 
+    _print_source_mutation_notice(new_path, action="Skill source renamed")
+
 
 @skills_app.command("sync")
 def cmd_skills_sync(
@@ -505,7 +565,7 @@ def cmd_skills_sync(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Sync skills to tool destinations."""
+    """Sync only skill files; use vaultspec-core sync for complete refresh."""
     apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import skills_sync
@@ -521,6 +581,7 @@ def cmd_skills_sync(
         raise typer.Exit(0)
 
     console = get_console()
+    _print_complete_sync_notice(resource="skill")
     console.print(f"  [bold]{format_summary('Skills', result)}[/bold]")
     for warning in result.warnings:
         console.print(f"  [yellow]•[/yellow] {warning}")
@@ -633,6 +694,9 @@ def cmd_agents_add(
         typer.echo(json.dumps({"path": str(file_path)}, indent=2))
         raise typer.Exit(0)
 
+    action = "Would create agent source" if dry_run else "Agent source updated"
+    _print_source_mutation_notice(file_path, action=action)
+
 
 @agents_app.command("show")
 def cmd_agents_show(
@@ -716,6 +780,11 @@ def cmd_agents_remove(
         typer.echo(json.dumps({"removed": name}, indent=2))
         raise typer.Exit(0)
 
+    _print_source_mutation_notice(
+        _resource_path(get_context().agents_src_dir, name),
+        action="Agent source removed",
+    )
+
 
 @agents_app.command("rename")
 def cmd_agents_rename(
@@ -752,6 +821,8 @@ def cmd_agents_rename(
         )
         raise typer.Exit(0)
 
+    _print_source_mutation_notice(new_path, action="Agent source renamed")
+
 
 @agents_app.command("sync")
 def cmd_agents_sync(
@@ -763,7 +834,7 @@ def cmd_agents_sync(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Sync agents to tool destinations."""
+    """Sync only agent files; use vaultspec-core sync for complete refresh."""
     apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import agents_sync
@@ -779,6 +850,7 @@ def cmd_agents_sync(
         raise typer.Exit(0)
 
     console = get_console()
+    _print_complete_sync_notice(resource="agent")
     console.print(f"  [bold]{format_summary('Agents', result)}[/bold]")
     for warning in result.warnings:
         console.print(f"  [yellow]•[/yellow] {warning}")
@@ -885,7 +957,7 @@ def cmd_system_sync(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Sync system prompts to tool destinations."""
+    """Sync only system prompts; use vaultspec-core sync for complete refresh."""
     apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import system_sync
@@ -900,7 +972,9 @@ def cmd_system_sync(
         typer.echo(json.dumps(dataclasses.asdict(result), indent=2, default=str))
         raise typer.Exit(0)
 
-    get_console().print(f"  [bold]{format_summary('System', result)}[/bold]")
+    console = get_console()
+    _print_complete_sync_notice(resource="system prompt")
+    console.print(f"  [bold]{format_summary('System', result)}[/bold]")
 
 
 # =============================================================================
@@ -1056,6 +1130,50 @@ def cmd_mcps_list(
     console.print(table)
 
 
+@mcps_app.command("status")
+def cmd_mcps_status(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Report focused MCP definition and .mcp.json sync status."""
+    apply_target(target)
+    from rich import box
+    from rich.table import Table
+
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core import mcp_status
+
+    status = mcp_status()
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps(status, indent=2, default=str))
+        raise typer.Exit(0 if status["status"] == "ok" else 1)
+
+    console = get_console()
+    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
+    table.add_column("Field", no_wrap=True)
+    table.add_column("Value")
+    table.add_row("status", str(status["status"]))
+    table.add_row("config", str(status["config_path"]))
+    table.add_row("definitions", ", ".join(status["definitions"]) or "none")
+    table.add_row("configured", ", ".join(status["configured"]) or "none")
+    table.add_row("managed", ", ".join(status["managed"]) or "none")
+    if status["missing"]:
+        table.add_row("missing", ", ".join(status["missing"]))
+    if status["drifted"]:
+        table.add_row("drifted", ", ".join(status["drifted"]))
+    if status["stale_managed"]:
+        table.add_row("stale managed", ", ".join(status["stale_managed"]))
+    console.print(table)
+
+    for warning in status["warnings"]:
+        console.print(f"  [yellow]•[/yellow] {warning}")
+    if status["status"] != "ok":
+        raise typer.Exit(code=1)
+
+
 @mcps_app.command("add")
 def cmd_mcps_add(
     name: Annotated[str, typer.Option("--name", help="MCP server name")],
@@ -1093,6 +1211,8 @@ def cmd_mcps_add(
         typer.echo(json.dumps({"path": str(file_path)}, indent=2))
         raise typer.Exit(0)
 
+    _print_source_mutation_notice(file_path, action="MCP source updated")
+
 
 @mcps_app.command("remove")
 def cmd_mcps_remove(
@@ -1110,7 +1230,7 @@ def cmd_mcps_remove(
         raise typer.Abort()
 
     try:
-        mcp_remove(name=name)
+        removed_path = mcp_remove(name=name)
     except VaultSpecError as exc:
         _handle_error(exc)
         return
@@ -1120,6 +1240,8 @@ def cmd_mcps_remove(
 
         typer.echo(json.dumps({"removed": name}, indent=2))
         raise typer.Exit(0)
+
+    _print_source_mutation_notice(removed_path, action="MCP source removed")
 
 
 @mcps_app.command("sync")
@@ -1132,7 +1254,7 @@ def cmd_mcps_sync(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Sync MCP definitions to .mcp.json."""
+    """Sync only MCP definitions to .mcp.json."""
     apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import mcp_sync
@@ -1148,6 +1270,7 @@ def cmd_mcps_sync(
         raise typer.Exit(0)
 
     console = get_console()
+    _print_complete_sync_notice(resource="MCP", mcp=True)
     console.print(f"  [bold]{format_summary('MCPs', result)}[/bold]")
     for warning in result.warnings:
         console.print(f"  [yellow]•[/yellow] {warning}")
@@ -1180,12 +1303,6 @@ def cmd_doctor(
     import dataclasses
     import json
 
-    # Initialize workspace context so collectors can read tool configs.
-    try:
-        apply_target(target)
-    except Exception:
-        logger.debug("Could not initialize workspace context", exc_info=True)
-
     from vaultspec_core.core.diagnosis import (
         BuiltinVersionSignal,
         ConfigSignal,
@@ -1195,6 +1312,7 @@ def cmd_doctor(
         GitignoreSignal,
         ManifestEntrySignal,
         PrecommitSignal,
+        VaultContentSignal,
         diagnose,
     )
 
@@ -1208,11 +1326,24 @@ def cmd_doctor(
         )
         raise typer.Exit(code=2)
 
+    previous_logging_disable = logging.root.manager.disable
+    if json_output:
+        logging.disable(logging.CRITICAL)
     try:
-        diag = diagnose(effective, scope="full")
-    except Exception as exc:
-        typer.echo(f"Error: diagnosis failed: {exc}", err=True)
-        raise typer.Exit(code=2) from None
+        # Initialize workspace context so collectors can read tool configs.
+        try:
+            apply_target(target)
+        except Exception:
+            logger.debug("Could not initialize workspace context", exc_info=True)
+
+        try:
+            diag = diagnose(effective, scope="full")
+        except Exception as exc:
+            typer.echo(f"Error: diagnosis failed: {exc}", err=True)
+            raise typer.Exit(code=2) from None
+    finally:
+        if json_output:
+            logging.disable(previous_logging_disable)
 
     if json_output:
         data = dataclasses.asdict(diag)
@@ -1365,6 +1496,39 @@ def cmd_doctor(
         mig_detail,
     )
 
+    # Vault content row - read-only annotation signal.
+    vc_status, vc_style = _signal_status(
+        diag.vault_content,
+        {
+            VaultContentSignal.CLEAN: ("ok", "green"),
+            VaultContentSignal.ANNOTATIONS: ("warn", "yellow"),
+            VaultContentSignal.UNREADABLE: ("warn", "yellow"),
+            VaultContentSignal.NO_VAULT: ("info", "dim"),
+        },
+    )
+    vc_details = {
+        VaultContentSignal.CLEAN: "no generated template annotations",
+        VaultContentSignal.ANNOTATIONS: (
+            f"{diag.vault_annotation_count} document(s) contain generated "
+            "template annotations; run vaultspec-core vault sanitize annotations"
+        ),
+        VaultContentSignal.UNREADABLE: (
+            f"{diag.vault_unreadable_count} markdown file(s) unreadable"
+        ),
+        VaultContentSignal.NO_VAULT: "no vault documents found",
+    }
+    vc_detail = vc_details.get(diag.vault_content, str(diag.vault_content))
+    if (
+        diag.vault_content == VaultContentSignal.ANNOTATIONS
+        and diag.vault_unreadable_count
+    ):
+        vc_detail += f"; {diag.vault_unreadable_count} markdown file(s) unreadable"
+    table.add_row(
+        "vault content",
+        f"[{vc_style}]{vc_status}[/{vc_style}]",
+        vc_detail,
+    )
+
     # Pre-commit row
     pc_status, pc_style = _signal_status(
         diag.precommit,
@@ -1453,6 +1617,7 @@ def _doctor_exit_code(
         ManifestEntrySignal,
         PrecommitSignal,
         ProviderDirSignal,
+        VaultContentSignal,
     )
 
     has_error = False
@@ -1479,6 +1644,11 @@ def _doctor_exit_code(
         has_warn = True
 
     if diag.migration_status == "pending":
+        has_warn = True
+    if diag.vault_content in (
+        VaultContentSignal.ANNOTATIONS,
+        VaultContentSignal.UNREADABLE,
+    ):
         has_warn = True
 
     for prov in diag.providers.values():

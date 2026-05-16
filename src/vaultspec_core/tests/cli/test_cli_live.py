@@ -14,6 +14,9 @@ Tests are parametrized wherever possible so ``pytest-randomly`` (or
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from datetime import datetime
 
 import pytest
@@ -320,17 +323,27 @@ class TestSync:
         result = _run(cli, synthetic_project, "sync", provider)
         assert result.exit_code == 0, f"exit={result.exit_code}\n{result.output}"
 
-    def test_sync_writes_to_target_not_cwd(self, cli, synthetic_project, monkeypatch):
+    def test_sync_writes_to_target_not_cwd(self, synthetic_project):
         """Remove a synced file, re-sync, confirm it reappears at --target."""
         synced = synthetic_project / ".claude" / "rules" / "vaultspec.builtin.md"
         if synced.exists():
             synced.unlink()
-        # Set CWD to the project so that split_source sees CWD == target
-        # (no framework-root override) and sync reads from the project's
-        # own .vaultspec/ source  - the real-world single-workspace case.
-        monkeypatch.chdir(synthetic_project)
-        result = _run(cli, synthetic_project, "sync")
-        assert result.exit_code == 0
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "vaultspec_core",
+                "sync",
+                "--target",
+                str(synthetic_project),
+            ],
+            cwd=synthetic_project,
+            env={**os.environ, "NO_COLOR": "1"},
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
         assert synced.exists(), "sync did not regenerate file at --target"
 
     @pytest.mark.parametrize("flag", ["--dry-run", "--force"])
@@ -822,16 +835,27 @@ class TestTargetPropagation:
         assert (target / ".claude" / "rules").is_dir()
         assert any((target / ".claude" / "rules").iterdir())
 
-    def test_sync_regenerates_at_target(self, cli, synthetic_project, monkeypatch):
+    def test_sync_regenerates_at_target(self, synthetic_project):
         """Remove a synced file, re-sync, verify it reappears at target."""
         synced = synthetic_project / ".claude" / "rules" / "vaultspec.builtin.md"
         if synced.exists():
             synced.unlink()
-        # CWD must be the project so split_source sees CWD == target
-        # (single-workspace mode) and uses the project's own .vaultspec/.
-        monkeypatch.chdir(synthetic_project)
-        r = cli.invoke(app, ["sync", "--target", str(synthetic_project)])
-        assert r.exit_code == 0
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "vaultspec_core",
+                "sync",
+                "--target",
+                str(synthetic_project),
+            ],
+            cwd=synthetic_project,
+            env={**os.environ, "NO_COLOR": "1"},
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
         assert synced.exists(), "sync did not write to --target"
 
     def test_sync_does_not_leak_to_cwd(self, cli, synthetic_project, tmp_path):

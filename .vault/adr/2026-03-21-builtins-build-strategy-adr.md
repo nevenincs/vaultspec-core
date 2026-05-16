@@ -1,22 +1,12 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #builtins-build-strategy
-# Directory tag (hardcoded - DO NOT CHANGE - based on .vault/adr/ location)
-# Feature tag (replace builtins-build-strategy with your feature name, e.g., #editor-demo)
 tags:
   - '#adr'
   - '#builtins-build-strategy'
-# ISO date format (e.g., 2026-02-06)
 date: '2026-03-21'
-# Related documents as quoted wiki-links
-# (e.g., "[[2026-02-04-feature-research]]")
 related:
   - '[[2026-02-21-packaging-restructure-research]]'
   - '[[2026-02-21-packaging-restructure-adr]]'
 ---
-
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
 
 # `builtins-build-strategy` adr: `builtins-build-strategy` | (**status:** `{accepted|rejected|deprecated}`)
 

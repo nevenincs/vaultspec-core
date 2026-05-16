@@ -39,6 +39,14 @@ repos:
     types:
     - markdown
     exclude: '^CHANGELOG\.md$'
+  - id: mdformat-wrap-docs-check
+    name: Check wrapped user-facing Markdown (mdformat)
+    entry: uv run --no-sync mdformat --wrap 88 --check
+    language: system
+    pass_filenames: true
+    types:
+    - markdown
+    files: '^(README\.md|\.vaultspec/(README|MCP|CLI)\.md|\.vaultspec/rules/.*\.md)$'
   - id: pymarkdown
     name: Lint Markdown style (pymarkdown)
     entry: uv run --no-sync pymarkdown --config .pymarkdown.json scan
@@ -50,6 +58,13 @@ repos:
   - id: vault-fix
     name: Vault Doctor (Fix)
     entry: uv run --no-sync vaultspec-core vault check all --fix
+    language: system
+    types:
+    - markdown
+    pass_filenames: false
+  - id: vault-sanitize-annotations
+    name: Vault sanitize annotations
+    entry: uv run --no-sync vaultspec-core vault sanitize annotations
     language: system
     types:
     - markdown

@@ -7,9 +7,6 @@ related:
   - '[[2026-04-30-vault-index-folder-research]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `vault-index-folder` adr: dedicated index subfolder | (**status:** `accepted`)
 
 ## Problem Statement

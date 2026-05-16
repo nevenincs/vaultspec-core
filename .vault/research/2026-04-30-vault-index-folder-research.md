@@ -6,9 +6,6 @@ date: '2026-04-30'
 related: []
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `vault-index-folder` research: as-is index handling
 
 Issue #91 proposes moving generated `<feature>.index.md` files out of the

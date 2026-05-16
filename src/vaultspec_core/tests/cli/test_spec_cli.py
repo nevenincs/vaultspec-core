@@ -28,8 +28,17 @@ class TestSpecCliHelp:
             "skills",
             "system",
             "hooks",
+            "mcps",
         ]:
             assert resource in result.output, f"Missing '{resource}' in help output"
+
+    def test_mcps_help(self, runner, synthetic_project):
+        result = runner.invoke(
+            app, ["--target", str(synthetic_project), "spec", "mcps", "--help"]
+        )
+        assert result.exit_code == 0
+        for cmd in ["list", "status", "add", "remove", "sync"]:
+            assert cmd in result.output, f"Missing '{cmd}' in MCP help"
 
     def test_rules_help(self, runner, synthetic_project):
         result = runner.invoke(

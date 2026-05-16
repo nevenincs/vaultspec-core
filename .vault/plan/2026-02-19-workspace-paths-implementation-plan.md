@@ -8,9 +8,6 @@ related:
   - '[[2026-02-19-workspace-path-decoupling-research]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `workspace-paths` `implementation` plan
 
 Implement three-path workspace decoupling with git-aware layout detection, as

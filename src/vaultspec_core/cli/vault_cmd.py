@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
     from vaultspec_core.graph.api import VaultGraph
     from vaultspec_core.vaultcore.checks._base import CheckResult
+    from vaultspec_core.vaultcore.repair import RepairRun
 
 
 vault_app = typer.Typer(
@@ -46,6 +47,12 @@ check_app = typer.Typer(
     no_args_is_help=True,
 )
 vault_app.add_typer(check_app, name="check")
+
+sanitize_app = typer.Typer(
+    help="Run explicit vault sanitizers.",
+    no_args_is_help=True,
+)
+vault_app.add_typer(sanitize_app, name="sanitize")
 
 from vaultspec_core.cli.plan_cmd import plan_app  # noqa: E402
 
@@ -190,27 +197,35 @@ def cmd_add(
     if has_errors:
         raise typer.Exit(code=1)
 
+    import logging
+
+    previous_logging_disable = logging.root.manager.disable
+    if json_output:
+        logging.disable(logging.CRITICAL)
     try:
-        path = create_vault_doc(
-            root_dir=_get_ctx().target_dir,
-            doc_type=dt,
-            feature=feat,
-            date_str=date_str,
-            title=title,
-            related=resolved_related,
-            extra_tags=extra_tags,
-            force=force,
-            dry_run=dry_run,
-        )
-    except FileNotFoundError as exc:
-        _handle_error(exc)
-        return
-    except Exception as exc:
-        _handle_error(exc)
-        return
+        try:
+            path = create_vault_doc(
+                root_dir=_get_ctx().target_dir,
+                doc_type=dt,
+                feature=feat,
+                date_str=date_str,
+                title=title,
+                related=resolved_related,
+                extra_tags=extra_tags,
+                force=force,
+                dry_run=dry_run,
+            )
+        except FileNotFoundError as exc:
+            _handle_error(exc)
+            return
+        except Exception as exc:
+            _handle_error(exc)
+            return
+    finally:
+        if json_output:
+            logging.disable(previous_logging_disable)
 
     if dry_run:
-        console.print(f"[dim]Would create:[/dim] {path}")
         if json_output:
             import json
 
@@ -225,6 +240,8 @@ def cmd_add(
                     indent=2,
                 )
             )
+        else:
+            console.print(f"[dim]Would create:[/dim] {path}")
         raise typer.Exit(0)
 
     # Post-creation self-validation
@@ -445,18 +462,18 @@ def cmd_graph(
         console.print(f"[red]Error reading vault: {exc}[/red]")
         raise typer.Exit(code=1) from exc
 
-    if not graph.nodes:
-        console.print("[dim]No vault documents found.[/dim]")
-        raise typer.Exit(code=0)
-
     if as_json:
-        console.print_json(
+        typer.echo(
             graph.to_json(
                 feature=feature,
                 include_body=include_body,
             ),
         )
         return
+
+    if not graph.nodes:
+        console.print("[dim]No vault documents found.[/dim]")
+        raise typer.Exit(code=0)
 
     if metrics:
         _print_metrics(console, graph, feature=feature)
@@ -568,6 +585,204 @@ def _render_and_exit(
         raise typer.Exit(code=1)
 
 
+# ---- vault repair -----------------------------------------------------------
+
+
+@vault_app.command("repair")
+def cmd_repair(
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview repair actions without writing"),
+    ] = False,
+    include_index: Annotated[
+        bool,
+        typer.Option(
+            "--include-index/--no-index",
+            help="Refresh generated feature indexes during repair.",
+        ),
+    ] = True,
+    feature: Annotated[
+        str | None,
+        typer.Option("--feature", "-f", help="Scope repair to one feature tag"),
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Run the operator repair pipeline for vault content.
+
+    The repair pipeline is broader than ``vaultspec-core vault check all --fix``: it
+    reports preflight and migration state, runs checks, applies safe
+    check-level fixes unless ``--dry-run`` is set, refreshes generated
+    feature indexes unless ``--no-index`` is set, rebuilds graph state,
+    and runs a postcheck pass.
+    """
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.repair import run_repair_pipeline
+
+    run = run_repair_pipeline(
+        _get_ctx().target_dir,
+        dry_run=dry_run,
+        include_index=include_index,
+        feature=feature,
+    )
+    if json_output:
+        import json
+
+        typer.echo(json.dumps(_repair_payload(run), indent=2, default=str))
+        raise typer.Exit(code=1 if run.error_count else 0)
+
+    _render_repair_run(run, verbose=verbose)
+    if run.error_count:
+        raise typer.Exit(code=1)
+
+
+def _repair_payload(run: RepairRun) -> dict:
+    """Convert a :class:`RepairRun` to a JSON-serializable mapping."""
+    return {
+        "dry_run": run.dry_run,
+        "feature": run.feature,
+        "include_index": run.include_index,
+        "partial_failure": run.partial_failure,
+        "phases": run.phases,
+        "journal": run.journal,
+        "changed_files": run.changed_files,
+        "generated_indexes": run.generated_indexes,
+        "planned_fixes": run.planned_fixes,
+        "unresolved": run.unresolved,
+        "root_causes": run.root_causes,
+        "error_count": run.error_count,
+        "warning_count": run.warning_count,
+        "fixed_count": run.fixed_count,
+    }
+
+
+def _render_repair_run(run: RepairRun, *, verbose: bool = False) -> None:
+    """Render a repair run for human operators."""
+    from vaultspec_core.console import get_console
+
+    console = get_console()
+    title = "Vault Repair Preview" if run.dry_run else "Vault Repair"
+    if run.feature:
+        title += f" - #{run.feature}"
+    console.print(f"[bold]{title}[/bold]")
+    if run.partial_failure:
+        console.print("[red]  partial repair: at least one phase failed[/red]")
+
+    for phase in run.phases:
+        name = phase.get("phase", "unknown")
+        if name == "preflight":
+            status = phase.get("migration_status", "unknown")
+            pending = phase.get("pending_migrations", [])
+            platform = phase.get("platform", {})
+            case_probe = platform.get("case_sensitive_probe", "unknown")
+            console.print(f"  [bold]preflight[/bold]: migrations {status}")
+            console.print(f"    filesystem case probe: {case_probe}")
+            if pending:
+                console.print(f"    pending migrations: {', '.join(pending)}")
+            for migration in phase.get("applied_migrations", []):
+                console.print(f"    applied migration: {migration['summary']}")
+            if phase.get("message"):
+                console.print(f"    [yellow]{phase['message']}[/yellow]")
+        elif name in {"check", "fix", "postcheck"}:
+            errors = phase.get("error_count", 0)
+            warnings = phase.get("warning_count", 0)
+            fixed = phase.get("fixed_count", 0)
+            summary = f"{errors} errors, {warnings} warnings"
+            if fixed:
+                summary += f", {fixed} fixed"
+            if phase.get("dry_run"):
+                summary += ", preview only"
+            console.print(f"  [bold]{name}[/bold]: {summary}")
+            if verbose:
+                _render_phase_diagnostics(console, phase)
+        elif name == "index":
+            if phase.get("skipped"):
+                console.print(f"  [bold]index[/bold]: skipped ({phase.get('reason')})")
+            elif phase.get("dry_run"):
+                planned = phase.get("planned", [])
+                console.print(f"  [bold]index[/bold]: {len(planned)} planned")
+                if verbose:
+                    for path in planned:
+                        console.print(f"    {path}")
+            else:
+                generated = phase.get("generated", [])
+                console.print(f"  [bold]index[/bold]: {len(generated)} refreshed")
+                if verbose:
+                    for path in generated:
+                        console.print(f"    {path}")
+        elif name == "summary":
+            changed = phase.get("changed_files", [])
+            unresolved = phase.get("unresolved_count", 0)
+            console.print(f"  [bold]summary[/bold]: {len(changed)} changed files")
+            console.print(f"    unresolved diagnostics: {unresolved}")
+            if phase.get("partial_failure"):
+                console.print("    [red]partial failure: true[/red]")
+            if phase.get("journal_count"):
+                console.print(f"    journal entries: {phase['journal_count']}")
+
+    if run.planned_fixes and run.dry_run:
+        console.print()
+        console.print(
+            f"[bold]Planned mechanical fixes[/bold] ({len(run.planned_fixes)})"
+        )
+        for item in run.planned_fixes[:20]:
+            path = f"{item['path']}: " if item.get("path") else ""
+            console.print(f"  - {path}{item['fix_description'] or item['message']}")
+        if len(run.planned_fixes) > 20:
+            console.print(f"  ... {len(run.planned_fixes) - 20} more")
+
+    if run.root_causes:
+        console.print()
+        console.print("[bold]Root-cause groups[/bold]")
+        for group in run.root_causes:
+            console.print(f"  - {group['root_cause']}: {group['count']}")
+
+    if run.changed_files:
+        console.print()
+        console.print("[bold]Changed files[/bold]")
+        for path in run.changed_files[:30]:
+            console.print(f"  - {path}")
+        if len(run.changed_files) > 30:
+            console.print(f"  ... {len(run.changed_files) - 30} more")
+
+    if run.unresolved:
+        console.print()
+        console.print("[bold]Unresolved work[/bold]")
+        severity_rank = {"error": 0, "warning": 1, "info": 2}
+        display_items = [
+            item for item in run.unresolved if verbose or item.get("severity") != "info"
+        ]
+        hidden_info = len(run.unresolved) - len(display_items)
+        display_items.sort(
+            key=lambda item: severity_rank.get(str(item.get("severity")), 3)
+        )
+        for item in display_items[:20]:
+            path = f"{item['path']}: " if item.get("path") else ""
+            console.print(f"  - [{item['severity']}] {path}{item['message']}")
+        if hidden_info:
+            console.print(
+                f"  ... {hidden_info} INFO diagnostics hidden; "
+                "rerun with --verbose to show them."
+            )
+        if len(display_items) > 20:
+            console.print(f"  ... {len(display_items) - 20} more non-INFO diagnostics")
+
+
+def _render_phase_diagnostics(console, phase: dict) -> None:
+    for check in phase.get("checks", []):
+        diagnostics = check.get("diagnostics", [])
+        if not diagnostics:
+            continue
+        console.print(f"    {check['check_name']}:")
+        for diag in diagnostics[:10]:
+            path = f"{diag['path']}: " if diag.get("path") else ""
+            console.print(f"      - [{diag['severity']}] {path}{diag['message']}")
+
+
 @check_app.command("all")
 def cmd_check_all(
     fix: Annotated[
@@ -649,6 +864,55 @@ def cmd_check_body_links(
     snapshot = graph.to_snapshot()
     result = check_body_links(_get_ctx().target_dir, snapshot=snapshot, feature=feature)
     _render_and_exit(result, verbose, json_output=json_output)
+
+
+@check_app.command("annotations")
+def cmd_check_annotations(
+    fix: Annotated[
+        bool,
+        typer.Option("--fix", help="Strip generated template annotations"),
+    ] = False,
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Find generated template annotations in vault documents."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.checks import check_annotations
+
+    result = check_annotations(_get_ctx().target_dir, feature=feature, fix=fix)
+    _render_and_exit(result, verbose, json_output=json_output)
+
+
+@sanitize_app.command("annotations")
+def cmd_sanitize_annotations(
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview annotation stripping")
+    ] = False,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show stripped files")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Strip generated template annotations from vault documents."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.checks import check_annotations
+
+    result = check_annotations(
+        _get_ctx().target_dir, feature=feature, fix=True, dry_run=dry_run
+    )
+    _render_and_exit(result, verbose or dry_run, json_output=json_output)
 
 
 @check_app.command("dangling")
@@ -937,6 +1201,11 @@ def cmd_feature_index(
     features = [feature.lstrip("#")] if feature else graph.get_features()
 
     if not features:
+        if json_output:
+            import json
+
+            typer.echo(json.dumps({"generated": []}, indent=2))
+            raise typer.Exit(0)
         console.print("[dim]No features found in vault.[/dim]")
         return
 

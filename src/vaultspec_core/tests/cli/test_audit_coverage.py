@@ -400,8 +400,7 @@ class TestDoctorV1Manifest:
 
         result = factory.run("spec", "doctor", "--json")
         # Should produce valid JSON despite v1 manifest
-        json_start = result.output.index("{")
-        data = json.loads(result.output[json_start:])
+        data = json.loads(result.output)
         assert "framework" in data
 
 
@@ -427,8 +426,11 @@ class TestRmtreeRobustSymlink:
         link_dir = tmp_path / "linked"
         try:
             link_dir.symlink_to(real_dir, target_is_directory=True)
-        except OSError:
-            pytest.skip("Symlink creation requires elevated privileges")
+        except OSError as exc:
+            raise AssertionError(
+                "This platform must allow the symlink regression to run; "
+                "do not hide filesystem coverage with a runtime skip."
+            ) from exc
 
         _rmtree_robust(link_dir)
 

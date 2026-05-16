@@ -118,6 +118,7 @@ _dev-lint-help:
 
 _dev-lint-python:
   uv run ruff check src tests
+  uv run ruff format --check src tests
 
 _dev-lint-type:
   uv run python -m ty check src/vaultspec_core
@@ -138,6 +139,7 @@ _dev-lint-toml:
 
 _dev-lint-markdown:
   uv run mdformat --check README.md .vaultspec/ .vault/
+  uv run mdformat --wrap 88 --check README.md .vaultspec/README.md .vaultspec/MCP.md .vaultspec/CLI.md .vaultspec/rules
   uv run pymarkdown --config .pymarkdown.json scan -r README.md .vaultspec/ .vault/
 
 _dev-lint-workflow:
@@ -183,10 +185,12 @@ _dev-fix-toml:
 
 _dev-fix-markdown:
   uv run mdformat README.md .vaultspec/ .vault/
+  uv run mdformat --wrap 88 README.md .vaultspec/README.md .vaultspec/MCP.md .vaultspec/CLI.md .vaultspec/rules
   uv run pymarkdown --config .pymarkdown.json fix -r README.md .vaultspec/ .vault/
 
 _dev-fix-vault:
   uv run vaultspec-core vault check all --fix
+  uv run vaultspec-core vault sanitize annotations
 
 _dev-fix-all:
   just _dev-fix-python

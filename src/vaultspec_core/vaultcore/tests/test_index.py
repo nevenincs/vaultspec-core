@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pytest
 
 from ...config import reset_config
+from ...graph.api import DocNode
 from ..index import generate_feature_index
+from ..models import DocType
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -23,32 +24,6 @@ def _reset_cfg():
     reset_config()
 
 
-@dataclass
-class FakeDocType:
-    """Minimal stand-in for DocType enum."""
-
-    value: str
-
-
-@dataclass
-class FakeDocNode:
-    """Minimal stand-in for DocNode."""
-
-    path: Path | None
-    name: str
-    doc_type: Any = None
-    feature: str | None = None
-    date: str | None = None
-    title: str | None = None
-    tags: set[str] = field(default_factory=set)
-    frontmatter: dict[str, Any] = field(default_factory=dict)
-    body: str = ""
-    word_count: int = 0
-    out_links: set[str] = field(default_factory=set)
-    in_links: set[str] = field(default_factory=set)
-    phantom: bool = False
-
-
 def _node(
     root: Path,
     name: str,
@@ -56,11 +31,11 @@ def _node(
     feat: str,
     date: str,
     title: str,
-) -> FakeDocNode:
-    return FakeDocNode(
+) -> DocNode:
+    return DocNode(
         path=root / ".vault" / dtype / f"{name}.md",
         name=name,
-        doc_type=FakeDocType(dtype),
+        doc_type=DocType(dtype),
         feature=feat,
         date=date,
         title=title,
@@ -164,7 +139,7 @@ class TestGenerateFeatureIndex:
     def test_excludes_self_from_related(self, tmp_path):
         nodes = [
             _node(tmp_path, "a", "research", "f", "2026-03-01", "A"),
-            FakeDocNode(
+            DocNode(
                 path=tmp_path / ".vault" / "f.index.md",
                 name="f.index",
                 feature="f",

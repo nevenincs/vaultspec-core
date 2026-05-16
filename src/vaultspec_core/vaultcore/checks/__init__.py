@@ -21,6 +21,7 @@ from ._base import (
     VaultSnapshot,
     render_check_result,
 )
+from .annotations import check_annotations
 from .body_links import check_body_links
 from .dangling import check_dangling
 from .features import check_features
@@ -39,6 +40,7 @@ __all__ = [
     "Severity",
     "VaultDocData",
     "VaultSnapshot",
+    "check_annotations",
     "check_body_links",
     "check_dangling",
     "check_features",
@@ -61,8 +63,8 @@ def run_all_checks(
 ) -> list[CheckResult]:
     """Run all vault health checkers and return their results.
 
-    Executes structure, frontmatter, links, dangling, body-links, orphans,
-    features, references, and schema checks in order. Builds a single
+    Executes structure, frontmatter, annotations, links, dangling, body-links,
+    orphans, features, references, and schema checks in order. Builds a single
     :class:`~vaultspec_core.graph.VaultGraph` and shares it across
     graph-consuming checkers to avoid redundant I/O.
 
@@ -77,17 +79,65 @@ def run_all_checks(
     """
     from ...graph import VaultGraph
 
-    graph = VaultGraph(root_dir)
-    snapshot = graph.to_snapshot()
+    if not fix:
+        graph = VaultGraph(root_dir)
+        snapshot = graph.to_snapshot()
+        return [
+            check_structure(root_dir, snapshot=snapshot, fix=False),
+            check_frontmatter(root_dir, snapshot=snapshot, feature=feature, fix=False),
+            check_annotations(root_dir, feature=feature, fix=False),
+            check_links(root_dir, snapshot=snapshot, feature=feature, fix=False),
+            check_dangling(root_dir, graph=graph, feature=feature, fix=False),
+            check_body_links(root_dir, snapshot=snapshot, feature=feature),
+            check_orphans(root_dir, graph=graph, feature=feature),
+            check_features(root_dir, snapshot=snapshot, feature=feature),
+            check_references(root_dir, graph=graph, feature=feature, fix=False),
+            check_schema(root_dir, graph=graph, feature=feature, fix=False),
+        ]
 
-    return [
-        check_structure(root_dir, snapshot=snapshot, fix=fix),
-        check_frontmatter(root_dir, snapshot=snapshot, feature=feature, fix=fix),
-        check_links(root_dir, snapshot=snapshot, feature=feature, fix=fix),
-        check_dangling(root_dir, graph=graph, feature=feature, fix=fix),
-        check_body_links(root_dir, snapshot=snapshot, feature=feature),
-        check_orphans(root_dir, graph=graph, feature=feature),
-        check_features(root_dir, snapshot=snapshot, feature=feature),
-        check_references(root_dir, graph=graph, feature=feature, fix=fix),
-        check_schema(root_dir, graph=graph, feature=feature, fix=fix),
-    ]
+    # Mutating checks can rename files or rewrite frontmatter. Refresh graph
+    # state only after a checker reports a mutation.
+    results: list[CheckResult] = []
+    graph = VaultGraph(root_dir)
+
+    def append_and_refresh(result: CheckResult) -> None:
+        nonlocal graph
+        results.append(result)
+        if result.fixed_count:
+            graph = VaultGraph(root_dir)
+
+    result = check_structure(root_dir, snapshot=graph.to_snapshot(), fix=True)
+    append_and_refresh(result)
+
+    result = check_frontmatter(
+        root_dir,
+        snapshot=graph.to_snapshot(),
+        feature=feature,
+        fix=True,
+    )
+    append_and_refresh(result)
+
+    result = check_annotations(root_dir, feature=feature, fix=True)
+    append_and_refresh(result)
+
+    result = check_links(
+        root_dir, snapshot=graph.to_snapshot(), feature=feature, fix=True
+    )
+    append_and_refresh(result)
+
+    result = check_dangling(root_dir, graph=graph, feature=feature, fix=True)
+    append_and_refresh(result)
+
+    results.append(
+        check_body_links(root_dir, snapshot=graph.to_snapshot(), feature=feature)
+    )
+    results.append(check_orphans(root_dir, graph=graph, feature=feature))
+    results.append(
+        check_features(root_dir, snapshot=graph.to_snapshot(), feature=feature)
+    )
+
+    result = check_references(root_dir, graph=graph, feature=feature, fix=True)
+    append_and_refresh(result)
+
+    results.append(check_schema(root_dir, graph=graph, feature=feature, fix=True))
+    return results

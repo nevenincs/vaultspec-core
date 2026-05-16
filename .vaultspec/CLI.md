@@ -1,6 +1,7 @@
 # vaultspec-core CLI reference
 
-Complete command-line interface (CLI) reference for `vaultspec-core`. See the [framework manual](./README.md) for workflows and concepts.
+Complete command-line interface (CLI) reference for `vaultspec-core`. See the
+[framework manual](./README.md) for workflows and concepts.
 
 ## Entry points
 
@@ -12,7 +13,11 @@ Complete command-line interface (CLI) reference for `vaultspec-core`. See the [f
 
 ## Global options
 
-These options apply at the top level unless noted. `--debug` and `--version` are top-level only. `--target` is accepted by target-aware workspace commands, `vaultspec-core vault ...`, `vaultspec-core spec ...`, and `vaultspec-core migrations ...`. `--json` is command-specific and appears only on commands that support JavaScript Object Notation (JSON) output.
+These options apply at the top level unless noted. `--debug` and `--version` are
+top-level only. `--target` is accepted by target-aware workspace commands,
+`vaultspec-core vault ...`, `vaultspec-core spec ...`, and
+`vaultspec-core migrations ...`. `--json` is command-specific and appears only on
+commands that support JavaScript Object Notation (JSON) output.
 
 | Option         | Short | Default | Description                                                                                                                |
 | -------------- | ----- | ------- | -------------------------------------------------------------------------------------------------------------------------- |
@@ -20,12 +25,109 @@ These options apply at the top level unless noted. `--debug` and `--version` are
 | `--debug`      | `-d`  | off     | Enable DEBUG-level logging (top-level flag).                                                                               |
 | `--version`    | `-V`  | -       | Print version and exit (top-level flag).                                                                                   |
 
+## Command signature contract
+
+This generated block is checked against the live Typer command tree. Keep prose curated
+elsewhere in this document, but do not hand-edit these signatures.
+
+<!-- vaultspec-cli-signatures:start -->
+
+```text
+vaultspec-core install [OPTIONS] [PROVIDER]
+vaultspec-core uninstall [OPTIONS] [PROVIDER]
+vaultspec-core sync [OPTIONS] [PROVIDER]
+vaultspec-core vault add [OPTIONS] DOC_TYPE
+vaultspec-core vault stats [OPTIONS]
+vaultspec-core vault list [OPTIONS] [DOC_TYPE]
+vaultspec-core vault repair [OPTIONS]
+vaultspec-core vault feature list [OPTIONS]
+vaultspec-core vault feature index [OPTIONS]
+vaultspec-core vault feature archive [OPTIONS] FEATURE_TAG
+vaultspec-core vault check all [OPTIONS]
+vaultspec-core vault check body-links [OPTIONS]
+vaultspec-core vault check annotations [OPTIONS]
+vaultspec-core vault check dangling [OPTIONS]
+vaultspec-core vault check orphans [OPTIONS]
+vaultspec-core vault check frontmatter [OPTIONS]
+vaultspec-core vault check links [OPTIONS]
+vaultspec-core vault check features [OPTIONS]
+vaultspec-core vault check references [OPTIONS]
+vaultspec-core vault check schema [OPTIONS]
+vaultspec-core vault check structure [OPTIONS]
+vaultspec-core vault sanitize annotations [OPTIONS]
+vaultspec-core vault plan status [OPTIONS] PATH
+vaultspec-core vault plan check [OPTIONS] PATH
+vaultspec-core vault plan query [OPTIONS] PATH
+vaultspec-core vault plan step toggle [OPTIONS] PATH STEP_ID
+vaultspec-core vault plan step check [OPTIONS] PATH STEP_ID
+vaultspec-core vault plan step uncheck [OPTIONS] PATH STEP_ID
+vaultspec-core vault plan step add [OPTIONS] PATH
+vaultspec-core vault plan step insert [OPTIONS] PATH
+vaultspec-core vault plan step edit [OPTIONS] PATH STEP_ID
+vaultspec-core vault plan step move [OPTIONS] PATH STEP_ID
+vaultspec-core vault plan step remove [OPTIONS] PATH STEP_ID
+vaultspec-core vault plan phase add [OPTIONS] PATH
+vaultspec-core vault plan phase insert [OPTIONS] PATH
+vaultspec-core vault plan phase edit [OPTIONS] PATH PHASE_ID
+vaultspec-core vault plan phase move [OPTIONS] PATH PHASE_ID
+vaultspec-core vault plan phase renumber [OPTIONS] PATH PHASE_ID
+vaultspec-core vault plan phase remove [OPTIONS] PATH PHASE_ID
+vaultspec-core vault plan wave add [OPTIONS] PATH
+vaultspec-core vault plan wave insert [OPTIONS] PATH
+vaultspec-core vault plan wave edit [OPTIONS] PATH WAVE_ID
+vaultspec-core vault plan wave move [OPTIONS] PATH WAVE_ID
+vaultspec-core vault plan wave remove [OPTIONS] PATH WAVE_ID
+vaultspec-core vault plan epic intent show [OPTIONS] PATH
+vaultspec-core vault plan epic intent edit [OPTIONS] PATH
+vaultspec-core vault plan tier show [OPTIONS] PATH
+vaultspec-core vault plan tier promote [OPTIONS] PATH
+vaultspec-core vault plan tier demote [OPTIONS] PATH
+vaultspec-core spec doctor [OPTIONS]
+vaultspec-core spec rules list [OPTIONS]
+vaultspec-core spec rules add [OPTIONS]
+vaultspec-core spec rules show [OPTIONS] NAME
+vaultspec-core spec rules edit [OPTIONS] NAME
+vaultspec-core spec rules remove [OPTIONS] NAME
+vaultspec-core spec rules rename [OPTIONS] OLD_NAME NEW_NAME
+vaultspec-core spec rules sync [OPTIONS]
+vaultspec-core spec rules revert [OPTIONS] FILENAME
+vaultspec-core spec skills list [OPTIONS]
+vaultspec-core spec skills add [OPTIONS]
+vaultspec-core spec skills show [OPTIONS] NAME
+vaultspec-core spec skills edit [OPTIONS] NAME
+vaultspec-core spec skills remove [OPTIONS] NAME
+vaultspec-core spec skills rename [OPTIONS] OLD_NAME NEW_NAME
+vaultspec-core spec skills sync [OPTIONS]
+vaultspec-core spec skills revert [OPTIONS] FILENAME
+vaultspec-core spec agents list [OPTIONS]
+vaultspec-core spec agents add [OPTIONS]
+vaultspec-core spec agents show [OPTIONS] NAME
+vaultspec-core spec agents edit [OPTIONS] NAME
+vaultspec-core spec agents remove [OPTIONS] NAME
+vaultspec-core spec agents rename [OPTIONS] OLD_NAME NEW_NAME
+vaultspec-core spec agents sync [OPTIONS]
+vaultspec-core spec agents revert [OPTIONS] FILENAME
+vaultspec-core spec system show [OPTIONS]
+vaultspec-core spec system sync [OPTIONS]
+vaultspec-core spec hooks list [OPTIONS]
+vaultspec-core spec hooks run [OPTIONS] EVENT
+vaultspec-core spec mcps list [OPTIONS]
+vaultspec-core spec mcps status [OPTIONS]
+vaultspec-core spec mcps add [OPTIONS]
+vaultspec-core spec mcps remove [OPTIONS] NAME
+vaultspec-core spec mcps sync [OPTIONS]
+vaultspec-core migrations status [OPTIONS]
+vaultspec-core migrations run [OPTIONS]
+```
+
+<!-- vaultspec-cli-signatures:end -->
+
 ## Workspace commands
 
 ### install
 
 ```bash
-vaultspec-core install [PROVIDER] [OPTIONS]
+vaultspec-core install [OPTIONS] [PROVIDER]
 ```
 
 Deploy the vaultspec framework into the target directory.
@@ -54,7 +156,7 @@ ______________________________________________________________________
 ### uninstall
 
 ```bash
-vaultspec-core uninstall [PROVIDER] [OPTIONS]
+vaultspec-core uninstall [OPTIONS] [PROVIDER]
 ```
 
 Remove the vaultspec framework from the target directory.
@@ -83,10 +185,12 @@ ______________________________________________________________________
 ### sync
 
 ```bash
-vaultspec-core sync [PROVIDER] [OPTIONS]
+vaultspec-core sync [OPTIONS] [PROVIDER]
 ```
 
-Sync rules, skills, agents, system prompts, and config from `.vaultspec/` to provider destinations.
+Authoritative complete sync from `.vaultspec/` to enrolled provider outputs: rules,
+skills, agents, system prompts, provider config stubs, and MCP entries. After editing or
+adding framework source files, this is the normal propagation command.
 
 #### Arguments
 
@@ -94,7 +198,10 @@ Sync rules, skills, agents, system prompts, and config from `.vaultspec/` to pro
 | ---------- | ------- | ------------------------------------------------- |
 | `PROVIDER` | `all`   | `all`, `claude`, `gemini`, `antigravity`, `codex` |
 
-`core` is not a valid sync target.
+`core` is not a valid sync target because sync reads from `.vaultspec/`. Use
+`vaultspec-core install --upgrade` or `vaultspec-core install --force` for
+framework/provider scaffolding repair, not as the normal propagation path after source
+edits.
 
 #### Options
 
@@ -108,12 +215,12 @@ Sync rules, skills, agents, system prompts, and config from `.vaultspec/` to pro
 
 ## Vault commands
 
-Group command: `vaultspec-core vault COMMAND`
+Group command: `vaultspec-core vault [OPTIONS] COMMAND [ARGS]...`
 
 ### vaultspec-core vault add
 
 ```bash
-vaultspec-core vault add DOC_TYPE [OPTIONS]
+vaultspec-core vault add [OPTIONS] DOC_TYPE
 ```
 
 Create a new `.vault/` document from a template.
@@ -142,7 +249,7 @@ ______________________________________________________________________
 ### vaultspec-core vault list
 
 ```bash
-vaultspec-core vault list [DOC_TYPE] [OPTIONS]
+vaultspec-core vault list [OPTIONS] [DOC_TYPE]
 ```
 
 List vault documents.
@@ -187,7 +294,7 @@ ______________________________________________________________________
 ### vaultspec-core vault graph
 
 ```bash
-vaultspec-core vault graph [OPTIONS]
+vaultspec-core vault graph [OPTIONS] COMMAND [ARGS]...
 ```
 
 Outputs a hierarchical tree grouped by feature and type.
@@ -201,6 +308,76 @@ Outputs a hierarchical tree grouped by feature and type.
 | `--metrics`     | `-m`  | off     | Show aggregate graph metrics         |
 | `--ascii`       | -     | off     | Render ASCII topology                |
 | `--body`        | -     | off     | Include document body in JSON output |
+
+______________________________________________________________________
+
+### vaultspec-core vault repair
+
+```bash
+vaultspec-core vault repair [OPTIONS]
+```
+
+Run the operator repair pipeline for `.vault/` content. This is the guided recovery
+surface for degraded vaults. It reports preflight and migration state, runs the health
+checks, applies supported mechanical fixes unless `--dry-run` is set, refreshes
+generated feature indexes unless `--no-index` is set, rebuilds graph state, and runs a
+postcheck pass.
+
+`vaultspec-core vault repair` is broader than `vaultspec-core vault check all --fix`.
+The check-level fixer remains available for compatibility, but it does not own generated
+index refresh, post-fix graph rebuild, root-cause grouping, or final delta reporting. It
+also strips standalone annotation comments during the fix phase. Inline HTML comments
+embedded in prose are preserved.
+
+#### Options
+
+| Option                       | Short | Default | Description                                      |
+| ---------------------------- | ----- | ------- | ------------------------------------------------ |
+| `--dry-run`                  | -     | off     | Preview repair actions without writing           |
+| `--include-index/--no-index` | -     | on      | Refresh generated feature indexes during repair  |
+| `--feature TAG`              | `-f`  | None    | Scope repair and index refresh to one feature    |
+| `--verbose`                  | `-v`  | off     | Show INFO-level diagnostics and detailed paths   |
+| `--json`                     | -     | off     | Emit machine-readable phase and summary payloads |
+
+#### Phases
+
+| Phase       | Purpose                                                               |
+| ----------- | --------------------------------------------------------------------- |
+| `preflight` | Report migration status and platform path behavior                    |
+| `check`     | Run the current vault health suite without mutation                   |
+| `fix`       | Apply supported safe check-level fixes, or report planned fixes       |
+| `index`     | Refresh or preview generated `.vault/index/<feature>.index.md` files  |
+| `postcheck` | Rebuild graph state and rerun checks after mutation                   |
+| `summary`   | Report changed files, generated indexes, unresolved work, root causes |
+
+Dry-run mode never writes generated indexes or check fixes. If migrations are pending,
+dry-run reports that state instead of entering the vault scan path that would apply lazy
+migrations on first use.
+
+______________________________________________________________________
+
+### vaultspec-core vault sanitize annotations
+
+```bash
+vaultspec-core vault sanitize annotations [OPTIONS]
+```
+
+Strip generated template annotations from `.vault/` documents. Template hydration keeps
+agent-facing instructions in newly created documents; this command removes those
+instructions only when explicitly requested. Use `--dry-run` to see which files would be
+stripped without mutating the vault. The sanitizer removes YAML frontmatter comment
+directives, standalone HTML comment blocks, and malformed standalone `<-- ... -->`
+annotation blocks. It preserves fenced examples, inline HTML comments embedded in prose,
+and machine-owned comments such as retired plan markers.
+
+#### Options
+
+| Option          | Short | Default | Description                          |
+| --------------- | ----- | ------- | ------------------------------------ |
+| `--feature TAG` | `-f`  | None    | Sanitize documents for one feature   |
+| `--dry-run`     | -     | off     | Preview annotation removals          |
+| `--verbose`     | `-v`  | off     | Show stripped files                  |
+| `--json`        | -     | off     | Emit machine-readable check payloads |
 
 ______________________________________________________________________
 
@@ -229,7 +406,10 @@ ______________________________________________________________________
 vaultspec-core vault feature index [OPTIONS]
 ```
 
-Generate or update `<feature>.index.md` files in `.vault/index/`. Each index links to every document sharing that feature tag, making implicit feature clusters explicit in the graph. Indexes carry the `#index` directory tag plus the feature tag and are auto-managed.
+Generate or update `<feature>.index.md` files in `.vault/index/`. Each index links to
+every document sharing that feature tag, making implicit feature clusters explicit in
+the graph. Indexes carry the `#index` directory tag plus the feature tag and are
+auto-managed.
 
 #### Options
 
@@ -243,7 +423,7 @@ ______________________________________________________________________
 ### vaultspec-core vault feature archive
 
 ```bash
-vaultspec-core vault feature archive FEATURE_TAG [OPTIONS]
+vaultspec-core vault feature archive [OPTIONS] FEATURE_TAG
 ```
 
 Move all documents for a feature tag to the archive.
@@ -259,7 +439,7 @@ ______________________________________________________________________
 ### vaultspec-core vault check
 
 ```bash
-vaultspec-core vault check COMMAND [OPTIONS]
+vaultspec-core vault check [OPTIONS] COMMAND [ARGS]...
 ```
 
 Run health checks on `.vault/`. Exits with code `1` if errors are found.
@@ -277,6 +457,7 @@ Run health checks on `.vault/`. Exits with code `1` if errors are found.
 | Subcommand    | `--fix` | `--feature` | Description                                                      |
 | ------------- | ------- | ----------- | ---------------------------------------------------------------- |
 | `all`         | partial | yes         | Run every check in sequence                                      |
+| `annotations` | yes     | yes         | Find generated template annotations                              |
 | `body-links`  | no      | yes         | Find wiki-links and markdown path links in document body text    |
 | `dangling`    | yes     | yes         | Find `related:` wiki-links that resolve to no document           |
 | `frontmatter` | yes     | yes         | Validate frontmatter against vault schema                        |
@@ -287,15 +468,24 @@ Run health checks on `.vault/`. Exits with code `1` if errors are found.
 | `schema`      | yes     | yes         | Enforce dependency rules (ADR refs research, plan refs ADR)      |
 | `structure`   | yes     | no          | Check directory structure and filename conventions               |
 
-`yes` = fully supported, `partial` = only the sub-checks that accept `--fix` apply fixes (`all` dispatches to every check), `no` = flag rejected with error. `structure` does not support `--feature` filtering.
+`yes` = fully supported, `partial` = only the sub-checks that accept `--fix` apply fixes
+(`all` dispatches to every check), `no` = flag rejected with error. `structure` does not
+support `--feature` filtering.
+
+Use `vaultspec-core vault repair` when the operator goal is end-to-end recovery with
+generated index refresh, post-fix validation, and a final delta report.
 
 ### vaultspec-core vault plan
 
 ```bash
-vaultspec-core vault plan COMMAND [OPTIONS] PATH ...
+vaultspec-core vault plan [OPTIONS] COMMAND [ARGS]...
 ```
 
-Inspect and manipulate plan documents per the plan-hardening convention. Plans declare a complexity tier (`L1`, `L2`, `L3`, `L4`) in frontmatter and are structured as `Epic > Wave > Phase > Step`. Every mutating operation goes through this surface. Canonical identifiers (`S##`, `P##`, `W##`) remain append-only and gap-no-reuse. `vaultspec-core vault plan check` flags hand-edits to checkbox glyphs or display paths.
+Inspect and manipulate plan documents per the plan-hardening convention. Plans declare a
+complexity tier (`L1`, `L2`, `L3`, `L4`) in frontmatter and are structured as
+`Epic > Wave > Phase > Step`. Every mutating operation goes through this surface.
+Canonical identifiers (`S##`, `P##`, `W##`) remain append-only and gap-no-reuse.
+`vaultspec-core vault plan check` flags hand-edits to checkbox glyphs or display paths.
 
 #### Read commands
 
@@ -305,7 +495,8 @@ Inspect and manipulate plan documents per the plan-hardening convention. Plans d
 | `check`    | Validate convention compliance; with `--fix`, apply autofixable transformations          |
 | `query`    | Filter Step rows by `--phase`/`--wave` scope and `--open`/`--closed` predicate           |
 
-`vaultspec-core vault plan check` exits `1` when at least one ERROR-severity finding is present.
+`vaultspec-core vault plan check` exits `1` when at least one ERROR-severity finding is
+present.
 
 #### Step commands
 
@@ -331,11 +522,16 @@ Inspect and manipulate plan documents per the plan-hardening convention. Plans d
 | `renumber` | Remediate a duplicated id via `--to <P##>`; refuses live / retired collisions |
 | `remove`   | Retire the Phase plus every descendant Step (cascading retirement)            |
 
-`phase renumber` is the audited remediation surface for collisions inherited from legacy plans. One example is a writer who treated `P##` as Wave-scoped rather than per-document. The verb retires the old id so it cannot be reused, then recomputes every descendant Step's display path against the new parent canonical id.
+`phase renumber` is the audited remediation surface for collisions inherited from legacy
+plans. One example is a writer who treated `P##` as Wave-scoped rather than
+per-document. The verb retires the old id so it cannot be reused, then recomputes every
+descendant Step's display path against the new parent canonical id.
 
 #### Wave commands
 
-Identical shape to Phase, but the parent is implicit (Epic frame). Only `--before`/`--after` re-position. No `--to-epic` flag exists. Wave operations require `L3` or `L4`.
+Identical shape to Phase, but the parent is implicit (Epic frame). Only
+`--before`/`--after` re-position. No `--to-epic` flag exists. Wave operations require
+`L3` or `L4`.
 
 #### Epic intent (L4 only)
 
@@ -354,23 +550,31 @@ Identical shape to Phase, but the parent is implicit (Epic frame). Only `--befor
 
 #### Move-flag precedence
 
-`step move` and `phase move` accept the re-parent flag (`--to-phase` / `--to-wave`) and the position flags (`--before` / `--after`) independently or together:
+`step move` and `phase move` accept the re-parent flag (`--to-phase` / `--to-wave`) and
+the position flags (`--before` / `--after`) independently or together:
 
 - Re-parent flag alone re-parents and appends to the destination tail.
-- Position flag alone re-positions within the current parent; the anchor must share that parent.
-- Both flags re-parent and position the item; the anchor must reside in the destination post-move.
+- Position flag alone re-positions within the current parent; the anchor must share that
+  parent.
+- Both flags re-parent and position the item; the anchor must reside in the destination
+  post-move.
 
-A self-referential move (`step move S01 --before S01`) is rejected with the relevant `Move{Step,Phase,Wave}Error`.
+A self-referential move (`step move S01 --before S01`) is rejected with the relevant
+`Move{Step,Phase,Wave}Error`.
 
 #### Identifier retirement
 
-`remove`, multi-step demotion, and Wave / Phase removal all add the retired canonical id to a hidden `<!-- RETIRED: ... -->` ledger embedded in the plan body. `next_available_*` consults this ledger so retired identifiers are never reused, even across `parse / serialise` round-trips invoked by `--fix`.
+`remove`, multi-step demotion, and Wave / Phase removal all add the retired canonical id
+to a hidden `<!-- RETIRED: ... -->` ledger embedded in the plan body. `next_available_*`
+consults this ledger so retired identifiers are never reused, even across
+`parse / serialise` round-trips invoked by `--fix`.
 
 ## Spec commands
 
-Group command: `vaultspec-core spec COMMAND`
+Group command: `vaultspec-core spec [OPTIONS] COMMAND [ARGS]...`
 
-Spec subcommands that operate on a workspace accept `--target / -t DIR`. `--json` is command-specific and appears only on commands that support machine-readable output.
+Spec subcommands that operate on a workspace accept `--target / -t DIR`. `--json` is
+command-specific and appears only on commands that support machine-readable output.
 
 ### vaultspec-core spec doctor
 
@@ -378,7 +582,12 @@ Spec subcommands that operate on a workspace accept `--target / -t DIR`. `--json
 vaultspec-core spec doctor [OPTIONS]
 ```
 
-Run diagnostic collectors across the framework, providers, builtins, `.gitignore`, and configuration files. Reports findings and exits with the highest severity observed.
+Run diagnostic collectors across the framework, providers, builtins, `.gitignore`, vault
+content, and configuration files. Reports findings and exits with the highest severity
+observed. The vault content row is read-only; when generated template annotations are
+present, doctor reports a warning and points to
+`vaultspec-core vault sanitize annotations`. Unreadable vault markdown files are
+reported as warnings and are not modified.
 
 #### Options
 
@@ -393,26 +602,27 @@ ______________________________________________________________________
 
 ### vaultspec-core spec rules / vaultspec-core spec skills / vaultspec-core spec agents
 
-Create, read, update, and delete (CRUD) operations for framework resources. All three groups share the same subcommand structure.
+Create, read, update, and delete (CRUD) operations for framework resources. All three
+groups share the same subcommand structure.
 
 ```bash
-vaultspec-core spec rules COMMAND
-vaultspec-core spec skills COMMAND
-vaultspec-core spec agents COMMAND
+vaultspec-core spec rules [OPTIONS] COMMAND [ARGS]...
+vaultspec-core spec skills [OPTIONS] COMMAND [ARGS]...
+vaultspec-core spec agents [OPTIONS] COMMAND [ARGS]...
 ```
 
 #### Subcommands
 
-| Subcommand | Signature                           | Description                                                      |
-| ---------- | ----------------------------------- | ---------------------------------------------------------------- |
-| `list`     | -                                   | List all resources                                               |
-| `add`      | `--name NAME [--force] [--dry-run]` | Create a resource. Extra options vary per resource type (below). |
-| `show`     | `NAME`                              | Print resource content to stdout                                 |
-| `edit`     | `NAME`                              | Open in configured editor (`VAULTSPEC_EDITOR`)                   |
-| `remove`   | `NAME [--yes\|--force]` (`-y`)      | Delete a resource. Prompts unless confirmed.                     |
-| `rename`   | `OLD_NAME NEW_NAME`                 | Rename a resource                                                |
-| `sync`     | `[--dry-run] [--force]`             | Sync resources to provider destinations                          |
-| `revert`   | `FILENAME`                          | Revert to snapshotted original                                   |
+| Subcommand | Signature                           | Description                                                                               |
+| ---------- | ----------------------------------- | ----------------------------------------------------------------------------------------- |
+| `list`     | -                                   | List all resources                                                                        |
+| `add`      | `--name NAME [--force] [--dry-run]` | Create a resource. Extra options vary per resource type (below).                          |
+| `show`     | `NAME`                              | Print resource content to stdout                                                          |
+| `edit`     | `NAME`                              | Open in configured editor (`VAULTSPEC_EDITOR`)                                            |
+| `remove`   | `NAME [--yes\|--force]` (`-y`)      | Delete a resource. Prompts unless confirmed.                                              |
+| `rename`   | `OLD_NAME NEW_NAME`                 | Rename a resource                                                                         |
+| `sync`     | `[--dry-run] [--force]`             | Resource-scoped sync; use top-level `vaultspec-core sync` for a complete provider refresh |
+| `revert`   | `FILENAME`                          | Revert to snapshotted original                                                            |
 
 `add` accepts different body-content flags per resource type:
 
@@ -420,12 +630,18 @@ vaultspec-core spec agents COMMAND
 - `vaultspec-core spec skills add` accepts `--description TEXT` and `--template TEXT`.
 - `vaultspec-core spec agents add` accepts `--description TEXT`.
 
+`vaultspec-core spec <resource> sync` commands are narrow maintenance surfaces. They do
+not guarantee that provider-facing config stubs such as `AGENTS.md`, `CLAUDE.md`,
+`GEMINI.md`, or `.codex/config.toml` have been fully refreshed. Run
+`vaultspec-core sync` after source-side changes when the goal is a complete
+provider-facing workspace.
+
 ______________________________________________________________________
 
 ### vaultspec-core spec system
 
 ```bash
-vaultspec-core spec system COMMAND
+vaultspec-core spec system [OPTIONS] COMMAND [ARGS]...
 ```
 
 #### Subcommands
@@ -433,14 +649,14 @@ vaultspec-core spec system COMMAND
 | Subcommand | Options                 | Description                                        |
 | ---------- | ----------------------- | -------------------------------------------------- |
 | `show`     | -                       | Display system prompt parts and generation targets |
-| `sync`     | `[--dry-run] [--force]` | Sync system prompts to provider destinations       |
+| `sync`     | `[--dry-run] [--force]` | Resource-scoped system prompt sync                 |
 
 ______________________________________________________________________
 
 ### vaultspec-core spec hooks
 
 ```bash
-vaultspec-core spec hooks COMMAND
+vaultspec-core spec hooks [OPTIONS] COMMAND [ARGS]...
 ```
 
 #### Subcommands
@@ -455,27 +671,39 @@ ______________________________________________________________________
 ### vaultspec-core spec mcps
 
 ```bash
-vaultspec-core spec mcps COMMAND
+vaultspec-core spec mcps [OPTIONS] COMMAND [ARGS]...
 ```
 
-Manage MCP server definitions and the synced `.mcp.json` entries deployed for provider clients.
+Manage MCP server definitions and the synced `.mcp.json` entries deployed for provider
+clients. MCP sync updates `.mcp.json`; use top-level `vaultspec-core sync` for a
+complete refresh across all provider-facing outputs.
 
 #### Subcommands
 
 | Subcommand | Signature                               | Description                                                    |
 | ---------- | --------------------------------------- | -------------------------------------------------------------- |
 | `list`     | -                                       | List all registered MCP server definitions                     |
+| `status`   | `[--json]`                              | Validate MCP definitions against `.mcp.json`                   |
 | `add`      | `--name NAME [--config JSON] [--force]` | Add a new custom MCP server definition                         |
 | `remove`   | `NAME [--force]`                        | Remove an MCP server definition (`--force` skips confirmation) |
 | `sync`     | `[--dry-run] [--force]`                 | Sync MCP definitions to `.mcp.json`                            |
 
+`vaultspec-core spec mcps status` exits `0` only when MCP config status is `ok`,
+otherwise `1`. It checks config health only and does not start or probe MCP server
+processes.
+
 ## Migration commands
 
-Group command: `vaultspec-core migrations COMMAND`
+Group command: `vaultspec-core migrations [OPTIONS] COMMAND [ARGS]...`
 
-Every migration subcommand also accepts the global `--target / -t DIR` and `--json` flags.
+Every migration subcommand also accepts the global `--target / -t DIR` and `--json`
+flags.
 
-The migration registry runs every entry whose target version exceeds the workspace manifest's `vaultspec_version`, then bumps the manifest version on success. Migrations are idempotent and run lazily on every `vaultspec-core vault ...` command, on `vaultspec-core install --upgrade`, or explicitly through `vaultspec-core migrations run`.
+The migration registry runs every entry whose target version exceeds the workspace
+manifest's `vaultspec_version`, then bumps the manifest version on success. Migrations
+are idempotent and run lazily on every `vaultspec-core vault ...` command, on
+`vaultspec-core install --upgrade`, or explicitly through
+`vaultspec-core migrations run`.
 
 ### vaultspec-core migrations status
 
@@ -483,7 +711,8 @@ The migration registry runs every entry whose target version exceeds the workspa
 vaultspec-core migrations status [OPTIONS]
 ```
 
-List registered migrations and which entries are pending against the current workspace manifest. Read-only; never mutates.
+List registered migrations and which entries are pending against the current workspace
+manifest. Read-only; never mutates.
 
 #### Options
 
@@ -492,7 +721,8 @@ List registered migrations and which entries are pending against the current wor
 | `--target DIR` | `-t`  | cwd     | Inspect a workspace other than the current directory.   |
 | `--json`       | -     | off     | Emit status, registered list, and pending list as JSON. |
 
-Exit codes: `0` when up to date or workspace has no manifest, `1` when migrations are pending.
+Exit codes: `0` when up to date or workspace has no manifest, `1` when migrations are
+pending.
 
 ______________________________________________________________________
 
@@ -502,7 +732,9 @@ ______________________________________________________________________
 vaultspec-core migrations run [OPTIONS]
 ```
 
-Apply every pending migration in version order and bump the manifest's `vaultspec_version`. A migration that fails stops the run and leaves the manifest unchanged so the next invocation re-attempts it.
+Apply every pending migration in version order and bump the manifest's
+`vaultspec_version`. A migration that fails stops the run and leaves the manifest
+unchanged so the next invocation re-attempts it.
 
 #### Options
 
@@ -511,13 +743,15 @@ Apply every pending migration in version order and bump the manifest's `vaultspe
 | `--target DIR` | `-t`  | cwd     | Migrate a workspace other than the current directory. |
 | `--json`       | -     | off     | Emit per-entry summaries and counts as JSON.          |
 
-Exit codes: `0` on success (including the no-pending no-op), `1` if any migration failed.
+Exit codes: `0` on success (including the no-pending no-op), `1` if any migration
+failed.
 
 ______________________________________________________________________
 
 ## Environment variables
 
-All variables are prefixed `VAULTSPEC_`. Environment variables override defaults but are overridden by the `--target` flag.
+All variables are prefixed `VAULTSPEC_`. Environment variables override defaults but are
+overridden by the `--target` flag.
 
 | Variable                          | Type | Default      | Description                                                                                                                                                                                                       |
 | --------------------------------- | ---- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -540,4 +774,5 @@ All variables are prefixed `VAULTSPEC_`. Environment variables override defaults
 | [Framework manual](./README.md) | Development workflow, skills, and customization |
 | [MCP reference](./MCP.md)       | MCP server tools, setup, and configuration      |
 
-For bug reports and feature requests, open an issue on the [vaultspec-core issue tracker](https://github.com/wgergely/vaultspec-core/issues).
+For bug reports and feature requests, open an issue on the
+[vaultspec-core issue tracker](https://github.com/wgergely/vaultspec-core/issues).

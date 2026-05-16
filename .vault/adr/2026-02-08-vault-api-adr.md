@@ -8,8 +8,6 @@ related:
   - '[[2026-02-08-vault-api-research]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields outside the YAML frontmatter above -->
-
 # vault-api adr: Modular Docs API and Auditing System | (**status:** accepted)
 
 ## Problem Statement

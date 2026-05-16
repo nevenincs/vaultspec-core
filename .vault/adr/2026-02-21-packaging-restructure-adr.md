@@ -7,9 +7,6 @@ related:
   - '[[2026-02-21-packaging-restructure-research]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `packaging-restructure` adr: `src/vaultspec namespace + uv + unified MCP` | (**status:** `accepted`)
 
 ## Problem Statement

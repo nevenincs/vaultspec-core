@@ -14,6 +14,7 @@ import logging
 import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from ...core.helpers import atomic_write
 from ._base import (
@@ -30,6 +31,78 @@ if TYPE_CHECKING:
 __all__ = ["check_structure"]
 
 logger = logging.getLogger(__name__)
+
+
+def _paths_refer_to_same_file(src: Path, dst: Path) -> bool:
+    """Return True when *src* and *dst* identify the same on-disk file."""
+    try:
+        return src.samefile(dst)
+    except OSError:
+        return False
+
+
+def _case_rename_temp_path(src: Path) -> Path:
+    """Return a short same-directory temp path for a case-only rename hop."""
+    return src.with_name(f".vs-{uuid4().hex[:12]}.tmp")
+
+
+def _absolute_path_text(path: Path) -> str:
+    """Return an absolute path string without requiring the path to exist."""
+    try:
+        return str(path.resolve(strict=False))
+    except OSError:
+        return str(path.absolute())
+
+
+def _rename_document_path(src: Path, dst: Path) -> bool:
+    """Rename *src* to *dst*, including case-only renames on Windows.
+
+    Case-insensitive filesystems can report that a desired destination
+    exists even when it is just the source file under different casing.
+    In that situation, force the casing update through a temporary
+    same-directory hop so the final name is materialized on disk.
+    """
+    if str(src) == str(dst):
+        return False
+
+    if src.name.lower() == dst.name.lower() and src.name != dst.name:
+        try:
+            exact_names = {path.name for path in src.parent.iterdir()}
+        except OSError:
+            exact_names = set()
+        if dst.name in exact_names:
+            return src.name not in exact_names
+        for _attempt in range(10):
+            tmp = _case_rename_temp_path(src)
+            if tmp.exists():
+                continue
+            try:
+                src.rename(tmp)
+            except OSError:
+                return False
+            try:
+                tmp.rename(dst)
+                return True
+            except OSError:
+                try:
+                    tmp.rename(src)
+                except OSError:
+                    logger.warning(
+                        "Failed to roll back case-only rename temp path; "
+                        "manual recovery may be needed. temp=%s source=%s "
+                        "destination=%s",
+                        _absolute_path_text(tmp),
+                        _absolute_path_text(src),
+                        _absolute_path_text(dst),
+                    )
+                return False
+        return False
+
+    if dst.exists() and not _paths_refer_to_same_file(src, dst):
+        return False
+
+    src.rename(dst)
+    return True
 
 
 def _fix_filename(
@@ -61,6 +134,19 @@ def _fix_filename(
 
     filename = doc_path.name
     rel = doc_path.relative_to(root_dir)
+    fixed_messages: list[str] = []
+
+    def _flush_fixed_messages() -> None:
+        fixed_rel = doc_path.relative_to(root_dir)
+        for message in fixed_messages:
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=fixed_rel,
+                    message=message,
+                    severity=Severity.INFO,
+                )
+            )
+        fixed_messages.clear()
 
     expected_suffix = f"-{doc_type.value}.md"
     needs_rename = False
@@ -83,24 +169,19 @@ def _fix_filename(
             new_filename = f"{base}{expected_suffix}"
             new_path = doc_path.parent / new_filename
 
-            if not new_path.exists():
+            if _rename_document_path(doc_path, new_path):
                 old_stem = doc_path.stem
-                doc_path.rename(new_path)
+                old_filename = doc_path.name
                 result.fixed_count += 1
                 renames.append((old_stem, new_path.stem))
                 doc_path = new_path
                 rel = doc_path.relative_to(root_dir)
                 filename = new_filename
-                result.diagnostics.append(
-                    CheckDiagnostic(
-                        path=rel,
-                        message=f"Fixed: renamed to {new_filename}",
-                        severity=Severity.INFO,
-                    )
-                )
-                logger.info("Renamed %s -> %s", filename, new_filename)
+                fixed_messages.append(f"Fixed: renamed to {new_filename}")
+                logger.info("Renamed %s -> %s", old_filename, new_filename)
             else:
                 logger.warning("Cannot rename %s: target exists", filename)
+                _flush_fixed_messages()
                 result.diagnostics.append(
                     CheckDiagnostic(
                         path=rel,
@@ -120,23 +201,19 @@ def _fix_filename(
         new_filename = f"{today}-{filename}"
         new_path = doc_path.parent / new_filename
 
-        if not new_path.exists():
+        if _rename_document_path(doc_path, new_path):
             old_stem = doc_path.stem
-            doc_path.rename(new_path)
+            old_filename = doc_path.name
             result.fixed_count += 1
             renames.append((old_stem, new_path.stem))
             doc_path = new_path
             rel = doc_path.relative_to(root_dir)
-            result.diagnostics.append(
-                CheckDiagnostic(
-                    path=rel,
-                    message=f"Fixed: renamed to {new_filename}",
-                    severity=Severity.INFO,
-                )
-            )
-            logger.info("Renamed %s -> %s", filename, new_filename)
+            filename = doc_path.name
+            fixed_messages.append(f"Fixed: renamed to {new_filename}")
+            logger.info("Renamed %s -> %s", old_filename, new_filename)
         else:
             logger.warning("Cannot rename %s: target exists", filename)
+            _flush_fixed_messages()
             result.diagnostics.append(
                 CheckDiagnostic(
                     path=rel,
@@ -145,6 +222,30 @@ def _fix_filename(
                 )
             )
 
+    lowercase_filename = doc_path.name.lower()
+    if doc_path.name != lowercase_filename:
+        old_stem = doc_path.stem
+        new_path = doc_path.with_name(lowercase_filename)
+        if _rename_document_path(doc_path, new_path):
+            old_filename = doc_path.name
+            result.fixed_count += 1
+            renames.append((old_stem, new_path.stem))
+            doc_path = new_path
+            rel = doc_path.relative_to(root_dir)
+            filename = doc_path.name
+            fixed_messages.append(f"Fixed: renamed to {lowercase_filename}")
+            logger.info("Renamed %s -> %s", old_filename, lowercase_filename)
+        else:
+            _flush_fixed_messages()
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=rel,
+                    message=(f"Cannot rename to {lowercase_filename}: target exists"),
+                    severity=Severity.ERROR,
+                )
+            )
+
+    _flush_fixed_messages()
     return renames, doc_path
 
 
@@ -159,7 +260,7 @@ def _rewrite_incoming_refs(
 ) -> None:
     """Rewrite ``[[old_stem]]`` -> ``[[new_stem]]`` in ``related:`` frontmatter.
 
-    Walks every ``*.md`` file under ``root_dir / ".vault"`` directly off
+    Walks every ``*.md`` file under the configured docs directory directly off
     the filesystem (the renames have already happened on disk; the
     in-memory :class:`VaultSnapshot` is now stale).  Inspects the YAML
     frontmatter ``related:`` list and rewrites any matching wiki-link
@@ -213,7 +314,9 @@ def _rewrite_incoming_refs(
         if not cycle:
             rename_map[old] = current
 
-    vault_root = root_dir / ".vault"
+    from ...config import get_config
+
+    vault_root = root_dir / get_config().docs_dir
     if not vault_root.is_dir():
         return
 

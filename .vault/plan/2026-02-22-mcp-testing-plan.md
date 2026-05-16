@@ -8,9 +8,6 @@ related:
   - '[[2026-02-22-mcp-testing-research]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `mcp-testing` plan
 
 Add in-memory MCP client session tests using the SDK's

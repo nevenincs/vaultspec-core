@@ -109,6 +109,12 @@ def generate_feature_index(
     from ..core.helpers import atomic_write
 
     index_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        if index_path.exists() and index_path.read_text(encoding="utf-8") == content:
+            logger.info("Feature index already current: %s", index_path)
+            return index_path
+    except OSError:
+        pass
     atomic_write(index_path, content)
     logger.info("Generated feature index: %s", index_path)
     return index_path

@@ -7,14 +7,7 @@ related:
   - '[[2026-03-21-builtins-build-strategy-adr]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `feature-documentation` Code Review
-
-<!-- Persistent log of audit findings appended below. -->
-
-<!-- Use: {TOPIC}-### | {LEVEL} | {Summary} \n {DESCRIPTION} format-->
 
 ## CLI Layer
 

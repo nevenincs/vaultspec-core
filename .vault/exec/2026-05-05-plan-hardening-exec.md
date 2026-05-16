@@ -9,15 +9,6 @@ related:
   - '[[2026-05-06-plan-hardening-adr]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
-<!-- LINK RULES:
-     - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
-     - NEVER use [[wiki-links]] or markdown links in the document body.
-     - NEVER reference file paths in the body. If you must name a source file,
-       class, or function, use inline backtick code: `src/module.py`. -->
-
 # `plan-hardening` exec summary
 
 Aggregated summary of the `#plan-hardening` feature work spanning Wave 1 (firmware: rule extension prose) and Wave 2 (Python implementation: the `vault plan` CLI). Both Waves landed; the originating plan is at 99 / 99 closed Steps.

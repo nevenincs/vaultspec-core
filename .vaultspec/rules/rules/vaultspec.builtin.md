@@ -4,35 +4,27 @@ name: vaultspec-skills
 
 # Spec Skills
 
-This project follows agent-driven development with
-`<ADR>`-backed `<Plan>`s.
+This project follows agent-driven development with `<ADR>`-backed `<Plan>`s.
 
 The workflow persists the following documents:
 
-- `.vault/plan/yyyy-mm-dd-<feature>-<phase>-plan.md`:
-  The `<Plan>` to execute.
+- `.vault/plan/yyyy-mm-dd-<feature>-plan.md`: The `<Plan>` to execute.
 
-- `.vault/research/yyyy-mm-dd-<feature>-<phase>-research.md`:
-  The `<Research>` findings.
+- `.vault/research/yyyy-mm-dd-<feature>-research.md`: The `<Research>` findings.
 
-- `.vault/adr/yyyy-mm-dd-<feature>-<phase>-adr.md`:
-  Research-derived `<ADR>`.
+- `.vault/adr/yyyy-mm-dd-<feature>-adr.md`: Research-derived `<ADR>`.
 
-- `.vault/reference/yyyy-mm-dd-<feature>-reference.md`:
-  The implementation `<Reference>`.
+- `.vault/reference/yyyy-mm-dd-<feature>-reference.md`: The implementation
+  `<Reference>`.
 
-- `.vault/audit/yyyy-mm-dd-<feature>-audit.md`:
-  The `<Audit>` report.
+- `.vault/audit/yyyy-mm-dd-<feature>-audit.md`: The `<Audit>` report.
 
-- `.vault/exec/yyyy-mm-dd-<feature>/.../<step>.md`:
-  The individual `<Step Record>`.
+- `.vault/exec/yyyy-mm-dd-<feature>/.../<step>.md`: The individual `<Step Record>`.
 
-- `.vault/exec/yyyy-mm-dd-<feature>/...-summary.md`:
-  The `<Phase Summary>`.
+- `.vault/exec/yyyy-mm-dd-<feature>/...-summary.md`: The `<Phase Summary>`.
 
-- `.vault/index/<feature>.index.md`:
-  The auto-generated `<Feature Index>` linking every document for a
-  feature. Managed by `vaultspec-core vault feature index`; do not author
+- `.vault/index/<feature>.index.md`: The auto-generated `<Feature Index>` linking every
+  document for a feature. Managed by `vaultspec-core vault feature index`; do not author
   by hand.
 
 Where appropriate, use the following skills:
@@ -40,18 +32,17 @@ Where appropriate, use the following skills:
 - `vaultspec-research`
 - `vaultspec-code-research`
 - `vaultspec-adr`
-- `vaultspec-code-reference`
 - `vaultspec-write-plan`
 - `vaultspec-execute`
 - `vaultspec-documentation`
 
 ## Documentation Hierarchy
 
-The documentation trail follows a strict dependency graph.
-Artifacts lower in the hierarchy should reference those above them.
+The documentation trail follows a strict dependency graph. Artifacts lower in the
+hierarchy should reference those above them.
 
-- **Brainstorm** / **Research / Reference Audit**
-  (`.vault/research/`, `.vault/reference/`)
+- **Brainstorm** / **Research / Reference Audit** (`.vault/research/`,
+  `.vault/reference/`)
 
 - **Architecture Decision Records (ADR)** (`.vault/adr/`)
 
@@ -67,15 +58,15 @@ Artifacts lower in the hierarchy should reference those above them.
   - *Depends on:* Plans.
   - *References:* The Plan being executed.
   - *Location:* Inside feature-specific folder.
-  - *Filename:* `{yyyy-mm-dd-feature-{phase}-{step}}.md` where `{phase}`
-    and `{step}` are the canonical container identifiers (`P##`, `S##`)
-    from the plan, zero-padded to a minimum of two digits. At `L1`
-    the `{phase}` segment is omitted; at `L3`/`L4` a `{wave}` segment
-    (`W##`) is prepended.
+  - *Filename:* `{yyyy-mm-dd-feature-{phase}-{step}}.md` where `{phase}` and `{step}`
+    are the canonical container identifiers (`P##`, `S##`) from the plan, zero-padded to
+    a minimum of two digits. At `L1` the `{phase}` segment is omitted; at `L3`/`L4` a
+    `{wave}` segment (`W##`) is prepended.
   - *Examples:*
     - L1: `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-S01.md`
     - L2: `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-P01-S01.md`
-    - L3 / L4: `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-W01-P01-S01.md`
+    - L3 / L4:
+      `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-W01-P01-S01.md`
 
 - **Summaries**
   (`.vault/exec/{yyyy-mm-dd-feature}/{yyyy-mm-dd-feature-{phase}-summary}.md`)
@@ -83,11 +74,12 @@ Artifacts lower in the hierarchy should reference those above them.
   - *Depends on:* Execution Logs.
   - *References:* The Plan and key Artifacts produced.
   - *Location:* Inside feature-specific folder.
-  - *Filename:* `{yyyy-mm-dd-feature-{phase}-summary}.md` where `{phase}`
-    is the canonical Phase identifier (`P##`).
+  - *Filename:* `{yyyy-mm-dd-feature-{phase}-summary}.md` where `{phase}` is the
+    canonical Phase identifier (`P##`).
   - *Examples:*
     - L2: `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-P01-summary.md`
-    - L3 / L4: `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-W01-P01-summary.md`
+    - L3 / L4:
+      `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-W01-P01-summary.md`
 
 - **Feature Indexes** (`.vault/index/{feature}.index.md`)
 
@@ -100,41 +92,37 @@ Artifacts lower in the hierarchy should reference those above them.
 - We **ALWAYS** use **Obsidian-style Wiki Links** for internal documentation.
 
 - **Always** populate the `related:` field in the YAML frontmatter with
-  `"[[wiki-links]]"` (quoted as strings).
+  `'[[wiki-links]]'` (quoted as strings).
 
-- **Never** use relative paths (`../`) in wiki links; assume a flat namespace
-  or vault-root resolution.
+- **Never** use relative paths (`../`) in wiki links; assume a flat namespace or
+  vault-root resolution.
 
 - **Always** check if a referenced file exists before linking (if possible).
 
-- **Always** include the relevant `#{feature}` tag in the YAML frontmatter
-  using the `tags:` field.
+- **Always** include the relevant `#{feature}` tag in the YAML frontmatter using the
+  `tags:` field.
 
-- **Always** use the `tags:` field (not `feature:`) with the format
-  `tags: "#{feature}"`.
+- **Always** use the `tags:` field (not `feature:`) as a YAML list.
 
-- **Always** quote wiki-links in YAML: `- "[[file-name]]"` or
-  `related: "[[file-name]]"`.
+- **Always** quote wiki-links in YAML: `- '[[file-name]]'`.
 
 ## Tag Taxonomy
 
-**ALLOWED TAGS - DO NOT REMOVE - REFERENCE:**
-`#adr` `#audit` `#exec` `#index` `#plan` `#reference` `#research`
-`#{feature}`
+**ALLOWED TAGS - DO NOT REMOVE - REFERENCE:** `#adr` `#audit` `#exec` `#index` `#plan`
+`#reference` `#research` `#{feature}`
 
-Every document in `.vault/` MUST include **EXACTLY TWO** tags in the
-frontmatter `tags:` field:
+Every document in `.vault/` MUST include the required tag pair in the frontmatter
+`tags:` field:
 
-- **Directory Tag**: Based on the `.vault/` subfolder location
-  (`#adr`, `#audit`, `#exec`, `#index`, `#plan`, `#reference`,
-  `#research`)
+- **Directory Tag**: Based on the `.vault/` subfolder location (`#adr`, `#audit`,
+  `#exec`, `#index`, `#plan`, `#reference`, `#research`)
 
-- **Feature Tag**: Groups related documents across the feature lifecycle
-  (kebab-case, e.g., `#editor-demo`)
+- **Feature Tag**: Groups related documents across the feature lifecycle (kebab-case,
+  e.g., `#editor-demo`)
 
-**CRITICAL:** No structural tags like `#step`, `#summary`, `#phase*`, or
-`#design` are allowed. Only the 7 directory tags above plus the
-`#{feature}` slot.
+**CRITICAL:** No structural tags like `#step`, `#summary`, `#phase*`, or `#design` are
+allowed. The required pair is one directory tag plus the `#{feature}` tag; optional
+extra tags may be appended when the template allows them.
 
 ### Directory Tags (Required for ALL documents)
 
@@ -152,41 +140,34 @@ The directory tag is determined by the file's location in `.vault/`:
 
 ### Tag Format
 
-All documents use YAML list syntax with at least 2 tags (one directory tag,
-one feature tag; additional tags are allowed):
+All documents use YAML list syntax with at least 2 tags (one directory tag, one feature
+tag; additional tags are allowed):
 
 ```yaml
 ---
-
-# REQUIRED TAGS (minimum 2): one directory tag + one feature tag
-
-# DIRECTORY TAGS: #adr #audit #exec #index #plan #reference #research
-
 tags:
-
-  - "#plan"           # directory tag (based on file location)
-  - "#feature-name"   # feature tag (kebab-case)
+  - '#plan'
+  - '#feature-name'
 date: 2026-02-06
 related:
-
-  - "[[related-file]]"
+  - '[[related-file]]'
 ---
 ```
 
 **Examples:**
 
-- Plan file: `tags: ["#plan", "#editor-demo"]`
-- ADR file: `tags: ["#adr", "#editor-demo"]`
-- Exec step: `tags: ["#exec", "#editor-demo"]`
-- Exec summary: `tags: ["#exec", "#editor-demo"]`
-- Research: `tags: ["#research", "#text-layout"]`
-- Reference: `tags: ["#reference", "#text-layout"]`
-- Feature index (auto-generated): `tags: ["#index", "#editor-demo"]`
+- Plan file: `tags: ['#plan', '#editor-demo']`
+- ADR file: `tags: ['#adr', '#editor-demo']`
+- Exec step: `tags: ['#exec', '#editor-demo']`
+- Exec summary: `tags: ['#exec', '#editor-demo']`
+- Research: `tags: ['#research', '#text-layout']`
+- Reference: `tags: ['#reference', '#text-layout']`
+- Feature index (auto-generated): `tags: ['#index', '#editor-demo']`
 
 ### Feature Tags
 
-Feature tags use kebab-case and group all documents related to a specific
-feature or work stream:
+Feature tags use kebab-case and group all documents related to a specific feature or
+work stream:
 
 - Format: `#{feature}` (e.g., `#live-preview-blocks`, `#grid-layout`,
   `#syntax-highlighting`)
@@ -197,8 +178,8 @@ feature or work stream:
 
 ## Placeholder Naming Conventions
 
-Templates use curly-brace placeholders `{...}` to indicate values that must
-be replaced. Follow these conventions:
+Templates use curly-brace placeholders `{...}` to indicate values that must be replaced.
+Follow these conventions:
 
 ### Frontmatter Placeholders
 
@@ -211,9 +192,8 @@ be replaced. Follow these conventions:
 
 ### Document Body Placeholders
 
-Container identifiers (`{wave}`, `{phase}`, `{step}`) use the canonical
-uppercase zero-padded form from the convention ADR. Other placeholders
-use lowercase kebab-case.
+Container identifiers (`{wave}`, `{phase}`, `{step}`) use the canonical uppercase
+zero-padded form from the convention ADR. Other placeholders use lowercase kebab-case.
 
 | Placeholder | Format              | Example                  |
 | :---------- | :------------------ | :----------------------- |
@@ -228,34 +208,31 @@ use lowercase kebab-case.
 
 - **YAML frontmatter**: Always lowercase, kebab-case
 
-- **Document titles/headings**: kebab-case for narrative segments;
-  canonical uppercase identifiers for `{wave}`, `{phase}`, `{step}`
-  segments
-  (e.g., `# editor-demo W01 plan`, `# editor-demo W01.P01 - phase title`).
+- **Document titles/headings**: kebab-case for narrative segments; canonical uppercase
+  identifiers for `{wave}`, `{phase}`, `{step}` segments (e.g.,
+  `# editor-demo W01 plan`, `# editor-demo W01.P01 - phase title`).
 
-- **File names**: lowercase kebab-case for narrative segments
-  (`{feature}`, `{type}`); canonical uppercase identifiers for
-  `{wave}`, `{phase}`, `{step}` segments. Patterns:
+- **File names**: lowercase kebab-case for narrative segments (`{feature}`, `{type}`);
+  canonical uppercase identifiers for `{wave}`, `{phase}`, `{step}` segments. Patterns:
 
-  - Top-level docs: `yyyy-mm-dd-{feature}-{type}.md`
-    (e.g., `2026-02-04-editor-demo-plan.md`)
+  - Top-level docs: `yyyy-mm-dd-{feature}-{type}.md` (e.g.,
+    `2026-02-04-editor-demo-plan.md`)
 
-  - Exec Steps (L1): `yyyy-mm-dd-{feature}-{step}.md`
-    (e.g., `2026-02-04-editor-demo-S01.md`)
+  - Exec Steps (L1): `yyyy-mm-dd-{feature}-{step}.md` (e.g.,
+    `2026-02-04-editor-demo-S01.md`)
 
-  - Exec Steps (L2): `yyyy-mm-dd-{feature}-{phase}-{step}.md`
-    (e.g., `2026-02-04-editor-demo-P01-S01.md`)
+  - Exec Steps (L2): `yyyy-mm-dd-{feature}-{phase}-{step}.md` (e.g.,
+    `2026-02-04-editor-demo-P01-S01.md`)
 
-  - Exec Steps (L3 / L4): `yyyy-mm-dd-{feature}-{wave}-{phase}-{step}.md`
-    (e.g., `2026-02-04-editor-demo-W01-P01-S01.md`)
-    inside `.vault/exec/yyyy-mm-dd-{feature}/` folder.
+  - Exec Steps (L3 / L4): `yyyy-mm-dd-{feature}-{wave}-{phase}-{step}.md` (e.g.,
+    `2026-02-04-editor-demo-W01-P01-S01.md`) inside `.vault/exec/yyyy-mm-dd-{feature}/`
+    folder.
 
-  - Exec Summaries (L2): `yyyy-mm-dd-{feature}-{phase}-summary.md`
-    (e.g., `2026-02-04-editor-demo-P01-summary.md`)
+  - Exec Summaries (L2): `yyyy-mm-dd-{feature}-{phase}-summary.md` (e.g.,
+    `2026-02-04-editor-demo-P01-summary.md`)
 
-  - Exec Summaries (L3 / L4): `yyyy-mm-dd-{feature}-{wave}-{phase}-summary.md`
-    (e.g., `2026-02-04-editor-demo-W01-P01-summary.md`)
-    inside the feature folder.
+  - Exec Summaries (L3 / L4): `yyyy-mm-dd-{feature}-{wave}-{phase}-summary.md` (e.g.,
+    `2026-02-04-editor-demo-W01-P01-summary.md`) inside the feature folder.
 
 - **Replace ALL placeholders**: No template should be committed with `{...}`
   placeholders remaining

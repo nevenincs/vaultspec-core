@@ -1,5 +1,7 @@
 """Tests for install command behavior."""
 
+import json
+
 import pytest
 from typer.testing import CliRunner
 
@@ -27,6 +29,17 @@ class TestInstallForce:
         # Should not error about already installed
         if result.exit_code != 0:
             assert "already installed" not in result.output.lower()
+
+
+class TestInstallJson:
+    def test_install_json_stdout_is_parseable(self, tmp_path, runner):
+        """JSON mode must not prepend preflight warnings to stdout."""
+        result = runner.invoke(app, ["-t", str(tmp_path), "install", "--json"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["action"] == "install"
+        assert payload["has_mcp"] is True
 
 
 class TestInstallDryRun:

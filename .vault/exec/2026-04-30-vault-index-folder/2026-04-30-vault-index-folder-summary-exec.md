@@ -8,9 +8,6 @@ related:
   - '[[2026-04-30-vault-index-folder-adr]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `vault-index-folder` exec summary and self-review
 
 Aggregated summary of the work completed on issue #91.

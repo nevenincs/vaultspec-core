@@ -6,7 +6,7 @@ import io
 
 import pytest
 
-from vaultspec_core.console import get_console, reset_console
+from vaultspec_core.console import _console_kwargs, get_console, reset_console
 
 
 @pytest.mark.unit
@@ -35,22 +35,23 @@ class TestConsole:
         console.print("\u2591")  # light shade
         # If we get here without UnicodeEncodeError, the test passes
 
-    def test_safe_box_on_non_utf8_terminal(self, monkeypatch):
+    def test_safe_box_on_non_utf8_terminal(self):
         """safe_box must be True when terminal encoding is not UTF-8."""
-        fake_stdout = type(
-            "FakeStdout",
-            (),
-            {"encoding": "cp1252", "buffer": io.BytesIO()},
-        )()
-        monkeypatch.setattr("vaultspec_core.console.sys.stdout", fake_stdout)
-        reset_console()
-        console = get_console()
-        assert console.safe_box is True
-        reset_console()
+        stream = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+        kwargs = _console_kwargs(stdout=stream, environ={})
 
-    def test_no_color_env_var(self, monkeypatch):
+        assert kwargs["safe_box"] is True
+        assert kwargs["legacy_windows"] is False
+
+    def test_unknown_encoding_stream_uses_rich_default_capture(self):
+        """Streams without an encoding should not be wrapped away from capture."""
+        stream = io.StringIO()
+        kwargs = _console_kwargs(stdout=stream, environ={})
+
+        assert kwargs["safe_box"] is False
+        assert "file" not in kwargs
+
+    def test_no_color_env_var(self):
         """no_color must be True when NO_COLOR env var is set."""
-        monkeypatch.setenv("NO_COLOR", "1")
-        reset_console()
-        console = get_console()
-        assert console.no_color is True
+        kwargs = _console_kwargs(environ={"NO_COLOR": "1"})
+        assert kwargs["no_color"] is True

@@ -103,6 +103,32 @@ jobs:
       - name: Run tests
         run: just dev test python
 
+  windows-vault-repair:
+    name: Windows Vault Repair Tests
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install just
+        uses: taiki-e/install-action@just
+
+      - name: Install dependencies
+        run: just dev deps sync
+
+      - name: Run vault repair regression tests
+        run: uv run pytest src/vaultspec_core/tests/cli/test_vault_repair.py src/vaultspec_core/vaultcore/checks/tests/test_structure_case_rename.py -q
+
   vault-audit:
     name: Vault Audit
     runs-on: ubuntu-latest

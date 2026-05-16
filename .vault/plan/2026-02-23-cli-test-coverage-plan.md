@@ -8,9 +8,6 @@ related:
   - '[[2026-03-23-cli-test-coverage-research]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # cli-test-coverage plan
 
 Comprehensive CLI test coverage across all 4 vaultspec CLI entry points:
@@ -74,9 +71,6 @@ All tests follow project constraints:
 | Team CLI       | `src/vaultspec/team_cli.py`     | `test_team_cli.py` (6/8 commands) | `message` and `spawn` commands                 |
 
 ## Tasks
-
-<!-- IMPORTANT: This document must be updated between execution runs to
-     track progress. -->
 
 ### Phase 1: `__main__.py` unified router tests
 

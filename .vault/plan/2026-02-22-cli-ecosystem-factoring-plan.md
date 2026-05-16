@@ -8,9 +8,6 @@ related:
   - '[[2026-02-22-cli-ecosystem-factoring-research]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # cli-ecosystem-factoring plan
 
 Restructure the vaultspec CLI ecosystem in four phases: rename `vaultspec.core`
@@ -42,9 +39,6 @@ locations that ground every step below.
   must keep working after Phase 3
 
 ## Tasks
-
-<!-- IMPORTANT: This document must be updated between execution runs to
-     track progress. -->
 
 ### Phase 1: Rename `vaultspec.core` to `vaultspec.config`
 

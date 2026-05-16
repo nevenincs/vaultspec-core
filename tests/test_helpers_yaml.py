@@ -145,22 +145,44 @@ class TestLazyRegistrationOnDump:
 class TestDegradedPyYAML:
     """The framework must remain importable on a partially broken PyYAML."""
 
-    def test_import_survives_missing_add_representer(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_import_survives_missing_add_representer(self) -> None:
         """Simulate the issue #85 scenario: ``yaml.add_representer`` is gone.
 
         Reloading the helpers module under that condition must succeed; only
         the *first* attempt to call ``_yaml_dump`` should raise, and it must
         raise a clear ``AttributeError`` rather than crash at import.
         """
-        monkeypatch.delattr(yaml, "add_representer", raising=False)
+        script = textwrap.dedent(
+            """
+            import importlib
+            import yaml
 
-        helpers = _reload_helpers()
-        assert helpers._literal_representer_registered is False
+            import vaultspec_core.core.helpers as helpers_module
 
-        with pytest.raises(AttributeError):
-            helpers._yaml_dump({"k": "multi\nline"})
+            del yaml.add_representer
+
+            helpers = importlib.reload(helpers_module)
+            assert helpers._literal_representer_registered is False
+
+            try:
+                helpers._yaml_dump({"k": "multi\\nline"})
+            except AttributeError:
+                print("ok")
+            else:
+                raise AssertionError("_yaml_dump did not surface AttributeError")
+            """
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0, (
+            f"helpers import/dump contract failed on degraded yaml:\n"
+            f"stdout={result.stdout!r}\nstderr={result.stderr!r}"
+        )
+        assert result.stdout.strip().endswith("ok")
 
     def test_core_package_import_survives_missing_add_representer(
         self,
@@ -213,9 +235,6 @@ class TestConcurrentRegistration:
 
         # Replace yaml.add_representer with a counting wrapper so we can
         # observe how many threads actually entered the critical section.
-        # The replacement is only swapped onto the helpers module's view
-        # of yaml; pytest's monkeypatch is not used here because we need
-        # the swap to persist for the life of the threads we spawn.
         calls: list[float] = []
         real_add = helpers.yaml.add_representer
 

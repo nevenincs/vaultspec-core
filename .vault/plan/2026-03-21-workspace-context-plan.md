@@ -26,9 +26,6 @@ and the `_ensure_tool_configs` race.
 
 ## Tasks
 
-<!-- IMPORTANT: This document must be updated between execution runs to
-     track progress. -->
-
 - Phase 1 - define `WorkspaceContext`, `ContextVar`, and `get_context()`
 
   1. Create a frozen `WorkspaceContext` dataclass in `types.py` with fields

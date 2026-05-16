@@ -19,6 +19,7 @@ from vaultspec_core.core.diagnosis.signals import (
     PrecommitSignal,
     ProviderDirSignal,
     ResolutionAction,
+    VaultContentSignal,
 )
 from vaultspec_core.core.enums import CliAction, PrecommitHook, Tool
 
@@ -71,9 +72,19 @@ pytestmark = [pytest.mark.unit]
             },
         ),
         (
+            VaultContentSignal,
+            {
+                "NO_VAULT",
+                "CLEAN",
+                "ANNOTATIONS",
+                "UNREADABLE",
+            },
+        ),
+        (
             PrecommitHook,
             {
                 "VAULT_FIX",
+                "VAULT_SANITIZE_ANNOTATIONS",
                 "CHECK_PROVIDER_ARTIFACTS",
                 "SPEC_CHECK",
             },
@@ -157,6 +168,9 @@ class TestWorkspaceDiagnosis:
         assert diag.builtin_version == BuiltinVersionSignal.NO_SNAPSHOTS
         assert diag.gitignore == GitignoreSignal.NO_FILE
         assert diag.gitattributes == GitattributesSignal.NO_FILE
+        assert diag.vault_content == VaultContentSignal.NO_VAULT
+        assert diag.vault_annotation_count == 0
+        assert diag.vault_unreadable_count == 0
 
     def test_construction_with_providers(self):
         prov = ProviderDiagnosis(

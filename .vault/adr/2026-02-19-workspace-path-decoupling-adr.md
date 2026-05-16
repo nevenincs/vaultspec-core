@@ -7,9 +7,6 @@ related:
   - '[[2026-02-19-workspace-path-decoupling-research]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `workspace-paths` adr: `Three-path workspace decoupling with git-aware layout detection` | (**status:** `accepted`)
 
 Response to companion project ADR-006 (VaultSpec Directory Placement and Path

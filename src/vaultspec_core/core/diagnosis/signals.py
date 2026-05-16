@@ -95,6 +95,15 @@ class PrecommitSignal(StrEnum):
     COMPLETE = "complete"
 
 
+class VaultContentSignal(StrEnum):
+    """Observed state of generated vault document annotations."""
+
+    NO_VAULT = "no_vault"
+    CLEAN = "clean"
+    ANNOTATIONS = "annotations"
+    UNREADABLE = "unreadable"
+
+
 class ResolutionAction(StrEnum):
     """Corrective action that a resolver can apply."""
 

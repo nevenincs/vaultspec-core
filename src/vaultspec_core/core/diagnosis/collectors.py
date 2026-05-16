@@ -21,6 +21,7 @@ from .signals import (
     ManifestEntrySignal,
     PrecommitSignal,
     ProviderDirSignal,
+    VaultContentSignal,
 )
 
 logger = logging.getLogger(__name__)
@@ -390,6 +391,47 @@ def collect_mcp_config_state(target: Path) -> ConfigSignal:
         return ConfigSignal.USER_MCP
 
     return ConfigSignal.OK
+
+
+def collect_vault_content_state(target: Path) -> tuple[VaultContentSignal, int, int]:
+    """Assess generated template annotations in ``.vault/`` without mutating.
+
+    This collector intentionally avoids the vault scanner because scanner access
+    can trigger lazy migrations. Doctor must remain a read-only signal surface.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        ``(signal, annotated_document_count, unreadable_markdown_count)``.
+    """
+    from ...config import get_config
+    from ...vaultcore.checks.annotations import strip_template_annotations
+
+    vault_dir = target / get_config().docs_dir
+    if not vault_dir.is_dir():
+        return VaultContentSignal.NO_VAULT, 0, 0
+
+    annotated = 0
+    unreadable = 0
+    for path in sorted(vault_dir.rglob("*.md")):
+        if ".obsidian" in path.parts or "_archive" in path.parts:
+            continue
+        try:
+            content = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            unreadable += 1
+            continue
+
+        _cleaned, stats = strip_template_annotations(content)
+        if stats.total:
+            annotated += 1
+
+    if annotated:
+        return VaultContentSignal.ANNOTATIONS, annotated, unreadable
+    if unreadable:
+        return VaultContentSignal.UNREADABLE, annotated, unreadable
+    return VaultContentSignal.CLEAN, annotated, unreadable
 
 
 def collect_gitignore_state(target: Path) -> GitignoreSignal:

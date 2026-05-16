@@ -16,17 +16,16 @@ When to use this skill:
 - Before debugging complex issues.
 - When you need user input on design options.
 
-**Announce at start:** "I'm using the `vaultspec-research` skill to conduct
-structured research and brainstorming."
+**Announce at start:** "I'm using the `vaultspec-research` skill to conduct structured
+research and brainstorming."
 
 **Save findings to:** Research artifact at
-`.vault/research/yyyy-mm-dd-{feature}-{phase}-research.md`
+`.vault/research/yyyy-mm-dd-{feature}-research.md`
 
-Load the `vaultspec-adr-researcher` agent persona for focused work. When the
-task benefits from multiple researchers, coordinate them through the host
-environment rather than assuming a shipped MCP team-thread runtime. Instruct
-the researcher to "Conduct research on `{topic}`.
-Persist findings to `.vault/research/...`"
+Load the `vaultspec-adr-researcher` agent persona for focused work. When the task
+benefits from multiple researchers, coordinate them through the host environment rather
+than assuming a shipped MCP team-thread runtime. Instruct the researcher to "Conduct
+research on `{topic}`. Persist findings to `.vault/research/...`"
 
 ## Template
 
@@ -36,14 +35,13 @@ Persist findings to `.vault/research/...`"
 
 Every document MUST strictly adhere to the following schema:
 
-- **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
+- **`tags`**: MUST contain the required tag pair in a YAML list.
 
   - **Directory Tag**: Exactly `#research`.
   - **Feature Tag**: Exactly one kebab-case `#{feature}` tag.
-  - *Syntax:* `tags: ["#research", "#feature"]` (Must be quoted strings in a
-    list).
+  - *Syntax:* `tags: ['#research', '#feature']` (Must be quoted strings in a list).
 
-- **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
+- **`related`**: MUST be a YAML list of quoted `'[[wiki-links]]'`.
 
   - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
 
@@ -59,8 +57,8 @@ Every document MUST strictly adhere to the following schema:
 
 ## Artifact Linking
 
-- Any persisted markdown files must be linked against other persisted
-  documents using `[[wiki-links]]`.
+- Any persisted markdown files must be linked against other persisted documents using
+  `[[wiki-links]]`.
 
 - DO NOT use `@ref` style links.
 

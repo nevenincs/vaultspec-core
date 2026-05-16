@@ -111,6 +111,7 @@ def _run_preflight(
     force: bool = False,
     dry_run: bool = False,
     scope: str = "framework",
+    render: bool = True,
 ) -> None:
     """Run diagnosis and resolution pre-flight.
 
@@ -137,18 +138,23 @@ def _run_preflight(
     if not plan.warnings and not plan.conflicts and not plan.steps:
         return
 
-    from vaultspec_core.console import get_console
+    console = None
+    if render:
+        from vaultspec_core.console import get_console
 
-    console = get_console()
+        console = get_console()
 
     for warning in plan.warnings:
-        console.print(f"  [yellow]![/yellow] {warning}")
+        if console:
+            console.print(f"  [yellow]![/yellow] {warning}")
 
     # Execute preflight-safe resolution steps
     if plan.steps and not plan.blocked:
         exec_result = execute_plan(plan, target, dry_run=dry_run)
 
         for sr in exec_result.results:
+            if not console:
+                continue
             if sr.success:
                 console.print(f"  [green]ok[/green] {sr.step.reason}")
             else:
@@ -160,15 +166,18 @@ def _run_preflight(
     # Show non-preflight steps as informational (deferred to the main command)
     non_preflight = [s for s in plan.steps if s.action not in PREFLIGHT_ACTIONS]
     for step in non_preflight:
-        console.print(
-            f"  [dim]>[/dim] {step.reason} (detected, will be addressed by {action})"
-        )
+        if console:
+            console.print(
+                f"  [dim]>[/dim] {step.reason} "
+                f"(detected, will be addressed by {action})"
+            )
 
     if plan.conflicts:
-        console.print()
-        for conflict in plan.conflicts:
-            console.print(f"  [red]x[/red] {conflict}")
-        console.print()
+        if console:
+            console.print()
+            for conflict in plan.conflicts:
+                console.print(f"  [red]x[/red] {conflict}")
+            console.print()
         if not dry_run:
             raise typer.Exit(code=1)
 
@@ -273,6 +282,7 @@ def cmd_install(
         force=force,
         dry_run=dry_run,
         scope="framework",
+        render=not json_output,
     )
 
     try:
@@ -417,6 +427,7 @@ def cmd_uninstall(
         force=force,
         dry_run=dry_run,
         scope="framework",
+        render=not json_output,
     )
 
     try:
@@ -508,11 +519,12 @@ def cmd_sync(
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
-    """Sync rules, skills, agents, configs, and system prompts.
+    """Sync rules, skills, agents, configs, system prompts, and MCPs.
 
-    By default sync is non-destructive: missing files are added and changed
-    files are updated, but stale destination files and user-authored
-    system/config files are left untouched (with warnings).
+    This is the authoritative complete sync from .vaultspec/ to enrolled
+    provider outputs. By default sync is non-destructive: missing files are
+    added and changed files are updated, but stale destination files and
+    user-authored system/config files are left untouched (with warnings).
 
     Use --force for a complete sync that prunes stale files and overwrites
     user-authored content to match the .vaultspec/ source exactly.
@@ -549,6 +561,7 @@ def cmd_sync(
         force=force,
         dry_run=dry_run,
         scope="sync",
+        render=not json_output,
     )
 
     from vaultspec_core.core.commands import sync_provider
@@ -613,7 +626,21 @@ def cmd_sync(
         from vaultspec_core.core.manifest import installed_tool_configs
         from vaultspec_core.core.types import SyncResult
 
-        active_names = [cfg.name for cfg in installed_tool_configs().values()]
+        active_configs = installed_tool_configs()
+        if provider == "all":
+            active_names = [
+                cfg.name
+                for tool, cfg in active_configs.items()
+                if tool.value not in skip and cfg.name not in skip
+            ]
+        else:
+            active_names = [
+                cfg.name
+                for tool, cfg in active_configs.items()
+                if (tool.value == provider or cfg.name == provider)
+                and tool.value not in skip
+                and cfg.name not in skip
+            ]
 
         # Header
         provider_list = ", ".join(f"[cyan]{n}[/cyan]" for n in active_names)
@@ -624,7 +651,7 @@ def cmd_sync(
 
         # Collect per-tool results across all 5 resource passes
         resource_labels = ["rules", "skills", "agents", "system", "config"]
-        if "mcp" not in skip:
+        if provider == "all" and "mcp" not in skip:
             resource_labels.append("mcps")
         tool_resources: dict[str, list[tuple[str, SyncResult]]] = {}
         for label, r in zip(resource_labels, results, strict=True):
@@ -695,7 +722,12 @@ def cmd_sync(
         # Warn if sync produced 0 files
         total_changes = sum(r.added + r.updated for r in results)
         total_skipped = sum(r.skipped for r in results)
-        if total_changes == 0 and total_skipped == 0 and not all_warnings:
+        if (
+            active_names
+            and total_changes == 0
+            and total_skipped == 0
+            and not all_warnings
+        ):
             console.print(
                 "\n[bold yellow]Warning:[/bold yellow] Sync produced 0 files. "
                 "The .vaultspec/rules/ source directories may be empty.\n"

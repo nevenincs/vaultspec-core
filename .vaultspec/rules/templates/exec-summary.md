@@ -1,22 +1,22 @@
 ---
-# REQUIRED TAGS (minimum 2): one directory tag + one feature tag
-# DIRECTORY TAGS: #adr #audit #exec #index #plan #reference #research
-# Directory tag (hardcoded - DO NOT CHANGE - based on .vault/exec/ location)
-# Feature tag (replace {feature} with your feature name, e.g., #editor-demo)
-# Additional tags may be appended below the required pair
 tags:
   - '#exec'
   - '#{feature}'
-# ISO date format (e.g., 2026-02-06)
 date: '{yyyy-mm-dd}'
-# Related documents as quoted wiki-links - MUST link to parent PLAN
-# (e.g., "[[2026-02-04-feature-plan]]")
 related:
   - '[[{yyyy-mm-dd-*-plan}]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
+<!-- FRONTMATTER RULES:
+     tags: one directory tag (hardcoded #exec) and one feature tag.
+     Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
+     Additional tags may be appended below the required pair.
+
+     Related: use wiki-links as '[[YYYY-MM-DD-foo-bar-plan]]' and link the
+     parent plan.
+
+     DO NOT add frontmatter fields
+     outside the frontmatter. -->
 
 <!-- LINK RULES:
      - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
@@ -40,11 +40,4 @@ Brief summary of overall progress across every Step in this Phase.
 
 ## Description
 
-High-level description of work accomplished.
-
-## Tests
-
-Brief description of overall verification and auditing.
-
-Link any audit reports related to `{phase}` summary or individual
-`{step}` summaries.
+<!-- High-level description of work accomplished. -->

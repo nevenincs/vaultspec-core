@@ -9,8 +9,6 @@ related:
 
 # `vault-data-dir` Code Review
 
-<!-- Persistent log of audit findings appended below. -->
-
 DOCSTRING-001 | LOW | `is_supported_directory` docstring is now inaccurate
 The docstring says "True if the directory is in `SUPPORTED_DIRECTORIES`" but
 the method now also checks `AUXILIARY_DIRECTORIES`. Should read something like

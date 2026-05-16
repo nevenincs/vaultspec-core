@@ -46,15 +46,14 @@ class TestDoctorCommand:
         assert "builtin_version" in data
         assert "gitignore" in data
         assert "gitattributes" in data
+        assert "vault_content" in data
 
     def test_json_exit_code_reflects_corrupted_state(self, tmp_path: Path) -> None:
         factory = WorkspaceFactory(tmp_path)
         factory.install().corrupt_manifest()
         result = factory.run("spec", "doctor", "--json")
         assert result.exit_code == 2
-        # The output may contain log warnings before the JSON payload.
-        json_start = result.output.index("{")
-        data = json.loads(result.output[json_start:])
+        data = json.loads(result.output)
         assert data["framework"] == "corrupted"
 
     def test_missing_framework_exit_two(self, tmp_path: Path) -> None:
@@ -146,3 +145,80 @@ class TestDoctorCommand:
         assert "manifest: untracked" not in result.output
         assert "antigravity" in result.output.lower()
         assert "file(s) need attention" not in result.output
+
+    def test_doctor_reports_vault_annotations_without_mutating(
+        self, tmp_path: Path
+    ) -> None:
+        factory = WorkspaceFactory(tmp_path)
+        factory.install("core")
+        doc = tmp_path / ".vault" / "research" / "2026-05-15-doctor.md"
+        doc.parent.mkdir(parents=True, exist_ok=True)
+        doc.write_text(
+            "---\n"
+            "tags:\n"
+            "  - '#research'\n"
+            "  - '#doctor-annotations'\n"
+            "date: '2026-05-15'\n"
+            "related: []\n"
+            "---\n"
+            "\n"
+            "<!-- Fill this generated scaffold before committing. -->\n"
+            "\n"
+            "# Doctor annotations\n",
+            encoding="utf-8",
+        )
+
+        result = factory.run("spec", "doctor")
+
+        assert result.exit_code == 1
+        output = result.output.lower()
+        assert "vault content" in output
+        assert "generated template" in output
+        assert "annotations" in output
+        assert "vaultspec-core" in output
+        assert "vault sanitize" in output
+        assert "<!-- Fill" in doc.read_text(encoding="utf-8")
+
+    def test_doctor_json_reports_vault_annotation_signal(self, tmp_path: Path) -> None:
+        factory = WorkspaceFactory(tmp_path)
+        factory.install("core")
+        doc = tmp_path / ".vault" / "research" / "2026-05-15-doctor-json.md"
+        doc.parent.mkdir(parents=True, exist_ok=True)
+        doc.write_text(
+            "---\n"
+            "tags:\n"
+            "  - '#research'\n"
+            "  - '#doctor-json-annotations'\n"
+            "date: '2026-05-15'\n"
+            "related: []\n"
+            "---\n"
+            "\n"
+            "<!-- Generated instruction. -->\n"
+            "\n"
+            "# Doctor JSON annotations\n",
+            encoding="utf-8",
+        )
+
+        result = factory.run("spec", "doctor", "--json")
+
+        assert result.exit_code == 1
+        data = json.loads(result.output)
+        assert data["vault_content"] == "annotations"
+        assert data["vault_annotation_count"] == 1
+        assert "<!-- Generated instruction." in doc.read_text(encoding="utf-8")
+
+    def test_doctor_json_reports_unreadable_vault_markdown(
+        self, tmp_path: Path
+    ) -> None:
+        factory = WorkspaceFactory(tmp_path)
+        factory.install("core")
+        bad_doc = tmp_path / ".vault" / "research" / "2026-05-15-unreadable.md"
+        bad_doc.parent.mkdir(parents=True, exist_ok=True)
+        bad_doc.write_bytes(b"\xff\xfe\xfa")
+
+        result = factory.run("spec", "doctor", "--json")
+
+        assert result.exit_code == 1
+        data = json.loads(result.output)
+        assert data["vault_content"] == "unreadable"
+        assert data["vault_unreadable_count"] == 1

@@ -8,9 +8,6 @@ related:
   - '[[2026-03-15-claude-code-provider-research]]'
 ---
 
-<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
-     outside the YAML frontmatter above -->
-
 # `install-cmds` implementation plan
 
 Harden the `install`/`uninstall` CLI commands and justfile recipes with
