@@ -201,6 +201,7 @@ def test_lint_all_runs_every_validation_surface() -> None:
     assert "just _dev-lint-toml" in justfile
     assert "just _dev-lint-markdown" in justfile
     assert "just _dev-lint-workflow" in justfile
+    assert "uv run ruff format --check src tests" in justfile
 
 
 def test_test_all_runs_python_and_docker() -> None:

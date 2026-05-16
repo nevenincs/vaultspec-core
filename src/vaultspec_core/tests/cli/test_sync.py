@@ -8,6 +8,7 @@ import pytest
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
+from vaultspec_core.core.manifest import read_manifest_data, write_manifest_data
 
 pytestmark = [pytest.mark.unit]
 
@@ -232,6 +233,63 @@ class TestSyncAuthority:
         assert "gemini" not in output
         assert "antigravity" not in output
         assert "codex" not in output
+
+    def test_provider_scoped_sync_respects_skip_for_requested_provider(
+        self, runner, synthetic_project
+    ):
+        """`sync claude --skip claude` must not refresh Claude outputs."""
+        claude_rule = next((synthetic_project / ".claude" / "rules").glob("*.md"))
+        before = claude_rule.read_text(encoding="utf-8")
+        mcp_path = synthetic_project / ".mcp.json"
+        mcp_before = mcp_path.read_text(encoding="utf-8")
+        claude_rule.write_text(before + "\nlocal drift\n", encoding="utf-8")
+
+        result = runner.invoke(
+            app,
+            ["--target", str(synthetic_project), "sync", "claude", "--skip", "claude"],
+        )
+
+        assert result.exit_code == 0, result.output
+        output = ANSI_RE.sub("", result.output)
+        assert "Syncing 0 enabled providers" in output
+        assert "Sync produced 0 files" not in output
+        assert claude_rule.read_text(encoding="utf-8") == before + "\nlocal drift\n"
+        assert mcp_path.read_text(encoding="utf-8") == mcp_before
+
+    def test_sync_all_skip_does_not_stamp_skipped_provider(
+        self, runner, synthetic_project
+    ):
+        """Skipped providers must not get fresh last_synced state."""
+        mdata = read_manifest_data(synthetic_project)
+        mdata.provider_state.setdefault("claude", {})["last_synced"] = "old-claude"
+        mdata.provider_state.setdefault("gemini", {})["last_synced"] = "old-gemini"
+        write_manifest_data(synthetic_project, mdata)
+
+        result = runner.invoke(
+            app,
+            ["--target", str(synthetic_project), "sync", "--skip", "claude"],
+        )
+
+        assert result.exit_code == 0, result.output
+        after = read_manifest_data(synthetic_project)
+        assert after.provider_state["claude"]["last_synced"] == "old-claude"
+        assert after.provider_state["gemini"]["last_synced"] != "old-gemini"
+
+    def test_sync_all_deleted_gitignore_disables_management(
+        self, runner, synthetic_project
+    ):
+        """Deleting managed .gitignore should opt out without crashing sync."""
+        mdata = read_manifest_data(synthetic_project)
+        mdata.gitignore_managed = True
+        write_manifest_data(synthetic_project, mdata)
+        gitignore_path = synthetic_project / ".gitignore"
+        if gitignore_path.exists():
+            gitignore_path.unlink()
+
+        result = runner.invoke(app, ["--target", str(synthetic_project), "sync"])
+
+        assert result.exit_code == 0, result.output
+        assert read_manifest_data(synthetic_project).gitignore_managed is False
 
     def test_rule_add_then_top_level_sync_updates_provider_stubs(
         self, runner, synthetic_project

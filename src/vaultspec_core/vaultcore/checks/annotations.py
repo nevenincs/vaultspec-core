@@ -267,6 +267,15 @@ def _strip_html_comments(markdown: str) -> tuple[str, tuple[int, int]]:
                 output.append(tail)
             continue
 
+        sequence = _strip_standalone_comment_sequence(line)
+        if sequence is not None:
+            cleaned_line, html_count, malformed_count = sequence
+            removed += html_count
+            malformed_removed += malformed_count
+            if cleaned_line:
+                output.append(cleaned_line)
+            continue
+
         is_html_comment = stripped.startswith("<!--")
         is_malformed_comment = not is_html_comment and stripped.startswith("<--")
         if not is_html_comment and not is_malformed_comment:
@@ -301,6 +310,52 @@ def _strip_html_comments(markdown: str) -> tuple[str, tuple[int, int]]:
         removed += 1
 
     return "".join(output), (removed, malformed_removed)
+
+
+def _strip_standalone_comment_sequence(line: str) -> tuple[str, int, int] | None:
+    """Strip removable same-line comments when the whole line is comments."""
+    cursor = 0
+    html_comments = 0
+    malformed_comments = 0
+    saw_comment = False
+    kept_comments: list[str] = []
+    newline = "\n" if line.endswith("\n") else ""
+    content = line[:-1] if newline else line
+    indent = content[: len(content) - len(content.lstrip())]
+
+    while cursor < len(content):
+        while cursor < len(content) and content[cursor].isspace():
+            cursor += 1
+        if cursor >= len(content):
+            break
+
+        is_html_comment = content.startswith("<!--", cursor)
+        is_malformed_comment = not is_html_comment and content.startswith("<--", cursor)
+        if not is_html_comment and not is_malformed_comment:
+            return None
+
+        start_len = 4 if is_html_comment else 3
+        body_start = cursor + start_len
+        end = content.find("-->", body_start)
+        if end == -1:
+            return None
+
+        comment_text = content[body_start:end].lstrip()
+        if is_html_comment and comment_text.startswith(PRESERVED_HTML_COMMENT_PREFIXES):
+            kept_comments.append(content[cursor : end + 3])
+        else:
+            saw_comment = True
+            if is_malformed_comment:
+                malformed_comments += 1
+            else:
+                html_comments += 1
+        cursor = end + 3
+
+    if not saw_comment and not kept_comments:
+        return None
+    if not kept_comments:
+        return "", html_comments, malformed_comments
+    return indent + " ".join(kept_comments) + newline, html_comments, malformed_comments
 
 
 def _markdown_fence(line: str) -> tuple[str, int] | None:

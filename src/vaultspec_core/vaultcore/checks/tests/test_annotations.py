@@ -118,6 +118,67 @@ def test_fix_strips_malformed_standalone_annotation_blocks(tmp_path: Path) -> No
     assert "<-- code sample stays visible -->" in cleaned
 
 
+def test_fix_strips_multiple_standalone_annotations_on_one_line(
+    tmp_path: Path,
+) -> None:
+    doc = _write_doc(
+        tmp_path,
+        "same-line-annotations",
+        (
+            "---\n"
+            "tags:\n"
+            "  - '#research'\n"
+            "  - '#same-line-annotations'\n"
+            "date: '2026-05-15'\n"
+            "related: []\n"
+            "---\n"
+            "\n"
+            "<!-- Remove first. --> <!-- Remove second. -->\n"
+            "<-- Remove malformed. --> <!-- Remove third. -->\n"
+            "Keep prose <!-- inline comment mention --> untouched.\n"
+        ),
+    )
+
+    result = check_annotations(tmp_path, fix=True)
+
+    cleaned = doc.read_text(encoding="utf-8")
+    assert result.fixed_count == 1
+    assert "3 HTML comment blocks" in result.diagnostics[0].message
+    assert "1 malformed HTML comment block" in result.diagnostics[0].message
+    assert "Remove first" not in cleaned
+    assert "Remove second" not in cleaned
+    assert "Remove malformed" not in cleaned
+    assert "Remove third" not in cleaned
+    assert "Keep prose <!-- inline comment mention --> untouched." in cleaned
+
+
+def test_fix_strips_same_line_annotations_while_preserving_retired_ledger(
+    tmp_path: Path,
+) -> None:
+    doc = _write_doc(
+        tmp_path,
+        "mixed-same-line-annotations",
+        (
+            "---\n"
+            "tags:\n"
+            "  - '#research'\n"
+            "  - '#mixed-same-line-annotations'\n"
+            "date: '2026-05-15'\n"
+            "related: []\n"
+            "---\n"
+            "\n"
+            "<!-- Remove generated annotation. --> <!-- RETIRED: S01 -->\n"
+        ),
+    )
+
+    result = check_annotations(tmp_path, fix=True)
+
+    cleaned = doc.read_text(encoding="utf-8")
+    assert result.fixed_count == 1
+    assert "Remove generated annotation" not in cleaned
+    assert "<!-- RETIRED: S01 -->" in cleaned
+
+
 def test_fix_preserves_comments_inside_longer_markdown_fences(tmp_path: Path) -> None:
     doc = _write_doc(
         tmp_path,

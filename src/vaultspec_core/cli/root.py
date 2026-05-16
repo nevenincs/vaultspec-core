@@ -637,7 +637,9 @@ def cmd_sync(
             active_names = [
                 cfg.name
                 for tool, cfg in active_configs.items()
-                if tool.value == provider or cfg.name == provider
+                if (tool.value == provider or cfg.name == provider)
+                and tool.value not in skip
+                and cfg.name not in skip
             ]
 
         # Header
@@ -720,7 +722,12 @@ def cmd_sync(
         # Warn if sync produced 0 files
         total_changes = sum(r.added + r.updated for r in results)
         total_skipped = sum(r.skipped for r in results)
-        if total_changes == 0 and total_skipped == 0 and not all_warnings:
+        if (
+            active_names
+            and total_changes == 0
+            and total_skipped == 0
+            and not all_warnings
+        ):
             console.print(
                 "\n[bold yellow]Warning:[/bold yellow] Sync produced 0 files. "
                 "The .vaultspec/rules/ source directories may be empty.\n"

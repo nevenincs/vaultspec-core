@@ -326,7 +326,8 @@ postcheck pass.
 `vaultspec-core vault repair` is broader than `vaultspec-core vault check all --fix`.
 The check-level fixer remains available for compatibility, but it does not own generated
 index refresh, post-fix graph rebuild, root-cause grouping, or final delta reporting. It
-also runs the annotation sanitizer as part of the fix phase.
+also strips standalone annotation comments during the fix phase. Inline HTML comments
+embedded in prose are preserved.
 
 #### Options
 
@@ -366,8 +367,8 @@ agent-facing instructions in newly created documents; this command removes those
 instructions only when explicitly requested. Use `--dry-run` to see which files would be
 stripped without mutating the vault. The sanitizer removes YAML frontmatter comment
 directives, standalone HTML comment blocks, and malformed standalone `<-- ... -->`
-annotation blocks, while preserving fenced examples, inline prose mentions, and
-machine-owned comments such as retired plan markers.
+annotation blocks. It preserves fenced examples, inline HTML comments embedded in prose,
+and machine-owned comments such as retired plan markers.
 
 #### Options
 

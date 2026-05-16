@@ -46,6 +46,14 @@ def _case_rename_temp_path(src: Path) -> Path:
     return src.with_name(f".vs-{uuid4().hex[:12]}.tmp")
 
 
+def _absolute_path_text(path: Path) -> str:
+    """Return an absolute path string without requiring the path to exist."""
+    try:
+        return str(path.resolve(strict=False))
+    except OSError:
+        return str(path.absolute())
+
+
 def _rename_document_path(src: Path, dst: Path) -> bool:
     """Rename *src* to *dst*, including case-only renames on Windows.
 
@@ -80,7 +88,12 @@ def _rename_document_path(src: Path, dst: Path) -> bool:
                     tmp.rename(src)
                 except OSError:
                     logger.warning(
-                        "Failed to roll back case-only rename temp path: %s", tmp
+                        "Failed to roll back case-only rename temp path; "
+                        "manual recovery may be needed. temp=%s source=%s "
+                        "destination=%s",
+                        _absolute_path_text(tmp),
+                        _absolute_path_text(src),
+                        _absolute_path_text(dst),
                     )
                 return False
         return False

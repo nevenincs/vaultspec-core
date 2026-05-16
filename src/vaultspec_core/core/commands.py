@@ -1582,6 +1582,10 @@ def sync_provider(
     ctx = _t.get_context()
     guard_dev_repo(ctx.target_dir, dev=dev)
 
+    def _empty_sync_results() -> list[_t.SyncResult]:
+        result_count = 5 if "mcp" in skip else 6
+        return [_t.SyncResult() for _ in range(result_count)]
+
     def _run_all_syncs() -> list[_t.SyncResult]:
         results: list[_t.SyncResult] = []
         sync_passes: list[tuple[Callable[[], _t.SyncResult], str]] = [
@@ -1677,6 +1681,7 @@ def sync_provider(
             mdata = read_manifest_data(ctx.target_dir)
             if mdata.gitignore_managed:
                 gi_path = ctx.target_dir / ".gitignore"
+                block_present = False
                 if gi_path.exists():
                     try:
                         content = gi_path.read_text(encoding="utf-8")
@@ -1719,7 +1724,7 @@ def sync_provider(
             mdata = read_manifest_data(ctx.target_dir)
             for tool_type in ctx.tool_configs:
                 name = tool_type.value
-                if name not in mdata.installed:
+                if name in skip or name not in mdata.installed:
                     continue
                 mdata.provider_state.setdefault(name, {})
                 mdata.provider_state[name]["last_synced"] = now
@@ -1728,9 +1733,11 @@ def sync_provider(
 
         return results
 
-    # Validate provider is installed
+    provider_skipped = provider in skip
+
+    # Validate provider is installed unless the provider was explicitly skipped.
     installed = read_manifest(ctx.target_dir)
-    if installed and provider not in installed:
+    if not provider_skipped and installed and provider not in installed:
         raise ProviderNotInstalledError(
             f"Provider '{provider}' is not installed.",
             hint=(
@@ -1741,14 +1748,17 @@ def sync_provider(
 
     # Per-provider sync: filter tool_configs to only the requested tool.
     requested: set[Tool] = set()
-    if provider == "claude":
-        requested = {Tool.CLAUDE}
-    elif provider == "gemini":
-        requested = {Tool.GEMINI}
-    elif provider == "antigravity":
-        requested = {Tool.ANTIGRAVITY}
-    elif provider == "codex":
-        requested = {Tool.CODEX}
+    if not provider_skipped:
+        if provider == "claude":
+            requested = {Tool.CLAUDE}
+        elif provider == "gemini":
+            requested = {Tool.GEMINI}
+        elif provider == "antigravity":
+            requested = {Tool.ANTIGRAVITY}
+        elif provider == "codex":
+            requested = {Tool.CODEX}
+    else:
+        return _empty_sync_results()
 
     def _sync_single_provider(
         provider_configs: dict[Tool, _t.ToolConfig],

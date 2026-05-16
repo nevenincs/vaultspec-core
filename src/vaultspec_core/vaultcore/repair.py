@@ -28,6 +28,8 @@ __all__ = [
     "run_repair_pipeline",
 ]
 
+_FINGERPRINT_EXCLUDED_DIR_NAMES = frozenset({"data", "logs", "_archive"})
+
 
 class RepairPhase(StrEnum):
     """Named phases emitted by ``vaultspec-core vault repair``."""
@@ -100,11 +102,19 @@ def run_repair_pipeline(
     feat = feature.lstrip("#") if feature else None
     run = RepairRun(dry_run=dry_run, feature=feat, include_index=include_index)
     before = _vault_file_fingerprints(root_dir)
+    current = before
+
+    def refresh_fingerprints() -> dict[str, tuple[int, int]]:
+        nonlocal current
+        current = _vault_file_fingerprints(root_dir)
+        return current
+
+    def finalize_current() -> None:
+        _finalize(run, before, current)
 
     try:
         status, pending_names = migration_status(root_dir)
     except Exception as exc:
-        run = RepairRun(dry_run=dry_run, feature=feat, include_index=include_index)
         _record_failure(run, RepairPhase.PREFLIGHT, exc)
         run.phases.append(
             {
@@ -118,7 +128,7 @@ def run_repair_pipeline(
                 "error": str(exc),
             }
         )
-        _finalize(run, before, _vault_file_fingerprints(root_dir))
+        finalize_current()
         return run
     preflight: dict[str, Any] = {
         "phase": RepairPhase.PREFLIGHT.value,
@@ -144,7 +154,7 @@ def run_repair_pipeline(
                 "path": None,
             }
         )
-        _finalize(run, before, _vault_file_fingerprints(root_dir))
+        finalize_current()
         return run
 
     if not dry_run:
@@ -155,8 +165,11 @@ def run_repair_pipeline(
             preflight["failed"] = True
             preflight["error"] = str(exc)
             run.phases.append(preflight)
-            _finalize(run, before, _vault_file_fingerprints(root_dir))
+            refresh_fingerprints()
+            finalize_current()
             return run
+        if applied:
+            refresh_fingerprints()
         preflight["applied_migrations"] = [
             {
                 "name": result.name,
@@ -173,7 +186,7 @@ def run_repair_pipeline(
     except Exception as exc:
         _record_failure(run, RepairPhase.CHECK, exc)
         run.phases.append(_failed_phase(RepairPhase.CHECK, exc))
-        _finalize(run, before, _vault_file_fingerprints(root_dir))
+        finalize_current()
         return run
     run.phases.append(_checks_phase(RepairPhase.CHECK, initial))
     run.planned_fixes = _collect_fixable(initial)
@@ -224,33 +237,35 @@ def run_repair_pipeline(
         run.postcheck = initial
         run.phases.append(_checks_phase(RepairPhase.POSTCHECK, initial, dry_run=True))
         run.unresolved = _collect_unresolved(initial)
-        _finalize(run, before, _vault_file_fingerprints(root_dir))
+        finalize_current()
         return run
 
-    phase_before = _vault_file_fingerprints(root_dir)
+    phase_before = current
     try:
         fixed = run_all_checks(root_dir, feature=feat, fix=True)
     except Exception as exc:
         _record_failure(run, RepairPhase.FIX, exc)
         run.phases.append(_failed_phase(RepairPhase.FIX, exc))
+        phase_after = refresh_fingerprints()
         _record_file_deltas(
             run,
             RepairPhase.FIX,
             phase_before,
-            _vault_file_fingerprints(root_dir),
+            phase_after,
         )
-        _finalize(run, before, _vault_file_fingerprints(root_dir))
+        finalize_current()
         return run
     run.phases.append(_checks_phase(RepairPhase.FIX, fixed))
+    phase_after = refresh_fingerprints()
     _record_file_deltas(
         run,
         RepairPhase.FIX,
         phase_before,
-        _vault_file_fingerprints(root_dir),
+        phase_after,
     )
 
     if include_index:
-        phase_before = _vault_file_fingerprints(root_dir)
+        phase_before = current
         try:
             generated = _refresh_indexes(root_dir, feat)
         except Exception as exc:
@@ -265,11 +280,12 @@ def run_repair_pipeline(
                     "error": str(exc),
                 }
             )
+            phase_after = refresh_fingerprints()
             _record_file_deltas(
                 run,
                 RepairPhase.INDEX,
                 phase_before,
-                _vault_file_fingerprints(root_dir),
+                phase_after,
             )
             failure_unresolved = list(run.unresolved)
             try:
@@ -277,13 +293,13 @@ def run_repair_pipeline(
             except Exception as postcheck_exc:
                 _record_failure(run, RepairPhase.POSTCHECK, postcheck_exc)
                 run.phases.append(_failed_phase(RepairPhase.POSTCHECK, postcheck_exc))
-                _finalize(run, before, _vault_file_fingerprints(root_dir))
+                finalize_current()
                 return run
             run.postcheck = postcheck
             run.unresolved = failure_unresolved + _collect_unresolved(postcheck)
             run.root_causes = _group_root_causes(postcheck)
             run.phases.append(_checks_phase(RepairPhase.POSTCHECK, postcheck))
-            _finalize(run, before, _vault_file_fingerprints(root_dir))
+            finalize_current()
             return run
         run.generated_indexes = [_rel_str(path, root_dir) for path in generated]
         run.phases.append(
@@ -294,11 +310,12 @@ def run_repair_pipeline(
                 "skipped": False,
             }
         )
+        phase_after = refresh_fingerprints()
         _record_file_deltas(
             run,
             RepairPhase.INDEX,
             phase_before,
-            _vault_file_fingerprints(root_dir),
+            phase_after,
         )
     else:
         run.phases.append(_skipped_index_phase("disabled by --no-index"))
@@ -308,14 +325,14 @@ def run_repair_pipeline(
     except Exception as exc:
         _record_failure(run, RepairPhase.POSTCHECK, exc)
         run.phases.append(_failed_phase(RepairPhase.POSTCHECK, exc))
-        _finalize(run, before, _vault_file_fingerprints(root_dir))
+        finalize_current()
         return run
     run.postcheck = postcheck
     run.unresolved = _collect_unresolved(postcheck)
     run.root_causes = _group_root_causes(postcheck)
     run.phases.append(_checks_phase(RepairPhase.POSTCHECK, postcheck))
 
-    _finalize(run, before, _vault_file_fingerprints(root_dir))
+    finalize_current()
     return run
 
 
@@ -568,10 +585,7 @@ def _vault_file_fingerprints(root_dir: Path) -> dict[str, tuple[int, int]]:
             rel_parts = path.relative_to(docs_dir).parts
         except ValueError:
             continue
-        if any(
-            part.startswith(".") or part in {"data", "logs", "_archive"}
-            for part in rel_parts[:-1]
-        ):
+        if any(_is_fingerprint_excluded_dir(part) for part in rel_parts[:-1]):
             continue
         try:
             rel = _rel_str(path, root_dir)
@@ -583,6 +597,10 @@ def _vault_file_fingerprints(root_dir: Path) -> dict[str, tuple[int, int]]:
         except OSError:
             continue
     return fingerprints
+
+
+def _is_fingerprint_excluded_dir(part: str) -> bool:
+    return part.startswith(".") or part in _FINGERPRINT_EXCLUDED_DIR_NAMES
 
 
 def _changed_files(

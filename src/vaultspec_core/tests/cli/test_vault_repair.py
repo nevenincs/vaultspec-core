@@ -168,6 +168,25 @@ class TestVaultRepair:
         assert ".vault/index/repair-index.index.md" in payload["generated_indexes"]
         assert ".vault/index/repair-index.index.md" in payload["changed_files"]
 
+    def test_repair_does_not_report_unchanged_index_as_modified(
+        self,
+        factory: WorkspaceFactory,
+    ) -> None:
+        factory.install("core")
+        _write_doc(
+            factory.path,
+            "research",
+            "2026-05-15-repair-index-stable",
+            "repair-index-stable",
+        )
+
+        first = run_repair_pipeline(factory.path, feature="repair-index-stable")
+        second = run_repair_pipeline(factory.path, feature="repair-index-stable")
+
+        index_rel = ".vault/index/repair-index-stable.index.md"
+        assert index_rel in first.changed_files
+        assert index_rel not in second.changed_files
+
     def test_repair_tracks_changed_indexes_in_configured_docs_dir(
         self,
         factory: WorkspaceFactory,
