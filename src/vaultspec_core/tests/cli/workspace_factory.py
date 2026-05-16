@@ -100,6 +100,9 @@ class WorkspaceFactory:
         after the subcommand so both the root callback (``set_root_target``)
         and per-command ``TargetOption`` parameters receive the path.
         """
+        from vaultspec_core.console import reset_console
+
+        reset_console()
         target = str(self.root)
         cmd = ["-t", target, *args, "--target", target]
         return self._runner.invoke(app, cmd)
