@@ -33,12 +33,20 @@ repos:
     pass_filenames: false
   - id: mdformat-check
     name: Check Markdown formatting (mdformat)
-    entry: uv run --no-sync mdformat --wrap 88 --check
+    entry: uv run --no-sync mdformat --check
     language: system
     pass_filenames: true
     types:
     - markdown
     exclude: '^CHANGELOG\.md$'
+  - id: mdformat-wrap-docs-check
+    name: Check wrapped user-facing Markdown (mdformat)
+    entry: uv run --no-sync mdformat --wrap 88 --check
+    language: system
+    pass_filenames: true
+    types:
+    - markdown
+    files: '^(README\.md|\.vaultspec/(README|MCP|CLI)\.md|\.vaultspec/rules/.*\.md)$'
   - id: pymarkdown
     name: Lint Markdown style (pymarkdown)
     entry: uv run --no-sync pymarkdown --config .pymarkdown.json scan

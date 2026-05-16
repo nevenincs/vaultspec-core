@@ -386,7 +386,7 @@ Audit the existing pytest test suites to determine the blast radius of replacing
 - **Detail:** Files like ests/cli/test_vault_cli.py, ests/cli/test_spec_cli.py, and
   ests/protocol/conftest.py rely heavily on injecting isolated tmp paths via the --root
   flag. For example, ests/protocol/conftest.py spins up the MCP server using rgs:
-  \["-m", "vaultspec.subagent_cli", "--root", str(tmp_path), "serve"\].
+  ["-m", "vaultspec.subagent_cli", "--root", str(tmp_path), "serve"].
 
 - **Triage:** High - The ADR implementation will instantly fail CI/CD if these tests are
   not migrated concurrently.
