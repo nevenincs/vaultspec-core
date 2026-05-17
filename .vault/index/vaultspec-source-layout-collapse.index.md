@@ -6,6 +6,7 @@ tags:
 date: '2026-05-17'
 related:
   - '[[2026-05-17-vaultspec-source-layout-collapse-adr]]'
+  - '[[2026-05-17-vaultspec-source-layout-collapse-audit]]'
   - '[[2026-05-17-vaultspec-source-layout-collapse-plan]]'
   - '[[2026-05-17-vaultspec-source-layout-collapse-research]]'
 ---
@@ -19,6 +20,10 @@ Auto-generated index of all documents tagged with `#vaultspec-source-layout-coll
 ### adr
 
 - `2026-05-17-vaultspec-source-layout-collapse-adr` - `vaultspec-source-layout-collapse` adr: `collapse the dev-mode carve-out and relocate bundled content into the package` | (**status:** `accepted`)
+
+### audit
+
+- `2026-05-17-vaultspec-source-layout-collapse-audit` - `vaultspec-source-layout-collapse` audit: `code review verdict pass with five low-medium findings`
 
 ### plan
 

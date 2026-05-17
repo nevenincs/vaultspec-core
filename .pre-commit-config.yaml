@@ -46,7 +46,7 @@ repos:
     pass_filenames: true
     types:
     - markdown
-    files: '^(README\.md|docs/(framework|MCP|CLI)\.md|src/vaultspec_core/builtins/.*\.md)$'
+    files: '^(README\.md|docs/.*\.md|src/vaultspec_core/builtins/.*\.md)$'
   - id: pymarkdown
     name: Lint Markdown style (pymarkdown)
     entry: uv run --no-sync pymarkdown --config .pymarkdown.json scan

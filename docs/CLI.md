@@ -761,7 +761,6 @@ overridden by the `--target` flag.
 | `VAULTSPEC_IO_BUFFER_SIZE`        | int  | `8192`       | I/O read buffer size in bytes                                                                                                                                                                                     |
 | `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int  | `1000000`    | Subprocess stdout capture limit in bytes                                                                                                                                                                          |
 | `VAULTSPEC_LOG_LEVEL`             | str  | `INFO`       | Root log level for the CLI, for example `DEBUG`, `INFO`, or `WARNING`. Overridden by `--debug` when set.                                                                                                          |
-| `VAULTSPEC_ALLOW_DEV_WRITES`      | bool | unset        | Bypass the development-write guard that blocks source-repo writes. Accepts `1`/`true`/`yes`. Use with care - intended for fixture and test automation only.                                                       |
 | `VAULTSPEC_EDITOR`                | str  | `zed -w`     | Editor command for `vaultspec-core spec {rules\|skills\|agents} edit`. Set to your preferred editor, for example `code -w` or `vim`.                                                                              |
 
 ## See also
