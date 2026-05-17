@@ -5,6 +5,7 @@ tags:
   - '#test-framework-hardening'
 date: '2026-05-17'
 related:
+  - '[[2026-05-17-test-framework-hardening-audit]]'
   - '[[2026-05-17-test-framework-hardening-research]]'
 ---
 
@@ -13,6 +14,10 @@ related:
 Auto-generated index of all documents tagged with `#test-framework-hardening`.
 
 ## Documents
+
+### audit
+
+- `2026-05-17-test-framework-hardening-audit` - `test-framework-hardening` audit: `semantic sweep findings and remediation`
 
 ### research
 

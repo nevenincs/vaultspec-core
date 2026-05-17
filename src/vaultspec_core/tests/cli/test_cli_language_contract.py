@@ -30,10 +30,10 @@ pytestmark = [pytest.mark.integration]
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _DOC_PATHS = (
     _REPO_ROOT / "README.md",
-    _REPO_ROOT / ".vaultspec" / "CLI.md",
-    _REPO_ROOT / ".vaultspec" / "README.md",
-    _REPO_ROOT / ".vaultspec" / "MCP.md",
-    *_REPO_ROOT.joinpath(".vaultspec", "rules").rglob("*.md"),
+    _REPO_ROOT / "docs" / "CLI.md",
+    _REPO_ROOT / "docs" / "framework.md",
+    _REPO_ROOT / "docs" / "MCP.md",
+    *_REPO_ROOT.joinpath("src", "vaultspec_core", "builtins").rglob("*.md"),
 )
 
 _INLINE_CODE = re.compile(r"`([^`\n]+)`")
@@ -351,7 +351,7 @@ def test_markdown_cli_signatures_match_live_usage() -> None:
 
 
 def test_cli_handbook_contains_every_live_leaf_signature() -> None:
-    handbook = (_REPO_ROOT / ".vaultspec" / "CLI.md").read_text(encoding="utf-8")
+    handbook = (_REPO_ROOT / "docs" / "CLI.md").read_text(encoding="utf-8")
     missing = [
         _usage_for_command_path(command_path)
         for command_path in _collect_leaf_command_paths(app)

@@ -207,9 +207,10 @@ class TestDoctorDegradedWorkspaces:
             app,
             ["spec", "doctor", "--target", str(installed_workspace)],
         )
-        # Clean workspace should not have hard errors (exit code 2)
-        # Exit code 1 (warnings) is acceptable for test workspaces
-        assert result.exit_code in (0, 1)
+        assert result.exit_code == 0, (
+            f"clean installed workspace reported unhealthy: "
+            f"exit={result.exit_code}\n{result.output}"
+        )
 
     def test_corrupted_manifest_reported(
         self, installed_workspace: Path, runner: CliRunner
@@ -219,8 +220,14 @@ class TestDoctorDegradedWorkspaces:
             app,
             ["spec", "doctor", "--target", str(installed_workspace)],
         )
-        # Corrupted manifest should be reported as an issue
-        assert result.exit_code != 0 or "corrupt" in result.output.lower()
+        output = result.output.lower()
+        assert "corrupt" in output, (
+            f"corrupted manifest not surfaced in doctor output: {result.output}"
+        )
+        assert result.exit_code != 0, (
+            f"corrupted manifest reported but exit code masked as success: "
+            f"exit={result.exit_code}\n{result.output}"
+        )
 
     def test_orphaned_provider_reported(
         self, installed_workspace: Path, runner: CliRunner
@@ -231,12 +238,12 @@ class TestDoctorDegradedWorkspaces:
             ["spec", "doctor", "--target", str(installed_workspace)],
         )
         output = result.output.lower()
-        # Should report the orphaned provider
-        assert (
-            result.exit_code != 0
-            or "orphan" in output
-            or "missing" in output
-            or "warn" in output
+        assert any(token in output for token in ("orphan", "missing", "warn")), (
+            f"orphaned provider not surfaced in doctor output: {result.output}"
+        )
+        assert result.exit_code != 0, (
+            f"orphaned provider reported but exit code masked as success: "
+            f"exit={result.exit_code}\n{result.output}"
         )
 
     def test_untracked_directory_reported(
@@ -248,4 +255,10 @@ class TestDoctorDegradedWorkspaces:
             ["spec", "doctor", "--target", str(installed_workspace)],
         )
         output = result.output.lower()
-        assert result.exit_code != 0 or "untracked" in output or "warn" in output
+        assert "untracked" in output or "warn" in output, (
+            f"untracked directory not surfaced in doctor output: {result.output}"
+        )
+        assert result.exit_code != 0, (
+            f"untracked directory reported but exit code masked as success: "
+            f"exit={result.exit_code}\n{result.output}"
+        )

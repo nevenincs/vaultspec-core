@@ -4,8 +4,8 @@ tags:
   - '#vaultspec-source-layout-collapse'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-vaultspec-source-layout-collapse-adr]]"
-  - "[[2026-05-17-vaultspec-source-layout-collapse-plan]]"
+  - '[[2026-05-17-vaultspec-source-layout-collapse-adr]]'
+  - '[[2026-05-17-vaultspec-source-layout-collapse-plan]]'
 ---
 
 # `vaultspec-source-layout-collapse` audit: `code review verdict pass with five low-medium findings`
