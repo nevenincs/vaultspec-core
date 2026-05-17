@@ -77,8 +77,8 @@ This Phase deletes the walk-up branch and the wheel-probe shortcut in
 editable and wheel installs. The Phase ends when the resolver is a single
 unconditional return.
 
-- [ ] `P04.S19` - delete the wheel-probe shortcut that returns `pkg_dir` when `templates/` exists alongside the module; `src/vaultspec_core/builtins/__init__.py`.
-- [ ] `P04.S20` - delete the walk-up loop that searches for `pyproject.toml` and falls back to the source-repo `.vaultspec/rules/`; `src/vaultspec_core/builtins/__init__.py`.
+- [x] `P04.S19` - delete the wheel-probe shortcut that returns `pkg_dir` when `templates/` exists alongside the module; `src/vaultspec_core/builtins/__init__.py`.
+- [x] `P04.S20` - delete the walk-up loop that searches for `pyproject.toml` and falls back to the source-repo `.vaultspec/rules/`; `src/vaultspec_core/builtins/__init__.py`.
 
 ### Phase `P05` - retire the dev-mode plumbing
 
