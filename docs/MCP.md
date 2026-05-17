@@ -175,7 +175,7 @@ at startup by `configure_logging()`.
 | Document                          | What it covers                                        |
 | --------------------------------- | ----------------------------------------------------- |
 | [Repository README](../README.md) | Project overview, installation, and getting started   |
-| [Framework Manual](./README.md)   | Development workflow, skills, and customization       |
+| [Framework Manual](./framework.md)   | Development workflow, skills, and customization       |
 | [CLI Reference](./CLI.md)         | All commands, flags, and options for `vaultspec-core` |
 
 For bug reports and feature requests, open an issue on the

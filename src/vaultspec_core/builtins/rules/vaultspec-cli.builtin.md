@@ -5,7 +5,8 @@ name: vaultspec-cli
 # Vaultspec Core CLI
 
 This project is vaultspec-managed. See `vaultspec.builtin.md` for framework rules and
-`.vaultspec/README.md` for workflow concepts.
+the [framework manual](https://github.com/wgergely/vaultspec-core/blob/main/docs/framework.md)
+for workflow concepts.
 
 ## Mandate
 
@@ -66,5 +67,7 @@ Forbidden:
 
 ## References
 
-- `.vaultspec/CLI.md` - every command, subcommand, option, and exit code.
-- `.vaultspec/README.md` - framework concepts, workflow, and skill catalog.
+- [CLI reference](https://github.com/wgergely/vaultspec-core/blob/main/docs/CLI.md) -
+  every command, subcommand, option, and exit code.
+- [Framework manual](https://github.com/wgergely/vaultspec-core/blob/main/docs/framework.md) -
+  framework concepts, workflow, and skill catalog.

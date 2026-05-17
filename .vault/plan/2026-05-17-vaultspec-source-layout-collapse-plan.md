@@ -130,19 +130,19 @@ the moved content tree, and strips the `--dev` mentions from the CLI
 command docstrings. The Phase ends when no doc, config, or docstring
 references the old paths.
 
-- [ ] `P07.S45` - retarget the MCP badge link from `./.vaultspec/MCP.md` to `./docs/MCP.md`; `README.md`.
-- [ ] `P07.S46` - retarget the CLI reference prose links from `./.vaultspec/CLI.md` to `./docs/CLI.md`; `README.md`.
-- [ ] `P07.S47` - retarget the MCP reference prose links from `./.vaultspec/MCP.md` to `./docs/MCP.md`; `README.md`.
-- [ ] `P07.S48` - retarget the framework manual prose links from `./.vaultspec/README.md` to `./docs/framework.md`; `README.md`.
-- [ ] `P07.S49` - retarget the intra-docs framework manual cross-reference; `docs/CLI.md`.
-- [ ] `P07.S50` - retarget the intra-docs framework manual cross-reference; `docs/MCP.md`.
-- [ ] `P07.S51` - retarget the `mdformat --check` glob from `.vaultspec/` paths to `docs/` and `src/vaultspec_core/builtins/`; `justfile`.
-- [ ] `P07.S52` - retarget the `pymarkdown scan` glob from `.vaultspec/` paths to `docs/` and `src/vaultspec_core/builtins/`; `justfile`.
-- [ ] `P07.S53` - retarget the lychee link-check glob from `.vaultspec` to `docs` and `src/vaultspec_core/builtins`; `justfile`.
-- [ ] `P07.S54` - retarget the `mdformat` fix-target glob from `.vaultspec/` paths to `docs/` and `src/vaultspec_core/builtins/`; `justfile`.
-- [ ] `P07.S55` - retarget the wrapped-markdown hook file regex from `^(README\.md|\.vaultspec/(README|MCP|CLI)\.md|\.vaultspec/rules/.*\.md)$` to a regex covering `docs/(framework|MCP|CLI)\.md` and `src/vaultspec_core/builtins/.*\.md`; `.pre-commit-config.yaml`.
-- [ ] `P07.S56` - retarget the bundled CLI reference link from `.vaultspec/CLI.md` to the source repository's GitHub URL for `docs/CLI.md`; `src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md`.
-- [ ] `P07.S57` - retarget the bundled framework manual reference link from `.vaultspec/README.md` to the source repository's GitHub URL for `docs/framework.md`; `src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md`.
-- [ ] `P07.S58` - strip the `--dev` flag mention and the source-repo-install example from the `cmd_install` docstring; `src/vaultspec_core/cli/root.py`.
-- [ ] `P07.S59` - strip the `--dev` flag mention and the source-repo-uninstall example from the `cmd_uninstall` docstring; `src/vaultspec_core/cli/root.py`.
-- [ ] `P07.S60` - strip the `--dev` flag mention from the `cmd_sync` docstring; `src/vaultspec_core/cli/root.py`.
+- [x] `P07.S45` - retarget the MCP badge link from `./.vaultspec/MCP.md` to `./docs/MCP.md`; `README.md`.
+- [x] `P07.S46` - retarget the CLI reference prose links from `./.vaultspec/CLI.md` to `./docs/CLI.md`; `README.md`.
+- [x] `P07.S47` - retarget the MCP reference prose links from `./.vaultspec/MCP.md` to `./docs/MCP.md`; `README.md`.
+- [x] `P07.S48` - retarget the framework manual prose links from `./.vaultspec/README.md` to `./docs/framework.md`; `README.md`.
+- [x] `P07.S49` - retarget the intra-docs framework manual cross-reference; `docs/CLI.md`.
+- [x] `P07.S50` - retarget the intra-docs framework manual cross-reference; `docs/MCP.md`.
+- [x] `P07.S51` - retarget the `mdformat --check` glob from `.vaultspec/` paths to `docs/` and `src/vaultspec_core/builtins/`; `justfile`.
+- [x] `P07.S52` - retarget the `pymarkdown scan` glob from `.vaultspec/` paths to `docs/` and `src/vaultspec_core/builtins/`; `justfile`.
+- [x] `P07.S53` - retarget the lychee link-check glob from `.vaultspec` to `docs` and `src/vaultspec_core/builtins`; `justfile`.
+- [x] `P07.S54` - retarget the `mdformat` fix-target glob from `.vaultspec/` paths to `docs/` and `src/vaultspec_core/builtins/`; `justfile`.
+- [x] `P07.S55` - retarget the wrapped-markdown hook file regex from `^(README\.md|\.vaultspec/(README|MCP|CLI)\.md|\.vaultspec/rules/.*\.md)$` to a regex covering `docs/(framework|MCP|CLI)\.md` and `src/vaultspec_core/builtins/.*\.md`; `.pre-commit-config.yaml`.
+- [x] `P07.S56` - retarget the bundled CLI reference link from `.vaultspec/CLI.md` to the source repository's GitHub URL for `docs/CLI.md`; `src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md`.
+- [x] `P07.S57` - retarget the bundled framework manual reference link from `.vaultspec/README.md` to the source repository's GitHub URL for `docs/framework.md`; `src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md`.
+- [x] `P07.S58` - strip the `--dev` flag mention and the source-repo-install example from the `cmd_install` docstring; `src/vaultspec_core/cli/root.py`.
+- [x] `P07.S59` - strip the `--dev` flag mention and the source-repo-uninstall example from the `cmd_uninstall` docstring; `src/vaultspec_core/cli/root.py`.
+- [x] `P07.S60` - strip the `--dev` flag mention from the `cmd_sync` docstring; `src/vaultspec_core/cli/root.py`.

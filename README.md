@@ -3,7 +3,7 @@
 [![Python](https://img.shields.io/badge/python-3.13%2B-blue.svg)](./pyproject.toml)
 [![Continuous integration](https://github.com/wgergely/vaultspec-core/actions/workflows/ci.yml/badge.svg)](https://github.com/wgergely/vaultspec-core/actions/workflows/ci.yml)
 [![Docker](https://github.com/wgergely/vaultspec-core/actions/workflows/docker.yml/badge.svg)](https://github.com/wgergely/vaultspec-core/actions/workflows/docker.yml)
-[![Model Context Protocol](https://img.shields.io/badge/MCP-vaultspec--mcp-informational)](./.vaultspec/MCP.md)
+[![Model Context Protocol](https://img.shields.io/badge/MCP-vaultspec--mcp-informational)](./docs/MCP.md)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
@@ -34,14 +34,14 @@ Two entry points ship with the framework:
 
 - **`vaultspec-core`** is the command-line interface (CLI) that manages your workspace.
   It installs, syncs, and validates framework resources. See the
-  [CLI reference](./.vaultspec/CLI.md) for the full command surface.
+  [CLI reference](./docs/CLI.md) for the full command surface.
 - **MCP server** exposes vault discovery and document creation to Model Context Protocol
   (MCP) clients like Claude Code. Invoke it with
   `uv run python -m vaultspec_core.mcp_server.app`. A `vaultspec-mcp` console script is
   also installed, but module invocation avoids binary locking on Windows. See the
-  [MCP reference](./.vaultspec/MCP.md) for setup and tool documentation.
+  [MCP reference](./docs/MCP.md) for setup and tool documentation.
 
-The [framework manual](./.vaultspec/README.md) walks through the development workflow
+The [framework manual](./docs/framework.md) walks through the development workflow
 and explains how to customize rules, skills, agents, and system prompts.
 
 ______________________________________________________________________
@@ -121,7 +121,7 @@ You can also invoke skills explicitly to start a specific stage. The bundled ski
 `vaultspec-code-review`) read the relevant vault records and structure the AI's output
 accordingly.
 
-The [framework manual](./.vaultspec/README.md) walks through each stage in detail with
+The [framework manual](./docs/framework.md) walks through each stage in detail with
 examples.
 
 ______________________________________________________________________
@@ -167,7 +167,7 @@ vaultspec-core vault graph --feature search-api
 Valid document types are `adr`, `audit`, `exec`, `plan`, `reference`, and `research`.
 Generated feature indexes live in `.vault/index/` and are managed by
 `vaultspec-core vault feature index`. See the
-[CLI reference](./.vaultspec/CLI.md#vault-commands) for the full command surface.
+[CLI reference](./docs/CLI.md#vault-commands) for the full command surface.
 
 ______________________________________________________________________
 
@@ -201,9 +201,9 @@ ______________________________________________________________________
 
 | Guide                                      | What it covers                                        |
 | ------------------------------------------ | ----------------------------------------------------- |
-| [Framework manual](./.vaultspec/README.md) | Development workflow, skills, and customization       |
-| [CLI reference](./.vaultspec/CLI.md)       | All commands, flags, and options for `vaultspec-core` |
-| [MCP reference](./.vaultspec/MCP.md)       | MCP server tools, setup, and configuration            |
+| [Framework manual](./docs/framework.md) | Development workflow, skills, and customization       |
+| [CLI reference](./docs/CLI.md)       | All commands, flags, and options for `vaultspec-core` |
+| [MCP reference](./docs/MCP.md)       | MCP server tools, setup, and configuration            |
 
 ### Getting help
 
