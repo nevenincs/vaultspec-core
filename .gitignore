@@ -26,15 +26,7 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Whitelist .vaultspec/lib
-!/.vaultspec/lib/
-!/.vaultspec/lib/**
-.vaultspec/lib/**/__pycache__/
-.vaultspec/lib/**/*.pyc
-.vaultspec/providers.json
-
 # Auto-generated temp files
-.vaultspec/.tmp/
 tmp/
 
 # PyInstaller
@@ -193,19 +185,13 @@ GEMINI.md
 .claude/
 .gemini/
 
-# Builtins content — copied from .vaultspec/rules/ at build time
-src/vaultspec_core/builtins/*
-!src/vaultspec_core/builtins/__init__.py
-
 # >>> vaultspec-managed (do not edit this block) >>>
 .mcp.json
 .vault/.obsidian/
 .vault/.trash/
 .vault/data/
 .vault/logs/
-.vaultspec/*.lock
-.vaultspec/_snapshots/
-.vaultspec/providers.json
+.vaultspec/
 /.gitignore.lock
 /.mcp.json.lock
 /.pre-commit-config.yaml.lock

@@ -51,9 +51,9 @@ consumer-shape ignore for `.vaultspec/` so the dev repo can install
 vaultspec against itself without polluting `git status`. The Phase ends
 when the tracked tree and the ignore set match the consumer shape.
 
-- [ ] `P02.S12` - remove the `src/vaultspec_core/builtins/*` exclusion and the `!src/vaultspec_core/builtins/__init__.py` whitelist; `.gitignore`.
-- [ ] `P02.S13` - remove the obsolete `.vaultspec/lib/` whitelist block and the `.vaultspec/.tmp/` entry; `.gitignore`.
-- [ ] `P02.S14` - replace the `.vaultspec/*.lock`, `.vaultspec/_snapshots/`, and `.vaultspec/providers.json` entries inside the vaultspec-managed block with a single bare `.vaultspec/` entry; `.gitignore`.
+- [x] `P02.S12` - remove the `src/vaultspec_core/builtins/*` exclusion and the `!src/vaultspec_core/builtins/__init__.py` whitelist; `.gitignore`.
+- [x] `P02.S13` - remove the obsolete `.vaultspec/lib/` whitelist block and the `.vaultspec/.tmp/` entry; `.gitignore`.
+- [x] `P02.S14` - replace the `.vaultspec/*.lock`, `.vaultspec/_snapshots/`, and `.vaultspec/providers.json` entries inside the vaultspec-managed block with a single bare `.vaultspec/` entry; `.gitignore`.
 
 ### Phase `P03` - retarget the build system
 
