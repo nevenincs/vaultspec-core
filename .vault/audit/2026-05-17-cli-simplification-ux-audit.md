@@ -245,3 +245,154 @@ structural break.
   `uninstall` requires today. The current asymmetry punishes the more
   common operation (install in the wrong directory) and protects the
   less common one (intentional removal).
+
+## Findings
+
+### Round 2 — revision, supersession, override
+
+#### B3. Blocker — no `supersede` verb anywhere in the CLI
+
+For a tool whose elevator pitch is "spec-driven development with a paper
+trail", the lack of any first-class way to express "this decision
+supersedes that one" is structural, not cosmetic. Xavi was briefed by
+his imagined team lead to "mark yesterday's design decision as
+superseded by a new one" — natural English for the exact thing the
+framework is built around. He walked every `--help` page and found
+nothing. The audit trail had to be reconstructed from three unrelated
+mechanisms:
+
+- Hand-editing the prior ADR's H1 status token (`accepted` → `superseded`)
+  in body prose, which is the only place the framework's link rules
+  allow manual edits.
+- `--related` back-pointers on the new ADR, plan, and audit.
+- Body prose in the new documents that names the supersession
+  explicitly.
+
+The `--related` field is flat. It cannot distinguish "supersedes" from
+"informs" from "authorised-by" from "refines". The only reason a
+reader can follow the chain at all is that the auto-generated feature
+index renders each document's H1 verbatim, so the supersession token
+flows through by accident. The intentional path through the CLI does
+not surface the relationship.
+
+#### B4. Blocker — same-feature, same-day documents collide on filename
+
+A second ADR (or plan, or research note) for the same feature on the
+same day cannot be created via `vault add <type> --feature <tag>`. The
+generated filename is `YYYY-MM-DD-{feature}-{type}.md` and the
+existing file blocks the write. The only escape Xavi found was to
+override `--date` to a future date, which puts a lie into the
+artifact's frontmatter. Within-day revisions are a normal occurrence
+when supersession is the workflow's first-class operation (B3); the
+filename scheme makes them impossible to record honestly.
+
+#### B5. Sharp/Blocker — `tier promote` writes literal `TODO` placeholders into the doc
+
+A direct cousin of B2 from Round 1. Running `vault plan tier promote
+... --target L2` with the minimum flags writes a synthesised phase
+containing `TODO: Phase title` as the phase title. The very next
+`vault check all` then flags the document as failing. The scaffolder
+emits an invalid value that the validator on the same surface
+rejects. As with `vault add plan` and `tier: L{#}`, the right call is
+to require or accept the missing values up front, not paste a TODO
+and hope.
+
+#### B6. Sharp — `vault plan step add` body destruction reproduced a third time
+
+Joan reproduced this in Round 1 against tag-search. Xavi reproduced it
+in Round 1 against snippets. Xavi reproduced it again in Round 2
+against the new SQLite plan. Three independent reproductions across
+two agents and two sandboxes. The plan-step add path silently rewrites
+the document body and discards author-written prose sections.
+
+#### S7. Sharp — retired phase IDs cannot be reused
+
+`vault plan phase renumber P01 --to P02` retires the identifier `P01`
+permanently. Joan tried to chain two renumbers (`P01 → P02`, then
+`P01a → P01`) to clean up the alpha-suffix that `phase insert
+--before` had produced; the second renumber failed because `P01` is
+retired. The retirement semantics are not surfaced in `--help` and
+the recovery path the user reaches for first is closed. Related to
+the existing open issue `#109`.
+
+#### S8. Sharp — outcome vocabulary across the plan-revision surface is incoherent
+
+Joan collected seven distinct result words from one noun's verbs:
+`Closed`, `Retired`, `Renumbered`, `Promoted`, `Inserted`, `Added`,
+`Moved`. The grammar is inconsistent — some are past-perfect verbs,
+some are simple past, some refer to the operation performed, some
+refer to the state of the affected entity. A normalised set would
+have made all seven readable at a glance and made `--json` output
+straightforward.
+
+### Smaller paper cuts (Round 2)
+
+- `vault add exec` template emits both `step_id: '{S##}'` and a
+  literal `<display-path>` token, and substitutes `--title` into the
+  example display-paths twice. Joan and Xavi both flagged it on first
+  invocation. The CLI has plan-parsing surface to do better but does
+  not connect it to exec scaffolding.
+- `vault plan step check` is idempotent and silent. Running it twice
+  on an already-closed step gives no indication of whether anything
+  changed. A `(no change)` annotation would make the silence less
+  ambiguous.
+- `vault feature index` regenerates without a "what changed" line.
+  When the regeneration is part of a fix-up sequence, the user has no
+  signal whether the regeneration mattered.
+- `<!-- RETIRED: P01, S01 -->` survives `vault check annotations --fix`
+  (positive — the stripper has a structural-metadata discriminator)
+  but the discriminator is undocumented. New hires cannot predict
+  what the fix step will and will not preserve.
+- `vault plan step add --phase` enforces phase membership at command
+  time, but the enforcement is not surfaced in the help text. Joan
+  flagged this after trial-and-error.
+- Positive: `vault plan step move --after` is the cleanest revision
+  verb either agent met across both rounds. Use it as the pattern
+  template for normalising the rest of the revision surface.
+- Positive: monotonically allocated canonical step IDs make plan
+  history easy to reason about, even when intermediate IDs retire.
+
+### Override semantics — emergent, not designed
+
+Xavi's reconstruction of the supersession trail worked only because
+the feature index regenerates from H1 lines. The override story is
+therefore an emergent property of one specific renderer, not a
+designed semantic. If a future change moves the index off H1 parsing,
+the trail breaks silently. The right fix is to make supersession a
+first-class concept (frontmatter field `supersedes:`, CLI verb
+`vault adr supersede <old> --by <new>` or similar) so the relationship
+is data, not prose.
+
+## Recommendations
+
+### Highest leverage (updated)
+
+- Make supersession a first-class concept (B3). Add a frontmatter
+  relationship type beyond flat `related:` and a CLI verb that writes
+  it. The whole framework is built on relationship semantics; this
+  one cannot be inferred from prose.
+- Allow multiple same-feature documents per day (B4). Either let
+  `vault add <type>` accept a `--slug` suffix, or auto-append a
+  monotonic suffix when a collision would occur. Forcing date fakery
+  defeats the audit trail.
+- Stop emitting TODO/placeholder values from scaffolders (B5, B2).
+  Either require the missing inputs up front or refuse to write the
+  document until they are supplied.
+- Make `vault plan step add` preserve author prose, or surface the
+  rewrite explicitly (B6). Three reproductions across two agents and
+  two sandboxes is decisive evidence.
+
+### Vocabulary and shape (updated)
+
+- Normalise outcome verbs across the plan-revision surface (S8).
+  `step move --after` is the template; align the rest of the surface
+  to that shape.
+- Document or remove retirement semantics for phase / step IDs (S7).
+  The current behavior is correct in spirit (you cannot accidentally
+  reuse a retired identifier) but invisible in `--help`.
+
+### Discoverability (updated)
+
+- Surface `vault repair`, `vault feature index`, and `vault check
+  annotations --fix` as the recommended post-revision pipeline. Right
+  now an agent has to discover the regen-and-recheck loop by trial.
