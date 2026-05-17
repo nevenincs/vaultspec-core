@@ -186,6 +186,10 @@ GEMINI.md
 .gemini/
 
 # >>> vaultspec-managed (do not edit this block) >>>
+.agents/
+.claude/
+.codex/
+.gemini/
 .mcp.json
 .vault/.obsidian/
 .vault/.trash/
@@ -195,4 +199,7 @@ GEMINI.md
 /.gitignore.lock
 /.mcp.json.lock
 /.pre-commit-config.yaml.lock
+AGENTS.md
+CLAUDE.md
+GEMINI.md
 # <<< vaultspec-managed <<<

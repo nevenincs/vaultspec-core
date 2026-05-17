@@ -527,9 +527,7 @@ def cmd_sync(
     from vaultspec_core.core.exceptions import VaultSpecError
 
     try:
-        results = sync_provider(
-            provider, dry_run=dry_run, force=force, skip=set(skip)
-        )
+        results = sync_provider(provider, dry_run=dry_run, force=force, skip=set(skip))
     except VaultSpecError as exc:
         _handle_error(exc)
         return

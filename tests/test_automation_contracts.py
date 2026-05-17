@@ -301,12 +301,13 @@ def test_prod_delegates_to_cli() -> None:
     assert "uv run vaultspec-core" in justfile
 
 
-def test_provider_capability_enum_covers_all_tools() -> None:
+def test_provider_capability_enum_covers_all_tools(tmp_path: Path) -> None:
     """Every Tool enum member must have a ToolConfig with non-empty capabilities."""
     from vaultspec_core.core.enums import Tool
     from vaultspec_core.core.types import init_paths
 
-    ctx = init_paths(ROOT)
+    (tmp_path / ".vaultspec").mkdir()
+    ctx = init_paths(tmp_path)
 
     for tool in Tool:
         cfg = ctx.tool_configs.get(tool)
@@ -314,12 +315,13 @@ def test_provider_capability_enum_covers_all_tools() -> None:
         assert cfg.capabilities, f"Tool {tool.value} has empty capabilities"
 
 
-def test_provider_capability_consistency() -> None:
+def test_provider_capability_consistency(tmp_path: Path) -> None:
     """Capability declarations must be consistent with ToolConfig fields."""
     from vaultspec_core.core.enums import ProviderCapability, Tool
     from vaultspec_core.core.types import init_paths
 
-    ctx = init_paths(ROOT)
+    (tmp_path / ".vaultspec").mkdir()
+    ctx = init_paths(tmp_path)
 
     for tool in Tool:
         cfg = ctx.tool_configs.get(tool)
@@ -345,12 +347,13 @@ def test_provider_capability_consistency() -> None:
             )
 
 
-def test_every_capability_has_at_least_one_provider() -> None:
+def test_every_capability_has_at_least_one_provider(tmp_path: Path) -> None:
     """Each ProviderCapability value must map to at least one provider."""
     from vaultspec_core.core.enums import ProviderCapability, Tool
     from vaultspec_core.core.types import init_paths
 
-    ctx = init_paths(ROOT)
+    (tmp_path / ".vaultspec").mkdir()
+    ctx = init_paths(tmp_path)
 
     for cap in ProviderCapability:
         providers = [

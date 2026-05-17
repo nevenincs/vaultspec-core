@@ -73,7 +73,12 @@ def test_code_review_guidance_persists_audit_artifacts() -> None:
         / "skills"
         / "vaultspec-code-review"
         / "SKILL.md",
-        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "agents" / "vaultspec-code-reviewer.md",
+        PROJECT_ROOT
+        / "src"
+        / "vaultspec_core"
+        / "builtins"
+        / "agents"
+        / "vaultspec-code-reviewer.md",
     )
     stale_patterns = (
         ".vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-review.md",
@@ -125,7 +130,12 @@ def test_curator_guidance_matches_current_frontmatter_contract() -> None:
         / "skills"
         / "vaultspec-curate"
         / "SKILL.md",
-        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "agents" / "vaultspec-docs-curator.md",
+        PROJECT_ROOT
+        / "src"
+        / "vaultspec_core"
+        / "builtins"
+        / "agents"
+        / "vaultspec-docs-curator.md",
     )
     stale_patterns = (
         "mandatory comment `# ALLOWED TAGS",
