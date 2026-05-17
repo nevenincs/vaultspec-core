@@ -392,8 +392,7 @@ class TestDoctorV1Manifest:
         # present or surfaces a recoverable warning. Exit code 2 is the
         # Typer crash signal and must never be tolerated here.
         assert result.exit_code in (0, 1), (
-            f"v1 manifest crashed doctor: exit={result.exit_code}\n"
-            f"{result.output}"
+            f"v1 manifest crashed doctor: exit={result.exit_code}\n{result.output}"
         )
         assert "framework" in result.output.lower()
 

@@ -110,8 +110,7 @@ class TestSpecCliFallthrough:
         )
         assert "Vault Check" in result.output
         assert "fix:" in result.output, (
-            f"synthetic corpus warnings did not surface fix hints: "
-            f"{result.output}"
+            f"synthetic corpus warnings did not surface fix hints: {result.output}"
         )
 
     def test_unknown_command_fails(self, runner, synthetic_project):
