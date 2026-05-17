@@ -64,10 +64,10 @@ publish workflow guard. The Phase ends when a clean `uv build` produces a
 wheel that ships the bundled content at `vaultspec_core/builtins/` purely
 via package discovery.
 
-- [ ] `P03.S15` - remove the sdist force-include block that mapped `.vaultspec/rules` onto itself; `pyproject.toml`.
-- [ ] `P03.S16` - remove the wheel force-include block that mapped `.vaultspec/rules` to `vaultspec_core/builtins`; `pyproject.toml`.
-- [ ] `P03.S17` - repoint the `Documentation` project URL from `.vaultspec/README.md` to `docs/framework.md`; `pyproject.toml`.
-- [ ] `P03.S18` - retarget the wheel-precondition guard from `.vaultspec/rules` to `src/vaultspec_core/builtins`; `.github/workflows/publish.yml`.
+- [x] `P03.S15` - remove the sdist force-include block that mapped `.vaultspec/rules` onto itself; `pyproject.toml`.
+- [x] `P03.S16` - remove the wheel force-include block that mapped `.vaultspec/rules` to `vaultspec_core/builtins`; `pyproject.toml`.
+- [x] `P03.S17` - repoint the `Documentation` project URL from `.vaultspec/README.md` to `docs/framework.md`; `pyproject.toml`.
+- [x] `P03.S18` - retarget the wheel-precondition guard from `.vaultspec/rules` to `src/vaultspec_core/builtins`; `.github/workflows/publish.yml`.
 
 ### Phase `P04` - collapse the `_builtins_root` resolver
 

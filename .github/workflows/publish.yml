@@ -31,10 +31,10 @@ jobs:
       - name: Install Python
         run: uv python install 3.13
 
-      - name: Verify .vaultspec/rules present
+      - name: Verify bundled builtins present
         run: |
-          if [ ! -d ".vaultspec/rules" ]; then
-            echo "::error::.vaultspec/rules is missing - wheel build will fail"
+          if [ ! -d "src/vaultspec_core/builtins/templates" ]; then
+            echo "::error::src/vaultspec_core/builtins/ is missing canonical content - wheel build will fail"
             exit 1
           fi
 
