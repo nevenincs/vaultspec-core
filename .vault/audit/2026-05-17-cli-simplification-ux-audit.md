@@ -716,3 +716,42 @@ systemic gap in how the CLI lets a project mutate its memory.
   per-machine state.
 
 ### Vocabulary, shape, and machine-readable outputs
+
+## Translation — findings to ADRs
+
+Every finding cluster in this audit has been formalised into a
+sibling ADR (and supporting research note) under its own feature
+tag, per the framework's own pipeline. The mapping below is the
+single-source-of-truth index from finding to architectural
+decision. References use backtick-quoted stems rather than
+wiki-links so cross-feature provenance lives in document bodies
+and survives the archive verb (per the memory-lifecycle ADR's
+fix).
+
+| Cluster | Findings | ADR feature tag |
+|---|---|---|
+| Memory-lifecycle verbs | B3, B9, Bridge Gap | `cli-memory-lifecycle` |
+| Spec-layer gitignore reversal | S5 (Round 1) | `cli-spec-gitignore` |
+| Sync-shaped vocabulary normalisation | S2, S8, S10 | `cli-sync-vocabulary` |
+| Scaffolder integrity | B2, B5 | `cli-scaffolder-integrity` |
+| Plan-body preservation | B6 | `cli-plan-body-preservation` |
+| Exec per-step records | B1 | `cli-exec-step-records` |
+| Spec edit safety | B7 | `cli-spec-edit-safety` |
+| Rename integrity | B8 | `cli-rename-integrity` |
+| Spec CRUD parity | S9, S15, S16 | `cli-spec-crud-parity` |
+| Next-step hints / discoverability | S3, Round 1 [20] | `cli-next-step-hints` |
+| Destructive blast-radius gating | S4, S14 | `cli-blast-radius-gating` |
+| Machine-readable output consistency | S19 | `cli-json-consistency` |
+| Duplicate-surface consolidation | S12, S13, Round 1 [13] | `cli-surface-consolidation` |
+| Residual paper cuts | Round 1 [03], [06], [18], Round 3a [53], [54], [57], [58], Round 3b S20 | `cli-paper-cuts` |
+
+Each ADR is paired with a research synthesis note under the same
+feature tag. Each ADR includes a Companion language updates
+section that names the rule files, agent personas, templates,
+and manual sections that must change alongside the code. This is
+the dual-track translation the audit's findings demand: code
+changes for the bugs, language changes for the framing.
+
+The loop the user opened on this audit terminates here on the
+ADR list. Downstream work — plans, exec records, implementation —
+flows out of each ADR via the framework's own pipeline.
