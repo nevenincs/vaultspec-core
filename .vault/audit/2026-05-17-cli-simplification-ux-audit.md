@@ -396,3 +396,161 @@ is data, not prose.
 - Surface `vault repair`, `vault feature index`, and `vault check
   annotations --fix` as the recommended post-revision pipeline. Right
   now an agent has to discover the regen-and-recheck loop by trial.
+
+## Findings
+
+### Round 3a — spec customisation surface (Joan)
+
+Methodology note: Joan reached the spec subtree only because his round-3
+brief told him to. Across rounds 1 and 2 he authored a full feature
+through to `vault check all` clean without ever reaching for
+`spec rules`, `spec skills`, `spec agents`, `spec system`, `spec hooks`,
+or `spec mcps`. That observation is itself a finding (see "Bridge gap"
+below) and a confirmation of the framing problem: the spec tree is not
+on the path from the pipeline.
+
+Once accessed under explicit prompting, the surface produced its own
+substantial friction.
+
+#### B7. Blocker — `spec rules edit` silently fails
+
+The verb hardcodes `zed` as the editor binary and ignores `$EDITOR` /
+`$VISUAL`. With no `zed` available, the command emits a Python
+traceback to stderr and **exits 0**. A pre-commit hook or CI step that
+relies on `spec * edit` exit codes will silently miss every failure.
+An internal configuration object exposes `editor` (Joan saw the
+attribute in the traceback) but no CLI verb surfaces it — there is no
+`vaultspec-core config get editor` or equivalent. Workaround discovered
+by Joan: write directly to `.vaultspec/rules/<group>/<file>.md`, since
+`spec * show` and `spec * sync` are file readers. The entire `edit`
+verb is therefore optional today.
+
+#### B8. Blocker — `rename` produces frontmatter desync
+
+After `spec skills rename A B`, `spec skills list` shows `B`. Yet
+`spec skills show B` returns a body whose `name:` frontmatter field
+still says `A`. The verb renames the file but does not update the
+frontmatter the file declares about itself. Any downstream consumer
+that trusts the filename and any that trusts the frontmatter will
+disagree silently. The same path runs for `spec rules rename` and
+`spec agents rename`.
+
+#### S9. Sharp — CRUD parity is uneven across spec resource types
+
+`spec rules`, `spec skills`, and `spec agents` look like a noun
+trinity that should share the same verb shape, but the `add` flag
+sets diverge: `rules add` accepts `--content`, `skills add` and
+`agents add` accept `--description`. The output verbs also diverge
+across the three. `spec mcps` has a `status` verb that `rules`,
+`skills`, and `agents` do not. `spec system` is its own shape entirely.
+Same-shaped nouns, different lifecycles.
+
+#### S10. Sharp — five distinct sync vocabularies across five sync-shaped surfaces
+
+Joan collected: `added` and `skipped` from `spec * sync`, `updated`
+from top-level `sync`, `re-seeded` from `install --upgrade`, and
+`new` from `install --dry-run`. Five vocabularies on five surfaces
+that ostensibly do the same conceptual thing — reconcile state in one
+place against state in another. Round 1's S2 hypothesis is now backed
+by decisive evidence.
+
+#### S11. Sharp — `revert` is restoration, not undo; semantics are undocumented
+
+`spec rules revert <authored-rule>` fails with a terse error. The verb
+applies only to customised builtins; for authored content the right
+verb is `remove`. The distinction is invisible in `--help`. A user
+who customises a rule, then changes their mind, expects "revert" to
+mean "undo my change". Today it means "drop in the framework's copy
+over yours". The word does not match the operation.
+
+#### S12. Sharp — `spec rules sync` rejects a provider positional the top-level `sync` accepts
+
+`vaultspec-core sync claude` accepts the provider. `vaultspec-core
+spec rules sync claude` rejects it. Same verb, two incompatible
+argument schemas across two surfaces, no `--help` text reconciling them.
+
+#### S13. Sharp — `spec * sync` duplicates a slice of top-level `sync`
+
+For every group `g` in `{rules, skills, agents, system, mcps}`,
+`vaultspec-core spec g sync` produces output that overlaps
+significantly with `vaultspec-core sync`. The relationship between
+the granular and the global surfaces is unstated. Should pre-commit
+call the global form or the granular form? The CLI does not say.
+
+#### S14. Sharp — `install --upgrade` has no preview; success line omits the preservation guarantee
+
+`install --upgrade --dry-run` emits an empty preview. The actual
+run preserved all three of Joan's authored resources cleanly and
+re-seeded 42 builtin files. That is correct behaviour, but the
+success line (`Re-seeded 42 builtin files. Upgrade complete.`)
+never advertised that authored content was preserved. The highest
+blast radius verb in the CLI ships without a preview and without
+explicit preservation messaging.
+
+#### S15. Sharp — `spec hooks` is CRUD-less
+
+`spec hooks list` enumerates events; `spec hooks run` invokes them.
+There is no `add`, no `edit`, no `enable`, no `disable`. The
+example hook ships disabled and the only way to turn it on is to
+edit the configuration directly. The verb pair invites the natural
+question "how do I add a hook?" and the surface has no answer.
+
+#### S16. Sharp — `spec mcps` has `status`; the other spec noun groups do not
+
+A verb that exists on one same-shaped noun and not on the others is
+the canonical sign of unfinished CRUD parity. Either `status` is
+useful (in which case rules / skills / agents should have it) or it
+is not (in which case mcps should not).
+
+#### S17. Sharp — `vault check all` + `spec doctor` together still leave the operator guessing
+
+Joan's terminal state was `vault check all` exit 0 and `spec doctor`
+exit 0. He noted he still could not answer "am I safe to commit?"
+without a third command. There is no single "is the workspace
+green?" entry point.
+
+### Smaller paper cuts (Round 3a)
+
+- `spec * add` prints `... updated` on a fresh create. The state
+  transition is creation; the past-tense verb is `created`, not
+  `updated`.
+- Positive: `spec doctor` is well-shaped, with one verbosity gap noted
+  by Joan. The verb does not overlap with `vault repair` despite
+  surface similarity.
+- `spec system show` describes a sync target that does not exist on
+  the workspace Joan tested against. The verb is wired before the
+  feature is.
+- `spec hooks list` truncates the event-name column; `spec hooks run`
+  requires the untruncated name. Output column truncation breaks the
+  input contract.
+- `migrations status` claims `applied 0.1.17 index_subfolder`. Only
+  one migration is registered. Joan flagged the report as suspicious
+  but could not confirm without source.
+- Outcome line shape varies even within the same group:
+  `Rule source updated` versus `Reverted rule`. Subject-first vs.
+  verb-first.
+
+### Bridge gap (Round 3a — meta-finding)
+
+Across rounds 1 and 2 (six agent days, two sandboxes, full feature
+implementations end-to-end), neither agent reached the `spec` subtree
+organically. Round 3a required an explicit instruction. The framing
+problem first surfaced in Round 1 (S5 — `.vault/` versus `.vaultspec/`
+naming and opposite gitignore policies) is therefore not a wording
+nit; it is a structural barrier between the pipeline (`vault`) and
+the durable rule layer (`spec`).
+
+Concretely: the framework's natural-language pipeline verbs
+("research", "decide", "plan", "execute", "review") all map to
+`vault add <type>`. None maps to `spec rules add` or any of its
+siblings. There is no verb in the pipeline for "we just learned
+something durable; codify it as a project rule so future agents
+inherit it". This is the gap that prevents the spec subtree from
+being touched in the natural course of work.
+
+The implementation of the spec surface exists. The path to reach it
+from the pipeline does not.
+
+## Recommendations
+
+### Highest leverage (updated again)
