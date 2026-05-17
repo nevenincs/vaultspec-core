@@ -1,4 +1,4 @@
-"""Guard against drift between the CLI command surface and `.vaultspec/CLI.md`.
+"""Guard against drift between the CLI command surface and `docs/CLI.md`.
 
 Walks the Typer app tree, invokes ``--help`` on every visible leaf command, and
 asserts that every command name and every non-global option name appears in
@@ -24,7 +24,7 @@ pytestmark = [pytest.mark.integration]
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
-_HANDBOOK = _REPO_ROOT / ".vaultspec" / "CLI.md"
+_HANDBOOK = _REPO_ROOT / "docs" / "CLI.md"
 
 # Options carried through the global options table or otherwise inherited on
 # essentially every subcommand. Documenting them once at the top of CLI.md is

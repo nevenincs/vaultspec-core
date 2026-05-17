@@ -28,7 +28,7 @@ def test_top_level_doc_guidance_omits_phase_filename_segment() -> None:
         "yyyy-mm-dd-{feature}-" + "{phase}-adr.md",
         "yyyy-mm-dd-<feature>-" + "<phase>-adr.md",
     )
-    checked_roots = (PROJECT_ROOT / ".vaultspec" / "rules",)
+    checked_roots = (PROJECT_ROOT / "src" / "vaultspec_core" / "builtins",)
 
     offenders: list[str] = []
     for root in checked_roots:
@@ -48,8 +48,8 @@ def test_rule_guidance_uses_canonical_file_placeholders() -> None:
         "YYYY-MM-DD-<Feature>",
     )
     checked_roots = (
-        PROJECT_ROOT / ".vaultspec" / "rules" / "skills",
-        PROJECT_ROOT / ".vaultspec" / "rules" / "agents",
+        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "skills",
+        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "agents",
     )
 
     offenders: list[str] = []
@@ -67,12 +67,13 @@ def test_code_review_guidance_persists_audit_artifacts() -> None:
     """Code-review reports use the audit template and audit directory."""
     checked_paths = (
         PROJECT_ROOT
-        / ".vaultspec"
-        / "rules"
+        / "src"
+        / "vaultspec_core"
+        / "builtins"
         / "skills"
         / "vaultspec-code-review"
         / "SKILL.md",
-        PROJECT_ROOT / ".vaultspec" / "rules" / "agents" / "vaultspec-code-reviewer.md",
+        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "agents" / "vaultspec-code-reviewer.md",
     )
     stale_patterns = (
         ".vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-review.md",
@@ -99,8 +100,8 @@ def test_exec_step_guidance_is_not_l2_only() -> None:
         ".vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-<step>.md",
     )
     checked_roots = (
-        PROJECT_ROOT / ".vaultspec" / "rules" / "skills",
-        PROJECT_ROOT / ".vaultspec" / "rules" / "agents",
+        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "skills",
+        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "agents",
     )
 
     offenders: list[str] = []
@@ -118,12 +119,13 @@ def test_curator_guidance_matches_current_frontmatter_contract() -> None:
     """Curator instructions should not reintroduce removed YAML guidance."""
     checked_paths = (
         PROJECT_ROOT
-        / ".vaultspec"
-        / "rules"
+        / "src"
+        / "vaultspec_core"
+        / "builtins"
         / "skills"
         / "vaultspec-curate"
         / "SKILL.md",
-        PROJECT_ROOT / ".vaultspec" / "rules" / "agents" / "vaultspec-docs-curator.md",
+        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "agents" / "vaultspec-docs-curator.md",
     )
     stale_patterns = (
         "mandatory comment `# ALLOWED TAGS",
@@ -147,9 +149,9 @@ def test_curator_guidance_matches_current_frontmatter_contract() -> None:
 def test_rule_guidance_does_not_forbid_template_extra_tags() -> None:
     """Template guidance allows tags beyond the required pair."""
     checked_roots = (
-        PROJECT_ROOT / ".vaultspec" / "rules" / "skills",
-        PROJECT_ROOT / ".vaultspec" / "rules" / "agents",
-        PROJECT_ROOT / ".vaultspec" / "rules" / "rules",
+        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "skills",
+        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "agents",
+        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "rules",
     )
 
     offenders: list[str] = []
@@ -170,9 +172,9 @@ def test_rule_guidance_uses_template_quote_style() -> None:
         'tags: ["#',
     )
     checked_roots = (
-        PROJECT_ROOT / ".vaultspec" / "rules" / "skills",
-        PROJECT_ROOT / ".vaultspec" / "rules" / "agents",
-        PROJECT_ROOT / ".vaultspec" / "rules" / "rules",
+        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "skills",
+        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "agents",
+        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "rules",
     )
 
     offenders: list[str] = []

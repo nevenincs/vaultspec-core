@@ -116,12 +116,12 @@ location, and repoints the handbook drift test at the new docs path. The
 Phase ends when no production code or test reads canonical content from
 the old `.vaultspec/rules/` location.
 
-- [ ] `P06.S39` - retarget the `_AGENTS_SRC` constant used to parametrise the agents-render regression suite; `src/vaultspec_core/tests/cli/test_agents_render.py`.
-- [ ] `P06.S40` - retarget the canonical-content path fixtures that assert on the skill and agent rule contracts; `src/vaultspec_core/tests/cli/test_vaultspec_rule_contracts.py`.
-- [ ] `P06.S41` - retarget the canonical-content glob that asserts on `*.builtin.md` presence during install conditions; `src/vaultspec_core/tests/cli/test_install_conditions.py`.
-- [ ] `P06.S42` - retarget the canonical-content glob that walks the rules subtree from the ambiguous-states regression suite; `src/vaultspec_core/tests/cli/test_ambiguous_states.py`.
-- [ ] `P06.S43` - retarget the canonical-content glob inside the shared workspace factory helper; `src/vaultspec_core/tests/cli/workspace_factory.py`.
-- [ ] `P06.S44` - retarget the `_HANDBOOK` constant in the CLI handbook drift guard; `src/vaultspec_core/tests/cli/test_cli_handbook_drift.py`.
+- [x] `P06.S39` - retarget the `_AGENTS_SRC` constant used to parametrise the agents-render regression suite; `src/vaultspec_core/tests/cli/test_agents_render.py`.
+- [x] `P06.S40` - retarget the canonical-content path fixtures that assert on the skill and agent rule contracts; `src/vaultspec_core/tests/cli/test_vaultspec_rule_contracts.py`.
+- [x] `P06.S41` - retarget the canonical-content glob that asserts on `*.builtin.md` presence during install conditions; `src/vaultspec_core/tests/cli/test_install_conditions.py`.
+- [x] `P06.S42` - retarget the canonical-content glob that walks the rules subtree from the ambiguous-states regression suite; `src/vaultspec_core/tests/cli/test_ambiguous_states.py`.
+- [x] `P06.S43` - retarget the canonical-content glob inside the shared workspace factory helper; `src/vaultspec_core/tests/cli/workspace_factory.py`.
+- [x] `P06.S44` - retarget the `_HANDBOOK` constant in the CLI handbook drift guard; `src/vaultspec_core/tests/cli/test_cli_handbook_drift.py`.
 
 ### Phase `P07` - update documentation cross-references
 
