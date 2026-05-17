@@ -551,6 +551,168 @@ being touched in the natural course of work.
 The implementation of the spec surface exists. The path to reach it
 from the pipeline does not.
 
+### Round 3b — archive, parallel features, machine-readable outputs (Xavi)
+
+Xavi's round-3 brief delivered three threads in parallel: archive the
+snippets feature ("retire / archive"), develop two new features
+(exports, stats) in alternation under context-switching pressure, and
+survey `--json` outputs across nine commands for CI usability. The
+brief also told him explicitly that the paper trail had to stay
+readable.
+
+#### B9. Critical blocker — `vault feature archive` is structurally broken
+
+The single most severe finding of the audit. Five compounding failures
+in one verb:
+
+- **No `--dry-run`.** The only first-class memory-retirement verb in
+  the CLI cannot be previewed. Three other vault verbs (`add`, `sync`,
+  `check`, plus `install`) all expose `--dry-run`; archive does not.
+- **No reversal verb.** No `vault feature unarchive`, no
+  `vault feature restore`, no path through the CLI to undo. Archive
+  is one-way from the user's perspective.
+- **Cross-feature `--related` wiki-links break silently.** Xavi
+  authored exports and stats with `--related 2026-05-18-snippets-adr`
+  pointing at the round-2 supersession ADR — exactly the kind of
+  provenance link the team lead said must stay readable. After
+  archiving snippets, all four of those links became dangling. The
+  CLI emitted no warning at archive time; `vault check dangling`
+  discovered the breakage post-hoc.
+- **The only available auto-fix amputates provenance.**
+  `vault repair --dry-run --json` reports the dangling-link
+  diagnostics as `fixable: true`, with a fix description that
+  instructs the user to remove the offending stem from the
+  `related:` frontmatter list. Running repair without
+  `--dry-run` would silently delete the cross-feature provenance the
+  team lead explicitly said must remain. The "fix" is the opposite of
+  what the rule says.
+- **`vault check structure` rejects the directory `vault feature
+  archive` just created.** `Vault violation: Unsupported directory
+  found in .vault/: '_archive'`. `vault repair --json` reports this
+  structure error as `fixable: false`. Two first-class verbs disagree
+  about legal vault layout, and the auditor flatly refuses what the
+  archiver writes.
+
+Plus a sixth, lower-grade: `vault feature archive <typo>` returns
+exit 0 with `No documents found for feature '<typo>'.` Silent
+no-op on a typo means CI cannot catch a mis-typed archive target.
+
+After archive, Xavi's vault is in a permanent error state: `vault
+check all` exits 1 with five errors that no clean-fix path can
+resolve. The lead's expectation ("trail should stay readable") and
+the CLI's enforcement ("vault check fails after archive, fix means
+deleting links") are in direct conflict. The verb the lead invoked
+by name does exactly what the lead said not to do.
+
+#### S18. Sharp (positive) — parallel features work cleanly
+
+Two simultaneous features (`exports`, `stats`) with same-day
+documents did not collide. The filename schema includes the feature
+segment, so cross-feature same-day collisions do not exist. Xavi
+alternated `vault plan step add` invocations between the two plans
+(`exports S01`, `stats S01`, `exports S02`, `stats S02`, ...) for
+eight calls; each step landed on the correct plan with the correct
+identifier, no cross-talk, no implicit "active plan" state. The CLI
+is fully stateless across plans. Plan-revision under
+context-switching pressure works.
+
+This is the framework's structural memory model behaving correctly
+at the leaf level. The breakdown is at the operations on that model
+(B3 supersession, B9 archive), not at the model itself.
+
+#### S19. Sharp — `--json` consistency across the CLI is uneven
+
+Xavi surveyed nine commands. Findings:
+
+- **Gold standard**: `spec mcps status --json` has a top-level
+  `status: "ok"` string. CI gate is a single string compare.
+- **CI-ready**: `migrations status --json`, `vault list --json`,
+  `vault stats --json`, `spec doctor --json`, `vault repair --json`,
+  `vault graph --json`. All have either top-level summary fields or
+  clean per-row arrays.
+- **Weakest**: `vault check all --json` returns a bare per-check
+  array with no top-level success/failure wrapper, no diagnostic
+  counts at the array level, no schema version. To answer "did
+  vault check pass" CI must iterate the array.
+
+Four of the nine outputs carry a top-level status field; the most
+important one for CI (the all-checks gate) does not. The same
+inconsistency shape as the sync-vocabulary fragmentation
+(S2, S8, S10) — design-by-accretion rather than design-by-policy.
+
+#### S20. Sharp — `vault feature list` text rendering bug
+
+The text output trails each feature with an unexplained `plan`
+token: `snippets  9 docs  (adr, audit, index, plan, research) plan`.
+The `--json` form has `has_plan: true` instead. The text render
+appears to be trying to surface plan-ness in a way that does not fit
+the per-feature one-liner.
+
+### Smaller paper cuts (Round 3b)
+
+- `vault feature archive` help text is the thinnest of any
+  vault-mutating verb: one sentence, no mention of destination, no
+  mention of reversibility, no mention of link-graph impact. The
+  verb with the highest blast radius in the vault layer has the
+  least documented surface.
+- `vault add adr` and `vault add plan` template-placeholder warnings
+  (round 1) still fire in round 3, three rounds later, unchanged.
+  Long-standing noise.
+- `tier: L{#}` placeholder on `vault add plan` (round 1 B2) still
+  requires a hand edit in round 3. No `--tier` flag yet.
+- `vault add exec` (round 1 B1) still has no `--step` / `--phase` /
+  `--wave` flag in round 3. Three rounds, same wall.
+- `vault plan step add` body destruction (rounds 1, 2 B6) was avoided
+  in round 3 by ordering Steps before prose. The bug is unchanged;
+  the workaround is now folklore.
+- Positive: `vault graph --json` produces a node-link export
+  immediately consumable by NetworkX-shaped graph tooling. The
+  graph layer is the cleanest machine-readable surface in the CLI.
+- Positive: `migrations status` reports `up_to_date` cleanly even
+  when no run is needed, listing applied migrations as provenance.
+  Migration verbs are uneventful — which is exactly right.
+
+### Memory-lifecycle gap (Round 3 meta-finding)
+
+Across rounds 1, 2, and 3 the framework's memory operations have a
+consistent failure shape:
+
+- **Addition / codification** (the "we just learned X; mandate X for
+  future agents" verb) does not exist in the pipeline. Round 3a
+  Bridge Gap.
+- **Supersession** (the "this decision overrides that one" verb)
+  does not exist (B3). Reconstructed from prose plus flat `--related`
+  links plus emergent feature-index rendering.
+- **Retirement / archive** (the "preserve forever, hide from active
+  view" verb) exists but actively destroys the relationship layer it
+  was supposed to preserve (B9).
+
+Three points on the memory lifecycle, three CLI failures of three
+different shapes. The framework's structural model of memory
+(frontmatter + wiki-links + feature indexes + per-feature isolation)
+is sound; the operations on that model — addition, supersession,
+retirement — are weak at every endpoint. This is independent of the
+vocabulary-fragmentation and tactical-bug findings; it is a
+systemic gap in how the CLI lets a project mutate its memory.
+
 ## Recommendations
 
-### Highest leverage (updated again)
+### Highest leverage (round 3 update)
+
+- Fix `vault feature archive` end to end (B9). At minimum: add
+  `--dry-run`, add `vault feature unarchive`, rewrite incoming
+  `related:` links into `.vault/_archive/` on archive (or teach
+  `vault check dangling` to resolve into the archive before declaring
+  a link dead), reconcile `vault check structure` with
+  `vault feature archive` on legal layout, exit non-zero on typo'd
+  archive targets. The verb the team lead invokes by name must
+  preserve the trail the team lead asked to preserve.
+- Address the memory-lifecycle gap as a single architectural
+  decision rather than three separate bugs. The pipeline needs a
+  first-class verb for each lifecycle event: codify, supersede,
+  retire. Today none of the three is properly surfaced.
+- Reverse the `.vaultspec/` gitignore default (Round 1 S5). The
+  memory mechanism is moot while the framework signals it as
+  per-machine state.
+
+### Vocabulary, shape, and machine-readable outputs
