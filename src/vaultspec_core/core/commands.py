@@ -951,7 +951,10 @@ def install_run(
         run_pending_migrations(path)
 
         sync_target = provider if provider not in ("all", "core") else "all"
-        sync_provider(sync_target, force=True, skip=skip)
+        # `sync_provider` rejects `core` in its skip set (`allow_core=False`).
+        # `install_run` accepts `core` because it skips the framework scaffold;
+        # filter it out before forwarding to the sync pass.
+        sync_provider(sync_target, force=True, skip=skip - {"core"})
 
         if "precommit" not in skip:
             _scaffold_precommit(path)
@@ -1010,7 +1013,9 @@ def install_run(
 
     sync_target = provider if provider not in ("all", "core") else "all"
     try:
-        sync_provider(sync_target, skip=skip)
+        # Filter `core` out: `sync_provider` rejects it, but `install_run`
+        # accepts it as a "framework only, skip provider sync" hint.
+        sync_provider(sync_target, skip=skip - {"core"})
     except (VaultSpecError, OSError) as exc:
         logger.warning("Sync failed during install: %s", exc)
         post_errors.append(f"sync: {exc}")

@@ -4,7 +4,7 @@ tags:
   - '#test-framework-hardening'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-test-framework-hardening-research]]"
+  - '[[2026-05-17-test-framework-hardening-research]]'
 ---
 
 # `test-framework-hardening` audit: `semantic sweep findings and remediation`
@@ -182,8 +182,7 @@ regressions that introduce stray warnings.
 #### TEST-13 - FALSE POSITIVE - `test_audit_coverage.py:427-433` symlink platform probe
 
 The pattern catches `OSError` from `symlink_to` and re-raises as
-`AssertionError("This platform must allow ... do not hide filesystem
-coverage with a runtime skip")`. The intent is explicit: this test
+`AssertionError("This platform must allow ... do not hide filesystem coverage with a runtime skip")`. The intent is explicit: this test
 must NOT silently skip on a platform that lacks symlink support; if
 the symlink call fails, the test must fail loudly. The `from exc`
 chain preserves the OSError context. This is the right pattern, not a

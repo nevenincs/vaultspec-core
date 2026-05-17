@@ -37,7 +37,7 @@ def get_recommended_entries(target: Path) -> list[str]:
     try:
         framework_installed = (target / ".vaultspec").is_dir()
         if framework_installed:
-            entries.add(".vaultspec/")
+            entries.update(DEFAULT_ENTRIES)
         if (target / ".vault").is_dir():
             entries.add(".vault/.obsidian/")
             entries.add(".vault/.trash/")

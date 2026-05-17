@@ -241,6 +241,40 @@ class TestInstallSkip:
             "gemini"
         ), "No provider dirs created when skipping core"
 
+    def test_skip_core_via_cli_does_not_log_sync_failure(
+        self, factory: WorkspaceFactory, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Regression: `install --skip core` must not crash `sync_provider`.
+
+        `sync_provider` rejects `core` in its skip set (`allow_core=False`).
+        `install_run` previously forwarded the unfiltered skip set, which
+        raised `ProviderError`. The error was caught by the post-sync
+        `try/except (VaultSpecError, OSError)` block and silently logged
+        as a warning, so the headline test only verified provider dirs
+        existed.  This test locks the absence of that warning.
+        """
+        import logging
+
+        # Pre-create .vaultspec/ so core scaffold is present.
+        (factory.root / ".vaultspec" / "rules" / "rules").mkdir(
+            parents=True, exist_ok=True
+        )
+        factory.create_gitignore()
+
+        caplog.set_level(logging.WARNING, logger="vaultspec_core.core.commands")
+        factory.install(skip={"core"})
+
+        sync_failures = [
+            record
+            for record in caplog.records
+            if "Sync failed during install" in record.getMessage()
+        ]
+        assert not sync_failures, (
+            "`install --skip core` produced sync-failure warnings; "
+            "sync_provider must receive a skip set with `core` filtered out: "
+            f"{[r.getMessage() for r in sync_failures]}"
+        )
+
     def test_skip_provider_installs_others(self, factory: WorkspaceFactory) -> None:
         factory.create_gitignore()
         result = factory.run("install", "--skip", "claude")
