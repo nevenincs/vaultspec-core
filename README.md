@@ -41,8 +41,8 @@ Two entry points ship with the framework:
   also installed, but module invocation avoids binary locking on Windows. See the
   [MCP reference](./docs/MCP.md) for setup and tool documentation.
 
-The [framework manual](./docs/framework.md) walks through the development workflow
-and explains how to customize rules, skills, agents, and system prompts.
+The [framework manual](./docs/framework.md) walks through the development workflow and
+explains how to customize rules, skills, agents, and system prompts.
 
 ______________________________________________________________________
 
@@ -199,11 +199,11 @@ ______________________________________________________________________
 
 ## Further reading
 
-| Guide                                      | What it covers                                        |
-| ------------------------------------------ | ----------------------------------------------------- |
+| Guide                                   | What it covers                                        |
+| --------------------------------------- | ----------------------------------------------------- |
 | [Framework manual](./docs/framework.md) | Development workflow, skills, and customization       |
-| [CLI reference](./docs/CLI.md)       | All commands, flags, and options for `vaultspec-core` |
-| [MCP reference](./docs/MCP.md)       | MCP server tools, setup, and configuration            |
+| [CLI reference](./docs/CLI.md)          | All commands, flags, and options for `vaultspec-core` |
+| [MCP reference](./docs/MCP.md)          | MCP server tools, setup, and configuration            |
 
 ### Getting help
 

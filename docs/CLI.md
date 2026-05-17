@@ -766,10 +766,10 @@ overridden by the `--target` flag.
 
 ## See also
 
-| Document                        | What it covers                                  |
-| ------------------------------- | ----------------------------------------------- |
+| Document                           | What it covers                                  |
+| ---------------------------------- | ----------------------------------------------- |
 | [Framework manual](./framework.md) | Development workflow, skills, and customization |
-| [MCP reference](./MCP.md)       | MCP server tools, setup, and configuration      |
+| [MCP reference](./MCP.md)          | MCP server tools, setup, and configuration      |
 
 For bug reports and feature requests, open an issue on the
 [vaultspec-core issue tracker](https://github.com/wgergely/vaultspec-core/issues).

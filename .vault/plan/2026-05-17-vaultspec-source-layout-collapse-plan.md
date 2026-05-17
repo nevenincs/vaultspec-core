@@ -11,17 +11,34 @@ related:
   - '[[2026-04-30-doctor-dev-repo-adr]]'
 ---
 
-<!-- LINK RULES:
-     - [[wiki-links]] are ONLY for .vault/ documents in the
-       related: field above.
-     - The related: field carries the AUTHORISING documents
-       (ADR, research, reference, prior plan) for every Step in
-       this plan. Steps inherit this chain; per-row reference
-       footers do not exist.
-     - NEVER use [[wiki-links]] or markdown links in the
-       document body. -->
-
 # `vaultspec-source-layout-collapse` plan
+
+Relocate the canonical bundled content from `.vaultspec/rules/` into the
+Python package source tree, move the three human-facing documents into a
+new top-level `docs/` directory, delete the dev-mode carve-out, and
+bootstrap the dev repo so it runs the normal consumer install path against
+itself.
+
+## Description
+
+The work is authorised by the source-layout-collapse ADR. It reverses the
+two earlier ADRs noted in the `related` chain: the builtins build strategy
+(which kept canonical content at `.vaultspec/rules/` and rewrote paths at
+wheel build time via hatchling `force-include`) and the doctor dev-repo
+exception (which added a multi-signal source-repo detector plus a `--dev`
+authorisation flag on install, uninstall, and sync). Both ADRs were correct
+local fixes for the underlying collision (the dev repo's `.vaultspec/`
+serves as both authored content and install target). This plan removes the
+collision structurally so the carve-outs become unnecessary.
+
+The plan is tier L2: a single linear sequence of Phases, each containing
+concrete Steps. The Phases are ordered by dependency: the canonical content
+must move before any code can reference the new location, the build system
+must be retargeted before a wheel build can succeed, and the test fixtures
+must be repointed before the test suite can pass. Within a Phase, Steps
+are atomic file or symbol changes and can be applied in any order.
+
+## Steps
 
 ### Phase `P01` - relocate canonical content
 
@@ -31,16 +48,16 @@ homes (`src/vaultspec_core/builtins/` for the bundled rules tree,
 history is preserved. The Phase ends when `.vaultspec/` no longer exists
 in the source tree.
 
-- [x] `P01.S01` - move the agents subtree; `.vaultspec/rules/agents/` to `src/vaultspec_core/builtins/agents/`.
-- [x] `P01.S02` - move the hooks subtree; `.vaultspec/rules/hooks/` to `src/vaultspec_core/builtins/hooks/`.
-- [x] `P01.S03` - move the mcps subtree; `.vaultspec/rules/mcps/` to `src/vaultspec_core/builtins/mcps/`.
-- [x] `P01.S04` - move the rules subtree; `.vaultspec/rules/rules/` to `src/vaultspec_core/builtins/rules/`.
-- [x] `P01.S05` - move the skills subtree; `.vaultspec/rules/skills/` to `src/vaultspec_core/builtins/skills/`.
-- [x] `P01.S06` - move the system subtree; `.vaultspec/rules/system/` to `src/vaultspec_core/builtins/system/`.
-- [x] `P01.S07` - move the templates subtree; `.vaultspec/rules/templates/` to `src/vaultspec_core/builtins/templates/`.
-- [x] `P01.S08` - move the CLI reference; `.vaultspec/CLI.md` to `docs/CLI.md`.
-- [x] `P01.S09` - move the MCP reference; `.vaultspec/MCP.md` to `docs/MCP.md`.
-- [x] `P01.S10` - move and rename the framework manual; `.vaultspec/README.md` to `docs/framework.md`.
+- [x] `P01.S01` - relocate the agents subtree from the old framework directory into the package source tree; `src/vaultspec_core/builtins/agents/`.
+- [x] `P01.S02` - relocate the hooks subtree from the old framework directory into the package source tree; `src/vaultspec_core/builtins/hooks/`.
+- [x] `P01.S03` - relocate the mcps subtree from the old framework directory into the package source tree; `src/vaultspec_core/builtins/mcps/`.
+- [x] `P01.S04` - relocate the rules subtree from the old framework directory into the package source tree; `src/vaultspec_core/builtins/rules/`.
+- [x] `P01.S05` - relocate the skills subtree from the old framework directory into the package source tree; `src/vaultspec_core/builtins/skills/`.
+- [x] `P01.S06` - relocate the system subtree from the old framework directory into the package source tree; `src/vaultspec_core/builtins/system/`.
+- [x] `P01.S07` - relocate the templates subtree from the old framework directory into the package source tree; `src/vaultspec_core/builtins/templates/`.
+- [x] `P01.S08` - relocate the CLI reference into the human-docs tree; `docs/CLI.md`.
+- [x] `P01.S09` - relocate the MCP reference into the human-docs tree; `docs/MCP.md`.
+- [x] `P01.S10` - relocate and rename the framework manual into the human-docs tree; `docs/framework.md`.
 - [x] `P01.S11` - remove the now-empty top-level directory; `.vaultspec/`.
 
 ### Phase `P02` - flip the gitignore tracking contract
@@ -146,3 +163,57 @@ references the old paths.
 - [x] `P07.S58` - strip the `--dev` flag mention and the source-repo-install example from the `cmd_install` docstring; `src/vaultspec_core/cli/root.py`.
 - [x] `P07.S59` - strip the `--dev` flag mention and the source-repo-uninstall example from the `cmd_uninstall` docstring; `src/vaultspec_core/cli/root.py`.
 - [x] `P07.S60` - strip the `--dev` flag mention from the `cmd_sync` docstring; `src/vaultspec_core/cli/root.py`.
+
+## Parallelization
+
+The Phases run in strict dependency order. `P01` must land first because
+every subsequent Phase references the new canonical paths. `P02` must
+land before any `vaultspec-core install` invocation against the dev repo
+otherwise the install will refuse to overwrite tracked content. `P03`,
+`P04`, and `P05` are independent of each other and can be applied in any
+order once `P01` and `P02` have landed; the executor SHOULD treat them as
+one editing batch since the test suite expects all three to be consistent.
+`P06` and `P07` depend on `P01` through `P05` together; they cannot be
+verified in isolation because the test suite assertions and the doc
+cross-references describe the post-collapse state.
+
+Within a Phase, individual Steps are atomic file or symbol edits with no
+ordering constraint. An executor may batch Steps inside a Phase into a
+single commit if the Phase as a whole produces a working tree; partial
+Phase commits are not permitted because the gitignore contract, the build
+system, and the dev-mode plumbing are mutually entangled and an
+intermediate state cannot be tested.
+
+## Verification
+
+The plan is complete when every Step in every Phase is closed and the
+following criteria all hold simultaneously.
+
+- `uv run --no-sync pytest -m "not integration and not e2e"` passes the
+  full unit suite with no regressions.
+- `uv run --no-sync pytest src/vaultspec_core/tests/cli/test_cli_handbook_drift.py -v` passes against the new docs location.
+- `uv run --no-sync pytest src/vaultspec_core/tests/cli/test_collectors.py -v` passes without the two deleted integration tests.
+- `uv run --no-sync pytest src/vaultspec_core/tests/cli/test_vaultspec_rule_contracts.py -v` passes against the new canonical content location.
+- `uv run --no-sync pytest src/vaultspec_core/tests/cli/test_agents_render.py -v` passes with `_AGENTS_SRC` resolving to the new canonical location.
+- `uv run --no-sync ty check src/vaultspec_core` is clean.
+- `uv run --no-sync ruff check src tests` and
+  `uv run --no-sync ruff format --check src tests` are clean.
+- `uv build` produces a wheel that ships the bundled content at the
+  expected import path `vaultspec_core/builtins/` without any
+  `force-include` rewrite in `pyproject.toml`.
+- `git grep -nE 'is_dev_repo|guard_dev_repo|_cached_is_dev_repo|DevRepoProtectionError|--dev|dev: bool'`
+  returns zero matches in `src/` and `tests/` (the `uv sync --dev` shell
+  command inside the project-coordinator agent body is the only allowed
+  occurrence and is unrelated to the source-repo guard).
+- `uv run --no-sync vaultspec-core install` against a fresh checkout of
+  the source repository succeeds without `--dev`, creates a `.vaultspec/`
+  directory at the workspace root, leaves it untracked in `git status`,
+  and produces a `.vaultspec/providers.json` manifest.
+- `uv run --no-sync vaultspec-core spec doctor` against the freshly
+  installed source repository reports `framework: ok / present` without
+  any source-repo carve-out.
+- `uv run --no-sync vaultspec-core vault check all` passes.
+- `uv run --no-sync prek run --all-files` passes.
+- A `git commit` and `git push` on the working branch succeed without
+  `--no-verify`. If any push needs `--no-verify` after the collapse
+  lands, the collapse is incomplete.

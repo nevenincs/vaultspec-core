@@ -112,8 +112,7 @@ Three callers depend on the bundled-content layout via the
 
 - `vaultspec_core.core.commands._list_builtins` walks `_builtins_root()`
   during dry-run install to enumerate what would be written.
-- `vaultspec_core.core.commands.install_run` calls `seed_builtins(rules_dir,
-  force=...)` to copy bundled content into the consumer workspace's
+- `vaultspec_core.core.commands.install_run` calls `seed_builtins(rules_dir, force=...)` to copy bundled content into the consumer workspace's
   `.vaultspec/rules/` during install and upgrade.
 - `vaultspec_core.cli.root.cmd_spec_doctor` calls `check_outdated` to
   surface drift between the deployed and bundled content.
@@ -168,10 +167,8 @@ hardcodes `_HANDBOOK = _REPO_ROOT / ".vaultspec" / "CLI.md"`.
 Test files in `src/vaultspec_core/tests/cli/` assert on the canonical content
 location in five distinct ways:
 
-- `test_vaultspec_rule_contracts.py` reads `PROJECT_ROOT / ".vaultspec" /
-  "rules"` and several specific subdirectories and files (eight lines).
-- `test_agents_render.py` defines `_AGENTS_SRC = _REPO_ROOT / ".vaultspec" /
-  "rules" / "agents"` and parametrises over its contents at collection time.
+- `test_vaultspec_rule_contracts.py` reads `PROJECT_ROOT / ".vaultspec" / "rules"` and several specific subdirectories and files (eight lines).
+- `test_agents_render.py` defines `_AGENTS_SRC = _REPO_ROOT / ".vaultspec" / "rules" / "agents"` and parametrises over its contents at collection time.
 - `test_install_conditions.py` and `test_ambiguous_states.py` glob
   `*.builtin.md` from the canonical rules subtree.
 - `workspace_factory.py` (test helper) globs `*.builtin.md` from the same

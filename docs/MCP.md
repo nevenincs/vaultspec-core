@@ -172,11 +172,11 @@ at startup by `configure_logging()`.
 
 ## See Also
 
-| Document                          | What it covers                                        |
-| --------------------------------- | ----------------------------------------------------- |
-| [Repository README](../README.md) | Project overview, installation, and getting started   |
-| [Framework Manual](./framework.md)   | Development workflow, skills, and customization       |
-| [CLI Reference](./CLI.md)         | All commands, flags, and options for `vaultspec-core` |
+| Document                           | What it covers                                        |
+| ---------------------------------- | ----------------------------------------------------- |
+| [Repository README](../README.md)  | Project overview, installation, and getting started   |
+| [Framework Manual](./framework.md) | Development workflow, skills, and customization       |
+| [CLI Reference](./CLI.md)          | All commands, flags, and options for `vaultspec-core` |
 
 For bug reports and feature requests, open an issue on the
 [vaultspec-core issue tracker](https://github.com/wgergely/vaultspec-core/issues).

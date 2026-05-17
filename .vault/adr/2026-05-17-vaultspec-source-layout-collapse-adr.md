@@ -4,9 +4,9 @@ tags:
   - '#vaultspec-source-layout-collapse'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-vaultspec-source-layout-collapse-research]]"
-  - "[[2026-03-21-builtins-build-strategy-adr]]"
-  - "[[2026-04-30-doctor-dev-repo-adr]]"
+  - '[[2026-05-17-vaultspec-source-layout-collapse-research]]'
+  - '[[2026-03-21-builtins-build-strategy-adr]]'
+  - '[[2026-04-30-doctor-dev-repo-adr]]'
 ---
 
 # `vaultspec-source-layout-collapse` adr: `collapse the dev-mode carve-out and relocate bundled content into the package` | (**status:** `accepted`)
