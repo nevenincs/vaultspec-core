@@ -89,24 +89,24 @@ production module references `guards`, `is_dev_repo`,
 `_cached_is_dev_repo`, `guard_dev_repo`, `DevRepoProtectionError`, or the
 `dev=` keyword.
 
-- [ ] `P05.S21` - delete the guards module that defines the source-repo detector and the authorisation policy; `src/vaultspec_core/core/guards.py`.
-- [ ] `P05.S22` - delete the dedicated tests for the source-repo detector and the guard policy; `src/vaultspec_core/core/tests/test_guards.py`.
-- [ ] `P05.S23` - delete the regression tests for the `--dev` parameter forwarding through install to sync; `src/vaultspec_core/core/tests/test_guard_plumbing.py`.
-- [ ] `P05.S24` - delete the end-to-end dev-mode tests covering CLI guard behaviour and entry shape; `tests/test_dev_mode.py`.
-- [ ] `P05.S25` - remove the `--dev` Typer option and its docstring block from `cmd_install`; `src/vaultspec_core/cli/root.py`.
-- [ ] `P05.S26` - remove the `--dev` Typer option and its docstring block from `cmd_uninstall`; `src/vaultspec_core/cli/root.py`.
-- [ ] `P05.S27` - remove the `--dev` Typer option and its docstring block from `cmd_sync`; `src/vaultspec_core/cli/root.py`.
-- [ ] `P05.S28` - remove the `dev=` parameter and the `guard_dev_repo` call from `install_run`, including all internal `dev=` forwarding; `src/vaultspec_core/core/commands.py`.
-- [ ] `P05.S29` - remove the `dev=` parameter and the `guard_dev_repo` call from `uninstall_run`, including all internal `dev=` forwarding; `src/vaultspec_core/core/commands.py`.
-- [ ] `P05.S30` - remove the `dev=` parameter and the `guard_dev_repo` call from `sync_provider`, including all internal `dev=` forwarding; `src/vaultspec_core/core/commands.py`.
-- [ ] `P05.S31` - remove the `dev=` parameter and the dev-shape branches from `get_recommended_entries`; `src/vaultspec_core/core/gitignore.py`.
-- [ ] `P05.S32` - update `DEFAULT_ENTRIES` to the single `.vaultspec/` entry; `src/vaultspec_core/core/gitignore.py`.
-- [ ] `P05.S33` - drop the specialised `.vaultspec/_snapshots/`, `.vaultspec/*.lock`, and `.vaultspec/providers.json` emissions made redundant by the bare `.vaultspec/` entry; `src/vaultspec_core/core/gitignore.py`.
-- [ ] `P05.S34` - remove the `_cached_is_dev_repo` consultation from the framework-presence collector; `src/vaultspec_core/core/diagnosis/collectors.py`.
-- [ ] `P05.S35` - remove the `is_dev_repo` consultation from the gitignore-state collector; `src/vaultspec_core/core/diagnosis/collectors.py`.
-- [ ] `P05.S36` - remove the `is_dev_repo` consultation from the gitignore-repair executor step; `src/vaultspec_core/core/executor.py`.
-- [ ] `P05.S37` - delete the dev-repo-aware framework-presence integration test; `src/vaultspec_core/tests/cli/test_collectors.py`.
-- [ ] `P05.S38` - delete the consumer-near-miss multi-signal integration test; `src/vaultspec_core/tests/cli/test_collectors.py`.
+- [x] `P05.S21` - delete the guards module that defines the source-repo detector and the authorisation policy; `src/vaultspec_core/core/guards.py`.
+- [x] `P05.S22` - delete the dedicated tests for the source-repo detector and the guard policy; `src/vaultspec_core/core/tests/test_guards.py`.
+- [x] `P05.S23` - delete the regression tests for the `--dev` parameter forwarding through install to sync; `src/vaultspec_core/core/tests/test_guard_plumbing.py`.
+- [x] `P05.S24` - delete the end-to-end dev-mode tests covering CLI guard behaviour and entry shape; `tests/test_dev_mode.py`.
+- [x] `P05.S25` - remove the `--dev` Typer option and its docstring block from `cmd_install`; `src/vaultspec_core/cli/root.py`.
+- [x] `P05.S26` - remove the `--dev` Typer option and its docstring block from `cmd_uninstall`; `src/vaultspec_core/cli/root.py`.
+- [x] `P05.S27` - remove the `--dev` Typer option and its docstring block from `cmd_sync`; `src/vaultspec_core/cli/root.py`.
+- [x] `P05.S28` - remove the `dev=` parameter and the `guard_dev_repo` call from `install_run`, including all internal `dev=` forwarding; `src/vaultspec_core/core/commands.py`.
+- [x] `P05.S29` - remove the `dev=` parameter and the `guard_dev_repo` call from `uninstall_run`, including all internal `dev=` forwarding; `src/vaultspec_core/core/commands.py`.
+- [x] `P05.S30` - remove the `dev=` parameter and the `guard_dev_repo` call from `sync_provider`, including all internal `dev=` forwarding; `src/vaultspec_core/core/commands.py`.
+- [x] `P05.S31` - remove the `dev=` parameter and the dev-shape branches from `get_recommended_entries`; `src/vaultspec_core/core/gitignore.py`.
+- [x] `P05.S32` - update `DEFAULT_ENTRIES` to the single `.vaultspec/` entry; `src/vaultspec_core/core/gitignore.py`.
+- [x] `P05.S33` - drop the specialised `.vaultspec/_snapshots/`, `.vaultspec/*.lock`, and `.vaultspec/providers.json` emissions made redundant by the bare `.vaultspec/` entry; `src/vaultspec_core/core/gitignore.py`.
+- [x] `P05.S34` - remove the `_cached_is_dev_repo` consultation from the framework-presence collector; `src/vaultspec_core/core/diagnosis/collectors.py`.
+- [x] `P05.S35` - remove the `is_dev_repo` consultation from the gitignore-state collector; `src/vaultspec_core/core/diagnosis/collectors.py`.
+- [x] `P05.S36` - remove the `is_dev_repo` consultation from the gitignore-repair executor step; `src/vaultspec_core/core/executor.py`.
+- [x] `P05.S37` - delete the dev-repo-aware framework-presence integration test; `src/vaultspec_core/tests/cli/test_collectors.py`.
+- [x] `P05.S38` - delete the consumer-near-miss multi-signal integration test; `src/vaultspec_core/tests/cli/test_collectors.py`.
 
 ### Phase `P06` - repoint test fixtures at the new canonical location
 

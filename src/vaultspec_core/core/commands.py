@@ -821,7 +821,6 @@ def install_run(
     dry_run: bool = False,
     force: bool = False,
     skip: set[str] | None = None,
-    dev: bool = False,
 ) -> dict[str, Any]:
     """Deploy the vaultspec framework to a project directory.
 
@@ -832,10 +831,6 @@ def install_run(
         dry_run: Preview the manifest of files that would be created.
         force: Override contents if installation already exists.
         skip: Set of component names to skip (``core`` and/or provider names).
-        dev: Authorise source-repo operation (the ``--dev`` flag).  Required
-            when *path* is the vaultspec-core source repository or one of
-            its worktrees; otherwise the dev-repo guard refuses the write.
-            See GitHub issue #88.
 
     Returns:
         A dict describing the result:
@@ -846,21 +841,15 @@ def install_run(
     Raises:
         ProviderError: If *provider* is invalid.
         ResourceExistsError: If already installed and *force*/*upgrade* not set.
-        DevRepoProtectionError: If *path* is the source repo and *dev* is
-            ``False``, or if *dev* is ``True`` but *path* is not the
-            source repo.
     """
     from vaultspec_core.config import reset_config
     from vaultspec_core.config.workspace import WorkspaceError, resolve_workspace
     from vaultspec_core.core.types import init_paths
 
     from .exceptions import ResourceExistsError
-    from .guards import guard_dev_repo
 
     _validate_provider(provider)
     skip = _validate_skip(skip)
-
-    guard_dev_repo(path, dev=dev)
 
     # Bootstrap a minimal context so downstream code can read target_dir
     _t.set_context(
@@ -962,7 +951,7 @@ def install_run(
         run_pending_migrations(path)
 
         sync_target = provider if provider not in ("all", "core") else "all"
-        sync_provider(sync_target, force=True, skip=skip, dev=dev)
+        sync_provider(sync_target, force=True, skip=skip)
 
         if "precommit" not in skip:
             _scaffold_precommit(path)
@@ -979,7 +968,7 @@ def install_run(
         if force:
             ensure_gitignore_block(
                 path,
-                get_recommended_entries(path, dev=dev),
+                get_recommended_entries(path),
                 state=ManagedState.PRESENT,
             )
             mdata.gitignore_managed = True
@@ -999,7 +988,7 @@ def install_run(
         # historically-committed state files (e.g. .vaultspec/providers.json
         # from a pre-managed-block install) stop showing up as dirty on
         # every subsequent run.
-        _untrack_managed_paths(path, get_recommended_entries(path, dev=dev))
+        _untrack_managed_paths(path, get_recommended_entries(path))
 
         return {"action": "upgrade", "seeded_count": len(seeded), "path": path}
 
@@ -1021,7 +1010,7 @@ def install_run(
 
     sync_target = provider if provider not in ("all", "core") else "all"
     try:
-        sync_provider(sync_target, skip=skip, dev=dev)
+        sync_provider(sync_target, skip=skip)
     except (VaultSpecError, OSError) as exc:
         logger.warning("Sync failed during install: %s", exc)
         post_errors.append(f"sync: {exc}")
@@ -1044,7 +1033,7 @@ def install_run(
     has_mcp = (path / ".mcp.json").exists()
 
     # Manage gitignore block
-    recommended = get_recommended_entries(path, dev=dev)
+    recommended = get_recommended_entries(path)
 
     gi_written = ensure_gitignore_block(path, recommended, state=ManagedState.PRESENT)
     if gi_written:
@@ -1126,7 +1115,6 @@ def uninstall_run(
     dry_run: bool = False,
     force: bool = False,
     skip: set[str] | None = None,
-    dev: bool = False,
 ) -> dict[str, Any]:
     """Remove the vaultspec framework from a project directory.
 
@@ -1137,8 +1125,6 @@ def uninstall_run(
         dry_run: Preview what would be removed without deleting.
         force: Required to execute. Uninstall is destructive.
         skip: Set of component names to skip (``core`` and/or provider names).
-        dev: Authorise source-repo operation (the ``--dev`` flag).  See
-            GitHub issue #88.
 
     Returns:
         A dict describing the result:
@@ -1147,15 +1133,7 @@ def uninstall_run(
 
     Raises:
         ProviderError: If *provider* is invalid or *force* not set.
-        DevRepoProtectionError: If *path* is the source repo and *dev* is
-            ``False``, or if *dev* is ``True`` but *path* is not the
-            source repo.
     """
-    from .guards import guard_dev_repo
-
-    guard_dev_repo(path, dev=dev)
-
-    # Validate inputs before any state mutation
     _validate_provider(provider)
     skip = _validate_skip(skip)
 
@@ -1422,7 +1400,7 @@ def uninstall_run(
         except Exception:
             mdata_after = ManifestData()
 
-        recommended = get_recommended_entries(path, dev=dev)
+        recommended = get_recommended_entries(path)
         # If no providers remain and we are not keeping the vault, remove the block.
         # Otherwise, we sync it if it was managed before.
         if not mdata_after.installed and not keep_vault:
@@ -1534,7 +1512,6 @@ def sync_provider(
     dry_run: bool = False,
     force: bool = False,
     skip: set[str] | None = None,
-    dev: bool = False,
 ) -> list[_t.SyncResult]:
     """Sync resources for a single provider target.
 
@@ -1551,8 +1528,6 @@ def sync_provider(
         dry_run: Preview changes without writing.
         force: Prune stale files and overwrite user-authored content.
         skip: Set of provider names to exclude from the sync.
-        dev: Authorise source-repo operation (the ``--dev`` flag).  See
-            GitHub issue #88.
 
     Returns:
         A list of :class:`SyncResult` objects from each sync pass.
@@ -1561,9 +1536,6 @@ def sync_provider(
         ProviderError: If *provider* is invalid.
         WorkspaceNotInitializedError: If ``.vaultspec/`` does not exist.
         ProviderNotInstalledError: If the specified provider is not installed.
-        DevRepoProtectionError: If the workspace is the source repo and
-            *dev* is ``False``, or if *dev* is ``True`` but the workspace
-            is not the source repo.
     """
     if provider not in SYNC_PROVIDERS:
         raise ProviderError(
@@ -1575,14 +1547,12 @@ def sync_provider(
 
     from .agents import agents_sync
     from .config_gen import config_sync
-    from .guards import guard_dev_repo
     from .mcps import mcp_sync as _mcp_sync
     from .rules import rules_sync
     from .skills import skills_sync
     from .system import system_sync
 
     ctx = _t.get_context()
-    guard_dev_repo(ctx.target_dir, dev=dev)
 
     def _empty_sync_results() -> list[_t.SyncResult]:
         return [_t.SyncResult() for _ in range(5)]
@@ -1696,7 +1666,7 @@ def sync_provider(
                 if block_present:
                     ensure_gitignore_block(
                         ctx.target_dir,
-                        get_recommended_entries(ctx.target_dir, dev=dev),
+                        get_recommended_entries(ctx.target_dir),
                     )
                 else:
                     mdata.gitignore_managed = False
