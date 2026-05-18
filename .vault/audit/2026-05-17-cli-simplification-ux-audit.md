@@ -755,3 +755,180 @@ changes for the bugs, language changes for the framing.
 The loop the user opened on this audit terminates here on the
 ADR list. Downstream work — plans, exec records, implementation —
 flows out of each ADR via the framework's own pipeline.
+
+## Findings
+
+### Round 4 — convergence test on the language-track delivery
+
+Round 4 ran the same two persona subagents (Joan and Xavi) back
+through their sandboxes after the language-track delivery for the
+memory-addition cluster shipped. The codify triad
+(rule + persona + skill) plus the pipeline-table edit, the audit
+template's Codification candidates section, and three worked-
+example discipline rules (archive, plan-editing, dry-run) were
+under test. The convergence test asks one question: do agents
+discover and use the new artifacts organically, without explicit
+prompting at the language they speak?
+
+#### B10. Confirmed positive — bridge gap closes when language-track lands
+
+Joan v4 and Xavi v4 both reached the spec subtree organically.
+Joan's command log shows him scanning `spec rules list`,
+`spec agents list`, and `spec skills list` after `install
+--upgrade` — without being told to. Joan codified a finding
+(`harbor-notes-empty-filter-contract`) from his work without any
+explicit instruction to do so. Xavi codified
+`archive-post-mortem-trail` from the recovery audit he had been
+asked to write. Both crossed the bridge that across rounds 1, 2,
+and 3 had never been crossed organically.
+
+This is the round-3a Bridge Gap meta-finding's structural arm
+closing under load. Six prior agent-days produced zero
+organic spec-subtree contact; one round after the language-track
+landed, both agents reached it and both produced project rules.
+
+#### B11. Sharp — codify is real in language but not in CLI; verb gap surfaces immediately
+
+Joan v4 finding [62]. The pipeline now has a sixth phase. The
+audit template has a Codification candidates section. The skill,
+persona, and discipline rules all describe codification. But
+`vault rule --help` returns exit 2 ("No such command 'rule'") —
+Joan tried the planned verb organically and found it missing.
+Codification is authored via `spec rules add` and a hand-patched
+body today; the higher-level `vault rule promote` verb that the
+codify language-track names is `cli-memory-lifecycle` plan step
+W02.P04.S12 work, not shipped.
+
+The visible-but-unfinished surface is itself a fresh audit
+finding: agents that read the system prompt's pipeline table see
+phase 6 and reach for a command that does not exist. The
+language-track outran the code-track. The disposition is the
+work in W02.P04.S12; the rule and skill have to be honest about
+the today-shape until then.
+
+#### B12. Sharp — codification rules cite forward-pointing CLI surfaces
+
+Two reproductions in round 4.
+
+- Joan v4 finding [69]: the codify skill, persona, and rule all
+  named `.vaultspec/rules/project/` as the authored-rule home;
+  `spec rules add` actually writes to `.vaultspec/rules/rules/`
+  alongside builtins. Fixed in commit `6553796` (round-4
+  hardening).
+- Joan v4 finding [65]: the `vaultspec-dry-run-discipline` rule's
+  "Good" worked example invoked `vault add plan --tier L1`. The
+  CLI rejects `--tier` (exit 2, "No such option `--tier`"). Fixed
+  in commit `9e90ff7` (round-4 hardening).
+
+The pattern: a rule authored against a planned-but-unshipped CLI
+surface gives agents wrong instructions today. The codify rule
+itself prescribes the discipline ("DO NOT name unshipped framework
+verbs except as planned forward-pointers explicitly marked as
+such"), and the rule violated its own discipline twice in its
+first iteration. Both violations were caught and fixed within
+round 4 itself, validating the convergence loop's self-correcting
+property — but the framing problem is structural: codification
+preceded implementation across the round, and the language
+artifacts must reflect today's CLI honestly while pointing at
+planned verbs only as marked-as-planned asides.
+
+#### S21. Sharp — `vault plan step add` body destruction still reproduces, four rounds in
+
+Joan v4 finding [67]. The bug Joan first observed in round 1
+[17], reproduced by Xavi round 1 [08] and Xavi round 2, persists
+unchanged in round 4. Joan ran a `Write` against the plan body
+after `step add`, lost the Steps, and had to re-add them. The
+`vaultspec-plan-editing-discipline` rule warned about a related
+direction (structural mutation destroying prose) but did not
+cover the inverse (prose mutation destroying structure). Both
+directions are the same underlying bug; the rule's coverage is
+half.
+
+Disposition: the `cli-plan-body-preservation` ADR's serialiser-
+preservation fix (W03.P07.S23–S26) closes the full bidirectional
+case. The rule will widen in the same round.
+
+#### S22. Sharp — `tier: L{#}` placeholder survives four rounds and a framework upgrade
+
+Joan v4 finding [66]. The longest-lived friction in the audit
+log. The fix is in `cli-scaffolder-integrity` plan step W01.P03.S08
+which has not landed. The language-track upgrade explicitly added
+new discipline rules referencing the workaround but did not fix
+the underlying scaffolder antipattern. This is the clearest
+illustration that language-track delivery alone does not move a
+bug forward; the code-track must follow.
+
+#### S23. Sharp — no next-step hint volunteers codify
+
+Joan v4 finding [68]. The codify discipline is documented in the
+system prompt, in the skill, in the persona, in the audit template
+(Codification candidates section). But no CLI output anywhere
+points the user at codification as a follow-on. After
+`vault add audit ...` finishes, the operator sees `Created: ...`
+and stops. After `vault check all` exits zero on a feature whose
+audit has populated codification candidates, the operator sees
+the all-clear and stops. The follow-on is invisible.
+
+The `cli-next-step-hints` ADR (P13) is the disposition. Until
+that ships, the operator is the discipline.
+
+#### S24. Sharp — `spec doctor` does not validate language-track integrity
+
+Joan v4 finding [71]. The path mismatch (B12 above) was a real
+bug in three shipped builtin files. `spec doctor` ran clean
+through every round. The doctor checks framework state but does
+not cross-validate that the language-track's instructions match
+the CLI's actual behaviour. This is a missing check class —
+either an extension to `spec doctor` or a new `vault check
+language-track-consistency` verb that walks every rule, skill,
+and persona for CLI-surface claims and runs them against today's
+CLI.
+
+Disposition: candidate sub-step under `cli-paper-cuts` P14, or a
+new ADR if the scope expands beyond paper-cut work.
+
+#### Smaller paper cuts (Round 4)
+
+- Joan v4 finding [70]: `vault add plan --dry-run` on an L1 plan
+  with no Steps emits an empty preview. Same shape as `install
+  --upgrade --dry-run` from round 3a S14. Empty preview on a
+  state-changing verb is worse than no preview; both belong in
+  the same `cli-blast-radius-gating` (P11) fix family.
+
+- Joan v4 finding [62] additional surface: `vault rule --help`
+  exit 2 produces no hint at the canonical authoring path. A
+  user who guesses the planned verb shape gets no redirect to
+  `spec rules add`. The next-step-hint mechanism (P13) is the
+  proper disposition; a small fix in the meantime is to detect
+  the noun `rule` at the top-level verb and suggest `spec rules`.
+
+- Positive: Xavi v4 produced a `### Codification candidates`
+  block in his recovery audit doc. The audit template's new
+  section did exactly the discoverability work it was meant to
+  do.
+
+### Round 4 meta — self-correcting convergence loop
+
+The round produced four artifacts that the loop itself then fixed:
+
+- Path mismatch in codify rule + persona + skill — found by Xavi,
+  fixed mid-round.
+- Path mismatch reproduced by Joan independently — confirms the
+  bug was structural, not session-specific.
+- `--tier` flag invocation in dry-run-discipline rule — found by
+  Joan, fixed mid-round.
+- `vaultspec-codify` skill missing from `vaultspec.builtin.md`'s
+  skill list — found by Xavi, fixed mid-round.
+
+Four bugs in newly-shipped language artifacts, all surfaced and
+closed within the same round that introduced them. The
+convergence loop's self-correcting property is now empirically
+validated: language-track artifacts that ship against unshipped
+CLI surfaces will be caught by the next fresh-eyes agent and
+corrected before they harden into folklore.
+
+The remaining round-4 findings (B11 codify-verb gap, S21 plan
+body destruction, S22 tier placeholder, S23 missing next-step
+hint, S24 spec-doctor language-track integrity check) are
+dispositioned through the existing ADR set. None require a new
+cluster ADR; all extend or refine existing ones.
