@@ -23,6 +23,15 @@ related:
   - '[[2026-05-17-cli-paper-cuts-adr]]'
 ---
 
+<!-- LINK RULES:
+     - [[wiki-links]] are ONLY for .vault/ documents in the
+       related: field above.
+     - The related: field carries the AUTHORISING documents
+       (ADR, research, reference, prior plan) for every Step in
+       this plan. Steps inherit this chain; per-row reference
+       footers do not exist.
+     - NEVER use [[wiki-links]] or markdown links in the
+       document body. -->
 
 # `cli-simplification-ux` `CLI simplification and UX hardening epic` plan
 
@@ -55,7 +64,7 @@ Establish the seven-word canonical outcome taxonomy (created/updated/unchanged/r
 Enforce the framework-wide invariant that scaffolders never emit values their validators would reject, with an emit-time linter and required flags on the verbs that today emit placeholders.
 
 - [ ] `W01.P03.S07` - Implement emit-time validator that runs the schema check against scaffolded output before flush; `src/vaultspec_core/vaultcore/`.
-- [ ] `W01.P03.S08` - Add --tier flag with default L1 to vault add plan and remove the L curly-pound placeholder from the plan template; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `W01.P03.S08` - Add --tier flag with default L1 to vault add plan and remove the L curly-pound placeholder from the plan template; `src/vaultspec_core/cli/vault_cmd.py`.
 - [ ] `W01.P03.S09` - Require --phase-title and --phase-intent on vault plan tier promote from L1 to L2 and remove the TODO placeholder; `src/vaultspec_core/plan/commands/`.
 - [ ] `W01.P03.S10` - Narrow the unhydrated-placeholder warning to skip tokens inside HTML comment regions; `src/vaultspec_core/builtins/`.
 
