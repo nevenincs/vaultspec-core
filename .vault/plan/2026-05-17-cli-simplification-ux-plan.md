@@ -23,6 +23,15 @@ related:
   - '[[2026-05-17-cli-paper-cuts-adr]]'
 ---
 
+<!-- LINK RULES:
+     - [[wiki-links]] are ONLY for .vault/ documents in the
+       related: field above.
+     - The related: field carries the AUTHORISING documents
+       (ADR, research, reference, prior plan) for every Step in
+       this plan. Steps inherit this chain; per-row reference
+       footers do not exist.
+     - NEVER use [[wiki-links]] or markdown links in the
+       document body. -->
 
 # `cli-simplification-ux` `CLI simplification and UX hardening epic` plan
 
@@ -71,7 +80,7 @@ Introduce codify, supersede, and retire as first-class lifecycle verbs with type
 - [ ] `W02.P04.S12` - Implement vault rule promote --from --as as the codify verb; `src/vaultspec_core/cli/`.
 - [ ] `W02.P04.S13` - Implement vault adr supersede with frontmatter rewrites on both old and new documents; `src/vaultspec_core/cli/vault_cmd.py`.
 - [ ] `W02.P04.S14` - Fix vault feature archive end to end: dry-run, unarchive verb, cross-feature link rewriting, structure-check allowlist, dangling-check archive resolver; `src/vaultspec_core/cli/vault_cmd.py`.
-- [ ] `W02.P04.S15` - Update ADR template, pipeline rules, and agent personas to teach the codify lifecycle phase; `.vaultspec/`.
+- [x] `W02.P04.S15` - Update ADR template, pipeline rules, and agent personas to teach the codify lifecycle phase; `.vaultspec/`.
 
 ### Phase `W02.P05` - Atomic rename invariant
 
@@ -171,25 +180,3 @@ Sweep the residual paper-cut tail under a documented contribution discipline and
 - [ ] `W05.P14.S50` - Add top-level vaultspec-core doctor verb composing vault check all and spec doctor under a single exit code; `src/vaultspec_core/cli/root.py`.
 - [ ] `W05.P14.S51` - Document the contribution discipline checklist gating every new CLI verb at merge time; `CONTRIBUTING.md`.
 - [ ] `W05.P14.S52` - Add post-merge audit check enforcing the discipline checklist on every newly introduced verb; `src/vaultspec_core/vaultcore/checks/`.
-
-## Parallelization
-
-Waves are sequenced. `W01` Foundation must land before any other wave; the canonical outcome vocabulary (P02), the gitignore policy (P01), and the scaffolder-integrity invariant (P03) are referenced by every downstream phase. `W02` Memory architecture and `W03` Pipeline integrity may begin once `W01` is closed; `W03` does not depend on `W02` except through the scaffolder-integrity invariant from P03, so the two waves admit limited parallelism if separate contributors take them. `W04` Surface and parity depends on `W02` and `W03` landing first; the spec CRUD template inherits from P05 atomic rename and P06 editor safety, and surface consolidation depends on P02 vocabulary. `W05` Contract and discovery is the consumer-facing finalisation and lands last; P12 JSON envelope and P13 next-step hints share the renderer modified by P02 so they cannot be parallelised against each other, and P14 paper-cut sweep depends on every prior phase and is the closing pass.
-
-Within a single phase, Steps are not independent. P01 S01 (migration) must land before S02 (summary line) which must land before S03 (manual update). P04 S11 (schema additions) must land before S12, S13, and S14 (verbs that depend on the new fields). Each phase's intent paragraph names the dependency direction.
-
-Documentation Steps (those scoped at `.vaultspec/` or the framework manual) trail their corresponding code Steps within a phase; the documentation reflects the as-shipped surface.
-
-## Verification
-
-Mission success criteria are verifiable per Step, per phase, per wave, and at the epic level.
-
-Per Step: the Step is closed when its scope file change is committed and the relevant pre-commit hooks pass. Steps whose scope is documentation pass `pymarkdown` and `mdformat-check`. Steps whose scope is Python source pass `ruff check` and `ty` type-checking.
-
-Per phase: the phase is closed when every Step is closed and the phase's authorising ADR Consequences section is verifiable on the changed surface. Each phase ships a regression test that exercises the change against the failure mode the audit documented (B1 reproduces fixable, S10 vocabulary becomes consistent across surveyed surfaces, B7 silent-edit-failure no longer exits 0, and so on per phase).
-
-Per wave: the wave is closed when every phase is closed and `vaultspec-core vault check all` plus `vaultspec-core spec doctor` both exit zero on a sample project that has run through the wave's end state. From `W05` onwards the new top-level `vaultspec-core doctor` verb (introduced in P14.S50) is the single readiness check.
-
-At epic completion: the project-management association (pull request #114) reports the epic complete. The rolling audit document gains a final Resolution section that closes each finding cluster with a back-pointer to the phase that delivered it. The fourteen sibling ADRs have their status updated from `accepted` to `accepted (delivered)` through the supersession-aware status workflow introduced in P04.S13.
-
-A regression-audit pass: a fresh-eyes agent with no source-code access (the audit methodology of this plan) is briefed to onboard onto a vaultspec-managed project, run a feature end to end through the pipeline including the new codify phase, archive a feature, and report friction. The pass is successful when the new agent's friction log does not reproduce any blocker-grade finding from this audit (B1, B2, B3, B5, B6, B7, B8, B9).
