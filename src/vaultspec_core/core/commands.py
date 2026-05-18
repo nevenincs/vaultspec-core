@@ -954,7 +954,12 @@ def install_run(
         # `sync_provider` rejects `core` in its skip set (`allow_core=False`).
         # `install_run` accepts `core` because it skips the framework scaffold;
         # filter it out before forwarding to the sync pass.
-        sync_provider(sync_target, force=True, skip=skip - {"core"})
+        # Forward `force`: `--upgrade` and `--force` are separate flags;
+        # `install --upgrade` (without `--force`) must preserve user-authored
+        # content. The pre-collapse hardcoded `force=True` was an asymmetry
+        # against the fresh-install path and silently overwrote user content
+        # on every upgrade. See PR #116 review thread r3260188496.
+        sync_provider(sync_target, force=force, skip=skip - {"core"})
 
         if "precommit" not in skip:
             _scaffold_precommit(path)

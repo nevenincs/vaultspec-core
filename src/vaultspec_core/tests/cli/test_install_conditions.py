@@ -275,6 +275,54 @@ class TestInstallSkip:
             f"{[r.getMessage() for r in sync_failures]}"
         )
 
+    def test_upgrade_without_force_preserves_user_authored_content(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        """Regression: `install --upgrade` (no `--force`) must preserve user files.
+
+        Pre-fix the upgrade path called
+        `sync_provider(sync_target, force=True, skip=skip - {"core"})`
+        with `force` hardcoded, ignoring the `force=force` parameter
+        threaded through `install_run`. That meant
+        `vaultspec-core install --upgrade` silently overwrote user-
+        authored system prompts and configs (files without the
+        vaultspec managed-block marker) every time, breaking the
+        documented contract where `--upgrade` and `--force` are
+        independent flags.
+
+        This test installs, replaces `.gemini/SYSTEM.md` with content
+        lacking the vaultspec marker, then runs `install --upgrade`
+        without `force=True`. The user-authored content MUST survive.
+        Paired with `test_install_force_propagates_to_sync_provider`,
+        these two tests lock the full `--force`/`--upgrade` matrix:
+        force=True overwrites, force=False preserves, on both paths.
+        """
+        factory.install()
+
+        system_file = factory.root / DirName.GEMINI / "SYSTEM.md"
+        assert system_file.exists(), (
+            "gemini SYSTEM.md must exist after a clean install for this "
+            f"regression test to be meaningful (looked at {system_file})"
+        )
+
+        # User-authored content without the vaultspec managed-block marker.
+        sentinel = (
+            "user-authored upgrade-preservation sentinel without vaultspec marker"
+        )
+        system_file.write_text(sentinel, encoding="utf-8")
+
+        # `--upgrade` without `--force`: sync_provider's force= must be
+        # False so user-authored files are skipped (with a warning), not
+        # overwritten.
+        factory.install(upgrade=True)
+
+        survived = system_file.read_text(encoding="utf-8")
+        assert survived == sentinel, (
+            "`install --upgrade` (no --force) overwrote user-authored "
+            "content. The sync pass is receiving force=True unconditionally "
+            "on the upgrade path; user content is not safe across upgrades."
+        )
+
     def test_install_force_propagates_to_sync_provider(
         self, factory: WorkspaceFactory
     ) -> None:
