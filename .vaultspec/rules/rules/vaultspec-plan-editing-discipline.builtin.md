@@ -21,7 +21,7 @@ operation has settled.
 
 The rolling CLI UX audit's B6 finding reproduced three times across
 two persona agents and two sandboxes: every invocation of
-`vault plan step add` on a plan containing author-written prose
+`vaultspec-core vault plan step add` on a plan containing author-written prose
 silently rewrites the body and discards the prose sections. The
 plan template instructs the author to write the prose; the CLI
 then deletes it. The agents who survived this bug were the ones
@@ -55,7 +55,7 @@ The canonical ordering for revising an existing plan:
 
 1. If the plan already contains author prose sections, copy them
    aside in your working memory before invoking any
-   `vault plan step ...` verb.
+   `vaultspec-core vault plan step ...` verb.
 2. Run every structural verb (`step add`, `step move`, `step
    insert`, `step remove`, `phase add`, `phase remove`, `wave add`,
    `tier promote`, etc.) before re-authoring prose.

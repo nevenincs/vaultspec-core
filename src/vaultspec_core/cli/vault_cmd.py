@@ -97,6 +97,16 @@ def cmd_add(
         bool, typer.Option("--dry-run", help="Preview without writing")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    tier: Annotated[
+        str,
+        typer.Option(
+            "--tier",
+            help=(
+                "Plan tier (L1..L4). Default L1. Ignored for non-plan "
+                "document types whose templates do not carry a tier field."
+            ),
+        ),
+    ] = "L1",
     target: TargetOption = None,
 ) -> None:
     """Create a new .vault/ document from a template.
@@ -136,6 +146,14 @@ def cmd_add(
             "[red]'index' documents are auto-generated. "
             "Use 'vaultspec-core vault feature index' instead of "
             "'vaultspec-core vault add index'.[/red]"
+        )
+        raise typer.Exit(code=1)
+
+    # Validate tier for plan documents (no-op for other types whose
+    # templates do not carry the placeholder).
+    if dt is DocType.PLAN and tier not in {"L1", "L2", "L3", "L4"}:
+        console.print(
+            f"[red]Invalid tier '{tier}'. Allowed values: L1, L2, L3, L4.[/red]"
         )
         raise typer.Exit(code=1)
 
@@ -214,6 +232,7 @@ def cmd_add(
                 extra_tags=extra_tags,
                 force=force,
                 dry_run=dry_run,
+                tier=tier if dt is DocType.PLAN else None,
             )
         except FileNotFoundError as exc:
             _handle_error(exc)

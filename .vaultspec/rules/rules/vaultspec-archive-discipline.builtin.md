@@ -19,9 +19,9 @@ acknowledged as dangling, or block the archive entirely.
 ## Why
 
 The rolling CLI UX audit's B9 finding documented that
-`vault feature archive` today has five compounding gaps: no
+`vaultspec-core vault feature archive` today has five compounding gaps: no
 `--dry-run`, no reversal verb, silent breakage of cross-feature
-`related:` links, an output directory `vault check structure`
+`related:` links, an output directory `vaultspec-core vault check structure`
 declares illegal, and an auto-fix path that amputates the very
 relationships the verb was invoked to preserve. The team-lead
 brief in the audit's Round 3 explicitly stated "the trail should
@@ -55,35 +55,35 @@ Then take the right action:
 
 - **Good:** the discovery pass reports zero incoming
   cross-feature references. Archive is safe.
-  Run `vault feature archive <feature-tag>` and verify
-  `vault check all` stays green.
+  Run `vaultspec-core vault feature archive <feature-tag>` and verify
+  `vaultspec-core vault check all` stays green.
 
 - **Good:** the discovery pass reports incoming references and
   you have explicitly rewritten or removed them before invoking
   the archive verb. The archive then leaves no dangling links.
 
-- **Bad:** invoke `vault feature archive` against a feature with
+- **Bad:** invoke `vaultspec-core vault feature archive` against a feature with
   unaudited incoming references, then attempt to "fix" the
-  resulting dangling errors via `vault repair`. The repair's
+  resulting dangling errors via `vaultspec-core vault repair`. The repair's
   auto-fix removes the `related:` entries, silently destroying
   the cross-feature provenance the rule was meant to preserve.
 
-- **Bad:** invoke `vault feature archive <typo>` against a tag
+- **Bad:** invoke `vaultspec-core vault feature archive <typo>` against a tag
   that does not exist. The verb returns exit 0 with a silent
   no-op (also finding B9); CI cannot detect that nothing was
   archived. Validate the feature tag with
-  `vault feature list` before archive.
+  `vaultspec-core vault feature list` before archive.
 
 ## Status
 
 Active. Once `cli-memory-lifecycle` `W02.P04.S14` lands
-(`vault feature archive` gains `--dry-run`, `vault feature
-unarchive`, cross-feature link rewriting, and a non-zero exit on
-typo'd targets), the discovery-pass burden moves into the CLI and
-this rule's body shortens to a one-line pointer at
-`vault feature archive --dry-run` as the canonical preview path.
-The rule's intent (audit incoming references before retirement)
-survives the verb improvement; only the procedure changes.
+(the archive verb gains a dry-run preview, a paired unarchive
+verb, cross-feature link rewriting, and a non-zero exit on
+typo'd targets), the discovery-pass burden moves into the CLI
+and this rule's body shortens to a one-line pointer at the new
+dry-run preview path as canonical. The rule's intent (audit
+incoming references before retirement) survives the verb
+improvement; only the procedure changes.
 
 ## Source
 

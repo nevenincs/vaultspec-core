@@ -45,6 +45,70 @@ def test_hydrate_template_leaves_missing_title_and_warns(caplog):
     assert "Potential unhydrated placeholder found in template: {title}" in caplog.text
 
 
+def test_hydrate_template_substitutes_tier_when_passed():
+    """Verify the {tier} placeholder is hydrated when tier is supplied."""
+    template = "tier: {tier}"
+    result = hydrate_template(template, "feat", "2026-05-18", tier="L3")
+    assert result == "tier: L3"
+
+
+def test_hydrate_template_leaves_tier_unhydrated_when_none(caplog):
+    """Verify {tier} stays as-is when tier is not provided, with warning."""
+    template = "tier: {tier}"
+    with caplog.at_level(logging.WARNING):
+        result = hydrate_template(template, "feat", "2026-05-18")
+    assert result == "tier: {tier}"
+    assert "Potential unhydrated placeholder found in template: {tier}" in caplog.text
+
+
+def test_create_vault_doc_plan_substitutes_tier(tmp_path):
+    """End-to-end: vault add plan with tier writes the supplied tier value."""
+    from vaultspec_core.builtins import seed_builtins
+
+    rules_dir = tmp_path / ".vaultspec" / "rules"
+    rules_dir.mkdir(parents=True)
+    seed_builtins(rules_dir, force=True)
+    for dt in DocType:
+        (tmp_path / ".vault" / dt.value).mkdir(parents=True, exist_ok=True)
+
+    path = create_vault_doc(
+        tmp_path,
+        DocType.PLAN,
+        "tier-test",
+        "2026-05-18",
+        title="Tier test",
+        tier="L3",
+    )
+    assert path.exists()
+    content = path.read_text(encoding="utf-8")
+    assert "tier: L3" in content
+    assert "tier: L{#}" not in content
+    assert "tier: {tier}" not in content
+
+
+def test_create_vault_doc_plan_default_tier_l1(tmp_path):
+    """Plan scaffolded without explicit tier still hydrates cleanly when L1 passed."""
+    from vaultspec_core.builtins import seed_builtins
+
+    rules_dir = tmp_path / ".vaultspec" / "rules"
+    rules_dir.mkdir(parents=True)
+    seed_builtins(rules_dir, force=True)
+    for dt in DocType:
+        (tmp_path / ".vault" / dt.value).mkdir(parents=True, exist_ok=True)
+
+    path = create_vault_doc(
+        tmp_path,
+        DocType.PLAN,
+        "tier-default",
+        "2026-05-18",
+        title="Default tier",
+        tier="L1",
+    )
+    assert path.exists()
+    content = path.read_text(encoding="utf-8")
+    assert "tier: L1" in content
+
+
 class TestCreateVaultDocStemCollision:
     """Ensure vault add rejects files whose stem collides with an existing doc."""
 

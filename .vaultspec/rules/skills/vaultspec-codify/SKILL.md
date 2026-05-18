@@ -3,7 +3,7 @@ name: vaultspec-codify
 description: >-
   Use this skill to promote durable lessons from a completed audit
   or ADR into a project-shared rule under `.vaultspec/rules/rules/`
-  (the directory the CLI's `spec rules add` writes to today; the
+  (the directory the CLI's `vaultspec-core spec rules add` writes to today; the
   planned `--scope project` flag will move authored rules under
   `.vaultspec/rules/rules/project/`). Codification is the
   discretionary sixth phase of the pipeline; engage only when a
@@ -106,7 +106,7 @@ backticks. Name the failure mode this rule prevents.>
 
 ### Frontmatter & tagging mandate
 
-Project rule files use the `spec rules` schema, not the `.vault/`
+Project rule files use the `vaultspec-core spec rules` schema, not the `.vault/`
 schema:
 
 - **`name`**: MUST match the kebab-case slug used in the filename.
@@ -138,7 +138,7 @@ in the audit document that surfaced the new constraint.
   builtin rules. Project-authored rules are distinguished from
   builtins by name convention (builtins use the `*.builtin.md`
   suffix; authored rules do not). A planned `--scope project` flag
-  on `spec rules add` will separate authored rules under a
+  on `vaultspec-core spec rules add` will separate authored rules under a
   dedicated subdirectory; see the sibling `cli-spec-crud-parity`
   ADR.
 

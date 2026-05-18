@@ -41,7 +41,7 @@ related: []
 <!-- Findings that satisfy the three durability criteria
 (cross-session, constraint-shaped, project-bound) and should be
 promoted into project-shared rules under `.vaultspec/rules/rules/`
-(the directory the CLI's `spec rules add` writes to today; the
+(the directory the CLI's `vaultspec-core spec rules add` writes to today; the
 planned `--scope project` flag will move authored rules under
 `.vaultspec/rules/rules/project/`).
 

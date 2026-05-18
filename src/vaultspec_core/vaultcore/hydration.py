@@ -40,6 +40,7 @@ def hydrate_template(
     *,
     related: list[str] | None = None,
     extra_tags: list[str] | None = None,
+    tier: str | None = None,
 ) -> str:
     """Replace placeholders in a template string with actual values.
 
@@ -49,7 +50,10 @@ def hydrate_template(
     When *related* is provided, the template's placeholder ``related:``
     entries are replaced with the resolved wiki-link list. When
     *extra_tags* is provided, those tags are appended to the ``tags:``
-    block in frontmatter.
+    block in frontmatter. When *tier* is provided, the template's
+    ``{tier}`` placeholder is substituted; otherwise the placeholder
+    is left as-is for the caller to fill (the post-hydration unhydrated-
+    placeholder check will flag it).
 
     Args:
         template_content: Raw template text containing placeholder tokens.
@@ -61,6 +65,8 @@ def hydrate_template(
             the ``related:`` frontmatter field.
         extra_tags: Additional ``#tag`` strings to append to the ``tags:``
             frontmatter field (beyond the directory and feature tags).
+        tier: Optional plan tier value (``L1``..``L4``) substituted into
+            the ``{tier}`` placeholder for plan templates.
 
     Returns:
         The fully-hydrated document string.
@@ -78,6 +84,8 @@ def hydrate_template(
         placeholders["topic"] = title  # alias used in research template
         placeholders["phase"] = title  # alias used in plan/exec templates
         placeholders["step"] = title  # alias used in exec template
+    if tier:
+        placeholders["tier"] = tier
 
     # Perform replacements for both styles
     for key, value in placeholders.items():
@@ -184,6 +192,7 @@ def create_vault_doc(
     content_root: pathlib.Path | None = None,
     force: bool = False,
     dry_run: bool = False,
+    tier: str | None = None,
 ) -> pathlib.Path:
     """Scaffold a new vault document from the appropriate template.
 
@@ -199,6 +208,9 @@ def create_vault_doc(
         content_root: Explicit content root for template lookup.
         force: If ``True``, overwrite an existing document.
         dry_run: If ``True``, return the target path without writing.
+        tier: Plan tier value (``L1``..``L4``) substituted into the plan
+            template's ``{tier}`` placeholder. Ignored for non-plan
+            doc types whose templates do not carry the placeholder.
 
     Returns:
         Path to the newly created (or would-be-created) document.
@@ -227,6 +239,7 @@ def create_vault_doc(
         title,
         related=effective_related,
         extra_tags=extra_tags,
+        tier=tier,
     )
 
     filename = f"{date_str}-{feature}-{doc_type.value}.md"

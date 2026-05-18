@@ -19,8 +19,8 @@ real run only after the preview matches your intent.
 The rolling CLI UX audit's findings S4, S14, and B9 documented
 that destructive verbs across the CLI are gated asymmetrically:
 `install` writes about seventy files into the workspace with no
-flag, `uninstall` requires `--force`, `install --upgrade` ships
-without a preview, and `vault feature archive` has no `--dry-run`,
+flag, `uninstall` requires `--force`, `vaultspec-core install --upgrade` ships
+without a preview, and `vaultspec-core vault feature archive` has no `--dry-run`,
 no reversal, and silently breaks cross-feature links. The blast
 radius of a wrong-directory invocation today is large and the
 recovery story is manual.
@@ -54,29 +54,27 @@ verified against `vaultspec-core --version` 0.1.19):
 
 - **Good:**
   `vaultspec-core vault add plan --feature my-feature
-  --title "..." --related <stem> --dry-run` to preview the
-  scaffolded path and frontmatter. Note that today the scaffolded
-  tier ships as the literal placeholder `tier: L{#}` and must be
-  hand-patched before any plan command can parse the document; see
-  the `vaultspec-plan-editing-discipline` rule and the sibling
-  `cli-scaffolder-integrity` ADR. A planned `--tier` flag will
-  close that gap in `W01.P03.S08` of the umbrella plan.
+  --title "..." --tier L1 --related <stem> --dry-run` to preview
+  the scaffolded path, frontmatter, and tier value. The `--tier`
+  flag (defaults to L1; accepted values L1..L4) ensures the
+  scaffolded document parses on the next vault command and is
+  the canonical way to set the plan's tier at creation time.
 
 - **Bad:**
   `vaultspec-core install` in a busy repository without a preview.
   About seventy files appear, `.gitignore` is rewritten, `CLAUDE.md`
   is created. If the directory was wrong, the cleanup is
-  `uninstall --force` -- and uninstall has its own gaps.
+  `vaultspec-core uninstall --force` -- and uninstall has its own gaps.
 
 - **Bad:**
   `vaultspec-core vault feature archive <typo>` against a tag that
   does not exist. The verb returns exit 0 with a silent no-op (see
   also the `vaultspec-archive-discipline` rule). The dry-run does
   not exist for this verb today, so the only safe path is to
-  validate the tag with `vault feature list` before invocation.
+  validate the tag with `vaultspec-core vault feature list` before invocation.
 
 - **Bad:**
-  trusting `install --upgrade --dry-run`'s output today (which is
+  trusting `vaultspec-core install --upgrade --dry-run`'s output today (which is
   empty per finding S14). Treat the empty preview as a warning,
   not as confirmation. Until the gap closes (umbrella plan
   `W04.P11.S39`), the operator must inspect the workspace by hand

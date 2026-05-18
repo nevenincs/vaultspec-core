@@ -70,7 +70,7 @@ as the framework's builtin rules (`.vaultspec/rules/rules/`).
 Project-authored rules are distinguished from builtins by name
 convention (builtins use the `*.builtin.md` suffix; authored
 rules do not). A planned `--scope project` flag on
-`spec rules add` will separate authored rules into
+`vaultspec-core spec rules add` will separate authored rules into
 `.vaultspec/rules/rules/project/`; see the sibling
 `cli-spec-crud-parity` ADR.
 
