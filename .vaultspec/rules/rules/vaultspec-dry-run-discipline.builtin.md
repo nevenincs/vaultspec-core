@@ -44,7 +44,8 @@ The general pattern, for any destructive verb:
 5. Re-run the original invocation without `--dry-run` only when
    the preview is satisfactory.
 
-Worked examples:
+Worked examples (every command below works against today's CLI;
+verified against `vaultspec-core --version` 0.1.19):
 
 - **Good:**
   `vaultspec-core install --dry-run` against an empty directory,
@@ -52,9 +53,14 @@ Worked examples:
   `vaultspec-core install`.
 
 - **Good:**
-  `vaultspec-core vault add plan --feature my-feature --tier L1
-  --dry-run` to preview the scaffolded path and frontmatter before
-  the real `vault add plan` invocation.
+  `vaultspec-core vault add plan --feature my-feature
+  --title "..." --related <stem> --dry-run` to preview the
+  scaffolded path and frontmatter. Note that today the scaffolded
+  tier ships as the literal placeholder `tier: L{#}` and must be
+  hand-patched before any plan command can parse the document; see
+  the `vaultspec-plan-editing-discipline` rule and the sibling
+  `cli-scaffolder-integrity` ADR. A planned `--tier` flag will
+  close that gap in `W01.P03.S08` of the umbrella plan.
 
 - **Bad:**
   `vaultspec-core install` in a busy repository without a preview.
