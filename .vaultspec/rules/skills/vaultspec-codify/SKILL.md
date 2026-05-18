@@ -2,9 +2,12 @@
 name: vaultspec-codify
 description: >-
   Use this skill to promote durable lessons from a completed audit
-  or ADR into a project-shared rule under `.vaultspec/rules/project/`.
-  Codification is the discretionary sixth phase of the pipeline; engage
-  only when a lesson satisfies the three durability criteria.
+  or ADR into a project-shared rule under `.vaultspec/rules/rules/`
+  (the directory the CLI's `spec rules add` writes to today; the
+  planned `--scope project` flag will move authored rules under
+  `.vaultspec/rules/rules/project/`). Codification is the
+  discretionary sixth phase of the pipeline; engage only when a
+  lesson satisfies the three durability criteria.
 ---
 
 # Codify: Project Rule Authoring Skill

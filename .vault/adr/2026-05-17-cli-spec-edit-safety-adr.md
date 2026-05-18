@@ -122,7 +122,14 @@ errors. On any failure path:
 **`--editor` flag on `spec * edit`.** A per-invocation override
 for the editor binary. Useful for CI contexts that want to
 script the edit with a non-interactive command (e.g.,
-`--editor='sed -i s/foo/bar/'`).
+`--editor='sed -i s/foo/bar/'`). The flag's value is parsed
+through `shlex.split` and invoked with `shell=False` so user
+quoting controls argv splitting, not shell expansion;
+spec-edit invocations never pass a string to a shell
+interpreter, even when the operator's value contains shell
+metacharacters. This invariant is mandatory; the implementation
+must not accept the flag's value as a shell command string under
+any condition.
 
 ## Rationale
 
@@ -162,10 +169,13 @@ surface. It must land with thoughtful help text, a documented
 schema, and a test surface that covers each entry.
 
 Pitfalls. An aggressive editor-resolution fallback ladder is
-useful; an aggressive `--editor` flag that accepts arbitrary
-shell commands is a security surface. The flag's value is
-exec'd as-is; users who pass shell metacharacters are
-responsible for their own quoting.
+useful; the `--editor` flag is a security surface that requires
+discipline. The flag's value is parsed via `shlex.split` and
+invoked with `shell=False`; the implementation must never pass
+the value to a shell interpreter. Any future helper that adds
+shell-style expansion (variable substitution, glob expansion,
+pipe chaining) belongs in a separate explicit verb, not in
+`--editor`'s execution path.
 
 Pathways. Once `spec * edit` works and exit codes are honest,
 the framework's pre-commit-hook integration surface becomes

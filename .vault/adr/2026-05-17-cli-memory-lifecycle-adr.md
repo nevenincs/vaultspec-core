@@ -83,9 +83,13 @@ small set of frontmatter additions.
 an audit document into a durable project rule.
 
 - `vaultspec-core vault rule promote --from <audit-stem> --as
-  <rule-name>` writes `.vaultspec/rules/project/<rule-name>.md` with
-  a `derived_from: ['audit:<audit-stem>']` frontmatter field, plus a
-  short body templated from the audit finding.
+  <rule-name>` writes `.vaultspec/rules/rules/project/<rule-name>.md`
+  with a `derived_from: ['audit:<audit-stem>']` frontmatter field,
+  plus a short body templated from the audit finding. The
+  `project/` subdirectory ships alongside this verb as part of the
+  `cli-spec-crud-parity` ADR's `--scope project` flag work;
+  pre-existing authored rules in the flat `.vaultspec/rules/rules/`
+  directory are migrated by the same Step.
 - The originating audit document gains a `promoted_to:
   ['rule:<rule-name>']` back-pointer.
 - The pipeline gains a sixth lifecycle phase: "codify". Builtin

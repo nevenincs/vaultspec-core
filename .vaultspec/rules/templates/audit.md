@@ -40,7 +40,10 @@ related: []
 
 <!-- Findings that satisfy the three durability criteria
 (cross-session, constraint-shaped, project-bound) and should be
-promoted into project-shared rules under `.vaultspec/rules/project/`.
+promoted into project-shared rules under `.vaultspec/rules/rules/`
+(the directory the CLI's `spec rules add` writes to today; the
+planned `--scope project` flag will move authored rules under
+`.vaultspec/rules/rules/project/`).
 
 Each candidate names the finding it derives from, the proposed
 rule slug (kebab-case, naming the constraint's subject not the
