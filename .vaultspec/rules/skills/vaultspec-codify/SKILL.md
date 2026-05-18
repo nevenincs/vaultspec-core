@@ -130,8 +130,14 @@ in the audit document that surfaced the new constraint.
 
 ## Persistence
 
-- **Output location:** `.vaultspec/rules/project/<rule-name>.md`,
-  authored via the CLI scaffold path.
+- **Output location:** today the CLI scaffold path writes to
+  `.vaultspec/rules/rules/<rule-name>.md` alongside the framework's
+  builtin rules. Project-authored rules are distinguished from
+  builtins by name convention (builtins use the `*.builtin.md`
+  suffix; authored rules do not). A planned `--scope project` flag
+  on `spec rules add` will separate authored rules under a
+  dedicated subdirectory; see the sibling `cli-spec-crud-parity`
+  ADR.
 
 - **Sharing policy:** project rules under `.vaultspec/rules/` are
   team-shared by the framework's policy; teammates inherit the

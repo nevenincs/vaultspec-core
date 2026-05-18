@@ -54,7 +54,7 @@ is actually a reference document; produce
 
 ## How to author
 
-A codification produces a file under `.vaultspec/rules/project/`
+A codification produces a file under `.vaultspec/rules/rules/`
 that captures the rule. Today's canonical authoring path is the
 existing CLI:
 
@@ -64,6 +64,15 @@ existing CLI:
   `destructive-verbs-need-dry-run`).
 - The author then opens the scaffolded file and fills the three
   sections above.
+
+Today the CLI places authored project rules in the same directory
+as the framework's builtin rules (`.vaultspec/rules/rules/`).
+Project-authored rules are distinguished from builtins by name
+convention (builtins use the `*.builtin.md` suffix; authored
+rules do not). A planned `--scope project` flag on
+`spec rules add` will separate authored rules into
+`.vaultspec/rules/rules/project/`; see the sibling
+`cli-spec-crud-parity` ADR.
 
 A higher-level codification verb (`vaultspec-core vault rule
 promote --from <audit-stem> --as <rule-name>`) is planned. It will
@@ -85,12 +94,15 @@ they fragment the discipline.
 
 ## Where the rule lives, and why
 
-Project-authored rules live under `.vaultspec/rules/project/`. The
-framework's install policy is for that directory to be tracked by
-git so the rule reaches every teammate on clone. (Pre-existing
-installs may have an older policy that gitignored the directory;
-see the framework manual's section on sharing policy and the
-sibling ADR `cli-spec-gitignore` for the migration story.)
+Project-authored rules live under `.vaultspec/rules/rules/`
+alongside the framework's builtin rules (the framework distinguishes
+authored from builtin by name convention: builtins use the
+`*.builtin.md` suffix; authored rules do not). The framework's
+install policy is for that directory to be tracked by git so the
+rule reaches every teammate on clone. (Pre-existing installs may
+have an older policy that gitignored the directory; see the
+framework manual's section on sharing policy and the sibling ADR
+`cli-spec-gitignore` for the migration story.)
 
 A rule that exists only on one developer's machine is not a
 codification; it is a personal note. The whole point of writing

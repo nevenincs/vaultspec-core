@@ -134,9 +134,14 @@ in the rule bodies.
 
 ## Persistence
 
-- **WRITE** the rule to `.vaultspec/rules/project/<rule-name>.md`
-  via the CLI scaffold path. Do NOT write directly to the file
-  system; the CLI ensures path discipline and metadata correctness.
+- **WRITE** the rule via the CLI scaffold path
+  (`vaultspec-core spec rules add --name <rule-name>`). Today this
+  places the file at `.vaultspec/rules/rules/<rule-name>.md`
+  alongside the framework's builtin rules; project-authored rules
+  are distinguished from builtins by name convention (builtins use
+  the `*.builtin.md` suffix; authored rules do not). Do NOT write
+  directly to the file system; the CLI ensures path discipline
+  and metadata correctness.
 
 - **VERIFY** with `vaultspec-core spec rules show <name>` that the
   rule reads as authored.
