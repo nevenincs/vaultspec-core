@@ -275,6 +275,51 @@ class TestInstallSkip:
             f"{[r.getMessage() for r in sync_failures]}"
         )
 
+    def test_install_force_propagates_to_sync_provider(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        """Regression: `install --force` must overwrite user-authored system files.
+
+        The fresh-install path used to call
+        `sync_provider(sync_target, skip=skip - {"core"})` without
+        forwarding `force=force`. `sync_provider`'s `system_sync` pass
+        preserves user-authored content (files lacking the vaultspec
+        managed-block marker) unless `force=True` is set, so an
+        `install --force` invocation would silently leave a
+        user-replaced `.gemini/SYSTEM.md` unchanged and only emit a
+        skipped-with-warning entry.
+
+        This test replaces `.gemini/SYSTEM.md` with content that does
+        NOT carry the vaultspec marker (i.e., looks user-authored),
+        re-runs install with `force=True`, and asserts the file was
+        overwritten with the canonical scaffold. Without `force=force`
+        propagation, the sync pass skips the file and the sentinel
+        survives.
+        """
+        factory.install()
+
+        system_file = factory.root / DirName.GEMINI / "SYSTEM.md"
+        assert system_file.exists(), (
+            "gemini SYSTEM.md must exist after a clean install for this "
+            f"regression test to be meaningful (looked at {system_file})"
+        )
+
+        # Write user-authored content with NO vaultspec marker so the
+        # sync pass treats it as user-owned and only overwrites under
+        # force.
+        sentinel = "user-authored sentinel without vaultspec marker"
+        system_file.write_text(sentinel, encoding="utf-8")
+
+        factory.install(force=True)
+
+        restored = system_file.read_text(encoding="utf-8")
+        assert sentinel not in restored, (
+            "`install --force` did not overwrite the user-authored "
+            "`.gemini/SYSTEM.md`. The sync pass is not receiving "
+            "`force=force`; user-authored content survives a forced "
+            "install."
+        )
+
     def test_skip_provider_installs_others(self, factory: WorkspaceFactory) -> None:
         factory.create_gitignore()
         result = factory.run("install", "--skip", "claude")

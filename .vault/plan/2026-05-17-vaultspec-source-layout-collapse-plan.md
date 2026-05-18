@@ -11,7 +11,7 @@ related:
   - '[[2026-04-30-doctor-dev-repo-adr]]'
 ---
 
-# `vaultspec-source-layout-collapse` plan
+# `vaultspec-source-layout-collapse` plan: `relocate canonical content and retire the dev-mode carve-out`
 
 Relocate the canonical bundled content from `.vaultspec/rules/` into the
 Python package source tree, move the three human-facing documents into a

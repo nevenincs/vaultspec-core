@@ -1015,7 +1015,10 @@ def install_run(
     try:
         # Filter `core` out: `sync_provider` rejects it, but `install_run`
         # accepts it as a "framework only, skip provider sync" hint.
-        sync_provider(sync_target, skip=skip - {"core"})
+        # Forward `force`: `install --force` must propagate to the sync
+        # pass so user-authored system prompts and provider configs are
+        # overwritten consistently with the rest of the install.
+        sync_provider(sync_target, force=force, skip=skip - {"core"})
     except (VaultSpecError, OSError) as exc:
         logger.warning("Sync failed during install: %s", exc)
         post_errors.append(f"sync: {exc}")
