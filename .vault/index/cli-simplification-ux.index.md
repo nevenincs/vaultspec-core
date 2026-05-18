@@ -3,12 +3,13 @@ generated: true
 tags:
   - '#index'
   - '#cli-simplification-ux'
-date: '2026-05-17'
+date: '2026-05-18'
 related:
   - '[[2026-05-17-cli-simplification-ux-adr]]'
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-simplification-ux-plan]]'
   - '[[2026-05-17-cli-simplification-ux-research]]'
+  - '[[2026-05-18-cli-simplification-ux-reference]]'
 ---
 
 # `cli-simplification-ux` feature index
@@ -28,6 +29,10 @@ Auto-generated index of all documents tagged with `#cli-simplification-ux`.
 ### plan
 
 - `2026-05-17-cli-simplification-ux-plan` - `cli-simplification-ux` `CLI simplification and UX hardening epic` plan
+
+### reference
+
+- `2026-05-18-cli-simplification-ux-reference` - `cli-simplification-ux` reference: `Audit-driven decomposition: from findings to rules`
 
 ### research
 
