@@ -932,3 +932,56 @@ body destruction, S22 tier placeholder, S23 missing next-step
 hint, S24 spec-doctor language-track integrity check) are
 dispositioned through the existing ADR set. None require a new
 cluster ADR; all extend or refine existing ones.
+
+## Codification candidates
+
+Backfilled per the audit template's new `## Codification
+candidates` section (which post-dated the original audit
+authoring). The audit's findings have already produced four
+builtin discipline rules through the codify pipeline phase. Each
+entry below names the source finding, the rule slug, and a
+one-sentence statement of the constraint codified.
+
+- **Source:** Round-3a Bridge Gap meta-finding.
+  **Rule slug:** `vaultspec-codify`.
+  **Rule:** Promote durable cross-session lessons surfaced in
+  audit or ADR documents into project-shared rules via the codify
+  pipeline phase, satisfying the three durability criteria
+  (cross-session, constraint-shaped, project-bound).
+
+- **Source:** Finding B9 (critical archive blast radius).
+  **Rule slug:** `vaultspec-archive-discipline`.
+  **Rule:** Before invoking `vault feature archive` against a
+  feature, audit incoming cross-feature `related:` references and
+  classify each as preserve, drop, or block-archive; do not run
+  the amputating auto-fix on the post-archive dangling errors.
+
+- **Source:** Finding B6 (plan-body destruction reproduced four
+  times).
+  **Rule slug:** `vaultspec-plan-editing-discipline`.
+  **Rule:** When authoring or revising a plan, complete every
+  Wave / Phase / Step structural mutation through the CLI verbs
+  first; author prose sections last; until the
+  `cli-plan-body-preservation` ADR's serialiser fix lands,
+  interleaving structure and prose destroys prose.
+
+- **Source:** Findings S4, S14, and the gating dimension of B9.
+  **Rule slug:** `vaultspec-dry-run-discipline`.
+  **Rule:** Before invoking any vaultspec CLI verb that writes or
+  removes state, run the verb with `--dry-run` first when the
+  flag is available; treat an empty preview as a warning, not as
+  confirmation; until the `cli-blast-radius-gating` ADR's
+  universal-dry-run fix lands, the operator is the discipline.
+
+Round-4 self-corrections (commits `6553796`, `9e90ff7`, `166822d`)
+hardened the codify-cluster rules against the discipline they
+themselves prescribe. The Round 4 audit-of-audit confirms that
+fresh-eyes agents catch language-track violations within the same
+round; the codify discipline holds under recursive application to
+itself.
+
+Remaining round-4 findings (B11, S21, S22, S23, S24) did not
+produce additional codification candidates because their
+disposition is code-track work in the umbrella plan, not durable
+cross-session constraints. The plan steps that deliver them carry
+forward the language-track updates each cluster ADR specifies.
