@@ -102,9 +102,16 @@ def hydrate_template(
     if extra_tags:
         hydrated = _inject_extra_tags(hydrated, extra_tags)
 
-    # Check for remaining placeholders that might have been missed
-    # Pattern matches {key} or <key> where key is alphanumeric with hyphens
-    remaining = re.findall(r"[{<][a-z0-9\-_*]+[}>]", hydrated)
+    # Check for remaining placeholders that might have been missed.
+    # Pattern matches {key} or <key> where key is alphanumeric with hyphens.
+    # Strip HTML comment regions (<!-- ... -->) first: tokens inside those
+    # are intentional template guidance for the human author, not
+    # frontmatter placeholders. Without this, every freshly scaffolded
+    # adr/plan/exec doc emits warnings about {adr}, {research},
+    # {reference}, <display-path> etc. that live inside the template's
+    # own guidance comments.
+    scan_target = re.sub(r"<!--.*?-->", "", hydrated, flags=re.DOTALL)
+    remaining = re.findall(r"[{<][a-z0-9\-_*]+[}>]", scan_target)
     if remaining:
         for placeholder in set(remaining):
             if placeholder in _KNOWN_PLACEHOLDERS:

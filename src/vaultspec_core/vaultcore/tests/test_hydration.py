@@ -45,6 +45,27 @@ def test_hydrate_template_leaves_missing_title_and_warns(caplog):
     assert "Potential unhydrated placeholder found in template: {title}" in caplog.text
 
 
+def test_hydrate_template_skips_placeholders_inside_html_comments(caplog):
+    """Tokens inside HTML guidance comments do not raise unhydrated warnings.
+
+    The framework templates carry human-facing guidance like
+    ``<!-- Reference {adr}, {research}, {reference} for context -->`` that
+    is meant for the author and not for placeholder substitution. The
+    warning that flags genuinely unhydrated frontmatter placeholders must
+    not fire against tokens inside those comment regions.
+    """
+    template = (
+        "tags: ['#adr', '#{feature}']\n"
+        "<!-- Reference {adr}, {research}, {reference} for context.\n"
+        "     Multi-line comments must also be skipped. -->\n"
+        "body has no genuine placeholders\n"
+    )
+    with caplog.at_level(logging.WARNING):
+        result = hydrate_template(template, "feat", "2026-05-19")
+    assert "#feat" in result
+    assert "Potential unhydrated placeholder" not in caplog.text
+
+
 def test_hydrate_template_substitutes_tier_when_passed():
     """Verify the {tier} placeholder is hydrated when tier is supplied."""
     template = "tier: {tier}"

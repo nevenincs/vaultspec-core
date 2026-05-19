@@ -66,7 +66,7 @@ Enforce the framework-wide invariant that scaffolders never emit values their va
 - [ ] `W01.P03.S07` - Implement emit-time validator that runs the schema check against scaffolded output before flush; `src/vaultspec_core/vaultcore/`.
 - [x] `W01.P03.S08` - Add --tier flag with default L1 to vault add plan and remove the L curly-pound placeholder from the plan template; `src/vaultspec_core/cli/vault_cmd.py`.
 - [ ] `W01.P03.S09` - Require --phase-title and --phase-intent on vault plan tier promote from L1 to L2 and remove the TODO placeholder; `src/vaultspec_core/plan/commands/`.
-- [ ] `W01.P03.S10` - Narrow the unhydrated-placeholder warning to skip tokens inside HTML comment regions; `src/vaultspec_core/builtins/`.
+- [x] `W01.P03.S10` - Narrow the unhydrated-placeholder warning to skip tokens inside HTML comment regions; `src/vaultspec_core/builtins/`.
 
 ## Wave `W02` - Memory architecture
 
