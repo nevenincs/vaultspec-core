@@ -199,6 +199,28 @@ def test_step_remove_unknown_id_emits_clean_error(tmp_path, runner: CliRunner) -
     assert "Traceback" not in combined
 
 
+def test_tier_promote_rejects_missing_phase_flags(
+    tmp_path, runner: CliRunner
+) -> None:
+    """L1 -> L2 promotion without --phase-title / --phase-intent must refuse.
+
+    The CLI does not silently substitute ``TODO: Phase title`` placeholders
+    into the plan document; it requires explicit values up front.
+    """
+    rng = random.Random(8)
+    spec = make_clean_plan("L1", rng=rng, steps=2)
+    plan_path = tmp_path / "test-plan.md"
+    plan_path.write_text(spec.render(), encoding="utf-8")
+
+    result = runner.invoke(app, ["vault", "plan", "tier", "promote", str(plan_path)])
+
+    assert result.exit_code == 1
+    assert "--phase-title" in result.stdout
+    assert "--phase-intent" in result.stdout
+    # Plan body must be untouched after a refused promotion.
+    assert "TODO: Phase title" not in plan_path.read_text(encoding="utf-8")
+
+
 def test_tier_promote_advances_one_step(tmp_path, runner: CliRunner) -> None:
     """``vault plan tier promote`` advances the tier and synthesises a Phase wrapper."""
     from vaultspec_core.plan.parser import parse_plan
@@ -208,7 +230,20 @@ def test_tier_promote_advances_one_step(tmp_path, runner: CliRunner) -> None:
     plan_path = tmp_path / "test-plan.md"
     plan_path.write_text(spec.render(), encoding="utf-8")
 
-    result = runner.invoke(app, ["vault", "plan", "tier", "promote", str(plan_path)])
+    result = runner.invoke(
+        app,
+        [
+            "vault",
+            "plan",
+            "tier",
+            "promote",
+            str(plan_path),
+            "--phase-title",
+            "Implementation",
+            "--phase-intent",
+            "Deliver the substantive implementation work.",
+        ],
+    )
 
     assert result.exit_code == 0, result.stdout
     plan = parse_plan(plan_path)

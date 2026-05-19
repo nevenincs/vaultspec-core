@@ -715,33 +715,102 @@ def cmd_tier_promote(
         ),
     ] = None,
     phase_title: Annotated[
-        str, typer.Option("--phase-title", help="Title for the synthesised P01")
-    ] = "TODO: Phase title",
+        str | None,
+        typer.Option("--phase-title", help="Title for the synthesised P01"),
+    ] = None,
     phase_intent: Annotated[
-        str, typer.Option("--phase-intent", help="Intent for the synthesised P01")
-    ] = "TODO: Phase intent paragraph required.",
+        str | None,
+        typer.Option("--phase-intent", help="Intent for the synthesised P01"),
+    ] = None,
     wave_title: Annotated[
-        str, typer.Option("--wave-title", help="Title for the synthesised W01")
-    ] = "TODO: Wave title",
+        str | None,
+        typer.Option("--wave-title", help="Title for the synthesised W01"),
+    ] = None,
     wave_intent: Annotated[
-        str, typer.Option("--wave-intent", help="Intent for the synthesised W01")
-    ] = "TODO: Wave intent paragraph required.",
+        str | None,
+        typer.Option("--wave-intent", help="Intent for the synthesised W01"),
+    ] = None,
     epic_intent: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--epic-intent",
             help="Epic intent paragraph (must declare PM association)",
         ),
-    ] = "TODO: Epic intent paragraph required.",
+    ] = None,
 ) -> None:
-    """Promote the plan tier transitively (L1 -> ... -> L4)."""
+    """Promote the plan tier transitively (L1 -> ... -> L4).
+
+    Promotion paths that introduce new containers require explicit
+    title/intent flags for those containers. L1 -> L2 requires
+    ``--phase-title`` and ``--phase-intent``; L2 -> L3 requires
+    ``--wave-title`` and ``--wave-intent``; L3 -> L4 requires
+    ``--epic-intent``. Transitive promotions (e.g. L1 -> L4) require
+    the union of the relevant flag sets. The CLI refuses to write
+    ``TODO:`` placeholders into the plan document; the operator must
+    supply real values up front.
+    """
+    from vaultspec_core.console import get_console
     from vaultspec_core.plan.commands.tier_ops import promote_tier
     from vaultspec_core.plan.frontmatter import Tier
     from vaultspec_core.plan.parser import parse_plan
     from vaultspec_core.plan.serialiser import serialise_plan
 
+    console = get_console()
+
     plan = parse_plan(path)
+    current_tier_value = plan.frontmatter.tier.value
     target_tier = Tier(target) if target is not None else None
+
+    # Determine which transitions will be made and validate the matching
+    # flag sets are populated. Refuses to substitute TODO placeholders.
+    tier_order = ["L1", "L2", "L3", "L4"]
+    if target_tier is None:
+        # Default: advance one tier.
+        try:
+            current_idx = tier_order.index(current_tier_value)
+        except ValueError:
+            current_idx = 0
+        if current_idx + 1 >= len(tier_order):
+            target_value = current_tier_value
+        else:
+            target_value = tier_order[current_idx + 1]
+    else:
+        target_value = target_tier.value
+
+    try:
+        current_idx = tier_order.index(current_tier_value)
+        target_idx = tier_order.index(target_value)
+    except ValueError:
+        current_idx = 0
+        target_idx = 0
+    transitions = tier_order[current_idx + 1 : target_idx + 1]
+
+    missing: list[str] = []
+    if "L2" in transitions:
+        if phase_title is None:
+            missing.append("--phase-title")
+        if phase_intent is None:
+            missing.append("--phase-intent")
+    if "L3" in transitions:
+        if wave_title is None:
+            missing.append("--wave-title")
+        if wave_intent is None:
+            missing.append("--wave-intent")
+    if "L4" in transitions and epic_intent is None:
+        missing.append("--epic-intent")
+
+    if missing:
+        console.print(
+            f"[red]Cannot promote {current_tier_value} -> {target_value} "
+            f"without the following flag(s): {', '.join(missing)}.[/red]"
+        )
+        console.print(
+            "[dim]Each promotion path that introduces a new container "
+            "requires its title/intent up front; the CLI does not write "
+            "TODO placeholders into plan documents.[/dim]"
+        )
+        raise typer.Exit(code=1)
+
     new_tier = promote_tier(
         plan,
         target=target_tier,
