@@ -184,30 +184,6 @@ def has_block(content: str, block_type: str) -> bool:
         return False
 
 
-def get_block_content(content: str, block_type: str) -> str | None:
-    """Extract the inner content of a managed block.
-
-    Args:
-        content: Full file content to search.
-        block_type: The ``type`` attribute to look for.
-
-    Returns:
-        Block body as a string (may be empty string for an empty block),
-        or ``None`` if no block of the given type exists.
-
-    Raises:
-        TagError: If the file has malformed tags.
-    """
-    blocks = find_blocks(content)
-    lines = content.splitlines()
-    for b in blocks:
-        if b.block_type == block_type:
-            if b.content_start > b.content_end:
-                return ""
-            return "\n".join(lines[b.content_start - 1 : b.content_end])
-    return None
-
-
 def upsert_block(
     content: str,
     block_type: str,

@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import pathlib
 
-    from ...core.enums import CapabilityLevel, ModelRegistry
+    from ...core.enums import ModelRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -206,18 +206,6 @@ class ExecutionProvider(abc.ABC):
     @abc.abstractmethod
     def models(self) -> ModelRegistry:
         """The model registry class for this provider."""
-
-    def get_best_model_for_capability(self, level: CapabilityLevel) -> str:
-        """Return the model ID that best matches the requested capability level.
-
-        Args:
-            level: Desired capability tier.
-
-        Returns:
-            Model ID string; falls back to the MEDIUM model when the level
-            is not found in the registry.
-        """
-        return self.models.from_level(level)
 
     @abc.abstractmethod
     def load_system_prompt(self, root_dir: pathlib.Path) -> str:

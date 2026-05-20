@@ -487,53 +487,6 @@ class VaultGraph:
 
     # -- Query methods -------------------------------------------------------
 
-    def get_node(self, name: str) -> DocNode | None:
-        """Return the :class:`DocNode` for *name*, or ``None``.
-
-        Args:
-            name: Document stem (graph key).
-
-        Returns:
-            The matching :class:`DocNode`, or ``None`` if not found.
-        """
-        return self.nodes.get(name)
-
-    def get_hotspots(
-        self,
-        limit: int = 10,
-        doc_type: DocType | None = None,
-        feature: str | None = None,
-    ) -> list[tuple[str, int]]:
-        """Return documents with the most incoming links.
-
-        Uses ``nx.in_degree_centrality`` on the digraph and maps
-        normalised scores back to raw in-degree counts.
-
-        Args:
-            limit: Maximum number of results to return.
-            doc_type: Restrict results to this document type.
-            feature: Restrict results to documents tagged with this
-                feature (``#``-prefix is added automatically if absent).
-
-        Returns:
-            ``(name, in_link_count)`` tuples sorted descending.
-        """
-        filtered = [n for n in self.nodes.values() if not n.phantom]
-
-        if doc_type:
-            filtered = [n for n in filtered if n.doc_type == doc_type]
-
-        if feature:
-            tag = f"#{feature}" if not feature.startswith("#") else feature
-            filtered = [n for n in filtered if tag in n.tags]
-
-        rankings = [(n.name, len(n.in_links)) for n in filtered]
-        return sorted(
-            rankings,
-            key=lambda x: x[1],
-            reverse=True,
-        )[:limit]
-
     def get_feature_rankings(
         self,
         limit: int = 10,
@@ -653,31 +606,6 @@ class VaultGraph:
             )
             snapshot[node.path] = (metadata, node.body)
         return snapshot
-
-    def neighbors(
-        self,
-        name: str,
-        direction: str = "out",
-    ) -> list[str]:
-        """Return neighbor node names for *name*.
-
-        Args:
-            name: Document stem.
-            direction: ``"out"`` for successors, ``"in"`` for
-                predecessors, ``"both"`` for the union.
-
-        Returns:
-            Sorted list of neighbor names.
-        """
-        if name not in self._digraph:
-            return []
-        if direction == "in":
-            return sorted(self._digraph.predecessors(name))
-        if direction == "both":
-            preds = set(self._digraph.predecessors(name))
-            succs = set(self._digraph.successors(name))
-            return sorted(preds | succs)
-        return sorted(self._digraph.successors(name))
 
     # -- Metrics (networkx algorithms) ---------------------------------------
 

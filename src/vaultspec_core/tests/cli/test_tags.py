@@ -7,7 +7,6 @@ import pytest
 from vaultspec_core.core.tags import (
     TagError,
     find_blocks,
-    get_block_content,
     has_block,
     strip_block,
     upsert_block,
@@ -132,23 +131,6 @@ class TestHasBlock:
     def test_malformed_returns_false(self):
         content = '<vaultspec type="config">\nNo close\n'
         assert has_block(content, "config") is False
-
-
-# --- get_block_content ---
-
-
-class TestGetBlockContent:
-    def test_extracts_content(self):
-        content = '<vaultspec type="config">\nLine A\nLine B\n</vaultspec>\n'
-        assert get_block_content(content, "config") == "Line A\nLine B"
-
-    def test_empty_block(self):
-        content = '<vaultspec type="config">\n</vaultspec>\n'
-        assert get_block_content(content, "config") == ""
-
-    def test_missing_block(self):
-        content = "No tags here\n"
-        assert get_block_content(content, "config") is None
 
 
 # --- upsert_block ---

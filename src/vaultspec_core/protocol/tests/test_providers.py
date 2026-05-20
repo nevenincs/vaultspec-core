@@ -1,7 +1,7 @@
 """Behavioral tests for the execution protocol provider layer.
 
-Covers include resolution, model selection, prompt section ordering, Claude
-prompt loading, and include-directory validation against execution fixtures.
+Covers include resolution, prompt section ordering, Claude prompt
+loading, and the shared abstract provider API.
 """
 
 from __future__ import annotations
@@ -11,11 +11,8 @@ import inspect
 import pytest
 
 from ..providers import (
-    CapabilityLevel,
-    ClaudeModels,
     ClaudeProvider,
     ExecutionProvider,
-    GeminiModels,
     GeminiProvider,
     resolve_includes,
 )
@@ -52,18 +49,6 @@ class TestGeminiProvider:
     def test_name(self, provider):
         assert provider.name == "gemini"
 
-    def test_best_model_high(self, provider):
-        assert (
-            provider.get_best_model_for_capability(CapabilityLevel.HIGH)
-            == GeminiModels.HIGH
-        )
-
-    def test_best_model_low(self, provider):
-        assert (
-            provider.get_best_model_for_capability(CapabilityLevel.LOW)
-            == GeminiModels.LOW
-        )
-
     def test_system_prompt_ordering(self, provider):
         """Prompt ordering: system instructions -> persona -> rules."""
         prompt = provider.construct_system_prompt(
@@ -86,24 +71,6 @@ class TestClaudeProvider:
 
     def test_name(self, provider):
         assert provider.name == "claude"
-
-    def test_best_model_high(self, provider):
-        assert (
-            provider.get_best_model_for_capability(CapabilityLevel.HIGH)
-            == ClaudeModels.HIGH
-        )
-
-    def test_best_model_medium(self, provider):
-        assert (
-            provider.get_best_model_for_capability(CapabilityLevel.MEDIUM)
-            == ClaudeModels.MEDIUM
-        )
-
-    def test_best_model_low(self, provider):
-        assert (
-            provider.get_best_model_for_capability(CapabilityLevel.LOW)
-            == ClaudeModels.LOW
-        )
 
 
 class TestProviderAPIParity:

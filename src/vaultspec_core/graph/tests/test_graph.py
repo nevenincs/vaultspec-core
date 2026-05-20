@@ -227,37 +227,6 @@ class TestVaultGraphBuilding:
 
 
 class TestVaultGraphQueries:
-    def test_get_node_existing(self, vault_root):
-        graph = VaultGraph(vault_root)
-        node = graph.get_node(
-            "2026-02-05-editor-demo-architecture-adr",
-        )
-        assert node is not None
-        assert node.doc_type == DocType.ADR
-
-    def test_get_node_missing(self, vault_root):
-        graph = VaultGraph(vault_root)
-        assert graph.get_node("nonexistent") is None
-
-    def test_get_hotspots(self, vault_root):
-        graph = VaultGraph(vault_root)
-        hotspots = graph.get_hotspots(limit=5)
-        assert isinstance(hotspots, list)
-        assert len(hotspots) > 0
-        assert all(isinstance(h, tuple) and len(h) == 2 for h in hotspots)
-
-    def test_get_hotspots_filter_by_type(self, vault_root):
-        graph = VaultGraph(vault_root)
-        adr_only = graph.get_hotspots(doc_type=DocType.ADR)
-        for name, _count in adr_only:
-            assert graph.nodes[name].doc_type == DocType.ADR
-
-    def test_get_hotspots_filter_by_feature(self, vault_root):
-        graph = VaultGraph(vault_root)
-        results = graph.get_hotspots(feature="editor-demo")
-        for name, _count in results:
-            assert "#editor-demo" in graph.nodes[name].tags
-
     def test_get_orphaned(self, vault_root):
         graph = VaultGraph(vault_root)
         orphans = graph.get_orphaned()
@@ -308,31 +277,6 @@ class TestVaultGraphQueries:
         graph = VaultGraph(vault_root)
         sg = graph.subgraph(feature=None)
         assert sg is graph._digraph
-
-    def test_neighbors_out(self, vault_root):
-        graph = VaultGraph(vault_root)
-        node = graph.nodes["2026-02-05-editor-demo-architecture-adr"]
-        if node.out_links:
-            out_neighbors = graph.neighbors(
-                node.name,
-                direction="out",
-            )
-            assert len(out_neighbors) > 0
-
-    def test_neighbors_in(self, vault_root):
-        graph = VaultGraph(vault_root)
-        for node in graph.nodes.values():
-            if node.in_links:
-                in_neighbors = graph.neighbors(
-                    node.name,
-                    direction="in",
-                )
-                assert len(in_neighbors) > 0
-                break
-
-    def test_neighbors_missing_node(self, vault_root):
-        graph = VaultGraph(vault_root)
-        assert graph.neighbors("nonexistent") == []
 
 
 # ---------------------------------------------------------------------------
