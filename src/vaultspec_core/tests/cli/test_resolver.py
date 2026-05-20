@@ -290,9 +290,9 @@ class TestBuiltinVersionRules:
                 framework=FrameworkSignal.PRESENT,
             )
             plan = resolve(diag, action)
-            assert not any(
-                "no version baseline" in w.lower() for w in plan.warnings
-            ), f"{action} should not warn about a missing builtin baseline"
+            assert not any("no version baseline" in w.lower() for w in plan.warnings), (
+                f"{action} should not warn about a missing builtin baseline"
+            )
 
         diag = _make_diagnosis(
             builtin_version=BuiltinVersionSignal.NO_SNAPSHOTS,
