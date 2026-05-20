@@ -1,13 +1,17 @@
 """CLI-layer rendering helpers for dry-run previews and sync summaries.
 
 All Rich/console output for structured previews lives here, not in core.
-Key export: :func:`render_dry_run_tree`. Depends on
-:mod:`vaultspec_core.core.dry_run` for :class:`~vaultspec_core.core.dry_run.DryRunItem`
-and status styles; consumed by :mod:`.root` and indirectly by :mod:`.vault_cmd`.
+Key exports: :func:`render_dry_run_tree` and the canonical outcome
+vocabulary (:class:`Outcome`, :func:`render_outcomes`,
+:func:`outcomes_as_json`). Depends on :mod:`vaultspec_core.core.dry_run`
+for :class:`~vaultspec_core.core.dry_run.DryRunItem` and status styles;
+consumed by :mod:`.root` and indirectly by :mod:`.vault_cmd`.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from vaultspec_core.console import get_console
@@ -21,6 +25,169 @@ from vaultspec_core.core.dry_run import (
     count_by_status,
     group_by_label,
 )
+
+
+class Outcome(StrEnum):
+    """Canonical outcome-state vocabulary for state-changing operations.
+
+    One word per terminal state of a state-changing CLI operation,
+    shared across every sync-shaped surface (``install``, ``sync``, the
+    ``spec * sync`` family, ``migrations run``, ``vault repair``,
+    ``vault check ... --fix``) so operators and tooling read a single
+    taxonomy instead of the five divergent vocabularies the CLI UX
+    audit documented (findings S2, S8, S10). See the
+    ``cli-sync-vocabulary`` ADR.
+
+    Members:
+        CREATED: A destination that did not exist now exists.
+        UPDATED: A destination that existed was changed.
+        UNCHANGED: Destination already matched source; no write happened.
+        REMOVED: A destination that existed no longer does.
+        RESTORED: A destination was reset to its canonical version.
+        SKIPPED: A destination was not touched because a precondition
+            or policy excluded it.
+        FAILED: A write was attempted and an error was encountered.
+        MIXED: Aggregate only - a single invocation produced items with
+            more than one distinct outcome. Never assigned to an
+            individual item.
+    """
+
+    CREATED = "created"
+    UPDATED = "updated"
+    UNCHANGED = "unchanged"
+    REMOVED = "removed"
+    RESTORED = "restored"
+    SKIPPED = "skipped"
+    FAILED = "failed"
+    MIXED = "mixed"
+
+
+# Glyph + Rich colour per outcome, for text rendering. The glyphs mirror
+# the dry-run preview styling (+ create, ~ update, - removal) so a
+# preview and the result of applying it read consistently.
+OUTCOME_STYLE: dict[Outcome, tuple[str, str]] = {
+    Outcome.CREATED: ("+", "green"),
+    Outcome.UPDATED: ("~", "yellow"),
+    Outcome.UNCHANGED: ("=", "dim"),
+    Outcome.REMOVED: ("-", "red"),
+    Outcome.RESTORED: ("*", "cyan"),
+    Outcome.SKIPPED: ("s", "dim"),
+    Outcome.FAILED: ("x", "bold red"),
+    Outcome.MIXED: ("/", "magenta"),
+}
+
+
+@dataclass(frozen=True)
+class OutcomeItem:
+    """One named, classified result of a state-changing operation.
+
+    Attributes:
+        name: Identifier of the affected item - a resource name, a file
+            path, a migration id; whatever the surface operates on.
+        outcome: The canonical terminal state for this item. Never
+            :attr:`Outcome.MIXED` (that value is reserved for
+            aggregates).
+        detail: Optional human-readable annotation. Carries domain-
+            specific colour a single outcome word cannot - a skip
+            reason, or a plan-revision operation name such as
+            "renumbered" - without fragmenting the taxonomy.
+    """
+
+    name: str
+    outcome: Outcome
+    detail: str = ""
+
+
+def aggregate_outcome(items: Sequence[OutcomeItem]) -> Outcome:
+    """Collapse per-item outcomes into one summary outcome.
+
+    Returns the shared outcome when every item agrees,
+    :attr:`Outcome.MIXED` when they disagree, and
+    :attr:`Outcome.UNCHANGED` for an empty set - nothing happened,
+    which is the honest summary of a no-op run.
+
+    Args:
+        items: The per-item outcomes of a single invocation.
+
+    Returns:
+        The single summary :class:`Outcome` for the invocation. This is
+        the value a ``--json`` envelope's top-level ``status`` field
+        carries.
+    """
+    distinct = {item.outcome for item in items}
+    if not distinct:
+        return Outcome.UNCHANGED
+    if len(distinct) == 1:
+        return next(iter(distinct))
+    return Outcome.MIXED
+
+
+def count_outcomes(items: Sequence[OutcomeItem]) -> dict[Outcome, int]:
+    """Return per-outcome occurrence counts for an invocation's items."""
+    counts: dict[Outcome, int] = {}
+    for item in items:
+        counts[item.outcome] = counts.get(item.outcome, 0) + 1
+    return counts
+
+
+def outcomes_as_json(items: Sequence[OutcomeItem]) -> dict[str, object]:
+    """Build the machine-readable payload for a set of outcomes.
+
+    The single source of truth for the ``--json`` representation of a
+    state-changing operation: the top-level ``status`` is the aggregate
+    outcome, ``items`` is the per-item breakdown. Text rendering
+    (:func:`render_outcomes`) and this function consume the same
+    :class:`OutcomeItem` list, so the two surfaces cannot drift apart.
+
+    Args:
+        items: The per-item outcomes of a single invocation.
+
+    Returns:
+        A JSON-serialisable mapping with ``status`` (the aggregate
+        outcome word) and ``items`` (the per-item records).
+    """
+    return {
+        "status": str(aggregate_outcome(items)),
+        "items": [
+            {
+                "name": item.name,
+                "outcome": str(item.outcome),
+                **({"detail": item.detail} if item.detail else {}),
+            }
+            for item in items
+        ],
+    }
+
+
+def render_outcomes(items: Sequence[OutcomeItem], *, title: str = "Result") -> None:
+    """Print a human-readable outcome summary to the console.
+
+    Renders one glyph-prefixed line per item followed by a per-outcome
+    count summary. Consumes the same :class:`OutcomeItem` list as
+    :func:`outcomes_as_json`; the text and JSON surfaces therefore share
+    one taxonomy and one aggregate and cannot drift apart.
+
+    Args:
+        items: The per-item outcomes of a single invocation.
+        title: Heading printed above the per-item lines.
+    """
+    console = get_console()
+    console.print(f"[bold]{title}[/bold]")
+
+    for item in items:
+        glyph, colour = OUTCOME_STYLE[item.outcome]
+        detail = f" [dim]{item.detail}[/dim]" if item.detail else ""
+        console.print(f"  [{colour}]{glyph}[/{colour}] {item.name}{detail}")
+
+    counts = count_outcomes(items)
+    parts: list[str] = []
+    for outcome in Outcome:
+        n = counts.get(outcome, 0)
+        if n:
+            _, colour = OUTCOME_STYLE[outcome]
+            parts.append(f"[{colour}]{n} {outcome.value}[/{colour}]")
+    if parts:
+        console.print("  " + "  ".join(parts))
 
 
 def render_dry_run_tree(items: Sequence[DryRunItem], *, title: str = "Preview") -> None:

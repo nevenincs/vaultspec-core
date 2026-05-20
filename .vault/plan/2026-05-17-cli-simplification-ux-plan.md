@@ -45,7 +45,7 @@ Reverse the default gitignore policy so .vaultspec/ authored content reaches tea
 
 Establish the seven-word canonical outcome taxonomy (created/updated/unchanged/removed/restored/skipped/failed) and route every sync-shaped surface through a single renderer that emits text and JSON together.
 
-- [ ] `W01.P02.S04` - Implement Outcome enum and shared rendering helper for text and JSON together; `src/vaultspec_core/cli/rendering.py`.
+- [x] `W01.P02.S04` - Implement Outcome enum and shared rendering helper for text and JSON together; `src/vaultspec_core/cli/rendering.py`.
 - [ ] `W01.P02.S05` - Route every sync-shaped CLI surface through the shared outcome renderer; `src/vaultspec_core/cli/`.
 - [ ] `W01.P02.S06` - Update CLI reference, builtin rules, and agent personas to use the canonical seven-word taxonomy; `.vaultspec/`.
 
