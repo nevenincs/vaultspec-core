@@ -238,9 +238,9 @@ class TestSyncAuthority:
             ["--target", str(synthetic_project), "spec", "rules", "sync"],
         )
         assert result.exit_code == 0, result.output
-        assert "Resource-scoped sync only" in result.output
+        assert "Scoped sync" in result.output
         assert "vaultspec-core sync" in result.output
-        assert "complete provider-facing refresh" in result.output
+        assert "full provider refresh" in result.output
 
     def test_provider_scoped_sync_renders_only_requested_provider(
         self, runner, synthetic_project

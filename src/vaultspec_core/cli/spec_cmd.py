@@ -32,18 +32,18 @@ PROVIDER_OUTPUTS = "AGENTS.md, CLAUDE.md, GEMINI.md, .codex/config.toml, .mcp.js
 
 
 def _print_complete_sync_notice(*, resource: str, mcp: bool = False) -> None:
-    """Warn that a narrow sync is not the complete provider refresh path."""
+    """Note, as a quiet footnote, that this is a scoped sync.
+
+    Rendered dim rather than yellow: it is informational guidance toward
+    the complete-refresh path, not a warning, so it should not read as an
+    alarm on every invocation.
+    """
     from vaultspec_core.console import get_console
 
-    if mcp:
-        detail = "This updates MCP definitions in .mcp.json only."
-    else:
-        detail = f"This syncs only {resource} resource files."
-
+    scope = ".mcp.json only" if mcp else f"{resource} resource files only"
     get_console().print(
-        "[yellow]Resource-scoped sync only.[/yellow] "
-        f"{detail} Run [bold]{COMPLETE_SYNC_COMMAND}[/bold] for a complete "
-        "provider-facing refresh."
+        f"[dim]Scoped sync: {scope}. Run [bold]{COMPLETE_SYNC_COMMAND}[/bold] "
+        f"for the full provider refresh.[/dim]"
     )
 
 

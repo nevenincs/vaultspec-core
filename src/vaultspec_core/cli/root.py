@@ -313,6 +313,7 @@ def cmd_install(
             OutcomeItem,
             emit_outcomes,
         )
+        from vaultspec_core.cli_common import get_version
 
         action_map = {
             "[ADD]": Outcome.CREATED,
@@ -323,12 +324,20 @@ def cmd_install(
             OutcomeItem(name=rel, outcome=action_map.get(action, Outcome.UPDATED))
             for rel, action in result["items"]
         ]
-        title = (
-            f"Upgrade preview → {path}"
-            if result.get("dry_run")
-            else f"Upgrade → {path}"
+        # Stamp the framework version into the heading and the JSON so an
+        # operator can see *which* version they are now on, not just that
+        # something changed.
+        version = get_version()
+        verb = "Upgrade preview" if result.get("dry_run") else "Upgrade"
+        title = f"{verb} {version} → {path}"
+        raise typer.Exit(
+            emit_outcomes(
+                outcomes,
+                title=title,
+                json_output=json_output,
+                extra_json={"version": version},
+            )
         )
-        raise typer.Exit(emit_outcomes(outcomes, title=title, json_output=json_output))
 
     if json_output:
         import json
