@@ -189,21 +189,6 @@ class VaultConstants:
         )
 
     @classmethod
-    def get_tag_for_directory(cls, dirname: str) -> str | None:
-        """Return the ``#tag`` for a directory name, or ``None`` if unsupported.
-
-        Args:
-            dirname: Bare directory name (e.g. ``"adr"``, ``"plan"``).
-
-        Returns:
-            Hashtag string such as ``"#adr"``, or ``None`` if not recognised.
-        """
-        try:
-            return DocType(dirname).tag
-        except ValueError:
-            return None
-
-    @classmethod
     def validate_vault_structure(cls, root_dir: Path) -> list[str]:
         """Ensure the docs directory only contains recognised subdirectories.
 

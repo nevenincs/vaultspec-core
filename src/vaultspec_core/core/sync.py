@@ -247,49 +247,6 @@ def sync_files(
     return result
 
 
-def _skill_dest_path(dest_dir: Path, name: str) -> Path:
-    """Return the destination path for a skill's SKILL.md file."""
-    return dest_dir / name / "SKILL.md"
-
-
-def sync_skills(
-    sources: dict[str, tuple[Path, dict[str, Any], str]],
-    skills_dir: Path,
-    transform_fn: Callable[[Any, str, dict[str, Any], str], str | None],
-    prune: bool = False,
-    dry_run: bool = False,
-    label: str = "",
-) -> SyncResult:
-    """Synchronize skill definitions to a destination skills directory.
-
-    Thin wrapper around :func:`sync_files` with ``is_skill=True``, which
-    routes each skill's content to ``skill_name/SKILL.md`` and scopes
-    pruning to ``vaultspec-*`` subdirectories.
-
-    Args:
-        sources: Skill resource map (directory name → path/meta/body tuple).
-        skills_dir: Root skills destination directory.
-        transform_fn: Content transform callback
-            ``(tool, name, meta, body) → str | None``.
-        prune: Remove ``vaultspec-*`` skill directories not in *sources*.
-        dry_run: Log planned actions without writing.
-        label: Human-readable label used in log messages.
-
-    Returns:
-        A :class:`SyncResult` tallying the sync outcome.
-    """
-    return sync_files(
-        sources=sources,
-        dest_dir=skills_dir,
-        transform_fn=transform_fn,
-        dest_path_fn=_skill_dest_path,
-        prune=prune,
-        dry_run=dry_run,
-        label=label,
-        is_skill=True,
-    )
-
-
 def sync_to_all_tools(
     sources: dict[str, tuple[Path, dict[str, Any], str]],
     dir_attr: str,

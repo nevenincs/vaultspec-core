@@ -239,26 +239,6 @@ def _generate_codex_native_config_body() -> str | None:
     return "\n".join(lines)
 
 
-def _generate_codex_agents_body() -> str | None:
-    """Generate body for Codex config.toml managed agents block."""
-    from .agents import collect_agents
-
-    sources = collect_agents()
-    if not sources:
-        return None
-
-    lines = []
-    for filename, (_path, meta, body) in sorted(sources.items()):
-        agent_name = meta.get("name", filename.removesuffix(".md"))
-        description = meta.get(
-            "description",
-            body.strip().split("\n")[0] if body.strip() else "",
-        )
-        lines.append(f"[agents.{_toml_quote(str(agent_name))}]")
-        lines.append(f"description = {_toml_quote(str(description))}")
-    return "\n".join(lines)
-
-
 # ---------------------------------------------------------------------------
 # Sync helpers  - write managed blocks into files.
 # ---------------------------------------------------------------------------

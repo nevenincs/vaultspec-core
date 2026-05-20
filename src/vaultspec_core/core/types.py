@@ -167,34 +167,6 @@ def set_context(ctx: WorkspaceContext) -> None:
     _workspace_ctx.set(ctx)
 
 
-def _create_tool_cfg(
-    tool: Tool,
-    root: Path,
-    tool_dir: str | None = None,
-    rules: bool = True,
-    skills: bool = True,
-    agents: bool = True,
-    config: FileName | None = None,
-    system: FileName | str | None = None,
-) -> ToolConfig:
-    """Helper to create a ToolConfig with standard directory patterns."""
-    t_dir = root / tool_dir if tool_dir else None
-    rules_dir = t_dir / Resource.RULES.value if t_dir and rules else None
-    return ToolConfig(
-        name=tool.value,
-        rules_dir=rules_dir,
-        skills_dir=t_dir / Resource.SKILLS.value if t_dir and skills else None,
-        agents_dir=t_dir / Resource.AGENTS.value if t_dir and agents else None,
-        config_file=(t_dir / config.value) if t_dir and config else None,
-        rule_ref_dir=rules_dir,
-        system_file=(
-            (t_dir / (system.value if isinstance(system, FileName) else system))
-            if t_dir and system
-            else None
-        ),
-    )
-
-
 def _validate_tool_containment(
     root: Path, tool_configs: dict[Tool, ToolConfig]
 ) -> None:

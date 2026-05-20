@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING
 
 from vaultspec_core.plan.frontmatter import (
     PlanFrontmatter,
-    Tier,
     parse_plan_frontmatter,
 )
 from vaultspec_core.vaultcore.parser import parse_frontmatter
@@ -434,8 +433,3 @@ def _split_action_and_scope(rest: str) -> tuple[str, str]:
     action_part, scope_part = rest.split(";", maxsplit=1)
     scope = scope_part.strip().strip("`")
     return action_part.strip(), scope
-
-
-def _is_l4_with_intent(frontmatter: PlanFrontmatter) -> bool:
-    """Return ``True`` when the plan is ``L4`` (Epic intent expected)."""
-    return frontmatter.tier is Tier.L4
