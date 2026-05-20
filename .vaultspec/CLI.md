@@ -25,6 +25,31 @@ commands that support JavaScript Object Notation (JSON) output.
 | `--debug`      | `-d`  | off     | Enable DEBUG-level logging (top-level flag).                                                                               |
 | `--version`    | `-V`  | -       | Print version and exit (top-level flag).                                                                                   |
 
+## Outcome vocabulary
+
+State-changing commands report results with one shared seven-word vocabulary, so a
+result reads the same regardless of which command produced it. Sync-shaped surfaces -
+`vaultspec-core install`, `vaultspec-core sync`, the resource-scoped
+`vaultspec-core spec <resource> sync` commands, and `vaultspec-core migrations run` -
+print one glyph-prefixed line per item followed by a per-outcome count summary. With
+`--json` they emit a top-level `status` field plus a per-item `items` array, and each
+item carries its own `outcome`.
+
+| Outcome     | Glyph | Meaning                                                                     |
+| ----------- | ----- | --------------------------------------------------------------------------- |
+| `created`   | `+`   | A destination that did not exist now exists.                                |
+| `updated`   | `~`   | A destination that existed was changed.                                     |
+| `unchanged` | `=`   | The destination already matched the source; no write happened.              |
+| `removed`   | `-`   | A destination that existed no longer does.                                  |
+| `restored`  | `*`   | A destination was reset to its canonical version.                           |
+| `skipped`   | `s`   | A destination was not touched because a precondition or policy excluded it. |
+| `failed`    | `x`   | A write was attempted and an error was encountered.                         |
+
+A `--json` `status` of `mixed` means a single invocation produced items with more than
+one distinct outcome. An `unchanged` status is the honest summary of a no-op run, not a
+failure. A `skipped` outcome always carries a reason and is safe to interrogate. A
+`failed` outcome is the only one that stops a pipeline.
+
 ## Command signature contract
 
 This generated block is checked against the live Typer command tree. Keep prose curated

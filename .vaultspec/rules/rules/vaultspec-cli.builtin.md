@@ -45,6 +45,12 @@ command after source-side changes.
 - Use `--target DIR` (or `-t`) to operate on a directory other than the current one.
 - Use `--dry-run` to preview changes.
 - Use `--json` for machine-readable output.
+- Read sync-shaped results (`vaultspec-core install`, `vaultspec-core sync`,
+  `vaultspec-core spec <resource> sync`, `vaultspec-core migrations run`) with one
+  vocabulary: `created`, `updated`, `unchanged`, `removed`, `restored`, `skipped`,
+  `failed`. `unchanged` is a successful no-op, not a failure; `skipped` always carries a
+  reason worth reading; only `failed` stops the pipeline. With `--json`, the top-level
+  `status` is the run's aggregate outcome (`mixed` when items disagree).
 - Use `--force` when a mutating command must overwrite existing output.
 - Run `vaultspec-core <cmd> --help` for the full flag, subcommand, and exit-code
   reference.

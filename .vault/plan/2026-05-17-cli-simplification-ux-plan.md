@@ -47,7 +47,7 @@ Establish the seven-word canonical outcome taxonomy (created/updated/unchanged/r
 
 - [x] `W01.P02.S04` - Implement Outcome enum and shared rendering helper for text and JSON together; `src/vaultspec_core/cli/rendering.py`.
 - [ ] `W01.P02.S05` - Route every sync-shaped CLI surface through the shared outcome renderer; `src/vaultspec_core/cli/`.
-- [ ] `W01.P02.S06` - Update CLI reference, builtin rules, and agent personas to use the canonical seven-word taxonomy; `.vaultspec/`.
+- [x] `W01.P02.S06` - Update CLI reference, builtin rules, and agent personas to use the canonical seven-word taxonomy; `.vaultspec/`.
 
 ### Phase `W01.P03` - Enforce scaffolder integrity
 
