@@ -200,7 +200,7 @@ def cmd_install(
     target: TargetOption = None,
     upgrade: Annotated[
         bool,
-        typer.Option("--upgrade", help="Re-sync builtin rules and firmware"),
+        typer.Option("--upgrade", help="Re-seed bundled builtin content"),
     ] = False,
     dry_run: Annotated[
         bool,
@@ -245,7 +245,7 @@ def cmd_install(
       vaultspec-core install core                  # framework only, no providers\n
       vaultspec-core install claude                # framework + claude\n
       vaultspec-core install --target ./my-project # install in specific directory\n
-      vaultspec-core install --upgrade             # update firmware + re-sync\n
+      vaultspec-core install --upgrade             # re-seed builtins + sync\n
       vaultspec-core install claude --dry-run      # preview what would be created\n
       vaultspec-core install --skip claude         # install all except claude\n
       vaultspec-core install --dev                 # authorise source-repo install\n
