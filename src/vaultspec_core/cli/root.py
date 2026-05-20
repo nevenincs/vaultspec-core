@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
@@ -22,6 +22,10 @@ from vaultspec_core.cli._target import (
     apply_target_install,
 )
 from vaultspec_core.core.enums import CliAction
+
+if TYPE_CHECKING:
+    from vaultspec_core.cli.rendering import OutcomeItem
+    from vaultspec_core.core.types import SyncResult
 
 logger = logging.getLogger(__name__)
 
@@ -600,11 +604,12 @@ def cmd_sync(
 
     if dry_run:
         if json_output:
-            import dataclasses
             import json
 
-            data = [dataclasses.asdict(r) for r in results]
-            typer.echo(json.dumps(data, indent=2, default=str))
+            from vaultspec_core.cli.rendering import outcomes_as_json
+
+            outcomes = _collect_sync_outcomes(results, provider, skip)
+            typer.echo(json.dumps(outcomes_as_json(outcomes), indent=2))
             raise typer.Exit(0)
 
         from vaultspec_core.cli.rendering import render_dry_run_tree
@@ -647,11 +652,7 @@ def cmd_sync(
     # S2/S8/S10/S19), one helper feeds text and JSON from a single
     # OutcomeItem list, and each provider becomes a group so the output
     # stays per-provider readable without a bespoke summary loop.
-    from vaultspec_core.cli.rendering import (
-        OutcomeItem,
-        emit_outcomes,
-        sync_outcomes,
-    )
+    from vaultspec_core.cli.rendering import emit_outcomes
     from vaultspec_core.core.manifest import installed_tool_configs
 
     active_configs = installed_tool_configs()
@@ -674,19 +675,7 @@ def cmd_sync(
         console.print("[dim]No enabled providers to sync.[/dim]")
         raise typer.Exit(0)
 
-    # Each resource pass carries per-provider results in `per_tool`;
-    # global passes (e.g. mcps) carry only the aggregate. Tag every item
-    # with its group so the renderer sub-heads the output by provider.
-    resource_labels = ["rules", "skills", "agents", "system", "config"]
-    if provider == "all" and "mcp" not in skip:
-        resource_labels.append("mcps")
-    outcomes: list[OutcomeItem] = []
-    for label, r in zip(resource_labels, results, strict=True):
-        if r.per_tool:
-            for tool_name, tool_result in r.per_tool.items():
-                outcomes.extend(sync_outcomes(tool_result, group=tool_name))
-        else:
-            outcomes.extend(sync_outcomes(r, group=label))
+    outcomes = _collect_sync_outcomes(results, provider, skip)
 
     all_warnings = [w for r in results for w in r.warnings]
     extra_json = {"warnings": all_warnings} if all_warnings else None
@@ -744,6 +733,32 @@ def cmd_sync(
             )
 
     raise typer.Exit(code)
+
+
+def _collect_sync_outcomes(
+    results: list[SyncResult], provider: str, skip: list[str]
+) -> list[OutcomeItem]:
+    """Flatten sync-pass results into per-provider-grouped outcomes.
+
+    Each resource pass carries per-provider results in ``per_tool``;
+    global passes (e.g. mcps) carry only the aggregate and are grouped
+    under their resource label. Shared by the text and ``--json``
+    renderings of both ``sync`` and ``sync --dry-run`` so the surfaces
+    cannot drift apart.
+    """
+    from vaultspec_core.cli.rendering import sync_outcomes
+
+    labels = ["rules", "skills", "agents", "system", "config"]
+    if provider == "all" and "mcp" not in skip:
+        labels.append("mcps")
+    outcomes: list[OutcomeItem] = []
+    for label, r in zip(labels, results, strict=True):
+        if r.per_tool:
+            for tool_name, tool_result in r.per_tool.items():
+                outcomes.extend(sync_outcomes(tool_result, group=tool_name))
+        else:
+            outcomes.extend(sync_outcomes(r, group=label))
+    return outcomes
 
 
 def _infer_label(item_path: str) -> str:
