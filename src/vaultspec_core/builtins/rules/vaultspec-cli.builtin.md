@@ -68,7 +68,10 @@ Forbidden:
 
 ## References
 
+- `.vaultspec/rules/reference/cli.md` - locally-resident machine-facing CLI reference:
+  command inventory, options, argument enumerations, exit codes, and environment
+  variables. Read this first; no network round-trip needed.
 - [CLI reference](https://github.com/wgergely/vaultspec-core/blob/main/docs/CLI.md) -
-  every command, subcommand, option, and exit code.
+  human-facing prose reference: every command, subcommand, option, and exit code.
 - [Framework manual](https://github.com/wgergely/vaultspec-core/blob/main/docs/framework.md)
   \- framework concepts, workflow, and skill catalog.
