@@ -23,16 +23,6 @@ related:
   - '[[2026-05-17-cli-paper-cuts-adr]]'
 ---
 
-<!-- LINK RULES:
-     - [[wiki-links]] are ONLY for .vault/ documents in the
-       related: field above.
-     - The related: field carries the AUTHORISING documents
-       (ADR, research, reference, prior plan) for every Step in
-       this plan. Steps inherit this chain; per-row reference
-       footers do not exist.
-     - NEVER use [[wiki-links]] or markdown links in the
-       document body. -->
-
 # `cli-simplification-ux` `CLI simplification and UX hardening epic` plan
 
 ## Epic intent

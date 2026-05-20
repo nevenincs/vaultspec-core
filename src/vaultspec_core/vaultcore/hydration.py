@@ -89,7 +89,12 @@ def hydrate_template(
 
     # Perform replacements for both styles
     for key, value in placeholders.items():
-        for pattern in [f"{{{key}}}", f"<{key}>"]:
+        patterns = [f"{{{key}}}", f"<{key}>"]
+        if key == "tier":
+            # mdformat parses the unquoted `{tier}` YAML placeholder as an
+            # inline map and normalizes it to `{tier: null}`.
+            patterns.append("{tier: null}")
+        for pattern in patterns:
             if pattern in hydrated:
                 logger.debug("Replacing '%s' with '%s'", pattern, value)
                 hydrated = hydrated.replace(pattern, value)
@@ -112,6 +117,8 @@ def hydrate_template(
     # own guidance comments.
     scan_target = re.sub(r"<!--.*?-->", "", hydrated, flags=re.DOTALL)
     remaining = re.findall(r"[{<][a-z0-9\-_*]+[}>]", scan_target)
+    if "{tier: null}" in scan_target:
+        remaining.append("{tier: null}")
     if remaining:
         for placeholder in set(remaining):
             if placeholder in _KNOWN_PLACEHOLDERS:

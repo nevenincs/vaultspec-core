@@ -194,24 +194,29 @@ Follow these conventions:
 ### Document Body Placeholders
 
 Container identifiers (`{wave}`, `{phase}`, `{step}`) use the canonical uppercase
-zero-padded form from the convention ADR. Other placeholders use lowercase kebab-case.
+zero-padded form from the convention ADR. `{feature}` uses lowercase kebab-case.
+Narrative placeholders (`{topic}`, `{title}`) use concise prose.
 
-| Placeholder | Format              | Example                  |
-| :---------- | :------------------ | :----------------------- |
-| `{feature}` | kebab-case          | `editor-demo`            |
-| `{wave}`    | uppercase canonical | `W01`, `W02`             |
-| `{phase}`   | uppercase canonical | `P01`, `P02`             |
-| `{step}`    | uppercase canonical | `S01`, `S02`             |
-| `{topic}`   | kebab-case          | `event-handling`         |
-| `{title}`   | kebab-case          | `displaymap-integration` |
+| Placeholder | Format              | Example                   |
+| :---------- | :------------------ | :------------------------ |
+| `{feature}` | kebab-case          | `editor-demo`             |
+| `{wave}`    | uppercase canonical | `W01`, `W02`              |
+| `{phase}`   | uppercase canonical | `P01`, `P02`              |
+| `{step}`    | uppercase canonical | `S01`, `S02`              |
+| `{topic}`   | concise prose       | `event handling`          |
+| `{title}`   | concise prose       | `display map integration` |
 
 ### General Rules
 
 - **YAML frontmatter**: Always lowercase, kebab-case
 
-- **Document titles/headings**: kebab-case for narrative segments; canonical uppercase
-  identifiers for `{wave}`, `{phase}`, `{step}` segments (e.g.,
-  `# editor-demo W01 plan`, `# editor-demo W01.P01 - phase title`).
+- **Document titles/headings**: The shipped templates are canonical for level-one
+  headings. Top-level vault documents use backticks around both the `{feature}` segment
+  and the narrative `{title}`, `{topic}`, or `{phase}` segment. Examples:
+  `# {feature} research: {topic}` represents the literal template heading '# `{feature}`
+  research: `{topic}`', and `# {feature} {phase} plan` represents '# `{feature}`
+  `{phase}` plan'. Narrative segments should be concise prose; canonical uppercase
+  identifiers remain required for `{wave}`, `{phase}`, and `{step}` identifier segments.
 
 - **File names**: lowercase kebab-case for narrative segments (`{feature}`, `{type}`);
   canonical uppercase identifiers for `{wave}`, `{phase}`, `{step}` segments. Patterns:

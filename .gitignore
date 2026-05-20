@@ -198,6 +198,10 @@ src/vaultspec_core/builtins/*
 !src/vaultspec_core/builtins/__init__.py
 
 # >>> vaultspec-managed (do not edit this block) >>>
+.agents/
+.claude/
+.codex/
+.gemini/
 .mcp.json
 .vault/.obsidian/
 .vault/.trash/
@@ -209,4 +213,7 @@ src/vaultspec_core/builtins/*
 /.gitignore.lock
 /.mcp.json.lock
 /.pre-commit-config.yaml.lock
+AGENTS.md
+CLAUDE.md
+GEMINI.md
 # <<< vaultspec-managed <<<

@@ -73,6 +73,13 @@ def test_hydrate_template_substitutes_tier_when_passed():
     assert result == "tier: L3"
 
 
+def test_hydrate_template_substitutes_mdformat_normalized_tier():
+    """Verify mdformat-normalized plan templates still hydrate tier."""
+    template = "tier: {tier: null}"
+    result = hydrate_template(template, "feat", "2026-05-18", tier="L3")
+    assert result == "tier: L3"
+
+
 def test_hydrate_template_leaves_tier_unhydrated_when_none(caplog):
     """Verify {tier} stays as-is when tier is not provided, with warning."""
     template = "tier: {tier}"
@@ -80,6 +87,18 @@ def test_hydrate_template_leaves_tier_unhydrated_when_none(caplog):
         result = hydrate_template(template, "feat", "2026-05-18")
     assert result == "tier: {tier}"
     assert "Potential unhydrated placeholder found in template: {tier}" in caplog.text
+
+
+def test_hydrate_template_warns_on_mdformat_normalized_tier(caplog):
+    """Verify mdformat-normalized tier placeholders still emit diagnostics."""
+    template = "tier: {tier: null}"
+    with caplog.at_level(logging.WARNING):
+        result = hydrate_template(template, "feat", "2026-05-18")
+    assert result == "tier: {tier: null}"
+    assert (
+        "Potential unhydrated placeholder found in template: {tier: null}"
+        in caplog.text
+    )
 
 
 def test_create_vault_doc_plan_substitutes_tier(tmp_path):
