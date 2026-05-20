@@ -323,9 +323,7 @@ def cmd_install(
             for rel, action in result["items"]
         ]
         raise typer.Exit(
-            emit_outcomes(
-                outcomes, title=f"Upgrade → {path}", json_output=json_output
-            )
+            emit_outcomes(outcomes, title=f"Upgrade → {path}", json_output=json_output)
         )
 
     if json_output:

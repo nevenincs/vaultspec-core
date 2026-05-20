@@ -41,9 +41,7 @@ class TestSeedBuiltinsOutcomes:
         assert results[drifted] == "[UPDATE]"
         # Every other builtin is still unchanged.
         assert all(
-            action == "[UNCHANGED]"
-            for rel, action in results.items()
-            if rel != drifted
+            action == "[UNCHANGED]" for rel, action in results.items() if rel != drifted
         )
 
     def test_no_force_skips_existing_builtins(self, tmp_path: Path):

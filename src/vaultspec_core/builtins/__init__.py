@@ -93,9 +93,7 @@ def seed_builtins(
             action = "[ADD]"
         else:
             try:
-                action = (
-                    "[UNCHANGED]" if dest.read_bytes() == src_bytes else "[UPDATE]"
-                )
+                action = "[UNCHANGED]" if dest.read_bytes() == src_bytes else "[UPDATE]"
             except OSError:
                 action = "[UPDATE]"
 
