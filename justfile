@@ -209,45 +209,16 @@ _dev-audit-help:
   @echo "Targets:"
   @echo "  deps      Run uv audit on locked dependencies"
 
-# uv audit is the uv-native vulnerability scanner; --preview-features audit
-# silences its experimental warning.  The audit's default scope already
-# includes the project plus the default dependency groups (dev), which is
-# all groups in this project, so we don't pass --all-groups: that flag was
-# accepted by uv 0.10.x but rejected by 0.11.x where the in-flight audit
-# CLI tightened to single-group selection.  The wrapper greps for the
-# clean-summary line ("Found no known vulnerabilit..." or "Found 0 ...")
-# because uv 0.10.x/0.11.x exit 0 even when advisories are present; drop
-# the wrapper once `uv audit --strict` (or equivalent) ships and exits
-# non-zero on findings.
-#
-# --ignore PYSEC-2025-183 (alias CVE-2025-45768): a pyjwt advisory
-# claiming "weak encryption". It is DISPUTED by pyjwt's maintainer
-# (the OSV record states the dispute: key length is chosen by the
-# application, not the library) and its affected range covers EVERY
-# pyjwt release (introduced at 0, no fixed event) -- there is no
-# version to upgrade to. pyjwt is a transitive dependency pulled by
-# `mcp` (the MCP SDK behind vaultspec-mcp), which hard-depends on
-# `pyjwt[crypto]` and cannot be dropped. A blanket --ignore is used
-# rather than --ignore-until-fixed because the advisory's OSV range
-# is malformed (an empty event object), which prevents uv from
-# evaluating fix-availability; and because, being disputed and
-# unfixed across all versions, no fix is expected. Revisit this
-# entry if pyjwt ships a release that resolves or the advisory is
-# withdrawn.
-#
-# uv's preview audit decoder has been observed to fail before producing any
-# finding output when the OSV response carries data it cannot parse ("error
-# decoding response body"). That is a transient tool/service decode failure,
-# not a vulnerability verdict, so the wrapper retries the uv-native scan up
-# to three times. A persistent decode failure fails the gate rather than
-# silently passing: this project is uv-managed end to end and never shells
-# out to pip, so there is no second scanner to fall back to.
+# The supply-chain gate runs `uv audit` -- uv's native, preview-feature OSV
+# scanner -- and never shells out to pip. The cross-platform wrapper lives in
+# scripts/dependency_audit.py; it fails the gate on real findings (uv audit
+# itself exits 0 even when advisories are present) and, when uv's preview
+# decoder aborts on a malformed upstream OSV record, independently repeats the
+# bulk OSV query to confirm the only affected advisories are ones already
+# triaged. See that script's module docstring for the full rationale,
+# including the disputed, unfixable pyjwt advisory PYSEC-2025-183.
 _dev-audit-deps:
-  @{{ if os() == "windows" { \
-    "for ($i = 1; $i -le 3; $i++) { $out = uv audit --preview-features audit --frozen --ignore PYSEC-2025-183 --ignore CVE-2025-45768 2>&1 | Out-String; Write-Host $out; if ($out -match 'Found (no|0) known vulnerabilit') { exit 0 }; if ($out -match 'error decoding response body') { Write-Host \"uv audit OSV decode failed (attempt $i/3); retrying\"; Start-Sleep -Seconds 3; continue }; exit 1 }; Write-Host 'uv audit could not decode the OSV response after 3 attempts'; exit 1" \
-  } else { \
-    "i=0; while [ \"$i\" -lt 3 ]; do out=$(uv audit --preview-features audit --frozen --ignore PYSEC-2025-183 --ignore CVE-2025-45768 2>&1) || true; printf '%s\\n' \"$out\"; if printf '%s\\n' \"$out\" | grep -Eq 'Found (no|0) known vulnerabilit'; then exit 0; fi; if printf '%s\\n' \"$out\" | grep -q 'error decoding response body'; then i=$((i + 1)); printf '%s\\n' \"uv audit OSV decode failed (attempt $i/3); retrying\"; sleep 3; continue; fi; exit 1; done; printf '%s\\n' 'uv audit could not decode the OSV response after 3 attempts'; exit 1" \
-  } }}
+  uv run python scripts/dependency_audit.py
 
 # ---------------------------------------------------------------------------
 

@@ -78,24 +78,27 @@ def test_justfile_exposes_approved_targets() -> None:
 
 def test_dependency_audit_uses_uv_native_scanner() -> None:
     justfile = _read("justfile")
-    # The supply-chain gate runs uv's native auditor against the frozen
-    # lockfile as its PRIMARY scanner.  The default scope already covers
-    # the project plus the default dependency groups (dev), so we
-    # deliberately do not pin any group-selection flag here: --all-groups
-    # was accepted by uv 0.10.x but rejected by 0.11.x, and breaking CI on
-    # a uv minor bump is exactly the brittleness this audit is meant to
-    # prevent.
-    assert "uv audit" in justfile
-    assert "--preview-features audit" in justfile
-    assert "--frozen" in justfile
-    # This is a uv-managed project: the supply-chain gate is uv-native end
-    # to end and never shells out to pip. pip-audit drags `pip` itself into
-    # the environment as a transitive dependency - historically the only
+    audit_script = _read("scripts/dependency_audit.py")
+    # The supply-chain gate's justfile recipe delegates to the cross-platform
+    # audit wrapper, which runs uv's native auditor against the frozen
+    # lockfile. The default scope already covers the project plus the default
+    # dependency groups, so no group-selection flag is pinned: --all-groups
+    # was accepted by uv 0.10.x but rejected by 0.11.x, and breaking CI on a
+    # uv minor bump is exactly the brittleness this audit is meant to prevent.
+    assert "scripts/dependency_audit.py" in justfile
+    assert "uv audit" in audit_script
+    assert "--preview-features" in audit_script
+    assert "--frozen" in audit_script
+    # This is a uv-managed project: the supply-chain gate is uv-native end to
+    # end and never shells out to pip. pip-audit drags `pip` itself into the
+    # environment as a transitive dependency - historically the only
     # vulnerability `uv audit` ever reported here - so no pip-named scanner
-    # may appear in the audit recipe. A transient OSV decode failure is
-    # handled by retrying the uv-native scan, not by a second tool.
-    assert "pip-audit" not in justfile
-    assert "pip-tools" not in justfile
+    # may appear in the recipe or the wrapper. When uv's preview decoder
+    # aborts on a malformed OSV record, the wrapper independently repeats the
+    # bulk OSV query rather than falling back to a second tool.
+    for surface in (justfile, audit_script):
+        assert "pip-audit" not in surface
+        assert "pip-tools" not in surface
 
 
 def test_pyproject_has_no_pip_named_dev_tools() -> None:
