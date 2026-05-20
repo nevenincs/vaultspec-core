@@ -114,6 +114,7 @@ def _remove_related_entries(path: Path, targets: list[str]) -> int:
 
     in_frontmatter = False
     in_related = False
+    related_idx: int | None = None
     new_lines: list[str] = []
     removed = 0
 
@@ -132,6 +133,7 @@ def _remove_related_entries(path: Path, targets: list[str]) -> int:
             # Detect start of related: field
             if line.startswith("related:"):
                 in_related = True
+                related_idx = len(new_lines)
                 new_lines.append(line)
                 continue
 
@@ -148,6 +150,18 @@ def _remove_related_entries(path: Path, targets: list[str]) -> int:
         new_lines.append(line)
 
     if removed:
+        # If every entry under `related:` was a dangling link, the key is
+        # now bare and parses as null. Emit an explicit empty list so the
+        # file stays valid YAML; the empty related: is then surfaced as a
+        # separate, honest finding rather than a malformed document.
+        if related_idx is not None:
+            after = (
+                new_lines[related_idx + 1] if related_idx + 1 < len(new_lines) else ""
+            )
+            indented = after.startswith((" ", "\t"))
+            if not (indented and after.lstrip().startswith("-")):
+                new_lines[related_idx] = "related: []"
+
         new_content = source_newline.join(new_lines)
         bak = path.with_suffix(path.suffix + ".bak")
         bak.write_bytes(path.read_bytes())

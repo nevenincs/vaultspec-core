@@ -7,7 +7,7 @@ import pytest
 from ....graph import VaultGraph
 from ....testing import build_synthetic_vault
 from .._base import Severity
-from ..dangling import check_dangling
+from ..dangling import _remove_related_entries, check_dangling
 
 pytestmark = [pytest.mark.unit]
 
@@ -58,3 +58,45 @@ class TestCheckDangling:
         doc_path = tmp_vault / relative
         content = doc_path.read_text(encoding="utf-8")
         assert f"[[{broken_stem}]]" not in content
+
+
+class TestRemoveRelatedEntries:
+    def test_all_dangling_leaves_valid_empty_list(self, tmp_path):
+        """Removing every related: entry must leave `related: []`, not a
+        bare key that parses as null and corrupts the document."""
+        doc = tmp_path / "doc.md"
+        doc.write_text(
+            "---\n"
+            "tags:\n"
+            "  - '#adr'\n"
+            "related:\n"
+            '  - "[[gone-one]]"\n'
+            '  - "[[gone-two]]"\n'
+            "---\n"
+            "\nBody.\n",
+            encoding="utf-8",
+        )
+
+        removed = _remove_related_entries(doc, ["gone-one", "gone-two"])
+
+        assert removed == 2
+        content = doc.read_text(encoding="utf-8")
+        assert "related: []" in content
+        # The bare `related:` key (followed straight by the `---` fence)
+        # must not survive.
+        assert "related:\n---" not in content
+
+    def test_surviving_entry_keeps_block_form(self, tmp_path):
+        """A related: block that still has a live entry stays a block."""
+        doc = tmp_path / "doc.md"
+        doc.write_text(
+            '---\nrelated:\n  - "[[gone]]"\n  - "[[kept]]"\n---\n',
+            encoding="utf-8",
+        )
+
+        removed = _remove_related_entries(doc, ["gone"])
+
+        assert removed == 1
+        content = doc.read_text(encoding="utf-8")
+        assert "related: []" not in content
+        assert "[[kept]]" in content
