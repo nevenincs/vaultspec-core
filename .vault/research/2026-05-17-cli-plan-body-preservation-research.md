@@ -4,7 +4,7 @@ tags:
   - '#cli-plan-body-preservation'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---
 
 # `cli-plan-body-preservation` research: `vault plan step add silently rewrites plan body`
@@ -54,8 +54,7 @@ The bug is unchanged across rounds; only the agents adapted.
 
 Several first-class destructive operations exist in the CLI
 (`uninstall`, `install --force`, `vault feature archive`). Most
-require explicit flags, dry-run support, or both. `vault plan
-step add` requires nothing. The verb's name is `add` — additive
+require explicit flags, dry-run support, or both. `vault plan step add` requires nothing. The verb's name is `add` — additive
 — but its effect is rewrite. The naming actively misleads the
 user about the blast radius.
 

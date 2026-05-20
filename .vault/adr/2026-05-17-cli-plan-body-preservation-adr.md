@@ -4,8 +4,8 @@ tags:
   - '#cli-plan-body-preservation'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
-  - "[[2026-05-17-cli-plan-body-preservation-research]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
+  - '[[2026-05-17-cli-plan-body-preservation-research]]'
 ---
 
 # `cli-plan-body-preservation` adr: `Plan-editing verbs must preserve author prose` | (**status:** `accepted`)
@@ -48,12 +48,8 @@ serialise cycle is exposed.
   discriminator (`<!-- RETIRED -->` survives `--fix`). The plan-
   edit serialiser needs a comparable discriminator for author
   prose, modelled on the same pattern.
-- Every plan-editing verb (`step add`, `step insert`, `step
-  edit`, `step move`, `step remove`, `phase add`, `phase
-  insert`, `phase edit`, `phase move`, `phase renumber`, `phase
-  remove`, `wave add`, `wave insert`, `wave edit`, `wave move`,
-  `wave remove`, `tier promote`, `tier demote`, `epic intent
-  edit`, `step toggle`, `step check`, `step uncheck`) routes
+- Every plan-editing verb (`step add`, `step insert`, `step edit`, `step move`, `step remove`, `phase add`, `phase insert`, `phase edit`, `phase move`, `phase renumber`, `phase remove`, `wave add`, `wave insert`, `wave edit`, `wave move`,
+  `wave remove`, `tier promote`, `tier demote`, `epic intent edit`, `step toggle`, `step check`, `step uncheck`) routes
   through the same serialiser. Fix the round-trip layer and
   every verb benefits.
 
@@ -84,8 +80,7 @@ serialise cycle is exposed.
   a stable identity for round-tripping.
 - The serialiser emits each unknown block in its original
   position, verbatim, with surrounding whitespace preserved.
-- The annotations-stripper rule that preserves `<!-- RETIRED
-  -->` markers extends to author prose blocks the same way:
+- The annotations-stripper rule that preserves `<!-- RETIRED -->` markers extends to author prose blocks the same way:
   preserved by default, with explicit opt-in `--canonicalise`
   flag if the operator wants the document re-emitted in
   canonical form (which intentionally drops unknown sections).
@@ -97,8 +92,7 @@ serialise cycle is exposed.
 - The diff is the canonical preview format. JSON output is
   produced alongside text output.
 - The success line on a real run reports the structural change
-  (`Step S04 added`) and confirms preservation (`Body sections
-  preserved: 3 (Description, Parallelization, Verification)`)
+  (`Step S04 added`) and confirms preservation (`Body sections preserved: 3 (Description, Parallelization, Verification)`)
   whenever unknown blocks exist.
 
 **Verb-name reconciliation.**
@@ -134,12 +128,10 @@ preservation works.
 Serialiser-side preservation is preferred over parser-side
 refusal because the framework's existing pattern is to fix-and-
 proceed rather than refuse-and-instruct. The annotations
-stripper already demonstrates this pattern works (the `<!--
-RETIRED -->` discriminator). Extending the same shape to author
+stripper already demonstrates this pattern works (the `<!-- RETIRED -->` discriminator). Extending the same shape to author
 prose is consistent with the existing design.
 
-Verb-name honesty matters for agent trust. `vault plan step
-add` should not also rewrite the document. Separating the
+Verb-name honesty matters for agent trust. `vault plan step add` should not also rewrite the document. Separating the
 canonicalisation step under its own flag means the destructive
 operation has a name and a gate.
 

@@ -78,4 +78,3 @@ positive signal, not a failure. -->
   accept `--dry-run` and emit a usable preview before applying.
 
 -->
-

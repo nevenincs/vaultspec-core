@@ -4,8 +4,8 @@ tags:
   - '#cli-blast-radius-gating'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
-  - "[[2026-05-17-cli-blast-radius-gating-research]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
+  - '[[2026-05-17-cli-blast-radius-gating-research]]'
 ---
 
 # `cli-blast-radius-gating` adr: `Gate every destructive verb consistently` | (**status:** `accepted`)
@@ -172,7 +172,6 @@ apart. A `--dry-run` that lies about what the real run will
 do is the worst case.
 
 Pathways. Once gating is uniform, the failure modes the
-audit found around `install` / `uninstall` / `install
---upgrade` / `archive` collapse into one shape. Future
+audit found around `install` / `uninstall` / `install --upgrade` / `archive` collapse into one shape. Future
 destructive verbs (rule remove, agent remove, etc.) inherit
 the contract.

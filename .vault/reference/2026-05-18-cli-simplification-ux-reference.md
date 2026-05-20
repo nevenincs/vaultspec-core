@@ -4,8 +4,8 @@ tags:
   - '#cli-simplification-ux'
 date: '2026-05-18'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
-  - "[[2026-05-17-cli-simplification-ux-adr]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
+  - '[[2026-05-17-cli-simplification-ux-adr]]'
 ---
 
 # `cli-simplification-ux` reference: `Audit-driven decomposition: from findings to rules`
@@ -140,8 +140,7 @@ inherit:
 - **Language-track outruns code-track.** This PR shipped the
   codify pipeline phase, the codifier persona, the codify skill,
   the audit template's Codification candidates section, and three
-  discipline rules — all before the CLI verb (`vault rule
-  promote`) that the language refers to existed. The validation
+  discipline rules — all before the CLI verb (`vault rule promote`) that the language refers to existed. The validation
   loop caught two violations of the framework's own discipline
   ("rules must reflect today's CLI") and corrected them mid-round.
   Future applications should expect this same loop and budget for
@@ -169,24 +168,24 @@ For a future audit, the sequence:
    constraints and a friction-log format. Run multiple rounds
    across days of audit work. Append findings to one rolling
    audit document.
-2. Identify clusters. Group findings by shared architectural
+1. Identify clusters. Group findings by shared architectural
    lever. Validate cluster boundaries against the three criteria.
-3. Author one research synthesis per cluster. Distil the audit
+1. Author one research synthesis per cluster. Distil the audit
    evidence on the cluster's axis.
-4. Author one sibling ADR per cluster. Reference the audit and
+1. Author one sibling ADR per cluster. Reference the audit and
    the research synthesis. State the architectural decision.
-5. Author the umbrella decomposition ADR. Record the choice to
+1. Author the umbrella decomposition ADR. Record the choice to
    decompose into siblings rather than monolith.
-6. Author the umbrella plan. Bind the cluster ADRs through
+1. Author the umbrella plan. Bind the cluster ADRs through
    `related:`. Sequence Waves and Phases by dependency order.
    Add Steps via the CLI verbs, then prose last (per the
    `vaultspec-plan-editing-discipline` rule).
-7. Ship the language-track artifacts. For each cluster whose
+1. Ship the language-track artifacts. For each cluster whose
    findings produce a durable cross-session constraint, author a
    builtin discipline rule under `.vaultspec/rules/rules/`. Add
    pipeline-phase or skill entries if the cluster introduces a
    new lifecycle operation.
-8. Run the validation loop. Re-deploy the auditor personas
+1. Run the validation loop. Re-deploy the auditor personas
    against the just-shipped artifacts. Fix violations mid-round.
    Confirm convergence on the closing meta-finding.
 

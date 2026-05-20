@@ -107,6 +107,59 @@ def test_create_vault_doc_plan_substitutes_tier(tmp_path):
     assert "tier: {tier}" not in content
 
 
+def test_emit_time_validator_rejects_invalid_plan_tier(tmp_path):
+    """A plan template that hydrates to an invalid tier value must refuse to write.
+
+    Exercises the scaffolder-integrity invariant: scaffolders never write
+    content the framework's own validator would reject. Closes umbrella
+    plan W01.P03.S07.
+    """
+    from vaultspec_core.builtins import seed_builtins
+    from vaultspec_core.vaultcore.hydration import (
+        ScaffoldValidationError,
+        _assert_scaffolded_content_valid,
+    )
+
+    rules_dir = tmp_path / ".vaultspec" / "rules"
+    rules_dir.mkdir(parents=True)
+    seed_builtins(rules_dir, force=True)
+
+    # Hand-craft a hydrated plan body whose frontmatter would crash the
+    # parse path. This is exactly the B2-shape antipattern.
+    invalid_plan = (
+        "---\n"
+        "tags:\n"
+        "  - '#plan'\n"
+        "  - '#bad-tier'\n"
+        "date: '2026-05-19'\n"
+        "tier: L{#}\n"
+        "related: []\n"
+        "---\n"
+        "# `bad-tier` plan\n"
+    )
+    with pytest.raises(ScaffoldValidationError, match="frontmatter validator"):
+        _assert_scaffolded_content_valid(invalid_plan, DocType.PLAN)
+
+
+def test_emit_time_validator_accepts_valid_plan(tmp_path):
+    """A well-formed plan passes the emit-time validator without raising."""
+    from vaultspec_core.vaultcore.hydration import _assert_scaffolded_content_valid
+
+    valid_plan = (
+        "---\n"
+        "tags:\n"
+        "  - '#plan'\n"
+        "  - '#good-tier'\n"
+        "date: '2026-05-19'\n"
+        "tier: L1\n"
+        "related: []\n"
+        "---\n"
+        "# `good-tier` plan\n"
+    )
+    # Should not raise.
+    _assert_scaffolded_content_valid(valid_plan, DocType.PLAN)
+
+
 def test_create_vault_doc_plan_default_tier_l1(tmp_path):
     """Plan scaffolded without explicit tier still hydrates cleanly when L1 passed."""
     from vaultspec_core.builtins import seed_builtins

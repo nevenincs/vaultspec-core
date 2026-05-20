@@ -4,7 +4,7 @@ tags:
   - '#cli-sync-vocabulary'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---
 
 # `cli-sync-vocabulary` research: `Sync-shaped surfaces emit five different vocabularies`
@@ -47,15 +47,13 @@ without translating each verb individually.
 
 Round-3b S19 (Xavi): of nine `--json` outputs surveyed, four
 carried a top-level `status` field (the gold-standard pattern is
-`spec mcps status --json`). The most consequential for CI — `vault
-check all --json` — does not. CI integrators have to iterate the
+`spec mcps status --json`). The most consequential for CI — `vault check all --json` — does not. CI integrators have to iterate the
 per-check array to learn whether the gate passed.
 
 ### Verb collisions across surfaces
 
 `install --force` and `sync --force` accept the same flag with
-different overwrite semantics (round 1 finding [02]). `vault check
-annotations --fix` and `vault sanitize annotations` produce
+different overwrite semantics (round 1 finding [02]). `vault check annotations --fix` and `vault sanitize annotations` produce
 identical outputs from different command paths (round 1 finding
 [13]). `spec rules sync claude` and `vaultspec-core sync claude`
 accept incompatible argument shapes (round 3a S12). The same words

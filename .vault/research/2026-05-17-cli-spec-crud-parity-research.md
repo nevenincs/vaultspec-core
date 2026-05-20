@@ -4,7 +4,7 @@ tags:
   - '#cli-spec-crud-parity'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---
 
 # `cli-spec-crud-parity` research: `CRUD verbs diverge across spec noun groups`

@@ -4,14 +4,13 @@ tags:
   - '#cli-surface-consolidation'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---
 
 # `cli-surface-consolidation` research: `Two-surface CRUD: spec sync duplicates top-level sync`
 
 Synthesis note for findings S12, S13, and round-1 finding [13]
-(`vault sanitize annotations` overlaps with `vault check
-annotations --fix`).
+(`vault sanitize annotations` overlaps with `vault check annotations --fix`).
 
 ## Findings
 
@@ -45,8 +44,7 @@ form or the per-group form.
 ### Round-1 finding [13] — `sanitize` overlaps with `check ... --fix`
 
 `vault sanitize annotations` "strips generated template
-annotations from vault documents". `vault check annotations
---fix` does the same; the `check`-help calls the `--fix`
+annotations from vault documents". `vault check annotations --fix` does the same; the `check`-help calls the `--fix`
 flag "strip generated template annotations". Both accept the
 same flags. Both produce the same output. Two different
 verbs reach the same destination.
@@ -79,9 +77,7 @@ deprecate the other:
   precisely. Top-level `sync` becomes a fanout helper
   that calls each granular form, documented as
   equivalent to running them all.
-- **`vault sanitize annotations` vs `vault check
-  annotations --fix`.** Pick `vault check annotations
-  --fix` as canonical because the check is the noun the
+- **`vault sanitize annotations` vs `vault check annotations --fix`.** Pick `vault check annotations --fix` as canonical because the check is the noun the
   user reaches for and the fix is the action they apply.
   Deprecate `vault sanitize`. The annotations check
   becomes the only path.
@@ -110,6 +106,5 @@ documented shape per noun group.
 
 For each duplicate-surface pair, pick the canonical form and
 deprecate the other. Top-level `sync` becomes a fanout
-helper around the granular `spec * sync` verbs. `vault
-sanitize` is deprecated; `vault check annotations --fix` is
+helper around the granular `spec * sync` verbs. `vault sanitize` is deprecated; `vault check annotations --fix` is
 canonical. Full design in the sibling ADR.

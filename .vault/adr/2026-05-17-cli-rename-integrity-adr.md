@@ -4,8 +4,8 @@ tags:
   - '#cli-rename-integrity'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
-  - "[[2026-05-17-cli-rename-integrity-research]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
+  - '[[2026-05-17-cli-rename-integrity-research]]'
 ---
 
 # `cli-rename-integrity` adr: `Rename must rewrite the frontmatter name field` | (**status:** `accepted`)
@@ -61,14 +61,14 @@ Finding B8. Same dispatch path across the three rename verbs.
 
 1. Read the existing resource (filename `OLD`, frontmatter
    `name: OLD`).
-2. Compute the new file path (filename `NEW`).
-3. Build the new file content: identical body, frontmatter with
+1. Compute the new file path (filename `NEW`).
+1. Build the new file content: identical body, frontmatter with
    `name: NEW`.
-4. Write the new file at the new path.
-5. Remove the old file.
-6. Steps 4–5 happen in an atomic operation (write-then-rename,
+1. Write the new file at the new path.
+1. Remove the old file.
+1. Steps 4–5 happen in an atomic operation (write-then-rename,
    or rename-then-rewrite under a lock).
-7. Print the canonical outcome `updated` (per the sync-
+1. Print the canonical outcome `updated` (per the sync-
    vocabulary ADR) with the previous and new names named in
    the annotation.
 
@@ -142,8 +142,7 @@ broken state from prior renames.
 
 Difficulties. Atomic filesystem operations on Windows are
 historically fragile; the implementation must test on the
-Windows path with care. The new check runs on every `vault
-check all`, adding to the per-check cost; the check is cheap
+Windows path with care. The new check runs on every `vault check all`, adding to the per-check cost; the check is cheap
 (walk the spec tree, compare filename stem to frontmatter
 field) but it does add a constant.
 

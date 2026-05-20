@@ -4,8 +4,8 @@ tags:
   - '#cli-scaffolder-integrity'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
-  - "[[2026-05-17-cli-scaffolder-integrity-research]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
+  - '[[2026-05-17-cli-scaffolder-integrity-research]]'
 ---
 
 # `cli-scaffolder-integrity` adr: `Scaffolders must not emit invalid values: require inputs or refuse to write` | (**status:** `accepted`)

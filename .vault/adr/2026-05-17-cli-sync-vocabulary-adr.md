@@ -4,8 +4,8 @@ tags:
   - '#cli-sync-vocabulary'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
-  - "[[2026-05-17-cli-sync-vocabulary-research]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
+  - '[[2026-05-17-cli-sync-vocabulary-research]]'
 ---
 
 # `cli-sync-vocabulary` adr: `Normalise outcome vocabulary across sync-shaped surfaces` | (**status:** `accepted`)

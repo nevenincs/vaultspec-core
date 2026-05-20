@@ -4,8 +4,8 @@ tags:
   - '#cli-paper-cuts'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
-  - "[[2026-05-17-cli-paper-cuts-research]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
+  - '[[2026-05-17-cli-paper-cuts-research]]'
 ---
 
 # `cli-paper-cuts` adr: `Sweep the smaller paper cuts under a shared discipline` | (**status:** `accepted`)
@@ -17,8 +17,7 @@ individually trivial but collectively form a felt-quality
 problem: unhydrated-placeholder warnings, the `--dev` flag
 leaking into consumer help, `vault graph --help`'s wrong
 usage line, `vault feature list`'s trailing token,
-`migrations status`'s ambiguous applied entry, `spec hooks
-list`'s column truncation, `spec system show`'s phantom
+`migrations status`'s ambiguous applied entry, `spec hooks list`'s column truncation, `spec system show`'s phantom
 sync target, outcome line shape variation, the "is the
 workspace green" question.
 
@@ -90,8 +89,7 @@ The checklist lives in the contribution doc.
   in the CLI framework wiring. Document developer mode in
   a contributor doc.
 - **`vault graph --help` usage line.** Fix the framework
-  integration so leaf commands do not render `COMMAND
-  [ARGS]...`. The fix applies to every leaf command, not
+  integration so leaf commands do not render `COMMAND [ARGS]...`. The fix applies to every leaf command, not
   just `vault graph`.
 - **`vault feature list` trailing token.** Remove the
   trailing token from text output. The `has_plan` semantic
@@ -123,8 +121,7 @@ The checklist lives in the contribution doc.
 - Pre-commit hook examples are updated to call
   `vaultspec-core doctor` as the single workspace-green
   gate.
-- Agent personas update to reach for `vaultspec-core
-  doctor` as the readiness check.
+- Agent personas update to reach for `vaultspec-core doctor` as the readiness check.
 
 ## Rationale
 

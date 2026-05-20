@@ -4,7 +4,7 @@ tags:
   - '#cli-spec-edit-safety'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---
 
 # `cli-spec-edit-safety` research: `spec * edit silently fails: hardcoded editor and exit-0-on-traceback`
@@ -27,8 +27,7 @@ documented fallbacks like `vi`) is not consulted.
 The traceback includes a reference to an internal configuration
 object's `editor` attribute, suggesting an editor-configuration
 mechanism exists internally. No CLI verb surfaces it. There is no
-`vaultspec-core config get editor`, no `--editor` flag on `spec *
-edit`, no documented environment variable.
+`vaultspec-core config get editor`, no `--editor` flag on `spec * edit`, no documented environment variable.
 
 ### The exit code lies
 

@@ -4,8 +4,8 @@ tags:
   - '#cli-next-step-hints'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
-  - "[[2026-05-17-cli-next-step-hints-research]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
+  - '[[2026-05-17-cli-next-step-hints-research]]'
 ---
 
 # `cli-next-step-hints` adr: `Every command emits an actionable next-step hint` | (**status:** `accepted`)
@@ -109,18 +109,14 @@ verb adds a new entry, not new render logic.
   or `--no-hints`).
 - The verb's output stream is not JSON. JSON output is
   machine-readable and does not carry prose hints; the next-
-  step suggestion is a top-level field instead (`next_step:
-  {command: "...", description: "..."}` alongside the canonical
+  step suggestion is a top-level field instead (`next_step: {command: "...", description: "..."}` alongside the canonical
   `status` field from the sync-vocabulary ADR).
 
 **Discoverable repair.** Surface `vault repair` as a documented
-candidate hint from multiple verb endpoints (every `vault check
-all` with warnings; every `vault sanitize`; every `vault feature
-index`). The hint mechanism solves the S3 discoverability
+candidate hint from multiple verb endpoints (every `vault check all` with warnings; every `vault sanitize`; every `vault feature index`). The hint mechanism solves the S3 discoverability
 finding by construction.
 
-**Top-level help quickstart.** The top-level `vaultspec-core
---help` gains a one-line quickstart pointer:
+**Top-level help quickstart.** The top-level `vaultspec-core --help` gains a one-line quickstart pointer:
 
 > Run `vaultspec-core install` to set up a new project, then
 > `vaultspec-core vault add research --feature <kebab-tag>` to
@@ -166,8 +162,7 @@ non-confused.
 
 The mechanism also makes `vault repair` discoverable from at
 least four entry points (every `vault check` with warnings,
-every `vault sanitize` invocation, every `vault feature
-index` invocation, and the install summary). The S3 finding
+every `vault sanitize` invocation, every `vault feature index` invocation, and the install summary). The S3 finding
 closes automatically.
 
 ## Consequences

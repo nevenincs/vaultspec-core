@@ -4,8 +4,8 @@ tags:
   - '#cli-spec-edit-safety'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
-  - "[[2026-05-17-cli-spec-edit-safety-research]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
+  - '[[2026-05-17-cli-spec-edit-safety-research]]'
 ---
 
 # `cli-spec-edit-safety` adr: `Surface editor configuration and make spec edit fail honestly` | (**status:** `accepted`)
@@ -67,12 +67,12 @@ by any team whose preferred editor is not `zed`.
 editor binary is resolved in this order:
 
 1. Command-line `--editor <binary>` flag if present.
-2. Project-local config: `vaultspec-core config get editor`
+1. Project-local config: `vaultspec-core config get editor`
    reading from a documented config entry.
-3. `$VISUAL` environment variable.
-4. `$EDITOR` environment variable.
-5. Fallback to `vi`.
-6. If none of the above resolves to an executable on `$PATH`,
+1. `$VISUAL` environment variable.
+1. `$EDITOR` environment variable.
+1. Fallback to `vi`.
+1. If none of the above resolves to an executable on `$PATH`,
    the verb prints an error naming every variable it tried
    and exits non-zero.
 

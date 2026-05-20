@@ -4,8 +4,8 @@ tags:
   - '#cli-simplification-ux'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
-  - "[[2026-05-17-cli-simplification-ux-research]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
+  - '[[2026-05-17-cli-simplification-ux-research]]'
 ---
 
 # `cli-simplification-ux` adr: `Decompose the CLI simplification epic into per-cluster sibling ADRs` | (**status:** `accepted`)

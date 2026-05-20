@@ -4,7 +4,7 @@ tags:
   - '#cli-simplification-ux'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-research]]"
+  - '[[2026-05-17-cli-simplification-ux-research]]'
 ---
 
 # `cli-simplification-ux` audit: `CLI UX rolling audit — Joan and Xavi sessions`
@@ -28,7 +28,7 @@ agent-facing ergonomics. Methodology:
 
 Tracking issue: GitHub `#113`. Scope note in the sibling research document.
 
-## Findings
+## Findings — round 1
 
 ### Round 1 — onboarding and first-feature implementation
 
@@ -51,8 +51,7 @@ incomplete paper trail by design.
 
 The scaffolded plan document contains `tier: L{#}` as the literal value in
 frontmatter. The plan validator then rejects the same document with an
-uncaught `PlanFrontmatterError: tier must be one of L1, L2, L3, L4; got
-'L{#}'` and prints a full Python traceback whose paths reference internal
+uncaught `PlanFrontmatterError: tier must be one of L1, L2, L3, L4; got 'L{#}'` and prints a full Python traceback whose paths reference internal
 source files. Joan crashed on this within minutes of first install. Xavi
 spotted the placeholder and hand-patched it before invoking any plan
 command. The scaffolder owns enough context to require or accept
@@ -196,7 +195,7 @@ structural break.
   noun used both under `vault check annotations` (read-with-fix-flag)
   and `vault sanitize annotations` (write directly).
 
-## Recommendations
+## Recommendations — round 1
 
 ### Highest leverage
 
@@ -246,7 +245,7 @@ structural break.
   common operation (install in the wrong directory) and protects the
   less common one (intentional removal).
 
-## Findings
+## Findings — round 2
 
 ### Round 2 — revision, supersession, override
 
@@ -288,8 +287,7 @@ filename scheme makes them impossible to record honestly.
 
 #### B5. Sharp/Blocker — `tier promote` writes literal `TODO` placeholders into the doc
 
-A direct cousin of B2 from Round 1. Running `vault plan tier promote
-... --target L2` with the minimum flags writes a synthesised phase
+A direct cousin of B2 from Round 1. Running `vault plan tier promote ... --target L2` with the minimum flags writes a synthesised phase
 containing `TODO: Phase title` as the phase title. The very next
 `vault check all` then flags the document as failing. The scaffolder
 emits an invalid value that the validator on the same surface
@@ -309,8 +307,7 @@ the document body and discards author-written prose sections.
 
 `vault plan phase renumber P01 --to P02` retires the identifier `P01`
 permanently. Joan tried to chain two renumbers (`P01 → P02`, then
-`P01a → P01`) to clean up the alpha-suffix that `phase insert
---before` had produced; the second renumber failed because `P01` is
+`P01a → P01`) to clean up the alpha-suffix that `phase insert --before` had produced; the second renumber failed because `P01` is
 retired. The retirement semantics are not surfaced in `--help` and
 the recovery path the user reaches for first is closed. Related to
 the existing open issue `#109`.
@@ -363,7 +360,7 @@ first-class concept (frontmatter field `supersedes:`, CLI verb
 `vault adr supersede <old> --by <new>` or similar) so the relationship
 is data, not prose.
 
-## Recommendations
+## Recommendations — round 2
 
 ### Highest leverage (updated)
 
@@ -393,11 +390,10 @@ is data, not prose.
 
 ### Discoverability (updated)
 
-- Surface `vault repair`, `vault feature index`, and `vault check
-  annotations --fix` as the recommended post-revision pipeline. Right
+- Surface `vault repair`, `vault feature index`, and `vault check annotations --fix` as the recommended post-revision pipeline. Right
   now an agent has to discover the regen-and-recheck loop by trial.
 
-## Findings
+## Findings — round 3
 
 ### Round 3a — spec customisation surface (Joan)
 
@@ -465,8 +461,7 @@ over yours". The word does not match the operation.
 
 #### S12. Sharp — `spec rules sync` rejects a provider positional the top-level `sync` accepts
 
-`vaultspec-core sync claude` accepts the provider. `vaultspec-core
-spec rules sync claude` rejects it. Same verb, two incompatible
+`vaultspec-core sync claude` accepts the provider. `vaultspec-core spec rules sync claude` rejects it. Same verb, two incompatible
 argument schemas across two surfaces, no `--help` text reconciling them.
 
 #### S13. Sharp — `spec * sync` duplicates a slice of top-level `sync`
@@ -586,9 +581,7 @@ in one verb:
   `--dry-run` would silently delete the cross-feature provenance the
   team lead explicitly said must remain. The "fix" is the opposite of
   what the rule says.
-- **`vault check structure` rejects the directory `vault feature
-  archive` just created.** `Vault violation: Unsupported directory
-  found in .vault/: '_archive'`. `vault repair --json` reports this
+- **`vault check structure` rejects the directory `vault feature archive` just created.** `Vault violation: Unsupported directory found in .vault/: '_archive'`. `vault repair --json` reports this
   structure error as `fixable: false`. Two first-class verbs disagree
   about legal vault layout, and the auditor flatly refuses what the
   archiver writes.
@@ -597,8 +590,7 @@ Plus a sixth, lower-grade: `vault feature archive <typo>` returns
 exit 0 with `No documents found for feature '<typo>'.` Silent
 no-op on a typo means CI cannot catch a mis-typed archive target.
 
-After archive, Xavi's vault is in a permanent error state: `vault
-check all` exits 1 with five errors that no clean-fix path can
+After archive, Xavi's vault is in a permanent error state: `vault check all` exits 1 with five errors that no clean-fix path can
 resolve. The lead's expectation ("trail should stay readable") and
 the CLI's enforcement ("vault check fails after archive, fix means
 deleting links") are in direct conflict. The verb the lead invoked
@@ -695,7 +687,7 @@ retirement — are weak at every endpoint. This is independent of the
 vocabulary-fragmentation and tactical-bug findings; it is a
 systemic gap in how the CLI lets a project mutate its memory.
 
-## Recommendations
+## Recommendations — round 3
 
 ### Highest leverage (round 3 update)
 
@@ -728,22 +720,22 @@ wiki-links so cross-feature provenance lives in document bodies
 and survives the archive verb (per the memory-lifecycle ADR's
 fix).
 
-| Cluster | Findings | ADR feature tag |
-|---|---|---|
-| Memory-lifecycle verbs | B3, B9, Bridge Gap | `cli-memory-lifecycle` |
-| Spec-layer gitignore reversal | S5 (Round 1) | `cli-spec-gitignore` |
-| Sync-shaped vocabulary normalisation | S2, S8, S10 | `cli-sync-vocabulary` |
-| Scaffolder integrity | B2, B5 | `cli-scaffolder-integrity` |
-| Plan-body preservation | B6 | `cli-plan-body-preservation` |
-| Exec per-step records | B1 | `cli-exec-step-records` |
-| Spec edit safety | B7 | `cli-spec-edit-safety` |
-| Rename integrity | B8 | `cli-rename-integrity` |
-| Spec CRUD parity | S9, S15, S16 | `cli-spec-crud-parity` |
-| Next-step hints / discoverability | S3, Round 1 [20] | `cli-next-step-hints` |
-| Destructive blast-radius gating | S4, S14 | `cli-blast-radius-gating` |
-| Machine-readable output consistency | S19 | `cli-json-consistency` |
-| Duplicate-surface consolidation | S12, S13, Round 1 [13] | `cli-surface-consolidation` |
-| Residual paper cuts | Round 1 [03], [06], [18], Round 3a [53], [54], [57], [58], Round 3b S20 | `cli-paper-cuts` |
+| Cluster                              | Findings                                                                | ADR feature tag              |
+| ------------------------------------ | ----------------------------------------------------------------------- | ---------------------------- |
+| Memory-lifecycle verbs               | B3, B9, Bridge Gap                                                      | `cli-memory-lifecycle`       |
+| Spec-layer gitignore reversal        | S5 (Round 1)                                                            | `cli-spec-gitignore`         |
+| Sync-shaped vocabulary normalisation | S2, S8, S10                                                             | `cli-sync-vocabulary`        |
+| Scaffolder integrity                 | B2, B5                                                                  | `cli-scaffolder-integrity`   |
+| Plan-body preservation               | B6                                                                      | `cli-plan-body-preservation` |
+| Exec per-step records                | B1                                                                      | `cli-exec-step-records`      |
+| Spec edit safety                     | B7                                                                      | `cli-spec-edit-safety`       |
+| Rename integrity                     | B8                                                                      | `cli-rename-integrity`       |
+| Spec CRUD parity                     | S9, S15, S16                                                            | `cli-spec-crud-parity`       |
+| Next-step hints / discoverability    | S3, Round 1 [20]                                                        | `cli-next-step-hints`        |
+| Destructive blast-radius gating      | S4, S14                                                                 | `cli-blast-radius-gating`    |
+| Machine-readable output consistency  | S19                                                                     | `cli-json-consistency`       |
+| Duplicate-surface consolidation      | S12, S13, Round 1 [13]                                                  | `cli-surface-consolidation`  |
+| Residual paper cuts                  | Round 1 [03], [06], [18], Round 3a [53], [54], [57], [58], Round 3b S20 | `cli-paper-cuts`             |
 
 Each ADR is paired with a research synthesis note under the same
 feature tag. Each ADR includes a Companion language updates
@@ -756,7 +748,7 @@ The loop the user opened on this audit terminates here on the
 ADR list. Downstream work — plans, exec records, implementation —
 flows out of each ADR via the framework's own pipeline.
 
-## Findings
+## Findings — round 4
 
 ### Round 4 — convergence test on the language-track delivery
 
@@ -774,8 +766,7 @@ prompting at the language they speak?
 
 Joan v4 and Xavi v4 both reached the spec subtree organically.
 Joan's command log shows him scanning `spec rules list`,
-`spec agents list`, and `spec skills list` after `install
---upgrade` — without being told to. Joan codified a finding
+`spec agents list`, and `spec skills list` after `install --upgrade` — without being told to. Joan codified a finding
 (`harbor-notes-empty-filter-contract`) from his work without any
 explicit instruction to do so. Xavi codified
 `archive-post-mortem-trail` from the recovery audit he had been
@@ -810,12 +801,12 @@ the today-shape until then.
 
 Two reproductions in round 4.
 
-- Joan v4 finding [69]: the codify skill, persona, and rule all
+- Joan v4 finding \[69\]: the codify skill, persona, and rule all
   named `.vaultspec/rules/project/` as the authored-rule home;
   `spec rules add` actually writes to `.vaultspec/rules/rules/`
   alongside builtins. Fixed in commit `6553796` (round-4
   hardening).
-- Joan v4 finding [65]: the `vaultspec-dry-run-discipline` rule's
+- Joan v4 finding \[65\]: the `vaultspec-dry-run-discipline` rule's
   "Good" worked example invoked `vault add plan --tier L1`. The
   CLI rejects `--tier` (exit 2, "No such option `--tier`"). Fixed
   in commit `9e90ff7` (round-4 hardening).
@@ -879,8 +870,7 @@ bug in three shipped builtin files. `spec doctor` ran clean
 through every round. The doctor checks framework state but does
 not cross-validate that the language-track's instructions match
 the CLI's actual behaviour. This is a missing check class —
-either an extension to `spec doctor` or a new `vault check
-language-track-consistency` verb that walks every rule, skill,
+either an extension to `spec doctor` or a new `vault check language-track-consistency` verb that walks every rule, skill,
 and persona for CLI-surface claims and runs them against today's
 CLI.
 
@@ -889,9 +879,8 @@ new ADR if the scope expands beyond paper-cut work.
 
 #### Smaller paper cuts (Round 4)
 
-- Joan v4 finding [70]: `vault add plan --dry-run` on an L1 plan
-  with no Steps emits an empty preview. Same shape as `install
-  --upgrade --dry-run` from round 3a S14. Empty preview on a
+- Joan v4 finding \[70\]: `vault add plan --dry-run` on an L1 plan
+  with no Steps emits an empty preview. Same shape as `install --upgrade --dry-run` from round 3a S14. Empty preview on a
   state-changing verb is worse than no preview; both belong in
   the same `cli-blast-radius-gating` (P11) fix family.
 
@@ -935,8 +924,7 @@ cluster ADR; all extend or refine existing ones.
 
 ## Codification candidates
 
-Backfilled per the audit template's new `## Codification
-candidates` section (which post-dated the original audit
+Backfilled per the audit template's new `## Codification candidates` section (which post-dated the original audit
 authoring). The audit's findings have already produced four
 builtin discipline rules through the codify pipeline phase. Each
 entry below names the source finding, the rule slug, and a

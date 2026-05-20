@@ -17,17 +17,22 @@ order: 3
 
 All significant work must follow this pipeline:
 
-| Phase       | Skill                   | Artifact                        | Requires                                                |
-| ----------- | ----------------------- | ------------------------------- | ------------------------------------------------------- |
-| 1 Research  | vaultspec-research      | .vault/research/...             | -                                                       |
-| 1 Reference | vaultspec-code-research | .vault/reference/...            | -                                                       |
-| 2 Specify   | vaultspec-adr           | .vault/adr/...                  | Research artifact                                       |
-| 3 Plan      | vaultspec-write-plan    | .vault/plan/...                 | ADR artifact                                            |
-| 4 Execute   | vaultspec-execute       | .vault/exec/.../steps           | Approved plan                                           |
-| 5 Verify    | vaultspec-code-review   | .vault/exec/.../review          | Completed step(s)                                       |
-| 6 Codify    | vaultspec-codify        | .vaultspec/rules/rules/...      | Review surfacing a durable cross-session lesson         |
+| Phase       | Skill                   | Artifact                   | Requires                                        |
+| ----------- | ----------------------- | -------------------------- | ----------------------------------------------- |
+| 1 Research  | vaultspec-research      | .vault/research/...        | -                                               |
+| 1 Reference | vaultspec-code-research | .vault/reference/...       | -                                               |
+| 2 Specify   | vaultspec-adr           | .vault/adr/...             | Research artifact                               |
+| 3 Plan      | vaultspec-write-plan    | .vault/plan/...            | ADR artifact                                    |
+| 4 Execute   | vaultspec-execute       | .vault/exec/.../steps      | Approved plan                                   |
+| 5 Verify    | vaultspec-code-review   | .vault/exec/.../review     | Completed step(s)                               |
+| 6 Codify    | vaultspec-codify        | .vaultspec/rules/rules/... | Review surfacing a durable cross-session lesson |
 
-Phase 6 (Codify) is **discretionary**: most features end at Verify. Only when a Verify pass surfaces a lesson that satisfies the three durability criteria (cross-session, constraint-shaped, project-bound) does the work continue into Codify. The `vaultspec-codify` rule defines the criteria and the body template; the `vaultspec-codifier` agent persona enacts the discipline. A rule authored under Phase 6 binds future agents across sessions, clones, and CI runs.
+Phase 6 (Codify) is **discretionary**: most features end at Verify. Only when a Verify
+pass surfaces a lesson that satisfies the three durability criteria (cross-session,
+constraint-shaped, project-bound) does the work continue into Codify. The
+`vaultspec-codify` rule defines the criteria and the body template; the
+`vaultspec-codifier` agent persona enacts the discipline. A rule authored under Phase 6
+binds future agents across sessions, clones, and CI runs.
 
 Plan documents structure work with the hierarchy `Epic > Wave > Phase > Step` and
 declare a complexity tier (`L1`, `L2`, `L3`, or `L4`) in frontmatter. The tier

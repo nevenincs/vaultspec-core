@@ -4,7 +4,7 @@ tags:
   - '#cli-paper-cuts'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---
 
 # `cli-paper-cuts` research: `Smaller paper cuts that share a discipline`
@@ -46,8 +46,7 @@ contributor doc.
 
 ### `vault graph --help` lies about its usage line
 
-Round 1 [18]. The Click/Typer wiring renders `Usage:
-vaultspec-core vault graph [OPTIONS] COMMAND [ARGS]...`
+Round 1 [18]. The Click/Typer wiring renders `Usage: vaultspec-core vault graph [OPTIONS] COMMAND [ARGS]...`
 despite the verb being a leaf with no subcommands. New readers
 hunt for subcommands that do not exist.
 
@@ -57,8 +56,7 @@ render `[OPTIONS]` only, not `COMMAND [ARGS]...`.
 ### `vault feature list` text trails an unexplained `plan` token
 
 Round 3b S20. Text output trails each feature with an
-unattached `plan` token: `snippets  9 docs  (adr, audit,
-index, plan, research) plan`. The `--json` form has
+unattached `plan` token: `snippets  9 docs  (adr, audit, index, plan, research) plan`. The `--json` form has
 `has_plan: true` instead.
 
 The fix is to remove the trailing token from text output (the
@@ -66,8 +64,7 @@ The fix is to remove the trailing token from text output (the
 
 ### `migrations status` reports a fishy applied entry
 
-Round 3a [57]. The output names `applied 0.1.17
-index_subfolder` even on a single-registered-migration
+Round 3a [57]. The output names `applied 0.1.17 index_subfolder` even on a single-registered-migration
 workspace. Joan flagged it as suspicious. Xavi round 3
 ([32]) saw the same line.
 
@@ -111,8 +108,7 @@ I safe to commit?". Joan called this out: no single "is the
 workspace green?" entry point.
 
 The next-step-hints ADR's pattern partially addresses this
-(clean `vault check all` hints at `git commit` or `vault
-repair`). A small additional fix is useful: a top-level
+(clean `vault check all` hints at `git commit` or `vault repair`). A small additional fix is useful: a top-level
 `vaultspec-core doctor` that calls both `vault check all`
 and `spec doctor` and reports a unified pass/fail with one
 exit code.

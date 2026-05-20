@@ -4,7 +4,7 @@ tags:
   - '#cli-scaffolder-integrity'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---
 
 # `cli-scaffolder-integrity` research: `Scaffolders emit invalid values their own validators then reject`
@@ -25,8 +25,7 @@ tier: L{#}
 
 The literal string `L{#}` is intended as a placeholder. The plan
 validator on the same CLI surface then rejects the document with
-an uncaught `PlanFrontmatterError: tier must be one of L1, L2, L3,
-L4; got 'L{#}'` and prints a Python traceback to stderr.
+an uncaught `PlanFrontmatterError: tier must be one of L1, L2, L3, L4; got 'L{#}'` and prints a Python traceback to stderr.
 
 Joan crashed on it within minutes of first install. Xavi spotted
 it on round 1 and hand-patched the value before invoking any plan
@@ -36,8 +35,7 @@ round-3 list). Three rounds; same wart.
 
 ### B5 — `vault plan tier promote` writes literal `TODO: Phase title`
 
-Round 2 evidence (Joan, finding [23]). Running `vault plan tier
-promote ... --target L2` with the minimum flags writes a
+Round 2 evidence (Joan, finding [23]). Running `vault plan tier promote ... --target L2` with the minimum flags writes a
 synthesised phase containing `TODO: Phase title` as the phase
 title. The very next `vault check all` flags the document as
 failing.

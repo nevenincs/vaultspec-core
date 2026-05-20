@@ -4,8 +4,8 @@ tags:
   - '#cli-exec-step-records'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
-  - "[[2026-05-17-cli-exec-step-records-research]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
+  - '[[2026-05-17-cli-exec-step-records-research]]'
 ---
 
 # `cli-exec-step-records` adr: `Make vault add exec produce per-Step records the framework rules require` | (**status:** `accepted`)
@@ -65,25 +65,23 @@ round 2.
 
 **Required `--step` flag.**
 
-- `vault add exec --feature <tag> --step S<NN> --related
-  <plan-stem>` becomes the canonical invocation.
+- `vault add exec --feature <tag> --step S<NN> --related <plan-stem>` becomes the canonical invocation.
 - The CLI reads the plan referenced by `--related`, looks up
   the named Step, populates the output:
-    - Path: `.vault/exec/{date}-{feature}/{date}-{feature}-S##.md`
-      (creating the per-feature directory on first call).
-    - Frontmatter: `step_id: 'S##'`, `related: ['<plan-stem>']`,
-      `tags: ['#exec', '#<feature>']`, `date: <today>`.
-    - Body: heading from the Step's `action`; pre-populated
-      "Scope" section listing the Step's `scope` paths; empty
-      "Outcome" and "Notes" sections for the author to fill.
+  - Path: `.vault/exec/{date}-{feature}/{date}-{feature}-S##.md`
+    (creating the per-feature directory on first call).
+  - Frontmatter: `step_id: 'S##'`, `related: ['<plan-stem>']`,
+    `tags: ['#exec', '#<feature>']`, `date: <today>`.
+  - Body: heading from the Step's `action`; pre-populated
+    "Scope" section listing the Step's `scope` paths; empty
+    "Outcome" and "Notes" sections for the author to fill.
 - `--title` becomes optional; when supplied it overrides the
   derived heading. When omitted, the Step's `action` is used
   verbatim.
 
 **Bulk `--all-steps` form.**
 
-- `vault add exec --feature <tag> --related <plan-stem>
-  --all-steps` enumerates every Step in the plan and scaffolds
+- `vault add exec --feature <tag> --related <plan-stem> --all-steps` enumerates every Step in the plan and scaffolds
   one exec record per Step, returning a list of created paths.
 - `--all-steps` is mutually exclusive with `--step`.
 - Idempotent: re-running against an already-scaffolded plan

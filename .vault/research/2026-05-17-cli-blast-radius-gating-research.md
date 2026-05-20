@@ -4,7 +4,7 @@ tags:
   - '#cli-blast-radius-gating'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---
 
 # `cli-blast-radius-gating` research: `Destructive verbs are gated asymmetrically`
@@ -51,8 +51,7 @@ the verb that adds steps to a plan.
 
 ### The pattern across the three findings
 
-Three first-class destructive verbs (`install`, `install
---upgrade`, `vault feature archive`) all ship with inadequate
+Three first-class destructive verbs (`install`, `install --upgrade`, `vault feature archive`) all ship with inadequate
 gating. One forces `--force` for removal but not for
 addition (S4). One has no preview (S14). One has no preview
 and no reversal (B9). The framework's gating choices appear

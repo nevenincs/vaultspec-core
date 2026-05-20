@@ -4,7 +4,7 @@ tags:
   - '#cli-rename-integrity'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---
 
 # `cli-rename-integrity` research: `spec rename leaves frontmatter name field stale`
@@ -53,8 +53,7 @@ three.
 
 The framework's design philosophy is that the frontmatter is
 authoritative metadata. `vault check schema` validates
-frontmatter against documented schemas. `vault check
-frontmatter` checks required fields. The filename is supposed
+frontmatter against documented schemas. `vault check frontmatter` checks required fields. The filename is supposed
 to be a derived convenience: a sortable index into the
 canonical content.
 

@@ -4,8 +4,8 @@ tags:
   - '#cli-spec-crud-parity'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
-  - "[[2026-05-17-cli-spec-crud-parity-research]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
+  - '[[2026-05-17-cli-spec-crud-parity-research]]'
 ---
 
 # `cli-spec-crud-parity` adr: `Define a uniform CRUD shape for every spec noun group` | (**status:** `accepted`)
@@ -36,12 +36,12 @@ Findings S9, S15, S16 in the audit.
   need the same verbs. Singleton-shaped nouns (system) get a
   reduced template. The distinction must be explicit.
 - The fix interacts with several adjacent ADRs:
-    - Sync-vocabulary (the `revert` verb's semantics are
-      redefined there; `restore` may be the cleaner name).
-    - Rename-integrity (the rename verb's atomicity invariant
-      applies here).
-    - Spec-edit-safety (the editor-resolution contract applies
-      to every `<group> edit`).
+  - Sync-vocabulary (the `revert` verb's semantics are
+    redefined there; `restore` may be the cleaner name).
+  - Rename-integrity (the rename verb's atomicity invariant
+    applies here).
+  - Spec-edit-safety (the editor-resolution contract applies
+    to every `<group> edit`).
 - Adding CRUD to `spec hooks` is the largest content addition;
   it makes hooks an authored-content first-class surface
   rather than a configuration-file-only surface.

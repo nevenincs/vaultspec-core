@@ -4,7 +4,7 @@ tags:
   - '#cli-next-step-hints'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---
 
 # `cli-next-step-hints` research: `CLI never volunteers what to run next`
@@ -39,19 +39,16 @@ surface is the one no `--help` text recommends. Joan independently
 discovered it and called it "the single best command in the
 entire CLI surface". Xavi never discovered it in three rounds;
 he spent three commands (`vault sanitize annotations` →
-`vault feature index` → `vault check all`) doing what `vault
-repair` does in one.
+`vault feature index` → `vault check all`) doing what `vault repair` does in one.
 
 The CLI had every chance to surface it. The install summary
-could have. Any `vault add` output could have. The `vault check
-all` clean output could have. None did.
+could have. Any `vault add` output could have. The `vault check all` clean output could have. None did.
 
 ### Round 3a Bridge Gap is the structural form
 
 Across six agent-days, neither persona reached the `spec`
 subtree organically. The pipeline (research, decide, plan,
-execute, review) never pushes the agent toward `spec rules
-add` even though the spec subtree is the durable rule-
+execute, review) never pushes the agent toward `spec rules add` even though the spec subtree is the durable rule-
 authoring surface the pipeline ostensibly exists to support.
 
 The framework's natural-language verbs map exclusively to

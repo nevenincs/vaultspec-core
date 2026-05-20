@@ -4,8 +4,8 @@ tags:
   - '#cli-surface-consolidation'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
-  - "[[2026-05-17-cli-surface-consolidation-research]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
+  - '[[2026-05-17-cli-surface-consolidation-research]]'
 ---
 
 # `cli-surface-consolidation` adr: `Consolidate duplicated CLI surfaces around one canonical verb each` | (**status:** `accepted`)
@@ -15,13 +15,11 @@ related:
 The CLI exposes the same conceptual operation through two
 different command paths in at least three places:
 
-- `vaultspec-core sync claude` and `vaultspec-core spec rules
-  sync claude` are both "push spec content to claude provider"
+- `vaultspec-core sync claude` and `vaultspec-core spec rules sync claude` are both "push spec content to claude provider"
   surfaces — and accept incompatible argument shapes (S12).
 - `spec * sync` and top-level `sync` overlap significantly
   in output and effect (S13).
-- `vault sanitize annotations` and `vault check annotations
-  --fix` produce identical results (round-1 [13]).
+- `vault sanitize annotations` and `vault check annotations --fix` produce identical results (round-1 [13]).
 
 Two-surface CRUD doubles the documentation surface, invites
 silent drift, and produces real user-facing inconsistencies
@@ -49,8 +47,7 @@ silent drift, and produces real user-facing inconsistencies
 - Some operators may have memorised `vault sanitize` after
   the round-1 paper-cut. The deprecation message must
   unambiguously redirect them.
-- Argument-shape reconciliation between `spec * sync
-  <provider>` and `sync <provider>` is itself part of this
+- Argument-shape reconciliation between `spec * sync <provider>` and `sync <provider>` is itself part of this
   fix.
 
 ## Implementation
@@ -73,8 +70,7 @@ silent drift, and produces real user-facing inconsistencies
   `mixed` when individual groups had heterogeneous
   outcomes.
 
-**`vault sanitize annotations` and `vault check annotations
---fix`.**
+**`vault sanitize annotations` and `vault check annotations --fix`.**
 
 - `vault check annotations --fix` is canonical.
 - `vault sanitize annotations` emits a deprecation warning
@@ -123,8 +119,7 @@ same shape.
 
 Picking `spec * sync` as canonical over top-level `sync`
 follows the framework's own per-noun-group CRUD template
-(spec-crud-parity ADR). Picking `vault check annotations
---fix` over `vault sanitize` follows the principle that
+(spec-crud-parity ADR). Picking `vault check annotations --fix` over `vault sanitize` follows the principle that
 the verb the user reaches for is `check` (with `--fix` as
 the action) rather than a parallel verb tree.
 

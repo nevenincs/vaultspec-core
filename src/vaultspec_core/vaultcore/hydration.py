@@ -275,6 +275,12 @@ def create_vault_doc(
                         hint="Use --force to overwrite",
                     )
 
+    # Emit-time validator: refuse to write content the framework's own
+    # validators would reject on the next read. Closes the
+    # scaffolder-integrity invariant prescribed by the
+    # cli-scaffolder-integrity ADR.
+    _assert_scaffolded_content_valid(hydrated, doc_type)
+
     if dry_run:
         return target_path
 
@@ -284,6 +290,50 @@ def create_vault_doc(
     atomic_write(target_path, hydrated)
     logger.info("Created %s", target_path)
     return target_path
+
+
+class ScaffoldValidationError(ValueError):
+    """Raised when a scaffolded document would fail its own validator.
+
+    The scaffolder must never write a document the framework's read-path
+    validators would reject. When this exception fires, the failure is
+    in the template + hydration pipeline, not in the operator's input.
+    """
+
+
+def _assert_scaffolded_content_valid(content: str, doc_type: DocType) -> None:
+    """Validate hydrated scaffolder output before the write hits disk.
+
+    Scope is deliberately narrow: this is the emit-time guard against
+    the B2/B5-shape antipattern where a scaffolder writes content the
+    next read-path command crashes on with an uncaught exception. It
+    is not a general lint pass -- soft frontmatter advisories (extra
+    tags, missing related entries) remain post-creation warnings via
+    :func:`vaultspec_core.cli.vault_cmd._validate_created_doc` and are
+    not blocking here.
+
+    For plan documents the frontmatter is parsed with the same parser
+    the read path uses; a failure (e.g. an invalid ``tier`` value)
+    raises :class:`ScaffoldValidationError` and the scaffolder must
+    not write. Other document types have no crash-on-parse frontmatter
+    field today, so they pass through.
+    """
+    if doc_type is DocType.PLAN:
+        try:
+            from ..plan.frontmatter import parse_plan_frontmatter
+        except ImportError:
+            return
+        try:
+            parse_plan_frontmatter(content)
+        except Exception as exc:
+            msg = (
+                "Scaffolded plan failed the framework's own frontmatter "
+                f"validator: {exc}. The template + hydration pipeline "
+                "produced content the next vault plan command would "
+                "reject. This is a scaffolder bug; do not edit the file "
+                "by hand."
+            )
+            raise ScaffoldValidationError(msg) from exc
 
 
 def get_template_path(

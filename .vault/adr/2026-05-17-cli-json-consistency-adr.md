@@ -4,8 +4,8 @@ tags:
   - '#cli-json-consistency'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
-  - "[[2026-05-17-cli-json-consistency-research]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
+  - '[[2026-05-17-cli-json-consistency-research]]'
 ---
 
 # `cli-json-consistency` adr: `Adopt a uniform --json schema with top-level status field` | (**status:** `accepted`)
@@ -86,8 +86,7 @@ content in this shape:
 - `spec mcps status --json` already has top-level `status`;
   wrapped to envelope shape.
 - Every other surveyed command (`spec doctor`, `vault list`,
-  `vault stats`, `vault graph`, `vault plan status`, `vault
-  repair`) wraps its payload identically.
+  `vault stats`, `vault graph`, `vault plan status`, `vault repair`) wraps its payload identically.
 
 **Schema registry.** A documented section in the framework
 manual enumerates every command's current schema version and

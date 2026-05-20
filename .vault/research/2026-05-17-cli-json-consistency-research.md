@@ -4,7 +4,7 @@ tags:
   - '#cli-json-consistency'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---
 
 # `cli-json-consistency` research: `--json outputs lack uniform shape across the CLI`
@@ -23,8 +23,7 @@ Outputs surveyed:
   `status: "ok"` plus typed arrays for `missing`, `drifted`,
   `stale_managed`, `warnings`. CI gate is a single string
   compare.
-- **`migrations status --json`**: top-level `status:
-  "up_to_date"` plus `registered: [...]`, `pending: [...]`.
+- **`migrations status --json`**: top-level `status: "up_to_date"` plus `registered: [...]`, `pending: [...]`.
   Self-describing.
 - **`spec doctor --json`**: deep tree per-provider state.
   Useful but verbose.
@@ -33,8 +32,7 @@ Outputs surveyed:
 - **`vault list --json`**: clean per-document array
   `{path, name, doc_type, feature, date, tags}`. Excellent.
 - **`vault stats --json`**: single-shot summary
-  `{total_docs, total_features, counts_by_type,
-  orphaned_count, dangling_link_count}`. Tidy.
+  `{total_docs, total_features, counts_by_type, orphaned_count, dangling_link_count}`. Tidy.
 - **`vault graph --json`**: standard NetworkX-shaped node-link
   export. Immediately consumable by graph tooling.
 - **`vault plan status --json`**: clean per-plan object
@@ -46,10 +44,8 @@ Outputs surveyed:
 ### The pattern in the data
 
 Four of nine outputs carry a top-level `status` field. Five
-do not. The output most consequential for CI (`vault check
-all --json` — the obvious gate for "is this vault green")
-does not. The output least likely to drive CI (`spec mcps
-status --json`) does.
+do not. The output most consequential for CI (`vault check all --json` — the obvious gate for "is this vault green")
+does not. The output least likely to drive CI (`spec mcps status --json`) does.
 
 The pattern is not random. Verbs that semantically report a
 single state (status verbs) have a top-level status field.
@@ -84,8 +80,7 @@ outcomes). The two ADRs share the same source of truth.
 
 None of the surveyed outputs declares a schema version. A
 consumer that pattern-matches against today's structure has
-no way to detect future schema additions. Adding `schema:
-"vaultspec.<command>.<v>"` at the top level lets consumers
+no way to detect future schema additions. Adding `schema: "vaultspec.<command>.<v>"` at the top level lets consumers
 adapt cleanly across CLI versions.
 
 ## Constraints identified

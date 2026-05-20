@@ -43,16 +43,16 @@ the surface is mapped.
 1. Audit the full top-level command surface and the major subtrees against the
    three failure modes above. Collect concrete agent-transcript evidence in
    the sandbox harness.
-2. Define a normalised outcome-state vocabulary (for example: `installed`,
+1. Define a normalised outcome-state vocabulary (for example: `installed`,
    `unchanged`, `synced`, `drifted`, `repaired`, `skipped`) and one canonical
    way to render each one. Apply consistently across surfaces.
-3. Tighten the `install` / `sync` / `uninstall` semantics so each command has
+1. Tighten the `install` / `sync` / `uninstall` semantics so each command has
    one job, with state-aware refusals and guidance when run in the wrong
    state.
-4. Add discoverability affordances: a top-level "what to run next" entry
+1. Add discoverability affordances: a top-level "what to run next" entry
    point, clearer `--help` summaries, and a machine-readable index of
    commands suitable for agent consumption.
-5. Capture agent-facing transcripts as fixtures so the UX feedback strings,
+1. Capture agent-facing transcripts as fixtures so the UX feedback strings,
    not just exit codes, regress under test.
 
 ## Sandbox harness

@@ -4,7 +4,7 @@ tags:
   - '#cli-memory-lifecycle'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---
 
 # `cli-memory-lifecycle` research: `Memory-lifecycle gap: findings synthesis`
@@ -18,11 +18,11 @@ ADR proposes.
 
 ### The structural model holds; the verbs that mutate it do not
 
-Round 3b S18 (positive) confirmed that the frontmatter + wiki-links
-+ feature-index model handles parallel features cleanly. Two
-features authored same-day with cross-feature `related:` links
-produced no collisions and no cross-talk at the leaf level. The
-representation layer is sound.
+Round 3b S18 (positive) confirmed that the structural model
+(frontmatter, wiki-links, and feature indexes) handles parallel
+features cleanly. Two features authored same-day with cross-feature
+`related:` links produced no collisions and no cross-talk at the
+leaf level. The representation layer is sound.
 
 The failure surface is the set of CLI verbs that change memory
 state across the lifecycle:

@@ -4,8 +4,8 @@ tags:
   - '#cli-spec-gitignore'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
-  - "[[2026-05-17-cli-spec-gitignore-research]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
+  - '[[2026-05-17-cli-spec-gitignore-research]]'
 ---
 
 # `cli-spec-gitignore` adr: `Reverse default gitignore policy: spec layer is team-shared` | (**status:** `accepted`)
@@ -87,8 +87,7 @@ gitignore block on next `install --upgrade`. Detection logic:
 - The migration is idempotent. Re-running after the rewrite is a
   no-op.
 
-**Install summary language.** After `install` and `install
---upgrade` both, print a one-line policy statement under a section
+**Install summary language.** After `install` and `install --upgrade` both, print a one-line policy statement under a section
 heading "Sharing policy". Example wording:
 
 > `.vaultspec/` (rules, skills, agents, system) and `CLAUDE.md`

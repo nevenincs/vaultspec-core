@@ -4,8 +4,8 @@ tags:
   - '#cli-memory-lifecycle'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
-  - "[[2026-05-17-cli-memory-lifecycle-research]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
+  - '[[2026-05-17-cli-memory-lifecycle-research]]'
 ---
 
 # `cli-memory-lifecycle` adr: `First-class memory-lifecycle verbs: codify, supersede, retire` | (**status:** `accepted`)
@@ -82,16 +82,14 @@ small set of frontmatter additions.
 **Codify.** Introduce a single command that promotes a finding from
 an audit document into a durable project rule.
 
-- `vaultspec-core vault rule promote --from <audit-stem> --as
-  <rule-name>` writes `.vaultspec/rules/rules/project/<rule-name>.md`
+- `vaultspec-core vault rule promote --from <audit-stem> --as <rule-name>` writes `.vaultspec/rules/rules/project/<rule-name>.md`
   with a `derived_from: ['audit:<audit-stem>']` frontmatter field,
   plus a short body templated from the audit finding. The
   `project/` subdirectory ships alongside this verb as part of the
   `cli-spec-crud-parity` ADR's `--scope project` flag work;
   pre-existing authored rules in the flat `.vaultspec/rules/rules/`
   directory are migrated by the same Step.
-- The originating audit document gains a `promoted_to:
-  ['rule:<rule-name>']` back-pointer.
+- The originating audit document gains a `promoted_to: ['rule:<rule-name>']` back-pointer.
 - The pipeline gains a sixth lifecycle phase: "codify". Builtin
   rules and agent personas are updated to teach that codify follows
   review and is part of the completion criteria for any feature
@@ -102,8 +100,7 @@ an audit document into a durable project rule.
 **Supersede.** Introduce a single command that records that one
 decision overrides another.
 
-- `vaultspec-core vault adr supersede <old-adr-stem> --by
-  <new-adr-stem>` writes `superseded_by: '<new-adr-stem>'` on the
+- `vaultspec-core vault adr supersede <old-adr-stem> --by <new-adr-stem>` writes `superseded_by: '<new-adr-stem>'` on the
   old ADR's frontmatter and `supersedes: ['<old-adr-stem>']` on the
   new one. Optionally rewrites the old ADR's H1 status token from
   `accepted` to `superseded` to keep the feature-index renderer

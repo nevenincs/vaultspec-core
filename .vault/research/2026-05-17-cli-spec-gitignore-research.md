@@ -4,7 +4,7 @@ tags:
   - '#cli-spec-gitignore'
 date: '2026-05-17'
 related:
-  - "[[2026-05-17-cli-simplification-ux-audit]]"
+  - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---
 
 # `cli-spec-gitignore` research: `Default gitignore policy demotes the spec layer`
