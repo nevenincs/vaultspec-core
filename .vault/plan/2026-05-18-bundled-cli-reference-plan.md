@@ -5,8 +5,8 @@ tags:
 date: '2026-05-18'
 tier: L1
 related:
-  - "[[2026-05-18-bundled-cli-reference-adr]]"
-  - "[[2026-05-18-bundled-cli-reference-research]]"
+  - '[[2026-05-18-bundled-cli-reference-adr]]'
+  - '[[2026-05-18-bundled-cli-reference-research]]'
 ---
 
 # `bundled-cli-reference` plan: `bundle a machine-facing CLI reference and guard it against drift`
@@ -49,8 +49,7 @@ either order. The whole plan is small enough to land in a single commit.
 The plan is complete when every Step is closed and the following criteria
 all hold.
 
-- `uv run --no-sync pytest src/vaultspec_core/tests/cli/test_cli_reference_drift.py
-  -v` passes: every live command and option appears in the bundled
+- `uv run --no-sync pytest src/vaultspec_core/tests/cli/test_cli_reference_drift.py -v` passes: every live command and option appears in the bundled
   reference.
 - `uv run --no-sync pytest -m "not integration and not e2e"` passes the
   full unit suite with no regressions.
@@ -62,8 +61,7 @@ all hold.
 - `uv run --no-sync prek run --all-files` passes every hook, including the
   wrapped-markdown check on the new `builtins/reference/cli.md` file.
 - `uv run --no-sync vaultspec-core install` against a workspace seeds
-  `.vaultspec/rules/reference/cli.md` and `uv run --no-sync vaultspec-core
-  sync --force` followed by `spec doctor` and `vault check all` all report
+  `.vaultspec/rules/reference/cli.md` and `uv run --no-sync vaultspec-core sync --force` followed by `spec doctor` and `vault check all` all report
   clean: the new `reference/` subtree is inert to the sync passes and the
   diagnostics.
 - The assembled provider configurations (the consumer's `CLAUDE.md`,
