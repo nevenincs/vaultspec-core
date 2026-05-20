@@ -220,18 +220,25 @@ _dev-audit-help:
 # the wrapper once `uv audit --strict` (or equivalent) ships and exits
 # non-zero on findings.
 #
-# --ignore-until-fixed PYSEC-2025-183: pyjwt advisory with no fixed
-# release. pyjwt is a transitive dependency pulled by `mcp`; 2.12.1 is
-# the latest version on PyPI, so there is nothing to upgrade to.
-# --ignore-until-fixed (unlike a blanket --ignore) suppresses the
-# advisory ONLY while no fix is published; the moment pyjwt ships a
-# patched release uv audit re-surfaces it and this entry must be
-# removed alongside a lockfile bump.
+# --ignore PYSEC-2025-183 (alias CVE-2025-45768): a pyjwt advisory
+# claiming "weak encryption". It is DISPUTED by pyjwt's maintainer
+# (the OSV record states the dispute: key length is chosen by the
+# application, not the library) and its affected range covers EVERY
+# pyjwt release (introduced at 0, no fixed event) -- there is no
+# version to upgrade to. pyjwt is a transitive dependency pulled by
+# `mcp` (the MCP SDK behind vaultspec-mcp), which hard-depends on
+# `pyjwt[crypto]` and cannot be dropped. A blanket --ignore is used
+# rather than --ignore-until-fixed because the advisory's OSV range
+# is malformed (an empty event object), which prevents uv from
+# evaluating fix-availability; and because, being disputed and
+# unfixed across all versions, no fix is expected. Revisit this
+# entry if pyjwt ships a release that resolves or the advisory is
+# withdrawn.
 _dev-audit-deps:
   @{{ if os() == "windows" { \
-    "$out = uv audit --preview-features audit --frozen --ignore-until-fixed PYSEC-2025-183 2>&1 | Out-String; Write-Host $out; if ($out -notmatch 'Found (no|0) known vulnerabilit') { exit 1 }" \
+    "$out = uv audit --preview-features audit --frozen --ignore PYSEC-2025-183 --ignore CVE-2025-45768 2>&1 | Out-String; Write-Host $out; if ($out -notmatch 'Found (no|0) known vulnerabilit') { exit 1 }" \
   } else { \
-    "out=$(uv audit --preview-features audit --frozen --ignore-until-fixed PYSEC-2025-183 2>&1); printf '%s\\n' \"$out\"; printf '%s\\n' \"$out\" | grep -Eq 'Found (no|0) known vulnerabilit' || exit 1" \
+    "out=$(uv audit --preview-features audit --frozen --ignore PYSEC-2025-183 --ignore CVE-2025-45768 2>&1); printf '%s\\n' \"$out\"; printf '%s\\n' \"$out\" | grep -Eq 'Found (no|0) known vulnerabilit' || exit 1" \
   } }}
 
 # ---------------------------------------------------------------------------
