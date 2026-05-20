@@ -67,6 +67,57 @@ def _sync_supporting_files(
             atomic_write(dest_file, src_data.decode("utf-8"))
 
 
+def apply_file_sync(
+    result: SyncResult, dest_path: Path, content: str, *, dry_run: bool
+) -> str:
+    """Write *content* to *dest_path* unless it is already current.
+
+    Classifies the write as ``[ADD]``, ``[UPDATE]`` or ``[UNCHANGED]``,
+    appends a ``(path, action)`` record to ``result.items`` in every mode
+    (dry-run included), performs the write outside dry-run, and bumps the
+    matching :class:`~vaultspec_core.core.types.SyncResult` counter.
+
+    The single place the add/update/unchanged decision is made: shared by
+    :func:`sync_files` and the system-prompt sync so every file-shaped
+    sync surface records the same per-file outcomes.
+
+    Args:
+        result: Accumulator updated in place.
+        dest_path: Destination file.
+        content: Content the destination should hold.
+        dry_run: When ``True``, classify and record but do not write.
+
+    Returns:
+        The action string assigned to this file.
+    """
+    abs_path = str(dest_path).replace("\\", "/")
+    if not dest_path.exists():
+        action = "[ADD]"
+    else:
+        try:
+            action = (
+                "[UNCHANGED]"
+                if dest_path.read_text(encoding="utf-8") == content
+                else "[UPDATE]"
+            )
+        except Exception:
+            action = "[UPDATE]"
+
+    result.items.append((abs_path, action))
+    if action == "[UNCHANGED]":
+        result.unchanged += 1
+        return action
+
+    if not dry_run:
+        ensure_dir(dest_path.parent)
+        atomic_write(dest_path, content)
+    if action == "[ADD]":
+        result.added += 1
+    else:
+        result.updated += 1
+    return action
+
+
 def sync_files(
     sources: dict[str, tuple[Path, dict[str, Any], str]],
     dest_dir: Path,
@@ -109,39 +160,14 @@ def sync_files(
     for name, meta_tuple in sources.items():
         _src_path, meta, body = meta_tuple
         dest_path = dest_path_fn(dest_dir, name)
-        abs_path = str(dest_path).replace("\\", "/")
         try:
             content = transform_fn(None, name, meta, body)
             if content is None:
                 result.skipped += 1
-                result.items.append((abs_path, "[SKIP]"))
+                result.items.append((str(dest_path).replace("\\", "/"), "[SKIP]"))
                 continue
 
-            if not dest_path.exists():
-                action = "[ADD]"
-            else:
-                try:
-                    action = (
-                        "[UNCHANGED]"
-                        if dest_path.read_text(encoding="utf-8") == content
-                        else "[UPDATE]"
-                    )
-                except Exception:
-                    action = "[UPDATE]"
-
-            result.items.append((abs_path, action))
-            if action == "[ADD]":
-                if not dry_run:
-                    ensure_dir(dest_path.parent)
-                    atomic_write(dest_path, content)
-                result.added += 1
-            elif action == "[UPDATE]":
-                if not dry_run:
-                    ensure_dir(dest_path.parent)
-                    atomic_write(dest_path, content)
-                result.updated += 1
-            else:  # [UNCHANGED]
-                result.unchanged += 1
+            apply_file_sync(result, dest_path, content, dry_run=dry_run)
 
             # For directory-shaped resources (skills), sync supporting files
             # alongside the main entrypoint (e.g. agents/, references/).

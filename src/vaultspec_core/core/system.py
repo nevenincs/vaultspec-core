@@ -14,8 +14,9 @@ from typing import Any
 
 from . import types as _t
 from .config_gen import _is_cli_managed
-from .helpers import atomic_write, build_file, ensure_dir
+from .helpers import build_file
 from .skills import collect_skills
+from .sync import apply_file_sync
 from .types import SyncResult, ToolConfig
 
 logger = logging.getLogger(__name__)
@@ -191,6 +192,9 @@ def system_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
             content = _generate_system_prompt(cfg)
             if content is None:
                 tool_result.skipped += 1
+                tool_result.items.append(
+                    (str(system_file).replace("\\", "/"), "[SKIP]")
+                )
             else:
                 rel = system_file.relative_to(_t.get_context().target_dir)
 
@@ -207,61 +211,17 @@ def system_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
                         f"use --force to overwrite)"
                     )
                     tool_result.skipped += 1
+                    tool_result.items.append(
+                        (str(system_file).replace("\\", "/"), "[SKIP]")
+                    )
                 else:
-                    action = "[SKIP]"
-                    if not system_file.exists():
-                        action = "[ADD]"
-                    else:
-                        try:
-                            if system_file.read_text(encoding="utf-8") != content:
-                                action = "[UPDATE]"
-                        except Exception:
-                            action = "[UPDATE]"
-
-                    if action != "[SKIP]":
-                        abs_path = str(system_file).replace("\\", "/")
-                        if dry_run:
-                            tool_result.items.append((abs_path, action))
-                        else:
-                            ensure_dir(system_file.parent)
-                            atomic_write(system_file, content)
-
-                        if action == "[ADD]":
-                            tool_result.added += 1
-                        else:
-                            tool_result.updated += 1
-                    else:
-                        tool_result.skipped += 1
+                    apply_file_sync(tool_result, system_file, content, dry_run=dry_run)
 
         elif cfg.rules_dir is not None and cfg.emit_system_rule:
             content = _generate_system_rules(cfg)
             if content is not None:
                 rule_path = cfg.rules_dir / SYSTEM_BUILTIN_RULE
-
-                action = "[SKIP]"
-                if not rule_path.exists():
-                    action = "[ADD]"
-                else:
-                    try:
-                        if rule_path.read_text(encoding="utf-8") != content:
-                            action = "[UPDATE]"
-                    except Exception:
-                        action = "[UPDATE]"
-
-                if action != "[SKIP]":
-                    abs_path = str(rule_path).replace("\\", "/")
-                    if dry_run:
-                        tool_result.items.append((abs_path, action))
-                    else:
-                        ensure_dir(cfg.rules_dir)
-                        atomic_write(rule_path, content)
-
-                    if action == "[ADD]":
-                        tool_result.added += 1
-                    else:
-                        tool_result.updated += 1
-                else:
-                    tool_result.skipped += 1
+                apply_file_sync(tool_result, rule_path, content, dry_run=dry_run)
 
         result.merge(tool_result)
         result.per_tool[cfg.name] = tool_result

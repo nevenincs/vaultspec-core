@@ -702,3 +702,18 @@ class TestDryRunReturnsItems:
         )
         result = system_sync(dry_run=True)
         assert result.items, "system dry-run must populate items list"
+
+    def test_system_sync_real_run_returns_items(self, synthetic_project):
+        """Regression: a non-dry-run system sync must record per-file items.
+
+        system_sync once appended to result.items only under dry_run, so
+        routing it through the canonical renderer made a real `spec system
+        sync` print nothing about what it actually wrote.
+        """
+        (synthetic_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+            "---\n---\n\n# Base prompt", encoding="utf-8"
+        )
+        result = system_sync(dry_run=False)
+        assert result.items, "real-run system sync must populate items list"
+        actions = {action for _path, action in result.items}
+        assert actions <= {"[ADD]", "[UPDATE]", "[UNCHANGED]", "[SKIP]"}

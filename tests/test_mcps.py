@@ -514,7 +514,32 @@ class TestMcpSync:
             mcp_sync()
             result = mcp_sync()
             assert result.added == 0
-            assert result.skipped == 1
+            # A re-sync of an identical entry is `unchanged`, not `skipped`
+            # (cli-sync-vocabulary ADR).
+            assert result.unchanged == 1
+            assert result.skipped == 0
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_sync_records_canonical_action_strings(self):
+        """Regression: mcp_sync items must use the canonical action
+        vocabulary (``[ADD]``/``[UPDATE]``/``[UNCHANGED]``) so the shared
+        outcome renderer classifies them correctly. Bare words like
+        "added" silently fell through to the wrong outcome."""
+        path, mcps_dir = _make_workspace()
+        try:
+            config = {"command": "uv", "args": ["run", "test"]}
+            (mcps_dir / "srv.builtin.json").write_text(
+                json.dumps(config), encoding="utf-8"
+            )
+            _init_context(path)
+            from vaultspec_core.core.mcps import mcp_sync
+
+            added = mcp_sync()
+            assert ("srv", "[ADD]") in added.items
+            unchanged = mcp_sync()
+            assert ("srv", "[UNCHANGED]") in unchanged.items
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)

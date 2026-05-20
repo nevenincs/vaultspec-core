@@ -446,19 +446,21 @@ def mcp_sync(
                 servers[name] = config
                 managed.add(name)
                 result.added += 1
-                result.items.append((name, "added"))
+                result.items.append((name, "[ADD]"))
                 changed = True
             elif name in managed:
                 # Previously managed by vaultspec — sync content.
                 if servers[name] == config:
-                    result.skipped += 1
+                    result.unchanged += 1
+                    result.items.append((name, "[UNCHANGED]"))
                 elif force:
                     servers[name] = config
                     result.updated += 1
-                    result.items.append((name, "updated"))
+                    result.items.append((name, "[UPDATE]"))
                     changed = True
                 else:
                     result.skipped += 1
+                    result.items.append((name, "[SKIP]"))
                     result.warnings.append(
                         f"MCP server '{name}' differs from definition "
                         f"(use --force to overwrite)"
@@ -467,6 +469,7 @@ def mcp_sync(
                 # User-added entry that shares a name with a current
                 # source. Preserve it; never take ownership implicitly.
                 result.skipped += 1
+                result.items.append((name, "[SKIP]"))
                 result.warnings.append(
                     f"MCP server '{name}' is user-managed and shares "
                     f"its name with a vaultspec source; skipping. "
