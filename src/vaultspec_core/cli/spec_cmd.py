@@ -20,6 +20,7 @@ import typer
 
 if TYPE_CHECKING:
     from vaultspec_core.core.diagnosis import ProviderDiagnosis, WorkspaceDiagnosis
+    from vaultspec_core.core.types import SyncResult
 
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
@@ -44,6 +45,44 @@ def _print_complete_sync_notice(*, resource: str, mcp: bool = False) -> None:
         f"{detail} Run [bold]{COMPLETE_SYNC_COMMAND}[/bold] for a complete "
         "provider-facing refresh."
     )
+
+
+def _emit_sync_result(
+    result: "SyncResult", *, label: str, dry_run: bool, json_output: bool
+) -> None:
+    """Render a sync pass through the canonical outcome renderer.
+
+    Routes the text summary and the ``--json`` payload through one
+    :class:`~vaultspec_core.cli.rendering.OutcomeItem` list, per the
+    ``cli-sync-vocabulary`` ADR, so the two surfaces cannot drift apart.
+    Raises :class:`typer.Exit` and returns no value for ``--json``.
+    """
+    from vaultspec_core.cli.rendering import (
+        outcomes_as_json,
+        render_outcomes,
+        sync_outcomes,
+    )
+
+    outcomes = sync_outcomes(result)
+
+    if json_output:
+        import json
+
+        payload = outcomes_as_json(outcomes)
+        if result.warnings:
+            payload["warnings"] = result.warnings
+        typer.echo(json.dumps(payload, indent=2))
+        raise typer.Exit(0)
+
+    title = f"{label} sync" + (" (dry run)" if dry_run else "")
+    render_outcomes(outcomes, title=title)
+
+    if result.warnings:
+        from vaultspec_core.console import get_console
+
+        console = get_console()
+        for warning in result.warnings:
+            console.print(f"  [yellow]•[/yellow] {warning}")
 
 
 def _print_source_mutation_notice(path: Path, *, action: str) -> None:
@@ -287,24 +326,13 @@ def cmd_rules_sync(
 ) -> None:
     """Sync only rule files; use vaultspec-core sync for complete refresh."""
     apply_target(target)
-    from vaultspec_core.console import get_console
     from vaultspec_core.core import rules_sync
-    from vaultspec_core.core.sync import format_summary
 
     result = rules_sync(prune=force, dry_run=dry_run)
 
-    if json_output:
-        import dataclasses
-        import json
-
-        typer.echo(json.dumps(dataclasses.asdict(result), indent=2, default=str))
-        raise typer.Exit(0)
-
-    console = get_console()
-    _print_complete_sync_notice(resource="rule")
-    console.print(f"  [bold]{format_summary('Rules', result)}[/bold]")
-    for warning in result.warnings:
-        console.print(f"  [yellow]•[/yellow] {warning}")
+    if not json_output:
+        _print_complete_sync_notice(resource="rule")
+    _emit_sync_result(result, label="Rules", dry_run=dry_run, json_output=json_output)
 
 
 @rules_app.command("revert")
@@ -567,24 +595,13 @@ def cmd_skills_sync(
 ) -> None:
     """Sync only skill files; use vaultspec-core sync for complete refresh."""
     apply_target(target)
-    from vaultspec_core.console import get_console
     from vaultspec_core.core import skills_sync
-    from vaultspec_core.core.sync import format_summary
 
     result = skills_sync(prune=force, dry_run=dry_run)
 
-    if json_output:
-        import dataclasses
-        import json
-
-        typer.echo(json.dumps(dataclasses.asdict(result), indent=2, default=str))
-        raise typer.Exit(0)
-
-    console = get_console()
-    _print_complete_sync_notice(resource="skill")
-    console.print(f"  [bold]{format_summary('Skills', result)}[/bold]")
-    for warning in result.warnings:
-        console.print(f"  [yellow]•[/yellow] {warning}")
+    if not json_output:
+        _print_complete_sync_notice(resource="skill")
+    _emit_sync_result(result, label="Skills", dry_run=dry_run, json_output=json_output)
 
 
 @skills_app.command("revert")
@@ -836,24 +853,13 @@ def cmd_agents_sync(
 ) -> None:
     """Sync only agent files; use vaultspec-core sync for complete refresh."""
     apply_target(target)
-    from vaultspec_core.console import get_console
     from vaultspec_core.core import agents_sync
-    from vaultspec_core.core.sync import format_summary
 
     result = agents_sync(prune=force, dry_run=dry_run)
 
-    if json_output:
-        import dataclasses
-        import json
-
-        typer.echo(json.dumps(dataclasses.asdict(result), indent=2, default=str))
-        raise typer.Exit(0)
-
-    console = get_console()
-    _print_complete_sync_notice(resource="agent")
-    console.print(f"  [bold]{format_summary('Agents', result)}[/bold]")
-    for warning in result.warnings:
-        console.print(f"  [yellow]•[/yellow] {warning}")
+    if not json_output:
+        _print_complete_sync_notice(resource="agent")
+    _emit_sync_result(result, label="Agents", dry_run=dry_run, json_output=json_output)
 
 
 @agents_app.command("revert")
@@ -959,22 +965,13 @@ def cmd_system_sync(
 ) -> None:
     """Sync only system prompts; use vaultspec-core sync for complete refresh."""
     apply_target(target)
-    from vaultspec_core.console import get_console
     from vaultspec_core.core import system_sync
-    from vaultspec_core.core.sync import format_summary
 
     result = system_sync(dry_run=dry_run, force=force)
 
-    if json_output:
-        import dataclasses
-        import json
-
-        typer.echo(json.dumps(dataclasses.asdict(result), indent=2, default=str))
-        raise typer.Exit(0)
-
-    console = get_console()
-    _print_complete_sync_notice(resource="system prompt")
-    console.print(f"  [bold]{format_summary('System', result)}[/bold]")
+    if not json_output:
+        _print_complete_sync_notice(resource="system prompt")
+    _emit_sync_result(result, label="System", dry_run=dry_run, json_output=json_output)
 
 
 # =============================================================================
@@ -1256,24 +1253,13 @@ def cmd_mcps_sync(
 ) -> None:
     """Sync only MCP definitions to .mcp.json."""
     apply_target(target)
-    from vaultspec_core.console import get_console
     from vaultspec_core.core import mcp_sync
-    from vaultspec_core.core.sync import format_summary
 
     result = mcp_sync(force=force, dry_run=dry_run)
 
-    if json_output:
-        import dataclasses
-        import json
-
-        typer.echo(json.dumps(dataclasses.asdict(result), indent=2, default=str))
-        raise typer.Exit(0)
-
-    console = get_console()
-    _print_complete_sync_notice(resource="MCP", mcp=True)
-    console.print(f"  [bold]{format_summary('MCPs', result)}[/bold]")
-    for warning in result.warnings:
-        console.print(f"  [yellow]•[/yellow] {warning}")
+    if not json_output:
+        _print_complete_sync_notice(resource="MCP", mcp=True)
+    _emit_sync_result(result, label="MCPs", dry_run=dry_run, json_output=json_output)
 
 
 # =============================================================================

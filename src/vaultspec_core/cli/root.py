@@ -601,6 +601,8 @@ def cmd_sync(
         action_map = {
             "[ADD]": DryRunStatus.NEW,
             "[UPDATE]": DryRunStatus.UPDATE,
+            "[UNCHANGED]": DryRunStatus.EXISTS,
+            "[SKIP]": DryRunStatus.EXISTS,
             "[DELETE]": DryRunStatus.DELETE,
         }
         all_items = []

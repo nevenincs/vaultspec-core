@@ -20,8 +20,10 @@ from vaultspec_core.cli.rendering import (
     count_outcomes,
     outcomes_as_json,
     render_outcomes,
+    sync_outcomes,
 )
 from vaultspec_core.console import reset_console
+from vaultspec_core.core.types import SyncResult
 
 
 @pytest.mark.unit
@@ -142,3 +144,35 @@ class TestRenderOutcomes:
     def test_empty_invocation_renders_without_error(self, capsys):
         render_outcomes([])
         assert "Result" in capsys.readouterr().out
+
+
+@pytest.mark.unit
+class TestSyncOutcomes:
+    def test_action_log_maps_to_canonical_outcomes(self):
+        result = SyncResult()
+        result.items = [
+            ("a.md", "[ADD]"),
+            ("b.md", "[UPDATE]"),
+            ("c.md", "[UNCHANGED]"),
+            ("d.md", "[DELETE]"),
+            ("e.md", "[SKIP]"),
+        ]
+        assert [o.outcome for o in sync_outcomes(result)] == [
+            Outcome.CREATED,
+            Outcome.UPDATED,
+            Outcome.UNCHANGED,
+            Outcome.REMOVED,
+            Outcome.SKIPPED,
+        ]
+
+    def test_errors_become_failed_items_with_detail(self):
+        result = SyncResult()
+        result.errors = ["broken.md: transform exploded"]
+        item = sync_outcomes(result)[0]
+        assert item.outcome == Outcome.FAILED
+        assert item.name == "broken.md"
+        assert item.detail == "transform exploded"
+
+    def test_empty_result_aggregates_to_unchanged(self):
+        payload = outcomes_as_json(sync_outcomes(SyncResult()))
+        assert payload["status"] == "unchanged"

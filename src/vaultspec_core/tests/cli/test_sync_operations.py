@@ -72,7 +72,7 @@ class TestSyncFiles:
         assert result.updated == 1
         assert (dest / "a.md").read_text(encoding="utf-8") != "old"
 
-    def test_skips_unchanged_files(self, synthetic_project):
+    def test_unchanged_files_are_not_rewritten(self, synthetic_project):
         dest = synthetic_project / "dest"
         dest.mkdir()
         sources = self._make_sources(synthetic_project, ["a.md"])
@@ -96,7 +96,10 @@ class TestSyncFiles:
             dry_run=False,
             label="test",
         )
-        assert result.skipped == 1
+        # A destination that already matches its source is `unchanged`, a
+        # distinct outcome from `skipped` (cli-sync-vocabulary ADR).
+        assert result.unchanged == 1
+        assert result.skipped == 0
         assert result.added == 0
         assert result.updated == 0
 
@@ -686,8 +689,12 @@ class TestDryRunReturnsItems:
             synthetic_project / ".vaultspec" / "rules" / "rules" / "new-rule.md"
         ).write_text("---\nname: new-rule\n---\n\nNew.", encoding="utf-8")
         result = rules_sync(dry_run=True)
-        actions = [a for _p, a in result.items]
-        assert all(a == "[ADD]" for a in actions)
+        new_rule_actions = [a for p, a in result.items if "new-rule" in p]
+        assert new_rule_actions, "new rule must appear in the dry-run item log"
+        assert all(a == "[ADD]" for a in new_rule_actions)
+        # Builtin rules synced by the fixture report unchanged, never a
+        # spurious add or update.
+        assert all(a in {"[ADD]", "[UNCHANGED]"} for _p, a in result.items)
 
     def test_system_sync_dry_run_returns_items(self, synthetic_project):
         (synthetic_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(

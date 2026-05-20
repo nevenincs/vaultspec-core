@@ -109,37 +109,39 @@ def sync_files(
     for name, meta_tuple in sources.items():
         _src_path, meta, body = meta_tuple
         dest_path = dest_path_fn(dest_dir, name)
+        abs_path = str(dest_path).replace("\\", "/")
         try:
             content = transform_fn(None, name, meta, body)
             if content is None:
                 result.skipped += 1
+                result.items.append((abs_path, "[SKIP]"))
                 continue
 
-            action = "[SKIP]"
             if not dest_path.exists():
                 action = "[ADD]"
             else:
                 try:
-                    existing_content = dest_path.read_text(encoding="utf-8")
-                    if existing_content != content:
-                        action = "[UPDATE]"
+                    action = (
+                        "[UNCHANGED]"
+                        if dest_path.read_text(encoding="utf-8") == content
+                        else "[UPDATE]"
+                    )
                 except Exception:
                     action = "[UPDATE]"
 
-            if action != "[SKIP]":
-                abs_path = str(dest_path).replace("\\", "/")
-                if dry_run:
-                    result.items.append((abs_path, action))
-                else:
+            result.items.append((abs_path, action))
+            if action == "[ADD]":
+                if not dry_run:
                     ensure_dir(dest_path.parent)
                     atomic_write(dest_path, content)
-
-                if action == "[ADD]":
-                    result.added += 1
-                else:
-                    result.updated += 1
-            else:
-                result.skipped += 1
+                result.added += 1
+            elif action == "[UPDATE]":
+                if not dry_run:
+                    ensure_dir(dest_path.parent)
+                    atomic_write(dest_path, content)
+                result.updated += 1
+            else:  # [UNCHANGED]
+                result.unchanged += 1
 
             # For directory-shaped resources (skills), sync supporting files
             # alongside the main entrypoint (e.g. agents/, references/).
@@ -202,9 +204,8 @@ def sync_files(
                             )
                             continue
 
-                if dry_run:
-                    result.items.append((abs_path, "[DELETE]"))
-                else:
+                result.items.append((abs_path, "[DELETE]"))
+                if not dry_run:
                     if is_skill:
                         _rmtree_robust(item)
                     else:
@@ -350,6 +351,8 @@ def format_summary(resource: str, result: SyncResult) -> str:
         parts.append(f"{result.added} added")
     if result.updated:
         parts.append(f"{result.updated} updated")
+    if result.unchanged:
+        parts.append(f"{result.unchanged} unchanged")
     if result.pruned:
         parts.append(f"{result.pruned} pruned")
     if result.skipped:

@@ -18,6 +18,8 @@ from vaultspec_core.console import get_console
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from vaultspec_core.core.types import SyncResult
 from vaultspec_core.core.dry_run import (
     STATUS_STYLE,
     DryRunItem,
@@ -188,6 +190,45 @@ def render_outcomes(items: Sequence[OutcomeItem], *, title: str = "Result") -> N
             parts.append(f"[{colour}]{n} {outcome.value}[/{colour}]")
     if parts:
         console.print("  " + "  ".join(parts))
+
+
+# Maps the per-file action strings recorded by ``sync_files`` onto the
+# canonical outcome vocabulary, so a sync result renders through the same
+# helper as every other state-changing surface.
+_SYNC_ACTION_OUTCOME: dict[str, Outcome] = {
+    "[ADD]": Outcome.CREATED,
+    "[UPDATE]": Outcome.UPDATED,
+    "[UNCHANGED]": Outcome.UNCHANGED,
+    "[DELETE]": Outcome.REMOVED,
+    "[SKIP]": Outcome.SKIPPED,
+}
+
+
+def sync_outcomes(result: SyncResult) -> list[OutcomeItem]:
+    """Translate a :class:`~vaultspec_core.core.types.SyncResult` into outcomes.
+
+    Maps the per-file action log onto the canonical taxonomy and appends
+    one :attr:`Outcome.FAILED` item per recorded error. The returned list
+    is what both :func:`render_outcomes` and :func:`outcomes_as_json`
+    consume, so a sync surface's text and JSON cannot drift apart.
+
+    Args:
+        result: The accumulator returned by a sync pass.
+
+    Returns:
+        One :class:`OutcomeItem` per file the sync pass touched or
+        inspected, in pass order, with errors appended last.
+    """
+    items = [
+        OutcomeItem(
+            name=path, outcome=_SYNC_ACTION_OUTCOME.get(action, Outcome.UPDATED)
+        )
+        for path, action in result.items
+    ]
+    for error in result.errors:
+        name, _, detail = error.partition(": ")
+        items.append(OutcomeItem(name=name, outcome=Outcome.FAILED, detail=detail))
+    return items
 
 
 def render_dry_run_tree(items: Sequence[DryRunItem], *, title: str = "Preview") -> None:

@@ -81,6 +81,8 @@ class SyncResult:
     Attributes:
         added: Number of files newly created at the destination.
         updated: Number of existing files that were overwritten.
+        unchanged: Number of files whose destination already matched the
+            source; no write happened.
         skipped: Number of files that were intentionally not written
             (e.g. transform returned ``None``, or safety guard triggered).
         pruned: Number of stale destination files that were deleted.
@@ -93,6 +95,7 @@ class SyncResult:
 
     added: int = 0
     updated: int = 0
+    unchanged: int = 0
     skipped: int = 0
     pruned: int = 0
     errored: int = 0
@@ -109,6 +112,7 @@ class SyncResult:
         """
         self.added += other.added
         self.updated += other.updated
+        self.unchanged += other.unchanged
         self.skipped += other.skipped
         self.pruned += other.pruned
         self.errored += other.errored
