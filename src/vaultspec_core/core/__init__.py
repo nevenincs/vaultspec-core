@@ -2,7 +2,7 @@
 
 Aggregates per-resource CRUD (:func:`agents_add`, :func:`rules_sync`,
 :func:`skills_list`, :func:`system_sync`), the sync engine
-(:func:`sync_files`, :func:`format_summary`), config generation
+(:func:`sync_files`), config generation
 (:func:`config_show`, :func:`config_sync`), I/O helpers
 (:func:`atomic_write`, :func:`build_file`), domain exceptions
 (:class:`VaultSpecError` and subclasses), and path/type contracts
@@ -46,7 +46,6 @@ from .skills import skills_add as skills_add
 from .skills import skills_list as skills_list
 from .skills import skills_sync as skills_sync
 from .skills import transform_skill as transform_skill
-from .sync import format_summary as format_summary
 from .sync import sync_files as sync_files
 from .system import system_show as system_show
 from .system import system_sync as system_sync

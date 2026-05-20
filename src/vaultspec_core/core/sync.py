@@ -338,28 +338,3 @@ def sync_to_all_tools(
             total.per_tool[tool_type.value] = result
 
     return total
-
-
-def format_summary(resource: str, result: SyncResult) -> str:
-    """Format a one-line summary of a synchronization pass.
-
-    Returns:
-        A human-readable summary string (without Rich markup).
-    """
-    parts = []
-    if result.added:
-        parts.append(f"{result.added} added")
-    if result.updated:
-        parts.append(f"{result.updated} updated")
-    if result.unchanged:
-        parts.append(f"{result.unchanged} unchanged")
-    if result.pruned:
-        parts.append(f"{result.pruned} pruned")
-    if result.skipped:
-        parts.append(f"{result.skipped} skipped")
-    if result.errored:
-        parts.append(f"{result.errored} errored")
-    if result.errors:
-        parts.append(f"{len(result.errors)} errors")
-    summary = ", ".join(parts) if parts else "no changes"
-    return f"{resource}: {summary}"

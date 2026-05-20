@@ -55,34 +55,26 @@ def _emit_sync_result(
     Routes the text summary and the ``--json`` payload through one
     :class:`~vaultspec_core.cli.rendering.OutcomeItem` list, per the
     ``cli-sync-vocabulary`` ADR, so the two surfaces cannot drift apart.
-    Raises :class:`typer.Exit` and returns no value for ``--json``.
+    Always raises :class:`typer.Exit` - code 1 when the pass recorded a
+    failure, else 0.
     """
-    from vaultspec_core.cli.rendering import (
-        outcomes_as_json,
-        render_outcomes,
-        sync_outcomes,
-    )
+    from vaultspec_core.cli.rendering import emit_outcomes, sync_outcomes
 
     outcomes = sync_outcomes(result)
-
-    if json_output:
-        import json
-
-        payload = outcomes_as_json(outcomes)
-        if result.warnings:
-            payload["warnings"] = result.warnings
-        typer.echo(json.dumps(payload, indent=2))
-        raise typer.Exit(0)
-
     title = f"{label} sync" + (" (dry run)" if dry_run else "")
-    render_outcomes(outcomes, title=title)
+    extra = {"warnings": result.warnings} if result.warnings else None
+    code = emit_outcomes(
+        outcomes, title=title, json_output=json_output, extra_json=extra
+    )
 
-    if result.warnings:
+    if result.warnings and not json_output:
         from vaultspec_core.console import get_console
 
         console = get_console()
         for warning in result.warnings:
             console.print(f"  [yellow]•[/yellow] {warning}")
+
+    raise typer.Exit(code)
 
 
 def _print_source_mutation_notice(path: Path, *, action: str) -> None:

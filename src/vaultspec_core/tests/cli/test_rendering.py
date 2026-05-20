@@ -8,6 +8,7 @@ therefore cannot drift apart.
 from __future__ import annotations
 
 import dataclasses
+import json
 from typing import cast
 
 import pytest
@@ -18,6 +19,7 @@ from vaultspec_core.cli.rendering import (
     OutcomeItem,
     aggregate_outcome,
     count_outcomes,
+    emit_outcomes,
     outcomes_as_json,
     render_outcomes,
     sync_outcomes,
@@ -176,3 +178,53 @@ class TestSyncOutcomes:
     def test_empty_result_aggregates_to_unchanged(self):
         payload = outcomes_as_json(sync_outcomes(SyncResult()))
         assert payload["status"] == "unchanged"
+
+
+@pytest.mark.unit
+class TestEmitOutcomes:
+    def setup_method(self):
+        reset_console()
+
+    def teardown_method(self):
+        reset_console()
+
+    def test_failed_outcome_forces_exit_code_one(self, capsys):
+        items = [OutcomeItem(name="broken.md", outcome=Outcome.FAILED, detail="boom")]
+        code = emit_outcomes(items, title="Sync", json_output=False)
+        # A failed outcome is the one outcome that stops a pipeline.
+        assert code == 1
+        out = capsys.readouterr().out
+        assert "broken.md" in out
+        assert "boom" in out
+
+    def test_no_failure_exits_zero(self, capsys):
+        items = [
+            OutcomeItem(name="a", outcome=Outcome.CREATED),
+            OutcomeItem(name="b", outcome=Outcome.SKIPPED),
+        ]
+        assert emit_outcomes(items, title="Sync", json_output=False) == 0
+        capsys.readouterr()
+
+    def test_empty_invocation_exits_zero(self, capsys):
+        assert emit_outcomes([], title="Sync", json_output=False) == 0
+        capsys.readouterr()
+
+    def test_json_envelope_merges_extra_keys(self, capsys):
+        items = [OutcomeItem(name="a", outcome=Outcome.CREATED)]
+        code = emit_outcomes(
+            items,
+            title="Sync",
+            json_output=True,
+            extra_json={"warnings": ["heads up"]},
+        )
+        assert code == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["status"] == "created"
+        assert payload["items"][0]["name"] == "a"
+        assert payload["warnings"] == ["heads up"]
+
+    def test_json_path_still_reports_failure_in_exit_code(self, capsys):
+        items = [OutcomeItem(name="x", outcome=Outcome.FAILED)]
+        code = emit_outcomes(items, title="Sync", json_output=True)
+        assert code == 1
+        assert json.loads(capsys.readouterr().out)["status"] == "failed"

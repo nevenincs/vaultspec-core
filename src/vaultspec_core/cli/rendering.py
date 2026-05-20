@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from vaultspec_core.console import get_console
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     from vaultspec_core.core.types import SyncResult
 from vaultspec_core.core.dry_run import (
@@ -190,6 +190,45 @@ def render_outcomes(items: Sequence[OutcomeItem], *, title: str = "Result") -> N
             parts.append(f"[{colour}]{n} {outcome.value}[/{colour}]")
     if parts:
         console.print("  " + "  ".join(parts))
+
+
+def emit_outcomes(
+    items: Sequence[OutcomeItem],
+    *,
+    title: str,
+    json_output: bool,
+    extra_json: Mapping[str, object] | None = None,
+) -> int:
+    """Emit a set of outcomes as text or JSON and return the exit code.
+
+    The shared exit point for every sync-shaped command. With
+    ``json_output`` it prints the canonical ``status``/``items`` envelope
+    (merged with any ``extra_json``); otherwise it prints the
+    human-readable summary. Returns ``1`` when any item is
+    :attr:`Outcome.FAILED`, else ``0`` - a failed outcome is the one
+    outcome that stops a pipeline. The caller raises :class:`typer.Exit`
+    with the returned code.
+
+    Args:
+        items: The per-item outcomes of a single invocation.
+        title: Heading for the text rendering.
+        json_output: When true, emit the JSON envelope instead of text.
+        extra_json: Optional extra top-level keys merged into the JSON
+            envelope (e.g. ``warnings``). Ignored for text output.
+
+    Returns:
+        The process exit code: ``1`` if any outcome failed, else ``0``.
+    """
+    if json_output:
+        import json
+
+        payload = outcomes_as_json(items)
+        if extra_json:
+            payload.update(extra_json)
+        print(json.dumps(payload, indent=2))
+    else:
+        render_outcomes(items, title=title)
+    return 1 if any(item.outcome is Outcome.FAILED for item in items) else 0
 
 
 # Maps the per-file action strings recorded by ``sync_files`` onto the

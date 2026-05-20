@@ -480,7 +480,13 @@ class TestSurgicalMcpJsonRemoval:
 
 
 class TestSyncResultErrorsDisplay:
-    """Validate SyncResult.errors display and non-zero exit code."""
+    """Validate sync preflight warnings for degraded workspaces.
+
+    The exit-code contract for failed sync outcomes is covered as a fast
+    unit test in ``test_rendering.py::TestEmitOutcomes`` -- the canonical
+    renderer is the single surface that derives the code, so that is
+    where the contract is genuinely exercised.
+    """
 
     def test_sync_with_deleted_builtins_warns(self, tmp_path: Path) -> None:
         """Deleting builtin rules and syncing should produce preflight warnings."""
@@ -494,16 +500,6 @@ class TestSyncResultErrorsDisplay:
         output_lower = result.output.lower()
         # Preflight should warn about deleted builtins
         assert "deleted" in output_lower or "skipped" in output_lower
-
-    def test_sync_errors_list_in_output_and_exit_code(self, tmp_path: Path) -> None:
-        """When sync passes produce errors, CLI must render them and exit 1."""
-        from vaultspec_core.core.types import SyncResult
-
-        # Verify the SyncResult.errors field works in the data model
-        r = SyncResult()
-        r.errors.append("test error")
-        assert len(r.errors) == 1
-        assert r.errors[0] == "test error"
 
 
 # ---------------------------------------------------------------------------

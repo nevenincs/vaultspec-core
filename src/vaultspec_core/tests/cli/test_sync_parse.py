@@ -12,7 +12,6 @@ from ...core import init_paths
 from ...core.config_gen import _is_cli_managed
 from ...core.enums import Tool
 from ...core.helpers import atomic_write, build_file
-from ...core.sync import format_summary
 from ...core.types import SyncResult
 from ...vaultcore import parse_frontmatter
 
@@ -152,19 +151,7 @@ class TestSyncResult:
         r = SyncResult()
         assert r.added == 0
         assert r.updated == 0
+        assert r.unchanged == 0
         assert r.pruned == 0
         assert r.skipped == 0
         assert r.errors == []
-
-
-class TestFormatSummary:
-    def test_format_summary_no_changes(self, synthetic_project):
-        result = format_summary("Test", SyncResult())
-        assert "no changes" in result
-
-    def test_format_summary_with_counts(self, synthetic_project):
-        r = SyncResult(added=2, updated=1, pruned=3)
-        result = format_summary("Rules", r)
-        assert "2 added" in result
-        assert "1 updated" in result
-        assert "3 pruned" in result

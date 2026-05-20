@@ -116,12 +116,7 @@ def cmd_migrations_run(
     """
     apply_target(target)
 
-    from vaultspec_core.cli.rendering import (
-        Outcome,
-        OutcomeItem,
-        outcomes_as_json,
-        render_outcomes,
-    )
+    from vaultspec_core.cli.rendering import Outcome, OutcomeItem, emit_outcomes
     from vaultspec_core.console import get_console
     from vaultspec_core.core.types import get_context
     from vaultspec_core.migrations import run_pending_migrations
@@ -150,12 +145,10 @@ def cmd_migrations_run(
         for r in results
     ]
 
-    if json_output:
-        typer.echo(_json.dumps(outcomes_as_json(outcomes), indent=2))
+    if not outcomes and not json_output:
+        get_console().print("[dim]unchanged[/dim]: no pending migrations.")
         raise typer.Exit(code=0)
 
-    if not outcomes:
-        get_console().print("[dim]unchanged[/dim]: no pending migrations.")
-    else:
-        render_outcomes(outcomes, title="Migrations")
-    raise typer.Exit(code=0)
+    raise typer.Exit(
+        emit_outcomes(outcomes, title="Migrations", json_output=json_output)
+    )
