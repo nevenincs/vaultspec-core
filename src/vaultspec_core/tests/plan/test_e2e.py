@@ -199,9 +199,7 @@ def test_step_remove_unknown_id_emits_clean_error(tmp_path, runner: CliRunner) -
     assert "Traceback" not in combined
 
 
-def test_tier_promote_rejects_missing_phase_flags(
-    tmp_path, runner: CliRunner
-) -> None:
+def test_tier_promote_rejects_missing_phase_flags(tmp_path, runner: CliRunner) -> None:
     """L1 -> L2 promotion without --phase-title / --phase-intent must refuse.
 
     The CLI does not silently substitute ``TODO: Phase title`` placeholders
