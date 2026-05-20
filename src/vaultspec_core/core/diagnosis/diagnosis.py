@@ -250,7 +250,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
             dir_state = ProviderDirSignal.MISSING
 
         try:
-            config = collect_config_state(target, tool.value)
+            config = collect_config_state(tool.value)
         except Exception:
             logger.warning(
                 "Config state collector failed for %s", tool.value, exc_info=True
@@ -261,7 +261,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         if scope == "full":
             # Layer 4: full scope only - content integrity
             try:
-                content = collect_content_integrity(target, tool.value)
+                content = collect_content_integrity(tool.value)
             except Exception:
                 logger.warning(
                     "Content integrity collector failed for %s",

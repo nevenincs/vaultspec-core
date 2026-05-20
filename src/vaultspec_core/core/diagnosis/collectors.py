@@ -293,11 +293,10 @@ def collect_builtin_version_state(target: Path) -> BuiltinVersionSignal:
     return BuiltinVersionSignal.CURRENT
 
 
-def collect_config_state(target: Path, tool_value: str) -> ConfigSignal:
+def collect_config_state(tool_value: str) -> ConfigSignal:
     """Assess the state of a provider's root configuration file.
 
     Args:
-        target: Workspace root directory.
         tool_value: The :class:`~vaultspec_core.core.enums.Tool` ``.value``
             string (e.g. ``"claude"``).
 
@@ -498,16 +497,13 @@ def collect_gitignore_state(target: Path) -> GitignoreSignal:
     return GitignoreSignal.PARTIAL
 
 
-def collect_content_integrity(
-    target: Path, tool_value: str
-) -> dict[str, ContentSignal]:
+def collect_content_integrity(tool_value: str) -> dict[str, ContentSignal]:
     """Check content integrity of managed rule files for a provider.
 
-    Simplified implementation that checks file existence only.  SHA-256
-    content comparison is deferred to a later iteration.
+    Verifies that each managed rule file exists at the provider's
+    destination.
 
     Args:
-        target: Workspace root directory.
         tool_value: The :class:`~vaultspec_core.core.enums.Tool` ``.value``
             string (e.g. ``"claude"``).
 

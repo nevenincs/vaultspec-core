@@ -264,7 +264,7 @@ def cmd_add(
         raise typer.Exit(0)
 
     # Post-creation self-validation
-    _validate_created_doc(console, path, _get_ctx().target_dir)
+    _validate_created_doc(console, path)
     if json_output:
         import json
 
@@ -277,7 +277,7 @@ def cmd_add(
     console.print(f"[green]Created:[/green] {path}")
 
 
-def _validate_created_doc(console: Console, doc_path, root_dir) -> None:
+def _validate_created_doc(console: Console, doc_path) -> None:
     """Run frontmatter validation on a newly created document.
 
     Prints warnings if the created document fails the project's own

@@ -366,11 +366,11 @@ class TestBuiltinVersionState:
 class TestConfigState:
     def test_missing_no_context(self, tmp_path: Path) -> None:
         """Without WorkspaceContext, config is always MISSING."""
-        assert collect_config_state(tmp_path, "claude") == ConfigSignal.MISSING
+        assert collect_config_state("claude") == ConfigSignal.MISSING
 
     def test_ok_with_marker(self, synthetic_project: Path) -> None:
         """After install, CLAUDE.md should have the AUTO-GENERATED marker."""
-        result = collect_config_state(synthetic_project, "claude")
+        result = collect_config_state("claude")
         assert result == ConfigSignal.OK
 
     def test_foreign_without_marker(self, synthetic_project: Path) -> None:
@@ -380,7 +380,7 @@ class TestConfigState:
         cfg = get_context().tool_configs[Tool.CLAUDE]
         assert cfg.config_file is not None
         cfg.config_file.write_text("# My custom config\n", encoding="utf-8")
-        assert collect_config_state(synthetic_project, "claude") == ConfigSignal.FOREIGN
+        assert collect_config_state("claude") == ConfigSignal.FOREIGN
 
 
 # ---------------------------------------------------------------------------
@@ -450,7 +450,7 @@ class TestGitignoreState:
 # ---------------------------------------------------------------------------
 class TestContentIntegrity:
     def test_empty_without_context(self, tmp_path: Path) -> None:
-        result = collect_content_integrity(tmp_path, "claude")
+        result = collect_content_integrity("claude")
         assert result == {}
 
     def test_clean_stale_missing(self, synthetic_project: Path) -> None:
@@ -461,7 +461,7 @@ class TestContentIntegrity:
         cfg = ctx.tool_configs.get(Tool.CLAUDE)
         assert cfg is not None and cfg.rules_dir is not None
 
-        result = collect_content_integrity(synthetic_project, "claude")
+        result = collect_content_integrity("claude")
         # All files present in both source and dest should be CLEAN
         for name, signal in result.items():
             if signal == ContentSignal.CLEAN:
@@ -484,7 +484,7 @@ class TestContentIntegrity:
         builtin = cfg.rules_dir / "vaultspec-system.builtin.md"
         builtin.write_text("# Synthesized builtin\n", encoding="utf-8")
 
-        result = collect_content_integrity(synthetic_project, "claude")
+        result = collect_content_integrity("claude")
         assert "vaultspec-system.builtin.md" not in result
 
 
