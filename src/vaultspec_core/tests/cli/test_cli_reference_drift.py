@@ -27,9 +27,7 @@ pytestmark = [pytest.mark.integration]
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
-_REFERENCE = (
-    _REPO_ROOT / "src" / "vaultspec_core" / "builtins" / "reference" / "cli.md"
-)
+_REFERENCE = _REPO_ROOT / "src" / "vaultspec_core" / "builtins" / "reference" / "cli.md"
 
 # Options carried through the global options table or otherwise inherited on
 # essentially every subcommand. Documenting them once at the top of the
