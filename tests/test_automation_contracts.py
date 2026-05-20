@@ -78,19 +78,25 @@ def test_justfile_exposes_approved_targets() -> None:
 
 def test_dependency_audit_uses_uv_native_scanner() -> None:
     justfile = _read("justfile")
-    # The supply-chain gate must run uv's native auditor against the
-    # frozen lockfile.  The default scope already covers the project plus
-    # the default dependency groups (dev), so we deliberately do not pin
-    # any group-selection flag here: --all-groups was accepted by uv
-    # 0.10.x but rejected by 0.11.x, and breaking CI on a uv minor bump
-    # is exactly the brittleness this audit is meant to prevent.  The
-    # legacy pip-audit toolchain (and the transitive `pip` it dragged
-    # in) must not reappear.
+    # The supply-chain gate runs uv's native auditor against the frozen
+    # lockfile as its PRIMARY scanner.  The default scope already covers
+    # the project plus the default dependency groups (dev), so we
+    # deliberately do not pin any group-selection flag here: --all-groups
+    # was accepted by uv 0.10.x but rejected by 0.11.x, and breaking CI on
+    # a uv minor bump is exactly the brittleness this audit is meant to
+    # prevent.
     assert "uv audit" in justfile
     assert "--preview-features audit" in justfile
     assert "--frozen" in justfile
-    assert "pip-audit" not in justfile
-    assert "uv run pip-audit" not in justfile
+    # `uv audit` is a preview feature that has been observed to fail with
+    # an OSV response-decoding error in some network environments. A
+    # pip-audit fallback is permitted ONLY for that error path, and ONLY
+    # when invoked ephemerally (`uv run --with pip-audit` or `uvx`) so it
+    # never enters the project's locked dependency set. The real concern -
+    # the transitive `pip` that a project-level pip-audit dependency drags
+    # in - is guarded by test_pyproject_has_no_pip_named_dev_tools below.
+    if "pip-audit" in justfile:
+        assert ("uv run --with pip-audit" in justfile) or ("uvx pip-audit" in justfile)
 
 
 def test_pyproject_has_no_pip_named_dev_tools() -> None:

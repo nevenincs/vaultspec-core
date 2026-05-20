@@ -777,12 +777,17 @@ def cmd_tier_promote(
     else:
         target_value = target_tier.value
 
+    # An invalid current tier (e.g. a hand-mangled plan) must not silently
+    # empty the transitions list and bypass the mandatory-flag checks:
+    # default current_idx to 0 so every container-introducing tier up to
+    # the target is still validated. target_value is always a valid tier
+    # (derived from tier_order or a validated Tier), so its lookup is not
+    # guarded.
     try:
         current_idx = tier_order.index(current_tier_value)
-        target_idx = tier_order.index(target_value)
     except ValueError:
         current_idx = 0
-        target_idx = 0
+    target_idx = tier_order.index(target_value)
     transitions = tier_order[current_idx + 1 : target_idx + 1]
 
     missing: list[str] = []
