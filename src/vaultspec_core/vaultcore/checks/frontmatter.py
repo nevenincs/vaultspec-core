@@ -258,7 +258,6 @@ def check_frontmatter(
                     message=msg,
                     severity=severity,
                     fixable=True,
-                    fix_description="Run with --fix to attempt auto-correction",
                 )
             )
 

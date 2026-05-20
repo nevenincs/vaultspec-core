@@ -790,7 +790,6 @@ def check_structure(
                         message=msg,
                         severity=Severity.ERROR,
                         fixable=True,
-                        fix_description="Run with --fix to attempt auto-rename",
                     )
                 )
 

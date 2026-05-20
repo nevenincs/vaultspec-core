@@ -108,7 +108,6 @@ def check_links(
                     ),
                     severity=Severity.WARNING,
                     fixable=True,
-                    fix_description="Run with --fix to normalize wiki-links",
                 )
             )
 

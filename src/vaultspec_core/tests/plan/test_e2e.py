@@ -67,6 +67,35 @@ def test_check_command_clean_plan_exits_zero(tmp_path, runner: CliRunner) -> Non
     assert result.exit_code == 0
 
 
+def test_check_text_output_surfaces_fix_hint(tmp_path, runner: CliRunner) -> None:
+    """`vault plan check` text output must surface a finding's fix hint,
+    labelled autofix/manual - it used to be reachable only via --json."""
+    body = (
+        "---\n"
+        "tags:\n"
+        "  - '#plan'\n"
+        "  - '#hintdemo'\n"
+        "date: '2026-05-05'\n"
+        "related:\n"
+        "  - '[[2026-05-05-demo-adr]]'\n"
+        "---\n"
+        "\n"
+        "# `hintdemo` plan\n"
+        "\n"
+        "Demo.\n"
+        "\n"
+        "- [ ] `S01` - first action; `src/a.py`.\n"
+    )
+    plan_path = tmp_path / "hint-plan.md"
+    plan_path.write_text(body, encoding="utf-8")
+
+    result = runner.invoke(app, ["vault", "plan", "check", str(plan_path)])
+
+    # Missing `tier:` -> PLAN001, which is autofixable and carries a hint.
+    assert "PLAN001" in result.output
+    assert "fix (autofix):" in result.output
+
+
 def test_step_check_toggles_persistence_to_disk(tmp_path, runner: CliRunner) -> None:
     """``vault plan step check`` mutates the file on disk; round-trip preserves ids."""
     from vaultspec_core.plan.parser import parse_plan

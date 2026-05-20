@@ -171,6 +171,12 @@ def cmd_check(
                 f"[{finding.severity.value}] {finding.code} "
                 f"line {finding.line_number}: {finding.message}"
             )
+            # Surface the fix hint in the text output too - it used to be
+            # reachable only via --json - and label whether --fix can
+            # apply it or the operator must act manually.
+            if finding.fix_hint:
+                tag = "autofix" if finding.autofixable else "manual"
+                typer.echo(f"  fix ({tag}): {finding.fix_hint}")
 
     if has_errors(findings):
         sys.exit(1)
