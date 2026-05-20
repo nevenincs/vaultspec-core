@@ -229,6 +229,36 @@ class TestUpgradeEdgeCases:
 class TestInstallSkip:
     """--skip must exclude the named component."""
 
+    def test_install_core_scaffolds_framework_only(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        """`install core` scaffolds `.vaultspec/` and zero provider directories.
+
+        Contract: the `core` provider installs the framework directory only
+        (`docs/CLI.md`: "core installs `.vaultspec/` only, without any
+        provider config"). `init_run` enforces this via
+        `_PROVIDER_TO_TOOLS["core"] == []`, so no provider tool is enrolled.
+
+        The post-init `sync_provider` call maps `core` to the `all` sync
+        target, but that pass only ever propagates to *enrolled* providers.
+        With none enrolled it is a no-op for provider config; on a later
+        `install --upgrade core` against an existing install it correctly
+        re-propagates the re-seeded builtins to whatever providers are
+        already enrolled. This test pins the fresh-install half of that
+        contract: no provider directory may appear from `install core`.
+        """
+        factory.create_gitignore()
+        factory.install(provider="core")
+
+        assert (factory.root / ".vaultspec").is_dir(), (
+            "`install core` did not scaffold the framework directory"
+        )
+        for provider in ("claude", "gemini", "antigravity", "codex"):
+            assert not factory.provider_dir_exists(provider), (
+                f"`install core` created the {provider} provider directory; "
+                "core must scaffold the framework only"
+            )
+
     def test_skip_core_installs_provider_only(self, factory: WorkspaceFactory) -> None:
         # Pre-create .vaultspec/ so core scaffold is present
         (factory.root / ".vaultspec" / "rules" / "rules").mkdir(
