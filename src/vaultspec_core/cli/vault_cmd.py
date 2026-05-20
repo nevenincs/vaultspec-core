@@ -235,10 +235,10 @@ def cmd_add(
                 tier=tier if dt is DocType.PLAN else None,
             )
         except FileNotFoundError as exc:
-            _handle_error(exc)
+            _handle_error(exc, json_output=json_output)
             return
         except Exception as exc:
-            _handle_error(exc)
+            _handle_error(exc, json_output=json_output)
             return
     finally:
         if json_output:

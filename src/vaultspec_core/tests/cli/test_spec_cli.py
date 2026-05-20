@@ -89,6 +89,46 @@ class TestSpecCliFunctional:
         )
         assert result.exit_code == 0
 
+    def test_rules_add_json_error_is_parseable_envelope(
+        self, runner, synthetic_project
+    ):
+        """A spec failure under --json must be a parseable error
+        envelope, not a plain-text line a JSON consumer cannot read."""
+        import json
+
+        runner.invoke(
+            app,
+            [
+                "--target",
+                str(synthetic_project),
+                "spec",
+                "rules",
+                "add",
+                "--name",
+                "dup-rule",
+                "--content",
+                "first",
+            ],
+        )
+        result = runner.invoke(
+            app,
+            [
+                "--target",
+                str(synthetic_project),
+                "spec",
+                "rules",
+                "add",
+                "--name",
+                "dup-rule",
+                "--content",
+                "second",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 1, result.output
+        payload = json.loads(result.output)
+        assert payload["status"] == "error"
+
 
 class TestSpecCliDispatchRouting:
     """Test that core handlers can be called directly."""

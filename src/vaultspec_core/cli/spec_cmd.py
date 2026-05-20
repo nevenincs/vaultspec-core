@@ -167,7 +167,7 @@ def cmd_rules_add(
     try:
         file_path = rules_add(name=name, content=content, force=force, dry_run=dry_run)
     except VaultSpecError as exc:
-        _handle_error(exc)
+        _handle_error(exc, json_output=json_output)
         return
 
     if json_output:
@@ -203,7 +203,7 @@ def cmd_rules_show(
             raise typer.Exit(0)
         typer.echo(content)
     except (VaultSpecError, OSError) as exc:
-        _handle_error(exc)
+        _handle_error(exc, json_output=json_output)
 
 
 @rules_app.command("edit")
@@ -253,7 +253,7 @@ def cmd_rules_remove(
             confirm_fn=typer.confirm,
         )
     except (VaultSpecError, OSError) as exc:
-        _handle_error(exc)
+        _handle_error(exc, json_output=json_output)
         return
 
     if json_output:
@@ -289,7 +289,7 @@ def cmd_rules_rename(
             label="Rule",
         )
     except (VaultSpecError, OSError) as exc:
-        _handle_error(exc)
+        _handle_error(exc, json_output=json_output)
         return
 
     if json_output:
@@ -432,7 +432,7 @@ def cmd_skills_add(
             dry_run=dry_run,
         )
     except VaultSpecError as exc:
-        _handle_error(exc)
+        _handle_error(exc, json_output=json_output)
         return
 
     if json_output:
@@ -468,7 +468,7 @@ def cmd_skills_show(
             raise typer.Exit(0)
         typer.echo(content)
     except (VaultSpecError, OSError) as exc:
-        _handle_error(exc)
+        _handle_error(exc, json_output=json_output)
 
 
 @skills_app.command("edit")
@@ -521,7 +521,7 @@ def cmd_skills_remove(
             confirm_fn=typer.confirm,
         )
     except (VaultSpecError, OSError) as exc:
-        _handle_error(exc)
+        _handle_error(exc, json_output=json_output)
         return
 
     if json_output:
@@ -558,7 +558,7 @@ def cmd_skills_rename(
             is_dir=True,
         )
     except (VaultSpecError, OSError) as exc:
-        _handle_error(exc)
+        _handle_error(exc, json_output=json_output)
         return
 
     if json_output:
@@ -694,7 +694,7 @@ def cmd_agents_add(
             name=name, description=description, force=force, dry_run=dry_run
         )
     except VaultSpecError as exc:
-        _handle_error(exc)
+        _handle_error(exc, json_output=json_output)
         return
 
     if json_output:
@@ -730,7 +730,7 @@ def cmd_agents_show(
             raise typer.Exit(0)
         typer.echo(content)
     except (VaultSpecError, OSError) as exc:
-        _handle_error(exc)
+        _handle_error(exc, json_output=json_output)
 
 
 @agents_app.command("edit")
@@ -780,7 +780,7 @@ def cmd_agents_remove(
             confirm_fn=typer.confirm,
         )
     except (VaultSpecError, OSError) as exc:
-        _handle_error(exc)
+        _handle_error(exc, json_output=json_output)
         return
 
     if json_output:
@@ -816,7 +816,7 @@ def cmd_agents_rename(
             label="Agent",
         )
     except (VaultSpecError, OSError) as exc:
-        _handle_error(exc)
+        _handle_error(exc, json_output=json_output)
         return
 
     if json_output:
@@ -1045,7 +1045,7 @@ def cmd_hooks_run(
     try:
         results = hooks_run(event=event, path=path)
     except VaultSpecError as exc:
-        _handle_error(exc)
+        _handle_error(exc, json_output=json_output)
         return
 
     if json_output:
@@ -1191,7 +1191,7 @@ def cmd_mcps_add(
     try:
         file_path = mcp_add(name=name, config=parsed_config, force=force)
     except VaultSpecError as exc:
-        _handle_error(exc)
+        _handle_error(exc, json_output=json_output)
         return
 
     if json_output:
@@ -1221,7 +1221,7 @@ def cmd_mcps_remove(
     try:
         removed_path = mcp_remove(name=name)
     except VaultSpecError as exc:
-        _handle_error(exc)
+        _handle_error(exc, json_output=json_output)
         return
 
     if json_output:
