@@ -55,7 +55,10 @@ plan_app = typer.Typer(
 )
 
 step_app = typer.Typer(
-    help="Step-level operations (add / insert / move / remove / state / edit).",
+    help=(
+        "Step-level operations "
+        "(add / insert / move / remove / check / uncheck / toggle / edit)."
+    ),
     no_args_is_help=True,
 )
 plan_app.add_typer(step_app, name="step")
