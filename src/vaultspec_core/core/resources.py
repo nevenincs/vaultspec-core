@@ -12,7 +12,7 @@ import shutil
 from collections.abc import Callable
 from pathlib import Path
 
-from .exceptions import ResourceExistsError, ResourceNotFoundError
+from .exceptions import ResourceExistsError, ResourceNotFoundError, VaultSpecError
 from .helpers import _launch_editor, _rmtree_robust, ensure_dir
 
 logger = logging.getLogger(__name__)
@@ -72,8 +72,14 @@ def resource_edit(
     logger.info("Opening editor (%s) for %s...", editor, _canonical)
     try:
         _launch_editor(editor, str(file_path))
-    except Exception as e:
-        logger.error("Error opening editor: %s", e, exc_info=True)
+    except OSError as e:
+        raise VaultSpecError(
+            f"Could not launch editor '{editor}': {e}",
+            hint=(
+                "Set a working editor command via the VAULTSPEC_EDITOR "
+                "environment variable (e.g. VAULTSPEC_EDITOR='code -w')."
+            ),
+        ) from e
 
     return file_path
 

@@ -403,7 +403,10 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
         env_name="VAULTSPEC_EDITOR",
         attr_name="editor",
         var_type=str,
-        default="zed -w",
+        # Honour the standard $VISUAL / $EDITOR convention before the
+        # built-in fallback, so an operator's existing editor choice is
+        # respected without a vaultspec-specific variable.
+        default=os.environ.get("VISUAL") or os.environ.get("EDITOR") or "zed -w",
         description="Default editor command for creating rules/skills.",
     ),
 ]
