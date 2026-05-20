@@ -46,7 +46,7 @@ def _builtins_root() -> Path:
 
 
 def seed_builtins(
-    target_rules_dir: Path, *, force: bool = False
+    target_rules_dir: Path, *, force: bool = False, dry_run: bool = False
 ) -> list[tuple[str, str]]:
     """Copy bundled builtins into a target ``.vaultspec/rules/`` directory.
 
@@ -55,13 +55,15 @@ def seed_builtins(
     Args:
         target_rules_dir: The ``.vaultspec/rules/`` directory to populate.
         force: Overwrite existing files.
+        dry_run: Classify every builtin without writing anything - used to
+            preview an ``install --upgrade`` run.
 
     Returns:
         List of ``(relative_path, action)`` pairs for every builtin the
-        call acted on, where ``action`` is ``[ADD]`` (newly written),
-        ``[UPDATE]`` (overwritten with changed content) or
-        ``[UNCHANGED]`` (already current). Builtins skipped because they
-        exist and *force* is False are omitted.
+        call acted on (or would act on, under *dry_run*), where ``action``
+        is ``[ADD]`` (newly written), ``[UPDATE]`` (overwritten with
+        changed content) or ``[UNCHANGED]`` (already current). Builtins
+        skipped because they exist and *force* is False are omitted.
     """
     src = _builtins_root()
     results: list[tuple[str, str]] = []
@@ -97,7 +99,7 @@ def seed_builtins(
             except OSError:
                 action = "[UPDATE]"
 
-        if action != "[UNCHANGED]":
+        if action != "[UNCHANGED]" and not dry_run:
             try:
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src_file, dest)

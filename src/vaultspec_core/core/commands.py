@@ -886,10 +886,18 @@ def install_run(
 
     if upgrade and dry_run:
         _ensure_tool_configs(path)
+        items: list[tuple[str, str]] = []
+        if not skip_core:
+            from vaultspec_core.builtins import seed_builtins
+
+            items = seed_builtins(
+                path / ".vaultspec" / "rules", force=True, dry_run=True
+            )
         return {
-            "action": "dry_run",
-            "upgrade": True,
-            "items": [],
+            "action": "upgrade",
+            "items": items,
+            "path": path,
+            "dry_run": True,
         }
 
     if dry_run:

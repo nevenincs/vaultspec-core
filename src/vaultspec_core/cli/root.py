@@ -322,9 +322,12 @@ def cmd_install(
             OutcomeItem(name=rel, outcome=action_map.get(action, Outcome.UPDATED))
             for rel, action in result["items"]
         ]
-        raise typer.Exit(
-            emit_outcomes(outcomes, title=f"Upgrade → {path}", json_output=json_output)
+        title = (
+            f"Upgrade preview → {path}"
+            if result.get("dry_run")
+            else f"Upgrade → {path}"
         )
+        raise typer.Exit(emit_outcomes(outcomes, title=title, json_output=json_output))
 
     if json_output:
         import json
