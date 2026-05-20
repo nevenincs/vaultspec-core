@@ -119,6 +119,15 @@ class TestOutcomesAsJson:
         assert records[0]["detail"] == "excluded by policy"
         assert "detail" not in records[1]
 
+    def test_group_is_recorded_when_present_and_omitted_when_blank(self):
+        items = [
+            OutcomeItem(name="a", outcome=Outcome.CREATED, group="claude"),
+            OutcomeItem(name="b", outcome=Outcome.CREATED),
+        ]
+        records = cast("list[dict[str, str]]", outcomes_as_json(items)["items"])
+        assert records[0]["group"] == "claude"
+        assert "group" not in records[1]
+
 
 @pytest.mark.unit
 class TestRenderOutcomes:
@@ -163,6 +172,21 @@ class TestRenderOutcomes:
         assert "2 unchanged" in out
         assert "1 created" in out
 
+    def test_grouped_items_render_under_sub_headings(self, capsys):
+        items = [
+            OutcomeItem(name="rule.md", outcome=Outcome.CREATED, group="claude"),
+            OutcomeItem(name="quiet.md", outcome=Outcome.UNCHANGED, group="gemini"),
+        ]
+        render_outcomes(items, title="Sync")
+        out = capsys.readouterr().out
+        # A group with a real change gets a sub-heading + its items.
+        assert "claude" in out
+        assert "rule.md" in out
+        # A group that is all-unchanged collapses to one acknowledgement.
+        assert "gemini" in out
+        assert "quiet.md" not in out
+        assert "up to date" in out
+
 
 @pytest.mark.unit
 class TestSyncOutcomes:
@@ -194,6 +218,14 @@ class TestSyncOutcomes:
     def test_empty_result_aggregates_to_unchanged(self):
         payload = outcomes_as_json(sync_outcomes(SyncResult()))
         assert payload["status"] == "unchanged"
+
+    def test_group_label_propagates_to_every_item(self):
+        result = SyncResult()
+        result.items = [("a.md", "[ADD]")]
+        result.errors = ["bad.md: transform exploded"]
+        items = sync_outcomes(result, group="claude")
+        assert items, "expected file and error items"
+        assert all(item.group == "claude" for item in items)
 
 
 @pytest.mark.unit

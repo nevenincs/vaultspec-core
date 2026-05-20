@@ -578,19 +578,19 @@ def cmd_sync(
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from None
 
-    if json_output:
-        import dataclasses
-        import json
-
-        data = [dataclasses.asdict(r) for r in results]
-        typer.echo(json.dumps(data, indent=2, default=str))
-        raise typer.Exit(0)
-
     from vaultspec_core.console import get_console
 
     console = get_console()
 
     if dry_run:
+        if json_output:
+            import dataclasses
+            import json
+
+            data = [dataclasses.asdict(r) for r in results]
+            typer.echo(json.dumps(data, indent=2, default=str))
+            raise typer.Exit(0)
+
         from vaultspec_core.cli.rendering import render_dry_run_tree
         from vaultspec_core.core.dry_run import (
             DryRunItem,
@@ -624,63 +624,61 @@ def cmd_sync(
             render_dry_run_tree(all_items, title=title)
         else:
             console.print("[dim]Sync preview: no changes[/dim]")
+        raise typer.Exit(0)
+
+    # Non-dry-run: route every provider through the canonical outcome
+    # renderer. Per the cli-sync-vocabulary ADR (audit findings
+    # S2/S8/S10/S19), one helper feeds text and JSON from a single
+    # OutcomeItem list, and each provider becomes a group so the output
+    # stays per-provider readable without a bespoke summary loop.
+    from vaultspec_core.cli.rendering import (
+        OutcomeItem,
+        emit_outcomes,
+        sync_outcomes,
+    )
+    from vaultspec_core.core.manifest import installed_tool_configs
+
+    active_configs = installed_tool_configs()
+    if provider == "all":
+        active_names = [
+            cfg.name
+            for tool, cfg in active_configs.items()
+            if tool.value not in skip and cfg.name not in skip
+        ]
     else:
-        from vaultspec_core.core.manifest import installed_tool_configs
-        from vaultspec_core.core.types import SyncResult
+        active_names = [
+            cfg.name
+            for tool, cfg in active_configs.items()
+            if (tool.value == provider or cfg.name == provider)
+            and tool.value not in skip
+            and cfg.name not in skip
+        ]
 
-        active_configs = installed_tool_configs()
-        if provider == "all":
-            active_names = [
-                cfg.name
-                for tool, cfg in active_configs.items()
-                if tool.value not in skip and cfg.name not in skip
-            ]
-        else:
-            active_names = [
-                cfg.name
-                for tool, cfg in active_configs.items()
-                if (tool.value == provider or cfg.name == provider)
-                and tool.value not in skip
-                and cfg.name not in skip
-            ]
+    if not active_names and not json_output:
+        console.print("[dim]No enabled providers to sync.[/dim]")
+        raise typer.Exit(0)
 
-        # Header
-        provider_list = ", ".join(f"[cyan]{n}[/cyan]" for n in active_names)
-        console.print(
-            f"Syncing [bold]{len(active_names)}[/bold] enabled "
-            f"providers ({provider_list})...\n"
-        )
-
-        # Collect per-tool results across all 5 resource passes
-        resource_labels = ["rules", "skills", "agents", "system", "config"]
-        if provider == "all" and "mcp" not in skip:
-            resource_labels.append("mcps")
-        tool_resources: dict[str, list[tuple[str, SyncResult]]] = {}
-        for label, r in zip(resource_labels, results, strict=True):
+    # Each resource pass carries per-provider results in `per_tool`;
+    # global passes (e.g. mcps) carry only the aggregate. Tag every item
+    # with its group so the renderer sub-heads the output by provider.
+    resource_labels = ["rules", "skills", "agents", "system", "config"]
+    if provider == "all" and "mcp" not in skip:
+        resource_labels.append("mcps")
+    outcomes: list[OutcomeItem] = []
+    for label, r in zip(resource_labels, results, strict=True):
+        if r.per_tool:
             for tool_name, tool_result in r.per_tool.items():
-                tool_resources.setdefault(tool_name, []).append((label, tool_result))
+                outcomes.extend(sync_outcomes(tool_result, group=tool_name))
+        else:
+            outcomes.extend(sync_outcomes(r, group=label))
 
-        # Render one line per provider
-        for tool_name in active_names:
-            entries = tool_resources.get(tool_name, [])
-            parts: list[str] = []
-            for res_label, tr in entries:
-                if tr.added:
-                    parts.append(f"{tr.added} {res_label} added")
-                if tr.updated:
-                    parts.append(f"{tr.updated} {res_label} updated")
-                if tr.pruned:
-                    parts.append(f"{tr.pruned} {res_label} pruned")
+    all_warnings = [w for r in results for w in r.warnings]
+    extra_json = {"warnings": all_warnings} if all_warnings else None
+    code = emit_outcomes(
+        outcomes, title="Sync", json_output=json_output, extra_json=extra_json
+    )
 
-            if parts:
-                detail = ", ".join(parts)
-                console.print(f"  [bold]{tool_name:<16}[/bold] {detail}")
-            else:
-                console.print(
-                    f"  [green]\u2713[/green] [dim]{tool_name:<16} up to date[/dim]"
-                )
-
-        # Check if bundled builtins are newer than deployed
+    if not json_output:
         from vaultspec_core.builtins import check_outdated
 
         vaultspec_rules = sync_target / ".vaultspec" / "rules"
@@ -699,8 +697,6 @@ def cmd_sync(
                 "to update, then [bold]vaultspec-core sync[/bold] again."
             )
 
-        # Collect and display warnings from all sync passes
-        all_warnings = [w for r in results for w in r.warnings]
         if all_warnings:
             console.print()
             console.print(
@@ -711,25 +707,14 @@ def cmd_sync(
             for warning in all_warnings:
                 console.print(f"  [yellow]•[/yellow] {warning}")
 
-        # Collect and display errors from all sync passes
-        all_errors = []
-        for r in results:
-            all_errors.extend(r.errors)
-        if all_errors:
-            console.print(f"\n  [red]Errors ({len(all_errors)}):[/red]")
-            for err in all_errors:
-                console.print(f"    [red]x[/red] {err}")
-            raise typer.Exit(code=1)
-
-        # Warn only when sync genuinely found nothing to project: no
-        # changes, no skips, and no files already in place. Counting
-        # unchanged files keeps the warning from firing on a healthy
-        # re-sync where every destination already matches its source.
+        # Warn only when a clean run genuinely found nothing to project:
+        # no changes, no skips, and no files already in place.
         total_changes = sum(r.added + r.updated for r in results)
         total_skipped = sum(r.skipped for r in results)
         total_unchanged = sum(r.unchanged for r in results)
         if (
-            active_names
+            code == 0
+            and active_names
             and total_changes == 0
             and total_skipped == 0
             and total_unchanged == 0
@@ -741,6 +726,8 @@ def cmd_sync(
                 "  Run [bold]vaultspec-core install --upgrade[/bold] "
                 "to re-seed builtin content."
             )
+
+    raise typer.Exit(code)
 
 
 def _infer_label(item_path: str) -> str:

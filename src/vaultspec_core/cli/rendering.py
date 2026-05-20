@@ -93,11 +93,15 @@ class OutcomeItem:
             specific colour a single outcome word cannot - a skip
             reason, or a plan-revision operation name such as
             "renumbered" - without fragmenting the taxonomy.
+        group: Optional grouping label. When set, the text renderer
+            collects the item under a sub-heading (e.g. one provider per
+            group on ``sync``); an empty string renders at the root.
     """
 
     name: str
     outcome: Outcome
     detail: str = ""
+    group: str = ""
 
 
 def aggregate_outcome(items: Sequence[OutcomeItem]) -> Outcome:
@@ -154,11 +158,19 @@ def outcomes_as_json(items: Sequence[OutcomeItem]) -> dict[str, object]:
             {
                 "name": item.name,
                 "outcome": str(item.outcome),
+                **({"group": item.group} if item.group else {}),
                 **({"detail": item.detail} if item.detail else {}),
             }
             for item in items
         ],
     }
+
+
+def _outcome_line(item: OutcomeItem, *, indent: str) -> str:
+    """Format one glyph-prefixed outcome line at the given indent."""
+    glyph, colour = OUTCOME_STYLE[item.outcome]
+    detail = f" [dim]{item.detail}[/dim]" if item.detail else ""
+    return f"{indent}[{colour}]{glyph}[/{colour}] {item.name}{detail}"
 
 
 def render_outcomes(items: Sequence[OutcomeItem], *, title: str = "Result") -> None:
@@ -171,6 +183,11 @@ def render_outcomes(items: Sequence[OutcomeItem], *, title: str = "Result") -> N
     noise. The machine-readable surface (:func:`outcomes_as_json`) keeps
     full per-item fidelity, so the JSON still carries every record.
 
+    When any item carries a :attr:`OutcomeItem.group`, the items are
+    collected under one sub-heading per group; a group whose every item
+    is unchanged collapses to a single ``up to date`` acknowledgement so
+    a no-op multi-target run stays compact.
+
     Consumes the same :class:`OutcomeItem` list as
     :func:`outcomes_as_json`; the text and JSON surfaces therefore share
     one taxonomy and one aggregate and cannot drift apart.
@@ -182,12 +199,24 @@ def render_outcomes(items: Sequence[OutcomeItem], *, title: str = "Result") -> N
     console = get_console()
     console.print(f"[bold]{title}[/bold]")
 
-    for item in items:
-        if item.outcome is Outcome.UNCHANGED:
-            continue
-        glyph, colour = OUTCOME_STYLE[item.outcome]
-        detail = f" [dim]{item.detail}[/dim]" if item.detail else ""
-        console.print(f"  [{colour}]{glyph}[/{colour}] {item.name}{detail}")
+    if any(item.group for item in items):
+        grouped: dict[str, list[OutcomeItem]] = {}
+        for item in items:
+            grouped.setdefault(item.group, []).append(item)
+        for group, members in grouped.items():
+            label = group or "(ungrouped)"
+            changed = [m for m in members if m.outcome is not Outcome.UNCHANGED]
+            if changed:
+                console.print(f"  [bold dim]{label}[/bold dim]")
+                for member in changed:
+                    console.print(_outcome_line(member, indent="    "))
+            else:
+                console.print(f"  [dim]= {label}  up to date[/dim]")
+    else:
+        for item in items:
+            if item.outcome is Outcome.UNCHANGED:
+                continue
+            console.print(_outcome_line(item, indent="  "))
 
     counts = count_outcomes(items)
     parts: list[str] = []
@@ -251,7 +280,7 @@ _SYNC_ACTION_OUTCOME: dict[str, Outcome] = {
 }
 
 
-def sync_outcomes(result: SyncResult) -> list[OutcomeItem]:
+def sync_outcomes(result: SyncResult, *, group: str = "") -> list[OutcomeItem]:
     """Translate a :class:`~vaultspec_core.core.types.SyncResult` into outcomes.
 
     Maps the per-file action log onto the canonical taxonomy and appends
@@ -261,6 +290,9 @@ def sync_outcomes(result: SyncResult) -> list[OutcomeItem]:
 
     Args:
         result: The accumulator returned by a sync pass.
+        group: Optional grouping label stamped onto every returned item -
+            used by multi-target callers (e.g. ``sync`` tagging each
+            provider) so the renderer can sub-head the output.
 
     Returns:
         One :class:`OutcomeItem` per file the sync pass touched or
@@ -268,13 +300,17 @@ def sync_outcomes(result: SyncResult) -> list[OutcomeItem]:
     """
     items = [
         OutcomeItem(
-            name=path, outcome=_SYNC_ACTION_OUTCOME.get(action, Outcome.UPDATED)
+            name=path,
+            outcome=_SYNC_ACTION_OUTCOME.get(action, Outcome.UPDATED),
+            group=group,
         )
         for path, action in result.items
     ]
     for error in result.errors:
         name, _, detail = error.partition(": ")
-        items.append(OutcomeItem(name=name, outcome=Outcome.FAILED, detail=detail))
+        items.append(
+            OutcomeItem(name=name, outcome=Outcome.FAILED, detail=detail, group=group)
+        )
     return items
 
 

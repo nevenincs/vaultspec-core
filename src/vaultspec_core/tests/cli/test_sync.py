@@ -239,7 +239,8 @@ class TestSyncAuthority:
 
         assert result.exit_code == 0, result.output
         output = ANSI_RE.sub("", result.output)
-        assert "Syncing 1 enabled providers" in output
+        # The grouped renderer sub-heads only the requested provider, so
+        # the output never implies the others were refreshed.
         assert "claude" in output
         assert "gemini" not in output
         assert "antigravity" not in output
@@ -292,7 +293,8 @@ class TestSyncAuthority:
 
         assert result.exit_code == 0, result.output
         output = ANSI_RE.sub("", result.output)
-        assert "Syncing 0 enabled providers" in output
+        # Skipping the only requested provider leaves nothing to sync.
+        assert "No enabled providers to sync" in output
         assert "Sync produced 0 files" not in output
         assert claude_rule.read_text(encoding="utf-8") == before + "\nlocal drift\n"
         assert mcp_path.read_text(encoding="utf-8") == mcp_before
