@@ -116,6 +116,13 @@ def cmd_migrations_run(
     """
     apply_target(target)
 
+    from vaultspec_core.cli.rendering import (
+        Outcome,
+        OutcomeItem,
+        outcomes_as_json,
+        render_outcomes,
+    )
+    from vaultspec_core.console import get_console
     from vaultspec_core.core.types import get_context
     from vaultspec_core.migrations import run_pending_migrations
 
@@ -125,43 +132,30 @@ def cmd_migrations_run(
         results = run_pending_migrations(root_dir)
     except Exception as exc:
         if json_output:
-            typer.echo(_json.dumps({"ok": False, "error": str(exc)}, indent=2))
+            typer.echo(
+                _json.dumps(
+                    {"status": "failed", "error": str(exc), "items": []}, indent=2
+                )
+            )
         else:
             typer.echo(f"Error: migration failed: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
-    if json_output:
-        typer.echo(
-            _json.dumps(
-                {
-                    "ok": True,
-                    "applied": [
-                        {
-                            "name": r.name,
-                            "target_version": r.target_version,
-                            "summary": r.summary,
-                            "counts": r.counts,
-                        }
-                        for r in results
-                    ],
-                },
-                indent=2,
-            )
+    outcomes = [
+        OutcomeItem(
+            name=r.name,
+            outcome=Outcome.UPDATED,
+            detail=f"{r.target_version}  {r.summary}",
         )
+        for r in results
+    ]
+
+    if json_output:
+        typer.echo(_json.dumps(outcomes_as_json(outcomes), indent=2))
         raise typer.Exit(code=0)
 
-    from vaultspec_core.console import get_console
-
-    console = get_console()
-    if not results:
-        console.print("[green]up to date[/green]: no pending migrations.")
+    if not outcomes:
+        get_console().print("[dim]unchanged[/dim]: no pending migrations.")
     else:
-        console.print(
-            f"[bold]Applied {len(results)} migration"
-            f"{'s' if len(results) != 1 else ''}.[/bold]"
-        )
-        for r in results:
-            console.print(
-                f"  [green]ok[/green] {r.target_version}  {r.name}: {r.summary}"
-            )
+        render_outcomes(outcomes, title="Migrations")
     raise typer.Exit(code=0)
