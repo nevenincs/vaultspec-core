@@ -235,17 +235,18 @@ _dev-audit-help:
 # entry if pyjwt ships a release that resolves or the advisory is
 # withdrawn.
 #
-# uv 0.11.10 can currently fail before producing any finding output when the
-# OSV response contains data its audit decoder cannot parse ("error decoding
-# response body"). That is a tool/service decode failure, not a vulnerability
-# verdict. In that specific case only, fall back to pip-audit against the
-# already-synced local environment so the CI job still performs an advisory
-# check and still fails on real findings.
+# uv's preview audit decoder has been observed to fail before producing any
+# finding output when the OSV response carries data it cannot parse ("error
+# decoding response body"). That is a transient tool/service decode failure,
+# not a vulnerability verdict, so the wrapper retries the uv-native scan up
+# to three times. A persistent decode failure fails the gate rather than
+# silently passing: this project is uv-managed end to end and never shells
+# out to pip, so there is no second scanner to fall back to.
 _dev-audit-deps:
   @{{ if os() == "windows" { \
-    "$out = uv audit --preview-features audit --frozen --ignore PYSEC-2025-183 --ignore CVE-2025-45768 2>&1 | Out-String; Write-Host $out; if ($out -match 'Found (no|0) known vulnerabilit') { exit 0 }; if ($out -match 'error decoding response body') { Write-Host 'uv audit response decoding failed; falling back to pip-audit'; uv run --with pip-audit pip-audit --local --ignore-vuln PYSEC-2025-183 --ignore-vuln CVE-2025-45768; exit $LASTEXITCODE }; exit 1" \
+    "for ($i = 1; $i -le 3; $i++) { $out = uv audit --preview-features audit --frozen --ignore PYSEC-2025-183 --ignore CVE-2025-45768 2>&1 | Out-String; Write-Host $out; if ($out -match 'Found (no|0) known vulnerabilit') { exit 0 }; if ($out -match 'error decoding response body') { Write-Host \"uv audit OSV decode failed (attempt $i/3); retrying\"; Start-Sleep -Seconds 3; continue }; exit 1 }; Write-Host 'uv audit could not decode the OSV response after 3 attempts'; exit 1" \
   } else { \
-    "out=$(uv audit --preview-features audit --frozen --ignore PYSEC-2025-183 --ignore CVE-2025-45768 2>&1) || true; printf '%s\\n' \"$out\"; if printf '%s\\n' \"$out\" | grep -Eq 'Found (no|0) known vulnerabilit'; then exit 0; fi; if printf '%s\\n' \"$out\" | grep -q 'error decoding response body'; then printf '%s\\n' 'uv audit response decoding failed; falling back to pip-audit'; uv run --with pip-audit pip-audit --local --ignore-vuln PYSEC-2025-183 --ignore-vuln CVE-2025-45768; exit $?; fi; exit 1" \
+    "i=0; while [ \"$i\" -lt 3 ]; do out=$(uv audit --preview-features audit --frozen --ignore PYSEC-2025-183 --ignore CVE-2025-45768 2>&1) || true; printf '%s\\n' \"$out\"; if printf '%s\\n' \"$out\" | grep -Eq 'Found (no|0) known vulnerabilit'; then exit 0; fi; if printf '%s\\n' \"$out\" | grep -q 'error decoding response body'; then i=$((i + 1)); printf '%s\\n' \"uv audit OSV decode failed (attempt $i/3); retrying\"; sleep 3; continue; fi; exit 1; done; printf '%s\\n' 'uv audit could not decode the OSV response after 3 attempts'; exit 1" \
   } }}
 
 # ---------------------------------------------------------------------------

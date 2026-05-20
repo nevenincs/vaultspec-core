@@ -88,15 +88,14 @@ def test_dependency_audit_uses_uv_native_scanner() -> None:
     assert "uv audit" in justfile
     assert "--preview-features audit" in justfile
     assert "--frozen" in justfile
-    # `uv audit` is a preview feature that has been observed to fail with
-    # an OSV response-decoding error in some network environments. A
-    # pip-audit fallback is permitted ONLY for that error path, and ONLY
-    # when invoked ephemerally (`uv run --with pip-audit` or `uvx`) so it
-    # never enters the project's locked dependency set. The real concern -
-    # the transitive `pip` that a project-level pip-audit dependency drags
-    # in - is guarded by test_pyproject_has_no_pip_named_dev_tools below.
-    if "pip-audit" in justfile:
-        assert ("uv run --with pip-audit" in justfile) or ("uvx pip-audit" in justfile)
+    # This is a uv-managed project: the supply-chain gate is uv-native end
+    # to end and never shells out to pip. pip-audit drags `pip` itself into
+    # the environment as a transitive dependency - historically the only
+    # vulnerability `uv audit` ever reported here - so no pip-named scanner
+    # may appear in the audit recipe. A transient OSV decode failure is
+    # handled by retrying the uv-native scan, not by a second tool.
+    assert "pip-audit" not in justfile
+    assert "pip-tools" not in justfile
 
 
 def test_pyproject_has_no_pip_named_dev_tools() -> None:
