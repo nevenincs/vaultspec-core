@@ -110,7 +110,12 @@ def resolve(
 
     _resolve_framework(plan, diagnosis.framework, fw_action, force=force)
     _resolve_version_warning(plan, diagnosis)
-    _resolve_builtin_version(plan, diagnosis.builtin_version, prov_action, force=force)
+    # Builtins live in .vaultspec/rules/ - framework content. Under
+    # `install --upgrade` they are re-seeded unconditionally, so the
+    # builtin-version signal must resolve with framework semantics; using
+    # prov_action (SYNC) would wrongly tell the operator to pass --force
+    # to re-seed something the upgrade is already about to re-seed.
+    _resolve_builtin_version(plan, diagnosis.builtin_version, fw_action, force=force)
     _resolve_gitignore(plan, diagnosis.gitignore, prov_action, force=force)
     _resolve_gitattributes(plan, diagnosis.gitattributes, prov_action, force=force)
 
@@ -520,10 +525,14 @@ def _resolve_builtin_version(
         return
 
     if signal == BuiltinVersionSignal.NO_SNAPSHOTS:
-        plan.warnings.append(
-            "No version baseline for builtins - cannot verify integrity. "
-            "Run 'vaultspec-core install --upgrade' to establish baseline."
-        )
+        # install / install --upgrade write the snapshot themselves, so a
+        # missing baseline is not actionable for them. Only a plain sync
+        # against a snapshot-less workspace needs the operator warned.
+        if action == CliAction.SYNC:
+            plan.warnings.append(
+                "No version baseline for builtins - cannot verify integrity. "
+                "Run 'vaultspec-core install --upgrade' to establish baseline."
+            )
         return
 
     if signal == BuiltinVersionSignal.MODIFIED and action == CliAction.SYNC:

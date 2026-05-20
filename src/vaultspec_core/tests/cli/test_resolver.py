@@ -270,14 +270,36 @@ class TestBuiltinVersionRules:
         assert ResolutionAction.SYNC in actions
         assert any("re-seed" in s.reason.lower() for s in plan.steps)
 
-    def test_no_snapshots_any_action_warns(self):
-        for action in ("install", "sync", "uninstall"):
+    def test_modified_upgrade_does_not_warn_use_force(self):
+        """install --upgrade re-seeds builtins unconditionally, so it must
+        not tell the operator to pass --force to re-seed them."""
+        diag = _make_diagnosis(builtin_version=BuiltinVersionSignal.MODIFIED)
+        plan = resolve(diag, "upgrade", force=False)
+        assert not any("--force" in w for w in plan.warnings)
+
+    def test_no_snapshots_warns_only_for_sync(self):
+        """A missing builtin baseline is actionable only for plain sync.
+
+        install / install --upgrade write the snapshot themselves, so
+        warning them to "run install --upgrade" is noise (and alarming
+        on a brand-new install).
+        """
+        for action in ("install", "uninstall", "upgrade"):
             diag = _make_diagnosis(
                 builtin_version=BuiltinVersionSignal.NO_SNAPSHOTS,
                 framework=FrameworkSignal.PRESENT,
             )
             plan = resolve(diag, action)
-            assert any("no version baseline" in w.lower() for w in plan.warnings)
+            assert not any(
+                "no version baseline" in w.lower() for w in plan.warnings
+            ), f"{action} should not warn about a missing builtin baseline"
+
+        diag = _make_diagnosis(
+            builtin_version=BuiltinVersionSignal.NO_SNAPSHOTS,
+            framework=FrameworkSignal.PRESENT,
+        )
+        plan = resolve(diag, "sync")
+        assert any("no version baseline" in w.lower() for w in plan.warnings)
 
 
 # ---------------------------------------------------------------------------
