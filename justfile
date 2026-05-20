@@ -219,11 +219,19 @@ _dev-audit-help:
 # because uv 0.10.x/0.11.x exit 0 even when advisories are present; drop
 # the wrapper once `uv audit --strict` (or equivalent) ships and exits
 # non-zero on findings.
+#
+# --ignore-until-fixed PYSEC-2025-183: pyjwt advisory with no fixed
+# release. pyjwt is a transitive dependency pulled by `mcp`; 2.12.1 is
+# the latest version on PyPI, so there is nothing to upgrade to.
+# --ignore-until-fixed (unlike a blanket --ignore) suppresses the
+# advisory ONLY while no fix is published; the moment pyjwt ships a
+# patched release uv audit re-surfaces it and this entry must be
+# removed alongside a lockfile bump.
 _dev-audit-deps:
   @{{ if os() == "windows" { \
-    "$out = uv audit --preview-features audit --frozen 2>&1 | Out-String; Write-Host $out; if ($out -notmatch 'Found (no|0) known vulnerabilit') { exit 1 }" \
+    "$out = uv audit --preview-features audit --frozen --ignore-until-fixed PYSEC-2025-183 2>&1 | Out-String; Write-Host $out; if ($out -notmatch 'Found (no|0) known vulnerabilit') { exit 1 }" \
   } else { \
-    "out=$(uv audit --preview-features audit --frozen 2>&1); printf '%s\\n' \"$out\"; printf '%s\\n' \"$out\" | grep -Eq 'Found (no|0) known vulnerabilit' || exit 1" \
+    "out=$(uv audit --preview-features audit --frozen --ignore-until-fixed PYSEC-2025-183 2>&1); printf '%s\\n' \"$out\"; printf '%s\\n' \"$out\" | grep -Eq 'Found (no|0) known vulnerabilit' || exit 1" \
   } }}
 
 # ---------------------------------------------------------------------------
