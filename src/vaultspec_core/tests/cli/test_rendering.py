@@ -147,6 +147,22 @@ class TestRenderOutcomes:
         render_outcomes([])
         assert "Result" in capsys.readouterr().out
 
+    def test_unchanged_items_are_counted_but_not_listed(self, capsys):
+        items = [
+            OutcomeItem(name="changed.md", outcome=Outcome.CREATED),
+            OutcomeItem(name="quiet-one.md", outcome=Outcome.UNCHANGED),
+            OutcomeItem(name="quiet-two.md", outcome=Outcome.UNCHANGED),
+        ]
+        render_outcomes(items, title="Sync")
+        out = capsys.readouterr().out
+        assert "changed.md" in out
+        # Unchanged files are folded into the count, never line-listed:
+        # a result that names every untouched file is noise.
+        assert "quiet-one.md" not in out
+        assert "quiet-two.md" not in out
+        assert "2 unchanged" in out
+        assert "1 created" in out
+
 
 @pytest.mark.unit
 class TestSyncOutcomes:

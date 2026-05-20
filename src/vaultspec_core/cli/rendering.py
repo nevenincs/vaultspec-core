@@ -164,8 +164,14 @@ def outcomes_as_json(items: Sequence[OutcomeItem]) -> dict[str, object]:
 def render_outcomes(items: Sequence[OutcomeItem], *, title: str = "Result") -> None:
     """Print a human-readable outcome summary to the console.
 
-    Renders one glyph-prefixed line per item followed by a per-outcome
-    count summary. Consumes the same :class:`OutcomeItem` list as
+    Renders one glyph-prefixed line per item that represents an actual
+    change, followed by a per-outcome count summary. :attr:`Outcome.
+    UNCHANGED` items are folded into the count summary only and never
+    listed line by line - a result that reports every untouched file is
+    noise. The machine-readable surface (:func:`outcomes_as_json`) keeps
+    full per-item fidelity, so the JSON still carries every record.
+
+    Consumes the same :class:`OutcomeItem` list as
     :func:`outcomes_as_json`; the text and JSON surfaces therefore share
     one taxonomy and one aggregate and cannot drift apart.
 
@@ -177,6 +183,8 @@ def render_outcomes(items: Sequence[OutcomeItem], *, title: str = "Result") -> N
     console.print(f"[bold]{title}[/bold]")
 
     for item in items:
+        if item.outcome is Outcome.UNCHANGED:
+            continue
         glyph, colour = OUTCOME_STYLE[item.outcome]
         detail = f" [dim]{item.detail}[/dim]" if item.detail else ""
         console.print(f"  [{colour}]{glyph}[/{colour}] {item.name}{detail}")
