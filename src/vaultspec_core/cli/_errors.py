@@ -7,16 +7,31 @@ CLI error exits with optional hint messages.
 import typer
 
 
-def handle_error(exc: Exception) -> None:
-    """Convert a domain or OS exception to a CLI error exit."""
+def handle_error(exc: Exception, *, json_output: bool = False) -> None:
+    """Convert a domain or OS exception to a CLI error exit.
+
+    Args:
+        exc: The caught exception. :class:`VaultSpecError` and
+            :class:`OSError` exit with code 1; anything else re-raises.
+        json_output: When ``True``, emit a machine-readable
+            ``{"status": "error", "message": ...}`` envelope to stdout
+            instead of a plain-text ``Error:`` line on stderr, so a
+            ``--json`` consumer can parse failures, not just exit codes.
+    """
     from vaultspec_core.core.exceptions import VaultSpecError
 
-    if isinstance(exc, VaultSpecError):
-        typer.echo(f"Error: {exc}", err=True)
-        if exc.hint:
-            typer.echo(f"  Hint: {exc.hint}", err=True)
-        raise typer.Exit(code=1) from exc
-    if isinstance(exc, OSError):
-        typer.echo(f"Error: {exc}", err=True)
+    if isinstance(exc, (VaultSpecError, OSError)):
+        hint = getattr(exc, "hint", None)
+        if json_output:
+            import json
+
+            payload: dict[str, str] = {"status": "error", "message": str(exc)}
+            if hint:
+                payload["hint"] = hint
+            print(json.dumps(payload, indent=2))
+        else:
+            typer.echo(f"Error: {exc}", err=True)
+            if hint:
+                typer.echo(f"  Hint: {hint}", err=True)
         raise typer.Exit(code=1) from exc
     raise exc

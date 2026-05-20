@@ -47,6 +47,20 @@ class TestSyncValidation:
         )
         assert result.exit_code != 0
 
+    def test_sync_unknown_provider_json_emits_error_envelope(
+        self, runner, synthetic_project
+    ):
+        """Under --json a failure must be a parseable error envelope,
+        not a plain-text line a JSON consumer cannot read."""
+        result = runner.invoke(
+            app,
+            ["--target", str(synthetic_project), "sync", "nonexistent", "--json"],
+        )
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["status"] == "error"
+        assert "nonexistent" in payload["message"]
+
     def test_sync_help_shows_providers(self, runner):
         """--help should list available providers."""
         result = runner.invoke(app, ["sync", "--help"])

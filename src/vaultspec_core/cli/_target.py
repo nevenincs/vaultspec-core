@@ -99,7 +99,12 @@ def _resolve_framework_root(effective_target: Path | None) -> Path | None:
     return None
 
 
-def apply_target(target: Path | None, *, split_source: bool = False) -> None:
+def apply_target(
+    target: Path | None,
+    *,
+    split_source: bool = False,
+    json_output: bool = False,
+) -> None:
     """Initialize workspace from the effective target.
 
     Priority: *target* (subcommand) > :func:`set_root_target` > cwd.
@@ -113,6 +118,9 @@ def apply_target(target: Path | None, *, split_source: bool = False) -> None:
             correct model for ``sync``  - like ``rsync src/ dest/``.  Other
             commands (``spec add``, ``spec list``) operate on a single
             workspace, so they leave this ``False``.
+        json_output: When ``True``, a workspace-resolution failure is
+            emitted as a ``{"status": "error", ...}`` JSON envelope on
+            stdout instead of a plain-text ``Error:`` line on stderr.
 
     Idempotent  - if the workspace was already initialized with the same
     effective target, this is a no-op.
@@ -137,7 +145,12 @@ def apply_target(target: Path | None, *, split_source: bool = False) -> None:
         init_paths(layout)
         _workspace_initialized = True
     except WorkspaceError as e:
-        typer.echo(f"Error: {e}", err=True)
+        if json_output:
+            import json
+
+            print(json.dumps({"status": "error", "message": str(e)}, indent=2))
+        else:
+            typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(code=1) from e
 
 

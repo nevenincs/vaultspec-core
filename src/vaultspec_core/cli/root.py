@@ -299,12 +299,9 @@ def cmd_install(
             skip=set(skip),
             dev=dev,
         )
-    except VaultSpecError as exc:
-        _handle_error(exc)
+    except (VaultSpecError, OSError) as exc:
+        _handle_error(exc, json_output=json_output)
         return  # unreachable, but satisfies type checker
-    except OSError as exc:
-        typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(code=1) from None
 
     # The upgrade path re-seeds bundled builtins. Per the
     # cli-sync-vocabulary ADR it reports per-builtin canonical outcomes
@@ -460,12 +457,9 @@ def cmd_uninstall(
             skip=set(skip),
             dev=dev,
         )
-    except VaultSpecError as exc:
-        _handle_error(exc)
+    except (VaultSpecError, OSError) as exc:
+        _handle_error(exc, json_output=json_output)
         return
-    except OSError as exc:
-        typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(code=1) from None
 
     if json_output:
         import json
@@ -555,7 +549,7 @@ def cmd_sync(
     Use --dev to operate inside the vaultspec-core source repo or worktree.
     """
     skip = list(skip or [])
-    apply_target(target, split_source=True)
+    apply_target(target, split_source=True, json_output=json_output)
     if provider == "core":
         typer.echo(
             "Error: 'core' is not a valid sync target. "
@@ -591,12 +585,9 @@ def cmd_sync(
         results = sync_provider(
             provider, dry_run=dry_run, force=force, skip=set(skip), dev=dev
         )
-    except VaultSpecError as exc:
-        _handle_error(exc)
+    except (VaultSpecError, OSError) as exc:
+        _handle_error(exc, json_output=json_output)
         return
-    except OSError as exc:
-        typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(code=1) from None
 
     from vaultspec_core.console import get_console
 
