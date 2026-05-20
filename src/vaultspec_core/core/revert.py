@@ -94,21 +94,35 @@ def revert_resource(vaultspec_dir: Path, category: str, filename: str) -> dict:
     Args:
         vaultspec_dir: The .vaultspec directory.
         category: Subdirectory under rules/ (e.g., "rules", "skills", "agents").
-        filename: The resource filename (must end in .builtin.md).
+        filename: The resource name. A bare name or a ``.builtin`` stem is
+            resolved to its canonical ``.builtin.md`` form; a name already
+            ending in ``.md`` is left as given (so a custom resource still
+            fails the builtin guard).
 
     Returns:
-        Dict with "reverted" (bool) and "reason" (str).
+        Dict with "reverted" (bool), "filename" (the resolved name), and
+        "reason" (str).
     """
+    # Resolve a bare name to the canonical builtin filename. A name that
+    # already ends in .md is a fully-qualified resource and is left alone.
+    if not filename.endswith(".md"):
+        filename += ".md" if filename.endswith(".builtin") else ".builtin.md"
+
     if not is_builtin(filename):
         return {
             "reverted": False,
-            "reason": "Not a builtin resource. Only .builtin.md files can be reverted.",
+            "filename": filename,
+            "reason": (
+                f"'{filename}' is not a builtin resource; "
+                "only *.builtin.md files can be reverted."
+            ),
         }
 
     original = get_snapshot_content(vaultspec_dir, category, filename)
     if original is None:
         return {
             "reverted": False,
+            "filename": filename,
             "reason": f"No snapshot found for {category}/{filename}. Was install run?",
         }
 
@@ -116,7 +130,11 @@ def revert_resource(vaultspec_dir: Path, category: str, filename: str) -> dict:
     target.parent.mkdir(parents=True, exist_ok=True)
     atomic_write(target, original)
     logger.info("Reverted %s/%s to snapshot original.", category, filename)
-    return {"reverted": True, "reason": "Restored to install snapshot."}
+    return {
+        "reverted": True,
+        "filename": filename,
+        "reason": "Restored to install snapshot.",
+    }
 
 
 def list_modified_builtins(vaultspec_dir: Path) -> list[dict]:

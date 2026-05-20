@@ -95,6 +95,43 @@ def _resource_path(base_dir: Path, name: str, *, suffix: str = ".md") -> Path:
     return base_dir / filename
 
 
+def _revert_resource_command(
+    *, category: str, label: str, filename: str, json_output: bool
+) -> None:
+    """Shared body for ``spec {rules,skills,agents} revert``.
+
+    Bare-name resolution to the canonical ``.builtin.md`` form is handled
+    by :func:`~vaultspec_core.core.revert.revert_resource`. Always raises
+    :class:`typer.Exit` - code 0 on success, 1 on failure - and honours
+    ``--json`` on both paths.
+    """
+    from vaultspec_core.core.revert import revert_resource
+    from vaultspec_core.core.types import get_context
+
+    vaultspec_dir = get_context().target_dir / ".vaultspec"
+    result = revert_resource(vaultspec_dir, category, filename)
+    reverted = bool(result.get("reverted"))
+    resolved = str(result.get("filename", filename))
+    reason = str(result.get("reason", "revert failed"))
+
+    if json_output:
+        import json
+
+        payload: dict[str, str] = (
+            {"status": "reverted", "name": resolved}
+            if reverted
+            else {"status": "error", "message": reason}
+        )
+        typer.echo(json.dumps(payload, indent=2))
+        raise typer.Exit(0 if reverted else 1)
+
+    if reverted:
+        typer.echo(f"Reverted {label}: {resolved}")
+        raise typer.Exit(0)
+    typer.echo(reason, err=True)
+    raise typer.Exit(code=1)
+
+
 spec_app = typer.Typer(
     help=(
         "Manage framework resources: rules, skills, agents, system prompts, hooks, "
@@ -329,30 +366,15 @@ def cmd_rules_sync(
 
 @rules_app.command("revert")
 def cmd_rules_revert(
-    filename: Annotated[str, typer.Argument(help="Rule filename to revert")],
+    filename: Annotated[str, typer.Argument(help="Rule name or filename to revert")],
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Revert a rule to its snapshotted original."""
     apply_target(target)
-    from vaultspec_core.core.revert import revert_resource
-    from vaultspec_core.core.types import get_context
-
-    vaultspec_dir = get_context().target_dir / ".vaultspec"
-    if not filename.endswith(".md"):
-        filename = f"{filename}.md"
-    result = revert_resource(vaultspec_dir, "rules", filename)
-    if result.get("reverted"):
-        if json_output:
-            import json
-
-            typer.echo(json.dumps({"reverted": filename}, indent=2))
-            raise typer.Exit(0)
-        typer.echo(f"Reverted rule: {filename}")
-    else:
-        msg = result.get("reason", f"No snapshot found for rule: {filename}")
-        typer.echo(msg, err=True)
-        raise typer.Exit(code=1)
+    _revert_resource_command(
+        category="rules", label="rule", filename=filename, json_output=json_output
+    )
 
 
 # =============================================================================
@@ -598,30 +620,15 @@ def cmd_skills_sync(
 
 @skills_app.command("revert")
 def cmd_skills_revert(
-    filename: Annotated[str, typer.Argument(help="Skill filename to revert")],
+    filename: Annotated[str, typer.Argument(help="Skill name or filename to revert")],
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Revert a skill to its snapshotted original."""
     apply_target(target)
-    from vaultspec_core.core.revert import revert_resource
-    from vaultspec_core.core.types import get_context
-
-    vaultspec_dir = get_context().target_dir / ".vaultspec"
-    if not filename.endswith(".md"):
-        filename = f"{filename}.md"
-    result = revert_resource(vaultspec_dir, "skills", filename)
-    if result.get("reverted"):
-        if json_output:
-            import json
-
-            typer.echo(json.dumps({"reverted": filename}, indent=2))
-            raise typer.Exit(0)
-        typer.echo(f"Reverted skill: {filename}")
-    else:
-        msg = result.get("reason", f"No snapshot found for skill: {filename}")
-        typer.echo(msg, err=True)
-        raise typer.Exit(code=1)
+    _revert_resource_command(
+        category="skills", label="skill", filename=filename, json_output=json_output
+    )
 
 
 # =============================================================================
@@ -856,30 +863,15 @@ def cmd_agents_sync(
 
 @agents_app.command("revert")
 def cmd_agents_revert(
-    filename: Annotated[str, typer.Argument(help="Agent filename to revert")],
+    filename: Annotated[str, typer.Argument(help="Agent name or filename to revert")],
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Revert an agent to its snapshotted original."""
     apply_target(target)
-    from vaultspec_core.core.revert import revert_resource
-    from vaultspec_core.core.types import get_context
-
-    vaultspec_dir = get_context().target_dir / ".vaultspec"
-    if not filename.endswith(".md"):
-        filename = f"{filename}.md"
-    result = revert_resource(vaultspec_dir, "agents", filename)
-    if result.get("reverted"):
-        if json_output:
-            import json
-
-            typer.echo(json.dumps({"reverted": filename}, indent=2))
-            raise typer.Exit(0)
-        typer.echo(f"Reverted agent: {filename}")
-    else:
-        msg = result.get("reason", f"No snapshot found for agent: {filename}")
-        typer.echo(msg, err=True)
-        raise typer.Exit(code=1)
+    _revert_resource_command(
+        category="agents", label="agent", filename=filename, json_output=json_output
+    )
 
 
 # =============================================================================
