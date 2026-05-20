@@ -271,35 +271,3 @@ class ExecutionProvider(abc.ABC):
         if rules.strip():
             parts.append(f"# SYSTEM RULES & CONTEXT\n{rules}")
         return "\n\n".join(parts)
-
-    def _validate_include_dirs(
-        self,
-        include_dirs: str,
-        root_dir: pathlib.Path,
-    ) -> list[str]:
-        """Validate a comma-separated list of include directories for path traversal.
-
-        Each directory is resolved relative to ``root_dir`` and kept only if the
-        resolved path stays within ``root_dir``.
-
-        Args:
-            include_dirs: Comma-separated directory paths (relative to root).
-            root_dir: Workspace root used as the security boundary.
-
-        Returns:
-            List of validated directory strings that are safe to pass to the model.
-        """
-        validated: list[str] = []
-        for d in (x.strip() for x in include_dirs.split(",") if x.strip()):
-            try:
-                resolved = (root_dir / d).resolve()
-                if resolved.is_relative_to(root_dir.resolve()):
-                    validated.append(d)
-                else:
-                    logger.warning(
-                        "include_dirs path '%s' rejected: outside workspace root",
-                        d,
-                    )
-            except (ValueError, OSError) as exc:
-                logger.warning("include_dirs path '%s' rejected: %s", d, exc)
-        return validated

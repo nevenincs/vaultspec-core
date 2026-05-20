@@ -134,10 +134,6 @@ class TestProviderAPIParity:
         ):
             assert method in abstracts
 
-    def test_validate_include_dirs_on_base(self):
-        """Base class provides _validate_include_dirs."""
-        assert hasattr(ExecutionProvider, "_validate_include_dirs")
-
 
 class TestClaudeSystemPrompt:
     """Verify Claude provider system prompt methods."""
@@ -178,25 +174,3 @@ class TestClaudeSystemPrompt:
         prompt = provider.construct_system_prompt("persona", "rules", "")
         assert "SYSTEM INSTRUCTIONS" not in prompt
         assert "INSTRUCTIONS" in prompt
-
-
-class TestValidateIncludeDirsBase:
-    """Verify _validate_include_dirs on base class."""
-
-    def test_valid_dirs_accepted(self, tmp_path):
-        (tmp_path / ".vault").mkdir()
-        (tmp_path / "src").mkdir()
-        provider = ClaudeProvider()
-        result = provider._validate_include_dirs(".vault, src", tmp_path)
-        assert ".vault" in result
-        assert "src" in result
-
-    def test_traversal_rejected(self, tmp_path):
-        provider = ClaudeProvider()
-        result = provider._validate_include_dirs("../outside", tmp_path)
-        assert result == []
-
-    def test_empty_string(self, tmp_path):
-        provider = ClaudeProvider()
-        result = provider._validate_include_dirs("", tmp_path)
-        assert result == []
