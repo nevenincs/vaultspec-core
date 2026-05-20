@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from vaultspec_core.plan.commands._anchors import resolve_exactly_one_anchor
 from vaultspec_core.plan.commands._errors import PlanCommandError
 from vaultspec_core.plan.frontmatter import Tier
 from vaultspec_core.plan.identifiers import (
@@ -69,17 +70,9 @@ def insert_wave(
 ) -> Wave:
     """Place a Wave at a named document position relative to an anchor."""
     _require_wave_supporting_tier(plan)
-    if before is None and after is None:
-        msg = "insert_wave requires either --before or --after"
-        raise AddWaveError(msg)
-    if before is not None and after is not None:
-        msg = "insert_wave accepts at most one of --before / --after"
-        raise AddWaveError(msg)
-
-    anchor_id = before if before is not None else after
-    if anchor_id is None:
-        msg = "insert_wave received None anchor after exactly-one validation"
-        raise AddWaveError(msg)
+    anchor_id = resolve_exactly_one_anchor(
+        before, after, op="insert_wave", error=AddWaveError
+    )
 
     anchor_index = next(
         (i for i, wave in enumerate(plan.waves) if wave.canonical_id == anchor_id),
@@ -149,17 +142,9 @@ def move_wave(
     Phase and Step display paths are recomputed against the new
     position.
     """
-    if before is None and after is None:
-        msg = "move_wave requires either --before or --after"
-        raise MoveWaveError(msg)
-    if before is not None and after is not None:
-        msg = "move_wave accepts at most one of --before / --after"
-        raise MoveWaveError(msg)
-
-    anchor_id = before if before is not None else after
-    if anchor_id is None:
-        msg = "move_wave received None anchor after exactly-one validation"
-        raise MoveWaveError(msg)
+    anchor_id = resolve_exactly_one_anchor(
+        before, after, op="move_wave", error=MoveWaveError
+    )
     if anchor_id == wave_id:
         msg = (
             f"cannot move Wave {wave_id!r} relative to itself; "

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from vaultspec_core.plan.commands._anchors import resolve_exactly_one_anchor
 from vaultspec_core.plan.commands._errors import PlanCommandError
 from vaultspec_core.plan.display_path import phase_display_path
 from vaultspec_core.plan.frontmatter import Tier
@@ -385,17 +386,9 @@ def insert_phase(
     after: str | None = None,
 ) -> Phase:
     """Place a Phase at a named document position; parent inferred from anchor."""
-    if before is None and after is None:
-        msg = "insert_phase requires either --before or --after"
-        raise AddPhaseError(msg)
-    if before is not None and after is not None:
-        msg = "insert_phase accepts at most one of --before / --after"
-        raise AddPhaseError(msg)
-
-    anchor_id = before if before is not None else after
-    if anchor_id is None:
-        msg = "insert_phase received None anchor after exactly-one validation"
-        raise AddPhaseError(msg)
+    anchor_id = resolve_exactly_one_anchor(
+        before, after, op="insert_phase", error=AddPhaseError
+    )
     anchor_wave, anchor_index = _locate_phase(plan, anchor_id)
     suffix_base = _phase_suffix_base(
         plan,

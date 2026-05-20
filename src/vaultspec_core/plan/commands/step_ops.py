@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from vaultspec_core.plan.commands._anchors import resolve_exactly_one_anchor
 from vaultspec_core.plan.commands._errors import PlanCommandError
 from vaultspec_core.plan.display_path import step_display_path
 from vaultspec_core.plan.frontmatter import Tier
@@ -145,17 +146,9 @@ def insert_step(
         AddStepError: When neither or both of ``before`` / ``after``
             are supplied, or the anchor identifier is not in ``plan``.
     """
-    if before is None and after is None:
-        msg = "insert_step requires either --before or --after"
-        raise AddStepError(msg)
-    if before is not None and after is not None:
-        msg = "insert_step accepts at most one of --before / --after"
-        raise AddStepError(msg)
-
-    anchor_id = before if before is not None else after
-    if anchor_id is None:
-        msg = "insert_step received None anchor after exactly-one validation"
-        raise AddStepError(msg)
+    anchor_id = resolve_exactly_one_anchor(
+        before, after, op="insert_step", error=AddStepError
+    )
     anchor_phase, anchor_index = _locate_step_in_phase(plan, anchor_id)
     anchor_step = find_step(plan, anchor_id)
     canonical_id = next_available_step(plan)
