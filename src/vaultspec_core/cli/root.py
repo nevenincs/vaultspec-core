@@ -721,13 +721,18 @@ def cmd_sync(
                 console.print(f"    [red]x[/red] {err}")
             raise typer.Exit(code=1)
 
-        # Warn if sync produced 0 files
+        # Warn only when sync genuinely found nothing to project: no
+        # changes, no skips, and no files already in place. Counting
+        # unchanged files keeps the warning from firing on a healthy
+        # re-sync where every destination already matches its source.
         total_changes = sum(r.added + r.updated for r in results)
         total_skipped = sum(r.skipped for r in results)
+        total_unchanged = sum(r.unchanged for r in results)
         if (
             active_names
             and total_changes == 0
             and total_skipped == 0
+            and total_unchanged == 0
             and not all_warnings
         ):
             console.print(
