@@ -45,20 +45,26 @@ def _builtins_root() -> Path:
     return pkg_dir
 
 
-def seed_builtins(target_rules_dir: Path, *, force: bool = False) -> list[str]:
+def seed_builtins(
+    target_rules_dir: Path, *, force: bool = False
+) -> list[tuple[str, str]]:
     """Copy bundled builtins into a target ``.vaultspec/rules/`` directory.
 
-    Only copies files that don't already exist unless *force* is True.
+    Files that already exist are left untouched unless *force* is True.
 
     Args:
         target_rules_dir: The ``.vaultspec/rules/`` directory to populate.
         force: Overwrite existing files.
 
     Returns:
-        List of relative paths (forward-slash separated) that were written.
+        List of ``(relative_path, action)`` pairs for every builtin the
+        call acted on, where ``action`` is ``[ADD]`` (newly written),
+        ``[UPDATE]`` (overwritten with changed content) or
+        ``[UNCHANGED]`` (already current). Builtins skipped because they
+        exist and *force* is False are omitted.
     """
     src = _builtins_root()
-    written: list[str] = []
+    results: list[tuple[str, str]] = []
 
     # Walk the bundled builtins tree
     for src_file in sorted(src.rglob("*")):
@@ -72,19 +78,37 @@ def seed_builtins(target_rules_dir: Path, *, force: bool = False) -> list[str]:
 
         rel = src_file.relative_to(src)
         dest = target_rules_dir / rel
+        rel_str = str(rel).replace("\\", "/")
 
         if dest.exists() and not force:
             continue
 
         try:
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src_file, dest)
+            src_bytes = src_file.read_bytes()
         except OSError as exc:
-            logger.warning("Failed to seed %s: %s", rel, exc)
+            logger.warning("Failed to read builtin %s: %s", rel, exc)
             continue
-        written.append(str(rel).replace("\\", "/"))
 
-    return written
+        if not dest.exists():
+            action = "[ADD]"
+        else:
+            try:
+                action = (
+                    "[UNCHANGED]" if dest.read_bytes() == src_bytes else "[UPDATE]"
+                )
+            except OSError:
+                action = "[UPDATE]"
+
+        if action != "[UNCHANGED]":
+            try:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src_file, dest)
+            except OSError as exc:
+                logger.warning("Failed to seed %s: %s", rel, exc)
+                continue
+        results.append((rel_str, action))
+
+    return results
 
 
 def list_builtins() -> list[str]:

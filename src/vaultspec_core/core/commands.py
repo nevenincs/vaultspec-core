@@ -723,7 +723,7 @@ def init_run(
 
         rules_dir = fw_dir / "rules"
         seeded = seed_builtins(rules_dir, force=force)
-        for rel in seeded:
+        for rel, _action in seeded:
             created.append((f".vaultspec/rules/{rel}", "builtin"))
 
         # Snapshot builtins for revert support
@@ -840,8 +840,8 @@ def install_run(
     Returns:
         A dict describing the result:
         - ``"action"``: ``"dry_run"``, ``"upgrade"``, or ``"install"``
-        - ``"items"``: list of ``(path, label)`` tuples (for dry_run)
-        - ``"seeded_count"``: number of re-seeded files (for upgrade)
+        - ``"items"``: list of ``(path, label)`` tuples (for dry_run);
+          list of ``(builtin_path, action)`` tuples (for upgrade)
 
     Raises:
         ProviderError: If *provider* is invalid.
@@ -935,7 +935,7 @@ def install_run(
                 hint=f"Run 'vaultspec-core install {path}' first.",
             ) from e
 
-        seeded: list[str] = []
+        seeded: list[tuple[str, str]] = []
         if not skip_core:
             # Re-seed builtins (force=True overwrites existing)
             from vaultspec_core.builtins import seed_builtins
@@ -1001,7 +1001,7 @@ def install_run(
         # every subsequent run.
         _untrack_managed_paths(path, get_recommended_entries(path, dev=dev))
 
-        return {"action": "upgrade", "seeded_count": len(seeded), "path": path}
+        return {"action": "upgrade", "items": seeded, "path": path}
 
     fw_dir = path / ".vaultspec"
     if fw_dir.exists() and not force and not skip_core:

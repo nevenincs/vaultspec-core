@@ -302,17 +302,38 @@ def cmd_install(
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from None
 
+    # The upgrade path re-seeds bundled builtins. Per the
+    # cli-sync-vocabulary ADR it reports per-builtin canonical outcomes
+    # (created/updated/unchanged) through the shared renderer instead of
+    # the old "Re-seeded N / Upgrade complete" wording.
+    if result["action"] == "upgrade":
+        from vaultspec_core.cli.rendering import (
+            Outcome,
+            OutcomeItem,
+            emit_outcomes,
+        )
+
+        action_map = {
+            "[ADD]": Outcome.CREATED,
+            "[UPDATE]": Outcome.UPDATED,
+            "[UNCHANGED]": Outcome.UNCHANGED,
+        }
+        outcomes = [
+            OutcomeItem(name=rel, outcome=action_map.get(action, Outcome.UPDATED))
+            for rel, action in result["items"]
+        ]
+        raise typer.Exit(
+            emit_outcomes(
+                outcomes, title=f"Upgrade → {path}", json_output=json_output
+            )
+        )
+
     if json_output:
         import json
 
         result["path"] = str(result["path"])
         typer.echo(json.dumps(result, indent=2, default=str))
         raise typer.Exit(0)
-
-    # Render result
-    from vaultspec_core.console import get_console
-
-    console = get_console()
 
     if result["action"] == "dry_run":
         from vaultspec_core.cli.rendering import render_dry_run_tree
@@ -333,12 +354,6 @@ def cmd_install(
             for rel, label in items
         ]
         render_dry_run_tree(dry_items, title=f"Install preview → {path}")
-    elif result["action"] == "upgrade":
-        console.print(f"[bold]Upgraded vaultspec framework at {path}[/bold]")
-        seeded = result.get("seeded_count", 0)
-        if seeded:
-            console.print(f"  Re-seeded [bold]{seeded}[/bold] builtin files.")
-        console.print("[bold green]Upgrade complete.[/bold green]")
     else:
         from vaultspec_core.cli.rendering import render_install_summary
 
