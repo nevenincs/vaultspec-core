@@ -106,7 +106,12 @@ def cmd_status(
     status = collect_status(plan)
 
     if json_output:
-        typer.echo(json.dumps(status_to_json_dict(status), indent=2))
+        from vaultspec_core.cli.rendering import json_envelope
+
+        envelope = json_envelope(
+            "vault.plan.status", "unchanged", status_to_json_dict(status)
+        )
+        typer.echo(json.dumps(envelope, indent=2))
         return
 
     typer.echo(f"Plan: {path}")
@@ -153,7 +158,9 @@ def cmd_check(
     findings = collect_all(plan, text)
 
     if json_output:
-        payload = [
+        from vaultspec_core.cli.rendering import json_envelope
+
+        findings_data = [
             {
                 "code": f.code,
                 "severity": f.severity.value,
@@ -164,7 +171,11 @@ def cmd_check(
             }
             for f in findings
         ]
-        typer.echo(json.dumps(payload, indent=2))
+        status = "failed" if has_errors(findings) else "unchanged"
+        envelope = json_envelope(
+            "vault.plan.check", status, {"findings": findings_data}
+        )
+        typer.echo(json.dumps(envelope, indent=2))
     else:
         for finding in findings:
             typer.echo(
@@ -216,6 +227,8 @@ def cmd_query(
         ),
     )
     if json_output:
+        from vaultspec_core.cli.rendering import json_envelope
+
         payload = {
             "matched": len(result.matched),
             "total": result.total,
@@ -229,7 +242,11 @@ def cmd_query(
                 for step in result.matched
             ],
         }
-        typer.echo(json.dumps(payload, indent=2))
+        typer.echo(
+            json.dumps(
+                json_envelope("vault.plan.query", "unchanged", payload), indent=2
+            )
+        )
         return
     typer.echo(f"Matched {len(result.matched)} of {result.total} Steps:")
     for step in result.matched:
@@ -733,7 +750,14 @@ def cmd_tier_show(
     plan = parse_plan(path)
     tier = current_tier(plan).value
     if json_output:
-        typer.echo(json.dumps({"tier": tier}, indent=2))
+        from vaultspec_core.cli.rendering import json_envelope
+
+        typer.echo(
+            json.dumps(
+                json_envelope("vault.plan.tier.show", "unchanged", {"tier": tier}),
+                indent=2,
+            )
+        )
         return
     typer.echo(tier)
 

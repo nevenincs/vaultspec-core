@@ -50,7 +50,10 @@ def test_status_json_output_is_valid_json(tmp_path, runner: CliRunner) -> None:
     result = runner.invoke(app, ["vault", "plan", "status", str(plan_path), "--json"])
 
     assert result.exit_code == 0
-    payload = json.loads(result.stdout)
+    envelope = json.loads(result.stdout)
+    assert envelope["schema"] == "vaultspec.vault.plan.status.v1"
+    assert envelope["status"] == "unchanged"
+    payload = envelope["data"]
     assert payload["tier"] == "L3"
     assert payload["wave_count"] == 1
 
@@ -147,7 +150,7 @@ def test_query_json_emits_parseable_payload(tmp_path, runner: CliRunner) -> None
     )
 
     assert result.exit_code == 0
-    payload = json.loads(result.stdout)
+    payload = json.loads(result.stdout)["data"]
     assert payload["matched"] == 3
     assert payload["total"] == 4
     assert len(payload["steps"]) == 3
@@ -172,7 +175,9 @@ def test_tier_show_reports_canonical_tier(tmp_path, runner: CliRunner) -> None:
     assert json_result.exit_code == 0
     import json
 
-    assert json.loads(json_result.stdout) == {"tier": "L4"}
+    envelope = json.loads(json_result.stdout)
+    assert envelope["schema"] == "vaultspec.vault.plan.tier.show.v1"
+    assert envelope["data"] == {"tier": "L4"}
 
 
 def test_help_lists_plan_subcommands(runner: CliRunner) -> None:
