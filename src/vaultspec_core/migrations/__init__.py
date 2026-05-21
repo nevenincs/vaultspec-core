@@ -166,8 +166,9 @@ def _build_registry() -> list[Migration]:
     cheap to import in code paths that never run migrations.
     """
     from .m_0_1_17_index_subfolder import MIGRATION as M_INDEX_SUBFOLDER
+    from .m_0_1_20_gitignore_reversal import MIGRATION as M_GITIGNORE_REVERSAL
 
-    entries: list[Migration] = [M_INDEX_SUBFOLDER]
+    entries: list[Migration] = [M_INDEX_SUBFOLDER, M_GITIGNORE_REVERSAL]
     return sorted(entries, key=lambda m: parse_version_tuple(m.target_version))
 
 

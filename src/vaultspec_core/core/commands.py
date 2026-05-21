@@ -70,6 +70,22 @@ def _stamp_manifest_version_no_downgrade(mdata: ManifestData) -> None:
         mdata.vaultspec_version = running
 
 
+def _fresh_install_schema_version() -> str:
+    """Return the manifest version a freshly-installed workspace conforms to.
+
+    A fresh install writes the current on-disk schema, so it must not
+    leave any registered migration pending. When a migration targets a
+    version above the running package - the normal state while a schema
+    change and its migration ship together, before the release that
+    carries them - the fresh manifest is stamped at that target so the
+    migration is correctly seen as already satisfied.
+    """
+    from ..migrations import REGISTRY
+
+    candidates = [package_version(), *(m.target_version for m in REGISTRY)]
+    return max(candidates, key=parse_version_tuple)
+
+
 # Valid provider arguments for install/uninstall commands.
 VALID_PROVIDERS = {"all", "core", "claude", "gemini", "antigravity", "codex"}
 
@@ -1101,7 +1117,7 @@ def install_run(
         PrecommitSignal.NO_HOOKS,
     )
 
-    mdata.vaultspec_version = package_version()
+    mdata.vaultspec_version = _fresh_install_schema_version()
     mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
     for name in provider_names:
         mdata.provider_state.setdefault(name, {})
