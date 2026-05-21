@@ -194,7 +194,6 @@ src/vaultspec_core/builtins/*
 !src/vaultspec_core/builtins/__init__.py
 
 # >>> vaultspec-managed (do not edit this block) >>>
-.mcp.json
 .vault/.obsidian/
 .vault/.trash/
 .vault/data/
@@ -203,6 +202,5 @@ src/vaultspec_core/builtins/*
 .vaultspec/_snapshots/
 .vaultspec/providers.json
 /.gitignore.lock
-/.mcp.json.lock
 /.pre-commit-config.yaml.lock
 # <<< vaultspec-managed <<<
