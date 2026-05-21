@@ -149,6 +149,18 @@ class TestArchiveFeature:
         assert result["archived_count"] == 0
         assert result["paths"] == []
 
+    @pytest.mark.parametrize("empty_tag", ["", "   ", "#", " # "])
+    def test_archive_empty_tag_refuses(self, tmp_path, empty_tag):
+        """An empty/whitespace feature tag must be rejected, never treated
+        as a wildcard that archives every document in the vault."""
+        from ...core.exceptions import VaultSpecError
+        from ..query import archive_feature
+
+        (tmp_path / ".vault" / "adr").mkdir(parents=True)
+
+        with pytest.raises(VaultSpecError, match="feature tag is required"):
+            archive_feature(tmp_path, empty_tag)
+
     def test_archive_preserves_subdir_structure(self, tmp_path):
         """Archived docs maintain their type subdirectory."""
         from ..query import archive_feature

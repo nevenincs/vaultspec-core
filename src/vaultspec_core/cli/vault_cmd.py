@@ -1261,10 +1261,15 @@ def cmd_feature_archive(
     """Archive all documents for a feature tag."""
     apply_target(target)
     from vaultspec_core.console import get_console
+    from vaultspec_core.core.exceptions import VaultSpecError
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.query import archive_feature
 
-    result = archive_feature(_get_ctx().target_dir, feature_tag)
+    try:
+        result = archive_feature(_get_ctx().target_dir, feature_tag)
+    except (VaultSpecError, OSError) as exc:
+        _handle_error(exc, json_output=json_output)
+        return
     console = get_console()
     if json_output:
         import json

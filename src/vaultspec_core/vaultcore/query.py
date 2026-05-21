@@ -309,12 +309,19 @@ def archive_feature(root_dir: Path, feature: str) -> dict:
     import shutil
 
     from ..config import get_config
+    from ..core.exceptions import VaultSpecError
+
+    feature = feature.strip().lstrip("#").strip()
+    if not feature:
+        raise VaultSpecError(
+            "A feature tag is required to archive. Refusing to run with an "
+            "empty tag, which would match and archive every document.",
+        )
 
     cfg = get_config()
     vault_dir = root_dir / cfg.docs_dir
     archive_dir = vault_dir / "_archive"
 
-    feature = feature.lstrip("#")
     docs = list_documents(root_dir, feature=feature)
 
     if not docs:
