@@ -15,8 +15,9 @@ These tests pin the new contract:
 - ``get_recommended_entries(target, dev=True)`` switches to the source
   shape (omits ``.vaultspec/``, retains the truly-generated children).
 - The Typer commands ``install``, ``uninstall``, and ``sync`` accept a
-  ``--dev`` flag, surface it in ``--help`` output, and the CLI source
-  no longer references the dropped env-var bypass.
+  ``--dev`` flag that is hidden from ``--help`` (a developer-only flag,
+  per the cli-paper-cuts ADR) yet still callable, and the CLI source no
+  longer references the dropped env-var bypass.
 """
 
 from __future__ import annotations
@@ -114,7 +115,8 @@ class TestRecommendedEntriesShape:
 
 
 class TestCliSurface:
-    """The Typer commands must expose ``--dev`` and not the env var."""
+    """``--dev`` is a hidden developer flag: absent from ``--help``,
+    still accepted by the parser; the env-var bypass is gone."""
 
     def _help_for(self, command: str) -> str:
         result = subprocess.run(
@@ -126,17 +128,29 @@ class TestCliSurface:
         )
         return result.stdout + result.stderr
 
-    def test_install_help_lists_dev_flag(self) -> None:
-        out = self._help_for("install")
-        assert re.search(r"--dev\b", out), out
+    def _dev_flag_accepted(self, command: str) -> bool:
+        """True when the parser accepts ``--dev`` (hidden, not unknown)."""
+        result = subprocess.run(
+            [sys.executable, "-m", "vaultspec_core", command, "--dev", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        return result.returncode == 0 and "No such option" not in (
+            result.stdout + result.stderr
+        )
 
-    def test_uninstall_help_lists_dev_flag(self) -> None:
-        out = self._help_for("uninstall")
-        assert re.search(r"--dev\b", out), out
+    def test_install_hides_but_accepts_dev_flag(self) -> None:
+        assert not re.search(r"--dev\b", self._help_for("install"))
+        assert self._dev_flag_accepted("install")
 
-    def test_sync_help_lists_dev_flag(self) -> None:
-        out = self._help_for("sync")
-        assert re.search(r"--dev\b", out), out
+    def test_uninstall_hides_but_accepts_dev_flag(self) -> None:
+        assert not re.search(r"--dev\b", self._help_for("uninstall"))
+        assert self._dev_flag_accepted("uninstall")
+
+    def test_sync_hides_but_accepts_dev_flag(self) -> None:
+        assert not re.search(r"--dev\b", self._help_for("sync"))
+        assert self._dev_flag_accepted("sync")
 
     def test_cli_source_does_not_reference_env_var(self) -> None:
         import pathlib
