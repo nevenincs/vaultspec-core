@@ -1,7 +1,6 @@
 """Vault command group  - create, query, graph, check, and audit ``.vault/`` records.
 
-Sub-groups: ``vaultspec-core vault feature`` (:data:`feature_app`),
-``vaultspec-core vault graph`` (:data:`graph_app`), and
+Sub-groups: ``vaultspec-core vault feature`` (:data:`feature_app`) and
 ``vaultspec-core vault check`` (:data:`check_app`). Delegates to
 :mod:`vaultspec_core.vaultcore.query`, :mod:`vaultspec_core.vaultcore.hydration`,
 :mod:`vaultspec_core.vaultcore.checks`, and :mod:`vaultspec_core.graph` for
@@ -35,12 +34,6 @@ feature_app = typer.Typer(
     no_args_is_help=True,
 )
 vault_app.add_typer(feature_app, name="feature")
-
-graph_app = typer.Typer(
-    help="Visualise and export the vault document graph.",
-    invoke_without_command=True,
-)
-vault_app.add_typer(graph_app, name="graph")
 
 check_app = typer.Typer(
     help="Run vault health checks with optional auto-fix.",
@@ -441,9 +434,8 @@ def cmd_list(
 # ---- vault graph ------------------------------------------------------------
 
 
-@graph_app.callback(invoke_without_command=True)
+@vault_app.command("graph")
 def cmd_graph(
-    ctx: typer.Context,
     feature: Annotated[
         str | None,
         typer.Option(
@@ -480,9 +472,6 @@ def cmd_graph(
     for networkx node-link JSON export, or --metrics for aggregate
     statistics computed by networkx algorithms.
     """
-    if ctx.invoked_subcommand is not None:
-        return
-
     apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core.types import get_context as _get_ctx
