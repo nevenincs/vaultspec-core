@@ -216,16 +216,21 @@ def render_check_result(
     if summary_only:
         return
 
+    # Diagnostic text is content (it embeds file paths and [[wiki-link]]
+    # names); escape it so Rich does not treat [[...]] as console markup.
+    from rich.markup import escape
+
     for diag in result.diagnostics:
         if diag.severity == Severity.INFO and not verbose:
             continue
         style = _SEVERITY_STYLE[diag.severity]
         icon = _SEVERITY_ICON[diag.severity]
-        path_str = str(diag.path) if diag.path else ""
+        message = escape(diag.message)
+        path_str = escape(str(diag.path)) if diag.path else ""
         if path_str:
             console.print(f"    [{style}]{icon}[/{style}] {path_str}")
-            console.print(f"      {diag.message}")
+            console.print(f"      {message}")
         else:
-            console.print(f"    [{style}]{icon}[/{style}] {diag.message}")
+            console.print(f"    [{style}]{icon}[/{style}] {message}")
         if diag.fix_description:
-            console.print(f"      [dim]fix: {diag.fix_description}[/dim]")
+            console.print(f"      [dim]fix: {escape(diag.fix_description)}[/dim]")
