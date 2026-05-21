@@ -327,7 +327,7 @@ class TestVaultRepair:
             "sanitize-command",
             "--json",
         )
-        payload = json.loads(result.output)
+        payload = json.loads(result.output)["data"]
 
         assert result.exit_code == 0, result.output
         assert payload["fixed_count"] == 1
@@ -362,7 +362,7 @@ class TestVaultRepair:
             "--dry-run",
             "--json",
         )
-        payload = json.loads(result.output)
+        payload = json.loads(result.output)["data"]
 
         assert result.exit_code == 0
         assert payload["fixed_count"] == 0
@@ -595,8 +595,8 @@ class TestVaultRepair:
         )
 
         json_result = factory.run("vault", "check", "all", "--json")
-        payload = json.loads(json_result.output)
-        assert [item["check_name"] for item in payload] == [
+        checks = json.loads(json_result.output)["data"]["checks"]
+        assert [item["check_name"] for item in checks] == [
             "structure",
             "frontmatter",
             "annotations",

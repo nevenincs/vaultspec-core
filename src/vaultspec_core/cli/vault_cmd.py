@@ -588,15 +588,37 @@ def _reject_fix(check_name: str, fix: bool) -> None:
         raise typer.Exit(code=1)
 
 
+def _check_status(results: list[CheckResult]) -> str:
+    """Aggregate canonical outcome word for a set of check results.
+
+    ``failed`` when any error is present, ``updated`` when ``--fix``
+    corrected something, else ``unchanged``.
+    """
+    if any(r.error_count for r in results):
+        return "failed"
+    if any(r.fixed_count for r in results):
+        return "updated"
+    return "unchanged"
+
+
 def _render_and_exit(
-    result: CheckResult, verbose: bool, json_output: bool = False
+    result: CheckResult,
+    verbose: bool,
+    json_output: bool = False,
+    *,
+    command: str,
 ) -> None:
     """Render a CheckResult and exit with appropriate code."""
     if json_output:
         import dataclasses
         import json
 
-        typer.echo(json.dumps(dataclasses.asdict(result), indent=2, default=str))
+        from vaultspec_core.cli.rendering import json_envelope
+
+        envelope = json_envelope(
+            command, _check_status([result]), dataclasses.asdict(result)
+        )
+        typer.echo(json.dumps(envelope, indent=2, default=str))
         raise typer.Exit(code=1 if result.error_count else 0)
     from vaultspec_core.console import get_console
     from vaultspec_core.vaultcore.checks import render_check_result
@@ -832,9 +854,14 @@ def cmd_check_all(
         import dataclasses
         import json
 
-        typer.echo(
-            json.dumps([dataclasses.asdict(r) for r in results], indent=2, default=str)
+        from vaultspec_core.cli.rendering import json_envelope
+
+        envelope = json_envelope(
+            "vault.check.all",
+            _check_status(results),
+            {"checks": [dataclasses.asdict(r) for r in results]},
         )
+        typer.echo(json.dumps(envelope, indent=2, default=str))
         raise typer.Exit(0 if all(r.error_count == 0 for r in results) else 1)
 
     console.print("[bold]Vault Check  - All[/bold]")
@@ -885,7 +912,9 @@ def cmd_check_body_links(
     graph = VaultGraph(_get_ctx().target_dir)
     snapshot = graph.to_snapshot()
     result = check_body_links(_get_ctx().target_dir, snapshot=snapshot, feature=feature)
-    _render_and_exit(result, verbose, json_output=json_output)
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.body-links"
+    )
 
 
 @check_app.command("annotations")
@@ -909,7 +938,9 @@ def cmd_check_annotations(
     from vaultspec_core.vaultcore.checks import check_annotations
 
     result = check_annotations(_get_ctx().target_dir, feature=feature, fix=fix)
-    _render_and_exit(result, verbose, json_output=json_output)
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.annotations"
+    )
 
 
 @sanitize_app.command("annotations")
@@ -934,7 +965,12 @@ def cmd_sanitize_annotations(
     result = check_annotations(
         _get_ctx().target_dir, feature=feature, fix=True, dry_run=dry_run
     )
-    _render_and_exit(result, verbose or dry_run, json_output=json_output)
+    _render_and_exit(
+        result,
+        verbose or dry_run,
+        json_output=json_output,
+        command="vault.sanitize.annotations",
+    )
 
 
 @check_app.command("dangling")
@@ -961,7 +997,9 @@ def cmd_check_dangling(
     result = check_dangling(
         _get_ctx().target_dir, graph=graph, feature=feature, fix=fix
     )
-    _render_and_exit(result, verbose, json_output=json_output)
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.dangling"
+    )
 
 
 @check_app.command("orphans")
@@ -987,7 +1025,9 @@ def cmd_check_orphans(
 
     graph = VaultGraph(_get_ctx().target_dir)
     result = check_orphans(_get_ctx().target_dir, graph=graph, feature=feature)
-    _render_and_exit(result, verbose, json_output=json_output)
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.orphans"
+    )
 
 
 @check_app.command("frontmatter")
@@ -1015,7 +1055,9 @@ def cmd_check_frontmatter(
     result = check_frontmatter(
         _get_ctx().target_dir, snapshot=snapshot, feature=feature, fix=fix
     )
-    _render_and_exit(result, verbose, json_output=json_output)
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.frontmatter"
+    )
 
 
 @check_app.command("links")
@@ -1043,7 +1085,9 @@ def cmd_check_links(
     result = check_links(
         _get_ctx().target_dir, snapshot=snapshot, feature=feature, fix=fix
     )
-    _render_and_exit(result, verbose, json_output=json_output)
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.links"
+    )
 
 
 @check_app.command("features")
@@ -1070,7 +1114,9 @@ def cmd_check_features(
     graph = VaultGraph(_get_ctx().target_dir)
     snapshot = graph.to_snapshot()
     result = check_features(_get_ctx().target_dir, snapshot=snapshot, feature=feature)
-    _render_and_exit(result, verbose, json_output=json_output)
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.features"
+    )
 
 
 @check_app.command("references")
@@ -1097,7 +1143,9 @@ def cmd_check_references(
     result = check_references(
         _get_ctx().target_dir, graph=graph, feature=feature, fix=fix
     )
-    _render_and_exit(result, verbose, json_output=json_output)
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.references"
+    )
 
 
 @check_app.command("schema")
@@ -1122,7 +1170,9 @@ def cmd_check_schema(
 
     graph = VaultGraph(_get_ctx().target_dir)
     result = check_schema(_get_ctx().target_dir, graph=graph, feature=feature, fix=fix)
-    _render_and_exit(result, verbose, json_output=json_output)
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.schema"
+    )
 
 
 @check_app.command("structure")
@@ -1145,7 +1195,9 @@ def cmd_check_structure(
     graph = VaultGraph(_get_ctx().target_dir)
     snapshot = graph.to_snapshot()
     result = check_structure(_get_ctx().target_dir, snapshot=snapshot, fix=fix)
-    _render_and_exit(result, verbose, json_output=json_output)
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.structure"
+    )
 
 
 # ---- vault feature list ------------------------------------------------------
