@@ -319,7 +319,7 @@ ______________________________________________________________________
 ### vaultspec-core vault graph
 
 ```bash
-vaultspec-core vault graph [OPTIONS] COMMAND [ARGS]...
+vaultspec-core vault graph [OPTIONS]
 ```
 
 Outputs a hierarchical tree grouped by feature and type.
