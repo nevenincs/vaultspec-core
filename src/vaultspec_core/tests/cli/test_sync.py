@@ -93,7 +93,7 @@ class TestSyncValidation:
             ["--target", str(synthetic_project), "spec", "mcps", "status", "--json"],
         )
 
-        payload = json.loads(result.output)
+        payload = json.loads(result.output)["data"]
         assert result.exit_code == 0, result.output
         assert payload["status"] == "ok"
         assert payload["config_exists"] is True
@@ -109,7 +109,7 @@ class TestSyncValidation:
             ["--target", str(synthetic_project), "spec", "mcps", "status", "--json"],
         )
 
-        payload = json.loads(result.output)
+        payload = json.loads(result.output)["data"]
         assert result.exit_code == 1, result.output
         assert payload["status"] == "missing_config"
         assert payload["missing"] == ["vaultspec-core"]
@@ -128,7 +128,7 @@ class TestSyncValidation:
             ["--target", str(synthetic_project), "spec", "mcps", "status", "--json"],
         )
 
-        status = json.loads(result.output)
+        status = json.loads(result.output)["data"]
         assert result.exit_code == 1, result.output
         assert status["status"] == "partial"
         assert status["drifted"] == ["vaultspec-core"]
@@ -173,7 +173,7 @@ class TestSyncAuthority:
                 "--json",
             ],
         )
-        payload = json.loads(result.output)
+        payload = json.loads(result.output)["data"]
 
         assert result.exit_code == 0, result.output
         assert payload["path"].endswith("operator-sync-json.md")
@@ -425,7 +425,7 @@ class TestSyncAuthority:
             app,
             ["--target", str(synthetic_project), "spec", "mcps", "status", "--json"],
         )
-        before_status = json.loads(before.output)
+        before_status = json.loads(before.output)["data"]
         assert before.exit_code == 1, before.output
         assert before_status["drifted"] == ["vaultspec-core"]
         assert before_status["stale_managed"] == ["stale-managed"]
@@ -448,6 +448,6 @@ class TestSyncAuthority:
             app,
             ["--target", str(synthetic_project), "spec", "mcps", "status", "--json"],
         )
-        after_status = json.loads(after.output)
+        after_status = json.loads(after.output)["data"]
         assert after.exit_code == 0, after.output
         assert after_status["status"] == "ok"

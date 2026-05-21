@@ -99,6 +99,19 @@ def _resource_path(base_dir: Path, name: str, *, suffix: str = ".md") -> Path:
     return base_dir / filename
 
 
+def _emit_json(command: str, status: str, data: dict) -> None:
+    """Print a command payload as the canonical ``--json`` envelope.
+
+    Per the ``cli-json-consistency`` ADR every ``--json`` output shares
+    the ``{schema, status, data}`` shape.
+    """
+    import json
+
+    from vaultspec_core.cli.rendering import json_envelope
+
+    typer.echo(json.dumps(json_envelope(command, status, data), indent=2, default=str))
+
+
 def _revert_resource_command(
     *, category: str, label: str, filename: str, json_output: bool
 ) -> None:
@@ -119,14 +132,10 @@ def _revert_resource_command(
     reason = str(result.get("reason", "revert failed"))
 
     if json_output:
-        import json
-
-        payload: dict[str, str] = (
-            {"status": "reverted", "name": resolved}
-            if reverted
-            else {"status": "error", "message": reason}
-        )
-        typer.echo(json.dumps(payload, indent=2))
+        if reverted:
+            _emit_json(f"spec.{category}.revert", "restored", {"name": resolved})
+        else:
+            _emit_json(f"spec.{category}.revert", "failed", {"message": reason})
         raise typer.Exit(0 if reverted else 1)
 
     if reverted:
@@ -172,9 +181,7 @@ def cmd_rules_list(
     items = rules_list()
 
     if json_output:
-        import json
-
-        typer.echo(json.dumps(items, indent=2, default=str))
+        _emit_json("spec.rules.list", "unchanged", {"items": items})
         raise typer.Exit(0)
 
     table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
@@ -212,9 +219,7 @@ def cmd_rules_add(
         return
 
     if json_output:
-        import json
-
-        typer.echo(json.dumps({"path": str(file_path)}, indent=2))
+        _emit_json("spec.rules.add", "created", {"path": str(file_path)})
         raise typer.Exit(0)
 
     action = "Would create rule source" if dry_run else "Rule source updated"
@@ -238,9 +243,9 @@ def cmd_rules_show(
             name=name, base_dir=get_context().rules_src_dir, label="Rule"
         )
         if json_output:
-            import json
-
-            typer.echo(json.dumps({"name": name, "content": content}, indent=2))
+            _emit_json(
+                "spec.rules.show", "unchanged", {"name": name, "content": content}
+            )
             raise typer.Exit(0)
         typer.echo(content)
     except (VaultSpecError, OSError) as exc:
@@ -298,9 +303,7 @@ def cmd_rules_remove(
         return
 
     if json_output:
-        import json
-
-        typer.echo(json.dumps({"removed": name}, indent=2))
+        _emit_json("spec.rules.remove", "removed", {"removed": name})
         raise typer.Exit(0)
 
     _print_source_mutation_notice(
@@ -334,13 +337,10 @@ def cmd_rules_rename(
         return
 
     if json_output:
-        import json
-
-        typer.echo(
-            json.dumps(
-                {"old_name": old_name, "new_name": new_name, "path": str(new_path)},
-                indent=2,
-            )
+        _emit_json(
+            "spec.rules.rename",
+            "updated",
+            {"old_name": old_name, "new_name": new_name, "path": str(new_path)},
         )
         raise typer.Exit(0)
 
@@ -408,9 +408,7 @@ def cmd_skills_list(
     items = skills_list()
 
     if json_output:
-        import json
-
-        typer.echo(json.dumps(items, indent=2, default=str))
+        _emit_json("spec.skills.list", "unchanged", {"items": items})
         raise typer.Exit(0)
 
     console = get_console()
@@ -462,9 +460,7 @@ def cmd_skills_add(
         return
 
     if json_output:
-        import json
-
-        typer.echo(json.dumps({"path": str(file_path)}, indent=2))
+        _emit_json("spec.skills.add", "created", {"path": str(file_path)})
         raise typer.Exit(0)
 
     action = "Would create skill source" if dry_run else "Skill source updated"
@@ -488,9 +484,9 @@ def cmd_skills_show(
             name=name, base_dir=get_context().skills_src_dir, label="Skill", is_dir=True
         )
         if json_output:
-            import json
-
-            typer.echo(json.dumps({"name": name, "content": content}, indent=2))
+            _emit_json(
+                "spec.skills.show", "unchanged", {"name": name, "content": content}
+            )
             raise typer.Exit(0)
         typer.echo(content)
     except (VaultSpecError, OSError) as exc:
@@ -551,9 +547,7 @@ def cmd_skills_remove(
         return
 
     if json_output:
-        import json
-
-        typer.echo(json.dumps({"removed": name}, indent=2))
+        _emit_json("spec.skills.remove", "removed", {"removed": name})
         raise typer.Exit(0)
 
     _print_source_mutation_notice(
@@ -588,13 +582,10 @@ def cmd_skills_rename(
         return
 
     if json_output:
-        import json
-
-        typer.echo(
-            json.dumps(
-                {"old_name": old_name, "new_name": new_name, "path": str(new_path)},
-                indent=2,
-            )
+        _emit_json(
+            "spec.skills.rename",
+            "updated",
+            {"old_name": old_name, "new_name": new_name, "path": str(new_path)},
         )
         raise typer.Exit(0)
 
@@ -662,9 +653,7 @@ def cmd_agents_list(
     items = agents_list()
 
     if json_output:
-        import json
-
-        typer.echo(json.dumps(items, indent=2, default=str))
+        _emit_json("spec.agents.list", "unchanged", {"items": items})
         raise typer.Exit(0)
 
     console = get_console()
@@ -709,9 +698,7 @@ def cmd_agents_add(
         return
 
     if json_output:
-        import json
-
-        typer.echo(json.dumps({"path": str(file_path)}, indent=2))
+        _emit_json("spec.agents.add", "created", {"path": str(file_path)})
         raise typer.Exit(0)
 
     action = "Would create agent source" if dry_run else "Agent source updated"
@@ -735,9 +722,9 @@ def cmd_agents_show(
             name=name, base_dir=get_context().agents_src_dir, label="Agent"
         )
         if json_output:
-            import json
-
-            typer.echo(json.dumps({"name": name, "content": content}, indent=2))
+            _emit_json(
+                "spec.agents.show", "unchanged", {"name": name, "content": content}
+            )
             raise typer.Exit(0)
         typer.echo(content)
     except (VaultSpecError, OSError) as exc:
@@ -795,9 +782,7 @@ def cmd_agents_remove(
         return
 
     if json_output:
-        import json
-
-        typer.echo(json.dumps({"removed": name}, indent=2))
+        _emit_json("spec.agents.remove", "removed", {"removed": name})
         raise typer.Exit(0)
 
     _print_source_mutation_notice(
@@ -831,13 +816,10 @@ def cmd_agents_rename(
         return
 
     if json_output:
-        import json
-
-        typer.echo(
-            json.dumps(
-                {"old_name": old_name, "new_name": new_name, "path": str(new_path)},
-                indent=2,
-            )
+        _emit_json(
+            "spec.agents.rename",
+            "updated",
+            {"old_name": old_name, "new_name": new_name, "path": str(new_path)},
         )
         raise typer.Exit(0)
 
@@ -905,9 +887,7 @@ def cmd_system_show(
     data = system_show()
 
     if json_output:
-        import json
-
-        typer.echo(json.dumps(data, indent=2, default=str))
+        _emit_json("spec.system.show", "unchanged", data)
         raise typer.Exit(0)
 
     console = get_console()
@@ -989,9 +969,7 @@ def cmd_hooks_list(
     data = hooks_list_data()
 
     if json_output:
-        import json
-
-        typer.echo(json.dumps(data, indent=2, default=str))
+        _emit_json("spec.hooks.list", "unchanged", data)
         raise typer.Exit(0)
 
     console = get_console()
@@ -1045,9 +1023,7 @@ def cmd_hooks_run(
         return
 
     if json_output:
-        import json
-
-        typer.echo(json.dumps(results, indent=2, default=str))
+        _emit_json("spec.hooks.run", "unchanged", {"results": results})
         raise typer.Exit(0)
 
     console = get_console()
@@ -1095,9 +1071,7 @@ def cmd_mcps_list(
     items = mcp_list()
 
     if json_output:
-        import json
-
-        typer.echo(json.dumps(items, indent=2, default=str))
+        _emit_json("spec.mcps.list", "unchanged", {"items": items})
         raise typer.Exit(0)
 
     console = get_console()
@@ -1131,9 +1105,7 @@ def cmd_mcps_status(
     status = mcp_status()
 
     if json_output:
-        import json
-
-        typer.echo(json.dumps(status, indent=2, default=str))
+        _emit_json("spec.mcps.status", "unchanged", status)
         raise typer.Exit(0 if status["status"] == "ok" else 1)
 
     console = get_console()
@@ -1191,9 +1163,7 @@ def cmd_mcps_add(
         return
 
     if json_output:
-        import json
-
-        typer.echo(json.dumps({"path": str(file_path)}, indent=2))
+        _emit_json("spec.mcps.add", "created", {"path": str(file_path)})
         raise typer.Exit(0)
 
     _print_source_mutation_notice(file_path, action="MCP source updated")
@@ -1221,9 +1191,7 @@ def cmd_mcps_remove(
         return
 
     if json_output:
-        import json
-
-        typer.echo(json.dumps({"removed": name}, indent=2))
+        _emit_json("spec.mcps.remove", "removed", {"removed": name})
         raise typer.Exit(0)
 
     _print_source_mutation_notice(removed_path, action="MCP source removed")
@@ -1275,7 +1243,6 @@ def cmd_doctor(
       vaultspec-core spec doctor --json                 # machine-readable output\n
     """
     import dataclasses
-    import json
 
     from vaultspec_core.core.diagnosis import (
         BuiltinVersionSignal,
@@ -1321,8 +1288,8 @@ def cmd_doctor(
 
     if json_output:
         data = dataclasses.asdict(diag)
-        typer.echo(json.dumps(data, indent=2, default=str))
         exit_code = _doctor_exit_code(diag)
+        _emit_json("spec.doctor", "failed" if exit_code else "unchanged", data)
         raise typer.Exit(code=exit_code)
 
     from rich.table import Table

@@ -359,7 +359,7 @@ class TestDoctorJsonSchema:
         factory.install()
 
         result = factory.run("spec", "doctor", "--json")
-        data = json.loads(result.output)
+        data = json.loads(result.output)["data"]
 
         # Top-level keys
         assert "framework" in data
@@ -400,7 +400,7 @@ class TestDoctorV1Manifest:
 
         result = factory.run("spec", "doctor", "--json")
         # Should produce valid JSON despite v1 manifest
-        data = json.loads(result.output)
+        data = json.loads(result.output)["data"]
         assert "framework" in data
 
 

@@ -40,7 +40,7 @@ class TestDoctorCommand:
         factory = WorkspaceFactory(tmp_path)
         factory.install()
         result = factory.run("spec", "doctor", "--json")
-        data = json.loads(result.output)
+        data = json.loads(result.output)["data"]
         assert "framework" in data
         assert "providers" in data
         assert "builtin_version" in data
@@ -53,7 +53,7 @@ class TestDoctorCommand:
         factory.install().corrupt_manifest()
         result = factory.run("spec", "doctor", "--json")
         assert result.exit_code == 2
-        data = json.loads(result.output)
+        data = json.loads(result.output)["data"]
         assert data["framework"] == "corrupted"
 
     def test_missing_framework_exit_two(self, tmp_path: Path) -> None:
@@ -95,7 +95,7 @@ class TestDoctorCommand:
         factory = WorkspaceFactory(tmp_path)
         factory.install()
         result = factory.run("spec", "doctor", "--json")
-        data = json.loads(result.output)
+        data = json.loads(result.output)["data"]
         assert data["framework"] == "present"
 
     def test_single_provider_install_does_not_report_skipped_provider_drift(
@@ -202,7 +202,7 @@ class TestDoctorCommand:
         result = factory.run("spec", "doctor", "--json")
 
         assert result.exit_code == 1
-        data = json.loads(result.output)
+        data = json.loads(result.output)["data"]
         assert data["vault_content"] == "annotations"
         assert data["vault_annotation_count"] == 1
         assert "<!-- Generated instruction." in doc.read_text(encoding="utf-8")
@@ -219,6 +219,6 @@ class TestDoctorCommand:
         result = factory.run("spec", "doctor", "--json")
 
         assert result.exit_code == 1
-        data = json.loads(result.output)
+        data = json.loads(result.output)["data"]
         assert data["vault_content"] == "unreadable"
         assert data["vault_unreadable_count"] == 1
