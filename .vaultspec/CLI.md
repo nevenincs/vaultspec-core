@@ -32,8 +32,9 @@ result reads the same regardless of which command produced it. Sync-shaped surfa
 `vaultspec-core install`, `vaultspec-core sync`, the resource-scoped
 `vaultspec-core spec <resource> sync` commands, and `vaultspec-core migrations run` -
 print one glyph-prefixed line per item followed by a per-outcome count summary. With
-`--json` they emit a top-level `status` field plus a per-item `items` array, and each
-item carries its own `outcome`.
+`--json` the summary is nested inside the standard envelope (see "JSON output envelope"
+below): `data.items` is the per-item array, each item carries its own `outcome`, and the
+envelope's top-level `status` is the outcome for the whole invocation.
 
 | Outcome     | Glyph | Meaning                                                                     |
 | ----------- | ----- | --------------------------------------------------------------------------- |
@@ -49,6 +50,43 @@ A `--json` `status` of `mixed` means a single invocation produced items with mor
 one distinct outcome. An `unchanged` status is the honest summary of a no-op run, not a
 failure. A `skipped` outcome always carries a reason and is safe to interrogate. A
 `failed` outcome is the only one that stops a pipeline.
+
+## JSON output envelope
+
+Every command that accepts `--json` emits one uniform envelope, so a consumer parses one
+shape regardless of which command produced it:
+
+```json
+{
+  "schema": "vaultspec.<command>.v1",
+  "status": "<outcome word>",
+  "data": { },
+  "hints": { }
+}
+```
+
+| Field    | Required | Meaning                                                                                          |
+| -------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `schema` | yes      | Namespaced identifier of the command plus a monotonic version integer.                           |
+| `status` | yes      | The canonical outcome word for the whole invocation (one of the seven words above, or `mixed`).  |
+| `data`   | yes      | The command-specific payload. Read-only commands report their content here under stable keys.    |
+| `hints`  | no       | Structured next-step guidance. Absent when no hint applies; its presence never changes `status`. |
+
+The `schema` value follows the convention `vaultspec.<dotted-command-path>.v1` - for
+example `vaultspec.sync.v1`, `vaultspec.vault.stats.v1`, or
+`vaultspec.spec.rules.add.v1`. Every schema is currently at version `v1`. Adding new
+keys under `data` is additive and does not bump the version; renaming or removing a key
+bumps the integer (`v2`, ...). Schema bumps are recorded in the release notes.
+
+Failures under `--json` emit the same envelope with the fixed schema
+`vaultspec.error.v1` and `status` set to `failed`; `data.message` carries the
+human-readable reason and `data.hint` carries remediation guidance when one is
+available. A `status` of `failed` always pairs with a non-zero exit code.
+
+Under `--json`, stdout carries only the envelope - no banners, no prose. Diagnostic
+logging stays on stderr. The envelope is pretty-printed for readability. The single
+question "did this run pass" is answered by the top-level `status` field alone, so a CI
+gate reduces to inspecting that one key.
 
 ## Command signature contract
 

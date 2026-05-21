@@ -46,7 +46,7 @@ Reverse the default gitignore policy so .vaultspec/ authored content reaches tea
 Establish the seven-word canonical outcome taxonomy (created/updated/unchanged/removed/restored/skipped/failed) and route every sync-shaped surface through a single renderer that emits text and JSON together.
 
 - [x] `W01.P02.S04` - Implement Outcome enum and shared rendering helper for text and JSON together; `src/vaultspec_core/cli/rendering.py`.
-- [ ] `W01.P02.S05` - Route every sync-shaped CLI surface through the shared outcome renderer; `src/vaultspec_core/cli/`.
+- [x] `W01.P02.S05` - Route every sync-shaped CLI surface through the shared outcome renderer; `src/vaultspec_core/cli/`.
 - [x] `W01.P02.S06` - Update CLI reference, builtin rules, and agent personas to use the canonical seven-word taxonomy; `.vaultspec/`.
 
 ### Phase `W01.P03` - Enforce scaffolder integrity
@@ -150,9 +150,9 @@ Finalise the consumer-facing contract. Machine-readable output adopts a uniform 
 
 Adopt a uniform top-level envelope (status, schema, data, hints) across every machine-readable output, with documented schema versioning for forward compatibility.
 
-- [ ] `W05.P12.S43` - Define the uniform JSON envelope schema (status, schema, data, hints) in the rendering helper; `src/vaultspec_core/cli/rendering.py`.
-- [ ] `W05.P12.S44` - Wire the envelope through every --json-emitting verb without removing existing payload fields; `src/vaultspec_core/cli/`.
-- [ ] `W05.P12.S45` - Document the schema registry and version contract in the CLI reference; `.vaultspec/CLI.md`.
+- [x] `W05.P12.S43` - Define the uniform JSON envelope schema (status, schema, data, hints) in the rendering helper; `src/vaultspec_core/cli/rendering.py`.
+- [x] `W05.P12.S44` - Wire the envelope through every --json-emitting verb without removing existing payload fields; `src/vaultspec_core/cli/`.
+- [x] `W05.P12.S45` - Document the schema registry and version contract in the CLI reference; `.vaultspec/CLI.md`.
 
 ### Phase `W05.P13` - Next-step hints
 
