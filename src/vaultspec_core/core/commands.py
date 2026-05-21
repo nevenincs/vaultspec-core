@@ -987,7 +987,7 @@ def install_run(
         if force:
             ensure_gitignore_block(
                 path,
-                get_recommended_entries(path, dev=dev),
+                get_recommended_entries(path),
                 state=ManagedState.PRESENT,
             )
             mdata.gitignore_managed = True
@@ -1007,7 +1007,7 @@ def install_run(
         # historically-committed state files (e.g. .vaultspec/providers.json
         # from a pre-managed-block install) stop showing up as dirty on
         # every subsequent run.
-        _untrack_managed_paths(path, get_recommended_entries(path, dev=dev))
+        _untrack_managed_paths(path, get_recommended_entries(path))
 
         return {"action": "upgrade", "items": seeded, "path": path}
 
@@ -1052,7 +1052,7 @@ def install_run(
     has_mcp = (path / ".mcp.json").exists()
 
     # Manage gitignore block
-    recommended = get_recommended_entries(path, dev=dev)
+    recommended = get_recommended_entries(path)
 
     gi_written = ensure_gitignore_block(path, recommended, state=ManagedState.PRESENT)
     if gi_written:
@@ -1430,7 +1430,7 @@ def uninstall_run(
         except Exception:
             mdata_after = ManifestData()
 
-        recommended = get_recommended_entries(path, dev=dev)
+        recommended = get_recommended_entries(path)
         # If no providers remain and we are not keeping the vault, remove the block.
         # Otherwise, we sync it if it was managed before.
         if not mdata_after.installed and not keep_vault:
@@ -1704,7 +1704,7 @@ def sync_provider(
                 if block_present:
                     ensure_gitignore_block(
                         ctx.target_dir,
-                        get_recommended_entries(ctx.target_dir, dev=dev),
+                        get_recommended_entries(ctx.target_dir),
                     )
                 else:
                     mdata.gitignore_managed = False

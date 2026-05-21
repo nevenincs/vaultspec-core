@@ -1,23 +1,24 @@
-"""End-to-end tests for the ``--dev`` flag and dev-shaped gitignore output.
+"""End-to-end tests for the ``--dev`` flag and the team-shared gitignore policy.
 
-Issue #88: vaultspec-core is itself the source of the framework rules
-that the wheel bundles into ``vaultspec_core/builtins/``.  In a consumer
-project the install/sync logic correctly emits a managed
-``.gitignore`` block that includes a bare ``.vaultspec/`` line, so the
-generated install target does not pollute git history.  In the source
-repo that exact rule silently swallows new framework content from
-``git status`` and ``git add``.
+The ``--dev`` flag authorises install/uninstall/sync writes inside the
+vaultspec-core source repository itself (the source-repo write guard).
+It is hidden from ``--help`` (a developer-only flag, per the
+cli-paper-cuts ADR) yet still callable.
 
-These tests pin the new contract:
+Per the cli-spec-gitignore ADR the managed ``.gitignore`` block lists
+only per-machine runtime by-products; the spec layer (``.vaultspec/``
+rules, skills, agents, system), the synthesised ``CLAUDE.md``, and
+``.mcp.json`` are team-shared and committed to git so a teammate
+cloning the project inherits its authoritative policy. The recommended
+entry set no longer varies by source-repo mode.
 
-- ``get_recommended_entries(target, dev=False)`` keeps the consumer
-  shape (includes ``.vaultspec/``).
-- ``get_recommended_entries(target, dev=True)`` switches to the source
-  shape (omits ``.vaultspec/``, retains the truly-generated children).
+These tests pin the contract:
+
+- ``get_recommended_entries(target)`` lists only runtime by-products
+  and never the bare ``.vaultspec/`` line.
 - The Typer commands ``install``, ``uninstall``, and ``sync`` accept a
-  ``--dev`` flag that is hidden from ``--help`` (a developer-only flag,
-  per the cli-paper-cuts ADR) yet still callable, and the CLI source no
-  longer references the dropped env-var bypass.
+  ``--dev`` flag that is hidden from ``--help`` yet still callable, and
+  the CLI source no longer references the dropped env-var bypass.
 """
 
 from __future__ import annotations
@@ -62,54 +63,47 @@ def _make_consumer_repo(root: Path) -> Path:
 
 
 class TestRecommendedEntriesShape:
-    """``get_recommended_entries`` must change shape on the ``dev=`` flag."""
+    """``get_recommended_entries`` lists only runtime by-products; the spec
+    layer is team-shared (cli-spec-gitignore ADR)."""
 
-    def test_consumer_shape_includes_bare_vaultspec(self, tmp_path: Path) -> None:
+    def test_spec_layer_is_not_blanket_ignored(self, tmp_path: Path) -> None:
         from vaultspec_core.core.gitignore import get_recommended_entries
 
         _make_consumer_repo(tmp_path)
-        entries = get_recommended_entries(tmp_path, dev=False)
-        # In consumer mode the bare ignore is correct: `.vaultspec/` is a
-        # generated install target.
-        assert ".vaultspec/" in entries
-        # Truly-generated children remain ignored in both modes.
-        assert ".vaultspec/_snapshots/" in entries
-        assert ".vaultspec/*.lock" in entries
+        entries = get_recommended_entries(tmp_path)
+        # Authored content under .vaultspec/ (rules, skills, agents,
+        # system) is committed so teammates inherit it. The bare
+        # directory ignore must never appear.
+        assert ".vaultspec/" not in entries
 
-    def test_dev_shape_drops_bare_vaultspec(self, tmp_path: Path) -> None:
+    def test_runtime_children_stay_ignored(self, tmp_path: Path) -> None:
         from vaultspec_core.core.gitignore import get_recommended_entries
 
-        _make_dev_repo(tmp_path)
-        entries = get_recommended_entries(tmp_path, dev=True)
-        # The bare line is the bug.  In dev mode it must NOT appear, so
-        # new agents/skills/templates added under .vaultspec/rules/ stay
-        # visible to git.
-        assert ".vaultspec/" not in entries
-        # Generated children stay ignored.
+        _make_consumer_repo(tmp_path)
+        entries = get_recommended_entries(tmp_path)
+        # Per-machine runtime state stays ignored: the snapshot
+        # directory, advisory-lock sentinels, and the install manifest.
         assert ".vaultspec/_snapshots/" in entries
         assert ".vaultspec/*.lock" in entries
-        # providers.json is local install state in either mode; dev mode
-        # explicitly ignores it because the bare `.vaultspec/` line that
-        # would otherwise have masked it is gone.
         assert ".vaultspec/providers.json" in entries
 
-    def test_dev_shape_default_false_preserves_consumer_behaviour(
-        self, tmp_path: Path
-    ) -> None:
-        """Calling without the keyword must keep the legacy consumer output."""
+    def test_mcp_config_is_shared(self, tmp_path: Path) -> None:
         from vaultspec_core.core.gitignore import get_recommended_entries
 
         _make_consumer_repo(tmp_path)
-        # No ``dev=`` keyword -> default False -> consumer shape.
+        (tmp_path / ".mcp.json").write_text("{}", encoding="utf-8")
         entries = get_recommended_entries(tmp_path)
-        assert ".vaultspec/" in entries
+        # .mcp.json is committed so teammates inherit the MCP config;
+        # only its advisory-lock sentinel is per-machine runtime state.
+        assert ".mcp.json" not in entries
+        assert "/.mcp.json.lock" in entries
 
     def test_no_framework_no_entries(self, tmp_path: Path) -> None:
         """Without a ``.vaultspec/`` directory the function emits nothing for it."""
         from vaultspec_core.core.gitignore import get_recommended_entries
 
         # No `.vaultspec/` dir.
-        entries = get_recommended_entries(tmp_path, dev=True)
+        entries = get_recommended_entries(tmp_path)
         assert ".vaultspec/" not in entries
         assert ".vaultspec/_snapshots/" not in entries
 

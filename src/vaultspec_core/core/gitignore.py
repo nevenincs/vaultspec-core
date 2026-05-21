@@ -19,56 +19,39 @@ MARKER_END = "# <<< vaultspec-managed <<<"
 DEFAULT_ENTRIES = [".vaultspec/_snapshots/"]
 
 
-def get_recommended_entries(target: Path, *, dev: bool = False) -> list[str]:
-    """Return a list of gitignore entries for all managed paths.
+def get_recommended_entries(target: Path) -> list[str]:
+    """Return the runtime-only gitignore entries for the managed block.
 
-    Uses :class:`~vaultspec_core.core.types.WorkspaceContext` and manifest
-    data to dynamically discover provider directories and configuration files.
+    Per the ``cli-spec-gitignore`` ADR the spec layer is team-shared:
+    authored content under ``.vaultspec/`` (rules, skills, agents, system),
+    the synthesised ``CLAUDE.md``, ``.mcp.json``, and the generated provider
+    directories are committed to git so a teammate cloning the project
+    inherits its authoritative policy. The managed block therefore ignores
+    only genuine per-machine runtime by-products: the snapshot directory,
+    advisory-lock sentinels, the install manifest, and the vault's local
+    caches. Authored content is never added here.
 
     Args:
         target: Workspace root directory.
-        dev: ``True`` when running in source-repo mode (caller passed
-            ``--dev``).  In that mode the bare ``.vaultspec/`` line is
-            **omitted** because ``.vaultspec/rules/`` is the canonical,
-            version-controlled source content (bundled into the wheel as
-            ``vaultspec_core/builtins/`` via ``pyproject.toml``
-            ``force-include``); a blanket ignore would silently swallow
-            new agents/skills/templates added under ``.vaultspec/rules/``
-            from ``git status``.  The truly-generated children
-            (``_snapshots/``, ``*.lock``, ``providers.json``) stay
-            ignored in both modes.  See GitHub issue #88.
     """
     entries: set[str] = set()
 
-    from .manifest import read_manifest_data
-
     try:
-        # Internal state that must ALWAYS be ignored if framework exists
+        # Internal state that must ALWAYS be ignored if the framework
+        # exists. The snapshot directory, advisory-lock sentinels, and the
+        # install manifest (providers.json) are per-machine state, never
+        # authored content. Everything else under .vaultspec/ (rules,
+        # skills, agents, system) is team-shared and is not listed here.
         framework_installed = (target / ".vaultspec").is_dir()
         if framework_installed:
             entries.add(".vaultspec/_snapshots/")
-            if not dev:
-                entries.add(".vaultspec/")
-            # Advisory-lock sentinels left by helpers.advisory_lock on any
-            # file persisted under .vaultspec/ (providers.json, etc.).
             entries.add(".vaultspec/*.lock")
-            # In dev-mode the bare .vaultspec/ rule isn't there to mask
-            # providers.json; explicitly ignore it because it's local
-            # install state (manifest of which providers are deployed),
-            # not source-of-truth content.
-            if dev:
-                entries.add(".vaultspec/providers.json")
+            entries.add(".vaultspec/providers.json")
         if (target / ".vault").is_dir():
             entries.add(".vault/.obsidian/")
             entries.add(".vault/.trash/")
             entries.add(".vault/data/")
             entries.add(".vault/logs/")
-
-        mdata = read_manifest_data(target)
-
-        # Global files
-        if (target / ".mcp.json").exists():
-            entries.add(".mcp.json")
 
         # Root-level advisory-lock sentinels produced by ``advisory_lock``
         # when vaultspec locks each of these managed files during install
@@ -86,30 +69,6 @@ def get_recommended_entries(target: Path, *, dev: bool = False) -> list[str]:
             ):
                 if (target / managed_file).exists():
                     entries.add(f"/{managed_file}.lock")
-
-        # Use the local artifact collection logic to ensure gitignore is
-        # perfectly synced with provider artifacts.
-
-        for name in mdata.installed:
-            try:
-                tool = Tool(name)
-                dirs, files = _collect_provider_artifacts(target, tool)
-                for d in dirs:
-                    try:
-                        rel_dir = d.relative_to(target)
-                        rel_dir_str = str(rel_dir).replace("\\", "/")
-                        entries.add(f"{rel_dir_str}/")
-                    except ValueError:
-                        pass
-                for f in files:
-                    try:
-                        rel_file = f.relative_to(target)
-                        rel_file_str = str(rel_file).replace("\\", "/")
-                        entries.add(rel_file_str)
-                    except ValueError:
-                        pass
-            except ValueError:
-                continue
 
     except Exception:
         # Fallback for very early bootstrap or corruption
