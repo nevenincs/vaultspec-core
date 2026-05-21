@@ -131,6 +131,29 @@ def test_query_open_filter_lists_uncompleted_steps(tmp_path, runner: CliRunner) 
     assert "Matched 3 of 4" in result.stdout
 
 
+def test_query_json_emits_parseable_payload(tmp_path, runner: CliRunner) -> None:
+    """``vault plan query --json`` is machine-readable, matching the
+    ``--json`` coverage its sibling ``vault plan status`` already has."""
+    import json
+
+    rng = random.Random(4)
+    spec = make_clean_plan("L1", rng=rng, steps=4)
+    spec.steps[0].checked = True
+    plan_path = tmp_path / "test-plan.md"
+    plan_path.write_text(spec.render(), encoding="utf-8")
+
+    result = runner.invoke(
+        app, ["vault", "plan", "query", str(plan_path), "--open", "--json"]
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["matched"] == 3
+    assert payload["total"] == 4
+    assert len(payload["steps"]) == 3
+    assert all(s["checked"] is False for s in payload["steps"])
+
+
 def test_tier_show_reports_canonical_tier(tmp_path, runner: CliRunner) -> None:
     """``vault plan tier show`` prints the declared tier."""
     rng = random.Random(5)

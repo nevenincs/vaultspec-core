@@ -197,6 +197,9 @@ def cmd_query(
     in_wave: Annotated[
         str | None, typer.Option("--wave", help="Restrict to Wave W##")
     ] = None,
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Emit matched Steps as JSON")
+    ] = False,
 ) -> None:
     """Filter Step rows by container scope and open/closed predicate."""
     from vaultspec_core.plan.parser import parse_plan
@@ -212,6 +215,22 @@ def cmd_query(
             only_closed=closed_only,
         ),
     )
+    if json_output:
+        payload = {
+            "matched": len(result.matched),
+            "total": result.total,
+            "steps": [
+                {
+                    "display_path": step.display_path,
+                    "checked": step.checked,
+                    "action": step.action,
+                    "scope": step.scope,
+                }
+                for step in result.matched
+            ],
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        return
     typer.echo(f"Matched {len(result.matched)} of {result.total} Steps:")
     for step in result.matched:
         state = "x" if step.checked else " "
