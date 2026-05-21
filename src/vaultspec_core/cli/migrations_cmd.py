@@ -61,6 +61,8 @@ def cmd_migrations_status(
     pending = list_pending(root_dir, manifest=mdata)
 
     if json_output:
+        from vaultspec_core.cli.rendering import json_envelope
+
         payload = {
             "manifest_version": manifest_version,
             "status": status.value,
@@ -71,7 +73,8 @@ def cmd_migrations_status(
                 {"name": m.name, "target_version": m.target_version} for m in pending
             ],
         }
-        typer.echo(_json.dumps(payload, indent=2))
+        envelope = json_envelope("migrations.status", "unchanged", payload)
+        typer.echo(_json.dumps(envelope, indent=2))
         raise typer.Exit(code=0 if status != MigrationStatus.PENDING else 1)
 
     from vaultspec_core.console import get_console
@@ -127,9 +130,12 @@ def cmd_migrations_run(
         results = run_pending_migrations(root_dir)
     except Exception as exc:
         if json_output:
+            from vaultspec_core.cli.rendering import json_envelope
+
             typer.echo(
                 _json.dumps(
-                    {"status": "failed", "error": str(exc), "items": []}, indent=2
+                    json_envelope("migrations.run", "failed", {"error": str(exc)}),
+                    indent=2,
                 )
             )
         else:
