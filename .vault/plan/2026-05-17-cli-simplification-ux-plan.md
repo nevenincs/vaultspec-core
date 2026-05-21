@@ -37,9 +37,9 @@ Lay the preconditions every downstream wave depends on. The spec layer becomes t
 
 Reverse the default gitignore policy so .vaultspec/ authored content reaches teammates by default; ship the managed-block migration and the install-summary language update together.
 
-- [ ] `W01.P01.S01` - Implement versioned migration rewriting the managed gitignore block on next upgrade with detection of operator customisation; `src/vaultspec_core/migrations/`.
-- [ ] `W01.P01.S02` - Add sharing-policy summary line to install and upgrade output; `src/vaultspec_core/cli/root.py`.
-- [ ] `W01.P01.S03` - Update framework manual, builtin rules, and agent personas to describe the new shared-by-default policy; `.vaultspec/`.
+- [x] `W01.P01.S01` - Implement versioned migration rewriting the managed gitignore block on next upgrade with detection of operator customisation; `src/vaultspec_core/migrations/`.
+- [x] `W01.P01.S02` - Add sharing-policy summary line to install and upgrade output; `src/vaultspec_core/cli/root.py`.
+- [x] `W01.P01.S03` - Update framework manual, builtin rules, and agent personas to describe the new shared-by-default policy; `.vaultspec/`.
 
 ### Phase `W01.P02` - Define canonical outcome vocabulary
 
