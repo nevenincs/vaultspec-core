@@ -205,15 +205,29 @@ def cmd_add(
 
     # Validate feature dependencies (lifecycle rules)
     dep_diagnostics = validate_feature_dependencies(_get_ctx().target_dir, dt, feat)
-    has_errors = False
-    for diag in dep_diagnostics:
-        if diag.startswith("ERROR:"):
-            console.print(f"[red]{diag}[/red]")
-            has_errors = True
-        elif diag.startswith("WARNING:"):
-            console.print(f"[yellow]{diag}[/yellow]")
-    if has_errors:
-        raise typer.Exit(code=1)
+    dep_errors = [d for d in dep_diagnostics if d.startswith("ERROR:")]
+
+    if json_output:
+        # stdout must stay a pure JSON document: lifecycle advisories go
+        # to stderr, and a blocking error becomes the JSON error envelope.
+        for diag in dep_diagnostics:
+            if not diag.startswith("ERROR:"):
+                typer.echo(diag, err=True)
+        if dep_errors:
+            import json
+
+            typer.echo(
+                json.dumps(
+                    {"status": "error", "message": " ".join(dep_errors)}, indent=2
+                )
+            )
+            raise typer.Exit(code=1)
+    else:
+        for diag in dep_diagnostics:
+            style = "red" if diag.startswith("ERROR:") else "yellow"
+            console.print(f"[{style}]{diag}[/{style}]")
+        if dep_errors:
+            raise typer.Exit(code=1)
 
     import logging
 
