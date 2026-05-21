@@ -209,9 +209,14 @@ def cmd_add(
         if dep_errors:
             import json
 
+            from vaultspec_core.cli.rendering import json_envelope
+
             typer.echo(
                 json.dumps(
-                    {"status": "error", "message": " ".join(dep_errors)}, indent=2
+                    json_envelope(
+                        "vault.add", "failed", {"message": " ".join(dep_errors)}
+                    ),
+                    indent=2,
                 )
             )
             raise typer.Exit(code=1)
@@ -255,14 +260,20 @@ def cmd_add(
         if json_output:
             import json
 
+            from vaultspec_core.cli.rendering import json_envelope
+
             typer.echo(
                 json.dumps(
-                    {
-                        "path": str(path),
-                        "type": doc_type,
-                        "name": path.stem,
-                        "dry_run": True,
-                    },
+                    json_envelope(
+                        "vault.add",
+                        "created",
+                        {
+                            "path": str(path),
+                            "type": doc_type,
+                            "name": path.stem,
+                            "dry_run": True,
+                        },
+                    ),
                     indent=2,
                 )
             )
@@ -275,9 +286,16 @@ def cmd_add(
     if json_output:
         import json
 
+        from vaultspec_core.cli.rendering import json_envelope
+
         typer.echo(
             json.dumps(
-                {"path": str(path), "type": doc_type, "name": path.stem}, indent=2
+                json_envelope(
+                    "vault.add",
+                    "created",
+                    {"path": str(path), "type": doc_type, "name": path.stem},
+                ),
+                indent=2,
             )
         )
         raise typer.Exit(0)
@@ -345,7 +363,15 @@ def cmd_stats(
     if json_output:
         import json
 
-        typer.echo(json.dumps(stats, indent=2, default=str))
+        from vaultspec_core.cli.rendering import json_envelope
+
+        typer.echo(
+            json.dumps(
+                json_envelope("vault.stats", "unchanged", stats),
+                indent=2,
+                default=str,
+            )
+        )
         raise typer.Exit(0)
     console.print("[bold]Vault Statistics[/bold]")
     console.print(f"  Total documents: {stats['total_docs']}")
@@ -414,8 +440,18 @@ def cmd_list(
         import dataclasses
         import json
 
+        from vaultspec_core.cli.rendering import json_envelope
+
         typer.echo(
-            json.dumps([dataclasses.asdict(d) for d in docs], indent=2, default=str)
+            json.dumps(
+                json_envelope(
+                    "vault.list",
+                    "unchanged",
+                    {"documents": [dataclasses.asdict(d) for d in docs]},
+                ),
+                indent=2,
+                default=str,
+            )
         )
         raise typer.Exit(0)
     if not docs:
@@ -485,12 +521,16 @@ def cmd_graph(
         raise typer.Exit(code=1) from exc
 
     if as_json:
-        typer.echo(
-            graph.to_json(
-                feature=feature,
-                include_body=include_body,
-            ),
+        import json
+
+        from vaultspec_core.cli.rendering import json_envelope
+
+        envelope = json_envelope(
+            "vault.graph",
+            "unchanged",
+            graph.to_dict(feature=feature, include_body=include_body),
         )
+        typer.echo(json.dumps(envelope, indent=2, default=str))
         return
 
     if not graph.nodes:
@@ -676,7 +716,21 @@ def cmd_repair(
     if json_output:
         import json
 
-        typer.echo(json.dumps(_repair_payload(run), indent=2, default=str))
+        from vaultspec_core.cli.rendering import json_envelope
+
+        if run.error_count:
+            repair_status = "failed"
+        elif run.fixed_count:
+            repair_status = "updated"
+        else:
+            repair_status = "unchanged"
+        typer.echo(
+            json.dumps(
+                json_envelope("vault.repair", repair_status, _repair_payload(run)),
+                indent=2,
+                default=str,
+            )
+        )
         raise typer.Exit(code=1 if run.error_count else 0)
 
     _render_repair_run(run, verbose=verbose)
@@ -1228,7 +1282,17 @@ def cmd_feature_list(
     if json_output:
         import json
 
-        typer.echo(json.dumps(features, indent=2, default=str))
+        from vaultspec_core.cli.rendering import json_envelope
+
+        typer.echo(
+            json.dumps(
+                json_envelope(
+                    "vault.feature.list", "unchanged", {"features": features}
+                ),
+                indent=2,
+                default=str,
+            )
+        )
         raise typer.Exit(0)
     if not features:
         console.print("[dim]No features found.[/dim]")
@@ -1278,7 +1342,16 @@ def cmd_feature_index(
         if json_output:
             import json
 
-            typer.echo(json.dumps({"generated": []}, indent=2))
+            from vaultspec_core.cli.rendering import json_envelope
+
+            typer.echo(
+                json.dumps(
+                    json_envelope(
+                        "vault.feature.index", "unchanged", {"generated": []}
+                    ),
+                    indent=2,
+                )
+            )
             raise typer.Exit(0)
         console.print("[dim]No features found in vault.[/dim]")
         return
@@ -1298,8 +1371,18 @@ def cmd_feature_index(
     if json_output:
         import json
 
+        from vaultspec_core.cli.rendering import json_envelope
+
+        index_status = "updated" if generated_paths else "unchanged"
         typer.echo(
-            json.dumps({"generated": [str(p) for p in generated_paths]}, indent=2)
+            json.dumps(
+                json_envelope(
+                    "vault.feature.index",
+                    index_status,
+                    {"generated": [str(p) for p in generated_paths]},
+                ),
+                indent=2,
+            )
         )
         raise typer.Exit(0)
 
@@ -1329,7 +1412,16 @@ def cmd_feature_archive(
     if json_output:
         import json
 
-        typer.echo(json.dumps(result, indent=2, default=str))
+        from vaultspec_core.cli.rendering import json_envelope
+
+        archive_status = "removed" if result["archived_count"] else "unchanged"
+        typer.echo(
+            json.dumps(
+                json_envelope("vault.feature.archive", archive_status, result),
+                indent=2,
+                default=str,
+            )
+        )
         raise typer.Exit(0)
     if result["archived_count"] == 0:
         console.print(f"[dim]No documents found for feature '{feature_tag}'.[/dim]")

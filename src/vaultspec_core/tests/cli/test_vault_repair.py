@@ -57,7 +57,11 @@ def _json_payload(output: str) -> dict:
         "JSON-mode CLI output must not include human text before the payload:\n"
         f"{output}"
     )
-    return json.loads(output)
+    # Unwrap the cli-json-consistency envelope; repair tests assert on the
+    # command's own payload nested under `data`.
+    envelope = json.loads(output)
+    assert set(envelope) >= {"schema", "status", "data"}, envelope
+    return envelope["data"]
 
 
 def _write_state_mutation_workspace(root: Path) -> None:

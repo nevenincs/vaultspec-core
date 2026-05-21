@@ -317,7 +317,7 @@ class TestVaultJsonOutput:
             ],
         )
 
-        payload = json.loads(result.output)
+        payload = json.loads(result.output)["data"]
         assert result.exit_code == 0, result.output
         assert result.output.lstrip().startswith("{")
         assert payload["dry_run"] is True
@@ -328,7 +328,7 @@ class TestVaultJsonOutput:
 
         result = factory.run("vault", "graph", "--json")
 
-        payload = json.loads(result.output)
+        payload = json.loads(result.output)["data"]
         assert result.exit_code == 0, result.output
         assert result.output.lstrip().startswith("{")
         assert payload["nodes"] == []
@@ -339,7 +339,7 @@ class TestVaultJsonOutput:
 
         result = factory.run("vault", "feature", "index", "--json")
 
-        payload = json.loads(result.output)
+        payload = json.loads(result.output)["data"]
         assert result.exit_code == 0, result.output
         assert result.output.lstrip().startswith("{")
         assert payload == {"generated": []}
