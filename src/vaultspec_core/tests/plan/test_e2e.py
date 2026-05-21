@@ -166,6 +166,14 @@ def test_tier_show_reports_canonical_tier(tmp_path, runner: CliRunner) -> None:
     assert result.exit_code == 0
     assert "L4" in result.stdout
 
+    json_result = runner.invoke(
+        app, ["vault", "plan", "tier", "show", str(plan_path), "--json"]
+    )
+    assert json_result.exit_code == 0
+    import json
+
+    assert json.loads(json_result.stdout) == {"tier": "L4"}
+
 
 def test_help_lists_plan_subcommands(runner: CliRunner) -> None:
     """``vault plan --help`` lists every documented subcommand group."""

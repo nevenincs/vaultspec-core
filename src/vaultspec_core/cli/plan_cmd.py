@@ -722,13 +722,20 @@ def cmd_epic_intent_edit(
 @tier_app.command("show")
 def cmd_tier_show(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Emit the tier as JSON")
+    ] = False,
 ) -> None:
     """Print the plan's declared tier."""
     from vaultspec_core.plan.commands.tier_ops import current_tier
     from vaultspec_core.plan.parser import parse_plan
 
     plan = parse_plan(path)
-    typer.echo(current_tier(plan).value)
+    tier = current_tier(plan).value
+    if json_output:
+        typer.echo(json.dumps({"tier": tier}, indent=2))
+        return
+    typer.echo(tier)
 
 
 @tier_app.command("promote")
