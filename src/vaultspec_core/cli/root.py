@@ -342,8 +342,12 @@ def cmd_install(
     if json_output:
         import json
 
+        from vaultspec_core.cli.rendering import json_envelope
+
         result["path"] = str(result["path"])
-        typer.echo(json.dumps(result, indent=2, default=str))
+        status = "unchanged" if result["action"] == "dry_run" else "created"
+        envelope = json_envelope("install", status, result)
+        typer.echo(json.dumps(envelope, indent=2, default=str))
         raise typer.Exit(0)
 
     if result["action"] == "dry_run":
@@ -472,8 +476,17 @@ def cmd_uninstall(
     if json_output:
         import json
 
+        from vaultspec_core.cli.rendering import json_envelope
+
         result["path"] = str(result["path"])
-        typer.echo(json.dumps(result, indent=2, default=str))
+        if result["action"] == "dry_run":
+            status = "unchanged"
+        elif result.get("removed"):
+            status = "removed"
+        else:
+            status = "unchanged"
+        envelope = json_envelope("uninstall", status, result)
+        typer.echo(json.dumps(envelope, indent=2, default=str))
         raise typer.Exit(0)
 
     # Render result

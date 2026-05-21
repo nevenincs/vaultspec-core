@@ -119,8 +119,9 @@ def apply_target(
             commands (``spec add``, ``spec list``) operate on a single
             workspace, so they leave this ``False``.
         json_output: When ``True``, a workspace-resolution failure is
-            emitted as a ``{"status": "error", ...}`` JSON envelope on
-            stdout instead of a plain-text ``Error:`` line on stderr.
+            emitted as the canonical ``{"schema": "vaultspec.error.v1",
+            "status": "failed", "data": {...}}`` JSON envelope on stdout
+            instead of a plain-text ``Error:`` line on stderr.
 
     Idempotent  - if the workspace was already initialized with the same
     effective target, this is a no-op.
@@ -148,7 +149,10 @@ def apply_target(
         if json_output:
             import json
 
-            print(json.dumps({"status": "error", "message": str(e)}, indent=2))
+            from vaultspec_core.cli.rendering import json_envelope
+
+            envelope = json_envelope("error", "failed", {"message": str(e)})
+            print(json.dumps(envelope, indent=2))
         else:
             typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(code=1) from e

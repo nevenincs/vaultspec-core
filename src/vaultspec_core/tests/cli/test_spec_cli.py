@@ -127,7 +127,9 @@ class TestSpecCliFunctional:
         )
         assert result.exit_code == 1, result.output
         payload = json.loads(result.output)
-        assert payload["status"] == "error"
+        assert payload["schema"] == "vaultspec.error.v1"
+        assert payload["status"] == "failed"
+        assert payload["data"]["message"]
 
 
 class TestSpecCliDispatchRouting:

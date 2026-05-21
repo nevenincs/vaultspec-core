@@ -37,7 +37,7 @@ class TestInstallJson:
         result = runner.invoke(app, ["-t", str(tmp_path), "install", "--json"])
 
         assert result.exit_code == 0, result.output
-        payload = json.loads(result.output)
+        payload = json.loads(result.output)["data"]
         assert payload["action"] == "install"
         assert payload["has_mcp"] is True
 
