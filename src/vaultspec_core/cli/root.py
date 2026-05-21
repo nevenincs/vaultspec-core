@@ -332,6 +332,7 @@ def cmd_install(
         raise typer.Exit(
             emit_outcomes(
                 outcomes,
+                command="install",
                 title=title,
                 json_output=json_output,
                 extra_json={"version": version},
@@ -604,10 +605,17 @@ def cmd_sync(
         if json_output:
             import json
 
-            from vaultspec_core.cli.rendering import outcomes_as_json
+            from vaultspec_core.cli.rendering import (
+                json_envelope,
+                outcomes_as_json,
+            )
 
             outcomes = _collect_sync_outcomes(results, provider, skip)
-            typer.echo(json.dumps(outcomes_as_json(outcomes), indent=2))
+            inner = outcomes_as_json(outcomes)
+            envelope = json_envelope(
+                "sync", str(inner["status"]), {"items": inner["items"]}
+            )
+            typer.echo(json.dumps(envelope, indent=2))
             raise typer.Exit(0)
 
         from vaultspec_core.cli.rendering import render_dry_run_tree
@@ -678,7 +686,11 @@ def cmd_sync(
     all_warnings = [w for r in results for w in r.warnings]
     extra_json = {"warnings": all_warnings} if all_warnings else None
     code = emit_outcomes(
-        outcomes, title="Sync", json_output=json_output, extra_json=extra_json
+        outcomes,
+        command="sync",
+        title="Sync",
+        json_output=json_output,
+        extra_json=extra_json,
     )
 
     if not json_output:

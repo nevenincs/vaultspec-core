@@ -20,6 +20,7 @@ from vaultspec_core.cli.rendering import (
     aggregate_outcome,
     count_outcomes,
     emit_outcomes,
+    json_envelope,
     outcomes_as_json,
     render_outcomes,
     sync_outcomes,
@@ -229,6 +230,29 @@ class TestSyncOutcomes:
 
 
 @pytest.mark.unit
+class TestJsonEnvelope:
+    def test_wraps_payload_with_schema_and_status(self):
+        env = json_envelope("sync", "updated", {"items": [1, 2]})
+        assert env == {
+            "schema": "vaultspec.sync.v1",
+            "status": "updated",
+            "data": {"items": [1, 2]},
+        }
+
+    def test_dotted_command_forms_namespaced_schema(self):
+        env = json_envelope("spec.rules.sync", "unchanged", {})
+        assert env["schema"] == "vaultspec.spec.rules.sync.v1"
+
+    def test_hints_included_only_when_supplied(self):
+        without = json_envelope("sync", "unchanged", {})
+        assert "hints" not in without
+        with_hint = json_envelope(
+            "sync", "unchanged", {}, hints={"next_step": {"command": "x"}}
+        )
+        assert with_hint["hints"] == {"next_step": {"command": "x"}}
+
+
+@pytest.mark.unit
 class TestEmitOutcomes:
     def setup_method(self):
         reset_console()
@@ -238,7 +262,7 @@ class TestEmitOutcomes:
 
     def test_failed_outcome_forces_exit_code_one(self, capsys):
         items = [OutcomeItem(name="broken.md", outcome=Outcome.FAILED, detail="boom")]
-        code = emit_outcomes(items, title="Sync", json_output=False)
+        code = emit_outcomes(items, command="sync", title="Sync", json_output=False)
         # A failed outcome is the one outcome that stops a pipeline.
         assert code == 1
         out = capsys.readouterr().out
@@ -250,29 +274,34 @@ class TestEmitOutcomes:
             OutcomeItem(name="a", outcome=Outcome.CREATED),
             OutcomeItem(name="b", outcome=Outcome.SKIPPED),
         ]
-        assert emit_outcomes(items, title="Sync", json_output=False) == 0
+        assert (
+            emit_outcomes(items, command="sync", title="Sync", json_output=False) == 0
+        )
         capsys.readouterr()
 
     def test_empty_invocation_exits_zero(self, capsys):
-        assert emit_outcomes([], title="Sync", json_output=False) == 0
+        assert emit_outcomes([], command="sync", title="Sync", json_output=False) == 0
         capsys.readouterr()
 
-    def test_json_envelope_merges_extra_keys(self, capsys):
+    def test_json_envelope_wraps_payload_with_extra_keys(self, capsys):
         items = [OutcomeItem(name="a", outcome=Outcome.CREATED)]
         code = emit_outcomes(
             items,
+            command="sync",
             title="Sync",
             json_output=True,
             extra_json={"warnings": ["heads up"]},
         )
         assert code == 0
         payload = json.loads(capsys.readouterr().out)
+        # cli-json-consistency envelope: {schema, status, data}.
+        assert payload["schema"] == "vaultspec.sync.v1"
         assert payload["status"] == "created"
-        assert payload["items"][0]["name"] == "a"
-        assert payload["warnings"] == ["heads up"]
+        assert payload["data"]["items"][0]["name"] == "a"
+        assert payload["data"]["warnings"] == ["heads up"]
 
     def test_json_path_still_reports_failure_in_exit_code(self, capsys):
         items = [OutcomeItem(name="x", outcome=Outcome.FAILED)]
-        code = emit_outcomes(items, title="Sync", json_output=True)
+        code = emit_outcomes(items, command="sync", title="Sync", json_output=True)
         assert code == 1
         assert json.loads(capsys.readouterr().out)["status"] == "failed"

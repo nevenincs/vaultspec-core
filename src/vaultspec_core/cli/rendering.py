@@ -229,9 +229,44 @@ def render_outcomes(items: Sequence[OutcomeItem], *, title: str = "Result") -> N
         console.print("  " + "  ".join(parts))
 
 
+def json_envelope(
+    command: str,
+    status: str,
+    data: Mapping[str, object],
+    *,
+    hints: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    """Wrap a command payload in the canonical ``--json`` envelope.
+
+    Per the ``cli-json-consistency`` ADR every ``--json`` output shares
+    one shape - ``{schema, status, data, hints}`` - so a CI consumer
+    matches a single pattern across every verb.
+
+    Args:
+        command: Dotted command identifier (e.g. ``"sync"``,
+            ``"spec.rules.sync"``); forms the ``schema`` string.
+        status: The invocation's aggregate canonical outcome word.
+        data: The command's own payload, nested unmodified.
+        hints: Optional structured next-step hint; omitted when absent.
+
+    Returns:
+        The envelope mapping ``{schema, status, data}`` plus ``hints``
+        when supplied.
+    """
+    envelope: dict[str, object] = {
+        "schema": f"vaultspec.{command}.v1",
+        "status": str(status),
+        "data": dict(data),
+    }
+    if hints is not None:
+        envelope["hints"] = dict(hints)
+    return envelope
+
+
 def emit_outcomes(
     items: Sequence[OutcomeItem],
     *,
+    command: str,
     title: str,
     json_output: bool,
     extra_json: Mapping[str, object] | None = None,
@@ -248,10 +283,11 @@ def emit_outcomes(
 
     Args:
         items: The per-item outcomes of a single invocation.
+        command: Dotted command identifier for the JSON ``schema`` field.
         title: Heading for the text rendering.
         json_output: When true, emit the JSON envelope instead of text.
-        extra_json: Optional extra top-level keys merged into the JSON
-            envelope (e.g. ``warnings``). Ignored for text output.
+        extra_json: Optional extra keys merged into the envelope's
+            ``data`` payload (e.g. ``warnings``). Ignored for text output.
 
     Returns:
         The process exit code: ``1`` if any outcome failed, else ``0``.
@@ -259,10 +295,12 @@ def emit_outcomes(
     if json_output:
         import json
 
-        payload = outcomes_as_json(items)
+        inner = outcomes_as_json(items)
+        data: dict[str, object] = {"items": inner["items"]}
         if extra_json:
-            payload.update(extra_json)
-        print(json.dumps(payload, indent=2))
+            data.update(extra_json)
+        envelope = json_envelope(command, str(inner["status"]), data)
+        print(json.dumps(envelope, indent=2))
     else:
         render_outcomes(items, title=title)
     return 1 if any(item.outcome is Outcome.FAILED for item in items) else 0

@@ -150,5 +150,10 @@ def cmd_migrations_run(
         raise typer.Exit(code=0)
 
     raise typer.Exit(
-        emit_outcomes(outcomes, title="Migrations", json_output=json_output)
+        emit_outcomes(
+            outcomes,
+            command="migrations.run",
+            title="Migrations",
+            json_output=json_output,
+        )
     )

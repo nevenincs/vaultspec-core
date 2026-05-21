@@ -64,7 +64,11 @@ def _emit_sync_result(
     title = f"{label} sync" + (" (dry run)" if dry_run else "")
     extra = {"warnings": result.warnings} if result.warnings else None
     code = emit_outcomes(
-        outcomes, title=title, json_output=json_output, extra_json=extra
+        outcomes,
+        command=f"spec.{label.lower()}.sync",
+        title=title,
+        json_output=json_output,
+        extra_json=extra,
     )
 
     if result.warnings and not json_output:
