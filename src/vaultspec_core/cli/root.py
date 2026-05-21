@@ -278,6 +278,13 @@ def cmd_install(
         )
         raise typer.Exit(code=1)
 
+    # Preflight rewrites a stale managed gitignore block, so capture
+    # whether this workspace is still on the pre-reversal policy first -
+    # an upgrade that carries it across prints the sharing-policy notice.
+    from vaultspec_core.core.gitignore import block_is_pre_reversal
+
+    gitignore_was_pre_reversal = upgrade and not dry_run and block_is_pre_reversal(path)
+
     _run_preflight(
         path,
         action=CliAction.UPGRADE if upgrade else CliAction.INSTALL,
@@ -311,6 +318,7 @@ def cmd_install(
             Outcome,
             OutcomeItem,
             emit_outcomes,
+            render_sharing_policy,
         )
         from vaultspec_core.cli_common import get_version
 
@@ -329,15 +337,18 @@ def cmd_install(
         version = get_version()
         verb = "Upgrade preview" if result.get("dry_run") else "Upgrade"
         title = f"{verb} {version} → {path}"
-        raise typer.Exit(
-            emit_outcomes(
-                outcomes,
-                command="install",
-                title=title,
-                json_output=json_output,
-                extra_json={"version": version},
-            )
+        code = emit_outcomes(
+            outcomes,
+            command="install",
+            title=title,
+            json_output=json_output,
+            extra_json={"version": version},
         )
+        # Surface the new sharing policy when this upgrade carried the
+        # workspace off the pre-reversal team-hidden gitignore policy.
+        if not json_output and gitignore_was_pre_reversal:
+            render_sharing_policy()
+        raise typer.Exit(code)
 
     if json_output:
         import json
@@ -370,7 +381,10 @@ def cmd_install(
         ]
         render_dry_run_tree(dry_items, title=f"Install preview → {path}")
     else:
-        from vaultspec_core.cli.rendering import render_install_summary
+        from vaultspec_core.cli.rendering import (
+            render_install_summary,
+            render_sharing_policy,
+        )
 
         render_install_summary(
             result.get("source_counts", {}),
@@ -378,6 +392,7 @@ def cmd_install(
             providers=result.get("providers", []),
             has_mcp=result.get("has_mcp", False),
         )
+        render_sharing_policy()
 
 
 @app.command("uninstall")

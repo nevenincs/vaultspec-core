@@ -452,6 +452,27 @@ def render_install_summary(
     console.print()
 
 
+def render_sharing_policy() -> None:
+    """Print the spec-layer sharing-policy statement.
+
+    Per the cli-spec-gitignore ADR, install and upgrade state the
+    team-shared default plainly so an operator knows authored content
+    reaches teammates and only runtime by-products stay local.
+    """
+    console = get_console()
+    console.print("[bold]Sharing policy[/bold]")
+    console.print(
+        "  [dim].vaultspec/[/dim] (rules, skills, agents, system), "
+        "[dim]CLAUDE.md[/dim], and [dim].mcp.json[/dim] are committed to git "
+        "so teammates inherit your project policy."
+    )
+    console.print(
+        "  Runtime by-products ([dim].vaultspec/_snapshots/[/dim], lock "
+        "files, [dim]providers.json[/dim]) stay local."
+    )
+    console.print()
+
+
 def render_uninstall_summary(
     removed: Sequence[tuple[str, str]], *, path: str, keep_vault: bool = True
 ) -> None:

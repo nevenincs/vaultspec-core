@@ -77,6 +77,36 @@ def get_recommended_entries(target: Path) -> list[str]:
     return sorted(entries)
 
 
+# Managed-block entries the cli-spec-gitignore reversal removed. Their
+# presence marks a block still on the pre-reversal team-hidden policy.
+_PRE_REVERSAL_MARKERS = (".vaultspec/", ".mcp.json")
+
+
+def block_is_pre_reversal(target: Path) -> bool:
+    """Return ``True`` when ``.gitignore``'s managed block predates the reversal.
+
+    A managed block that still lists ``.vaultspec/`` wholesale or
+    ``.mcp.json`` is on the pre-``cli-spec-gitignore`` policy that hid
+    team-shared content from teammates. Callers use this to decide
+    whether an upgrade should surface the sharing-policy statement.
+
+    Args:
+        target: Workspace root directory containing ``.gitignore``.
+    """
+    gi_path = target / ".gitignore"
+    if not gi_path.exists():
+        return False
+    try:
+        lines = gi_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return False
+    begins, ends = _find_markers(lines)
+    if len(begins) != 1 or len(ends) != 1 or begins[0] >= ends[0]:
+        return False
+    block = {line.strip() for line in lines[begins[0] + 1 : ends[0]]}
+    return any(marker in block for marker in _PRE_REVERSAL_MARKERS)
+
+
 def _collect_provider_artifacts(
     path: Path, tool: ManagedState | Tool
 ) -> tuple[list[Path], list[Path]]:

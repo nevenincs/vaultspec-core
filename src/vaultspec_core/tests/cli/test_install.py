@@ -80,3 +80,46 @@ class TestInstallPathSafety:
         runner.invoke(app, ["-t", str(target), "install", "--dry-run"])
         # The key invariant: dry-run must never create the target directory
         assert not target.exists()
+
+
+class TestSharingPolicy:
+    """install and upgrade state the team-shared gitignore policy."""
+
+    def test_install_prints_sharing_policy(self, tmp_path, runner):
+        """A fresh install states the spec-layer sharing policy plainly."""
+        result = runner.invoke(app, ["-t", str(tmp_path), "install"])
+        assert result.exit_code == 0, result.output
+        assert "Sharing policy" in result.output
+
+    def test_dry_run_install_omits_sharing_policy(self, tmp_path, runner):
+        """A dry-run previews changes; it does not state the policy."""
+        result = runner.invoke(app, ["-t", str(tmp_path), "install", "--dry-run"])
+        assert result.exit_code == 0
+        assert "Sharing policy" not in result.output
+
+    def test_upgrade_off_pre_reversal_block_prints_sharing_policy(
+        self, tmp_path, runner
+    ):
+        """Upgrading a workspace still on the pre-reversal policy states it."""
+        from vaultspec_core.core.gitignore import MARKER_BEGIN, MARKER_END
+
+        runner.invoke(app, ["-t", str(tmp_path), "install"])
+        # Plant a pre-reversal managed block (blanket-ignores the spec layer).
+        old_block = "\n".join(
+            [MARKER_BEGIN, ".vaultspec/", ".mcp.json", ".vault/logs/", MARKER_END]
+        )
+        (tmp_path / ".gitignore").write_text(
+            f"# project\n\n{old_block}\n", encoding="utf-8"
+        )
+
+        result = runner.invoke(app, ["-t", str(tmp_path), "install", "--upgrade"])
+        assert result.exit_code == 0, result.output
+        assert "Sharing policy" in result.output
+
+    def test_upgrade_of_current_workspace_omits_sharing_policy(self, tmp_path, runner):
+        """Re-upgrading an already-team-shared workspace stays quiet."""
+        runner.invoke(app, ["-t", str(tmp_path), "install"])
+
+        result = runner.invoke(app, ["-t", str(tmp_path), "install", "--upgrade"])
+        assert result.exit_code == 0, result.output
+        assert "Sharing policy" not in result.output
