@@ -16,10 +16,12 @@ MARKER_BEGIN = "# >>> vaultspec-managed (do not edit this block) >>>"
 MARKER_END = "# <<< vaultspec-managed <<<"
 
 # Internal state that must ALWAYS be ignored if gitignore is managed.
-DEFAULT_ENTRIES = [".vaultspec/_snapshots/"]
+# `.vaultspec/` is an install artefact in any consumer project; the
+# canonical source content lives bundled in `src/vaultspec_core/builtins/`.
+DEFAULT_ENTRIES = [".vaultspec/"]
 
 
-def get_recommended_entries(target: Path, *, dev: bool = False) -> list[str]:
+def get_recommended_entries(target: Path) -> list[str]:
     """Return a list of gitignore entries for all managed paths.
 
     Uses :class:`~vaultspec_core.core.types.WorkspaceContext` and manifest
@@ -27,37 +29,15 @@ def get_recommended_entries(target: Path, *, dev: bool = False) -> list[str]:
 
     Args:
         target: Workspace root directory.
-        dev: ``True`` when running in source-repo mode (caller passed
-            ``--dev``).  In that mode the bare ``.vaultspec/`` line is
-            **omitted** because ``.vaultspec/rules/`` is the canonical,
-            version-controlled source content (bundled into the wheel as
-            ``vaultspec_core/builtins/`` via ``pyproject.toml``
-            ``force-include``); a blanket ignore would silently swallow
-            new agents/skills/templates added under ``.vaultspec/rules/``
-            from ``git status``.  The truly-generated children
-            (``_snapshots/``, ``*.lock``, ``providers.json``) stay
-            ignored in both modes.  See GitHub issue #88.
     """
     entries: set[str] = set()
 
     from .manifest import read_manifest_data
 
     try:
-        # Internal state that must ALWAYS be ignored if framework exists
         framework_installed = (target / ".vaultspec").is_dir()
         if framework_installed:
-            entries.add(".vaultspec/_snapshots/")
-            if not dev:
-                entries.add(".vaultspec/")
-            # Advisory-lock sentinels left by helpers.advisory_lock on any
-            # file persisted under .vaultspec/ (providers.json, etc.).
-            entries.add(".vaultspec/*.lock")
-            # In dev-mode the bare .vaultspec/ rule isn't there to mask
-            # providers.json; explicitly ignore it because it's local
-            # install state (manifest of which providers are deployed),
-            # not source-of-truth content.
-            if dev:
-                entries.add(".vaultspec/providers.json")
+            entries.update(DEFAULT_ENTRIES)
         if (target / ".vault").is_dir():
             entries.add(".vault/.obsidian/")
             entries.add(".vault/.trash/")

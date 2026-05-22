@@ -387,8 +387,14 @@ class TestDoctorV1Manifest:
         manifest_path.write_text(json.dumps(v1_data, indent=2), encoding="utf-8")
 
         result = factory.run("spec", "doctor")
-        # Should not crash -- should handle gracefully
-        assert result.exit_code in (0, 1, 2)
+        # V1 manifest must be handled gracefully: no crash (exit 2), and
+        # the legacy-manifest pathway either reports the framework as
+        # present or surfaces a recoverable warning. Exit code 2 is the
+        # Typer crash signal and must never be tolerated here.
+        assert result.exit_code in (0, 1), (
+            f"v1 manifest crashed doctor: exit={result.exit_code}\n{result.output}"
+        )
+        assert "framework" in result.output.lower()
 
     def test_doctor_json_on_v1_manifest(self, tmp_path: Path) -> None:
         factory = WorkspaceFactory(tmp_path)

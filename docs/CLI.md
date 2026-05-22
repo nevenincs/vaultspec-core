@@ -1,7 +1,7 @@
 # vaultspec-core CLI reference
 
 Complete command-line interface (CLI) reference for `vaultspec-core`. See the
-[framework manual](./README.md) for workflows and concepts.
+[framework manual](./framework.md) for workflows and concepts.
 
 ## Entry points
 
@@ -146,7 +146,6 @@ Deploy the vaultspec framework into the target directory.
 | `--dry-run` | off     | Preview without writing                 |
 | `--force`   | off     | Overwrite existing installation         |
 | `--skip`    | `[]`    | Skip specific sync passes (repeatable)  |
-| `--dev`     | off     | Permit running inside the source repo   |
 | `--json`    | off     | Emit machine-readable output            |
 
 `core` installs `.vaultspec/` only, without any provider config.
@@ -175,7 +174,6 @@ Remove the vaultspec framework from the target directory.
 | `--dry-run`      | off     | Preview without deleting                       |
 | `--force`        | off     | Required to execute (uninstall is destructive) |
 | `--skip`         | `[]`    | Skip specific removal passes (repeatable)      |
-| `--dev`          | off     | Permit running inside the source repo          |
 | `--json`         | off     | Emit machine-readable output                   |
 
 `.vault/` is preserved by default. Pass `--remove-vault` to delete it.
@@ -210,7 +208,6 @@ edits.
 | `--dry-run` | off     | Preview changes without writing                       |
 | `--force`   | off     | Prune stale files and overwrite user-authored content |
 | `--skip`    | `[]`    | Skip specific sync passes (repeatable)                |
-| `--dev`     | off     | Permit running inside the source repo                 |
 | `--json`    | off     | Emit machine-readable output                          |
 
 ## Vault commands
@@ -764,15 +761,14 @@ overridden by the `--target` flag.
 | `VAULTSPEC_IO_BUFFER_SIZE`        | int  | `8192`       | I/O read buffer size in bytes                                                                                                                                                                                     |
 | `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int  | `1000000`    | Subprocess stdout capture limit in bytes                                                                                                                                                                          |
 | `VAULTSPEC_LOG_LEVEL`             | str  | `INFO`       | Root log level for the CLI, for example `DEBUG`, `INFO`, or `WARNING`. Overridden by `--debug` when set.                                                                                                          |
-| `VAULTSPEC_ALLOW_DEV_WRITES`      | bool | unset        | Bypass the development-write guard that blocks source-repo writes. Accepts `1`/`true`/`yes`. Use with care - intended for fixture and test automation only.                                                       |
 | `VAULTSPEC_EDITOR`                | str  | `zed -w`     | Editor command for `vaultspec-core spec {rules\|skills\|agents} edit`. Set to your preferred editor, for example `code -w` or `vim`.                                                                              |
 
 ## See also
 
-| Document                        | What it covers                                  |
-| ------------------------------- | ----------------------------------------------- |
-| [Framework manual](./README.md) | Development workflow, skills, and customization |
-| [MCP reference](./MCP.md)       | MCP server tools, setup, and configuration      |
+| Document                           | What it covers                                  |
+| ---------------------------------- | ----------------------------------------------- |
+| [Framework manual](./framework.md) | Development workflow, skills, and customization |
+| [MCP reference](./MCP.md)          | MCP server tools, setup, and configuration      |
 
 For bug reports and feature requests, open an issue on the
 [vaultspec-core issue tracker](https://github.com/wgergely/vaultspec-core/issues).

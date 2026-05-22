@@ -33,7 +33,7 @@ pytestmark = [pytest.mark.unit]
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
-_AGENTS_SRC = _REPO_ROOT / ".vaultspec" / "rules" / "agents"
+_AGENTS_SRC = _REPO_ROOT / "src" / "vaultspec_core" / "builtins" / "agents"
 _GEMINI_TOOL_SET = frozenset(t.value for t in GeminiBuiltinTool)
 
 # URL of the upstream gemini-cli source file that defines the canonical

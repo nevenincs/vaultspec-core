@@ -123,7 +123,7 @@ class TestGitignoreCorruptionRepair:
         repaired = gi.read_text(encoding="utf-8")
         assert MARKER_BEGIN in repaired
         assert MARKER_END in repaired
-        assert ".vaultspec/_snapshots/" in repaired
+        assert ".vaultspec/" in repaired
 
 
 class TestFullLifecycleRecovery:
@@ -134,12 +134,15 @@ class TestFullLifecycleRecovery:
         result = runner.invoke(app, ["-t", str(tmp_path), "install"])
         assert result.exit_code == 0
 
-        # 2. Doctor: should be healthy
+        # 2. Doctor: should be healthy on a freshly-installed workspace.
         result = runner.invoke(
             app,
             ["spec", "doctor", "--target", str(tmp_path)],
         )
-        assert result.exit_code in (0, 1)  # 0 or 1 (warnings ok)
+        assert result.exit_code == 0, (
+            f"clean install reported unhealthy: exit={result.exit_code}\n"
+            f"{result.output}"
+        )
 
         # 3. Corrupt manifest
         manifest = tmp_path / ".vaultspec" / "providers.json"
@@ -152,22 +155,27 @@ class TestFullLifecycleRecovery:
         )
         assert result.exit_code == 2  # error
 
-        # 5. Sync --force: should repair and sync
+        # 5. Sync --force: must repair the corrupted manifest and sync.
         result = runner.invoke(app, ["-t", str(tmp_path), "sync", "--force"])
-        # May exit 0 or 1 depending on warnings - but should not crash
-        assert result.exit_code in (0, 1)
+        assert result.exit_code == 0, (
+            f"sync --force did not recover cleanly: exit={result.exit_code}\n"
+            f"{result.output}"
+        )
 
         # 6. Verify manifest is repaired
         raw = json.loads(manifest.read_text(encoding="utf-8"))
         assert "installed" in raw
         assert len(raw["installed"]) > 0
 
-        # 7. Doctor again: should be healthier
+        # 7. Doctor again: workspace must be fully healthy after recovery.
         result = runner.invoke(
             app,
             ["spec", "doctor", "--target", str(tmp_path)],
         )
-        assert result.exit_code in (0, 1)
+        assert result.exit_code == 0, (
+            f"post-recovery doctor reported unhealthy: exit={result.exit_code}\n"
+            f"{result.output}"
+        )
 
 
 class TestMultipleCorruptions:
@@ -189,9 +197,12 @@ class TestMultipleCorruptions:
         content = content.replace(MARKER_END, "")
         gi.write_text(content, encoding="utf-8")
 
-        # 3. Sync --force
+        # 3. Sync --force must repair all three corruptions cleanly.
         result = runner.invoke(app, ["-t", str(tmp_path), "sync", "--force"])
-        assert result.exit_code in (0, 1)
+        assert result.exit_code == 0, (
+            f"sync --force did not repair multi-corruption: "
+            f"exit={result.exit_code}\n{result.output}"
+        )
 
         # 4. Verify ALL repairs:
         # - manifest valid

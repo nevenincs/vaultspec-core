@@ -348,7 +348,13 @@ class TestVaultJsonOutput:
 class TestNoCommand:
     def test_no_command_prints_help(self, runner, synthetic_project):
         result = runner.invoke(app, ["--target", str(synthetic_project), "vault"])
-        # vault_app uses no_args_is_help=True, which Typer reports as exit code 0
-        # but the CliRunner may return 2 depending on version; accept both.
-        assert result.exit_code in (0, 2)
-        assert "add" in result.output or "Usage" in result.output
+        # vault_app uses no_args_is_help=True. The actual contract is that
+        # help is rendered to output; the exit code is a Typer-version
+        # implementation detail (0 in newer Typer, 2 in older), so we
+        # assert on the rendered help block, not the exit code.
+        assert "Usage" in result.output, (
+            f"vault command without args did not render help: {result.output}"
+        )
+        assert "add" in result.output, (
+            f"vault help did not list the 'add' subcommand: {result.output}"
+        )

@@ -229,6 +229,36 @@ class TestUpgradeEdgeCases:
 class TestInstallSkip:
     """--skip must exclude the named component."""
 
+    def test_install_core_scaffolds_framework_only(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        """`install core` scaffolds `.vaultspec/` and zero provider directories.
+
+        Contract: the `core` provider installs the framework directory only
+        (`docs/CLI.md`: "core installs `.vaultspec/` only, without any
+        provider config"). `init_run` enforces this via
+        `_PROVIDER_TO_TOOLS["core"] == []`, so no provider tool is enrolled.
+
+        The post-init `sync_provider` call maps `core` to the `all` sync
+        target, but that pass only ever propagates to *enrolled* providers.
+        With none enrolled it is a no-op for provider config; on a later
+        `install --upgrade core` against an existing install it correctly
+        re-propagates the re-seeded builtins to whatever providers are
+        already enrolled. This test pins the fresh-install half of that
+        contract: no provider directory may appear from `install core`.
+        """
+        factory.create_gitignore()
+        factory.install(provider="core")
+
+        assert (factory.root / ".vaultspec").is_dir(), (
+            "`install core` did not scaffold the framework directory"
+        )
+        for provider in ("claude", "gemini", "antigravity", "codex"):
+            assert not factory.provider_dir_exists(provider), (
+                f"`install core` created the {provider} provider directory; "
+                "core must scaffold the framework only"
+            )
+
     def test_skip_core_installs_provider_only(self, factory: WorkspaceFactory) -> None:
         # Pre-create .vaultspec/ so core scaffold is present
         (factory.root / ".vaultspec" / "rules" / "rules").mkdir(
@@ -240,6 +270,133 @@ class TestInstallSkip:
         assert factory.provider_dir_exists("claude") or factory.provider_dir_exists(
             "gemini"
         ), "No provider dirs created when skipping core"
+
+    def test_skip_core_via_cli_does_not_log_sync_failure(
+        self, factory: WorkspaceFactory, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Regression: `install --skip core` must not crash `sync_provider`.
+
+        `sync_provider` rejects `core` in its skip set (`allow_core=False`).
+        `install_run` previously forwarded the unfiltered skip set, which
+        raised `ProviderError`. The error was caught by the post-sync
+        `try/except (VaultSpecError, OSError)` block and silently logged
+        as a warning, so the headline test only verified provider dirs
+        existed.  This test locks the absence of that warning.
+        """
+        import logging
+
+        # Pre-create .vaultspec/ so core scaffold is present.
+        (factory.root / ".vaultspec" / "rules" / "rules").mkdir(
+            parents=True, exist_ok=True
+        )
+        factory.create_gitignore()
+
+        caplog.set_level(logging.WARNING, logger="vaultspec_core.core.commands")
+        factory.install(skip={"core"})
+
+        sync_failures = [
+            record
+            for record in caplog.records
+            if "Sync failed during install" in record.getMessage()
+        ]
+        assert not sync_failures, (
+            "`install --skip core` produced sync-failure warnings; "
+            "sync_provider must receive a skip set with `core` filtered out: "
+            f"{[r.getMessage() for r in sync_failures]}"
+        )
+
+    def test_upgrade_without_force_preserves_user_authored_content(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        """Regression: `install --upgrade` (no `--force`) must preserve user files.
+
+        Pre-fix the upgrade path called
+        `sync_provider(sync_target, force=True, skip=skip - {"core"})`
+        with `force` hardcoded, ignoring the `force=force` parameter
+        threaded through `install_run`. That meant
+        `vaultspec-core install --upgrade` silently overwrote user-
+        authored system prompts and configs (files without the
+        vaultspec managed-block marker) every time, breaking the
+        documented contract where `--upgrade` and `--force` are
+        independent flags.
+
+        This test installs, replaces `.gemini/SYSTEM.md` with content
+        lacking the vaultspec marker, then runs `install --upgrade`
+        without `force=True`. The user-authored content MUST survive.
+        Paired with `test_install_force_propagates_to_sync_provider`,
+        these two tests lock the full `--force`/`--upgrade` matrix:
+        force=True overwrites, force=False preserves, on both paths.
+        """
+        factory.install()
+
+        system_file = factory.root / DirName.GEMINI / "SYSTEM.md"
+        assert system_file.exists(), (
+            "gemini SYSTEM.md must exist after a clean install for this "
+            f"regression test to be meaningful (looked at {system_file})"
+        )
+
+        # User-authored content without the vaultspec managed-block marker.
+        sentinel = (
+            "user-authored upgrade-preservation sentinel without vaultspec marker"
+        )
+        system_file.write_text(sentinel, encoding="utf-8")
+
+        # `--upgrade` without `--force`: sync_provider's force= must be
+        # False so user-authored files are skipped (with a warning), not
+        # overwritten.
+        factory.install(upgrade=True)
+
+        survived = system_file.read_text(encoding="utf-8")
+        assert survived == sentinel, (
+            "`install --upgrade` (no --force) overwrote user-authored "
+            "content. The sync pass is receiving force=True unconditionally "
+            "on the upgrade path; user content is not safe across upgrades."
+        )
+
+    def test_install_force_propagates_to_sync_provider(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        """Regression: `install --force` must overwrite user-authored system files.
+
+        The fresh-install path used to call
+        `sync_provider(sync_target, skip=skip - {"core"})` without
+        forwarding `force=force`. `sync_provider`'s `system_sync` pass
+        preserves user-authored content (files lacking the vaultspec
+        managed-block marker) unless `force=True` is set, so an
+        `install --force` invocation would silently leave a
+        user-replaced `.gemini/SYSTEM.md` unchanged and only emit a
+        skipped-with-warning entry.
+
+        This test replaces `.gemini/SYSTEM.md` with content that does
+        NOT carry the vaultspec marker (i.e., looks user-authored),
+        re-runs install with `force=True`, and asserts the file was
+        overwritten with the canonical scaffold. Without `force=force`
+        propagation, the sync pass skips the file and the sentinel
+        survives.
+        """
+        factory.install()
+
+        system_file = factory.root / DirName.GEMINI / "SYSTEM.md"
+        assert system_file.exists(), (
+            "gemini SYSTEM.md must exist after a clean install for this "
+            f"regression test to be meaningful (looked at {system_file})"
+        )
+
+        # Write user-authored content with NO vaultspec marker so the
+        # sync pass treats it as user-owned and only overwrites under
+        # force.
+        sentinel = "user-authored sentinel without vaultspec marker"
+        system_file.write_text(sentinel, encoding="utf-8")
+
+        factory.install(force=True)
+
+        restored = system_file.read_text(encoding="utf-8")
+        assert sentinel not in restored, (
+            "`install --force` did not overwrite the user-authored "
+            "`.gemini/SYSTEM.md`. The sync pass is not receiving "
+            "`force=force`; user-authored content survives a forced "
+            "install."
+        )
 
     def test_skip_provider_installs_others(self, factory: WorkspaceFactory) -> None:
         factory.create_gitignore()

@@ -125,9 +125,9 @@ _dev-lint-type:
 
 _dev-lint-links:
   @{{ if os() == "windows" { \
-    "if (Get-Command lychee -ErrorAction SilentlyContinue) { lychee --config lychee.toml README.md .vault .vaultspec } elseif (Get-Command docker -ErrorAction SilentlyContinue) { docker run --rm -v '${PWD}:/repo' -w /repo lycheeverse/lychee:latest --config /repo/lychee.toml README.md .vault .vaultspec } else { Write-Error 'lychee not found and docker is unavailable'; exit 127 }" \
+    "if (Get-Command lychee -ErrorAction SilentlyContinue) { lychee --config lychee.toml README.md docs .vault src/vaultspec_core/builtins } elseif (Get-Command docker -ErrorAction SilentlyContinue) { docker run --rm -v '${PWD}:/repo' -w /repo lycheeverse/lychee:latest --config /repo/lychee.toml README.md docs .vault src/vaultspec_core/builtins } else { Write-Error 'lychee not found and docker is unavailable'; exit 127 }" \
   } else { \
-    "if command -v lychee >/dev/null 2>&1; then lychee --config lychee.toml README.md .vault .vaultspec; elif command -v docker >/dev/null 2>&1; then docker run --rm -v \"$PWD:/repo\" -w /repo lycheeverse/lychee:latest --config /repo/lychee.toml README.md .vault .vaultspec; else echo 'lychee not found and docker is unavailable' >&2; exit 127; fi" \
+    "if command -v lychee >/dev/null 2>&1; then lychee --config lychee.toml README.md docs .vault src/vaultspec_core/builtins; elif command -v docker >/dev/null 2>&1; then docker run --rm -v \"$PWD:/repo\" -w /repo lycheeverse/lychee:latest --config /repo/lychee.toml README.md docs .vault src/vaultspec_core/builtins; else echo 'lychee not found and docker is unavailable' >&2; exit 127; fi" \
   } }}
 
 _dev-lint-toml:
@@ -138,9 +138,9 @@ _dev-lint-toml:
   } }}
 
 _dev-lint-markdown:
-  uv run mdformat --check README.md .vaultspec/ .vault/
-  uv run mdformat --wrap 88 --check README.md .vaultspec/README.md .vaultspec/MCP.md .vaultspec/CLI.md .vaultspec/rules
-  uv run pymarkdown --config .pymarkdown.json scan -r README.md .vaultspec/ .vault/
+  uv run mdformat --check README.md docs/ .vault/ src/vaultspec_core/builtins/
+  uv run mdformat --wrap 88 --check README.md docs/framework.md docs/MCP.md docs/CLI.md src/vaultspec_core/builtins
+  uv run pymarkdown --config .pymarkdown.json scan -r README.md docs/ .vault/ src/vaultspec_core/builtins/
 
 _dev-lint-workflow:
   @{{ if os() == "windows" { \
@@ -184,9 +184,9 @@ _dev-fix-toml:
   } }}
 
 _dev-fix-markdown:
-  uv run mdformat README.md .vaultspec/ .vault/
-  uv run mdformat --wrap 88 README.md .vaultspec/README.md .vaultspec/MCP.md .vaultspec/CLI.md .vaultspec/rules
-  uv run pymarkdown --config .pymarkdown.json fix -r README.md .vaultspec/ .vault/
+  uv run mdformat README.md docs/ .vault/ src/vaultspec_core/builtins/
+  uv run mdformat --wrap 88 README.md docs/framework.md docs/MCP.md docs/CLI.md src/vaultspec_core/builtins
+  uv run pymarkdown --config .pymarkdown.json fix -r README.md docs/ .vault/ src/vaultspec_core/builtins/
 
 _dev-fix-vault:
   uv run vaultspec-core vault check all --fix

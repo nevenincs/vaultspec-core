@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
@@ -145,10 +146,23 @@ class TestVaultSpecConfig:
         # io_buffer_size has min_value=1
         old = os.environ.get("VAULTSPEC_IO_BUFFER_SIZE")
         os.environ["VAULTSPEC_IO_BUFFER_SIZE"] = "0"
+        caplog.set_level(logging.ERROR, logger="vaultspec_core.config.config")
         try:
             cfg = VaultSpecConfig.from_environment()
             assert cfg.io_buffer_size == 8192  # falls back to default
-            assert "below minimum" in caplog.text
+            matching = [
+                record
+                for record in caplog.records
+                if "below minimum" in record.getMessage()
+            ]
+            assert matching, (
+                f"expected a 'below minimum' log record; "
+                f"got {[r.getMessage() for r in caplog.records]}"
+            )
+            assert all(record.levelno == logging.ERROR for record in matching), (
+                f"'below minimum' record emitted at wrong level: "
+                f"{[record.levelname for record in matching]}"
+            )
         finally:
             if old is None:
                 os.environ.pop("VAULTSPEC_IO_BUFFER_SIZE", None)

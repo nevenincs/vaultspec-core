@@ -98,9 +98,20 @@ class TestSpecCliFallthrough:
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "vault", "check", "all"]
         )
-        # check all may find issues in the synthetic corpus, accept 0 or 1
-        assert result.exit_code in (0, 1)
+        # The synthetic_project fixture deterministically seeds documents
+        # that surface filename-rename warnings (n_docs=24, seed=42). The
+        # contract for that corpus is exit_code 1 with a non-empty
+        # rendered Vault Check report; exit 0 would mean the check
+        # pipeline missed the seeded warnings and exit 2 would mean it
+        # crashed.
+        assert result.exit_code == 1, (
+            f"vault check all on synthetic_project produced unexpected exit: "
+            f"exit={result.exit_code}\n{result.output}"
+        )
         assert "Vault Check" in result.output
+        assert "fix:" in result.output, (
+            f"synthetic corpus warnings did not surface fix hints: {result.output}"
+        )
 
     def test_unknown_command_fails(self, runner, synthetic_project):
         """``vaultspec nonexistent`` fails."""

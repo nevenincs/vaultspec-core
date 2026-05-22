@@ -152,6 +152,14 @@ jobs:
       - name: Install dependencies
         run: just dev deps sync
 
+      - name: Bootstrap framework
+        # The source repo no longer tracks .vaultspec/ (collapsed into the
+        # package source tree at src/vaultspec_core/builtins/). A fresh
+        # checkout has no .vaultspec/, so `vault check all` would fail with
+        # `vaultspec_dir does not exist`. Run install first to scaffold the
+        # workspace the same way any consumer would.
+        run: just prod install
+
       - name: Verify vault structure and links
         run: just prod vault check all
 

@@ -326,15 +326,18 @@ class TestRecommendedEntries:
         assert ".vault/data/" in entries
         assert ".vault/logs/" in entries
 
-    def test_vaultspec_snapshots_always_ignored(self, tmp_path):
-        (tmp_path / ".vaultspec").mkdir()
-        entries = get_recommended_entries(tmp_path)
-        assert ".vaultspec/_snapshots/" in entries
+    def test_vaultspec_dir_blanket_ignored(self, tmp_path):
+        """`.vaultspec/` itself is the install artefact and is ignored as a whole.
 
-    def test_vaultspec_lock_glob_covers_advisory_sentinels(self, tmp_path):
+        The previous shape emitted specialised `.vaultspec/_snapshots/`,
+        `.vaultspec/*.lock`, and `.vaultspec/providers.json` lines so canonical
+        rules content stayed tracked.  After the source-layout collapse, the
+        canonical content lives at `src/vaultspec_core/builtins/` and the bare
+        `.vaultspec/` rule subsumes every child.
+        """
         (tmp_path / ".vaultspec").mkdir()
         entries = get_recommended_entries(tmp_path)
-        assert ".vaultspec/*.lock" in entries
+        assert ".vaultspec/" in entries
 
     def test_root_lock_sentinel_when_companion_exists(self, tmp_path):
         (tmp_path / ".vaultspec").mkdir()
