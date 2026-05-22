@@ -2,8 +2,7 @@ set positional-arguments := false
 set shell := ["sh", "-cu"]
 set windows-shell := ["pwsh.exe", "-NoProfile", "-c"]
 
-image := "ghcr.io/wgergely/vaultspec-core"
-local_image := "vaultspec-core:local"
+
 
 default:
   @echo "Available commands:"
@@ -48,9 +47,8 @@ _dev-help:
   @echo "  lint      read-only static analysis (ruff, ty, taplo, markdownlint, ...)"
   @echo "  fix       auto-fix everything fixable (python, toml, markdown, vault)"
   @echo "  audit     supply-chain / security checks (uv audit)"
-  @echo "  test      pytest, docker smoke"
-  @echo "  build     uv build, docker build"
-  @echo "  publish   docker push"
+  @echo "  test      pytest"
+  @echo "  build     uv build"
   @echo "  precommit pre-commit hook management (install, upgrade, run)"
 
 # ===========================================================================
@@ -236,19 +234,13 @@ _dev-test-help:
   @echo ""
   @echo "Targets:"
   @echo "  python    Run pytest on Python source"
-  @echo "  docker    Run smoke test in Docker"
   @echo "  all       Run all tests"
 
 _dev-test-python:
   uv run pytest src/vaultspec_core -x -q --tb=short -m "unit and not gemini and not claude"
 
-_dev-test-docker:
-  just _dev-build-docker
-  docker run --rm {{ local_image }} vaultspec-core --help
-
 _dev-test-all:
   just _dev-test-python
-  just _dev-test-docker
 
 # ---------------------------------------------------------------------------
 
@@ -260,36 +252,13 @@ _dev-build-help:
   @echo ""
   @echo "Targets:"
   @echo "  python    Build Python package"
-  @echo "  docker    Build Docker image locally"
   @echo "  all       Run all builds"
 
 _dev-build-python:
   uv build
 
-_dev-build-docker:
-  docker buildx build --load -t {{ local_image }} .
-
 _dev-build-all:
   just _dev-build-python
-  just _dev-build-docker
-
-# ---------------------------------------------------------------------------
-
-_dev-publish target='--help' tag='':
-  @{{ if target == "--help" { "just _dev-publish-help" } else if target == "-h" { "just _dev-publish-help" } else if target == "help" { "just _dev-publish-help" } else { "just _dev-publish-" + target + " " + tag } }}
-
-_dev-publish-help:
-  @echo "Usage: just dev publish <target> <tag>"
-  @echo ""
-  @echo "Targets:"
-  @echo "  docker-ghcr   Publish docker image to GHCR"
-
-_dev-publish-docker-ghcr tag:
-  @{{ if os() == "windows" { \
-    "if (-not '" + tag + "') { Write-Error \"error: missing argument 'tag' for docker-ghcr\"; exit 1 }; docker buildx build --platform linux/amd64 --push -t " + image + ":" + tag + " ." \
-  } else { \
-    "if [ -z '" + tag + "' ]; then echo \"error: missing argument 'tag' for docker-ghcr\" >&2; exit 1; fi; docker buildx build --platform linux/amd64 --push -t " + image + ":" + tag + " ." \
-  } }}
 
 # ---------------------------------------------------------------------------
 
