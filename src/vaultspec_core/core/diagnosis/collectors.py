@@ -68,14 +68,6 @@ def _validate_tool_dir() -> None:
 def collect_framework_presence(target: Path) -> FrameworkSignal:
     """Check whether the vaultspec framework directory is present and valid.
 
-    On the vaultspec-core source repository ``.vaultspec/providers.json``
-    is intentionally absent because the manifest is an install artifact
-    written by :func:`~vaultspec_core.core.commands.install_run` on
-    consumer projects.  Consult
-    :func:`~vaultspec_core.core.guards._cached_is_dev_repo` before
-    declaring corruption so ``vaultspec-core spec doctor`` does not false-positive on
-    the source repo or any of its worktrees.  See GitHub issue #93.
-
     Args:
         target: Workspace root directory.
 
@@ -89,10 +81,6 @@ def collect_framework_presence(target: Path) -> FrameworkSignal:
 
     manifest_path = fw_dir / "providers.json"
     if not manifest_path.exists():
-        from ..guards import _cached_is_dev_repo
-
-        if _cached_is_dev_repo(str(target.resolve())):
-            return FrameworkSignal.PRESENT
         return FrameworkSignal.CORRUPTED
 
     try:

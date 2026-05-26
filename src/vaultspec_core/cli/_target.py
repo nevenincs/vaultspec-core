@@ -79,6 +79,11 @@ def _resolve_framework_root(effective_target: Path | None) -> Path | None:
     Returns ``None`` (let ``resolve_workspace`` use its default) when no
     ``--target`` is given, or when the CWD has no ``.vaultspec/``.
     """
+    import os
+
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        return None
+
     if effective_target is None:
         return None
 

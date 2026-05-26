@@ -27,9 +27,7 @@
 
 # Standard configs & tools
 justfile        text eol=lf
-Dockerfile      text eol=lf
 .gitignore      text eol=lf
-.dockerignore   text eol=lf
 .gitattributes  text eol=lf
 
 # Shell scripts

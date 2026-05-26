@@ -279,7 +279,7 @@ class TestFailureDoesNotBumpVersion:
         before = read_manifest_data(workspace).vaultspec_version
         registry = [_raising("broken", "0.2.0")]
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError, match="broken intentionally failed"):
             run_pending_migrations(workspace, registry=registry)
 
         after = read_manifest_data(workspace).vaultspec_version
@@ -288,7 +288,7 @@ class TestFailureDoesNotBumpVersion:
     def test_failure_is_retried_on_next_call(self, workspace: Path):
         # First call raises. After the failing entry is replaced, the
         # next call should pick up where it left off.
-        with pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError, match="broken intentionally failed"):
             run_pending_migrations(workspace, registry=[_raising("broken", "0.2.0")])
 
         # Replace with a successful version of the same target.

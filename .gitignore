@@ -26,15 +26,7 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Whitelist .vaultspec/lib
-!/.vaultspec/lib/
-!/.vaultspec/lib/**
-.vaultspec/lib/**/__pycache__/
-.vaultspec/lib/**/*.pyc
-.vaultspec/providers.json
-
 # Auto-generated temp files
-.vaultspec/.tmp/
 tmp/
 
 # PyInstaller
@@ -188,11 +180,6 @@ test-project/
 
 # Temporary reference files
 tmp-ref/
-
-# Builtins content — copied from .vaultspec/rules/ at build time
-src/vaultspec_core/builtins/*
-!src/vaultspec_core/builtins/__init__.py
-
 # >>> vaultspec-managed (do not edit this block) >>>
 .vault/.obsidian/
 .vault/.trash/

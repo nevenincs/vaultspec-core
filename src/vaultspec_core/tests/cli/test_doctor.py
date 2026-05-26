@@ -22,7 +22,10 @@ class TestDoctorCommand:
         factory = WorkspaceFactory(tmp_path)
         factory.install()
         result = factory.run("spec", "doctor")
-        assert result.exit_code in (0, 1)
+        assert result.exit_code == 0, (
+            f"freshly-installed workspace did not report healthy: "
+            f"exit={result.exit_code}\n{result.output}"
+        )
 
     def test_output_contains_framework(self, tmp_path: Path) -> None:
         factory = WorkspaceFactory(tmp_path)

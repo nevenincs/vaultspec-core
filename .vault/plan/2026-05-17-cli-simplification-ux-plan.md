@@ -23,7 +23,6 @@ related:
   - '[[2026-05-17-cli-paper-cuts-adr]]'
 ---
 
-
 # `cli-simplification-ux` `CLI simplification and UX hardening epic` plan
 
 ## Epic intent

@@ -1,9 +1,12 @@
-"""Guard against drift between the CLI command surface and `docs/CLI.md`.
+"""Guard against drift between the CLI surface and the bundled reference.
 
-Walks the Typer app tree, invokes ``--help`` on every visible leaf command, and
-asserts that every command name and every non-global option name appears in
-the handbook. Prevents silent regressions where a new command, subcommand, or
-flag lands without a documentation update.
+The bundled machine-facing reference at
+`src/vaultspec_core/builtins/reference/cli.md` is hand-authored. This test
+walks the live Typer command tree, invokes ``--help`` on every visible leaf
+command, and asserts that every command name and every non-global option
+name appears in the bundled reference. It mirrors `test_cli_handbook_drift`
+for the bundled reference so a new command, subcommand, or flag cannot land
+without a corresponding reference update.
 """
 
 from __future__ import annotations
@@ -24,11 +27,11 @@ pytestmark = [pytest.mark.integration]
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
-_HANDBOOK = _REPO_ROOT / "docs" / "CLI.md"
+_REFERENCE = _REPO_ROOT / "src" / "vaultspec_core" / "builtins" / "reference" / "cli.md"
 
 # Options carried through the global options table or otherwise inherited on
-# essentially every subcommand. Documenting them once at the top of CLI.md is
-# sufficient; per-command tables do not need to repeat them.
+# essentially every subcommand. Documenting them once at the top of the
+# reference is sufficient; per-command tables do not need to repeat them.
 _GLOBAL_FLAGS: frozenset[str] = frozenset(
     {"--help", "--target", "-t", "--debug", "-d", "--version", "-V"}
 )
@@ -122,12 +125,12 @@ def _extract_options(help_text: str) -> set[str]:
     return options
 
 
-def test_handbook_exists() -> None:
-    assert _HANDBOOK.is_file(), f"Missing handbook at {_HANDBOOK}"
+def test_reference_exists() -> None:
+    assert _REFERENCE.is_file(), f"Missing bundled CLI reference at {_REFERENCE}"
 
 
-def test_every_cli_command_is_documented() -> None:
-    handbook_text = _HANDBOOK.read_text(encoding="utf-8")
+def test_every_cli_command_is_in_reference() -> None:
+    reference_text = _REFERENCE.read_text(encoding="utf-8")
     leaf_paths = _collect_leaf_command_paths(app)
     group_paths = _collect_group_paths(app)
     assert leaf_paths, "CLI tree is empty; Typer app failed to register commands"
@@ -136,18 +139,19 @@ def test_every_cli_command_is_documented() -> None:
     for path in leaf_paths + group_paths:
         leaf = path[-1]
         full = " ".join(path)
-        if leaf in handbook_text or full in handbook_text:
+        if leaf in reference_text or full in reference_text:
             continue
         missing.append(full)
 
     assert not missing, (
-        "The following CLI commands are registered in code but not mentioned in "
-        f"{_HANDBOOK.relative_to(_REPO_ROOT)}:\n  - " + "\n  - ".join(sorted(missing))
+        "The following CLI commands are registered in code but not mentioned "
+        f"in {_REFERENCE.relative_to(_REPO_ROOT)}:\n  - "
+        + "\n  - ".join(sorted(missing))
     )
 
 
-def test_every_cli_option_is_documented() -> None:
-    handbook_text = _HANDBOOK.read_text(encoding="utf-8")
+def test_every_cli_option_is_in_reference() -> None:
+    reference_text = _REFERENCE.read_text(encoding="utf-8")
     cli = CliRunner(env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"})
 
     missing: list[str] = []
@@ -156,12 +160,12 @@ def test_every_cli_option_is_documented() -> None:
         for option in sorted(_extract_options(help_text)):
             if option in _GLOBAL_FLAGS:
                 continue
-            if option in handbook_text:
+            if option in reference_text:
                 continue
             missing.append(f"{' '.join(path)}  {option}")
 
     assert not missing, (
         "The following CLI options appear in `--help` but are not mentioned "
-        f"anywhere in {_HANDBOOK.relative_to(_REPO_ROOT)}:\n  - "
+        f"anywhere in {_REFERENCE.relative_to(_REPO_ROOT)}:\n  - "
         + "\n  - ".join(sorted(missing))
     )

@@ -666,8 +666,10 @@ class TestVaultRepair:
         )
 
         _render_repair_run(run)
-        output = capsys.readouterr().out
+        captured = capsys.readouterr()
+        output = captured.out
 
+        assert captured.err == "", f"unexpected stderr output: {captured.err!r}"
         assert "actionable failure" in output
         assert output.index("actionable failure") < output.index("warning 0")
         assert "warning 20" not in output
@@ -689,7 +691,9 @@ class TestVaultRepair:
         ]
 
         _render_repair_run(run)
-        output = capsys.readouterr().out
+        captured = capsys.readouterr()
+        output = captured.out
 
+        assert captured.err == "", f"unexpected stderr output: {captured.err!r}"
         assert "informational 0" not in output
         assert "3 INFO diagnostics hidden" in output

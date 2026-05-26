@@ -808,7 +808,6 @@ def install_run(
     dry_run: bool = False,
     force: bool = False,
     skip: set[str] | None = None,
-    dev: bool = False,
 ) -> dict[str, Any]:
     """Deploy the vaultspec framework to a project directory.
 
@@ -819,10 +818,6 @@ def install_run(
         dry_run: Preview the manifest of files that would be created.
         force: Override contents if installation already exists.
         skip: Set of component names to skip (``core`` and/or provider names).
-        dev: Authorise source-repo operation (the ``--dev`` flag).  Required
-            when *path* is the vaultspec-core source repository or one of
-            its worktrees; otherwise the dev-repo guard refuses the write.
-            See GitHub issue #88.
 
     Returns:
         A dict describing the result:
@@ -833,21 +828,15 @@ def install_run(
     Raises:
         ProviderError: If *provider* is invalid.
         ResourceExistsError: If already installed and *force*/*upgrade* not set.
-        DevRepoProtectionError: If *path* is the source repo and *dev* is
-            ``False``, or if *dev* is ``True`` but *path* is not the
-            source repo.
     """
     from vaultspec_core.config import reset_config
     from vaultspec_core.config.workspace import WorkspaceError, resolve_workspace
     from vaultspec_core.core.types import init_paths
 
     from .exceptions import ResourceExistsError
-    from .guards import guard_dev_repo
 
     _validate_provider(provider)
     skip = _validate_skip(skip)
-
-    guard_dev_repo(path, dev=dev)
 
     # Bootstrap a minimal context so downstream code can read target_dir
     _t.set_context(
@@ -957,7 +946,15 @@ def install_run(
         run_pending_migrations(path)
 
         sync_target = provider if provider not in ("all", "core") else "all"
-        sync_provider(sync_target, force=True, skip=skip, dev=dev)
+        # `sync_provider` rejects `core` in its skip set (`allow_core=False`).
+        # `install_run` accepts `core` because it skips the framework scaffold;
+        # filter it out before forwarding to the sync pass.
+        # Forward `force`: `--upgrade` and `--force` are separate flags;
+        # `install --upgrade` (without `--force`) must preserve user-authored
+        # content. The pre-collapse hardcoded `force=True` was an asymmetry
+        # against the fresh-install path and silently overwrote user content
+        # on every upgrade. See PR #116 review thread r3260188496.
+        sync_provider(sync_target, force=force, skip=skip - {"core"})
 
         if "precommit" not in skip:
             _scaffold_precommit(path)
@@ -1016,7 +1013,12 @@ def install_run(
 
     sync_target = provider if provider not in ("all", "core") else "all"
     try:
-        sync_provider(sync_target, skip=skip, dev=dev)
+        # Filter `core` out: `sync_provider` rejects it, but `install_run`
+        # accepts it as a "framework only, skip provider sync" hint.
+        # Forward `force`: `install --force` must propagate to the sync
+        # pass so user-authored system prompts and provider configs are
+        # overwritten consistently with the rest of the install.
+        sync_provider(sync_target, force=force, skip=skip - {"core"})
     except (VaultSpecError, OSError) as exc:
         logger.warning("Sync failed during install: %s", exc)
         post_errors.append(f"sync: {exc}")
@@ -1121,7 +1123,6 @@ def uninstall_run(
     dry_run: bool = False,
     force: bool = False,
     skip: set[str] | None = None,
-    dev: bool = False,
 ) -> dict[str, Any]:
     """Remove the vaultspec framework from a project directory.
 
@@ -1132,8 +1133,6 @@ def uninstall_run(
         dry_run: Preview what would be removed without deleting.
         force: Required to execute. Uninstall is destructive.
         skip: Set of component names to skip (``core`` and/or provider names).
-        dev: Authorise source-repo operation (the ``--dev`` flag).  See
-            GitHub issue #88.
 
     Returns:
         A dict describing the result:
@@ -1142,15 +1141,7 @@ def uninstall_run(
 
     Raises:
         ProviderError: If *provider* is invalid or *force* not set.
-        DevRepoProtectionError: If *path* is the source repo and *dev* is
-            ``False``, or if *dev* is ``True`` but *path* is not the
-            source repo.
     """
-    from .guards import guard_dev_repo
-
-    guard_dev_repo(path, dev=dev)
-
-    # Validate inputs before any state mutation
     _validate_provider(provider)
     skip = _validate_skip(skip)
 
@@ -1529,7 +1520,6 @@ def sync_provider(
     dry_run: bool = False,
     force: bool = False,
     skip: set[str] | None = None,
-    dev: bool = False,
 ) -> list[_t.SyncResult]:
     """Sync resources for a single provider target.
 
@@ -1546,8 +1536,6 @@ def sync_provider(
         dry_run: Preview changes without writing.
         force: Prune stale files and overwrite user-authored content.
         skip: Set of provider names to exclude from the sync.
-        dev: Authorise source-repo operation (the ``--dev`` flag).  See
-            GitHub issue #88.
 
     Returns:
         A list of :class:`SyncResult` objects from each sync pass.
@@ -1556,9 +1544,6 @@ def sync_provider(
         ProviderError: If *provider* is invalid.
         WorkspaceNotInitializedError: If ``.vaultspec/`` does not exist.
         ProviderNotInstalledError: If the specified provider is not installed.
-        DevRepoProtectionError: If the workspace is the source repo and
-            *dev* is ``False``, or if *dev* is ``True`` but the workspace
-            is not the source repo.
     """
     if provider not in SYNC_PROVIDERS:
         raise ProviderError(
@@ -1570,14 +1555,12 @@ def sync_provider(
 
     from .agents import agents_sync
     from .config_gen import config_sync
-    from .guards import guard_dev_repo
     from .mcps import mcp_sync as _mcp_sync
     from .rules import rules_sync
     from .skills import skills_sync
     from .system import system_sync
 
     ctx = _t.get_context()
-    guard_dev_repo(ctx.target_dir, dev=dev)
 
     def _empty_sync_results() -> list[_t.SyncResult]:
         return [_t.SyncResult() for _ in range(5)]

@@ -16,7 +16,9 @@ MARKER_BEGIN = "# >>> vaultspec-managed (do not edit this block) >>>"
 MARKER_END = "# <<< vaultspec-managed <<<"
 
 # Internal state that must ALWAYS be ignored if gitignore is managed.
-DEFAULT_ENTRIES = [".vaultspec/_snapshots/"]
+# `.vaultspec/` is an install artefact in any consumer project; the
+# canonical source content lives bundled in `src/vaultspec_core/builtins/`.
+DEFAULT_ENTRIES = [".vaultspec/"]
 
 
 def get_recommended_entries(target: Path) -> list[str]:

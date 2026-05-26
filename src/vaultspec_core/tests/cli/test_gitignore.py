@@ -326,15 +326,18 @@ class TestRecommendedEntries:
         assert ".vault/data/" in entries
         assert ".vault/logs/" in entries
 
-    def test_vaultspec_snapshots_always_ignored(self, tmp_path):
-        (tmp_path / ".vaultspec").mkdir()
-        entries = get_recommended_entries(tmp_path)
-        assert ".vaultspec/_snapshots/" in entries
+    def test_vaultspec_dir_not_blanket_ignored_but_runtime_ignored(self, tmp_path):
+        """`.vaultspec/` itself is team-shared and not blanket-ignored.
 
-    def test_vaultspec_lock_glob_covers_advisory_sentinels(self, tmp_path):
+        Only genuine per-machine runtime by-products (snapshots, advisory locks,
+        and the install manifest) are ignored.
+        """
         (tmp_path / ".vaultspec").mkdir()
         entries = get_recommended_entries(tmp_path)
+        assert ".vaultspec/" not in entries
+        assert ".vaultspec/_snapshots/" in entries
         assert ".vaultspec/*.lock" in entries
+        assert ".vaultspec/providers.json" in entries
 
     def test_root_lock_sentinel_when_companion_exists(self, tmp_path):
         (tmp_path / ".vaultspec").mkdir()

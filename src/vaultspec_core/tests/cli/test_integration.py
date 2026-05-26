@@ -22,8 +22,15 @@ class TestPathsEnvBridge:
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "vault", "check", "all"]
         )
-        # check all may find issues in the synthetic corpus, accept 0 or 1
-        assert result.exit_code in (0, 1)
+        # The synthetic_project fixture deterministically surfaces
+        # filename-rename warnings. The contract is exit_code 1 (warnings
+        # present, not a hard failure) with a non-empty Vault Check
+        # report; exit 2 would mean the path override crashed the check
+        # pipeline.
+        assert result.exit_code == 1, (
+            f"vault check all on synthetic_project produced unexpected exit: "
+            f"exit={result.exit_code}\n{result.output}"
+        )
         assert "Vault Check" in result.output
 
 

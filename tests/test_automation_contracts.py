@@ -33,7 +33,6 @@ def test_justfile_contains_required_recipes() -> None:
         "_dev-audit",
         "_dev-test",
         "_dev-build",
-        "_dev-publish",
         "_dev-precommit",
     }
     missing = [name for name in sorted(required) if not _recipe_exists(justfile, name)]
@@ -53,7 +52,6 @@ def test_justfile_exposes_approved_targets() -> None:
     assert "_dev-audit target='--help':" in justfile
     assert "_dev-test target='--help':" in justfile
     assert "_dev-build target='--help':" in justfile
-    assert "_dev-publish target='--help' tag='':" in justfile
     assert "_dev-precommit target='--help':" in justfile
     # Dev dispatch covers all verbs
     for verb in (
@@ -63,7 +61,6 @@ def test_justfile_exposes_approved_targets() -> None:
         "audit",
         "test",
         "build",
-        "publish",
         "precommit",
     ):
         assert verb in justfile
@@ -71,9 +68,8 @@ def test_justfile_exposes_approved_targets() -> None:
     for target in ("python", "type", "links", "toml", "markdown", "workflow"):
         assert target in justfile
     # Build/test sub-targets
-    for target in ("python", "docker", "all"):
+    for target in ("python", "all"):
         assert target in justfile
-    assert "docker-ghcr" in justfile
 
 
 def test_dependency_audit_uses_uv_native_scanner() -> None:
@@ -212,11 +208,9 @@ def test_lint_all_runs_every_validation_surface() -> None:
     assert "uv run ruff format --check src tests" in justfile
 
 
-def test_test_all_runs_python_and_docker() -> None:
+def test_test_all_runs_python() -> None:
     justfile = _read("justfile")
     assert "just _dev-test-python" in justfile
-    assert "just _dev-test-docker" in justfile
-    assert "just _dev-build-docker" in justfile
     assert "just _dev-build-python" in justfile
 
 
@@ -309,12 +303,13 @@ def test_prod_delegates_to_cli() -> None:
     assert "uv run vaultspec-core" in justfile
 
 
-def test_provider_capability_enum_covers_all_tools() -> None:
+def test_provider_capability_enum_covers_all_tools(tmp_path: Path) -> None:
     """Every Tool enum member must have a ToolConfig with non-empty capabilities."""
     from vaultspec_core.core.enums import Tool
     from vaultspec_core.core.types import init_paths
 
-    ctx = init_paths(ROOT)
+    (tmp_path / ".vaultspec").mkdir()
+    ctx = init_paths(tmp_path)
 
     for tool in Tool:
         cfg = ctx.tool_configs.get(tool)
@@ -322,12 +317,13 @@ def test_provider_capability_enum_covers_all_tools() -> None:
         assert cfg.capabilities, f"Tool {tool.value} has empty capabilities"
 
 
-def test_provider_capability_consistency() -> None:
+def test_provider_capability_consistency(tmp_path: Path) -> None:
     """Capability declarations must be consistent with ToolConfig fields."""
     from vaultspec_core.core.enums import ProviderCapability, Tool
     from vaultspec_core.core.types import init_paths
 
-    ctx = init_paths(ROOT)
+    (tmp_path / ".vaultspec").mkdir()
+    ctx = init_paths(tmp_path)
 
     for tool in Tool:
         cfg = ctx.tool_configs.get(tool)
@@ -353,12 +349,13 @@ def test_provider_capability_consistency() -> None:
             )
 
 
-def test_every_capability_has_at_least_one_provider() -> None:
+def test_every_capability_has_at_least_one_provider(tmp_path: Path) -> None:
     """Each ProviderCapability value must map to at least one provider."""
     from vaultspec_core.core.enums import ProviderCapability, Tool
     from vaultspec_core.core.types import init_paths
 
-    ctx = init_paths(ROOT)
+    (tmp_path / ".vaultspec").mkdir()
+    ctx = init_paths(tmp_path)
 
     for cap in ProviderCapability:
         providers = [

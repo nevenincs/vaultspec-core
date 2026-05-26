@@ -219,19 +219,6 @@ def cmd_install(
             help="Skip a component (core or provider name). Repeatable.",
         ),
     ] = None,
-    dev: Annotated[
-        bool,
-        typer.Option(
-            "--dev",
-            hidden=True,
-            help=(
-                "Authorise install in the vaultspec-core source repository "
-                "or one of its worktrees.  Without this flag the source-repo "
-                "guard refuses the write to protect canonical .vaultspec/ "
-                "content."
-            ),
-        ),
-    ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     no_hints: Annotated[
         bool,
@@ -307,7 +294,6 @@ def cmd_install(
             dry_run=dry_run,
             force=force,
             skip=set(skip),
-            dev=dev,
         )
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc, json_output=json_output)
@@ -457,18 +443,6 @@ def cmd_uninstall(
             help="Skip a component (core or provider name). Repeatable.",
         ),
     ] = None,
-    dev: Annotated[
-        bool,
-        typer.Option(
-            "--dev",
-            hidden=True,
-            help=(
-                "Authorise uninstall in the vaultspec-core source repository "
-                "or one of its worktrees.  Without this flag the source-repo "
-                "guard refuses the write."
-            ),
-        ),
-    ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Remove the vaultspec framework from the target directory.
@@ -514,7 +488,6 @@ def cmd_uninstall(
             dry_run=dry_run,
             force=force,
             skip=set(skip),
-            dev=dev,
         )
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc, json_output=json_output)
@@ -588,18 +561,6 @@ def cmd_sync(
             help="Skip a component (core or provider name). Repeatable.",
         ),
     ] = None,
-    dev: Annotated[
-        bool,
-        typer.Option(
-            "--dev",
-            hidden=True,
-            help=(
-                "Authorise sync in the vaultspec-core source repository "
-                "or one of its worktrees.  Without this flag the source-repo "
-                "guard refuses the write."
-            ),
-        ),
-    ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Sync rules, skills, agents, configs, system prompts, and MCPs.
@@ -650,9 +611,7 @@ def cmd_sync(
     from vaultspec_core.core.exceptions import VaultSpecError
 
     try:
-        results = sync_provider(
-            provider, dry_run=dry_run, force=force, skip=set(skip), dev=dev
-        )
+        results = sync_provider(provider, dry_run=dry_run, force=force, skip=set(skip))
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc, json_output=json_output)
         return
