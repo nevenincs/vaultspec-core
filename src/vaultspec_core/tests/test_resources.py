@@ -19,6 +19,7 @@ pytestmark = [pytest.mark.unit]
 
 def test_resource_edit_raises_clean_error_on_editor_launch_failure(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A failed editor launch must surface a VaultSpecError with a hint.
 
@@ -29,6 +30,9 @@ def test_resource_edit_raises_clean_error_on_editor_launch_failure(
     """
     rule = tmp_path / "demo.md"
     rule.write_text("body", encoding="utf-8")
+
+    # Force shutil.which to return None so that no fallback (like vi) can be resolved
+    monkeypatch.setattr("shutil.which", lambda cmd, mode=os.F_OK, path=None: None)
 
     old_editor = os.environ.get("VAULTSPEC_EDITOR")
     os.environ["VAULTSPEC_EDITOR"] = "vaultspec-no-such-editor-xyz"

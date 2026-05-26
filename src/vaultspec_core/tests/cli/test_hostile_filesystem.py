@@ -167,6 +167,12 @@ class TestFullLifecycleRecovery:
         assert "installed" in raw
         assert len(raw["installed"]) > 0
 
+        # Run pending migrations to resolve drift on the repaired manifest.
+        result = runner.invoke(app, ["-t", str(tmp_path), "migrations", "run"])
+        assert result.exit_code == 0, (
+            f"migrations run failed: exit={result.exit_code}\n{result.output}"
+        )
+
         # 7. Doctor again: workspace must be fully healthy after recovery.
         result = runner.invoke(
             app,

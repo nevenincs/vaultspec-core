@@ -91,12 +91,11 @@ def test_scaffold_precommit_repairs_non_canonical_entries() -> None:
     import yaml
 
     from vaultspec_core.core.commands import (
-        _DEPRECATED_HOOK_IDS,
         _scaffold_precommit,
     )
 
-    # Pick the first deprecated ID to simulate an old config
-    old_id = next(iter(_DEPRECATED_HOOK_IDS))
+    # Pick the first canonical ID to simulate an old config
+    old_id = next(iter(CANONICAL_HOOK_IDS))
 
     tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"precommit-repair-{uuid4().hex}"
     try:
