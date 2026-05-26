@@ -33,7 +33,6 @@ def test_justfile_contains_required_recipes() -> None:
         "_dev-audit",
         "_dev-test",
         "_dev-build",
-        "_dev-publish",
         "_dev-precommit",
     }
     missing = [name for name in sorted(required) if not _recipe_exists(justfile, name)]
@@ -53,7 +52,6 @@ def test_justfile_exposes_approved_targets() -> None:
     assert "_dev-audit target='--help':" in justfile
     assert "_dev-test target='--help':" in justfile
     assert "_dev-build target='--help':" in justfile
-    assert "_dev-publish target='--help' tag='':" in justfile
     assert "_dev-precommit target='--help':" in justfile
     # Dev dispatch covers all verbs
     for verb in (
@@ -63,7 +61,6 @@ def test_justfile_exposes_approved_targets() -> None:
         "audit",
         "test",
         "build",
-        "publish",
         "precommit",
     ):
         assert verb in justfile
@@ -71,9 +68,8 @@ def test_justfile_exposes_approved_targets() -> None:
     for target in ("python", "type", "links", "toml", "markdown", "workflow"):
         assert target in justfile
     # Build/test sub-targets
-    for target in ("python", "docker", "all"):
+    for target in ("python", "all"):
         assert target in justfile
-    assert "docker-ghcr" in justfile
 
 
 def test_dependency_audit_uses_uv_native_scanner() -> None:
@@ -204,11 +200,9 @@ def test_lint_all_runs_every_validation_surface() -> None:
     assert "uv run ruff format --check src tests" in justfile
 
 
-def test_test_all_runs_python_and_docker() -> None:
+def test_test_all_runs_python() -> None:
     justfile = _read("justfile")
     assert "just _dev-test-python" in justfile
-    assert "just _dev-test-docker" in justfile
-    assert "just _dev-build-docker" in justfile
     assert "just _dev-build-python" in justfile
 
 
