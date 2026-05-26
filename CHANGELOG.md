@@ -1,5 +1,58 @@
 # Changelog
 
+## [0.1.20](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.19...vaultspec-core-v0.1.20) (2026-05-26)
+
+
+### Features
+
+* **cli:** add --json to vault plan query for sibling parity (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([1d1a619](https://github.com/wgergely/vaultspec-core/commit/1d1a619000324f0a7004cf8526e8427aca6d9ea0))
+* **cli:** add --json to vault plan tier show for read-command parity (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([f533d8e](https://github.com/wgergely/vaultspec-core/commit/f533d8ee14e8d92186f5612d6a2e9dd75d703467))
+* **cli:** add --tier flag to vault add plan; close longest-lived audit friction (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([482205e](https://github.com/wgergely/vaultspec-core/commit/482205e7bc9b822641f0a1f7f2a4a246dd26c7e2))
+* **cli:** add canonical outcome vocabulary for sync-shaped surfaces (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([c4a94aa](https://github.com/wgergely/vaultspec-core/commit/c4a94aae6a6d37f5b97ff52952555ba365de8ed1))
+* **cli:** complete CLI CRUD simplification and next-step hints engine ([afe3616](https://github.com/wgergely/vaultspec-core/commit/afe36162060f438ec6e785d1f2df37b44f0ec461))
+* **cli:** envelope the migrations --json output (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([2585506](https://github.com/wgergely/vaultspec-core/commit/25855061df0e75e12cebcb6cfebd5e823c85d869))
+* **cli:** envelope the vault --json commands (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([6e8df18](https://github.com/wgergely/vaultspec-core/commit/6e8df18c8544c3db4dd7ecc3e914e5c08c269bdd))
+* **cli:** envelope the vault plan --json commands (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([1331c3b](https://github.com/wgergely/vaultspec-core/commit/1331c3be2b5e108f58ec40f48afb79215bdcc307))
+* **cli:** route install --upgrade through the canonical outcome renderer (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([30595b0](https://github.com/wgergely/vaultspec-core/commit/30595b0ae58a9b85ab3b5ab23f646d5d77c74818))
+* **cli:** route migrations run through the canonical outcome renderer (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([50d8d50](https://github.com/wgergely/vaultspec-core/commit/50d8d50ce105272b452f533dc8423b40cb7e1b93))
+* **cli:** route spec sync commands through the canonical outcome renderer (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([9e5b459](https://github.com/wgergely/vaultspec-core/commit/9e5b4591c404c7017cce34fe60923d8c370cc874))
+* **cli:** route the main sync command through a grouped outcome renderer (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([88c811e](https://github.com/wgergely/vaultspec-core/commit/88c811e15afd01dd909712c1179d42bda9e7aa7f))
+* **cli:** skip HTML-comment placeholders in hydration warning (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([673a5fb](https://github.com/wgergely/vaultspec-core/commit/673a5fb3aee2d5ee41c2b25452e1d1dcc43e20fd))
+* **cli:** state the spec-layer sharing policy on install and upgrade (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([04d2ad3](https://github.com/wgergely/vaultspec-core/commit/04d2ad3c16ddbc1a601320dc148741f312e01521))
+* **cli:** tier promote refuses TODO placeholders, requires real flags (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([e2d22d7](https://github.com/wgergely/vaultspec-core/commit/e2d22d7abec4dbc91f2fbb89a2962b3d8590ad59))
+* **cli:** wrap sync-family --json in the canonical envelope (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([d6dae81](https://github.com/wgergely/vaultspec-core/commit/d6dae81251a61090a7e69a28165b95ab0005e620))
+* **cli:** wrap the vault check family --json in the canonical envelope (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([1ccf649](https://github.com/wgergely/vaultspec-core/commit/1ccf649192296f744c83065ef0c2b53bbba8296f))
+* **gitignore:** make the spec layer team-shared by default (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([c10c778](https://github.com/wgergely/vaultspec-core/commit/c10c778aa1b28d7a8de7cd1beea011bb2de77be3))
+* **migrations:** rewrite stale gitignore blocks to the shared policy (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([6eac911](https://github.com/wgergely/vaultspec-core/commit/6eac9119d81145680cd7e9d537ebd61d38634e6c))
+
+
+### Bug Fixes
+
+* **ci:** fall back when uv audit cannot decode OSV response ([1262aee](https://github.com/wgergely/vaultspec-core/commit/1262aee0c9ca41c0bccaa1a9147e8f7b700488fc))
+* **ci:** make the dependency audit resilient to uv's OSV decoder bug (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([5e1ff91](https://github.com/wgergely/vaultspec-core/commit/5e1ff919df0ac934525599d68fcdc987d76121ae))
+* **ci:** reconcile cli simplification checks ([5e740b9](https://github.com/wgergely/vaultspec-core/commit/5e740b97f46e9dcd5ed84d1186462e9716c17c85))
+* **ci:** repair markdown formatting + close W01.P03.S07 emit-time validator (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([0946b22](https://github.com/wgergely/vaultspec-core/commit/0946b22b4a96e5fa8f2e16e59477097c3f5a1f16))
+* **ci:** resolve Dependency Audit failures (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([bb24a07](https://github.com/wgergely/vaultspec-core/commit/bb24a070be3c33632921c08230b64acc2c774540))
+* **ci:** use unconditional --ignore for disputed pyjwt advisory (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([6036e48](https://github.com/wgergely/vaultspec-core/commit/6036e48d99801ed9d52b3f510db42dd2592719d8))
+* **cli:** accept bare names in spec revert and honor --json (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([8fc0b6f](https://github.com/wgergely/vaultspec-core/commit/8fc0b6f45ae715ac0df017dc8f12d64fb8645f1d))
+* **cli:** emit JSON error envelopes under --json (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([4f6f66c](https://github.com/wgergely/vaultspec-core/commit/4f6f66caa23634ca9024a0b9bb5b6b59b6c0dca8))
+* **cli:** fail cleanly when the editor cannot launch (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([4b1169f](https://github.com/wgergely/vaultspec-core/commit/4b1169f6d4f41840520887c3516fd4e3a5bfa96c))
+* **cli:** harden the sync "0 files" guard against the unchanged/skipped split (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([017358b](https://github.com/wgergely/vaultspec-core/commit/017358b01c477c566b56f9d3569b544459ad672f))
+* **cli:** hide the developer-only --dev flag from --help (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([27539e8](https://github.com/wgergely/vaultspec-core/commit/27539e871b730b364168143aba24147d187de599))
+* **cli:** honor --json on errors across the spec and vault commands (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([b55d72d](https://github.com/wgergely/vaultspec-core/commit/b55d72d0c031435cf1afce860ba963313ab13b5c))
+* **cli:** keep vault add --json stdout free of advisory text (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([6d0293e](https://github.com/wgergely/vaultspec-core/commit/6d0293ef3aa9cf40400849102856875bae9de69e))
+* **cli:** make check --fix guidance honest in the text output (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([415435a](https://github.com/wgergely/vaultspec-core/commit/415435ade81c018fde861a1f460316a824968154))
+* **cli:** make sync --dry-run --json emit the canonical envelope (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([f57d790](https://github.com/wgergely/vaultspec-core/commit/f57d790e1e9a5060ab1ff9b0181a999b6fbaff27))
+* **cli:** make vault graph a plain command, not a subcommand-less group (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([6bd190f](https://github.com/wgergely/vaultspec-core/commit/6bd190f949105c62a90c47795b773eecd7530cf9))
+* **cli:** quiet the scoped-sync notice and stamp the upgrade version (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([114dade](https://github.com/wgergely/vaultspec-core/commit/114dadeebf9be6c122df51235d8bf7baeceb8f39))
+* **cli:** repair system/mcps sync output broken by S05 routing (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([4aad490](https://github.com/wgergely/vaultspec-core/commit/4aad49095551a4ebffc7e89e42247ab8d3bb9819))
+* **cli:** repair the install --upgrade --dry-run crash and stub preview (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([783e74f](https://github.com/wgergely/vaultspec-core/commit/783e74fddbf173053901b899f825b56715a0c014))
+* **cli:** stop the resolver warning about state install --upgrade fixes (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([35eee4c](https://github.com/wgergely/vaultspec-core/commit/35eee4ce518dcbf58c471a34993dfba48fd68aca))
+* reconcile gitignore, tier-promote bug, audit contract test (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([a461a9c](https://github.com/wgergely/vaultspec-core/commit/a461a9c1f6ca3d2755e306262b95a4ee48d124f4))
+* **vault:** escape diagnostic text so [[wiki-links]] render intact (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([c0d8bd9](https://github.com/wgergely/vaultspec-core/commit/c0d8bd9c2bc08dc73fdec4eec2c3eb53e16ff091))
+* **vault:** keep related: valid YAML when repair removes all entries (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([822e375](https://github.com/wgergely/vaultspec-core/commit/822e37563fbc1ccf68f3b72059f9ac31a14b9884))
+* **vault:** refuse to archive on an empty feature tag (refs [#113](https://github.com/wgergely/vaultspec-core/issues/113)) ([0e57f0b](https://github.com/wgergely/vaultspec-core/commit/0e57f0bf51ef464570293dd84eef48f27fba0308))
+
 ## [0.1.19](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.18...vaultspec-core-v0.1.19) (2026-05-14)
 
 
