@@ -230,10 +230,11 @@ ignores the snapshot directory, advisory-lock sentinels, the install manifest
 (`.vaultspec/providers.json`), and the vault's local caches (`.vault/.obsidian/`,
 `.vault/.trash/`, `.vault/data/`, `.vault/logs/`) - nothing authored.
 
-`install` states this policy on completion, and `install --upgrade` carries a workspace
-created under the older framework-local default onto the shared policy, rewriting a
-stale managed block in place. A block you have hand-edited is left untouched so your
-customisation is never clobbered.
+`vaultspec-core install` states this policy on completion, and
+`vaultspec-core install --upgrade` carries a workspace created under the older
+framework-local default onto the shared policy, rewriting a stale managed block in
+place. A block you have hand-edited is left untouched so your customisation is never
+clobbered.
 
 ## Managing vault records
 

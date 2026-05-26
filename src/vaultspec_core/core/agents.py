@@ -373,6 +373,7 @@ def agents_add(
     description: str = "",
     force: bool = False,
     *,
+    body: str | None = None,
     dry_run: bool = False,
     interactive: bool | None = None,
 ) -> Path:
@@ -382,6 +383,7 @@ def agents_add(
         name: Agent name.
         description: Short description.
         force: Whether to overwrite existing.
+        body: Optional direct body content to override scaffold.
         dry_run: If ``True``, return the target path without writing.
         interactive: Override TTY detection.  ``None`` means auto-detect.
 
@@ -406,26 +408,34 @@ def agents_add(
     if dry_run:
         return file_path
 
-    fm = {"name": name, "description": description}
-    body = "# Instructions\n\nAdd agent instructions here.\n"
-
+    body_content = body
     is_interactive = interactive if interactive is not None else sys.stdin.isatty()
 
-    if is_interactive and not description:
-        from ..config import get_config
+    if body_content is None:
+        if is_interactive and not description:
+            body_content = "# Instructions\n\nAdd agent instructions here.\n"
+            fm = {"name": name, "description": description}
+            content = build_file(fm, body_content)
+            atomic_write(file_path, content)
+            from ..config import get_config
 
-        editor = get_config().editor
-        content = build_file(fm, body)
-        atomic_write(file_path, content)
-        logger.info("Opening editor (%s) for %s...", editor, file_path)
-        try:
-            _launch_editor(editor, str(file_path))
-        except Exception as e:
-            logger.error("Error opening editor: %s", e)
-    else:
-        content = build_file(fm, body)
-        atomic_write(file_path, content)
+            editor = get_config().editor
+            logger.info("Opening editor (%s) for %s...", editor, file_path)
+            try:
+                _launch_editor(editor, str(file_path))
+                logger.info("Agent saved to %s", file_path)
+            except Exception as e:
+                logger.error("Error opening editor: %s", e)
+            return file_path
+        else:
+            if not sys.stdin.isatty():
+                body_content = sys.stdin.read()
+            if not body_content:
+                body_content = "# Instructions\n\nAdd agent instructions here.\n"
 
+    fm = {"name": name, "description": description}
+    content = build_file(fm, body_content)
+    atomic_write(file_path, content)
     logger.info("Created agent: %s", file_path)
     return file_path
 

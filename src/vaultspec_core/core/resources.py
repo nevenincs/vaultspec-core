@@ -13,7 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from .exceptions import ResourceExistsError, ResourceNotFoundError, VaultSpecError
-from .helpers import _launch_editor, _rmtree_robust, ensure_dir
+from .helpers import _rmtree_robust, ensure_dir
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,14 @@ def _resolve_path(name: str, base_dir: Path, is_dir: bool) -> tuple[str, Path]:
         dir_path = base_dir / name
         return name, dir_path / "SKILL.md"
     file_name = name if name.endswith(".md") else f"{name}.md"
-    return file_name, base_dir / file_name
+    if file_name.replace("\\", "/").startswith("project/"):
+        return file_name, base_dir / file_name
+    path = base_dir / file_name
+    if not path.exists():
+        project_path = base_dir / "project" / file_name
+        if project_path.exists():
+            return f"project/{file_name}", project_path
+    return file_name, path
 
 
 def resource_show(
@@ -51,7 +58,12 @@ def resource_show(
 
 
 def resource_edit(
-    name: str, *, base_dir: Path, label: str, is_dir: bool = False
+    name: str,
+    *,
+    base_dir: Path,
+    label: str,
+    is_dir: bool = False,
+    editor: str | None = None,
 ) -> Path:
     """Open a resource file in the configured text editor.
 
@@ -60,24 +72,67 @@ def resource_edit(
 
     Raises:
         ResourceNotFoundError: If the resource does not exist.
+        EditorResolutionError: If the editor cannot be resolved.
+        EditorSubprocessError: If the editor fails to launch or exits with a
+            non-zero status.
+        EditorCancellationError: If the editor session was interrupted/cancelled.
     """
     _canonical, file_path = _resolve_path(name, base_dir, is_dir)
 
     if not file_path.exists():
         raise ResourceNotFoundError(f"{label} '{name}' not found.")
 
-    from ..config import get_config
+    from .exceptions import (
+        EditorCancellationError,
+        EditorResolutionError,
+        EditorSubprocessError,
+    )
+    from .local_config import resolve_editor
 
-    editor = get_config().editor
-    logger.info("Opening editor (%s) for %s...", editor, _canonical)
     try:
-        _launch_editor(editor, str(file_path))
-    except OSError as e:
-        raise VaultSpecError(
-            f"Could not launch editor '{editor}': {e}",
+        from .types import get_context
+
+        target_dir = get_context().target_dir
+    except Exception:
+        target_dir = None
+
+    resolved_editor = resolve_editor(editor, target_dir)
+
+    logger.info("Opening editor (%s) for %s...", resolved_editor, _canonical)
+
+    import shlex
+    import subprocess
+    import sys
+
+    parts = shlex.split(resolved_editor)
+    if not parts:
+        raise EditorResolutionError(
+            f"Empty editor command resolved from {resolved_editor!r}"
+        )
+
+    exe = shutil.which(parts[0]) or parts[0]
+    cmd = [exe, *parts[1:], str(file_path)]
+
+    try:
+        if sys.platform == "win32" and exe.lower().endswith((".cmd", ".bat")):
+            result = subprocess.run(["cmd.exe", "/c", *cmd], shell=False)
+        else:
+            result = subprocess.run(cmd, shell=False)
+
+        if result.returncode != 0:
+            if result.returncode == 130:
+                raise EditorCancellationError("Editor edit cancelled by user.")
+            raise EditorSubprocessError(
+                f"Editor exited with non-zero exit code {result.returncode}."
+            )
+    except KeyboardInterrupt as e:
+        raise EditorCancellationError("Editor edit cancelled by user (Ctrl+C).") from e
+    except (OSError, subprocess.SubprocessError) as e:
+        raise EditorSubprocessError(
+            f"Failed to launch or run editor {resolved_editor!r}: {e}",
             hint=(
-                "Set a working editor command via the VAULTSPEC_EDITOR "
-                "environment variable (e.g. VAULTSPEC_EDITOR='code -w')."
+                "Ensure the editor command is valid and the "
+                "executable is present on your PATH."
             ),
         ) from e
 
@@ -136,7 +191,7 @@ def resource_rename(
     label: str,
     is_dir: bool = False,
 ) -> Path:
-    """Rename a resource file or directory on disk.
+    """Rename a resource on disk atomically across filename and frontmatter.
 
     Returns:
         The new path after renaming.
@@ -145,22 +200,103 @@ def resource_rename(
         ResourceNotFoundError: If the source resource does not exist.
         ResourceExistsError: If the destination already exists.
     """
+    from ..vaultcore import parse_frontmatter
+    from .helpers import atomic_write, build_file
+
+    def _get_frontmatter_name(name_str: str) -> str:
+        stem = name_str
+        if stem.endswith(".md"):
+            stem = stem[:-3]
+        if stem.endswith(".builtin"):
+            stem = stem[:-8]
+        return stem
+
     if is_dir:
         old_path = base_dir / old_name
         new_path = base_dir / new_name
+
+        if not old_path.exists():
+            raise ResourceNotFoundError(f"{label} '{old_name}' not found.")
+
+        old_file = old_path / "SKILL.md"
+        if not old_file.exists():
+            raise ResourceNotFoundError(
+                f"{label} '{old_name}' not found (SKILL.md missing)."
+            )
+
+        if new_path.exists():
+            raise ResourceExistsError(f"Destination '{new_name}' already exists.")
+
+        try:
+            content = old_file.read_text(encoding="utf-8")
+            fm, body = parse_frontmatter(content)
+        except Exception as exc:
+            raise VaultSpecError(
+                f"Failed to parse frontmatter in {old_file}: {exc}"
+            ) from exc
+
+        fm["name"] = _get_frontmatter_name(new_name)
+        new_content = build_file(fm, body)
+
+        ensure_dir(base_dir)
+        shutil.move(str(old_path), str(new_path))
+        try:
+            atomic_write(new_path / "SKILL.md", new_content)
+        except Exception as exc:
+            # Rollback
+            try:
+                shutil.move(str(new_path), str(old_path))
+            except Exception as rollback_exc:
+                logger.error(
+                    "Failed to rollback directory move during rename: %s", rollback_exc
+                )
+            raise exc
+
+        logger.info("Renamed %s '%s' to '%s'.", label, old_name, new_name)
+        return new_path
+
     else:
-        old_file = old_name if old_name.endswith(".md") else f"{old_name}.md"
+        old_canonical, old_path = _resolve_path(old_name, base_dir, is_dir)
         new_file = new_name if new_name.endswith(".md") else f"{new_name}.md"
-        old_path = base_dir / old_file
-        new_path = base_dir / new_file
+        if (
+            "project/" in old_canonical
+            or "project\\" in old_canonical
+            or old_path.parent.name == "project"
+        ):
+            new_path = base_dir / "project" / new_file
+        else:
+            new_path = base_dir / new_file
 
-    if not old_path.exists():
-        raise ResourceNotFoundError(f"{label} '{old_name}' not found.")
+        if not old_path.exists():
+            raise ResourceNotFoundError(f"{label} '{old_name}' not found.")
 
-    if new_path.exists():
-        raise ResourceExistsError(f"Destination '{new_name}' already exists.")
+        if new_path.exists():
+            raise ResourceExistsError(f"Destination '{new_name}' already exists.")
 
-    ensure_dir(base_dir)
-    shutil.move(str(old_path), str(new_path))
-    logger.info("Renamed %s '%s' to '%s'.", label, old_name, new_name)
-    return new_path
+        try:
+            content = old_path.read_text(encoding="utf-8")
+            fm, body = parse_frontmatter(content)
+        except Exception as exc:
+            raise VaultSpecError(
+                f"Failed to parse frontmatter in {old_path}: {exc}"
+            ) from exc
+
+        fm["name"] = _get_frontmatter_name(new_name)
+        new_content = build_file(fm, body)
+
+        ensure_dir(new_path.parent)
+        atomic_write(new_path, new_content)
+        try:
+            old_path.unlink()
+        except Exception as exc:
+            # Rollback write
+            try:
+                new_path.unlink()
+            except Exception as rollback_exc:
+                logger.error(
+                    "Failed to rollback file write during rename: %s", rollback_exc
+                )
+            raise exc
+
+        logger.info("Renamed %s '%s' to '%s'.", label, old_name, new_name)
+        return new_path

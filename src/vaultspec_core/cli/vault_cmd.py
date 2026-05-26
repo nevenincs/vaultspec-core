@@ -47,6 +47,18 @@ sanitize_app = typer.Typer(
 )
 vault_app.add_typer(sanitize_app, name="sanitize")
 
+rule_app = typer.Typer(
+    help="Manage project rules.",
+    no_args_is_help=True,
+)
+vault_app.add_typer(rule_app, name="rule")
+
+adr_app = typer.Typer(
+    help="Manage Architecture Decision Records (ADRs).",
+    no_args_is_help=True,
+)
+vault_app.add_typer(adr_app, name="adr")
+
 from vaultspec_core.cli.plan_cmd import plan_app  # noqa: E402
 
 vault_app.add_typer(plan_app, name="plan")
@@ -90,6 +102,9 @@ def cmd_add(
         bool, typer.Option("--dry-run", help="Preview without writing")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    no_hints: Annotated[
+        bool, typer.Option("--no-hints", help="Suppress next-step advisory hints")
+    ] = False,
     tier: Annotated[
         str,
         typer.Option(
@@ -100,6 +115,20 @@ def cmd_add(
             ),
         ),
     ] = "L1",
+    step: Annotated[
+        str | None,
+        typer.Option(
+            "--step",
+            help="Canonical ID or display path of step to scaffold",
+        ),
+    ] = None,
+    all_steps: Annotated[
+        bool,
+        typer.Option(
+            "--all-steps",
+            help="Scaffold execution records for all steps in parent plan",
+        ),
+    ] = False,
     target: TargetOption = None,
 ) -> None:
     """Create a new .vault/ document from a template.
@@ -126,9 +155,6 @@ def cmd_add(
     try:
         dt = DocType(doc_type)
     except ValueError:
-        # Index is auto-generated and is not user-creatable; surface
-        # it explicitly as a non-option here so the error message
-        # matches the rest of the docs surface.
         valid = ", ".join(d.value for d in DocType if d is not DocType.INDEX)
         console.print(
             f"[red]Unknown document type '{doc_type}'. Valid types: {valid}[/red]"
@@ -142,8 +168,21 @@ def cmd_add(
         )
         raise typer.Exit(code=1)
 
-    # Validate tier for plan documents (no-op for other types whose
-    # templates do not carry the placeholder).
+    # Validate step-aware flags
+    if (step is not None or all_steps) and dt is not DocType.EXEC:
+        console.print(
+            "[red]Error: --step and --all-steps options are only valid when "
+            "creating 'exec' documents.[/red]"
+        )
+        raise typer.Exit(code=1)
+
+    if step is not None and all_steps:
+        console.print(
+            "[red]Error: --step and --all-steps options are mutually exclusive.[/red]"
+        )
+        raise typer.Exit(code=1)
+
+    # Validate tier for plan documents
     if dt is DocType.PLAN and tier not in {"L1", "L2", "L3", "L4"}:
         console.print(
             f"[red]Invalid tier '{tier}'. Allowed values: L1, L2, L3, L4.[/red]"
@@ -162,8 +201,7 @@ def cmd_add(
         )
         raise typer.Exit(code=1)
 
-    # Default date to today (UTC so vault doc dates stay deterministic
-    # across runners regardless of the operator's local timezone).
+    # Default date to today (UTC for deterministic vault doc dates)
     date_str = date or datetime.now(UTC).strftime("%Y-%m-%d")
 
     # Validate extra tags format
@@ -201,8 +239,6 @@ def cmd_add(
     dep_errors = [d for d in dep_diagnostics if d.startswith("ERROR:")]
 
     if json_output:
-        # stdout must stay a pure JSON document: lifecycle advisories go
-        # to stderr, and a blocking error becomes the JSON error envelope.
         for diag in dep_diagnostics:
             if not diag.startswith("ERROR:"):
                 typer.echo(diag, err=True)
@@ -227,6 +263,177 @@ def cmd_add(
         if dep_errors:
             raise typer.Exit(code=1)
 
+    # Handle parent plan resolution if step-aware route is active
+    plan_date_arg = None
+    plan_stem_arg = None
+    step_id_arg = None
+    step_display_path_arg = None
+    step_scope_arg = None
+    step_action_arg = None
+
+    if dt is DocType.EXEC and (step is not None or all_steps):
+        from vaultspec_core.vaultcore.query import list_documents
+
+        parent_plan_doc = None
+        if resolved_related:
+            for rel in resolved_related:
+                stem = rel.lstrip("[").rstrip("]")
+                plan_docs = list_documents(_get_ctx().target_dir, doc_type="plan")
+                for doc in plan_docs:
+                    if doc.path.stem == stem:
+                        parent_plan_doc = doc
+                        break
+                if parent_plan_doc:
+                    break
+
+        if parent_plan_doc is None:
+            plan_docs = list_documents(
+                _get_ctx().target_dir, doc_type="plan", feature=feat
+            )
+            if len(plan_docs) == 1:
+                parent_plan_doc = plan_docs[0]
+            elif len(plan_docs) > 1:
+                names = ", ".join(d.path.name for d in plan_docs)
+                console.print(
+                    f"[red]Multiple plans found for feature '{feat}': {names}. "
+                    "Specify the parent plan using --related.[/red]"
+                )
+                raise typer.Exit(code=1)
+            else:
+                console.print(
+                    f"[red]No plan found for feature '{feat}'. "
+                    "Create a plan document before adding execution records.[/red]"
+                )
+                raise typer.Exit(code=1)
+
+        from vaultspec_core.plan.parser import parse_plan
+
+        parsed_plan = parse_plan(parent_plan_doc.path)
+        plan_stem_arg = parent_plan_doc.path.stem
+        plan_date_arg = parent_plan_doc.date or plan_stem_arg[:10]
+
+        if step is not None:
+            from vaultspec_core.plan.commands.step_ops import (
+                AmbiguousStepError,
+                StepNotFoundError,
+                find_step,
+            )
+
+            try:
+                target_step = find_step(parsed_plan, step)
+            except StepNotFoundError as exc:
+                console.print(f"[red]Error: {exc}[/red]")
+                raise typer.Exit(code=1) from None
+            except AmbiguousStepError as exc:
+                console.print(f"[red]Error: {exc}[/red]")
+                raise typer.Exit(code=1) from None
+
+            step_id_arg = target_step.canonical_id
+            step_display_path_arg = target_step.display_path
+            step_scope_arg = target_step.scope
+            step_action_arg = target_step.action
+
+        elif all_steps:
+            # Bulk scaffolding loop
+            import logging
+
+            from vaultspec_core.cli.rendering import Outcome, OutcomeItem, emit_outcomes
+
+            items = []
+            root_dir = _get_ctx().target_dir
+
+            previous_logging_disable = logging.root.manager.disable
+            if json_output:
+                logging.disable(logging.CRITICAL)
+
+            try:
+                for s in parsed_plan.steps:
+                    target_path = create_vault_doc(
+                        root_dir=root_dir,
+                        doc_type=dt,
+                        feature=feat,
+                        date_str=date_str,
+                        title=title,
+                        related=resolved_related,
+                        extra_tags=extra_tags,
+                        force=True,
+                        dry_run=True,
+                        step_id=s.canonical_id,
+                        step_display_path=s.display_path,
+                        step_scope=s.scope,
+                        step_action=s.action,
+                        plan_date=plan_date_arg,
+                        plan_stem=plan_stem_arg,
+                    )
+
+                    rel_name = str(target_path.relative_to(root_dir))
+
+                    if target_path.exists():
+                        if not force:
+                            items.append(
+                                OutcomeItem(
+                                    name=rel_name,
+                                    outcome=Outcome.SKIPPED,
+                                    detail="skipped; exists",
+                                )
+                            )
+                            continue
+                        else:
+                            outcome_type = Outcome.UPDATED
+                            detail_msg = (
+                                "overwritten" if not dry_run else "would overwrite"
+                            )
+                    else:
+                        outcome_type = Outcome.CREATED
+                        detail_msg = "created" if not dry_run else "would create"
+
+                    if not dry_run:
+                        create_vault_doc(
+                            root_dir=root_dir,
+                            doc_type=dt,
+                            feature=feat,
+                            date_str=date_str,
+                            title=title,
+                            related=resolved_related,
+                            extra_tags=extra_tags,
+                            force=force,
+                            dry_run=False,
+                            step_id=s.canonical_id,
+                            step_display_path=s.display_path,
+                            step_scope=s.scope,
+                            step_action=s.action,
+                            plan_date=plan_date_arg,
+                            plan_stem=plan_stem_arg,
+                        )
+
+                    items.append(
+                        OutcomeItem(
+                            name=rel_name,
+                            outcome=outcome_type,
+                            detail=detail_msg,
+                        )
+                    )
+            finally:
+                if json_output:
+                    logging.disable(previous_logging_disable)
+
+            exit_code = emit_outcomes(
+                items,
+                command="vault.add",
+                title="Scaffold Execution Steps",
+                json_output=json_output,
+            )
+            raise typer.Exit(code=exit_code)
+
+    elif dt is DocType.EXEC:
+        if not json_output:
+            console.print(
+                "[yellow]Deprecation Warning: Scaffolding a flat execution "
+                "record without --step or --all-steps is deprecated and will "
+                "be removed in a future release.[/yellow]"
+            )
+
+    # Single-document scaffolding path (legacy route or --step route)
     import logging
 
     previous_logging_disable = logging.root.manager.disable
@@ -245,6 +452,12 @@ def cmd_add(
                 force=force,
                 dry_run=dry_run,
                 tier=tier if dt is DocType.PLAN else None,
+                step_id=step_id_arg,
+                step_display_path=step_display_path_arg,
+                step_scope=step_scope_arg,
+                step_action=step_action_arg,
+                plan_date=plan_date_arg,
+                plan_stem=plan_stem_arg,
             )
         except FileNotFoundError as exc:
             _handle_error(exc, json_output=json_output)
@@ -283,6 +496,26 @@ def cmd_add(
 
     # Post-creation self-validation
     _validate_created_doc(console, path)
+
+    from vaultspec_core.cli.rendering import emit_next_step_hint
+
+    context_vars = {
+        "feature": feat,
+        "research_stem": path.stem,
+        "adr_stem": path.stem,
+        "plan_stem": path.stem,
+        "audit_stem": path.stem,
+        "rule_name": f"{feat}-rule",
+    }
+
+    hint_dict = emit_next_step_hint(
+        command=f"vault.add.{dt.value}",
+        outcome="created",
+        context_vars=context_vars,
+        json_output=json_output,
+        no_hints=no_hints,
+    )
+
     if json_output:
         import json
 
@@ -294,6 +527,7 @@ def cmd_add(
                     "vault.add",
                     "created",
                     {"path": str(path), "type": doc_type, "name": path.stem},
+                    hints=hint_dict,
                 ),
                 indent=2,
             )
@@ -893,6 +1127,9 @@ def cmd_check_all(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    no_hints: Annotated[
+        bool, typer.Option("--no-hints", help="Suppress next-step advisory hints")
+    ] = False,
     target: TargetOption = None,
 ) -> None:
     """Run all vault health checks."""
@@ -904,6 +1141,18 @@ def cmd_check_all(
     console = get_console()
     results = run_all_checks(_get_ctx().target_dir, feature=feature, fix=fix)
 
+    total_errors = sum(r.error_count for r in results)
+    outcome = "failed" if total_errors > 0 else "unchanged"
+
+    from vaultspec_core.cli.rendering import emit_next_step_hint
+
+    hint_dict = emit_next_step_hint(
+        command="vault.check.all",
+        outcome=outcome,
+        json_output=json_output,
+        no_hints=no_hints,
+    )
+
     if json_output:
         import dataclasses
         import json
@@ -914,15 +1163,15 @@ def cmd_check_all(
             "vault.check.all",
             _check_status(results),
             {"checks": [dataclasses.asdict(r) for r in results]},
+            hints=hint_dict,
         )
         typer.echo(json.dumps(envelope, indent=2, default=str))
-        raise typer.Exit(0 if all(r.error_count == 0 for r in results) else 1)
+        raise typer.Exit(0 if total_errors == 0 else 1)
 
     console.print("[bold]Vault Check  - All[/bold]")
     for r in results:
         render_check_result(console, r, verbose=verbose)
 
-    total_errors = sum(r.error_count for r in results)
     total_warnings = sum(r.warning_count for r in results)
     total_fixed = sum(r.fixed_count for r in results)
 
@@ -1015,6 +1264,16 @@ def cmd_sanitize_annotations(
     apply_target(target)
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.checks import check_annotations
+
+    if not json_output:
+        from vaultspec_core.console import get_console
+
+        console = get_console()
+        console.print(
+            "[yellow]Deprecation Warning: 'vaultspec-core vault sanitize annotations' "
+            "is deprecated. Please use 'vaultspec-core vault check annotations --fix' "
+            "instead.[/yellow]"
+        )
 
     result = check_annotations(
         _get_ctx().target_dir, feature=feature, fix=True, dry_run=dry_run
@@ -1254,6 +1513,48 @@ def cmd_check_structure(
     )
 
 
+@check_app.command("rename-integrity")
+def cmd_check_rename_integrity(
+    fix: Annotated[
+        bool,
+        typer.Option(
+            "--fix", help="Filename-wins: update frontmatter name to match filename"
+        ),
+    ] = False,
+    fix_frontmatter_wins: Annotated[
+        bool,
+        typer.Option(
+            "--fix-frontmatter-wins",
+            help="Frontmatter-wins: physically rename file to match frontmatter name",
+        ),
+    ] = False,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Check name/filename integrity for rules, skills, and agents."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.checks import check_rename_integrity
+
+    root_dir = _get_ctx().target_dir
+
+    def confirm_fn(prompt: str) -> bool:
+        return typer.confirm(prompt, default=True)
+
+    result = check_rename_integrity(
+        root_dir,
+        fix=fix,
+        fix_frontmatter_wins=fix_frontmatter_wins,
+        confirm_fn=confirm_fn if not json_output else None,
+    )
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.rename-integrity"
+    )
+
+
 # ---- vault feature list ------------------------------------------------------
 
 
@@ -1393,18 +1694,115 @@ def cmd_feature_index(
 @feature_app.command("archive")
 def cmd_feature_archive(
     feature_tag: Annotated[str, typer.Argument(help="Feature tag to archive")],
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview planned changes")
+    ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    no_hints: Annotated[
+        bool, typer.Option("--no-hints", help="Suppress next-step advisory hints")
+    ] = False,
     target: TargetOption = None,
 ) -> None:
     """Archive all documents for a feature tag."""
     apply_target(target)
     from vaultspec_core.console import get_console
+
+    console = get_console()
     from vaultspec_core.core.exceptions import VaultSpecError
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.query import archive_feature
 
     try:
-        result = archive_feature(_get_ctx().target_dir, feature_tag)
+        result = archive_feature(_get_ctx().target_dir, feature_tag, dry_run=dry_run)
+    except (VaultSpecError, OSError) as exc:
+        _handle_error(exc, json_output=json_output)
+        return
+    outcome = (
+        "updated" if (result["archived_count"] > 0 and not dry_run) else "unchanged"
+    )
+    from vaultspec_core.cli.rendering import emit_next_step_hint
+
+    hint_dict = emit_next_step_hint(
+        command="vault.feature.archive",
+        outcome=outcome,
+        json_output=json_output,
+        no_hints=no_hints,
+    )
+
+    if json_output:
+        import json
+
+        from vaultspec_core.cli.rendering import json_envelope
+
+        archive_status = (
+            "removed" if result["archived_count"] and not dry_run else "unchanged"
+        )
+        typer.echo(
+            json.dumps(
+                json_envelope(
+                    "vault.feature.archive",
+                    archive_status,
+                    result,
+                    hints=hint_dict,
+                ),
+                indent=2,
+                default=str,
+            )
+        )
+        raise typer.Exit(0)
+
+    if dry_run:
+        console.print(
+            f"[yellow]Dry-run: Previewing feature archive for '{feature_tag}'[/yellow]"
+        )
+        if result["paths"]:
+            console.print("[yellow]Planned movements:[/yellow]")
+            for p in result["paths"]:
+                console.print(f"  {p}")
+        else:
+            console.print("[dim]No planned movements.[/dim]")
+
+        if result.get("cross_links"):
+            console.print(
+                "[yellow]Warning: The following external documents link to "
+                "feature documents and may become dangling:[/yellow]"
+            )
+            for link in result["cross_links"]:
+                console.print(f"  {link['source_path']} -> {link['target']}")
+        else:
+            console.print("[green]No incoming cross-feature links found.[/green]")
+    else:
+        if result["archived_count"] == 0:
+            console.print(f"[dim]No documents found for feature '{feature_tag}'.[/dim]")
+        else:
+            console.print(
+                f"[green]Archived {result['archived_count']} documents.[/green]"
+            )
+            for p in result["paths"]:
+                console.print(f"  {p}")
+
+
+# ---- vault feature unarchive -------------------------------------------------
+
+
+@feature_app.command("unarchive")
+def cmd_feature_unarchive(
+    feature_tag: Annotated[str, typer.Argument(help="Feature tag to unarchive")],
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview planned changes")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Restore all archived documents for a feature tag."""
+    apply_target(target)
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.query import unarchive_feature
+
+    try:
+        result = unarchive_feature(_get_ctx().target_dir, feature_tag, dry_run=dry_run)
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc, json_output=json_output)
         return
@@ -1414,18 +1812,173 @@ def cmd_feature_archive(
 
         from vaultspec_core.cli.rendering import json_envelope
 
-        archive_status = "removed" if result["archived_count"] else "unchanged"
+        unarchive_status = (
+            "restored" if result["unarchived_count"] and not dry_run else "unchanged"
+        )
         typer.echo(
             json.dumps(
-                json_envelope("vault.feature.archive", archive_status, result),
+                json_envelope("vault.feature.unarchive", unarchive_status, result),
                 indent=2,
                 default=str,
             )
         )
         raise typer.Exit(0)
-    if result["archived_count"] == 0:
-        console.print(f"[dim]No documents found for feature '{feature_tag}'.[/dim]")
+
+    if dry_run:
+        console.print(
+            "[yellow]Dry-run: Previewing feature unarchive for "
+            f"'{feature_tag}'[/yellow]"
+        )
+        if result["paths"]:
+            console.print("[yellow]Planned restorations:[/yellow]")
+            for p in result["paths"]:
+                console.print(f"  {p}")
+        else:
+            console.print("[dim]No planned restorations.[/dim]")
     else:
-        console.print(f"[green]Archived {result['archived_count']} documents.[/green]")
-        for p in result["paths"]:
-            console.print(f"  {p}")
+        if result["unarchived_count"] == 0:
+            console.print(
+                f"[dim]No archived documents found for feature '{feature_tag}'.[/dim]"
+            )
+        else:
+            console.print(
+                f"[green]Unarchived {result['unarchived_count']} documents.[/green]"
+            )
+            for p in result["paths"]:
+                console.print(f"  {p}")
+
+
+# ---- vault rule promote ------------------------------------------------------
+
+
+@rule_app.command("promote")
+def cmd_rule_promote(
+    from_audit: Annotated[
+        str, typer.Option("--from", help="Audit stem to promote from")
+    ],
+    as_rule: Annotated[
+        str, typer.Option("--as", help="Kebab-case name of the promoted rule")
+    ],
+    force: Annotated[
+        bool, typer.Option("--force", help="Overwrite existing rule source")
+    ] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview without writing")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Promote an audit finding to a project-level rule."""
+    apply_target(target)
+    import json
+
+    from vaultspec_core.cli.rendering import json_envelope
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.rules import rule_promote
+
+    try:
+        rule_file = rule_promote(
+            from_audit=from_audit,
+            rule_name=as_rule,
+            force=force,
+            dry_run=dry_run,
+        )
+    except (VaultSpecError, OSError) as exc:
+        _handle_error(exc, json_output=json_output)
+        return
+
+    console = get_console()
+    if json_output:
+        status = "created" if not dry_run else "unchanged"
+        typer.echo(
+            json.dumps(
+                json_envelope(
+                    "vault.rule.promote",
+                    status,
+                    {"path": str(rule_file)},
+                ),
+                indent=2,
+            )
+        )
+        raise typer.Exit(0)
+
+    action = "Would promote rule" if dry_run else "Rule promoted successfully"
+    console.print(f"[green]{action}:[/green] {rule_file}")
+
+
+# ---- vault adr supersede -----------------------------------------------------
+
+
+@adr_app.command("supersede")
+def cmd_adr_supersede(
+    old_adr: Annotated[str, typer.Argument(help="Old ADR stem to supersede")],
+    by_new_adr: Annotated[
+        str,
+        typer.Option(
+            "--by",
+            help="New ADR stem that supersedes the old one",
+        ),
+    ] = "",
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview without writing")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Supersede an old ADR with a new ADR."""
+    apply_target(target)
+    import json
+
+    from vaultspec_core.cli.rendering import json_envelope
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core.adr import adr_supersede
+    from vaultspec_core.core.exceptions import VaultSpecError
+
+    console = get_console()
+
+    if not by_new_adr:
+        if json_output:
+            typer.echo(
+                json.dumps(
+                    json_envelope(
+                        "vault.adr.supersede",
+                        "failed",
+                        {"message": "--by option is required."},
+                    ),
+                    indent=2,
+                )
+            )
+        else:
+            console.print("[red]Error: --by option is required.[/red]")
+        raise typer.Exit(code=1)
+
+    try:
+        old_file, new_file = adr_supersede(
+            old_adr=old_adr,
+            by_new_adr=by_new_adr,
+            dry_run=dry_run,
+        )
+    except (VaultSpecError, OSError) as exc:
+        _handle_error(exc, json_output=json_output)
+        return
+
+    if json_output:
+        status = "updated" if not dry_run else "unchanged"
+        typer.echo(
+            json.dumps(
+                json_envelope(
+                    "vault.adr.supersede",
+                    status,
+                    {
+                        "old_path": str(old_file),
+                        "new_path": str(new_file),
+                    },
+                ),
+                indent=2,
+            )
+        )
+        raise typer.Exit(0)
+
+    action = "Would supersede ADR" if dry_run else "ADR superseded successfully"
+    console.print(f"[green]{action}:[/green] {old_file} by {new_file}")

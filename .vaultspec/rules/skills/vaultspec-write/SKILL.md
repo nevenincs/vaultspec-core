@@ -1,5 +1,5 @@
 ---
-name: vaultspec-write-plan
+name: vaultspec-write
 description: >-
   Use this skill to write implementation plans, Step flows. It must be
   explicitly called after a vaultspec-adr skill has yielded an approved ADR

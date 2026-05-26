@@ -121,6 +121,7 @@ def skills_add(
     force: bool = False,
     template: str | None = None,
     *,
+    body: str | None = None,
     dry_run: bool = False,
     interactive: bool | None = None,
 ) -> Path:
@@ -131,6 +132,7 @@ def skills_add(
         description: Optional skill description.
         force: Whether to overwrite an existing skill.
         template: Optional template name to pre-populate.
+        body: Optional direct body content to override scaffold.
         dry_run: If ``True``, return the target path without writing.
         interactive: Override TTY detection.  ``None`` means auto-detect.
 
@@ -159,38 +161,59 @@ def skills_add(
 
     ensure_dir(skill_dir)
 
-    body = f"# {skill_name}\n\nDefine your skill instructions here.\n"
-    if template:
-        tmpl_path = _t.get_context().templates_dir / template
-        if not tmpl_path.suffix:
-            tmpl_path = tmpl_path.with_suffix(".md")
-        if tmpl_path.exists():
-            body = tmpl_path.read_text(encoding="utf-8")
-        else:
-            logger.warning(
-                "Warning: Template '%s' not found at %s", template, tmpl_path
-            )
-
-    fm = {"name": skill_name, "description": description}
-    scaffold = build_file(fm, body)
-
+    body_content = body
     is_interactive = interactive if interactive is not None else sys.stdin.isatty()
 
-    if is_interactive:
-        atomic_write(file_path, scaffold)
-        from ..config import get_config
+    if body_content is None:
+        if is_interactive:
+            body_content = f"# {skill_name}\n\nDefine your skill instructions here.\n"
+            if template:
+                tmpl_path = _t.get_context().templates_dir / template
+                if not tmpl_path.suffix:
+                    tmpl_path = tmpl_path.with_suffix(".md")
+                if tmpl_path.exists():
+                    body_content = tmpl_path.read_text(encoding="utf-8")
+                else:
+                    logger.warning(
+                        "Warning: Template '%s' not found at %s", template, tmpl_path
+                    )
+            fm = {"name": skill_name, "description": description}
+            scaffold = build_file(fm, body_content)
+            atomic_write(file_path, scaffold)
+            from ..config import get_config
 
-        editor = get_config().editor
-        logger.info("Opening editor (%s) for %s...", editor, file_path)
-        try:
-            _launch_editor(editor, str(file_path))
-            logger.info("Skill saved to %s", file_path)
-        except Exception as e:
-            logger.error("Error opening editor: %s", e, exc_info=True)
-    else:
-        atomic_write(file_path, scaffold)
-        logger.info("Created skill: %s", file_path)
+            editor = get_config().editor
+            logger.info("Opening editor (%s) for %s...", editor, file_path)
+            try:
+                _launch_editor(editor, str(file_path))
+                logger.info("Skill saved to %s", file_path)
+            except Exception as e:
+                logger.error("Error opening editor: %s", e, exc_info=True)
+            return file_path
+        else:
+            if not sys.stdin.isatty():
+                body_content = sys.stdin.read()
+            if not body_content:
+                body_content = (
+                    f"# {skill_name}\n\nDefine your skill instructions here.\n"
+                )
+                if template:
+                    tmpl_path = _t.get_context().templates_dir / template
+                    if not tmpl_path.suffix:
+                        tmpl_path = tmpl_path.with_suffix(".md")
+                    if tmpl_path.exists():
+                        body_content = tmpl_path.read_text(encoding="utf-8")
+                    else:
+                        logger.warning(
+                            "Warning: Template '%s' not found at %s",
+                            template,
+                            tmpl_path,
+                        )
 
+    fm = {"name": skill_name, "description": description}
+    scaffold = build_file(fm, body_content)
+    atomic_write(file_path, scaffold)
+    logger.info("Created skill: %s", file_path)
     return file_path
 
 

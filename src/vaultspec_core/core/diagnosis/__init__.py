@@ -19,6 +19,7 @@ from .signals import (
     ManifestEntrySignal,
     PrecommitSignal,
     ProviderDirSignal,
+    RenameIntegritySignal,
     ResolutionAction,
     VaultContentSignal,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "PrecommitSignal",
     "ProviderDiagnosis",
     "ProviderDirSignal",
+    "RenameIntegritySignal",
     "ResolutionAction",
     "ResolutionPlan",
     "ResolutionStep",

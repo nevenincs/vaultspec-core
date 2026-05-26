@@ -138,16 +138,16 @@ class TestArchiveFeature:
         assert (archive_dir / "adr" / doc.name).exists()
 
     def test_archive_nonexistent_feature(self, tmp_path):
-        """Archiving a feature with no docs returns zero count."""
+        """Archiving a feature with no docs raises VaultSpecError."""
+        from ...core.exceptions import VaultSpecError
         from ..query import archive_feature
 
         # Set up an empty vault
         vault_dir = tmp_path / ".vault" / "adr"
         vault_dir.mkdir(parents=True)
 
-        result = archive_feature(tmp_path, "nonexistent-feature-xyz")
-        assert result["archived_count"] == 0
-        assert result["paths"] == []
+        with pytest.raises(VaultSpecError, match="matches zero documents"):
+            archive_feature(tmp_path, "nonexistent-feature-xyz")
 
     @pytest.mark.parametrize("empty_tag", ["", "   ", "#", " # "])
     def test_archive_empty_tag_refuses(self, tmp_path, empty_tag):

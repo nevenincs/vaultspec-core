@@ -498,21 +498,8 @@ CANONICAL_HOOK_ENTRIES: dict[str, str] = {
     hook.value: str(meta["entry"]) for hook, meta in _HOOK_DEFS.items()
 }
 
-# Old hook IDs that should be replaced during scaffold/sync.
-# Maps every previously-used ID to its canonical replacement.
-_DEPRECATED_HOOK_IDS: dict[str, str] = {
-    "vault-doctor": PrecommitHook.VAULT_FIX.value,
-    "vault-doctor-deep": PrecommitHook.SPEC_CHECK.value,
-    "check-naming": PrecommitHook.VAULT_FIX.value,
-    "check-dangling": PrecommitHook.VAULT_FIX.value,
-    "check-body-links": PrecommitHook.VAULT_FIX.value,
-    "vault-check": PrecommitHook.VAULT_FIX.value,
-}
-
-# All managed hook IDs (canonical + deprecated) for uninstall filtering.
-_ALL_MANAGED_HOOK_IDS: frozenset[str] = CANONICAL_HOOK_IDS | frozenset(
-    _DEPRECATED_HOOK_IDS
-)
+# All managed hook IDs for uninstall filtering.
+_ALL_MANAGED_HOOK_IDS: frozenset[str] = CANONICAL_HOOK_IDS
 
 
 def _scaffold_precommit(
@@ -577,24 +564,8 @@ def _scaffold_precommit(
                     h.get("id"): h for h in existing_hooks if isinstance(h, dict)
                 }
 
-                # Migrate deprecated hook IDs to their canonical replacements
                 changed = False
-                for old_id, new_id in _DEPRECATED_HOOK_IDS.items():
-                    if old_id in existing_by_id and new_id not in existing_by_id:
-                        existing_by_id[old_id]["id"] = new_id
-                        existing_by_id[new_id] = existing_by_id.pop(old_id)
-                        logger.info(
-                            "Migrated pre-commit hook '%s' -> '%s'", old_id, new_id
-                        )
-                        changed = True
-                    elif old_id in existing_by_id:
-                        existing_hooks[:] = [
-                            h
-                            for h in existing_hooks
-                            if not (isinstance(h, dict) and h.get("id") == old_id)
-                        ]
-                        del existing_by_id[old_id]
-                        changed = True
+
                 for canonical in CANONICAL_PRECOMMIT_HOOKS:
                     hook_id = str(canonical["id"])
                     if hook_id in existing_by_id:

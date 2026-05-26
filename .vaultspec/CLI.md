@@ -106,6 +106,9 @@ vaultspec-core vault repair [OPTIONS]
 vaultspec-core vault feature list [OPTIONS]
 vaultspec-core vault feature index [OPTIONS]
 vaultspec-core vault feature archive [OPTIONS] FEATURE_TAG
+vaultspec-core vault feature unarchive [OPTIONS] FEATURE_TAG
+vaultspec-core vault adr supersede [OPTIONS] OLD_ADR
+vaultspec-core vault rule promote [OPTIONS]
 vaultspec-core vault check all [OPTIONS]
 vaultspec-core vault check body-links [OPTIONS]
 vaultspec-core vault check annotations [OPTIONS]
@@ -117,6 +120,7 @@ vaultspec-core vault check features [OPTIONS]
 vaultspec-core vault check references [OPTIONS]
 vaultspec-core vault check schema [OPTIONS]
 vaultspec-core vault check structure [OPTIONS]
+vaultspec-core vault check rename-integrity [OPTIONS]
 vaultspec-core vault sanitize annotations [OPTIONS]
 vaultspec-core vault plan status [OPTIONS] PATH
 vaultspec-core vault plan check [OPTIONS] PATH
@@ -147,32 +151,43 @@ vaultspec-core vault plan tier promote [OPTIONS] PATH
 vaultspec-core vault plan tier demote [OPTIONS] PATH
 vaultspec-core spec doctor [OPTIONS]
 vaultspec-core spec rules list [OPTIONS]
-vaultspec-core spec rules add [OPTIONS]
+vaultspec-core spec rules add [OPTIONS] [NAME]
 vaultspec-core spec rules show [OPTIONS] NAME
 vaultspec-core spec rules edit [OPTIONS] NAME
 vaultspec-core spec rules remove [OPTIONS] NAME
 vaultspec-core spec rules rename [OPTIONS] OLD_NAME NEW_NAME
+vaultspec-core spec rules restore [OPTIONS] FILENAME
 vaultspec-core spec rules sync [OPTIONS]
-vaultspec-core spec rules revert [OPTIONS] FILENAME
+vaultspec-core spec rules status [OPTIONS]
 vaultspec-core spec skills list [OPTIONS]
-vaultspec-core spec skills add [OPTIONS]
+vaultspec-core spec skills add [OPTIONS] [NAME]
 vaultspec-core spec skills show [OPTIONS] NAME
 vaultspec-core spec skills edit [OPTIONS] NAME
 vaultspec-core spec skills remove [OPTIONS] NAME
 vaultspec-core spec skills rename [OPTIONS] OLD_NAME NEW_NAME
+vaultspec-core spec skills restore [OPTIONS] FILENAME
 vaultspec-core spec skills sync [OPTIONS]
-vaultspec-core spec skills revert [OPTIONS] FILENAME
+vaultspec-core spec skills status [OPTIONS]
 vaultspec-core spec agents list [OPTIONS]
-vaultspec-core spec agents add [OPTIONS]
+vaultspec-core spec agents add [OPTIONS] [NAME]
 vaultspec-core spec agents show [OPTIONS] NAME
 vaultspec-core spec agents edit [OPTIONS] NAME
 vaultspec-core spec agents remove [OPTIONS] NAME
 vaultspec-core spec agents rename [OPTIONS] OLD_NAME NEW_NAME
+vaultspec-core spec agents restore [OPTIONS] FILENAME
 vaultspec-core spec agents sync [OPTIONS]
-vaultspec-core spec agents revert [OPTIONS] FILENAME
+vaultspec-core spec agents status [OPTIONS]
 vaultspec-core spec system show [OPTIONS]
 vaultspec-core spec system sync [OPTIONS]
 vaultspec-core spec hooks list [OPTIONS]
+vaultspec-core spec hooks add [OPTIONS] [NAME]
+vaultspec-core spec hooks show [OPTIONS] NAME
+vaultspec-core spec hooks edit [OPTIONS] NAME
+vaultspec-core spec hooks rename [OPTIONS] OLD_NAME NEW_NAME
+vaultspec-core spec hooks remove [OPTIONS] NAME
+vaultspec-core spec hooks restore [OPTIONS] FILENAME
+vaultspec-core spec hooks sync [OPTIONS]
+vaultspec-core spec hooks status [OPTIONS]
 vaultspec-core spec hooks run [OPTIONS] EVENT
 vaultspec-core spec mcps list [OPTIONS]
 vaultspec-core spec mcps status [OPTIONS]
@@ -181,6 +196,10 @@ vaultspec-core spec mcps remove [OPTIONS] NAME
 vaultspec-core spec mcps sync [OPTIONS]
 vaultspec-core migrations status [OPTIONS]
 vaultspec-core migrations run [OPTIONS]
+vaultspec-core config get [OPTIONS] KEY
+vaultspec-core config set [OPTIONS] KEY VALUE
+vaultspec-core config unset [OPTIONS] KEY
+vaultspec-core config list [OPTIONS]
 ```
 
 <!-- vaultspec-cli-signatures:end -->
@@ -214,6 +233,15 @@ Deploy the vaultspec framework into the target directory.
 
 `core` installs `.vaultspec/` only, without any provider config.
 
+#### Examples
+
+- **Install the framework for all supported AI provider layers in the current
+  directory**:
+
+  ```bash
+  vaultspec-core install all
+  ```
+
 ______________________________________________________________________
 
 ### uninstall
@@ -242,6 +270,14 @@ Remove the vaultspec framework from the target directory.
 | `--json`         | off     | Emit machine-readable output                   |
 
 `.vault/` is preserved by default. Pass `--remove-vault` to delete it.
+
+#### Examples
+
+- **Completely uninstall all framework files and delete all files in the vault**:
+
+  ```bash
+  vaultspec-core uninstall all --remove-vault --force
+  ```
 
 ______________________________________________________________________
 
@@ -276,6 +312,14 @@ edits.
 | `--dev`     | off     | Permit running inside the source repo                 |
 | `--json`    | off     | Emit machine-readable output                          |
 
+#### Examples
+
+- **Synchronize modified rule and agent source files to all provider workspaces**:
+
+  ```bash
+  vaultspec-core sync all
+  ```
+
 ## Vault commands
 
 Group command: `vaultspec-core vault [OPTIONS] COMMAND [ARGS]...`
@@ -296,16 +340,117 @@ Create a new `.vault/` document from a template.
 
 #### Options
 
-| Option          | Short | Default         | Description                                                                          |
-| --------------- | ----- | --------------- | ------------------------------------------------------------------------------------ |
-| `--feature TAG` | `-f`  | None (required) | Feature tag (kebab-case)                                                             |
-| `--date DATE`   | -     | today           | Override date (ISO 8601)                                                             |
-| `--title TITLE` | -     | None            | Document title                                                                       |
-| `--related DOC` | `-r`  | None            | Related document(s). Accepts path, filename, stem, or `[[wiki-link]]`. Repeatable.   |
-| `--tags TAG`    | -     | None            | Additional freeform tags beyond the required directory and feature tags. Repeatable. |
-| `--force`       | -     | off             | Overwrite an existing document at the resolved path.                                 |
-| `--dry-run`     | -     | off             | Preview without writing.                                                             |
-| `--json`        | -     | off             | Emit machine-readable output.                                                        |
+| Option          | Short | Default         | Description                                                                           |
+| --------------- | ----- | --------------- | ------------------------------------------------------------------------------------- |
+| `--feature TAG` | `-f`  | None (required) | Feature tag (kebab-case, lowercase letters, digits, hyphens).                         |
+| `--date DATE`   | -     | today           | Override date (ISO 8601, e.g., YYYY-MM-DD).                                           |
+| `--title TITLE` | -     | None            | Document title. For execution records, overrides the default heading.                 |
+| `--related DOC` | `-r`  | None            | Related document(s). Accepts path, filename, stem, or `[[wiki-link]]`. Repeatable.    |
+| `--tags TAG`    | -     | None            | Additional tags beyond the required directory and feature tags. Repeatable.           |
+| `--force`       | -     | off             | Overwrite an existing document at the resolved path.                                  |
+| `--dry-run`     | -     | off             | Preview without writing files.                                                        |
+| `--json`        | -     | off             | Emit machine-readable JSON output in standard envelope.                               |
+| `--tier TIER`   | -     | L1              | Plan tier (`L1`, `L2`, `L3`, `L4`). (Ignored for non-plan types).                     |
+| `--step STEP`   | -     | None            | Canonical ID or display path of a specific step to scaffold. (Only valid for `exec`). |
+| `--all-steps`   | -     | off             | Scaffold execution records for all steps in parent plan. (Only valid for `exec`).     |
+
+#### Step-Aware Execution Scaffolding (`DOC_TYPE=exec`)
+
+When adding an execution record (`exec`), the CLI supports step-aware mechanics to
+target individual or bulk steps from the parent plan.
+
+##### Option Gating and Fallbacks
+
+- **Mutual Exclusion**: `--step` and `--all-steps` are strictly mutually exclusive. If
+  both are provided, or if either is passed with a document type other than `exec`, the
+  CLI aborts with exit code `1`.
+- **Legacy Fallback**: If neither option is provided when creating an `exec` document,
+  the CLI displays a yellow warning:
+  `Deprecation Warning: Scaffolding flat (non-step-aware) execution records is deprecated. Use --step or --all-steps.`
+  It then falls back to scaffolding a flat record routed to
+  `.vault/exec/{date_str}-{feature}-exec.md` without nested folders.
+
+##### Parent Plan Resolution
+
+To resolve step definitions, the CLI searches for the parent plan using a two-tiered
+lookup:
+
+1. **Explicit (`--related` option)**: Scans user-supplied `--related` arguments. If
+   multiple resolved links are provided, the CLI iterates over them and uses the first
+   resolved plan document found.
+1. **Implicit (Unique Feature Lookup)**: Scans the entire vault for plan documents
+   tagged with the corresponding feature tag.
+
+- **Resolution Failures**:
+  - If zero plans are found, the CLI aborts with exit code `1` and prints:
+    `No plan found for feature '{feat}'. Create a plan document before adding execution records.`
+  - If multiple plans are found, the CLI aborts with exit code `1` and prints:
+    `Multiple plans found for feature '{feat}': {names}. Specify the parent plan using --related.`
+
+##### Custom Directory Routing
+
+Step-aware execution records are written to a nested folder structure:
+`.vault/exec/{plan-date}-{feature}/{plan-date}-{feature}-{suffix}.md` where `{suffix}`
+is the step's display path with all dots replaced by hyphens (e.g., display path
+`P01.S01` is saved with suffix `P01-S01`).
+
+##### Parent Plan Link Hydration
+
+The CLI automatically prepends the resolved parent plan's filename stem as a wiki-link
+(e.g., `[[2026-05-17-test-feature-plan]]`) as the first entry in the YAML frontmatter
+`related:` list.
+
+##### Template Placeholder Hydration Rules
+
+The scaffolding engine populates the following placeholders in the execution template:
+
+- `{step_id}`: Hydrated with the step's canonical ID (e.g., `S01`).
+
+- `{plan_stem}`: Hydrated with the parent plan's filename stem (e.g.,
+  `2026-05-17-test-feature-plan`).
+
+- `{heading}`: Hydrated with the step action. If a title is explicitly passed via
+  `--title`, it overrides this heading. Defaults to `{feature} <display-path>` if
+  neither is available.
+
+- `{scope_block}`: If the step defines a scope (e.g., `src/foo.py; src/bar.py`), parses
+  comma/semicolon-separated values and hydrates a clean list block:
+
+  ````markdown
+  ```markdown
+  ## Scope
+
+  - `src/foo.py`
+  - `src/bar.py`
+  ```
+  ````
+
+This block is omitted entirely if the step defines no scope.
+
+##### Bulk Scaffolding & Idempotency
+
+- `--all-steps` iterates over **all steps** (both checked and unchecked) listed in the
+  resolved parent plan.
+- **Idempotency**: Existing files are skipped and reported as `skipped; exists` unless
+  the `--force` flag is supplied, which overwrites them.
+- **Outcome Reporting**: Emits a structured outcome list. Plain-text lists files tagged
+  with lowercase outcome words: `created`, `skipped`, or `updated`. JSON output
+  (`--json`) emits a machine-readable payload adhering to the `vaultspec.vault.add.v1`
+  envelope schema listing details for each file.
+
+##### Examples
+
+- **Scaffold all execution records for a feature plan (Bulk Scaffolding)**:
+
+```bash
+vaultspec-core vault add exec --feature test-feature --all-steps
+```
+
+- **Scaffold an execution record for a specific step**:
+
+```bash
+vaultspec-core vault add exec --feature test-feature --step P01.S01
+```
 
 ______________________________________________________________________
 
@@ -331,6 +476,14 @@ List vault documents.
 | `--date DATE`   | -     | None    | Filter by date                |
 | `--json`        | -     | off     | Emit machine-readable output. |
 
+#### Examples
+
+- **List all plans in the vault for a specific feature**:
+
+  ```bash
+  vaultspec-core vault list plan --feature test-feature
+  ```
+
 ______________________________________________________________________
 
 ### vaultspec-core vault stats
@@ -352,6 +505,15 @@ Show vault statistics and document counts.
 | `--orphaned`    | -     | off     | Show only orphaned documents           |
 | `--json`        | -     | off     | Emit machine-readable output.          |
 
+#### Examples
+
+- **Display vault-wide statistics with details for orphaned and invalid-link
+  documents**:
+
+  ```bash
+  vaultspec-core vault stats --invalid --orphaned
+  ```
+
 ______________________________________________________________________
 
 ### vaultspec-core vault graph
@@ -371,6 +533,14 @@ Outputs a hierarchical tree grouped by feature and type.
 | `--metrics`     | `-m`  | off     | Show aggregate graph metrics         |
 | `--ascii`       | -     | off     | Render ASCII topology                |
 | `--body`        | -     | off     | Include document body in JSON output |
+
+#### Examples
+
+- **Visualize the vault hierarchy and structure as an ASCII tree scoped to a feature**:
+
+  ```bash
+  vaultspec-core vault graph --feature test-feature --ascii
+  ```
 
 ______________________________________________________________________
 
@@ -417,6 +587,14 @@ Dry-run mode never writes generated indexes or check fixes. If migrations are pe
 dry-run reports that state instead of entering the vault scan path that would apply lazy
 migrations on first use.
 
+#### Examples
+
+- **Scan and apply all safe automatic repairs to a degraded vault**:
+
+  ```bash
+  vaultspec-core vault repair
+  ```
+
 ______________________________________________________________________
 
 ### vaultspec-core vault sanitize annotations
@@ -442,6 +620,15 @@ and machine-owned comments such as retired plan markers.
 | `--verbose`     | `-v`  | off     | Show stripped files                  |
 | `--json`        | -     | off     | Emit machine-readable check payloads |
 
+#### Examples
+
+- **Strip all default template instructions and annotations from a feature's
+  documents**:
+
+  ```bash
+  vaultspec-core vault sanitize annotations --feature test-feature
+  ```
+
 ______________________________________________________________________
 
 ### vaultspec-core vault feature list
@@ -460,6 +647,14 @@ List all feature tags in the vault.
 | `--orphaned`  | off     | Show only features with no incoming links |
 | `--type TYPE` | None    | Filter by document type                   |
 | `--json`      | off     | Emit machine-readable output.             |
+
+#### Examples
+
+- **List all active feature tags in the vault**:
+
+  ```bash
+  vaultspec-core vault feature list
+  ```
 
 ______________________________________________________________________
 
@@ -481,6 +676,14 @@ auto-managed.
 | `--feature TAG` | `-f`  | None    | Generate index for a specific feature |
 | `--json`        | -     | off     | Emit machine-readable output.         |
 
+#### Examples
+
+- **Rebuild or generate the index document for a specific feature**:
+
+  ```bash
+  vaultspec-core vault feature index --feature test-feature
+  ```
+
 ______________________________________________________________________
 
 ### vaultspec-core vault feature archive
@@ -493,9 +696,107 @@ Move all documents for a feature tag to the archive.
 
 #### Options
 
-| Option   | Default | Description                   |
-| -------- | ------- | ----------------------------- |
-| `--json` | off     | Emit machine-readable output. |
+| Option      | Short | Default | Description                                              |
+| ----------- | ----- | ------- | -------------------------------------------------------- |
+| `--dry-run` | -     | off     | Preview planned changes.                                 |
+| `--json`    | -     | off     | Emit machine-readable output.                            |
+| `--target`  | `-t`  | None    | Target directory (defaults to current working directory) |
+
+#### Examples
+
+- **Archive all documents for a completed feature tag**:
+
+  ```bash
+  vaultspec-core vault feature archive test-feature
+  ```
+
+______________________________________________________________________
+
+### vaultspec-core vault feature unarchive
+
+```bash
+vaultspec-core vault feature unarchive [OPTIONS] FEATURE_TAG
+```
+
+Restore all archived documents for a feature tag.
+
+#### Options
+
+| Option      | Short | Default | Description                                              |
+| ----------- | ----- | ------- | -------------------------------------------------------- |
+| `--dry-run` | -     | off     | Preview planned changes.                                 |
+| `--json`    | -     | off     | Emit machine-readable output.                            |
+| `--target`  | `-t`  | None    | Target directory (defaults to current working directory) |
+
+#### Examples
+
+- **Restore and unarchive all documents for a previously archived feature**:
+
+  ```bash
+  vaultspec-core vault feature unarchive test-feature
+  ```
+
+______________________________________________________________________
+
+### vaultspec-core vault adr supersede
+
+```bash
+vaultspec-core vault adr supersede [OPTIONS] OLD_ADR
+```
+
+Supersede an old ADR with a new ADR.
+
+#### Arguments
+
+| Argument  | Description               |
+| --------- | ------------------------- |
+| `OLD_ADR` | Old ADR stem to supersede |
+
+#### Options
+
+| Option      | Short | Default | Description                                              |
+| ----------- | ----- | ------- | -------------------------------------------------------- |
+| `--by`      | -     | None    | New ADR stem that supersedes the old one                 |
+| `--dry-run` | -     | off     | Preview without writing                                  |
+| `--json`    | -     | off     | Output as JSON                                           |
+| `--target`  | `-t`  | None    | Target directory (defaults to current working directory) |
+
+#### Examples
+
+- **Supersede an outdated ADR with a newly created one**:
+
+  ```bash
+  vaultspec-core vault adr supersede 2026-05-17-old-adr-stem --by 2026-05-26-new-adr-stem
+  ```
+
+______________________________________________________________________
+
+### vaultspec-core vault rule promote
+
+```bash
+vaultspec-core vault rule promote [OPTIONS]
+```
+
+Promote an audit finding to a project-level rule.
+
+#### Options
+
+| Option      | Short | Default | Description                                              |
+| ----------- | ----- | ------- | -------------------------------------------------------- |
+| `--from`    | -     | None    | Audit stem to promote from (required)                    |
+| `--as`      | -     | None    | Kebab-case name of the promoted rule (required)          |
+| `--force`   | -     | off     | Overwrite existing rule source                           |
+| `--dry-run` | -     | off     | Preview without writing                                  |
+| `--json`    | -     | off     | Output as JSON                                           |
+| `--target`  | `-t`  | None    | Target directory (defaults to current working directory) |
+
+#### Examples
+
+- **Promote a specific finding from an audit file into a project-shared rule**:
+
+  ```bash
+  vaultspec-core vault rule promote --from 2026-05-17-feature-audit --as project-rule-name
+  ```
 
 ______________________________________________________________________
 
@@ -517,19 +818,20 @@ Run health checks on `.vault/`. Exits with code `1` if errors are found.
 
 #### Subcommands
 
-| Subcommand    | `--fix` | `--feature` | Description                                                      |
-| ------------- | ------- | ----------- | ---------------------------------------------------------------- |
-| `all`         | partial | yes         | Run every check in sequence                                      |
-| `annotations` | yes     | yes         | Find generated template annotations                              |
-| `body-links`  | no      | yes         | Find wiki-links and markdown path links in document body text    |
-| `dangling`    | yes     | yes         | Find `related:` wiki-links that resolve to no document           |
-| `frontmatter` | yes     | yes         | Validate frontmatter against vault schema                        |
-| `links`       | yes     | yes         | Check wiki-links follow Obsidian convention (no `.md` extension) |
-| `orphans`     | no      | yes         | Find documents with no incoming wiki-links                       |
-| `features`    | no      | yes         | Check feature tag completeness (missing doc types)               |
-| `references`  | yes     | yes         | Check cross-references within features                           |
-| `schema`      | yes     | yes         | Enforce dependency rules (ADR refs research, plan refs ADR)      |
-| `structure`   | yes     | no          | Check directory structure and filename conventions               |
+| Subcommand         | `--fix` | `--feature` | Description                                                      |
+| ------------------ | ------- | ----------- | ---------------------------------------------------------------- |
+| `all`              | partial | yes         | Run every check in sequence                                      |
+| `annotations`      | yes     | yes         | Find generated template annotations                              |
+| `body-links`       | no      | yes         | Find wiki-links and markdown path links in document body text    |
+| `dangling`         | yes     | yes         | Find `related:` wiki-links that resolve to no document           |
+| `frontmatter`      | yes     | yes         | Validate frontmatter against vault schema                        |
+| `links`            | yes     | yes         | Check wiki-links follow Obsidian convention (no `.md` extension) |
+| `orphans`          | no      | yes         | Find documents with no incoming wiki-links                       |
+| `features`         | no      | yes         | Check feature tag completeness (missing doc types)               |
+| `references`       | yes     | yes         | Check cross-references within features                           |
+| `schema`           | yes     | yes         | Enforce dependency rules (ADR refs research, plan refs ADR)      |
+| `structure`        | yes     | no          | Check directory structure and filename conventions               |
+| `rename-integrity` | yes     | no          | Check name/filename integrity for rules, skills, and agents      |
 
 `yes` = fully supported, `partial` = only the sub-checks that accept `--fix` apply fixes
 (`all` dispatches to every check), `no` = flag rejected with error. `structure` does not
@@ -537,6 +839,80 @@ support `--feature` filtering.
 
 Use `vaultspec-core vault repair` when the operator goal is end-to-end recovery with
 generated index refresh, post-fix validation, and a final delta report.
+
+#### Examples
+
+- **Run all vault health checks to verify link integrity and directory structure**:
+
+  ```bash
+  vaultspec-core vault check all
+  ```
+
+- **Audit and automatically repair dangling wiki-links**:
+
+  ```bash
+  vaultspec-core vault check dangling --fix
+  ```
+
+- **Check feature completeness for a specific feature tag**:
+
+  ```bash
+  vaultspec-core vault check features --feature test-feature
+  ```
+
+- **Scan for and report any generated template instructions or annotations**:
+
+  ```bash
+  vaultspec-core vault check annotations --feature test-feature
+  ```
+
+- **Verify Obsidian-style wiki links in body text resolved against the vault**:
+
+  ```bash
+  vaultspec-core vault check body-links
+  ```
+
+- **Audit rule, skill, and agent filenames for matching name tags**:
+
+  ```bash
+  vaultspec-core vault check rename-integrity
+  ```
+
+- **Find all unreferenced (orphaned) documents in the vault**:
+
+  ```bash
+  vaultspec-core vault check orphans
+  ```
+
+- **Validate document frontmatter fields against required templates**:
+
+  ```bash
+  vaultspec-core vault check frontmatter --fix
+  ```
+
+- **Check wiki-link formats (ensuring no .md file extensions are used)**:
+
+  ```bash
+  vaultspec-core vault check links
+  ```
+
+- **Enforce architectural schema dependency rules**:
+
+  ```bash
+  vaultspec-core vault check schema
+  ```
+
+- **Verify all external references are valid and up to date**:
+
+  ```bash
+  vaultspec-core vault check references
+  ```
+
+- **Check directory structure and naming conventions for rules, skills, and agents**:
+
+  ```bash
+  vaultspec-core vault check structure
+  ```
 
 ### vaultspec-core vault plan
 
@@ -550,6 +926,164 @@ complexity tier (`L1`, `L2`, `L3`, `L4`) in frontmatter and are structured as
 Canonical identifiers (`S##`, `P##`, `W##`) remain append-only and gap-no-reuse.
 `vaultspec-core vault plan check` flags hand-edits to checkbox glyphs or display paths.
 
+#### Examples
+
+- **Query all open steps in a plan**:
+
+  ```bash
+  vaultspec-core vault plan query .vault/plan/2026-05-17-test-feature-plan.md --open
+  ```
+
+- **Append a new step to the active phase of a plan**:
+
+  ```bash
+  vaultspec-core vault plan step add --action "Implement login authentication handler" --scope "src/auth.py" .vault/plan/2026-05-17-test-feature-plan.md
+  ```
+
+- **Toggle completion checkbox of a step**:
+
+  ```bash
+  vaultspec-core vault plan step toggle .vault/plan/2026-05-17-test-feature-plan.md S01
+  ```
+
+- **Renumber a phase to resolve duplicate identifier conflicts**:
+
+  ```bash
+  vaultspec-core vault plan phase renumber --to P02 .vault/plan/2026-05-17-test-feature-plan.md P01
+  ```
+
+- **Validate the formatting and structure of an existing plan file**:
+
+  ```bash
+  vaultspec-core vault plan check .vault/plan/2026-05-17-test-feature-plan.md
+  ```
+
+- **Mark a plan step completed (idempotent check)**:
+
+  ```bash
+  vaultspec-core vault plan step check .vault/plan/2026-05-17-test-feature-plan.md S01
+  ```
+
+- **Mark a plan step incomplete (idempotent uncheck)**:
+
+  ```bash
+  vaultspec-core vault plan step uncheck .vault/plan/2026-05-17-test-feature-plan.md S01
+  ```
+
+- **Insert a new step before an existing anchor step**:
+
+  ```bash
+  vaultspec-core vault plan step insert --action "Validate input arguments" --before S02 .vault/plan/2026-05-17-test-feature-plan.md
+  ```
+
+- **Edit an existing step's action prose and code scope**:
+
+  ```bash
+  vaultspec-core vault plan step edit --action "New auth handler" --scope "src/auth.py" .vault/plan/2026-05-17-test-feature-plan.md S01
+  ```
+
+- **Move a step to a different phase inside the plan**:
+
+  ```bash
+  vaultspec-core vault plan step move --to-phase P02 .vault/plan/2026-05-17-test-feature-plan.md S01
+  ```
+
+- **Retire a plan step permanently**:
+
+  ```bash
+  vaultspec-core vault plan step remove .vault/plan/2026-05-17-test-feature-plan.md S01
+  ```
+
+- **Append a new phase to the current wave of a plan**:
+
+  ```bash
+  vaultspec-core vault plan phase add --title "Authentication Layer" --intent "Set up secure login/signup" .vault/plan/2026-05-17-test-feature-plan.md
+  ```
+
+- **Insert a phase before an existing anchor phase**:
+
+  ```bash
+  vaultspec-core vault plan phase insert --title "Database Setup" --before P02 .vault/plan/2026-05-17-test-feature-plan.md
+  ```
+
+- **Edit a phase's title or intent prose in place**:
+
+  ```bash
+  vaultspec-core vault plan phase edit --title "Updated Auth Setup" .vault/plan/2026-05-17-test-feature-plan.md P01
+  ```
+
+- **Move a phase to a different wave in the plan**:
+
+  ```bash
+  vaultspec-core vault plan phase move --to-wave W02 .vault/plan/2026-05-17-test-feature-plan.md P01
+  ```
+
+- **Retire a phase along with all of its descendant steps**:
+
+  ```bash
+  vaultspec-core vault plan phase remove .vault/plan/2026-05-17-test-feature-plan.md P01
+  ```
+
+- **Append a new wave to a plan**:
+
+  ```bash
+  vaultspec-core vault plan wave add --title "Advanced Features" --intent "Add AI features" .vault/plan/2026-05-17-test-feature-plan.md
+  ```
+
+- **Insert a wave after an existing anchor wave**:
+
+  ```bash
+  vaultspec-core vault plan wave insert --title "Optimization Wave" --after W01 .vault/plan/2026-05-17-test-feature-plan.md
+  ```
+
+- **Edit a wave's title or intent prose in place**:
+
+  ```bash
+  vaultspec-core vault plan wave edit --title "Updated Core Wave" .vault/plan/2026-05-17-test-feature-plan.md W01
+  ```
+
+- **Move a wave to reposition it within the plan**:
+
+  ```bash
+  vaultspec-core vault plan wave move --after W02 .vault/plan/2026-05-17-test-feature-plan.md W01
+  ```
+
+- **Retire a wave along with all of its descendant phases and steps**:
+
+  ```bash
+  vaultspec-core vault plan wave remove .vault/plan/2026-05-17-test-feature-plan.md W01
+  ```
+
+- **Display the plan's high-level Epic intent paragraph**:
+
+  ```bash
+  vaultspec-core vault plan epic intent show .vault/plan/2026-05-17-test-feature-plan.md
+  ```
+
+- **Update the plan's Epic intent paragraph**:
+
+  ```bash
+  vaultspec-core vault plan epic intent edit --text "Epic intent text associating PM issues" .vault/plan/2026-05-17-test-feature-plan.md
+  ```
+
+- **Display the plan's current complexity tier**:
+
+  ```bash
+  vaultspec-core vault plan tier show .vault/plan/2026-05-17-test-feature-plan.md
+  ```
+
+- **Promote a plan's complexity tier to L4**:
+
+  ```bash
+  vaultspec-core vault plan tier promote --target L4 --epic-intent "Epic goal" .vault/plan/2026-05-17-test-feature-plan.md
+  ```
+
+- **Demote a plan's complexity tier to L1**:
+
+  ```bash
+  vaultspec-core vault plan tier demote --target L1 --force .vault/plan/2026-05-17-test-feature-plan.md
+  ```
+
 #### Read commands
 
 | Subcommand | Description                                                                              |
@@ -560,6 +1094,84 @@ Canonical identifiers (`S##`, `P##`, `W##`) remain append-only and gap-no-reuse.
 
 `vaultspec-core vault plan check` exits `1` when at least one ERROR-severity finding is
 present.
+
+______________________________________________________________________
+
+#### vaultspec-core vault plan status
+
+```bash
+vaultspec-core vault plan status [OPTIONS] PATH
+```
+
+Report plan health, structure, completion percentages, and identify missing execution
+records.
+
+##### Arguments
+
+| Argument | Description                                      |
+| -------- | ------------------------------------------------ |
+| `PATH`   | Path to the `.vault/plan/...-plan.md` plan file. |
+
+##### Options
+
+| Option   | Short | Default | Description                           |
+| -------- | ----- | ------- | ------------------------------------- |
+| `--json` | -     | off     | Emit machine-readable status payload. |
+
+##### General Output
+
+When run without `--json`, the command renders a console summary displaying:
+
+- **Plan Path & Complexity Tier**: Declared level (`L1` to `L4`).
+- **Container Counts**: Total count of Epic, Waves, Phases, and Steps.
+- **Completion Status**: Checked vs. unchecked steps and total progress percentage.
+
+##### Execution Record Verification (`exec-missing`)
+
+The status command performs an active sanity check on execution records:
+
+- If a step is checked (`[x]`) in the plan but no step-aware execution record (e.g.
+  `.vault/exec/{plan-date}-{feature}/{plan-date}-{feature}-P01-S01.md`) exists in the
+  vault, the CLI generates a yellow warning block:
+
+  ```text
+  ! exec-missing: checked steps lacking execution records: S01, S02
+  ```
+
+- This warning does not block execution or raise exit codes; the command still exits
+  with code `0`.
+
+##### Machine-Readable Output (`--json`)
+
+When passed `--json`, the output utilizes the uniform `vaultspec.vault.plan.status.v1`
+schema envelope:
+
+```json
+{
+  "schema": "vaultspec.vault.plan.status.v1",
+  "status": "unchanged",
+  "data": {
+    "path": ".vault/plan/2026-05-17-test-feature-plan.md",
+    "tier": "L2",
+    "waves": 0,
+    "phases": 1,
+    "steps": 5,
+    "checked_steps": 2,
+    "completion_pct": 40.0,
+    "exec_missing_ids": ["S01", "S02"]
+  }
+}
+```
+
+##### Examples
+
+- **Check the progress and execution record status of a plan**:
+
+  ```bash
+  vaultspec-core vault plan status .vault/plan/2026-05-17-test-feature-plan.md
+  ```
+
+______________________________________________________________________
 
 #### Step commands
 
@@ -661,6 +1273,14 @@ reported as warnings and are not modified.
 
 Exit codes: `0` = all ok, `1` = warnings, `2` = errors.
 
+#### Examples
+
+- **Diagnose overall workspace health across configuration, git, and vault**:
+
+  ```bash
+  vaultspec-core spec doctor
+  ```
+
 ______________________________________________________________________
 
 ### vaultspec-core spec rules / vaultspec-core spec skills / vaultspec-core spec agents
@@ -676,28 +1296,95 @@ vaultspec-core spec agents [OPTIONS] COMMAND [ARGS]...
 
 #### Subcommands
 
-| Subcommand | Signature                           | Description                                                                               |
-| ---------- | ----------------------------------- | ----------------------------------------------------------------------------------------- |
-| `list`     | -                                   | List all resources                                                                        |
-| `add`      | `--name NAME [--force] [--dry-run]` | Create a resource. Extra options vary per resource type (below).                          |
-| `show`     | `NAME`                              | Print resource content to stdout                                                          |
-| `edit`     | `NAME`                              | Open in configured editor (`VAULTSPEC_EDITOR`)                                            |
-| `remove`   | `NAME [--yes\|--force]` (`-y`)      | Delete a resource. Prompts unless confirmed.                                              |
-| `rename`   | `OLD_NAME NEW_NAME`                 | Rename a resource                                                                         |
-| `sync`     | `[--dry-run] [--force]`             | Resource-scoped sync; use top-level `vaultspec-core sync` for a complete provider refresh |
-| `revert`   | `FILENAME`                          | Revert to snapshotted original                                                            |
+| Subcommand | Signature                                                     | Description                                                                                  |
+| ---------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `list`     | -                                                             | List all resources                                                                           |
+| `add`      | `NAME [--body BODY] [--from-file FILE] [--force] [--dry-run]` | Create a resource.                                                                           |
+| `show`     | `NAME`                                                        | Print resource content to stdout                                                             |
+| `edit`     | `NAME [--editor EDITOR]`                                      | Open in configured editor. Resolution order: --editor flag, local config, VISUAL, EDITOR, vi |
+| `remove`   | `NAME [--yes\|--force]` (`-y`)                                | Delete a resource. Prompts unless confirmed.                                                 |
+| `rename`   | `OLD_NAME NEW_NAME`                                           | Rename a resource                                                                            |
+| `sync`     | `[--dry-run] [--force]`                                       | Resource-scoped sync; use top-level `vaultspec-core sync` for a complete provider refresh    |
+| `restore`  | `FILENAME`                                                    | Restore to snapshotted original                                                              |
+| `status`   | `[--json]`                                                    | Report dry-run sync with prune enabled, returning missing/drifted/stale status               |
 
-`add` accepts different body-content flags per resource type:
-
-- `vaultspec-core spec rules add` accepts `--content TEXT`.
-- `vaultspec-core spec skills add` accepts `--description TEXT` and `--template TEXT`.
-- `vaultspec-core spec agents add` accepts `--description TEXT`.
+`edit` accepts the `--editor` option to override the editor binary for this invocation.
+`add` accepts the unified `--body` flag for direct content or `--from-file` to read from
+a file.
 
 `vaultspec-core spec <resource> sync` commands are narrow maintenance surfaces. They do
 not guarantee that provider-facing config stubs such as `AGENTS.md`, `CLAUDE.md`,
 `GEMINI.md`, or `.codex/config.toml` have been fully refreshed. Run
 `vaultspec-core sync` after source-side changes when the goal is a complete
 provider-facing workspace.
+
+#### Examples
+
+- **List all rules, skills, or agents configured in the current project**:
+
+  ```bash
+  vaultspec-core spec rules list
+  ```
+
+- **Create a new custom project-level rule**:
+
+  ```bash
+  vaultspec-core spec rules add enforce-newline --body "All workspace source files must end with a single trailing newline."
+  ```
+
+- **Create a new custom skill from a local template**:
+
+  ```bash
+  vaultspec-core spec skills add unit-test-runner --description "Run python pytest suite" --template "templates/skill_template.md"
+  ```
+
+- **Create a new custom agent persona**:
+
+  ```bash
+  vaultspec-core spec agents add database_expert --description "An expert database optimization agent"
+  ```
+
+- **Display the content of a project rule**:
+
+  ```bash
+  vaultspec-core spec rules show enforce-newline
+  ```
+
+- **Edit a project skill using a specified editor command**:
+
+  ```bash
+  vaultspec-core spec skills edit unit-test-runner --editor zed
+  ```
+
+- **Delete a project agent persona**:
+
+  ```bash
+  vaultspec-core spec agents remove database_expert --force
+  ```
+
+- **Rename a project-level rule atomically**:
+
+  ```bash
+  vaultspec-core spec rules rename old-rule-name new-rule-name
+  ```
+
+- **Synchronize local rules changes to enrolled provider output stubs**:
+
+  ```bash
+  vaultspec-core spec rules sync
+  ```
+
+- **Report parsing and synchronization status of project skills**:
+
+  ```bash
+  vaultspec-core spec skills status
+  ```
+
+- **Restore a default rule to its original snapshotted version**:
+
+  ```bash
+  vaultspec-core spec rules restore enforce-newline.builtin.md
+  ```
 
 ______________________________________________________________________
 
@@ -714,6 +1401,20 @@ vaultspec-core spec system [OPTIONS] COMMAND [ARGS]...
 | `show`     | -                       | Display system prompt parts and generation targets |
 | `sync`     | `[--dry-run] [--force]` | Resource-scoped system prompt sync                 |
 
+#### Examples
+
+- **Display assembled system prompt configuration and composition**:
+
+  ```bash
+  vaultspec-core spec system show
+  ```
+
+- **Synchronize system prompts and stubs to AI provider workspaces**:
+
+  ```bash
+  vaultspec-core spec system sync
+  ```
+
 ______________________________________________________________________
 
 ### vaultspec-core spec hooks
@@ -724,10 +1425,80 @@ vaultspec-core spec hooks [OPTIONS] COMMAND [ARGS]...
 
 #### Subcommands
 
-| Subcommand | Signature             | Description                                                                                                           |
-| ---------- | --------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `list`     | -                     | List hooks with name, status, event, and action count                                                                 |
-| `run`      | `EVENT [--path PATH]` | Trigger enabled hooks for the given event. Valid events: `vault.document.created`, `config.synced`, `audit.completed` |
+| Subcommand | Signature                                                                                       | Description                                                                                                           |
+| ---------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `list`     | -                                                                                               | List hooks with name, status, event, and action count                                                                 |
+| `add`      | `[NAME] [--event EVENT] [--command CMD] [--body BODY] [--from-file FILE] [--force] [--dry-run]` | Add a new custom hook definition.                                                                                     |
+| `show`     | `NAME`                                                                                          | Display a hook's content.                                                                                             |
+| `edit`     | `NAME [--editor EDITOR]`                                                                        | Open a hook in the configured editor.                                                                                 |
+| `rename`   | `OLD_NAME NEW_NAME`                                                                             | Rename an existing hook atomically.                                                                                   |
+| `remove`   | `NAME [--yes\|--force]`                                                                         | Delete a hook.                                                                                                        |
+| `restore`  | `FILENAME`                                                                                      | Restore a hook (not supported for custom hooks, exits with error 1).                                                  |
+| `sync`     | `[--dry-run] [--force]`                                                                         | Sync only hooks files.                                                                                                |
+| `status`   | `[--json]`                                                                                      | Report declarative hooks parsing and taxonomy compliance status.                                                      |
+| `run`      | `EVENT [--path PATH]`                                                                           | Trigger enabled hooks for the given event. Valid events: `vault.document.created`, `config.synced`, `audit.completed` |
+
+#### Examples
+
+- **Run all hooks registered for the document creation event**:
+
+  ```bash
+  vaultspec-core spec hooks run vault.document.created
+  ```
+
+- **List all registered hooks and their enabled/disabled status**:
+
+  ```bash
+  vaultspec-core spec hooks list
+  ```
+
+- **Add a new custom hook triggered on document creation**:
+
+  ```bash
+  vaultspec-core spec hooks add log-created --event vault.document.created --command "echo Created"
+  ```
+
+- **Display the definition and command block of a hook**:
+
+  ```bash
+  vaultspec-core spec hooks show log-created
+  ```
+
+- **Edit an existing hook definition using a configured editor**:
+
+  ```bash
+  vaultspec-core spec hooks edit log-created
+  ```
+
+- **Rename an existing hook atomically**:
+
+  ```bash
+  vaultspec-core spec hooks rename log-created document-logger
+  ```
+
+- **Remove/delete an obsolete hook**:
+
+  ```bash
+  vaultspec-core spec hooks remove document-logger --force
+  ```
+
+- **Check and report overall parsing and compliance status of hooks**:
+
+  ```bash
+  vaultspec-core spec hooks status
+  ```
+
+- **Synchronize local hook definitions**:
+
+  ```bash
+  vaultspec-core spec hooks sync
+  ```
+
+- **Restore a default hook to its original snapshotted version**:
+
+  ```bash
+  vaultspec-core spec hooks restore some-default-hook.json
+  ```
 
 ______________________________________________________________________
 
@@ -754,6 +1525,38 @@ complete refresh across all provider-facing outputs.
 `vaultspec-core spec mcps status` exits `0` only when MCP config status is `ok`,
 otherwise `1`. It checks config health only and does not start or probe MCP server
 processes.
+
+#### Examples
+
+- **Verify the health and synchronization status of MCP server definitions**:
+
+  ```bash
+  vaultspec-core spec mcps status
+  ```
+
+- **List all registered MCP server definitions**:
+
+  ```bash
+  vaultspec-core spec mcps list
+  ```
+
+- **Sync registered MCP definitions to deployment files**:
+
+  ```bash
+  vaultspec-core spec mcps sync
+  ```
+
+- **Register a new custom MCP server definition**:
+
+  ```bash
+  vaultspec-core spec mcps add --name sqlite-mcp --config "{\"command\": \"npx\", \"args\": [\"@modelcontextprotocol/server-sqlite\"]}"
+  ```
+
+- **Remove a registered MCP server definition**:
+
+  ```bash
+  vaultspec-core spec mcps remove sqlite-mcp --force
+  ```
 
 ## Migration commands
 
@@ -787,6 +1590,14 @@ manifest. Read-only; never mutates.
 Exit codes: `0` when up to date or workspace has no manifest, `1` when migrations are
 pending.
 
+#### Examples
+
+- **List all registered schema migrations and check for pending entries**:
+
+  ```bash
+  vaultspec-core migrations status
+  ```
+
 ______________________________________________________________________
 
 ### vaultspec-core migrations run
@@ -809,6 +1620,89 @@ unchanged so the next invocation re-attempts it.
 Exit codes: `0` on success (including the no-pending no-op), `1` if any migration
 failed.
 
+#### Examples
+
+- **Execute all pending schema migrations and upgrade the workspace**:
+
+  ```bash
+  vaultspec-core migrations run
+  ```
+
+______________________________________________________________________
+
+## Config commands
+
+Group command: `vaultspec-core config [OPTIONS] COMMAND [ARGS]...`
+
+Manage local project configuration settings stored in `.vaultspec/config.toml` at the
+workspace root.
+
+Every config subcommand also accepts the global `--target / -t DIR` and `--json` flags.
+
+### vaultspec-core config get
+
+```bash
+vaultspec-core config get [OPTIONS] KEY
+```
+
+Read a local configuration value.
+
+#### Examples
+
+- **Retrieve the local project-level editor setting**:
+
+  ```bash
+  vaultspec-core config get editor
+  ```
+
+### vaultspec-core config set
+
+```bash
+vaultspec-core config set [OPTIONS] KEY VALUE
+```
+
+Write a local configuration value. Supported keys: `editor`.
+
+#### Examples
+
+- **Configure the local project-level editor command to Zed**:
+
+  ```bash
+  vaultspec-core config set editor zed
+  ```
+
+### vaultspec-core config unset
+
+```bash
+vaultspec-core config unset [OPTIONS] KEY
+```
+
+Clear a local configuration entry.
+
+#### Examples
+
+- **Clear the local project-level editor configuration**:
+
+  ```bash
+  vaultspec-core config unset editor
+  ```
+
+### vaultspec-core config list
+
+```bash
+vaultspec-core config list [OPTIONS]
+```
+
+Enumerate all known configuration entries and current values.
+
+#### Examples
+
+- **Enumerate all local project-level configuration settings and values**:
+
+  ```bash
+  vaultspec-core config list
+  ```
+
 ______________________________________________________________________
 
 ## Environment variables
@@ -816,19 +1710,19 @@ ______________________________________________________________________
 All variables are prefixed `VAULTSPEC_`. Environment variables override defaults but are
 overridden by the `--target` flag.
 
-| Variable                          | Type | Default      | Description                                                                                                                                                                                                       |
-| --------------------------------- | ---- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `VAULTSPEC_TARGET_DIR`            | path | cwd          | Root workspace directory (where `.vault/` and `.vaultspec/` live). Equivalent to `--target` on the CLI. Also used by `vaultspec-mcp` to locate the workspace. Defaults to the current working directory if unset. |
-| `VAULTSPEC_DOCS_DIR`              | str  | `.vault`     | Vault directory name                                                                                                                                                                                              |
-| `VAULTSPEC_FRAMEWORK_DIR`         | str  | `.vaultspec` | Framework directory name                                                                                                                                                                                          |
-| `VAULTSPEC_CLAUDE_DIR`            | str  | `.claude`    | Claude tool directory name                                                                                                                                                                                        |
-| `VAULTSPEC_GEMINI_DIR`            | str  | `.gemini`    | Gemini tool directory name                                                                                                                                                                                        |
-| `VAULTSPEC_ANTIGRAVITY_DIR`       | str  | `.agents`    | Antigravity directory name                                                                                                                                                                                        |
-| `VAULTSPEC_IO_BUFFER_SIZE`        | int  | `8192`       | I/O read buffer size in bytes                                                                                                                                                                                     |
-| `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int  | `1000000`    | Subprocess stdout capture limit in bytes                                                                                                                                                                          |
-| `VAULTSPEC_LOG_LEVEL`             | str  | `INFO`       | Root log level for the CLI, for example `DEBUG`, `INFO`, or `WARNING`. Overridden by `--debug` when set.                                                                                                          |
-| `VAULTSPEC_ALLOW_DEV_WRITES`      | bool | unset        | Bypass the development-write guard that blocks source-repo writes. Accepts `1`/`true`/`yes`. Use with care - intended for fixture and test automation only.                                                       |
-| `VAULTSPEC_EDITOR`                | str  | `zed -w`     | Editor command for `vaultspec-core spec {rules\|skills\|agents} edit`. Set to your preferred editor, for example `code -w` or `vim`.                                                                              |
+| Variable                          | Type | Default      | Description                                                                                                                                                                                                                                               |
+| --------------------------------- | ---- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VAULTSPEC_TARGET_DIR`            | path | cwd          | Root workspace directory (where `.vault/` and `.vaultspec/` live). Equivalent to `--target` on the CLI. Also used by `vaultspec-mcp` to locate the workspace. Defaults to the current working directory if unset.                                         |
+| `VAULTSPEC_DOCS_DIR`              | str  | `.vault`     | Vault directory name                                                                                                                                                                                                                                      |
+| `VAULTSPEC_FRAMEWORK_DIR`         | str  | `.vaultspec` | Framework directory name                                                                                                                                                                                                                                  |
+| `VAULTSPEC_CLAUDE_DIR`            | str  | `.claude`    | Claude tool directory name                                                                                                                                                                                                                                |
+| `VAULTSPEC_GEMINI_DIR`            | str  | `.gemini`    | Gemini tool directory name                                                                                                                                                                                                                                |
+| `VAULTSPEC_ANTIGRAVITY_DIR`       | str  | `.agents`    | Antigravity directory name                                                                                                                                                                                                                                |
+| `VAULTSPEC_IO_BUFFER_SIZE`        | int  | `8192`       | I/O read buffer size in bytes                                                                                                                                                                                                                             |
+| `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int  | `1000000`    | Subprocess stdout capture limit in bytes                                                                                                                                                                                                                  |
+| `VAULTSPEC_LOG_LEVEL`             | str  | `INFO`       | Root log level for the CLI, for example `DEBUG`, `INFO`, or `WARNING`. Overridden by `--debug` when set.                                                                                                                                                  |
+| `VAULTSPEC_ALLOW_DEV_WRITES`      | bool | unset        | Bypass the development-write guard that blocks source-repo writes. Accepts `1`/`true`/`yes`. Use with care - intended for fixture and test automation only.                                                                                               |
+| `VAULTSPEC_EDITOR`                | str  | `zed -w`     | Editor command for `vaultspec-core spec {rules\|skills\|agents} edit`. Overridden by the project-local config `editor` value, and the `--editor` flag. Resolved in order: `--editor` flag, project config, `$VISUAL`, `$EDITOR`/`VAULTSPEC_EDITOR`, `vi`. |
 
 ## See also
 

@@ -81,6 +81,54 @@ def _emit_sync_result(
     raise typer.Exit(code)
 
 
+def _apply_provider_filter(provider: str) -> None:
+    """Validate provider is installed and filter tool_configs in active context."""
+    from dataclasses import replace
+
+    import typer
+
+    from vaultspec_core.core.commands import SYNC_PROVIDERS
+    from vaultspec_core.core.manifest import read_manifest
+    from vaultspec_core.core.types import Tool, get_context, set_context
+
+    if provider not in SYNC_PROVIDERS:
+        typer.echo(
+            f"Error: Unknown sync target '{provider}'. "
+            f"Valid: {', '.join(sorted(SYNC_PROVIDERS))}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    if provider == "all":
+        return
+
+    ctx = get_context()
+    root_dir = ctx.target_dir
+
+    installed = read_manifest(root_dir)
+    if installed and provider not in installed:
+        typer.echo(
+            f"Error: Provider '{provider}' is not installed.\n"
+            f"  Hint: Run 'vaultspec-core install "
+            f"--target {root_dir} {provider}' first.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    requested: set[Tool] = set()
+    if provider == "claude":
+        requested = {Tool.CLAUDE}
+    elif provider == "gemini":
+        requested = {Tool.GEMINI}
+    elif provider == "antigravity":
+        requested = {Tool.ANTIGRAVITY}
+    elif provider == "codex":
+        requested = {Tool.CODEX}
+
+    narrowed = {k: v for k, v in ctx.tool_configs.items() if k in requested}
+    set_context(replace(ctx, tool_configs=narrowed))
+
+
 def _print_source_mutation_notice(path: Path, *, action: str) -> None:
     """Explain that source-side resource changes need top-level sync."""
     from vaultspec_core.console import get_console
@@ -112,10 +160,14 @@ def _emit_json(command: str, status: str, data: dict) -> None:
     typer.echo(json.dumps(json_envelope(command, status, data), indent=2, default=str))
 
 
-def _revert_resource_command(
-    *, category: str, label: str, filename: str, json_output: bool
+def _restore_resource_command(
+    *,
+    category: str,
+    label: str,
+    filename: str,
+    json_output: bool,
 ) -> None:
-    """Shared body for ``spec {rules,skills,agents} revert``.
+    """Shared body for ``spec {rules,skills,agents} restore``.
 
     Bare-name resolution to the canonical ``.builtin.md`` form is handled
     by :func:`~vaultspec_core.core.revert.revert_resource`. Always raises
@@ -129,20 +181,73 @@ def _revert_resource_command(
     result = revert_resource(vaultspec_dir, category, filename)
     reverted = bool(result.get("reverted"))
     resolved = str(result.get("filename", filename))
-    reason = str(result.get("reason", "revert failed"))
+    reason = str(result.get("reason", "restore failed"))
 
     if json_output:
         if reverted:
-            _emit_json(f"spec.{category}.revert", "restored", {"name": resolved})
+            _emit_json(f"spec.{category}.restore", "restored", {"name": resolved})
         else:
-            _emit_json(f"spec.{category}.revert", "failed", {"message": reason})
+            _emit_json(f"spec.{category}.restore", "failed", {"message": reason})
         raise typer.Exit(0 if reverted else 1)
 
     if reverted:
-        typer.echo(f"Reverted {label}: {resolved}")
+        typer.echo(f"Restored {label}: {resolved}")
         raise typer.Exit(0)
     typer.echo(reason, err=True)
     raise typer.Exit(code=1)
+
+
+def _spec_status_command(result: "SyncResult", label: str, json_output: bool) -> None:
+    missing, drifted, stale, up_to_date, skipped = [], [], [], [], []
+    for path, action in result.items:
+        if action == "[ADD]":
+            missing.append(path)
+        elif action == "[UPDATE]":
+            drifted.append(path)
+        elif action == "[DELETE]":
+            stale.append(path)
+        elif action == "[UNCHANGED]":
+            up_to_date.append(path)
+        elif action == "[SKIP]":
+            skipped.append(path)
+    errors = list(result.errors)
+    status_str = (
+        "error" if errors else ("drifted" if (missing or drifted or stale) else "ok")
+    )
+    data = {
+        "status": status_str,
+        "missing": missing,
+        "drifted": drifted,
+        "stale": stale,
+        "up_to_date": up_to_date,
+        "warnings": result.warnings,
+        "errors": errors,
+    }
+    if json_output:
+        _emit_json(f"spec.{label.lower()}.status", status_str, data)
+        raise typer.Exit(0 if status_str == "ok" else 1)
+
+    from rich import box
+    from rich.table import Table
+
+    from vaultspec_core.console import get_console
+
+    console = get_console()
+    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
+    table.add_column("Field", no_wrap=True)
+    table.add_column("Value")
+    table.add_row("status", status_str)
+    table.add_row("missing", ", ".join(missing) or "none")
+    table.add_row("drifted", ", ".join(drifted) or "none")
+    table.add_row("stale", ", ".join(stale) or "none")
+    table.add_row("up_to_date", f"{len(up_to_date)} files" if up_to_date else "none")
+    console.print(table)
+    for w in result.warnings:
+        console.print(f"  [yellow]•[/yellow] {w}")
+    for e in errors:
+        console.print(f"  [red]•[/red] {e}")
+    if status_str != "ok":
+        raise typer.Exit(1)
 
 
 spec_app = typer.Typer(
@@ -196,9 +301,12 @@ def cmd_rules_list(
 
 @rules_app.command("add")
 def cmd_rules_add(
-    name: Annotated[str, typer.Option("--name", help="Rule name")],
-    content: Annotated[
-        str | None, typer.Option("--content", help="Rule content")
+    name: Annotated[str, typer.Argument(help="Rule name")],
+    body: Annotated[
+        str | None, typer.Option("--body", help="Rule body content")
+    ] = None,
+    from_file: Annotated[
+        Path | None, typer.Option("--from-file", help="Read body content from file")
     ] = None,
     force: Annotated[bool, typer.Option("--force", help="Overwrite existing")] = False,
     dry_run: Annotated[
@@ -209,11 +317,27 @@ def cmd_rules_add(
 ) -> None:
     """Add a new custom rule source under .vaultspec/."""
     apply_target(target)
+
+    if from_file and body is not None:
+        typer.echo("Error: Cannot specify both --body and --from-file.", err=True)
+        raise typer.Exit(code=1)
+
+    resolved_body = None
+    if from_file:
+        if not from_file.exists():
+            typer.echo(f"Error: File not found: {from_file}", err=True)
+            raise typer.Exit(code=1)
+        resolved_body = from_file.read_text(encoding="utf-8")
+    elif body is not None:
+        resolved_body = body
+
     from vaultspec_core.core import rules_add
     from vaultspec_core.core.exceptions import VaultSpecError
 
     try:
-        file_path = rules_add(name=name, content=content, force=force, dry_run=dry_run)
+        file_path = rules_add(
+            name=name, content=resolved_body, force=force, dry_run=dry_run
+        )
     except VaultSpecError as exc:
         _handle_error(exc, json_output=json_output)
         return
@@ -255,18 +379,32 @@ def cmd_rules_show(
 @rules_app.command("edit")
 def cmd_rules_edit(
     name: Annotated[str, typer.Argument(help="Rule name")],
+    editor: Annotated[
+        str | None, typer.Option("--editor", help="Override the editor binary to use")
+    ] = None,
     target: TargetOption = None,
 ) -> None:
-    """Open a rule in the configured editor."""
+    """Open a rule in the configured editor.
+
+    Editor resolution order:
+      1. Command-line --editor flag
+      2. Project-local config (vaultspec-core config set editor <value>)
+      3. $VISUAL environment variable
+      4. $EDITOR environment variable
+      5. Fallback to 'vi'
+
+    If no working editor is resolved, the command exits with code 2.
+    """
     apply_target(target)
-    from vaultspec_core.core import resource_edit
-    from vaultspec_core.core.exceptions import VaultSpecError
     from vaultspec_core.core.types import get_context
 
-    try:
-        resource_edit(name=name, base_dir=get_context().rules_src_dir, label="Rule")
-    except VaultSpecError as exc:
-        _handle_error(exc)
+    _run_edit_command(
+        name=name,
+        base_dir=get_context().rules_src_dir,
+        label="Rule",
+        is_dir=False,
+        editor=editor,
+    )
 
 
 @rules_app.command("remove")
@@ -319,7 +457,10 @@ def cmd_rules_rename(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Rename an existing rule."""
+    """Rename an existing rule atomically.
+
+    Rewrites both filename and frontmatter name.
+    """
     apply_target(target)
     from vaultspec_core.core import resource_rename
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -349,6 +490,12 @@ def cmd_rules_rename(
 
 @rules_app.command("sync")
 def cmd_rules_sync(
+    provider: Annotated[
+        str,
+        typer.Argument(
+            help="Provider to sync (all, claude, gemini, antigravity, codex)"
+        ),
+    ] = "all",
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
     force: Annotated[
         bool,
@@ -359,6 +506,7 @@ def cmd_rules_sync(
 ) -> None:
     """Sync only rule files; use vaultspec-core sync for complete refresh."""
     apply_target(target)
+    _apply_provider_filter(provider)
     from vaultspec_core.core import rules_sync
 
     result = rules_sync(prune=force, dry_run=dry_run)
@@ -368,17 +516,30 @@ def cmd_rules_sync(
     _emit_sync_result(result, label="Rules", dry_run=dry_run, json_output=json_output)
 
 
-@rules_app.command("revert")
-def cmd_rules_revert(
-    filename: Annotated[str, typer.Argument(help="Rule name or filename to revert")],
+@rules_app.command("restore")
+def cmd_rules_restore(
+    filename: Annotated[str, typer.Argument(help="Rule name or filename to restore")],
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Revert a rule to its snapshotted original."""
+    """Restore a rule to its snapshotted original."""
     apply_target(target)
-    _revert_resource_command(
+    _restore_resource_command(
         category="rules", label="rule", filename=filename, json_output=json_output
     )
+
+
+@rules_app.command("status")
+def cmd_rules_status(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Report rules sync status against provider destinations."""
+    apply_target(target)
+    from vaultspec_core.core import rules_sync
+
+    result = rules_sync(prune=True, dry_run=True)
+    _spec_status_command(result, label="Rules", json_output=json_output)
 
 
 # =============================================================================
@@ -428,10 +589,16 @@ def cmd_skills_list(
 
 @skills_app.command("add")
 def cmd_skills_add(
-    name: Annotated[str, typer.Option("--name", help="Skill name")],
+    name: Annotated[str, typer.Argument(help="Skill name")],
     description: Annotated[
         str, typer.Option("--description", help="Skill description")
     ] = "",
+    body: Annotated[
+        str | None, typer.Option("--body", help="Skill body content")
+    ] = None,
+    from_file: Annotated[
+        Path | None, typer.Option("--from-file", help="Read body content from file")
+    ] = None,
     force: Annotated[bool, typer.Option("--force", help="Overwrite existing")] = False,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview without writing")
@@ -444,6 +611,20 @@ def cmd_skills_add(
 ) -> None:
     """Add a new skill."""
     apply_target(target)
+
+    if from_file and body is not None:
+        typer.echo("Error: Cannot specify both --body and --from-file.", err=True)
+        raise typer.Exit(code=1)
+
+    resolved_body = None
+    if from_file:
+        if not from_file.exists():
+            typer.echo(f"Error: File not found: {from_file}", err=True)
+            raise typer.Exit(code=1)
+        resolved_body = from_file.read_text(encoding="utf-8")
+    elif body is not None:
+        resolved_body = body
+
     from vaultspec_core.core import skills_add
     from vaultspec_core.core.exceptions import VaultSpecError
 
@@ -453,6 +634,7 @@ def cmd_skills_add(
             description=description,
             force=force,
             template=template,
+            body=resolved_body,
             dry_run=dry_run,
         )
     except VaultSpecError as exc:
@@ -496,20 +678,32 @@ def cmd_skills_show(
 @skills_app.command("edit")
 def cmd_skills_edit(
     name: Annotated[str, typer.Argument(help="Skill name")],
+    editor: Annotated[
+        str | None, typer.Option("--editor", help="Override the editor binary to use")
+    ] = None,
     target: TargetOption = None,
 ) -> None:
-    """Open a skill in the configured editor."""
+    """Open a skill in the configured editor.
+
+    Editor resolution order:
+      1. Command-line --editor flag
+      2. Project-local config (vaultspec-core config set editor <value>)
+      3. $VISUAL environment variable
+      4. $EDITOR environment variable
+      5. Fallback to 'vi'
+
+    If no working editor is resolved, the command exits with code 2.
+    """
     apply_target(target)
-    from vaultspec_core.core import resource_edit
-    from vaultspec_core.core.exceptions import VaultSpecError
     from vaultspec_core.core.types import get_context
 
-    try:
-        resource_edit(
-            name=name, base_dir=get_context().skills_src_dir, label="Skill", is_dir=True
-        )
-    except VaultSpecError as exc:
-        _handle_error(exc)
+    _run_edit_command(
+        name=name,
+        base_dir=get_context().skills_src_dir,
+        label="Skill",
+        is_dir=True,
+        editor=editor,
+    )
 
 
 @skills_app.command("remove")
@@ -563,7 +757,10 @@ def cmd_skills_rename(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Rename an existing skill."""
+    """Rename an existing skill atomically.
+
+    Rewrites both directory name and SKILL.md frontmatter name.
+    """
     apply_target(target)
     from vaultspec_core.core import resource_rename
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -594,6 +791,12 @@ def cmd_skills_rename(
 
 @skills_app.command("sync")
 def cmd_skills_sync(
+    provider: Annotated[
+        str,
+        typer.Argument(
+            help="Provider to sync (all, claude, gemini, antigravity, codex)"
+        ),
+    ] = "all",
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
     force: Annotated[
         bool,
@@ -604,6 +807,7 @@ def cmd_skills_sync(
 ) -> None:
     """Sync only skill files; use vaultspec-core sync for complete refresh."""
     apply_target(target)
+    _apply_provider_filter(provider)
     from vaultspec_core.core import skills_sync
 
     result = skills_sync(prune=force, dry_run=dry_run)
@@ -613,17 +817,30 @@ def cmd_skills_sync(
     _emit_sync_result(result, label="Skills", dry_run=dry_run, json_output=json_output)
 
 
-@skills_app.command("revert")
-def cmd_skills_revert(
-    filename: Annotated[str, typer.Argument(help="Skill name or filename to revert")],
+@skills_app.command("restore")
+def cmd_skills_restore(
+    filename: Annotated[str, typer.Argument(help="Skill name or filename to restore")],
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Revert a skill to its snapshotted original."""
+    """Restore a skill to its snapshotted original."""
     apply_target(target)
-    _revert_resource_command(
+    _restore_resource_command(
         category="skills", label="skill", filename=filename, json_output=json_output
     )
+
+
+@skills_app.command("status")
+def cmd_skills_status(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Report skills sync status against provider destinations."""
+    apply_target(target)
+    from vaultspec_core.core import skills_sync
+
+    result = skills_sync(prune=True, dry_run=True)
+    _spec_status_command(result, label="Skills", json_output=json_output)
 
 
 # =============================================================================
@@ -673,10 +890,16 @@ def cmd_agents_list(
 
 @agents_app.command("add")
 def cmd_agents_add(
-    name: Annotated[str, typer.Option("--name", help="Agent name")],
+    name: Annotated[str, typer.Argument(help="Agent name")],
     description: Annotated[
         str, typer.Option("--description", help="Agent description")
     ] = "",
+    body: Annotated[
+        str | None, typer.Option("--body", help="Agent body content")
+    ] = None,
+    from_file: Annotated[
+        Path | None, typer.Option("--from-file", help="Read body content from file")
+    ] = None,
     force: Annotated[bool, typer.Option("--force", help="Overwrite existing")] = False,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview without writing")
@@ -686,12 +909,30 @@ def cmd_agents_add(
 ) -> None:
     """Add a new agent definition."""
     apply_target(target)
+
+    if from_file and body is not None:
+        typer.echo("Error: Cannot specify both --body and --from-file.", err=True)
+        raise typer.Exit(code=1)
+
+    resolved_body = None
+    if from_file:
+        if not from_file.exists():
+            typer.echo(f"Error: File not found: {from_file}", err=True)
+            raise typer.Exit(code=1)
+        resolved_body = from_file.read_text(encoding="utf-8")
+    elif body is not None:
+        resolved_body = body
+
     from vaultspec_core.core import agents_add
     from vaultspec_core.core.exceptions import VaultSpecError
 
     try:
         file_path = agents_add(
-            name=name, description=description, force=force, dry_run=dry_run
+            name=name,
+            description=description,
+            force=force,
+            body=resolved_body,
+            dry_run=dry_run,
         )
     except VaultSpecError as exc:
         _handle_error(exc, json_output=json_output)
@@ -734,18 +975,32 @@ def cmd_agents_show(
 @agents_app.command("edit")
 def cmd_agents_edit(
     name: Annotated[str, typer.Argument(help="Agent name")],
+    editor: Annotated[
+        str | None, typer.Option("--editor", help="Override the editor binary to use")
+    ] = None,
     target: TargetOption = None,
 ) -> None:
-    """Open an agent in the configured editor."""
+    """Open an agent in the configured editor.
+
+    Editor resolution order:
+      1. Command-line --editor flag
+      2. Project-local config (vaultspec-core config set editor <value>)
+      3. $VISUAL environment variable
+      4. $EDITOR environment variable
+      5. Fallback to 'vi'
+
+    If no working editor is resolved, the command exits with code 2.
+    """
     apply_target(target)
-    from vaultspec_core.core import resource_edit
-    from vaultspec_core.core.exceptions import VaultSpecError
     from vaultspec_core.core.types import get_context
 
-    try:
-        resource_edit(name=name, base_dir=get_context().agents_src_dir, label="Agent")
-    except VaultSpecError as exc:
-        _handle_error(exc)
+    _run_edit_command(
+        name=name,
+        base_dir=get_context().agents_src_dir,
+        label="Agent",
+        is_dir=False,
+        editor=editor,
+    )
 
 
 @agents_app.command("remove")
@@ -798,7 +1053,10 @@ def cmd_agents_rename(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Rename an existing agent definition."""
+    """Rename an existing agent definition atomically.
+
+    Rewrites both filename and frontmatter name.
+    """
     apply_target(target)
     from vaultspec_core.core import resource_rename
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -828,6 +1086,12 @@ def cmd_agents_rename(
 
 @agents_app.command("sync")
 def cmd_agents_sync(
+    provider: Annotated[
+        str,
+        typer.Argument(
+            help="Provider to sync (all, claude, gemini, antigravity, codex)"
+        ),
+    ] = "all",
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
     force: Annotated[
         bool,
@@ -838,6 +1102,7 @@ def cmd_agents_sync(
 ) -> None:
     """Sync only agent files; use vaultspec-core sync for complete refresh."""
     apply_target(target)
+    _apply_provider_filter(provider)
     from vaultspec_core.core import agents_sync
 
     result = agents_sync(prune=force, dry_run=dry_run)
@@ -847,17 +1112,30 @@ def cmd_agents_sync(
     _emit_sync_result(result, label="Agents", dry_run=dry_run, json_output=json_output)
 
 
-@agents_app.command("revert")
-def cmd_agents_revert(
-    filename: Annotated[str, typer.Argument(help="Agent name or filename to revert")],
+@agents_app.command("restore")
+def cmd_agents_restore(
+    filename: Annotated[str, typer.Argument(help="Agent name or filename to restore")],
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Revert an agent to its snapshotted original."""
+    """Restore an agent to its snapshotted original."""
     apply_target(target)
-    _revert_resource_command(
+    _restore_resource_command(
         category="agents", label="agent", filename=filename, json_output=json_output
     )
+
+
+@agents_app.command("status")
+def cmd_agents_status(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Report agents sync status against provider destinations."""
+    apply_target(target)
+    from vaultspec_core.core import agents_sync
+
+    result = agents_sync(prune=True, dry_run=True)
+    _spec_status_command(result, label="Agents", json_output=json_output)
 
 
 # =============================================================================
@@ -924,6 +1202,12 @@ def cmd_system_show(
 
 @system_app.command("sync")
 def cmd_system_sync(
+    provider: Annotated[
+        str,
+        typer.Argument(
+            help="Provider to sync (all, claude, gemini, antigravity, codex)"
+        ),
+    ] = "all",
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
     force: Annotated[
         bool, typer.Option("--force", help="Overwrite non-managed files")
@@ -933,6 +1217,7 @@ def cmd_system_sync(
 ) -> None:
     """Sync only system prompts; use vaultspec-core sync for complete refresh."""
     apply_target(target)
+    _apply_provider_filter(provider)
     from vaultspec_core.core import system_sync
 
     result = system_sync(dry_run=dry_run, force=force)
@@ -999,6 +1284,285 @@ def cmd_hooks_list(
         table.add_row(hook["name"], status, hook["event"], hook["actions"])
 
     console.print(table)
+
+
+@hooks_app.command("add")
+def cmd_hooks_add(
+    name: Annotated[str, typer.Argument(help="Hook name")],
+    event: Annotated[
+        str, typer.Option("--event", help="Lifecycle event to trigger on")
+    ] = "vault.document.created",
+    command: Annotated[str, typer.Option("--command", help="Command to run")] = "",
+    body: Annotated[
+        str | None, typer.Option("--body", help="Hook body content")
+    ] = None,
+    from_file: Annotated[
+        Path | None, typer.Option("--from-file", help="Read body content from file")
+    ] = None,
+    force: Annotated[bool, typer.Option("--force", help="Overwrite existing")] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview without writing")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Add a new declarative hook under .vaultspec/."""
+    apply_target(target)
+
+    if from_file and body is not None:
+        typer.echo("Error: Cannot specify both --body and --from-file.", err=True)
+        raise typer.Exit(code=1)
+
+    resolved_body = None
+    if from_file:
+        if not from_file.exists():
+            typer.echo(f"Error: File not found: {from_file}", err=True)
+            raise typer.Exit(code=1)
+        resolved_body = from_file.read_text(encoding="utf-8")
+    elif body is not None:
+        resolved_body = body
+
+    from vaultspec_core.core import hooks_add
+    from vaultspec_core.core.exceptions import VaultSpecError
+
+    try:
+        file_path = hooks_add(
+            name=name,
+            event=event,
+            command=command,
+            force=force,
+            body=resolved_body,
+            dry_run=dry_run,
+        )
+    except VaultSpecError as exc:
+        _handle_error(exc, json_output=json_output)
+        return
+
+    if json_output:
+        _emit_json("spec.hooks.add", "created", {"path": str(file_path)})
+        raise typer.Exit(0)
+
+    action = "Would create hook source" if dry_run else "Hook source updated"
+    _print_source_mutation_notice(file_path, action=action)
+
+
+@hooks_app.command("show")
+def cmd_hooks_show(
+    name: Annotated[str, typer.Argument(help="Hook name")],
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Display a hook's content."""
+    apply_target(target)
+    from vaultspec_core.core import hooks_show
+    from vaultspec_core.core.exceptions import VaultSpecError
+
+    try:
+        content = hooks_show(name=name)
+        if json_output:
+            _emit_json(
+                "spec.hooks.show", "unchanged", {"name": name, "content": content}
+            )
+            raise typer.Exit(0)
+        typer.echo(content)
+    except (VaultSpecError, OSError) as exc:
+        _handle_error(exc, json_output=json_output)
+
+
+@hooks_app.command("edit")
+def cmd_hooks_edit(
+    name: Annotated[str, typer.Argument(help="Hook name")],
+    editor: Annotated[
+        str | None, typer.Option("--editor", help="Override the editor binary to use")
+    ] = None,
+    target: TargetOption = None,
+) -> None:
+    """Open a hook in the configured editor."""
+    apply_target(target)
+    from vaultspec_core.core import hooks_edit
+    from vaultspec_core.core.exceptions import (
+        EditorCancellationError,
+        EditorResolutionError,
+        EditorSubprocessError,
+        VaultSpecError,
+    )
+
+    try:
+        hooks_edit(name=name, editor=editor)
+    except EditorResolutionError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        if exc.hint:
+            typer.echo(f"  Hint: {exc.hint}", err=True)
+        raise typer.Exit(code=2) from exc
+    except EditorSubprocessError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        if exc.hint:
+            typer.echo(f"  Hint: {exc.hint}", err=True)
+        raise typer.Exit(code=3) from exc
+    except EditorCancellationError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        if exc.hint:
+            typer.echo(f"  Hint: {exc.hint}", err=True)
+        raise typer.Exit(code=4) from exc
+    except VaultSpecError as exc:
+        _handle_error(exc)
+    except OSError as exc:
+        _handle_error(exc)
+
+
+@hooks_app.command("rename")
+def cmd_hooks_rename(
+    old_name: Annotated[str, typer.Argument(help="Current hook name")],
+    new_name: Annotated[str, typer.Argument(help="New hook name")],
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Rename an existing hook atomically."""
+    apply_target(target)
+    from vaultspec_core.core import hooks_rename
+    from vaultspec_core.core.exceptions import VaultSpecError
+
+    try:
+        new_path = hooks_rename(old_name=old_name, new_name=new_name)
+    except (VaultSpecError, OSError) as exc:
+        _handle_error(exc, json_output=json_output)
+        return
+
+    if json_output:
+        _emit_json(
+            "spec.hooks.rename",
+            "updated",
+            {"old_name": old_name, "new_name": new_name, "path": str(new_path)},
+        )
+        raise typer.Exit(0)
+
+    _print_source_mutation_notice(new_path, action="Hook source renamed")
+
+
+@hooks_app.command("remove")
+def cmd_hooks_remove(
+    name: Annotated[str, typer.Argument(help="Hook name")],
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--yes",
+            "-y",
+            "--force",
+            help="Confirm removal without prompting",
+        ),
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Delete a hook."""
+    apply_target(target)
+    from vaultspec_core.core import hooks_remove
+    from vaultspec_core.core.exceptions import VaultSpecError
+
+    try:
+        hooks_remove(
+            name=name,
+            force=force,
+            confirm_fn=typer.confirm,
+        )
+    except (VaultSpecError, OSError) as exc:
+        _handle_error(exc, json_output=json_output)
+        return
+
+    if json_output:
+        _emit_json("spec.hooks.remove", "removed", {"removed": name})
+        raise typer.Exit(0)
+
+    from vaultspec_core.core.hooks import _resolve_hook_path
+
+    _print_source_mutation_notice(
+        _resolve_hook_path(name),
+        action="Hook source removed",
+    )
+
+
+@hooks_app.command("restore")
+def cmd_hooks_restore(
+    filename: Annotated[str, typer.Argument(help="Hook name or filename to restore")],
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Restore a hook to its snapshotted original (not supported for custom hooks)."""
+    apply_target(target)
+    _ = filename
+    if json_output:
+        _emit_json(
+            "spec.hooks.restore",
+            "failed",
+            {"message": "Custom hooks cannot be restored"},
+        )
+        raise typer.Exit(1)
+    typer.echo("Error: Custom hooks cannot be restored.", err=True)
+    raise typer.Exit(code=1)
+
+
+@hooks_app.command("sync")
+def cmd_hooks_sync(
+    provider: Annotated[
+        str,
+        typer.Argument(
+            help="Provider to sync (all, claude, gemini, antigravity, codex)"
+        ),
+    ] = "all",
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Prune stale files and overwrite user content"),
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Sync only hooks files; use vaultspec-core sync for complete refresh."""
+    apply_target(target)
+    _apply_provider_filter(provider)
+    from vaultspec_core.core import hooks_sync
+
+    result = hooks_sync(prune=force, dry_run=dry_run)
+
+    if not json_output:
+        _print_complete_sync_notice(resource="hook")
+    _emit_sync_result(result, label="Hooks", dry_run=dry_run, json_output=json_output)
+
+
+@hooks_app.command("status")
+def cmd_hooks_status(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Report declarative hooks parsing and taxonomy compliance status."""
+    apply_target(target)
+    from rich import box
+    from rich.table import Table
+
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core import hooks_status
+
+    status = hooks_status()
+
+    if json_output:
+        _emit_json("spec.hooks.status", status["status"], status)
+        raise typer.Exit(0 if status["status"] == "ok" else 1)
+
+    console = get_console()
+    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
+    table.add_column("Field", no_wrap=True)
+    table.add_column("Value")
+    table.add_row("status", str(status["status"]))
+    table.add_row("hooks_dir", str(status["hooks_dir"]))
+    table.add_row("definitions", ", ".join(status["definitions"]) or "none")
+    console.print(table)
+
+    for warning in status["warnings"]:
+        console.print(f"  [yellow]•[/yellow] {warning}")
+    for error in status["errors"]:
+        console.print(f"  [red]•[/red] {error}")
+    if status["status"] != "ok":
+        raise typer.Exit(code=1)
 
 
 @hooks_app.command("run")
@@ -1199,6 +1763,12 @@ def cmd_mcps_remove(
 
 @mcps_app.command("sync")
 def cmd_mcps_sync(
+    provider: Annotated[
+        str,
+        typer.Argument(
+            help="Provider to sync (all, claude, gemini, antigravity, codex)"
+        ),
+    ] = "all",
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
     force: Annotated[
         bool,
@@ -1209,6 +1779,7 @@ def cmd_mcps_sync(
 ) -> None:
     """Sync only MCP definitions to .mcp.json."""
     apply_target(target)
+    _apply_provider_filter(provider)
     from vaultspec_core.core import mcp_sync
 
     result = mcp_sync(force=force, dry_run=dry_run)
@@ -1245,15 +1816,6 @@ def cmd_doctor(
     import dataclasses
 
     from vaultspec_core.core.diagnosis import (
-        BuiltinVersionSignal,
-        ConfigSignal,
-        ContentSignal,
-        FrameworkSignal,
-        GitattributesSignal,
-        GitignoreSignal,
-        ManifestEntrySignal,
-        PrecommitSignal,
-        VaultContentSignal,
         diagnose,
     )
 
@@ -1292,11 +1854,32 @@ def cmd_doctor(
         _emit_json("spec.doctor", "failed" if exit_code else "unchanged", data)
         raise typer.Exit(code=exit_code)
 
-    from rich.table import Table
-
     from vaultspec_core.console import get_console
 
     console = get_console()
+    _render_diagnosis_table(console, diag)
+
+    exit_code = _doctor_exit_code(diag)
+    raise typer.Exit(code=exit_code)
+
+
+def _render_diagnosis_table(console, diag: "WorkspaceDiagnosis") -> None:
+    """Render the workspace diagnosis table."""
+    from rich.table import Table
+
+    from vaultspec_core.core.diagnosis import (
+        BuiltinVersionSignal,
+        ConfigSignal,
+        ContentSignal,
+        FrameworkSignal,
+        GitattributesSignal,
+        GitignoreSignal,
+        ManifestEntrySignal,
+        PrecommitSignal,
+        RenameIntegritySignal,
+        VaultContentSignal,
+    )
+
     table = Table(show_header=True, show_edge=False, pad_edge=False)
     table.add_column("Component", style="bold", min_width=16)
     table.add_column("Status", min_width=8)
@@ -1494,10 +2077,33 @@ def cmd_doctor(
         pc_detail,
     )
 
-    console.print(table)
+    # Rename integrity row
+    ri_status, ri_style = _signal_status(
+        diag.rename_integrity,
+        {
+            RenameIntegritySignal.CLEAN: ("ok", "green"),
+            RenameIntegritySignal.MISMATCH: ("warn", "yellow"),
+            RenameIntegritySignal.ERROR: ("error", "red"),
+        },
+    )
+    ri_details = {
+        RenameIntegritySignal.CLEAN: (
+            "all rules, skills, and agents names are consistent"
+        ),
+        RenameIntegritySignal.MISMATCH: (
+            f"{diag.rename_mismatch_count} name/filename mismatch(es) found; "
+            "run vaultspec-core vault check rename-integrity"
+        ),
+        RenameIntegritySignal.ERROR: "failed to evaluate name/filename integrity",
+    }
+    ri_detail = ri_details.get(diag.rename_integrity, str(diag.rename_integrity))
+    table.add_row(
+        "rename integrity",
+        f"[{ri_style}]{ri_status}[/{ri_style}]",
+        ri_detail,
+    )
 
-    exit_code = _doctor_exit_code(diag)
-    raise typer.Exit(code=exit_code)
+    console.print(table)
 
 
 def _signal_status(
@@ -1558,6 +2164,7 @@ def _doctor_exit_code(
         ManifestEntrySignal,
         PrecommitSignal,
         ProviderDirSignal,
+        RenameIntegritySignal,
         VaultContentSignal,
     )
 
@@ -1590,6 +2197,11 @@ def _doctor_exit_code(
         VaultContentSignal.ANNOTATIONS,
         VaultContentSignal.UNREADABLE,
     ):
+        has_warn = True
+
+    if diag.rename_integrity == RenameIntegritySignal.ERROR:
+        has_error = True
+    elif diag.rename_integrity == RenameIntegritySignal.MISMATCH:
         has_warn = True
 
     for prov in diag.providers.values():
@@ -1629,3 +2241,47 @@ def _doctor_exit_code(
     if has_warn:
         return 1
     return 0
+
+
+def _run_edit_command(
+    name: str,
+    base_dir: Path,
+    label: str,
+    is_dir: bool = False,
+    editor: str | None = None,
+) -> None:
+    from vaultspec_core.core import resource_edit
+    from vaultspec_core.core.exceptions import (
+        EditorCancellationError,
+        EditorResolutionError,
+        EditorSubprocessError,
+        VaultSpecError,
+    )
+
+    try:
+        resource_edit(
+            name=name,
+            base_dir=base_dir,
+            label=label,
+            is_dir=is_dir,
+            editor=editor,
+        )
+    except EditorResolutionError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        if exc.hint:
+            typer.echo(f"  Hint: {exc.hint}", err=True)
+        raise typer.Exit(code=2) from exc
+    except EditorSubprocessError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        if exc.hint:
+            typer.echo(f"  Hint: {exc.hint}", err=True)
+        raise typer.Exit(code=3) from exc
+    except EditorCancellationError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        if exc.hint:
+            typer.echo(f"  Hint: {exc.hint}", err=True)
+        raise typer.Exit(code=4) from exc
+    except VaultSpecError as exc:
+        _handle_error(exc)
+    except OSError as exc:
+        _handle_error(exc)

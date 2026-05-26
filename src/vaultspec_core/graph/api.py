@@ -379,7 +379,9 @@ class VaultGraph:
                     if target_key in self.nodes:
                         self.nodes[target_key].in_links.add(name)
                         self._digraph.add_edge(name, target_key)
-                        if self.nodes[target_key].phantom:
+                        if self.nodes[target_key].phantom and not self._is_archived(
+                            target_key
+                        ):
                             self._dangling_links.append(
                                 (name, target_key),
                             )
@@ -397,9 +399,10 @@ class VaultGraph:
                         )
                         phantom.in_links.add(name)
                         self._digraph.add_edge(name, target_key)
-                        self._dangling_links.append(
-                            (name, target_key),
-                        )
+                        if not self._is_archived(target_key):
+                            self._dangling_links.append(
+                                (name, target_key),
+                            )
             except (OSError, UnicodeDecodeError) as e:
                 logger.warning(
                     "Failed to extract links from %s: %s",
@@ -422,6 +425,20 @@ class VaultGraph:
             self._digraph.number_of_edges(),
         )
 
+    def _is_archived(self, target: str) -> bool:
+        """Check if target exists under .vault/_archive/."""
+        from ..config import get_config
+
+        cfg = get_config()
+        archive_dir = self.root_dir / cfg.docs_dir / "_archive"
+        if not archive_dir.exists():
+            return False
+        target_norm = target.replace("\\", "/")
+        if "/" in target_norm:
+            return (archive_dir / f"{target_norm}.md").exists()
+        else:
+            return len(list(archive_dir.rglob(f"{target_norm}.md"))) > 0
+
     def _resolve_link(self, target: str) -> list[str]:
         """Resolve a wiki-link target to one or more node keys.
 
@@ -431,7 +448,9 @@ class VaultGraph:
            stems and already-qualified ``type/stem`` references).
         2. Stem index lookup  - if the bare stem maps to multiple
            qualified keys, all are returned and a warning is logged.
-        3. No match  - returns the original target so it is recorded as
+        3. Match in .vault/_archive/ - returns the resolved archived key
+           so it can be resolved without being flagged as dangling.
+        4. No match  - returns the original target so it is recorded as
            a dangling link.
         """
         # Exact key match (unique stem or qualified reference)
@@ -449,6 +468,26 @@ class VaultGraph:
                     keys,
                 )
             return keys
+
+        # Try to resolve against .vault/_archive/
+        from ..config import get_config
+
+        cfg = get_config()
+        archive_dir = self.root_dir / cfg.docs_dir / "_archive"
+        if archive_dir.exists():
+            target_norm = target.replace("\\", "/")
+            if "/" in target_norm:
+                if (archive_dir / f"{target_norm}.md").exists():
+                    return [target_norm]
+            else:
+                matches = list(archive_dir.rglob(f"{target_norm}.md"))
+                if matches:
+                    resolved = []
+                    for match in matches:
+                        rel = match.relative_to(archive_dir)
+                        key = str(rel.with_suffix("")).replace("\\", "/")
+                        resolved.append(key)
+                    return resolved
 
         # No match  - treat as dangling link
         return [target]

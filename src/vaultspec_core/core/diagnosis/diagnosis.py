@@ -21,6 +21,7 @@ from .signals import (
     ManifestEntrySignal,
     PrecommitSignal,
     ProviderDirSignal,
+    RenameIntegritySignal,
     VaultContentSignal,
 )
 
@@ -66,10 +67,12 @@ class WorkspaceDiagnosis:
         pending_migrations: List of pending migration names; empty
             unless ``migration_status`` is ``"pending"``.
         vault_content: Read-only generated annotation state for ``.vault/``.
-        vault_annotation_count: Count of markdown documents containing
+            vault_annotation_count: Count of markdown documents containing
             generated template annotations.
         vault_unreadable_count: Count of unreadable markdown documents skipped
             by the annotation probe.
+        rename_integrity: Observed state of name/filename mismatches.
+        rename_mismatch_count: Count of name/filename mismatches.
     """
 
     framework: FrameworkSignal
@@ -84,6 +87,8 @@ class WorkspaceDiagnosis:
     vault_content: VaultContentSignal = VaultContentSignal.NO_VAULT
     vault_annotation_count: int = 0
     vault_unreadable_count: int = 0
+    rename_integrity: RenameIntegritySignal = RenameIntegritySignal.CLEAN
+    rename_mismatch_count: int = 0
 
 
 def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
@@ -117,6 +122,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         collect_mcp_config_state,
         collect_precommit_state,
         collect_provider_dir_state,
+        collect_rename_integrity,
         collect_vault_content_state,
     )
 
@@ -161,6 +167,15 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         vault_annotation_count = 0
         vault_unreadable_count = 0
 
+    rename_integrity = RenameIntegritySignal.CLEAN
+    rename_mismatch_count = 0
+    if scope == "full":
+        try:
+            rename_integrity, rename_mismatch_count = collect_rename_integrity(target)
+        except Exception:
+            logger.warning("Rename integrity collector failed", exc_info=True)
+            rename_integrity = RenameIntegritySignal.ERROR
+
     diag = WorkspaceDiagnosis(
         framework=framework,
         gitignore=gitignore,
@@ -170,6 +185,8 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         vault_content=vault_content,
         vault_annotation_count=vault_annotation_count,
         vault_unreadable_count=vault_unreadable_count,
+        rename_integrity=rename_integrity,
+        rename_mismatch_count=rename_mismatch_count,
     )
 
     if framework == FrameworkSignal.MISSING:

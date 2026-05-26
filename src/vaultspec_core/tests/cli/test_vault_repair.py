@@ -553,6 +553,9 @@ class TestVaultRepair:
         payload = _json_payload(result.output)
         index_phase = next(p for p in payload["phases"] if p["phase"] == "index")
 
+        if result.exit_code != 0:
+            print("REPAIR OUTPUT:")
+            print(result.output)
         assert result.exit_code == 0
         assert payload["generated_indexes"] == []
         assert index_phase["planned"] == []
@@ -611,6 +614,7 @@ class TestVaultRepair:
             "features",
             "references",
             "schema",
+            "rename-integrity",
         ]
 
         factory.run("vault", "feature", "index", "--feature", "info-visibility")

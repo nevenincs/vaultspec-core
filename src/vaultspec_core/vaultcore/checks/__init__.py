@@ -29,6 +29,7 @@ from .frontmatter import check_frontmatter
 from .links import check_links
 from .orphans import check_orphans
 from .references import check_references, check_schema
+from .rename_integrity import check_rename_integrity
 from .structure import check_structure
 
 if TYPE_CHECKING:
@@ -48,6 +49,7 @@ __all__ = [
     "check_links",
     "check_orphans",
     "check_references",
+    "check_rename_integrity",
     "check_schema",
     "check_structure",
     "render_check_result",
@@ -93,6 +95,7 @@ def run_all_checks(
             check_features(root_dir, snapshot=snapshot, feature=feature),
             check_references(root_dir, graph=graph, feature=feature, fix=False),
             check_schema(root_dir, graph=graph, feature=feature, fix=False),
+            check_rename_integrity(root_dir, fix=False),
         ]
 
     # Mutating checks can rename files or rewrite frontmatter. Refresh graph
@@ -140,4 +143,5 @@ def run_all_checks(
     append_and_refresh(result)
 
     results.append(check_schema(root_dir, graph=graph, feature=feature, fix=True))
+    results.append(check_rename_integrity(root_dir, fix=True))
     return results

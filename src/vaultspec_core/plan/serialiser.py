@@ -33,11 +33,12 @@ if TYPE_CHECKING:
 __all__ = ["serialise_plan"]
 
 
-def serialise_plan(plan: Plan) -> str:
+def serialise_plan(plan: Plan, canonicalise: bool = False) -> str:
     """Return canonical Markdown text for ``plan``.
 
     Args:
         plan: Parsed :class:`Plan` model.
+        canonicalise: If True, do not preserve unknown blocks.
 
     Returns:
         Markdown text terminated by a single trailing newline.
@@ -51,8 +52,23 @@ def serialise_plan(plan: Plan) -> str:
     if ledger is not None:
         parts.append(ledger)
         parts.append("")
+
+    # Render any before_title blocks
+    if not canonicalise:
+        for block in plan.unknown_blocks:
+            if block.anchor == "before_title":
+                parts.append(block.content)
+                parts.append("")
+
     parts.append(f"# {plan.title or '(untitled plan)'}")
     parts.append("")
+
+    # Render any before_epic_intent blocks
+    if not canonicalise:
+        for block in plan.unknown_blocks:
+            if block.anchor == "before_epic_intent":
+                parts.append(block.content)
+                parts.append("")
 
     if plan.frontmatter.tier is Tier.L4 and plan.epic_intent is not None:
         parts.append("## Epic intent")
@@ -62,13 +78,30 @@ def serialise_plan(plan: Plan) -> str:
 
     if plan.frontmatter.tier is Tier.L1:
         for step in plan.steps:
+            # Render before_step blocks at L1
+            if not canonicalise:
+                for block in plan.unknown_blocks:
+                    if block.anchor == f"before_step_{step.canonical_id}":
+                        parts.append(block.content)
+                        parts.append("")
             parts.append(_render_step_row(step, phase_id=None, wave_id=None))
     elif plan.frontmatter.tier is Tier.L2:
         for phase in plan.phases:
-            parts.extend(_render_phase_block(phase, wave_id=None))
+            parts.extend(
+                _render_phase_block(
+                    phase, wave_id=None, plan=plan, canonicalise=canonicalise
+                )
+            )
     else:
         for wave in plan.waves:
-            parts.extend(_render_wave_block(wave))
+            parts.extend(_render_wave_block(wave, plan=plan, canonicalise=canonicalise))
+
+    # Render any after_all blocks
+    if not canonicalise:
+        for block in plan.unknown_blocks:
+            if block.anchor == "after_all":
+                parts.append(block.content)
+                parts.append("")
 
     return "\n".join(parts).rstrip() + "\n"
 
@@ -118,15 +151,39 @@ def _render_step_row(
     return f"- [{state}] `{path}` - {step.action}; `{step.scope}`."
 
 
-def _render_phase_block(phase: Phase, *, wave_id: str | None) -> list[str]:
+def _render_phase_block(
+    phase: Phase,
+    *,
+    wave_id: str | None,
+    plan: Plan,
+    canonicalise: bool = False,
+) -> list[str]:
     path = phase_display_path(phase_id=phase.canonical_id, wave_id=wave_id)
-    lines = [
-        f"### Phase `{path}` - {phase.title}",
-        "",
-        phase.intent or _placeholder_intent("Phase"),
-        "",
-    ]
+    lines: list[str] = []
+
+    # Render before_phase blocks
+    if not canonicalise:
+        for block in plan.unknown_blocks:
+            if block.anchor == f"before_phase_{phase.canonical_id}":
+                lines.append(block.content)
+                lines.append("")
+
+    lines.extend(
+        [
+            f"### Phase `{path}` - {phase.title}",
+            "",
+            phase.intent or _placeholder_intent("Phase"),
+            "",
+        ]
+    )
+
     for step in phase.steps:
+        # Render before_step blocks
+        if not canonicalise:
+            for block in plan.unknown_blocks:
+                if block.anchor == f"before_step_{step.canonical_id}":
+                    lines.append(block.content)
+                    lines.append("")
         lines.append(
             _render_step_row(step, phase_id=phase.canonical_id, wave_id=wave_id),
         )
@@ -134,16 +191,35 @@ def _render_phase_block(phase: Phase, *, wave_id: str | None) -> list[str]:
     return lines
 
 
-def _render_wave_block(wave: Wave) -> list[str]:
+def _render_wave_block(wave: Wave, plan: Plan, canonicalise: bool = False) -> list[str]:
     path = wave_display_path(wave_id=wave.canonical_id)
-    lines = [
-        f"## Wave `{path}` - {wave.title}",
-        "",
-        wave.intent or _placeholder_intent("Wave"),
-        "",
-    ]
+    lines: list[str] = []
+
+    # Render before_wave blocks
+    if not canonicalise:
+        for block in plan.unknown_blocks:
+            if block.anchor == f"before_wave_{wave.canonical_id}":
+                lines.append(block.content)
+                lines.append("")
+
+    lines.extend(
+        [
+            f"## Wave `{path}` - {wave.title}",
+            "",
+            wave.intent or _placeholder_intent("Wave"),
+            "",
+        ]
+    )
+
     for phase in wave.phases:
-        lines.extend(_render_phase_block(phase, wave_id=wave.canonical_id))
+        lines.extend(
+            _render_phase_block(
+                phase,
+                wave_id=wave.canonical_id,
+                plan=plan,
+                canonicalise=canonicalise,
+            )
+        )
     return lines
 
 

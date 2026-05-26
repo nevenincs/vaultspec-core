@@ -3,9 +3,9 @@ tags:
   - '#exec'
   - '#{feature}'
 date: '{yyyy-mm-dd}'
-step_id: '{S##}'
+step_id: '{step_id}'
 related:
-  - '[[{yyyy-mm-dd-*-plan}]]'
+  - '[[{plan_stem}]]'
 ---
 
 <!-- FRONTMATTER RULES:
@@ -28,31 +28,17 @@ related:
 
 <!-- STEP RECORD:
      This file represents one Step from the originating plan. Identified
-     by its canonical leaf identifier (S##) and ancestor display path
-     (e.g., S03 at L1, P02.S03 at L2, W01.P02.S03 at L3 / L4). The
-     step_id frontmatter field below carries the canonical identifier;
-     the heading restates the display path as a reading hint. -->
+     by its canonical leaf identifier (S##) and ancestor display path. -->
 
-# `{feature}` `<display-path>`
+# {heading}
 
-<!-- The <display-path> in the heading above is the originating Step's
-     tier-conditional display path:
-       L1       = `{step}`            (e.g., `S01`)
-       L2       = `{phase}.{step}`    (e.g., `P01.S01`)
-       L3 / L4  = `{wave}.{phase}.{step}`  (e.g., `W01.P01.S01`) -->
-
-<!-- Headline summary of work done. Use:
-
-- Agent: <your agent model, effort level>
-- Session id: the session id of the agent, if available.
-
-- Modified: `{file1}`
-- Modified: `{file2}`
-- Created: `{file3}` -->
+{scope_block}
 
 ## Description
 
 <!-- Succint line-by-line list of steps executed. Use imperative language, mirroring git commit summary lines. -->
+
+## Outcome
 
 ## Notes
 

@@ -222,3 +222,33 @@ class TestDoctorCommand:
         data = json.loads(result.output)["data"]
         assert data["vault_content"] == "unreadable"
         assert data["vault_unreadable_count"] == 1
+
+
+class TestTopLevelDoctorCommand:
+    """Tests for the composed top-level doctor CLI command."""
+
+    def test_top_level_doctor_healthy(self, tmp_path: Path) -> None:
+        factory = WorkspaceFactory(tmp_path)
+        factory.install()
+        result = factory.run("doctor")
+        assert result.exit_code in (0, 1)
+        assert "vault check" in result.output.lower()
+
+    def test_top_level_doctor_json_healthy(self, tmp_path: Path) -> None:
+        factory = WorkspaceFactory(tmp_path)
+        factory.install()
+        result = factory.run("doctor", "--json")
+        assert result.exit_code in (0, 1)
+        data = json.loads(result.output)
+        assert "schema" in data
+        assert data["schema"] == "vaultspec.doctor.v1"
+        assert "status" in data
+        assert "data" in data
+        assert "spec" in data["data"]
+        assert "vault" in data["data"]
+        assert "checks" in data["data"]["vault"]
+
+    def test_top_level_doctor_missing_framework_exit_two(self, tmp_path: Path) -> None:
+        factory = WorkspaceFactory(tmp_path)
+        result = factory.run("doctor")
+        assert result.exit_code == 2

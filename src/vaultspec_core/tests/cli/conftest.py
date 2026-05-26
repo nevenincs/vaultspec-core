@@ -59,6 +59,9 @@ def synthetic_project(tmp_path) -> Path:
 
     layout = resolve_workspace(target_override=dest)
     init_paths(layout)
+    (dest / ".vaultspec" / "rules" / "rules" / "project").mkdir(
+        parents=True, exist_ok=True
+    )
 
     return dest
 
@@ -127,6 +130,7 @@ def _isolate_state():
     at the wrong tmp_path.
     """
     from vaultspec_core.cli._target import reset as reset_target
+    from vaultspec_core.config import reset_config
     from vaultspec_core.console import reset_console
     from vaultspec_core.core.types import _workspace_ctx
 
@@ -154,6 +158,7 @@ def _isolate_state():
 
     reset_console()
     reset_target()
+    reset_config()
 
     yield
 
@@ -161,3 +166,4 @@ def _isolate_state():
     _workspace_ctx.reset(token)
     reset_console()
     reset_target()
+    reset_config()

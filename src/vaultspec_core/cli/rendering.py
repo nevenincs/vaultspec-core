@@ -270,6 +270,7 @@ def emit_outcomes(
     title: str,
     json_output: bool,
     extra_json: Mapping[str, object] | None = None,
+    hints: Mapping[str, object] | None = None,
 ) -> int:
     """Emit a set of outcomes as text or JSON and return the exit code.
 
@@ -288,6 +289,7 @@ def emit_outcomes(
         json_output: When true, emit the JSON envelope instead of text.
         extra_json: Optional extra keys merged into the envelope's
             ``data`` payload (e.g. ``warnings``). Ignored for text output.
+        hints: Optional structured next-step hint; omitted when absent.
 
     Returns:
         The process exit code: ``1`` if any outcome failed, else ``0``.
@@ -299,7 +301,7 @@ def emit_outcomes(
         data: dict[str, object] = {"items": inner["items"]}
         if extra_json:
             data.update(extra_json)
-        envelope = json_envelope(command, str(inner["status"]), data)
+        envelope = json_envelope(command, str(inner["status"]), data, hints=hints)
         print(json.dumps(envelope, indent=2))
     else:
         render_outcomes(items, title=title)
@@ -516,3 +518,96 @@ def render_uninstall_summary(
             "  [dim].vault/ preserved"
             "  - pass --remove-vault to also remove documentation[/dim]"
         )
+
+
+_NEXT_STEP_HINTS: dict[tuple[str, str], tuple[str, str]] = {
+    ("vault.add.research", "created"): (
+        "vaultspec-core vault add adr --feature {feature} --related {research_stem}",
+        "Define an Architecture Decision Record (ADR) for your research",
+    ),
+    ("vault.add.adr", "created"): (
+        "vaultspec-core vault add plan --feature {feature} --related {adr_stem}",
+        "Draft an implementation plan based on your ADR",
+    ),
+    ("vault.add.plan", "created"): (
+        "vaultspec-core vault add exec --all-steps --feature {feature} "
+        "--related {plan_stem}",
+        "Scaffold step-aware execution records for your plan",
+    ),
+    ("vault.add.exec", "created"): (
+        "vaultspec-core vault plan status",
+        "Track the progress and verification of your plan",
+    ),
+    ("vault.add.audit", "created"): (
+        "vaultspec-core vault rule promote --from {audit_stem} --as {rule_name}",
+        "Promote your audit findings to a project-shared rule",
+    ),
+    ("vault.check.all", "unchanged"): (
+        'git commit -m "Commit changes after successful vault checks"',
+        "Your vault is clean. Proceed to commit your changes",
+    ),
+    ("vault.check.all", "failed"): (
+        "vaultspec-core vault repair",
+        "Run safe auto-corrections to resolve vault errors",
+    ),
+    ("install", "created"): (
+        "vaultspec-core vault add research --feature {feature_tag}",
+        "Framework installed. Start research on your first feature",
+    ),
+    ("install", "updated"): (
+        "vaultspec-core vault add research --feature {feature_tag}",
+        "Framework updated. Start research on your first feature",
+    ),
+    ("vault.feature.archive", "updated"): (
+        "vaultspec-core vault check all",
+        "Verify your vault remains completely clean after archiving",
+    ),
+}
+
+
+class SafeDict(dict):
+    """A dictionary that retains unknown string placeholders for formatting."""
+
+    def __missing__(self, key: str) -> str:
+        return f"{{{key}}}"
+
+
+def emit_next_step_hint(
+    command: str,
+    outcome: str,
+    context_vars: dict[str, str] | None = None,
+    json_output: bool = False,
+    no_hints: bool = False,
+) -> dict[str, object] | None:
+    """Emit the next-step advisory hint for a command and outcome.
+
+    Checks the VAULTSPEC_NO_HINTS environment variable and the --no-hints
+    flag suppression.
+
+    Returns:
+        A dict matching {"text": str, "command": str} for JSON, or None.
+        Also prints to the console if not json_output.
+    """
+    import os
+
+    if no_hints or os.environ.get("VAULTSPEC_NO_HINTS") == "1":
+        return None
+
+    hint = _NEXT_STEP_HINTS.get((command, outcome))
+    if not hint:
+        return None
+
+    cmd_template, description = hint
+    # Format safely using SafeDict so missing variables remain placeholders
+    safe_vars = SafeDict(context_vars or {})
+    formatted_command = cmd_template.format_map(safe_vars)
+
+    if not json_output:
+        console = get_console()
+        console.print()
+        console.print("[bold cyan]Suggested Next Step:[/bold cyan]")
+        console.print(f"  {description}")
+        console.print(f"  [bold cyan]>[/bold cyan] [bold]{formatted_command}[/bold]")
+        console.print()
+
+    return {"text": description, "command": formatted_command}

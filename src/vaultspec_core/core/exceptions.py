@@ -39,3 +39,15 @@ class WorkspaceNotInitializedError(VaultSpecError):
 
 class ProviderNotInstalledError(VaultSpecError):
     """A provider is not installed in the workspace manifest."""
+
+
+class EditorResolutionError(VaultSpecError):
+    """Failed to resolve a working text editor."""
+
+
+class EditorSubprocessError(VaultSpecError):
+    """The text editor subprocess failed or exited with a non-zero status."""
+
+
+class EditorCancellationError(VaultSpecError):
+    """The text editor edit was cancelled by the user."""

@@ -32,6 +32,7 @@ __all__ = [
     "Plan",
     "PlanParseError",
     "Step",
+    "UnknownBlock",
     "Wave",
     "parse_plan",
 ]
@@ -121,6 +122,19 @@ class EpicIntent:
 
 
 @dataclass
+class UnknownBlock:
+    """An unrecognized prose block from the plan document body.
+
+    Attributes:
+        anchor: Positioning anchor string.
+        content: Verbatim content string.
+    """
+
+    anchor: str
+    content: str
+
+
+@dataclass
 class Plan:
     """Parsed plan-document model.
 
@@ -162,6 +176,7 @@ class Plan:
     retired_step_ids: set[str] = field(default_factory=set)
     retired_phase_ids: set[str] = field(default_factory=set)
     retired_wave_ids: set[str] = field(default_factory=set)
+    unknown_blocks: list[UnknownBlock] = field(default_factory=list)
 
 
 class PlanParseError(ValueError):
@@ -214,7 +229,7 @@ def parse_plan(source: str | Path) -> Plan:
 
     title = _extract_title(body)
     epic_intent = _extract_epic_intent(body)
-    waves, phases, steps = _walk_body(body)
+    waves, phases, steps, unknown_blocks = _walk_body(body)
     retired_steps, retired_phases, retired_waves = _extract_retirement_ledger(body)
 
     return Plan(
@@ -227,6 +242,7 @@ def parse_plan(source: str | Path) -> Plan:
         retired_step_ids=retired_steps,
         retired_phase_ids=retired_phases,
         retired_wave_ids=retired_waves,
+        unknown_blocks=unknown_blocks,
     )
 
 
@@ -317,41 +333,81 @@ def _extract_epic_intent(body: str) -> EpicIntent | None:
     return None
 
 
-def _walk_body(body: str) -> tuple[list[Wave], list[Phase], list[Step]]:
-    """Walk the body line-by-line and assemble the container chains.
-
-    Document-order is preserved: containers are appended as they are
-    discovered. The returned ``phases`` and ``steps`` are flattened
-    mirrors that convey order across the entire document.
-
-    Intent prose between a Wave or Phase heading and the next
-    structural element (row, sub-heading, or sibling heading) is
-    captured into the corresponding container's ``intent`` field so
-    that round-trips do not silently discard it.
-    """
+def _walk_body(
+    body: str,
+) -> tuple[list[Wave], list[Phase], list[Step], list[UnknownBlock]]:
+    """Walk the body and assemble container chains and unknown blocks."""
     waves: list[Wave] = []
     phases: list[Phase] = []
     steps: list[Step] = []
+    unknown_blocks: list[UnknownBlock] = []
 
     current_wave: Wave | None = None
     current_phase: Phase | None = None
     intent_target: Wave | Phase | None = None
     intent_buffer: list[str] = []
 
+    buffered_unknown: list[str] = []
+    in_epic_intent: bool = False
+    in_link_rules_comment: bool = False
+
     def _flush_intent() -> None:
         if intent_target is not None and intent_buffer:
             intent_target.intent = "\n".join(intent_buffer).strip()
         intent_buffer.clear()
 
+    def _flush_unknown(anchor: str) -> None:
+        if buffered_unknown:
+            content = "\n".join(buffered_unknown).strip()
+            if content.strip():
+                unknown_blocks.append(UnknownBlock(anchor=anchor, content=content))
+            buffered_unknown.clear()
+
     for index, line in enumerate(body.splitlines(), start=1):
         wave_match = _RE_WAVE_HEADING.match(line)
         phase_match = _RE_PHASE_HEADING.match(line)
         step_match = _RE_STEP_ROW.match(line)
+        title_match = _RE_TITLE.match(line)
+        epic_intent_match = _RE_EPIC_INTENT.match(line)
 
+        # 1. H1 Title line
+        if title_match:
+            _flush_unknown("before_title")
+            continue
+
+        # 2. Link rules comment block
+        if "<!-- LINK RULES:" in line:
+            in_link_rules_comment = True
+        if in_link_rules_comment:
+            if "-->" in line:
+                in_link_rules_comment = False
+            continue
+
+        # 3. Retired comment ledger
+        if _RE_RETIRED_LEDGER.search(line):
+            continue
+
+        # 4. Epic intent heading
+        if epic_intent_match:
+            _flush_intent()
+            intent_target = None
+            _flush_unknown("before_epic_intent")
+            in_epic_intent = True
+            continue
+
+        if in_epic_intent:
+            if wave_match or phase_match or step_match or title_match:
+                in_epic_intent = False
+            else:
+                continue
+
+        # 5. Wave heading
         if wave_match:
             _flush_intent()
+            wave_id = wave_match.group("id")
+            _flush_unknown(f"before_wave_{wave_id}")
             current_wave = Wave(
-                canonical_id=wave_match.group("id"),
+                canonical_id=wave_id,
                 title=wave_match.group("title"),
                 intent="",
                 line_number=index,
@@ -361,10 +417,12 @@ def _walk_body(body: str) -> tuple[list[Wave], list[Phase], list[Step]]:
             intent_target = current_wave
             continue
 
+        # 6. Phase heading
         if phase_match:
             _flush_intent()
             path = phase_match.group("path")
             phase_id = path.split(".")[-1]
+            _flush_unknown(f"before_phase_{phase_id}")
             current_phase = Phase(
                 canonical_id=phase_id,
                 display_path=path,
@@ -378,28 +436,40 @@ def _walk_body(body: str) -> tuple[list[Wave], list[Phase], list[Step]]:
             intent_target = current_phase
             continue
 
+        # 7. Step row
         if step_match:
             _flush_intent()
             intent_target = None
+            path = step_match.group("path")
+            step_id = path.split(".")[-1]
+            _flush_unknown(f"before_step_{step_id}")
             step = _build_step(step_match, index, line)
             steps.append(step)
             if current_phase is not None:
                 current_phase.steps.append(step)
             continue
 
+        # 8. Intent paragraph checking
         if intent_target is not None:
             stripped = line.strip()
-            if stripped.startswith("# ") or stripped.startswith("## "):
+            if (
+                stripped.startswith("# ")
+                or stripped.startswith("## ")
+                or stripped.startswith("### ")
+            ):
                 _flush_intent()
                 intent_target = None
+            else:
+                intent_buffer.append(line)
                 continue
-            if _RE_RETIRED_LEDGER.search(line):
-                continue
-            intent_buffer.append(line)
+
+        # 9. Fallthrough to unknown buffered lines
+        buffered_unknown.append(line)
 
     _flush_intent()
+    _flush_unknown("after_all")
 
-    return waves, phases, steps
+    return waves, phases, steps, unknown_blocks
 
 
 def _build_step(match: re.Match[str], index: int, raw_line: str) -> Step:

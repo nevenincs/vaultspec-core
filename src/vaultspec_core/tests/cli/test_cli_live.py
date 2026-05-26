@@ -190,7 +190,6 @@ _HELP_SURFACES: list[list[str]] = [
     ["spec", "rules", "remove", "--help"],
     ["spec", "rules", "rename", "--help"],
     ["spec", "rules", "sync", "--help"],
-    ["spec", "rules", "revert", "--help"],
     ["spec", "skills", "list", "--help"],
     ["spec", "skills", "add", "--help"],
     ["spec", "skills", "show", "--help"],
@@ -218,6 +217,7 @@ _HELP_SURFACES: list[list[str]] = [
     ["vault", "check", "structure", "--help"],
     ["vault", "feature", "list", "--help"],
     ["vault", "feature", "archive", "--help"],
+    ["vault", "feature", "unarchive", "--help"],
 ]
 
 
@@ -426,7 +426,6 @@ class TestSpecRules:
             "spec",
             "rules",
             "add",
-            "--name",
             "lifecycle-test-rule",
             input="Live rule body",
         )
@@ -436,6 +435,7 @@ class TestSpecRules:
             / ".vaultspec"
             / "rules"
             / "rules"
+            / "project"
             / "lifecycle-test-rule.md"
         )
         assert rule_path.exists()
@@ -467,9 +467,8 @@ class TestSpecRules:
             "spec",
             "rules",
             "add",
-            "--name",
             "rename-src",
-            "--content",
+            "--body",
             "To rename",
         )
         result = _run(
@@ -482,7 +481,14 @@ class TestSpecRules:
             "rename-dst",
         )
         assert result.exit_code == 0
-        dst = synthetic_project / ".vaultspec" / "rules" / "rules" / "rename-dst.md"
+        dst = (
+            synthetic_project
+            / ".vaultspec"
+            / "rules"
+            / "rules"
+            / "project"
+            / "rename-dst.md"
+        )
         assert dst.exists()
 
     def test_add_force_overwrites(self, cli, synthetic_project):
@@ -492,9 +498,8 @@ class TestSpecRules:
             "spec",
             "rules",
             "add",
-            "--name",
             "overwrite-me",
-            "--content",
+            "--body",
             "v1",
         )
         result = _run(
@@ -503,44 +508,21 @@ class TestSpecRules:
             "spec",
             "rules",
             "add",
-            "--name",
             "overwrite-me",
-            "--content",
+            "--body",
             "v2",
             "--force",
         )
         assert result.exit_code == 0
         content = (
-            synthetic_project / ".vaultspec" / "rules" / "rules" / "overwrite-me.md"
+            synthetic_project
+            / ".vaultspec"
+            / "rules"
+            / "rules"
+            / "project"
+            / "overwrite-me.md"
         ).read_text(encoding="utf-8")
         assert "v2" in content
-
-    def test_revert(self, cli, synthetic_project):
-        src = (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "rules"
-            / "vaultspec.builtin.md"
-        )
-        snapshot = (
-            synthetic_project
-            / ".vaultspec"
-            / "_snapshots"
-            / "rules"
-            / "vaultspec.builtin.md"
-        )
-        assert snapshot.exists(), (
-            "Snapshot missing after install - snapshot_builtins should have run"
-        )
-        original = src.read_text(encoding="utf-8")
-        src.write_text("MODIFIED CONTENT", encoding="utf-8")
-
-        result = _run(
-            cli, synthetic_project, "spec", "rules", "revert", "vaultspec.builtin"
-        )
-        assert result.exit_code == 0
-        assert src.read_text(encoding="utf-8") == original
 
     @pytest.mark.parametrize(
         "subcmd",
@@ -567,7 +549,6 @@ class TestSpecSkills:
             "spec",
             "skills",
             "add",
-            "--name",
             "vaultspec-live-skill",
             "--description",
             "Live skill test",
@@ -608,7 +589,6 @@ class TestSpecSkills:
             "spec",
             "skills",
             "add",
-            "--name",
             "vaultspec-old-skill",
             "--description",
             "Old",
@@ -654,7 +634,6 @@ class TestSpecAgents:
             "spec",
             "agents",
             "add",
-            "--name",
             "live-agent",
             "--description",
             "Live agent test",
@@ -689,7 +668,6 @@ class TestSpecAgents:
             "spec",
             "agents",
             "add",
-            "--name",
             "old-agent",
             "--description",
             "Old",
@@ -806,12 +784,189 @@ class TestVaultCheckFixRejection:
 
 
 class TestVaultFeature:
-    def test_feature_archive(self, cli, synthetic_project):
+    def test_feature_archive_dry_run_and_execution(self, cli, synthetic_project):
+        # Create a document for archive-me
         _run(cli, synthetic_project, "vault", "add", "adr", "--feature", "archive-me")
+
+        # Run archive in dry-run mode
+        result = _run(
+            cli,
+            synthetic_project,
+            "vault",
+            "feature",
+            "archive",
+            "archive-me",
+            "--dry-run",
+        )
+        assert result.exit_code == 0
+        assert "Dry-run: Previewing feature archive for 'archive-me'" in result.output
+        assert "Planned movements:" in result.output
+
+        # Verify no files were actually moved to archive yet
+        archive_dir = synthetic_project / ".vault" / "_archive"
+        assert not archive_dir.exists() or len(list(archive_dir.rglob("*.md"))) == 0
+
+        # Now archive for real
         result = _run(
             cli, synthetic_project, "vault", "feature", "archive", "archive-me"
         )
         assert result.exit_code == 0
+        assert "Archived 1 documents." in result.output
+
+        # Verify it is in _archive
+        assert archive_dir.is_dir()
+        archived_files = list(archive_dir.rglob("*.md"))
+        assert len(archived_files) == 1
+
+        # Run unarchive in dry-run mode
+        result = _run(
+            cli,
+            synthetic_project,
+            "vault",
+            "feature",
+            "unarchive",
+            "archive-me",
+            "--dry-run",
+        )
+        assert result.exit_code == 0
+        assert "Dry-run: Previewing feature unarchive for 'archive-me'" in result.output
+        assert "Planned restorations:" in result.output
+
+        # Verify it is still in _archive
+        assert len(list(archive_dir.rglob("*.md"))) == 1
+
+        # Unarchive for real
+        result = _run(
+            cli, synthetic_project, "vault", "feature", "unarchive", "archive-me"
+        )
+        assert result.exit_code == 0
+        assert "Unarchived 1 documents." in result.output
+
+        # Verify archive dir is empty or deleted
+        assert not archive_dir.exists() or len(list(archive_dir.rglob("*.md"))) == 0
+
+    def test_feature_archive_nonexistent(self, cli, synthetic_project):
+        result = _run(
+            cli, synthetic_project, "vault", "feature", "archive", "nonexistent-tag"
+        )
+        assert result.exit_code == 1
+        assert "matches zero documents" in result.output
+
+    def test_feature_unarchive_nonexistent(self, cli, synthetic_project):
+        result = _run(
+            cli, synthetic_project, "vault", "feature", "unarchive", "nonexistent-tag"
+        )
+        assert result.exit_code == 1
+        assert "matches zero archived documents" in result.output
+
+    def test_feature_archive_and_unarchive_json(self, cli, synthetic_project):
+        # Create a document
+        _run(cli, synthetic_project, "vault", "add", "adr", "--feature", "json-me")
+
+        # Dry-run archive with JSON output
+        result = _run(
+            cli,
+            synthetic_project,
+            "vault",
+            "feature",
+            "archive",
+            "json-me",
+            "--dry-run",
+            "--json",
+        )
+        assert result.exit_code == 0
+        import json
+
+        data = json.loads(result.output)
+        assert data["status"] == "unchanged"
+        assert data["data"]["dry_run"] is True
+        assert data["data"]["archived_count"] == 1
+
+        # Run archive with JSON output
+        result = _run(
+            cli, synthetic_project, "vault", "feature", "archive", "json-me", "--json"
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["status"] == "removed"
+        assert data["data"]["dry_run"] is False
+        assert data["data"]["archived_count"] == 1
+
+        # Dry-run unarchive with JSON output
+        result = _run(
+            cli,
+            synthetic_project,
+            "vault",
+            "feature",
+            "unarchive",
+            "json-me",
+            "--dry-run",
+            "--json",
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["status"] == "unchanged"
+        assert data["data"]["dry_run"] is True
+        assert data["data"]["unarchived_count"] == 1
+
+        # Run unarchive with JSON output
+        result = _run(
+            cli, synthetic_project, "vault", "feature", "unarchive", "json-me", "--json"
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["status"] == "restored"
+        assert data["data"]["dry_run"] is False
+        assert data["data"]["unarchived_count"] == 1
+
+    def test_feature_archive_cross_links_warning(self, cli, synthetic_project):
+        # Create doc-a in feature-a
+        res_a = _run(
+            cli, synthetic_project, "vault", "add", "adr", "--feature", "feature-a"
+        )
+        assert res_a.exit_code == 0
+
+        # Create doc-b in feature-b
+        res_b = _run(
+            cli, synthetic_project, "vault", "add", "adr", "--feature", "feature-b"
+        )
+        assert res_b.exit_code == 0
+
+        # Find the files:
+        adr_dir = synthetic_project / ".vault" / "adr"
+        files = sorted(adr_dir.glob("*.md"), key=lambda p: p.stat().st_mtime)
+        doc_b_path = files[-1]
+        doc_a_path = files[-2]
+
+        # Add cross-feature link from doc-b to doc-a
+        new_content = f"""---
+tags:
+  - '#adr'
+  - '#feature-b'
+date: 2026-05-22
+related:
+  - '[[{doc_a_path.name}]]'
+---
+# Test Document B
+"""
+        doc_b_path.write_text(new_content, encoding="utf-8")
+
+        # Now run dry-run archive on feature-a
+        result = _run(
+            cli,
+            synthetic_project,
+            "vault",
+            "feature",
+            "archive",
+            "feature-a",
+            "--dry-run",
+        )
+        assert result.exit_code == 0
+        assert (
+            "Warning: The following external documents link to feature documents"
+            in result.output
+        )
+        assert doc_b_path.name in result.output
 
 
 # ═══════════════════════════════════════════════════════════════════

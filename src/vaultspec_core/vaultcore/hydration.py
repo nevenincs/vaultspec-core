@@ -41,6 +41,10 @@ def hydrate_template(
     related: list[str] | None = None,
     extra_tags: list[str] | None = None,
     tier: str | None = None,
+    step_id: str | None = None,
+    step_scope: str | None = None,
+    step_action: str | None = None,
+    plan_stem: str | None = None,
 ) -> str:
     """Replace placeholders in a template string with actual values.
 
@@ -52,8 +56,7 @@ def hydrate_template(
     *extra_tags* is provided, those tags are appended to the ``tags:``
     block in frontmatter. When *tier* is provided, the template's
     ``{tier}`` placeholder is substituted; otherwise the placeholder
-    is left as-is for the caller to fill (the post-hydration unhydrated-
-    placeholder check will flag it).
+    is left as-is for the caller to fill.
 
     Args:
         template_content: Raw template text containing placeholder tokens.
@@ -67,6 +70,10 @@ def hydrate_template(
             frontmatter field (beyond the directory and feature tags).
         tier: Optional plan tier value (``L1``..``L4``) substituted into
             the ``{tier}`` placeholder for plan templates.
+        step_id: Optional step canonical identifier (e.g. ``S01``).
+        step_scope: Optional file or area scope of the step.
+        step_action: Optional verbatim action of the step.
+        plan_stem: Optional parent plan stem used in wiki-links.
 
     Returns:
         The fully-hydrated document string.
@@ -99,6 +106,33 @@ def hydrate_template(
                 logger.debug("Replacing '%s' with '%s'", pattern, value)
                 hydrated = hydrated.replace(pattern, value)
 
+    # Hydrate step-aware placeholders
+    val_step_id = step_id if step_id is not None else "{S##}"
+    val_plan_stem = plan_stem if plan_stem is not None else "{yyyy-mm-dd-*-plan}"
+
+    if title is not None:
+        val_heading = title
+    elif step_action is not None:
+        val_heading = step_action
+    else:
+        val_heading = f"{feature} <display-path>"
+
+    val_scope_block = ""
+    if step_scope:
+        scopes = [
+            s.strip().strip("`") for s in re.split(r"[,;]+", step_scope) if s.strip()
+        ]
+        if scopes:
+            lines = ["## Scope", ""]
+            for s in scopes:
+                lines.append(f"- `{s}`")
+            val_scope_block = "\n".join(lines)
+
+    hydrated = hydrated.replace("{step_id}", val_step_id)
+    hydrated = hydrated.replace("{plan_stem}", val_plan_stem)
+    hydrated = hydrated.replace("{heading}", val_heading)
+    hydrated = hydrated.replace("{scope_block}", val_scope_block)
+
     # Inject resolved related links into frontmatter
     if related is not None:
         hydrated = _inject_related(hydrated, related)
@@ -124,7 +158,8 @@ def hydrate_template(
             if placeholder in _KNOWN_PLACEHOLDERS:
                 continue
             logger.warning(
-                "Potential unhydrated placeholder found in template: %s", placeholder
+                "Potential unhydrated placeholder found in template: %s",
+                placeholder,
             )
 
     logger.debug("Successfully hydrated template (feature=%s)", feature)
@@ -207,6 +242,12 @@ def create_vault_doc(
     force: bool = False,
     dry_run: bool = False,
     tier: str | None = None,
+    step_id: str | None = None,
+    step_display_path: str | None = None,
+    step_scope: str | None = None,
+    step_action: str | None = None,
+    plan_date: str | None = None,
+    plan_stem: str | None = None,
 ) -> pathlib.Path:
     """Scaffold a new vault document from the appropriate template.
 
@@ -225,6 +266,12 @@ def create_vault_doc(
         tier: Plan tier value (``L1``..``L4``) substituted into the plan
             template's ``{tier}`` placeholder. Ignored for non-plan
             doc types whose templates do not carry the placeholder.
+        step_id: Optional step canonical identifier (e.g. ``S01``).
+        step_display_path: Optional display path of the step.
+        step_scope: Optional file or area scope of the step.
+        step_action: Optional verbatim action of the step.
+        plan_date: Optional parent plan date.
+        plan_stem: Optional parent plan stem used in wiki-links.
 
     Returns:
         Path to the newly created (or would-be-created) document.
@@ -244,7 +291,11 @@ def create_vault_doc(
 
     # Default to empty related list so created documents pass validation
     # instead of keeping template placeholder entries like [[{yyyy-mm-dd-*}]]
-    effective_related = related if related is not None else []
+    effective_related = list(related) if related is not None else []
+    if plan_stem:
+        plan_link = f"[[{plan_stem}]]"
+        if plan_link not in effective_related:
+            effective_related.insert(0, plan_link)
 
     hydrated = hydrate_template(
         content,
@@ -254,10 +305,25 @@ def create_vault_doc(
         related=effective_related,
         extra_tags=extra_tags,
         tier=tier,
+        step_id=step_id,
+        step_scope=step_scope,
+        step_action=step_action,
+        plan_stem=plan_stem,
     )
 
-    filename = f"{date_str}-{feature}-{doc_type.value}.md"
-    target_dir = root_dir / get_config().docs_dir / doc_type.value
+    if doc_type is DocType.EXEC and step_id is not None:
+        suffix = step_display_path.replace(".", "-") if step_display_path else "S01"
+        filename = f"{plan_date or date_str}-{feature}-{suffix}.md"
+        target_dir = (
+            root_dir
+            / get_config().docs_dir
+            / doc_type.value
+            / f"{plan_date or date_str}-{feature}"
+        )
+    else:
+        filename = f"{date_str}-{feature}-{doc_type.value}.md"
+        target_dir = root_dir / get_config().docs_dir / doc_type.value
+
     target_path = target_dir / filename
 
     if not force:

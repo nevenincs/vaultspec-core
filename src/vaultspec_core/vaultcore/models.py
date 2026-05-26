@@ -64,11 +64,21 @@ class DocumentMetadata:
             Additional freeform tags are allowed beyond the required pair.
         date: ISO 8601 creation date (``YYYY-MM-DD``).
         related: List of Obsidian-style ``[[wiki-link]]`` strings.
+        supersedes: List of old ADR/Plan stems.
+        superseded_by: Single new ADR/Plan stem.
+        derived_from: List of audit/finding references.
+        promoted_to: List of rules promoted.
+        archived: ISO date (``YYYY-MM-DD``) set on archived documents.
     """
 
     tags: list[str] = field(default_factory=list)
     date: str | None = None
     related: list[str] = field(default_factory=list)
+    supersedes: list[str] = field(default_factory=list)
+    superseded_by: str | None = None
+    derived_from: list[str] = field(default_factory=list)
+    promoted_to: list[str] = field(default_factory=list)
+    archived: str | None = None
 
     def validate(self) -> list[str]:
         """Validate the metadata against the vault schema rules.
@@ -127,6 +137,14 @@ class DocumentMetadata:
                 )
                 errors.append(msg)
 
+        #  Archived Date Format
+        if self.archived and not re.match(r"^\d{4}-\d{2}-\d{2}$", self.archived):
+            msg = (
+                f"Vault violation: Invalid archived date format '{self.archived}'. "
+                "Must be YYYY-MM-DD."
+            )
+            errors.append(msg)
+
         return errors
 
 
@@ -166,7 +184,7 @@ class VaultConstants:
 
     # Non-document directories that are legitimate .vault/ content
     # (e.g. data stores, log output) but not document types.
-    AUXILIARY_DIRECTORIES: ClassVar[set[str]] = {"data", "logs"}
+    AUXILIARY_DIRECTORIES: ClassVar[set[str]] = {"data", "logs", "_archive"}
 
     # Supported directory tags (one per DocType, including #index).
     SUPPORTED_TAGS: ClassVar[set[str]] = {dt.tag for dt in DocType}

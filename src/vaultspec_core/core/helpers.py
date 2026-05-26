@@ -299,11 +299,12 @@ def collect_md_resources(
     sources: dict[str, tuple[Path, dict[str, Any], str]] = {}
     if not src_dir.exists():
         return sources
-    for f in sorted(src_dir.glob("*.md")):
+    for f in sorted(src_dir.glob("**/*.md")):
         try:
             content = f.read_text(encoding="utf-8")
             meta, body = parse_frontmatter(content)
-            sources[f.name] = (f, meta, body)
+            rel_path = f.relative_to(src_dir).as_posix()
+            sources[rel_path] = (f, meta, body)
         except Exception as e:
             logger.error("Failed to read/parse %s: %s", f, e)
             if warnings is not None:

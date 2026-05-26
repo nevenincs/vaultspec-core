@@ -23,6 +23,7 @@ related:
   - '[[2026-05-17-cli-paper-cuts-adr]]'
 ---
 
+
 # `cli-simplification-ux` `CLI simplification and UX hardening epic` plan
 
 ## Epic intent
@@ -66,28 +67,28 @@ Introduce the missing memory-lifecycle verbs and the atomicity invariant every m
 
 Introduce codify, supersede, and retire as first-class lifecycle verbs with typed frontmatter relationship fields and an archive verb that preserves cross-feature provenance.
 
-- [ ] `W02.P04.S11` - Land frontmatter schema additions (supersedes, superseded_by, derived_from, promoted_to, archived) with a versioned migration; `src/vaultspec_core/migrations/`.
-- [ ] `W02.P04.S12` - Implement vault rule promote --from --as as the codify verb; `src/vaultspec_core/cli/`.
-- [ ] `W02.P04.S13` - Implement vault adr supersede with frontmatter rewrites on both old and new documents; `src/vaultspec_core/cli/vault_cmd.py`.
-- [ ] `W02.P04.S14` - Fix vault feature archive end to end: dry-run, unarchive verb, cross-feature link rewriting, structure-check allowlist, dangling-check archive resolver; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `W02.P04.S11` - Land frontmatter schema additions (supersedes, superseded_by, derived_from, promoted_to, archived) with a versioned migration; `src/vaultspec_core/migrations/`.
+- [x] `W02.P04.S12` - Implement vault rule promote --from --as as the codify verb; `src/vaultspec_core/cli/`.
+- [x] `W02.P04.S13` - Implement vault adr supersede with frontmatter rewrites on both old and new documents; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `W02.P04.S14` - Fix vault feature archive end to end: dry-run, unarchive verb, cross-feature link rewriting, structure-check allowlist, dangling-check archive resolver; `src/vaultspec_core/cli/vault_cmd.py`.
 - [x] `W02.P04.S15` - Update ADR template, pipeline rules, and agent personas to teach the codify lifecycle phase; `.vaultspec/`.
 
 ### Phase `W02.P05` - Atomic rename invariant
 
 Make rename rewrite filename and frontmatter atomically across every metadata-rewriting verb, with a new vault check that surfaces pre-existing inconsistencies.
 
-- [ ] `W02.P05.S16` - Implement atomic rename rewriting filename and frontmatter together across spec rules, skills, and agents; `src/vaultspec_core/cli/spec_cmd.py`.
-- [ ] `W02.P05.S17` - Add vault check rename-integrity with --fix and --fix-frontmatter-wins modes; `src/vaultspec_core/vaultcore/checks/`.
-- [ ] `W02.P05.S18` - Update help text, manual, and agent personas to describe atomic rename behaviour; `.vaultspec/`.
+- [x] `W02.P05.S16` - Implement atomic rename rewriting filename and frontmatter together across spec rules, skills, and agents; `src/vaultspec_core/cli/spec_cmd.py`.
+- [x] `W02.P05.S17` - Add vault check rename-integrity with --fix and --fix-frontmatter-wins modes; `src/vaultspec_core/vaultcore/checks/`.
+- [x] `W02.P05.S18` - Update help text, manual, and agent personas to describe atomic rename behaviour; `.vaultspec/`.
 
 ### Phase `W02.P06` - Spec edit safety
 
 Resolve editor selection through the standard environment-variable contract, introduce the vaultspec-core config surface, and make every exit code honest.
 
-- [ ] `W02.P06.S19` - Add vaultspec-core config verb group with get, set, unset, list against .vaultspec/config.toml; `src/vaultspec_core/cli/`.
-- [ ] `W02.P06.S20` - Implement editor resolution order (flag, config, VISUAL, EDITOR, vi, fail) in spec edit; `src/vaultspec_core/cli/spec_cmd.py`.
-- [ ] `W02.P06.S21` - Wrap the editor subprocess invocation translating failures into honest non-zero exit codes; `src/vaultspec_core/cli/spec_cmd.py`.
-- [ ] `W02.P06.S22` - Update CLI reference and builtin rules to describe editor-resolution order and config surface; `.vaultspec/`.
+- [x] `W02.P06.S19` - Add vaultspec-core config verb group with get, set, unset, list against .vaultspec/config.toml; `src/vaultspec_core/cli/`.
+- [x] `W02.P06.S20` - Implement editor resolution order (flag, config, VISUAL, EDITOR, vi, fail) in spec edit; `src/vaultspec_core/cli/spec_cmd.py`.
+- [x] `W02.P06.S21` - Wrap the editor subprocess invocation translating failures into honest non-zero exit codes; `src/vaultspec_core/cli/spec_cmd.py`.
+- [x] `W02.P06.S22` - Update CLI reference and builtin rules to describe editor-resolution order and config surface; `.vaultspec/`.
 
 ## Wave `W03` - Pipeline integrity
 
@@ -97,19 +98,19 @@ Make the pipeline's daily-use verbs safe. Plan-editing operations preserve autho
 
 Preserve author prose across every plan-editing verb through unknown-block round-tripping in the parser/serialiser, plus universal dry-run on the plan-editing surface.
 
-- [ ] `W03.P07.S23` - Extend the plan parser to capture unknown-but-positioned blocks with verbatim source and anchor positions; `src/vaultspec_core/plan/`.
-- [ ] `W03.P07.S24` - Update the plan serialiser to round-trip unknown blocks verbatim in their original position; `src/vaultspec_core/plan/`.
-- [ ] `W03.P07.S25` - Add --dry-run to every plan-editing verb emitting a unified diff against the current file; `src/vaultspec_core/cli/plan_cmd.py`.
-- [ ] `W03.P07.S26` - Add --canonicalise flag and update help, plan template, and agent personas to describe preservation; `src/vaultspec_core/cli/plan_cmd.py`.
+- [x] `W03.P07.S23` - Extend the plan parser to capture unknown-but-positioned blocks with verbatim source and anchor positions; `src/vaultspec_core/plan/`.
+- [x] `W03.P07.S24` - Update the plan serialiser to round-trip unknown blocks verbatim in their original position; `src/vaultspec_core/plan/`.
+- [x] `W03.P07.S25` - Add --dry-run to every plan-editing verb emitting a unified diff against the current file; `src/vaultspec_core/cli/plan_cmd.py`.
+- [x] `W03.P07.S26` - Add --canonicalise flag and update help, plan template, and agent personas to describe preservation; `src/vaultspec_core/cli/plan_cmd.py`.
 
 ### Phase `W03.P08` - Step-aware exec records
 
 Make vault add exec Step-aware so per-Step execution records become CLI-authorable, closing the framework's own rules-versus-CLI disagreement on the execute phase.
 
-- [ ] `W03.P08.S27` - Add required --step flag to vault add exec with derived path and frontmatter from the parent plan; `src/vaultspec_core/cli/vault_cmd.py`.
-- [ ] `W03.P08.S28` - Add --all-steps bulk form: idempotent enumeration over plan Steps with --force override; `src/vaultspec_core/cli/vault_cmd.py`.
-- [ ] `W03.P08.S29` - Remove step_id and display-path placeholders from the exec template and route through scaffolder-integrity invariant; `src/vaultspec_core/builtins/`.
-- [ ] `W03.P08.S30` - Surface the exec-missing hint from vault plan status and update rules and agent personas; `src/vaultspec_core/cli/plan_cmd.py`.
+- [x] `W03.P08.S27` - Add required --step flag to vault add exec with derived path and frontmatter from the parent plan; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `W03.P08.S28` - Add --all-steps bulk form: idempotent enumeration over plan Steps with --force override; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `W03.P08.S29` - Remove step_id and display-path placeholders from the exec template and route through scaffolder-integrity invariant; `src/vaultspec_core/builtins/`.
+- [x] `W03.P08.S30` - Surface the exec-missing hint from vault plan status and update rules and agent personas; `src/vaultspec_core/cli/plan_cmd.py`.
 
 ## Wave `W04` - Surface and parity
 
@@ -119,28 +120,28 @@ Resolve the structural cleanup the earlier waves enable. Spec noun groups adopt 
 
 Apply a uniform CRUD template to every collection-shaped spec noun group, promote hooks to first-class CRUD, add status to every group, unify the body-content flag.
 
-- [ ] `W04.P09.S31` - Define the canonical CRUD shape and apply it to spec rules, spec skills, and spec agents (list, show, add, edit, rename, remove, restore, sync, status); `src/vaultspec_core/cli/spec_cmd.py`.
-- [ ] `W04.P09.S32` - Promote spec hooks to first-class CRUD with add, edit, rename, remove, restore, sync, status; `src/vaultspec_core/cli/spec_cmd.py`.
-- [ ] `W04.P09.S33` - Implement status verb on every collection-shaped spec noun group with consistent semantics; `src/vaultspec_core/cli/spec_cmd.py`.
-- [ ] `W04.P09.S34` - Unify the body-content flag to --body across add verbs and deprecate --content and --description as aliases; `src/vaultspec_core/cli/spec_cmd.py`.
+- [x] `W04.P09.S31` - Define the canonical CRUD shape and apply it to spec rules, spec skills, and spec agents (list, show, add, edit, rename, remove, restore, sync, status); `src/vaultspec_core/cli/spec_cmd.py`.
+- [x] `W04.P09.S32` - Promote spec hooks to first-class CRUD with add, edit, rename, remove, restore, sync, status; `src/vaultspec_core/cli/spec_cmd.py`.
+- [x] `W04.P09.S33` - Implement status verb on every collection-shaped spec noun group with consistent semantics; `src/vaultspec_core/cli/spec_cmd.py`.
+- [x] `W04.P09.S34` - Unify the body-content flag to --body across add verbs and deprecate --content and --description as aliases; `src/vaultspec_core/cli/spec_cmd.py`.
 
 ### Phase `W04.P10` - Surface consolidation
 
 Pick one canonical surface per duplicated operation, deprecate the alternative with redirect messaging, and ship a deprecated-usage scanner.
 
-- [ ] `W04.P10.S35` - Reframe top-level sync as a fanout helper invoking each spec sync per noun group in sequence; `src/vaultspec_core/cli/root.py`.
-- [ ] `W04.P10.S36` - Deprecate vault sanitize annotations with a redirect message pointing at vault check annotations --fix; `src/vaultspec_core/cli/vault_cmd.py`.
-- [ ] `W04.P10.S37` - Reconcile spec sync argument shapes to accept the provider positional consistent with top-level sync; `src/vaultspec_core/cli/spec_cmd.py`.
-- [ ] `W04.P10.S38` - Add vault check deprecated-usage scanning hook configs, agent personas, rule files, and templates for legacy invocations; `src/vaultspec_core/vaultcore/checks/`.
+- [x] `W04.P10.S35` - Reframe top-level sync as a fanout helper invoking each spec sync per noun group in sequence; `src/vaultspec_core/cli/root.py`.
+- [x] `W04.P10.S36` - Deprecate vault sanitize annotations with a redirect message pointing at vault check annotations --fix; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `W04.P10.S37` - Reconcile spec sync argument shapes to accept the provider positional consistent with top-level sync; `src/vaultspec_core/cli/spec_cmd.py`.
+- [x] `W04.P10.S38` - Add vault check deprecated-usage scanning hook configs, agent personas, rule files, and templates for legacy invocations; `src/vaultspec_core/vaultcore/checks/`.
 
 ### Phase `W04.P11` - Blast-radius gating discipline
 
 Apply a framework-wide gating discipline across every destructive verb with universal dry-run, gated destructive sub-paths, and preservation-summary lines.
 
-- [ ] `W04.P11.S39` - Implement universal --dry-run across every state-changing verb with shared code paths for preview and apply; `src/vaultspec_core/cli/`.
-- [ ] `W04.P11.S40` - Add --force requirement on destructive sub-paths within additive verbs such as install --upgrade; `src/vaultspec_core/cli/root.py`.
-- [ ] `W04.P11.S41` - Add preservation-summary line to install --upgrade and vault feature archive success output; `src/vaultspec_core/cli/`.
-- [ ] `W04.P11.S42` - Add interactive confirmation gate for TTY contexts on destructive verbs invoked without --force; `src/vaultspec_core/cli/`.
+- [x] `W04.P11.S39` - Implement universal --dry-run across every state-changing verb with shared code paths for preview and apply; `src/vaultspec_core/cli/`.
+- [x] `W04.P11.S40` - Add --force requirement on destructive sub-paths within additive verbs such as install --upgrade; `src/vaultspec_core/cli/root.py`.
+- [x] `W04.P11.S41` - Add preservation-summary line to install --upgrade and vault feature archive success output; `src/vaultspec_core/cli/`.
+- [x] `W04.P11.S42` - Add interactive confirmation gate for TTY contexts on destructive verbs invoked without --force; `src/vaultspec_core/cli/`.
 
 ## Wave `W05` - Contract and discovery
 
@@ -158,15 +159,31 @@ Adopt a uniform top-level envelope (status, schema, data, hints) across every ma
 
 Make every successful pipeline verb volunteer the natural next command in its output, surfacing vault repair and the codify phase from the verbs whose follow-on points at them.
 
-- [ ] `W05.P13.S46` - Implement the static next-step lookup table mapping verb plus outcome to suggested follow-on command; `src/vaultspec_core/cli/rendering.py`.
-- [ ] `W05.P13.S47` - Wire hint emission into every successful pipeline verb output across text and JSON paths; `src/vaultspec_core/cli/`.
-- [ ] `W05.P13.S48` - Document the VAULTSPEC_NO_HINTS environment variable and --no-hints flag suppression contract; `.vaultspec/CLI.md`.
+- [x] `W05.P13.S46` - Implement the static next-step lookup table mapping verb plus outcome to suggested follow-on command; `src/vaultspec_core/cli/rendering.py`.
+- [x] `W05.P13.S47` - Wire hint emission into every successful pipeline verb output across text and JSON paths; `src/vaultspec_core/cli/`.
+- [x] `W05.P13.S48` - Document the VAULTSPEC_NO_HINTS environment variable and --no-hints flag suppression contract; `.vaultspec/CLI.md`.
 
 ### Phase `W05.P14` - Paper-cut sweep and doctor verb
 
 Sweep the residual paper-cut tail under a documented contribution discipline and add the top-level vaultspec-core doctor verb as the single workspace-readiness gate.
 
-- [ ] `W05.P14.S49` - Apply the discipline-checklist sweep: hide --dev, fix vault graph usage line, drop vault feature list trailing token, disambiguate migrations status, widen spec hooks list column, fix spec system show phantom target; `src/vaultspec_core/cli/`.
-- [ ] `W05.P14.S50` - Add top-level vaultspec-core doctor verb composing vault check all and spec doctor under a single exit code; `src/vaultspec_core/cli/root.py`.
-- [ ] `W05.P14.S51` - Document the contribution discipline checklist gating every new CLI verb at merge time; `CONTRIBUTING.md`.
-- [ ] `W05.P14.S52` - Add post-merge audit check enforcing the discipline checklist on every newly introduced verb; `src/vaultspec_core/vaultcore/checks/`.
+- [x] `W05.P14.S49` - Apply the discipline-checklist sweep: hide --dev, fix vault graph usage line, drop vault feature list trailing token, disambiguate migrations status, widen spec hooks list column, fix spec system show phantom target; `src/vaultspec_core/cli/`.
+- [x] `W05.P14.S50` - Add top-level vaultspec-core doctor verb composing vault check all and spec doctor under a single exit code; `src/vaultspec_core/cli/root.py`.
+- [x] `W05.P14.S51` - Document the contribution discipline checklist gating every new CLI verb at merge time; `CONTRIBUTING.md`.
+- [x] `W05.P14.S52` - Add post-merge audit check enforcing the discipline checklist on every newly introduced verb; `src/vaultspec_core/vaultcore/checks/`.
+
+### Phase `W05.P15` - Code health and test audit
+
+Establish rigorous quality baselines by eliminating tautological tests that pass vacuously, conducting formal code reviews using the vaultspec-code-review skill, and executing a comprehensive code audit.
+
+- [x] `W05.P15.S53` - Audit the test suite to eliminate tautological testing (where assertions vacuously pass or verify trivialities) and ensure zero false positive signals; `tests/`.
+- [x] `W05.P15.S54` - Conduct a formal code review of all epic code changes utilizing the vaultspec-code-review skill; `src/vaultspec_core/`.
+- [x] `W05.P15.S55` - Execute a comprehensive code audit of the CLI simplification work and verify compliance with project standards; `.vault/audit/`.
+
+### Phase `W05.P16` - Documentation, rule working, and usage artifacts update
+
+Engage in an interactive session using the vaultspec-documentation skill to refine and manually approve docs via wireframing. Update framework rules and usage artifacts, and employ agent personas to explicitly verify all updated README and markdown (.md) files.
+
+- [x] `W05.P16.S56` - Engage in user-interactive documentation sessions using the vaultspec-documentation skill to author, refine, and manually approve docs via wireframing; `docs/`.
+- [x] `W05.P16.S57` - Update framework rules, system prompts, and usage artifacts under rules, agents, and templates to reflect CLI simplification outcomes; `.vaultspec/`.
+- [x] `W05.P16.S58` - Employ agent personas to explicitly verify all newly generated or updated README and markdown (.md) files; `'*.md'`.

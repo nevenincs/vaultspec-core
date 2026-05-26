@@ -1,5 +1,5 @@
 ---
-name: vaultspec-skills
+name: vaultspec
 ---
 
 # Spec Skills

@@ -21,6 +21,7 @@ from .signals import (
     ManifestEntrySignal,
     PrecommitSignal,
     ProviderDirSignal,
+    RenameIntegritySignal,
     VaultContentSignal,
 )
 
@@ -657,3 +658,37 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
                 return PrecommitSignal.NON_CANONICAL
 
     return PrecommitSignal.COMPLETE
+
+
+def collect_rename_integrity(target: Path) -> tuple[RenameIntegritySignal, int]:
+    """Check name/filename integrity for rules, skills, and agents.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        ``(signal, mismatch_count)``.
+    """
+    from ...vaultcore.checks import Severity
+    from ...vaultcore.checks.rename_integrity import check_rename_integrity
+
+    try:
+        result = check_rename_integrity(target)
+        mismatch_count = 0
+        has_error = False
+
+        for diag in result.diagnostics:
+            if diag.severity == Severity.ERROR:
+                if "does not match expected name" in diag.message:
+                    mismatch_count += 1
+                else:
+                    has_error = True
+
+        if has_error:
+            return RenameIntegritySignal.ERROR, mismatch_count
+        if mismatch_count > 0:
+            return RenameIntegritySignal.MISMATCH, mismatch_count
+        return RenameIntegritySignal.CLEAN, 0
+    except Exception as exc:
+        logger.warning("Rename integrity collector failed: %s", exc, exc_info=True)
+        return RenameIntegritySignal.ERROR, 0

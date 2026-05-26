@@ -145,9 +145,8 @@ class TestSyncAuthority:
                 "spec",
                 "rules",
                 "add",
-                "--name",
                 "operator-sync-guidance",
-                "--content",
+                "--body",
                 "Keep provider stubs fresh.",
             ],
         )
@@ -166,9 +165,8 @@ class TestSyncAuthority:
                 "spec",
                 "rules",
                 "add",
-                "--name",
                 "operator-sync-json",
-                "--content",
+                "--body",
                 "Keep JSON parseable.",
                 "--json",
             ],
@@ -187,7 +185,6 @@ class TestSyncAuthority:
                     "spec",
                     "skills",
                     "add",
-                    "--name",
                     "operator-skill-guidance",
                     "--description",
                     "Skill guidance",
@@ -199,7 +196,6 @@ class TestSyncAuthority:
                     "spec",
                     "agents",
                     "add",
-                    "--name",
                     "operator-agent-guidance",
                     "--description",
                     "Agent guidance",
@@ -362,16 +358,20 @@ class TestSyncAuthority:
                     "spec",
                     "rules",
                     "add",
-                    "--name",
                     rule_name,
-                    "--content",
+                    "--body",
                     "Surface this rule in provider config stubs.",
                 ],
             )
             assert add_result.exit_code == 0, add_result.output
 
             source_rule = (
-                synthetic_project / ".vaultspec" / "rules" / "rules" / f"{rule_name}.md"
+                synthetic_project
+                / ".vaultspec"
+                / "rules"
+                / "rules"
+                / "project"
+                / f"{rule_name}.md"
             )
             assert source_rule.exists(), f"Rule source missing: {source_rule}"
 

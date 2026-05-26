@@ -34,7 +34,9 @@ def test_resource_edit_raises_clean_error_on_editor_launch_failure(
     os.environ["VAULTSPEC_EDITOR"] = "vaultspec-no-such-editor-xyz"
     reset_config()
     try:
-        with pytest.raises(VaultSpecError, match="Could not launch editor"):
+        with pytest.raises(
+            VaultSpecError, match="Could not resolve a working text editor"
+        ):
             resources.resource_edit("demo", base_dir=tmp_path, label="Rule")
     finally:
         if old_editor is None:

@@ -9,10 +9,12 @@ the legacy-L2 default. The snapshot has both a structured form
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from vaultspec_core.plan.frontmatter import Tier
     from vaultspec_core.plan.parser import Plan
 
@@ -36,6 +38,8 @@ class PlanStatus:
             is zero.
         has_epic_intent: ``True`` when an L4 plan declares its Epic
             intent block.
+        exec_missing_ids: Canonical IDs of checked steps lacking an execution
+            record.
     """
 
     tier: Tier
@@ -46,13 +50,16 @@ class PlanStatus:
     steps_completed: int
     completion_percent: float
     has_epic_intent: bool
+    exec_missing_ids: list[str] = field(default_factory=list)
 
 
-def collect_status(plan: Plan) -> PlanStatus:
+def collect_status(plan: Plan, root_dir: Path | None = None) -> PlanStatus:
     """Compute a :class:`PlanStatus` snapshot from a parsed plan.
 
     Args:
         plan: Parsed :class:`vaultspec_core.plan.parser.Plan` model.
+        root_dir: Optional project root directory to check for missing
+            execution records.
 
     Returns:
         :class:`PlanStatus` populated from the plan's frontmatter and
@@ -61,6 +68,37 @@ def collect_status(plan: Plan) -> PlanStatus:
     step_count = len(plan.steps)
     steps_completed = sum(1 for step in plan.steps if step.checked)
     completion = (steps_completed / step_count * 100.0) if step_count else 0.0
+
+    exec_missing_ids: list[str] = []
+    if root_dir is not None:
+        from vaultspec_core.plan.frontmatter import _DIRECTORY_TAGS
+
+        feature = None
+        for tag in plan.frontmatter.tags:
+            if tag != "#plan" and tag not in _DIRECTORY_TAGS:
+                feature = tag.lstrip("#")
+                break
+
+        if feature:
+            from vaultspec_core.vaultcore.parser import parse_frontmatter
+            from vaultspec_core.vaultcore.query import list_documents
+
+            exec_docs = list_documents(root_dir, doc_type="exec", feature=feature)
+            scaffolded_step_ids = set()
+            for doc in exec_docs:
+                try:
+                    content = doc.path.read_text(encoding="utf-8")
+                    meta, _ = parse_frontmatter(content)
+                    step_id = meta.get("step_id")
+                    if step_id:
+                        scaffolded_step_ids.add(step_id)
+                except Exception:
+                    pass
+
+            for s in plan.steps:
+                if s.checked and s.canonical_id not in scaffolded_step_ids:
+                    exec_missing_ids.append(s.canonical_id)
+
     return PlanStatus(
         tier=plan.frontmatter.tier,
         legacy_tier_default=plan.frontmatter.legacy_tier_default,
@@ -70,6 +108,7 @@ def collect_status(plan: Plan) -> PlanStatus:
         steps_completed=steps_completed,
         completion_percent=round(completion, 1),
         has_epic_intent=plan.epic_intent is not None,
+        exec_missing_ids=exec_missing_ids,
     )
 
 
@@ -87,7 +126,7 @@ def status_to_json_dict(status: PlanStatus) -> dict[str, object]:
         Dict with keys ``tier``, ``legacy_tier_default``,
         ``wave_count``, ``phase_count``, ``step_count``,
         ``steps_completed``, ``completion_percent``,
-        ``has_epic_intent``.
+        ``has_epic_intent``, ``exec_missing_ids``.
     """
     return {
         "tier": status.tier.value,
@@ -98,4 +137,5 @@ def status_to_json_dict(status: PlanStatus) -> dict[str, object]:
         "steps_completed": status.steps_completed,
         "completion_percent": status.completion_percent,
         "has_epic_intent": status.has_epic_intent,
+        "exec_missing_ids": status.exec_missing_ids,
     }

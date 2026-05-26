@@ -16,9 +16,11 @@ import sys
 from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
-from typing import Annotated, cast
+from typing import Annotated, Any, cast
 
 import typer
+
+from vaultspec_core.cli._target import TargetOption
 
 __all__ = ["plan_app"]
 
@@ -47,6 +49,43 @@ def _render_user_errors[F: Callable[..., None]](func: F) -> F:
             raise typer.Exit(1) from exc
 
     return cast("F", wrapper)
+
+
+def _save_plan_or_dry_run(
+    path: Path,
+    plan: Any,
+    original_text: str,
+    dry_run: bool,
+    canonicalise: bool,
+    success_msg: str,
+) -> None:
+    """Helper to serialise plan and output a unified diff on dry-run.
+
+    Or write to disk on apply.
+    """
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    new_text = serialise_plan(plan, canonicalise=canonicalise)
+
+    if dry_run:
+        import difflib
+
+        diff = difflib.unified_diff(
+            original_text.splitlines(keepends=True),
+            new_text.splitlines(keepends=True),
+            fromfile=f"a/{path.name}",
+            tofile=f"b/{path.name}",
+        )
+        diff_str = "".join(diff)
+        if diff_str:
+            typer.echo(diff_str)
+        else:
+            typer.echo("No changes.")
+    else:
+        if new_text != original_text:
+            path.write_text(new_text, encoding="utf-8")
+        preserved_count = 0 if canonicalise else len(plan.unknown_blocks)
+        typer.echo(f"{success_msg} (Preserved {preserved_count} unknown blocks)")
 
 
 plan_app = typer.Typer(
@@ -97,13 +136,19 @@ def cmd_status(
     json_output: Annotated[
         bool, typer.Option("--json", help="Emit JSON instead of human form")
     ] = False,
+    target: TargetOption = None,
 ) -> None:
     """Report plan health, structure, and completion."""
+    from vaultspec_core.cli._target import apply_target
+
+    apply_target(target)
+
+    from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.plan.parser import parse_plan
     from vaultspec_core.plan.status import collect_status, status_to_json_dict
 
     plan = parse_plan(path)
-    status = collect_status(plan)
+    status = collect_status(plan, root_dir=_get_ctx().target_dir)
 
     if json_output:
         from vaultspec_core.cli.rendering import json_envelope
@@ -128,6 +173,14 @@ def cmd_status(
         f"Completion: {status.steps_completed} of {status.step_count} "
         f"({status.completion_percent}%)"
     )
+    if status.exec_missing_ids:
+        missing_ids_str = ", ".join(status.exec_missing_ids)
+        hint = typer.style(
+            f"! exec-missing: checked steps lacking execution records: "
+            f"{missing_ids_str}",
+            fg=typer.colors.YELLOW,
+        )
+        typer.echo(hint)
 
 
 @plan_app.command("check")
@@ -264,17 +317,33 @@ def cmd_query(
 def cmd_step_toggle(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Flip the Step's checkbox state."""
     from vaultspec_core.plan.commands.step_ops import toggle_step
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     step = toggle_step(plan, step_id)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
     new_state = "closed" if step.checked else "open"
-    typer.echo(f"Toggled Step `{step.canonical_id}` to {new_state}.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Toggled Step `{step.canonical_id}` to {new_state}.",
+    )
 
 
 @step_app.command("check")
@@ -282,16 +351,32 @@ def cmd_step_toggle(
 def cmd_step_check(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Mark the Step closed (idempotent)."""
     from vaultspec_core.plan.commands.step_ops import check_step
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     check_step(plan, step_id)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Closed Step `{step_id}`.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Closed Step `{step_id}`.",
+    )
 
 
 @step_app.command("uncheck")
@@ -299,16 +384,32 @@ def cmd_step_check(
 def cmd_step_uncheck(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Mark the Step open (idempotent)."""
     from vaultspec_core.plan.commands.step_ops import uncheck_step
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     uncheck_step(plan, step_id)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Re-opened Step `{step_id}`.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Re-opened Step `{step_id}`.",
+    )
 
 
 # ---- Step add / insert / edit / move / remove ------------------------------
@@ -327,16 +428,32 @@ def cmd_step_add(
             help="Parent Phase id (required at L2+, omitted at L1)",
         ),
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Append a new Step at the next-available canonical id."""
     from vaultspec_core.plan.commands.step_ops import add_step
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     step = add_step(plan, action=action, scope=scope, phase_id=phase_id)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Added Step `{step.display_path}`.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Added Step `{step.display_path}`.",
+    )
 
 
 @step_app.command("insert")
@@ -353,16 +470,32 @@ def cmd_step_insert(
         str | None,
         typer.Option("--after", help="Anchor Step id; the new row follows it"),
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Insert a Step at a named position relative to an existing anchor."""
     from vaultspec_core.plan.commands.step_ops import insert_step
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     step = insert_step(plan, action=action, scope=scope, before=before, after=after)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Inserted Step `{step.display_path}`.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Inserted Step `{step.display_path}`.",
+    )
 
 
 @step_app.command("edit")
@@ -376,16 +509,32 @@ def cmd_step_edit(
     scope: Annotated[
         str | None, typer.Option("--scope", help="New `path/to/file` scope clause")
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Edit the Step's action and / or scope without changing its identifier."""
     from vaultspec_core.plan.commands.step_ops import edit_step
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     edit_step(plan, step_id, action=action, scope=scope)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Edited Step `{step_id}`.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Edited Step `{step_id}`.",
+    )
 
 
 @step_app.command("move")
@@ -402,16 +551,32 @@ def cmd_step_move(
     after: Annotated[
         str | None, typer.Option("--after", help="Place after this anchor Step")
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Re-parent and / or re-position a Step per the move-flag precedence rule."""
     from vaultspec_core.plan.commands.step_ops import move_step
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     step = move_step(plan, step_id, to_phase=to_phase, before=before, after=after)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Moved Step `{step.display_path}`.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Moved Step `{step.display_path}`.",
+    )
 
 
 @step_app.command("remove")
@@ -419,16 +584,32 @@ def cmd_step_move(
 def cmd_step_remove(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Remove a Step; its identifier is retired and never reused."""
     from vaultspec_core.plan.commands.step_ops import remove_step
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     retired = remove_step(plan, step_id)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Retired Step `{retired}`.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Retired Step `{retired}`.",
+    )
 
 
 # ---- Phase add / insert / edit / move / remove -----------------------------
@@ -443,16 +624,32 @@ def cmd_phase_add(
     wave_id: Annotated[
         str | None, typer.Option("--wave", help="Parent Wave id (L3+ only)")
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Append a new Phase at the next-available canonical id."""
     from vaultspec_core.plan.commands.phase_ops import add_phase
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     phase = add_phase(plan, title=title, intent=intent, wave_id=wave_id)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Added Phase `{phase.display_path}`.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Added Phase `{phase.display_path}`.",
+    )
 
 
 @phase_app.command("insert")
@@ -469,16 +666,32 @@ def cmd_phase_insert(
         str | None,
         typer.Option("--after", help="Anchor Phase id; new Phase follows it"),
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Insert a Phase at a named position; parent Wave inferred from anchor."""
     from vaultspec_core.plan.commands.phase_ops import insert_phase
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     phase = insert_phase(plan, title=title, intent=intent, before=before, after=after)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Inserted Phase `{phase.display_path}`.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Inserted Phase `{phase.display_path}`.",
+    )
 
 
 @phase_app.command("edit")
@@ -492,16 +705,32 @@ def cmd_phase_edit(
     intent: Annotated[
         str | None, typer.Option("--intent", help="New Phase intent paragraph")
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Edit the Phase's title and / or intent paragraph in place."""
     from vaultspec_core.plan.commands.phase_ops import edit_phase
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     edit_phase(plan, phase_id, title=title, intent=intent)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Edited Phase `{phase_id}`.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Edited Phase `{phase_id}`.",
+    )
 
 
 @phase_app.command("move")
@@ -518,16 +747,32 @@ def cmd_phase_move(
     after: Annotated[
         str | None, typer.Option("--after", help="Place after this anchor Phase")
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Re-parent and / or re-position a Phase."""
     from vaultspec_core.plan.commands.phase_ops import move_phase
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     phase = move_phase(plan, phase_id, to_wave=to_wave, before=before, after=after)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Moved Phase `{phase.display_path}`.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Moved Phase `{phase.display_path}`.",
+    )
 
 
 @phase_app.command("renumber")
@@ -542,16 +787,32 @@ def cmd_phase_renumber(
             help="New canonical id (P##); must not collide with live or retired ids",
         ),
     ],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Reassign a Phase's canonical id; descendant Step display paths recompute."""
     from vaultspec_core.plan.commands.phase_ops import renumber_phase
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     phase = renumber_phase(plan, phase_id, to=to)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Renumbered Phase `{phase_id}` to `{phase.canonical_id}`.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Renumbered Phase `{phase_id}` to `{phase.canonical_id}`.",
+    )
 
 
 @phase_app.command("remove")
@@ -559,18 +820,32 @@ def cmd_phase_renumber(
 def cmd_phase_remove(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     phase_id: Annotated[str, typer.Argument(help="Phase canonical id (P##)")],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Remove a Phase; descendant Step ids cascade-retire."""
     from vaultspec_core.plan.commands.phase_ops import remove_phase
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     retired_phase, retired_steps = remove_phase(plan, phase_id)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(
-        f"Retired Phase `{retired_phase}`; cascaded Steps: "
-        f"{', '.join(retired_steps) if retired_steps else '(none)'}."
+    cascaded_str = f"{', '.join(retired_steps) if retired_steps else '(none)'}"
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Retired Phase `{retired_phase}`; cascaded Steps: {cascaded_str}.",
     )
 
 
@@ -583,16 +858,32 @@ def cmd_wave_add(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     title: Annotated[str, typer.Option("--title", help="Wave heading title")],
     intent: Annotated[str, typer.Option("--intent", help="Wave intent paragraph")],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Append a new Wave at the next-available canonical id (L3+ only)."""
     from vaultspec_core.plan.commands.wave_ops import add_wave
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     wave = add_wave(plan, title=title, intent=intent)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Added Wave `{wave.canonical_id}`.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Added Wave `{wave.canonical_id}`.",
+    )
 
 
 @wave_app.command("insert")
@@ -609,16 +900,32 @@ def cmd_wave_insert(
         str | None,
         typer.Option("--after", help="Anchor Wave id; new Wave follows it"),
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Insert a Wave at a named position relative to an existing anchor."""
     from vaultspec_core.plan.commands.wave_ops import insert_wave
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     wave = insert_wave(plan, title=title, intent=intent, before=before, after=after)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Inserted Wave `{wave.canonical_id}`.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Inserted Wave `{wave.canonical_id}`.",
+    )
 
 
 @wave_app.command("edit")
@@ -632,16 +939,32 @@ def cmd_wave_edit(
     intent: Annotated[
         str | None, typer.Option("--intent", help="New Wave intent paragraph")
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Edit the Wave's title and / or intent paragraph in place."""
     from vaultspec_core.plan.commands.wave_ops import edit_wave
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     edit_wave(plan, wave_id, title=title, intent=intent)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Edited Wave `{wave_id}`.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Edited Wave `{wave_id}`.",
+    )
 
 
 @wave_app.command("move")
@@ -655,16 +978,32 @@ def cmd_wave_move(
     after: Annotated[
         str | None, typer.Option("--after", help="Place after this anchor Wave")
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Re-position a Wave in document order."""
     from vaultspec_core.plan.commands.wave_ops import move_wave
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     wave = move_wave(plan, wave_id, before=before, after=after)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Moved Wave `{wave.canonical_id}`.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Moved Wave `{wave.canonical_id}`.",
+    )
 
 
 @wave_app.command("remove")
@@ -672,20 +1011,36 @@ def cmd_wave_move(
 def cmd_wave_remove(
     path: Annotated[Path, typer.Argument(help="Plan document path")],
     wave_id: Annotated[str, typer.Argument(help="Wave canonical id (W##)")],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Remove a Wave; descendant Phase and Step ids cascade-retire."""
     from vaultspec_core.plan.commands.wave_ops import remove_wave
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     retired_wave, retired_phases, retired_steps = remove_wave(plan, wave_id)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(
-        f"Retired Wave `{retired_wave}`; cascaded Phases: "
-        f"{', '.join(retired_phases) if retired_phases else '(none)'}; "
-        f"cascaded Steps: "
-        f"{', '.join(retired_steps) if retired_steps else '(none)'}."
+    phases_str = f"{', '.join(retired_phases) if retired_phases else '(none)'}"
+    steps_str = f"{', '.join(retired_steps) if retired_steps else '(none)'}"
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=(
+            f"Retired Wave `{retired_wave}`; cascaded Phases: {phases_str}; "
+            f"cascaded Steps: {steps_str}."
+        ),
     )
 
 
@@ -721,16 +1076,32 @@ def cmd_epic_intent_edit(
             "--text", help="New Epic intent paragraph (must declare PM association)"
         ),
     ],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Replace the Epic intent paragraph (L4 plans only)."""
     from vaultspec_core.plan.commands.epic_ops import edit_epic_intent
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     edit_epic_intent(plan, text=text)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo("Edited Epic intent.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg="Edited Epic intent.",
+    )
 
 
 # ---- Tier commands ----------------------------------------------------------
@@ -796,6 +1167,16 @@ def cmd_tier_promote(
             help="Epic intent paragraph (must declare PM association)",
         ),
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Promote the plan tier transitively (L1 -> ... -> L4).
 
@@ -812,11 +1193,11 @@ def cmd_tier_promote(
     from vaultspec_core.plan.commands.tier_ops import promote_tier
     from vaultspec_core.plan.frontmatter import Tier
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
     console = get_console()
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     current_tier_value = plan.frontmatter.tier.value
     target_tier = Tier(target) if target is not None else None
 
@@ -884,8 +1265,14 @@ def cmd_tier_promote(
         wave_intent=wave_intent,
         epic_intent=epic_intent,
     )
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Tier promoted to {new_tier.value}.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Tier promoted to {new_tier.value}.",
+    )
 
 
 @tier_app.command("demote")
@@ -906,15 +1293,31 @@ def cmd_tier_demote(
             help="Override the multi-child collapse refusal; descendant ids retire",
         ),
     ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing to disk"),
+    ] = False,
+    canonicalise: Annotated[
+        bool,
+        typer.Option(
+            "--canonicalise", help="Strip unknown prose blocks during serialization"
+        ),
+    ] = False,
 ) -> None:
     """Demote the plan tier; refuses multi-child collapse without ``--force``."""
     from vaultspec_core.plan.commands.tier_ops import demote_tier
     from vaultspec_core.plan.frontmatter import Tier
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.plan.serialiser import serialise_plan
 
-    plan = parse_plan(path)
+    original_text = path.read_text(encoding="utf-8")
+    plan = parse_plan(original_text)
     target_tier = Tier(target) if target is not None else None
     new_tier = demote_tier(plan, target=target_tier, force=force)
-    path.write_text(serialise_plan(plan), encoding="utf-8")
-    typer.echo(f"Tier demoted to {new_tier.value}.")
+    _save_plan_or_dry_run(
+        path=path,
+        plan=plan,
+        original_text=original_text,
+        dry_run=dry_run,
+        canonicalise=canonicalise,
+        success_msg=f"Tier demoted to {new_tier.value}.",
+    )

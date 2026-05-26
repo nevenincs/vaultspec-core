@@ -233,6 +233,10 @@ def cmd_install(
         ),
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    no_hints: Annotated[
+        bool,
+        typer.Option("--no-hints", help="Suppress next-step advisory hints"),
+    ] = False,
 ) -> None:
     """Deploy the vaultspec framework to the target directory.
 
@@ -317,6 +321,7 @@ def cmd_install(
         from vaultspec_core.cli.rendering import (
             Outcome,
             OutcomeItem,
+            emit_next_step_hint,
             emit_outcomes,
             render_sharing_policy,
         )
@@ -337,18 +342,38 @@ def cmd_install(
         version = get_version()
         verb = "Upgrade preview" if result.get("dry_run") else "Upgrade"
         title = f"{verb} {version} → {path}"
+
+        hint_dict = emit_next_step_hint(
+            command="install",
+            outcome="updated",
+            json_output=json_output,
+            no_hints=no_hints,
+        )
+
         code = emit_outcomes(
             outcomes,
             command="install",
             title=title,
             json_output=json_output,
             extra_json={"version": version},
+            hints=hint_dict,
         )
         # Surface the new sharing policy when this upgrade carried the
         # workspace off the pre-reversal team-hidden gitignore policy.
         if not json_output and gitignore_was_pre_reversal:
             render_sharing_policy()
         raise typer.Exit(code)
+
+    hint_dict = None
+    if json_output and result["action"] != "dry_run":
+        from vaultspec_core.cli.rendering import emit_next_step_hint
+
+        hint_dict = emit_next_step_hint(
+            command="install",
+            outcome="created",
+            json_output=True,
+            no_hints=no_hints,
+        )
 
     if json_output:
         import json
@@ -357,7 +382,7 @@ def cmd_install(
 
         result["path"] = str(result["path"])
         status = "unchanged" if result["action"] == "dry_run" else "created"
-        envelope = json_envelope("install", status, result)
+        envelope = json_envelope("install", status, result, hints=hint_dict)
         typer.echo(json.dumps(envelope, indent=2, default=str))
         raise typer.Exit(0)
 
@@ -382,6 +407,7 @@ def cmd_install(
         render_dry_run_tree(dry_items, title=f"Install preview → {path}")
     else:
         from vaultspec_core.cli.rendering import (
+            emit_next_step_hint,
             render_install_summary,
             render_sharing_policy,
         )
@@ -393,6 +419,12 @@ def cmd_install(
             has_mcp=result.get("has_mcp", False),
         )
         render_sharing_policy()
+        emit_next_step_hint(
+            command="install",
+            outcome="created",
+            json_output=False,
+            no_hints=no_hints,
+        )
 
 
 @app.command("uninstall")
@@ -863,8 +895,99 @@ def cmd_check_providers() -> None:
         raise typer.Exit(code=1)
 
 
+@app.command("doctor")
+def cmd_doctor(
+    target: TargetOption = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Diagnose overall workspace and vault health.
+
+    Runs both spec workspace diagnosis and vault check-all under a unified exit code.
+
+    Exit codes: 0 = all ok, 1 = warnings, 2 = errors.
+    """
+    import contextlib
+    import dataclasses
+    import json
+    import logging
+    from pathlib import Path
+
+    import typer
+
+    from vaultspec_core.cli.rendering import json_envelope
+    from vaultspec_core.cli.spec_cmd import _doctor_exit_code, _render_diagnosis_table
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core.diagnosis import diagnose
+    from vaultspec_core.vaultcore.checks import render_check_result, run_all_checks
+
+    effective_dir = target or Path.cwd()
+    effective_dir = effective_dir.resolve()
+
+    if not effective_dir.exists():
+        typer.echo(f"Error: target directory does not exist: {effective_dir}", err=True)
+        raise typer.Exit(code=2)
+
+    previous_logging_disable = logging.root.manager.disable
+    if json_output:
+        logging.disable(logging.CRITICAL)
+
+    try:
+        with contextlib.suppress(Exception):
+            apply_target(target)
+
+        try:
+            diag = diagnose(effective_dir, scope="full")
+        except Exception as exc:
+            typer.echo(f"Error: workspace diagnosis failed: {exc}", err=True)
+            raise typer.Exit(code=2) from None
+
+        try:
+            results = run_all_checks(effective_dir)
+        except Exception as exc:
+            typer.echo(f"Error: vault checking failed: {exc}", err=True)
+            raise typer.Exit(code=2) from None
+
+    finally:
+        if json_output:
+            logging.disable(previous_logging_disable)
+
+    spec_exit_code = _doctor_exit_code(diag)
+    vault_has_errors = any(r.error_count for r in results)
+    vault_has_warnings = any(r.warning_count for r in results)
+
+    if spec_exit_code == 2 or vault_has_errors:
+        exit_code = 2
+    elif spec_exit_code == 1 or vault_has_warnings:
+        exit_code = 1
+    else:
+        exit_code = 0
+
+    if json_output:
+        data = {
+            "spec": dataclasses.asdict(diag),
+            "vault": {"checks": [dataclasses.asdict(r) for r in results]},
+        }
+        envelope = json_envelope(
+            "doctor",
+            "failed" if exit_code == 2 else "unchanged",
+            data,
+        )
+        typer.echo(json.dumps(envelope, indent=2, default=str))
+        raise typer.Exit(code=exit_code)
+
+    console = get_console()
+    _render_diagnosis_table(console, diag)
+    console.print()
+    console.print("[bold]Vault Check - All[/bold]")
+    for r in results:
+        render_check_result(console, r, verbose=False)
+
+    raise typer.Exit(code=exit_code)
+
+
 def _register_subcommands() -> None:
     """Mount sub-apps with deferred imports to avoid circular dependencies."""
+    from .config_cmd import config_app
     from .migrations_cmd import migrations_app
     from .spec_cmd import spec_app
     from .vault_cmd import vault_app
@@ -872,6 +995,7 @@ def _register_subcommands() -> None:
     app.add_typer(vault_app, name="vault")
     app.add_typer(spec_app, name="spec")
     app.add_typer(migrations_app, name="migrations")
+    app.add_typer(config_app, name="config")
 
 
 _register_subcommands()

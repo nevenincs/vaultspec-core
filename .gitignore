@@ -202,5 +202,6 @@ src/vaultspec_core/builtins/*
 .vaultspec/_snapshots/
 .vaultspec/providers.json
 /.gitignore.lock
+/.mcp.json.lock
 /.pre-commit-config.yaml.lock
 # <<< vaultspec-managed <<<

@@ -18,6 +18,7 @@ from vaultspec_core.core.diagnosis.signals import (
     ManifestEntrySignal,
     PrecommitSignal,
     ProviderDirSignal,
+    RenameIntegritySignal,
     ResolutionAction,
     VaultContentSignal,
 )
@@ -81,6 +82,14 @@ pytestmark = [pytest.mark.unit]
             },
         ),
         (
+            RenameIntegritySignal,
+            {
+                "CLEAN",
+                "MISMATCH",
+                "ERROR",
+            },
+        ),
+        (
             PrecommitHook,
             {
                 "VAULT_FIX",
@@ -127,6 +136,7 @@ def test_enum_members(enum_cls, expected_members):
         (ResolutionAction, "SKIP", "skip"),
         (FrameworkSignal, "PRESENT", "present"),
         (GitignoreSignal, "NO_FILE", "no_file"),
+        (RenameIntegritySignal, "CLEAN", "clean"),
     ],
 )
 def test_enum_string_values(enum_cls, member, value):
@@ -171,6 +181,8 @@ class TestWorkspaceDiagnosis:
         assert diag.vault_content == VaultContentSignal.NO_VAULT
         assert diag.vault_annotation_count == 0
         assert diag.vault_unreadable_count == 0
+        assert diag.rename_integrity == RenameIntegritySignal.CLEAN
+        assert diag.rename_mismatch_count == 0
 
     def test_construction_with_providers(self):
         prov = ProviderDiagnosis(

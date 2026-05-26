@@ -46,7 +46,18 @@ def collect_rules(
         A mapping of filename to a three-tuple of
         ``(source_path, frontmatter_dict, body_text)``.
     """
-    return collect_md_resources(_t.get_context().rules_src_dir, warnings=warnings)
+    rules_src_dir = _t.get_context().rules_src_dir
+    migrate_flat_custom_rules(rules_src_dir)
+    raw_sources = collect_md_resources(rules_src_dir, warnings=warnings)
+    sources = {}
+    for k, v in raw_sources.items():
+        if k.startswith("project/"):
+            sources[k[len("project/") :]] = v
+        elif k.startswith("project\\"):
+            sources[k[len("project\\") :]] = v
+        else:
+            sources[k] = v
+    return sources
 
 
 def transform_rule(tool: Tool, name: str, _meta: dict[str, Any], body: str) -> str:
@@ -82,9 +93,11 @@ def rules_list() -> list[dict[str, str]]:
     items: list[dict[str, str]] = []
     rules_src_dir = _t.get_context().rules_src_dir
     if rules_src_dir.exists():
-        for f in sorted(rules_src_dir.glob("*.md")):
+        migrate_flat_custom_rules(rules_src_dir)
+        for f in sorted(rules_src_dir.glob("**/*.md")):
+            rel_name = f.relative_to(rules_src_dir).as_posix()
             source = "Built-in" if f.name.endswith(".builtin.md") else "Custom"
-            items.append({"name": f.name, "source": source})
+            items.append({"name": rel_name, "source": source})
     return items
 
 
@@ -115,10 +128,13 @@ def rules_add(
         ResourceExistsError: If the rule exists and *force* is ``False``.
     """
     rules_src_dir = _t.get_context().rules_src_dir
-    ensure_dir(rules_src_dir)
+    ensure_dir(rules_src_dir / "project")
 
     file_name = name if name.endswith(".md") else f"{name}.md"
-    file_path = rules_src_dir / file_name
+    if not (file_name.startswith("project/") or file_name.startswith("project\\")):
+        file_path = rules_src_dir / "project" / file_name
+    else:
+        file_path = rules_src_dir / file_name
 
     if file_path.exists() and not force:
         raise ResourceExistsError(
@@ -179,3 +195,200 @@ def rules_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
     )
     result.warnings.extend(parse_warnings)
     return result
+
+
+def migrate_flat_custom_rules(rules_src_dir: Path) -> None:
+    """Migrate flat custom rules to project/ subdirectory."""
+    if not rules_src_dir.exists():
+        return
+    import shutil
+
+    for f in rules_src_dir.glob("*.md"):
+        if f.is_file() and not f.name.endswith(".builtin.md"):
+            project_dir = rules_src_dir / "project"
+            project_dir.mkdir(parents=True, exist_ok=True)
+            dest_file = project_dir / f.name
+            try:
+                shutil.move(str(f), str(dest_file))
+                logger.info("Migrated flat custom rule %s to %s", f, dest_file)
+            except Exception as e:
+                logger.error("Failed to migrate flat custom rule %s: %s", f, e)
+
+
+def rule_promote(
+    from_audit: str,
+    rule_name: str,
+    force: bool = False,
+    dry_run: bool = False,
+) -> Path:
+    """Promote an audit finding to a project-level rule.
+
+    Scaffolds a new rule under `.vaultspec/rules/rules/project/` and appends
+    the rule to the originating audit's ``promoted_to`` frontmatter field.
+
+    Args:
+        from_audit: The audit document stem (e.g., '2026-05-17-cli-simplification').
+        rule_name: The kebab-case name of the new rule to scaffold.
+        force: Whether to overwrite the rule file if it already exists.
+        dry_run: If True, preview the action without writing any changes.
+
+    Returns:
+        The Path to the scaffolded rule file.
+    """
+    import re
+
+    from ..vaultcore import VaultConstants, parse_vault_metadata
+    from .exceptions import ResourceExistsError, ResourceNotFoundError, VaultSpecError
+
+    # 1. Locate the originating audit document
+    target_dir = _t.get_context().target_dir
+    audit_stem = from_audit[:-3] if from_audit.endswith(".md") else from_audit
+    docs_dir = VaultConstants._get_docs_dir()
+    audit_file = target_dir / docs_dir / "audit" / f"{audit_stem}.md"
+    if not audit_file.exists():
+        raise ResourceNotFoundError(
+            f"Audit document '{docs_dir}/audit/{audit_stem}.md' not found."
+        )
+
+    # 2. Validate that rule_name is kebab-case
+    rule_name_stem = rule_name[:-3] if rule_name.endswith(".md") else rule_name
+    if not re.match(r"^[a-z0-9-]+$", rule_name_stem):
+        raise VaultSpecError(
+            f"Rule name '{rule_name_stem}' must be in kebab-case "
+            "(lowercase letters, numbers, and hyphens)."
+        )
+
+    # 3. Define target rule file path
+    rules_src_dir = _t.get_context().rules_src_dir
+    rule_file = rules_src_dir / "project" / f"{rule_name_stem}.md"
+
+    if rule_file.exists() and not force:
+        raise ResourceExistsError(
+            f"Rule '{rule_name_stem}' already exists.",
+            hint="Use --force to overwrite, or --dry-run to preview.",
+        )
+
+    # 4. Form the rule scaffold content
+    scaffold_content = f"""---
+derived_from:
+  - "audit:{audit_stem}"
+---
+
+# Rule
+
+<!-- Describe the positive or negative obligation in one sentence. -->
+
+## Why
+
+<!-- Explain the constraint's origin in 2-3 sentences. -->
+
+## How
+
+<!-- Provide concrete examples of the rule applied and the rule violated. -->
+"""
+
+    # 5. Read audit content, update its frontmatter: promoted_to: ['rule:<rule-name>']
+    raw_bytes = audit_file.read_bytes()
+    raw_content = raw_bytes.decode("utf-8")
+    source_newline = "\r\n" if "\r\n" in raw_content else "\n"
+    normalized_content = raw_content.replace("\r\n", "\n")
+
+    # Let's parse metadata
+    meta, _body = parse_vault_metadata(normalized_content)
+
+    # Append to promoted_to
+    new_rule_ref = f"rule:{rule_name_stem}"
+    if new_rule_ref not in meta.promoted_to:
+        meta.promoted_to.append(new_rule_ref)
+
+    # Rebuild the audit's frontmatter to update promoted_to, preserving rest
+    match = re.match(
+        r"^---\s*\n(.*?)\n---\s*\n?(.*)$", normalized_content.lstrip(), re.DOTALL
+    )
+    if not match:
+        raise VaultSpecError(
+            f"Could not parse frontmatter of audit file '{audit_file}'."
+        )
+
+    yaml_block = match.group(1)
+    audit_body = match.group(2)
+    leading_whitespace = normalized_content[
+        : len(normalized_content) - len(normalized_content.lstrip())
+    ]
+
+    # Rebuild frontmatter keys
+    lines = ["---"]
+    if meta.tags:
+        lines.append("tags:")
+        for tag in meta.tags:
+            lines.append(f'  - "{tag}"')
+    if meta.date:
+        lines.append(f"date: '{meta.date}'")
+    if meta.related:
+        lines.append("related:")
+        for link in meta.related:
+            lines.append(f'  - "{link}"')
+    if meta.supersedes:
+        lines.append("supersedes:")
+        for stem in meta.supersedes:
+            lines.append(f"  - '{stem}'")
+    if meta.superseded_by:
+        lines.append(f"superseded_by: '{meta.superseded_by}'")
+    if meta.derived_from:
+        lines.append("derived_from:")
+        for stem in meta.derived_from:
+            lines.append(f"  - '{stem}'")
+    if meta.promoted_to:
+        lines.append("promoted_to:")
+        for rule in meta.promoted_to:
+            lines.append(f"  - '{rule}'")
+    if meta.archived:
+        lines.append(f"archived: '{meta.archived}'")
+
+    # Preserve any unknown keys
+    known_keys = {
+        "tags",
+        "date",
+        "related",
+        "feature",
+        "supersedes",
+        "superseded_by",
+        "derived_from",
+        "promoted_to",
+        "archived",
+    }
+    in_unknown_key = False
+    for line in yaml_block.split("\n"):
+        stripped = line.strip()
+        if ":" in stripped and not stripped.startswith("-"):
+            key = stripped.split(":", 1)[0].strip()
+            in_unknown_key = key not in known_keys
+            if in_unknown_key:
+                lines.append(line)
+        elif stripped.startswith("-"):
+            if in_unknown_key:
+                lines.append(line)
+        else:
+            if in_unknown_key and stripped:
+                lines.append(line)
+            in_unknown_key = False
+
+    lines.append("---")
+    if audit_body:
+        lines.append(audit_body)
+
+    rendered_audit = leading_whitespace + "\n".join(lines)
+    final_audit_content = (
+        rendered_audit
+        if source_newline == "\n"
+        else rendered_audit.replace("\n", source_newline)
+    )
+
+    if not dry_run:
+        # Write rule file
+        ensure_dir(rule_file.parent)
+        atomic_write(rule_file, scaffold_content)
+        # Write updated audit file
+        atomic_write(audit_file, final_audit_content)
+
+    return rule_file

@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import json
 import random
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from vaultspec_core.plan.frontmatter import Tier
 from vaultspec_core.plan.parser import parse_plan
@@ -103,3 +107,50 @@ def test_status_to_json_dict_round_trips_through_json_module() -> None:
     assert restored == payload
     assert restored["tier"] == "L4"
     assert restored["has_epic_intent"] is True
+
+
+def test_status_collect_missing_exec_records(tmp_path: Path) -> None:
+    """``collect_status`` finds checked plan steps lacking execution records."""
+    body = (
+        "---\n"
+        "tags:\n"
+        "  - '#plan'\n"
+        "  - '#test-feature'\n"
+        "date: '2026-05-17'\n"
+        "tier: L2\n"
+        "---\n"
+        "\n"
+        "# `test-feature` plan\n"
+        "\n"
+        "## Phase `P01` - Test Phase\n"
+        "- [x] `P01.S01` - Checked step with missing exec; `src/foo.py`.\n"
+        "- [x] `P01.S02` - Checked step with existing exec; `src/bar.py`.\n"
+        "- [ ] `P01.S03` - Unchecked step; `src/baz.py`.\n"
+    )
+    plan = parse_plan(body)
+
+    # Prepare some directories
+    exec_dir = tmp_path / ".vault" / "exec" / "2026-05-17-test-feature"
+    exec_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write a valid exec doc with step_id: S02
+    exec_file = exec_dir / "2026-05-17-test-feature-P01-S02.md"
+    exec_file.write_text(
+        "---\n"
+        "tags:\n"
+        "  - '#exec'\n"
+        "  - '#test-feature'\n"
+        "step_id: S02\n"
+        "---\n"
+        "\n"
+        "Some execution details.",
+        encoding="utf-8",
+    )
+
+    status = collect_status(plan, root_dir=tmp_path)
+
+    assert status.exec_missing_ids == ["S01"]
+
+    # Also assert JSON serialization of exec_missing_ids
+    payload = status_to_json_dict(status)
+    assert payload["exec_missing_ids"] == ["S01"]

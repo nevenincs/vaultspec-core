@@ -121,7 +121,38 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
         for link in metadata.related:
             lines.append(f'  - "{link}"')
 
-    known_keys = {"tags", "date", "related", "feature"}
+    if metadata.supersedes:
+        lines.append("supersedes:")
+        for stem in metadata.supersedes:
+            lines.append(f"  - '{stem}'")
+
+    if metadata.superseded_by:
+        lines.append(f"superseded_by: '{metadata.superseded_by}'")
+
+    if metadata.derived_from:
+        lines.append("derived_from:")
+        for stem in metadata.derived_from:
+            lines.append(f"  - '{stem}'")
+
+    if metadata.promoted_to:
+        lines.append("promoted_to:")
+        for rule in metadata.promoted_to:
+            lines.append(f"  - '{rule}'")
+
+    if metadata.archived:
+        lines.append(f"archived: '{metadata.archived}'")
+
+    known_keys = {
+        "tags",
+        "date",
+        "related",
+        "feature",
+        "supersedes",
+        "superseded_by",
+        "derived_from",
+        "promoted_to",
+        "archived",
+    }
     in_unknown_key = False
     for line in yaml_block.split("\n"):
         stripped = line.strip()

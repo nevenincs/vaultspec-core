@@ -154,6 +154,10 @@ def parse_vault_metadata(content: str) -> tuple[DocumentMetadata, str]:
 
             if key == "date":
                 metadata.date = val.strip("\"'")
+            elif key == "superseded_by":
+                metadata.superseded_by = val.strip("\"'") or None
+            elif key == "archived":
+                metadata.archived = val.strip("\"'") or None
             elif val.startswith("[") and val.endswith("]"):
                 # Simple inline list parsing: ["#a", "#b"]
                 items = [
@@ -163,6 +167,12 @@ def parse_vault_metadata(content: str) -> tuple[DocumentMetadata, str]:
                     metadata.tags = items
                 elif key == "related":
                     metadata.related = items
+                elif key == "supersedes":
+                    metadata.supersedes = items
+                elif key == "derived_from":
+                    metadata.derived_from = items
+                elif key == "promoted_to":
+                    metadata.promoted_to = items
         elif line.startswith("-") and current_key:
             # Bulleted list item
             val = line[1:].strip().strip("\"'")
@@ -170,5 +180,11 @@ def parse_vault_metadata(content: str) -> tuple[DocumentMetadata, str]:
                 metadata.tags.append(val)
             elif current_key == "related":
                 metadata.related.append(val)
+            elif current_key == "supersedes":
+                metadata.supersedes.append(val)
+            elif current_key == "derived_from":
+                metadata.derived_from.append(val)
+            elif current_key == "promoted_to":
+                metadata.promoted_to.append(val)
 
     return metadata, body

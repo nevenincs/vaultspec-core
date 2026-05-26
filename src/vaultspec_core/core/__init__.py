@@ -17,6 +17,15 @@ from .agents import collect_agents as collect_agents
 from .agents import transform_agent as transform_agent
 from .config_gen import config_show as config_show
 from .config_gen import config_sync as config_sync
+from .exceptions import (
+    EditorCancellationError as EditorCancellationError,
+)
+from .exceptions import (
+    EditorResolutionError as EditorResolutionError,
+)
+from .exceptions import (
+    EditorSubprocessError as EditorSubprocessError,
+)
 from .exceptions import ProviderError as ProviderError
 from .exceptions import ProviderNotInstalledError as ProviderNotInstalledError
 from .exceptions import ResourceExistsError as ResourceExistsError
@@ -26,6 +35,37 @@ from .exceptions import WorkspaceNotInitializedError as WorkspaceNotInitializedE
 from .helpers import atomic_write as atomic_write
 from .helpers import build_file as build_file
 from .helpers import ensure_dir as ensure_dir
+from .hooks import hooks_add as hooks_add
+from .hooks import hooks_edit as hooks_edit
+from .hooks import hooks_remove as hooks_remove
+from .hooks import hooks_rename as hooks_rename
+from .hooks import hooks_show as hooks_show
+from .hooks import hooks_status as hooks_status
+from .hooks import hooks_sync as hooks_sync
+from .local_config import (
+    KNOWN_KEYS as KNOWN_KEYS,
+)
+from .local_config import (
+    get_config_value as get_config_value,
+)
+from .local_config import (
+    get_local_config_path as get_local_config_path,
+)
+from .local_config import (
+    read_local_config as read_local_config,
+)
+from .local_config import (
+    resolve_editor as resolve_editor,
+)
+from .local_config import (
+    set_config_value as set_config_value,
+)
+from .local_config import (
+    unset_config_value as unset_config_value,
+)
+from .local_config import (
+    write_local_config as write_local_config,
+)
 from .mcps import collect_mcp_servers as collect_mcp_servers
 from .mcps import mcp_add as mcp_add
 from .mcps import mcp_list as mcp_list

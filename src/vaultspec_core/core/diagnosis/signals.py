@@ -104,6 +104,14 @@ class VaultContentSignal(StrEnum):
     UNREADABLE = "unreadable"
 
 
+class RenameIntegritySignal(StrEnum):
+    """Observed state of resource name/filename integrity."""
+
+    CLEAN = "clean"
+    MISMATCH = "mismatch"
+    ERROR = "error"
+
+
 class ResolutionAction(StrEnum):
     """Corrective action that a resolver can apply."""
 
