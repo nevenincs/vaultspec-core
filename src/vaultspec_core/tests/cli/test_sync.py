@@ -451,3 +451,51 @@ class TestSyncAuthority:
         after_status = json.loads(after.output)["data"]
         assert after.exit_code == 0, after.output
         assert after_status["status"] == "ok"
+
+    def test_force_adopts_name_colliding_user_mcp_entry(
+        self, runner, synthetic_project
+    ):
+        """--force adopts a name-colliding user .mcp.json entry (issue #120).
+
+        When .mcp.json carries an entry whose name matches a source but which is
+        absent from _vaultspecManaged, a plain sync preserves it and points at
+        --force; --force then overwrites it with the source definition and
+        records it as managed, with no hand-editing of the generated file.
+        """
+        mcp_path = synthetic_project / ".mcp.json"
+        source_path = (
+            synthetic_project
+            / ".vaultspec"
+            / "rules"
+            / "mcps"
+            / "vaultspec-core.builtin.json"
+        )
+        expected_config = json.loads(source_path.read_text(encoding="utf-8"))
+
+        # _vaultspecManaged present but empty: vaultspec-core collides with the
+        # source yet is unmanaged, the exact state the issue reports.
+        payload = {
+            "mcpServers": {
+                "vaultspec-core": {"command": "node", "args": ["user-authored.js"]}
+            },
+            "_vaultspecManaged": [],
+        }
+        mcp_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+        plain = runner.invoke(
+            app,
+            ["--target", str(synthetic_project), "spec", "mcps", "sync", "--json"],
+        )
+        assert "--force" in plain.output
+        preserved = json.loads(mcp_path.read_text(encoding="utf-8"))
+        assert preserved["mcpServers"]["vaultspec-core"]["args"] == ["user-authored.js"]
+        assert "vaultspec-core" not in preserved.get("_vaultspecManaged", [])
+
+        forced = runner.invoke(
+            app,
+            ["--target", str(synthetic_project), "spec", "mcps", "sync", "--force"],
+        )
+        assert forced.exit_code == 0, forced.output
+        adopted = json.loads(mcp_path.read_text(encoding="utf-8"))
+        assert adopted["mcpServers"]["vaultspec-core"] == expected_config
+        assert "vaultspec-core" in adopted["_vaultspecManaged"]

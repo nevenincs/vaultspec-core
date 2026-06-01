@@ -465,15 +465,28 @@ def mcp_sync(
                         f"MCP server '{name}' differs from definition "
                         f"(use --force to overwrite)"
                     )
+            elif force:
+                # User-added entry that shares a name with a current source.
+                # --force is the explicit adopt path (issue #120): overwrite it
+                # with the source definition and take ownership, so the entry
+                # converges without the user hand-editing the generated
+                # .mcp.json the CLI tells them not to touch.
+                if servers[name] != config:
+                    servers[name] = config
+                    changed = True
+                managed.add(name)
+                result.updated += 1
+                result.items.append((name, "[ADOPT]"))
+                changed = True
             else:
                 # User-added entry that shares a name with a current
                 # source. Preserve it; never take ownership implicitly.
                 result.skipped += 1
                 result.items.append((name, "[SKIP]"))
                 result.warnings.append(
-                    f"MCP server '{name}' is user-managed and shares "
-                    f"its name with a vaultspec source; skipping. "
-                    f"Rename one to resolve."
+                    f"MCP server '{name}' is user-managed and shares its name "
+                    f"with a vaultspec source; skipping. Re-run with --force to "
+                    f"adopt it into vaultspec management, or rename one to resolve."
                 )
 
         if prune:

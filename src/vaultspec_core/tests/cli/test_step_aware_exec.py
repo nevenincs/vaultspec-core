@@ -185,6 +185,47 @@ def test_step_aware_individual_scaffolding(runner, synthetic_project):
     assert "## Notes" in content
 
 
+def test_scaffolded_step_record_passes_structure_check(runner, synthetic_project):
+    """A scaffolded Step Record must satisfy `vault check structure` (issue #123).
+
+    The scaffolder emits the canonical `<date>-<feature>-P01-S01.md` Step Record
+    name; the structure validator previously rejected it for lacking an `-exec`
+    type token, leaving the documented `vault add exec --step` flow permanently
+    red. Scaffold a record, then assert the structure check finds no filename
+    violation for it.
+    """
+    from vaultspec_core.vaultcore.models import DocType, VaultConstants
+
+    setup_test_plan(synthetic_project)
+    add_result = runner.invoke(
+        app,
+        [
+            "--target",
+            str(synthetic_project),
+            "vault",
+            "add",
+            "exec",
+            "--feature",
+            "test-feature",
+            "--step",
+            "P01.S01",
+        ],
+    )
+    assert add_result.exit_code == 0, add_result.output
+
+    scaffolded = (
+        synthetic_project
+        / ".vault"
+        / "exec"
+        / "2026-05-17-test-feature"
+        / "2026-05-17-test-feature-P01-S01.md"
+    )
+    assert scaffolded.exists(), add_result.output
+    # The validator that powers `vault check structure` must accept the exact
+    # name the scaffolder produced.
+    assert VaultConstants.validate_filename(scaffolded.name, DocType.EXEC) == []
+
+
 def test_step_aware_bulk_scaffolding(runner, synthetic_project):
     """Bulk scaffolding creates all records idempotently and obeys --force."""
     setup_test_plan(synthetic_project)
