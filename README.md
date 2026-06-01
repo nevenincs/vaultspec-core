@@ -116,10 +116,12 @@ findings in `.vault/research/`, then progress through architectural decisions, p
 execution, and review. Each stage writes records to `.vault/` and references the output
 of earlier stages.
 
-You can also invoke skills explicitly to start a specific stage. The bundled skills
+You can also invoke skills explicitly to start a specific stage. The pipeline skills
 (`vaultspec-research`, `vaultspec-adr`, `vaultspec-write`, `vaultspec-execute`,
 `vaultspec-code-review`) read the relevant vault records and structure the AI's output
-accordingly.
+accordingly. Supporting skills round out the workflow: `vaultspec-code-research` grounds
+work in real reference implementations, `vaultspec-documentation` drafts user-facing
+docs, and `vaultspec-curate` keeps the vault's links and tags healthy.
 
 The [framework manual](./docs/framework.md) walks through each stage in detail with
 examples.
@@ -168,6 +170,31 @@ Valid document types are `adr`, `audit`, `exec`, `plan`, `reference`, and `resea
 Generated feature indexes live in `.vault/index/` and are managed by
 `vaultspec-core vault feature index`. See the
 [CLI reference](./docs/CLI.md#vault-commands) for the full command surface.
+
+______________________________________________________________________
+
+## Planning and execution
+
+Implementation plans carry structure beyond a flat checklist. A plan declares a
+complexity tier (`L1` through `L4`) and organises work into an
+`Epic > Wave > Phase > Step` hierarchy, so a large feature stays navigable as it grows.
+The `vaultspec-core vault plan` command group is the canonical surface for that
+structure:
+
+```bash
+# Inspect a plan's tier, counts, and completion
+vaultspec-core vault plan status .vault/plan/2026-06-01-search-api-plan.md
+
+# Validate convention compliance, then apply autofixes
+vaultspec-core vault plan check .vault/plan/2026-06-01-search-api-plan.md --fix
+```
+
+Steps, phases, and waves are added, moved, and checked off through the
+`vaultspec-core vault plan step`, `vaultspec-core vault plan phase`, and
+`vaultspec-core vault plan wave` subcommands, which preserve canonical identifiers so
+existing references never shift when work is inserted or removed. Completed features are
+archived with `vaultspec-core vault feature archive` and restored with
+`vaultspec-core vault feature unarchive`.
 
 ______________________________________________________________________
 
