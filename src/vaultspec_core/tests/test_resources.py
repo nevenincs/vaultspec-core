@@ -19,23 +19,34 @@ pytestmark = [pytest.mark.unit]
 
 def test_resource_edit_raises_clean_error_on_editor_launch_failure(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A failed editor launch must surface a VaultSpecError with a hint.
 
     Previously the launch error was swallowed (logged with a full
     traceback) and the command returned normally, exiting 0 as if the
-    edit had succeeded. Exercises the real path: a genuinely missing
-    editor command resolved from VAULTSPEC_EDITOR.
+    edit had succeeded. Exercises the real path with no test doubles: an
+    empty PATH plus a genuinely missing VAULTSPEC_EDITOR command means
+    shutil.which resolves nothing - not the configured command and not the
+    "vi" fallback - so editor resolution fails for real.
     """
     rule = tmp_path / "demo.md"
     rule.write_text("body", encoding="utf-8")
 
-    # Force shutil.which to return None so that no fallback (like vi) can be resolved
-    monkeypatch.setattr("shutil.which", lambda cmd, mode=os.F_OK, path=None: None)
+    empty_path_dir = tmp_path / "empty-path"
+    empty_path_dir.mkdir()
 
-    old_editor = os.environ.get("VAULTSPEC_EDITOR")
-    os.environ["VAULTSPEC_EDITOR"] = "vaultspec-no-such-editor-xyz"
+    overrides = {
+        "VAULTSPEC_EDITOR": "vaultspec-no-such-editor-xyz",
+        "PATH": str(empty_path_dir),
+        "VISUAL": None,
+        "EDITOR": None,
+    }
+    saved = {name: os.environ.get(name) for name in overrides}
+    for name, value in overrides.items():
+        if value is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = value
     reset_config()
     try:
         with pytest.raises(
@@ -43,8 +54,9 @@ def test_resource_edit_raises_clean_error_on_editor_launch_failure(
         ):
             resources.resource_edit("demo", base_dir=tmp_path, label="Rule")
     finally:
-        if old_editor is None:
-            os.environ.pop("VAULTSPEC_EDITOR", None)
-        else:
-            os.environ["VAULTSPEC_EDITOR"] = old_editor
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
         reset_config()
