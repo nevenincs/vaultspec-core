@@ -38,6 +38,8 @@ Every leaf-command signature, matching the live Typer usage lines.
 vaultspec-core install [OPTIONS] [PROVIDER]
 vaultspec-core uninstall [OPTIONS] [PROVIDER]
 vaultspec-core sync [OPTIONS] [PROVIDER]
+vaultspec-core config set [OPTIONS] KEY VALUE
+vaultspec-core config unset [OPTIONS] KEY
 vaultspec-core vault add [OPTIONS] DOC_TYPE
 vaultspec-core vault stats [OPTIONS]
 vaultspec-core vault list [OPTIONS] [DOC_TYPE]
@@ -45,6 +47,8 @@ vaultspec-core vault repair [OPTIONS]
 vaultspec-core vault feature list [OPTIONS]
 vaultspec-core vault feature index [OPTIONS]
 vaultspec-core vault feature archive [OPTIONS] FEATURE_TAG
+vaultspec-core vault feature unarchive [OPTIONS] FEATURE_TAG
+vaultspec-core vault adr supersede [OPTIONS] OLD_ADR
 vaultspec-core vault check all [OPTIONS]
 vaultspec-core vault check body-links [OPTIONS]
 vaultspec-core vault check annotations [OPTIONS]
@@ -56,6 +60,7 @@ vaultspec-core vault check features [OPTIONS]
 vaultspec-core vault check references [OPTIONS]
 vaultspec-core vault check schema [OPTIONS]
 vaultspec-core vault check structure [OPTIONS]
+vaultspec-core vault check rename-integrity [OPTIONS]
 vaultspec-core vault sanitize annotations [OPTIONS]
 vaultspec-core vault plan status [OPTIONS] PATH
 vaultspec-core vault plan check [OPTIONS] PATH
@@ -86,38 +91,40 @@ vaultspec-core vault plan tier promote [OPTIONS] PATH
 vaultspec-core vault plan tier demote [OPTIONS] PATH
 vaultspec-core spec doctor [OPTIONS]
 vaultspec-core spec rules list [OPTIONS]
-vaultspec-core spec rules add [OPTIONS]
+vaultspec-core spec rules add [OPTIONS] NAME
 vaultspec-core spec rules show [OPTIONS] NAME
 vaultspec-core spec rules edit [OPTIONS] NAME
 vaultspec-core spec rules remove [OPTIONS] NAME
 vaultspec-core spec rules rename [OPTIONS] OLD_NAME NEW_NAME
-vaultspec-core spec rules sync [OPTIONS]
-vaultspec-core spec rules revert [OPTIONS] FILENAME
+vaultspec-core spec rules sync [OPTIONS] [PROVIDER]
+vaultspec-core spec rules restore [OPTIONS] FILENAME
 vaultspec-core spec skills list [OPTIONS]
-vaultspec-core spec skills add [OPTIONS]
+vaultspec-core spec skills add [OPTIONS] NAME
 vaultspec-core spec skills show [OPTIONS] NAME
 vaultspec-core spec skills edit [OPTIONS] NAME
 vaultspec-core spec skills remove [OPTIONS] NAME
 vaultspec-core spec skills rename [OPTIONS] OLD_NAME NEW_NAME
-vaultspec-core spec skills sync [OPTIONS]
-vaultspec-core spec skills revert [OPTIONS] FILENAME
+vaultspec-core spec skills sync [OPTIONS] [PROVIDER]
+vaultspec-core spec skills restore [OPTIONS] FILENAME
 vaultspec-core spec agents list [OPTIONS]
-vaultspec-core spec agents add [OPTIONS]
+vaultspec-core spec agents add [OPTIONS] NAME
 vaultspec-core spec agents show [OPTIONS] NAME
 vaultspec-core spec agents edit [OPTIONS] NAME
 vaultspec-core spec agents remove [OPTIONS] NAME
 vaultspec-core spec agents rename [OPTIONS] OLD_NAME NEW_NAME
-vaultspec-core spec agents sync [OPTIONS]
-vaultspec-core spec agents revert [OPTIONS] FILENAME
+vaultspec-core spec agents sync [OPTIONS] [PROVIDER]
+vaultspec-core spec agents restore [OPTIONS] FILENAME
 vaultspec-core spec system show [OPTIONS]
-vaultspec-core spec system sync [OPTIONS]
+vaultspec-core spec system sync [OPTIONS] [PROVIDER]
 vaultspec-core spec hooks list [OPTIONS]
+vaultspec-core spec hooks add [OPTIONS] NAME
+vaultspec-core spec hooks restore [OPTIONS] FILENAME
 vaultspec-core spec hooks run [OPTIONS] EVENT
 vaultspec-core spec mcps list [OPTIONS]
 vaultspec-core spec mcps status [OPTIONS]
 vaultspec-core spec mcps add [OPTIONS]
 vaultspec-core spec mcps remove [OPTIONS] NAME
-vaultspec-core spec mcps sync [OPTIONS]
+vaultspec-core spec mcps sync [OPTIONS] [PROVIDER]
 vaultspec-core migrations status [OPTIONS]
 vaultspec-core migrations run [OPTIONS]
 ```
@@ -211,8 +218,8 @@ Show vault statistics and document counts.
 
 ### vaultspec-core vault graph
 
-Signature: `vaultspec-core vault graph [OPTIONS] COMMAND [ARGS]...`. Hierarchical
-dependency tree grouped by feature and type.
+Signature: `vaultspec-core vault graph [OPTIONS]`. Hierarchical dependency tree grouped
+by feature and type.
 
 | Option          | Short | Default | Description                           |
 | --------------- | ----- | ------- | ------------------------------------- |
@@ -335,20 +342,21 @@ content, and configuration files.
 The `vaultspec-core spec rules`, `vaultspec-core spec skills`, and
 `vaultspec-core spec agents` groups share an identical CRUD subcommand shape:
 
-| Subcommand | Signature                           | Description                       |
-| ---------- | ----------------------------------- | --------------------------------- |
-| `list`     | -                                   | List all resources.               |
-| `add`      | `--name NAME [--force] [--dry-run]` | Create a resource.                |
-| `show`     | `NAME`                              | Print resource content to stdout. |
-| `edit`     | `NAME`                              | Open in `VAULTSPEC_EDITOR`.       |
-| `remove`   | `NAME [--yes` / `-y` / `--force]`   | Delete a resource (prompts).      |
-| `rename`   | `OLD_NAME NEW_NAME`                 | Rename a resource.                |
-| `sync`     | `[--dry-run] [--force]`             | Resource-scoped sync.             |
-| `revert`   | `FILENAME`                          | Revert to snapshotted original.   |
+| Subcommand | Signature                          | Description                       |
+| ---------- | ---------------------------------- | --------------------------------- |
+| `list`     | -                                  | List all resources.               |
+| `add`      | `NAME [--force] [--dry-run]`       | Create a resource.                |
+| `show`     | `NAME`                             | Print resource content to stdout. |
+| `edit`     | `NAME`                             | Open in `VAULTSPEC_EDITOR`.       |
+| `remove`   | `NAME [--yes` / `-y` / `--force]`  | Delete a resource (prompts).      |
+| `rename`   | `OLD_NAME NEW_NAME`                | Rename a resource.                |
+| `sync`     | `[PROVIDER] [--dry-run] [--force]` | Resource-scoped sync.             |
+| `restore`  | `FILENAME`                         | Restore to snapshotted original.  |
 
 Body-content flags on `add` vary by resource: `vaultspec-core spec rules add` takes
-`--content TEXT`; `vaultspec-core spec skills add` takes `--description TEXT` and
-`--template TEXT`; `vaultspec-core spec agents add` takes `--description TEXT`.
+`--body TEXT`; `vaultspec-core spec skills add` takes `--description TEXT` and
+`--template TEXT`; `vaultspec-core spec agents add` takes `--description TEXT`. All
+three also accept `--from-file PATH`.
 
 ### vaultspec-core spec system
 

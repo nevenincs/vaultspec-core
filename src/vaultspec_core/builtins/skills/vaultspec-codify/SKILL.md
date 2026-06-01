@@ -55,9 +55,8 @@ Do NOT use this skill:
   data), `destructive-verbs-need-dry-run` (subject: destructive verbs). Slug
   counter-examples: `audit-finding-23`, `joan-said-so`.
 
-- **Scaffold the rule via the CLI**: `vaultspec-core spec rules add --name <rule-name>`.
-  Do NOT write the file directly; the CLI ensures path discipline and metadata
-  correctness.
+- **Scaffold the rule via the CLI**: `vaultspec-core spec rules add <rule-name>`. Do NOT
+  write the file directly; the CLI ensures path discipline and metadata correctness.
 
 - **Author the rule body** using the three-section shape: **Rule**, **Why**, **How**.
   See the body template below.

@@ -60,7 +60,7 @@ You **DO NOT** engage when:
   prompted it.
 
 - **SCAFFOLD** the rule via the canonical CLI path:
-  `vaultspec-core spec rules add --name <rule-name>`.
+  `vaultspec-core spec rules add <rule-name>`.
 
 - **AUTHOR** the rule body using the three-section shape: **Rule** (one imperative
   sentence), **Why** (two or three sentences naming the audit or ADR origin and the
@@ -124,7 +124,7 @@ that surfaces the new constraint, not just in the rule bodies.
 ## Persistence
 
 - **WRITE** the rule via the CLI scaffold path
-  (`vaultspec-core spec rules add --name <rule-name>`). Today this places the file at
+  (`vaultspec-core spec rules add <rule-name>`). Today this places the file at
   `.vaultspec/rules/rules/<rule-name>.md` alongside the framework's builtin rules;
   project-authored rules are distinguished from builtins by name convention (builtins
   use the `*.builtin.md` suffix; authored rules do not). Do NOT write directly to the
