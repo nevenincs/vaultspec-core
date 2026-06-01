@@ -106,8 +106,18 @@ def migrate(workspace: Path) -> MigrationResult:
         ensure_gitignore_block,
         get_recommended_entries,
     )
+    from ..core.rules import converge_spec_layer_gitignore
 
-    counts = {"rewritten": 0, "skipped": 0}
+    counts = {"rewritten": 0, "skipped": 0, "nested_gitignore": 0}
+
+    # The reversal's intent - stop hiding a project's authoritative policy from
+    # teammates - also covers the nested .vaultspec/rules/rules/.gitignore, which
+    # pre-0.1.20 un-tracked project-authored rule sources. Converge it here so an
+    # upgrade repairs the drift, not only install --force (issue #124).
+    rules_src_dir = workspace / ".vaultspec" / "rules" / "rules"
+    if rules_src_dir.exists() and converge_spec_layer_gitignore(rules_src_dir):
+        counts["nested_gitignore"] = 1
+
     gi_path = workspace / ".gitignore"
     if not gi_path.exists():
         return MigrationResult(

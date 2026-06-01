@@ -185,6 +185,13 @@ def rules_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
         all active tool destinations.
     """
     parse_warnings: list[str] = []
+    if not dry_run:
+        try:
+            rules_src_dir = _t.get_context().rules_src_dir
+        except (LookupError, AttributeError):
+            rules_src_dir = None
+        if rules_src_dir is not None:
+            converge_spec_layer_gitignore(Path(rules_src_dir))
     result = sync_to_all_tools(
         sources=collect_rules(warnings=parse_warnings),
         dir_attr="rules_dir",
@@ -195,6 +202,68 @@ def rules_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
     )
     result.warnings.extend(parse_warnings)
     return result
+
+
+# Active (non-comment, non-blank) lines of the pre-0.1.20 nested rules
+# .gitignore that un-tracked project-authored rule sources. Convergence only
+# rewrites a file whose active policy is a subset of these, so an operator's
+# hand-authored nested .gitignore is never clobbered (issue #124).
+_STALE_RULES_GITIGNORE_POLICY: frozenset[str] = frozenset({"*.md", "!*.builtin.md"})
+
+
+def converge_spec_layer_gitignore(rules_src_dir: Path) -> bool:
+    """Refresh the nested ``rules/.gitignore`` to the shipped team-shared policy.
+
+    Pre-0.1.20 installs left a ``*.md`` / ``!*.builtin.md`` policy in
+    ``.vaultspec/rules/rules/.gitignore`` that silently un-tracks the
+    project-authored rule sources now relocated under ``project/`` - the exact
+    failure the ``gitignore_reversal`` migration was meant to end. Only
+    ``install --force`` previously refreshed it; this convergence lets ``sync``
+    (and the migration) repair the drift idempotently.
+
+    Conservative, like the migration: a file whose active lines fall outside the
+    known stale policy is treated as operator-customised and left untouched.
+
+    Returns:
+        ``True`` if the file was rewritten, ``False`` otherwise.
+    """
+    from vaultspec_core.builtins import _builtins_root
+
+    template = _builtins_root() / "rules" / ".gitignore"
+    try:
+        want = template.read_bytes()
+    except OSError:
+        return False
+
+    dest = rules_src_dir / ".gitignore"
+    if dest.exists():
+        try:
+            current = dest.read_bytes()
+        except OSError:
+            return False
+        if current == want:
+            return False
+        active = {
+            line.strip()
+            for line in current.decode("utf-8", errors="replace").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+        if not active <= _STALE_RULES_GITIGNORE_POLICY:
+            logger.debug(
+                "Nested rules .gitignore at %s carries custom entries; "
+                "leaving untouched",
+                dest,
+            )
+            return False
+
+    try:
+        rules_src_dir.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(want)
+    except OSError as exc:
+        logger.error("Failed to converge nested rules .gitignore at %s: %s", dest, exc)
+        return False
+    logger.info("Converged nested rules .gitignore at %s to shipped policy", dest)
+    return True
 
 
 def migrate_flat_custom_rules(rules_src_dir: Path) -> None:

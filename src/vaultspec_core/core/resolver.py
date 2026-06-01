@@ -886,7 +886,25 @@ def _resolve_version_warning(
     try:
         running_parts = parse_version_tuple(running_version)
         manifest_parts = parse_version_tuple(manifest_version)
-        if manifest_parts > running_parts:
+
+        # A bundled migration legitimately stamps the manifest to its own
+        # target_version, which can exceed the running package version (e.g.
+        # 0.1.20 shipped a migration tagged 0.1.21). Gating the advisory on the
+        # package version alone then points users at a release that does not
+        # exist on PyPI, an unresolvable warning (issue #119). Raise the
+        # threshold to the highest version this package actually knows about:
+        # the greater of the running version and the highest registered
+        # migration target. Only a manifest beyond that genuinely came from a
+        # newer install and warrants the upgrade advisory.
+        from ..migrations import REGISTRY
+
+        known_ceiling = running_parts
+        for migration in REGISTRY:
+            target_parts = parse_version_tuple(migration.target_version)
+            if target_parts > known_ceiling:
+                known_ceiling = target_parts
+
+        if manifest_parts > known_ceiling:
             plan.warnings.append(
                 f"Manifest was written by vaultspec-core {manifest_version}, "
                 f"but running version is {running_version}. "
