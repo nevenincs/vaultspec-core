@@ -244,6 +244,86 @@ class TestSyncAgents:
         assert 'model = "gpt-5"' in content
         assert "v2 prompt" in content
 
+    @staticmethod
+    def _agent_headers(text: str) -> list[str]:
+        return [
+            line.strip()
+            for line in text.splitlines()
+            if line.strip().startswith("[agents.")
+        ]
+
+    def test_codex_removes_legacy_sentinel_agents_block(self, synthetic_project):
+        # Regression for #140: a pre-tag-system sentinel block must not collide
+        # with the freshly-upserted managed block (duplicate TOML keys).
+        agents_dir = synthetic_project / ".vaultspec" / "rules" / "agents"
+        agents_dir.mkdir(parents=True, exist_ok=True)
+        (agents_dir / "vaultspec-worker.md").write_text(
+            "---\ndescription: worker\n---\n\n# Worker\n\nDo work.",
+            encoding="utf-8",
+        )
+        codex_cfg = synthetic_project / ".codex" / "config.toml"
+        codex_cfg.parent.mkdir(parents=True, exist_ok=True)
+        codex_cfg.write_text(
+            "# BEGIN VAULTSPEC MANAGED CODEX AGENTS\n"
+            "[agents.vaultspec-worker]\n"
+            'description = "old"\n'
+            'prompt = """old"""\n'
+            "# END VAULTSPEC MANAGED CODEX AGENTS\n",
+            encoding="utf-8",
+        )
+
+        agents_sync()
+
+        content = codex_cfg.read_text(encoding="utf-8")
+        assert "# BEGIN VAULTSPEC MANAGED CODEX AGENTS" not in content
+        headers = self._agent_headers(content)
+        assert len(headers) == len(set(headers)), f"duplicate tables: {headers}"
+        assert headers.count('[agents."vaultspec-worker"]') == 1
+
+    def test_codex_removes_raw_duplicate_agent_tables(self, synthetic_project):
+        # Regression for #140: raw unwrapped legacy tables (no sentinel) that
+        # duplicate a managed name are stripped, even when a prompt body holds
+        # a line that looks like a TOML table header.
+        agents_dir = synthetic_project / ".vaultspec" / "rules" / "agents"
+        agents_dir.mkdir(parents=True, exist_ok=True)
+        (agents_dir / "vaultspec-worker.md").write_text(
+            "---\ndescription: worker\n---\n\n# Worker\n\nDo work.",
+            encoding="utf-8",
+        )
+        agents_sync()
+        codex_cfg = synthetic_project / ".codex" / "config.toml"
+        clean = codex_cfg.read_text(encoding="utf-8")
+        legacy = (
+            "[agents.vaultspec-worker]\n"
+            'description = "old"\n'
+            'prompt = """\n[not a table]\n"""\n\n'
+        )
+        codex_cfg.write_text(legacy + clean, encoding="utf-8")
+
+        result = agents_sync()
+
+        content = codex_cfg.read_text(encoding="utf-8")
+        headers = self._agent_headers(content)
+        assert len(headers) == len(set(headers)), f"duplicate tables: {headers}"
+        # The stale rewrite is reported as work done, not skipped unchanged.
+        assert result.per_tool[Tool.CODEX.value].updated == 1
+
+    def test_codex_agents_sync_is_idempotent(self, synthetic_project):
+        agents_dir = synthetic_project / ".vaultspec" / "rules" / "agents"
+        agents_dir.mkdir(parents=True, exist_ok=True)
+        (agents_dir / "vaultspec-worker.md").write_text(
+            "---\ndescription: worker\n---\n\n# Worker\n\nDo work.",
+            encoding="utf-8",
+        )
+        agents_sync()
+        codex_cfg = synthetic_project / ".codex" / "config.toml"
+        first = codex_cfg.read_text(encoding="utf-8")
+
+        result = agents_sync()
+
+        assert codex_cfg.read_text(encoding="utf-8") == first
+        assert result.per_tool[Tool.CODEX.value].updated == 0
+
 
 class TestSyncSkillsCodex:
     """Verify skills sync lands in .agents/skills/ for Codex destination."""

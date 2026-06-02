@@ -8,6 +8,7 @@ delegates cross-tool propagation to the shared sync engine.
 from __future__ import annotations
 
 import logging
+import re
 import sys
 from pathlib import Path
 from typing import Any, Protocol
@@ -295,6 +296,173 @@ def _build_codex_agents_body(
     return "\n\n".join(rendered_agents)
 
 
+# Legacy sentinel markers used by pre-tag-system releases to delimit the
+# Codex agents region. Workspaces installed before the ``<vaultspec>`` tag
+# system landed carry these instead of (or in addition to) the managed block.
+_LEGACY_AGENTS_BEGIN = "# BEGIN VAULTSPEC MANAGED CODEX AGENTS"
+_LEGACY_AGENTS_END = "# END VAULTSPEC MANAGED CODEX AGENTS"
+
+# A TOML table header (``[table]`` or ``[a.b]``) at the start of a line.
+_TOML_TABLE_HEADER_RE = re.compile(r"^\s*\[")
+# An ``[agents.<name>]`` table header, with either a quoted or a bare key.
+_AGENTS_TABLE_RE = re.compile(
+    r'^\s*\[agents\.(?:"(?P<quoted>[^"]+)"|(?P<bare>[^\]]+))\]\s*$'
+)
+
+
+def _agents_table_name(line: str) -> str | None:
+    """Return the agent name from an ``[agents.<name>]`` header, else ``None``."""
+    match = _AGENTS_TABLE_RE.match(line)
+    if match is None:
+        return None
+    quoted = match.group("quoted")
+    if quoted is not None:
+        return quoted
+    bare = match.group("bare")
+    return bare.strip() if bare else None
+
+
+def _advance_multiline_state(line: str, state: str | None) -> str | None:
+    """Track open TOML multiline-string delimiters across physical lines.
+
+    *state* is the currently-open triple-delimiter (``'''`` or ``\"\"\"``) or
+    ``None`` when outside a multiline string. Returns the state after
+    consuming *line*. Used so structural ``[table]`` headers embedded inside
+    an agent ``prompt`` body are not mistaken for real table headers.
+    """
+    cursor = 0
+    length = len(line)
+    while cursor < length:
+        if state is None:
+            single = line.find("'''", cursor)
+            double = line.find('"""', cursor)
+            candidates = [pos for pos in (single, double) if pos != -1]
+            if not candidates:
+                return None
+            opener = min(candidates)
+            state = line[opener : opener + 3]
+            cursor = opener + 3
+        else:
+            close = line.find(state, cursor)
+            if close == -1:
+                return state
+            cursor = close + 3
+            state = None
+    return state
+
+
+def _strip_legacy_sentinel_block(content: str) -> str:
+    """Remove a legacy ``# BEGIN/END VAULTSPEC MANAGED CODEX AGENTS`` block.
+
+    The sentinel block is entirely vaultspec-owned, so it is removed wholesale.
+    Returns *content* unchanged when no sentinel block is present.
+    """
+    if _LEGACY_AGENTS_BEGIN not in content:
+        return content
+    out: list[str] = []
+    skipping = False
+    for line in content.splitlines():
+        stripped = line.strip()
+        if not skipping and stripped == _LEGACY_AGENTS_BEGIN:
+            skipping = True
+            continue
+        if skipping:
+            if stripped == _LEGACY_AGENTS_END:
+                skipping = False
+            continue
+        out.append(line)
+    return "\n".join(out)
+
+
+def _strip_agent_tables_in_segment(lines: list[str], names: set[str]) -> list[str]:
+    """Drop ``[agents.<name>]`` tables whose name is in *names* from *lines*.
+
+    Walks *lines* honouring TOML multiline-string state so a ``[`` inside a
+    prompt body is never mistaken for a table boundary. A matched table is
+    removed from its header through the line before the next real table header
+    (or end of segment), including any intervening blank lines.
+    """
+    out: list[str] = []
+    state: str | None = None
+    index = 0
+    total = len(lines)
+    while index < total:
+        line = lines[index]
+        if state is None and _agents_table_name(line) in names:
+            index += 1
+            while index < total:
+                inner = lines[index]
+                if state is None and _TOML_TABLE_HEADER_RE.match(inner):
+                    break
+                state = _advance_multiline_state(inner, state)
+                index += 1
+            continue
+        state = _advance_multiline_state(line, state)
+        out.append(line)
+        index += 1
+    return out
+
+
+def _codex_managed_agent_names(content: str) -> set[str]:
+    """Return agent names declared inside the managed ``agents`` block."""
+    from .tags import TagError, find_blocks
+
+    try:
+        blocks = find_blocks(content)
+    except TagError:
+        return set()
+    managed = next((b for b in blocks if b.block_type == "agents"), None)
+    if managed is None:
+        return set()
+    lines = content.splitlines()
+    names: set[str] = set()
+    for line in lines[managed.content_start - 1 : managed.content_end]:
+        name = _agents_table_name(line)
+        if name is not None:
+            names.add(name)
+    return names
+
+
+def _sanitize_legacy_codex_agents(content: str, names: set[str]) -> str:
+    """Strip stale duplicate agent tables that collide with the managed block.
+
+    Removes the legacy sentinel block wholesale, then removes any
+    ``[agents.<name>]`` table for a name in *names* that lives outside the
+    managed ``<vaultspec type="agents">`` block. The managed block itself is
+    preserved verbatim so the subsequent upsert owns the canonical copy.
+    Returns *content* unchanged when there is nothing stale to remove.
+    """
+    if not content:
+        return content
+
+    sanitized = _strip_legacy_sentinel_block(content)
+    if names:
+        from .tags import TagError, find_blocks
+
+        try:
+            blocks = find_blocks(sanitized)
+        except TagError:
+            blocks = []
+        managed = next((b for b in blocks if b.block_type == "agents"), None)
+        lines = sanitized.splitlines()
+        if managed is None:
+            kept = _strip_agent_tables_in_segment(lines, names)
+        else:
+            pre = lines[: managed.start_line - 1]
+            mid = lines[managed.start_line - 1 : managed.end_line]
+            post = lines[managed.end_line :]
+            kept = (
+                _strip_agent_tables_in_segment(pre, names)
+                + mid
+                + _strip_agent_tables_in_segment(post, names)
+            )
+        sanitized = "\n".join(kept)
+
+    if sanitized and not sanitized.endswith("\n"):
+        sanitized += "\n"
+    return sanitized
+
+
 def _sync_codex_agents(
     sources: dict[str, tuple[Path, dict[str, Any], str]],
     prune: bool = False,
@@ -309,18 +477,25 @@ def _sync_codex_agents(
 
     path = codex_cfg.native_config_file
     existed = path.exists()
-    existing = path.read_text(encoding="utf-8") if existed else ""
+    raw_existing = path.read_text(encoding="utf-8") if existed else ""
     body = _build_codex_agents_body(sources)
+    managed_names = {Path(name).stem for name in sources}
+    existing = _sanitize_legacy_codex_agents(raw_existing, managed_names)
 
     abs_path = str(path).replace("\\", "/")
 
     if not body:
-        if prune and existed and has_block(existing, "agents"):
-            try:
-                new_content = strip_block(existing, "agents")
-            except TagError as e:
-                logger.warning("Cannot prune agents from %s: %s", path, e)
-                result.errors.append(str(e))
+        if prune and existed:
+            new_content = existing
+            if has_block(existing, "agents"):
+                try:
+                    new_content = strip_block(existing, "agents")
+                except TagError as e:
+                    logger.warning("Cannot prune agents from %s: %s", path, e)
+                    result.errors.append(str(e))
+                    return result
+            if new_content == raw_existing:
+                result.skipped = 1
                 return result
             if dry_run:
                 result.items.append((abs_path, "[DELETE]"))
@@ -338,7 +513,10 @@ def _sync_codex_agents(
         result.errors.append(str(e))
         return result
 
-    if existing == new_content:
+    # Compare against the raw on-disk content, not the sanitized copy, so a
+    # file carrying only stale legacy duplicates (managed block already
+    # correct) is still rewritten rather than reported unchanged.
+    if raw_existing == new_content:
         result.skipped = len(sources) if sources else 1
         return result
 
