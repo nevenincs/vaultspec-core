@@ -302,6 +302,24 @@ class VaultConstants:
                 errors.append(msg)
             return errors
 
+        # Execution records use the plan-hardening Step Record / Phase Summary
+        # naming: uppercase canonical container ids (with an optional lowercase
+        # alpha suffix on Wave / Phase) and no '-exec' type token, matching what
+        # 'vault add exec --step' scaffolds and what the framework rules
+        # document (issue #123). The legacy '...-exec' form is still accepted via
+        # the generic pattern below for records authored before the convention.
+        if doc_type == DocType.EXEC:
+            date_feature = r"\d{4}-\d{2}-\d{2}-[a-z0-9-]+"
+            step_record = (
+                rf"^{date_feature}-(W\d{{2,}}[a-z]?-)?(P\d{{2,}}[a-z]?-)?"
+                r"S\d{2,}\.md$"
+            )
+            phase_summary = (
+                rf"^{date_feature}-(W\d{{2,}}[a-z]?-)?P\d{{2,}}[a-z]?-summary\.md$"
+            )
+            if re.match(step_record, filename) or re.match(phase_summary, filename):
+                return errors
+
         # Basic pattern: 2026-02-07-feature-name-adr.md
         # Or for exec: 2026-02-07-feature-name-phase1-step1.md
         pattern = (
