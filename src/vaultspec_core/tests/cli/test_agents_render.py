@@ -13,6 +13,7 @@ import os
 import re
 import shutil
 import subprocess
+import tomllib
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -22,8 +23,10 @@ import pytest
 from vaultspec_core.core.agents import (
     _CLAUDE_TO_GEMINI_TOOLS,
     _render_claude_agent,
+    _render_codex_agent,
     _render_gemini_agent,
     _render_passthrough_agent,
+    _toml_multiline,
     transform_agent,
 )
 from vaultspec_core.core.enums import GeminiBuiltinTool, Tool
@@ -149,6 +152,37 @@ class TestRenderGeminiAgent:
         meta = {"tools": ["Read", 42, None, "Grep"]}
         out = _render_gemini_agent("x.md", meta, "body")
         assert _fm(out)["tools"] == ["read_file", "grep_search"]
+
+
+class TestCodexMultilinePrompt:
+    """Codex agent prompts must round-trip through a TOML parser (#143).
+
+    ``_render_codex_agent`` frames the body with a leading and trailing
+    newline, and TOML strips the first newline after the opening delimiter, so
+    the parsed prompt carries a single trailing newline; the body content
+    itself must survive verbatim.
+    """
+
+    @staticmethod
+    def _roundtrip(body: str) -> str:
+        rendered = _render_codex_agent("worker.md", {"description": "d"}, body)
+        return tomllib.loads(rendered)["agents"]["worker"]["prompt"]
+
+    def test_plain_body_uses_literal_string(self):
+        out = _toml_multiline("hello\nworld")
+        assert out.startswith("'''")
+        assert self._roundtrip("hello\nworld") == "hello\nworld\n"
+
+    def test_body_with_triple_single_quotes_is_valid_toml(self):
+        body = "before '''quoted''' after"
+        out = _toml_multiline(body)
+        # A literal string cannot hold ''', so the basic form is used instead.
+        assert out.startswith('"""')
+        assert self._roundtrip(body) == body + "\n"
+
+    def test_body_with_backslashes_and_quotes_round_trips(self):
+        body = "path C:\\x '''y''' \"z\""
+        assert self._roundtrip(body) == body + "\n"
 
 
 class TestTransformAgentDispatch:
