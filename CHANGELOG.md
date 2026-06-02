@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.25](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.24...vaultspec-core-v0.1.25) (2026-06-02)
+
+
+### Miscellaneous
+
+* release 0.1.25 ([#147](https://github.com/wgergely/vaultspec-core/issues/147)) ([b0a0e98](https://github.com/wgergely/vaultspec-core/commit/b0a0e98e0d831bb5ce269e895fa4053ffdad9a46))
+
 ## [0.1.24](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.23...vaultspec-core-v0.1.24) (2026-06-02)
 
 
