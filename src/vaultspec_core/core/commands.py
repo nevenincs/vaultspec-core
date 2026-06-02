@@ -869,6 +869,30 @@ def install_run(
             items = seed_builtins(
                 path / ".vaultspec" / "rules", force=True, dry_run=True
             )
+
+        # The real upgrade re-seeds builtins AND runs the provider sync, which
+        # backfills new provider files and structural directories. Preview that
+        # provider-side work too so the dry-run enumerates what the real run
+        # changes rather than only the builtin seed (issue #134). Only the
+        # changed entries are surfaced to keep the preview signal-dense; an
+        # unchanged provider tree contributes nothing.
+        if path.joinpath(".vaultspec").exists():
+            sync_target = provider if provider not in ("all", "core") else "all"
+            try:
+                sync_results = sync_provider(sync_target, dry_run=True, skip=skip)
+            except (VaultSpecError, OSError) as exc:
+                logger.debug("Upgrade dry-run provider preview skipped: %s", exc)
+                sync_results = []
+            seen_preview = {rel for rel, _ in items}
+            for sync_result in sync_results:
+                for rel, action in sync_result.items:
+                    if action in ("[UNCHANGED]", "[SKIP]"):
+                        continue
+                    if rel in seen_preview:
+                        continue
+                    seen_preview.add(rel)
+                    items.append((rel, action))
+
         return {
             "action": "upgrade",
             "items": items,
@@ -1565,6 +1589,50 @@ def sync_provider(
     def _empty_sync_results() -> list[_t.SyncResult]:
         return [_t.SyncResult() for _ in range(5)]
 
+    def _backfill_structures() -> _t.SyncResult:
+        """Create missing structural provider directories during sync (#133).
+
+        Content files are backfilled by the per-resource sync passes (their
+        ``apply_file_sync`` adds any missing destination), but a content-less
+        structural directory such as a provider's ``workflows/`` is only ever
+        created by ``install``/``_scaffold_provider``. After an upgrade that
+        introduces such a directory, ``sync`` left the provider ``partial``
+        while reporting success ("will be addressed by sync") - a no-op. This
+        backfill makes that promise real: it creates only directories that are
+        missing, never overwriting existing content, so it is safe at every
+        ``--force`` level and previews correctly under ``--dry-run``.
+        """
+        result = _t.SyncResult()
+        active_ctx = _t.get_context()
+        target = active_ctx.target_dir
+        installed = read_manifest_data(target).installed
+        for tool, cfg in active_ctx.tool_configs.items():
+            # Only backfill providers the operator actually enrolled; never
+            # materialise a provider directory a core-only or partial install
+            # deliberately omitted.
+            if tool.value in skip or tool.value not in installed:
+                continue
+            caps = cfg.capabilities
+            structural: list[Path] = []
+            if ProviderCapability.RULES in caps and cfg.rules_dir:
+                structural.append(cfg.rules_dir)
+            if ProviderCapability.SKILLS in caps and cfg.skills_dir:
+                structural.append(cfg.skills_dir)
+            if ProviderCapability.AGENTS in caps and cfg.agents_dir:
+                structural.append(cfg.agents_dir)
+            if ProviderCapability.WORKFLOWS in caps and cfg.workflows_dir:
+                structural.append(cfg.workflows_dir)
+            for directory in structural:
+                if directory.exists():
+                    continue
+                result.items.append(
+                    (_rel(target, directory).replace("\\", "/"), "[ADD]")
+                )
+                result.added += 1
+                if not dry_run:
+                    ensure_dir(directory)
+        return result
+
     def _run_all_syncs(*, include_mcp: bool = True) -> list[_t.SyncResult]:
         results: list[_t.SyncResult] = []
         sync_passes: list[tuple[Callable[[], _t.SyncResult], str]] = [
@@ -1589,6 +1657,10 @@ def sync_provider(
                 error_result = _t.SyncResult()
                 error_result.errors.append(f"{label} sync failed: {exc}")
                 results.append(error_result)
+        # Structural backfill runs last and is appended after the positional
+        # resource passes; renderers treat any result beyond the known pass
+        # labels as structural (issue #133).
+        results.append(_backfill_structures())
         return results
 
     # Guard: refuse to sync if vaultspec isn't installed at the target
