@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.22](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.21...vaultspec-core-v0.1.22) (2026-06-02)
+
+
+### Bug Fixes
+
+* **sync:** backfill provider structural dirs + accurate dry-run preview ([#133](https://github.com/wgergely/vaultspec-core/issues/133), [#134](https://github.com/wgergely/vaultspec-core/issues/134)) ([#135](https://github.com/wgergely/vaultspec-core/issues/135)) ([6794df9](https://github.com/wgergely/vaultspec-core/commit/6794df913efef4b1c4cf4ffda5179c2cc3b3ae18))
+
 ## [0.1.21](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.20...vaultspec-core-v0.1.21) (2026-06-02)
 
 
