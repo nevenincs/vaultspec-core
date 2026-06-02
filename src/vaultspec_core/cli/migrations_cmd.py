@@ -84,9 +84,15 @@ def cmd_migrations_status(
     console.print(f"  manifest version: {manifest_version or '(unset)'}")
     console.print(f"  registered: {len(REGISTRY)}")
     for m in REGISTRY:
-        marker = (
-            "[yellow]pending[/yellow]" if m in pending else "[green]applied[/green]"
-        )
+        if status == MigrationStatus.UNKNOWN:
+            # No manifest baseline: applied state is genuinely unknowable, so do
+            # not assert that any entry has been applied (issue #121). Labelling
+            # everything "applied" here previously hid truly-pending migrations.
+            marker = "[dim]unknown[/dim]"
+        elif m in pending:
+            marker = "[yellow]pending[/yellow]"
+        else:
+            marker = "[green]applied[/green]"
         console.print(f"    {marker} {m.target_version}  {m.name}")
     if status == MigrationStatus.PENDING:
         console.print()

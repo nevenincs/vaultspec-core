@@ -149,7 +149,7 @@ class TestNoopCases:
 
         result = migrate(tmp_path)
 
-        assert result.counts == {"rewritten": 0, "skipped": 0}
+        assert result.counts == {"rewritten": 0, "skipped": 0, "nested_gitignore": 0}
         assert "nothing to migrate" in result.summary
 
     def test_no_managed_block_is_noop(self, tmp_path: Path):
@@ -157,5 +157,5 @@ class TestNoopCases:
 
         result = migrate(tmp_path)
 
-        assert result.counts == {"rewritten": 0, "skipped": 0}
+        assert result.counts == {"rewritten": 0, "skipped": 0, "nested_gitignore": 0}
         assert "nothing to migrate" in result.summary
