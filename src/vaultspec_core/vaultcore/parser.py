@@ -51,6 +51,15 @@ _yaml_load: Callable[[str], dict[str, Any]]
 try:
     import yaml
 
+    try:
+        # Prefer the libyaml-backed C loader: it parses frontmatter several
+        # times faster than the pure-Python SafeLoader with identical safe
+        # semantics. Every vault scan, graph build, check, and MCP tool call
+        # parses frontmatter, so this is the hottest parse path in the system.
+        from yaml import CSafeLoader as _SafeLoader
+    except ImportError:  # pragma: no cover - PyYAML built without libyaml
+        from yaml import SafeLoader as _SafeLoader
+
     def _yaml_load_impl(text: str) -> dict[str, Any]:
         """Load YAML text via PyYAML, falling back to the simple parser on error.
 
@@ -61,7 +70,7 @@ try:
             Dictionary of parsed key-value pairs.
         """
         try:
-            return yaml.safe_load(text) or {}
+            return yaml.load(text, Loader=_SafeLoader) or {}
         except yaml.YAMLError as e:
             # PyYAML chokes on unquoted colons in values (e.g.
             # ``description: A test: with colons``).  Fall back to
