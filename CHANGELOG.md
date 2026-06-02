@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.23](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.22...vaultspec-core-v0.1.23) (2026-06-02)
+
+
+### Performance
+
+* **vaultcore:** parse frontmatter with libyaml CSafeLoader ([#137](https://github.com/wgergely/vaultspec-core/issues/137)) ([#138](https://github.com/wgergely/vaultspec-core/issues/138)) ([163db22](https://github.com/wgergely/vaultspec-core/commit/163db2226c45d7c8c986d4e551fb4c2ff5407873))
+
 ## [0.1.22](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.21...vaultspec-core-v0.1.22) (2026-06-02)
 
 
