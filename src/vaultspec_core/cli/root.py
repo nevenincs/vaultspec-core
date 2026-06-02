@@ -781,13 +781,47 @@ def _collect_sync_outcomes(
     if provider == "all" and "mcp" not in skip:
         labels.append("mcps")
     outcomes: list[OutcomeItem] = []
-    for label, r in zip(labels, results, strict=True):
+    # Results beyond the known positional resource passes (e.g. the trailing
+    # structural-backfill pass, issue #133) are grouped per inferred provider so
+    # the surface never crashes on a length mismatch and still reports them.
+    for index, r in enumerate(results):
+        label = labels[index] if index < len(labels) else None
         if r.per_tool:
             for tool_name, tool_result in r.per_tool.items():
                 outcomes.extend(sync_outcomes(tool_result, group=tool_name))
-        else:
+        elif label is not None:
             outcomes.extend(sync_outcomes(r, group=label))
+        else:
+            for item_path, _action in r.items:
+                outcomes.extend(
+                    sync_outcomes(
+                        _single_item_result(r, item_path),
+                        group=_infer_label(item_path),
+                    )
+                )
     return outcomes
+
+
+def _single_item_result(source: SyncResult, item_path: str) -> SyncResult:
+    """Return a one-item SyncResult mirroring ``item_path``'s action.
+
+    Used to re-group structural-backfill items under their inferred provider
+    label without mutating the original aggregate result.
+    """
+    from vaultspec_core.core.types import SyncResult as _SyncResult
+
+    single = _SyncResult()
+    for path, action in source.items:
+        if path != item_path:
+            continue
+        single.items.append((path, action))
+        if action == "[ADD]":
+            single.added += 1
+        elif action == "[UPDATE]":
+            single.updated += 1
+        elif action == "[DELETE]":
+            single.pruned += 1
+    return single
 
 
 def _infer_label(item_path: str) -> str:
