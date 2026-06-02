@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.24](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.23...vaultspec-core-v0.1.24) (2026-06-02)
+
+
+### Bug Fixes
+
+* **codex:** dedupe agents tables in .codex/config.toml ([#140](https://github.com/wgergely/vaultspec-core/issues/140)) ([#141](https://github.com/wgergely/vaultspec-core/issues/141)) ([7ee3881](https://github.com/wgergely/vaultspec-core/commit/7ee38816a903f92c3fe0879f82f91c1eba456b47))
+* **codex:** emit valid TOML for agent prompts containing ''' ([#143](https://github.com/wgergely/vaultspec-core/issues/143)) ([#144](https://github.com/wgergely/vaultspec-core/issues/144)) ([38c4b77](https://github.com/wgergely/vaultspec-core/commit/38c4b7771300717b9b1a0714d934cdcf3fd2fb45))
+* **deps:** bump pyjwt 2.12.1 -&gt; 2.13.0 to clear advisories ([#142](https://github.com/wgergely/vaultspec-core/issues/142)) ([52747b6](https://github.com/wgergely/vaultspec-core/commit/52747b6f028e23e5c2a5155d7255d6386e44fe27))
+
 ## [0.1.23](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.22...vaultspec-core-v0.1.23) (2026-06-02)
 
 
