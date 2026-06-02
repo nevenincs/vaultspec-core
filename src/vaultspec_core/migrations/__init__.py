@@ -168,11 +168,13 @@ def _build_registry() -> list[Migration]:
     from .m_0_1_17_index_subfolder import MIGRATION as M_INDEX_SUBFOLDER
     from .m_0_1_20_gitignore_reversal import MIGRATION as M_GITIGNORE_REVERSAL
     from .m_0_1_21_frontmatter_lifecycle import MIGRATION as M_FRONTMATTER_LIFECYCLE
+    from .m_0_1_24_codex_agents_dedup import MIGRATION as M_CODEX_AGENTS_DEDUP
 
     entries: list[Migration] = [
         M_INDEX_SUBFOLDER,
         M_GITIGNORE_REVERSAL,
         M_FRONTMATTER_LIFECYCLE,
+        M_CODEX_AGENTS_DEDUP,
     ]
     return sorted(entries, key=lambda m: parse_version_tuple(m.target_version))
 
