@@ -216,8 +216,20 @@ def transform_agent(
 
 
 def _toml_multiline(value: str) -> str:
-    escaped = value.replace("'''", "'''\"'''\"'''")
-    return f"'''\n{escaped}\n'''"
+    """Render *value* as a TOML multiline string.
+
+    Prefers a literal (single-quote) multiline string so the body is preserved
+    verbatim with no escape processing. A literal string cannot contain a
+    ``'''`` run - it would terminate the string and there is no escape inside a
+    literal - so a body carrying ``'''`` falls back to a basic (double-quote)
+    multiline string with the minimal escaping required to stay valid TOML:
+    backslashes are doubled and every ``"`` is escaped so no ``\"\"\"`` run can
+    form. Both forms round-trip through a TOML parser to the original text.
+    """
+    if "'''" not in value:
+        return f"'''\n{value}\n'''"
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"""\n{escaped}\n"""'
 
 
 def _coerce_codex_model(meta: dict[str, Any]) -> str | None:
