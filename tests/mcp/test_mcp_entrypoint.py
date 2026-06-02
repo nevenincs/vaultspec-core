@@ -70,7 +70,9 @@ def test_mcp_entrypoint_starts_and_keeps_stdout_clean(tmp_path: Path) -> None:
 
     try:
         startup_lines: list[str] = []
-        deadline = time.time() + 5
+        # Generous deadline: a cold subprocess + import on a busy CI runner can
+        # take several seconds to emit its first startup line.
+        deadline = time.time() + 15
         while time.time() < deadline:
             try:
                 line = stderr_queue.get(timeout=0.25).decode("utf-8", errors="replace")
@@ -96,3 +98,36 @@ def test_mcp_entrypoint_starts_and_keeps_stdout_clean(tmp_path: Path) -> None:
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait(timeout=5)
+
+
+@pytest.mark.integration
+def test_mcp_entrypoint_exits_cleanly_on_stdin_eof(tmp_path: Path) -> None:
+    """The stdio server must exit promptly on stdin EOF, not spin or hang.
+
+    Regression guard for the busy-signal concern (#137): with no input and an
+    immediate EOF (``stdin`` closed), the server must terminate on its own
+    within a short window. A busy-loop or hang on EOF - the failure mode the
+    concern describes - would block until the timeout and fail this test.
+    """
+    _build_minimal_workspace(tmp_path)
+
+    env = os.environ.copy()
+    env["VAULTSPEC_TARGET_DIR"] = str(tmp_path)
+
+    proc = subprocess.Popen(
+        [sys.executable, "-c", "from vaultspec_core.mcp_server.app import run; run()"],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+    )
+    try:
+        returncode = proc.wait(timeout=20)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=5)
+        pytest.fail(
+            "MCP stdio server did not exit on stdin EOF within 20s; "
+            "possible busy-loop or hang (#137)."
+        )
+    assert returncode == 0, proc.stderr.read().decode("utf-8", errors="replace")
