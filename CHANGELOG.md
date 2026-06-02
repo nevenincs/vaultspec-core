@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.21](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.20...vaultspec-core-v0.1.21) (2026-06-02)
+
+
+### Bug Fixes
+
+* **cli:** align exec filename validator with scaffolder and add mcp adopt ([#123](https://github.com/wgergely/vaultspec-core/issues/123), [#120](https://github.com/wgergely/vaultspec-core/issues/120)) ([#129](https://github.com/wgergely/vaultspec-core/issues/129)) ([ac96f3b](https://github.com/wgergely/vaultspec-core/commit/ac96f3b8e2e31d3703573f919637d222b11ef688))
+* critical bugs - plan corruption ([#125](https://github.com/wgergely/vaultspec-core/issues/125)), doctor commit-block ([#122](https://github.com/wgergely/vaultspec-core/issues/122)), Windows cp1252 ([#111](https://github.com/wgergely/vaultspec-core/issues/111)) ([#126](https://github.com/wgergely/vaultspec-core/issues/126)) ([5b22a25](https://github.com/wgergely/vaultspec-core/commit/5b22a255a10100a95ce3922897a1593de73d910f))
+* **migrations:** resolve manifest/migration version rough edges ([#119](https://github.com/wgergely/vaultspec-core/issues/119), [#121](https://github.com/wgergely/vaultspec-core/issues/121), [#124](https://github.com/wgergely/vaultspec-core/issues/124)) ([#132](https://github.com/wgergely/vaultspec-core/issues/132)) ([5bcb809](https://github.com/wgergely/vaultspec-core/commit/5bcb809a0e42b8690c2f178bca16d7fd39bf4523))
+
 ## [0.1.20](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.19...vaultspec-core-v0.1.20) (2026-05-26)
 
 
