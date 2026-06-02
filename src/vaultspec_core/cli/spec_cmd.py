@@ -2214,11 +2214,15 @@ def _doctor_exit_code(
         if prov.dir_state == ProviderDirSignal.MISSING:
             has_error = True
         elif prov.dir_state in (
-            ProviderDirSignal.MIXED,
             ProviderDirSignal.EMPTY,
             ProviderDirSignal.PARTIAL,
         ):
             has_warn = True
+        # ProviderDirSignal.MIXED is a soft, informational signal: it means the
+        # provider directory carries extra files vaultspec does not own. That is
+        # benign (genuine managed-content drift surfaces via ContentSignal), so
+        # it must not fail the doctor exit code and block markdown commits via
+        # the bundled spec-check hook (issue #122).
         if prov.config in (
             ConfigSignal.MISSING,
             ConfigSignal.FOREIGN,

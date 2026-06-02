@@ -24,6 +24,13 @@ from vaultspec_core.cli._target import TargetOption
 
 __all__ = ["plan_app"]
 
+# Defensive ceiling for serialised plan output (issue #125). A legitimate
+# single structural edit never multiplies a plan several times over, so output
+# beyond ``max(_PLAN_GROWTH_FLOOR, _PLAN_GROWTH_FACTOR * len(source))`` signals a
+# serialiser fault and the write is refused. The floor keeps tiny plans editable.
+_PLAN_GROWTH_FLOOR = 65_536
+_PLAN_GROWTH_FACTOR = 4
+
 
 def _render_user_errors[F: Callable[..., None]](func: F) -> F:
     """Render handler-raised typed errors as one-line CLI messages.
@@ -63,9 +70,23 @@ def _save_plan_or_dry_run(
 
     Or write to disk on apply.
     """
+    from vaultspec_core.plan.commands._errors import PlanCommandError
     from vaultspec_core.plan.serialiser import serialise_plan
 
     new_text = serialise_plan(plan, canonicalise=canonicalise)
+
+    # Defence in depth against a serialiser regression that multiplies authored
+    # prose (issue #125): a single structural edit never grows a plan several
+    # times over, so refuse to persist pathological output rather than corrupt
+    # the file or exhaust the disk. The byte floor keeps tiny plans editable.
+    growth_ceiling = max(_PLAN_GROWTH_FLOOR, _PLAN_GROWTH_FACTOR * len(original_text))
+    if len(new_text) > growth_ceiling:
+        raise PlanCommandError(
+            f"refusing to write {path.name}: serialised output "
+            f"({len(new_text)} bytes) is implausibly larger than the source "
+            f"({len(original_text)} bytes); this indicates a serialiser fault, "
+            "not an intended edit. The file on disk was left unchanged."
+        )
 
     if dry_run:
         import difflib

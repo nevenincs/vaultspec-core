@@ -99,6 +99,7 @@ elsewhere in this document, but do not hand-edit these signatures.
 vaultspec-core install [OPTIONS] [PROVIDER]
 vaultspec-core uninstall [OPTIONS] [PROVIDER]
 vaultspec-core sync [OPTIONS] [PROVIDER]
+vaultspec-core doctor [OPTIONS]
 vaultspec-core vault add [OPTIONS] DOC_TYPE
 vaultspec-core vault stats [OPTIONS]
 vaultspec-core vault list [OPTIONS] [DOC_TYPE]
@@ -151,49 +152,49 @@ vaultspec-core vault plan tier promote [OPTIONS] PATH
 vaultspec-core vault plan tier demote [OPTIONS] PATH
 vaultspec-core spec doctor [OPTIONS]
 vaultspec-core spec rules list [OPTIONS]
-vaultspec-core spec rules add [OPTIONS] [NAME]
+vaultspec-core spec rules add [OPTIONS] NAME
 vaultspec-core spec rules show [OPTIONS] NAME
 vaultspec-core spec rules edit [OPTIONS] NAME
 vaultspec-core spec rules remove [OPTIONS] NAME
 vaultspec-core spec rules rename [OPTIONS] OLD_NAME NEW_NAME
 vaultspec-core spec rules restore [OPTIONS] FILENAME
-vaultspec-core spec rules sync [OPTIONS]
+vaultspec-core spec rules sync [OPTIONS] [PROVIDER]
 vaultspec-core spec rules status [OPTIONS]
 vaultspec-core spec skills list [OPTIONS]
-vaultspec-core spec skills add [OPTIONS] [NAME]
+vaultspec-core spec skills add [OPTIONS] NAME
 vaultspec-core spec skills show [OPTIONS] NAME
 vaultspec-core spec skills edit [OPTIONS] NAME
 vaultspec-core spec skills remove [OPTIONS] NAME
 vaultspec-core spec skills rename [OPTIONS] OLD_NAME NEW_NAME
 vaultspec-core spec skills restore [OPTIONS] FILENAME
-vaultspec-core spec skills sync [OPTIONS]
+vaultspec-core spec skills sync [OPTIONS] [PROVIDER]
 vaultspec-core spec skills status [OPTIONS]
 vaultspec-core spec agents list [OPTIONS]
-vaultspec-core spec agents add [OPTIONS] [NAME]
+vaultspec-core spec agents add [OPTIONS] NAME
 vaultspec-core spec agents show [OPTIONS] NAME
 vaultspec-core spec agents edit [OPTIONS] NAME
 vaultspec-core spec agents remove [OPTIONS] NAME
 vaultspec-core spec agents rename [OPTIONS] OLD_NAME NEW_NAME
 vaultspec-core spec agents restore [OPTIONS] FILENAME
-vaultspec-core spec agents sync [OPTIONS]
+vaultspec-core spec agents sync [OPTIONS] [PROVIDER]
 vaultspec-core spec agents status [OPTIONS]
 vaultspec-core spec system show [OPTIONS]
-vaultspec-core spec system sync [OPTIONS]
+vaultspec-core spec system sync [OPTIONS] [PROVIDER]
 vaultspec-core spec hooks list [OPTIONS]
-vaultspec-core spec hooks add [OPTIONS] [NAME]
+vaultspec-core spec hooks add [OPTIONS] NAME
 vaultspec-core spec hooks show [OPTIONS] NAME
 vaultspec-core spec hooks edit [OPTIONS] NAME
 vaultspec-core spec hooks rename [OPTIONS] OLD_NAME NEW_NAME
 vaultspec-core spec hooks remove [OPTIONS] NAME
 vaultspec-core spec hooks restore [OPTIONS] FILENAME
-vaultspec-core spec hooks sync [OPTIONS]
+vaultspec-core spec hooks sync [OPTIONS] [PROVIDER]
 vaultspec-core spec hooks status [OPTIONS]
 vaultspec-core spec hooks run [OPTIONS] EVENT
 vaultspec-core spec mcps list [OPTIONS]
 vaultspec-core spec mcps status [OPTIONS]
 vaultspec-core spec mcps add [OPTIONS]
 vaultspec-core spec mcps remove [OPTIONS] NAME
-vaultspec-core spec mcps sync [OPTIONS]
+vaultspec-core spec mcps sync [OPTIONS] [PROVIDER]
 vaultspec-core migrations status [OPTIONS]
 vaultspec-core migrations run [OPTIONS]
 vaultspec-core config get [OPTIONS] KEY

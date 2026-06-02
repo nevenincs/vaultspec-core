@@ -12,7 +12,7 @@ import sys
 
 from rich.console import Console
 
-__all__ = ["get_console", "reset_console"]
+__all__ = ["configure_stdio", "get_console", "reset_console"]
 
 _console: Console | None = None
 
@@ -24,6 +24,37 @@ def _is_utf8_capable(stdout=None) -> bool:
     if not encoding:
         return True
     return encoding.lower().replace("-", "") in ("utf8", "utf_8")
+
+
+def configure_stdio() -> None:
+    """Reconfigure ``sys.stdout``/``sys.stderr`` to UTF-8 at the CLI entry.
+
+    The shared Rich console (:func:`get_console`) already wraps stdout in a
+    UTF-8 writer, but ``typer.echo`` / ``click.echo`` write directly to the
+    interpreter's ``sys.stdout``. On a Windows console whose encoding is
+    ``cp1252`` (the default), echoing user-controlled content that contains
+    non-ASCII glyphs (such as ``->`` rendered as ``\\u2192`` from plan
+    ``action`` strings) raised :class:`UnicodeEncodeError` and crashed the
+    command (issue #111).
+
+    Reconfiguring the standard streams to UTF-8 with ``errors="replace"`` once,
+    at the process entry point, makes every ``typer.echo`` call safe without
+    routing each through the Rich console. Streams already UTF-8 (the common
+    POSIX case and redirected pipes) are left untouched, and streams that do
+    not support reconfiguration are skipped silently.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if stream is None or _is_utf8_capable(stream):
+            continue
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError, AttributeError):
+            # Stream does not support reconfiguration (already detached, a
+            # non-seekable wrapper, or a captured test buffer); leave it as-is.
+            continue
 
 
 def _make_utf8_stdout(stdout=None) -> io.TextIOWrapper:

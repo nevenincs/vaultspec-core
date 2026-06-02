@@ -18,6 +18,7 @@ the canonical form.
 from __future__ import annotations
 
 import re
+from collections import deque
 from typing import TYPE_CHECKING
 
 from vaultspec_core.plan.display_path import (
@@ -33,6 +34,60 @@ if TYPE_CHECKING:
 __all__ = ["serialise_plan"]
 
 
+class _UnknownBlockConsumer:
+    """Document-order, single-consume view over a plan's unknown blocks.
+
+    The parser anchors authored prose to the *bare* leaf identifier of the
+    container it precedes (e.g. ``before_step_S01``), and per-phase Step
+    numbering means an id such as ``S01`` recurs in every phase. A naive
+    serialiser that re-scans the global ``plan.unknown_blocks`` list for
+    each container therefore re-emits a colliding block once per occurrence;
+    the duplicated prose then merges on the next parse and multiplies again,
+    growing the serialised text exponentially across round-trips until the
+    file corrupts the workspace (see issue #125).
+
+    This consumer removes that failure mode structurally. Blocks are bucketed
+    into per-anchor FIFO queues in document order and each is handed out at
+    most once. Because the serialiser visits anchor slots in the same
+    document order the parser recorded them, every block binds to exactly one
+    location and a clean ``parse -> serialise`` round-trip is byte-stable.
+    """
+
+    def __init__(self, plan: Plan, *, enabled: bool) -> None:
+        self._contents: list[str] = [b.content for b in plan.unknown_blocks]
+        self._pending: dict[str, deque[int]] = {}
+        self._consumed: set[int] = set()
+        self._enabled = enabled
+        if enabled:
+            for index, block in enumerate(plan.unknown_blocks):
+                self._pending.setdefault(block.anchor, deque()).append(index)
+
+    def take(self, anchor: str) -> str | None:
+        """Return the next unconsumed block for ``anchor``, or ``None``."""
+        queue = self._pending.get(anchor)
+        if not queue:
+            return None
+        index = queue.popleft()
+        self._consumed.add(index)
+        return self._contents[index]
+
+    def leftovers(self) -> list[str]:
+        """Return blocks never consumed, in document order.
+
+        A block goes unconsumed only when its anchor slot no longer exists in
+        the model (e.g. the container it preceded was removed by a CLI edit).
+        Emitting these at the document tail preserves authored prose rather
+        than silently dropping it.
+        """
+        if not self._enabled:
+            return []
+        return [
+            self._contents[index]
+            for index in range(len(self._contents))
+            if index not in self._consumed
+        ]
+
+
 def serialise_plan(plan: Plan, canonicalise: bool = False) -> str:
     """Return canonical Markdown text for ``plan``.
 
@@ -43,6 +98,8 @@ def serialise_plan(plan: Plan, canonicalise: bool = False) -> str:
     Returns:
         Markdown text terminated by a single trailing newline.
     """
+    consumer = _UnknownBlockConsumer(plan, enabled=not canonicalise)
+
     parts: list[str] = []
     parts.append(_render_frontmatter(plan))
     parts.append("")
@@ -53,22 +110,12 @@ def serialise_plan(plan: Plan, canonicalise: bool = False) -> str:
         parts.append(ledger)
         parts.append("")
 
-    # Render any before_title blocks
-    if not canonicalise:
-        for block in plan.unknown_blocks:
-            if block.anchor == "before_title":
-                parts.append(block.content)
-                parts.append("")
+    _emit_block(parts, consumer.take("before_title"))
 
     parts.append(f"# {plan.title or '(untitled plan)'}")
     parts.append("")
 
-    # Render any before_epic_intent blocks
-    if not canonicalise:
-        for block in plan.unknown_blocks:
-            if block.anchor == "before_epic_intent":
-                parts.append(block.content)
-                parts.append("")
+    _emit_block(parts, consumer.take("before_epic_intent"))
 
     if plan.frontmatter.tier is Tier.L4 and plan.epic_intent is not None:
         parts.append("## Epic intent")
@@ -78,32 +125,30 @@ def serialise_plan(plan: Plan, canonicalise: bool = False) -> str:
 
     if plan.frontmatter.tier is Tier.L1:
         for step in plan.steps:
-            # Render before_step blocks at L1
-            if not canonicalise:
-                for block in plan.unknown_blocks:
-                    if block.anchor == f"before_step_{step.canonical_id}":
-                        parts.append(block.content)
-                        parts.append("")
+            _emit_block(parts, consumer.take(f"before_step_{step.canonical_id}"))
             parts.append(_render_step_row(step, phase_id=None, wave_id=None))
     elif plan.frontmatter.tier is Tier.L2:
         for phase in plan.phases:
-            parts.extend(
-                _render_phase_block(
-                    phase, wave_id=None, plan=plan, canonicalise=canonicalise
-                )
-            )
+            parts.extend(_render_phase_block(phase, wave_id=None, consumer=consumer))
     else:
         for wave in plan.waves:
-            parts.extend(_render_wave_block(wave, plan=plan, canonicalise=canonicalise))
+            parts.extend(_render_wave_block(wave, consumer=consumer))
 
-    # Render any after_all blocks
-    if not canonicalise:
-        for block in plan.unknown_blocks:
-            if block.anchor == "after_all":
-                parts.append(block.content)
-                parts.append("")
+    _emit_block(parts, consumer.take("after_all"))
+
+    # Any block whose anchor slot vanished (e.g. its container was removed by
+    # a CLI edit) is preserved at the tail rather than silently dropped.
+    for content in consumer.leftovers():
+        _emit_block(parts, content)
 
     return "\n".join(parts).rstrip() + "\n"
+
+
+def _emit_block(parts: list[str], content: str | None) -> None:
+    """Append an unknown-block ``content`` plus a trailing blank line, if any."""
+    if content is not None:
+        parts.append(content)
+        parts.append("")
 
 
 def _render_frontmatter(plan: Plan) -> str:
@@ -155,18 +200,12 @@ def _render_phase_block(
     phase: Phase,
     *,
     wave_id: str | None,
-    plan: Plan,
-    canonicalise: bool = False,
+    consumer: _UnknownBlockConsumer,
 ) -> list[str]:
     path = phase_display_path(phase_id=phase.canonical_id, wave_id=wave_id)
     lines: list[str] = []
 
-    # Render before_phase blocks
-    if not canonicalise:
-        for block in plan.unknown_blocks:
-            if block.anchor == f"before_phase_{phase.canonical_id}":
-                lines.append(block.content)
-                lines.append("")
+    _emit_block(lines, consumer.take(f"before_phase_{phase.canonical_id}"))
 
     lines.extend(
         [
@@ -178,12 +217,7 @@ def _render_phase_block(
     )
 
     for step in phase.steps:
-        # Render before_step blocks
-        if not canonicalise:
-            for block in plan.unknown_blocks:
-                if block.anchor == f"before_step_{step.canonical_id}":
-                    lines.append(block.content)
-                    lines.append("")
+        _emit_block(lines, consumer.take(f"before_step_{step.canonical_id}"))
         lines.append(
             _render_step_row(step, phase_id=phase.canonical_id, wave_id=wave_id),
         )
@@ -191,16 +225,11 @@ def _render_phase_block(
     return lines
 
 
-def _render_wave_block(wave: Wave, plan: Plan, canonicalise: bool = False) -> list[str]:
+def _render_wave_block(wave: Wave, *, consumer: _UnknownBlockConsumer) -> list[str]:
     path = wave_display_path(wave_id=wave.canonical_id)
     lines: list[str] = []
 
-    # Render before_wave blocks
-    if not canonicalise:
-        for block in plan.unknown_blocks:
-            if block.anchor == f"before_wave_{wave.canonical_id}":
-                lines.append(block.content)
-                lines.append("")
+    _emit_block(lines, consumer.take(f"before_wave_{wave.canonical_id}"))
 
     lines.extend(
         [
@@ -216,8 +245,7 @@ def _render_wave_block(wave: Wave, plan: Plan, canonicalise: bool = False) -> li
             _render_phase_block(
                 phase,
                 wave_id=wave.canonical_id,
-                plan=plan,
-                canonicalise=canonicalise,
+                consumer=consumer,
             )
         )
     return lines

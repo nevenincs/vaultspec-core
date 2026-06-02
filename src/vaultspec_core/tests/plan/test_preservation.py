@@ -41,10 +41,125 @@ Final closing remarks (after all)
 """
 
 
+L2_PROSE_BETWEEN_STEPS = """---
+tags:
+  - '#plan'
+  - '#demo-feature'
+date: '2026-06-01'
+tier: L2
+related: []
+---
+
+# `demo` plan
+
+### Phase `P01` - first
+
+Phase one intent.
+
+- [ ] `P01.S01` - do a; `src/a.py`.
+
+Authored prose between P01 S01 and S02.
+
+- [ ] `P01.S02` - do b; `src/b.py`.
+
+### Phase `P02` - second
+
+Phase two intent.
+
+- [ ] `P02.S01` - do c; `src/c.py`.
+
+Authored prose between P02 S01 and S02.
+
+- [ ] `P02.S02` - do d; `src/d.py`.
+"""
+
+
 @pytest.fixture()
 def runner() -> CliRunner:
     """Typer test runner with colour disabled."""
     return CliRunner(env={"NO_COLOR": "1"})
+
+
+def test_multi_phase_round_trip_does_not_multiply_prose() -> None:
+    """Regression gate for issue #125.
+
+    A multi-phase L2 plan numbers steps per phase, so an id such as ``S01``
+    recurs across phases and an authored prose block between steps is anchored
+    to the bare leaf id (``before_step_S02``). The pre-fix serialiser re-scanned
+    the global unknown-block list per step and re-emitted each colliding block
+    once per phase; the duplicates merged on the next parse and multiplied
+    again, growing the file exponentially until it corrupted the workspace.
+
+    The fixed serialiser hands each block out at most once in document order,
+    so repeated round-trips are size-stable and byte-stable.
+    """
+    text = serialise_plan(parse_plan(L2_PROSE_BETWEEN_STEPS))
+    first_len = len(text)
+
+    for _ in range(8):
+        plan = parse_plan(text)
+        text = serialise_plan(plan)
+        # Size never grows across round-trips - the exponential blow-up is gone.
+        assert len(text) == first_len
+        # The colliding prose blocks are preserved exactly once each, not
+        # duplicated per phase that shares the recurring step id.
+        assert text.count("Authored prose between P01 S01 and S02.") == 1
+        assert text.count("Authored prose between P02 S01 and S02.") == 1
+
+    # Each prose block stays bound to its own phase rather than leaking across.
+    p01_region, _, p02_region = text.partition("### Phase `P02`")
+    assert "Authored prose between P01 S01 and S02." in p01_region
+    assert "Authored prose between P02 S01 and S02." in p02_region
+
+
+def test_multi_wave_round_trip_does_not_multiply_prose() -> None:
+    """Regression gate for issue #125 at L3 (waves sharing phase/step ids)."""
+    l3_sample = """---
+tags:
+  - '#plan'
+  - '#demo-feature'
+date: '2026-06-01'
+tier: L3
+related: []
+---
+
+# `demo` plan
+
+## Wave `W01` - alpha
+
+Wave one intent.
+
+### Phase `W01.P01` - first
+
+Phase intent.
+
+- [ ] `W01.P01.S01` - do a; `src/a.py`.
+
+Prose inside W01 P01.
+
+- [ ] `W01.P01.S02` - do b; `src/b.py`.
+
+## Wave `W02` - beta
+
+Wave two intent.
+
+### Phase `W02.P01` - second
+
+Phase intent.
+
+- [ ] `W02.P01.S01` - do c; `src/c.py`.
+
+Prose inside W02 P01.
+
+- [ ] `W02.P01.S02` - do d; `src/d.py`.
+"""
+    text = serialise_plan(parse_plan(l3_sample))
+    first_len = len(text)
+    for _ in range(8):
+        text = serialise_plan(parse_plan(text))
+        assert len(text) == first_len
+        assert text.count("Prose inside W01 P01.") == 1
+        assert text.count("Prose inside W02 P01.") == 1
 
 
 def test_serialise_plan_preserves_unknown_blocks() -> None:

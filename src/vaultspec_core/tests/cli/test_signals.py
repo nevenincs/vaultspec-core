@@ -199,3 +199,47 @@ class TestWorkspaceDiagnosis:
         assert Tool.CLAUDE in diag.providers
         assert diag.builtin_version == BuiltinVersionSignal.CURRENT
         assert diag.gitignore == GitignoreSignal.COMPLETE
+
+
+class TestDoctorExitCode:
+    """The doctor exit code must not block commits on soft signals (issue #122)."""
+
+    def _clean_workspace(self, prov: ProviderDiagnosis) -> WorkspaceDiagnosis:
+        return WorkspaceDiagnosis(
+            framework=FrameworkSignal.PRESENT,
+            providers={prov.tool: prov},
+            builtin_version=BuiltinVersionSignal.CURRENT,
+            gitignore=GitignoreSignal.COMPLETE,
+            gitattributes=GitattributesSignal.COMPLETE,
+            precommit=PrecommitSignal.COMPLETE,
+            migration_status="up_to_date",
+            vault_content=VaultContentSignal.CLEAN,
+            rename_integrity=RenameIntegritySignal.CLEAN,
+        )
+
+    def test_mixed_provider_dir_does_not_fail_exit_code(self) -> None:
+        """A MIXED provider directory is informational and must exit 0.
+
+        A real Claude Code / Codex workspace always carries host-native files;
+        before the fix, MIXED set has_warn and the doctor exited 1, which the
+        bundled spec-check pre-commit hook turned into a blocked markdown commit.
+        """
+        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+
+        prov = ProviderDiagnosis(
+            tool=Tool.CLAUDE,
+            dir_state=ProviderDirSignal.MIXED,
+            manifest_entry=ManifestEntrySignal.COHERENT,
+        )
+        assert _doctor_exit_code(self._clean_workspace(prov)) == 0
+
+    def test_partial_provider_dir_still_warns(self) -> None:
+        """PARTIAL remains a genuine warning - the fix is scoped to MIXED."""
+        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+
+        prov = ProviderDiagnosis(
+            tool=Tool.CLAUDE,
+            dir_state=ProviderDirSignal.PARTIAL,
+            manifest_entry=ManifestEntrySignal.COHERENT,
+        )
+        assert _doctor_exit_code(self._clean_workspace(prov)) == 1

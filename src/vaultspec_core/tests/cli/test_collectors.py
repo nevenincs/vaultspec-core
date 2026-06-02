@@ -256,6 +256,37 @@ class TestProviderDirState:
         result = collect_provider_dir_state(synthetic_project, "claude")
         assert result in (ProviderDirSignal.COMPLETE, ProviderDirSignal.PARTIAL)
 
+    def test_host_native_file_is_not_mixed(self, synthetic_project: Path) -> None:
+        """Host-tool-native files must not classify the dir as MIXED (issue #122).
+
+        Claude Code creates ``.claude/settings.local.json`` during normal use;
+        its presence previously made ``spec doctor`` report MIXED and exit 1,
+        which blocked every markdown commit via the bundled spec-check hook.
+        """
+        baseline = collect_provider_dir_state(synthetic_project, "claude")
+        claude_dir = synthetic_project / ".claude"
+        (claude_dir / "settings.local.json").write_text("{}\n", encoding="utf-8")
+        (claude_dir / "settings.json").write_text("{}\n", encoding="utf-8")
+        (claude_dir / ".gitignore").write_text("*.local\n", encoding="utf-8")
+
+        after = collect_provider_dir_state(synthetic_project, "claude")
+        assert after != ProviderDirSignal.MIXED
+        assert after == baseline
+
+    def test_unmanaged_file_is_still_mixed(self, synthetic_project: Path) -> None:
+        """A genuinely unmanaged extra file still classifies as MIXED.
+
+        Only allow-listed host-native files are benign; the MIXED signal must
+        remain meaningful for everything else.
+        """
+        (synthetic_project / ".claude" / "stray-foreign.bin").write_text(
+            "x", encoding="utf-8"
+        )
+        assert (
+            collect_provider_dir_state(synthetic_project, "claude")
+            == ProviderDirSignal.MIXED
+        )
+
     def test_unknown_tool(self, tmp_path: Path) -> None:
         assert (
             collect_provider_dir_state(tmp_path, "nonexistent")

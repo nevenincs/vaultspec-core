@@ -193,10 +193,10 @@ touch files directly:
 
 ```bash
 # Add a custom rule
-vaultspec-core spec rules add --name my-project-conventions
+vaultspec-core spec rules add my-project-conventions
 
 # Add a skill with a description
-vaultspec-core spec skills add --name my-deploy --description "Deploy to staging"
+vaultspec-core spec skills add my-deploy --description "Deploy to staging"
 
 # List what you have
 vaultspec-core spec rules list

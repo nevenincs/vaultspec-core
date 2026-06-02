@@ -47,9 +47,9 @@ plot. If the rule needs more than a page, it is actually a reference document; p
 A codification produces a file under `.vaultspec/rules/rules/` that captures the rule.
 Today's canonical authoring path is the existing CLI:
 
-- `vaultspec-core spec rules add --name <rule-name>` scaffolds the rule file. The
-  `<rule-name>` is the kebab-case slug naming the rule's subject (e.g.,
-  `harbor-notes-runtime-data`, `destructive-verbs-need-dry-run`).
+- `vaultspec-core spec rules add <rule-name>` scaffolds the rule file. The `<rule-name>`
+  is the kebab-case slug naming the rule's subject (e.g., `harbor-notes-runtime-data`,
+  `destructive-verbs-need-dry-run`).
 - The author then opens the scaffolded file and fills the three sections above.
 
 Today the CLI places authored project rules in the same directory as the framework's
