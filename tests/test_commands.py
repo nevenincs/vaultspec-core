@@ -498,11 +498,17 @@ def test_spec_add_dry_run_no_write() -> None:
 
 @pytest.mark.unit
 def test_sync_all_result_count_matches_resource_labels() -> None:
-    """sync_provider('all') must return one SyncResult per resource label.
+    """sync_provider('all') results render without a label/result mismatch.
 
-    Regression test for #54: the CLI display zips resource_labels with
-    sync results using strict=True, so the counts must match exactly.
+    Regression test for #54 (the CLI display once zipped resource_labels with
+    sync results) extended for #133: sync now appends a trailing structural-
+    backfill result after the positional resource passes, so the renderer must
+    tolerate one result beyond the labels rather than crash. Assert the exact
+    contract (one result per resource label plus the backfill) and that the
+    real outcome-collector consumes the results without raising.
     """
+    from vaultspec_core.cli.root import _collect_sync_outcomes
+
     tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"sync-labels-{uuid4().hex}"
     try:
         tmp_path.mkdir(parents=True, exist_ok=True)
@@ -514,14 +520,17 @@ def test_sync_all_result_count_matches_resource_labels() -> None:
 
         results = sync_provider("all")
 
-        # The CLI display code builds this exact label list and zips it
-        # with results using strict=True - a mismatch causes ValueError
         resource_labels = ["rules", "skills", "agents", "system", "config", "mcps"]
-        assert len(results) == len(resource_labels), (
-            f"sync_provider('all') returned {len(results)} results "
-            f"but resource_labels has {len(resource_labels)} entries; "
-            f"zip(..., strict=True) would crash"
+        # One result per resource label, plus the trailing structural backfill.
+        assert len(results) == len(resource_labels) + 1, (
+            f"sync_provider('all') returned {len(results)} results; expected "
+            f"{len(resource_labels)} resource passes plus one structural backfill"
         )
+
+        # The collector must consume the variable-length results without the
+        # historical strict-zip ValueError.
+        outcomes = _collect_sync_outcomes(results, "all", [])
+        assert isinstance(outcomes, list)
     finally:
         reset_config()
         shutil.rmtree(tmp_path, ignore_errors=True)
