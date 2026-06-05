@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.26](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.25...vaultspec-core-v0.1.26) (2026-06-05)
+
+
+### Bug Fixes
+
+* resolve plan serializer unexpected retirements and prune obsolete codex agents (fixes [#149](https://github.com/wgergely/vaultspec-core/issues/149), [#150](https://github.com/wgergely/vaultspec-core/issues/150)) ([e591380](https://github.com/wgergely/vaultspec-core/commit/e591380ca6b3633369b2becdde4cfa21a99fa048))
+
 ## [0.1.25](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.24...vaultspec-core-v0.1.25) (2026-06-02)
 
 
