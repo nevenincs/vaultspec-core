@@ -320,6 +320,26 @@ _TOML_TABLE_HEADER_RE = re.compile(r"^\s*\[")
 _AGENTS_TABLE_RE = re.compile(
     r'^\s*\[agents\.(?:"(?P<quoted>[^"]+)"|(?P<bare>[^\]]+))\]\s*$'
 )
+# A TOML key-value assignment regex (matches key = value,
+# where key can be quoted or bare)
+_TOML_KEY_ASSIGNMENT_RE = re.compile(
+    r"^\s*(?:\"(?P<quoted_d>[^\"]+)\"|'(?P<quoted_s>[^']+)'|(?P<bare>[^=\s#]+))\s*="
+)
+
+
+def _is_agent_key_assignment(line: str, names: set[str]) -> bool:
+    """Return True if line is a key assignment for a name in *names*."""
+    match = _TOML_KEY_ASSIGNMENT_RE.match(line)
+    if match is None:
+        return False
+    quoted_d = match.group("quoted_d")
+    if quoted_d is not None:
+        return quoted_d in names
+    quoted_s = match.group("quoted_s")
+    if quoted_s is not None:
+        return quoted_s in names
+    bare = match.group("bare")
+    return bare.strip() in names if bare else False
 
 
 def _agents_table_name(line: str) -> str | None:
@@ -405,6 +425,18 @@ def _strip_agent_tables_in_segment(lines: list[str], names: set[str]) -> list[st
             while index < total:
                 inner = lines[index]
                 if state is None and _TOML_TABLE_HEADER_RE.match(inner):
+                    break
+                state = _advance_multiline_state(inner, state)
+                index += 1
+            continue
+        if state is None and _is_agent_key_assignment(line, names):
+            index += 1
+            while index < total:
+                inner = lines[index]
+                if state is None and (
+                    _TOML_TABLE_HEADER_RE.match(inner)
+                    or _TOML_KEY_ASSIGNMENT_RE.match(inner)
+                ):
                     break
                 state = _advance_multiline_state(inner, state)
                 index += 1
@@ -495,6 +527,23 @@ def _sync_codex_agents(
     existing = _sanitize_legacy_codex_agents(raw_existing, managed_names)
 
     abs_path = str(path).replace("\\", "/")
+
+    # Issue 149: Prune obsolete agents directory if prune is True
+    if prune:
+        agents_dir = path.parent / "agents"
+        if agents_dir.is_dir():
+            for child in sorted(agents_dir.iterdir()):
+                if child.is_file():
+                    child_abs = str(child).replace("\\", "/")
+                    result.items.append((child_abs, "[DELETE]"))
+                    if not dry_run:
+                        child.unlink()
+                    result.pruned += 1
+            if not dry_run:
+                import contextlib
+
+                with contextlib.suppress(OSError):
+                    agents_dir.rmdir()
 
     if not body:
         if prune and existed:

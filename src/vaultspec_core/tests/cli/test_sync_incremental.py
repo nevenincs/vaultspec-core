@@ -327,3 +327,43 @@ class TestIncrementalAgents:
         assert '[agents."vaultspec-worker"]' not in codex_cfg.read_text(
             encoding="utf-8"
         )
+
+    def test_prune_obsolete_codex_agents_directory(self, synthetic_project):
+        obsolete_dir = synthetic_project / ".codex" / "agents"
+        obsolete_dir.mkdir(parents=True, exist_ok=True)
+        legacy_file = obsolete_dir / "vaultspec-adr-researcher.toml"
+        legacy_file.write_text("some content", encoding="utf-8")
+
+        assert legacy_file.exists()
+        assert obsolete_dir.exists()
+
+        agents_sync(prune=True)
+
+        assert not legacy_file.exists()
+        assert not obsolete_dir.exists()
+
+    def test_strip_unmanaged_duplicate_agent_keys(self, synthetic_project):
+        codex_cfg = synthetic_project / ".codex" / "config.toml"
+        initial_toml = """[agents]
+vaultspec-worker = "legacy-value"
+other-config = 123
+
+# <vaultspec type="agents">
+# </vaultspec>
+"""
+        codex_cfg.write_text(initial_toml, encoding="utf-8")
+
+        agents_dir = synthetic_project / ".vaultspec" / "rules" / "agents"
+        agents_dir.mkdir(parents=True, exist_ok=True)
+        agent_path = agents_dir / "vaultspec-worker.md"
+        agent_path.write_text(
+            "---\ndescription: worker\n---\n\n# Worker\n\nv1",
+            encoding="utf-8",
+        )
+
+        agents_sync()
+
+        content = codex_cfg.read_text(encoding="utf-8")
+        assert 'vaultspec-worker = "legacy-value"' not in content
+        assert "other-config = 123" in content
+        assert '[agents."vaultspec-worker"]' in content
