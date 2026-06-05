@@ -65,15 +65,45 @@ def _save_plan_or_dry_run(
     dry_run: bool,
     canonicalise: bool,
     success_msg: str,
+    expected_retired: set[str] | None = None,
 ) -> None:
     """Helper to serialise plan and output a unified diff on dry-run.
 
     Or write to disk on apply.
     """
     from vaultspec_core.plan.commands._errors import PlanCommandError
+    from vaultspec_core.plan.parser import parse_plan
     from vaultspec_core.plan.serialiser import serialise_plan
 
     new_text = serialise_plan(plan, canonicalise=canonicalise)
+
+    # Issue 150: Verify that no unexpected elements are retired during this mutation
+    try:
+        old_plan = parse_plan(original_text)
+        new_plan = parse_plan(new_text)
+    except Exception as exc:
+        raise PlanCommandError(f"Plan validation failed during parsing: {exc}") from exc
+
+    old_retired = (
+        old_plan.retired_step_ids
+        | old_plan.retired_phase_ids
+        | old_plan.retired_wave_ids
+    )
+    new_retired = (
+        new_plan.retired_step_ids
+        | new_plan.retired_phase_ids
+        | new_plan.retired_wave_ids
+    )
+    newly_retired = new_retired - old_retired
+
+    expected = expected_retired if expected_retired is not None else set()
+    unexpected = newly_retired - expected
+    if unexpected:
+        sorted_unexpected = sorted(unexpected)
+        raise PlanCommandError(
+            f"mutation aborted: unexpected retirement of active plan items: "
+            f"{', '.join(sorted_unexpected)}. This indicates a serialization conflict."
+        )
 
     # Defence in depth against a serialiser regression that multiplies authored
     # prose (issue #125): a single structural edit never grows a plan several
@@ -630,6 +660,7 @@ def cmd_step_remove(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Retired Step `{retired}`.",
+        expected_retired={retired},
     )
 
 
@@ -867,6 +898,7 @@ def cmd_phase_remove(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Retired Phase `{retired_phase}`; cascaded Steps: {cascaded_str}.",
+        expected_retired={retired_phase} | set(retired_steps),
     )
 
 
@@ -1062,6 +1094,7 @@ def cmd_wave_remove(
             f"Retired Wave `{retired_wave}`; cascaded Phases: {phases_str}; "
             f"cascaded Steps: {steps_str}."
         ),
+        expected_retired={retired_wave} | set(retired_phases) | set(retired_steps),
     )
 
 
@@ -1333,6 +1366,23 @@ def cmd_tier_demote(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     target_tier = Tier(target) if target is not None else None
+
+    # Calculate expected_retired before we mutate the plan
+    expected_retired: set[str] = set()
+    current_t = plan.frontmatter.tier
+    resolved_target = target_tier
+    if resolved_target is None:
+        from vaultspec_core.plan.commands.tier_ops import _previous_tier
+
+        resolved_target = _previous_tier(current_t)
+
+    if resolved_target is not None:
+        if current_t in (Tier.L4, Tier.L3) and resolved_target is Tier.L2:
+            expected_retired.update(w.canonical_id for w in plan.waves)
+        elif current_t in (Tier.L4, Tier.L3, Tier.L2) and resolved_target is Tier.L1:
+            expected_retired.update(w.canonical_id for w in plan.waves)
+            expected_retired.update(p.canonical_id for p in plan.phases)
+
     new_tier = demote_tier(plan, target=target_tier, force=force)
     _save_plan_or_dry_run(
         path=path,
@@ -1341,4 +1391,5 @@ def cmd_tier_demote(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Tier demoted to {new_tier.value}.",
+        expected_retired=expected_retired,
     )

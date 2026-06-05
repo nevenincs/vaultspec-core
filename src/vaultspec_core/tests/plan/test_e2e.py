@@ -472,3 +472,50 @@ def test_cli_stable_insertion_uses_alpha_suffixes_for_waves_and_phases(
     assert "P01a" in reparsed.retired_phase_ids
     assert "W01a" in reparsed.retired_wave_ids
     assert "S03" in reparsed.retired_step_ids
+
+
+def test_unexpected_retirement_check_direct(tmp_path) -> None:
+    """Verify that unexpected retirement check raises PlanCommandError.
+
+    Tests calling _save_plan_or_dry_run directly.
+    """
+    from vaultspec_core.cli.plan_cmd import _save_plan_or_dry_run
+    from vaultspec_core.plan.commands._errors import PlanCommandError
+    from vaultspec_core.plan.parser import parse_plan
+
+    original_text = """---
+tags:
+  - '#plan'
+  - '#test'
+date: '2026-06-05'
+tier: L1
+related: []
+---
+
+# `test` plan
+
+- [ ] `S01` - work; `src/a.py`.
+"""
+    plan_path = tmp_path / "test-plan.md"
+    plan_path.write_text(original_text, encoding="utf-8")
+
+    plan = parse_plan(original_text)
+    # Simulate a mutation that retires S01 (adds S01 to retired_step_ids)
+    plan.retired_step_ids.add("S01")
+    # And removes S01 from steps
+    plan.steps = []
+
+    # If we don't pass S01 in expected_retired, it should raise PlanCommandError
+    with pytest.raises(PlanCommandError) as exc_info:
+        _save_plan_or_dry_run(
+            path=plan_path,
+            plan=plan,
+            original_text=original_text,
+            dry_run=False,
+            canonicalise=False,
+            success_msg="Mutated plan",
+            expected_retired=set(),
+        )
+
+    assert "unexpected retirement of active plan items" in str(exc_info.value)
+    assert "S01" in str(exc_info.value)
