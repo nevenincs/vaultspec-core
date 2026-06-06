@@ -547,7 +547,7 @@ def collect_content_integrity(tool_value: str) -> dict[str, ContentSignal]:
     # Collect files from source
     source_files: set[str] = set()
     if source_dir.is_dir():
-        source_files = {f.name for f in source_dir.glob("*.md")}
+        source_files = {f.name for f in source_dir.glob("**/*.md")}
 
     # Files in both
     for name in dest_files & source_files:
