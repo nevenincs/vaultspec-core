@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.27](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.26...vaultspec-core-v0.1.27) (2026-06-06)
+
+
+### Bug Fixes
+
+* support rules in project/ subdirectory in spec doctor ([#153](https://github.com/wgergely/vaultspec-core/issues/153)) ([66e7ac8](https://github.com/wgergely/vaultspec-core/commit/66e7ac80ab8b48a0a91d1c3d8a430a508a9684c2))
+
 ## [0.1.26](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.25...vaultspec-core-v0.1.26) (2026-06-05)
 
 
