@@ -79,8 +79,8 @@ Agent personas are defined in `.vaultspec/rules/agents/`. Two mechanisms are ava
 depending on plan complexity:
 
 - **Parallel sub-agents** for focused, managed work
-- **Agent teams** for self-orchestrating complex challenges using the team dispatch
-  tools.
+- **Agent teams** for self-orchestrating complex challenges, coordinated through the
+  host environment.
 
 Artifacts are persisted in `.vault/`. The user must approve plans before execution
 proceeds. Code review via vaultspec-code-review is mandatory after execution.

@@ -14,6 +14,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P01-S07]]'
   - '[[2026-06-09-firmware-wording-review-P01-S08]]'
   - '[[2026-06-09-firmware-wording-review-P01-S09]]'
+  - '[[2026-06-09-firmware-wording-review-P01-S10]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -40,6 +41,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P01-S07` - retire the undocumented code-review-audit double suffix at lines 28 and 48 in favor of the canonical audit address with optional narrative infix (D2)
 - `2026-06-09-firmware-wording-review-P01-S08` - retire the undocumented code-review-audit double suffix at line 87 in favor of the canonical audit address with optional narrative infix (D2)
 - `2026-06-09-firmware-wording-review-P01-S09` - confirm the hardcoded audit directory tag stands and the template remains the review-flavored audit body living under .vault/audit/ (D2)
+- `2026-06-09-firmware-wording-review-P01-S10` - replace the asserted team dispatch tools infrastructure claim at line 82 with hedged coordinated-through-the-host-environment wording (D12)
 
 ### plan
 
