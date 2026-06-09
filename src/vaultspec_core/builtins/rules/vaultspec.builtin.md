@@ -32,7 +32,7 @@ Where appropriate, use the following skills:
 - `vaultspec-research`
 - `vaultspec-code-research`
 - `vaultspec-adr`
-- `vaultspec-write-plan`
+- `vaultspec-write`
 - `vaultspec-execute`
 - `vaultspec-documentation`
 - `vaultspec-codify`

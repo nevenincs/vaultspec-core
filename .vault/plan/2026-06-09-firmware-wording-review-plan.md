@@ -28,7 +28,7 @@ Agent assignment: `vaultspec-standard-executor` executes the bulk prose, referen
 Land the three behavior-affecting decisions (D1 plan-skill name, D2 verify-artifact address, D12 team-dispatch wording) so every later phase edits against a coherent baseline.
 
 - [x] `P01.S01` - replace the phantom vaultspec-write-plan skill name with vaultspec-write in the pipeline table at line 25 and the intent table at line 68 (D1); `src/vaultspec_core/builtins/system/03-vaultspec.md`.
-- [ ] `P01.S02` - replace the phantom vaultspec-write-plan skill name with vaultspec-write in the skill catalog at line 35 (D1); `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
+- [x] `P01.S02` - replace the phantom vaultspec-write-plan skill name with vaultspec-write in the skill catalog at line 35 (D1); `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
 - [ ] `P01.S03` - replace the phantom vaultspec-write-plan skill name with vaultspec-write in the pipeline cross-reference at line 24 (D1); `src/vaultspec_core/builtins/skills/vaultspec-code-research/SKILL.md`.
 - [ ] `P01.S04` - correct the Verify-phase artifact cell from the exec review path to the canonical audit address .vault/audit/yyyy-mm-dd-feature-audit.md (D2); `src/vaultspec_core/builtins/system/03-vaultspec.md`.
 - [ ] `P01.S05` - document the optional narrative-infix audit filename yyyy-mm-dd-feature-topic-audit.md as the disambiguator for features with multiple audits (D2); `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.

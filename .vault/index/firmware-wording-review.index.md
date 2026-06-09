@@ -6,6 +6,7 @@ tags:
 date: '2026-06-09'
 related:
   - '[[2026-06-09-firmware-wording-review-P01-S01]]'
+  - '[[2026-06-09-firmware-wording-review-P01-S02]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -24,6 +25,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 ### exec
 
 - `2026-06-09-firmware-wording-review-P01-S01` - replace the phantom vaultspec-write-plan skill name with vaultspec-write in the pipeline table at line 25 and the intent table at line 68 (D1)
+- `2026-06-09-firmware-wording-review-P01-S02` - replace the phantom vaultspec-write-plan skill name with vaultspec-write in the skill catalog at line 35 (D1)
 
 ### plan
 
