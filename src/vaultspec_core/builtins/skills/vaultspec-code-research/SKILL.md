@@ -21,7 +21,7 @@ Use this skill:
 
 - To ground and de-risk complex coding tasks with actual code.
 
-Invoke when `vaultspec-research` -> `vaultspec-adr` -> `vaultspec-write-plan` explicitly
+Invoke when `vaultspec-research` -> `vaultspec-adr` -> `vaultspec-write` explicitly
 requires direct code referencing.
 
 ## Required steps
