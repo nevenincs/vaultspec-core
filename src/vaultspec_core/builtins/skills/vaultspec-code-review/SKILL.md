@@ -25,8 +25,8 @@ When to use this skill:
 
 - Identify files modified
 
-- Log discovered issues to `.vault/audit/yyyy-mm-dd-{feature}-code-review-audit.md` as
-  triaged `LOW`->`CRITICAL` task entries.
+- Log discovered issues to `.vault/audit/yyyy-mm-dd-{feature}-audit.md` as triaged
+  `LOW`->`CRITICAL` task entries.
 
 - Use a `vaultspec-code-reviewer` agent persona, or other code-review specialists.
 
@@ -34,9 +34,8 @@ When to use this skill:
 
 - Instruct agents to always read grounding docs, ADRs, and plans.
 
-- Instruct agents to use a single shared
-  `.vault/audit/yyyy-mm-dd-{feature}-code-review-audit.md` to persist findings as
-  triaged issue logs.
+- Instruct agents to use a single shared `.vault/audit/yyyy-mm-dd-{feature}-audit.md` to
+  persist findings as triaged issue logs.
 
 - Code review is not a code fixer skill - do NOT modify the codebase.
 
@@ -45,7 +44,9 @@ When to use this skill:
 - **Template:** You MUST read and use the template at
   `.vaultspec/rules/templates/code-review.md`.
 
-- **Location:** Must save to `.vault/audit/yyyy-mm-dd-{feature}-code-review-audit.md`.
+- **Location:** Must save to `.vault/audit/yyyy-mm-dd-{feature}-audit.md`. When the
+  feature already carries an audit, disambiguate with the optional narrative infix:
+  `yyyy-mm-dd-{feature}-{topic}-audit.md`.
 
 - **Tags:** Ensure persisted audit doc uses the `#audit` and `#{feature}` tags.
 
