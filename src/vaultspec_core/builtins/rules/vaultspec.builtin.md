@@ -47,6 +47,12 @@ hierarchy should reference those above them.
 - **Brainstorm** / **Research / Reference Audit** (`.vault/research/`,
   `.vault/reference/`)
 
+- **Audits** (`.vault/audit/yyyy-mm-dd-{feature}-audit.md`, optionally
+  `.vault/audit/yyyy-mm-dd-{feature}-{topic}-audit.md`)
+
+  - *Depends on:* brainstorm, research
+  - *References:* the artifacts under review
+
 - **Architecture Decision Records (ADR)** (`.vault/adr/`)
 
   - *Depends on:* brainstorm, research, audits
