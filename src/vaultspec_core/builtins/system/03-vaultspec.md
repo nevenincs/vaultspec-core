@@ -22,7 +22,7 @@ All significant work must follow this pipeline:
 | 1 Research  | vaultspec-research      | .vault/research/...        | -                                               |
 | 1 Reference | vaultspec-code-research | .vault/reference/...       | -                                               |
 | 2 Specify   | vaultspec-adr           | .vault/adr/...             | Research artifact                               |
-| 3 Plan      | vaultspec-write-plan    | .vault/plan/...            | ADR artifact                                    |
+| 3 Plan      | vaultspec-write         | .vault/plan/...            | ADR artifact                                    |
 | 4 Execute   | vaultspec-execute       | .vault/exec/.../steps      | Approved plan                                   |
 | 5 Verify    | vaultspec-code-review   | .vault/exec/.../review     | Completed step(s)                               |
 | 6 Codify    | vaultspec-codify        | .vaultspec/rules/rules/... | Review surfacing a durable cross-session lesson |
@@ -65,7 +65,7 @@ Supporting skills, invoked when appropriate:
 | "Research X" / "Investigate"        | vaultspec-research      |
 | "Decide on X" / "Create an ADR"     | vaultspec-adr           |
 | "How does [codebase] implement X?"  | vaultspec-code-research |
-| "Plan the implementation"           | vaultspec-write-plan    |
+| "Plan the implementation"           | vaultspec-write         |
 | "Execute the plan" / "Build it"     | vaultspec-execute       |
 | "Review the code" / "Verify"        | vaultspec-code-review   |
 | "Codify X" / "Promote X to a rule"  | vaultspec-codify        |
