@@ -9,6 +9,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P01-S02]]'
   - '[[2026-06-09-firmware-wording-review-P01-S03]]'
   - '[[2026-06-09-firmware-wording-review-P01-S04]]'
+  - '[[2026-06-09-firmware-wording-review-P01-S05]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -30,6 +31,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P01-S02` - replace the phantom vaultspec-write-plan skill name with vaultspec-write in the skill catalog at line 35 (D1)
 - `2026-06-09-firmware-wording-review-P01-S03` - replace the phantom vaultspec-write-plan skill name with vaultspec-write in the pipeline cross-reference at line 24 (D1)
 - `2026-06-09-firmware-wording-review-P01-S04` - correct the Verify-phase artifact cell from the exec review path to the canonical audit address .vault/audit/yyyy-mm-dd-feature-audit.md (D2)
+- `2026-06-09-firmware-wording-review-P01-S05` - document the optional narrative-infix audit filename yyyy-mm-dd-feature-topic-audit.md as the disambiguator for features with multiple audits (D2)
 
 ### plan
 

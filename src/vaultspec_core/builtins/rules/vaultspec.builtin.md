@@ -17,7 +17,9 @@ The workflow persists the following documents:
 - `.vault/reference/yyyy-mm-dd-<feature>-reference.md`: The implementation
   `<Reference>`.
 
-- `.vault/audit/yyyy-mm-dd-<feature>-audit.md`: The `<Audit>` report.
+- `.vault/audit/yyyy-mm-dd-<feature>-audit.md`: The `<Audit>` report. A feature with
+  multiple audits disambiguates each with an optional narrative infix:
+  `yyyy-mm-dd-<feature>-<topic>-audit.md`.
 
 - `.vault/exec/yyyy-mm-dd-<feature>/.../<step>.md`: The individual `<Step Record>`.
 
