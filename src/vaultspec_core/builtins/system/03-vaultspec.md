@@ -24,7 +24,7 @@ All significant work must follow this pipeline:
 | 2 Specify   | vaultspec-adr           | .vault/adr/...             | Research artifact                               |
 | 3 Plan      | vaultspec-write         | .vault/plan/...            | ADR artifact                                    |
 | 4 Execute   | vaultspec-execute       | .vault/exec/.../steps      | Approved plan                                   |
-| 5 Verify    | vaultspec-code-review   | .vault/exec/.../review     | Completed step(s)                               |
+| 5 Verify    | vaultspec-code-review   | .vault/audit/...           | Completed step(s)                               |
 | 6 Codify    | vaultspec-codify        | .vaultspec/rules/rules/... | Review surfacing a durable cross-session lesson |
 
 Phase 6 (Codify) is **discretionary**: most features end at Verify. Only when a Verify
