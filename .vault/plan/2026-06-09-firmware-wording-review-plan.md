@@ -34,7 +34,7 @@ Land the three behavior-affecting decisions (D1 plan-skill name, D2 verify-artif
 - [x] `P01.S05` - document the optional narrative-infix audit filename yyyy-mm-dd-feature-topic-audit.md as the disambiguator for features with multiple audits (D2); `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
 - [x] `P01.S06` - add the missing Audit node to the Documentation Hierarchy so the ADR and Plan depends-on-audits links resolve (D2); `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
 - [x] `P01.S07` - retire the undocumented code-review-audit double suffix at lines 28 and 48 in favor of the canonical audit address with optional narrative infix (D2); `src/vaultspec_core/builtins/skills/vaultspec-code-review/SKILL.md`.
-- [ ] `P01.S08` - retire the undocumented code-review-audit double suffix at line 87 in favor of the canonical audit address with optional narrative infix (D2); `src/vaultspec_core/builtins/agents/vaultspec-code-reviewer.md`.
+- [x] `P01.S08` - retire the undocumented code-review-audit double suffix at line 87 in favor of the canonical audit address with optional narrative infix (D2); `src/vaultspec_core/builtins/agents/vaultspec-code-reviewer.md`.
 - [ ] `P01.S09` - confirm the hardcoded audit directory tag stands and the template remains the review-flavored audit body living under .vault/audit/ (D2); `src/vaultspec_core/builtins/templates/code-review.md`.
 - [ ] `P01.S10` - replace the asserted team dispatch tools infrastructure claim at line 82 with hedged coordinated-through-the-host-environment wording (D12); `src/vaultspec_core/builtins/system/03-vaultspec.md`.
 

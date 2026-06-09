@@ -84,7 +84,9 @@ macroscopic awareness of an architect.
 - **Template:** You MUST read and use the template at
   `.vaultspec/rules/templates/code-review.md`.
 
-- **Location:** `.vault/audit/yyyy-mm-dd-<feature>-code-review-audit.md`.
+- **Location:** `.vault/audit/yyyy-mm-dd-<feature>-audit.md`. When the feature already
+  carries an audit, disambiguate with the optional narrative infix:
+  `yyyy-mm-dd-<feature>-<topic>-audit.md`.
 
 ### Frontmatter & Tagging Mandate
 
