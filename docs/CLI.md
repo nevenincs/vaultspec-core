@@ -153,6 +153,9 @@ vaultspec-core vault plan epic intent edit [OPTIONS] PATH
 vaultspec-core vault plan tier show [OPTIONS] PATH
 vaultspec-core vault plan tier promote [OPTIONS] PATH
 vaultspec-core vault plan tier demote [OPTIONS] PATH
+vaultspec-core vault link list [OPTIONS] [SRC]
+vaultspec-core vault link add [OPTIONS] SRC DST
+vaultspec-core vault link remove [OPTIONS] SRC DST
 vaultspec-core spec doctor [OPTIONS]
 vaultspec-core spec rules list [OPTIONS]
 vaultspec-core spec rules add [OPTIONS] NAME

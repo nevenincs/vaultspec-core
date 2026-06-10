@@ -63,6 +63,10 @@ from vaultspec_core.cli.plan_cmd import plan_app  # noqa: E402
 
 vault_app.add_typer(plan_app, name="plan")
 
+from vaultspec_core.cli.link_cmd import link_app  # noqa: E402
+
+vault_app.add_typer(link_app, name="link")
+
 
 # ---- vault add ---------------------------------------------------------------
 
