@@ -214,8 +214,23 @@ def _extract_title(body: str) -> str | None:
 
 
 def _extract_feature(tags: set[str]) -> str | None:
-    """Return the first non-type tag as the feature name (no ``#``)."""
-    for tag in tags:
+    """Return the feature name (no ``#``) from a document's tags.
+
+    The feature is the lexicographically smallest non-directory tag.  Sorting
+    makes the choice deterministic when a document carries more than one
+    non-directory tag; iterating the raw ``set`` would otherwise pick an
+    order-dependent tag under hash randomisation, which would make feature
+    assignment - and therefore the derived relatedness edges that depend on
+    it - non-reproducible across processes.
+
+    Args:
+        tags: The document's full tag set.
+
+    Returns:
+        The feature name without its ``#`` prefix, or ``None`` when the
+        document carries no non-directory tag.
+    """
+    for tag in sorted(tags):
         if not DocType.from_tag(tag):
             return tag.lstrip("#")
     return None
