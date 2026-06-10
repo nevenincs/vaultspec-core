@@ -53,10 +53,12 @@ CLI ADR (`2026-05-06-plan-hardening-adr`) for the subcommand contract.
 
 Supporting skills, invoked when appropriate:
 
-| Need          | Skill                   | Purpose                                     |
-| ------------- | ----------------------- | ------------------------------------------- |
-| Curate        | vaultspec-curate        | Maintain `.vault/` links, tags, and hygiene |
-| Documentation | vaultspec-documentation | Write or revise project documentation       |
+| Need               | Skill                    | Purpose                                                             |
+| ------------------ | ------------------------ | ------------------------------------------------------------------- |
+| Curate             | vaultspec-curate         | Maintain `.vault/` links, tags, and hygiene                         |
+| Documentation      | vaultspec-documentation  | Write or revise project documentation                               |
+| Team coordination  | vaultspec-team           | Start coding teams for complex challenges spanning parallel workers |
+| Project management | vaultspec-projectmanager | Coordinate issues, milestones, and releases outside the pipeline    |
 
 - **Use vaultspec- skills** to interpret user intent:
 
