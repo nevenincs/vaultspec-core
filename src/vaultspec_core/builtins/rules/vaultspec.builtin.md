@@ -161,7 +161,7 @@ tag; additional tags are allowed):
 tags:
   - '#plan'
   - '#feature-name'
-date: 2026-02-06
+date: '2026-02-06'
 related:
   - '[[related-file]]'
 ---
