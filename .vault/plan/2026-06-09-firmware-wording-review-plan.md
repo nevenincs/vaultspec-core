@@ -189,7 +189,7 @@ Propagate source edits to the deployed mirror, close out health checks and tests
 
 - [x] `P09.S121` - run vaultspec-core sync to propagate the source edits to every provider surface (D16); `src/vaultspec_core/builtins`.
 - [x] `P09.S122` - run vaultspec-core install --upgrade to clear the three-file reflow drift in the deployed mirror (D16); `.vaultspec/rules`.
-- [ ] `P09.S123` - run vault check all and spec doctor and confirm both report green (D16); `.vault`.
+- [x] `P09.S123` - run vault check all and spec doctor and confirm both report green (D16); `.vault`.
 - [ ] `P09.S124` - run the full test suite via uv run --no-sync pytest and the prek hooks on modified files, confirming green (D16); `tests`.
 - [ ] `P09.S125` - log a follow-up issue for automated regeneration of the bundled CLI reference from the live Typer surface (D16); `src/vaultspec_core/builtins/reference/cli.md`.
 - [x] `P09.S126` - log follow-up issues for any Python work surfaced by the tier-enum and template-filename code-binding checks (D16); `src/vaultspec_core`.

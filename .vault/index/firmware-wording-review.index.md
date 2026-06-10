@@ -135,6 +135,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P08-summary]]'
   - '[[2026-06-09-firmware-wording-review-P09-S121]]'
   - '[[2026-06-09-firmware-wording-review-P09-S122]]'
+  - '[[2026-06-09-firmware-wording-review-P09-S123]]'
   - '[[2026-06-09-firmware-wording-review-P09-S126]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
@@ -288,6 +289,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P08-summary` - `firmware-wording-review` `P08` summary
 - `2026-06-09-firmware-wording-review-P09-S121` - run vaultspec-core sync to propagate the source edits to every provider surface (D16)
 - `2026-06-09-firmware-wording-review-P09-S122` - run vaultspec-core install --upgrade to clear the three-file reflow drift in the deployed mirror (D16)
+- `2026-06-09-firmware-wording-review-P09-S123` - run vault check all and spec doctor and confirm both report green (D16)
 - `2026-06-09-firmware-wording-review-P09-S126` - remediate the template-rename downstream-upgrade hazard in code (D16, REVIEW-005)
 
 ### plan
