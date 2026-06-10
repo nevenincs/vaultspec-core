@@ -61,8 +61,12 @@ You are read-only and do not write the `<Reference>` document to disk.
 ```markdown
 Module(s): <list of relevant modules>
 File(s): <list of relevant files with paths>
-Related: <links to related <ADR>s, <Research>, or <Plan>s using [[wiki-links]]>
 ```
+
+- **NAME** related `<ADR>`, `<Research>`, or `<Plan>` documents alongside your returned
+  findings so the orchestrator can seed them into the scaffolded document's frontmatter
+  `related:` field (via the `--related` flag at scaffold time). Do NOT emit body-text
+  `Related:` lines; metadata in the body is drifted content the curator must repair.
 
 **CRITICAL RULES**:
 
