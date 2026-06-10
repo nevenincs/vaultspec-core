@@ -66,6 +66,7 @@ version = "0.1.28"
     "pytest-timeout>=2.4.0",
     "ruff>=0.15.2",
     "ty>=0.0.15",
+    "vaultspec-rag>=0.2.19",
   ]
 
 [dependency-groups]
@@ -83,6 +84,7 @@ dev = [
   "pytest-timeout>=2.4.0",
   "ruff>=0.15.2",
   "ty>=0.0.15",
+  "vaultspec-rag>=0.2.19",
 ]
 
 [tool.hatch.metadata]
