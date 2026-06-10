@@ -17,6 +17,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P01-S10]]'
   - '[[2026-06-09-firmware-wording-review-P01-summary]]'
   - '[[2026-06-09-firmware-wording-review-P02-S11]]'
+  - '[[2026-06-09-firmware-wording-review-P02-S12]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -46,6 +47,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P01-S10` - replace the asserted team dispatch tools infrastructure claim at line 82 with hedged coordinated-through-the-host-environment wording (D12)
 - `2026-06-09-firmware-wording-review-P01-summary` - `firmware-wording-review` `P01` summary
 - `2026-06-09-firmware-wording-review-P02-S11` - shorten the rule per its own Status clause now that archive dry-run, the paired unarchive verb, and exit-1 on nonexistent tags have landed, replacing the version anchor with a dated verification note (D5)
+- `2026-06-09-firmware-wording-review-P02-S12` - shorten the rule per its own Status clause, dropping the stale 0.1.19 claims, the empty-upgrade-preview example, and the silent-no-op claim, replacing the version anchor with a dated verification note (D5)
 
 ### plan
 
