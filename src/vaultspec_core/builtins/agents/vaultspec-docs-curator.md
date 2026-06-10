@@ -151,7 +151,16 @@ logic.
 - **`rg`**: Use for pattern matching (finding placeholders, drifted tags).
 - **Agent personas**: Load the appropriate persona for ALL modifications.
 
+## Audit Report Persistence
+
+You MUST persist your findings as an audit report. Scaffold it via
+`vaultspec-core vault add audit --feature docs-curation` - the CLI owns the filename
+(`.vault/audit/yyyy-mm-dd-docs-curation-audit.md`) and the frontmatter - then author the
+findings into the scaffolded document's body yourself (you carry Write and Edit for
+exactly this): the violations found, the fixes applied or delegated, and the flagged
+items under **Recommendations**.
+
 ## Final Output
 
 Only when zero violations remain, output a summary: "Audit Complete. [N] files fixed.
-Vault is compliant."
+Vault is compliant." and link the persisted audit report.
