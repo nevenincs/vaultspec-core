@@ -1,0 +1,303 @@
+"""Generate the derivable regions of the bundled CLI reference.
+
+The bundled machine-facing reference at
+``src/vaultspec_core/builtins/reference/cli.md`` is a hybrid of two content
+classes (per the ``cli-reference-automation`` ADR): mechanically derivable
+zones that this module owns and rewrites, and hand-written prose zones that it
+preserves verbatim.
+
+Generator-owned zones are delimited in the markdown by stable HTML-comment
+markers::
+
+    <!-- vaultspec:generated:begin <region-id> -->
+    ...generated content...
+    <!-- vaultspec:generated:end <region-id> -->
+
+This module walks the live Typer command tree exactly as the drift guard
+(:mod:`vaultspec_core.tests.cli.test_cli_reference_drift`) does -
+``registered_commands`` and ``registered_groups``, descending recursively and
+skipping ``hidden`` entries - and reads per-command argument metadata from the
+Click command objects Typer builds. From that tree it renders the
+command-inventory signature block. Everything outside the managed markers
+(entry-point table, global-options narrative, sync-vocabulary section, the
+curated per-command option tables, the consolidated ``vault check`` / ``vault
+plan`` paragraphs, the exit-code table, and the environment-variable table) is
+left untouched.
+
+The renderer runs in two modes from one rendering path. :func:`generate` with
+``check=False`` rewrites the managed regions in place; with ``check=True`` it
+renders into memory, diffs against the committed file, and reports whether they
+match. The CLI verb ``vaultspec-core spec reference generate`` exposes both
+modes; ``--check`` is the CI and pre-commit entry point.
+"""
+
+from __future__ import annotations
+
+import difflib
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    import click
+    import typer
+
+# Marker grammar. The region id is interpolated between the fixed prefix and
+# suffix so a single regex-free string search locates each managed zone.
+_MARKER_PREFIX = "<!-- vaultspec:generated:begin "
+_MARKER_SUFFIX = " -->"
+_END_PREFIX = "<!-- vaultspec:generated:end "
+
+
+def begin_marker(region_id: str) -> str:
+    """Return the opening marker line for *region_id*."""
+    return f"{_MARKER_PREFIX}{region_id}{_MARKER_SUFFIX}"
+
+
+def end_marker(region_id: str) -> str:
+    """Return the closing marker line for *region_id*."""
+    return f"{_END_PREFIX}{region_id}{_MARKER_SUFFIX}"
+
+
+def bundled_reference_path() -> Path:
+    """Return the filesystem path to the bundled ``reference/cli.md``."""
+    from vaultspec_core.builtins import _builtins_root
+
+    return _builtins_root() / "reference" / "cli.md"
+
+
+# ---------------------------------------------------------------------------
+# Typer / Click introspection
+# ---------------------------------------------------------------------------
+
+
+def _leaf_commands_in_order(
+    typer_app: typer.Typer, prefix: tuple[str, ...]
+) -> list[tuple[str, ...]]:
+    """Return visible leaf-command paths in registration order.
+
+    Mirrors the drift guard's tree walk: commands declared on a level come
+    before its sub-groups, and ``hidden`` entries are skipped. Registration
+    order (not alphabetical) is preserved so the rendered inventory matches the
+    order a contributor reads the command modules in.
+    """
+    paths: list[tuple[str, ...]] = []
+    for info in typer_app.registered_commands:
+        if info.hidden:
+            continue
+        name = info.name
+        if not name and info.callback is not None:
+            name = getattr(info.callback, "__name__", None)
+        if name:
+            paths.append((*prefix, name))
+    for group in typer_app.registered_groups:
+        name = group.name
+        if not name or group.hidden:
+            continue
+        if group.typer_instance is not None:
+            paths.extend(_leaf_commands_in_order(group.typer_instance, (*prefix, name)))
+    return paths
+
+
+def _resolve_click_command(
+    root: click.Command, root_ctx: click.Context, path: tuple[str, ...]
+) -> tuple[click.Command, click.Context]:
+    """Descend the Click command tree to the command at *path*."""
+    import click
+
+    command = root
+    ctx = root_ctx
+    for segment in path:
+        assert isinstance(command, click.Group)
+        sub = command.get_command(ctx, segment)
+        if sub is None:
+            raise KeyError(f"Click command not found for path: {' '.join(path)}")
+        command = sub
+        ctx = click.Context(sub, info_name=segment, parent=ctx)
+    return command, ctx
+
+
+def _command_signature(
+    command: click.Command, ctx: click.Context, path: tuple[str, ...]
+) -> str:
+    """Render one leaf signature line: ``vaultspec-core <path> [OPTIONS] ARGS``.
+
+    The ``[OPTIONS]`` token is emitted unconditionally to match the Typer usage
+    line shape; positional arguments follow in declaration order, each rendered
+    through Click's own ``make_metavar`` so optional arguments keep their
+    ``[BRACKETS]`` and required ones stay bare.
+    """
+    import click
+
+    parts = ["vaultspec-core", *path, "[OPTIONS]"]
+    for param in command.get_params(ctx):
+        if isinstance(param, click.Argument):
+            parts.append(param.make_metavar(ctx))
+    return " ".join(parts)
+
+
+def collect_leaf_signatures(typer_app: typer.Typer) -> list[str]:
+    """Return every visible leaf-command signature line in registration order."""
+    import click
+    from typer.main import get_command
+
+    root = get_command(typer_app)
+    root_ctx = click.Context(root, info_name="vaultspec-core")
+
+    signatures: list[str] = []
+    for path in _leaf_commands_in_order(typer_app, ()):
+        command, ctx = _resolve_click_command(root, root_ctx, path)
+        signatures.append(_command_signature(command, ctx, path))
+    return signatures
+
+
+# ---------------------------------------------------------------------------
+# Region renderers
+# ---------------------------------------------------------------------------
+
+
+def render_command_inventory(typer_app: typer.Typer) -> str:
+    """Render the command-inventory fenced block body (without markers).
+
+    The body is a single ``text`` fenced block listing every leaf signature,
+    surrounded by the blank lines mdformat keeps between the markers and the
+    block so generated output equals the formatted committed artifact.
+    """
+    signatures = collect_leaf_signatures(typer_app)
+    lines = ["```text", *signatures, "```"]
+    return "\n".join(lines)
+
+
+@dataclass(frozen=True)
+class ManagedRegion:
+    """A generator-owned zone delimited by begin/end markers in the reference."""
+
+    region_id: str
+    render: Callable[[typer.Typer], str]
+
+
+# Registry of every managed region, in document order. Adding a sibling
+# reference (mcp.md, framework.md) later extends this registry rather than
+# rewriting the apply loop.
+MANAGED_REGIONS: tuple[ManagedRegion, ...] = (
+    ManagedRegion(region_id="command-inventory", render=render_command_inventory),
+)
+
+
+# ---------------------------------------------------------------------------
+# Region application
+# ---------------------------------------------------------------------------
+
+
+class ReferenceMarkerError(ValueError):
+    """Raised when a managed region's markers are missing or malformed."""
+
+
+def _replace_region(text: str, region: ManagedRegion, body: str) -> str:
+    """Replace the content between *region*'s markers with *body*.
+
+    The begin and end marker lines are preserved exactly; only the content
+    between them is rewritten. A single blank line separates each marker from
+    the body, matching the mdformat layout, so a freshly generated file is
+    byte-identical to one that has been formatted.
+    """
+    begin = begin_marker(region.region_id)
+    end = end_marker(region.region_id)
+
+    begin_idx = text.find(begin)
+    if begin_idx == -1:
+        raise ReferenceMarkerError(
+            f"Missing begin marker for managed region {region.region_id!r}"
+        )
+    end_idx = text.find(end, begin_idx)
+    if end_idx == -1:
+        raise ReferenceMarkerError(
+            f"Missing end marker for managed region {region.region_id!r}"
+        )
+
+    before = text[:begin_idx] + begin
+    after = end + text[end_idx + len(end) :]
+    return f"{before}\n\n{body}\n\n{after}"
+
+
+def render_reference(committed_text: str, typer_app: typer.Typer) -> str:
+    """Return *committed_text* with every managed region freshly rendered.
+
+    Prose zones outside the markers are carried through verbatim; only the
+    content between each region's markers is replaced with generator output.
+    """
+    text = committed_text
+    for region in MANAGED_REGIONS:
+        text = _replace_region(text, region, region.render(typer_app))
+    return text
+
+
+# ---------------------------------------------------------------------------
+# Generate / check
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class GenerateResult:
+    """Outcome of a generate or check pass."""
+
+    path: Path
+    changed: bool
+    diff: str
+
+    @property
+    def in_sync(self) -> bool:
+        """True when the committed reference already equals fresh output."""
+        return not self.changed
+
+
+def _unified_diff(old: str, new: str, path: Path) -> str:
+    rel = path.name
+    return "".join(
+        difflib.unified_diff(
+            old.splitlines(keepends=True),
+            new.splitlines(keepends=True),
+            fromfile=f"a/{rel}",
+            tofile=f"b/{rel}",
+        )
+    )
+
+
+def generate(
+    *,
+    check: bool,
+    reference_path: Path | None = None,
+    typer_app: typer.Typer | None = None,
+) -> GenerateResult:
+    """Render the managed regions of the bundled reference.
+
+    Args:
+        check: When ``True`` the file is left untouched; the rendered output is
+            diffed against the committed content and the diff is returned.
+            When ``False`` the rendered output is written back in place when it
+            differs.
+        reference_path: Override the bundled reference path (tests point this
+            at a fixture).
+        typer_app: Override the Typer app object introspected (defaults to the
+            live :data:`vaultspec_core.cli.app`).
+
+    Returns:
+        A :class:`GenerateResult` recording whether the committed reference
+        diverged from fresh output and the unified diff between them.
+    """
+    if typer_app is None:
+        from vaultspec_core.cli import app as typer_app
+
+    path = reference_path or bundled_reference_path()
+    committed = path.read_text(encoding="utf-8")
+    rendered = render_reference(committed, typer_app)
+
+    changed = rendered != committed
+    diff = _unified_diff(committed, rendered, path) if changed else ""
+
+    if changed and not check:
+        path.write_text(rendered, encoding="utf-8", newline="\n")
+
+    return GenerateResult(path=path, changed=changed, diff=diff)

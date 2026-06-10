@@ -1863,6 +1863,111 @@ def cmd_doctor(
     raise typer.Exit(code=exit_code)
 
 
+# =============================================================================
+# Reference (generated documentation)
+# =============================================================================
+
+reference_app = typer.Typer(
+    help="Generate the derivable regions of the bundled CLI reference.",
+    no_args_is_help=True,
+)
+spec_app.add_typer(reference_app, name="reference", hidden=True)
+
+
+@reference_app.command("generate")
+def cmd_reference_generate(
+    check: Annotated[
+        bool,
+        typer.Option(
+            "--check",
+            help=(
+                "Render in memory and diff against the committed reference; "
+                "exit non-zero on mismatch without writing."
+            ),
+        ),
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Regenerate the generator-owned regions of the bundled CLI reference.
+
+    The bundled machine-facing reference at
+    ``src/vaultspec_core/builtins/reference/cli.md`` carries generator-owned
+    zones (delimited by ``vaultspec:generated`` HTML-comment markers) and
+    hand-written prose zones. This verb rewrites only the managed zones from
+    the live Typer command tree, leaving the prose untouched.
+
+    Default (write) mode rewrites the file in place when the managed regions
+    have drifted. ``--check`` mode renders into memory, diffs against the
+    committed file, prints the diff, and exits non-zero on mismatch (the CI and
+    pre-commit entry point); it exits 0 when the reference is already in sync.
+    """
+    from vaultspec_core.cli.reference_gen import (
+        ReferenceMarkerError,
+        generate,
+    )
+
+    try:
+        result = generate(check=check)
+    except (ReferenceMarkerError, OSError) as exc:
+        if json_output:
+            _emit_json("spec.reference.generate", "failed", {"message": str(exc)})
+        else:
+            typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    rel = result.path.name
+
+    if check:
+        if result.in_sync:
+            if json_output:
+                _emit_json(
+                    "spec.reference.generate",
+                    "unchanged",
+                    {"path": str(result.path), "in_sync": True},
+                )
+            else:
+                typer.echo(f"Bundled reference {rel} is in sync.")
+            raise typer.Exit(0)
+        if json_output:
+            _emit_json(
+                "spec.reference.generate",
+                "failed",
+                {"path": str(result.path), "in_sync": False, "diff": result.diff},
+            )
+        else:
+            typer.echo(
+                f"Bundled reference {rel} is out of sync with the live CLI surface.",
+                err=True,
+            )
+            typer.echo(result.diff, err=True)
+            typer.echo(
+                "  Run 'vaultspec-core spec reference generate' to refresh it.",
+                err=True,
+            )
+        raise typer.Exit(code=1)
+
+    if not result.changed:
+        if json_output:
+            _emit_json(
+                "spec.reference.generate",
+                "unchanged",
+                {"path": str(result.path), "in_sync": True},
+            )
+        else:
+            typer.echo(f"Bundled reference {rel} already up to date.")
+        raise typer.Exit(0)
+
+    if json_output:
+        _emit_json(
+            "spec.reference.generate",
+            "updated",
+            {"path": str(result.path), "diff": result.diff},
+        )
+    else:
+        typer.echo(f"Regenerated managed regions of {rel}.")
+    raise typer.Exit(0)
+
+
 def _render_diagnosis_table(console, diag: "WorkspaceDiagnosis") -> None:
     """Render the workspace diagnosis table."""
     from rich.table import Table

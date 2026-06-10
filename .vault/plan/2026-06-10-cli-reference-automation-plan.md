@@ -37,7 +37,7 @@ Harden the ref-audit.md legacy fallback and correct residual reference-accuracy 
 Decide whether to build a Typer-surface auto-generator for the bundled reference and roll it out only if the decision concludes build, since the enforced drift guard already prevents silent drift today.
 
 - [x] `P02.S04` - Produce a decision ADR weighing a Typer-surface auto-generator for the bundled reference against the existing hand-authored-plus-drift-guard approach, deciding whether to build it (D6 deferral); `.vault/adr`.
-- [ ] `P02.S05` - GATED on the ADR deciding build, implement the generator and wire it into the pre-commit and CI surface beside the drift guard, regenerating the bundled reference from the live Typer tree with covering tests (D6 deferral); `src/vaultspec_core`.
+- [x] `P02.S05` - GATED on the ADR deciding build, implement the generator and wire it into the pre-commit and CI surface beside the drift guard, regenerating the bundled reference from the live Typer tree with covering tests (D6 deferral); `src/vaultspec_core`.
 - [ ] `P02.S06` - GATED on the ADR deciding build, document the generator as the canonical reference-update path in the CLI rule (D6 deferral); `src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md`.
 
 ## Parallelization

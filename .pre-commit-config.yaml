@@ -76,6 +76,12 @@ repos:
     types:
     - markdown
     pass_filenames: false
+  - id: cli-reference-check
+    name: CLI reference up to date (generator --check)
+    entry: uv run --no-sync vaultspec-core spec reference generate --check
+    language: system
+    pass_filenames: false
+    files: '^(src/vaultspec_core/cli/.*\.py|src/vaultspec_core/builtins/reference/cli\.md)$'
   - id: check-provider-artifacts
     name: Check provider artifacts
     entry: uv run --no-sync vaultspec-core check-providers
