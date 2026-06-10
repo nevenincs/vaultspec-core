@@ -63,7 +63,9 @@ than hand-editing frontmatter:
 - **CRITICAL: you MUST always** present adr findings as an interactive prompt for user
   approval. Without explicit user sign-off the ADR is considere null and void.
 
-- **Draft ADR using an appropriate agent persona**, such as `vaultspec-writer`
+- **Draft ADR using the `vaultspec-adr-researcher` agent persona**, which formalizes the
+  research-backed decisions into ADR content and returns it for persistence into the
+  scaffolded document (the `vaultspec-writer` persona's mandate is plan-only).
 
 - Associate ADR with `{feature}` based on the findings in `[[...-research.md]]`.
 
