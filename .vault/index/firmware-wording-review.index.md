@@ -106,6 +106,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P08-S92]]'
   - '[[2026-06-09-firmware-wording-review-P08-S93]]'
   - '[[2026-06-09-firmware-wording-review-P08-S94]]'
+  - '[[2026-06-09-firmware-wording-review-P08-S95]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -224,6 +225,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P08-S92` - replace em dashes with spaced hyphens (D15)
 - `2026-06-09-firmware-wording-review-P08-S93` - replace em dashes with spaced hyphens (D15)
 - `2026-06-09-firmware-wording-review-P08-S94` - replace em dashes with spaced hyphens (D15)
+- `2026-06-09-firmware-wording-review-P08-S95` - replace em dashes with spaced hyphens (D15)
 
 ### plan
 
