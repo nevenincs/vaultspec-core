@@ -124,7 +124,7 @@ Fix every template placeholder leak against the documented placeholder conventio
 - [x] `P07.S65` - move the instructional boilerplate and the file1 and file2 placeholders inside comment blocks so sanitize strips them (D14); `src/vaultspec_core/builtins/templates/exec-summary.md`.
 - [x] `P07.S66` - seed the related field instead of the empty list that violates the always-populate hint the template itself states (D14); `src/vaultspec_core/builtins/templates/audit.md`.
 - [x] `P07.S67` - add proposed to the status enum and note the status convention in the frontmatter hint (D14); `src/vaultspec_core/builtins/templates/adr.md`.
-- [ ] `P07.S68` - document the generated frontmatter field the template declares (D14); `src/vaultspec_core/builtins/templates/index.md`.
+- [x] `P07.S68` - document the generated frontmatter field the template declares (D14); `src/vaultspec_core/builtins/templates/index.md`.
 - [ ] `P07.S69` - document the machine-filled placeholder class (heading, step_id, plan_stem, scope_block, document_list) as a named class in the placeholder conventions (D14); `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
 - [ ] `P07.S70` - align the documented date-quoting example with the quoted form the templates use (D14); `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
 - [ ] `P07.S71` - lowercase the uppercase YYYY-MM-DD in the hint block and reword the garbled DO-NOT-add-frontmatter-fields-outside-the-frontmatter hint (D14); `src/vaultspec_core/builtins/templates/adr.md`.
