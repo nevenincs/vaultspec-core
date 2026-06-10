@@ -10,69 +10,38 @@ in the `vaultspec-codify` rule.
 
 ## Rule
 
-Before invoking `vaultspec-core vault feature archive <feature-tag>`, enumerate every
-document outside the feature whose `related:` frontmatter points at any document inside
-the feature. Decide in advance whether those incoming references should be rewritten,
-acknowledged as dangling, or block the archive entirely.
+Before invoking `vaultspec-core vault feature archive <feature-tag>`, run the same verb
+with `--dry-run` as the canonical discovery pass and audit the preview for incoming
+references: documents outside the feature whose `related:` frontmatter points at
+documents inside it. Decide whether each incoming reference should be rewritten,
+acknowledged as dangling, or block the archive entirely before applying the real run.
 
 ## Why
 
-The rolling CLI UX audit's B9 finding documented that
-`vaultspec-core vault feature archive` today has five compounding gaps: no `--dry-run`,
-no reversal verb, silent breakage of cross-feature `related:` links, an output directory
-`vaultspec-core vault check structure` declares illegal, and an auto-fix path that
-amputates the very relationships the verb was invoked to preserve. The team-lead brief
-in the audit's Round 3 explicitly stated "the trail should stay readable; we're not
-deleting anything", and the CLI did the opposite.
-
-The sibling ADR `cli-memory-lifecycle` proposes a comprehensive fix landing in the
-umbrella plan's `W02.P04.S14`. Until that ships, this rule is the operator discipline
-that prevents the known failure mode.
+The rolling CLI UX audit's B9 finding documented compounding gaps in the archive verb:
+no preview, no reversal verb, silent breakage of cross-feature `related:` links, and a
+destructive auto-fix path. The CLI has since closed the verb-level gaps: the archive
+verb carries `--dry-run`, a paired `vault feature unarchive` verb restores a mistaken
+archive, and archiving a nonexistent tag exits 1 with an error (re-verified against the
+live CLI on 2026-06-10, `vaultspec-core --version` 0.1.26). What the CLI cannot decide
+is whether an incoming cross-feature reference is provenance to preserve, a stale link
+to drop, or a dependency that should block retirement. That judgment is this rule.
 
 ## How
 
-Before archive, run a discovery pass:
-
-- `vaultspec-core vault check dangling` against the current vault to record the baseline
-  (no dangling links before archive).
-
-- Search the vault for incoming references to the feature being archived. The feature's
-  index document at `.vault/index/<feature-tag>.index.md` enumerates the feature's own
-  documents; you want the inverse — every document in
-  `.vault/{adr,plan,research,audit,exec,reference}/` whose `related:` field references
-  any of those stems.
-
-- Classify each incoming reference: cross-feature provenance to preserve, stale link to
-  drop, or external dependency that should block archive until resolved.
-
-Then take the right action:
-
-- **Good:** the discovery pass reports zero incoming cross-feature references. Archive
-  is safe. Run `vaultspec-core vault feature archive <feature-tag>` and verify
-  `vaultspec-core vault check all` stays green.
-
-- **Good:** the discovery pass reports incoming references and you have explicitly
-  rewritten or removed them before invoking the archive verb. The archive then leaves no
-  dangling links.
-
-- **Bad:** invoke `vaultspec-core vault feature archive` against a feature with
-  unaudited incoming references, then attempt to "fix" the resulting dangling errors via
-  `vaultspec-core vault repair`. The repair's auto-fix removes the `related:` entries,
-  silently destroying the cross-feature provenance the rule was meant to preserve.
-
-- **Bad:** invoke `vaultspec-core vault feature archive <typo>` against a tag that does
-  not exist. The verb returns exit 0 with a silent no-op (also finding B9); CI cannot
-  detect that nothing was archived. Validate the feature tag with
-  `vaultspec-core vault feature list` before archive.
+- Run `vaultspec-core vault feature archive <feature-tag> --dry-run` and read the
+  previewed changes; classify every incoming reference before the real run.
+- After the real run, verify `vaultspec-core vault check all` stays green. If the
+  archive was a mistake, `vaultspec-core vault feature unarchive <feature-tag>` reverses
+  it.
 
 ## Status
 
-Active. Once `cli-memory-lifecycle` `W02.P04.S14` lands (the archive verb gains a
-dry-run preview, a paired unarchive verb, cross-feature link rewriting, and a non-zero
-exit on typo'd targets), the discovery-pass burden moves into the CLI and this rule's
-body shortens to a one-line pointer at the new dry-run preview path as canonical. The
-rule's intent (audit incoming references before retirement) survives the verb
-improvement; only the procedure changes.
+Active. The CLI improvements this rule anticipated (`cli-memory-lifecycle`
+`W02.P04.S14`) have landed: `--dry-run` is the canonical discovery pass, `unarchive` is
+the reversal verb, and typo'd tags fail loudly. The rule's intent (audit incoming
+references before retirement) survives the verb improvement; the discovery procedure now
+lives in the CLI preview.
 
 ## Source
 
