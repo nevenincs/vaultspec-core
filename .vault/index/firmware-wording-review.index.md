@@ -84,6 +84,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P07-S71]]'
   - '[[2026-06-09-firmware-wording-review-P07-S72]]'
   - '[[2026-06-09-firmware-wording-review-P07-S73]]'
+  - '[[2026-06-09-firmware-wording-review-P07-S74]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -180,6 +181,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P07-S71` - lowercase the uppercase YYYY-MM-DD in the hint block and reword the garbled DO-NOT-add-frontmatter-fields-outside-the-frontmatter hint (D14)
 - `2026-06-09-firmware-wording-review-P07-S72` - lowercase the uppercase YYYY-MM-DD in the hint block and reword the garbled DO-NOT-add-frontmatter-fields-outside-the-frontmatter hint (D14)
 - `2026-06-09-firmware-wording-review-P07-S73` - lowercase the uppercase YYYY-MM-DD in the hint block and reword the garbled DO-NOT-add-frontmatter-fields-outside-the-frontmatter hint (D14)
+- `2026-06-09-firmware-wording-review-P07-S74` - lowercase the uppercase YYYY-MM-DD in the hint block and reword the garbled DO-NOT-add-frontmatter-fields-outside-the-frontmatter hint (D14)
 
 ### plan
 

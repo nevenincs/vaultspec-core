@@ -16,11 +16,11 @@ related:
      The {step_id} and {plan_stem} placeholders are machine-filled by
      `vaultspec-core vault add exec`; do not fill them by hand.
 
-     Related: use wiki-links as '[[YYYY-MM-DD-foo-bar-plan]]' and link the
+     Related: use wiki-links as '[[yyyy-mm-dd-foo-bar-plan]]' and link the
      parent plan.
 
-     DO NOT add frontmatter fields
-     outside the frontmatter. -->
+     DO NOT add fields beyond those scaffolded; metadata lives
+     only in the frontmatter. -->
 
 <!-- LINK RULES:
      - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
