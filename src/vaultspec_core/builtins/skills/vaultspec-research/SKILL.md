@@ -19,35 +19,43 @@ When to use this skill:
 **Announce at start:** "I'm using the `vaultspec-research` skill to conduct structured
 research and brainstorming."
 
-**Save findings to:** Research artifact at
-`.vault/research/yyyy-mm-dd-{feature}-research.md`
+**Persist findings:** scaffold the research artifact with
+`vaultspec-core vault add research --feature {feature}`, then author the findings as
+body prose in the scaffolded file. The CLI owns the filename
+(`.vault/research/yyyy-mm-dd-{feature}-research.md`) and the frontmatter; never
+hand-write either.
 
 Load the `vaultspec-adr-researcher` agent persona for focused work. When the task
 benefits from multiple researchers, coordinate them through the host environment rather
 than assuming a shipped MCP team-thread runtime. Instruct the researcher to "Conduct
-research on `{topic}`. Persist findings to `.vault/research/...`"
+research on `{topic}`." and write the returned findings into the scaffolded document's
+body.
 
 ## Template
 
-- You MUST read and use the template at `.vaultspec/rules/templates/research.md`.
+- You MUST read and use the template at `.vaultspec/rules/templates/research.md`; its
+  embedded hint blocks govern the body structure.
 
 ### Frontmatter & Tagging Mandate
 
-Every document MUST strictly adhere to the following schema:
+The `vault add` scaffold produces frontmatter conforming to this schema. Verify it after
+scaffolding; report drift via `vaultspec-core vault check all` rather than hand-editing
+frontmatter:
 
-- **`tags`**: MUST contain the required tag pair in a YAML list.
+- **`tags`**: contains the required tag pair in a YAML list.
 
   - **Directory Tag**: Exactly `#research`.
   - **Feature Tag**: Exactly one kebab-case `#{feature}` tag.
-  - *Syntax:* `tags: ['#research', '#feature']` (Must be quoted strings in a list).
+  - *Syntax:* `tags: ['#research', '#feature']` (quoted strings in a list).
 
-- **`related`**: MUST be a YAML list of quoted `'[[wiki-links]]'`.
+- **`related`**: a YAML list of quoted `'[[wiki-links]]'`, seeded from the `--related`
+  flag at scaffold time.
 
   - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
 
-- **`date`**: MUST use `yyyy-mm-dd` format.
+- **`date`**: `yyyy-mm-dd` format, set by the scaffold.
 
-- **No `feature` key**: Use `tags:` exclusively for feature identification.
+- **No `feature` key**: `tags:` exclusively identifies the feature.
 
 ## Workflow
 
