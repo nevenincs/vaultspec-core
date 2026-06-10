@@ -3,7 +3,8 @@ name: vaultspec-curate
 description: >-
   Use this skill to audit and clean the .vault vault. Validates frontmatter,
   wiki-links, naming conventions, template compliance, and directory
-  structure. Fixes violations in-place and produces an audit report.
+  structure. Fixes violations through the CLI repair paths and produces an
+  audit report.
 ---
 
 # Documentation Curation Skill (vaultspec-curate)
@@ -32,20 +33,23 @@ documentation vault."
 
 Load the `vaultspec-docs-curator` agent persona. Instruct it to "Perform a full vault
 audit of `.vault/`. Validate frontmatter, wiki-links, naming conventions, template
-compliance, and directory structure. Fix violations in-place and produce an audit
-report."
+compliance, and directory structure. Repair violations through
+`vaultspec-core vault check all --fix` and the CLI repair paths rather than hand edits,
+and produce an audit report."
 
 For targeted audits, scope the audit accordingly (e.g., "Audit only `.vault/exec/...`").
 
 ### Review the Audit Report
 
-The curator persists its findings to:
-
-`.vault/audit/yyyy-mm-dd-docs-curation-audit.md`
+Scaffold the audit report with `vaultspec-core vault add audit --feature docs-curation`,
+then persist the curator's findings into its body. The CLI owns the filename
+(`.vault/audit/yyyy-mm-dd-docs-curation-audit.md`) and the frontmatter; never hand-write
+either.
 
 Review the report for:
 
-- **Auto-fixed** items (renames, link corrections, frontmatter additions).
+- **Auto-fixed** items (renames, link corrections, frontmatter additions applied by
+  `vaultspec-core vault check all --fix`).
 - **Flagged** items requiring author input (missing template sections, ambiguous file
   placement).
 
@@ -64,7 +68,9 @@ missing sections).
 
 ### Frontmatter & Tagging Mandate
 
-Every document MUST strictly adhere to the following schema:
+The curator validates every document against this schema. The `vault add` scaffold
+produces conforming frontmatter for new documents; violations in existing documents are
+repaired via `vaultspec-core vault check all --fix` rather than hand edits:
 
 - **`tags`**: MUST contain the required tag pair in a YAML list.
 
@@ -85,8 +91,8 @@ Every document MUST strictly adhere to the following schema:
 
 ## Requirements
 
-- **Non-destructive**: The curator never deletes files. It renames, edits
-  frontmatter/links, and flags.
+- **Non-destructive**: The curator never deletes files. It repairs through the CLI fix
+  paths (renames, link and frontmatter corrections) and flags what the CLI cannot fix.
 
 - **Traceability**: Every modification is logged in the audit report.
 
