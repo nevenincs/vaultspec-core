@@ -14,6 +14,7 @@ related:
   - '[[2026-06-10-cli-reference-automation-P02-S06]]'
   - '[[2026-06-10-cli-reference-automation-P02-summary]]'
   - '[[2026-06-10-cli-reference-automation-adr]]'
+  - '[[2026-06-10-cli-reference-automation-audit]]'
   - '[[2026-06-10-cli-reference-automation-plan]]'
 ---
 
@@ -26,6 +27,10 @@ Auto-generated index of all documents tagged with `#cli-reference-automation`.
 ### adr
 
 - `2026-06-10-cli-reference-automation-adr` - `cli-reference-automation` adr: `cli reference auto-generation` | (**status:** `accepted`)
+
+### audit
+
+- `2026-06-10-cli-reference-automation-audit` - `cli-reference-automation` audit: `cli reference generator code review`
 
 ### exec
 
