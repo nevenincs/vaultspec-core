@@ -136,6 +136,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
+  - '[[2026-06-10-firmware-wording-review-audit]]'
 ---
 
 # `firmware-wording-review` feature index
@@ -147,6 +148,10 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 ### adr
 
 - `2026-06-09-firmware-wording-review-adr` - `firmware-wording-review` adr: `firmware reconciliation decisions` | (**status:** `accepted`)
+
+### audit
+
+- `2026-06-10-firmware-wording-review-audit` - `firmware-wording-review` audit: `firmware reconciliation code review`
 
 ### exec
 
