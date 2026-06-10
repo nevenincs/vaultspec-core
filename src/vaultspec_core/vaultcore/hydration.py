@@ -436,7 +436,7 @@ def get_template_path(
         DocType.AUDIT: "audit.md",
         DocType.PLAN: "plan.md",
         DocType.RESEARCH: "research.md",
-        DocType.REFERENCE: "ref-audit.md",
+        DocType.REFERENCE: "reference.md",
         DocType.EXEC: "exec-step.md",
         DocType.INDEX: "index.md",
     }

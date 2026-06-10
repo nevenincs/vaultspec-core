@@ -101,7 +101,7 @@ Reconcile persona persistence mandates, the executor trio, ADR authorship, and t
 Wire the orphaned template, personas, and skills into the catalogs and unify the reference doc-type noun (D7, D8).
 
 - [x] `P06.S49` - run the code-binding check for the ref-audit.md template filename across Python loaders, provider sync mappings, and tests (D7); `src/vaultspec_core`.
-- [ ] `P06.S50` - rename the template file to reference.md if the code-binding check shows the name unbound or trivially remappable, otherwise keep the filename and unify prose only (D7); `src/vaultspec_core/builtins/templates/ref-audit.md`.
+- [x] `P06.S50` - rename the template file to reference.md if the code-binding check shows the name unbound or trivially remappable, otherwise keep the filename and unify prose only (D7); `src/vaultspec_core/builtins/templates/ref-audit.md`.
 - [ ] `P06.S51` - unify the reference noun across the hierarchy node, the pipeline phase wording, and the directory-table description (D7); `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
 - [ ] `P06.S52` - add the template mandate, the standard frontmatter-and-tagging mandate, and an explicit pointer to the vaultspec-reference-auditor persona (D8); `src/vaultspec_core/builtins/skills/vaultspec-code-research/SKILL.md`.
 - [ ] `P06.S53` - name the vaultspec-researcher persona as the generic persona for multi-researcher coordination (D8); `src/vaultspec_core/builtins/skills/vaultspec-research/SKILL.md`.
