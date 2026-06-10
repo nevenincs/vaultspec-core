@@ -74,6 +74,22 @@ Forbidden:
 - Editing files inside generated provider directories; `vaultspec-core sync` regenerates
   them.
 
+## Maintaining the bundled CLI reference
+
+The machine-facing reference at `reference/cli.md` is part hand-written prose and part
+generator-owned. The derivable zones (today, the command-inventory signature block) sit
+between `vaultspec:generated:begin` / `vaultspec:generated:end` HTML-comment markers and
+are owned by the generator: never hand-edit between the markers, because the next
+generate overwrites those edits. The prose outside the markers (the entry-point table,
+global-options narrative, per-command option tables, and the rest) stays hand-authored.
+
+Run `vaultspec-core spec reference generate` to rewrite the managed regions from the
+live Typer command surface; this is the canonical way to update the bundled reference
+after a command, flag, or argument changes. The `--check` variant renders in memory,
+diffs against the committed file, and exits non-zero on mismatch without writing - it is
+wired into pre-commit and gates CI, so a drifted reference fails the build until the
+generator is re-run.
+
 ## References
 
 - `.vaultspec/rules/reference/cli.md` - locally-resident machine-facing CLI reference:
