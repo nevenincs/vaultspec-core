@@ -80,7 +80,7 @@ Reconcile persona persistence mandates, the executor trio, ADR authorship, and t
 - [x] `P05.S31` - note the Bash-only mutation path via gh and git as deliberate for this read-write persona without Write or Edit tools (D3); `src/vaultspec_core/builtins/agents/vaultspec-project-coordinator.md`.
 - [x] `P05.S32` - rewrite the verbatim high-tier mission statement at lines 10-12 into a tier-appropriate mission of simplicity, pattern-following, and minimal blast radius (D9); `src/vaultspec_core/builtins/agents/vaultspec-low-executor.md`.
 - [x] `P05.S33` - add the mandatory Critical Requirement code-review section that the standard and high executors carry (D9); `src/vaultspec_core/builtins/agents/vaultspec-low-executor.md`.
-- [ ] `P05.S34` - run the code-binding check for tier MEDIUM frontmatter consumption in Python loaders and tests before any enum value change (D9); `src/vaultspec_core`.
+- [x] `P05.S34` - run the code-binding check for tier MEDIUM frontmatter consumption in Python loaders and tests before any enum value change (D9); `src/vaultspec_core`.
 - [ ] `P05.S35` - rename the medium-tier description wording to standard and move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9); `src/vaultspec_core/builtins/agents/vaultspec-standard-executor.md`.
 - [ ] `P05.S36` - move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9); `src/vaultspec_core/builtins/agents/vaultspec-codifier.md`.
 - [ ] `P05.S37` - move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9); `src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md`.
