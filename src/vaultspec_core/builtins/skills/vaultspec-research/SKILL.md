@@ -26,10 +26,11 @@ body prose in the scaffolded file. The CLI owns the filename
 hand-write either.
 
 Load the `vaultspec-adr-researcher` agent persona for focused work. When the task
-benefits from multiple researchers, coordinate them through the host environment rather
-than assuming a shipped MCP team-thread runtime. Instruct the researcher to "Conduct
-research on `{topic}`." and write the returned findings into the scaffolded document's
-body.
+benefits from multiple researchers, load the generic `vaultspec-researcher` agent
+persona for the additional research threads and coordinate them through the host
+environment rather than assuming a shipped MCP team-thread runtime. Instruct each
+researcher to "Conduct research on `{topic}`." and write the returned findings into the
+scaffolded document's body.
 
 ## Template
 
