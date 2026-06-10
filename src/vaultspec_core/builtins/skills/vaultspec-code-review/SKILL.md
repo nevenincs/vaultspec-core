@@ -54,4 +54,5 @@ When to use this skill:
 - **Tags:** the scaffold tags the audit document with `#audit` and `#{feature}`; verify
   via `vaultspec-core vault check all` rather than hand-editing.
 
-- Issues must be continously appended to audit document as a rolling log of task queue.
+- Issues must be continuously appended to the audit document as a rolling log of open
+  tasks.
