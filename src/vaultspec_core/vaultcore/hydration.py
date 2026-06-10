@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 _KNOWN_PLACEHOLDERS = (
     "{yyyy-mm-dd-*}",
     "[[{yyyy-mm-dd-*}]]",
-    "{accepted|rejected|deprecated}",
+    "{proposed|accepted|rejected|deprecated}",
 )
 
 if TYPE_CHECKING:
