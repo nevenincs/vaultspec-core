@@ -16,6 +16,9 @@ Use this skill:
 
 ## Required Steps
 
+- **Announce at start:** "I'm using the `vaultspec-execute` skill to execute the
+  implementation plan."
+
 - This skill MUST be invoked to execute an implementation `.vault/plan` located at
   `.vault/plan/yyyy-mm-dd-{feature}-plan.md`.
 
