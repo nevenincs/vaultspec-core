@@ -1,3 +1,10 @@
+---
+description: Fresh-eyes documentation wireframe evaluator. Assumes zero project knowledge, judges a proposed document outline against the Diataxis framework, and returns findings only.
+tier: STANDARD
+mode: read-only
+tools: [Read]
+---
+
 # Wireframe Agent
 
 ## Setup - read before responding

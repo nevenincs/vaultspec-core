@@ -178,7 +178,7 @@ Apply the single style pass (spelling locale, dash convention, label form, annou
 - [x] `P08.S114` - unify the supersession procedure on a Status section naming the successor followed by spec rules remove, and add the no-first-encounter execution-cycle guard the persona and skill already state (D13); `src/vaultspec_core/builtins/rules/vaultspec-codify.builtin.md`.
 - [x] `P08.S115` - align the supersession mechanics with the unified Status-section procedure (D13); `src/vaultspec_core/builtins/skills/vaultspec-codify/SKILL.md`.
 - [x] `P08.S116` - align the supersession mechanics with the unified Status-section procedure (D13); `src/vaultspec_core/builtins/agents/vaultspec-codifier.md`.
-- [ ] `P08.S117` - add the shared persona frontmatter schema the eleven top-level personas carry (D15); `src/vaultspec_core/builtins/skills/vaultspec-documentation/agents/wireframe-agent.md`.
+- [x] `P08.S117` - add the shared persona frontmatter schema the eleven top-level personas carry (D15); `src/vaultspec_core/builtins/skills/vaultspec-documentation/agents/wireframe-agent.md`.
 - [ ] `P08.S118` - add the shared persona frontmatter schema the eleven top-level personas carry (D15); `src/vaultspec_core/builtins/skills/vaultspec-documentation/agents/editorial-reviewer.md`.
 - [ ] `P08.S119` - remove the duplicated mandatory-read instruction and convert square-bracket placeholders to the curly-brace convention (D15); `src/vaultspec_core/builtins/skills/vaultspec-documentation/agents/wireframe-agent.md`.
 - [ ] `P08.S120` - reword the Start-with-Phase instruction so it holds at L1 where only Steps exist (D15); `src/vaultspec_core/builtins/skills/vaultspec-execute/SKILL.md`.
