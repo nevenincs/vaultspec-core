@@ -20,6 +20,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P02-S12]]'
   - '[[2026-06-09-firmware-wording-review-P02-S13]]'
   - '[[2026-06-09-firmware-wording-review-P02-S14]]'
+  - '[[2026-06-09-firmware-wording-review-P02-summary]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -52,6 +53,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P02-S12` - shorten the rule per its own Status clause, dropping the stale 0.1.19 claims, the empty-upgrade-preview example, and the silent-no-op claim, replacing the version anchor with a dated verification note (D5)
 - `2026-06-09-firmware-wording-review-P02-S13` - live-confirm plan body-prose preservation by running structural plan verbs against a scratch plan document carrying authored prose sections (D5)
 - `2026-06-09-firmware-wording-review-P02-S14` - shorten the rule per its own Status clause only after the live prose-preservation confirmation passes, replacing the ordering procedure with a pointer at the preserved-prose behavior (D5)
+- `2026-06-09-firmware-wording-review-P02-summary` - `firmware-wording-review` `P02` summary
 
 ### plan
 
