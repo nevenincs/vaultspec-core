@@ -234,6 +234,7 @@ def json_envelope(
     status: str,
     data: Mapping[str, object],
     *,
+    version: int = 1,
     hints: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Wrap a command payload in the canonical ``--json`` envelope.
@@ -247,14 +248,30 @@ def json_envelope(
             ``"spec.rules.sync"``); forms the ``schema`` string.
         status: The invocation's aggregate canonical outcome word.
         data: The command's own payload, nested unmodified.
+        version: Schema version suffix appended to the ``schema`` string
+            (e.g. ``1`` yields ``vaultspec.{command}.v1``). Defaults to
+            ``1``; all existing callers inherit ``v1`` unchanged. Pass
+            ``version=2`` when a command's payload shape has been bumped
+            and the consuming contract must be versioned (e.g.
+            :func:`cmd_graph` after the v2 envelope bump).
         hints: Optional structured next-step hint; omitted when absent.
 
     Returns:
         The envelope mapping ``{schema, status, data}`` plus ``hints``
         when supplied.
+
+    Example::
+
+        # Default v1 - all existing callers unchanged
+        json_envelope("vault.check", "unchanged", {...})
+        # => {"schema": "vaultspec.vault.check.v1", ...}
+
+        # Explicit v2 for the graph command after its schema bump
+        json_envelope("vault.graph", "unchanged", {...}, version=2)
+        # => {"schema": "vaultspec.vault.graph.v2", ...}
     """
     envelope: dict[str, object] = {
-        "schema": f"vaultspec.{command}.v1",
+        "schema": f"vaultspec.{command}.v{version}",
         "status": str(status),
         "data": dict(data),
     }

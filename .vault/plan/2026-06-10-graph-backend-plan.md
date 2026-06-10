@@ -38,7 +38,7 @@ Pin the graph JSON wire contract, fix wasteful metrics computation, and close kn
 - [x] `P01.S01` - pass an explicit edges keyword to the node-link serialisation call so the wire key is version-independent; `src/vaultspec_core/graph/api.py`.
 - [x] `P01.S02` - raise the networkx dependency floor to 3.6; `pyproject.toml`.
 - [x] `P01.S03` - eliminate the duplicate metrics computation on the JSON export path; `src/vaultspec_core/graph/api.py`.
-- [ ] `P01.S04` - bump the graph envelope schema to vaultspec.vault.graph.v2; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `P01.S04` - bump the graph envelope schema to vaultspec.vault.graph.v2; `src/vaultspec_core/cli/vault_cmd.py`.
 - [ ] `P01.S05` - add a full-envelope v2 contract test asserting schema, status, every node field, every edge field, and metrics keys; `src/vaultspec_core/graph/tests/test_contract.py`.
 - [ ] `P01.S06` - add archive-resolution branch tests covering link resolution against the archive directory; `src/vaultspec_core/graph/tests/test_graph.py`.
 - [ ] `P01.S07` - add feature-scoped centrality assertions and replace the early-returning collision fan-out test with a guaranteed assertion; `src/vaultspec_core/graph/tests/test_graph.py`.

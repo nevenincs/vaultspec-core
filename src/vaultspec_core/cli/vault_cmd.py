@@ -763,6 +763,7 @@ def cmd_graph(
             "vault.graph",
             "unchanged",
             graph.to_dict(feature=feature, include_body=include_body),
+            version=2,
         )
         typer.echo(json.dumps(envelope, indent=2, default=str))
         return
