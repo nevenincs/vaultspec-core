@@ -27,6 +27,9 @@ related:
 
 <!-- Persistent log of audit findings appended below. -->
 
-## {TOPIC}-### | {LEVEL} | {Summary}
-
-<!-- Use: {TOPIC}-### | {LEVEL} | {Summary} \n {DESCRIPTION} format-->
+<!-- FINDINGS FORMAT:
+     Append one section per finding using the heading form
+     ## {topic}-### | {level} | {summary}
+     followed by a body paragraph carrying the {description}.
+     {topic} is a concise kebab-case slug, {level} is the severity
+     (critical, sharp, minor), and {summary} is a one-line statement. -->

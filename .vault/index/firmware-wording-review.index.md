@@ -73,6 +73,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P07-S60]]'
   - '[[2026-06-09-firmware-wording-review-P07-S61]]'
   - '[[2026-06-09-firmware-wording-review-P07-S62]]'
+  - '[[2026-06-09-firmware-wording-review-P07-S63]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -158,6 +159,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P07-S60` - update the plan heading example to the phase-less H1 form (D14)
 - `2026-06-09-firmware-wording-review-P07-S61` - retier the wave-assuming verification hint at line 173 so it holds at every tier (D14)
 - `2026-06-09-firmware-wording-review-P07-S62` - lowercase the Title Case H1 to match the all-lowercase heading convention every sibling follows (D14)
+- `2026-06-09-firmware-wording-review-P07-S63` - move the uppercase TOPIC, LEVEL, Summary, and DESCRIPTION placeholders into comments using convention-compliant names (D14)
 
 ### plan
 

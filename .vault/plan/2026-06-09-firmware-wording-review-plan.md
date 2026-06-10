@@ -119,7 +119,7 @@ Fix every template placeholder leak against the documented placeholder conventio
 - [x] `P07.S60` - update the plan heading example to the phase-less H1 form (D14); `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
 - [x] `P07.S61` - retier the wave-assuming verification hint at line 173 so it holds at every tier (D14); `src/vaultspec_core/builtins/templates/plan.md`.
 - [x] `P07.S62` - lowercase the Title Case H1 to match the all-lowercase heading convention every sibling follows (D14); `src/vaultspec_core/builtins/templates/code-review.md`.
-- [ ] `P07.S63` - move the uppercase TOPIC, LEVEL, Summary, and DESCRIPTION placeholders into comments using convention-compliant names (D14); `src/vaultspec_core/builtins/templates/code-review.md`.
+- [x] `P07.S63` - move the uppercase TOPIC, LEVEL, Summary, and DESCRIPTION placeholders into comments using convention-compliant names (D14); `src/vaultspec_core/builtins/templates/code-review.md`.
 - [ ] `P07.S64` - annotate the heading, scope_block, step_id, and plan_stem placeholders as machine-filled (D14); `src/vaultspec_core/builtins/templates/exec-step.md`.
 - [ ] `P07.S65` - move the instructional boilerplate and the file1 and file2 placeholders inside comment blocks so sanitize strips them (D14); `src/vaultspec_core/builtins/templates/exec-summary.md`.
 - [ ] `P07.S66` - seed the related field instead of the empty list that violates the always-populate hint the template itself states (D14); `src/vaultspec_core/builtins/templates/audit.md`.
