@@ -76,6 +76,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P07-S63]]'
   - '[[2026-06-09-firmware-wording-review-P07-S64]]'
   - '[[2026-06-09-firmware-wording-review-P07-S65]]'
+  - '[[2026-06-09-firmware-wording-review-P07-S66]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -164,6 +165,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P07-S63` - move the uppercase TOPIC, LEVEL, Summary, and DESCRIPTION placeholders into comments using convention-compliant names (D14)
 - `2026-06-09-firmware-wording-review-P07-S64` - annotate the heading, scope_block, step_id, and plan_stem placeholders as machine-filled (D14)
 - `2026-06-09-firmware-wording-review-P07-S65` - move the instructional boilerplate and the file1 and file2 placeholders inside comment blocks so sanitize strips them (D14)
+- `2026-06-09-firmware-wording-review-P07-S66` - seed the related field instead of the empty list that violates the always-populate hint the template itself states (D14)
 
 ### plan
 

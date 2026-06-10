@@ -3,7 +3,8 @@ tags:
   - '#audit'
   - '#{feature}'
 date: '{yyyy-mm-dd}'
-related: []
+related:
+  - '[[{yyyy-mm-dd-*}]]'
 ---
 
 <!-- FRONTMATTER RULES:
