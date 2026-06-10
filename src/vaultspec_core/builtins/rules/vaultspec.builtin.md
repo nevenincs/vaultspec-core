@@ -84,7 +84,7 @@ hierarchy should reference those above them.
 - **Summaries**
   (`.vault/exec/{yyyy-mm-dd-feature}/{yyyy-mm-dd-feature-{phase}-summary}.md`)
 
-  - *Depends on:* Execution Logs.
+  - *Depends on:* Execution Records.
   - *References:* The Plan and key Artifacts produced.
   - *Location:* Inside feature-specific folder.
   - *Filename:* `{yyyy-mm-dd-feature-{phase}-summary}.md` where `{phase}` is the

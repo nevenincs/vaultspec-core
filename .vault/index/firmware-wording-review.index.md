@@ -102,6 +102,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P08-S109]]'
   - '[[2026-06-09-firmware-wording-review-P08-S110]]'
   - '[[2026-06-09-firmware-wording-review-P08-S111]]'
+  - '[[2026-06-09-firmware-wording-review-P08-S112]]'
   - '[[2026-06-09-firmware-wording-review-P08-S79]]'
   - '[[2026-06-09-firmware-wording-review-P08-S80]]'
   - '[[2026-06-09-firmware-wording-review-P08-S81]]'
@@ -237,6 +238,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P08-S109` - fix the doubled the-dot-vault-vault phrasing (D15)
 - `2026-06-09-firmware-wording-review-P08-S110` - fix the doubled the-dot-vault-vault phrasing in the description (D15)
 - `2026-06-09-firmware-wording-review-P08-S111` - replace the host-specific read_file tool id with provider-neutral wording (D15)
+- `2026-06-09-firmware-wording-review-P08-S112` - unify the execution records versus execution logs naming for the one artifact (D15)
 - `2026-06-09-firmware-wording-review-P08-S79` - fix the fundations and considere-null-and-void typos and supply the missing conjunction at line 20 (D15)
 - `2026-06-09-firmware-wording-review-P08-S80` - fix the agent personaa typo (D15)
 - `2026-06-09-firmware-wording-review-P08-S81` - fix the continously typo and repair the garbled rolling-log-of-task-queue phrase (D15)
