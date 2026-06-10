@@ -226,9 +226,9 @@ Narrative placeholders (`{topic}`, `{title}`) use concise prose.
   headings. Top-level vault documents use backticks around both the `{feature}` segment
   and the narrative `{title}`, `{topic}`, or `{phase}` segment. Examples:
   `# {feature} research: {topic}` represents the literal template heading '# `{feature}`
-  research: `{topic}`', and `# {feature} {phase} plan` represents '# `{feature}`
-  `{phase}` plan'. Narrative segments should be concise prose; canonical uppercase
-  identifiers remain required for `{wave}`, `{phase}`, and `{step}` identifier segments.
+  research: `{topic}`', and `# {feature} plan` represents '# `{feature}` plan'.
+  Narrative segments should be concise prose; canonical uppercase identifiers remain
+  required for `{wave}`, `{phase}`, and `{step}` identifier segments.
 
 - **File names**: lowercase kebab-case for narrative segments (`{feature}`, `{type}`);
   canonical uppercase identifiers for `{wave}`, `{phase}`, `{step}` segments. Patterns:
