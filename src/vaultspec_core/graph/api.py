@@ -640,11 +640,15 @@ class VaultGraph:
                         **node.to_nx_attrs(),
                     )
                     keys.append(qualified)
-                self._stem_index[stem] = keys
+                # Sort so the index is deterministic across platforms and
+                # matches the cache-rebuild path (which also sorts); raw scan
+                # order is filesystem-dependent and diverges on Linux vs
+                # Windows, breaking cached-vs-fresh parity.
+                self._stem_index[stem] = sorted(keys)
                 logger.warning(
                     "Stem collision for '%s': qualified as %s",
                     stem,
-                    keys,
+                    sorted(keys),
                 )
 
         logger.info(
