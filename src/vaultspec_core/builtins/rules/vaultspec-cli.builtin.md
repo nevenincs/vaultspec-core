@@ -11,8 +11,10 @@ for workflow concepts.
 
 ## Mandate
 
-Use `vaultspec-core` to create, read, audit, and repair `.vault/` documents. Do not edit
-`.vault/` documents directly. `vaultspec-core` enforces templates, tag taxonomy,
+Use `vaultspec-core` to create, read, audit, and repair `.vault/` documents. Never
+hand-write frontmatter, filenames, plan structure, or new `.vault/` documents; editing
+the body prose of a document scaffolded by `vaultspec-core vault add` is permitted (see
+"Allowed manual edits" below). `vaultspec-core` enforces templates, tag taxonomy,
 wiki-link resolution, schema dependencies, and provider sync; bypassing it produces
 drift that `vaultspec-core vault check` and `vaultspec-core spec doctor` will flag.
 
