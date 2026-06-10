@@ -119,9 +119,26 @@ class DerivedEdge:
         }
 
 
-def _real_node_keys(graph: VaultGraph) -> list[str]:
-    """Return sorted keys of all non-phantom nodes in *graph*."""
-    return sorted(name for name, node in graph.nodes.items() if not node.phantom)
+def _real_node_keys(
+    graph: VaultGraph,
+    scope: set[str] | None = None,
+) -> list[str]:
+    """Return sorted keys of non-phantom nodes, optionally scoped.
+
+    Args:
+        graph: The vault graph to inspect.
+        scope: When set, restrict the result to keys present in *scope*; when
+            ``None`` (the default) every non-phantom node is returned.
+
+    Returns:
+        Sorted list of non-phantom node keys, intersected with *scope* when one
+        is given.
+    """
+    return sorted(
+        name
+        for name, node in graph.nodes.items()
+        if not node.phantom and (scope is None or name in scope)
+    )
 
 
 def _non_structural_tags(graph: VaultGraph, name: str) -> frozenset[str]:
@@ -146,11 +163,16 @@ def _non_structural_tags(graph: VaultGraph, name: str) -> frozenset[str]:
     )
 
 
-def _reciprocity_pairs(graph: VaultGraph) -> set[frozenset[str]]:
+def _reciprocity_pairs(
+    graph: VaultGraph,
+    scope: set[str] | None = None,
+) -> set[frozenset[str]]:
     """Return undirected pairs that link to each other in both directions.
 
     Args:
         graph: The vault graph to inspect.
+        scope: When set, only pairs whose endpoints both lie in *scope* are
+            returned; when ``None`` every reciprocal real pair is returned.
 
     Returns:
         Set of two-element frozensets ``{a, b}`` where the canonical graph
@@ -160,6 +182,8 @@ def _reciprocity_pairs(graph: VaultGraph) -> set[frozenset[str]]:
     g = graph.digraph
     pairs: set[frozenset[str]] = set()
     for src, tgt in g.edges():
+        if scope is not None and (src not in scope or tgt not in scope):
+            continue
         if (
             g.has_edge(tgt, src)
             and src in graph.nodes
@@ -171,34 +195,61 @@ def _reciprocity_pairs(graph: VaultGraph) -> set[frozenset[str]]:
     return pairs
 
 
-def _undirected_projection(graph: VaultGraph) -> nx.Graph:
+def _undirected_projection(
+    graph: VaultGraph,
+    scope: set[str] | None = None,
+) -> nx.Graph:
     """Return an undirected projection over non-phantom nodes only.
 
     The networkx link-prediction family (Jaccard, Adamic-Adar) operates on an
     undirected graph.  Phantom nodes are dropped so relatedness is computed
     purely over real documents.
 
+    When *scope* is supplied the projection is restricted to those nodes, so
+    the shared-neighbour structure that Jaccard and Adamic-Adar consume is the
+    local-neighbourhood structure rather than the whole-graph structure.  That
+    is a deliberate semantic choice for a scoped (ego or feature) view: these
+    two signals are projection-relative and therefore differ from their
+    whole-graph values once the projection is restricted.
+
     Args:
         graph: The vault graph to project.
+        scope: When set, restrict the projected node set to *scope*; when
+            ``None`` every real node is projected.
 
     Returns:
-        An undirected ``nx.Graph`` whose nodes are the real document keys and
-        whose edges mirror the canonical directed edges between real nodes.
+        An undirected ``nx.Graph`` whose nodes are the in-scope real document
+        keys and whose edges mirror the canonical directed edges between them.
     """
-    reals = {name for name, node in graph.nodes.items() if not node.phantom}
+    reals = {
+        name
+        for name, node in graph.nodes.items()
+        if not node.phantom and (scope is None or name in scope)
+    }
     sub = graph.digraph.subgraph(reals)
     return sub.to_undirected()
 
 
-def _co_citation_counts(graph: VaultGraph) -> dict[frozenset[str], int]:
+def _co_citation_counts(
+    graph: VaultGraph,
+    scope: set[str] | None = None,
+) -> dict[frozenset[str], int]:
     """Return co-citation counts: shared predecessors per undirected pair.
 
     Two documents are co-cited when a third document references both of them.
     The count is the number of distinct documents that link to both endpoints
     (the size of their common-predecessor set in the directed graph).
 
+    The citing (hub) document is never restricted to *scope*: a document
+    outside the scoped view that references two in-scope documents still
+    co-cites them.  Only the counted *endpoint* pair is restricted to *scope*,
+    so the scoped result equals the whole-graph result filtered to the scoped
+    pairs - co-citation is scope-invariant.
+
     Args:
         graph: The vault graph to inspect.
+        scope: When set, only count pairs whose endpoints both lie in *scope*;
+            when ``None`` every real pair is counted.
 
     Returns:
         Mapping from an undirected ``{a, b}`` pair to the number of shared
@@ -212,7 +263,9 @@ def _co_citation_counts(graph: VaultGraph) -> dict[frozenset[str], int]:
         cited = sorted(
             tgt
             for tgt in g.successors(citing)
-            if tgt in graph.nodes and not graph.nodes[tgt].phantom
+            if tgt in graph.nodes
+            and not graph.nodes[tgt].phantom
+            and (scope is None or tgt in scope)
         )
         for a, b in itertools.combinations(cited, 2):
             key = frozenset((a, b))
@@ -279,8 +332,11 @@ def _dominant_kind(signals: dict[str, float]) -> str:
     return sorted(present)[0]
 
 
-def compute_derived_edges(graph: VaultGraph) -> list[DerivedEdge]:
-    """Compute the full derived relatedness edge set for *graph*.
+def compute_derived_edges(
+    graph: VaultGraph,
+    scope: set[str] | None = None,
+) -> list[DerivedEdge]:
+    """Compute the derived relatedness edge set for *graph*.
 
     Builds one :class:`DerivedEdge` per undirected real-document pair that
     fires at least one relatedness signal.  Signals computed:
@@ -293,22 +349,49 @@ def compute_derived_edges(graph: VaultGraph) -> list[DerivedEdge]:
     - ``adamic_adar``: ``nx.adamic_adar_index`` on the undirected projection.
     - ``co_citation``: number of documents referencing both endpoints.
 
+    Scoping semantics.  When *scope* is ``None`` the computation runs over the
+    whole graph (the historical behaviour).  When *scope* is a set of node
+    keys - the node set of a feature- or ego-scoped export - the candidate pair
+    set, the reciprocity scan, the co-citation scan, and the undirected
+    projection are all built from the scoped node set alone.  The enclosing
+    export never pays the whole-graph ``O(n^2)`` pair cost just to throw most
+    of the result away.
+
+    Two relatedness families behave differently under scoping, and the
+    difference is deliberate:
+
+    - **Scope-invariant signals** - ``reciprocity``, ``shared_feature``,
+      ``shared_tag``, and ``co_citation`` - depend only on the two endpoints
+      (and, for co-citation, on any citing document anywhere in the graph).
+      Their scoped values equal the whole-graph values filtered to the scoped
+      pairs.
+
+    - **Projection-relative signals** - ``jaccard`` and ``adamic_adar`` - are
+      neighbourhood statistics over the undirected projection.  Restricting the
+      projection to the scoped node set restricts the shared-neighbour
+      structure they read, so their scoped values are computed within the local
+      neighbourhood and legitimately differ from their whole-graph values.  For
+      a local graph view this is the intended semantics: relatedness is the
+      relatedness *within the neighbourhood being viewed*.
+
     The canonical DiGraph is never mutated.  The returned list is sorted by
     descending composed weight then by endpoints, so the ordering is
     deterministic.
 
     Args:
         graph: The :class:`~vaultspec_core.graph.api.VaultGraph` to analyse.
+        scope: When set, restrict the computation to this node set (see the
+            scoping semantics above); when ``None``, run over the whole graph.
 
     Returns:
         Deterministically ordered list of :class:`DerivedEdge` instances; one
         per pair with at least one non-zero signal.
     """
-    reals = _real_node_keys(graph)
-    undirected = _undirected_projection(graph)
+    reals = _real_node_keys(graph, scope)
+    undirected = _undirected_projection(graph, scope)
 
-    reciprocity = _reciprocity_pairs(graph)
-    co_citation = _co_citation_counts(graph)
+    reciprocity = _reciprocity_pairs(graph, scope)
+    co_citation = _co_citation_counts(graph, scope)
 
     # networkx link-prediction over every non-adjacent and adjacent real pair.
     # jaccard_coefficient / adamic_adar_index accept an explicit ebunch so we

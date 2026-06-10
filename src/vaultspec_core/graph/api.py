@@ -1204,15 +1204,15 @@ class VaultGraph:
 
         # Derived (implicit) relatedness edges.  Computed on demand and kept
         # in a SEPARATE array so checkers and the canonical edges list stay
-        # free of synthetic edges.  Scoped to the exported node set so a
-        # feature- or ego-scoped payload only carries derived edges whose
-        # endpoints are both present.
+        # free of synthetic edges.  When the export is scoped (ego or feature),
+        # the derived computation is scoped to the exported node set too, so an
+        # ego query pays only its local pair cost instead of the whole-graph
+        # O(n^2) pass that is then filtered away.  An unscoped (full-graph)
+        # export passes scope=None and computes over every pair.
         derived: list[dict[str, Any]] = []
         if include_derived:
-            scope = set(g.nodes())
-            for edge in compute_derived_edges(self):
-                if edge.source in scope and edge.target in scope:
-                    derived.append(edge.to_dict())
+            scope = None if (node is None and feature is None) else set(g.nodes())
+            derived = [edge.to_dict() for edge in compute_derived_edges(self, scope)]
         data["derived_edges"] = derived
 
         # Enrich with vault-specific metadata.
