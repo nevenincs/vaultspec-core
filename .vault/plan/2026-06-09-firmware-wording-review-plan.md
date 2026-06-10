@@ -174,7 +174,7 @@ Apply the single style pass (spelling locale, dash convention, label form, annou
 - [x] `P08.S110` - fix the doubled the-dot-vault-vault phrasing in the description (D15); `src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md`.
 - [x] `P08.S111` - replace the host-specific read_file tool id with provider-neutral wording (D15); `src/vaultspec_core/builtins/agents/vaultspec-writer.md`.
 - [x] `P08.S112` - unify the Execution Records versus Execution Logs naming for the one artifact (D15); `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
-- [ ] `P08.S113` - align the execution-log artifact phrasing with the canonical Execution Records noun (D15); `src/vaultspec_core/builtins/system/03-vaultspec.md`.
+- [x] `P08.S113` - align the execution-log artifact phrasing with the canonical Execution Records noun (D15); `src/vaultspec_core/builtins/system/03-vaultspec.md`.
 - [ ] `P08.S114` - unify the supersession procedure on a Status section naming the successor followed by spec rules remove, and add the no-first-encounter execution-cycle guard the persona and skill already state (D13); `src/vaultspec_core/builtins/rules/vaultspec-codify.builtin.md`.
 - [ ] `P08.S115` - align the supersession mechanics with the unified Status-section procedure (D13); `src/vaultspec_core/builtins/skills/vaultspec-codify/SKILL.md`.
 - [ ] `P08.S116` - align the supersession mechanics with the unified Status-section procedure (D13); `src/vaultspec_core/builtins/agents/vaultspec-codifier.md`.

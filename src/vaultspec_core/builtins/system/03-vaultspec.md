@@ -39,9 +39,9 @@ declare a complexity tier (`L1`, `L2`, `L3`, or `L4`) in frontmatter. The tier
 determines which structural containers exist: `L1` is Steps only; `L2` adds Phases; `L3`
 adds Waves; `L4` adds an Epic frame and requires an external project-management
 association declared in the Epic intent block. The leaf row at every tier is named
-`Step`; the execution-log artifact retains the name `<Step Record>` and maps one-to-one
-to a Step. Full conventions live in the plan-hardening convention ADR and in the
-Markdown comment hint blocks embedded in `.vaultspec/rules/templates/plan.md`.
+`Step`; the Execution Record artifact retains the name `<Step Record>` and maps
+one-to-one to a Step. Full conventions live in the plan-hardening convention ADR and in
+the Markdown comment hint blocks embedded in `.vaultspec/rules/templates/plan.md`.
 
 The `vaultspec-core vault plan` CLI is the canonical surface for structural manipulation
 of plan documents. Writers and executors MUST use the `vaultspec-core vault plan ...`
