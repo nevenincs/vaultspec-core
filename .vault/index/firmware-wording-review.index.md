@@ -26,6 +26,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P03-S17]]'
   - '[[2026-06-09-firmware-wording-review-P03-S18]]'
   - '[[2026-06-09-firmware-wording-review-P03-S19]]'
+  - '[[2026-06-09-firmware-wording-review-P03-summary]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -64,6 +65,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P03-S17` - append rename-integrity to the vault check prose checker list (D6)
 - `2026-06-09-firmware-wording-review-P03-S18` - add the plan-verb --phase, --wave, --dry-run, and --canonicalise flags to the plan subcommand sections (D6)
 - `2026-06-09-firmware-wording-review-P03-S19` - add a sync output-vocabulary section matching the verified description in the CLI rule (D6)
+- `2026-06-09-firmware-wording-review-P03-summary` - `firmware-wording-review` `P03` summary
 
 ### plan
 
