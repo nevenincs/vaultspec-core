@@ -348,7 +348,7 @@ command takes `--text`.
 
 Tier commands: `tier show`, `tier promote`, `tier demote`. The `promote` command takes
 `--phase-title`, `--phase-intent`, `--wave-title`, `--wave-intent`, `--epic-intent` for
-synthesised containers. The `demote` command takes `--force`.
+synthesized containers. The `demote` command takes `--force`.
 
 ## Spec commands
 

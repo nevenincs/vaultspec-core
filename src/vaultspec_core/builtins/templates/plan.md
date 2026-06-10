@@ -19,7 +19,7 @@ related:
      field default to L2.
 
      Related: use wiki-links as '[[yyyy-mm-dd-foo-bar]]'. The related field
-     carries the AUTHORISING documents (ADR, research, reference, prior
+     carries the AUTHORIZING documents (ADR, research, reference, prior
      plan) for every Step in this plan; Steps inherit this chain;
      per-row reference footers do not exist.
 
@@ -28,7 +28,7 @@ related:
 
 <!-- LINK RULES:
      - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
-     - The related: field carries the AUTHORISING documents (ADR, research,
+     - The related: field carries the AUTHORIZING documents (ADR, research,
        reference, prior plan) for every Step in this plan. Steps inherit this
        chain; per-row reference footers do not exist.
      - NEVER use [[wiki-links]] or markdown links in the document body.
@@ -63,7 +63,7 @@ related:
        - [ ] `<display-path>` - imperative-verb action; `path/to/file`.
      Two-state checkboxes only ([ ] open, [x] closed). No per-row
      reference footers; wiki-links and markdown links are forbidden
-     in plan body. Authorising documents go in the plan's `related:`
+     in plan body. Authorizing documents go in the plan's `related:`
      frontmatter once.
      ASCII spaced hyphens everywhere; em-dash (U+2014) and en-dash
      (U+2013) are forbidden. Step rows within a Phase are
@@ -132,7 +132,7 @@ templates. -->
      ## Wave `W01` - language-only convention rollout
 
      One paragraph stating what this Wave delivers, which downstream
-     Wave depends on it, and which authorising documents back it.
+     Wave depends on it, and which authorizing documents back it.
 
      ### Phase `W01.P01` - ...
      ### Phase `W01.P02` - ...
@@ -160,7 +160,7 @@ templates. -->
 which carry hard ordering. At `L1` and `L2`, parallelism is decided
 per-Step or per-Phase. At `L3` and `L4`, Waves are sequenced by
 default (one Wave must land before the next can begin); Phases
-within a single Wave may be parallelised when they share no hard
+within a single Wave may be parallelized when they share no hard
 interdependency. -->
 
 ## Verification
@@ -175,4 +175,4 @@ the declared project-management association to report the Epic
 complete.
 
 For tier-specific verification cadence, see the convention ADR
-authorising this plan via the `related:` frontmatter. -->
+authorizing this plan via the `related:` frontmatter. -->

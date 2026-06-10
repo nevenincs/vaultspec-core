@@ -71,7 +71,7 @@ than restating them.
 
 - **Granularity:** Every Step is one Markdown bulleted checkbox row naming exactly one
   file or one cohesive area in inline backticks per the Step row contract embedded in
-  the plan template. No per-row reference footers; authorising documents go once in the
+  the plan template. No per-row reference footers; authorizing documents go once in the
   plan's `related:` frontmatter.
 
 - **Persistence:**
@@ -112,7 +112,7 @@ than hand-editing frontmatter:
   flag at scaffold time.
 
   - _Constraint:_ No relative paths (`../`), no bare strings, no `@ref`.
-  - _For plan documents:_ `related` carries the AUTHORISING documents (ADR, research,
+  - _For plan documents:_ `related` carries the AUTHORIZING documents (ADR, research,
     reference, prior plan) for every Step in the plan. Steps inherit this chain; per-row
     reference footers do not exist. `related` is required when the plan contains at
     least one Step row.

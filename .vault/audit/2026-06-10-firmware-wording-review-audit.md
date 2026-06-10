@@ -73,7 +73,10 @@ remediation lands.
 
 ### LOW
 
-- `REVIEW-006` | LOW | open - British spellings beyond the research
+- `REVIEW-006` | LOW | resolved - all named spellings Americanized
+  (authorizing/AUTHORIZING, parallelized, summarized, synthesized); the
+  backticked `--canonicalise` flag tokens are left as literal CLI surface.
+  Original finding: British spellings beyond the research
   inventory: "authorising/AUTHORISING" in `templates/plan.md`,
   `skills/vaultspec-write/SKILL.md`, `agents/vaultspec-writer.md`;
   "parallelised" in `templates/plan.md`; "summarised" in `templates/adr.md`;

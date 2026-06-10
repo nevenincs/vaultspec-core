@@ -65,7 +65,7 @@ Every document MUST strictly adhere to the following schema:
 - **`related`**: MUST be a YAML list of quoted `'[[wiki-links]]'`.
 
   - _Constraint:_ No relative paths (`../`), no bare strings, no `@ref`.
-  - _For plan documents:_ `related` carries the AUTHORISING documents (ADR, research,
+  - _For plan documents:_ `related` carries the AUTHORIZING documents (ADR, research,
     reference, prior plan) for every Step in the plan. Steps inherit this chain; per-row
     reference footers do not exist. `related` is required when the plan contains at
     least one Step row.
@@ -98,7 +98,7 @@ The row format (verbatim):
 
 The Step's canonical identifier (`S##`) is append-only and immutable; the
 `<display-path>` rendering is tier-conditional and computed from the Step's current
-ancestor chain. There is no per-row reference footer; authorising documents (ADR,
+ancestor chain. There is no per-row reference footer; authorizing documents (ADR,
 research, reference, prior plan) go once in the plan's `related:` frontmatter and every
 Step inherits that chain.
 
