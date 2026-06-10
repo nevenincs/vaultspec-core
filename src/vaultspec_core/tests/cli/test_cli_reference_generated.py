@@ -189,6 +189,38 @@ def test_reversed_markers_raise_distinct_message(tmp_path: Path) -> None:
     assert "Missing end marker" not in message
 
 
+def test_duplicate_begin_marker_raises(tmp_path: Path) -> None:
+    """A second begin marker for one region raises instead of swallowing content.
+
+    With two begin markers, the anchored end search binds to the wrong pair and
+    silently discards the first region's body. The guard must refuse to guess
+    which begin marker is canonical and raise, naming the region and the
+    duplicate.
+    """
+    region = MANAGED_REGIONS[0]
+    begin = begin_marker(region.region_id)
+    duplicated = (
+        "# heading\n\n"
+        f"{begin}\n\n"
+        "```text\nfirst region body that must not be silently swallowed\n```\n\n"
+        f"{begin}\n\n"
+        "```text\nsecond stray block\n```\n\n"
+        f"{end_marker(region.region_id)}\n"
+    )
+    ref = tmp_path / "cli.md"
+    ref.write_text(duplicated, encoding="utf-8")
+
+    with pytest.raises(ReferenceMarkerError) as excinfo:
+        generate(check=True, reference_path=ref, typer_app=app)
+
+    message = str(excinfo.value)
+    assert "Duplicate begin marker" in message
+    assert region.region_id in message
+    # The file is untouched: check mode never writes, and the raise happens
+    # before any replacement could swallow the first body.
+    assert ref.read_text(encoding="utf-8") == duplicated
+
+
 def test_write_mode_reconciles_drift_and_reports_unchanged_on_second_run(
     tmp_path: Path,
 ) -> None:

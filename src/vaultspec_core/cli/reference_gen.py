@@ -206,6 +206,23 @@ def _replace_region(text: str, region: ManagedRegion, body: str) -> str:
     begin = begin_marker(region.region_id)
     end = end_marker(region.region_id)
 
+    # Each marker must appear exactly once. A duplicated begin marker would
+    # otherwise let the anchored end search bind to the wrong pair and silently
+    # swallow the first region's body; a duplicated end marker is equally
+    # ambiguous. Refuse to guess which copy is canonical.
+    begin_count = text.count(begin)
+    if begin_count > 1:
+        raise ReferenceMarkerError(
+            f"Duplicate begin marker for managed region {region.region_id!r} "
+            f"(found {begin_count}; expected exactly one)"
+        )
+    end_count = text.count(end)
+    if end_count > 1:
+        raise ReferenceMarkerError(
+            f"Duplicate end marker for managed region {region.region_id!r} "
+            f"(found {end_count}; expected exactly one)"
+        )
+
     begin_idx = text.find(begin)
     if begin_idx == -1:
         raise ReferenceMarkerError(

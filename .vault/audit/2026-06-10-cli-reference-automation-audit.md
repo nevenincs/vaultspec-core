@@ -42,10 +42,14 @@ hidden commands).
   `ReferenceMarkerError("End marker precedes begin marker for region '<id>'")` when the
   anchored end search fails but an unanchored one succeeds;
   `test_reversed_markers_raise_distinct_message` proves the distinct message.
-- `GENREVIEW-002` | LOW | open - duplicated begin markers silently swallow the first
+- `GENREVIEW-002` | LOW | resolved - duplicated begin markers silently swallow the first
   region's body (the one silent-corruption path in an otherwise fail-loud design).
   `src/vaultspec_core/cli/reference_gen.py`: assert each region's begin and end marker
   count is exactly one before replacing; raise `ReferenceMarkerError` on a duplicate.
+  **Resolved:** `_replace_region` now counts each marker and raises
+  `ReferenceMarkerError("Duplicate begin/end marker for region '<id>' ...")` before any
+  replacement; `test_duplicate_begin_marker_raises` proves the raise and that the first
+  body is no longer swallowed.
 - `GENREVIEW-003` | LOW | open - `docs/CLI.md`'s parallel command inventory is not
   generator-owned and has already drifted in ordering from `cli.md` (first divergence at
   index 7, `vault repair` vs `vault graph`). The ADR's Problem Statement names the
