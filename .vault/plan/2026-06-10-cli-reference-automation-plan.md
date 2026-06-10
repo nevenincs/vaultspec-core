@@ -29,7 +29,7 @@ Phase `P02` is design-gated. The bundled `cli.md` is hand-authored and guarded b
 Harden the ref-audit.md legacy fallback and correct residual reference-accuracy gaps the firmware-wording-review code review left as LOW notes.
 
 - [x] `P01.S01` - Add a removal-milestone marker to the legacy template-name fallback so the ref-audit.md grace path is scheduled for removal one release after the rename, keeping the existing five fallback tests green (REVIEW-005 fallback); `src/vaultspec_core/vaultcore/hydration.py`.
-- [ ] `P01.S02` - Relocate the in-function current-name template mapping to module scope beside \_LEGACY_TEMPLATE_NAMES for symmetry, keeping tests green (REVIEW-005 fallback); `src/vaultspec_core/vaultcore/hydration.py`.
+- [x] `P01.S02` - Relocate the in-function current-name template mapping to module scope beside \_LEGACY_TEMPLATE_NAMES for symmetry, keeping tests green (REVIEW-005 fallback); `src/vaultspec_core/vaultcore/hydration.py`.
 - [ ] `P01.S03` - Correct the vault add --feature required-marker annotation to match live --help and grep the reference for any other stale required-markers (P03 doc gap); `src/vaultspec_core/builtins/reference/cli.md`.
 
 ### Phase `P02` - cli reference generator decision and rollout

@@ -28,6 +28,18 @@ _KNOWN_PLACEHOLDERS = (
     "{proposed|accepted|rejected|deprecated}",
 )
 
+# Current on-disk filename for each template, keyed by document type. A type
+# absent from this map has no template and resolves to ``None``.
+_TEMPLATE_NAMES = {
+    DocType.ADR: "adr.md",
+    DocType.AUDIT: "audit.md",
+    DocType.PLAN: "plan.md",
+    DocType.RESEARCH: "research.md",
+    DocType.REFERENCE: "reference.md",
+    DocType.EXEC: "exec-step.md",
+    DocType.INDEX: "index.md",
+}
+
 # Prior on-disk filenames for templates that have since been renamed in the
 # source tree. A deployed mirror that predates the rename still ships the old
 # filename; :func:`get_template_path` falls back to these so the scaffolder
@@ -453,17 +465,7 @@ def get_template_path(
     """
     from ..config import get_config
 
-    mapping = {
-        DocType.ADR: "adr.md",
-        DocType.AUDIT: "audit.md",
-        DocType.PLAN: "plan.md",
-        DocType.RESEARCH: "research.md",
-        DocType.REFERENCE: "reference.md",
-        DocType.EXEC: "exec-step.md",
-        DocType.INDEX: "index.md",
-    }
-
-    name = mapping.get(doc_type)
+    name = _TEMPLATE_NAMES.get(doc_type)
     if not name:
         return None
 
