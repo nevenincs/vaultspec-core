@@ -98,6 +98,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P08-S84]]'
   - '[[2026-06-09-firmware-wording-review-P08-S85]]'
   - '[[2026-06-09-firmware-wording-review-P08-S86]]'
+  - '[[2026-06-09-firmware-wording-review-P08-S87]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -208,6 +209,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P08-S84` - fix the Succint, twice-occurring failiures, and Scafolds typos and the stray punctuation (D15)
 - `2026-06-09-firmware-wording-review-P08-S85` - fix the Use-Concise-and-Direct label fragment, the i.e.-where-e.g.-is-meant misuse, and the bullet punctuation drift (D15)
 - `2026-06-09-firmware-wording-review-P08-S86` - normalize the three bold-label conventions to the single Label-colon-sentence mandate form (D15)
+- `2026-06-09-firmware-wording-review-P08-S87` - replace the project-bondedness neologism with project-bound, repair the verb-less back-pointer sentence, and order the tool list (D15)
 
 ### plan
 
