@@ -29,8 +29,12 @@ requires direct code referencing.
 - **Announce at start:** "I'm using the `vaultspec-code-research` skill to find out how
   `{Reference}` implements `{Feature}`."
 
-- Use appropriate focused agents when available. Instruct them to locate and audit the
-  `{Feature}` implementation in the reference codebase.
+- **You MUST read and use the template** at `.vaultspec/rules/templates/reference.md`;
+  its embedded hint blocks govern the body structure.
+
+- **Load the `vaultspec-reference-auditor` agent persona** for the focused code deep
+  dives. Instruct it to locate and audit the `{Feature}` implementation in the reference
+  codebase; it returns its findings to you for persistence.
 
 - **Persist findings:** scaffold the reference document with
   `vaultspec-core vault add reference --feature {feature}`, then author the findings as
@@ -38,11 +42,32 @@ requires direct code referencing.
   (`.vault/reference/yyyy-mm-dd-{feature}-reference.md`) and the frontmatter; never
   hand-write either.
 
+### Frontmatter & Tagging Mandate
+
+The `vaultspec-core vault add` scaffold produces frontmatter conforming to this schema.
+Verify it after scaffolding; report drift via `vaultspec-core vault check all` rather
+than hand-editing frontmatter:
+
+- **`tags`**: contains the required tag pair in a YAML list.
+
+  - **Directory Tag**: Exactly `#reference`.
+  - **Feature Tag**: Exactly one kebab-case `#{feature}` tag.
+  - *Syntax:* `tags: ['#reference', '#{feature}']` (quoted strings in a list).
+
+- **`related`**: a YAML list of quoted `'[[wiki-links]]'`, seeded from the `--related`
+  flag at scaffold time.
+
+  - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
+
+- **`date`**: `yyyy-mm-dd` format, set by the scaffold.
+
+- **No `feature` key**: `tags:` exclusively identifies the feature.
+
 ### Research & Audit
 
 Perform focused code deep dives.
 
-Coordinate the agents to:
+Coordinate the loaded persona and any supporting agents to:
 
 - Locate the code snippets and files.
 - Analyze implementation patterns and architecture.

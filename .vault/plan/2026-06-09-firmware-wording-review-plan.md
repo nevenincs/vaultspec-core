@@ -103,7 +103,7 @@ Wire the orphaned template, personas, and skills into the catalogs and unify the
 - [x] `P06.S49` - run the code-binding check for the ref-audit.md template filename across Python loaders, provider sync mappings, and tests (D7); `src/vaultspec_core`.
 - [x] `P06.S50` - rename the template file to reference.md if the code-binding check shows the name unbound or trivially remappable, otherwise keep the filename and unify prose only (D7); `src/vaultspec_core/builtins/templates/ref-audit.md`.
 - [x] `P06.S51` - unify the reference noun across the hierarchy node, the pipeline phase wording, and the directory-table description (D7); `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
-- [ ] `P06.S52` - add the template mandate, the standard frontmatter-and-tagging mandate, and an explicit pointer to the vaultspec-reference-auditor persona (D8); `src/vaultspec_core/builtins/skills/vaultspec-code-research/SKILL.md`.
+- [x] `P06.S52` - add the template mandate, the standard frontmatter-and-tagging mandate, and an explicit pointer to the vaultspec-reference-auditor persona (D8); `src/vaultspec_core/builtins/skills/vaultspec-code-research/SKILL.md`.
 - [ ] `P06.S53` - name the vaultspec-researcher persona as the generic persona for multi-researcher coordination (D8); `src/vaultspec_core/builtins/skills/vaultspec-research/SKILL.md`.
 - [ ] `P06.S54` - add vaultspec-team and vaultspec-projectmanager to the supporting-skills table (D8); `src/vaultspec_core/builtins/system/03-vaultspec.md`.
 - [ ] `P06.S55` - add vaultspec-team, vaultspec-projectmanager, vaultspec-code-review, and vaultspec-curate to the skill catalog, closing the catalog gaps (D8); `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
