@@ -61,7 +61,8 @@ than restating them.
 
 ## Rules
 
-- **Announce:** Explicitly state you are starting the planning phase.
+- **Announce at start:** "I'm using the `vaultspec-write` skill to write the
+  implementation plan."
 
 - **Must reference research and ADRs**. Read these in full prior to writing the plan.
 
