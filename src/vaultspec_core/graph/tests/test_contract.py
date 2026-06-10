@@ -51,6 +51,8 @@ _EXPECTED_NODE_FIELDS = frozenset(
         "out_links",
         "in_links",
         "phantom",
+        "pagerank",
+        "in_degree",
     }
 )
 

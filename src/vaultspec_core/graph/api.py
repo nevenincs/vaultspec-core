@@ -53,6 +53,10 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["DocNode", "GraphMetrics", "VaultGraph"]
 
+# PageRank damping factor.  Pinned so node-size hints are reproducible across
+# builds and exactly testable; matches the networkx default of 0.85.
+PAGERANK_ALPHA = 0.85
+
 # ---------------------------------------------------------------------------
 # Data models
 # ---------------------------------------------------------------------------
@@ -223,6 +227,76 @@ def _top_n(
     """Return the top *n* entries from *scores* by value descending."""
     ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
     return dict(ranked[:n])
+
+
+def _pagerank(
+    g: nx.DiGraph,
+    *,
+    alpha: float = 0.85,
+    max_iter: int = 100,
+    tol: float = 1.0e-6,
+) -> dict[str, float]:
+    """Compute PageRank with a deterministic pure-Python power iteration.
+
+    networkx 3.6 routes :func:`networkx.pagerank` through a SciPy sparse
+    solver, and this project ships neither NumPy nor SciPy.  This helper
+    reproduces the classic power-iteration PageRank in pure Python so node
+    sizing stays a zero-dependency, fully deterministic computation that
+    mirrors the networkx default semantics: a uniform initial vector,
+    iteration order following the graph's node order, uniform redistribution
+    of dangling-node mass, edge-``weight`` biasing, the same damping factor,
+    and the same node-count-scaled L1 convergence test (``err < n * tol``).
+    On the rare non-converging graph it falls back to the last iterate rather
+    than raising, so a graph build can never crash on node sizing.
+
+    Args:
+        g: The directed graph to rank.  Edge ``weight`` attributes, when
+            present, bias the rank distribution.
+        alpha: Damping factor (teleport probability is ``1 - alpha``).
+        max_iter: Maximum power-iteration steps.
+        tol: Per-node L1 convergence tolerance; the aggregate threshold is
+            ``n * tol``, matching networkx.
+
+    Returns:
+        Mapping of node key to PageRank score; scores sum to ``1.0``.  An
+        empty graph yields an empty mapping.
+    """
+    nodes = list(g.nodes())
+    n = len(nodes)
+    if n == 0:
+        return {}
+
+    rank = dict.fromkeys(nodes, 1.0 / n)
+    teleport = (1.0 - alpha) / n
+
+    # Pre-compute weighted out-degree so dangling nodes are detected once.
+    out_weight: dict[str, float] = {}
+    for node in nodes:
+        total = 0.0
+        for _, _, data in g.out_edges(node, data=True):
+            total += float(data.get("weight", 1.0))
+        out_weight[node] = total
+
+    for _ in range(max_iter):
+        prev = rank
+        # Dangling mass: nodes with no out-edges spread their rank uniformly.
+        dangling_mass = alpha * sum(
+            prev[node] for node in nodes if out_weight[node] == 0.0
+        )
+        nxt = dict.fromkeys(nodes, teleport + dangling_mass / n)
+        for node in nodes:
+            if out_weight[node] == 0.0:
+                continue
+            share = alpha * prev[node] / out_weight[node]
+            for _, target, data in g.out_edges(node, data=True):
+                nxt[target] += share * float(data.get("weight", 1.0))
+        err = sum(abs(nxt[node] - prev[node]) for node in nodes)
+        rank = nxt
+        # networkx scales the tolerance by the node count.
+        if err < n * tol:
+            return rank
+
+    return rank
 
 
 def _edge_kind(provenance: set[str]) -> str:
@@ -489,6 +563,21 @@ class VaultGraph:
             self._digraph.nodes[name]["in_links"] = sorted(
                 node.in_links,
             )
+
+        # Pass 4: node-size hints.  Attach pagerank and raw in-degree so a GUI
+        # consumer can size nodes without recomputing.  PageRank uses the
+        # pure-Python power iteration in _pagerank with a fixed damping factor
+        # (PAGERANK_ALPHA) and a uniform initial vector, so the result is
+        # deterministic for a fixed graph and exactly testable.  An empty
+        # graph yields no scores.
+        if self._digraph.number_of_nodes():
+            pagerank = _pagerank(self._digraph, alpha=PAGERANK_ALPHA)
+        else:
+            pagerank = {}
+        in_degree = dict(self._digraph.in_degree())
+        for name in self._digraph.nodes():
+            self._digraph.nodes[name]["pagerank"] = pagerank.get(name, 0.0)
+            self._digraph.nodes[name]["in_degree"] = in_degree.get(name, 0)
 
         logger.info(
             "Graph build complete: %d nodes, %d edges",
