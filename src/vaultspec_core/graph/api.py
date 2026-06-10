@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import Counter
 from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -361,21 +362,32 @@ class VaultGraph:
         for name in real_node_keys:
             node = self.nodes[name]
             try:
-                links = extract_wiki_links(node.body)
-                links.update(
-                    extract_related_links(
-                        node.frontmatter.get("related", []),
-                    ),
+                # Keep the body and related extractions separate so each
+                # resolved edge can record its provenance (body wiki-link,
+                # related frontmatter, or both).  Both extractors now return
+                # a Counter, preserving per-target multiplicity.
+                body_links = extract_wiki_links(node.body)
+                related_links = extract_related_links(
+                    node.frontmatter.get("related", []),
                 )
 
-                resolved_targets: set[str] = set()
-                for target in links:
-                    resolved = self._resolve_link(target)
-                    resolved_targets.update(resolved)
+                # Resolve each raw target to one or more node keys, summing
+                # the source multiplicity onto every resolved key and unioning
+                # the provenance kinds.  Iterating a Counter yields its keys.
+                target_counts: Counter[str] = Counter()
+                target_kinds: dict[str, set[str]] = {}
+                for raw_target, count in body_links.items():
+                    for resolved_key in self._resolve_link(raw_target):
+                        target_counts[resolved_key] += count
+                        target_kinds.setdefault(resolved_key, set()).add("body")
+                for raw_target, count in related_links.items():
+                    for resolved_key in self._resolve_link(raw_target):
+                        target_counts[resolved_key] += count
+                        target_kinds.setdefault(resolved_key, set()).add("related")
 
-                node.out_links = resolved_targets
+                node.out_links = set(target_counts)
 
-                for target_key in resolved_targets:
+                for target_key in target_counts:
                     if target_key in self.nodes:
                         self.nodes[target_key].in_links.add(name)
                         self._digraph.add_edge(name, target_key)

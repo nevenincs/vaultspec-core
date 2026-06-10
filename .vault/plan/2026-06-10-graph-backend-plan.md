@@ -48,7 +48,7 @@ Pin the graph JSON wire contract, fix wasteful metrics computation, and close kn
 Deliver connection strengths with zero new dependencies: provenance-typed weighted explicit edges, a parallel derived relatedness edge set, node-size hints, and local-graph scoping, all exposed through the v2 payload.
 
 - [x] `P02.S08` - preserve wiki-link and related-link multiplicity by returning per-target counts from the extractors; `src/vaultspec_core/vaultcore/links.py`.
-- [ ] `P02.S09` - audit and update every extractor call site for the counted return shape; `src/vaultspec_core/vaultcore/`.
+- [x] `P02.S09` - audit and update every extractor call site for the counted return shape; `src/vaultspec_core/vaultcore/`.
 - [ ] `P02.S10` - attach kind, multiplicity, and normalised weight attributes to explicit edges during graph build; `src/vaultspec_core/graph/api.py`.
 - [ ] `P02.S11` - create the derived relatedness edge module computing reciprocity, shared-tag, jaccard, adamic-adar, and co-citation signals with documented composition coefficients; `src/vaultspec_core/graph/derived.py`.
 - [ ] `P02.S12` - add pagerank and in-degree node-size hints as node attributes; `src/vaultspec_core/graph/api.py`.
