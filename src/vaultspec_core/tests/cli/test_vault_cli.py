@@ -345,6 +345,112 @@ class TestVaultJsonOutput:
         assert payload == {"generated": []}
 
 
+class TestVaultGraphScopingFlags:
+    """vault graph --node/--depth ego scoping and --derived/--no-derived."""
+
+    def _graph_json(self, runner, project, *extra: str) -> dict:
+        result = runner.invoke(
+            app,
+            ["--target", str(project), "vault", "graph", "--json", *extra],
+        )
+        assert result.exit_code == 0, result.output
+        return json.loads(result.output)
+
+    def _busiest_node(self, payload: dict) -> str:
+        """Return the node id with the most incoming plus outgoing links."""
+        nodes = payload["data"]["nodes"]
+        ranked = sorted(
+            nodes,
+            key=lambda n: (len(n["out_links"]) + len(n["in_links"]), n["id"]),
+            reverse=True,
+        )
+        return ranked[0]["id"]
+
+    def test_full_graph_includes_derived_edges_by_default(
+        self, runner, synthetic_project
+    ):
+        payload = self._graph_json(runner, synthetic_project)
+        assert payload["schema"] == "vaultspec.vault.graph.v2"
+        data = payload["data"]
+        assert "derived_edges" in data
+        assert "edges" in data
+        # derived_edges is a distinct array, never folded into edges.
+        assert isinstance(data["derived_edges"], list)
+        assert len(data["derived_edges"]) > 0
+
+    def test_no_derived_empties_the_derived_array(self, runner, synthetic_project):
+        payload = self._graph_json(runner, synthetic_project, "--no-derived")
+        assert payload["data"]["derived_edges"] == []
+        # The canonical edges array is unaffected by the derived toggle.
+        with_derived = self._graph_json(runner, synthetic_project)
+        assert payload["data"]["edges"] == with_derived["data"]["edges"]
+
+    def test_node_scopes_to_ego_neighbourhood(self, runner, synthetic_project):
+        full = self._graph_json(runner, synthetic_project)
+        centre = self._busiest_node(full)
+        ego = self._graph_json(runner, synthetic_project, "--node", centre)
+        ego_ids = {n["id"] for n in ego["data"]["nodes"]}
+        assert centre in ego_ids
+        # An ego scope is a subset of the full node set.
+        full_ids = {n["id"] for n in full["data"]["nodes"]}
+        assert ego_ids <= full_ids
+        assert len(ego_ids) < len(full_ids)
+
+    def test_depth_zero_returns_only_the_centre(self, runner, synthetic_project):
+        full = self._graph_json(runner, synthetic_project)
+        centre = self._busiest_node(full)
+        ego0 = self._graph_json(
+            runner, synthetic_project, "--node", centre, "--depth", "0"
+        )
+        ids = {n["id"] for n in ego0["data"]["nodes"]}
+        assert ids == {centre}
+
+    def test_depth_grows_neighbourhood_monotonically(self, runner, synthetic_project):
+        full = self._graph_json(runner, synthetic_project)
+        centre = self._busiest_node(full)
+        n0 = len(
+            self._graph_json(
+                runner, synthetic_project, "--node", centre, "--depth", "0"
+            )["data"]["nodes"]
+        )
+        n1 = len(
+            self._graph_json(
+                runner, synthetic_project, "--node", centre, "--depth", "1"
+            )["data"]["nodes"]
+        )
+        assert n0 == 1
+        assert n1 >= n0
+
+    def test_missing_node_fails_with_exit_one(self, runner, synthetic_project):
+        result = runner.invoke(
+            app,
+            [
+                "--target",
+                str(synthetic_project),
+                "vault",
+                "graph",
+                "--json",
+                "--node",
+                "this-node-does-not-exist",
+            ],
+        )
+        assert result.exit_code == 1, result.output
+        payload = json.loads(result.output)
+        assert payload["status"] == "failed"
+        assert "this-node-does-not-exist" in payload["data"]["message"]
+
+    def test_ego_derived_edges_stay_within_scope(self, runner, synthetic_project):
+        full = self._graph_json(runner, synthetic_project)
+        centre = self._busiest_node(full)
+        ego = self._graph_json(
+            runner, synthetic_project, "--node", centre, "--depth", "2"
+        )
+        ids = {n["id"] for n in ego["data"]["nodes"]}
+        for edge in ego["data"]["derived_edges"]:
+            assert edge["source"] in ids
+            assert edge["target"] in ids
+
+
 class TestNoCommand:
     def test_no_command_prints_help(self, runner, synthetic_project):
         result = runner.invoke(app, ["--target", str(synthetic_project), "vault"])
