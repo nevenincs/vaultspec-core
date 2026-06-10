@@ -18,13 +18,13 @@ related:
      Steps; PM association required. Pre-existing plans without this
      field default to L2.
 
-     Related: use wiki-links as '[[YYYY-MM-DD-foo-bar]]'. The related field
+     Related: use wiki-links as '[[yyyy-mm-dd-foo-bar]]'. The related field
      carries the AUTHORISING documents (ADR, research, reference, prior
      plan) for every Step in this plan; Steps inherit this chain;
      per-row reference footers do not exist.
 
-     DO NOT add frontmatter fields
-     outside the frontmatter. -->
+     DO NOT add fields beyond those scaffolded; metadata lives
+     only in the frontmatter. -->
 
 <!-- LINK RULES:
      - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
