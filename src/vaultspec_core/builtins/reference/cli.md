@@ -182,16 +182,20 @@ Create a `.vault/` document from a template.
 
 `DOC_TYPE`: `adr`, `audit`, `exec`, `plan`, `reference`, `research`.
 
-| Option          | Short | Default  | Description                           |
-| --------------- | ----- | -------- | ------------------------------------- |
-| `--feature TAG` | `-f`  | required | Feature tag (kebab-case).             |
-| `--date DATE`   | -     | today    | Override date (ISO 8601).             |
-| `--title TITLE` | -     | None     | Document title.                       |
-| `--related DOC` | `-r`  | None     | Related document(s). Repeatable.      |
-| `--tags TAG`    | -     | None     | Additional freeform tags. Repeatable. |
-| `--force`       | -     | off      | Overwrite an existing document.       |
-| `--dry-run`     | -     | off      | Preview without writing.              |
-| `--json`        | -     | off      | Emit machine-readable output.         |
+| Option          | Short | Default  | Description                                                          |
+| --------------- | ----- | -------- | -------------------------------------------------------------------- |
+| `--feature TAG` | `-f`  | required | Feature tag (kebab-case).                                            |
+| `--date DATE`   | -     | today    | Override date (ISO 8601).                                            |
+| `--title TITLE` | -     | None     | Document title.                                                      |
+| `--related DOC` | `-r`  | None     | Related document(s). Repeatable.                                     |
+| `--tags TAG`    | -     | None     | Additional freeform tags. Repeatable.                                |
+| `--force`       | -     | off      | Overwrite an existing document.                                      |
+| `--dry-run`     | -     | off      | Preview without writing.                                             |
+| `--json`        | -     | off      | Emit machine-readable output.                                        |
+| `--no-hints`    | -     | off      | Suppress next-step advisory hints.                                   |
+| `--tier TIER`   | -     | `L1`     | Plan tier (`L1`..`L4`). Ignored for non-plan document types.         |
+| `--step ID`     | -     | None     | Canonical ID or display path of the Step to scaffold (exec records). |
+| `--all-steps`   | -     | off      | Scaffold execution records for all Steps in the parent plan.         |
 
 ### vaultspec-core vault list
 
