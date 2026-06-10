@@ -58,6 +58,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P05-S47]]'
   - '[[2026-06-09-firmware-wording-review-P05-S48]]'
   - '[[2026-06-09-firmware-wording-review-P05-summary]]'
+  - '[[2026-06-09-firmware-wording-review-P06-S49]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -128,6 +129,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P05-S47` - reconcile the curator contract to the persona delegate model: orchestrate fixes through loaded personas rather than editing in-place (D11)
 - `2026-06-09-firmware-wording-review-P05-S48` - add the audit-report persistence obligation that the curate skill already promises (D11)
 - `2026-06-09-firmware-wording-review-P05-summary` - `firmware-wording-review` `P05` summary
+- `2026-06-09-firmware-wording-review-P06-S49` - run the code-binding check for the ref-audit.md template filename across Python loaders, provider sync mappings, and tests (D7)
 
 ### plan
 
