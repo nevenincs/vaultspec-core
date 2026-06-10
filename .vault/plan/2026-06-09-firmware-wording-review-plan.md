@@ -163,7 +163,7 @@ Apply the single style pass (spelling locale, dash convention, label form, annou
 - [x] `P08.S99` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15); `src/vaultspec_core/builtins/skills/vaultspec-adr/SKILL.md`.
 - [x] `P08.S100` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15); `src/vaultspec_core/builtins/skills/vaultspec-research/SKILL.md`.
 - [x] `P08.S101` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15); `src/vaultspec_core/builtins/skills/vaultspec-write/SKILL.md`.
-- [ ] `P08.S102` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15); `src/vaultspec_core/builtins/skills/vaultspec-curate/SKILL.md`.
+- [x] `P08.S102` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15); `src/vaultspec_core/builtins/skills/vaultspec-curate/SKILL.md`.
 - [ ] `P08.S103` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15); `src/vaultspec_core/builtins/skills/vaultspec-execute/SKILL.md`.
 - [ ] `P08.S104` - drop the fragile Second-worked-example ordinal (D15); `src/vaultspec_core/builtins/rules/vaultspec-plan-editing-discipline.builtin.md`.
 - [ ] `P08.S105` - drop the fragile Third-worked-example ordinal (D15); `src/vaultspec_core/builtins/rules/vaultspec-dry-run-discipline.builtin.md`.

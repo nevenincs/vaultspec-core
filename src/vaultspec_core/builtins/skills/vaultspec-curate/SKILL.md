@@ -86,7 +86,7 @@ edits:
 
   - **Feature Tag**: Exactly one kebab-case `#{feature}` tag.
 
-  - *Syntax:* `tags: ['#doc-type', '#feature']` (Must be quoted strings in a list).
+  - *Syntax:* `tags: ['#doc-type', '#{feature}']` (Must be quoted strings in a list).
 
 - **`related`**: MUST be a YAML list of quoted `'[[wiki-links]]'`.
 
