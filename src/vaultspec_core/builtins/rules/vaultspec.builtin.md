@@ -36,8 +36,12 @@ Where appropriate, use the following skills:
 - `vaultspec-adr`
 - `vaultspec-write`
 - `vaultspec-execute`
-- `vaultspec-documentation`
+- `vaultspec-code-review`
 - `vaultspec-codify`
+- `vaultspec-curate`
+- `vaultspec-documentation`
+- `vaultspec-team`
+- `vaultspec-projectmanager`
 
 ## Documentation Hierarchy
 

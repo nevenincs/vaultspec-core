@@ -106,7 +106,7 @@ Wire the orphaned template, personas, and skills into the catalogs and unify the
 - [x] `P06.S52` - add the template mandate, the standard frontmatter-and-tagging mandate, and an explicit pointer to the vaultspec-reference-auditor persona (D8); `src/vaultspec_core/builtins/skills/vaultspec-code-research/SKILL.md`.
 - [x] `P06.S53` - name the vaultspec-researcher persona as the generic persona for multi-researcher coordination (D8); `src/vaultspec_core/builtins/skills/vaultspec-research/SKILL.md`.
 - [x] `P06.S54` - add vaultspec-team and vaultspec-projectmanager to the supporting-skills table (D8); `src/vaultspec_core/builtins/system/03-vaultspec.md`.
-- [ ] `P06.S55` - add vaultspec-team, vaultspec-projectmanager, vaultspec-code-review, and vaultspec-curate to the skill catalog, closing the catalog gaps (D8); `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
+- [x] `P06.S55` - add vaultspec-team, vaultspec-projectmanager, vaultspec-code-review, and vaultspec-curate to the skill catalog, closing the catalog gaps (D8); `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
 - [ ] `P06.S56` - replace the body-text Related lines instruction in the snapshot template with frontmatter related guidance (D8); `src/vaultspec_core/builtins/agents/vaultspec-reference-auditor.md`.
 - [ ] `P06.S57` - remove the mention of the retired safety auditors persona (D8); `src/vaultspec_core/builtins/agents/vaultspec-reference-auditor.md`.
 

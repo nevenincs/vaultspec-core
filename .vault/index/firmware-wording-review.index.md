@@ -64,6 +64,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P06-S52]]'
   - '[[2026-06-09-firmware-wording-review-P06-S53]]'
   - '[[2026-06-09-firmware-wording-review-P06-S54]]'
+  - '[[2026-06-09-firmware-wording-review-P06-S55]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -140,6 +141,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P06-S52` - add the template mandate, the standard frontmatter-and-tagging mandate, and an explicit pointer to the vaultspec-reference-auditor persona (D8)
 - `2026-06-09-firmware-wording-review-P06-S53` - name the vaultspec-researcher persona as the generic persona for multi-researcher coordination (D8)
 - `2026-06-09-firmware-wording-review-P06-S54` - add vaultspec-team and vaultspec-projectmanager to the supporting-skills table (D8)
+- `2026-06-09-firmware-wording-review-P06-S55` - add vaultspec-team, vaultspec-projectmanager, vaultspec-code-review, and vaultspec-curate to the skill catalog, closing the catalog gaps (D8)
 
 ### plan
 
