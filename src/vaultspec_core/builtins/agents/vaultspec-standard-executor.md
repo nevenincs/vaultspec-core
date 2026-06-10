@@ -34,6 +34,14 @@ Use:
   path (`S##`, `P##-S##`, or `W##-P##-S##`). The originating Step's canonical identifier
   (`S##`) is recorded in the Step Record's `step_id:` frontmatter field.
 
+  - **Template**: You MUST read and use the template at
+    `.vaultspec/rules/templates/exec-step.md`.
+
+  - **Linking**: Use `[[wiki-links]]` only in the `related:` frontmatter; the body
+    remains free of wiki-links and markdown links.
+
+  - **Content**: List the modified files and give a concise summary of key changes.
+
 ## Standards & Tooling
 
 - **CODE VALIDATION**: Run the project's established type checker, linter, and formatter

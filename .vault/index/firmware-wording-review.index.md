@@ -51,6 +51,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P05-S40]]'
   - '[[2026-06-09-firmware-wording-review-P05-S41]]'
   - '[[2026-06-09-firmware-wording-review-P05-S42]]'
+  - '[[2026-06-09-firmware-wording-review-P05-S43]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -114,6 +115,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P05-S40` - move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9)
 - `2026-06-09-firmware-wording-review-P05-S41` - add the low executor to the Step routing table so low-tier Steps gain a routing target (D9)
 - `2026-06-09-firmware-wording-review-P05-S42` - align the Documentation section to the trio-parallel form referencing the exec-step.md template (D9)
+- `2026-06-09-firmware-wording-review-P05-S43` - align the Documentation section to the trio-parallel form referencing the exec-step.md template (D9)
 
 ### plan
 
