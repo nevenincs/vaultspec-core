@@ -73,7 +73,7 @@ Rewrite every artifact-producing skill around the vault add scaffold-then-edit-p
 
 Reconcile persona persistence mandates, the executor trio, ADR authorship, and the curate contract so each persona's declared mode matches its body (D3, D9, D10, D11).
 
-- [ ] `P05.S27` - reword the persistence mandate to return findings to the dispatching orchestrator, which persists via vault add scaffold plus body-prose edit, keeping the persona read-only (D3); `src/vaultspec_core/builtins/agents/vaultspec-code-reviewer.md`.
+- [x] `P05.S27` - reword the persistence mandate to return findings to the dispatching orchestrator, which persists via vault add scaffold plus body-prose edit, keeping the persona read-only (D3); `src/vaultspec_core/builtins/agents/vaultspec-code-reviewer.md`.
 - [ ] `P05.S28` - reword the persistence mandate to return findings to the dispatching orchestrator, which persists via vault add scaffold plus body-prose edit, keeping the persona read-only (D3); `src/vaultspec_core/builtins/agents/vaultspec-adr-researcher.md`.
 - [ ] `P05.S29` - reword the persistence mandate to return findings to the dispatching orchestrator, which persists via vault add scaffold plus body-prose edit, keeping the persona read-only (D3); `src/vaultspec_core/builtins/agents/vaultspec-reference-auditor.md`.
 - [ ] `P05.S30` - document once in the agents section the mode field semantics: declared file-mutation intent via harness tools, with the Bash caveat acknowledged (D3); `src/vaultspec_core/builtins/system/03-vaultspec.md`.
