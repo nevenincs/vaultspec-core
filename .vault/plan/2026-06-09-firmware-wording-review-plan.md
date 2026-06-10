@@ -149,7 +149,7 @@ Apply the single style pass (spelling locale, dash convention, label form, annou
 - [x] `P08.S85` - fix the Use-Concise-and-Direct label fragment, the i.e.-where-e.g.-is-meant misuse, and the bullet punctuation drift (D15); `src/vaultspec_core/builtins/system/02-operations.md`.
 - [x] `P08.S86` - normalize the three bold-label conventions to the single Label-colon-sentence mandate form (D15); `src/vaultspec_core/builtins/system/01-core.md`.
 - [x] `P08.S87` - replace the project-bondedness neologism with project-bound, repair the verb-less back-pointer sentence, and order the tool list (D15); `src/vaultspec_core/builtins/agents/vaultspec-codifier.md`.
-- [ ] `P08.S88` - replace the British spellings serialiser, behaviour, and centre with American forms (D15); `src/vaultspec_core/builtins/rules/vaultspec-plan-editing-discipline.builtin.md`.
+- [x] `P08.S88` - replace the British spellings serialiser, behaviour, and centre with American forms (D15); `src/vaultspec_core/builtins/rules/vaultspec-plan-editing-discipline.builtin.md`.
 - [ ] `P08.S89` - replace the British spellings with American forms (D15); `src/vaultspec_core/builtins/rules/vaultspec-codify.builtin.md`.
 - [ ] `P08.S90` - replace the British spellings with American forms (D15); `src/vaultspec_core/builtins/skills/vaultspec-codify/SKILL.md`.
 - [ ] `P08.S91` - replace the British spellings with American forms (D15); `src/vaultspec_core/builtins/agents/vaultspec-codifier.md`.
