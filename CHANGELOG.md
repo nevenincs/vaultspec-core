@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.1.28](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.27...vaultspec-core-v0.1.28) (2026-06-10)
+
+
+### Features
+
+* **cli-reference-automation:** add Typer-surface CLI-reference generator (P02.S05) ([8748cf7](https://github.com/wgergely/vaultspec-core/commit/8748cf77238be03cce700bc731de5cbb3cec8db7))
+* **graph-backend:** add derived relatedness edge module (P02.S11) ([9f15f9e](https://github.com/wgergely/vaultspec-core/commit/9f15f9e5253fdc5fccb26a455757e0e7a18e0383))
+* **graph-backend:** add ego-graph local scoping by node and depth (P02.S13) ([af444b0](https://github.com/wgergely/vaultspec-core/commit/af444b0347e4b835a827604aebfbd06e405afdae))
+* **graph-backend:** add fingerprint graph cache module (P04.S28) ([a7ae650](https://github.com/wgergely/vaultspec-core/commit/a7ae65064124f955a863ad84c3f292eedcfdb4f8))
+* **graph-backend:** add node, depth, derived toggles to vault graph (P02.S15) ([3bd0d8a](https://github.com/wgergely/vaultspec-core/commit/3bd0d8a92faa458c8830000e97cb9c05a3ebc6a2))
+* **graph-backend:** add pagerank and in-degree node-size hints (P02.S12) ([ca5d3d1](https://github.com/wgergely/vaultspec-core/commit/ca5d3d1efa4161e0868cff419cbe0aaa9b0e2c74))
+* **graph-backend:** attach kind, multiplicity, weight to explicit edges (P02.S10) ([0bf4947](https://github.com/wgergely/vaultspec-core/commit/0bf4947b0dd301204d47bb9d059f78b73ced38c8))
+* **graph-backend:** bump graph JSON envelope to vaultspec.vault.graph.v2 (P01.S04) ([60a1e9a](https://github.com/wgergely/vaultspec-core/commit/60a1e9a6744d8c8eb084b65a897a90fd2f62961b))
+* **graph-backend:** create vault link command group with list verb (P03.S21) ([9e69e8a](https://github.com/wgergely/vaultspec-core/commit/9e69e8a4348c9c2d79b0142c8192f146f5880984))
+* **graph-backend:** emit derived edges and node hints in v2 payload (P02.S14) ([41a1b61](https://github.com/wgergely/vaultspec-core/commit/41a1b619c5ab0900cd4236bbf102134a18859bfc))
+* **graph-backend:** implement vault link add with dangling refusal and dry-run (P03.S22) ([c123203](https://github.com/wgergely/vaultspec-core/commit/c1232032985cc4199c261c1e009a484ef872e5e2))
+* **graph-backend:** implement vault link remove with no-op detection and dry-run (P03.S23) ([a25e019](https://github.com/wgergely/vaultspec-core/commit/a25e0199d67b07e755a20600d5280d77891c3948))
+* **graph-backend:** invalidate graph cache from mutating verbs (P04.S30) ([f5fd041](https://github.com/wgergely/vaultspec-core/commit/f5fd0414d7fad3c2ffd52d23813c6d55c590650c))
+* **graph-backend:** preserve link multiplicity via Counter (P02.S08) ([327abaa](https://github.com/wgergely/vaultspec-core/commit/327abaa6202c7a2e128d9b11f3391f98ec2b2895))
+* **graph-backend:** register vault link group and regenerate CLI reference (P03.S24) ([7c258bd](https://github.com/wgergely/vaultspec-core/commit/7c258bdcd3234023763c0e8695a05ef476afd19b))
+* **graph-backend:** thread per-target link counts through graph build (P02.S09) ([d5ceb4f](https://github.com/wgergely/vaultspec-core/commit/d5ceb4f41ec1b246341726c3a90e85cc301da1b2))
+* **graph-backend:** wire graph cache load into construction (P04.S29) ([b7afca4](https://github.com/wgergely/vaultspec-core/commit/b7afca4a58c7aba4ff1b67d91b51eb0967ed5afe))
+
+
+### Bug Fixes
+
+* **cli-reference-automation:** distinct error for reversed region markers (GENREVIEW-001) ([d5c7016](https://github.com/wgergely/vaultspec-core/commit/d5c70166eaf9afa25a216616bcf4c67c5deadceb))
+* **cli-reference-automation:** guard duplicated region markers (GENREVIEW-002) ([17a8d9c](https://github.com/wgergely/vaultspec-core/commit/17a8d9c6d57c5bdfd8046efc94af8200f96de71d))
+* **cli-reference-automation:** lift template-name map to module scope (P01.S02) ([df23714](https://github.com/wgergely/vaultspec-core/commit/df237143c768e3de08267ad28d96c266212825cb))
+* **cli-reference-automation:** make docs/CLI.md inventory generator-owned (GENREVIEW-003) ([327dcfc](https://github.com/wgergely/vaultspec-core/commit/327dcfc9328d4584b8a32f1957e22078e605cf82))
+* **cli-reference-automation:** make spec reference group visible (P02.S05) ([9e8d53a](https://github.com/wgergely/vaultspec-core/commit/9e8d53a1f5c98858bc328290f557bc982963baae))
+* **cli-reference-automation:** mark ref-audit.md legacy fallback for removal (P01.S01) ([dd11e7f](https://github.com/wgergely/vaultspec-core/commit/dd11e7f5d7dc3209018ad122527766901f9baf5c))
+* **firmware:** legacy template-name fallback for stale workspaces (P09.S126) ([38da3f4](https://github.com/wgergely/vaultspec-core/commit/38da3f49ade421442da8a0ad487d28e08377940f))
+* **graph-backend:** eliminate duplicate metrics pass in to_dict (P01.S03) ([364097d](https://github.com/wgergely/vaultspec-core/commit/364097d114fd02dd5069ef08719a74c1ccafd988))
+* **graph-backend:** harden cache save and benchmark slack (P04 review M3, L3) ([d3bc283](https://github.com/wgergely/vaultspec-core/commit/d3bc2832ce9a6583d91705bf50b279862de15f4b))
+* **graph-backend:** invalidate cache from remaining vault-mutating verbs (P04 review M1) ([35dc759](https://github.com/wgergely/vaultspec-core/commit/35dc759bd2acba651aab0f5ec2dceb9703c93934))
+* **graph-backend:** normalise inline related: lists in surgery helper (P03 review C1) ([14de9ee](https://github.com/wgergely/vaultspec-core/commit/14de9eecc0be5756bd0bcc82b49fefefe14e20b2))
+* **graph-backend:** pass explicit edges= key to node_link_data (P01.S01) ([e859d2a](https://github.com/wgergely/vaultspec-core/commit/e859d2ad1bb899d61132b3e2dd8bebf4c01384d1))
+* **graph-backend:** sort _stem_index keys for cross-platform determinism ([8c7335c](https://github.com/wgergely/vaultspec-core/commit/8c7335c9f1e58a97a3dbb3d79d01141f6376039d))
+
+
+### Performance
+
+* **graph-backend:** scope derived-edge computation to the queried node set (P02 review HIGH-2) ([376a189](https://github.com/wgergely/vaultspec-core/commit/376a189178149e43ee4a3137d05cb4f3a70beea3))
+
 ## [0.1.27](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.26...vaultspec-core-v0.1.27) (2026-06-06)
 
 
