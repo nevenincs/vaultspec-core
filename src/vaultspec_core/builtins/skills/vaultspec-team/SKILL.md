@@ -11,6 +11,9 @@ scenario where parallel execution and multi-agent coordination provide an advant
 work itself follows the plan-hardening convention: a Wave / Phase / Step plan governs
 scope, and each Step is one prompt-run plus one commit.
 
+**Announce at start:** "I'm using the `vaultspec-team` skill to coordinate a team of
+agent personas."
+
 ## When to Use
 
 - The work spans multiple modules, repositories, or domains.

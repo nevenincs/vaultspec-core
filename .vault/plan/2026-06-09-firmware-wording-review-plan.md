@@ -158,7 +158,7 @@ Apply the single style pass (spelling locale, dash convention, label form, annou
 - [x] `P08.S94` - replace em dashes with spaced hyphens (D15); `src/vaultspec_core/builtins/rules/vaultspec-codify.builtin.md`.
 - [x] `P08.S95` - replace em dashes with spaced hyphens (D15); `src/vaultspec_core/builtins/rules/vaultspec-plan-editing-discipline.builtin.md`.
 - [x] `P08.S96` - add the canonical announce line the skill lacks (D15); `src/vaultspec_core/builtins/skills/vaultspec-execute/SKILL.md`.
-- [ ] `P08.S97` - add the canonical announce line the skill lacks (D15); `src/vaultspec_core/builtins/skills/vaultspec-team/SKILL.md`.
+- [x] `P08.S97` - add the canonical announce line the skill lacks (D15); `src/vaultspec_core/builtins/skills/vaultspec-team/SKILL.md`.
 - [ ] `P08.S98` - normalize the divergent announce line to the canonical form (D15); `src/vaultspec_core/builtins/skills/vaultspec-write/SKILL.md`.
 - [ ] `P08.S99` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15); `src/vaultspec_core/builtins/skills/vaultspec-adr/SKILL.md`.
 - [ ] `P08.S100` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15); `src/vaultspec_core/builtins/skills/vaultspec-research/SKILL.md`.
