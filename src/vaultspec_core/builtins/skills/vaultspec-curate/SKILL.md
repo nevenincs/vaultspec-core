@@ -37,6 +37,11 @@ compliance, and directory structure. Repair violations through
 `vaultspec-core vault check all --fix` and the CLI repair paths rather than hand edits,
 and produce an audit report."
 
+The curator's operating mode is **Audit -> Delegate -> Verify**: it identifies
+violations with precision and orchestrates fixes through the CLI fix paths and loaded
+agent personas rather than editing documents in-place itself, then re-scans after every
+delegated repair.
+
 For targeted audits, scope the audit accordingly (e.g., "Audit only `.vault/exec/...`").
 
 ### Review the Audit Report
@@ -55,9 +60,10 @@ Review the report for:
 
 ### Act on Flagged Items
 
-Items the curator cannot auto-fix are listed under **Recommendations**. Address these
-manually or dispatch the appropriate agent (e.g., `vaultspec-low-executor` for adding
-missing sections).
+Items the curator cannot auto-fix are listed under **Recommendations**. Orchestrate
+these per the delegate model: dispatch the appropriate agent persona (e.g.,
+`vaultspec-low-executor` for adding missing sections), or surface items needing author
+judgment to the user.
 
 ## Artifact Linking
 
@@ -93,7 +99,8 @@ edits:
 ## Requirements
 
 - **Non-destructive**: The curator never deletes files. It repairs through the CLI fix
-  paths (renames, link and frontmatter corrections) and flags what the CLI cannot fix.
+  paths (renames, link and frontmatter corrections), delegates semantic repairs to
+  loaded personas, and flags what neither path can fix.
 
 - **Traceability**: Every modification is logged in the audit report.
 

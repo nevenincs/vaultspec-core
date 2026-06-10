@@ -55,6 +55,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P05-S44]]'
   - '[[2026-06-09-firmware-wording-review-P05-S45]]'
   - '[[2026-06-09-firmware-wording-review-P05-S46]]'
+  - '[[2026-06-09-firmware-wording-review-P05-S47]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -122,6 +123,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P05-S44` - align the Documentation section to the trio-parallel form referencing the exec-step.md template (D9)
 - `2026-06-09-firmware-wording-review-P05-S45` - transfer ADR authorship to this persona by amending the context-enhancer-only restriction to match its own formalizes-decisions description (D10)
 - `2026-06-09-firmware-wording-review-P05-S46` - swap the named drafting persona from vaultspec-writer to vaultspec-adr-researcher, leaving the writer mandate plan-only (D10)
+- `2026-06-09-firmware-wording-review-P05-S47` - reconcile the curator contract to the persona delegate model: orchestrate fixes through loaded personas rather than editing in-place (D11)
 
 ### plan
 

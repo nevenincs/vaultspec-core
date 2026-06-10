@@ -93,7 +93,7 @@ Reconcile persona persistence mandates, the executor trio, ADR authorship, and t
 - [x] `P05.S44` - align the Documentation section to the trio-parallel form referencing the exec-step.md template (D9); `src/vaultspec_core/builtins/agents/vaultspec-high-executor.md`.
 - [x] `P05.S45` - transfer ADR authorship to this persona by amending the context-enhancer-only restriction to match its own formalizes-decisions description (D10); `src/vaultspec_core/builtins/agents/vaultspec-adr-researcher.md`.
 - [x] `P05.S46` - swap the named drafting persona from vaultspec-writer to vaultspec-adr-researcher, leaving the writer mandate plan-only (D10); `src/vaultspec_core/builtins/skills/vaultspec-adr/SKILL.md`.
-- [ ] `P05.S47` - reconcile the curator contract to the persona delegate model: orchestrate fixes through loaded personas rather than editing in-place (D11); `src/vaultspec_core/builtins/skills/vaultspec-curate/SKILL.md`.
+- [x] `P05.S47` - reconcile the curator contract to the persona delegate model: orchestrate fixes through loaded personas rather than editing in-place (D11); `src/vaultspec_core/builtins/skills/vaultspec-curate/SKILL.md`.
 - [ ] `P05.S48` - add the audit-report persistence obligation that the curate skill already promises (D11); `src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md`.
 
 ### Phase `P06` - orphan wiring
