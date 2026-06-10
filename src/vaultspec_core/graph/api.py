@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     from rich.tree import Tree
 
     from ..vaultcore.checks._base import VaultSnapshot
+    from . import cache
 
 logger = logging.getLogger(__name__)
 
@@ -330,6 +331,44 @@ def _pagerank(
     return rank
 
 
+def _docnode_from_attrs(name: str, attrs: dict[str, Any]) -> DocNode:
+    """Reconstruct a :class:`DocNode` from cached networkx node attributes.
+
+    Inverts :meth:`DocNode.to_nx_attrs`: the stored ``path`` string becomes a
+    :class:`pathlib.Path` (or ``None`` for phantoms), the ``doc_type`` value
+    string becomes a :class:`~vaultspec_core.vaultcore.DocType`, and the sorted
+    ``tags``, ``out_links``, and ``in_links`` lists become sets.  The ``body``
+    attribute is not part of ``to_nx_attrs`` and is restored separately by the
+    cache loader.
+
+    Args:
+        name: The node key (used as the :class:`DocNode` ``name``).
+        attrs: The networkx node attribute dict from the cached node-link data.
+
+    Returns:
+        A :class:`DocNode` equivalent to the one a fresh build would produce
+        for this node, minus its body text.
+    """
+    import pathlib
+
+    raw_path = attrs.get("path")
+    doc_type_value = attrs.get("doc_type")
+    return DocNode(
+        path=pathlib.Path(raw_path) if raw_path else None,
+        name=attrs.get("name", name),
+        doc_type=DocType(doc_type_value) if doc_type_value else None,
+        feature=attrs.get("feature"),
+        date=attrs.get("date"),
+        title=attrs.get("title"),
+        tags=set(attrs.get("tags", [])),
+        frontmatter=attrs.get("frontmatter", {}),
+        word_count=attrs.get("word_count", 0),
+        out_links=set(attrs.get("out_links", [])),
+        in_links=set(attrs.get("in_links", [])),
+        phantom=attrs.get("phantom", False),
+    )
+
+
 def _edge_kind(provenance: set[str]) -> str:
     """Map a set of provenance sources to a single edge ``kind`` value.
 
@@ -398,17 +437,128 @@ class VaultGraph:
         print(f"Density: {m.density:.3f}")
     """
 
-    def __init__(self, root_dir: pathlib.Path) -> None:
+    def __init__(self, root_dir: pathlib.Path, *, use_cache: bool = True) -> None:
         self.root_dir = root_dir
         self.nodes: dict[str, DocNode] = {}
         self._digraph: nx.DiGraph = nx.DiGraph()
         self._dangling_links: list[tuple[str, str]] = []
-        self._build_graph()
+        self._stem_index: dict[str, list[str]] = {}
+        self._build_graph(use_cache=use_cache)
 
     # -- Construction --------------------------------------------------------
 
-    def _build_graph(self) -> None:
-        """Scan the vault and populate nodes + networkx DiGraph.
+    def _build_graph(self, *, use_cache: bool = True) -> None:
+        """Populate the graph, loading from the fingerprint cache when valid.
+
+        Scans the vault once into a file list and fingerprints it.  When
+        *use_cache* is set and a cache file exists whose manifest matches the
+        current fingerprints exactly (same file set, same per-file size, mtime,
+        and content hash), the serialised canonical graph is loaded and the
+        full parse is skipped.  On any divergence - a changed, added, or
+        removed file, an absent cache, or a corrupt cache - the graph is
+        rebuilt from the scanned files and the cache is rewritten.
+
+        The cache can never serve data that does not match the bytes on disk:
+        :func:`vaultspec_core.graph.cache.validate` requires a total
+        fingerprint match, and a corrupt cache degrades silently to a full
+        rebuild rather than crashing or serving stale data.
+
+        Args:
+            use_cache: When ``True`` (default), attempt a cache load before
+                rebuilding and rewrite the cache after a rebuild.  When
+                ``False``, ignore and do not write the cache (a forced fresh
+                build).
+        """
+        from . import cache as cache_mod
+
+        logger.info("Building vault graph from %s", self.root_dir)
+
+        scanned_files = list(scan_vault(self.root_dir))
+        fingerprints = cache_mod.fingerprint_vault(scanned_files, self.root_dir)
+        path = cache_mod.cache_path(self.root_dir)
+
+        if use_cache:
+            payload = cache_mod.load(path)
+            if payload is not None and cache_mod.validate(
+                payload.manifest, fingerprints
+            ):
+                logger.info("Graph cache hit at %s; skipping re-parse", path)
+                self._load_from_cache(payload)
+                return
+            logger.info("Graph cache miss at %s; rebuilding", path)
+
+        self._rebuild_from_files(scanned_files)
+
+        if use_cache:
+            cache_mod.save(
+                path,
+                fingerprints,
+                self._to_cache_graph(),
+                self._dangling_links,
+            )
+
+    def _to_cache_graph(self) -> dict[str, Any]:
+        """Return the node-link serialisation of the canonical graph for caching.
+
+        Uses the same ``edges="edges"`` node-link contract the JSON export
+        uses, then injects each node's body text (which is held on the
+        :class:`DocNode`, not on the networkx node) so a cache load can
+        reconstruct a behaviourally identical graph, including
+        :meth:`to_dict` with ``include_body=True``.
+
+        Returns:
+            A node-link ``dict`` with body text attached to each node.
+        """
+        data = json_graph.node_link_data(self._digraph, edges="edges")
+        for node_dict in data.get("nodes", []):
+            nid = node_dict.get("id", "")
+            doc = self.nodes.get(nid)
+            node_dict["body"] = doc.body if doc is not None else ""
+        return data
+
+    def _load_from_cache(self, payload: cache.GraphCachePayload) -> None:
+        """Reconstruct the graph state from a validated cache payload.
+
+        Rebuilds ``self._digraph``, ``self.nodes``, ``self._stem_index``, and
+        ``self._dangling_links`` from the serialised node-link data so the
+        loaded graph is behaviourally identical to a fresh build (same nodes,
+        edges, attributes, and node-size metrics).  No filesystem parsing
+        occurs.
+
+        Args:
+            payload: A cache payload that has already passed
+                :func:`vaultspec_core.graph.cache.validate`.
+        """
+        self._digraph = json_graph.node_link_graph(
+            payload.graph,
+            directed=True,
+            multigraph=False,
+            edges="edges",
+        )
+        self.nodes = {}
+        self._stem_index = {}
+        by_stem: dict[str, list[str]] = {}
+        for key in self._digraph.nodes():
+            attrs = self._digraph.nodes[key]
+            self.nodes[key] = _docnode_from_attrs(key, attrs)
+            # The node body is held on the DocNode, not the nx node; pull it
+            # back off the cached node attrs and drop it so the nx node
+            # attribute set matches a fresh build exactly.
+            body = attrs.pop("body", "")
+            self.nodes[key].body = body
+            bare_stem = key.split("/", 1)[1] if "/" in key else key
+            by_stem.setdefault(bare_stem, []).append(key)
+        for bare_stem, keys in by_stem.items():
+            self._stem_index[bare_stem] = sorted(keys)
+        self._dangling_links = [(pair[0], pair[1]) for pair in payload.dangling_links]
+        logger.info(
+            "Graph loaded from cache: %d nodes, %d edges",
+            self._digraph.number_of_nodes(),
+            self._digraph.number_of_edges(),
+        )
+
+    def _rebuild_from_files(self, scanned_files: list[pathlib.Path]) -> None:
+        """Rebuild the graph by parsing every scanned file.
 
         Uses a two-pass strategy:
 
@@ -420,13 +570,19 @@ class VaultGraph:
         2. **Pass 2**  - extract links and create directed edges.  Bare
            wiki-link stems that match multiple qualified keys fan-out to
            all variants (with a logged warning).
+
+        Args:
+            scanned_files: The vault document paths to parse, as returned by
+                ``scan_vault``.
         """
-        logger.info("Building vault graph from %s", self.root_dir)
+        self.nodes = {}
+        self._digraph = nx.DiGraph()
+        self._dangling_links = []
 
         # Pass 1a: collect all DocNodes keyed by stem, detecting collisions
         by_stem: dict[str, list[DocNode]] = {}
 
-        for path in scan_vault(self.root_dir):
+        for path in scanned_files:
             logger.debug("Graph pass 1: reading %s", path)
             stem = path.stem
             doc_type = get_doc_type(path, self.root_dir)
@@ -457,7 +613,7 @@ class VaultGraph:
         # Pass 1b: assign unique keys  - qualify colliding stems with
         # their doc-type prefix, build a stem-to-keys index for link
         # resolution in pass 2.
-        self._stem_index: dict[str, list[str]] = {}
+        self._stem_index = {}
 
         for stem, node_list in by_stem.items():
             if len(node_list) == 1:
