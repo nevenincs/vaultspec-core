@@ -94,6 +94,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P08-S101]]'
   - '[[2026-06-09-firmware-wording-review-P08-S102]]'
   - '[[2026-06-09-firmware-wording-review-P08-S103]]'
+  - '[[2026-06-09-firmware-wording-review-P08-S104]]'
   - '[[2026-06-09-firmware-wording-review-P08-S79]]'
   - '[[2026-06-09-firmware-wording-review-P08-S80]]'
   - '[[2026-06-09-firmware-wording-review-P08-S81]]'
@@ -221,6 +222,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P08-S101` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15)
 - `2026-06-09-firmware-wording-review-P08-S102` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15)
 - `2026-06-09-firmware-wording-review-P08-S103` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15)
+- `2026-06-09-firmware-wording-review-P08-S104` - drop the fragile second-worked-example ordinal (D15)
 - `2026-06-09-firmware-wording-review-P08-S79` - fix the fundations and considere-null-and-void typos and supply the missing conjunction at line 20 (D15)
 - `2026-06-09-firmware-wording-review-P08-S80` - fix the agent personaa typo (D15)
 - `2026-06-09-firmware-wording-review-P08-S81` - fix the continously typo and repair the garbled rolling-log-of-task-queue phrase (D15)

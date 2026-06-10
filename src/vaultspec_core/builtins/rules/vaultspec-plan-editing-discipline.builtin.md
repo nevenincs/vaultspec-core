@@ -4,9 +4,9 @@ name: vaultspec-plan-editing-discipline
 
 # Plan editing discipline: structure first, prose last
 
-Second worked example of codification applied to an audit finding. Promoted from the
-rolling CLI UX audit (finding B6) following the discipline described in the
-`vaultspec-codify` rule.
+A worked example of codification applied to an audit finding. Promoted from the rolling
+CLI UX audit (finding B6) following the discipline described in the `vaultspec-codify`
+rule.
 
 ## Rule
 
