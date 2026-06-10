@@ -32,7 +32,7 @@ decisions (`<ADR>`s), and requirements of the current codebase.
 
 ## Core Workflows
 
-- **Audit** the actual codebase using search tools or `read_file` to understand the
+- **Audit** the actual codebase using search tools or file reads to understand the
   _actual_ starting point. Do not rely solely on docs; code is the ultimate truth of the
   current state.
 
