@@ -88,7 +88,7 @@ Reconcile persona persistence mandates, the executor trio, ADR authorship, and t
 - [x] `P05.S39` - move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9); `src/vaultspec_core/builtins/agents/vaultspec-project-coordinator.md`.
 - [x] `P05.S40` - move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9); `src/vaultspec_core/builtins/agents/vaultspec-researcher.md`.
 - [x] `P05.S41` - add the low executor to the Step routing table so low-tier Steps gain a routing target (D9); `src/vaultspec_core/builtins/agents/vaultspec-writer.md`.
-- [ ] `P05.S42` - align the Documentation section to the trio-parallel form referencing the exec-step.md template (D9); `src/vaultspec_core/builtins/agents/vaultspec-low-executor.md`.
+- [x] `P05.S42` - align the Documentation section to the trio-parallel form referencing the exec-step.md template (D9); `src/vaultspec_core/builtins/agents/vaultspec-low-executor.md`.
 - [ ] `P05.S43` - align the Documentation section to the trio-parallel form referencing the exec-step.md template (D9); `src/vaultspec_core/builtins/agents/vaultspec-standard-executor.md`.
 - [ ] `P05.S44` - align the Documentation section to the trio-parallel form referencing the exec-step.md template (D9); `src/vaultspec_core/builtins/agents/vaultspec-high-executor.md`.
 - [ ] `P05.S45` - transfer ADR authorship to this persona by amending the context-enhancer-only restriction to match its own formalizes-decisions description (D10); `src/vaultspec_core/builtins/agents/vaultspec-adr-researcher.md`.

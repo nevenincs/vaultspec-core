@@ -42,9 +42,7 @@ Use:
   - **Linking**: Use `[[wiki-links]]` only in the `related:` frontmatter; the body
     remains free of wiki-links and markdown links.
 
-  - Modified files listed.
-
-  - Concise summary of key changes.
+  - **Content**: List the modified files and give a concise summary of key changes.
 
 - **CLI usage mandate**: You MUST update the originating Step's state via
   `vaultspec-core vault plan step check` (close),
