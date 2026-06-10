@@ -92,6 +92,7 @@ allow-direct-references = true
 packages = ["src/vaultspec_core"]
 
 [tool.pytest.ini_options]
+addopts = "-m 'not benchmark'"
 asyncio_mode = "auto"
 log_cli = true
 log_cli_date_format = "%H:%M:%S"
@@ -107,6 +108,7 @@ markers = [
   "claude: requires Claude CLI installed",
   "timeout: timeout in seconds for individual tests",
   "e2e: end-to-end tests requiring real LLM API keys",
+  "benchmark: slow scale benchmarks, deselected by default",
 ]
 testpaths = ["tests", "src"]
 timeout = 300
