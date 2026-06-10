@@ -181,7 +181,7 @@ Apply the single style pass (spelling locale, dash convention, label form, annou
 - [x] `P08.S117` - add the shared persona frontmatter schema the eleven top-level personas carry (D15); `src/vaultspec_core/builtins/skills/vaultspec-documentation/agents/wireframe-agent.md`.
 - [x] `P08.S118` - add the shared persona frontmatter schema the eleven top-level personas carry (D15); `src/vaultspec_core/builtins/skills/vaultspec-documentation/agents/editorial-reviewer.md`.
 - [x] `P08.S119` - remove the duplicated mandatory-read instruction and convert square-bracket placeholders to the curly-brace convention (D15); `src/vaultspec_core/builtins/skills/vaultspec-documentation/agents/wireframe-agent.md`.
-- [ ] `P08.S120` - reword the Start-with-Phase instruction so it holds at L1 where only Steps exist (D15); `src/vaultspec_core/builtins/skills/vaultspec-execute/SKILL.md`.
+- [x] `P08.S120` - reword the Start-with-Phase instruction so it holds at L1 where only Steps exist (D15); `src/vaultspec_core/builtins/skills/vaultspec-execute/SKILL.md`.
 
 ### Phase `P09` - propagation and verification
 

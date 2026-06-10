@@ -38,8 +38,9 @@ Assume the persona of a delegator.
 - Always instruct the coders to execute the current plan, and to read grounding
   research, ADRs, and the `[[...-plan.md]]`.
 
-- Always instruct to "Start with Phase `P##`." (or the canonical display path, e.g.,
-  `W01.P01`, at L3 / L4).
+- Always name the tier-conditional entry point: instruct "Start with Step `S##`." at L1
+  (Steps only), "Start with Phase `P##`." at L2, or the canonical display path (e.g.,
+  `W01.P01`) at L3 / L4.
 
 ### Step Execution & Logging
 

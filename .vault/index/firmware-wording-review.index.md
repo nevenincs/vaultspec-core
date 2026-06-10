@@ -110,6 +110,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P08-S117]]'
   - '[[2026-06-09-firmware-wording-review-P08-S118]]'
   - '[[2026-06-09-firmware-wording-review-P08-S119]]'
+  - '[[2026-06-09-firmware-wording-review-P08-S120]]'
   - '[[2026-06-09-firmware-wording-review-P08-S79]]'
   - '[[2026-06-09-firmware-wording-review-P08-S80]]'
   - '[[2026-06-09-firmware-wording-review-P08-S81]]'
@@ -253,6 +254,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P08-S117` - add the shared persona frontmatter schema the eleven top-level personas carry (D15)
 - `2026-06-09-firmware-wording-review-P08-S118` - add the shared persona frontmatter schema the eleven top-level personas carry (D15)
 - `2026-06-09-firmware-wording-review-P08-S119` - remove the duplicated mandatory-read instruction and convert square-bracket placeholders (D15)
+- `2026-06-09-firmware-wording-review-P08-S120` - reword the start-with-phase instruction so it holds at l1 where only steps exist (D15)
 - `2026-06-09-firmware-wording-review-P08-S79` - fix the fundations and considere-null-and-void typos and supply the missing conjunction at line 20 (D15)
 - `2026-06-09-firmware-wording-review-P08-S80` - fix the agent personaa typo (D15)
 - `2026-06-09-firmware-wording-review-P08-S81` - fix the continously typo and repair the garbled rolling-log-of-task-queue phrase (D15)
