@@ -169,7 +169,7 @@ Apply the single style pass (spelling locale, dash convention, label form, annou
 - [x] `P08.S105` - drop the fragile Third-worked-example ordinal (D15); `src/vaultspec_core/builtins/rules/vaultspec-dry-run-discipline.builtin.md`.
 - [x] `P08.S106` - convert the numbered procedural lists to bullets per the operations fragment mandate (D15); `src/vaultspec_core/builtins/rules/vaultspec-dry-run-discipline.builtin.md`.
 - [x] `P08.S107` - convert the numbered procedural lists to bullets per the operations fragment mandate (D15); `src/vaultspec_core/builtins/rules/vaultspec-plan-editing-discipline.builtin.md`.
-- [ ] `P08.S108` - remove the orphan end-conventions comment marker at line 88 (D15); `src/vaultspec_core/builtins/system/03-vaultspec.md`.
+- [x] `P08.S108` - remove the orphan end-conventions comment marker at line 88 (D15); `src/vaultspec_core/builtins/system/03-vaultspec.md`.
 - [ ] `P08.S109` - fix the doubled the-dot-vault-vault phrasing (D15); `src/vaultspec_core/builtins/skills/vaultspec-curate/SKILL.md`.
 - [ ] `P08.S110` - fix the doubled the-dot-vault-vault phrasing in the description (D15); `src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md`.
 - [ ] `P08.S111` - replace the host-specific read_file tool id with provider-neutral wording (D15); `src/vaultspec_core/builtins/agents/vaultspec-writer.md`.

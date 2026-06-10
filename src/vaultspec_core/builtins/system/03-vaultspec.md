@@ -94,5 +94,3 @@ is persona discipline, not tooling enforcement.
 
 Artifacts are persisted in `.vault/`. The user must approve plans before execution
 proceeds. Code review via vaultspec-code-review is mandatory after execution.
-
-<!-- end conventions -->
