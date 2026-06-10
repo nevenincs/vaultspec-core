@@ -1,6 +1,6 @@
 ---
-description: Medium-tier implementation specialist for standard feature work, component development, and logic updates. Use for typical coding Steps and well-defined Step execution.
-tier: MEDIUM
+description: Standard-tier implementation specialist for standard feature work, component development, and logic updates. Use for typical coding Steps and well-defined Step execution.
+tier: STANDARD
 mode: read-write
 tools: [Glob, Grep, Read, Write, Edit, Bash]
 ---

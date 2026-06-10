@@ -43,6 +43,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P05-S32]]'
   - '[[2026-06-09-firmware-wording-review-P05-S33]]'
   - '[[2026-06-09-firmware-wording-review-P05-S34]]'
+  - '[[2026-06-09-firmware-wording-review-P05-S35]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -98,6 +99,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P05-S32` - rewrite the verbatim high-tier mission statement at lines 10-12 into a tier-appropriate mission of simplicity, pattern-following, and minimal blast radius (D9)
 - `2026-06-09-firmware-wording-review-P05-S33` - add the mandatory Critical Requirement code-review section that the standard and high executors carry (D9)
 - `2026-06-09-firmware-wording-review-P05-S34` - run the code-binding check for tier MEDIUM frontmatter consumption in Python loaders and tests before any enum value change (D9)
+- `2026-06-09-firmware-wording-review-P05-S35` - rename the medium-tier description wording to standard and move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9)
 
 ### plan
 
