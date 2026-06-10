@@ -22,6 +22,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P02-S14]]'
   - '[[2026-06-09-firmware-wording-review-P02-summary]]'
   - '[[2026-06-09-firmware-wording-review-P03-S15]]'
+  - '[[2026-06-09-firmware-wording-review-P03-S16]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -56,6 +57,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P02-S14` - shorten the rule per its own Status clause only after the live prose-preservation confirmation passes, replacing the ordering procedure with a pointer at the preserved-prose behavior (D5)
 - `2026-06-09-firmware-wording-review-P02-summary` - `firmware-wording-review` `P02` summary
 - `2026-06-09-firmware-wording-review-P03-S15` - add the missing vault add flags --tier, --step, --all-steps, and --no-hints to the vault add section (D6)
+- `2026-06-09-firmware-wording-review-P03-S16` - document vault feature archive --dry-run and --no-hints and add a vault feature unarchive prose section (D6)
 
 ### plan
 
