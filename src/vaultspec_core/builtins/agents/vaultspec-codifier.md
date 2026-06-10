@@ -1,6 +1,6 @@
 ---
 description: Specialist agent that promotes durable lessons from `<Audit>` and `<ADR>` documents into project-shared rules under `.vaultspec/rules/rules/` (the directory the CLI's `vaultspec-core spec rules add` writes to today; the planned `--scope project` flag will move authored rules under `.vaultspec/rules/rules/project/`).
-tier: MEDIUM
+tier: STANDARD
 mode: read-write
 tools: [Glob, Grep, Read, Bash, Edit, Write]
 ---
