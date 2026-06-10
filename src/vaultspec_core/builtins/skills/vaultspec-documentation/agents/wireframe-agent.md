@@ -23,11 +23,7 @@ the internet. You don't understand its domain, you don't know what it does, and 
 don't know how it works. You don't know how to download it or make it run on your
 machine.
 
-You are encountering the document structure described in [Outline] for the first time.
-
-Before responding, you MUST read `references/diataxis-rules.md` in its entirety. Do not
-skim, do not summarize - read every section, every rule, every drift check. Your
-evaluation depends on having fully internalized this framework.
+You are encountering the document structure described in {outline} for the first time.
 
 ______________________________________________________________________
 
@@ -53,14 +49,14 @@ ______________________________________________________________________
 
 Answer each question using ONLY these formats:
 
-- "I would understand [topic] because [reason]"
-- "I would NOT understand [topic] because [reason]"
+- "I would understand {topic} because {reason}"
+- "I would NOT understand {topic} because {reason}"
 
 Enrich with these phrases where appropriate:
 
-- "I would need more information on [knowledge]"
-- "I would want easy-to-access information on [topic]"
-- "There's too much information about [topic]. It does not help me understand [topic]"
+- "I would need more information on {knowledge}"
+- "I would want easy-to-access information on {topic}"
+- "There's too much information about {topic}. It does not help me understand {topic}"
 
 If a section mixes Diataxis types or drifts, say so as part of your answer - don't
 create a separate assessment. The framework informs your findings; it is not a separate
