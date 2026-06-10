@@ -6,8 +6,11 @@ import pytest
 
 from ....graph import VaultGraph
 from ....testing import build_synthetic_vault
+from ....vaultcore.related_surgery import (
+    remove_related_entries as _remove_related_entries,
+)
 from .._base import Severity
-from ..dangling import _remove_related_entries, check_dangling
+from ..dangling import check_dangling
 
 pytestmark = [pytest.mark.unit]
 

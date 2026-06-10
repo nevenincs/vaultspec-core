@@ -64,7 +64,7 @@ Deliver connection strengths with zero new dependencies: provenance-typed weight
 
 Add the vault link command group so a GUI can mutate graph edges through the CLI by safe related-frontmatter surgery only.
 
-- [ ] `P03.S20` - extract the related-frontmatter line surgery from the dangling fixer into a shared CRLF-preserving atomic helper; `src/vaultspec_core/vaultcore/`.
+- [x] `P03.S20` - extract the related-frontmatter line surgery from the dangling fixer into a shared CRLF-preserving atomic helper; `src/vaultspec_core/vaultcore/`.
 - [ ] `P03.S21` - create the vault link command group with the list verb and versioned JSON envelopes; `src/vaultspec_core/cli/link_cmd.py`.
 - [ ] `P03.S22` - implement vault link add with target resolution, dangling refusal behind force, and dry-run preview; `src/vaultspec_core/cli/link_cmd.py`.
 - [ ] `P03.S23` - implement vault link remove reusing the shared related-entry surgery with dry-run preview; `src/vaultspec_core/cli/link_cmd.py`.

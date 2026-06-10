@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING
 
-from ...core.helpers import atomic_write
+from ...vaultcore.related_surgery import remove_related_entries
 from ._base import CheckDiagnostic, CheckResult, Severity
 
 if TYPE_CHECKING:
@@ -84,93 +83,7 @@ def check_dangling(
             )
 
         if fix:
-            fixed = _remove_related_entries(node.path, targets)
+            fixed = remove_related_entries(node.path, targets)
             result.fixed_count += fixed
 
     return result
-
-
-def _remove_related_entries(path: Path, targets: list[str]) -> int:
-    """Remove ``[[target]]`` lines from the ``related:`` YAML field.
-
-    Only modifies lines within the ``related:`` list block in the YAML
-    frontmatter. Returns the number of entries removed.
-    """
-    try:
-        # Read as bytes and decode without universal newlines so the
-        # source CRLF/LF convention can be preserved when we re-emit
-        # the file.
-        raw_content = path.read_bytes().decode("utf-8")
-    except (OSError, UnicodeDecodeError):
-        return 0
-
-    source_newline = "\r\n" if "\r\n" in raw_content else "\n"
-    content = raw_content.replace("\r\n", "\n")
-    lines = content.split("\n")
-    target_set = {t.lower() for t in targets}
-
-    # Pattern matching a related list entry like:  - "[[some-target]]"
-    related_entry_re = re.compile(r'^\s*-\s*["\']?\[\[(.+?)\]\]["\']?\s*$')
-
-    in_frontmatter = False
-    in_related = False
-    related_idx: int | None = None
-    new_lines: list[str] = []
-    removed = 0
-
-    for line in lines:
-        # Track YAML frontmatter boundaries
-        if line.strip() == "---":
-            if not in_frontmatter:
-                in_frontmatter = True
-            else:
-                in_frontmatter = False
-                in_related = False
-            new_lines.append(line)
-            continue
-
-        if in_frontmatter:
-            # Detect start of related: field
-            if line.startswith("related:"):
-                in_related = True
-                related_idx = len(new_lines)
-                new_lines.append(line)
-                continue
-
-            # Detect exit from related: block (new top-level key)
-            if in_related and not line.startswith(" ") and not line.startswith("\t"):
-                in_related = False
-
-            if in_related:
-                m = related_entry_re.match(line)
-                if m and m.group(1).lower() in target_set:
-                    removed += 1
-                    continue
-
-        new_lines.append(line)
-
-    if removed:
-        # If every entry under `related:` was a dangling link, the key is
-        # now bare and parses as null. Emit an explicit empty list so the
-        # file stays valid YAML; the empty related: is then surfaced as a
-        # separate, honest finding rather than a malformed document.
-        if related_idx is not None:
-            after = (
-                new_lines[related_idx + 1] if related_idx + 1 < len(new_lines) else ""
-            )
-            indented = after.startswith((" ", "\t"))
-            if not (indented and after.lstrip().startswith("-")):
-                new_lines[related_idx] = "related: []"
-
-        new_content = source_newline.join(new_lines)
-        bak = path.with_suffix(path.suffix + ".bak")
-        bak.write_bytes(path.read_bytes())
-        try:
-            atomic_write(path, new_content)
-        except Exception:
-            if bak.exists():
-                bak.replace(path)
-            raise
-        bak.unlink(missing_ok=True)
-
-    return removed
