@@ -9,9 +9,9 @@ description: >-
 
 When to use this skill:
 
-- **Mandatory:** At the end of every `vaultspec-execute` cycle
-- before marking a feature as "Done", or before publishing a PR.
-- after major feature implementation work.
+- **Mandatory:** At the end of every `vaultspec-execute` cycle, before marking a feature
+  as "Done", and before publishing a PR.
+- After major feature implementation work.
 - When you need a second pair of eyes on a specific module or PR.
 - **Safety Check:** When you suspect a safety violation (e.g., `unsafe` usage) or
   testing framework issue in complex projects.
