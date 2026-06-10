@@ -112,3 +112,11 @@ When you do write or update tests, the following are **STRICTLY FORBIDDEN**:
 
 - **Hardcoded expected values:** YOU MUST NOT copy expected values from a broken test
   run's output. You MUST derive expected values strictly from the specification.
+
+## Critical Requirement
+
+Code review is mandatory before completion. Ensure the `vaultspec-code-reviewer` persona
+audits the changes for safety and intent violations - either by delegating to it or by
+including it in the supervised team workflow.
+
+**DO NOT** mark the Step as complete until the review passes.
