@@ -148,6 +148,8 @@ is in the NO COMPRESSION hint block embedded in the plan template.
 Autonomously assign the most appropriate agent persona for each Step:
 
 - `vaultspec-code-reviewer` for safety / intent checks.
+- `vaultspec-low-executor` for straightforward edits, documentation updates, and
+  low-risk changes following well-defined patterns.
 - `vaultspec-standard-executor` for typical features.
 - `vaultspec-high-executor` for core logic.
 
