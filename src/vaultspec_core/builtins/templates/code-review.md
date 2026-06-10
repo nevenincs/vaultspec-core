@@ -12,10 +12,10 @@ related:
      Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
      Additional tags may be appended below the required pair.
 
-     Related: use wiki-links as '[[YYYY-MM-DD-foo-bar]]'.
+     Related: use wiki-links as '[[yyyy-mm-dd-foo-bar]]'.
 
-     DO NOT add frontmatter fields
-     outside the frontmatter. -->
+     DO NOT add fields beyond those scaffolded; metadata lives
+     only in the frontmatter. -->
 
 <!-- LINK RULES:
      - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
