@@ -66,8 +66,8 @@ schema:
 - **`tags`**: MUST contain the required tag pair in a YAML list.
 
   - **Directory Tag**: Exactly `#exec`.
-  - *Feature Tag:* Exactly one kebab-case `#{feature}` tag.
-  - *Syntax:* `tags: ['#exec', '#feature']` (Must be quoted strings in a list).
+  - **Feature Tag**: Exactly one kebab-case `#{feature}` tag.
+  - *Syntax:* `tags: ['#exec', '#{feature}']` (Must be quoted strings in a list).
 
 - **`related`**: MUST be a YAML list of quoted `'[[wiki-links]]'`.
 
