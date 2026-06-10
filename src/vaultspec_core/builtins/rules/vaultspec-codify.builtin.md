@@ -5,8 +5,8 @@ name: vaultspec-codify
 # Codify durable lessons as project rules
 
 The `vaultspec-core` workflow has a research → decide → plan → execute → review arc. The
-audit-derived sixth phase is `codify`: when a review surfaces a durable lesson — a
-constraint that should bind future agents across sessions — write that lesson down as a
+audit-derived sixth phase is `codify`: when a review surfaces a durable lesson - a
+constraint that should bind future agents across sessions - write that lesson down as a
 rule the next agent inherits on load.
 
 This rule defines when to codify, what to codify, and how to author the artifact.
@@ -34,7 +34,7 @@ finding without a durable lesson).
 The rule body names the constraint precisely. Three sections, in order:
 
 - **Rule.** One sentence stating the obligation. Imperative voice. No backstory.
-- **Why.** Two or three sentences naming the constraint's origin — the audit document or
+- **Why.** Two or three sentences naming the constraint's origin - the audit document or
   ADR that surfaced the lesson, the failure mode it prevents.
 - **How.** Concrete worked examples of the rule applied and the rule violated.
 
@@ -112,7 +112,7 @@ The framework supports an audit-first codification flow. The sequence:
 
 - A review at the end of a feature surfaces lessons in
   `.vault/audit/yyyy-mm-dd-{feature}-audit.md`.
-- One audit can produce zero, one, or many rules — most produce zero (the lesson is
+- One audit can produce zero, one, or many rules - most produce zero (the lesson is
   feature-specific), some produce one, and a rare audit (the kind that surfaces a
   framework-wide pattern) produces several.
 - Each rule's body names the audit stem in backticks as its origin. Once the planned
