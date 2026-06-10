@@ -63,7 +63,7 @@ Rewrite every artifact-producing skill around the vault add scaffold-then-edit-p
 
 - [x] `P04.S20` - rewrite the persistence steps to scaffold via vaultspec-core vault add then edit body prose, removing the hand-authored frontmatter instruction (D4); `src/vaultspec_core/builtins/skills/vaultspec-adr/SKILL.md`.
 - [x] `P04.S21` - rewrite the persistence steps to scaffold via vaultspec-core vault add then edit body prose, removing the hand-authored frontmatter instruction (D4); `src/vaultspec_core/builtins/skills/vaultspec-research/SKILL.md`.
-- [ ] `P04.S22` - rewrite the persistence steps to scaffold via vaultspec-core vault add then edit body prose, removing the hand-authored frontmatter instruction (D4); `src/vaultspec_core/builtins/skills/vaultspec-write/SKILL.md`.
+- [x] `P04.S22` - rewrite the persistence steps to scaffold via vaultspec-core vault add then edit body prose, removing the hand-authored frontmatter instruction (D4); `src/vaultspec_core/builtins/skills/vaultspec-write/SKILL.md`.
 - [ ] `P04.S23` - rewrite the persistence steps to scaffold via vaultspec-core vault add then edit body prose, removing the hand-authored frontmatter instruction (D4); `src/vaultspec_core/builtins/skills/vaultspec-code-review/SKILL.md`.
 - [ ] `P04.S24` - rewrite the persistence steps to scaffold via vaultspec-core vault add then edit body prose, removing the hand-authored frontmatter instruction (D4); `src/vaultspec_core/builtins/skills/vaultspec-code-research/SKILL.md`.
 - [ ] `P04.S25` - rewrite the persistence steps to scaffold via vaultspec-core vault add then edit body prose, removing the hand-authored frontmatter instruction (D4); `src/vaultspec_core/builtins/skills/vaultspec-curate/SKILL.md`.

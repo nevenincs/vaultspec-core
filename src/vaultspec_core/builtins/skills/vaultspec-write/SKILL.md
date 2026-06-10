@@ -75,7 +75,12 @@ than restating them.
 
 - **Persistence:**
 
-  - Plans: `.vault/plan/yyyy-mm-dd-{feature}-plan.md`
+  - Plans: scaffold via
+    `vaultspec-core vault add plan --feature {feature} --tier <L1..L4> --related <adr-stem>`;
+    the CLI owns the filename (`.vault/plan/yyyy-mm-dd-{feature}-plan.md`) and the
+    frontmatter; never hand-write either. Build the structure with the
+    `vaultspec-core vault plan` verbs above, then author the prose sections
+    (Description, Parallelization, Verification) as body edits.
 
   - Phase Summaries: tier-conditional `.vault/exec/yyyy-mm-dd-{feature}/...-summary.md`
     filenames (`yyyy-mm-dd-{feature}-{phase}-summary.md` at L2;
@@ -87,19 +92,23 @@ than restating them.
 
 ## Template
 
-- You MUST read and use the template at `.vaultspec/rules/templates/plan.md`.
+- You MUST read and use the template at `.vaultspec/rules/templates/plan.md`; its
+  embedded hint blocks govern the body structure.
 
 ### Frontmatter & Tagging Mandate
 
-Every document MUST strictly adhere to the following schema:
+The `vault add` scaffold produces frontmatter conforming to this schema. Verify it after
+scaffolding; report drift via `vaultspec-core vault check all` rather than hand-editing
+frontmatter:
 
-- **`tags`**: MUST contain the required tag pair in a YAML list.
+- **`tags`**: contains the required tag pair in a YAML list.
 
   - **Directory Tag**: Exactly `#plan`.
   - **Feature Tag**: Exactly one kebab-case `#{feature}` tag.
-  - _Syntax:_ `tags: ['#plan', '#feature']` (Must be quoted strings in a list).
+  - _Syntax:_ `tags: ['#plan', '#feature']` (quoted strings in a list).
 
-- **`related`**: MUST be a YAML list of quoted `'[[wiki-links]]'`.
+- **`related`**: a YAML list of quoted `'[[wiki-links]]'`, seeded from the `--related`
+  flag at scaffold time.
 
   - _Constraint:_ No relative paths (`../`), no bare strings, no `@ref`.
   - _For plan documents:_ `related` carries the AUTHORISING documents (ADR, research,
@@ -107,13 +116,14 @@ Every document MUST strictly adhere to the following schema:
     reference footers do not exist. `related` is required when the plan contains at
     least one Step row.
 
-- **`date`**: MUST use `yyyy-mm-dd` format.
+- **`date`**: `yyyy-mm-dd` format, set by the scaffold.
 
-- **`tier`** (plan documents only): MUST be present as an unquoted scalar with value
-  `L1`, `L2`, `L3`, or `L4`. Pre-existing plans without the field default to `L2`; the
-  writer adds the field on first edit.
+- **`tier`** (plan documents only): an unquoted scalar with value `L1`, `L2`, `L3`, or
+  `L4`, set via the `--tier` flag at scaffold time and changed only through
+  `vaultspec-core vault plan tier promote | demote`. Pre-existing plans without the
+  field default to `L2`.
 
-- **No `feature` key**: Use `tags:` exclusively for feature identification.
+- **No `feature` key**: `tags:` exclusively identifies the feature.
 
 ## Workflow
 
@@ -127,7 +137,8 @@ Every document MUST strictly adhere to the following schema:
   Instruct it to "Create an implementation plan for `{feature}` based on
   `[[...-adr.md]]`. Use the template at `.vaultspec/rules/templates/plan.md` and conform
   to the embedded HIERARCHY AND TIERS, IDENTIFIERS AND ROW CONTRACT, and NO COMPRESSION
-  hint blocks. Declare the plan's tier (`L1`/`L2`/`L3`/`L4`) in frontmatter."
+  hint blocks. The plan's tier (`L1`/`L2`/`L3`/`L4`) is already set in frontmatter by
+  the `--tier` flag at scaffold time."
 
 - **Review**: Present the saved Plan summary to the user before executing.
 
