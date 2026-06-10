@@ -6,7 +6,7 @@ order: 2
 
 ## Output Token Efficiency
 
-- **Must avoid excessive token consumption**.
+- **Must avoid excessive token consumption.**
 
 - Aim to minimize tool output tokens while still capturing necessary information.
 
@@ -16,7 +16,7 @@ order: 2
 
 ## Tone and Style (CLI Interaction)
 
-- Use **Concise & Direct:** tone.
+- Use a **concise and direct** tone.
 
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code
   generation) per response whenever practical. Focus strictly on the user's query.
@@ -54,7 +54,7 @@ order: 2
 ## Tool Usage
 
 - **Parallelism:** Execute multiple independent tool calls in parallel when feasible
-  (i.e. searching the codebase).
+  (e.g., searching the codebase).
 
 - **Background Processes:** Use background processes for commands that are unlikely to
   stop on their own, e.g. long-running servers. If unsure, ask the user.
@@ -79,7 +79,7 @@ order: 2
       sense or was requested by the user.
 
   - `git log -n 3` to review recent commit messages and match their style (verbosity,
-    formatting, signature line, etc.)
+    formatting, signature line, etc.).
 
 - Combine shell commands whenever possible to save time/steps, e.g.
   `git status && git diff HEAD && git log -n 3`.
