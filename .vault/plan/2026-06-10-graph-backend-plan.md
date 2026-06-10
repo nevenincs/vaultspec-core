@@ -35,7 +35,7 @@ node identity are explicitly out of scope as decided in the ADR.
 
 Pin the graph JSON wire contract, fix wasteful metrics computation, and close known coverage gaps so every downstream consumer inherits a stable v2 envelope.
 
-- [ ] `P01.S01` - pass an explicit edges keyword to the node-link serialisation call so the wire key is version-independent; `src/vaultspec_core/graph/api.py`.
+- [x] `P01.S01` - pass an explicit edges keyword to the node-link serialisation call so the wire key is version-independent; `src/vaultspec_core/graph/api.py`.
 - [ ] `P01.S02` - raise the networkx dependency floor to 3.6; `pyproject.toml`.
 - [ ] `P01.S03` - eliminate the duplicate metrics computation on the JSON export path; `src/vaultspec_core/graph/api.py`.
 - [ ] `P01.S04` - bump the graph envelope schema to vaultspec.vault.graph.v2; `src/vaultspec_core/cli/vault_cmd.py`.

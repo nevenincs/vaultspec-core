@@ -106,6 +106,8 @@ both surfaces. `GENREVIEW-004` was accepted as-is. `spec reference generate --ch
 
 - **Source:** the generator design and `GENREVIEW-002`/`GENREVIEW-003`.
   **Rule slug:** `generated-reference-is-cli-owned`.
+  **Status:** promoted - codified as the `generated-reference-is-cli-owned` builtin rule
+  (`src/vaultspec_core/builtins/rules/generated-reference-is-cli-owned.builtin.md`).
   **Rule:** The bundled CLI reference's generator-managed regions are updated only by
   running `vaultspec-core spec reference generate`, never by hand-editing inside the
   managed markers; `--check` gates CI and fails until the reference matches fresh output.

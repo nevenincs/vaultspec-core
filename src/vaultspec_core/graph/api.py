@@ -920,8 +920,10 @@ class VaultGraph:
         """
         g = self.subgraph(feature=feature)
 
-        # networkx native serialisation
-        data = json_graph.node_link_data(g)
+        # networkx native serialisation - pass edges="edges" explicitly so
+        # the wire key is deterministic regardless of networkx version.
+        # networkx changed the default from "links" (<=3.5) to "edges" (>=3.6).
+        data = json_graph.node_link_data(g, edges="edges")
 
         # Strip body from nodes unless requested
         if not include_body:

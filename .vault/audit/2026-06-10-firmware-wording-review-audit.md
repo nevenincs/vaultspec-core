@@ -141,6 +141,8 @@ checker exit 0, and no commit in the range touches the deployed mirrors.
   cause: renamed artifacts leaving dangling prose references), matching the
   candidate the feature ADR already names.
   **Rule slug:** `firmware-reference-parity`.
+  **Status:** promoted - codified as the `firmware-reference-parity` builtin rule
+  (`src/vaultspec_core/builtins/rules/firmware-reference-parity.builtin.md`).
   **Rule:** Every skill, persona, template, or CLI verb named in firmware
   prose must resolve to a shipped artifact of exactly that name, and a
   rename must update every referencing surface in the same change.
