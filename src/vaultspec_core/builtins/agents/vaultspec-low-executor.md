@@ -36,6 +36,11 @@ Use:
   path (`S##`, `P##-S##`, or `W##-P##-S##`). The originating Step's canonical identifier
   (`S##`) is recorded in the Step Record's `step_id:` frontmatter field.
 
+  - **Scaffold**: Create the record with
+    `vaultspec-core vault add exec --feature <tag> --step <S##> --related <plan-stem>`,
+    then author the body prose; the verb machine-fills the tier-conditional filename and
+    the `step_id:` frontmatter field.
+
   - **Template**: You MUST read and use the template at
     `.vaultspec/rules/templates/exec-step.md`.
 

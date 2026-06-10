@@ -49,12 +49,14 @@ Assume the persona of a delegator.
   to `- [x]`) on completion.
 
 - **One Step Record per completed Step.** The executor writes a Step Record to
-  `.vault/exec/yyyy-mm-dd-{feature}/...md` for every completed Step (not per Phase). Use
-  the tier-conditional filename from the plan's canonical display path:
-  `yyyy-mm-dd-{feature}-{step}.md` at L1, `yyyy-mm-dd-{feature}-{phase}-{step}.md` at
-  L2, and `yyyy-mm-dd-{feature}-{wave}-{phase}-{step}.md` at L3/L4. The originating
-  Step's canonical identifier (`S##`) is recorded in the Step Record's `step_id:`
-  frontmatter field.
+  `.vault/exec/yyyy-mm-dd-{feature}/...md` for every completed Step (not per Phase).
+  Scaffold the record with
+  `vaultspec-core vault add exec --feature <tag> --step <S##> --related <plan-stem>`,
+  then author the body prose. The verb machine-fills the tier-conditional filename from
+  the plan's canonical display path (`yyyy-mm-dd-{feature}-{step}.md` at L1,
+  `yyyy-mm-dd-{feature}-{phase}-{step}.md` at L2, and
+  `yyyy-mm-dd-{feature}-{wave}-{phase}-{step}.md` at L3/L4) and the `step_id:`
+  frontmatter field carrying the originating Step's canonical identifier (`S##`).
 
 - **Coder or supervisor must read and use the template** at
   `.vaultspec/rules/templates/exec-step.md`.

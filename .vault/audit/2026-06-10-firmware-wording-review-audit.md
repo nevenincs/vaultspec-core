@@ -36,7 +36,10 @@ remediation lands.
   agent obeying all three receives two incompatible scales. Fix: align the
   template hint to the persona's published taxonomy (critical, high, medium,
   low).
-- `REVIEW-002` | HIGH | open - exec-record authoring path self-contradictory,
+- `REVIEW-002` | HIGH | resolved - `vault add exec --step` scaffold instruction
+  added to the execute skill's Step Record paragraph and to the executor trio's
+  Documentation sections (parallel wording). Original finding: exec-record
+  authoring path self-contradictory,
   sharpened by P07.S64. `templates/exec-step.md` and the machine-filled
   placeholder class in `rules/vaultspec.builtin.md` forbid filling
   `{step_id}`/`{plan_stem}`/`{heading}`/`{scope_block}` by hand, yet
