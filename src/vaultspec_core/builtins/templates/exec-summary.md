@@ -33,10 +33,10 @@ related:
 
 # `{feature}` `{phase}` summary
 
-Brief summary of overall progress across every Step in this Phase.
-
-- Modified: `{file1}`
-- Created: `{file2}`
+<!-- Brief summary of overall progress across every Step in this Phase,
+     followed by a list of files touched across the Phase, e.g.:
+     - Modified: `{file1}`
+     - Created: `{file2}` -->
 
 ## Description
 
