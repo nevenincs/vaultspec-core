@@ -11,6 +11,7 @@ to exercise the actual byte-level I/O that the helpers promise.
 from __future__ import annotations
 
 import pytest
+import yaml
 
 from ..related_surgery import append_related_entry, remove_related_entries
 
@@ -254,6 +255,67 @@ class TestAppendRelatedEntryLF:
 
         bak = doc.with_suffix(".md.bak")
         assert not bak.exists()
+
+
+# ---------------------------------------------------------------------------
+# append_related_entry: inline (flow) sequence normalisation (review C1)
+# ---------------------------------------------------------------------------
+
+
+class TestAppendInlineFlowSequence:
+    """A flow-form related: list must be normalised to block before append.
+
+    Appending a block item beneath a flow key produces unparseable YAML, so
+    the helper rewrites the whole key to block form first.  Every case must
+    re-parse cleanly under :func:`yaml.safe_load`.
+    """
+
+    def _body_after_fence(self, raw: bytes) -> bytes:
+        """Return the bytes after the closing frontmatter fence."""
+        text = raw.decode("utf-8")
+        # Split on the closing fence (second '---' line region).
+        idx = text.index("---", text.index("---") + 3)
+        return text[idx:].encode("utf-8")
+
+    def test_single_entry_flow_normalised(self, tmp_path):
+        doc = tmp_path / "doc.md"
+        _write_lf(doc, "---\nrelated: ['[[a]]']\n---\nBody paragraph.\n")
+        body_before = self._body_after_fence(doc.read_bytes())
+
+        appended = append_related_entry(doc, "[[b]]")
+
+        assert appended is True
+        text = doc.read_text(encoding="utf-8")
+        # (a) re-parses with no error
+        parsed = yaml.safe_load(text.split("---\n")[1])
+        # (b) new entry present  (c) prior entry survives  (order preserved)
+        assert parsed["related"] == ["[[a]]", "[[b]]"]
+        # (d) body bytes byte-identical
+        assert self._body_after_fence(doc.read_bytes()) == body_before
+
+    def test_double_quoted_multi_entry_flow_normalised(self, tmp_path):
+        doc = tmp_path / "doc.md"
+        _write_lf(doc, '---\nrelated: ["[[a]]", "[[b]]"]\n---\nBody paragraph.\n')
+        body_before = self._body_after_fence(doc.read_bytes())
+
+        appended = append_related_entry(doc, "[[c]]")
+
+        assert appended is True
+        text = doc.read_text(encoding="utf-8")
+        parsed = yaml.safe_load(text.split("---\n")[1])
+        assert parsed["related"] == ["[[a]]", "[[b]]", "[[c]]"]
+        assert self._body_after_fence(doc.read_bytes()) == body_before
+
+    def test_flow_idempotent_existing_stem(self, tmp_path):
+        doc = tmp_path / "doc.md"
+        _write_lf(doc, "---\nrelated: ['[[a]]']\n---\nBody.\n")
+        original = doc.read_bytes()
+
+        appended = append_related_entry(doc, "[[a]]")
+
+        assert appended is False
+        # No write occurred: bytes are identical.
+        assert doc.read_bytes() == original
 
 
 # ---------------------------------------------------------------------------

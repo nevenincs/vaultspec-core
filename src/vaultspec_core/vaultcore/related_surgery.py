@@ -17,6 +17,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+import yaml
+
 from ..core.helpers import atomic_write
 
 if TYPE_CHECKING:
@@ -175,6 +177,11 @@ def append_related_entry(path: Path, wiki_link: str) -> bool:
             ``[[stem]]`` and bare-stem forms; normalised to
             ``'[[stem]]'`` on write.
 
+    When the existing ``related:`` value is a non-empty inline (flow)
+    sequence, the whole key is first normalised to block form so the
+    append cannot corrupt the YAML; if that value cannot be safely parsed
+    a :class:`ValueError` is raised rather than writing unparseable bytes.
+
     Returns:
         ``True`` when the entry was appended; ``False`` when the entry
         already existed (idempotent no-op).
@@ -182,7 +189,8 @@ def append_related_entry(path: Path, wiki_link: str) -> bool:
     Raises:
         OSError: When the file cannot be read or written.
         UnicodeDecodeError: When the content is not valid UTF-8.
-        ValueError: When *wiki_link* cannot be parsed to a stem.
+        ValueError: When *wiki_link* cannot be parsed to a stem, or when an
+            existing inline ``related:`` value cannot be safely normalised.
     """
     # Normalise the target stem
     stem = _extract_stem(wiki_link)
@@ -197,6 +205,7 @@ def append_related_entry(path: Path, wiki_link: str) -> bool:
     related_idx: int | None = None
     last_related_item_idx: int | None = None
     frontmatter_close_idx: int | None = None
+    inline_value: str | None = None
 
     for i, line in enumerate(lines):
         if line.strip() == "---":
@@ -212,11 +221,10 @@ def append_related_entry(path: Path, wiki_link: str) -> bool:
             if line.startswith("related:"):
                 in_related = True
                 related_idx = i
-                # Check if it's an inline form like `related: []`
+                # Capture any inline value: `related: []` (empty) or
+                # `related: ['[[a]]']` (a flow sequence requiring normalisation).
                 stripped = line[len("related:") :].strip()
-                if stripped and stripped != "[]":
-                    # unexpected inline value - treat as list start
-                    pass
+                inline_value = stripped if stripped not in ("", "[]") else None
                 continue
 
             if in_related:
@@ -231,25 +239,33 @@ def append_related_entry(path: Path, wiki_link: str) -> bool:
                             return False
                         last_related_item_idx = i
 
-    # If entry not found (would have returned False above), we append it.
     new_entry = f"  - '[[{stem}]]'"
 
     new_lines = list(lines)
 
-    if related_idx is not None:
-        # Append after the last known related item, or right after the key
-        insert_after = (
-            last_related_item_idx if last_related_item_idx is not None else related_idx
-        )
-        # Handle the case where related: [] or related: (bare) exists
-        key_line = lines[related_idx]
-        stripped = key_line[len("related:") :].strip()
-        if stripped in ("[]", ""):
-            # Replace the key with a block-form key + new entry
-            new_lines[related_idx] = "related:"
-            new_lines.insert(related_idx + 1, new_entry)
-        else:
-            new_lines.insert(insert_after + 1, new_entry)
+    if related_idx is not None and inline_value is not None:
+        # Non-empty inline/flow sequence (e.g. `related: ['[[a]]']`).  Block
+        # surgery cannot append a list item beneath a flow key without
+        # producing unparseable YAML, so normalise the whole key to block
+        # form first, then append.  The ADR forbids writing corrupt YAML, so
+        # any value that cannot be parsed into a flow sequence raises.
+        existing_stems = _parse_inline_related(inline_value)
+        # Idempotency: the new stem may already be in the inline sequence.
+        if any(s.lower() == stem.lower() for s in existing_stems):
+            return False
+        block_lines = [f"  - '[[{_normalise_stem(s)}]]'" for s in existing_stems]
+        block_lines.append(new_entry)
+        new_lines[related_idx] = "related:"
+        new_lines[related_idx + 1 : related_idx + 1] = block_lines
+    elif related_idx is not None and last_related_item_idx is not None:
+        # Populated block list: append after the last existing item so the
+        # new entry lands at the END of the list (the docstring contract).
+        new_lines.insert(last_related_item_idx + 1, new_entry)
+    elif related_idx is not None:
+        # Genuinely empty list: `related:` (bare) or `related: []` with no
+        # block items.  Rewrite the key to block form and seed the entry.
+        new_lines[related_idx] = "related:"
+        new_lines.insert(related_idx + 1, new_entry)
     elif frontmatter_close_idx is not None:
         # No related: key found - insert one before the closing ---
         new_lines.insert(frontmatter_close_idx, new_entry)
@@ -261,6 +277,62 @@ def append_related_entry(path: Path, wiki_link: str) -> bool:
     new_content = source_newline.join(new_lines)
     _atomic_write_restore(path, new_content)
     return True
+
+
+def _parse_inline_related(inline_value: str) -> list[str]:
+    """Parse the inline value of a ``related:`` key into bare stems.
+
+    Used when ``related:`` holds a YAML flow sequence such as
+    ``['[[a]]', '[[b]]']`` that must be normalised to block form before a
+    new entry is appended.  Each parsed item is reduced to its bare stem so
+    the rewritten block can re-quote consistently.
+
+    Args:
+        inline_value: The text after ``related:`` on the key line, already
+            stripped of surrounding whitespace (e.g. ``"['[[a]]']"``).
+
+    Returns:
+        The bare stems of every entry in the flow sequence, in order.
+
+    Raises:
+        ValueError: When *inline_value* is not a parseable YAML flow
+            sequence of strings, or any item is not a wiki-link.  Raising
+            here forces the caller to surface a ``failed`` envelope rather
+            than write corrupt YAML.
+    """
+    try:
+        parsed = yaml.safe_load(f"related: {inline_value}")
+    except yaml.YAMLError as exc:
+        raise ValueError(
+            f"Cannot parse inline related: value {inline_value!r}: {exc}"
+        ) from exc
+
+    value = parsed.get("related") if isinstance(parsed, dict) else None
+    if not isinstance(value, list):
+        raise ValueError(f"Inline related: value is not a sequence: {inline_value!r}")
+
+    stems: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError(f"Inline related: entry is not a string: {item!r}")
+        stem = _extract_stem(item)
+        if not stem:
+            raise ValueError(f"Inline related: entry has no stem: {item!r}")
+        stems.append(stem)
+    return stems
+
+
+def _normalise_stem(stem: str) -> str:
+    """Return *stem* unwrapped of any residual ``[[ ]]`` or quoting.
+
+    Args:
+        stem: A bare stem or a ``[[stem]]`` form.
+
+    Returns:
+        The bare stem suitable for re-wrapping as ``'[[stem]]'``.
+    """
+    extracted = _extract_stem(stem)
+    return extracted if extracted is not None else stem
 
 
 def _extract_stem(wiki_link: str) -> str | None:
