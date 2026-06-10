@@ -561,3 +561,134 @@ class TestVaultGraphPhantom:
         assert len(phantom_dicts) > 0
         for pd in phantom_dicts:
             assert pd["phantom"] is True
+
+
+# ---------------------------------------------------------------------------
+# VaultGraph  - archive resolution branch
+# ---------------------------------------------------------------------------
+
+
+def _make_vault_with_archive(tmp_path):
+    """Build a minimal two-document vault where one doc is archived.
+
+    Layout::
+
+        <root>/
+          .vault/
+            adr/
+              source-doc.md       <- links to archived-doc
+            _archive/
+              adr/
+                archived-doc.md   <- the archived target
+
+    The source doc's ``related:`` entry points to ``archived-doc`` by
+    bare stem.  The archive resolver must find it under ``_archive/adr/``
+    and return the qualified key ``adr/archived-doc``.
+    """
+    vault_dir = tmp_path / ".vault"
+    adr_dir = vault_dir / "adr"
+    archive_adr_dir = vault_dir / "_archive" / "adr"
+    adr_dir.mkdir(parents=True)
+    archive_adr_dir.mkdir(parents=True)
+
+    # Source doc - links to the archived target by bare stem
+    source = adr_dir / "source-doc.md"
+    source.write_text(
+        '---\ntags:\n  - "#adr"\n  - "#archive-test"\n'
+        'date: 2026-01-01\nrelated:\n  - "[[archived-doc]]"\n---\n\n'
+        "# source doc\n\nLinks to archived-doc.\n",
+        encoding="utf-8",
+    )
+
+    # Archived target - lives under _archive/adr/
+    archived = archive_adr_dir / "archived-doc.md"
+    archived.write_text(
+        '---\ntags:\n  - "#adr"\n  - "#archive-test"\n'
+        "date: 2026-01-01\nrelated: []\n---\n\n"
+        "# archived doc\n\nThis document is archived.\n",
+        encoding="utf-8",
+    )
+
+    return tmp_path, source, archived
+
+
+class TestVaultGraphArchiveResolution:
+    """Tests for the _resolve_link / _is_archived archive-resolution branch.
+
+    Uses a real minimal vault fixture, not mocks, so the filesystem
+    traversal is exercised end-to-end.
+    """
+
+    def test_archived_link_does_not_appear_in_dangling(self, tmp_path):
+        """A link to an archived doc must not be counted as dangling."""
+        root, _src, _arch = _make_vault_with_archive(tmp_path)
+        graph = VaultGraph(root)
+        dangling = graph.get_dangling_links()
+        dangling_targets = {tgt for _src, tgt in dangling}
+        # archived-doc or adr/archived-doc should not be flagged as dangling
+        assert "archived-doc" not in dangling_targets
+        assert "adr/archived-doc" not in dangling_targets
+
+    def test_archived_target_produces_phantom_node(self, tmp_path):
+        """The graph creates a phantom node for the archived target."""
+        root, _src, _arch = _make_vault_with_archive(tmp_path)
+        graph = VaultGraph(root)
+        # The source doc links to archived-doc; it resolves to adr/archived-doc
+        resolved_key = "adr/archived-doc"
+        assert resolved_key in graph.nodes
+        assert graph.nodes[resolved_key].phantom is True
+
+    def test_source_out_links_contains_resolved_archive_key(self, tmp_path):
+        """source-doc.out_links resolves to the qualified archive key."""
+        root, _src, _arch = _make_vault_with_archive(tmp_path)
+        graph = VaultGraph(root)
+        src_node = graph.nodes["source-doc"]
+        assert "adr/archived-doc" in src_node.out_links
+
+    def test_is_archived_true_for_archived_stem(self, tmp_path):
+        """_is_archived returns True when the stem resolves under _archive/."""
+        root, _src, _arch = _make_vault_with_archive(tmp_path)
+        graph = VaultGraph(root)
+        # Bare stem - rglob branch
+        assert graph._is_archived("archived-doc") is True
+
+    def test_is_archived_true_for_qualified_key(self, tmp_path):
+        """_is_archived returns True for a qualified type/stem key."""
+        root, _src, _arch = _make_vault_with_archive(tmp_path)
+        graph = VaultGraph(root)
+        # Qualified key with slash - direct path branch
+        assert graph._is_archived("adr/archived-doc") is True
+
+    def test_is_archived_false_when_no_archive_dir(self, tmp_path):
+        """_is_archived returns False when there is no _archive/ directory."""
+        # Build vault without any _archive dir
+        vault_dir = tmp_path / ".vault" / "adr"
+        vault_dir.mkdir(parents=True)
+        (vault_dir / "only-doc.md").write_text(
+            '---\ntags:\n  - "#adr"\n  - "#no-archive"\n'
+            "date: 2026-01-01\nrelated: []\n---\n\n# only doc\n",
+            encoding="utf-8",
+        )
+        graph = VaultGraph(tmp_path)
+        assert graph._is_archived("any-stem") is False
+
+    def test_is_archived_false_for_nonexistent_stem(self, tmp_path):
+        """_is_archived returns False for a stem that is not in _archive/."""
+        root, _src, _arch = _make_vault_with_archive(tmp_path)
+        graph = VaultGraph(root)
+        assert graph._is_archived("completely-nonexistent-stem") is False
+
+    def test_resolve_link_archive_bare_stem(self, tmp_path):
+        """_resolve_link resolves a bare archived stem to its qualified key."""
+        root, _src, _arch = _make_vault_with_archive(tmp_path)
+        graph = VaultGraph(root)
+        # After graph build, archived-doc is in nodes as phantom;
+        # a second resolve call still hits the exact-match branch.
+        resolved = graph._resolve_link("adr/archived-doc")
+        assert resolved == ["adr/archived-doc"]
+
+    def test_archived_link_edge_exists_in_digraph(self, tmp_path):
+        """A directed edge from source to the archived phantom node exists."""
+        root, _src, _arch = _make_vault_with_archive(tmp_path)
+        graph = VaultGraph(root)
+        assert graph._digraph.has_edge("source-doc", "adr/archived-doc")
