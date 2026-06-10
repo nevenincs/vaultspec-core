@@ -114,9 +114,12 @@ When an existing rule no longer holds, do NOT silently delete it:
 - **Edit in place** if the constraint shifted at the margins (the rule's name stays, the
   body adapts).
 - **Supersede** if the constraint changed at the center. Author a new rule with a new
-  name. Mark the prior rule's status as `superseded` in its body. Once the planned
-  `superseded_by:` frontmatter field lands across both rules and ADRs, the back-pointer
-  becomes structured frontmatter.
+  name and add a `## Status` section to both rule bodies: the prior rule's Status names
+  the successor's slug, and the new rule's Status names the rule it supersedes. Once
+  teammates are aware, remove the prior rule via
+  `vaultspec-core spec rules remove <name>`. (Once the planned `superseded_by:`
+  frontmatter field lands across both rules and ADRs, the back-pointer becomes
+  structured frontmatter.)
 
 The supersession event is itself a project-level signal. Record it in the audit document
 that surfaces the new constraint, not just in the rule bodies.
