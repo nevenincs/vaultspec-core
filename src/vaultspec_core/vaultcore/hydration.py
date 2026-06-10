@@ -28,6 +28,14 @@ _KNOWN_PLACEHOLDERS = (
     "{proposed|accepted|rejected|deprecated}",
 )
 
+# Prior on-disk filenames for templates that have since been renamed in the
+# source tree. A deployed mirror that predates the rename still ships the old
+# filename; :func:`get_template_path` falls back to these so the scaffolder
+# keeps working on a not-yet-upgraded workspace.
+_LEGACY_TEMPLATE_NAMES = {
+    DocType.REFERENCE: "ref-audit.md",
+}
+
 if TYPE_CHECKING:
     import pathlib
 
@@ -289,7 +297,11 @@ def create_vault_doc(
 
     template_path = get_template_path(root_dir, doc_type, content_root=content_root)
     if template_path is None:
-        raise FileNotFoundError(f"No template found for type '{doc_type.value}'")
+        raise FileNotFoundError(
+            f"No template found for type '{doc_type.value}'. The deployed "
+            "template mirror is missing or stale; run "
+            "`vaultspec-core install --upgrade` to refresh it."
+        )
 
     content = template_path.read_text(encoding="utf-8")
 
@@ -455,5 +467,31 @@ def get_template_path(
         cfg = get_config()
         base = root_dir / cfg.framework_dir
 
-    path = base / "rules" / "templates" / name
-    return path if path.exists() else None
+    templates_dir = base / "rules" / "templates"
+    path = templates_dir / name
+    if path.exists():
+        return path
+
+    # Legacy-filename fallback for renamed templates. A workspace whose
+    # deployed mirror predates a template rename (for example a stale
+    # `.vaultspec/rules/` that still ships `ref-audit.md` after the source
+    # renamed it to `reference.md`) would otherwise resolve to a missing
+    # file. Fall back to the prior filename so the verb keeps working on a
+    # not-yet-upgraded workspace until the operator re-runs
+    # `vaultspec-core install --upgrade`. See REVIEW-005 in the
+    # firmware-wording-review audit.
+    legacy_name = _LEGACY_TEMPLATE_NAMES.get(doc_type)
+    if legacy_name is not None:
+        legacy_path = templates_dir / legacy_name
+        if legacy_path.exists():
+            logger.warning(
+                "Template '%s' for type '%s' is missing; falling back to the "
+                "legacy filename '%s'. Run `vaultspec-core install --upgrade` "
+                "to refresh the deployed mirror.",
+                name,
+                doc_type.value,
+                legacy_name,
+            )
+            return legacy_path
+
+    return None

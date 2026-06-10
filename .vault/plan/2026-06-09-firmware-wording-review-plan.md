@@ -192,7 +192,7 @@ Propagate source edits to the deployed mirror, close out health checks and tests
 - [ ] `P09.S123` - run vault check all and spec doctor and confirm both report green (D16); `.vault`.
 - [ ] `P09.S124` - run the full test suite via uv run --no-sync pytest and the prek hooks on modified files, confirming green (D16); `tests`.
 - [ ] `P09.S125` - log a follow-up issue for automated regeneration of the bundled CLI reference from the live Typer surface (D16); `src/vaultspec_core/builtins/reference/cli.md`.
-- [ ] `P09.S126` - log follow-up issues for any Python work surfaced by the tier-enum and template-filename code-binding checks (D16); `src/vaultspec_core`.
+- [x] `P09.S126` - log follow-up issues for any Python work surfaced by the tier-enum and template-filename code-binding checks (D16); `src/vaultspec_core`.
 
 ## Parallelization
 

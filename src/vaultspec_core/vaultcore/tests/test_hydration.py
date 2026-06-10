@@ -6,10 +6,120 @@ import pytest
 
 from vaultspec_core.core.exceptions import ResourceExistsError
 from vaultspec_core.vaultcore import hydrate_template
-from vaultspec_core.vaultcore.hydration import create_vault_doc
+from vaultspec_core.vaultcore.hydration import create_vault_doc, get_template_path
 from vaultspec_core.vaultcore.models import DocType
 
 pytestmark = [pytest.mark.unit]
+
+
+def _make_templates_dir(content_root):
+    """Create the ``rules/templates`` tree under a content root and return it."""
+    templates_dir = content_root / "rules" / "templates"
+    templates_dir.mkdir(parents=True, exist_ok=True)
+    return templates_dir
+
+
+class TestTemplatePathLegacyFallback:
+    """Resolve REFERENCE templates on workspaces predating the rename.
+
+    A deployed mirror that still ships the pre-rename ``ref-audit.md`` (instead
+    of the current ``reference.md``) must keep resolving the REFERENCE template,
+    and a mirror that ships neither must surface an error naming the remedy.
+    Guards REVIEW-005 in the firmware-wording-review audit.
+    """
+
+    def test_reference_resolves_to_current_filename(self, tmp_path):
+        """When ``reference.md`` exists it is preferred over the legacy name."""
+        content_root = tmp_path / ".vaultspec"
+        templates_dir = _make_templates_dir(content_root)
+        current = templates_dir / "reference.md"
+        current.write_text("# reference template\n", encoding="utf-8")
+        # A legacy file is also present; the current name must still win.
+        (templates_dir / "ref-audit.md").write_text("# legacy\n", encoding="utf-8")
+
+        resolved = get_template_path(
+            tmp_path, DocType.REFERENCE, content_root=content_root
+        )
+        assert resolved == current
+
+    def test_reference_falls_back_to_legacy_filename(self, tmp_path, caplog):
+        """A stale mirror with only ``ref-audit.md`` resolves to it with a warning."""
+        content_root = tmp_path / ".vaultspec"
+        templates_dir = _make_templates_dir(content_root)
+        legacy = templates_dir / "ref-audit.md"
+        legacy.write_text("# legacy reference template\n", encoding="utf-8")
+        # The current filename is deliberately absent on this stale mirror.
+        assert not (templates_dir / "reference.md").exists()
+
+        with caplog.at_level(logging.WARNING):
+            resolved = get_template_path(
+                tmp_path, DocType.REFERENCE, content_root=content_root
+            )
+
+        assert resolved == legacy
+        assert "vaultspec-core install --upgrade" in caplog.text
+
+    def test_reference_missing_both_names_returns_none(self, tmp_path):
+        """When neither filename is present the resolver returns ``None``."""
+        content_root = tmp_path / ".vaultspec"
+        _make_templates_dir(content_root)
+
+        resolved = get_template_path(
+            tmp_path, DocType.REFERENCE, content_root=content_root
+        )
+        assert resolved is None
+
+    def test_create_vault_doc_reference_uses_legacy_template(self, tmp_path):
+        """create_vault_doc scaffolds a REFERENCE doc from the legacy template.
+
+        End-to-end proof that the fallback flows through document creation:
+        a stale mirror shipping only ``ref-audit.md`` still produces a written
+        reference document.
+        """
+        content_root = tmp_path / ".vaultspec"
+        templates_dir = _make_templates_dir(content_root)
+        (templates_dir / "ref-audit.md").write_text(
+            "---\n"
+            "tags:\n"
+            "  - '#reference'\n"
+            "  - '#{feature}'\n"
+            "date: '{yyyy-mm-dd}'\n"
+            "related: []\n"
+            "---\n"
+            "# {feature} reference: {topic}\n",
+            encoding="utf-8",
+        )
+        (tmp_path / ".vault" / "reference").mkdir(parents=True, exist_ok=True)
+
+        path = create_vault_doc(
+            tmp_path,
+            DocType.REFERENCE,
+            "stale-feat",
+            "2026-06-10",
+            title="legacy fallback",
+            content_root=content_root,
+        )
+        assert path.exists()
+        content = path.read_text(encoding="utf-8")
+        assert "#stale-feat" in content
+        assert "{feature}" not in content
+
+    def test_create_vault_doc_missing_template_names_remedy(self, tmp_path):
+        """A mirror missing both filenames raises an error naming the remedy."""
+        content_root = tmp_path / ".vaultspec"
+        _make_templates_dir(content_root)
+        (tmp_path / ".vault" / "reference").mkdir(parents=True, exist_ok=True)
+
+        with pytest.raises(FileNotFoundError) as excinfo:
+            create_vault_doc(
+                tmp_path,
+                DocType.REFERENCE,
+                "no-template-feat",
+                "2026-06-10",
+                title="missing",
+                content_root=content_root,
+            )
+        assert "vaultspec-core install --upgrade" in str(excinfo.value)
 
 
 def test_hydrate_template_basic():

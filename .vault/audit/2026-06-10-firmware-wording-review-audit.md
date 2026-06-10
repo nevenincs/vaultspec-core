@@ -63,13 +63,25 @@ remediation lands.
   historical vault documents. Original finding: phantom skill name survives in
   `docs/framework.md` ("call the `vaultspec-write-plan` skill"); outside the
   builtins scope but reached via the CLI rule's manual link.
-- `REVIEW-005` | MEDIUM | open - interim verb breakage at HEAD:
-  `vault add reference --dry-run` errors with "No template found" because
-  the Python remap landed ahead of the mirror sync (deployed mirror still
-  ships `ref-audit.md`). P09.S122 is the planned fix; P09.S126 must log the
-  downstream-upgrade hazard (workspaces upgrading the package without
-  re-running `vaultspec-core install --upgrade` hit the same error with no
-  remediation hint).
+- `REVIEW-005` | MEDIUM | resolved - the deployed mirror was refreshed in
+  P09.S122 (`reference.md` present, stale `ref-audit.md` removed) and the
+  downstream-upgrade hazard was remediated in code in P09.S126 rather than
+  merely logged. `get_template_path` in
+  `src/vaultspec_core/vaultcore/hydration.py` now falls back to the legacy
+  `ref-audit.md` filename for the REFERENCE doc type when the renamed
+  `reference.md` is absent, emitting a warning that names
+  `vaultspec-core install --upgrade`; when neither filename exists,
+  `create_vault_doc` raises a `FileNotFoundError` whose message names the same
+  remedy. Five real unit tests in
+  `src/vaultspec_core/vaultcore/tests/test_hydration.py` cover the current-name
+  preference, the legacy fallback (with warning assertion), the both-missing
+  `None` return, end-to-end scaffolding from the legacy template, and the
+  actionable-error path. Evidence: `vault add reference -f <feat> --dry-run`
+  resolves without "No template found"; the targeted hydration suite reports 21
+  passed. Original finding: interim verb breakage at HEAD - `vault add reference --dry-run` errored with "No template found" because the Python remap
+  landed ahead of the mirror sync (deployed mirror still shipped `ref-audit.md`),
+  and a workspace upgrading the package without re-running
+  `vaultspec-core install --upgrade` hit the same error with no remediation hint.
 
 ### LOW
 
