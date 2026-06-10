@@ -301,8 +301,9 @@ Shared options: `--fix` (apply auto-fixes), `--feature TAG` / `-f` (limit to a f
 `--verbose` / `-v` (INFO diagnostics).
 
 Subcommands: `all`, `annotations`, `body-links`, `dangling`, `frontmatter`, `links`,
-`orphans`, `features`, `references`, `schema`, `structure`. The `structure` subcommand
-does not support `--feature`.
+`orphans`, `features`, `references`, `schema`, `structure`, `rename-integrity`. The
+`structure` subcommand does not support `--feature`. The `rename-integrity` subcommand
+checks name/filename integrity for rules, skills, and agents.
 
 ### vaultspec-core vault plan
 
