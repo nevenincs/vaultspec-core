@@ -44,7 +44,7 @@ Where appropriate, use the following skills:
 The documentation trail follows a strict dependency graph. Artifacts lower in the
 hierarchy should reference those above them.
 
-- **Brainstorm** / **Research / Reference Audit** (`.vault/research/`,
+- **Brainstorm** / **Research** / **Reference** (`.vault/research/`,
   `.vault/reference/`)
 
 - **Audits** (`.vault/audit/yyyy-mm-dd-{feature}-audit.md`, optionally
@@ -137,15 +137,15 @@ extra tags may be appended when the template allows them.
 
 The directory tag is determined by the file's location in `.vault/`:
 
-| Directory           | Tag          | Description                           |
-| :------------------ | :----------- | :------------------------------------ |
-| `.vault/adr/`       | `#adr`       | Architecture Decision Records         |
-| `.vault/audit/`     | `#audit`     | Audit reports and assessments         |
-| `.vault/exec/`      | `#exec`      | Execution records (steps & summaries) |
-| `.vault/index/`     | `#index`     | Auto-generated feature indexes        |
-| `.vault/plan/`      | `#plan`      | Implementation plans                  |
-| `.vault/reference/` | `#reference` | Reference audits and blueprints       |
-| `.vault/research/`  | `#research`  | Research and brainstorming            |
+| Directory           | Tag          | Description                              |
+| :------------------ | :----------- | :--------------------------------------- |
+| `.vault/adr/`       | `#adr`       | Architecture Decision Records            |
+| `.vault/audit/`     | `#audit`     | Audit reports and assessments            |
+| `.vault/exec/`      | `#exec`      | Execution records (steps & summaries)    |
+| `.vault/index/`     | `#index`     | Auto-generated feature indexes           |
+| `.vault/plan/`      | `#plan`      | Implementation plans                     |
+| `.vault/reference/` | `#reference` | Implementation references and blueprints |
+| `.vault/research/`  | `#research`  | Research and brainstorming               |
 
 ### Tag Format
 
