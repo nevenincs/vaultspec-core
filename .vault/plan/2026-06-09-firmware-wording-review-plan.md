@@ -188,7 +188,7 @@ Apply the single style pass (spelling locale, dash convention, label form, annou
 Propagate source edits to the deployed mirror, close out health checks and tests, and log follow-up issues for deferred items (D16).
 
 - [x] `P09.S121` - run vaultspec-core sync to propagate the source edits to every provider surface (D16); `src/vaultspec_core/builtins`.
-- [ ] `P09.S122` - run vaultspec-core install --upgrade to clear the three-file reflow drift in the deployed mirror (D16); `.vaultspec/rules`.
+- [x] `P09.S122` - run vaultspec-core install --upgrade to clear the three-file reflow drift in the deployed mirror (D16); `.vaultspec/rules`.
 - [ ] `P09.S123` - run vault check all and spec doctor and confirm both report green (D16); `.vault`.
 - [ ] `P09.S124` - run the full test suite via uv run --no-sync pytest and the prek hooks on modified files, confirming green (D16); `tests`.
 - [ ] `P09.S125` - log a follow-up issue for automated regeneration of the bundled CLI reference from the live Typer surface (D16); `src/vaultspec_core/builtins/reference/cli.md`.
