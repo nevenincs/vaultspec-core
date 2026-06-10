@@ -82,6 +82,14 @@ depending on plan complexity:
 - **Agent teams** for self-orchestrating complex challenges, coordinated through the
   host environment.
 
+Each persona declares a `mode:` field in its frontmatter. The field states the persona's
+declared file-mutation intent via the harness file tools (Write/Edit): `read-write`
+personas mutate files directly; `read-only` personas carry no Write or Edit tool and
+return their findings as their final message for the dispatching orchestrator to persist
+(scaffold via `vaultspec-core vault add`, then body-prose edit). The declaration is
+intent, not a sandbox - Bash can technically write files in either mode - so honoring it
+is persona discipline, not tooling enforcement.
+
 Artifacts are persisted in `.vault/`. The user must approve plans before execution
 proceeds. Code review via vaultspec-code-review is mandatory after execution.
 
