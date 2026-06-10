@@ -776,3 +776,94 @@ class TestVaultGraphArchiveResolution:
         root, _src, _arch = _make_vault_with_archive(tmp_path)
         graph = VaultGraph(root)
         assert graph._digraph.has_edge("source-doc", "adr/archived-doc")
+
+
+def _make_weighted_vault(tmp_path):
+    """Build a minimal vault with crafted edge multiplicity and provenance.
+
+    Document ``doc-a`` cites ``doc-b`` three times in its body and references
+    ``doc-c`` both in its body once and in its ``related:`` frontmatter once.
+    This yields exactly two edges with deterministic, hand-derivable
+    attributes:
+
+    - ``doc-a -> doc-b``: kind ``body``, multiplicity ``3`` (the graph maximum)
+    - ``doc-a -> doc-c``: kind ``both``, multiplicity ``2``
+
+    The maximum multiplicity is ``3`` so weights normalise to ``3/3 = 1.0`` and
+    ``2/3`` respectively.
+    """
+    vault_dir = tmp_path / ".vault"
+    (vault_dir / "research").mkdir(parents=True)
+    (vault_dir / "adr").mkdir()
+    (vault_dir / "plan").mkdir()
+
+    (vault_dir / "research" / "doc-a.md").write_text(
+        '---\ntags:\n  - "#research"\n  - "#weight-fixture"\n'
+        'date: 2026-01-01\nrelated:\n  - "[[doc-c]]"\n---\n\n'
+        "# doc a\n\nSee [[doc-b]] and [[doc-b]] and [[doc-b]] then [[doc-c]].\n",
+        encoding="utf-8",
+    )
+    (vault_dir / "adr" / "doc-b.md").write_text(
+        '---\ntags:\n  - "#adr"\n  - "#weight-fixture"\n'
+        "date: 2026-01-01\nrelated: []\n---\n\n# doc b\n",
+        encoding="utf-8",
+    )
+    (vault_dir / "plan" / "doc-c.md").write_text(
+        '---\ntags:\n  - "#plan"\n  - "#weight-fixture"\n'
+        "date: 2026-01-01\nrelated: []\n---\n\n# doc c\n",
+        encoding="utf-8",
+    )
+    return tmp_path
+
+
+class TestExplicitEdgeAttributes:
+    """Exact-value assertions for edge kind, multiplicity, and weight."""
+
+    def test_body_only_edge_kind_and_multiplicity(self, tmp_path):
+        """A body-only triple citation yields kind body, multiplicity 3."""
+        graph = VaultGraph(_make_weighted_vault(tmp_path))
+        data = graph.digraph.edges["doc-a", "doc-b"]
+        assert data["kind"] == "body"
+        assert data["multiplicity"] == 3
+
+    def test_both_sources_edge_kind_and_multiplicity(self, tmp_path):
+        """A target reached by body and related is kind both, multiplicity 2."""
+        graph = VaultGraph(_make_weighted_vault(tmp_path))
+        data = graph.digraph.edges["doc-a", "doc-c"]
+        assert data["kind"] == "both"
+        assert data["multiplicity"] == 2
+
+    def test_weight_is_multiplicity_over_graph_maximum(self, tmp_path):
+        """Weights are exact rationals: 3/3 = 1.0 and 2/3."""
+        graph = VaultGraph(_make_weighted_vault(tmp_path))
+        assert graph.digraph.edges["doc-a", "doc-b"]["weight"] == 1.0
+        assert graph.digraph.edges["doc-a", "doc-c"]["weight"] == 2 / 3
+
+    def test_strongest_edge_normalises_to_one(self, tmp_path):
+        """Exactly one edge - the maximum-multiplicity one - has weight 1.0."""
+        graph = VaultGraph(_make_weighted_vault(tmp_path))
+        weights = [d["weight"] for _, _, d in graph.digraph.edges(data=True)]
+        assert weights.count(1.0) == 1
+        assert max(weights) == 1.0
+
+    def test_only_two_edges_built(self, tmp_path):
+        """The crafted vault produces exactly the two intended edges."""
+        graph = VaultGraph(_make_weighted_vault(tmp_path))
+        assert graph.digraph.number_of_edges() == 2
+
+    def test_synthetic_corpus_related_edges_are_unit_weight(self, vault_root):
+        """The synthetic corpus emits only related, multiplicity-1 edges.
+
+        The synthetic generator wires documents solely through ``related:``
+        frontmatter with no duplicates, so every explicit edge is kind
+        ``related`` with multiplicity ``1`` and (since the maximum is 1)
+        weight ``1.0``.  This is a real assertion over the corpus, not a
+        contrived one.
+        """
+        graph = VaultGraph(vault_root)
+        edges = list(graph.digraph.edges(data=True))
+        assert len(edges) > 0
+        for _src, _tgt, data in edges:
+            assert data["kind"] == "related"
+            assert data["multiplicity"] == 1
+            assert data["weight"] == 1.0
