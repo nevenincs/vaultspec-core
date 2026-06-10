@@ -23,7 +23,7 @@ related:
      - NEVER reference file paths in the body. If you must name a source file,
        class, or function, use inline backtick code: `src/module.py`. -->
 
-# `{feature}` Code Review
+# `{feature}` code review
 
 <!-- Persistent log of audit findings appended below. -->
 
