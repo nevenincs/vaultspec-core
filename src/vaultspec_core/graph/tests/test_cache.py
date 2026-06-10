@@ -329,3 +329,141 @@ class TestCliMutationRefreshesCache:
         reset_config()
         rebuilt = VaultGraph(vault_root)
         assert dst_name in rebuilt.nodes[src_name].out_links
+
+
+# ---------------------------------------------------------------------------
+# (g) validate() content-hash guard - pure unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestValidateHashGuard:
+    """Isolate the content-hash guard in :func:`~vaultspec_core.graph.cache.validate`.
+
+    These tests call ``validate`` directly with hand-built manifest dicts so
+    the hash guard is exercised independently of mtime or size changes, which
+    is the scenario the existing filesystem-level test
+    ``test_same_size_edit_caught_by_content_hash`` cannot isolate (a real
+    write also bumps mtime, so the size-or-mtime guard fires first).
+    """
+
+    def test_identical_fingerprints_validate(self) -> None:
+        # Same size, same mtime, same hash: valid.
+        manifest: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 5, "h1")}
+        current: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 5, "h1")}
+        assert cache_mod.validate(manifest, current) is True
+
+    def test_different_hash_invalidates(self) -> None:
+        # Identical size and mtime, different hash: must invalidate.
+        manifest: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 5, "h1")}
+        current: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 5, "h2")}
+        assert cache_mod.validate(manifest, current) is False
+
+    def test_different_size_invalidates(self) -> None:
+        manifest: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 5, "h1")}
+        current: dict[str, cache_mod.Fingerprint] = {"a.md": (11, 5, "h1")}
+        assert cache_mod.validate(manifest, current) is False
+
+    def test_different_mtime_invalidates(self) -> None:
+        manifest: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 5, "h1")}
+        current: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 6, "h1")}
+        assert cache_mod.validate(manifest, current) is False
+
+    def test_added_key_invalidates(self) -> None:
+        manifest: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 5, "h1")}
+        current: dict[str, cache_mod.Fingerprint] = {
+            "a.md": (10, 5, "h1"),
+            "b.md": (20, 7, "h2"),
+        }
+        assert cache_mod.validate(manifest, current) is False
+
+    def test_removed_key_invalidates(self) -> None:
+        manifest: dict[str, cache_mod.Fingerprint] = {
+            "a.md": (10, 5, "h1"),
+            "b.md": (20, 7, "h2"),
+        }
+        current: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 5, "h1")}
+        assert cache_mod.validate(manifest, current) is False
+
+    def test_empty_manifests_validate(self) -> None:
+        assert cache_mod.validate({}, {}) is True
+
+    def test_multiple_keys_all_match(self) -> None:
+        manifest: dict[str, cache_mod.Fingerprint] = {
+            "a.md": (10, 5, "h1"),
+            "b.md": (20, 7, "h2"),
+        }
+        current: dict[str, cache_mod.Fingerprint] = {
+            "a.md": (10, 5, "h1"),
+            "b.md": (20, 7, "h2"),
+        }
+        assert cache_mod.validate(manifest, current) is True
+
+    def test_multiple_keys_one_hash_differs(self) -> None:
+        # One entry has same size+mtime but different hash: must invalidate.
+        manifest: dict[str, cache_mod.Fingerprint] = {
+            "a.md": (10, 5, "h1"),
+            "b.md": (20, 7, "h2"),
+        }
+        current: dict[str, cache_mod.Fingerprint] = {
+            "a.md": (10, 5, "h1"),
+            "b.md": (20, 7, "h2-changed"),
+        }
+        assert cache_mod.validate(manifest, current) is False
+
+
+# ---------------------------------------------------------------------------
+# (h) _stem_index parity between fresh build and cache-loaded graph (L1)
+# ---------------------------------------------------------------------------
+
+
+class TestStemIndexParity:
+    """Assert that a cache-loaded graph's ``_stem_index`` excludes phantom nodes
+    and therefore equals a fresh build's ``_stem_index`` for a corpus with phantoms.
+    """
+
+    def test_stem_index_excludes_phantoms_after_cache_load(
+        self, vault_root: Path
+    ) -> None:
+        # Ensure the fixture contains at least one phantom node.
+        fresh = VaultGraph(vault_root, use_cache=False)
+        phantoms = [n for n, node in fresh.nodes.items() if node.phantom]
+        assert phantoms, (
+            "Test corpus must have phantom nodes (use the 'phantom_only_links' "
+            "pathology when building the fixture)."
+        )
+
+        # Prime the on-disk cache.
+        VaultGraph(vault_root)
+        assert cache_mod.cache_path(vault_root).exists()
+
+        # Load from cache; verify _stem_index excludes every phantom key.
+        cached = VaultGraph(vault_root)
+        for phantom_key in phantoms:
+            bare_stem = (
+                phantom_key.split("/", 1)[1] if "/" in phantom_key else phantom_key
+            )
+            # The bare stem must not appear as a key in _stem_index that
+            # maps to the phantom key.  (It may still be present if a real
+            # node shares the same bare stem, but that is not the phantom
+            # contributing it.)
+            if bare_stem in cached._stem_index:
+                for mapped_key in cached._stem_index[bare_stem]:
+                    assert not cached.nodes[mapped_key].phantom, (
+                        f"_stem_index[{bare_stem!r}] contains phantom key "
+                        f"{mapped_key!r} after cache load."
+                    )
+
+    def test_stem_index_matches_fresh_build(self, vault_root: Path) -> None:
+        fresh = VaultGraph(vault_root, use_cache=False)
+        fresh_stem_index = dict(fresh._stem_index)
+
+        # Prime cache and load from it.
+        VaultGraph(vault_root)
+        cached = VaultGraph(vault_root)
+        cached_stem_index = dict(cached._stem_index)
+
+        assert cached_stem_index == fresh_stem_index, (
+            f"_stem_index mismatch between cached and fresh build.\n"
+            f"Keys only in fresh: {set(fresh_stem_index) - set(cached_stem_index)}\n"
+            f"Keys only in cached: {set(cached_stem_index) - set(fresh_stem_index)}"
+        )

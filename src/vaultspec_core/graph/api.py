@@ -546,8 +546,13 @@ class VaultGraph:
             # attribute set matches a fresh build exactly.
             body = attrs.pop("body", "")
             self.nodes[key].body = body
-            bare_stem = key.split("/", 1)[1] if "/" in key else key
-            by_stem.setdefault(bare_stem, []).append(key)
+            # Phantoms are excluded from _stem_index to match fresh-build
+            # semantics: _rebuild_from_files only indexes real (non-phantom)
+            # nodes in passes 1a/1b; phantoms are added later in pass 2 and
+            # never entered into _stem_index.
+            if not attrs.get("phantom", False):
+                bare_stem = key.split("/", 1)[1] if "/" in key else key
+                by_stem.setdefault(bare_stem, []).append(key)
         for bare_stem, keys in by_stem.items():
             self._stem_index[bare_stem] = sorted(keys)
         self._dangling_links = [(pair[0], pair[1]) for pair in payload.dangling_links]
