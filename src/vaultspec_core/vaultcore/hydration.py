@@ -32,6 +32,12 @@ _KNOWN_PLACEHOLDERS = (
 # source tree. A deployed mirror that predates the rename still ships the old
 # filename; :func:`get_template_path` falls back to these so the scaffolder
 # keeps working on a not-yet-upgraded workspace.
+#
+# TODO(remove after the release following the first published release that
+# ships reference.md): drop the ref-audit.md legacy fallback. The
+# `ref-audit.md` -> `reference.md` rename has not shipped in a release yet
+# (current version 0.1.26), so the grace path must survive one upgrade cycle
+# before removal. See REVIEW-005 in the firmware-wording-review audit.
 _LEGACY_TEMPLATE_NAMES = {
     DocType.REFERENCE: "ref-audit.md",
 }
@@ -480,6 +486,9 @@ def get_template_path(
     # not-yet-upgraded workspace until the operator re-runs
     # `vaultspec-core install --upgrade`. See REVIEW-005 in the
     # firmware-wording-review audit.
+    #
+    # TODO(remove after the release following the first published release that
+    # ships reference.md): drop this ref-audit.md legacy fallback branch.
     legacy_name = _LEGACY_TEMPLATE_NAMES.get(doc_type)
     if legacy_name is not None:
         legacy_path = templates_dir / legacy_name
