@@ -133,7 +133,7 @@ Fix every template placeholder leak against the documented placeholder conventio
 - [x] `P07.S74` - lowercase the uppercase YYYY-MM-DD in the hint block and reword the garbled DO-NOT-add-frontmatter-fields-outside-the-frontmatter hint (D14); `src/vaultspec_core/builtins/templates/exec-step.md`.
 - [x] `P07.S75` - lowercase the uppercase YYYY-MM-DD in the hint block and reword the garbled DO-NOT-add-frontmatter-fields-outside-the-frontmatter hint (D14); `src/vaultspec_core/builtins/templates/exec-summary.md`.
 - [x] `P07.S76` - lowercase the uppercase YYYY-MM-DD in the hint block and reword the garbled DO-NOT-add-frontmatter-fields-outside-the-frontmatter hint (D14); `src/vaultspec_core/builtins/templates/plan.md`.
-- [ ] `P07.S77` - lowercase the uppercase YYYY-MM-DD in the hint block and reword the garbled DO-NOT-add-frontmatter-fields-outside-the-frontmatter hint (D14); `src/vaultspec_core/builtins/templates/ref-audit.md`.
+- [x] `P07.S77` - lowercase the uppercase YYYY-MM-DD in the hint block and reword the garbled DO-NOT-add-frontmatter-fields-outside-the-frontmatter hint (D14); `src/vaultspec_core/builtins/templates/ref-audit.md`.
 - [ ] `P07.S78` - lowercase the uppercase YYYY-MM-DD in the hint block and reword the garbled DO-NOT-add-frontmatter-fields-outside-the-frontmatter hint (D14); `src/vaultspec_core/builtins/templates/research.md`.
 
 ### Phase `P08` - style and typo sweep
