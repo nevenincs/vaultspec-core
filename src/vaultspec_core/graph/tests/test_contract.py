@@ -54,7 +54,15 @@ _EXPECTED_NODE_FIELDS = frozenset(
     }
 )
 
-_EXPECTED_EDGE_FIELDS = frozenset({"source", "target"})
+_EXPECTED_EDGE_FIELDS = frozenset(
+    {
+        "source",
+        "target",
+        "kind",
+        "multiplicity",
+        "weight",
+    }
+)
 
 _EXPECTED_METRICS_KEYS = frozenset(
     {

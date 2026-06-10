@@ -225,6 +225,26 @@ def _top_n(
     return dict(ranked[:n])
 
 
+def _edge_kind(provenance: set[str]) -> str:
+    """Map a set of provenance sources to a single edge ``kind`` value.
+
+    Args:
+        provenance: The provenance tokens recorded for an edge during build.
+            Each token is one of ``"body"`` (a body wiki-link) or
+            ``"related"`` (a ``related:`` frontmatter entry).
+
+    Returns:
+        ``"both"`` when the target is reached by both a body wiki-link and a
+        ``related:`` entry, otherwise the single source token (``"body"`` or
+        ``"related"``).
+    """
+    if "body" in provenance and "related" in provenance:
+        return "both"
+    if "related" in provenance:
+        return "related"
+    return "body"
+
+
 # ---------------------------------------------------------------------------
 # VaultGraph
 # ---------------------------------------------------------------------------
@@ -238,6 +258,19 @@ class VaultGraph:
     algorithm access.  Each graph node stores serialisable attributes
     from its :class:`DocNode`, and each directed edge represents a
     wiki-link or ``related:`` reference.
+
+    Every explicit edge carries three attributes set during build:
+
+    - ``kind``: provenance of the reference, one of ``"body"`` (a body
+      wiki-link only), ``"related"`` (a ``related:`` frontmatter entry
+      only), or ``"both"`` (the target is reached by both sources).
+    - ``multiplicity``: the total number of times the source references
+      the target, summing body citations and ``related:`` entries.
+    - ``weight``: ``multiplicity`` normalised against the maximum
+      multiplicity of any edge in the graph, so the strongest edge has
+      weight ``1.0``.  Derived/implicit relatedness never enters these
+      edges; it is computed separately in
+      :mod:`vaultspec_core.graph.derived`.
 
     Args:
         root_dir: Root directory of the vault to analyse.
@@ -387,10 +420,16 @@ class VaultGraph:
 
                 node.out_links = set(target_counts)
 
-                for target_key in target_counts:
+                for target_key, multiplicity in target_counts.items():
+                    kind = _edge_kind(target_kinds[target_key])
                     if target_key in self.nodes:
                         self.nodes[target_key].in_links.add(name)
-                        self._digraph.add_edge(name, target_key)
+                        self._digraph.add_edge(
+                            name,
+                            target_key,
+                            kind=kind,
+                            multiplicity=multiplicity,
+                        )
                         if self.nodes[target_key].phantom and not self._is_archived(
                             target_key
                         ):
@@ -410,7 +449,12 @@ class VaultGraph:
                             **phantom.to_nx_attrs(),
                         )
                         phantom.in_links.add(name)
-                        self._digraph.add_edge(name, target_key)
+                        self._digraph.add_edge(
+                            name,
+                            target_key,
+                            kind=kind,
+                            multiplicity=multiplicity,
+                        )
                         if not self._is_archived(target_key):
                             self._dangling_links.append(
                                 (name, target_key),
@@ -421,6 +465,21 @@ class VaultGraph:
                     node.path,
                     e,
                 )
+
+        # Pass 2b: normalise edge weight against the maximum multiplicity in
+        # the graph so the strongest explicit edge has weight 1.0 and every
+        # other edge is its multiplicity as a fraction of that maximum.  The
+        # scheme is linear, deterministic, and exactly testable:
+        #   weight = multiplicity / max_multiplicity_in_graph
+        # When the graph has no edges there is nothing to normalise.
+        multiplicities = [
+            data["multiplicity"] for _, _, data in self._digraph.edges(data=True)
+        ]
+        max_multiplicity = max(multiplicities) if multiplicities else 0
+        for _src, _tgt, data in self._digraph.edges(data=True):
+            data["weight"] = (
+                data["multiplicity"] / max_multiplicity if max_multiplicity else 0.0
+            )
 
         # Pass 3: sync nx node attrs with updated in_links/out_links
         for name, node in self.nodes.items():
