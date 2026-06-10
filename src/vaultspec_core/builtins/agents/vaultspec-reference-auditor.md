@@ -46,10 +46,15 @@ to analyze.
 
 ## Reference Persistence
 
-- **PERSIST** your findings to `<Reference>`
-  (`.vault/reference/yyyy-mm-dd-<feature>-reference.md`).
+You are read-only and do not write the `<Reference>` document to disk.
 
-- **REPORT** back with outcome and absolute links to any persisted documents.
+- **RETURN** the complete `<Reference>` findings as your final message to the
+  dispatching orchestrator, which persists them by scaffolding
+  `vaultspec-core vault add reference --feature <feature>` and editing the scaffolded
+  document's body prose.
+
+- **KNOW** the destination: the orchestrator persists the findings to
+  `.vault/reference/yyyy-mm-dd-<feature>-reference.md`.
 
 ### Reference Snapshot Template
 
