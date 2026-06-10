@@ -153,7 +153,7 @@ Apply the single style pass (spelling locale, dash convention, label form, annou
 - [x] `P08.S89` - replace the British spellings with American forms (D15); `src/vaultspec_core/builtins/rules/vaultspec-codify.builtin.md`.
 - [x] `P08.S90` - replace the British spellings with American forms (D15); `src/vaultspec_core/builtins/skills/vaultspec-codify/SKILL.md`.
 - [x] `P08.S91` - replace the British spellings with American forms (D15); `src/vaultspec_core/builtins/agents/vaultspec-codifier.md`.
-- [ ] `P08.S92` - replace em dashes with spaced hyphens (D15); `src/vaultspec_core/builtins/reference/cli.md`.
+- [x] `P08.S92` - replace em dashes with spaced hyphens (D15); `src/vaultspec_core/builtins/reference/cli.md`.
 - [ ] `P08.S93` - replace em dashes with spaced hyphens (D15); `src/vaultspec_core/builtins/rules/vaultspec-archive-discipline.builtin.md`.
 - [ ] `P08.S94` - replace em dashes with spaced hyphens (D15); `src/vaultspec_core/builtins/rules/vaultspec-codify.builtin.md`.
 - [ ] `P08.S95` - replace em dashes with spaced hyphens (D15); `src/vaultspec_core/builtins/rules/vaultspec-plan-editing-discipline.builtin.md`.

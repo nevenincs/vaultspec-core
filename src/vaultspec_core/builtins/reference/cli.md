@@ -292,13 +292,13 @@ Generate or update `<feature>.index.md` files in `.vault/index/`.
 
 ### vaultspec-core vault feature archive
 
-`vaultspec-core vault feature archive [OPTIONS] FEATURE_TAG` — move all documents for a
+`vaultspec-core vault feature archive [OPTIONS] FEATURE_TAG` - move all documents for a
 feature tag to the archive. Options: `--dry-run` (preview planned changes), `--json`,
 `--no-hints` (suppress next-step advisory hints).
 
 ### vaultspec-core vault feature unarchive
 
-`vaultspec-core vault feature unarchive [OPTIONS] FEATURE_TAG` — restore all archived
+`vaultspec-core vault feature unarchive [OPTIONS] FEATURE_TAG` - restore all archived
 documents for a feature tag. Options: `--dry-run` (preview planned changes), `--json`.
 The `--no-hints` flag is not accepted here.
 
