@@ -100,6 +100,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P08-S86]]'
   - '[[2026-06-09-firmware-wording-review-P08-S87]]'
   - '[[2026-06-09-firmware-wording-review-P08-S88]]'
+  - '[[2026-06-09-firmware-wording-review-P08-S89]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -212,6 +213,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P08-S86` - normalize the three bold-label conventions to the single Label-colon-sentence mandate form (D15)
 - `2026-06-09-firmware-wording-review-P08-S87` - replace the project-bondedness neologism with project-bound, repair the verb-less back-pointer sentence, and order the tool list (D15)
 - `2026-06-09-firmware-wording-review-P08-S88` - replace the British spellings serialiser, behaviour, and centre with American forms (D15)
+- `2026-06-09-firmware-wording-review-P08-S89` - replace the British spellings with American forms (D15)
 
 ### plan
 

@@ -96,7 +96,7 @@ quarter. Two paths:
 
 - **Edit in place** when the constraint has shifted at the margins. The rule's name
   stays; the body changes.
-- **Supersede** when the constraint has changed at the centre. Author a new rule with a
+- **Supersede** when the constraint has changed at the center. Author a new rule with a
   new name. Mark the prior rule with a superseded status. (The supersession mechanism
   for rules mirrors the ADR-supersession story in the sibling ADR
   `cli-memory-lifecycle`; until that ships across both surfaces, use prose to declare
