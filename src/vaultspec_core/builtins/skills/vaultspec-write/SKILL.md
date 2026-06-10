@@ -66,8 +66,8 @@ than restating them.
 
 - **Must reference research and ADRs**. Read these in full prior to writing the plan.
 
-- Ensure no knowledge gap remains prior to writing plan. Call vaultspec- research skills
-  if more information is needed.
+- Ensure no knowledge gap remains prior to writing plan. Call the `vaultspec-research`
+  skill if more information is needed.
 
 - **Granularity:** Every Step is one Markdown bulleted checkbox row naming exactly one
   file or one cohesive area in inline backticks per the Step row contract embedded in

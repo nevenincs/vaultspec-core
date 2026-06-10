@@ -90,8 +90,9 @@ remediation lands.
   dangling parenthesis ("Do not add code; code references must be persisted in
   a separate `{reference}` document."). Original finding: unbalanced
   parenthesis in the `templates/adr.md` implementation hint.
-- `REVIEW-009` | LOW | open - stray space "vaultspec- research" in
-  `skills/vaultspec-write/SKILL.md`.
+- `REVIEW-009` | LOW | resolved - the line now reads "Call the
+  `vaultspec-research` skill". Original finding: stray space
+  "vaultspec- research" in `skills/vaultspec-write/SKILL.md`.
 - `REVIEW-010` | LOW | open - fragmented bullet pair in
   `skills/vaultspec-code-review/SKILL.md` ("**Mandatory:** At the end of
   every cycle" / "- before marking a feature as Done").
