@@ -174,6 +174,16 @@ not a valid sync target.
 | `--skip`    | `[]`    | Skip a component (repeatable).                      |
 | `--json`    | off     | Emit machine-readable output.                       |
 
+### Sync output vocabulary
+
+Sync-shaped results (`vaultspec-core install`, `vaultspec-core sync`,
+`vaultspec-core spec <resource> sync`, `vaultspec-core migrations run`) share one
+vocabulary: `created`, `updated`, `unchanged`, `removed`, `restored`, `skipped`,
+`failed`. `unchanged` is a successful no-op, not a failure; `skipped` always carries a
+reason worth reading; only `failed` stops the pipeline. With `--json`, the payload
+declares schema `vaultspec.sync.v1` and the top-level `status` is the run's aggregate
+outcome (`mixed` when items disagree).
+
 ## Vault commands
 
 ### vaultspec-core vault add
