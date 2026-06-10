@@ -32,7 +32,11 @@ requires direct code referencing.
 - Use appropriate focused agents when available. Instruct them to locate and audit the
   `{Feature}` implementation in the reference codebase.
 
-- **Must persist findings** to `.vault/reference/yyyy-mm-dd-{feature}-reference.md`.
+- **Persist findings:** scaffold the reference document with
+  `vaultspec-core vault add reference --feature {feature}`, then author the findings as
+  body prose. The CLI owns the filename
+  (`.vault/reference/yyyy-mm-dd-{feature}-reference.md`) and the frontmatter; never
+  hand-write either.
 
 ### Research & Audit
 
@@ -42,8 +46,8 @@ Coordinate the agents to:
 
 - Locate the code snippets and files.
 - Analyze implementation patterns and architecture.
-- Persist a Reference blueprint to `.vault/reference/yyyy-mm-dd-{feature}-reference.md`.
-  If file exists already, assess and update it.
+- Persist a Reference blueprint into the scaffolded document's body. If the document
+  exists already, assess and update its body prose.
 
 ### Implementation Plan
 

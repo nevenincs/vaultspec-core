@@ -31,6 +31,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P04-S21]]'
   - '[[2026-06-09-firmware-wording-review-P04-S22]]'
   - '[[2026-06-09-firmware-wording-review-P04-S23]]'
+  - '[[2026-06-09-firmware-wording-review-P04-S24]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -74,6 +75,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P04-S21` - rewrite the persistence steps to scaffold via vaultspec-core vault add then edit body prose, removing the hand-authored frontmatter instruction (D4)
 - `2026-06-09-firmware-wording-review-P04-S22` - rewrite the persistence steps to scaffold via vaultspec-core vault add then edit body prose, removing the hand-authored frontmatter instruction (D4)
 - `2026-06-09-firmware-wording-review-P04-S23` - rewrite the persistence steps to scaffold via vaultspec-core vault add then edit body prose, removing the hand-authored frontmatter instruction (D4)
+- `2026-06-09-firmware-wording-review-P04-S24` - rewrite the persistence steps to scaffold via vaultspec-core vault add then edit body prose, removing the hand-authored frontmatter instruction (D4)
 
 ### plan
 
