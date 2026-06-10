@@ -112,9 +112,10 @@ Project rule files use the `vaultspec-core spec rules` schema, not the `.vault/`
 When an existing rule no longer holds:
 
 - **Edit in place** if the constraint shifted at the margins.
-- **Supersede** with a new rule if the constraint changed at the center. Mark the prior
-  rule's body with a `## Status: superseded` heading naming the new rule's slug. Do NOT
-  silently delete; once teammates are aware, remove the prior rule via
+- **Supersede** with a new rule if the constraint changed at the center. Add a
+  `## Status` section to both rule bodies: the prior rule's Status names the successor's
+  slug, and the new rule's Status names the rule it supersedes. Do NOT silently delete;
+  once teammates are aware, remove the prior rule via
   `vaultspec-core spec rules remove <name>`.
 
 The supersession event is itself a project-level signal; record it in the audit document
