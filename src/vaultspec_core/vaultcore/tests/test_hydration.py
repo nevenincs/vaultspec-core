@@ -73,6 +73,13 @@ def test_hydrate_template_substitutes_tier_when_passed():
     assert result == "tier: L3"
 
 
+def test_hydrate_template_substitutes_quoted_tier_placeholder():
+    """The quoted template placeholder hydrates to an unquoted scalar."""
+    template = "tier: '{tier}'"
+    result = hydrate_template(template, "feat", "2026-06-10", tier="L3")
+    assert result == "tier: L3"
+
+
 def test_hydrate_template_substitutes_mdformat_normalized_tier():
     """Verify mdformat-normalized plan templates still hydrate tier."""
     template = "tier: {tier: null}"

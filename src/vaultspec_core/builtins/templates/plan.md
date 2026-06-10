@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#{feature}'
 date: '{yyyy-mm-dd}'
-tier: <tier>
+tier: '{tier}'
 related:
   - '[[{yyyy-mm-dd-*}]]'
 ---

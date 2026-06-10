@@ -98,8 +98,12 @@ def hydrate_template(
     for key, value in placeholders.items():
         patterns = [f"{{{key}}}", f"<{key}>"]
         if key == "tier":
-            # mdformat parses the unquoted `{tier}` YAML placeholder as an
-            # inline map and normalizes it to `{tier: null}`.
+            # The plan template quotes the placeholder (`tier: '{tier}'`) so
+            # YAML and mdformat treat it as a string; the quotes are stripped
+            # on substitution to keep the scaffolded scalar unquoted. mdformat
+            # parses a legacy unquoted `{tier}` YAML placeholder as an inline
+            # map and normalizes it to `{tier: null}`.
+            patterns.insert(0, "'{tier}'")
             patterns.append("{tier: null}")
         for pattern in patterns:
             if pattern in hydrated:
