@@ -21,11 +21,12 @@ acknowledged as dangling, or block the archive entirely before applying the real
 The rolling CLI UX audit's B9 finding documented compounding gaps in the archive verb:
 no preview, no reversal verb, silent breakage of cross-feature `related:` links, and a
 destructive auto-fix path. The CLI has since closed the verb-level gaps: the archive
-verb carries `--dry-run`, a paired `vault feature unarchive` verb restores a mistaken
-archive, and archiving a nonexistent tag exits 1 with an error (re-verified against the
-live CLI on 2026-06-10, `vaultspec-core --version` 0.1.26). What the CLI cannot decide
-is whether an incoming cross-feature reference is provenance to preserve, a stale link
-to drop, or a dependency that should block retirement. That judgment is this rule.
+verb carries `--dry-run`, a paired `vaultspec-core vault feature unarchive` verb
+restores a mistaken archive, and archiving a nonexistent tag exits 1 with an error
+(re-verified against the live CLI on 2026-06-10, `vaultspec-core --version` 0.1.26).
+What the CLI cannot decide is whether an incoming cross-feature reference is provenance
+to preserve, a stale link to drop, or a dependency that should block retirement. That
+judgment is this rule.
 
 ## How
 

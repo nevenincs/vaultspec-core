@@ -97,8 +97,8 @@ document's body prose.
 
 ### Frontmatter & Tagging Schema (orchestrator-owned)
 
-The orchestrator's `vault add` scaffold produces the frontmatter; you never author it.
-For reference, the persisted document conforms to this schema:
+The orchestrator's `vaultspec-core vault add` scaffold produces the frontmatter; you
+never author it. For reference, the persisted document conforms to this schema:
 
 - **`tags`**: contains the required tag pair in a YAML list.
   - **Directory Tag**: Exactly `#audit` (based on location in `.vault/audit/`).

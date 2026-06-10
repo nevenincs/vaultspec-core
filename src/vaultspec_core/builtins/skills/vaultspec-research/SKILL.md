@@ -38,9 +38,9 @@ body.
 
 ### Frontmatter & Tagging Mandate
 
-The `vault add` scaffold produces frontmatter conforming to this schema. Verify it after
-scaffolding; report drift via `vaultspec-core vault check all` rather than hand-editing
-frontmatter:
+The `vaultspec-core vault add` scaffold produces frontmatter conforming to this schema.
+Verify it after scaffolding; report drift via `vaultspec-core vault check all` rather
+than hand-editing frontmatter:
 
 - **`tags`**: contains the required tag pair in a YAML list.
 

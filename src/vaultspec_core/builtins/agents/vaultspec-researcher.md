@@ -1,6 +1,6 @@
 ---
 description: General-purpose research agent for information gathering, analysis, and synthesis tasks.
-tier: MEDIUM
+tier: STANDARD
 mode: read-only
 tools: [Glob, Grep, Read, WebFetch, WebSearch, Bash]
 ---

@@ -18,11 +18,11 @@ every destructive verb.
 
 The rolling CLI UX audit's findings S4, S14, and B9 documented asymmetric gating of
 destructive verbs: some lacked a preview entirely, and others previewed nothing. Those
-gaps have closed: `install`, `uninstall`, `sync`, `vault feature archive`, and every
-plan mutator accept `--dry-run`, and `install --upgrade --dry-run` prints a populated
-per-file preview (re-verified against the live CLI on 2026-06-10,
-`vaultspec-core --version` 0.1.26). The discipline survives the fix: a preview only
-protects the operator who reads it.
+gaps have closed: `install`, `uninstall`, `sync`,
+`vaultspec-core vault feature archive`, and every plan mutator accept `--dry-run`, and
+`vaultspec-core install --upgrade --dry-run` prints a populated per-file preview
+(re-verified against the live CLI on 2026-06-10, `vaultspec-core --version` 0.1.26). The
+discipline survives the fix: a preview only protects the operator who reads it.
 
 ## How
 

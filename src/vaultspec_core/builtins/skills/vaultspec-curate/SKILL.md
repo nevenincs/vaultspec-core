@@ -68,9 +68,10 @@ missing sections).
 
 ### Frontmatter & Tagging Mandate
 
-The curator validates every document against this schema. The `vault add` scaffold
-produces conforming frontmatter for new documents; violations in existing documents are
-repaired via `vaultspec-core vault check all --fix` rather than hand edits:
+The curator validates every document against this schema. The `vaultspec-core vault add`
+scaffold produces conforming frontmatter for new documents; violations in existing
+documents are repaired via `vaultspec-core vault check all --fix` rather than hand
+edits:
 
 - **`tags`**: MUST contain the required tag pair in a YAML list.
 
