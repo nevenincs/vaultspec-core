@@ -51,8 +51,9 @@ remediation lands.
 
 ### MEDIUM
 
-- `REVIEW-003` | MEDIUM | open - literal `'#feature'` tag examples survive
-  in four personas (`agents/vaultspec-adr-researcher.md`,
+- `REVIEW-003` | MEDIUM | resolved - all four personas now use `'#{feature}'`;
+  the builtins grep for literal `'#feature'` returns zero. Original finding:
+  literal `'#feature'` tag examples survive in four personas (`agents/vaultspec-adr-researcher.md`,
   `agents/vaultspec-code-reviewer.md`, `agents/vaultspec-docs-curator.md`,
   `agents/vaultspec-writer.md`) after P08 converted the five skills to
   `'#{feature}'`; skill and persona now state the same schema with different

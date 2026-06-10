@@ -103,7 +103,7 @@ never author it. For reference, the persisted document conforms to this schema:
 - **`tags`**: contains the required tag pair in a YAML list.
   - **Directory Tag**: Exactly `#audit` (based on location in `.vault/audit/`).
   - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
-  - *Syntax:* `tags: ['#audit', '#feature']` (quoted strings in a list).
+  - *Syntax:* `tags: ['#audit', '#{feature}']` (quoted strings in a list).
 - **`related`**: a YAML list of quoted `'[[wiki-links]]'`.
   - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
 - **`date`**: `yyyy-mm-dd` format, set by the scaffold.

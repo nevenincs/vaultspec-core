@@ -60,7 +60,7 @@ Every document MUST strictly adhere to the following schema:
 
   - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
 
-  - _Syntax:_ `tags: ['#doc-type', '#feature']` (Must be quoted strings in a list).
+  - _Syntax:_ `tags: ['#doc-type', '#{feature}']` (Must be quoted strings in a list).
 
 - **`related`**: MUST be a YAML list of quoted `'[[wiki-links]]'`.
 

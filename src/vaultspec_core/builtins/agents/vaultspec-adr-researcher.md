@@ -99,7 +99,7 @@ never author it. For reference, the persisted document conforms to this schema:
 
   - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
 
-  - *Syntax:* `tags: ['#research', '#feature']` (quoted strings in a list).
+  - *Syntax:* `tags: ['#research', '#{feature}']` (quoted strings in a list).
 
 - **`related`**: a YAML list of quoted `'[[wiki-links]]'`.
 
