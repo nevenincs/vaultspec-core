@@ -25,8 +25,9 @@ When to use this skill:
 
 - Identify files modified
 
-- Log discovered issues to `.vault/audit/yyyy-mm-dd-{feature}-audit.md` as triaged
-  `LOW`->`CRITICAL` task entries.
+- Scaffold the audit document with `vaultspec-core vault add audit --feature {feature}`;
+  the CLI owns the filename and frontmatter. Log discovered issues to its body as
+  triaged `LOW`->`CRITICAL` task entries.
 
 - Use a `vaultspec-code-reviewer` agent persona, or other code-review specialists.
 
@@ -34,20 +35,23 @@ When to use this skill:
 
 - Instruct agents to always read grounding docs, ADRs, and plans.
 
-- Instruct agents to use a single shared `.vault/audit/yyyy-mm-dd-{feature}-audit.md` to
-  persist findings as triaged issue logs.
+- Instruct agents to log findings as triaged issue entries into the single shared
+  scaffolded audit document's body.
 
 - Code review is not a code fixer skill - do NOT modify the codebase.
 
 ## IMPORTANT
 
 - **Template:** You MUST read and use the template at
-  `.vaultspec/rules/templates/code-review.md`.
+  `.vaultspec/rules/templates/code-review.md`; its embedded hint blocks govern the body
+  structure.
 
-- **Location:** Must save to `.vault/audit/yyyy-mm-dd-{feature}-audit.md`. When the
-  feature already carries an audit, disambiguate with the optional narrative infix:
+- **Location:** the scaffold creates `.vault/audit/yyyy-mm-dd-{feature}-audit.md`; never
+  hand-write the filename or frontmatter. When the feature already carries an audit,
+  disambiguate with the optional narrative infix:
   `yyyy-mm-dd-{feature}-{topic}-audit.md`.
 
-- **Tags:** Ensure persisted audit doc uses the `#audit` and `#{feature}` tags.
+- **Tags:** the scaffold tags the audit document with `#audit` and `#{feature}`; verify
+  via `vaultspec-core vault check all` rather than hand-editing.
 
 - Issues must be continously appended to audit document as a rolling log of task queue.
