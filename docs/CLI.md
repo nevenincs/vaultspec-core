@@ -528,13 +528,21 @@ Outputs a hierarchical tree grouped by feature and type.
 
 #### Options
 
-| Option          | Short | Default | Description                          |
-| --------------- | ----- | ------- | ------------------------------------ |
-| `--feature TAG` | `-f`  | None    | Scope to a single feature            |
-| `--json`        | -     | off     | Output as networkx node-link JSON    |
-| `--metrics`     | `-m`  | off     | Show aggregate graph metrics         |
-| `--ascii`       | -     | off     | Render ASCII topology                |
-| `--body`        | -     | off     | Include document body in JSON output |
+| Option                   | Short | Default | Description                                      |
+| ------------------------ | ----- | ------- | ------------------------------------------------ |
+| `--feature TAG`          | `-f`  | None    | Scope to a single feature                        |
+| `--json`                 | -     | off     | Output as networkx node-link JSON                |
+| `--metrics`              | `-m`  | off     | Show aggregate graph metrics                     |
+| `--ascii`                | -     | off     | Render ASCII topology                            |
+| `--body`                 | -     | off     | Include document body in JSON output             |
+| `--node STEM`            | -     | None    | Scope JSON to a node's local (ego) neighbourhood |
+| `--depth N`              | -     | 1       | Ego-graph radius in hops; only used with --node  |
+| `--derived/--no-derived` | -     | on      | Include the derived relatedness edge set in JSON |
+
+The `--json` payload (schema `vaultspec.vault.graph.v2`) carries typed weighted explicit
+edges (`kind`, `multiplicity`, `weight`), node-size hints (`pagerank`, `in_degree`), and
+a separate `derived_edges` array of implicit relatedness edges kept out of the canonical
+`edges` array. A missing `--node` stem exits 1 with a `failed` envelope.
 
 #### Examples
 

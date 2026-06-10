@@ -733,6 +733,27 @@ def cmd_graph(
         bool,
         typer.Option("--body", help="Include body in JSON"),
     ] = False,
+    node: Annotated[
+        str | None,
+        typer.Option(
+            "--node",
+            help="Scope the JSON graph to this node's local (ego) neighbourhood",
+        ),
+    ] = None,
+    depth: Annotated[
+        int,
+        typer.Option(
+            "--depth",
+            help="Ego-graph radius in hops; only used with --node",
+        ),
+    ] = 1,
+    derived: Annotated[
+        bool,
+        typer.Option(
+            "--derived/--no-derived",
+            help="Include the derived relatedness edge set in JSON output",
+        ),
+    ] = True,
     target: TargetOption = None,
 ) -> None:
     """Render the vault document graph.
@@ -741,6 +762,10 @@ def cmd_graph(
     type.  Use --ascii for a phart ASCII topology rendering, --json
     for networkx node-link JSON export, or --metrics for aggregate
     statistics computed by networkx algorithms.
+
+    For JSON output, --node <stem> with --depth N scopes the payload to a
+    node's local (ego) neighbourhood, and --no-derived omits the derived
+    relatedness edge set.
     """
     apply_target(target)
     from vaultspec_core.console import get_console
@@ -759,10 +784,31 @@ def cmd_graph(
 
         from vaultspec_core.cli.rendering import json_envelope
 
+        if node is not None and node not in graph.nodes:
+            typer.echo(
+                json.dumps(
+                    json_envelope(
+                        "vault.graph",
+                        "failed",
+                        {"message": f"Node not found: {node}"},
+                        version=2,
+                    ),
+                    indent=2,
+                    default=str,
+                )
+            )
+            raise typer.Exit(code=1)
+
         envelope = json_envelope(
             "vault.graph",
             "unchanged",
-            graph.to_dict(feature=feature, include_body=include_body),
+            graph.to_dict(
+                feature=feature,
+                include_body=include_body,
+                node=node,
+                depth=depth,
+                include_derived=derived,
+            ),
             version=2,
         )
         typer.echo(json.dumps(envelope, indent=2, default=str))
