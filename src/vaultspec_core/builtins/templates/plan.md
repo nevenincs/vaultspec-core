@@ -90,7 +90,7 @@ related:
      CLI ADR (2026-05-06-plan-hardening-adr) for the full
      subcommand surface. -->
 
-# `{feature}` `{phase}` plan
+# `{feature}` plan
 
 <!-- One-line headline summary plan. -->
 

@@ -69,6 +69,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P06-S57]]'
   - '[[2026-06-09-firmware-wording-review-P06-summary]]'
   - '[[2026-06-09-firmware-wording-review-P07-S58]]'
+  - '[[2026-06-09-firmware-wording-review-P07-S59]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -150,6 +151,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P06-S57` - remove the mention of the retired safety auditors persona (D8)
 - `2026-06-09-firmware-wording-review-P06-summary` - `firmware-wording-review` `P06` summary
 - `2026-06-09-firmware-wording-review-P07-S58` - replace the unquoted angle-bracket tier placeholder with a quoted curly-brace placeholder (D14)
+- `2026-06-09-firmware-wording-review-P07-S59` - drop the stale phase segment from the H1 heading, a fossil of the one-plan-per-phase model (D14)
 
 ### plan
 
