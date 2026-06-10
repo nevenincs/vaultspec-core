@@ -318,5 +318,5 @@ def save(
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         atomic_write(path, json.dumps(payload, default=str))
-    except OSError as exc:
-        logger.debug("Failed to persist graph cache at %s: %s", path, exc)
+    except Exception as exc:
+        logger.warning("Failed to persist graph cache at %s: %s", path, exc)
