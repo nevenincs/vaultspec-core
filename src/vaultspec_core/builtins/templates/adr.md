@@ -12,15 +12,15 @@ related:
      Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
      Additional tags may be appended below the required pair.
 
-     Related: use wiki-links as '[[YYYY-MM-DD-foo-bar]]'.
+     Related: use wiki-links as '[[yyyy-mm-dd-foo-bar]]'.
 
      Status convention: the H1 status value is one of proposed, accepted,
      rejected, or deprecated. A new ADR starts as proposed; it moves to
      accepted or rejected when the decision is made, and to deprecated
      when a later ADR supersedes it.
 
-     DO NOT add frontmatter fields
-     outside the frontmatter. -->
+     DO NOT add fields beyond those scaffolded; metadata lives
+     only in the frontmatter. -->
 
 <!-- LINK RULES:
      - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
