@@ -1,6 +1,6 @@
 ---
 description: Specialized auditor and orchestrator for the .vault vault. Enforces strict compliance with documentation standards, orchestrates repairs via agent personas, and ensures zero-tolerance for schema violations.
-tier: MEDIUM
+tier: STANDARD
 mode: read-write
 tools: [Glob, Grep, Read, Write, Edit, Bash]
 ---

@@ -45,6 +45,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P05-S34]]'
   - '[[2026-06-09-firmware-wording-review-P05-S35]]'
   - '[[2026-06-09-firmware-wording-review-P05-S36]]'
+  - '[[2026-06-09-firmware-wording-review-P05-S37]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -102,6 +103,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P05-S34` - run the code-binding check for tier MEDIUM frontmatter consumption in Python loaders and tests before any enum value change (D9)
 - `2026-06-09-firmware-wording-review-P05-S35` - rename the medium-tier description wording to standard and move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9)
 - `2026-06-09-firmware-wording-review-P05-S36` - move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9)
+- `2026-06-09-firmware-wording-review-P05-S37` - move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9)
 
 ### plan
 
