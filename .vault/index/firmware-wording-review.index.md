@@ -36,6 +36,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P04-S26]]'
   - '[[2026-06-09-firmware-wording-review-P04-summary]]'
   - '[[2026-06-09-firmware-wording-review-P05-S27]]'
+  - '[[2026-06-09-firmware-wording-review-P05-S28]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -84,6 +85,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P04-S26` - qualify the absolute hand-writing mandate at line 14 to match the allowed-manual-edits section it currently contradicts (D4)
 - `2026-06-09-firmware-wording-review-P04-summary` - `firmware-wording-review` `P04` summary
 - `2026-06-09-firmware-wording-review-P05-S27` - reword the persistence mandate to return findings to the dispatching orchestrator, which persists via vault add scaffold plus body-prose edit, keeping the persona read-only (D3)
+- `2026-06-09-firmware-wording-review-P05-S28` - reword the persistence mandate to return findings to the dispatching orchestrator, which persists via vault add scaffold plus body-prose edit, keeping the persona read-only (D3)
 
 ### plan
 

@@ -84,34 +84,43 @@ areas:
 
 ## Research Report Format
 
-- You MUST read and use the template at `.vaultspec/rules/templates/research.md`.
+- Structure your returned findings on the template at
+  `.vaultspec/rules/templates/research.md` so the orchestrator can transfer them into
+  the scaffolded body without rework.
 
-### Frontmatter & Tagging Mandate
+### Frontmatter & Tagging Schema (orchestrator-owned)
 
-Every document MUST strictly adhere to the following schema:
+The orchestrator's `vault add` scaffold produces the frontmatter; you never author it.
+For reference, the persisted document conforms to this schema:
 
-- **`tags`**: MUST contain the required tag pair in a YAML list.
+- **`tags`**: contains the required tag pair in a YAML list.
 
   - **Directory Tag**: Exactly `#research` (based on `.vault/research/` location).
 
   - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
 
-  - *Syntax:* `tags: ['#research', '#feature']` (Must be quoted strings in a list).
+  - *Syntax:* `tags: ['#research', '#feature']` (quoted strings in a list).
 
-- **`related`**: MUST be a YAML list of quoted `'[[wiki-links]]'`.
+- **`related`**: a YAML list of quoted `'[[wiki-links]]'`.
 
   - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
 
-- **`date`**: MUST use `yyyy-mm-dd` format.
+- **`date`**: `yyyy-mm-dd` format, set by the scaffold.
 
-- **No `feature` key**: Use `tags:` exclusively for feature identification.
+- **No `feature` key**: `tags:` exclusively identifies the feature.
 
 ## Persistence
 
-- Save all `<Research>` to `.vault/research/yyyy-mm-dd-<feature>-research.md`.
+You are read-only and do not write the research document to disk. Return the complete
+`<Research>` findings as your final message to the dispatching orchestrator, which
+persists them by scaffolding `vaultspec-core vault add research --feature <feature>` and
+editing the scaffolded document's body prose.
 
-- **Linking**: Any generated documents must use `[[wiki-links]]`. DO NOT use `@ref` or
-  `[label](path)`.
+- **Destination:** The orchestrator persists the findings to
+  `.vault/research/yyyy-mm-dd-<feature>-research.md`.
+
+- **Linking**: Persisted documents reference each other with `[[wiki-links]]`. DO NOT
+  use `@ref` or `[label](path)`.
 
 ## Important
 
