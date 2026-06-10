@@ -41,7 +41,7 @@ Pin the graph JSON wire contract, fix wasteful metrics computation, and close kn
 - [x] `P01.S04` - bump the graph envelope schema to vaultspec.vault.graph.v2; `src/vaultspec_core/cli/vault_cmd.py`.
 - [x] `P01.S05` - add a full-envelope v2 contract test asserting schema, status, every node field, every edge field, and metrics keys; `src/vaultspec_core/graph/tests/test_contract.py`.
 - [x] `P01.S06` - add archive-resolution branch tests covering link resolution against the archive directory; `src/vaultspec_core/graph/tests/test_graph.py`.
-- [ ] `P01.S07` - add feature-scoped centrality assertions and replace the early-returning collision fan-out test with a guaranteed assertion; `src/vaultspec_core/graph/tests/test_graph.py`.
+- [x] `P01.S07` - add feature-scoped centrality assertions and replace the early-returning collision fan-out test with a guaranteed assertion; `src/vaultspec_core/graph/tests/test_graph.py`.
 
 ### Phase `P02` - weighted typed edges
 

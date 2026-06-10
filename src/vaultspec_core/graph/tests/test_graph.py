@@ -143,20 +143,65 @@ class TestVaultGraphBuilding:
             assert all(k in graph.nodes for k in keys)
 
     def test_wiki_links_to_colliding_stems_fan_out(self, vault_root):
-        """A wiki-link to a colliding stem creates edges to all variants."""
+        """Stem collisions exist in the synthetic corpus fixture."""
         graph = VaultGraph(vault_root)
         collisions = {
             stem: keys for stem, keys in graph._stem_index.items() if len(keys) > 1
         }
         assert collisions, "Test vault must have stem collisions"
-        # Check that at least one qualified key has incoming links
-        for _stem, keys in collisions.items():
-            has_edges = any(
-                graph.nodes[k].in_links or graph.nodes[k].out_links for k in keys
-            )
-            if has_edges:
-                return
-        # It's OK if colliding nodes happen to have no links
+        for stem, keys in collisions.items():
+            assert len(keys) >= 2, f"Collision for {stem!r} has fewer than 2 variants"
+            for key in keys:
+                assert key in graph.nodes, f"Collision key {key!r} missing from nodes"
+
+    def test_wiki_links_to_colliding_stems_fan_out_guaranteed(self, tmp_path):
+        """A wiki-link to a colliding stem fans out to all qualified variants.
+
+        Constructs a minimal vault where two docs share the same stem in
+        different subdirectories and a third doc links to the bare stem.
+        The test asserts unconditionally that the linker has edges to both
+        collision variants - the condition is guaranteed by construction.
+        """
+        vault_dir = tmp_path / ".vault"
+        (vault_dir / "adr").mkdir(parents=True)
+        (vault_dir / "plan").mkdir(parents=True)
+        (vault_dir / "research").mkdir(parents=True)
+
+        # Two docs sharing the stem "shared-stem"
+        (vault_dir / "adr" / "shared-stem.md").write_text(
+            '---\ntags:\n  - "#adr"\n  - "#collision-test"\n'
+            "date: 2026-01-01\nrelated: []\n---\n\n# adr shared-stem\n",
+            encoding="utf-8",
+        )
+        (vault_dir / "plan" / "shared-stem.md").write_text(
+            '---\ntags:\n  - "#plan"\n  - "#collision-test"\n'
+            "date: 2026-01-01\nrelated: []\n---\n\n# plan shared-stem\n",
+            encoding="utf-8",
+        )
+
+        # Third doc links to the bare stem
+        (vault_dir / "research" / "linker-doc.md").write_text(
+            '---\ntags:\n  - "#research"\n  - "#collision-test"\n'
+            'date: 2026-01-01\nrelated:\n  - "[[shared-stem]]"\n---\n\n'
+            "# linker doc\n",
+            encoding="utf-8",
+        )
+
+        graph = VaultGraph(tmp_path)
+
+        # The stem must be a collision (mapped to two qualified keys)
+        assert len(graph._stem_index.get("shared-stem", [])) == 2
+        adr_key = "adr/shared-stem"
+        plan_key = "plan/shared-stem"
+        assert adr_key in graph.nodes
+        assert plan_key in graph.nodes
+
+        # linker-doc must have edges to BOTH collision variants
+        linker = graph.nodes["linker-doc"]
+        assert adr_key in linker.out_links, f"linker-doc missing edge to {adr_key!r}"
+        assert plan_key in linker.out_links, f"linker-doc missing edge to {plan_key!r}"
+        assert graph._digraph.has_edge("linker-doc", adr_key)
+        assert graph._digraph.has_edge("linker-doc", plan_key)
 
     def test_networkx_digraph_has_same_node_count(self, vault_root):
         graph = VaultGraph(vault_root)
@@ -316,6 +361,45 @@ class TestVaultGraphMetrics:
         assert m.nodes_by_feature == {
             "editor-demo": m.total_nodes,
         }
+
+    def test_feature_scoped_centrality_populated(self, vault_root):
+        """metrics(feature=...) populates centrality dicts for the subgraph.
+
+        The synthetic corpus fixture has enough editor-demo nodes that
+        the subgraph has >1 node, so networkx computes non-empty centrality
+        scores.  The test asserts both in_degree_centrality and
+        betweenness_centrality are non-empty dicts with normalised floats.
+        """
+        graph = VaultGraph(vault_root)
+        m = graph.metrics(feature="editor-demo")
+        # The feature subgraph must have more than one node for centrality
+        # to be computed; fail loudly if the fixture shrinks below the threshold.
+        assert m.total_nodes > 1, (
+            "editor-demo subgraph has <=1 node; "
+            "fixture must be regenerated with more docs for centrality assertions"
+        )
+        assert len(m.in_degree_centrality) > 0, (
+            "in_degree_centrality is empty for editor-demo subgraph"
+        )
+        assert len(m.betweenness_centrality) > 0, (
+            "betweenness_centrality is empty for editor-demo subgraph"
+        )
+        for v in m.in_degree_centrality.values():
+            assert 0.0 <= v <= 1.0, f"in_degree_centrality value {v} out of range"
+        for v in m.betweenness_centrality.values():
+            assert 0.0 <= v <= 1.0, f"betweenness_centrality value {v} out of range"
+
+    def test_feature_scoped_centrality_keys_are_node_names(self, vault_root):
+        """Centrality dict keys are node names belonging to the feature subgraph."""
+        graph = VaultGraph(vault_root)
+        m = graph.metrics(feature="editor-demo")
+        if not m.in_degree_centrality:
+            return  # subgraph too small; handled by previous test
+        feature_node_names = {n.name for n in graph.get_feature_nodes("editor-demo")}
+        for key in m.in_degree_centrality:
+            assert key in feature_node_names, (
+                f"centrality key {key!r} not in editor-demo feature nodes"
+            )
 
     def test_metrics_to_dict(self, vault_root):
         graph = VaultGraph(vault_root)
