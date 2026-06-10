@@ -651,6 +651,8 @@ class VaultGraph:
     def metrics(
         self,
         feature: str | None = None,
+        *,
+        _g: nx.DiGraph | None = None,
     ) -> GraphMetrics:
         """Compute aggregate statistics via networkx algorithms.
 
@@ -661,11 +663,18 @@ class VaultGraph:
 
         Args:
             feature: Compute metrics only for this feature's subgraph.
+            _g: Pre-computed subgraph from :meth:`subgraph`. When
+                supplied, the internal :meth:`subgraph` call is skipped
+                so callers that already hold a reference (e.g.
+                :meth:`to_dict`) avoid a redundant traversal and the
+                expensive betweenness computation runs exactly once.
+                This parameter is intentionally private (underscore
+                prefix) and not part of the public API.
 
         Returns:
             A :class:`GraphMetrics` instance.
         """
-        g = self.subgraph(feature=feature)
+        g = _g if _g is not None else self.subgraph(feature=feature)
         nodes = (
             {n.name: n for n in self.get_feature_nodes(feature)}
             if feature
@@ -938,8 +947,11 @@ class VaultGraph:
                 if doc:
                     node_dict["body"] = doc.body
 
-        # Enrich with vault-specific metadata
-        m = self.metrics(feature=feature)
+        # Enrich with vault-specific metadata.
+        # Pass the already-computed subgraph so betweenness_centrality runs
+        # exactly once per to_dict call instead of recomputing via a second
+        # subgraph() traversal inside metrics().
+        m = self.metrics(feature=feature, _g=g)
         data["root"] = str(self.root_dir)
         data["feature"] = feature
         data["metrics"] = m.to_dict()
