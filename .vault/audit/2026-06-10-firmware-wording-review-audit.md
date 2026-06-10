@@ -81,7 +81,9 @@ remediation lands.
   `skills/vaultspec-write/SKILL.md`, `agents/vaultspec-writer.md`;
   "parallelised" in `templates/plan.md`; "summarised" in `templates/adr.md`;
   "synthesised" in `reference/cli.md`.
-- `REVIEW-007` | LOW | open - "execution-log artifact" stragglers in
+- `REVIEW-007` | LOW | resolved - both stragglers now read "Execution Record
+  artifact", matching `system/03-vaultspec.md`. Original finding:
+  "execution-log artifact" stragglers in
   `agents/vaultspec-writer.md` and `templates/plan.md` against the unified
   Execution Records noun.
 - `REVIEW-008` | LOW | open - unbalanced parenthesis in the

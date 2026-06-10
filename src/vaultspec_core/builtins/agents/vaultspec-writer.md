@@ -102,9 +102,9 @@ ancestor chain. There is no per-row reference footer; authorizing documents (ADR
 research, reference, prior plan) go once in the plan's `related:` frontmatter and every
 Step inherits that chain.
 
-The execution-log artifact retains the name `<Step Record>` and is mapped one-to-one to
-a Step. The originating Step's canonical `S##` is recorded in the Step Record's
-`step_id:` frontmatter field per the convention ADR's Wave-1 contract anchors.
+The Execution Record artifact retains the name `<Step Record>` and maps one-to-one to a
+Step. The originating Step's canonical `S##` is recorded in the Step Record's `step_id:`
+frontmatter field per the convention ADR's Wave-1 contract anchors.
 
 ## Hierarchy and tier model
 

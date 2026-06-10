@@ -37,7 +37,7 @@ related:
 
 <!-- HIERARCHY AND TIERS:
      Epic > Wave > Phase > Step. Step is the canonical leaf-row
-     noun. Execution-log artifact: <Step Record>.
+     noun. Execution Record artifact: <Step Record>.
      Tier is declared in frontmatter as tier: L1/L2/L3/L4
      (mandatory for new plans; pre-existing plans without the
      field default to L2 and the writer adds the field on first
