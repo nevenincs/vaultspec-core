@@ -218,6 +218,21 @@ Narrative placeholders (`{topic}`, `{title}`) use concise prose.
 | `{topic}`   | concise prose       | `event handling`          |
 | `{title}`   | concise prose       | `display map integration` |
 
+### Machine-Filled Placeholders
+
+A separate placeholder class is filled by the CLI, never by the author. Machine-filled
+placeholders use snake_case to distinguish them from author-replaced placeholders; do
+not fill or rename them by hand - scaffold the document through the owning CLI verb
+instead.
+
+| Placeholder       | Filled by                            | Value                                           |
+| :---------------- | :----------------------------------- | :---------------------------------------------- |
+| `{heading}`       | `vaultspec-core vault add exec`      | The originating Step row's action text          |
+| `{step_id}`       | `vaultspec-core vault add exec`      | The Step's canonical identifier (`S##`)         |
+| `{plan_stem}`     | `vaultspec-core vault add exec`      | The parent plan's filename stem                 |
+| `{scope_block}`   | `vaultspec-core vault add exec`      | A Scope section listing the Step's scoped files |
+| `{document_list}` | `vaultspec-core vault feature index` | The feature's full document list                |
+
 ### General Rules
 
 - **YAML frontmatter**: Always lowercase, kebab-case
