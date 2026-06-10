@@ -213,6 +213,14 @@ def _replace_region(text: str, region: ManagedRegion, body: str) -> str:
         )
     end_idx = text.find(end, begin_idx)
     if end_idx == -1:
+        # The anchored search (after begin) failed. Distinguish a genuinely
+        # absent end marker from a misordered pair: if an unanchored search
+        # finds the end marker, it exists but precedes the begin marker, which
+        # is a different defect than a missing one.
+        if end in text:
+            raise ReferenceMarkerError(
+                f"End marker precedes begin marker for region {region.region_id!r}"
+            )
         raise ReferenceMarkerError(
             f"Missing end marker for managed region {region.region_id!r}"
         )

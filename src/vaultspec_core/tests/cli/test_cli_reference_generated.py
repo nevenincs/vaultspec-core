@@ -163,6 +163,32 @@ def test_missing_marker_raises(tmp_path: Path) -> None:
         generate(check=True, reference_path=ref, typer_app=app)
 
 
+def test_reversed_markers_raise_distinct_message(tmp_path: Path) -> None:
+    """End-before-begin reports the misordering, not a missing end marker.
+
+    With the end marker present but preceding the begin marker, the anchored
+    end search fails while an unanchored search succeeds. The error must name
+    the misordering rather than claim the end marker is absent.
+    """
+    region = MANAGED_REGIONS[0]
+    reversed_text = (
+        "# heading\n\n"
+        f"{end_marker(region.region_id)}\n\n"
+        "```text\nstale content\n```\n\n"
+        f"{begin_marker(region.region_id)}\n"
+    )
+    ref = tmp_path / "cli.md"
+    ref.write_text(reversed_text, encoding="utf-8")
+
+    with pytest.raises(ReferenceMarkerError) as excinfo:
+        generate(check=True, reference_path=ref, typer_app=app)
+
+    message = str(excinfo.value)
+    assert "precedes begin marker" in message
+    assert region.region_id in message
+    assert "Missing end marker" not in message
+
+
 def test_write_mode_reconciles_drift_and_reports_unchanged_on_second_run(
     tmp_path: Path,
 ) -> None:

@@ -33,12 +33,15 @@ hidden commands).
 
 ### LOW
 
-- `GENREVIEW-001` | LOW | open - reversed markers (end before begin) raise
+- `GENREVIEW-001` | LOW | resolved - reversed markers (end before begin) raise
   "Missing end marker", naming the wrong defect. `src/vaultspec_core/cli/reference_gen.py`
   `replace_managed_region`: the end search is anchored after the begin index, so a
   misordered pair reports a missing end marker that is actually present. Fix: detect the
   unanchored-end-found-but-anchored-failed case and raise a distinct "end marker precedes
-  begin marker" message.
+  begin marker" message. **Resolved:** `_replace_region` now raises
+  `ReferenceMarkerError("End marker precedes begin marker for region '<id>'")` when the
+  anchored end search fails but an unanchored one succeeds;
+  `test_reversed_markers_raise_distinct_message` proves the distinct message.
 - `GENREVIEW-002` | LOW | open - duplicated begin markers silently swallow the first
   region's body (the one silent-corruption path in an otherwise fail-loud design).
   `src/vaultspec_core/cli/reference_gen.py`: assert each region's begin and end marker
