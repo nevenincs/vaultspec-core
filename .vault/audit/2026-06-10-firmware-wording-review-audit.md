@@ -26,7 +26,9 @@ remediation lands.
 
 ### HIGH
 
-- `REVIEW-001` | HIGH | open - severity-vocabulary contradiction in the
+- `REVIEW-001` | HIGH | resolved - template hint aligned to "critical, high,
+  medium, low" in `templates/code-review.md`. Original finding:
+  severity-vocabulary contradiction in the
   Verify trio, introduced by P07.S63. `templates/code-review.md` line 35 hint
   says the severity scale is "critical, sharp, minor", while
   `agents/vaultspec-code-reviewer.md` mandates CRITICAL/HIGH/MEDIUM/LOW and

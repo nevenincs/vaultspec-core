@@ -32,4 +32,4 @@ related:
      ## {topic}-### | {level} | {summary}
      followed by a body paragraph carrying the {description}.
      {topic} is a concise kebab-case slug, {level} is the severity
-     (critical, sharp, minor), and {summary} is a one-line statement. -->
+     (critical, high, medium, low), and {summary} is a one-line statement. -->
