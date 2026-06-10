@@ -1,6 +1,6 @@
 ---
 description: Project coordination agent for GitHub Projects management, issue triage, milestone tracking, worktree provisioning, and release cycle coordination.
-tier: MEDIUM
+tier: STANDARD
 mode: read-write
 tools: [Glob, Grep, Read, Bash]
 ---
