@@ -94,6 +94,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P08-S80]]'
   - '[[2026-06-09-firmware-wording-review-P08-S81]]'
   - '[[2026-06-09-firmware-wording-review-P08-S82]]'
+  - '[[2026-06-09-firmware-wording-review-P08-S83]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -200,6 +201,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P08-S80` - fix the agent personaa typo (D15)
 - `2026-06-09-firmware-wording-review-P08-S81` - fix the continously typo and repair the garbled rolling-log-of-task-queue phrase (D15)
 - `2026-06-09-firmware-wording-review-P08-S82` - repair the grammatically broken description fragment (D15)
+- `2026-06-09-firmware-wording-review-P08-S83` - fix the constrainst, condense-but-clear, and descision typos (D15)
 
 ### plan
 

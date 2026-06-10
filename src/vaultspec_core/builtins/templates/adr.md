@@ -43,18 +43,18 @@ Describe why the ADR is being persisted. Is this a new feature? Result of an aud
 
 <!-- Technical limitations, e.g.: depends on non-mature library, frontier feature, requires rigorous research. 'Frontier' risk, e.g. technology is new and falls outside the implementing model's training cutoff.
 
-List out the blocking constrainst, and features, gaps needed for reliable implementation. Must explicitly evaluate how stable 'parent' features are if this adr
+List out the blocking constraints, and features, gaps needed for reliable implementation. Must explicitly evaluate how stable 'parent' features are if this adr
 relies on another feature. -->
 
 ## Implementation
 
-<!-- A high-level overview (not a plan!) of HOW and WHAT will be implemented. Focus on condense but clear prose that describes functionality layering.
+<!-- A high-level overview (not a plan!) of HOW and WHAT will be implemented. Focus on condensed but clear prose that describes functionality layering.
 
 Do not add code (code references must be persisted in separate `{reference}` document. Important `{reference}` snippets must be summarised and referenced explicitly. -->
 
 ## Rationale
 
-<!-- Brief rationale why architecture descision was made. Reference `{research}` findings and grounding `{reference}`. -->
+<!-- Brief rationale why architecture decision was made. Reference `{research}` findings and grounding `{reference}`. -->
 
 ## Consequences
 
