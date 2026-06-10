@@ -23,6 +23,10 @@ codification-worthy lesson satisfies all three:
 - **Project-bound.** The lesson is specific to this project's conventions, stack, or
   constraints. Generic engineering advice belongs in external documentation.
 
+Never codify on the first encounter with a constraint. A lesson qualifies only after it
+has held across at least one full execution cycle; the first encounter is an audit
+finding, not yet a rule.
+
 Examples that codify well: "harbor-notes runtime data lives under `~/.harbor-notes/`;
 never under `$TMPDIR`", "every destructive verb must accept `--dry-run`", "step records
 use the canonical filename schema". Examples that do not: "we considered library X,
@@ -97,11 +101,12 @@ quarter. Two paths:
 - **Edit in place** when the constraint has shifted at the margins. The rule's name
   stays; the body changes.
 - **Supersede** when the constraint has changed at the center. Author a new rule with a
-  new name. Mark the prior rule with a superseded status. (The supersession mechanism
-  for rules mirrors the ADR-supersession story in the sibling ADR
-  `cli-memory-lifecycle`; until that ships across both surfaces, use prose to declare
-  the supersession in both rule bodies and remove the prior rule via
-  `vaultspec-core spec rules remove <name>` once teammates are aware.)
+  new name and add a `## Status` section to both rule bodies: the prior rule's Status
+  names the successor's slug, and the new rule's Status names the rule it supersedes.
+  Once teammates are aware, remove the prior rule via
+  `vaultspec-core spec rules remove <name>`. (A structured supersession mechanism
+  mirroring the ADR-supersession story is planned in the sibling ADR
+  `cli-memory-lifecycle`; until it ships, the Status sections are the declaration.)
 
 A rule should never be silently deleted. The rule's removal is itself a project-level
 event; record it.
