@@ -54,7 +54,7 @@ Hand-update the machine-facing CLI reference to the live 0.1.26 surface so sibli
 - [x] `P03.S15` - add the missing vault add flags --tier, --step, --all-steps, and --no-hints to the vault add section (D6); `src/vaultspec_core/builtins/reference/cli.md`.
 - [x] `P03.S16` - document vault feature archive --dry-run and --no-hints and add a vault feature unarchive prose section (D6); `src/vaultspec_core/builtins/reference/cli.md`.
 - [x] `P03.S17` - append rename-integrity to the vault check prose checker list (D6); `src/vaultspec_core/builtins/reference/cli.md`.
-- [ ] `P03.S18` - add the plan-verb --phase, --wave, --dry-run, and --canonicalise flags to the plan subcommand sections (D6); `src/vaultspec_core/builtins/reference/cli.md`.
+- [x] `P03.S18` - add the plan-verb --phase, --wave, --dry-run, and --canonicalise flags to the plan subcommand sections (D6); `src/vaultspec_core/builtins/reference/cli.md`.
 - [ ] `P03.S19` - add a sync output-vocabulary section matching the verified description in the CLI rule (D6); `src/vaultspec_core/builtins/reference/cli.md`.
 
 ### Phase `P04` - skills authoring path

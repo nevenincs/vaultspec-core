@@ -314,15 +314,21 @@ identifiers (`S##`, `P##`, `W##`) are append-only and gap-no-reuse.
 Read commands: `status`, `check` (accepts `--fix`), `query` (accepts `--phase`,
 `--wave`, `--open`, `--closed`).
 
+Every mutating plan verb accepts `--dry-run` (preview changes without writing to disk)
+and `--canonicalise` (strip unknown prose blocks during serialization; off by default,
+so authored prose sections are preserved).
+
 Step commands operate on `PATH STEP_ID`: `add`, `insert`, `edit`, `move`, `remove`,
-`check`, `uncheck`, `toggle`. The `add` command requires `--action` and `--scope`. The
-`insert` command takes `--before` / `--after`. The `edit` command takes `--action`
-and/or `--scope`. The `move` command takes `--to-phase`, `--before`, `--after`.
+`check`, `uncheck`, `toggle`. The `add` command requires `--action` and `--scope`, and
+takes `--phase` (parent Phase id, required at `L2`+, omitted at `L1`). The `insert`
+command takes `--before` / `--after`. The `edit` command takes `--action` and/or
+`--scope`. The `move` command takes `--to-phase`, `--before`, `--after`.
 
 Phase commands operate on `PATH PHASE_ID`: `add`, `insert`, `edit`, `move`, `renumber`,
-`remove`. The `add` command requires `--title` and `--intent`. The `edit` command takes
-`--title` and/or `--intent`. The `move` command takes `--to-wave`, `--before`,
-`--after`. The `renumber` command takes `--to`.
+`remove`. The `add` command requires `--title` and `--intent`, and takes `--wave`
+(parent Wave id, `L3`+ only). The `edit` command takes `--title` and/or `--intent`. The
+`move` command takes `--to-wave`, `--before`, `--after`. The `renumber` command takes
+`--to`.
 
 Wave commands operate on `PATH WAVE_ID`: `add`, `insert`, `edit`, `move`, `remove`. Same
 flag shape as Phase minus the re-parent flag. Wave operations require tier `L3` or `L4`.
