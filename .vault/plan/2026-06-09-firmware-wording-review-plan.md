@@ -84,7 +84,7 @@ Reconcile persona persistence mandates, the executor trio, ADR authorship, and t
 - [x] `P05.S35` - rename the medium-tier description wording to standard and move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9); `src/vaultspec_core/builtins/agents/vaultspec-standard-executor.md`.
 - [x] `P05.S36` - move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9); `src/vaultspec_core/builtins/agents/vaultspec-codifier.md`.
 - [x] `P05.S37` - move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9); `src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md`.
-- [ ] `P05.S38` - move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9); `src/vaultspec_core/builtins/agents/vaultspec-reference-auditor.md`.
+- [x] `P05.S38` - move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9); `src/vaultspec_core/builtins/agents/vaultspec-reference-auditor.md`.
 - [ ] `P05.S39` - move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9); `src/vaultspec_core/builtins/agents/vaultspec-project-coordinator.md`.
 - [ ] `P05.S40` - move the frontmatter tier MEDIUM to STANDARD if the code-binding check clears (D9); `src/vaultspec_core/builtins/agents/vaultspec-researcher.md`.
 - [ ] `P05.S41` - add the low executor to the Step routing table so low-tier Steps gain a routing target (D9); `src/vaultspec_core/builtins/agents/vaultspec-writer.md`.
