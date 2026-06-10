@@ -31,10 +31,15 @@ related:
 
 ## Outcome
 
-Every node now carries deterministic node-size hints. The PageRank helper sums
-to exactly 1.0, returns uniform scores on a symmetric cycle, and ranks a star
-hub below its leaves; repeated calls are bit-identical. All 81 graph tests
-pass; ruff, ruff-format, and ty are clean.
+Every node now carries deterministic node-size hints: a `pagerank` float and a
+raw `in_degree` integer, both flowing through `node_link_data` serialisation.
+At S12 commit time the only test coverage for the new field was the v2 contract
+test asserting the `pagerank` and `in_degree` keys exist on every node; no
+value-level behavioural test of the PageRank helper was committed. The helper's
+mathematical behaviour (stochastic sums, symmetric-cycle uniformity, hub
+ranking, dangling-mass conservation, determinism) was reasoned about but not
+asserted by a committed test until the P02 review remediation (see Notes). All
+graph tests passed at S12 commit; ruff, ruff-format, and ty were clean.
 
 ## Notes
 
@@ -50,3 +55,16 @@ the real 658-node vault converges; on non-convergence it returns the last
 mass-conserving iterate rather than raising, so a graph build can never crash
 on node sizing. The contract node-field update is intentional evolution of the
 still-unshipped v2 schema.
+
+P02 review HIGH-1 remediation: the missing behavioural coverage was added in a
+follow-up commit as `src/vaultspec_core/graph/tests/test_pagerank.py`, which
+asserts the symmetric 3-cycle yields exactly `1/3` per node and a vector summing
+to `1.0`, a star hub ranks strictly above its leaves, a dangling node still
+yields a vector summing to `1.0`, the empty graph yields `{}`, and edges
+inserted in different orders yield bit-identical scores. To make the
+order-independence a genuine guarantee rather than a near-equality, the helper
+was changed in the same remediation to iterate nodes in sorted key order (the
+floating-point reduction order otherwise leaked insertion order into the last
+ulp of every score); the earlier Description's "graph node order" phrasing is
+superseded by sorted-key order. The helper also now logs a warning on
+non-convergence before returning the last iterate (review LOW-1).

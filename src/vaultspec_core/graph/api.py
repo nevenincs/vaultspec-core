@@ -258,12 +258,15 @@ def _pagerank(
     solver, and this project ships neither NumPy nor SciPy.  This helper
     reproduces the classic power-iteration PageRank in pure Python so node
     sizing stays a zero-dependency, fully deterministic computation that
-    mirrors the networkx default semantics: a uniform initial vector,
-    iteration order following the graph's node order, uniform redistribution
-    of dangling-node mass, edge-``weight`` biasing, the same damping factor,
-    and the same node-count-scaled L1 convergence test (``err < n * tol``).
-    On the rare non-converging graph it falls back to the last iterate rather
-    than raising, so a graph build can never crash on node sizing.
+    mirrors the networkx default semantics: a uniform initial vector, uniform
+    redistribution of dangling-node mass, edge-``weight`` biasing, the same
+    damping factor, and the same node-count-scaled L1 convergence test
+    (``err < n * tol``).  Nodes are iterated in sorted key order so the
+    floating-point reduction order - and therefore every score down to the
+    last ulp - is independent of the order edges were inserted into the graph.
+    On the rare non-converging graph it falls back to the last iterate (after
+    logging a warning) rather than raising, so a graph build can never crash on
+    node sizing.
 
     Args:
         g: The directed graph to rank.  Edge ``weight`` attributes, when
@@ -277,7 +280,12 @@ def _pagerank(
         Mapping of node key to PageRank score; scores sum to ``1.0``.  An
         empty graph yields an empty mapping.
     """
-    nodes = list(g.nodes())
+    # Iterate nodes in sorted key order rather than insertion order.  The L1
+    # error and per-node sums are accumulated as floating-point reductions, so
+    # the summation order affects the last ulp of every score; pinning the
+    # order to the sorted keys makes the result bit-identical regardless of the
+    # order edges were inserted (the regression guard in test_pagerank).
+    nodes = sorted(g.nodes())
     n = len(nodes)
     if n == 0:
         return {}
@@ -312,6 +320,13 @@ def _pagerank(
         if err < n * tol:
             return rank
 
+    logger.warning(
+        "PageRank did not converge in %d iterations (final L1 error %.3e >= %.3e); "
+        "returning the last iterate",
+        max_iter,
+        err,
+        n * tol,
+    )
     return rank
 
 
