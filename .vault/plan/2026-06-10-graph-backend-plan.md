@@ -71,7 +71,7 @@ Add the vault link command group so a GUI can mutate graph edges through the CLI
 - [x] `P03.S24` - register the link group on the vault command app and wire the exit-code contract; `src/vaultspec_core/cli/vault_cmd.py`.
 - [x] `P03.S25` - add CRLF-preservation, atomic-write, and round-trip tests for the shared surgery helper; `src/vaultspec_core/vaultcore/tests/test_link_surgery.py`.
 - [x] `P03.S26` - add CLI tests for link add, remove, and list covering dry-run, JSON envelopes, dangling refusal, and exit codes; `src/vaultspec_core/tests/cli/test_link_cli.py`.
-- [ ] `P03.S27` - regenerate the bundled CLI reference and propagate provider sync; `.vaultspec/rules/reference/cli.md`.
+- [x] `P03.S27` - regenerate the bundled CLI reference and propagate provider sync; `.vaultspec/rules/reference/cli.md`.
 
 ### Phase `P04` - performance and caching
 
