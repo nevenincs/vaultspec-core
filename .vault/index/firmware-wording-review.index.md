@@ -137,6 +137,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P09-S122]]'
   - '[[2026-06-09-firmware-wording-review-P09-S123]]'
   - '[[2026-06-09-firmware-wording-review-P09-S124]]'
+  - '[[2026-06-09-firmware-wording-review-P09-S125]]'
   - '[[2026-06-09-firmware-wording-review-P09-S126]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
@@ -292,6 +293,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P09-S122` - run vaultspec-core install --upgrade to clear the three-file reflow drift in the deployed mirror (D16)
 - `2026-06-09-firmware-wording-review-P09-S123` - run vault check all and spec doctor and confirm both report green (D16)
 - `2026-06-09-firmware-wording-review-P09-S124` - run the full test suite via uv run --no-sync pytest and the prek hooks on modified files, confirming green (D16)
+- `2026-06-09-firmware-wording-review-P09-S125` - right-size the deferred cli-reference-regeneration item: fix residual British spellings and extend the drift guard (D16)
 - `2026-06-09-firmware-wording-review-P09-S126` - remediate the template-rename downstream-upgrade hazard in code (D16, REVIEW-005)
 
 ### plan

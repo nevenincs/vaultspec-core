@@ -219,7 +219,7 @@ command surface.
 ## Sharing policy
 
 The spec layer is team-shared by default. Authored content under `.vaultspec/` (rules,
-skills, agents, system prompts), the synthesised `CLAUDE.md`, `.mcp.json`, and the
+skills, agents, system prompts), the synthesized `CLAUDE.md`, `.mcp.json`, and the
 generated provider directories are committed to git, so a teammate who clones the
 project inherits its authoritative policy. Codifying a rule is real, durable work: it
 reaches every teammate on their next clone and every CI run.
@@ -233,7 +233,7 @@ ignores the snapshot directory, advisory-lock sentinels, the install manifest
 `vaultspec-core install` states this policy on completion, and
 `vaultspec-core install --upgrade` carries a workspace created under the older
 framework-local default onto the shared policy, rewriting a stale managed block in
-place. A block you have hand-edited is left untouched so your customisation is never
+place. A block you have hand-edited is left untouched so your customization is never
 clobbered.
 
 ## Managing vault records

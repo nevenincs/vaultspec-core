@@ -169,3 +169,45 @@ def test_every_cli_option_is_in_reference() -> None:
         f"anywhere in {_REFERENCE.relative_to(_REPO_ROOT)}:\n  - "
         + "\n  - ".join(sorted(missing))
     )
+
+
+# Tokens the P03 reference-update phase of the firmware-wording-review
+# campaign added to the bundled reference after a drift audit found them
+# missing. The broad command/option sweeps above already guard these, but
+# pinning the specific tokens makes their coverage intentional and prevents a
+# future reference rewrite from silently dropping any of them. Each token is a
+# live surface the sibling CLI rule and discipline rules reference.
+_P03_REQUIRED_TOKENS: frozenset[str] = frozenset(
+    {
+        "--tier",
+        "--step",
+        "--all-steps",
+        "--no-hints",
+        "--dry-run",
+        "--phase",
+        "--wave",
+        "--canonicalise",
+        "rename-integrity",
+        "unarchive",
+    }
+)
+
+
+def test_p03_surfaced_tokens_are_in_reference() -> None:
+    """The flags and sections the P03 drift audit added must stay documented.
+
+    Regression guard for the specific gaps the firmware-wording-review P03
+    phase closed: the `vault add` tier/step flags, the archive/unarchive
+    coverage and its `--dry-run`/`--no-hints` flags, the plan-verb parent and
+    preview flags (`--phase`, `--wave`, `--canonicalise`), and the
+    `rename-integrity` checker. This is intentionally redundant with the broad
+    sweeps so a reference edit that drops one of these named tokens fails with
+    a pointed message rather than a generic one.
+    """
+    reference_text = _REFERENCE.read_text(encoding="utf-8")
+    missing = sorted(t for t in _P03_REQUIRED_TOKENS if t not in reference_text)
+    assert not missing, (
+        "The following tokens the P03 reference update documented are no longer "
+        f"present in {_REFERENCE.relative_to(_REPO_ROOT)}:\n  - "
+        + "\n  - ".join(missing)
+    )

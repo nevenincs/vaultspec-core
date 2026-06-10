@@ -1218,7 +1218,7 @@ Identical shape to Phase, but the parent is implicit (Epic frame). Only
 | Subcommand | Description                                                                                                                                                                                  |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `show`     | Print the plan's declared tier                                                                                                                                                               |
-| `promote`  | Advance the tier transitively, for example L1 -> L4 in one call. Synthesised containers use `--phase-title`/`--phase-intent`/`--wave-title`/`--wave-intent`/`--epic-intent` for placeholders |
+| `promote`  | Advance the tier transitively, for example L1 -> L4 in one call. Synthesized containers use `--phase-title`/`--phase-intent`/`--wave-title`/`--wave-intent`/`--epic-intent` for placeholders |
 | `demote`   | Step the tier down. Refuses with an error when the collapsing layer holds more than one container; pass `--force` to retire the dropped ids and proceed                                      |
 
 #### Move-flag precedence
@@ -1240,7 +1240,7 @@ A self-referential move (`step move S01 --before S01`) is rejected with the rele
 `remove`, multi-step demotion, and Wave / Phase removal all add the retired canonical id
 to a hidden `<!-- RETIRED: ... -->` ledger embedded in the plan body. `next_available_*`
 consults this ledger so retired identifiers are never reused, even across
-`parse / serialise` round-trips invoked by `--fix`.
+`parse / serialize` round-trips invoked by `--fix`.
 
 ## Spec commands
 
