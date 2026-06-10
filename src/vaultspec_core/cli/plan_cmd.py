@@ -133,10 +133,16 @@ def _save_plan_or_dry_run(
         else:
             typer.echo("No changes.")
     else:
-        if new_text != original_text:
+        wrote = new_text != original_text
+        if wrote:
             path.write_text(new_text, encoding="utf-8")
         preserved_count = 0 if canonicalise else len(plan.unknown_blocks)
         typer.echo(f"{success_msg} (Preserved {preserved_count} unknown blocks)")
+        if wrote:
+            from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+            from vaultspec_core.core.types import get_context as _get_ctx
+
+            invalidate_graph_cache(_get_ctx().target_dir)
 
 
 plan_app = typer.Typer(

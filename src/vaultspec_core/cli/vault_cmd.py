@@ -478,6 +478,9 @@ def cmd_add(
         if json_output:
             logging.disable(previous_logging_disable)
 
+    # Only invalidate when the doc was actually written (not a dry-run preview).
+    # Exceptions above cause early return, so reaching here means create_vault_doc
+    # completed successfully; dry_run=False implies a real write occurred.
     if not dry_run:
         from vaultspec_core.cli._cache_hook import invalidate_graph_cache
 
@@ -1348,6 +1351,10 @@ def cmd_sanitize_annotations(
     result = check_annotations(
         _get_ctx().target_dir, feature=feature, fix=True, dry_run=dry_run
     )
+    if not dry_run and result.fixed_count > 0:
+        from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+
+        invalidate_graph_cache(_get_ctx().target_dir)
     _render_and_exit(
         result,
         verbose or dry_run,
@@ -1738,6 +1745,11 @@ def cmd_feature_index(
         generated_paths.append(path)
         if not json_output:
             console.print(f"[green]Index:[/green] {path}")
+
+    if generated_paths:
+        from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+
+        invalidate_graph_cache(root_dir)
 
     if json_output:
         import json
