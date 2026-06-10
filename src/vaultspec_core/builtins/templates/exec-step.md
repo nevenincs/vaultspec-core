@@ -41,10 +41,10 @@ related:
 
 ## Description
 
-<!-- Succint line-by-line list of steps executed. Use imperative language, mirroring git commit summary lines. -->
+<!-- Succinct line-by-line list of steps executed. Use imperative language, mirroring git commit summary lines. -->
 
 ## Outcome
 
 ## Notes
 
-<!-- Incidents. Data loss. Difficulties (;persistent failiures. Skipped work. Scafolds left in code. Failiures. -->
+<!-- Incidents. Data loss. Difficulties; persistent failures. Skipped work. Scaffolds left in code. Failures. -->

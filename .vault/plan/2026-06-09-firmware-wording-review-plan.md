@@ -145,7 +145,7 @@ Apply the single style pass (spelling locale, dash convention, label form, annou
 - [x] `P08.S81` - fix the continously typo and repair the garbled rolling-log-of-task-queue phrase (D15); `src/vaultspec_core/builtins/skills/vaultspec-code-review/SKILL.md`.
 - [x] `P08.S82` - repair the grammatically broken description fragment (D15); `src/vaultspec_core/builtins/skills/vaultspec-research/SKILL.md`.
 - [x] `P08.S83` - fix the constrainst, condense-but-clear, and descision typos (D15); `src/vaultspec_core/builtins/templates/adr.md`.
-- [ ] `P08.S84` - fix the Succint, twice-occurring failiures, and Scafolds typos and the stray punctuation (D15); `src/vaultspec_core/builtins/templates/exec-step.md`.
+- [x] `P08.S84` - fix the Succint, twice-occurring failiures, and Scafolds typos and the stray punctuation (D15); `src/vaultspec_core/builtins/templates/exec-step.md`.
 - [ ] `P08.S85` - fix the Use-Concise-and-Direct label fragment, the i.e.-where-e.g.-is-meant misuse, and the bullet punctuation drift (D15); `src/vaultspec_core/builtins/system/02-operations.md`.
 - [ ] `P08.S86` - normalize the three bold-label conventions to the single Label-colon-sentence mandate form (D15); `src/vaultspec_core/builtins/system/01-core.md`.
 - [ ] `P08.S87` - replace the project-bondedness neologism with project-bound, repair the verb-less back-pointer sentence, and order the tool list (D15); `src/vaultspec_core/builtins/agents/vaultspec-codifier.md`.
