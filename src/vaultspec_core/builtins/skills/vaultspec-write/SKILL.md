@@ -152,6 +152,6 @@ than hand-editing frontmatter:
   ```
 
 - **Approval Loop**: User must explicitly approve the Plan. If changes are requested,
-  load the `vaultspec-writer` agent personaa again to make changes. If more research and
+  load the `vaultspec-writer` agent persona again to make changes. If more research and
   grounding is required, use the appropriate vaultspec research skills and agents.
   Instruct them to "Revise the plan based on user feedback: `{feedback}`."
