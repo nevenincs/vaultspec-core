@@ -133,6 +133,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P08-S98]]'
   - '[[2026-06-09-firmware-wording-review-P08-S99]]'
   - '[[2026-06-09-firmware-wording-review-P08-summary]]'
+  - '[[2026-06-09-firmware-wording-review-P09-S121]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -283,6 +284,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P08-S98` - normalize the divergent announce line to the canonical form (D15)
 - `2026-06-09-firmware-wording-review-P08-S99` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15)
 - `2026-06-09-firmware-wording-review-P08-summary` - `firmware-wording-review` `P08` summary
+- `2026-06-09-firmware-wording-review-P09-S121` - run vaultspec-core sync to propagate the source edits to every provider surface (D16)
 
 ### plan
 
