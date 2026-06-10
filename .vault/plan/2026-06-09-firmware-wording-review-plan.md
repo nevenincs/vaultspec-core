@@ -45,7 +45,7 @@ Shorten the three audit-derived discipline rules per their own Status clauses no
 - [x] `P02.S11` - shorten the rule per its own Status clause now that archive dry-run, the paired unarchive verb, and exit-1 on nonexistent tags have landed, replacing the version anchor with a dated verification note (D5); `src/vaultspec_core/builtins/rules/vaultspec-archive-discipline.builtin.md`.
 - [x] `P02.S12` - shorten the rule per its own Status clause, dropping the stale 0.1.19 claims, the empty-upgrade-preview example, and the silent-no-op claim, replacing the version anchor with a dated verification note (D5); `src/vaultspec_core/builtins/rules/vaultspec-dry-run-discipline.builtin.md`.
 - [x] `P02.S13` - live-confirm plan body-prose preservation by running structural plan verbs against a scratch plan document carrying authored prose sections (D5); `src/vaultspec_core/builtins/rules/vaultspec-plan-editing-discipline.builtin.md`.
-- [ ] `P02.S14` - shorten the rule per its own Status clause only after the live prose-preservation confirmation passes, replacing the ordering procedure with a pointer at the preserved-prose behavior (D5); `src/vaultspec_core/builtins/rules/vaultspec-plan-editing-discipline.builtin.md`.
+- [x] `P02.S14` - shorten the rule per its own Status clause only after the live prose-preservation confirmation passes, replacing the ordering procedure with a pointer at the preserved-prose behavior (D5); `src/vaultspec_core/builtins/rules/vaultspec-plan-editing-discipline.builtin.md`.
 
 ### Phase `P03` - bundled CLI reference update
 
