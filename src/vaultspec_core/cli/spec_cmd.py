@@ -1871,7 +1871,7 @@ reference_app = typer.Typer(
     help="Generate the derivable regions of the bundled CLI reference.",
     no_args_is_help=True,
 )
-spec_app.add_typer(reference_app, name="reference", hidden=True)
+spec_app.add_typer(reference_app, name="reference")
 
 
 @reference_app.command("generate")

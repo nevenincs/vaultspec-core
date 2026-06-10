@@ -195,6 +195,7 @@ vaultspec-core spec mcps status [OPTIONS]
 vaultspec-core spec mcps add [OPTIONS]
 vaultspec-core spec mcps remove [OPTIONS] NAME
 vaultspec-core spec mcps sync [OPTIONS] [PROVIDER]
+vaultspec-core spec reference generate [OPTIONS]
 vaultspec-core migrations status [OPTIONS]
 vaultspec-core migrations run [OPTIONS]
 vaultspec-core config get [OPTIONS] KEY
@@ -1554,6 +1555,40 @@ processes.
 
   ```bash
   vaultspec-core spec mcps remove sqlite-mcp --force
+  ```
+
+### vaultspec-core spec reference
+
+```bash
+vaultspec-core spec reference generate [OPTIONS]
+```
+
+Regenerate the generator-owned regions of the bundled machine-facing CLI reference
+(`src/vaultspec_core/builtins/reference/cli.md`) from the live Typer command surface.
+The reference is a hybrid of hand-written prose and generator-owned zones delimited by
+`vaultspec:generated` HTML-comment markers; this verb rewrites only the managed zones
+and leaves the prose untouched.
+
+| Option    | Default | Description                                                                                   |
+| --------- | ------- | --------------------------------------------------------------------------------------------- |
+| `--check` | off     | Render in memory, diff against the committed file, exit non-zero on mismatch without writing. |
+| `--json`  | off     | Emit machine-readable output.                                                                 |
+
+Default (write) mode rewrites the bundled reference in place when the managed regions
+have drifted. `--check` mode is the CI and pre-commit entry point: it renders into
+memory, prints a unified diff on mismatch, and exits non-zero, leaving the file
+untouched (exit 0 when already in sync).
+
+- **Refresh the bundled reference after a command or flag change**:
+
+  ```bash
+  vaultspec-core spec reference generate
+  ```
+
+- **Verify the bundled reference is up to date (CI gate)**:
+
+  ```bash
+  vaultspec-core spec reference generate --check
   ```
 
 ## Migration commands

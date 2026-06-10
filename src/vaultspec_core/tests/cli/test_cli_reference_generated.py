@@ -88,10 +88,16 @@ def test_managed_inventory_reflects_full_live_surface() -> None:
         assert expected in signatures, expected
 
 
-def test_hidden_reference_verb_is_absent_from_inventory() -> None:
-    """The hidden generator verb does not document itself in the inventory."""
+def test_reference_verb_documents_itself_in_inventory() -> None:
+    """The visible generator verb appears in its own generated inventory.
+
+    The ``spec reference`` group is a visible spec sub-group, so the generator
+    that produces the inventory includes its own ``generate`` leaf - and the
+    drift guard and language-contract test require a documented command to
+    exist in the live tree.
+    """
     signatures = collect_leaf_signatures(app)
-    assert not any("spec reference generate" in s for s in signatures)
+    assert "vaultspec-core spec reference generate [OPTIONS]" in signatures
 
 
 def test_generate_preserves_unmanaged_prose_verbatim(tmp_path: Path) -> None:

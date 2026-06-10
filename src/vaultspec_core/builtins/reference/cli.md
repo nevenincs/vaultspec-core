@@ -139,6 +139,7 @@ vaultspec-core spec mcps status [OPTIONS]
 vaultspec-core spec mcps add [OPTIONS]
 vaultspec-core spec mcps remove [OPTIONS] NAME
 vaultspec-core spec mcps sync [OPTIONS] [PROVIDER]
+vaultspec-core spec reference generate [OPTIONS]
 vaultspec-core migrations status [OPTIONS]
 vaultspec-core migrations run [OPTIONS]
 vaultspec-core config get [OPTIONS] KEY
@@ -148,9 +149,6 @@ vaultspec-core config list [OPTIONS]
 ```
 
 <!-- vaultspec:generated:end command-inventory -->
-
-The `spec reference generate` verb itself is hidden from the inventory above (it is a
-developer/CI tool), so the drift guards do not require it to document itself.
 
 ## Workspace commands
 
