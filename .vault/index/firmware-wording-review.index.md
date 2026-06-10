@@ -91,6 +91,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P07-S78]]'
   - '[[2026-06-09-firmware-wording-review-P07-summary]]'
   - '[[2026-06-09-firmware-wording-review-P08-S100]]'
+  - '[[2026-06-09-firmware-wording-review-P08-S101]]'
   - '[[2026-06-09-firmware-wording-review-P08-S79]]'
   - '[[2026-06-09-firmware-wording-review-P08-S80]]'
   - '[[2026-06-09-firmware-wording-review-P08-S81]]'
@@ -215,6 +216,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P07-S78` - lowercase the uppercase YYYY-MM-DD in the hint block and reword the garbled DO-NOT-add-frontmatter-fields-outside-the-frontmatter hint (D14)
 - `2026-06-09-firmware-wording-review-P07-summary` - `firmware-wording-review` `P07` summary
 - `2026-06-09-firmware-wording-review-P08-S100` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15)
+- `2026-06-09-firmware-wording-review-P08-S101` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15)
 - `2026-06-09-firmware-wording-review-P08-S79` - fix the fundations and considere-null-and-void typos and supply the missing conjunction at line 20 (D15)
 - `2026-06-09-firmware-wording-review-P08-S80` - fix the agent personaa typo (D15)
 - `2026-06-09-firmware-wording-review-P08-S81` - fix the continously typo and repair the garbled rolling-log-of-task-queue phrase (D15)

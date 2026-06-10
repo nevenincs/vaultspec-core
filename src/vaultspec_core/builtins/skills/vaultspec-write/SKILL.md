@@ -106,7 +106,7 @@ than hand-editing frontmatter:
 
   - **Directory Tag**: Exactly `#plan`.
   - **Feature Tag**: Exactly one kebab-case `#{feature}` tag.
-  - _Syntax:_ `tags: ['#plan', '#feature']` (quoted strings in a list).
+  - *Syntax:* `tags: ['#plan', '#{feature}']` (quoted strings in a list).
 
 - **`related`**: a YAML list of quoted `'[[wiki-links]]'`, seeded from the `--related`
   flag at scaffold time.
