@@ -1903,11 +1903,11 @@ def cmd_reference_generate(
     """
     from vaultspec_core.cli.reference_gen import (
         ReferenceMarkerError,
-        generate,
+        generate_all,
     )
 
     try:
-        result = generate(check=check)
+        results = generate_all(check=check)
     except (ReferenceMarkerError, OSError) as exc:
         if json_output:
             _emit_json("spec.reference.generate", "failed", {"message": str(exc)})
@@ -1915,56 +1915,71 @@ def cmd_reference_generate(
             typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
-    rel = result.path.name
+    files = [
+        {
+            "path": str(result.path),
+            "name": result.path.name,
+            "in_sync": result.in_sync,
+            "changed": result.changed,
+            "diff": result.diff,
+        }
+        for result in results
+    ]
+    out_of_sync = [result for result in results if result.changed]
 
     if check:
-        if result.in_sync:
+        if not out_of_sync:
             if json_output:
                 _emit_json(
                     "spec.reference.generate",
                     "unchanged",
-                    {"path": str(result.path), "in_sync": True},
+                    {"files": files, "in_sync": True},
                 )
             else:
-                typer.echo(f"Bundled reference {rel} is in sync.")
+                names = ", ".join(result.path.name for result in results)
+                typer.echo(f"Generated references in sync: {names}.")
             raise typer.Exit(0)
         if json_output:
             _emit_json(
                 "spec.reference.generate",
                 "failed",
-                {"path": str(result.path), "in_sync": False, "diff": result.diff},
+                {"files": files, "in_sync": False},
             )
         else:
-            typer.echo(
-                f"Bundled reference {rel} is out of sync with the live CLI surface.",
-                err=True,
-            )
-            typer.echo(result.diff, err=True)
+            for result in out_of_sync:
+                typer.echo(
+                    f"Generated reference {result.path.name} is out of sync with "
+                    "the live CLI surface.",
+                    err=True,
+                )
+                typer.echo(result.diff, err=True)
             typer.echo(
                 "  Run 'vaultspec-core spec reference generate' to refresh it.",
                 err=True,
             )
         raise typer.Exit(code=1)
 
-    if not result.changed:
+    if not out_of_sync:
         if json_output:
             _emit_json(
                 "spec.reference.generate",
                 "unchanged",
-                {"path": str(result.path), "in_sync": True},
+                {"files": files, "in_sync": True},
             )
         else:
-            typer.echo(f"Bundled reference {rel} already up to date.")
+            names = ", ".join(result.path.name for result in results)
+            typer.echo(f"Generated references already up to date: {names}.")
         raise typer.Exit(0)
 
     if json_output:
         _emit_json(
             "spec.reference.generate",
             "updated",
-            {"path": str(result.path), "diff": result.diff},
+            {"files": files},
         )
     else:
-        typer.echo(f"Regenerated managed regions of {rel}.")
+        names = ", ".join(result.path.name for result in out_of_sync)
+        typer.echo(f"Regenerated managed regions of: {names}.")
     raise typer.Exit(0)
 
 

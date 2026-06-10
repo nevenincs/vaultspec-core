@@ -81,7 +81,7 @@ repos:
     entry: uv run --no-sync vaultspec-core spec reference generate --check
     language: system
     pass_filenames: false
-    files: '^(src/vaultspec_core/cli/.*\.py|src/vaultspec_core/builtins/reference/cli\.md)$'
+    files: '^(src/vaultspec_core/cli/.*\.py|src/vaultspec_core/builtins/reference/cli\.md|docs/CLI\.md)$'
   - id: check-provider-artifacts
     name: Check provider artifacts
     entry: uv run --no-sync vaultspec-core check-providers

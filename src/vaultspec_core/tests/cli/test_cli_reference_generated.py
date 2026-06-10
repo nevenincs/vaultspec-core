@@ -22,13 +22,16 @@ from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
 from vaultspec_core.cli.reference_gen import (
+    MANAGED_FILES,
     MANAGED_REGIONS,
     ReferenceMarkerError,
     begin_marker,
     bundled_reference_path,
     collect_leaf_signatures,
+    docs_handbook_path,
     end_marker,
     generate,
+    generate_all,
     render_reference,
 )
 
@@ -241,3 +244,129 @@ def test_write_mode_reconciles_drift_and_reports_unchanged_on_second_run(
     second = generate(check=False, reference_path=ref, typer_app=app)
     assert not second.changed
     assert second.in_sync
+
+
+# ---------------------------------------------------------------------------
+# Two-surface coverage: the bundled reference and the source-tree handbook
+# share the command-inventory region so they cannot drift (GENREVIEW-003).
+# ---------------------------------------------------------------------------
+
+
+def test_registry_owns_both_surfaces_with_shared_region() -> None:
+    """The registry covers cli.md and docs/CLI.md via the same region set.
+
+    Both generator-owned files render the same ``command-inventory`` region, so
+    the bundled reference and the source-tree handbook are sourced from one
+    Typer walk and cannot diverge in command set or ordering.
+    """
+    paths = [managed.path_factory() for managed in MANAGED_FILES]
+    names = {path.name for path in paths}
+    assert names == {"cli.md", "CLI.md"}, names
+    for managed in MANAGED_FILES:
+        assert any(
+            region.region_id == "command-inventory" for region in managed.regions
+        ), managed.path_factory().name
+
+
+def test_generate_all_check_covers_both_files_in_sync() -> None:
+    """`generate_all(check=True)` reports both committed files already in sync."""
+    results = generate_all(check=True)
+    names = {result.path.name for result in results}
+    assert names == {"cli.md", "CLI.md"}, names
+    for result in results:
+        assert result.in_sync, (
+            f"{result.path.name} diverged from the live CLI surface. Run "
+            "`vaultspec-core spec reference generate` to refresh it.\n"
+            f"{result.diff}"
+        )
+
+
+def test_check_mode_via_cli_reports_both_files() -> None:
+    """The verb's `--check` output names both generator-owned surfaces."""
+    invocation = _RUNNER.invoke(app, ["spec", "reference", "generate", "--check"])
+    assert invocation.exit_code == 0, invocation.output
+    assert "cli.md" in invocation.output
+    assert "CLI.md" in invocation.output
+
+
+def test_handbook_inventory_equals_live_tree_set_and_order() -> None:
+    """docs/CLI.md's committed inventory equals the live tree, set and order.
+
+    This is the equality guard the review asked for: the handbook's signature
+    block, parsed out of its managed region, must match the live Typer walk
+    exactly - same commands, same order - so an ordering or membership drift
+    (the original index-7 `vault graph` divergence) fails here.
+    """
+    region = MANAGED_REGIONS[0]
+    handbook = docs_handbook_path().read_text(encoding="utf-8")
+    begin = begin_marker(region.region_id)
+    end = end_marker(region.region_id)
+    begin_idx = handbook.index(begin)
+    end_idx = handbook.index(end, begin_idx)
+    block = handbook[begin_idx + len(begin) : end_idx]
+
+    committed_signatures = [
+        line for line in block.splitlines() if line.startswith("vaultspec-core ")
+    ]
+    assert committed_signatures == collect_leaf_signatures(app)
+
+
+def test_corrupted_handbook_region_is_detected(tmp_path: Path) -> None:
+    """A hand-edit inside docs/CLI.md's managed region is caught by check."""
+    committed = docs_handbook_path().read_text(encoding="utf-8")
+    corrupted = committed.replace(
+        "vaultspec-core install [OPTIONS] [PROVIDER]",
+        "vaultspec-core install [OPTIONS] [TAMPERED]",
+        1,
+    )
+    assert corrupted != committed, "fixture corruption did not apply"
+    ref = tmp_path / "CLI.md"
+    ref.write_text(corrupted, encoding="utf-8")
+
+    result = generate(
+        check=True, reference_path=ref, typer_app=app, regions=region_tuple()
+    )
+    assert not result.in_sync
+    assert "[TAMPERED]" in result.diff
+    assert ref.read_text(encoding="utf-8") == corrupted
+
+
+def test_handbook_prose_outside_region_survives_regenerate(tmp_path: Path) -> None:
+    """Hand-written handbook prose around the region is preserved verbatim.
+
+    The handbook carries curated narrative (the per-command tables, examples,
+    and section headers) outside the markers. A regenerate must replace only
+    the signature block, leaving every other byte untouched.
+    """
+    region = MANAGED_REGIONS[0]
+    sentinel_before = "HANDBOOK-PROSE-BEFORE-7f3a curated narrative kept verbatim."
+    sentinel_after = "### install\n\nDeploy the vaultspec framework into the target."
+    fixture = (
+        "# vaultspec-core CLI handbook\n\n"
+        f"{sentinel_before}\n\n"
+        f"{begin_marker(region.region_id)}\n\n"
+        "```text\nvaultspec-core stale [OPTIONS]\n```\n\n"
+        f"{end_marker(region.region_id)}\n\n"
+        f"## Workspace commands\n\n{sentinel_after}\n"
+    )
+    ref = tmp_path / "CLI.md"
+    ref.write_text(fixture, encoding="utf-8")
+
+    result = generate(
+        check=False, reference_path=ref, typer_app=app, regions=region_tuple()
+    )
+    assert result.changed
+    rewritten = ref.read_text(encoding="utf-8")
+
+    assert sentinel_before in rewritten
+    assert sentinel_after in rewritten
+    assert "vaultspec-core stale [OPTIONS]" not in rewritten
+    assert "vaultspec-core install [OPTIONS] [PROVIDER]" in rewritten
+
+
+def region_tuple() -> tuple:
+    """Return the handbook's region set from the registry (the shared region)."""
+    for managed in MANAGED_FILES:
+        if managed.path_factory().name == "CLI.md":
+            return managed.regions
+    raise AssertionError("handbook not found in MANAGED_FILES registry")

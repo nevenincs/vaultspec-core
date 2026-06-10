@@ -90,10 +90,12 @@ gate reduces to inspecting that one key.
 
 ## Command signature contract
 
-This generated block is checked against the live Typer command tree. Keep prose curated
-elsewhere in this document, but do not hand-edit these signatures.
+This block is generator-owned: run `vaultspec-core spec reference generate` to refresh
+it. It is checked against the live Typer command tree by
+`vaultspec-core spec reference generate --check`. Keep prose curated elsewhere in this
+document, but do not hand-edit between the markers.
 
-<!-- vaultspec-cli-signatures:start -->
+<!-- vaultspec:generated:begin command-inventory -->
 
 ```text
 vaultspec-core install [OPTIONS] [PROVIDER]
@@ -103,13 +105,12 @@ vaultspec-core doctor [OPTIONS]
 vaultspec-core vault add [OPTIONS] DOC_TYPE
 vaultspec-core vault stats [OPTIONS]
 vaultspec-core vault list [OPTIONS] [DOC_TYPE]
+vaultspec-core vault graph [OPTIONS]
 vaultspec-core vault repair [OPTIONS]
 vaultspec-core vault feature list [OPTIONS]
 vaultspec-core vault feature index [OPTIONS]
 vaultspec-core vault feature archive [OPTIONS] FEATURE_TAG
 vaultspec-core vault feature unarchive [OPTIONS] FEATURE_TAG
-vaultspec-core vault adr supersede [OPTIONS] OLD_ADR
-vaultspec-core vault rule promote [OPTIONS]
 vaultspec-core vault check all [OPTIONS]
 vaultspec-core vault check body-links [OPTIONS]
 vaultspec-core vault check annotations [OPTIONS]
@@ -123,6 +124,8 @@ vaultspec-core vault check schema [OPTIONS]
 vaultspec-core vault check structure [OPTIONS]
 vaultspec-core vault check rename-integrity [OPTIONS]
 vaultspec-core vault sanitize annotations [OPTIONS]
+vaultspec-core vault rule promote [OPTIONS]
+vaultspec-core vault adr supersede [OPTIONS] OLD_ADR
 vaultspec-core vault plan status [OPTIONS] PATH
 vaultspec-core vault plan check [OPTIONS] PATH
 vaultspec-core vault plan query [OPTIONS] PATH
@@ -157,8 +160,8 @@ vaultspec-core spec rules show [OPTIONS] NAME
 vaultspec-core spec rules edit [OPTIONS] NAME
 vaultspec-core spec rules remove [OPTIONS] NAME
 vaultspec-core spec rules rename [OPTIONS] OLD_NAME NEW_NAME
-vaultspec-core spec rules restore [OPTIONS] FILENAME
 vaultspec-core spec rules sync [OPTIONS] [PROVIDER]
+vaultspec-core spec rules restore [OPTIONS] FILENAME
 vaultspec-core spec rules status [OPTIONS]
 vaultspec-core spec skills list [OPTIONS]
 vaultspec-core spec skills add [OPTIONS] NAME
@@ -166,8 +169,8 @@ vaultspec-core spec skills show [OPTIONS] NAME
 vaultspec-core spec skills edit [OPTIONS] NAME
 vaultspec-core spec skills remove [OPTIONS] NAME
 vaultspec-core spec skills rename [OPTIONS] OLD_NAME NEW_NAME
-vaultspec-core spec skills restore [OPTIONS] FILENAME
 vaultspec-core spec skills sync [OPTIONS] [PROVIDER]
+vaultspec-core spec skills restore [OPTIONS] FILENAME
 vaultspec-core spec skills status [OPTIONS]
 vaultspec-core spec agents list [OPTIONS]
 vaultspec-core spec agents add [OPTIONS] NAME
@@ -175,8 +178,8 @@ vaultspec-core spec agents show [OPTIONS] NAME
 vaultspec-core spec agents edit [OPTIONS] NAME
 vaultspec-core spec agents remove [OPTIONS] NAME
 vaultspec-core spec agents rename [OPTIONS] OLD_NAME NEW_NAME
-vaultspec-core spec agents restore [OPTIONS] FILENAME
 vaultspec-core spec agents sync [OPTIONS] [PROVIDER]
+vaultspec-core spec agents restore [OPTIONS] FILENAME
 vaultspec-core spec agents status [OPTIONS]
 vaultspec-core spec system show [OPTIONS]
 vaultspec-core spec system sync [OPTIONS] [PROVIDER]
@@ -204,7 +207,7 @@ vaultspec-core config unset [OPTIONS] KEY
 vaultspec-core config list [OPTIONS]
 ```
 
-<!-- vaultspec-cli-signatures:end -->
+<!-- vaultspec:generated:end command-inventory -->
 
 ## Workspace commands
 

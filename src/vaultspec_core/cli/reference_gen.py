@@ -68,6 +68,20 @@ def bundled_reference_path() -> Path:
     return _builtins_root() / "reference" / "cli.md"
 
 
+def docs_handbook_path() -> Path:
+    """Return the filesystem path to the source-tree handbook ``docs/CLI.md``.
+
+    The handbook is a source-only artifact: it lives in the repository under
+    ``docs/`` and is not shipped inside the installed wheel. The generator owns
+    its command-inventory region so the two surfaces cannot drift; when the
+    file is absent (an installed wheel, not a checkout) it is simply skipped by
+    the registry walk.
+    """
+    from pathlib import Path as _Path
+
+    return _Path(__file__).resolve().parents[3] / "docs" / "CLI.md"
+
+
 # ---------------------------------------------------------------------------
 # Typer / Click introspection
 # ---------------------------------------------------------------------------
@@ -178,11 +192,42 @@ class ManagedRegion:
     render: Callable[[typer.Typer], str]
 
 
-# Registry of every managed region, in document order. Adding a sibling
-# reference (mcp.md, framework.md) later extends this registry rather than
-# rewriting the apply loop.
+# Registry of every managed region, in document order. Adding a sibling region
+# (per-command option tables, exit-code table) later extends this tuple rather
+# than rewriting the apply loop.
 MANAGED_REGIONS: tuple[ManagedRegion, ...] = (
     ManagedRegion(region_id="command-inventory", render=render_command_inventory),
+)
+
+
+@dataclass(frozen=True)
+class ManagedFile:
+    """A file the generator owns, plus the regions it rewrites inside it.
+
+    ``path_factory`` is deferred so the package/repo paths resolve at call time
+    (tests never need them; an installed wheel may not ship the handbook).
+    ``optional`` marks a source-only file that is skipped when absent rather
+    than raising, so ``--check`` stays correct both in a checkout and in an
+    installed wheel.
+    """
+
+    path_factory: Callable[[], Path]
+    regions: tuple[ManagedRegion, ...]
+    optional: bool = False
+
+
+# Registry of every generator-owned file, in document order. The same renderer
+# shape extends to sibling references (mcp.md, framework.md) by appending a
+# ManagedFile here rather than touching the apply loop. The bundled reference
+# and the source-tree handbook share the command-inventory region so the two
+# surfaces cannot silently diverge in command set or ordering.
+MANAGED_FILES: tuple[ManagedFile, ...] = (
+    ManagedFile(path_factory=bundled_reference_path, regions=MANAGED_REGIONS),
+    ManagedFile(
+        path_factory=docs_handbook_path,
+        regions=MANAGED_REGIONS,
+        optional=True,
+    ),
 )
 
 
@@ -247,14 +292,20 @@ def _replace_region(text: str, region: ManagedRegion, body: str) -> str:
     return f"{before}\n\n{body}\n\n{after}"
 
 
-def render_reference(committed_text: str, typer_app: typer.Typer) -> str:
+def render_reference(
+    committed_text: str,
+    typer_app: typer.Typer,
+    regions: tuple[ManagedRegion, ...] = MANAGED_REGIONS,
+) -> str:
     """Return *committed_text* with every managed region freshly rendered.
 
     Prose zones outside the markers are carried through verbatim; only the
     content between each region's markers is replaced with generator output.
+    *regions* defaults to the bundled-reference region set; a caller may pass a
+    file-specific region tuple from the :data:`MANAGED_FILES` registry.
     """
     text = committed_text
-    for region in MANAGED_REGIONS:
+    for region in regions:
         text = _replace_region(text, region, region.render(typer_app))
     return text
 
@@ -295,8 +346,9 @@ def generate(
     check: bool,
     reference_path: Path | None = None,
     typer_app: typer.Typer | None = None,
+    regions: tuple[ManagedRegion, ...] = MANAGED_REGIONS,
 ) -> GenerateResult:
-    """Render the managed regions of the bundled reference.
+    """Render the managed regions of one generator-owned file.
 
     Args:
         check: When ``True`` the file is left untouched; the rendered output is
@@ -307,17 +359,19 @@ def generate(
             at a fixture).
         typer_app: Override the Typer app object introspected (defaults to the
             live :data:`vaultspec_core.cli.app`).
+        regions: The region tuple to rewrite; defaults to the bundled
+            reference's region set.
 
     Returns:
-        A :class:`GenerateResult` recording whether the committed reference
-        diverged from fresh output and the unified diff between them.
+        A :class:`GenerateResult` recording whether the committed file diverged
+        from fresh output and the unified diff between them.
     """
     if typer_app is None:
         from vaultspec_core.cli import app as typer_app
 
     path = reference_path or bundled_reference_path()
     committed = path.read_text(encoding="utf-8")
-    rendered = render_reference(committed, typer_app)
+    rendered = render_reference(committed, typer_app, regions)
 
     changed = rendered != committed
     diff = _unified_diff(committed, rendered, path) if changed else ""
@@ -326,3 +380,43 @@ def generate(
         path.write_text(rendered, encoding="utf-8", newline="\n")
 
     return GenerateResult(path=path, changed=changed, diff=diff)
+
+
+def generate_all(
+    *,
+    check: bool,
+    typer_app: typer.Typer | None = None,
+) -> list[GenerateResult]:
+    """Render every generator-owned file in the :data:`MANAGED_FILES` registry.
+
+    Each registry entry is rendered through :func:`generate`. Optional files
+    (the source-only handbook) that are absent on disk are skipped, so a
+    ``--check`` run in an installed wheel covers only the files it ships while a
+    checkout covers both the bundled reference and ``docs/CLI.md``.
+
+    Args:
+        check: Forwarded to :func:`generate`; ``True`` leaves files untouched
+            and only diffs, ``False`` rewrites drifted regions in place.
+        typer_app: Override the Typer app object introspected (defaults to the
+            live :data:`vaultspec_core.cli.app`).
+
+    Returns:
+        One :class:`GenerateResult` per processed file, in registry order.
+    """
+    if typer_app is None:
+        from vaultspec_core.cli import app as typer_app
+
+    results: list[GenerateResult] = []
+    for managed in MANAGED_FILES:
+        path = managed.path_factory()
+        if managed.optional and not path.is_file():
+            continue
+        results.append(
+            generate(
+                check=check,
+                reference_path=path,
+                typer_app=typer_app,
+                regions=managed.regions,
+            )
+        )
+    return results

@@ -50,13 +50,32 @@ hidden commands).
   `ReferenceMarkerError("Duplicate begin/end marker for region '<id>' ...")` before any
   replacement; `test_duplicate_begin_marker_raises` proves the raise and that the first
   body is no longer swallowed.
-- `GENREVIEW-003` | LOW | open - `docs/CLI.md`'s parallel command inventory is not
+- `GENREVIEW-003` | LOW | resolved - `docs/CLI.md`'s parallel command inventory is not
   generator-owned and has already drifted in ordering from `cli.md` (first divergence at
   index 7, `vault repair` vs `vault graph`). The ADR's Problem Statement names the
   two-surface burden as the motivation; automating only one surface leaves the second to
   drift. Fix: make the `docs/CLI.md` inventory block a second managed region owned by the
   same generator (the `MANAGED_REGIONS` registry was built to extend to additional files
-  and regions), so `--check` covers both surfaces.
+  and regions), so `--check` covers both surfaces. **Resolved (managed-region path):**
+  `docs/CLI.md`'s inventory was confirmed to be the same `text` signature-block format
+  the generator emits, so its prior bespoke `vaultspec-cli-signatures:start/end` markers
+  were replaced with the canonical `vaultspec:generated:begin/end command-inventory`
+  markers and the generator now owns it. The registry generalized to a `MANAGED_FILES`
+  tuple of `ManagedFile(path_factory, regions, optional)` entries; the bundled reference
+  and the handbook share the `command-inventory` region, so they are sourced from one
+  Typer walk and cannot diverge. Regenerating reconciled the handbook to the live tree
+  (added the missing `vault graph`, fixed the index-7 ordering and the
+  `rule promote`/`adr supersede` and `*-restore`/`*-sync` orderings); every hand-written
+  handbook sentence outside the markers is preserved verbatim. `generate_all` drives the
+  verb and `--check` over both files; the `cli-reference-check` pre-commit hook scope now
+  includes `docs/CLI.md`. The source-only handbook is `optional=True` so an installed
+  wheel that does not ship it is skipped rather than failing. New tests:
+  `test_registry_owns_both_surfaces_with_shared_region`,
+  `test_generate_all_check_covers_both_files_in_sync`,
+  `test_check_mode_via_cli_reports_both_files`,
+  `test_handbook_inventory_equals_live_tree_set_and_order`,
+  `test_corrupted_handbook_region_is_detected`, and
+  `test_handbook_prose_outside_region_survives_regenerate`.
 - `GENREVIEW-004` | LOW | resolved (accepted as-is) - `generate` write-mode resolves the
   package path, which under a non-editable installed wheel would be read-only. The verb
   is a developer/CI tool and degrades to a clean exit-1 with a remedy-naming message via
@@ -70,6 +89,18 @@ hidden commands).
   generator test suite, the drift guard, and the full suite plus prek.
 - `GENREVIEW-003` fulfills the ADR's two-surface motivation directly; after it lands,
   `docs/CLI.md` and `cli.md` inventories cannot silently diverge.
+
+## Remediation
+
+All three actionable findings are remediated in-cycle (one commit each, code plus test
+plus this status flip). `GENREVIEW-001` and `GENREVIEW-002` harden the marker-handling in
+`reference_gen.py` (distinct reversed-marker error; exactly-once marker guard).
+`GENREVIEW-003` takes the managed-region path: `docs/CLI.md`'s inventory was the same
+signature-block format the generator emits, so it is now a second generator-owned file in
+the `MANAGED_FILES` registry sharing the `command-inventory` region with `cli.md`, and
+`spec reference generate --check` plus the `cli-reference-check` pre-commit hook cover
+both surfaces. `GENREVIEW-004` was accepted as-is. `spec reference generate --check` exits
+0 over both files; the generator test suite and both drift guards pass.
 
 ## Codification candidates
 
