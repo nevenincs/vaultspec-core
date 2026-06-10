@@ -13,6 +13,8 @@ related:
      Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
      Additional tags may be appended below the required pair.
      step_id is the originating Step's canonical identifier, e.g. S01.
+     The {step_id} and {plan_stem} placeholders are machine-filled by
+     `vaultspec-core vault add exec`; do not fill them by hand.
 
      Related: use wiki-links as '[[YYYY-MM-DD-foo-bar-plan]]' and link the
      parent plan.
@@ -28,7 +30,10 @@ related:
 
 <!-- STEP RECORD:
      This file represents one Step from the originating plan. Identified
-     by its canonical leaf identifier (S##) and ancestor display path. -->
+     by its canonical leaf identifier (S##) and ancestor display path.
+     The {heading} and {scope_block} placeholders below are machine-filled
+     by `vaultspec-core vault add exec` from the originating Step row;
+     do not fill them by hand. -->
 
 # {heading}
 
