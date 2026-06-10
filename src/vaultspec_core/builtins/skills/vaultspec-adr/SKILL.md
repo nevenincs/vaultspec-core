@@ -15,9 +15,9 @@ Use this skill:
 - When multiple competing technical choices need a grounding document.
 
 - When a significant architectural decision is made that affects the project's
-  fundations, feature set, or development trajectory.
+  foundations, feature set, or development trajectory.
 
-- To document the blast radius, "why", "what" of major architectural choices.
+- To document the blast radius, "why", and "what" of major architectural choices.
 
 ## Required steps
 
@@ -61,7 +61,7 @@ than hand-editing frontmatter:
   session.
 
 - **CRITICAL: you MUST always** present adr findings as an interactive prompt for user
-  approval. Without explicit user sign-off the ADR is considere null and void.
+  approval. Without explicit user sign-off the ADR is considered null and void.
 
 - **Draft ADR using the `vaultspec-adr-researcher` agent persona**, which formalizes the
   research-backed decisions into ADR content and returns it for persistence into the

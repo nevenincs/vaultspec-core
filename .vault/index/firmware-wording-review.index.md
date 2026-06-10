@@ -90,6 +90,7 @@ related:
   - '[[2026-06-09-firmware-wording-review-P07-S77]]'
   - '[[2026-06-09-firmware-wording-review-P07-S78]]'
   - '[[2026-06-09-firmware-wording-review-P07-summary]]'
+  - '[[2026-06-09-firmware-wording-review-P08-S79]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-09-firmware-wording-review-plan]]'
   - '[[2026-06-09-firmware-wording-review-research]]'
@@ -192,6 +193,7 @@ Auto-generated index of all documents tagged with `#firmware-wording-review`.
 - `2026-06-09-firmware-wording-review-P07-S77` - lowercase the uppercase YYYY-MM-DD in the hint block and reword the garbled DO-NOT-add-frontmatter-fields-outside-the-frontmatter hint (D14)
 - `2026-06-09-firmware-wording-review-P07-S78` - lowercase the uppercase YYYY-MM-DD in the hint block and reword the garbled DO-NOT-add-frontmatter-fields-outside-the-frontmatter hint (D14)
 - `2026-06-09-firmware-wording-review-P07-summary` - `firmware-wording-review` `P07` summary
+- `2026-06-09-firmware-wording-review-P08-S79` - fix the fundations and considere-null-and-void typos and supply the missing conjunction at line 20 (D15)
 
 ### plan
 
