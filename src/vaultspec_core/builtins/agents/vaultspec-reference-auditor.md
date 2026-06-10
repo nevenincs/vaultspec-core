@@ -71,4 +71,5 @@ File(s): <list of relevant files with paths>
 **CRITICAL RULES**:
 
 - **DO NOT** implement code. Your job is research and reference.
-- **DO NOT** dispatch safety auditors. That is the executor's job.
+- **DO NOT** dispatch review work. Verification at close-out is the dispatching
+  orchestrator's responsibility; you return findings only.
