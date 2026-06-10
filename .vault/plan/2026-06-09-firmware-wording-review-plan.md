@@ -117,7 +117,7 @@ Fix every template placeholder leak against the documented placeholder conventio
 - [x] `P07.S58` - replace the unquoted angle-bracket tier placeholder with a quoted curly-brace placeholder (D14); `src/vaultspec_core/builtins/templates/plan.md`.
 - [x] `P07.S59` - drop the stale phase segment from the H1 heading, a fossil of the one-plan-per-phase model (D14); `src/vaultspec_core/builtins/templates/plan.md`.
 - [x] `P07.S60` - update the plan heading example to the phase-less H1 form (D14); `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
-- [ ] `P07.S61` - retier the wave-assuming verification hint at line 173 so it holds at every tier (D14); `src/vaultspec_core/builtins/templates/plan.md`.
+- [x] `P07.S61` - retier the wave-assuming verification hint at line 173 so it holds at every tier (D14); `src/vaultspec_core/builtins/templates/plan.md`.
 - [ ] `P07.S62` - lowercase the Title Case H1 to match the all-lowercase heading convention every sibling follows (D14); `src/vaultspec_core/builtins/templates/code-review.md`.
 - [ ] `P07.S63` - move the uppercase TOPIC, LEVEL, Summary, and DESCRIPTION placeholders into comments using convention-compliant names (D14); `src/vaultspec_core/builtins/templates/code-review.md`.
 - [ ] `P07.S64` - annotate the heading, scope_block, step_id, and plan_stem placeholders as machine-filled (D14); `src/vaultspec_core/builtins/templates/exec-step.md`.

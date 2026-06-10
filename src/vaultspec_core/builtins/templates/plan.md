@@ -169,7 +169,7 @@ interdependency. -->
 should be a verifiable check (test passes, surface conforms,
 reviewer signs off) rather than a free-form assertion.
 
-The plan is complete when every Step in every Wave is closed
+The plan is complete when every Step in the plan is closed
 (`- [x]`). At `L4`, the Epic-completion check additionally requires
 the declared project-management association to report the Epic
 complete.
