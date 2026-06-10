@@ -22,8 +22,13 @@ Use this skill:
 ## Required steps
 
 - **Announce at start:** "I'm using the `vaultspec-adr` skill to create a new ADR."
-- **You MUST read and use the template** at `.vaultspec/rules/templates/adr.md`.
-- **MUST save document to:** `.vault/adr/yyyy-mm-dd-{feature}-adr.md`
+- **You MUST read and use the template** at `.vaultspec/rules/templates/adr.md`; its
+  embedded hint blocks govern the body structure.
+- **Scaffold via the CLI:**
+  `vaultspec-core vault add adr --feature {feature} --related <research-stem>`, then
+  author the body prose in the scaffolded file. The CLI owns the filename
+  (`.vault/adr/yyyy-mm-dd-{feature}-adr.md`) and the frontmatter; never hand-write
+  either.
 - **Read and link related Research from:**
   `.vault/research/yyyy-mm-dd-{feature}-research.md`.
 - **Terminate if related research is not found** and prompt user to first invoke
@@ -31,21 +36,24 @@ Use this skill:
 
 ### Frontmatter & Tagging Mandate
 
-Every document MUST strictly adhere to the following schema:
+The `vault add` scaffold produces frontmatter conforming to this schema. Verify it after
+scaffolding; report drift via `vaultspec-core vault check all` rather than hand-editing
+frontmatter:
 
-- **`tags`**: MUST contain the required tag pair in a YAML list.
+- **`tags`**: contains the required tag pair in a YAML list.
 
   - **Directory Tag**: Exactly `#adr`.
   - **Feature Tag**: Exactly one kebab-case `#{feature}` tag.
-  - *Syntax:* `tags: ['#adr', '#feature']` (Must be quoted strings in a list).
+  - *Syntax:* `tags: ['#adr', '#feature']` (quoted strings in a list).
 
-- **`related`**: MUST be a YAML list of quoted `'[[wiki-links]]'`.
+- **`related`**: a YAML list of quoted `'[[wiki-links]]'`, seeded from the `--related`
+  flag at scaffold time.
 
   - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
 
-- **`date`**: MUST use `yyyy-mm-dd` format.
+- **`date`**: `yyyy-mm-dd` format, set by the scaffold.
 
-- **No `feature` key**: Use `tags:` exclusively for feature identification.
+- **No `feature` key**: `tags:` exclusively identifies the feature.
 
 ## Workflow
 
