@@ -86,8 +86,10 @@ remediation lands.
   "execution-log artifact" stragglers in
   `agents/vaultspec-writer.md` and `templates/plan.md` against the unified
   Execution Records noun.
-- `REVIEW-008` | LOW | open - unbalanced parenthesis in the
-  `templates/adr.md` implementation hint.
+- `REVIEW-008` | LOW | resolved - the implementation hint reworded without the
+  dangling parenthesis ("Do not add code; code references must be persisted in
+  a separate `{reference}` document."). Original finding: unbalanced
+  parenthesis in the `templates/adr.md` implementation hint.
 - `REVIEW-009` | LOW | open - stray space "vaultspec- research" in
   `skills/vaultspec-write/SKILL.md`.
 - `REVIEW-010` | LOW | open - fragmented bullet pair in

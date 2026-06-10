@@ -50,7 +50,7 @@ relies on another feature. -->
 
 <!-- A high-level overview (not a plan!) of HOW and WHAT will be implemented. Focus on condensed but clear prose that describes functionality layering.
 
-Do not add code (code references must be persisted in separate `{reference}` document. Important `{reference}` snippets must be summarized and referenced explicitly. -->
+Do not add code; code references must be persisted in a separate `{reference}` document. Important `{reference}` snippets must be summarized and referenced explicitly. -->
 
 ## Rationale
 
