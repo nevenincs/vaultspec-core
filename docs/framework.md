@@ -64,7 +64,7 @@ moving to planning.
 
 ### Planning
 
-With approved ADRs in hand, call the `vaultspec-write-plan` skill to produce an
+With approved ADRs in hand, call the `vaultspec-write` skill to produce an
 implementation plan. It reads the ADR and creates one checkbox row for each Step. The
 plan is grouped by the convention's complexity tier.
 

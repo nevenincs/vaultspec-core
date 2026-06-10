@@ -58,7 +58,9 @@ remediation lands.
   `agents/vaultspec-writer.md`) after P08 converted the five skills to
   `'#{feature}'`; skill and persona now state the same schema with different
   placeholder forms, failing the plan's Verification grep as written.
-- `REVIEW-004` | MEDIUM | open - phantom skill name survives in
+- `REVIEW-004` | MEDIUM | resolved - `docs/framework.md` now names
+  `vaultspec-write`; no other `vaultspec-write-plan` occurrence remains outside
+  historical vault documents. Original finding: phantom skill name survives in
   `docs/framework.md` ("call the `vaultspec-write-plan` skill"); outside the
   builtins scope but reached via the CLI rule's manual link.
 - `REVIEW-005` | MEDIUM | open - interim verb breakage at HEAD:
