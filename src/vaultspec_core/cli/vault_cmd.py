@@ -421,6 +421,11 @@ def cmd_add(
                 if json_output:
                     logging.disable(previous_logging_disable)
 
+            if not dry_run and items:
+                from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+
+                invalidate_graph_cache(root_dir)
+
             exit_code = emit_outcomes(
                 items,
                 command="vault.add",
@@ -472,6 +477,11 @@ def cmd_add(
     finally:
         if json_output:
             logging.disable(previous_logging_disable)
+
+    if not dry_run:
+        from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+
+        invalidate_graph_cache(_get_ctx().target_dir)
 
     if dry_run:
         if json_output:
@@ -998,6 +1008,10 @@ def cmd_repair(
         include_index=include_index,
         feature=feature,
     )
+    if not dry_run and run.changed_files:
+        from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+
+        invalidate_graph_cache(_get_ctx().target_dir)
     if json_output:
         import json
 
@@ -1191,6 +1205,11 @@ def cmd_check_all(
 
     console = get_console()
     results = run_all_checks(_get_ctx().target_dir, feature=feature, fix=fix)
+
+    if fix and sum(r.fixed_count for r in results) > 0:
+        from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+
+        invalidate_graph_cache(_get_ctx().target_dir)
 
     total_errors = sum(r.error_count for r in results)
     outcome = "failed" if total_errors > 0 else "unchanged"
@@ -1768,6 +1787,10 @@ def cmd_feature_archive(
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc, json_output=json_output)
         return
+    if not dry_run and result["archived_count"] > 0:
+        from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+
+        invalidate_graph_cache(_get_ctx().target_dir)
     outcome = (
         "updated" if (result["archived_count"] > 0 and not dry_run) else "unchanged"
     )
@@ -1857,6 +1880,10 @@ def cmd_feature_unarchive(
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc, json_output=json_output)
         return
+    if not dry_run and result["unarchived_count"] > 0:
+        from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+
+        invalidate_graph_cache(_get_ctx().target_dir)
     console = get_console()
     if json_output:
         import json

@@ -333,6 +333,11 @@ def cmd_link_add(
         )
         raise typer.Exit(code=1) from exc
 
+    if added:
+        from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+
+        invalidate_graph_cache(root_dir)
+
     status = "created" if added else "unchanged"
     _emit_ok(
         json_output,
@@ -468,6 +473,11 @@ def cmd_link_remove(
             f"Write failed: {exc}",
         )
         raise typer.Exit(code=1) from exc
+
+    if removed:
+        from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+
+        invalidate_graph_cache(root_dir)
 
     status = "removed" if removed else "unchanged"
     _emit_ok(

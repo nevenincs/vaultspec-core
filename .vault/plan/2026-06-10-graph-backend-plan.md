@@ -79,7 +79,7 @@ Add the fingerprint graph cache and scale benchmarks so repeated one-shot reads 
 
 - [x] `P04.S28` - create the fingerprint cache module with a size and mtime manifest and a serialised graph store; `src/vaultspec_core/graph/cache.py`.
 - [x] `P04.S29` - wire cache loading into graph construction with any fingerprint mismatch falling back to full rebuild; `src/vaultspec_core/graph/api.py`.
-- [ ] `P04.S30` - invalidate or refresh the graph cache from every mutating verb that touches vault documents; `src/vaultspec_core/cli/`.
+- [x] `P04.S30` - invalidate or refresh the graph cache from every mutating verb that touches vault documents; `src/vaultspec_core/cli/`.
 - [ ] `P04.S31` - add cache correctness tests proving a stale cache is never trusted; `src/vaultspec_core/graph/tests/test_cache.py`.
 - [ ] `P04.S32` - add 500 and 5000 document scale benchmarks with generous thresholds; `src/vaultspec_core/graph/tests/test_scale.py`.
 - [ ] `P04.S33` - register the dedicated benchmark marker; `pyproject.toml`.
