@@ -29,6 +29,44 @@ def _write_lf(path, text: str) -> None:
     path.write_bytes(text.encode("utf-8"))
 
 
+def _body_after_fence(raw: bytes) -> bytes:
+    """Return the bytes from the closing frontmatter fence onward.
+
+    The frontmatter is delimited by two ``---`` fences; this returns the
+    slice starting at the second fence, i.e. the document body plus the
+    closing fence line.
+    """
+    text = raw.decode("utf-8")
+    first = text.index("---")
+    second = text.index("---", first + 3)
+    return text[second:].encode("utf-8")
+
+
+def _frontmatter_key_block(raw: bytes, key: str) -> bytes:
+    """Return the raw byte slice of a single frontmatter key block.
+
+    Captures the *key* line and any indented continuation lines beneath it,
+    stopping at the next non-indented key or the closing fence.
+    """
+    text = raw.decode("utf-8")
+    # Normalise to logical lines while remembering the original newline.
+    newline = "\r\n" if "\r\n" in text else "\n"
+    lines = text.replace("\r\n", "\n").split("\n")
+    collected: list[str] = []
+    capturing = False
+    for line in lines:
+        if line.startswith(key):
+            capturing = True
+            collected.append(line)
+            continue
+        if capturing:
+            if line.startswith((" ", "\t")):
+                collected.append(line)
+            else:
+                break
+    return newline.join(collected).encode("utf-8")
+
+
 # ---------------------------------------------------------------------------
 # remove_related_entries
 # ---------------------------------------------------------------------------
@@ -206,6 +244,21 @@ class TestAppendRelatedEntryLF:
         assert "[[first]]" in content
         assert "[[second]]" in content
 
+    def test_append_lands_at_end_of_block_list(self, tmp_path):
+        """A new entry must be appended LAST, not prepended (review H1)."""
+        doc = tmp_path / "doc.md"
+        _write_lf(
+            doc,
+            "---\nrelated:\n  - '[[x]]'\n  - '[[z]]'\n---\nBody.\n",
+        )
+
+        appended = append_related_entry(doc, "[[y]]")
+
+        assert appended is True
+        parsed = yaml.safe_load(doc.read_text(encoding="utf-8").split("---\n")[1])
+        # Order must be preserved with the new entry LAST: [[x]], [[z]], [[y]]
+        assert parsed["related"] == ["[[x]]", "[[z]]", "[[y]]"]
+
     def test_idempotent_same_stem(self, tmp_path):
         doc = tmp_path / "doc.md"
         _write_lf(doc, "---\nrelated:\n  - '[[alpha]]'\n---\nBody.\n")
@@ -356,19 +409,18 @@ class TestRoundTrip:
             "Second paragraph.\n"
         )
         _write_crlf(doc, content)
-
-        # Capture the non-related block bytes before mutation
         original_raw = doc.read_bytes()
+        body_before = _body_after_fence(original_raw)
+        tags_before = _frontmatter_key_block(original_raw, "tags:")
 
-        # Remove the entry
+        # Remove the entry, then add it back.
         remove_related_entries(doc, ["adr"])
-        # Add it back
         append_related_entry(doc, "[[adr]]")
 
         final_raw = doc.read_bytes()
-        # The body bytes must survive unchanged (CRLF-terminated)
-        assert b"Lorem ipsum dolor sit amet." in final_raw
-        assert b"Second paragraph." in final_raw
-        # CRLF still present
+        # The body (everything after the closing fence) is byte-identical.
+        assert _body_after_fence(final_raw) == body_before
+        # The non-related frontmatter key (tags:) is byte-identical.
+        assert _frontmatter_key_block(final_raw, "tags:") == tags_before
+        # CRLF still present.
         assert b"\r\n" in final_raw
-        _ = original_raw  # silence linter
