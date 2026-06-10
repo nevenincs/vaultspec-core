@@ -30,6 +30,7 @@ _EXPECTED_DATA_KEYS = frozenset(
         "graph",
         "nodes",
         "edges",
+        "derived_edges",
         "root",
         "feature",
         "metrics",

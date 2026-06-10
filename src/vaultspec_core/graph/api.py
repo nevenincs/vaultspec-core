@@ -41,6 +41,7 @@ from ..vaultcore import (
     scan_vault,
 )
 from ..vaultcore.models import DocumentMetadata
+from .derived import compute_derived_edges
 
 if TYPE_CHECKING:
     import pathlib
@@ -1114,22 +1115,44 @@ class VaultGraph:
         self,
         feature: str | None = None,
         include_body: bool = False,
+        *,
+        node: str | None = None,
+        depth: int = 1,
+        include_derived: bool = True,
     ) -> dict[str, Any]:
         """Return the graph as a JSON-serialisable dictionary.
 
         Uses ``networkx.readwrite.json_graph.node_link_data`` for the
-        core node/edge structure, enriched with vault-specific metrics.
+        core node/edge structure, enriched with vault-specific metrics, the
+        node-size hints carried on each node (``pagerank``, ``in_degree``),
+        the explicit-edge attributes carried on each edge (``kind``,
+        ``multiplicity``, ``weight``), and a parallel ``derived_edges`` array
+        of implicit relatedness edges that is never mixed into the canonical
+        ``edges`` array.
+
+        Scoping precedence: when *node* is given the export is the ego
+        subgraph around it at *depth* hops; otherwise *feature* scopes to a
+        single feature; otherwise the full graph is exported.
 
         Args:
-            feature: When set, export only that feature's subgraph.
+            feature: When set (and *node* is unset), export only that
+                feature's subgraph.
             include_body: Include the full markdown body text in each
                 node.  Defaults to ``False`` to keep output compact.
+            node: When set, export the ego subgraph around this node key.
+            depth: Ego-graph radius in hops; only used when *node* is set.
+            include_derived: When ``True`` (default), emit the
+                ``derived_edges`` array; when ``False`` emit an empty one.
 
         Returns:
             Dictionary with ``directed``, ``multigraph``, ``graph``,
-            ``nodes``, ``edges``, and ``metrics`` keys.
+            ``nodes``, ``edges``, ``derived_edges``, ``root``, ``feature``,
+            and ``metrics`` keys.
         """
-        g = self.subgraph(feature=feature)
+        if node is not None:
+            g = self.ego_subgraph(node, depth=depth)
+        else:
+            g = self.subgraph(feature=feature)
 
         # networkx native serialisation - pass edges="edges" explicitly so
         # the wire key is deterministic regardless of networkx version.
@@ -1148,6 +1171,19 @@ class VaultGraph:
                 doc = self.nodes.get(nid)
                 if doc:
                     node_dict["body"] = doc.body
+
+        # Derived (implicit) relatedness edges.  Computed on demand and kept
+        # in a SEPARATE array so checkers and the canonical edges list stay
+        # free of synthetic edges.  Scoped to the exported node set so a
+        # feature- or ego-scoped payload only carries derived edges whose
+        # endpoints are both present.
+        derived: list[dict[str, Any]] = []
+        if include_derived:
+            scope = set(g.nodes())
+            for edge in compute_derived_edges(self):
+                if edge.source in scope and edge.target in scope:
+                    derived.append(edge.to_dict())
+        data["derived_edges"] = derived
 
         # Enrich with vault-specific metadata.
         # Pass the already-computed subgraph so betweenness_centrality runs
