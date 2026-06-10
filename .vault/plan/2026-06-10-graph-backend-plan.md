@@ -52,7 +52,7 @@ Deliver connection strengths with zero new dependencies: provenance-typed weight
 - [x] `P02.S10` - attach kind, multiplicity, and normalised weight attributes to explicit edges during graph build; `src/vaultspec_core/graph/api.py`.
 - [x] `P02.S11` - create the derived relatedness edge module computing reciprocity, shared-tag, jaccard, adamic-adar, and co-citation signals with documented composition coefficients; `src/vaultspec_core/graph/derived.py`.
 - [x] `P02.S12` - add pagerank and in-degree node-size hints as node attributes; `src/vaultspec_core/graph/api.py`.
-- [ ] `P02.S13` - add ego-graph local scoping by node and depth to the graph query surface; `src/vaultspec_core/graph/api.py`.
+- [x] `P02.S13` - add ego-graph local scoping by node and depth to the graph query surface; `src/vaultspec_core/graph/api.py`.
 - [ ] `P02.S14` - emit explicit edge attributes and the derived edge set in the v2 JSON payload; `src/vaultspec_core/graph/api.py`.
 - [ ] `P02.S15` - add node, depth, and derived-edge toggles to the vault graph verb; `src/vaultspec_core/cli/vault_cmd.py`.
 - [ ] `P02.S16` - add exact-value tests for multiplicity, edge attributes, and normalised weights on the synthetic corpus; `src/vaultspec_core/graph/tests/test_graph.py`.

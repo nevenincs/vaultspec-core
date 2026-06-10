@@ -684,6 +684,48 @@ class VaultGraph:
         names = {n.name for n in self.get_feature_nodes(feature)}
         return self._digraph.subgraph(names)
 
+    def ego_subgraph(
+        self,
+        node: str,
+        depth: int = 1,
+    ) -> nx.DiGraph:
+        """Return the local (ego) subgraph around *node* up to *depth* hops.
+
+        Mirrors Obsidian's local-graph view: the centre document plus every
+        document reachable within *depth* link hops in either direction.  The
+        traversal is undirected (a backlink is as relevant as a forward link
+        for local context) via ``nx.ego_graph(..., undirected=True)``, but the
+        returned graph is the directed subgraph induced on those nodes, so
+        edge direction and the ``kind``/``multiplicity``/``weight`` attributes
+        are preserved.
+
+        Args:
+            node: Centre node key.  Must exist in the graph.
+            depth: Radius in hops (``>= 0``).  ``0`` returns just the centre
+                node; ``1`` adds its immediate neighbours, and so on.
+
+        Returns:
+            A directed subgraph view of the canonical graph scoped to the ego
+            neighbourhood.
+
+        Raises:
+            KeyError: If *node* is not a key in the graph.
+            ValueError: If *depth* is negative.
+        """
+        if node not in self._digraph:
+            raise KeyError(node)
+        if depth < 0:
+            raise ValueError(f"depth must be >= 0, got {depth}")
+        ego = nx.ego_graph(
+            self._digraph,
+            node,
+            radius=depth,
+            undirected=True,
+        )
+        # Induce the directed subgraph on the ego node set so edge direction
+        # and edge attributes survive.
+        return self._digraph.subgraph(ego.nodes())
+
     # -- Query methods -------------------------------------------------------
 
     def get_feature_rankings(
