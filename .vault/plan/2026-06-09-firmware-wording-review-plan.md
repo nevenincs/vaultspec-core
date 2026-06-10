@@ -161,7 +161,7 @@ Apply the single style pass (spelling locale, dash convention, label form, annou
 - [x] `P08.S97` - add the canonical announce line the skill lacks (D15); `src/vaultspec_core/builtins/skills/vaultspec-team/SKILL.md`.
 - [x] `P08.S98` - normalize the divergent announce line to the canonical form (D15); `src/vaultspec_core/builtins/skills/vaultspec-write/SKILL.md`.
 - [x] `P08.S99` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15); `src/vaultspec_core/builtins/skills/vaultspec-adr/SKILL.md`.
-- [ ] `P08.S100` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15); `src/vaultspec_core/builtins/skills/vaultspec-research/SKILL.md`.
+- [x] `P08.S100` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15); `src/vaultspec_core/builtins/skills/vaultspec-research/SKILL.md`.
 - [ ] `P08.S101` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15); `src/vaultspec_core/builtins/skills/vaultspec-write/SKILL.md`.
 - [ ] `P08.S102` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15); `src/vaultspec_core/builtins/skills/vaultspec-curate/SKILL.md`.
 - [ ] `P08.S103` - replace the literal hash-feature tag example with the hash-curly-feature convention placeholder (D15); `src/vaultspec_core/builtins/skills/vaultspec-execute/SKILL.md`.

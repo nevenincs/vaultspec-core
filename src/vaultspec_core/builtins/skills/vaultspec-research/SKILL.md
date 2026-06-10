@@ -47,7 +47,7 @@ than hand-editing frontmatter:
 
   - **Directory Tag**: Exactly `#research`.
   - **Feature Tag**: Exactly one kebab-case `#{feature}` tag.
-  - *Syntax:* `tags: ['#research', '#feature']` (quoted strings in a list).
+  - *Syntax:* `tags: ['#research', '#{feature}']` (quoted strings in a list).
 
 - **`related`**: a YAML list of quoted `'[[wiki-links]]'`, seeded from the `--related`
   flag at scaffold time.
