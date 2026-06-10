@@ -4,8 +4,8 @@ name: vaultspec-dry-run-discipline
 
 # Dry-run discipline: preview destructive verbs before applying
 
-Third worked example of codification. Promoted from the rolling CLI UX audit's findings
-S4, S14, and the gating dimension of B9.
+A worked example of codification. Promoted from the rolling CLI UX audit's findings S4,
+S14, and the gating dimension of B9.
 
 ## Rule
 
