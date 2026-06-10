@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections import Counter
 
 __all__ = ["extract_related_links", "extract_wiki_links"]
 
@@ -30,18 +31,25 @@ def _strip_non_prose(text: str) -> str:
     return _INLINE_CODE_RE.sub("", stripped)
 
 
-def extract_wiki_links(content: str) -> set[str]:
+def extract_wiki_links(content: str) -> Counter[str]:
     """Extract all ``[[wiki-link]]`` targets from a markdown string.
 
     Handles both ``[[Target]]`` and ``[[Target|Display]]`` forms; only the
-    target (left-hand) portion is returned.  Links inside fenced code blocks
+    target (left-hand) portion is counted.  Links inside fenced code blocks
     and inline code spans are ignored.
+
+    Multiplicity is preserved: a body that cites the same target three times
+    yields a count of ``3`` for that target.  The returned
+    :class:`~collections.Counter` is a ``dict`` subclass, so iterating it
+    yields target keys and ``in`` membership tests behave like a set, while
+    indexing recovers the per-target count.
 
     Args:
         content: Raw markdown text to scan.
 
     Returns:
-        Set of unique link target strings with surrounding whitespace stripped.
+        :class:`~collections.Counter` mapping each unique link target string
+        (whitespace-stripped) to the number of times it appears.
     """
     # Strip code blocks/spans/comments so TOML [[headers]] etc. aren't matched
     prose = _strip_non_prose(content)
@@ -49,29 +57,36 @@ def extract_wiki_links(content: str) -> set[str]:
     # Matches [[Link Name]] or [[Link Name|Display Name]]
     pattern = r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]"
     matches = re.findall(pattern, prose)
-    targets = set()
+    counts: Counter[str] = Counter()
     for m in matches:
         target = m.strip()
         # Tolerate .md extensions (Obsidian convention: [[note-name]] without extension)
         if target.endswith(".md"):
             target = target[:-3]
-        targets.add(target)
-    return targets
+        counts[target] += 1
+    return counts
 
 
-def extract_related_links(related: list[str]) -> set[str]:
+def extract_related_links(related: list[str]) -> Counter[str]:
     """Extract link targets from the ``related`` YAML frontmatter field.
 
     Each entry is expected to be a ``[[wiki-link]]`` string.  Malformed
     entries are logged and skipped.
 
+    Multiplicity is preserved: if the same target is listed twice in the
+    ``related`` field it carries a count of ``2``.  The returned
+    :class:`~collections.Counter` is a ``dict`` subclass, so callers that
+    only need membership can iterate keys while callers that need edge
+    weight can read the count.
+
     Args:
         related: List of raw ``related`` values from parsed frontmatter.
 
     Returns:
-        Set of resolved link target strings.
+        :class:`~collections.Counter` mapping each resolved link target to
+        the number of times it appears in the ``related`` field.
     """
-    links = set()
+    links: Counter[str] = Counter()
     malformed_count = 0
 
     if not related:
@@ -93,7 +108,7 @@ def extract_related_links(related: list[str]) -> set[str]:
             # Strip .md (Obsidian wiki-link convention)
             if target.endswith(".md"):
                 target = target[:-3]
-            links.add(target)
+            links[target] += 1
         else:
             malformed_count += 1
             logger.debug("Malformed related link: %s", link)
