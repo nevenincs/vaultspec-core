@@ -69,7 +69,7 @@ Refresh the modified stamp from every CLI verb that mutates a vault document.
 - [x] `W01.P03.S16` - refresh the source audit's modified stamp on rule promotion; `src/vaultspec_core/core/rules.py`.
 - [x] `W01.P03.S17` - refresh the modified stamp on related-frontmatter link mutations; `src/vaultspec_core/vaultcore/related_surgery.py`.
 - [x] `W01.P03.S18` - refresh the modified stamp on repair-pipeline document rewrites; `src/vaultspec_core/vaultcore/repair.py`.
-- [ ] `W01.P03.S19` - add mutator stamp-refresh integration tests exercising the real CLI verbs; `src/vaultspec_core/tests/cli/test_modified_stamp_mutators.py`.
+- [x] `W01.P03.S19` - add mutator stamp-refresh integration tests exercising the real CLI verbs; `src/vaultspec_core/tests/cli/test_modified_stamp_mutators.py`.
 
 ### Phase `W01.P04` - reconciliation and backfill
 
