@@ -101,6 +101,14 @@ None blocking. Safe to merge. The trace-mode exec-index note above is a candidat
 micro-refactor if the two modes ever compose in one invocation. The full test suite
 passes (2105 tests, exit 0) alongside the review.
 
+Three interface refinements were applied after the human review of the rendered
+output, before sign-off: the rollup's active-features listing is capped at ten in
+human output with a feature-list pointer (the JSON payload stays uncapped); phase
+summaries group under their own `summaries` heading in the grounding trace instead of
+being misreported as unlinked anomalies; and an unresolvable target with no
+near-matches now points at `vaultspec-core vault feature list`. Each refinement is
+covered by new tests in the orientation and CLI suites.
+
 ## Codification candidates
 
 None. The orientation bootstrap mandate already shipped as builtin firmware in this

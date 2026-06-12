@@ -441,3 +441,86 @@ class TestTrace:
         commands = [h["command"] for h in payload["hints"]["next_steps"]]
         assert any("vault graph" in c for c in commands)
         assert any("vault plan status" in c for c in commands)
+
+
+# ---------------------------------------------------------------------------
+# Human-review refinements (post-verify sign-off pass)
+# ---------------------------------------------------------------------------
+
+
+class TestReviewRefinements:
+    """Refinements applied after the human interface review.
+
+    Phase summaries group under their own heading instead of the unlinked
+    bucket, the active-features listing is capped in human output, and an
+    unresolvable target with no near-matches points at the feature list.
+    """
+
+    def test_phase_summary_grouped_not_unlinked(self, tmp_path: Path) -> None:
+        ids = _build_vault(tmp_path)
+        feature = ids["feature"]
+        summary_stem = f"2026-03-01-{feature}-P01-summary"
+        _write(
+            tmp_path
+            / ".vault"
+            / "exec"
+            / f"2026-03-01-{feature}"
+            / f"{summary_stem}.md",
+            _exec(
+                feature,
+                date="2026-03-14",
+                modified="2026-03-14",
+                step_id=None,
+                plan_stem=ids["plan"],
+            ),
+        )
+
+        result = _run(tmp_path, ids["plan"], "--json")
+
+        assert result.exit_code == 0, result.output
+        plan = json.loads(result.output)["data"]["plans"][0]
+        assert summary_stem in plan["summaries"]
+        assert summary_stem not in plan["unlinked_records"]
+        # The genuinely unlinked record stays in its bucket.
+        assert ids["exec_orphan"] in plan["unlinked_records"]
+
+        human = _run(tmp_path, ids["plan"])
+        assert "summaries" in human.output
+        assert summary_stem in human.output
+
+    def test_unknown_target_without_near_matches_points_to_feature_list(
+        self, tmp_path: Path
+    ) -> None:
+        _build_vault(tmp_path)
+
+        result = _run(tmp_path, "zzz-no-such-target-qqq")
+
+        assert result.exit_code == 1, result.output
+        assert "Could not resolve" in result.output
+        assert "Did you mean" not in result.output
+        assert "vaultspec-core vault feature list" in result.output
+
+    def test_active_features_capped_in_human_output(self, tmp_path: Path) -> None:
+        ids = _build_vault(tmp_path)
+        # Twelve extra single-document features push the total past the
+        # ten-feature display cap.
+        for n in range(12):
+            feature = f"filler-{n:02d}"
+            _write(
+                tmp_path / ".vault" / "research" / f"2026-01-01-{feature}-research.md",
+                _grounding(
+                    "research", feature, date="2026-01-01", modified="2026-01-01"
+                ),
+            )
+
+        result = _run(tmp_path)
+
+        assert result.exit_code == 0, result.output
+        assert "more" in result.output
+        assert "vaultspec-core vault feature list" in result.output
+
+        payload = json.loads(_run(tmp_path, "--json").output)
+        features = payload["data"]["active_features"]
+        # The JSON payload stays uncapped: 12 fillers plus the widget feature.
+        assert len(features) == 13
+        assert ids["feature"] in {f["name"] for f in features}

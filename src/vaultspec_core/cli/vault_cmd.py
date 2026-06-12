@@ -712,6 +712,11 @@ def cmd_status(
     _emit_status_rollup(console, rollup, json_output=json_output, no_hints=no_hints)
 
 
+# The rollup's human rendering shows at most this many active features;
+# a vault that archives nothing would otherwise list every feature it has
+# ever carried, flooding the orientation view. The JSON payload is uncapped.
+_ACTIVE_FEATURES_DISPLAY_CAP = 10
+
 # Advisory hint pairs (description, command) for the status verb's two
 # modes, following the established "Suggested Next Step" mechanism. The
 # rollup points at the targeted mode and at health diagnosis; the trace
@@ -847,7 +852,11 @@ def _emit_status_rollup(
     console.print()
     console.print("[bold]Active features[/bold]")
     if rollup.active_features:
-        for feat in rollup.active_features:
+        # The human rendering caps the feature listing so a vault that
+        # archives nothing cannot flood the orientation rollup; the JSON
+        # payload always carries the full list.
+        shown = rollup.active_features[:_ACTIVE_FEATURES_DISPLAY_CAP]
+        for feat in shown:
             plan_marker = " [green]plan[/green]" if feat.has_plan else ""
             activity = (
                 f"  [dim]{feat.latest_activity}[/dim]" if feat.latest_activity else ""
@@ -855,6 +864,12 @@ def _emit_status_rollup(
             console.print(
                 f"  [bold]{feat.name}[/bold]  {feat.doc_count} docs"
                 f"{plan_marker}{activity}"
+            )
+        remainder = len(rollup.active_features) - len(shown)
+        if remainder > 0:
+            console.print(
+                f"  [dim]... and {remainder} more  "
+                f"> vaultspec-core vault feature list[/dim]"
             )
     else:
         console.print("  [dim]none[/dim]")
@@ -878,6 +893,7 @@ def _plan_trace_payload(plan) -> dict:
         "stem": plan.stem,
         "feature": plan.feature,
         "steps": [dataclasses.asdict(s) for s in plan.steps],
+        "summaries": list(plan.summaries),
         "unlinked_records": list(plan.unlinked_records),
         "grounding": {k: list(v) for k, v in plan.grounding.items()},
         "error": plan.error,
@@ -933,6 +949,11 @@ def _emit_status_trace(
             else:
                 record = "[dim]no record[/dim]"
             console.print(f"  {glyph} {step.display_path}  {record}")
+
+        if plan.summaries:
+            console.print("  [bold dim]summaries[/bold dim]")
+            for stem in plan.summaries:
+                console.print(f"    {stem}")
 
         if plan.unlinked_records:
             console.print("  [bold dim]unlinked records[/bold dim]")

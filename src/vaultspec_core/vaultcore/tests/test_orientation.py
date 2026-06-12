@@ -551,3 +551,31 @@ class TestTraceTargetResolution:
 
         with pytest.raises(TargetResolutionError):
             compute_trace(tmp_path, "no-such-thing-at-all")
+
+    def test_phase_summary_grouped_separately(self, tmp_path: Path) -> None:
+        stems = _build_single_feature_vault(tmp_path)
+        feature = "widget"
+        summary_stem = f"2026-03-01-{feature}-P01-summary"
+        _write(
+            tmp_path
+            / ".vault"
+            / "exec"
+            / f"2026-03-01-{feature}"
+            / f"{summary_stem}.md",
+            _exec(
+                feature,
+                date="2026-03-14",
+                modified="2026-03-14",
+                step_id=None,
+                plan_stem=stems["plan"],
+            ),
+        )
+
+        trace = compute_trace(tmp_path, stems["plan"])
+
+        plan = trace.plans[0]
+        # A -summary document referencing the plan is a summary by design,
+        # not an unlinked anomaly.
+        assert summary_stem in plan.summaries
+        assert summary_stem not in plan.unlinked_records
+        assert stems["exec_orphan"] in plan.unlinked_records

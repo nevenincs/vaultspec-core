@@ -202,6 +202,10 @@ class PlanTrace:
         stem: The plan document's filename stem.
         feature: The plan's feature tag without ``#``, or ``None``.
         steps: Per-step record mapping in document order.
+        summaries: Stems of phase-summary documents (``-summary`` suffix)
+            that reference this plan. Summaries carry no ``step_id:`` by
+            design, so they are grouped here instead of being misreported
+            as unlinked anomalies.
         unlinked_records: Stems of execution records that reference this
             plan (graph in-links or ``related:``) without a resolvable
             ``step_id:``, surfaced rather than dropped.
@@ -216,6 +220,7 @@ class PlanTrace:
     stem: str
     feature: str | None
     steps: list[StepTrace] = field(default_factory=list)
+    summaries: list[str] = field(default_factory=list)
     unlinked_records: list[str] = field(default_factory=list)
     grounding: dict[str, list[str]] = field(default_factory=dict)
     error: str | None = None
@@ -255,7 +260,12 @@ class TargetResolutionError(ValueError):
         self.target = target
         self.near_matches = near_matches
         suggestion = (
-            f" Did you mean: {', '.join(near_matches)}?" if near_matches else ""
+            f" Did you mean: {', '.join(near_matches)}?"
+            if near_matches
+            else (
+                " Run `vaultspec-core vault feature list` to enumerate"
+                " available targets."
+            )
         )
         super().__init__(
             f"Could not resolve orientation target {target!r}.{suggestion}"
@@ -645,13 +655,16 @@ def _plan_trace(
             )
         )
 
-    unlinked = _unlinked_records(graph, exec_index, stem, feature, matched_records)
+    referencing = _unlinked_records(graph, exec_index, stem, feature, matched_records)
+    summaries = [s for s in referencing if s.endswith("-summary")]
+    unlinked = [s for s in referencing if not s.endswith("-summary")]
     grounding = _grounding_documents(graph, stem)
 
     return PlanTrace(
         stem=stem,
         feature=feature,
         steps=steps,
+        summaries=summaries,
         unlinked_records=unlinked,
         grounding=grounding,
     )
