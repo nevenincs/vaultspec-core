@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import datetime as _dt
 import logging
 import re
 from pathlib import Path
 
-from ..vaultcore import VaultConstants, parse_vault_metadata
+from ..vaultcore import VaultConstants, parse_vault_metadata, refresh_modified_stamp
 from . import types as _t
 from .exceptions import ResourceNotFoundError, VaultSpecError
 from .helpers import atomic_write
@@ -222,6 +223,15 @@ def adr_supersede(
     final_new_content = new_leading + "\n".join(new_fm_lines)
     if new_newline == "\r\n":
         final_new_content = final_new_content.replace("\n", "\r\n")
+
+    # Vault-orientation ADR (decision D3): supersession is a lifecycle
+    # mutation, so refresh the modified stamp on both the superseded and
+    # the superseding document. Applied to the final rendered text (after
+    # any CRLF reapplication) so the helper sees the exact bytes about to
+    # be written; it preserves the document's line-ending convention.
+    today = _dt.date.today()
+    final_old_content = refresh_modified_stamp(final_old_content, today)
+    final_new_content = refresh_modified_stamp(final_new_content, today)
 
     if not dry_run:
         atomic_write(old_file, final_old_content)
