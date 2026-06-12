@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.1.29](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.28...vaultspec-core-v0.1.29) (2026-06-12)
+
+
+### Features
+
+* **vault-orientation:** research, ADR, and L3 plan; fix plan-mutator crash without workspace context ([5948d04](https://github.com/wgergely/vaultspec-core/commit/5948d044f45475c25d5fd02f175a36e41ae20aa7))
+* **vault-orientation:** W01.P01.S01 - add modified field and lenient date helpers to DocumentMetadata ([746d3de](https://github.com/wgergely/vaultspec-core/commit/746d3de80bee390579ef9154a529faa0e2251c85))
+* **vault-orientation:** W01.P01.S02 - surface the modified stamp through typed metadata parsing ([b320b96](https://github.com/wgergely/vaultspec-core/commit/b320b960262eebf52f6b2a093f278be95e212fe3))
+* **vault-orientation:** W01.P01.S03 - stamp modified equal to date at scaffold time ([f017a8c](https://github.com/wgergely/vaultspec-core/commit/f017a8c8d29bce590576fc0dd7d0b02dcd13265e))
+* **vault-orientation:** W01.P02.S05 - add modified schema row to the research template ([f1bce28](https://github.com/wgergely/vaultspec-core/commit/f1bce28ecbcfddc149d071747e8f1a15b0f9a8f6))
+* **vault-orientation:** W01.P02.S06 - add modified schema row to the reference template ([2dd0cac](https://github.com/wgergely/vaultspec-core/commit/2dd0cace63410f3e42a7284b2b59720962d69daf))
+* **vault-orientation:** W01.P02.S07 - add modified schema row to the adr template ([b8d0f6f](https://github.com/wgergely/vaultspec-core/commit/b8d0f6ff1c8894652cae7587962ab938b9889d82))
+* **vault-orientation:** W01.P02.S08 - add modified schema row to the plan template ([122e57a](https://github.com/wgergely/vaultspec-core/commit/122e57ae079ed8d1001802fe4c81cc2a6a900c9a))
+* **vault-orientation:** W01.P02.S09 - add modified schema row to the exec-step template ([1df5ac6](https://github.com/wgergely/vaultspec-core/commit/1df5ac6dfcf27fa92c322738645b67cb261ce002))
+* **vault-orientation:** W01.P02.S10 - add modified schema row to the exec-summary template ([59a3703](https://github.com/wgergely/vaultspec-core/commit/59a3703ae045149b379f2d68a39a3db179a9c69b))
+* **vault-orientation:** W01.P02.S11 - add modified schema row to the audit template ([6613799](https://github.com/wgergely/vaultspec-core/commit/6613799597ade8e5bea1d3990a3bfe4079006c0f))
+* **vault-orientation:** W01.P02.S12 - add modified schema row to the code-review template ([0082bdd](https://github.com/wgergely/vaultspec-core/commit/0082bdd76755afb3bba4484dd9e4c98a24c381d8))
+* **vault-orientation:** W01.P02.S13 - add modified schema row to the index template ([9e2f91c](https://github.com/wgergely/vaultspec-core/commit/9e2f91ced1896d23f3248f93f22c27770c2484af))
+* **vault-orientation:** W01.P03.S14 - refresh modified stamp on plan serialization writes ([4d4fafa](https://github.com/wgergely/vaultspec-core/commit/4d4fafa67ddd77bcb7180da74e5a0ab8fcfc9d00))
+* **vault-orientation:** W01.P03.S15 - refresh both ADR stamps on supersession ([2324317](https://github.com/wgergely/vaultspec-core/commit/23243177f585457fcdd70d5b075049c2d5955c73))
+* **vault-orientation:** W01.P03.S16 - refresh source audit stamp on rule promotion ([09e48c5](https://github.com/wgergely/vaultspec-core/commit/09e48c55a584123ea4c89e164be38500c461b235))
+* **vault-orientation:** W01.P03.S17 - refresh target stamp on link mutations ([6499c6d](https://github.com/wgergely/vaultspec-core/commit/6499c6ded9f8fe633a84f1ee2f8c733cffdfe07a))
+* **vault-orientation:** W01.P03.S18 - refresh stamps on repair-pipeline rewrites ([6f1e1e9](https://github.com/wgergely/vaultspec-core/commit/6f1e1e925434ac445c5b52652d8cd97eafbd5026))
+* **vault-orientation:** W01.P03.S19 - add mutator stamp-refresh integration tests ([e676707](https://github.com/wgergely/vaultspec-core/commit/e6767078172af3bd354d27ec807b68d70878072b))
+* **vault-orientation:** W01.P04.S20 - add modified-stamp checker ([1a5cc30](https://github.com/wgergely/vaultspec-core/commit/1a5cc3037aedddfd10e17b5fd744e23cddcd66d4))
+* **vault-orientation:** W01.P04.S21 - register modified-stamp checker ([23eb111](https://github.com/wgergely/vaultspec-core/commit/23eb1110aafe28d7bae5c06760ec83227ddfc08c))
+* **vault-orientation:** W01.P04.S22 - add modified-stamp checker tests ([0089219](https://github.com/wgergely/vaultspec-core/commit/00892197e64b5dce762d6e6cccbccaa06b933429))
+* **vault-orientation:** W01.P04.S23 - add modified-stamp backfill migration ([2d7fa0d](https://github.com/wgergely/vaultspec-core/commit/2d7fa0deee0bfdb3f1a94f837a5f12608a8e6c40))
+* **vault-orientation:** W01.P04.S24 - add backfill migration tests; reconcile checker with repair pipeline ([c75d08f](https://github.com/wgergely/vaultspec-core/commit/c75d08fe5b0a938f30431e4b080c700dd40a7b1e))
+* **vault-orientation:** W02.P05.S25 - batched all-plans status collector sharing one exec-record index ([67aebf8](https://github.com/wgergely/vaultspec-core/commit/67aebf8ae8817bb77f5325e326274552725527c7))
+* **vault-orientation:** W02.P05.S26 - orientation rollup and grounding-trace data layer ([246ea5e](https://github.com/wgergely/vaultspec-core/commit/246ea5e1c51aca84378789e6c3f38016597d1fc1))
+* **vault-orientation:** W02.P05.S27 - orientation core tests over a real tmp_path vault ([df4f777](https://github.com/wgergely/vaultspec-core/commit/df4f7771fd5369569973a13bd9d7b18d6b6bef60))
+* **vault-orientation:** W02.P06.S28 - add vault status verb with rollup and trace modes ([1caaf60](https://github.com/wgergely/vaultspec-core/commit/1caaf60de75470fc020ced2fb715373586237345))
+* **vault-orientation:** W02.P06.S29 - add vault status cli tests for both modes, hints, and json schema ([014249b](https://github.com/wgergely/vaultspec-core/commit/014249b6dd1844742039fed382696a17ef94340e))
+* **vault-orientation:** W03.P07.S30 - document modified frontmatter stamp ([b09e02a](https://github.com/wgergely/vaultspec-core/commit/b09e02a21218a25f3d33767c7cabbc4611170eee))
+* **vault-orientation:** W03.P07.S31 - add vault status command row and orientation mandate ([ff7813c](https://github.com/wgergely/vaultspec-core/commit/ff7813ca21a865f5df8851c394c8df44564fca1c))
+* **vault-orientation:** W03.P07.S32 - add zeroth-move orientation paragraph ([5e8e3f6](https://github.com/wgergely/vaultspec-core/commit/5e8e3f6b8eaaf87381e95d902abe05cc4524b09a))
+* **vault-orientation:** W03.P07.S33 - add modified to curator allowed keys with repair note ([5f5b3db](https://github.com/wgergely/vaultspec-core/commit/5f5b3db4de6ab50b59f05c9f3cf83f7c62141df0))
+* **vault-orientation:** W03.P08.S34 - vault status reference prose ([196cc07](https://github.com/wgergely/vaultspec-core/commit/196cc07b90a33b011f8cfb40f01d18ae79cc2293))
+* **vault-orientation:** W03.P08.S35 - orientation and stamp in framework manual ([18b158c](https://github.com/wgergely/vaultspec-core/commit/18b158cfe56f7abfa1b7905644a56da15d590bd2))
+
 ## [0.1.28](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.27...vaultspec-core-v0.1.28) (2026-06-10)
 
 
