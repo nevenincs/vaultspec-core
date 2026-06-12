@@ -109,7 +109,7 @@ Ship the orientation bootstrap mandate and the modified stamp schema documentati
 Document the modified field in the firmware schema surfaces and add the orientation bootstrap mandate now that the verb ships.
 
 - [x] `W03.P07.S30` - document the modified field in the frontmatter schema and tag sections; `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
-- [ ] `W03.P07.S31` - add the vault status command row and the orientation bootstrap mandate; `src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md`.
+- [x] `W03.P07.S31` - add the vault status command row and the orientation bootstrap mandate; `src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md`.
 - [ ] `W03.P07.S32` - add the zeroth-move orientation paragraph ahead of the pipeline table; `src/vaultspec_core/builtins/system/03-vaultspec.md`.
 - [ ] `W03.P07.S33` - add modified to the curator's allowed frontmatter keys with the lenient-parse repair note; `src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md`.
 
