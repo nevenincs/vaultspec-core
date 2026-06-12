@@ -142,7 +142,15 @@ def _save_plan_or_dry_run(
             from vaultspec_core.cli._cache_hook import invalidate_graph_cache
             from vaultspec_core.core.types import get_context as _get_ctx
 
-            invalidate_graph_cache(_get_ctx().target_dir)
+            # Plan mutators do not take --target, so the workspace context is
+            # only initialised when another command set it earlier in-process.
+            # Bare invocations fall back to the cwd, which is what
+            # apply_target(None) would have resolved.
+            try:
+                target_dir = _get_ctx().target_dir
+            except LookupError:
+                target_dir = Path.cwd()
+            invalidate_graph_cache(target_dir)
 
 
 plan_app = typer.Typer(
