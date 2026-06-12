@@ -54,10 +54,14 @@ Every document MUST strictly adhere to the following schema:
 ### Class A: Frontmatter Schema Violations
 
 - **Unsupported Properties:** Identify frontmatter keys NOT present in the allowed list
-  (`generated`, `tags`, `date`, `tier`, `step_id`, `related`).
+  (`generated`, `tags`, `date`, `modified`, `tier`, `step_id`, `related`).
 
   - *Action:* Flag for migration. Data must not be lost, just moved (e.g., `author: me`
     -> body text).
+
+  - *Stamp repair:* Noncanonical or stale `modified:` values are repaired via
+    `vaultspec-core vault check all --fix` (lenient parse, canonical rewrite), never by
+    hand.
 
 - **Drifted Content:** Scan the *body* of documents for metadata that belongs in
   frontmatter (e.g., lines starting with `Tags:`, `Related:`, `Feature:` in the markdown
