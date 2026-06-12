@@ -91,7 +91,7 @@ Compute plans-in-flight, per-plan completion, active features, and recency in on
 
 - [x] `W02.P05.S25` - extend plan status with a batched all-plans collector sharing one exec-record step-id index; `src/vaultspec_core/plan/status.py`.
 - [x] `W02.P05.S26` - add the orientation rollup module computing active features, plans in flight, recency ordering, and the graph-backed step-keyed grounding trace; `src/vaultspec_core/vaultcore/orientation.py`.
-- [ ] `W02.P05.S27` - add orientation core tests over a synthetic vault covering rollup, recency fallback, and unlinked-record reporting; `src/vaultspec_core/vaultcore/tests/test_orientation.py`.
+- [x] `W02.P05.S27` - add orientation core tests over a synthetic vault covering rollup, recency fallback, and unlinked-record reporting; `src/vaultspec_core/vaultcore/tests/test_orientation.py`.
 
 ### Phase `W02.P06` - vault status verb
 
