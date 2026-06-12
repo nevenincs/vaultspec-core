@@ -43,7 +43,7 @@ Add the modified field to the document model with lenient date parsing, stamp it
 - [x] `W01.P01.S01` - add the modified field with lenient multi-format date parsing and canonical-form validation to DocumentMetadata; `src/vaultspec_core/vaultcore/models.py`.
 - [x] `W01.P01.S02` - parse and surface the modified frontmatter field through typed metadata parsing; `src/vaultspec_core/vaultcore/parser.py`.
 - [x] `W01.P01.S03` - stamp modified equal to date at scaffold time in document hydration; `src/vaultspec_core/vaultcore/hydration.py`.
-- [ ] `W01.P01.S04` - add stamp model, lenient parsing, and scaffold-stamp tests using real files; `src/vaultspec_core/vaultcore/tests/test_modified_stamp.py`.
+- [x] `W01.P01.S04` - add stamp model, lenient parsing, and scaffold-stamp tests using real files; `src/vaultspec_core/vaultcore/tests/test_modified_stamp.py`.
 
 ### Phase `W01.P02` - template schema rows
 
