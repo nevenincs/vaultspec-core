@@ -57,7 +57,7 @@ Add the modified field and its FRONTMATTER RULES comment line to every shipped t
 - [x] `W01.P02.S10` - add the modified field and its frontmatter comment line to the exec-summary template; `src/vaultspec_core/builtins/templates/exec-summary.md`.
 - [x] `W01.P02.S11` - add the modified field and its frontmatter comment line to the audit template; `src/vaultspec_core/builtins/templates/audit.md`.
 - [x] `W01.P02.S12` - add the modified field and its frontmatter comment line to the code-review template; `src/vaultspec_core/builtins/templates/code-review.md`.
-- [ ] `W01.P02.S13` - add the modified field and its frontmatter comment line to the index template; `src/vaultspec_core/builtins/templates/index.md`.
+- [x] `W01.P02.S13` - add the modified field and its frontmatter comment line to the index template; `src/vaultspec_core/builtins/templates/index.md`.
 
 ### Phase `W01.P03` - mutator stamp refresh
 
