@@ -163,6 +163,12 @@ def hydrate_template(
     hydrated = hydrated.replace("{heading}", val_heading)
     hydrated = hydrated.replace("{scope_block}", val_scope_block)
 
+    # Stamp the CLI-maintained modified field (vault-orientation ADR D3):
+    # at scaffold time it equals the creation date. Injected here rather
+    # than relying on the template carrying the field, so scaffolds from
+    # mirrors whose templates predate the schema row still get stamped.
+    hydrated = _inject_modified(hydrated, date)
+
     # Inject resolved related links into frontmatter
     if related is not None:
         hydrated = _inject_related(hydrated, related)
@@ -194,6 +200,42 @@ def hydrate_template(
 
     logger.debug("Successfully hydrated template (feature=%s)", feature)
     return hydrated
+
+
+def _inject_modified(content: str, date: str) -> str:
+    """Ensure the frontmatter carries a ``modified:`` stamp equal to *date*.
+
+    Implements the scaffold-time half of the vault-orientation ADR's
+    decision D3: every scaffolded document starts with
+    ``modified: '<date>'`` (canonical quoted ``yyyy-mm-dd``, same value
+    as ``date:``). When the template already carries a ``modified:``
+    field (templates gain the schema row separately), the rendered
+    value is left untouched; otherwise the stamp is inserted directly
+    after the ``date:`` line inside the frontmatter block.
+
+    Args:
+        content: Full document text with YAML frontmatter.
+        date: ISO 8601 date string the stamp is set to.
+
+    Returns:
+        Document text whose frontmatter carries the ``modified:`` field.
+        Content without a recognisable frontmatter ``date:`` line is
+        returned unchanged.
+    """
+    fence = re.match(r"^---\s*\n(.*?\n)---", content, re.DOTALL)
+    if not fence:
+        return content
+    frontmatter_block = fence.group(1)
+
+    if re.search(r"^modified:", frontmatter_block, re.MULTILINE):
+        return content
+
+    date_line = re.search(r"^date:[^\n]*\n", frontmatter_block, re.MULTILINE)
+    if not date_line:
+        return content
+
+    insert_at = fence.start(1) + date_line.end()
+    return content[:insert_at] + f"modified: '{date}'\n" + content[insert_at:]
 
 
 def _inject_related(content: str, related: list[str]) -> str:
