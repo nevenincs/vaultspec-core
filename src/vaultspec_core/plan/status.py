@@ -5,6 +5,14 @@ declared tier, container counts, completion percentage, and a flag for
 the legacy-L2 default. The snapshot has both a structured form
 (:class:`PlanStatus`) and a JSON-serialisable dict (built in
 :mod:`.commands.status_emitter` once the CLI lands in W02.P02.S43).
+
+The module also exposes the batched status core mandated by the
+vault-orientation ADR (decision D6): :class:`ExecRecordIndex` scans the
+vault's execution records exactly once into a ``(feature, step_id)``
+lookup, and :func:`collect_all_statuses` parses every plan once while
+sharing that single index. The single-plan :func:`collect_status` path
+is refactored to consume the same shared index so both surfaces run the
+same core rather than re-scanning per call.
 """
 
 from __future__ import annotations
@@ -17,8 +25,16 @@ if TYPE_CHECKING:
 
     from vaultspec_core.plan.frontmatter import Tier
     from vaultspec_core.plan.parser import Plan
+    from vaultspec_core.vaultcore.query import VaultDocument
 
-__all__ = ["PlanStatus", "collect_status", "status_to_json_dict"]
+__all__ = [
+    "ExecRecordIndex",
+    "PlanStatus",
+    "PlanStatusEntry",
+    "collect_all_statuses",
+    "collect_status",
+    "status_to_json_dict",
+]
 
 
 @dataclass
@@ -53,13 +69,117 @@ class PlanStatus:
     exec_missing_ids: list[str] = field(default_factory=list)
 
 
-def collect_status(plan: Plan, root_dir: Path | None = None) -> PlanStatus:
+@dataclass
+class ExecRecordIndex:
+    """Shared one-pass index of execution records keyed by step.
+
+    Built once from a single ``list_documents(doc_type="exec")`` scan
+    (decision D6), this index maps every scaffolded execution record to
+    its originating Step so a plan's missing-record check is a dict
+    lookup rather than a per-plan exec rescan. Both the single-plan
+    :func:`collect_status` path and the batched
+    :func:`collect_all_statuses` path consume the same instance.
+
+    Attributes:
+        by_step: Map from ``(feature, step_id)`` to the execution
+            record's filename stem. A record whose ``step_id:``
+            frontmatter is absent is recorded under
+            :attr:`unlinked_by_feature` instead.
+        unlinked_by_feature: Map from feature to the stems of execution
+            records that carry no resolvable ``step_id:`` frontmatter,
+            so the orientation trace can surface them rather than drop
+            them silently (the unlinked bucket of decision D5).
+    """
+
+    by_step: dict[tuple[str, str], str] = field(default_factory=dict)
+    unlinked_by_feature: dict[str, list[str]] = field(default_factory=dict)
+
+    @classmethod
+    def build(cls, root_dir: Path) -> ExecRecordIndex:
+        """Scan every execution record once into the shared index.
+
+        Args:
+            root_dir: Project root directory.
+
+        Returns:
+            A populated :class:`ExecRecordIndex`. Records whose feature
+            tag or ``step_id:`` cannot be read are bucketed as unlinked
+            under their best-known feature rather than aborting the scan.
+        """
+        from vaultspec_core.vaultcore.parser import parse_frontmatter
+        from vaultspec_core.vaultcore.query import list_documents
+
+        index = cls()
+        for doc in list_documents(root_dir, doc_type="exec"):
+            feature = doc.feature
+            step_id: str | None = None
+            try:
+                content = doc.path.read_text(encoding="utf-8")
+                meta, _ = parse_frontmatter(content)
+                raw_step_id = meta.get("step_id")
+                if raw_step_id:
+                    step_id = str(raw_step_id).strip()
+            except (OSError, UnicodeDecodeError):
+                pass
+
+            if feature and step_id:
+                index.by_step[(feature, step_id)] = doc.name
+            elif feature:
+                index.unlinked_by_feature.setdefault(feature, []).append(doc.name)
+        return index
+
+    def record_for(self, feature: str, step_id: str) -> str | None:
+        """Return the execution-record stem mapped to a Step, or ``None``.
+
+        Args:
+            feature: Feature tag (without ``#``).
+            step_id: Canonical Step identifier (e.g. ``S01``).
+
+        Returns:
+            The execution record's stem, or ``None`` when no scaffolded
+            record references that Step.
+        """
+        return self.by_step.get((feature, step_id))
+
+
+def _plan_feature(plan: Plan) -> str | None:
+    """Return the plan's feature tag without ``#``, or ``None``.
+
+    The feature is the first tag that is neither ``#plan`` nor any other
+    canonical directory tag, matching the single-feature-tag schema rule.
+
+    Args:
+        plan: Parsed :class:`Plan` model.
+
+    Returns:
+        Feature name string, or ``None`` when the plan carries none.
+    """
+    from vaultspec_core.plan.frontmatter import _DIRECTORY_TAGS
+
+    for tag in plan.frontmatter.tags:
+        if tag != "#plan" and tag not in _DIRECTORY_TAGS:
+            return tag.lstrip("#")
+    return None
+
+
+def collect_status(
+    plan: Plan,
+    root_dir: Path | None = None,
+    *,
+    exec_index: ExecRecordIndex | None = None,
+) -> PlanStatus:
     """Compute a :class:`PlanStatus` snapshot from a parsed plan.
 
     Args:
         plan: Parsed :class:`vaultspec_core.plan.parser.Plan` model.
-        root_dir: Optional project root directory to check for missing
-            execution records.
+        root_dir: Optional project root directory used to build the
+            shared execution-record index when *exec_index* is not
+            supplied. Ignored when *exec_index* is given.
+        exec_index: Optional pre-built :class:`ExecRecordIndex`. When
+            supplied (the batched path), the per-call exec scan is
+            skipped entirely and this index is reused; this is the shared
+            core mandated by decision D6. When omitted but *root_dir* is
+            given, a fresh single-plan index is built.
 
     Returns:
         :class:`PlanStatus` populated from the plan's frontmatter and
@@ -70,34 +190,19 @@ def collect_status(plan: Plan, root_dir: Path | None = None) -> PlanStatus:
     completion = (steps_completed / step_count * 100.0) if step_count else 0.0
 
     exec_missing_ids: list[str] = []
-    if root_dir is not None:
-        from vaultspec_core.plan.frontmatter import _DIRECTORY_TAGS
+    index = exec_index
+    if index is None and root_dir is not None:
+        index = ExecRecordIndex.build(root_dir)
 
-        feature = None
-        for tag in plan.frontmatter.tags:
-            if tag != "#plan" and tag not in _DIRECTORY_TAGS:
-                feature = tag.lstrip("#")
-                break
-
+    if index is not None:
+        feature = _plan_feature(plan)
         if feature:
-            from vaultspec_core.vaultcore.parser import parse_frontmatter
-            from vaultspec_core.vaultcore.query import list_documents
-
-            exec_docs = list_documents(root_dir, doc_type="exec", feature=feature)
-            scaffolded_step_ids = set()
-            for doc in exec_docs:
-                try:
-                    content = doc.path.read_text(encoding="utf-8")
-                    meta, _ = parse_frontmatter(content)
-                    step_id = meta.get("step_id")
-                    if step_id:
-                        scaffolded_step_ids.add(step_id)
-                except Exception:
-                    pass
-
-            for s in plan.steps:
-                if s.checked and s.canonical_id not in scaffolded_step_ids:
-                    exec_missing_ids.append(s.canonical_id)
+            for step in plan.steps:
+                if (
+                    step.checked
+                    and index.record_for(feature, step.canonical_id) is None
+                ):
+                    exec_missing_ids.append(step.canonical_id)
 
     return PlanStatus(
         tier=plan.frontmatter.tier,
@@ -110,6 +215,70 @@ def collect_status(plan: Plan, root_dir: Path | None = None) -> PlanStatus:
         has_epic_intent=plan.epic_intent is not None,
         exec_missing_ids=exec_missing_ids,
     )
+
+
+@dataclass
+class PlanStatusEntry:
+    """One plan's batched status result from :func:`collect_all_statuses`.
+
+    Attributes:
+        document: The :class:`~vaultspec_core.vaultcore.query.VaultDocument`
+            for the plan, carrying its stem, path, feature, and dates.
+        plan: The parsed :class:`Plan`, or ``None`` when the plan could
+            not be parsed.
+        status: The computed :class:`PlanStatus`, or ``None`` when the
+            plan could not be parsed.
+        error: A human-readable parse-error note when *plan* is ``None``,
+            otherwise ``None``. An unparseable plan is collected with this
+            note rather than aborting the batch.
+    """
+
+    document: VaultDocument
+    plan: Plan | None
+    status: PlanStatus | None
+    error: str | None = None
+
+
+def collect_all_statuses(root_dir: Path) -> list[PlanStatusEntry]:
+    """Collect status for every plan in the vault in one batched pass.
+
+    Implements the batched status core (decision D6): the execution
+    records are scanned once into a shared :class:`ExecRecordIndex`, every
+    plan document is parsed once, and each plan's status is computed
+    against the shared index. An individual plan that fails to parse is
+    collected as a :class:`PlanStatusEntry` carrying an ``error`` note,
+    so one malformed plan never aborts the whole rollup.
+
+    Args:
+        root_dir: Project root directory.
+
+    Returns:
+        A list of :class:`PlanStatusEntry`, one per plan document, in the
+        order :func:`~vaultspec_core.vaultcore.query.list_documents`
+        returns them.
+    """
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.vaultcore.query import list_documents
+
+    exec_index = ExecRecordIndex.build(root_dir)
+    entries: list[PlanStatusEntry] = []
+    for doc in list_documents(root_dir, doc_type="plan"):
+        try:
+            content = doc.path.read_text(encoding="utf-8")
+            plan = parse_plan(content)
+        except (OSError, UnicodeDecodeError, ValueError) as exc:
+            entries.append(
+                PlanStatusEntry(
+                    document=doc,
+                    plan=None,
+                    status=None,
+                    error=f"{type(exc).__name__}: {exc}",
+                )
+            )
+            continue
+        status = collect_status(plan, exec_index=exec_index)
+        entries.append(PlanStatusEntry(document=doc, plan=plan, status=status))
+    return entries
 
 
 def status_to_json_dict(status: PlanStatus) -> dict[str, object]:
