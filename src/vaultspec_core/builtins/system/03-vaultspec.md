@@ -15,6 +15,11 @@ order: 3
   feature indexes live in `.vault/index/` and are managed by
   `vaultspec-core vault feature index`; do not author them by hand.
 
+**Orient first.** In a project with no session context, run
+`vaultspec-core vault status` before invoking any pipeline skill. Read the in-flight
+plans it names, then enter the pipeline at the right phase: resume an in-flight plan via
+`vaultspec-execute`, or start fresh at Research.
+
 All significant work must follow this pipeline:
 
 | Phase        | Skill                   | Artifact                   | Requires                                        |
