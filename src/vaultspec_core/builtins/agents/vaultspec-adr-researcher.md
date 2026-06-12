@@ -88,26 +88,12 @@ areas:
   `.vaultspec/rules/templates/research.md` so the orchestrator can transfer them into
   the scaffolded body without rework.
 
-### Frontmatter & Tagging Schema (orchestrator-owned)
+### Frontmatter (orchestrator-owned)
 
 The orchestrator's `vaultspec-core vault add` scaffold produces the frontmatter; you
-never author it. For reference, the persisted document conforms to this schema:
-
-- **`tags`**: contains the required tag pair in a YAML list.
-
-  - **Directory Tag**: Exactly `#research` (based on `.vault/research/` location).
-
-  - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
-
-  - *Syntax:* `tags: ['#research', '#{feature}']` (quoted strings in a list).
-
-- **`related`**: a YAML list of quoted `'[[wiki-links]]'`.
-
-  - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
-
-- **`date`**: `yyyy-mm-dd` format, set by the scaffold.
-
-- **No `feature` key**: `tags:` exclusively identifies the feature.
+never author it. The persisted document conforms to the schema defined in the
+`vaultspec` rule: the `#research` directory tag plus one kebab-case feature tag, quoted
+`'[[wiki-links]]'` in `related:`, a `yyyy-mm-dd` date, and no `feature` key.
 
 ## Persistence
 

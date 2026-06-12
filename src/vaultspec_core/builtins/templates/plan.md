@@ -86,9 +86,9 @@ related:
      identifier-affecting change rather than hand-editing the row
      grammar. Hand edits are tolerated by the parser but flagged by
      `vaultspec-core vault plan check`; canonical-identifier preservation is
-     guaranteed only when the CLI performs the mutation. See the
-     CLI ADR (2026-05-06-plan-hardening-adr) for the full
-     subcommand surface. -->
+     guaranteed only when the CLI performs the mutation. Run
+     `vaultspec-core vault plan --help` for the full subcommand
+     surface. -->
 
 # `{feature}` plan
 
@@ -174,5 +174,5 @@ The plan is complete when every Step in the plan is closed
 the declared project-management association to report the Epic
 complete.
 
-For tier-specific verification cadence, see the convention ADR
-authorizing this plan via the `related:` frontmatter. -->
+For tier-specific verification cadence, see the authorizing
+documents linked in the `related:` frontmatter. -->

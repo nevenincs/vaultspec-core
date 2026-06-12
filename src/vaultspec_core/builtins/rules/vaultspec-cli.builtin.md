@@ -30,6 +30,7 @@ drift that `vaultspec-core vault check` and `vaultspec-core spec doctor` will fl
 | Strip generated template annotations                  | `vaultspec-core vault sanitize annotations [--feature <tag>] [--dry-run]` |
 | Confirm required documents exist for a feature        | `vaultspec-core vault check features --feature <tag>`                     |
 | Archive a completed feature                           | `vaultspec-core vault feature archive <tag>`                              |
+| Promote an audit finding to a project rule            | `vaultspec-core vault rule promote --from <audit-stem> --as <rule-name>`  |
 | List registered rules, skills, agents, hooks, or MCPs | `vaultspec-core spec <resource> list`                                     |
 | Verify MCP config health                              | `vaultspec-core spec mcps status --json`                                  |
 | Inspect the assembled system prompt                   | `vaultspec-core spec system show`                                         |

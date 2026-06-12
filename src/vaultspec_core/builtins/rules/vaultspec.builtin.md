@@ -54,7 +54,7 @@ hierarchy should reference those above them.
 - **Audits** (`.vault/audit/yyyy-mm-dd-{feature}-audit.md`, optionally
   `.vault/audit/yyyy-mm-dd-{feature}-{topic}-audit.md`)
 
-  - *Depends on:* brainstorm, research
+  - *Depends on:* the artifacts under review (plans, execution records, code)
   - *References:* the artifacts under review
 
 - **Architecture Decision Records (ADR)** (`.vault/adr/`)
@@ -206,8 +206,8 @@ Follow these conventions:
 ### Document Body Placeholders
 
 Container identifiers (`{wave}`, `{phase}`, `{step}`) use the canonical uppercase
-zero-padded form from the convention ADR. `{feature}` uses lowercase kebab-case.
-Narrative placeholders (`{topic}`, `{title}`) use concise prose.
+zero-padded form from the plan template hint blocks. `{feature}` uses lowercase
+kebab-case. Narrative placeholders (`{topic}`, `{title}`) use concise prose.
 
 | Placeholder | Format              | Example                   |
 | :---------- | :------------------ | :------------------------ |

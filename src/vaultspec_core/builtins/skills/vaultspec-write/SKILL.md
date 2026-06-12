@@ -6,16 +6,19 @@ description: >-
   document.
 ---
 
-# Write Implementation Skill
+# Plan writing skill (vaultspec-write)
 
-Use this skill to:
+Use this skill:
 
-- Write the required implementation plan grounded with research and ADRs.
-- plan **non-trivial work, such as new features, complex auditing, or refactoring**.
-- when user explicitly asked to "write plan" or "draft Steps".
+- To write the required implementation plan grounded with research and ADRs.
+- To plan **non-trivial work, such as new features, complex auditing, or refactoring**.
+- When the user explicitly asked to "write plan" or "draft Steps".
 
 This skill **MUST always** be called after `vaultspec-adr` concludes with architectural
 approval.
+
+**Announce at start:** "I'm using the `vaultspec-write` skill to write the
+implementation plan."
 
 ## Important
 
@@ -38,8 +41,8 @@ is the canonical surface for every identifier-affecting change. The verbs are:
 - `vaultspec-core vault plan tier show | promote | demote`
 
 The CLI guarantees canonical-identifier preservation, gap-no-reuse via a hidden
-retirement ledger, and display-path consistency that hand edits cannot. See the CLI ADR
-(`2026-05-06-plan-hardening-adr`) for the full subcommand contract and
+retirement ledger, and display-path consistency that hand edits cannot. Run
+`vaultspec-core vault plan --help` for the full subcommand surface and
 `vaultspec-core vault plan check` for the validator that backs it.
 
 ## Hierarchy and tiers
@@ -54,20 +57,16 @@ containers exist:
 - `L4`: Epic above Waves above Phases above Steps; an external project-management
   association is declared in the Epic intent block.
 
-Full criteria, the row contract, identifier rules, and ordering rules are specified in
-the plan-hardening convention ADR and embedded as markdown-comment hint blocks in
-`.vaultspec/rules/templates/plan.md`. The skill defers to those canonical sources rather
-than restating them.
+Full criteria, the row contract, identifier rules, and ordering rules are embedded as
+markdown-comment hint blocks in `.vaultspec/rules/templates/plan.md`. The skill defers
+to those canonical sources rather than restating them.
 
 ## Rules
 
-- **Announce at start:** "I'm using the `vaultspec-write` skill to write the
-  implementation plan."
-
 - **Must reference research and ADRs**. Read these in full prior to writing the plan.
 
-- Ensure no knowledge gap remains prior to writing plan. Call the `vaultspec-research`
-  skill if more information is needed.
+- Ensure no knowledge gap remains prior to writing the plan. Call the
+  `vaultspec-research` skill if more information is needed.
 
 - **Granularity:** Every Step is one Markdown bulleted checkbox row naming exactly one
   file or one cohesive area in inline backticks per the Step row contract embedded in
@@ -91,40 +90,22 @@ than restating them.
     (`yyyy-mm-dd-{feature}-{step}.md` at L1; `yyyy-mm-dd-{feature}-{phase}-{step}.md` at
     L2; `yyyy-mm-dd-{feature}-{wave}-{phase}-{step}.md` at L3/L4).
 
-## Template
+## Frontmatter
 
-- You MUST read and use the template at `.vaultspec/rules/templates/plan.md`; its
-  embedded hint blocks govern the body structure.
+The scaffold owns the frontmatter; the full schema is defined in the `vaultspec` rule.
+Plan-specific requirements on top of the shared schema:
 
-### Frontmatter & Tagging Mandate
+- **`related`** carries the AUTHORIZING documents (ADR, research, reference, prior plan)
+  for every Step in the plan. Steps inherit this chain; per-row reference footers do not
+  exist. `related` is required when the plan contains at least one Step row.
 
-The `vaultspec-core vault add` scaffold produces frontmatter conforming to this schema.
-Verify it after scaffolding; report drift via `vaultspec-core vault check all` rather
-than hand-editing frontmatter:
-
-- **`tags`**: contains the required tag pair in a YAML list.
-
-  - **Directory Tag**: Exactly `#plan`.
-  - **Feature Tag**: Exactly one kebab-case `#{feature}` tag.
-  - *Syntax:* `tags: ['#plan', '#{feature}']` (quoted strings in a list).
-
-- **`related`**: a YAML list of quoted `'[[wiki-links]]'`, seeded from the `--related`
-  flag at scaffold time.
-
-  - _Constraint:_ No relative paths (`../`), no bare strings, no `@ref`.
-  - _For plan documents:_ `related` carries the AUTHORIZING documents (ADR, research,
-    reference, prior plan) for every Step in the plan. Steps inherit this chain; per-row
-    reference footers do not exist. `related` is required when the plan contains at
-    least one Step row.
-
-- **`date`**: `yyyy-mm-dd` format, set by the scaffold.
-
-- **`tier`** (plan documents only): an unquoted scalar with value `L1`, `L2`, `L3`, or
-  `L4`, set via the `--tier` flag at scaffold time and changed only through
+- **`tier`** is an unquoted scalar with value `L1`, `L2`, `L3`, or `L4`, set via the
+  `--tier` flag at scaffold time and changed only through
   `vaultspec-core vault plan tier promote | demote`. Pre-existing plans without the
   field default to `L2`.
 
-- **No `feature` key**: `tags:` exclusively identifies the feature.
+Verify after scaffolding with `vaultspec-core vault check all` rather than hand-editing
+frontmatter.
 
 ## Workflow
 
@@ -143,7 +124,7 @@ than hand-editing frontmatter:
 
 - **Review**: Present the saved Plan summary to the user before executing.
 
-- **Provide an absolute link** and prompt user:
+- **Provide an absolute link** and prompt the user:
 
   ```markdown
   The Plan is ready:
@@ -152,7 +133,7 @@ than hand-editing frontmatter:
   Do you want to approve the Plan, or request changes?
   ```
 
-- **Approval Loop**: User must explicitly approve the Plan. If changes are requested,
-  load the `vaultspec-writer` agent persona again to make changes. If more research and
-  grounding is required, use the appropriate vaultspec research skills and agents.
-  Instruct them to "Revise the plan based on user feedback: `{feedback}`."
+- **Approval loop**: The user must explicitly approve the Plan. If changes are
+  requested, load the `vaultspec-writer` agent persona again to make changes. If more
+  research and grounding is required, use the appropriate vaultspec research skills and
+  agents. Instruct them to "Revise the plan based on user feedback: `{feedback}`."
