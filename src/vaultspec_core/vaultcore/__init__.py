@@ -20,6 +20,8 @@ from .links import extract_wiki_links as extract_wiki_links
 from .models import DocType as DocType
 from .models import DocumentMetadata as DocumentMetadata
 from .models import VaultConstants as VaultConstants
+from .models import normalize_date as normalize_date
+from .models import parse_lenient_date as parse_lenient_date
 from .parser import parse_frontmatter as parse_frontmatter
 from .parser import parse_vault_metadata as parse_vault_metadata
 from .query import VaultDocument as VaultDocument

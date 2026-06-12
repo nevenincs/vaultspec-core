@@ -8,15 +8,148 @@ analysis depend.
 
 from __future__ import annotations
 
+import datetime as _dt
 import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, ClassVar
 
-__all__ = ["DocType", "DocumentMetadata", "VaultConstants"]
+__all__ = [
+    "DocType",
+    "DocumentMetadata",
+    "VaultConstants",
+    "normalize_date",
+    "parse_lenient_date",
+]
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+#: Canonical vault date form: ``yyyy-mm-dd`` (ISO 8601 calendar date).
+_CANONICAL_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+#: Slash-separated year-first form: ``yyyy/mm/dd``.
+_YEAR_FIRST_SLASH_RE = re.compile(r"^(\d{4})/(\d{1,2})/(\d{1,2})$")
+
+#: Two small components and a four-digit year, ``dd-mm-yyyy`` or
+#: ``mm/dd/yyyy`` style, with a consistent ``-`` or ``/`` separator.
+_YEAR_LAST_RE = re.compile(r"^(\d{1,2})([-/])(\d{1,2})\2(\d{4})$")
+
+
+def parse_lenient_date(value: object) -> _dt.date | None:
+    """Parse a frontmatter date value leniently into a :class:`datetime.date`.
+
+    This is the single canonical lenient-date helper mandated by the
+    vault-orientation ADR (decision D3b). Every consumer of the
+    ``date:`` / ``modified:`` stamps (validation, the check/fix
+    reconciliation path, the backfill migration, and the status
+    rollup's recency sort) parses through this function so hand-edited
+    values in common formats survive, while genuinely ambiguous or
+    unrecognisable values are rejected rather than guessed at.
+
+    Accepted inputs:
+
+    - :class:`datetime.date` / :class:`datetime.datetime` objects
+      (YAML parses unquoted ``yyyy-mm-dd`` scalars into these).
+    - Canonical ``yyyy-mm-dd`` strings.
+    - ISO 8601 timestamps (``yyyy-mm-ddTHH:MM:SS`` with optional
+      fractional seconds and zone offset; a space separator is also
+      accepted).
+    - Slash-separated year-first dates (``yyyy/mm/dd``).
+    - Year-last forms (``dd-mm-yyyy``, ``mm/dd/yyyy``) **only when
+      unambiguous**: one of the two leading components must exceed 12
+      so day and month are distinguishable. Ambiguous values such as
+      ``03-04-2026`` are rejected (return ``None``) rather than
+      guessed.
+
+    Surrounding whitespace and stray single/double quotes are stripped
+    before parsing.
+
+    Args:
+        value: Raw frontmatter value - a string, a
+            :class:`datetime.date`, a :class:`datetime.datetime`, or
+            any other object (which fails parsing).
+
+    Returns:
+        The parsed :class:`datetime.date`, or ``None`` when the value
+        is missing, ambiguous, or unrecognisable. Callers must treat
+        ``None`` as a finding (per D3b a value no parser recognises is
+        flagged, never silently dropped).
+
+    See Also:
+        :func:`normalize_date` for the canonical-string companion, and
+        :meth:`DocumentMetadata.validate` for the validation policy
+        built on this helper.
+    """
+    if isinstance(value, _dt.datetime):
+        return value.date()
+    if isinstance(value, _dt.date):
+        return value
+    if not isinstance(value, str):
+        return None
+
+    text = value.strip().strip("\"'").strip()
+    if not text:
+        return None
+
+    if _CANONICAL_DATE_RE.match(text):
+        try:
+            return _dt.date.fromisoformat(text)
+        except ValueError:
+            return None
+
+    # ISO 8601 timestamps, optionally zoned ('Z' or offset), with either
+    # a 'T' or a space separator (Python 3.11+ fromisoformat handles both).
+    try:
+        return _dt.datetime.fromisoformat(text).date()
+    except ValueError:
+        pass
+
+    m = _YEAR_FIRST_SLASH_RE.match(text)
+    if m:
+        year, month, day = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        try:
+            return _dt.date(year, month, day)
+        except ValueError:
+            return None
+
+    m = _YEAR_LAST_RE.match(text)
+    if m:
+        first, second, year = int(m.group(1)), int(m.group(3)), int(m.group(4))
+        if first > 12 and 1 <= second <= 12:
+            day, month = first, second
+        elif second > 12 and 1 <= first <= 12:
+            month, day = first, second
+        else:
+            # Both components could be a month: ambiguous - reject
+            # rather than guess (D3b).
+            return None
+        try:
+            return _dt.date(year, month, day)
+        except ValueError:
+            return None
+
+    return None
+
+
+def normalize_date(value: object) -> str | None:
+    """Normalize a lenient date value to the canonical ``yyyy-mm-dd`` string.
+
+    Companion to :func:`parse_lenient_date`: the check/fix
+    reconciliation path and the backfill migration use this to rewrite
+    whatever they parsed back to the canonical quoted ``yyyy-mm-dd``
+    form mandated by the vault-orientation ADR (decision D3b).
+
+    Args:
+        value: Raw frontmatter value accepted by
+            :func:`parse_lenient_date`.
+
+    Returns:
+        The canonical ``yyyy-mm-dd`` string, or ``None`` when the value
+        cannot be parsed.
+    """
+    parsed = parse_lenient_date(value)
+    return parsed.isoformat() if parsed is not None else None
 
 
 class DocType(StrEnum):
@@ -63,6 +196,10 @@ class DocumentMetadata:
         tags: At least two tags - one directory tag and one feature tag.
             Additional freeform tags are allowed beyond the required pair.
         date: ISO 8601 creation date (``YYYY-MM-DD``).
+        modified: CLI-maintained last-modified stamp (``YYYY-MM-DD``, same
+            granularity as ``date``). Set equal to ``date`` at scaffold time
+            and refreshed by every CLI verb that mutates the document; the
+            status rollup reads it as the recency source.
         related: List of Obsidian-style ``[[wiki-link]]`` strings.
         supersedes: List of old ADR/Plan stems.
         superseded_by: Single new ADR/Plan stem.
@@ -73,6 +210,7 @@ class DocumentMetadata:
 
     tags: list[str] = field(default_factory=list)
     date: str | None = None
+    modified: str | None = None
     related: list[str] = field(default_factory=list)
     supersedes: list[str] = field(default_factory=list)
     superseded_by: str | None = None
@@ -82,6 +220,15 @@ class DocumentMetadata:
 
     def validate(self) -> list[str]:
         """Validate the metadata against the vault schema rules.
+
+        The ``modified`` stamp follows the lenient policy from the
+        vault-orientation ADR (decision D3b): a canonical
+        ``yyyy-mm-dd`` value is valid; a value that
+        :func:`parse_lenient_date` can parse but is not canonical is
+        also accepted here (the ``vault check all --fix``
+        reconciliation path normalizes it later rather than validation
+        hard-failing on a permitted hand edit); only an unparseable
+        value is a violation.
 
         Returns:
             A list of human-readable violation messages; empty list means valid.
@@ -125,6 +272,20 @@ class DocumentMetadata:
             msg = (
                 f"Vault violation: Invalid date format '{self.date}'. "
                 "Must be YYYY-MM-DD."
+            )
+            errors.append(msg)
+
+        #  Modified Stamp: canonical ok; lenient-parseable noncanonical ok
+        #  (normalized later by the check/fix path); unparseable is a
+        #  violation (D3b: flagged, never silently dropped).
+        if (
+            self.modified
+            and not _CANONICAL_DATE_RE.match(self.modified)
+            and parse_lenient_date(self.modified) is None
+        ):
+            msg = (
+                f"Vault violation: Unparseable modified date '{self.modified}'. "
+                "Must be a date in (or normalizable to) YYYY-MM-DD form."
             )
             errors.append(msg)
 
