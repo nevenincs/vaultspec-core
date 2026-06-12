@@ -104,6 +104,7 @@ vaultspec-core sync [OPTIONS] [PROVIDER]
 vaultspec-core doctor [OPTIONS]
 vaultspec-core vault add [OPTIONS] DOC_TYPE
 vaultspec-core vault stats [OPTIONS]
+vaultspec-core vault status [OPTIONS] [TARGET]
 vaultspec-core vault list [OPTIONS] [DOC_TYPE]
 vaultspec-core vault graph [OPTIONS]
 vaultspec-core vault repair [OPTIONS]
