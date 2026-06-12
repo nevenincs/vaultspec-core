@@ -72,8 +72,11 @@ _MODIFIED_LINE_RE = re.compile(r"^(?P<indent>[ \t]*)modified:[^\n]*$", re.MULTIL
 
 #: Frontmatter ``date:`` line, the insertion anchor when ``modified:`` is
 #: absent (the new stamp lands directly after it, matching its layout).
+#: The trailing newline is optional so a ``date:`` line that is the last
+#: line of the frontmatter block (no ``\n`` before the closing fence,
+#: which the fence match strips) still anchors the insertion.
 _DATE_LINE_RE = re.compile(
-    r"^(?P<indent>[ \t]*)date:[^\n]*(?P<eol>\r\n|\n)", re.MULTILINE
+    r"^(?P<indent>[ \t]*)date:[^\n]*(?P<eol>\r\n|\n|$)", re.MULTILINE
 )
 
 
@@ -163,7 +166,14 @@ def _write_stamp(doc_path: Path, value: str) -> bool:
             return False
         indent = date_line.group("indent")
         insert_at = block_start + date_line.end()
-        stamp_line = f"{indent}modified: {canonical}\n"
+        if date_line.group("eol"):
+            # Date line carries its own newline: drop the new stamp on the
+            # following line, terminated so the next line is undisturbed.
+            stamp_line = f"{indent}modified: {canonical}\n"
+        else:
+            # Date line is the last line of the block (its newline was
+            # consumed by the closing-fence match): open a new line first.
+            stamp_line = f"\n{indent}modified: {canonical}"
         new_text = text[:insert_at] + stamp_line + text[insert_at:]
 
     rendered = (

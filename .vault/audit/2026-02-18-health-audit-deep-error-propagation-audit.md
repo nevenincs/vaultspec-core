@@ -3,6 +3,7 @@ tags:
   - '#audit'
   - '#code-health'
 date: '2026-02-18'
+modified: '2026-02-18'
 ---
 
 # Deep Audit: Error Propagation and Silent Failure Paths

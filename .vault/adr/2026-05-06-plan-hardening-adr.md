@@ -3,6 +3,7 @@ tags:
   - '#adr'
   - '#plan-hardening'
 date: '2026-05-06'
+modified: '2026-05-06'
 related:
   - '[[2026-05-05-plan-hardening-adr]]'
   - '[[2026-05-05-plan-hardening-research]]'

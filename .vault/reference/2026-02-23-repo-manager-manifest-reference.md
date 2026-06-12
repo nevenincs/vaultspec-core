@@ -3,6 +3,7 @@ tags:
   - '#reference'
   - '#repo-manager-extension'
 date: '2026-02-23'
+modified: '2026-02-23'
 ---
 
 # repo-manager manifest and configuration format reference

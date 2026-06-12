@@ -4,6 +4,7 @@ tags:
   - '#cli-ecosystem-factoring'
   - '#index'
 date: '2026-04-21'
+modified: '2026-04-21'
 related:
   - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
   - '[[2026-02-22-cli-ecosystem-factoring-phase1-summary-exec]]'

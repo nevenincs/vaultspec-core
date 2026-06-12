@@ -4,6 +4,7 @@ tags:
   - '#system-prompt-injection'
   - '#index'
 date: '2026-04-21'
+modified: '2026-04-21'
 related:
   - '[[2026-02-22-system-prompt-injection-adr]]'
   - '[[2026-02-22-system-prompt-injection-execution-summary-exec]]'

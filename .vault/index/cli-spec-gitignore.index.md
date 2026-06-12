@@ -4,6 +4,7 @@ tags:
   - '#index'
   - '#cli-spec-gitignore'
 date: '2026-05-17'
+modified: '2026-05-17'
 related:
   - '[[2026-05-17-cli-spec-gitignore-adr]]'
   - '[[2026-05-17-cli-spec-gitignore-research]]'

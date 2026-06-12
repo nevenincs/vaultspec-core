@@ -76,7 +76,7 @@ Refresh the modified stamp from every CLI verb that mutates a vault document.
 Reconcile hand-edited documents through the check-fix path with canonical normalization, and backfill the stamp on existing vaults via a schema migration.
 
 - [x] `W01.P04.S20` - add a checker that flags missing, unparseable, or stale modified stamps and normalizes parsed values to canonical form under fix; `src/vaultspec_core/vaultcore/checks/modified_stamp.py`.
-- [ ] `W01.P04.S21` - register the modified-stamp checker in the check registry; `src/vaultspec_core/vaultcore/checks/__init__.py`.
+- [x] `W01.P04.S21` - register the modified-stamp checker in the check registry; `src/vaultspec_core/vaultcore/checks/__init__.py`.
 - [ ] `W01.P04.S22` - add checker tests covering lenient parsing, normalization, and unparseable-value findings; `src/vaultspec_core/vaultcore/checks/tests/test_modified_stamp.py`.
 - [ ] `W01.P04.S23` - add a schema migration backfilling modified from date across existing vault documents; `src/vaultspec_core/migrations/m_0_1_29_modified_stamp_backfill.py`.
 - [ ] `W01.P04.S24` - add migration tests covering backfill, idempotence, and lenient date handling; `src/vaultspec_core/migrations/tests/test_m_0_1_29_modified_stamp_backfill.py`.

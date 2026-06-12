@@ -3,6 +3,7 @@ tags:
   - '#adr'
   - '#hooks-maturity'
 date: '2026-02-23'
+modified: '2026-02-23'
 related:
   - '[[2026-02-23-hooks-maturity-research]]'
 ---

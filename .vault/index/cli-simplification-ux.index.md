@@ -4,6 +4,7 @@ tags:
   - '#index'
   - '#cli-simplification-ux'
 date: '2026-05-26'
+modified: '2026-05-26'
 related:
   - '[[2026-05-17-cli-simplification-ux-adr]]'
   - '[[2026-05-17-cli-simplification-ux-audit]]'

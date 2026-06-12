@@ -3,6 +3,7 @@ tags:
   - '#adr'
   - '#cli-architecture'
 date: 2026-03-05
+modified: '2026-03-05'
 related:
   - '[[2026-03-05-cli-architecture-audit]]'
   - '[[2026-03-05-cli-path-resolution-adr]]'

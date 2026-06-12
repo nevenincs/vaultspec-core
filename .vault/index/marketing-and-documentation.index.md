@@ -4,6 +4,7 @@ tags:
   - '#marketing-and-documentation'
   - '#index'
 date: '2026-04-21'
+modified: '2026-04-21'
 related:
   - '[[2026-02-20-marketing-and-documentation-adr]]'
   - '[[2026-02-20-marketing-and-documentation-p1-plan]]'

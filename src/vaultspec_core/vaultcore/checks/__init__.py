@@ -27,6 +27,7 @@ from .dangling import check_dangling
 from .features import check_features
 from .frontmatter import check_frontmatter
 from .links import check_links
+from .modified_stamp import check_modified_stamp
 from .orphans import check_orphans
 from .references import check_references, check_schema
 from .rename_integrity import check_rename_integrity
@@ -47,6 +48,7 @@ __all__ = [
     "check_features",
     "check_frontmatter",
     "check_links",
+    "check_modified_stamp",
     "check_orphans",
     "check_references",
     "check_rename_integrity",
@@ -65,8 +67,9 @@ def run_all_checks(
 ) -> list[CheckResult]:
     """Run all vault health checkers and return their results.
 
-    Executes structure, frontmatter, annotations, links, dangling, body-links,
-    orphans, features, references, and schema checks in order. Builds a single
+    Executes structure, frontmatter, modified-stamp, annotations, links,
+    dangling, body-links, orphans, features, references, and schema checks
+    in order. Builds a single
     :class:`~vaultspec_core.graph.VaultGraph` and shares it across
     graph-consuming checkers to avoid redundant I/O.
 
@@ -87,6 +90,9 @@ def run_all_checks(
         return [
             check_structure(root_dir, snapshot=snapshot, fix=False),
             check_frontmatter(root_dir, snapshot=snapshot, feature=feature, fix=False),
+            check_modified_stamp(
+                root_dir, snapshot=snapshot, feature=feature, fix=False
+            ),
             check_annotations(root_dir, feature=feature, fix=False),
             check_links(root_dir, snapshot=snapshot, feature=feature, fix=False),
             check_dangling(root_dir, graph=graph, feature=feature, fix=False),
@@ -113,6 +119,14 @@ def run_all_checks(
     append_and_refresh(result)
 
     result = check_frontmatter(
+        root_dir,
+        snapshot=graph.to_snapshot(),
+        feature=feature,
+        fix=True,
+    )
+    append_and_refresh(result)
+
+    result = check_modified_stamp(
         root_dir,
         snapshot=graph.to_snapshot(),
         feature=feature,

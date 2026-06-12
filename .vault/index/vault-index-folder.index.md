@@ -4,6 +4,7 @@ tags:
   - '#index'
   - '#vault-index-folder'
 date: '2026-04-30'
+modified: '2026-04-30'
 related:
   - '[[2026-04-30-vault-index-folder-adr]]'
   - '[[2026-04-30-vault-index-folder-phase1-2-3-exec]]'

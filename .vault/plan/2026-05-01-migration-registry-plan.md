@@ -3,6 +3,7 @@ tags:
   - '#plan'
   - '#migration-registry'
 date: '2026-05-01'
+modified: '2026-05-01'
 related:
   - '[[2026-05-01-migration-registry-adr]]'
   - '[[2026-05-01-migration-registry-research]]'

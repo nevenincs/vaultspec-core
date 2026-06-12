@@ -4,6 +4,7 @@ tags:
   - '#index'
   - '#cli-next-step-hints'
 date: '2026-05-17'
+modified: '2026-05-17'
 related:
   - '[[2026-05-17-cli-next-step-hints-adr]]'
   - '[[2026-05-17-cli-next-step-hints-research]]'

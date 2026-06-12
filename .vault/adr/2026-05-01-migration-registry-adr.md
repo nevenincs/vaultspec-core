@@ -3,6 +3,7 @@ tags:
   - '#adr'
   - '#migration-registry'
 date: '2026-05-01'
+modified: '2026-05-01'
 related:
   - '[[2026-05-01-migration-registry-research]]'
   - '[[2026-04-30-vault-index-folder-adr]]'

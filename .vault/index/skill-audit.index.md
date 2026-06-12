@@ -4,6 +4,7 @@ tags:
   - '#skill-audit'
   - '#index'
 date: '2026-04-21'
+modified: '2026-04-21'
 related:
   - '[[2026-02-22-skill-audit-adr]]'
   - '[[2026-02-22-skill-audit-execution-summary]]'

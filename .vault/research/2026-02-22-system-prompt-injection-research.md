@@ -3,6 +3,7 @@ tags:
   - '#research'
   - '#system-prompt-injection'
 date: '2026-02-22'
+modified: '2026-02-22'
 ---
 
 # Research: System Prompt Injection of Skill Skeletons

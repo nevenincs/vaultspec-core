@@ -4,6 +4,7 @@ tags:
   - '#index'
   - '#operator-cli-sync-authority'
 date: '2026-05-15'
+modified: '2026-05-15'
 related:
   - '[[2026-05-15-operator-cli-sync-authority-adr]]'
   - '[[2026-05-15-operator-cli-sync-authority-research]]'

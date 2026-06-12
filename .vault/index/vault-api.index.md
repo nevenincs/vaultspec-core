@@ -4,6 +4,7 @@ tags:
   - '#vault-api'
   - '#index'
 date: '2026-04-21'
+modified: '2026-04-21'
 related:
   - '[[2026-02-08-vault-api-adr]]'
   - '[[2026-02-08-vault-api-plan]]'

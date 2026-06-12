@@ -3,6 +3,7 @@ tags:
   - '#adr'
   - '#system-prompt'
 date: '2026-02-18'
+modified: '2026-02-18'
 related:
   - '[[2026-02-18-system-prompt-architecture-research]]'
   - '[[2026-02-18-system-prompt-restructure-adr]]'

@@ -3,6 +3,7 @@ tags:
   - '#adr'
   - '#bundled-cli-reference'
 date: '2026-05-18'
+modified: '2026-05-18'
 related:
   - '[[2026-05-18-bundled-cli-reference-research]]'
   - '[[2026-05-17-vaultspec-source-layout-collapse-adr]]'

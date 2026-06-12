@@ -4,6 +4,7 @@ tags:
   - '#index'
   - '#cli-rename-integrity'
 date: '2026-05-17'
+modified: '2026-05-17'
 related:
   - '[[2026-05-17-cli-rename-integrity-adr]]'
   - '[[2026-05-17-cli-rename-integrity-research]]'

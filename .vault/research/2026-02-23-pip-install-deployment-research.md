@@ -3,6 +3,7 @@ tags:
   - '#research'
   - '#pip-install-deployment'
 date: '2026-02-23'
+modified: '2026-02-23'
 related:
   - '[[2026-02-21-packaging-restructure-research]]'
   - '[[2026-02-19-workspace-path-decoupling-research]]'

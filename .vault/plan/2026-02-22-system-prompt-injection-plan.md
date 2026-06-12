@@ -3,6 +3,7 @@ tags:
   - '#plan'
   - '#system-prompt-injection'
 date: '2026-02-22'
+modified: '2026-02-22'
 related:
   - '[[2026-02-22-system-prompt-injection-adr]]'
   - '[[2026-02-22-system-prompt-injection-research]]'

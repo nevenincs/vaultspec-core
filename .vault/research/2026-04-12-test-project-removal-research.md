@@ -3,6 +3,7 @@ tags:
   - '#research'
   - '#test-project-removal'
 date: '2026-04-12'
+modified: '2026-04-12'
 related:
   - '[[2026-03-23-test-quality-research]]'
   - '[[2026-03-23-cli-test-coverage-research]]'

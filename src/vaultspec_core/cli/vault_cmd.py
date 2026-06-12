@@ -1450,6 +1450,36 @@ def cmd_check_frontmatter(
     )
 
 
+@check_app.command("modified-stamp")
+def cmd_check_modified_stamp(
+    fix: Annotated[
+        bool, typer.Option("--fix", help="Apply safe auto-corrections to vault content")
+    ] = False,
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Validate and reconcile the modified recency stamp on every document."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
+    from vaultspec_core.vaultcore.checks import check_modified_stamp
+
+    graph = VaultGraph(_get_ctx().target_dir)
+    snapshot = graph.to_snapshot()
+    result = check_modified_stamp(
+        _get_ctx().target_dir, snapshot=snapshot, feature=feature, fix=fix
+    )
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.modified-stamp"
+    )
+
+
 @check_app.command("links")
 def cmd_check_links(
     fix: Annotated[

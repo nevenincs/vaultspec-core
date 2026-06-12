@@ -4,6 +4,7 @@ tags:
   - '#doctor-dev-repo'
   - '#index'
 date: '2026-05-01'
+modified: '2026-05-01'
 related:
   - '[[2026-04-30-doctor-dev-repo-adr]]'
   - '[[2026-04-30-doctor-dev-repo-plan]]'

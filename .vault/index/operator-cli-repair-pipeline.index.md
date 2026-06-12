@@ -4,6 +4,7 @@ tags:
   - '#index'
   - '#operator-cli-repair-pipeline'
 date: '2026-05-15'
+modified: '2026-05-15'
 related:
   - '[[2026-05-15-operator-cli-repair-pipeline-adr]]'
   - '[[2026-05-15-operator-cli-repair-pipeline-audit]]'
