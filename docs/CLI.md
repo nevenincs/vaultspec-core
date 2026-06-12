@@ -461,6 +461,65 @@ vaultspec-core vault add exec --feature test-feature --step P01.S01
 
 ______________________________________________________________________
 
+### vaultspec-core vault status
+
+```bash
+vaultspec-core vault status [OPTIONS] [TARGET]
+```
+
+Orient in a vaultspec vault: rollup or a grounding trace for a target. Read-only - it
+never writes and produces no artifact.
+
+**Rollup mode** (no `TARGET`): reports in-flight plans with open/closed step counts and
+completion percent, recently modified documents grouped by type, active features, and
+vault totals. Outcome semantics: always `unchanged` (read-only verb). Advisory hints
+point at the targeted form and at `vaultspec-core spec doctor` for framework health.
+
+**Targeted mode** (`TARGET` is a plan stem, plan path, or feature tag): renders the
+grounding trace - each plan step (canonical id, display path, open or closed) mapped to
+its execution-record stem, or `no record` for open steps without one, or `unlinked` for
+exec records that reference the plan but lack a resolvable `step_id:`. Grounding
+documents are grouped by type beneath the step list. A feature-tag target traces every
+plan under that feature.
+
+`vaultspec-core vault status` is orientation, not auditing: it describes what exists
+without judging conformance. Use `vaultspec-core vault check` to audit and
+`vaultspec-core spec doctor` for framework health.
+
+#### Options
+
+| Option       | Default | Description                                                 |
+| ------------ | ------- | ----------------------------------------------------------- |
+| `--limit N`  | `10`    | Number of recently modified documents to show.              |
+| `--since N`  | None    | Show documents modified within the last N days.             |
+| `--json`     | off     | Emit machine-readable output (`vaultspec.vault.status.v1`). |
+| `--no-hints` | off     | Suppress next-step advisory hints.                          |
+
+`--limit` and `--since` apply only in rollup mode. `--since` switches from a last-N
+count to a day-window query.
+
+#### Examples
+
+- **Get a vault-wide orientation rollup (in-flight plans and recent changes)**:
+
+  ```bash
+  vaultspec-core vault status
+  ```
+
+- **Trace a specific plan to its execution records and grounding documents**:
+
+  ```bash
+  vaultspec-core vault status 2026-05-17-test-feature-plan
+  ```
+
+- **Show only documents modified in the last 7 days**:
+
+  ```bash
+  vaultspec-core vault status --since 7
+  ```
+
+______________________________________________________________________
+
 ### vaultspec-core vault list
 
 ```bash
@@ -833,20 +892,21 @@ Run health checks on `.vault/`. Exits with code `1` if errors are found.
 
 #### Subcommands
 
-| Subcommand         | `--fix` | `--feature` | Description                                                      |
-| ------------------ | ------- | ----------- | ---------------------------------------------------------------- |
-| `all`              | partial | yes         | Run every check in sequence                                      |
-| `annotations`      | yes     | yes         | Find generated template annotations                              |
-| `body-links`       | no      | yes         | Find wiki-links and markdown path links in document body text    |
-| `dangling`         | yes     | yes         | Find `related:` wiki-links that resolve to no document           |
-| `frontmatter`      | yes     | yes         | Validate frontmatter against vault schema                        |
-| `links`            | yes     | yes         | Check wiki-links follow Obsidian convention (no `.md` extension) |
-| `orphans`          | no      | yes         | Find documents with no incoming wiki-links                       |
-| `features`         | no      | yes         | Check feature tag completeness (missing doc types)               |
-| `references`       | yes     | yes         | Check cross-references within features                           |
-| `schema`           | yes     | yes         | Enforce dependency rules (ADR refs research, plan refs ADR)      |
-| `structure`        | yes     | no          | Check directory structure and filename conventions               |
-| `rename-integrity` | yes     | no          | Check name/filename integrity for rules, skills, and agents      |
+| Subcommand         | `--fix` | `--feature` | Description                                                                                |
+| ------------------ | ------- | ----------- | ------------------------------------------------------------------------------------------ |
+| `all`              | partial | yes         | Run every check in sequence                                                                |
+| `annotations`      | yes     | yes         | Find generated template annotations                                                        |
+| `body-links`       | no      | yes         | Find wiki-links and markdown path links in document body text                              |
+| `dangling`         | yes     | yes         | Find `related:` wiki-links that resolve to no document                                     |
+| `frontmatter`      | yes     | yes         | Validate frontmatter against vault schema                                                  |
+| `links`            | yes     | yes         | Check wiki-links follow Obsidian convention (no `.md` extension)                           |
+| `orphans`          | no      | yes         | Find documents with no incoming wiki-links                                                 |
+| `features`         | no      | yes         | Check feature tag completeness (missing doc types)                                         |
+| `modified-stamp`   | yes     | yes         | Flag missing, unparseable, or stale `modified:` stamps; `--fix` normalizes to `yyyy-mm-dd` |
+| `references`       | yes     | yes         | Check cross-references within features                                                     |
+| `schema`           | yes     | yes         | Enforce dependency rules (ADR refs research, plan refs ADR)                                |
+| `structure`        | yes     | no          | Check directory structure and filename conventions                                         |
+| `rename-integrity` | yes     | no          | Check name/filename integrity for rules, skills, and agents                                |
 
 `yes` = fully supported, `partial` = only the sub-checks that accept `--fix` apply fixes
 (`all` dispatches to every check), `no` = flag rejected with error. `structure` does not

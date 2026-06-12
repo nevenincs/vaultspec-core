@@ -117,7 +117,7 @@ Document the modified field in the firmware schema surfaces and add the orientat
 
 Regenerate the generator-owned CLI references and describe the orientation surface in the user-facing documentation.
 
-- [ ] `W03.P08.S34` - regenerate the generator-owned cli reference regions for the new verb; `src/vaultspec_core/builtins/reference/cli.md`.
+- [x] `W03.P08.S34` - regenerate the generator-owned cli reference regions for the new verb; `src/vaultspec_core/builtins/reference/cli.md`.
 - [ ] `W03.P08.S35` - describe the orientation surface and the modified stamp in the framework manual; `docs/framework.md`.
 
 ## Parallelization
