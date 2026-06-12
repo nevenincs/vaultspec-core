@@ -20,6 +20,7 @@ __all__ = [
     "VaultConstants",
     "normalize_date",
     "parse_lenient_date",
+    "refresh_modified_stamp",
 ]
 
 if TYPE_CHECKING:
@@ -150,6 +151,89 @@ def normalize_date(value: object) -> str | None:
     """
     parsed = parse_lenient_date(value)
     return parsed.isoformat() if parsed is not None else None
+
+
+#: Frontmatter ``modified:`` line, capturing leading whitespace so an
+#: indented key is rewritten in place rather than duplicated.
+_MODIFIED_LINE_RE = re.compile(r"^(?P<indent>[ \t]*)modified:[^\n]*$", re.MULTILINE)
+
+#: Frontmatter ``date:`` line, used as the insertion anchor when no
+#: ``modified:`` field exists yet (the stamp lands directly after it).
+_DATE_LINE_RE = re.compile(
+    r"^(?P<indent>[ \t]*)date:[^\n]*(?P<eol>\r\n|\n)", re.MULTILINE
+)
+
+
+def refresh_modified_stamp(text: str, today: _dt.date) -> str:
+    """Refresh (or add) the frontmatter ``modified:`` stamp to *today*.
+
+    This is the single shared mutator-side helper mandated by the
+    vault-orientation ADR (decision D3): every CLI verb that mutates a
+    vault document refreshes that document's ``modified:`` frontmatter
+    stamp to the day the mutation lands, so the status rollup's recency
+    source travels with the document.
+
+    The function operates on full document text and preserves every
+    other byte:
+
+    - When the frontmatter already carries a ``modified:`` field, its
+      value is rewritten to ``'<today>'`` (canonical quoted
+      ``yyyy-mm-dd``), keeping the field's original indentation and the
+      surrounding line ending.
+    - When the field is absent (a pre-backfill document) it is inserted
+      directly after the ``date:`` line, matching that line's
+      indentation and line ending, so the stamp lands in its canonical
+      schema position.
+    - When there is no YAML frontmatter, or the frontmatter carries no
+      ``date:`` anchor and no ``modified:`` field, the text is returned
+      unchanged: there is no canonical place to put the stamp and the
+      caller's mutation is left to stand on its own.
+
+    The stamp is only refreshed inside the leading frontmatter fence;
+    body occurrences of ``modified:`` or ``date:`` are never touched.
+
+    Args:
+        text: Full document text, including any YAML frontmatter.
+        today: The date to stamp, normally :meth:`datetime.date.today`.
+
+    Returns:
+        The document text with its ``modified:`` stamp refreshed or
+        added, or the input unchanged when no canonical anchor exists.
+
+    See Also:
+        :func:`normalize_date` for the canonical-string companion and
+        :func:`vaultspec_core.vaultcore.hydration._inject_modified` for
+        the scaffold-time half of decision D3.
+    """
+    fence = re.match(r"^(﻿?)---[ \t]*(?:\r\n|\n)(.*?)(?:\r\n|\n)---", text, re.DOTALL)
+    if not fence:
+        return text
+
+    block_start = fence.start(2)
+    block_end = fence.end(2)
+    frontmatter = text[block_start:block_end]
+    canonical = f"'{today.isoformat()}'"
+
+    existing = _MODIFIED_LINE_RE.search(frontmatter)
+    if existing is not None:
+        indent = existing.group("indent")
+        replacement = f"{indent}modified: {canonical}"
+        new_frontmatter = (
+            frontmatter[: existing.start()]
+            + replacement
+            + frontmatter[existing.end() :]
+        )
+        return text[:block_start] + new_frontmatter + text[block_end:]
+
+    date_line = _DATE_LINE_RE.search(frontmatter)
+    if date_line is None:
+        return text
+
+    indent = date_line.group("indent")
+    eol = date_line.group("eol")
+    insert_at = block_start + date_line.end()
+    stamp_line = f"{indent}modified: {canonical}{eol}"
+    return text[:insert_at] + stamp_line + text[insert_at:]
 
 
 class DocType(StrEnum):
