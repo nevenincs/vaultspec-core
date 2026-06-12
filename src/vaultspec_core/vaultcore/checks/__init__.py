@@ -126,13 +126,20 @@ def run_all_checks(
     )
     append_and_refresh(result)
 
+    # The modified-stamp fix only inserts or rewrites a single frontmatter
+    # line; it never renames files or changes links, so it cannot invalidate
+    # the graph for the downstream checkers. Appending without a graph
+    # rebuild keeps the structure-rename cascade (which the repair pipeline
+    # depends on) intact - a mid-cascade rebuild here re-resolves a
+    # case-only rename against a stale snapshot on case-insensitive
+    # filesystems and strands the original-cased file.
     result = check_modified_stamp(
         root_dir,
         snapshot=graph.to_snapshot(),
         feature=feature,
         fix=True,
     )
-    append_and_refresh(result)
+    results.append(result)
 
     result = check_annotations(root_dir, feature=feature, fix=True)
     append_and_refresh(result)

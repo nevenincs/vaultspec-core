@@ -132,6 +132,19 @@ def _write_stamp(doc_path: Path, value: str) -> bool:
     Returns:
         ``True`` when the file was rewritten, ``False`` otherwise.
     """
+    # Guard against a stale-cased path from a snapshot built before a
+    # sibling checker's case-only rename. On a case-insensitive
+    # filesystem ``Path.exists`` and ``open`` both succeed for the wrong
+    # casing, and ``atomic_write`` would resurrect the old-cased name. A
+    # case-sensitive parent-directory listing check confirms the exact
+    # name is the one on disk before we touch it; if it is not, the stamp
+    # is skipped and the next clean pass stamps the correctly-cased file.
+    try:
+        if doc_path.name not in {entry.name for entry in doc_path.parent.iterdir()}:
+            return False
+    except OSError:
+        return False
+
     try:
         raw = doc_path.read_bytes()
         content = raw.decode("utf-8")

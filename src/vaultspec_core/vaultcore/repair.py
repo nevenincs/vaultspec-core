@@ -619,6 +619,17 @@ def _restamp_modified(root_dir: Path, rewritten: Iterable[str]) -> bool:
         path = root_dir / rel
         if not path.is_file():
             continue
+        # A case-only rename during the fix phase leaves the old-cased
+        # relative path in ``rewritten`` (it vanished from the after-set).
+        # On a case-insensitive filesystem ``is_file`` and ``atomic_write``
+        # both resolve that stale path to the renamed file and would
+        # resurrect the original casing. Confirm the exact name is the one
+        # on disk via a case-sensitive parent listing before restamping.
+        try:
+            if path.name not in {entry.name for entry in path.parent.iterdir()}:
+                continue
+        except OSError:
+            continue
         try:
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):

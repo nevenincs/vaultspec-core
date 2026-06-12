@@ -606,6 +606,7 @@ class TestVaultRepair:
         assert [item["check_name"] for item in checks] == [
             "structure",
             "frontmatter",
+            "modified-stamp",
             "annotations",
             "links",
             "dangling",

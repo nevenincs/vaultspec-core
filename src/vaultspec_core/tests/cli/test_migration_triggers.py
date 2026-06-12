@@ -178,7 +178,16 @@ class TestScannerLazyTrigger:
 
         assert result.exit_code == 0, result.stdout
         assert not legacy.exists()
-        assert target.read_text(encoding="utf-8") == canonical_before
+        # The lazy migration trigger fired by ``vault add`` runs the
+        # 0.1.29 backfill, which seeds the canonical index's missing
+        # ``modified:`` stamp from its ``date:``. The collision handling
+        # still preserves the body and every other field verbatim.
+        canonical_after = (
+            "---\ngenerated: true\ntags:\n  - '#index'\n  - '#alpha'\n"
+            "date: '2026-04-30'\nmodified: '2026-04-30'\nrelated: []\n---\n"
+            "\n# canonical alpha\n"
+        )
+        assert target.read_text(encoding="utf-8") == canonical_after
 
     def test_feature_index_no_split_brain(self, tmp_path: Path):
         # Headline bug: vault feature index in a legacy workspace used
