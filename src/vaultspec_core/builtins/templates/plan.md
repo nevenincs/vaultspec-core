@@ -3,6 +3,7 @@ tags:
   - '#plan'
   - '#{feature}'
 date: '{yyyy-mm-dd}'
+modified: '{yyyy-mm-dd}'
 tier: '{tier}'
 related:
   - '[[{yyyy-mm-dd-*}]]'
@@ -12,6 +13,10 @@ related:
      tags: one directory tag (hardcoded #plan) and one feature tag.
      Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
      Additional tags may be appended below the required pair.
+
+     modified: CLI-maintained last-modified stamp; set at scaffold time,
+     refreshed by mutating CLI verbs and vault check fix; never hand-edit.
+
      tier is mandatory for new plans. Allowed: L1, L2, L3, L4.
      L1 = Steps only. L2 = Phases above Steps. L3 = Waves above
      Phases above Steps. L4 = Epic above Waves above Phases above
