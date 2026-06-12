@@ -163,6 +163,8 @@ def parse_vault_metadata(content: str) -> tuple[DocumentMetadata, str]:
 
             if key == "date":
                 metadata.date = val.strip("\"'")
+            elif key == "modified":
+                metadata.modified = val.strip("\"'") or None
             elif key == "superseded_by":
                 metadata.superseded_by = val.strip("\"'") or None
             elif key == "archived":

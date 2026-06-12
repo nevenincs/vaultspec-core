@@ -116,6 +116,9 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
     elif metadata.date:
         lines.append(f"date: {metadata.date}")
 
+    if metadata.modified:
+        lines.append(f"modified: '{metadata.modified}'")
+
     if metadata.related:
         lines.append("related:")
         for link in metadata.related:
@@ -145,6 +148,7 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
     known_keys = {
         "tags",
         "date",
+        "modified",
         "related",
         "feature",
         "supersedes",
