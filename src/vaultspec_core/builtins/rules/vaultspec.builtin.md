@@ -162,10 +162,15 @@ tags:
   - '#plan'
   - '#feature-name'
 date: '2026-02-06'
+modified: '2026-02-06'
 related:
   - '[[related-file]]'
 ---
 ```
+
+`modified:` is a CLI-maintained last-modified stamp: set equal to `date:` at scaffold,
+refreshed by every mutating verb and by `vaultspec-core vault check all --fix`, parsed
+leniently but rewritten to the canonical quoted `yyyy-mm-dd` form, never hand-edited.
 
 **Examples:**
 
@@ -202,6 +207,7 @@ Follow these conventions:
 | `{yyyy-mm-dd}`   | lowercase, ISO 8601   | `2026-02-06`              |
 | `{yyyy-mm-dd-*}` | lowercase pattern     | `2026-02-04-feature-plan` |
 | `{tier}`         | uppercase enum        | `L1`, `L2`, `L3`, `L4`    |
+| `modified`       | CLI-maintained stamp  | `2026-02-06`              |
 
 ### Document Body Placeholders
 
