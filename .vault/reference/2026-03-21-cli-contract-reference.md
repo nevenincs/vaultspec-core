@@ -3,6 +3,7 @@ tags:
   - '#reference'
   - '#cli-architecture'
 date: 2026-03-21
+modified: '2026-03-21'
 ---
 
 # vaultspec-core CLI Binding Contract

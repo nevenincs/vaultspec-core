@@ -3,6 +3,7 @@ tags:
   - '#research'
   - '#cli-ambiguous-states'
 date: '2026-03-27'
+modified: '2026-03-27'
 related:
   - '[[2026-03-15-install-cmds-capability-audit]]'
   - '[[2026-03-23-cli-test-coverage-research]]'

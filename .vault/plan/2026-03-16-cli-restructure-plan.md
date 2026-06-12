@@ -3,6 +3,7 @@ tags:
   - '#plan'
   - '#cli-restructure'
 date: 2026-03-16
+modified: '2026-03-16'
 related:
   - '[[2026-03-05-cli-engine-typer-adr]]'
   - '[[2026-02-22-cli-ecosystem-factoring-adr]]'

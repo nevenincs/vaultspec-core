@@ -3,6 +3,7 @@ tags:
   - '#adr'
   - '#{feature}'
 date: '{yyyy-mm-dd}'
+modified: '{yyyy-mm-dd}'
 related:
   - '[[{yyyy-mm-dd-*}]]'
 ---
@@ -13,6 +14,9 @@ related:
      Additional tags may be appended below the required pair.
 
      Related: use wiki-links as '[[yyyy-mm-dd-foo-bar]]'.
+
+     modified: CLI-maintained last-modified stamp; set at scaffold time,
+     refreshed by mutating CLI verbs and vault check fix; never hand-edit.
 
      Status convention: the H1 status value is one of proposed, accepted,
      rejected, or deprecated. A new ADR starts as proposed; it moves to

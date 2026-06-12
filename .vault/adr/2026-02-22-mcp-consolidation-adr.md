@@ -3,6 +3,7 @@ tags:
   - '#adr'
   - '#mcp-consolidation'
 date: '2026-02-22'
+modified: '2026-02-22'
 related:
   - '[[2026-02-22-mcp-consolidation-research]]'
   - '[[2026-02-21-packaging-restructure-adr]]'

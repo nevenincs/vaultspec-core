@@ -3,6 +3,7 @@ tags:
   - '#plan'
   - '#cli-simplification-ux'
 date: '2026-05-17'
+modified: '2026-05-17'
 tier: L4
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'

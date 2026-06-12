@@ -3,6 +3,7 @@ tags:
   - '#adr'
   - '#graph-hardening'
 date: '2026-03-22'
+modified: '2026-03-22'
 related:
   - '[[2026-03-22-graph-hardening-research]]'
 ---

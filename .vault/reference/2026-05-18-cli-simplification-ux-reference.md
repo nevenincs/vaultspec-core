@@ -3,6 +3,7 @@ tags:
   - '#reference'
   - '#cli-simplification-ux'
 date: '2026-05-18'
+modified: '2026-05-18'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-simplification-ux-adr]]'

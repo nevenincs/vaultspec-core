@@ -4,6 +4,7 @@ tags:
   - '#index'
   - '#plan-serializer-fixes'
 date: '2026-06-05'
+modified: '2026-06-05'
 related:
   - '[[2026-06-05-plan-serializer-fixes-adr]]'
   - '[[2026-06-05-plan-serializer-fixes-plan]]'

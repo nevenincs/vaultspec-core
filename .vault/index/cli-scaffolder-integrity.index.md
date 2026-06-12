@@ -4,6 +4,7 @@ tags:
   - '#index'
   - '#cli-scaffolder-integrity'
 date: '2026-05-17'
+modified: '2026-05-17'
 related:
   - '[[2026-05-17-cli-scaffolder-integrity-adr]]'
   - '[[2026-05-17-cli-scaffolder-integrity-research]]'

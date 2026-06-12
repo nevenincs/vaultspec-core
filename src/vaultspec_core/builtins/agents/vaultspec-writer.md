@@ -42,41 +42,25 @@ You must use the template at `.vaultspec/rules/templates/plan.md` and persist `<
 to `.vault/plan/yyyy-mm-dd-<feature>-plan.md`.
 
 The plan template embeds three canonical markdown-comment hint blocks (HIERARCHY AND
-TIERS, IDENTIFIERS AND ROW CONTRACT, NO COMPRESSION) verbatim from the convention ADR.
-The writer reads those blocks at plan-creation time and conforms to them; this persona
-file does NOT duplicate the hint blocks, it references them. Any future revision to the
-convention edits the convention ADR first; the plan template re-syncs from the ADR; this
+TIERS, IDENTIFIERS AND ROW CONTRACT, NO COMPRESSION). The writer reads those blocks at
+plan-creation time and conforms to them; this persona file does NOT duplicate the hint
+blocks, it references them. The hint blocks are the canonical convention source; this
 persona remains a thin pointer.
 
 ### Frontmatter & Tagging Mandate
 
-Every document MUST strictly adhere to the following schema:
+Every document conforms to the schema defined in the `vaultspec` rule: one directory tag
+(`#plan` for plans authored by this agent) plus one kebab-case feature tag, quoted
+`'[[wiki-links]]'` in `related:`, a `yyyy-mm-dd` date, and no `feature` key. On top of
+that shared schema, plan documents require:
 
-- **`tags`**: MUST contain the required tag pair in a YAML list.
+- **`related`** carries the AUTHORIZING documents (ADR, research, reference, prior plan)
+  for every Step in the plan. Steps inherit this chain; per-row reference footers do not
+  exist. `related` is required when the plan contains at least one Step row.
 
-  - **Directory Tag**: Exactly one of `#adr`, `#audit`, `#exec`, `#index`, `#plan`,
-    `#reference`, `#research` (based on file location). For plan documents authored by
-    this agent, the directory tag is `#plan`.
-
-  - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
-
-  - _Syntax:_ `tags: ['#doc-type', '#{feature}']` (Must be quoted strings in a list).
-
-- **`related`**: MUST be a YAML list of quoted `'[[wiki-links]]'`.
-
-  - _Constraint:_ No relative paths (`../`), no bare strings, no `@ref`.
-  - _For plan documents:_ `related` carries the AUTHORIZING documents (ADR, research,
-    reference, prior plan) for every Step in the plan. Steps inherit this chain; per-row
-    reference footers do not exist. `related` is required when the plan contains at
-    least one Step row.
-
-- **`date`**: MUST use `yyyy-mm-dd` format.
-
-- **`tier`** (plan documents only): MUST be present as an unquoted scalar with value
-  `L1`, `L2`, `L3`, or `L4`. Pre-existing plans without the field default to `L2`; the
-  writer adds the field on first edit.
-
-- **No `feature` key**: Use `tags:` exclusively for feature identification.
+- **`tier`** MUST be present as an unquoted scalar with value `L1`, `L2`, `L3`, or `L4`.
+  Pre-existing plans without the field default to `L2`; the writer adds the field on
+  first edit.
 
 **Linking**: Use `[[wiki-links]]` only in the `related:` frontmatter field; the plan
 body remains free of wiki-links and markdown links per the embedded LINK RULES in
@@ -104,7 +88,7 @@ Step inherits that chain.
 
 The Execution Record artifact retains the name `<Step Record>` and maps one-to-one to a
 Step. The originating Step's canonical `S##` is recorded in the Step Record's `step_id:`
-frontmatter field per the convention ADR's Wave-1 contract anchors.
+frontmatter field.
 
 ## Hierarchy and tier model
 
@@ -161,7 +145,7 @@ Autonomously assign the most appropriate agent persona for each Step:
     parallel agents?"
 
   - Confirm `<Phase Summary>` paths are updated and references point to valid docs.
-    Filenames use canonical identifiers per the convention ADR (e.g.,
+    Filenames use canonical identifiers per the plan template hint blocks (e.g.,
     `2026-...-<feature>-P01-summary.md` at L2; `2026-...-<feature>-W01-P01-summary.md`
     at L3 / L4).
 
@@ -186,5 +170,4 @@ manage Step rows. Use `vaultspec-core vault plan phase add/move/remove/edit` for
 `vaultspec-core vault plan epic intent edit` for the L4 Epic intent block, and
 `vaultspec-core vault plan tier promote/demote` for tier transitions. The CLI guarantees
 canonical-identifier preservation, gap-no-reuse, and document-order independence; hand
-edits do not. See the CLI ADR (`2026-05-06-plan-hardening-adr`) for the full subcommand
-contract.
+edits do not. Run `vaultspec-core vault plan --help` for the full subcommand surface.

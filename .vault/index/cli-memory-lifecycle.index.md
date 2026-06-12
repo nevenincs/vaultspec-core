@@ -4,6 +4,7 @@ tags:
   - '#index'
   - '#cli-memory-lifecycle'
 date: '2026-05-17'
+modified: '2026-05-17'
 related:
   - '[[2026-05-17-cli-memory-lifecycle-adr]]'
   - '[[2026-05-17-cli-memory-lifecycle-research]]'

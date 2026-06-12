@@ -3,6 +3,7 @@ tags:
   - '#exec'
   - '#doctor-dev-repo'
 date: '2026-04-30'
+modified: '2026-04-30'
 related:
   - '[[2026-04-30-doctor-dev-repo-plan]]'
   - '[[2026-04-30-doctor-dev-repo-adr]]'

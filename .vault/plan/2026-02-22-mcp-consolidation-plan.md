@@ -3,6 +3,7 @@ tags:
   - '#plan'
   - '#mcp-consolidation'
 date: '2026-02-22'
+modified: '2026-02-22'
 related:
   - '[[2026-02-22-mcp-consolidation-adr]]'
   - '[[2026-02-22-mcp-consolidation-research]]'

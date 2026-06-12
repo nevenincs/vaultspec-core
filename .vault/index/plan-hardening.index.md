@@ -4,6 +4,7 @@ tags:
   - '#index'
   - '#plan-hardening'
 date: '2026-05-05'
+modified: '2026-05-05'
 related:
   - '[[2026-05-05-plan-hardening-adr]]'
   - '[[2026-05-05-plan-hardening-exec]]'

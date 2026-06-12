@@ -4,6 +4,7 @@ tags:
   - '#index'
   - '#migration-registry'
 date: '2026-05-01'
+modified: '2026-05-01'
 related:
   - '[[2026-05-01-migration-registry-adr]]'
   - '[[2026-05-01-migration-registry-phase1-summary-exec]]'

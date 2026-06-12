@@ -4,6 +4,7 @@ tags:
   - '#index'
   - '#bundled-cli-reference'
 date: '2026-05-20'
+modified: '2026-05-20'
 related:
   - '[[2026-05-18-bundled-cli-reference-adr]]'
   - '[[2026-05-18-bundled-cli-reference-plan]]'

@@ -3,6 +3,7 @@ tags:
   - '#plan'
   - '#plan-hardening'
 date: '2026-05-05'
+modified: '2026-05-05'
 tier: L3
 related:
   - '[[2026-05-05-plan-hardening-adr]]'

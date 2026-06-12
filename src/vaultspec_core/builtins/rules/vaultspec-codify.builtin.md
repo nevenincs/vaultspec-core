@@ -49,26 +49,26 @@ plot. If the rule needs more than a page, it is actually a reference document; p
 ## How to author
 
 A codification produces a file under `.vaultspec/rules/rules/` that captures the rule.
-Today's canonical authoring path is the existing CLI:
+Two canonical authoring paths exist:
 
-- `vaultspec-core spec rules add <rule-name>` scaffolds the rule file. The `<rule-name>`
-  is the kebab-case slug naming the rule's subject (e.g., `harbor-notes-runtime-data`,
-  `destructive-verbs-need-dry-run`).
-- The author then opens the scaffolded file and fills the three sections above.
+- **Promote from an audit** (preferred when the lesson originates in an audit document):
+  `vaultspec-core vault rule promote --from <audit-stem> --as <rule-name>` reads the
+  audit, scaffolds the rule file, and records the audit stem in the rule's
+  `derived_from:` frontmatter. The author then refines the scaffolded body into the
+  three-section shape above.
 
-Today the CLI places authored project rules in the same directory as the framework's
-builtin rules (`.vaultspec/rules/rules/`). Project-authored rules are distinguished from
-builtins by name convention (builtins use the `*.builtin.md` suffix; authored rules do
-not). A planned `--scope project` flag on `vaultspec-core spec rules add` will separate
-authored rules into `.vaultspec/rules/rules/project/`; see the sibling
-`cli-spec-crud-parity` ADR.
+- **Author directly** (when the lesson originates in an ADR or outside the vault):
+  `vaultspec-core spec rules add <rule-name>` scaffolds an empty rule file; the author
+  fills the three sections and names the source document by stem in backticks in the
+  **Why** section.
 
-A higher-level codification verb is planned: a promote command that will take an audit
-stem and a target rule name, read a designated finding from the audit document, and seed
-the rule file with the audit's evidence pre-populated. See the sibling
-`cli-memory-lifecycle` ADR for the proposed verb and its command group. Until it lands,
-copy the relevant audit text into the rule body by hand and reference the audit stem in
-backticks.
+In both paths, `<rule-name>` is the kebab-case slug naming the rule's subject (e.g.,
+`harbor-notes-runtime-data`, `destructive-verbs-need-dry-run`).
+
+The CLI places authored project rules in the same directory as the framework's builtin
+rules (`.vaultspec/rules/rules/`). Project-authored rules are distinguished from
+builtins by name convention: builtins use the `*.builtin.md` suffix; authored rules do
+not.
 
 ## How to find an existing rule
 
@@ -82,12 +82,8 @@ partial rules are worse than complete ones because they fragment the discipline.
 ## Where the rule lives, and why
 
 Project-authored rules live under `.vaultspec/rules/rules/` alongside the framework's
-builtin rules (the framework distinguishes authored from builtin by name convention:
-builtins use the `*.builtin.md` suffix; authored rules do not). The framework's install
-policy is for that directory to be tracked by git so the rule reaches every teammate on
-clone. (Pre-existing installs may have an older policy that gitignored the directory;
-see the framework manual's section on sharing policy and the sibling ADR
-`cli-spec-gitignore` for the migration story.)
+builtin rules. The framework's install policy is for that directory to be tracked by git
+so the rule reaches every teammate on clone.
 
 A rule that exists only on one developer's machine is not a codification; it is a
 personal note. The whole point of writing the rule down is that the next agent inherits
@@ -104,9 +100,7 @@ quarter. Two paths:
   new name and add a `## Status` section to both rule bodies: the prior rule's Status
   names the successor's slug, and the new rule's Status names the rule it supersedes.
   Once teammates are aware, remove the prior rule via
-  `vaultspec-core spec rules remove <name>`. (A structured supersession mechanism
-  mirroring the ADR-supersession story is planned in the sibling ADR
-  `cli-memory-lifecycle`; until it ships, the Status sections are the declaration.)
+  `vaultspec-core spec rules remove <name>`.
 
 A rule should never be silently deleted. The rule's removal is itself a project-level
 event; record it.
@@ -120,9 +114,10 @@ The framework supports an audit-first codification flow. The sequence:
 - One audit can produce zero, one, or many rules - most produce zero (the lesson is
   feature-specific), some produce one, and a rare audit (the kind that surfaces a
   framework-wide pattern) produces several.
-- Each rule's body names the audit stem in backticks as its origin. Once the planned
-  `derived_from:` frontmatter field lands, the rule will carry the back-pointer in
-  structured form too.
+- Each qualifying finding is promoted with
+  `vaultspec-core vault rule promote --from <audit-stem> --as <rule-name>`; the promoted
+  rule carries the audit stem in its `derived_from:` frontmatter, and the rule's **Why**
+  section names the finding in prose.
 
 Audit-driven codification is the natural follow-on to the `review` phase. The pipeline
 reads as research → decide → plan → execute → review → codify, with codify as the

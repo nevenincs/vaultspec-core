@@ -3,6 +3,7 @@ tags:
   - '#plan'
   - '#template-annotation-sanitization'
 date: '2026-05-15'
+modified: '2026-05-15'
 tier: L2
 related:
   - '[[2026-05-15-template-annotation-sanitization-research]]'

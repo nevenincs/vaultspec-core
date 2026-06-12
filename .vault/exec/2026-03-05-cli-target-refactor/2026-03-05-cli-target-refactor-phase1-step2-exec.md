@@ -3,6 +3,7 @@ tags:
   - '#exec'
   - '#cli-target-refactor'
 date: 2026-03-05
+modified: '2026-03-05'
 title: 'Phase 1 Step 2: Global Reference Updates & Config Registry Cleanup'
 ---
 

@@ -45,6 +45,7 @@ _EXPECTED_NODE_FIELDS = frozenset(
         "doc_type",
         "feature",
         "date",
+        "modified",
         "title",
         "tags",
         "frontmatter",

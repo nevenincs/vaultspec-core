@@ -3,6 +3,7 @@ tags:
   - '#adr'
   - '#builtins-build-strategy'
 date: '2026-03-21'
+modified: '2026-03-21'
 related:
   - '[[2026-02-21-packaging-restructure-research]]'
   - '[[2026-02-21-packaging-restructure-adr]]'

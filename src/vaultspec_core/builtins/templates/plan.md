@@ -3,6 +3,7 @@ tags:
   - '#plan'
   - '#{feature}'
 date: '{yyyy-mm-dd}'
+modified: '{yyyy-mm-dd}'
 tier: '{tier}'
 related:
   - '[[{yyyy-mm-dd-*}]]'
@@ -12,6 +13,10 @@ related:
      tags: one directory tag (hardcoded #plan) and one feature tag.
      Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
      Additional tags may be appended below the required pair.
+
+     modified: CLI-maintained last-modified stamp; set at scaffold time,
+     refreshed by mutating CLI verbs and vault check fix; never hand-edit.
+
      tier is mandatory for new plans. Allowed: L1, L2, L3, L4.
      L1 = Steps only. L2 = Phases above Steps. L3 = Waves above
      Phases above Steps. L4 = Epic above Waves above Phases above
@@ -86,9 +91,9 @@ related:
      identifier-affecting change rather than hand-editing the row
      grammar. Hand edits are tolerated by the parser but flagged by
      `vaultspec-core vault plan check`; canonical-identifier preservation is
-     guaranteed only when the CLI performs the mutation. See the
-     CLI ADR (2026-05-06-plan-hardening-adr) for the full
-     subcommand surface. -->
+     guaranteed only when the CLI performs the mutation. Run
+     `vaultspec-core vault plan --help` for the full subcommand
+     surface. -->
 
 # `{feature}` plan
 
@@ -174,5 +179,5 @@ The plan is complete when every Step in the plan is closed
 the declared project-management association to report the Epic
 complete.
 
-For tier-specific verification cadence, see the convention ADR
-authorizing this plan via the `related:` frontmatter. -->
+For tier-specific verification cadence, see the authorizing
+documents linked in the `related:` frontmatter. -->

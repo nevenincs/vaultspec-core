@@ -3,6 +3,7 @@ tags:
   - '#exec'
   - '#marketing-and-documentation'
 date: '2026-02-20'
+modified: '2026-02-20'
 related:
   - '[[2026-02-20-marketing-and-documentation-p1-plan]]'
 ---

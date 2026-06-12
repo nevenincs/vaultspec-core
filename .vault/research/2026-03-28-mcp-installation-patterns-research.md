@@ -3,6 +3,7 @@ tags:
   - '#research'
   - '#mcp-installation'
 date: '2026-03-28'
+modified: '2026-03-28'
 related:
   - '[[2026-02-22-mcp-consolidation-research]]'
   - '[[2026-02-22-mcp-testing-research]]'

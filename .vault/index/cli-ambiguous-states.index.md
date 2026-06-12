@@ -4,6 +4,7 @@ tags:
   - '#cli-ambiguous-states'
   - '#index'
 date: '2026-04-21'
+modified: '2026-04-21'
 related:
   - '[[2026-03-27-cli-ambiguous-states-audit]]'
   - '[[2026-03-27-cli-ambiguous-states-gitignore-adr]]'

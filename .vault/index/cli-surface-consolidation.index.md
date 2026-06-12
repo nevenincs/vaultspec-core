@@ -4,6 +4,7 @@ tags:
   - '#index'
   - '#cli-surface-consolidation'
 date: '2026-05-17'
+modified: '2026-05-17'
 related:
   - '[[2026-05-17-cli-surface-consolidation-adr]]'
   - '[[2026-05-17-cli-surface-consolidation-research]]'

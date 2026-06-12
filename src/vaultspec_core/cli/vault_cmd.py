@@ -638,6 +638,337 @@ def cmd_stats(
             console.print(f"  Dangling links: {stats['dangling_link_count']}")
 
 
+# ---- vault status ------------------------------------------------------------
+
+
+@vault_app.command("status")
+def cmd_status(
+    target_arg: Annotated[
+        str | None,
+        typer.Argument(
+            metavar="[TARGET]",
+            help=(
+                "Optional plan stem, plan path, or feature tag. When given, "
+                "renders the grounding trace for that target instead of the "
+                "vault-wide rollup."
+            ),
+        ),
+    ] = None,
+    limit: Annotated[
+        int,
+        typer.Option("--limit", help="Number of recent documents to show (rollup)."),
+    ] = 10,
+    since: Annotated[
+        int | None,
+        typer.Option(
+            "--since",
+            help="Show documents modified within this many days (rollup).",
+        ),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    no_hints: Annotated[
+        bool, typer.Option("--no-hints", help="Suppress next-step advisory hints")
+    ] = False,
+    target: TargetOption = None,
+) -> None:
+    """Orient in a vaultspec vault: rollup, or a grounding trace for a target.
+
+    With no argument, renders the vault-wide rollup: in-flight plans, recent
+    changes grouped by type, active features, and totals. With a TARGET (a
+    plan stem, plan path, or feature tag), renders that target's grounding
+    trace: each plan step mapped to its execution record, plus grounding
+    documents grouped by type. Read-only: it never writes and produces no
+    artifact.
+    """
+    apply_target(target)
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
+    from vaultspec_core.vaultcore.orientation import (
+        TargetResolutionError,
+        compute_rollup,
+        compute_trace,
+    )
+
+    console = get_console()
+    root_dir = _get_ctx().target_dir
+
+    try:
+        graph = VaultGraph(root_dir)
+    except OSError as exc:
+        console.print(f"[red]Error reading vault: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    if target_arg is not None:
+        try:
+            trace = compute_trace(root_dir, target_arg, graph=graph)
+        except TargetResolutionError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(code=1) from exc
+        _emit_status_trace(console, trace, json_output=json_output, no_hints=no_hints)
+        return
+
+    rollup = compute_rollup(root_dir, limit=limit, since_days=since, graph=graph)
+    _emit_status_rollup(console, rollup, json_output=json_output, no_hints=no_hints)
+
+
+# The rollup's human rendering shows at most this many active features;
+# a vault that archives nothing would otherwise list every feature it has
+# ever carried, flooding the orientation view. The JSON payload is uncapped.
+_ACTIVE_FEATURES_DISPLAY_CAP = 10
+
+# Advisory hint pairs (description, command) for the status verb's two
+# modes, following the established "Suggested Next Step" mechanism. The
+# rollup points at the targeted mode and at health diagnosis; the trace
+# points at graph exploration and the deep single-plan validator.
+_STATUS_ROLLUP_HINTS: tuple[tuple[str, str], ...] = (
+    (
+        "Trace a plan's steps, records, and grounding documents",
+        "vaultspec-core vault status <plan-stem>",
+    ),
+    (
+        "Diagnose vault and workspace health",
+        "vaultspec-core spec doctor",
+    ),
+)
+
+
+def _status_trace_hints(trace) -> tuple[tuple[str, str], ...]:
+    """Build the trace-mode hint pairs, naming the target's feature."""
+    feature = next((plan.feature for plan in trace.plans if plan.feature), None)
+    feature_arg = feature or "<tag>"
+    plan_arg = trace.plans[0].stem if trace.plans else "<path>"
+    return (
+        (
+            "Explore the full relationship graph for this feature",
+            f"vaultspec-core vault graph --feature {feature_arg}",
+        ),
+        (
+            "Validate a single plan's structure and step state",
+            f"vaultspec-core vault plan status {plan_arg}",
+        ),
+    )
+
+
+def _emit_status_hints(
+    console: Console,
+    pairs: tuple[tuple[str, str], ...],
+    *,
+    json_output: bool,
+    no_hints: bool,
+) -> list[dict[str, str]] | None:
+    """Render advisory hint lines for status, returning the JSON shape.
+
+    Mirrors :func:`~vaultspec_core.cli.rendering.emit_next_step_hint`:
+    honours the ``--no-hints`` flag and the ``VAULTSPEC_NO_HINTS``
+    environment variable, prints a "Suggested Next Step" block to the
+    console for human output, and returns the structured hint list for
+    the JSON envelope (or ``None`` when suppressed).
+    """
+    import os
+
+    if no_hints or os.environ.get("VAULTSPEC_NO_HINTS") == "1":
+        return None
+
+    hints = [{"text": text, "command": command} for text, command in pairs]
+    if not json_output:
+        console.print()
+        console.print("[bold cyan]Suggested Next Step:[/bold cyan]")
+        for text, command in pairs:
+            console.print(f"  {text}")
+            console.print(f"  [bold cyan]>[/bold cyan] [bold]{command}[/bold]")
+    return hints
+
+
+def _rollup_payload(rollup) -> dict:
+    """Shape a :class:`Rollup` into the JSON envelope's data mapping."""
+    import dataclasses
+
+    return {
+        "active_features": [dataclasses.asdict(f) for f in rollup.active_features],
+        "plans_in_flight": [dataclasses.asdict(p) for p in rollup.plans_in_flight],
+        "recent_documents": {
+            doc_type: [dataclasses.asdict(d) for d in docs]
+            for doc_type, docs in rollup.recent_documents.items()
+        },
+        "totals": rollup.totals,
+        "limit": rollup.limit,
+        "since_days": rollup.since_days,
+    }
+
+
+def _emit_status_rollup(
+    console: Console,
+    rollup,
+    *,
+    json_output: bool,
+    no_hints: bool,
+) -> None:
+    """Render the vault-wide rollup as text or JSON (decisions D2/D7)."""
+    if json_output:
+        import json
+
+        from vaultspec_core.cli.rendering import json_envelope
+
+        hints = _emit_status_hints(
+            console, _STATUS_ROLLUP_HINTS, json_output=True, no_hints=no_hints
+        )
+        envelope = json_envelope(
+            "vault.status",
+            "unchanged",
+            _rollup_payload(rollup),
+            hints={"next_steps": hints} if hints is not None else None,
+        )
+        typer.echo(json.dumps(envelope, indent=2, default=str))
+        return
+
+    console.print("[bold]Vault Status[/bold]")
+
+    console.print()
+    console.print("[bold]Plans in flight[/bold]")
+    if rollup.plans_in_flight:
+        for plan in rollup.plans_in_flight:
+            modified = f"  [dim]{plan.modified}[/dim]" if plan.modified else ""
+            console.print(
+                f"  [bold]{plan.stem}[/bold]  "
+                f"{plan.closed_steps}/{plan.total_steps} done, "
+                f"{plan.open_steps} open  "
+                f"[cyan]{plan.completion_percent:g}%[/cyan]{modified}"
+            )
+    else:
+        console.print("  [dim]none[/dim]")
+
+    console.print()
+    console.print("[bold]Recent changes[/bold]")
+    if rollup.recent_documents:
+        for doc_type in sorted(rollup.recent_documents):
+            console.print(f"  [bold dim]{doc_type}[/bold dim]")
+            for doc in rollup.recent_documents[doc_type]:
+                modified = f"  [dim]{doc.modified}[/dim]" if doc.modified else ""
+                console.print(f"    {doc.stem}{modified}")
+    else:
+        console.print("  [dim]none[/dim]")
+
+    console.print()
+    console.print("[bold]Active features[/bold]")
+    if rollup.active_features:
+        # The human rendering caps the feature listing so a vault that
+        # archives nothing cannot flood the orientation rollup; the JSON
+        # payload always carries the full list.
+        shown = rollup.active_features[:_ACTIVE_FEATURES_DISPLAY_CAP]
+        for feat in shown:
+            plan_marker = " [green]plan[/green]" if feat.has_plan else ""
+            activity = (
+                f"  [dim]{feat.latest_activity}[/dim]" if feat.latest_activity else ""
+            )
+            console.print(
+                f"  [bold]{feat.name}[/bold]  {feat.doc_count} docs"
+                f"{plan_marker}{activity}"
+            )
+        remainder = len(rollup.active_features) - len(shown)
+        if remainder > 0:
+            console.print(
+                f"  [dim]... and {remainder} more  "
+                f"> vaultspec-core vault feature list[/dim]"
+            )
+    else:
+        console.print("  [dim]none[/dim]")
+
+    totals = rollup.totals
+    console.print()
+    console.print("[bold]Totals[/bold]")
+    console.print(f"  Total documents: {totals.get('total_docs', 0)}")
+    console.print(f"  Total features:  {totals.get('total_features', 0)}")
+
+    _emit_status_hints(
+        console, _STATUS_ROLLUP_HINTS, json_output=False, no_hints=no_hints
+    )
+
+
+def _plan_trace_payload(plan) -> dict:
+    """Shape a :class:`PlanTrace` into the JSON envelope's data mapping."""
+    import dataclasses
+
+    return {
+        "stem": plan.stem,
+        "feature": plan.feature,
+        "steps": [dataclasses.asdict(s) for s in plan.steps],
+        "summaries": list(plan.summaries),
+        "unlinked_records": list(plan.unlinked_records),
+        "grounding": {k: list(v) for k, v in plan.grounding.items()},
+        "error": plan.error,
+    }
+
+
+def _emit_status_trace(
+    console: Console,
+    trace,
+    *,
+    json_output: bool,
+    no_hints: bool,
+) -> None:
+    """Render the grounding trace as text or JSON (decisions D5/D7)."""
+    hint_pairs = _status_trace_hints(trace)
+
+    if json_output:
+        import json
+
+        from vaultspec_core.cli.rendering import json_envelope
+
+        hints = _emit_status_hints(
+            console, hint_pairs, json_output=True, no_hints=no_hints
+        )
+        envelope = json_envelope(
+            "vault.status",
+            "unchanged",
+            {
+                "target": trace.target,
+                "kind": trace.kind,
+                "plans": [_plan_trace_payload(p) for p in trace.plans],
+            },
+            hints={"next_steps": hints} if hints is not None else None,
+        )
+        typer.echo(json.dumps(envelope, indent=2, default=str))
+        return
+
+    console.print(f"[bold]Grounding Trace[/bold]  {trace.target} ({trace.kind})")
+
+    for plan in trace.plans:
+        console.print()
+        console.print(f"[bold]{plan.stem}[/bold]")
+        if plan.error:
+            console.print(f"  [red]error: {plan.error}[/red]")
+            continue
+
+        for step in plan.steps:
+            glyph = "[green][x][/green]" if step.checked else "[dim][ ][/dim]"
+            if step.record_stem:
+                record = step.record_stem
+            elif step.checked:
+                record = "[yellow]unlinked[/yellow]"
+            else:
+                record = "[dim]no record[/dim]"
+            console.print(f"  {glyph} {step.display_path}  {record}")
+
+        if plan.summaries:
+            console.print("  [bold dim]summaries[/bold dim]")
+            for stem in plan.summaries:
+                console.print(f"    {stem}")
+
+        if plan.unlinked_records:
+            console.print("  [bold dim]unlinked records[/bold dim]")
+            for stem in plan.unlinked_records:
+                console.print(f"    [yellow]{stem}[/yellow]")
+
+        if plan.grounding:
+            console.print("  [bold dim]grounding[/bold dim]")
+            for doc_type in sorted(plan.grounding):
+                for stem in plan.grounding[doc_type]:
+                    console.print(f"    [dim]{doc_type}[/dim]  {stem}")
+
+    _emit_status_hints(console, hint_pairs, json_output=False, no_hints=no_hints)
+
+
 # ---- vault list --------------------------------------------------------------
 
 
@@ -1447,6 +1778,36 @@ def cmd_check_frontmatter(
     )
     _render_and_exit(
         result, verbose, json_output=json_output, command="vault.check.frontmatter"
+    )
+
+
+@check_app.command("modified-stamp")
+def cmd_check_modified_stamp(
+    fix: Annotated[
+        bool, typer.Option("--fix", help="Apply safe auto-corrections to vault content")
+    ] = False,
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Validate and reconcile the modified recency stamp on every document."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
+    from vaultspec_core.vaultcore.checks import check_modified_stamp
+
+    graph = VaultGraph(_get_ctx().target_dir)
+    snapshot = graph.to_snapshot()
+    result = check_modified_stamp(
+        _get_ctx().target_dir, snapshot=snapshot, feature=feature, fix=fix
+    )
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.modified-stamp"
     )
 
 

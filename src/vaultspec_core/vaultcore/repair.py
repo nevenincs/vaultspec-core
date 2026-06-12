@@ -264,6 +264,17 @@ def run_repair_pipeline(
         phase_after,
     )
 
+    # Vault-orientation ADR (decision D3): the fix pass rewrote documents,
+    # so refresh the modified stamp on exactly those the fix touched. Only
+    # files whose fingerprint changed during the fix phase are restamped;
+    # untouched documents are left byte-for-byte intact. Re-fingerprint
+    # afterwards so the index and postcheck phases observe the restamped
+    # state rather than reporting the stamp write as fresh drift.
+    if not dry_run:
+        rewritten = _changed_files(phase_before, phase_after)
+        if _restamp_modified(root_dir, rewritten):
+            phase_after = refresh_fingerprints()
+
     if include_index:
         phase_before = current
         try:
@@ -571,6 +582,63 @@ def _finalize(
             ],
         }
     )
+
+
+def _restamp_modified(root_dir: Path, rewritten: Iterable[str]) -> bool:
+    """Refresh the modified stamp on documents the fix pass rewrote.
+
+    Implements the repair-pipeline half of the vault-orientation ADR's
+    decision D3. For each relative path the fix phase actually changed,
+    the document is reloaded, its ``modified:`` frontmatter stamp is
+    refreshed to today via the shared
+    :func:`vaultspec_core.vaultcore.models.refresh_modified_stamp`
+    helper, and the file is rewritten only when the stamp differs from
+    what is already on disk. Files that no longer exist (renamed or
+    deleted by the fix pass) and non-markdown paths are skipped, and the
+    document's line-ending convention is preserved because the helper
+    operates on the raw text.
+
+    Args:
+        root_dir: Project root the relative paths resolve against.
+        rewritten: Relative POSIX paths the fix phase changed.
+
+    Returns:
+        ``True`` when at least one document's stamp was rewritten, so
+        the caller knows to re-fingerprint.
+    """
+    import datetime as _dt
+
+    from ..core.helpers import atomic_write
+    from .models import refresh_modified_stamp
+
+    today = _dt.date.today()
+    changed = False
+    for rel in rewritten:
+        if not rel.endswith(".md"):
+            continue
+        path = root_dir / rel
+        if not path.is_file():
+            continue
+        # A case-only rename during the fix phase leaves the old-cased
+        # relative path in ``rewritten`` (it vanished from the after-set).
+        # On a case-insensitive filesystem ``is_file`` and ``atomic_write``
+        # both resolve that stale path to the renamed file and would
+        # resurrect the original casing. Confirm the exact name is the one
+        # on disk via a case-sensitive parent listing before restamping.
+        try:
+            if path.name not in {entry.name for entry in path.parent.iterdir()}:
+                continue
+        except OSError:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        stamped = refresh_modified_stamp(text, today)
+        if stamped != text:
+            atomic_write(path, stamped)
+            changed = True
+    return changed
 
 
 def _vault_file_fingerprints(root_dir: Path) -> dict[str, tuple[int, int]]:

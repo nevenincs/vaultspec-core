@@ -3,6 +3,7 @@ tags:
   - '#adr'
   - '#clci-release'
 date: '2026-03-22'
+modified: '2026-03-22'
 related:
   - '[[2026-03-22-clci-release-research]]'
   - '[[2026-03-21-cli-release-readiness-audit]]'

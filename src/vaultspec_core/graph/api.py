@@ -77,6 +77,10 @@ class DocNode:
         doc_type: Categorised document type from vault folder location.
         feature: Feature tag (without ``#`` prefix), or ``None``.
         date: ISO-8601 date string from frontmatter, or ``None``.
+        modified: CLI-maintained ``modified:`` recency stamp as parsed
+            from frontmatter, or ``None`` when the field is absent. Carried
+            verbatim (not canonicalised) so the modified-stamp checker can
+            still distinguish a non-canonical value from a missing one.
         title: First ``# heading`` extracted from body, or ``None``.
         tags: Set of all frontmatter tags.
         frontmatter: Raw frontmatter dict (everything parsed from YAML).
@@ -93,6 +97,7 @@ class DocNode:
     doc_type: DocType | None = None
     feature: str | None = None
     date: str | None = None
+    modified: str | None = None
     title: str | None = None
     tags: set[str] = field(default_factory=set)
     frontmatter: dict[str, Any] = field(default_factory=dict)
@@ -119,6 +124,7 @@ class DocNode:
             "doc_type": (self.doc_type.value if self.doc_type else None),
             "feature": self.feature,
             "date": self.date,
+            "modified": self.modified,
             "title": self.title,
             "tags": sorted(self.tags),
             "frontmatter": self.frontmatter,
@@ -359,6 +365,7 @@ def _docnode_from_attrs(name: str, attrs: dict[str, Any]) -> DocNode:
         doc_type=DocType(doc_type_value) if doc_type_value else None,
         feature=attrs.get("feature"),
         date=attrs.get("date"),
+        modified=attrs.get("modified"),
         title=attrs.get("title"),
         tags=set(attrs.get("tags", [])),
         frontmatter=attrs.get("frontmatter", {}),
@@ -601,6 +608,7 @@ class VaultGraph:
 
                 node.tags = set(metadata.tags)
                 node.date = metadata.date
+                node.modified = metadata.modified
                 node.feature = _extract_feature(node.tags)
                 node.frontmatter = raw_fm
                 node.body = body
@@ -1019,7 +1027,8 @@ class VaultGraph:
         """Build a :data:`~vaultspec_core.vaultcore.checks._base.VaultSnapshot`
         from the graph's parsed node data.
 
-        Each node's frontmatter tags, date, and related links are packed into a
+        Each node's frontmatter tags, date, modified stamp, and related
+        links are packed into a
         :class:`~vaultspec_core.vaultcore.models.DocumentMetadata`, paired with
         the node's body text, and keyed by filesystem path.
 
@@ -1039,6 +1048,7 @@ class VaultGraph:
             metadata = DocumentMetadata(
                 tags=sorted(node.tags),
                 date=node.date,
+                modified=node.modified,
                 related=related,
             )
             snapshot[node.path] = (metadata, node.body)

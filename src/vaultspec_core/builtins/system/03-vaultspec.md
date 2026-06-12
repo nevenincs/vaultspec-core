@@ -15,24 +15,38 @@ order: 3
   feature indexes live in `.vault/index/` and are managed by
   `vaultspec-core vault feature index`; do not author them by hand.
 
+**Orient first.** In a project with no session context, run
+`vaultspec-core vault status` before invoking any pipeline skill. Read the in-flight
+plans it names, then enter the pipeline at the right phase: resume an in-flight plan via
+`vaultspec-execute`, or start fresh at Research.
+
 All significant work must follow this pipeline:
 
-| Phase       | Skill                   | Artifact                   | Requires                                        |
-| ----------- | ----------------------- | -------------------------- | ----------------------------------------------- |
-| 1 Research  | vaultspec-research      | .vault/research/...        | -                                               |
-| 1 Reference | vaultspec-code-research | .vault/reference/...       | -                                               |
-| 2 Specify   | vaultspec-adr           | .vault/adr/...             | Research artifact                               |
-| 3 Plan      | vaultspec-write         | .vault/plan/...            | ADR artifact                                    |
-| 4 Execute   | vaultspec-execute       | .vault/exec/.../steps      | Approved plan                                   |
-| 5 Verify    | vaultspec-code-review   | .vault/audit/...           | Completed step(s)                               |
-| 6 Codify    | vaultspec-codify        | .vaultspec/rules/rules/... | Review surfacing a durable cross-session lesson |
+| Phase        | Skill                   | Artifact                   | Requires                                        |
+| ------------ | ----------------------- | -------------------------- | ----------------------------------------------- |
+| 1a Research  | vaultspec-research      | .vault/research/...        | -                                               |
+| 1b Reference | vaultspec-code-research | .vault/reference/...       | -                                               |
+| 2 Specify    | vaultspec-adr           | .vault/adr/...             | Research artifact                               |
+| 3 Plan       | vaultspec-write         | .vault/plan/...            | ADR artifact                                    |
+| 4 Execute    | vaultspec-execute       | .vault/exec/.../steps      | Approved plan                                   |
+| 5 Verify     | vaultspec-code-review   | .vault/audit/...           | Completed step(s)                               |
+| 6 Codify     | vaultspec-codify        | .vaultspec/rules/rules/... | Review surfacing a durable cross-session lesson |
+
+Phases 1a and 1b are parallel entry points: Research explores the problem space,
+Reference grounds the work in existing source code. A feature needs at least one of the
+two; complex features benefit from both.
 
 Phase 6 (Codify) is **discretionary**: most features end at Verify. Only when a Verify
 pass surfaces a lesson that satisfies the three durability criteria (cross-session,
 constraint-shaped, project-bound) does the work continue into Codify. The
-`vaultspec-codify` rule defines the criteria and the body template; the
-`vaultspec-codifier` agent persona enacts the discipline. A rule authored under Phase 6
-binds future agents across sessions, clones, and CI runs.
+`vaultspec-codify` rule defines the criteria and the authoring path
+(`vaultspec-core vault rule promote`); the `vaultspec-codifier` agent persona enacts the
+discipline. A rule authored under Phase 6 binds future agents across sessions, clones,
+and CI runs.
+
+The pipeline scales with the work. Trivial, single-file fixes with no architectural
+weight may proceed directly with user approval; state explicitly that the pipeline is
+being skipped and why. Everything else follows the phases above.
 
 Plan documents structure work with the hierarchy `Epic > Wave > Phase > Step` and
 declare a complexity tier (`L1`, `L2`, `L3`, or `L4`) in frontmatter. The tier
@@ -40,16 +54,16 @@ determines which structural containers exist: `L1` is Steps only; `L2` adds Phas
 adds Waves; `L4` adds an Epic frame and requires an external project-management
 association declared in the Epic intent block. The leaf row at every tier is named
 `Step`; the Execution Record artifact retains the name `<Step Record>` and maps
-one-to-one to a Step. Full conventions live in the plan-hardening convention ADR and in
-the Markdown comment hint blocks embedded in `.vaultspec/rules/templates/plan.md`.
+one-to-one to a Step. Full conventions live in the Markdown comment hint blocks embedded
+in `.vaultspec/rules/templates/plan.md`.
 
 The `vaultspec-core vault plan` CLI is the canonical surface for structural manipulation
 of plan documents. Writers and executors MUST use the `vaultspec-core vault plan ...`
 CLI verbs (`step add/insert/move/remove/check/uncheck/toggle/edit`, `phase`/`wave`
 equivalents, `epic intent`, `tier promote/demote`) for every identifier-affecting change
 rather than hand-editing the markdown body. The CLI guarantees canonical-identifier
-preservation, gap-no-reuse, and display-path consistency that hand edits cannot. See the
-CLI ADR (`2026-05-06-plan-hardening-adr`) for the subcommand contract.
+preservation, gap-no-reuse, and display-path consistency that hand edits cannot. Run
+`vaultspec-core vault plan --help` for the full subcommand surface.
 
 Supporting skills, invoked when appropriate:
 
@@ -85,12 +99,12 @@ depending on plan complexity:
   host environment.
 
 Each persona declares a `mode:` field in its frontmatter. The field states the persona's
-declared file-mutation intent via the harness file tools (Write/Edit): `read-write`
-personas mutate files directly; `read-only` personas carry no Write or Edit tool and
-return their findings as their final message for the dispatching orchestrator to persist
-(scaffold via `vaultspec-core vault add`, then body-prose edit). The declaration is
-intent, not a sandbox - Bash can technically write files in either mode - so honoring it
-is persona discipline, not tooling enforcement.
+declared mutation intent: `read-write` personas mutate project state, whether through
+the harness file tools (Write/Edit) or through stateful commands such as `gh` and `git`;
+`read-only` personas mutate nothing and return their findings as their final message for
+the dispatching orchestrator to persist (scaffold via `vaultspec-core vault add`, then
+body-prose edit). The declaration is intent, not a sandbox - Bash can technically write
+files in either mode - so honoring it is persona discipline, not tooling enforcement.
 
 Artifacts are persisted in `.vault/`. The user must approve plans before execution
 proceeds. Code review via vaultspec-code-review is mandatory after execution.

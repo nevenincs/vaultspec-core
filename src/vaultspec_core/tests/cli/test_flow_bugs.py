@@ -1154,3 +1154,51 @@ class TestStructureRenameUpdatesRefs:
         assert backref.read_text(encoding="utf-8") == original
         assert result.fixed_count == 0
         assert not any("Updated wiki-link" in d.message for d in result.diagnostics)
+
+
+class TestPlanMutatorWithoutWorkspaceContext:
+    """Plan mutators must succeed when no workspace context was initialised.
+
+    Plan mutator commands take no ``--target`` option and never call
+    ``apply_target``, so a bare ``vaultspec-core vault plan wave add ...``
+    invocation reaches the post-write graph-cache invalidation with an unset
+    workspace ContextVar. The invalidation must fall back to the cwd instead
+    of crashing after the file was already mutated (half-applied verb).
+    """
+
+    def test_wave_add_succeeds_in_fresh_context(self, tmp_path: Path) -> None:
+        import contextvars
+        import random
+
+        from typer.testing import CliRunner
+
+        from vaultspec_core.cli import app
+        from vaultspec_core.tests.plan._factories import make_clean_plan
+
+        spec = make_clean_plan("L3", rng=random.Random(7), waves=1, phases=1, steps=1)
+        plan_path = tmp_path / "2026-06-12-ctx-plan.md"
+        plan_path.write_text(spec.render(), encoding="utf-8")
+        original = plan_path.read_text(encoding="utf-8")
+
+        runner = CliRunner()
+        fresh = contextvars.Context()
+        result = fresh.run(
+            runner.invoke,
+            app,
+            [
+                "vault",
+                "plan",
+                "wave",
+                "add",
+                str(plan_path),
+                "--title",
+                "fresh context wave",
+                "--intent",
+                "Wave added without an initialised workspace context.",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        mutated = plan_path.read_text(encoding="utf-8")
+        assert mutated != original
+        assert "fresh context wave" in mutated

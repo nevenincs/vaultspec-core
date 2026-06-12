@@ -3,6 +3,7 @@ tags:
   - '#plan'
   - '#packaging-restructure'
 date: '2026-02-21'
+modified: '2026-02-21'
 related:
   - '[[2026-02-21-packaging-restructure-adr]]'
   - '[[2026-02-21-packaging-restructure-research]]'

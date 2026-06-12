@@ -7,7 +7,7 @@ description: >-
   audit report.
 ---
 
-# Documentation Curation Skill (vaultspec-curate)
+# Documentation curation skill (vaultspec-curate)
 
 This skill governs the autonomous auditing and maintenance of the `.vault/`
 documentation vault. It ensures every artifact conforms to the project's documentation
@@ -16,7 +16,7 @@ standards as defined in `.vaultspec/rules/rules/vaultspec.builtin.md`.
 **Announce at start:** "I'm using the `vaultspec-curate` skill to audit and clean the
 documentation vault."
 
-## When to Use
+## When to use
 
 - After completing a feature (post `vaultspec-execute`) to verify documentation trail
   integrity.
@@ -29,7 +29,7 @@ documentation vault."
 
 ## Workflow
 
-### Dispatch the Curator
+### Dispatch the curator
 
 Load the `vaultspec-docs-curator` agent persona. Instruct it to "Perform a full vault
 audit of `.vault/`. Validate frontmatter, wiki-links, naming conventions, template
@@ -40,14 +40,15 @@ and produce an audit report."
 The curator's operating mode is **Audit -> Delegate -> Verify**: it identifies
 violations with precision and orchestrates fixes through the CLI fix paths and loaded
 agent personas rather than editing documents in-place itself, then re-scans after every
-delegated repair.
+delegated repair. The one document the curator authors directly is its own audit report.
 
 For targeted audits, scope the audit accordingly (e.g., "Audit only `.vault/exec/...`").
 
-### Review the Audit Report
+### Review the audit report
 
-Scaffold the audit report with `vaultspec-core vault add audit --feature docs-curation`,
-then persist the curator's findings into its body. The CLI owns the filename
+The curator scaffolds its report with
+`vaultspec-core vault add audit --feature docs-curation` and authors the findings into
+the scaffolded body itself. The CLI owns the filename
 (`.vault/audit/yyyy-mm-dd-docs-curation-audit.md`) and the frontmatter; never hand-write
 either.
 
@@ -58,43 +59,28 @@ Review the report for:
 - **Flagged** items requiring author input (missing template sections, ambiguous file
   placement).
 
-### Act on Flagged Items
+### Act on flagged items
 
 Items the curator cannot auto-fix are listed under **Recommendations**. Orchestrate
 these per the delegate model: dispatch the appropriate agent persona (e.g.,
 `vaultspec-low-executor` for adding missing sections), or surface items needing author
 judgment to the user.
 
-## Artifact Linking
+## Artifact linking
 
 - Any persisted markdown files must be linked against other persisted documents using
   quoted `'[[wiki-links]]'`.
 
 - DO NOT use `@ref` style links or `[label](path)` style links.
 
-### Frontmatter & Tagging Mandate
+## Standards
 
-The curator validates every document against this schema. The `vaultspec-core vault add`
-scaffold produces conforming frontmatter for new documents; violations in existing
-documents are repaired via `vaultspec-core vault check all --fix` rather than hand
-edits:
-
-- **`tags`**: MUST contain the required tag pair in a YAML list.
-
-  - **Directory Tag**: Exactly one of `#adr`, `#audit`, `#exec`, `#index`, `#plan`,
-    `#reference`, or `#research` (based on file location).
-
-  - **Feature Tag**: Exactly one kebab-case `#{feature}` tag.
-
-  - *Syntax:* `tags: ['#doc-type', '#{feature}']` (Must be quoted strings in a list).
-
-- **`related`**: MUST be a YAML list of quoted `'[[wiki-links]]'`.
-
-  - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
-
-- **`date`**: MUST use `yyyy-mm-dd` format.
-
-- **No `feature` key**: Use `tags:` exclusively for feature identification.
+The curator validates every document against the frontmatter schema defined in the
+`vaultspec` rule (`.vaultspec/rules/rules/vaultspec.builtin.md`): the required tag pair,
+quoted wiki-links in `related:`, `yyyy-mm-dd` dates, and no `feature` key. The
+`vaultspec-core vault add` scaffold produces conforming frontmatter for new documents;
+violations in existing documents are repaired via `vaultspec-core vault check all --fix`
+rather than hand edits.
 
 ## Requirements
 

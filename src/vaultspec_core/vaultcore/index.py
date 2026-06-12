@@ -35,8 +35,10 @@ def generate_feature_index(
     and contains a ``related:`` field linking to every document tagged
     with the feature, plus a body listing documents grouped by type. The
     rendered frontmatter carries the standard two-tag shape
-    (``#index`` directory tag plus ``#<feature>`` feature tag) and the
-    ``generated: true`` marker.
+    (``#index`` directory tag plus ``#<feature>`` feature tag), the
+    ``generated: true`` marker, and a ``modified:`` stamp equal to
+    ``date:`` so the index reconciles cleanly against the
+    modified-stamp checker like every other CLI-created document.
 
     Args:
         root_dir: Project root directory.
@@ -94,6 +96,7 @@ def generate_feature_index(
         f"  - '#index'\n"
         f"  - '#{feature}'\n"
         f"date: '{date}'\n"
+        f"modified: '{date}'\n"
         f"{related_block}\n"
         f"---\n"
         f"\n"

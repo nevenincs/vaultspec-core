@@ -3,6 +3,7 @@ tags:
   - '#exec'
   - '#cli-simplification-ux'
 date: '2026-05-26'
+modified: '2026-05-26'
 step_id: S34
 related:
   - '[[2026-05-17-cli-simplification-ux-plan]]'

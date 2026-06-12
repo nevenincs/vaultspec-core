@@ -3,6 +3,7 @@ tags:
   - '#exec'
   - '#audit-findings'
 date: '2026-03-30'
+modified: '2026-03-30'
 related:
   - '[[2026-03-30-audit-findings-plan]]'
   - '[[2026-03-27-cli-ambiguous-states-audit]]'

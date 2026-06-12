@@ -71,11 +71,21 @@ def _save_plan_or_dry_run(
 
     Or write to disk on apply.
     """
+    import datetime as _dt
+
     from vaultspec_core.plan.commands._errors import PlanCommandError
     from vaultspec_core.plan.parser import parse_plan
     from vaultspec_core.plan.serialiser import serialise_plan
+    from vaultspec_core.vaultcore import refresh_modified_stamp
 
     new_text = serialise_plan(plan, canonicalise=canonicalise)
+
+    # Vault-orientation ADR (decision D3): a plan mutation refreshes the
+    # document's modified stamp. This is applied to the serialised text
+    # before the diff is built so a dry-run preview stays truthful (the
+    # stamp change is visible) and before the write so the persisted file
+    # carries it. A pure dry-run still writes nothing.
+    new_text = refresh_modified_stamp(new_text, _dt.date.today())
 
     # Issue 150: Verify that no unexpected elements are retired during this mutation
     try:
@@ -142,7 +152,15 @@ def _save_plan_or_dry_run(
             from vaultspec_core.cli._cache_hook import invalidate_graph_cache
             from vaultspec_core.core.types import get_context as _get_ctx
 
-            invalidate_graph_cache(_get_ctx().target_dir)
+            # Plan mutators do not take --target, so the workspace context is
+            # only initialised when another command set it earlier in-process.
+            # Bare invocations fall back to the cwd, which is what
+            # apply_target(None) would have resolved.
+            try:
+                target_dir = _get_ctx().target_dir
+            except LookupError:
+                target_dir = Path.cwd()
+            invalidate_graph_cache(target_dir)
 
 
 plan_app = typer.Typer(

@@ -304,9 +304,14 @@ def rule_promote(
     Returns:
         The Path to the scaffolded rule file.
     """
+    import datetime as _dt
     import re
 
-    from ..vaultcore import VaultConstants, parse_vault_metadata
+    from ..vaultcore import (
+        VaultConstants,
+        parse_vault_metadata,
+        refresh_modified_stamp,
+    )
     from .exceptions import ResourceExistsError, ResourceNotFoundError, VaultSpecError
 
     # 1. Locate the originating audit document
@@ -452,6 +457,12 @@ derived_from:
         if source_newline == "\n"
         else rendered_audit.replace("\n", source_newline)
     )
+
+    # Vault-orientation ADR (decision D3): promote rewrites the source
+    # audit's frontmatter (appending the promoted rule reference), so the
+    # audit is mutated and its modified stamp is refreshed. The rule file
+    # is freshly scaffolded with its own stamp and needs no refresh here.
+    final_audit_content = refresh_modified_stamp(final_audit_content, _dt.date.today())
 
     if not dry_run:
         # Write rule file

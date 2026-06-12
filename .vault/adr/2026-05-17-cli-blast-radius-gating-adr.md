@@ -3,6 +3,7 @@ tags:
   - '#adr'
   - '#cli-blast-radius-gating'
 date: '2026-05-17'
+modified: '2026-05-17'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-blast-radius-gating-research]]'

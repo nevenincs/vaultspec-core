@@ -3,6 +3,7 @@ tags:
   - '#plan'
   - '#cli-ambiguous-states'
 date: '2026-03-27'
+modified: '2026-03-27'
 related:
   - '[[2026-03-27-cli-ambiguous-states-resolver-adr]]'
   - '[[2026-03-27-cli-ambiguous-states-gitignore-adr]]'

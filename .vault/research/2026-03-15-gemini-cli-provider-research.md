@@ -3,6 +3,7 @@ tags:
   - '#research'
   - '#install-cmds'
 date: '2026-03-15'
+modified: '2026-03-15'
 related:
   - '[[2026-03-15-install-cmds-plan]]'
   - '[[2026-03-15-claude-code-provider-research]]'

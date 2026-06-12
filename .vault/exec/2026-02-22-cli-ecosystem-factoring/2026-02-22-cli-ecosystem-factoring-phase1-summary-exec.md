@@ -3,6 +3,7 @@ tags:
   - '#exec'
   - '#cli-ecosystem-factoring'
 date: '2026-02-22'
+modified: '2026-02-22'
 related:
   - '[[2026-02-22-cli-ecosystem-factoring-plan]]'
   - '[[2026-02-22-cli-ecosystem-factoring-adr]]'

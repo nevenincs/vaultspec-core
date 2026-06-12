@@ -45,6 +45,7 @@ vaultspec-core sync [OPTIONS] [PROVIDER]
 vaultspec-core doctor [OPTIONS]
 vaultspec-core vault add [OPTIONS] DOC_TYPE
 vaultspec-core vault stats [OPTIONS]
+vaultspec-core vault status [OPTIONS] [TARGET]
 vaultspec-core vault list [OPTIONS] [DOC_TYPE]
 vaultspec-core vault graph [OPTIONS]
 vaultspec-core vault repair [OPTIONS]
@@ -58,6 +59,7 @@ vaultspec-core vault check annotations [OPTIONS]
 vaultspec-core vault check dangling [OPTIONS]
 vaultspec-core vault check orphans [OPTIONS]
 vaultspec-core vault check frontmatter [OPTIONS]
+vaultspec-core vault check modified-stamp [OPTIONS]
 vaultspec-core vault check links [OPTIONS]
 vaultspec-core vault check features [OPTIONS]
 vaultspec-core vault check references [OPTIONS]
@@ -231,6 +233,47 @@ Create a `.vault/` document from a template.
 | `--step ID`     | -     | None    | Canonical ID or display path of the Step to scaffold (exec records). |
 | `--all-steps`   | -     | off     | Scaffold execution records for all Steps in the parent plan.         |
 
+### vaultspec-core vault status
+
+Signature: `vaultspec-core vault status [OPTIONS] [TARGET]`. Orient in a vaultspec
+vault: rollup or a grounding trace for a target. Read-only - it never writes and
+produces no artifact.
+
+**Rollup mode** (no `TARGET`): reports in-flight plans with open/closed step counts and
+completion percent, recently modified documents grouped by type, active features, and
+vault totals. Advisory hints point at the targeted mode and at
+`vaultspec-core spec doctor` for health checks.
+
+**Targeted mode** (`TARGET` is a plan stem, plan path, or feature tag): renders the
+grounding trace for that target - each plan step (canonical id, display path, open or
+closed) mapped to its execution-record stem, or `no record` for open steps without one,
+or `unlinked` for exec records that reference the plan without a resolvable `step_id:`.
+Grounding documents are grouped by type beneath the step list. A feature-tag target
+traces every plan under the feature. Advisory hints point at
+`vaultspec-core vault graph` for full graph exploration and at
+`vaultspec-core vault plan status` for deep single-plan validation.
+
+`vaultspec-core vault status` is orientation, not auditing: it describes what exists
+without judging conformance. Use `vaultspec-core vault check` to audit and
+`vaultspec-core spec doctor` for framework health.
+
+| Option       | Short | Default | Description                                     |
+| ------------ | ----- | ------- | ----------------------------------------------- |
+| `--limit N`  | -     | `10`    | Number of recently modified documents to show.  |
+| `--since N`  | -     | None    | Show documents modified within the last N days. |
+| `--json`     | -     | off     | Emit machine-readable output.                   |
+| `--no-hints` | -     | off     | Suppress next-step advisory hints.              |
+
+`--limit` and `--since` apply only in rollup mode; in targeted mode they are accepted
+but have no effect. `--limit` and `--since` are mutually exclusive in rollup mode:
+`--since` switches from last-N to a day-window query.
+
+`--json` emits the versioned envelope with schema id `vaultspec.vault.status.v1` and
+`unchanged` outcome semantics (status rollup is always a read-only, no-mutation
+operation). The `data` payload carries `plans_in_flight`, `recent_documents`,
+`active_features`, and `hints` under stable keys. Schema bumps follow the standard
+version integer convention.
+
 ### vaultspec-core vault list
 
 List vault documents. `DOC_TYPE` filters by type.
@@ -343,10 +386,12 @@ on `.vault/`. Exits `1` if errors are found.
 Shared options: `--fix` (apply auto-fixes), `--feature TAG` / `-f` (limit to a feature),
 `--verbose` / `-v` (INFO diagnostics).
 
-Subcommands: `all`, `annotations`, `body-links`, `dangling`, `frontmatter`, `links`,
-`orphans`, `features`, `references`, `schema`, `structure`, `rename-integrity`. The
-`structure` subcommand does not support `--feature`. The `rename-integrity` subcommand
-checks name/filename integrity for rules, skills, and agents.
+Subcommands: `all`, `annotations`, `body-links`, `dangling`, `frontmatter`,
+`modified-stamp`, `links`, `orphans`, `features`, `references`, `schema`, `structure`,
+`rename-integrity`. The `structure` subcommand does not support `--feature`. The
+`rename-integrity` subcommand checks name/filename integrity for rules, skills, and
+agents. The `modified-stamp` subcommand flags missing, unparseable, or stale `modified:`
+stamps; with `--fix` it normalizes parsed values to canonical `yyyy-mm-dd` form.
 
 ### vaultspec-core vault plan
 

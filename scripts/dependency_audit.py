@@ -37,7 +37,19 @@ from pathlib import Path
 # PYSEC-2025-183 (alias CVE-2025-45768) is a disputed, unfixable pyjwt
 # advisory pulled transitively by ``mcp``; its OSV record carries a
 # malformed empty event object that uv's preview decoder cannot parse.
-IGNORED: frozenset[str] = frozenset({"PYSEC-2025-183", "CVE-2025-45768"})
+# GHSA-rrmf-rvhw-rf47 (alias CVE-2025-3000) is a torch.jit.script memory
+# corruption with no fixed release (OSV last_affected == 2.12.0, the
+# latest version). torch is dev-only tooling here (vaultspec-rag's
+# backend, never shipped in the wheel) and nothing in this repository
+# invokes torch.jit. Re-triage when a fixed torch release appears.
+IGNORED: frozenset[str] = frozenset(
+    {
+        "PYSEC-2025-183",
+        "CVE-2025-45768",
+        "GHSA-rrmf-rvhw-rf47",
+        "CVE-2025-3000",
+    }
+)
 
 _OSV_QUERYBATCH = "https://api.osv.dev/v1/querybatch"
 _REPO_ROOT = Path(__file__).resolve().parent.parent

@@ -54,7 +54,7 @@ hierarchy should reference those above them.
 - **Audits** (`.vault/audit/yyyy-mm-dd-{feature}-audit.md`, optionally
   `.vault/audit/yyyy-mm-dd-{feature}-{topic}-audit.md`)
 
-  - *Depends on:* brainstorm, research
+  - *Depends on:* the artifacts under review (plans, execution records, code)
   - *References:* the artifacts under review
 
 - **Architecture Decision Records (ADR)** (`.vault/adr/`)
@@ -162,10 +162,15 @@ tags:
   - '#plan'
   - '#feature-name'
 date: '2026-02-06'
+modified: '2026-02-06'
 related:
   - '[[related-file]]'
 ---
 ```
+
+`modified:` is a CLI-maintained last-modified stamp: set equal to `date:` at scaffold,
+refreshed by every mutating verb and by `vaultspec-core vault check all --fix`, parsed
+leniently but rewritten to the canonical quoted `yyyy-mm-dd` form, never hand-edited.
 
 **Examples:**
 
@@ -202,12 +207,13 @@ Follow these conventions:
 | `{yyyy-mm-dd}`   | lowercase, ISO 8601   | `2026-02-06`              |
 | `{yyyy-mm-dd-*}` | lowercase pattern     | `2026-02-04-feature-plan` |
 | `{tier}`         | uppercase enum        | `L1`, `L2`, `L3`, `L4`    |
+| `modified`       | CLI-maintained stamp  | `2026-02-06`              |
 
 ### Document Body Placeholders
 
 Container identifiers (`{wave}`, `{phase}`, `{step}`) use the canonical uppercase
-zero-padded form from the convention ADR. `{feature}` uses lowercase kebab-case.
-Narrative placeholders (`{topic}`, `{title}`) use concise prose.
+zero-padded form from the plan template hint blocks. `{feature}` uses lowercase
+kebab-case. Narrative placeholders (`{topic}`, `{title}`) use concise prose.
 
 | Placeholder | Format              | Example                   |
 | :---------- | :------------------ | :------------------------ |

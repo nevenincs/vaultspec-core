@@ -3,6 +3,7 @@ tags:
   - '#adr'
   - '#cli-paper-cuts'
 date: '2026-05-17'
+modified: '2026-05-17'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-paper-cuts-research]]'

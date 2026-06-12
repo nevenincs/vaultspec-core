@@ -4,6 +4,7 @@ tags:
   - '#hooks-maturity'
   - '#index'
 date: '2026-04-21'
+modified: '2026-04-21'
 related:
   - '[[2026-02-23-hooks-maturity-adr]]'
   - '[[2026-02-23-hooks-maturity-plan]]'

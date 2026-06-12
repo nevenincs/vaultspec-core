@@ -31,18 +31,18 @@ Requires an authenticated `gh` CLI and a git repo with a configured remote.
 
 ## Procedure
 
-1. **Load agent persona:** load the `vaultspec-project-coordinator` persona defined in
-   the agent persona section. Gather current project state from GitHub (issues,
-   milestones, GitHub Projects, labels) and local state (branches, worktrees, recent
-   commits).
+- **Load agent persona:** load the `vaultspec-project-coordinator` persona defined in
+  the agent persona section. Gather current project state from GitHub (issues,
+  milestones, GitHub Projects, labels) and local state (branches, worktrees, recent
+  commits).
 
-1. **Synthesize and present:** distill gathered state into an actionable summary.
-   Identify blockers, priorities, and gaps.
+- **Synthesize and present:** distill gathered state into an actionable summary.
+  Identify blockers, priorities, and gaps.
 
-1. **Query-response cycle:** enter the interaction loop. Gather relevant state via `gh`
-   and `git`. Present proposed actions with exact CLI invocations. On approval, execute
-   and confirm results. All proposals are subject to the operating principles defined in
-   the agent persona.
+- **Query-response cycle:** enter the interaction loop. Gather relevant state via `gh`
+  and `git`. Present proposed actions with exact CLI invocations. On approval, execute
+  and confirm results. All proposals are subject to the operating principles defined in
+  the agent persona.
 
 **Example interaction:**
 

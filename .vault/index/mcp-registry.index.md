@@ -4,6 +4,7 @@ tags:
   - '#mcp-registry'
   - '#index'
 date: '2026-04-21'
+modified: '2026-04-21'
 related:
   - '[[2026-04-11-mcp-registry-adr]]'
   - '[[2026-04-11-mcp-registry-audit]]'

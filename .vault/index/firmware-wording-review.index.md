@@ -4,6 +4,7 @@ tags:
   - '#index'
   - '#firmware-wording-review'
 date: '2026-06-10'
+modified: '2026-06-10'
 related:
   - '[[2026-06-09-firmware-wording-review-P01-S01]]'
   - '[[2026-06-09-firmware-wording-review-P01-S02]]'

@@ -3,6 +3,7 @@ tags:
   - '#adr'
   - '#vault-api'
 date: '2026-02-08'
+modified: '2026-02-08'
 related:
   - '[[2026-02-08-vault-api-plan]]'
   - '[[2026-02-08-vault-api-research]]'

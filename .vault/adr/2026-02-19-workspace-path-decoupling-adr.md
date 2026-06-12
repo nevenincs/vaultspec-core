@@ -3,6 +3,7 @@ tags:
   - '#adr'
   - '#workspace-paths'
 date: '2026-02-19'
+modified: '2026-02-19'
 related:
   - '[[2026-02-19-workspace-path-decoupling-research]]'
 ---
