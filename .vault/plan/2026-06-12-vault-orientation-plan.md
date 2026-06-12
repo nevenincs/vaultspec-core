@@ -98,7 +98,7 @@ Compute plans-in-flight, per-plan completion, active features, and recency in on
 Expose the rollup and the targeted grounding trace as the vault status CLI verb with hints and the versioned JSON envelope.
 
 - [x] `W02.P06.S28` - add the vault status command with rollup and targeted modes, limit and since flags, advisory hints, and the versioned json envelope; `src/vaultspec_core/cli/vault_cmd.py`.
-- [ ] `W02.P06.S29` - add cli tests for vault status covering both modes, hints, json schema, and stem-only output; `src/vaultspec_core/tests/cli/test_vault_status.py`.
+- [x] `W02.P06.S29` - add cli tests for vault status covering both modes, hints, json schema, and stem-only output; `src/vaultspec_core/tests/cli/test_vault_status.py`.
 
 ## Wave `W03` - firmware and documentation
 
