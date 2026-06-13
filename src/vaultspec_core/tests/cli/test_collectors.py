@@ -467,13 +467,18 @@ class TestContentIntegrity:
         result = collect_content_integrity("claude")
         assert "vaultspec-system.builtin.md" not in result
 
-    def test_subdirectory_custom_rule_is_clean(self, synthetic_project: Path) -> None:
-        """A custom rule under ``project/`` synced to the provider is CLEAN.
+    def test_project_authored_rule_synced_flat_is_clean(
+        self, synthetic_project: Path
+    ) -> None:
+        """A project-authored custom rule, synced FLAT, is CLEAN, not stale.
 
-        Regression for issue #153: custom rules live under
-        ``.vaultspec/rules/rules/project/`` and sync preserves that subpath in
-        the provider directory, so a flat ``*.md`` dest glob missed them and
-        falsely reported STALE/MISSING.
+        Regression for issue #153: custom rules are authored one level down
+        under ``.vaultspec/rules/rules/project/`` but providers do not support
+        nested folders - sync sanitizes the nesting, flattening the rule into
+        the provider root by its basename. The collector must therefore match
+        the recursively-discovered source basename against the flat provider
+        deployment and report CLEAN, rather than flagging the source as
+        STALE/MISSING because the destination has no ``project/`` subdir.
         """
         from vaultspec_core.core.types import get_context
 
@@ -481,11 +486,13 @@ class TestContentIntegrity:
         cfg = ctx.tool_configs.get(Tool.CLAUDE)
         assert cfg is not None and cfg.rules_dir is not None
 
+        # Source: authored under project/ (one level down).
         src_rule = ctx.rules_src_dir / "project" / "custom-rule.md"
         src_rule.parent.mkdir(parents=True, exist_ok=True)
         src_rule.write_text("# custom rule\n", encoding="utf-8")
 
-        dest_rule = cfg.rules_dir / "project" / "custom-rule.md"
+        # Destination: flattened into the provider rules root (what sync emits).
+        dest_rule = cfg.rules_dir / "custom-rule.md"
         dest_rule.parent.mkdir(parents=True, exist_ok=True)
         dest_rule.write_text("# custom rule\n", encoding="utf-8")
 

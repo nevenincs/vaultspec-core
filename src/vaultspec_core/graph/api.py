@@ -1445,6 +1445,32 @@ class VaultGraph:
 
     # -- JSON serialisation (networkx node_link_data) ------------------------
 
+    def _relativise_node_path(self, raw_path: Any) -> str | None:
+        """Return *raw_path* as a vault-relative POSIX path, or ``None``.
+
+        A working-tree node carries an absolute filesystem path; this rewrites
+        it to the same vault-relative virtual form a ref-scoped node already
+        uses (e.g. ``.vault/adr/foo.md``), so the serialised ``path`` field is
+        consistent across build modes and never leaks an absolute OS path. A
+        ``None`` path (phantom) stays ``None``; a path already relative or not
+        under the root is returned unchanged (as POSIX).
+
+        Args:
+            raw_path: The ``path`` value off a serialised node dict.
+
+        Returns:
+            The vault-relative POSIX path string, or ``None``.
+        """
+        import pathlib
+
+        if not raw_path:
+            return None
+        candidate = pathlib.PurePath(str(raw_path))
+        root = pathlib.PurePath(str(self.root_dir))
+        if candidate.is_absolute() and candidate.is_relative_to(root):
+            return candidate.relative_to(root).as_posix()
+        return candidate.as_posix()
+
     def to_dict(
         self,
         feature: str | None = None,
@@ -1507,6 +1533,16 @@ class VaultGraph:
                 doc = self.nodes.get(nid)
                 if doc:
                     node_dict["body"] = doc.body
+
+        # Normalise every node ``path`` to a vault-relative POSIX path so the
+        # wire format never leaks an absolute OS path and is identical across
+        # build modes (issue #160 consumer symmetry): a ref-scoped node already
+        # carries its virtual tree path (e.g. ``.vault/adr/foo.md``), and a
+        # working-tree node's absolute filesystem path is relativised to the
+        # same shape here. Phantoms (``path is None``) and any path already
+        # outside the root are left untouched.
+        for node_dict in data.get("nodes", []):
+            node_dict["path"] = self._relativise_node_path(node_dict.get("path"))
 
         # Derived (implicit) relatedness edges.  Computed on demand and kept
         # in a SEPARATE array so checkers and the canonical edges list stay

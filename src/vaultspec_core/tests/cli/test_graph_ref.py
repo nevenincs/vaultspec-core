@@ -182,6 +182,28 @@ def test_from_ref_node_path_is_virtual_tree_path(vault_repo) -> None:
     assert paths["2026-06-13-alpha-adr"] == ".vault/adr/2026-06-13-alpha-adr.md"
 
 
+def test_working_tree_node_path_is_vault_relative(vault_repo) -> None:
+    """A working-tree build emits the same vault-relative path as a ref build.
+
+    Consumer-symmetry follow-up: no absolute OS path leaks into the envelope,
+    and both build modes use the identical virtual ``.vault/...`` shape so a
+    consumer ingests them through one path format.
+    """
+    repo, _sha1, sha2 = vault_repo
+    wt = VaultGraph(repo, use_cache=False).to_dict()
+    paths = {n["id"]: n["path"] for n in wt["nodes"]}
+    adr = paths["2026-06-13-alpha-adr"]
+    assert adr == ".vault/adr/2026-06-13-alpha-adr.md"
+    # No drive letter, no backslash, not absolute: nothing OS-specific leaks.
+    assert "\\" not in adr
+    assert not adr.startswith("/") and ":" not in adr
+    # Identical to the ref-scoped build of the same corpus.
+    ref_paths = {
+        n["id"]: n["path"] for n in VaultGraph.from_ref(repo, sha2).to_dict()["nodes"]
+    }
+    assert paths == ref_paths
+
+
 def test_from_ref_bad_ref_raises(vault_repo) -> None:
     repo, _sha1, _sha2 = vault_repo
     with pytest.raises(RefScanError):

@@ -539,15 +539,19 @@ def collect_content_integrity(tool_value: str) -> dict[str, ContentSignal]:
     dest_dir = cfg.rules_dir
     source_dir = ctx.rules_src_dir
 
-    # Collect files from destination. Glob recursively to match the source
-    # side: custom rules under a subdirectory (e.g. ``rules/project/foo.md``)
-    # are synced into the provider dir preserving that subpath, so a flat
-    # ``*.md`` glob would miss them and falsely flag them as stale or missing.
+    # Provider rule directories are flat: nesting is not supported and sync
+    # sanitizes it (custom rules authored under ``rules/project/`` are
+    # flattened into the provider root, the ``project/`` prefix stripped). So
+    # the destination is globbed flat. The source is globbed recursively only
+    # to discover those project-authored sources by basename - the same
+    # basename the flattened destination carries - so a custom project rule is
+    # matched against its flat deployment and reported clean, not stale (#153).
     dest_files: set[str] = set()
     if dest_dir.is_dir():
-        dest_files = {f.name for f in dest_dir.glob("**/*.md")}
+        dest_files = {f.name for f in dest_dir.glob("*.md")}
 
-    # Collect files from source
+    # Collect files from source (recursive: project-authored rules live one
+    # level down, but only their basename matters for the flat comparison).
     source_files: set[str] = set()
     if source_dir.is_dir():
         source_files = {f.name for f in source_dir.glob("**/*.md")}

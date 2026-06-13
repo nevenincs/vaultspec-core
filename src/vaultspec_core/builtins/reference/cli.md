@@ -321,15 +321,17 @@ by feature and type.
 The `--json` payload (schema `vaultspec.vault.graph.v2`) carries typed weighted explicit
 edges (`kind`, `multiplicity`, `weight`), node-size hints (`pagerank`, `in_degree`), and
 a separate `derived_edges` array of implicit relatedness edges that is never mixed into
-the canonical `edges` array. A missing `--node` stem fails with exit code 1 and a
+the canonical `edges` array. Each node's `path` is a vault-relative POSIX path (e.g.
+`.vault/adr/foo.md`), identical across working-tree and ref-scoped builds; no absolute
+filesystem path is emitted. A missing `--node` stem fails with exit code 1 and a
 `failed` envelope.
 
 `--ref <branch|sha>` reads the corpus from the git object database at that ref without a
 checkout (read-only: the working-tree cache is neither read nor written, and the
 migration pass is skipped). The envelope stays `vaultspec.vault.graph.v2` with a
-top-level `ref` key naming the snapshot (`null` for a working-tree build) and each
-node's `path` set to the virtual tree path. A non-git workspace or an unresolvable ref
-exits 1 with a typed error instead of falling back to a working-tree read.
+top-level `ref` key naming the snapshot (`null` for a working-tree build). A non-git
+workspace or an unresolvable ref exits 1 with a typed error instead of falling back to a
+working-tree read.
 
 ### vaultspec-core vault repair
 

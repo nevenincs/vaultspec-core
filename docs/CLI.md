@@ -617,15 +617,18 @@ Outputs a hierarchical tree grouped by feature and type.
 The `--json` payload (schema `vaultspec.vault.graph.v2`) carries typed weighted explicit
 edges (`kind`, `multiplicity`, `weight`), node-size hints (`pagerank`, `in_degree`), and
 a separate `derived_edges` array of implicit relatedness edges kept out of the canonical
-`edges` array. A missing `--node` stem exits 1 with a `failed` envelope.
+`edges` array. Each node's `path` is a vault-relative POSIX path (e.g.
+`.vault/adr/foo.md`); no absolute filesystem path is emitted, and the format is
+identical for working-tree and ref-scoped builds. A missing `--node` stem exits 1 with a
+`failed` envelope.
 
 `--ref <branch|sha>` reads the vault corpus from the git object database at that ref
 instead of the working tree, without a checkout. The read is read-only: the working-tree
 graph cache is neither consulted nor written, and the working-tree migration pass is
 skipped. The envelope stays `vaultspec.vault.graph.v2` with a top-level `ref` key naming
-the snapshot (it is `null` for a working-tree build) and each node's `path` carrying the
-virtual tree path. A non-git workspace or an unresolvable ref exits 1 with a typed error
-rather than silently reading the working tree.
+the snapshot (it is `null` for a working-tree build). A non-git workspace or an
+unresolvable ref exits 1 with a typed error rather than silently reading the working
+tree.
 
 #### Examples
 
