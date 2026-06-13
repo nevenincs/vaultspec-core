@@ -59,9 +59,6 @@ def synthetic_project(tmp_path) -> Path:
 
     layout = resolve_workspace(target_override=dest)
     init_paths(layout)
-    (dest / ".vaultspec" / "rules" / "rules" / "project").mkdir(
-        parents=True, exist_ok=True
-    )
 
     return dest
 

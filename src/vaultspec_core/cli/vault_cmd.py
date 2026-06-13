@@ -48,7 +48,7 @@ sanitize_app = typer.Typer(
 vault_app.add_typer(sanitize_app, name="sanitize")
 
 rule_app = typer.Typer(
-    help="Manage project rules.",
+    help="Manage custom team-shared rules.",
     no_args_is_help=True,
 )
 vault_app.add_typer(rule_app, name="rule")
@@ -2395,7 +2395,7 @@ def cmd_rule_promote(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Promote an audit finding to a project-level rule."""
+    """Promote an audit finding to a team-shared rule."""
     apply_target(target)
     import json
 

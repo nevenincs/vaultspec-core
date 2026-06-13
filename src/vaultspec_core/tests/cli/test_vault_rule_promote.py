@@ -87,8 +87,8 @@ def test_rule_promote_existing_rule_fails_unless_forced(runner, test_project):
         encoding="utf-8",
     )
 
-    # Create the rule file beforehand
-    rule_dir = test_project / ".vaultspec" / "rules" / "rules" / "project"
+    # Create the rule file beforehand (flat under the rules root).
+    rule_dir = test_project / ".vaultspec" / "rules" / "rules"
     rule_dir.mkdir(parents=True, exist_ok=True)
     rule_file = rule_dir / "my-rule.md"
     rule_file.write_text("# Existing Rule", encoding="utf-8")
@@ -163,11 +163,10 @@ def test_rule_promote_success_mutates_audit_and_creates_rule(runner, test_projec
     )
     assert result.exit_code == 0
 
-    # Check rule file exists and has correct contents
-    rule_file = (
-        test_project / ".vaultspec" / "rules" / "rules" / "project" / "promoted-rule.md"
-    )
+    # Check rule file exists flat under the rules root (no project/ subdir).
+    rule_file = test_project / ".vaultspec" / "rules" / "rules" / "promoted-rule.md"
     assert rule_file.exists()
+    assert not (test_project / ".vaultspec" / "rules" / "rules" / "project").exists()
     rule_content = rule_file.read_text(encoding="utf-8")
     assert 'derived_from:\n  - "audit:2026-05-17-test-audit"' in rule_content
     assert "# Rule" in rule_content
@@ -209,9 +208,7 @@ def test_rule_promote_dry_run(runner, test_project):
     assert "Would promote rule:" in result.output
 
     # Check files are NOT created or mutated
-    rule_file = (
-        test_project / ".vaultspec" / "rules" / "rules" / "project" / "dry-run-rule.md"
-    )
+    rule_file = test_project / ".vaultspec" / "rules" / "rules" / "dry-run-rule.md"
     assert not rule_file.exists()
 
     audit_content = audit_file.read_text(encoding="utf-8")
@@ -248,43 +245,42 @@ def test_rule_promote_json_output(runner, test_project):
     assert "json-rule.md" in payload["data"]["path"]
 
 
-def test_flat_custom_rules_migration(runner, test_project):
-    # Setup a flat custom rule (custom rule directly under rules/)
-    flat_rule_file = (
-        test_project / ".vaultspec" / "rules" / "rules" / "flat-custom-rule.md"
-    )
-    flat_rule_file.write_text("# Flat Custom Rule", encoding="utf-8")
+def test_nested_custom_rules_are_flattened(runner, test_project):
+    """A custom rule under the legacy project/ subdir is sanitized to flat.
 
-    # Setup a builtin rule in the same folder
-    builtin_rule_file = (
-        test_project / ".vaultspec" / "rules" / "rules" / "some-builtin.builtin.md"
-    )
+    Nested rule folders are not supported; rules_list() (and sync) run the
+    sanitizer, which flattens any nested custom rule up to the rules root,
+    removes the emptied subdir, and never touches builtins.
+    """
+    rules_dir = test_project / ".vaultspec" / "rules" / "rules"
+
+    # A custom rule authored under the legacy project/ subdir (nested).
+    nested_rule_file = rules_dir / "project" / "nested-custom-rule.md"
+    nested_rule_file.parent.mkdir(parents=True, exist_ok=True)
+    nested_rule_file.write_text("# Nested Custom Rule", encoding="utf-8")
+
+    # A builtin rule sits flat in the same folder.
+    builtin_rule_file = rules_dir / "some-builtin.builtin.md"
     builtin_rule_file.write_text("# Builtin Rule", encoding="utf-8")
 
-    # Verify both files are in the rules directory initially
-    assert flat_rule_file.exists()
+    assert nested_rule_file.exists()
     assert builtin_rule_file.exists()
 
-    # Call rules_list() to trigger migrate_flat_custom_rules
+    # rules_list() triggers the sanitizer (flatten_nested_custom_rules).
     rules = rules_list()
 
-    # Verify migration occurred:
-    # 1. flat-custom-rule.md is moved to project/flat-custom-rule.md
-    migrated_rule_file = (
-        test_project
-        / ".vaultspec"
-        / "rules"
-        / "rules"
-        / "project"
-        / "flat-custom-rule.md"
-    )
-    assert migrated_rule_file.exists()
-    assert not flat_rule_file.exists()
+    # 1. The nested custom rule is flattened to the rules root and the empty
+    #    project/ subdir is removed.
+    flattened = rules_dir / "nested-custom-rule.md"
+    assert flattened.exists()
+    assert not nested_rule_file.exists()
+    assert not (rules_dir / "project").exists()
 
-    # 2. some-builtin.builtin.md was NOT moved
+    # 2. The builtin is untouched.
     assert builtin_rule_file.exists()
 
-    # 3. rules_list returns custom rule path as "project/flat-custom-rule.md"
+    # 3. rules_list reports the flat custom rule name (no project/ prefix).
     names = [r["name"] for r in rules]
-    assert "project/flat-custom-rule.md" in names
+    assert "nested-custom-rule.md" in names
     assert "some-builtin.builtin.md" in names
+    assert not any(n.startswith("project/") for n in names)

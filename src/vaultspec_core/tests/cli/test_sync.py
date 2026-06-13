@@ -366,12 +366,7 @@ class TestSyncAuthority:
             assert add_result.exit_code == 0, add_result.output
 
             source_rule = (
-                synthetic_project
-                / ".vaultspec"
-                / "rules"
-                / "rules"
-                / "project"
-                / f"{rule_name}.md"
+                synthetic_project / ".vaultspec" / "rules" / "rules" / f"{rule_name}.md"
             )
             assert source_rule.exists(), f"Rule source missing: {source_rule}"
 

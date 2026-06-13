@@ -12,14 +12,7 @@ pytestmark = [pytest.mark.unit]
 class TestIncrementalRules:
     def test_add_modify_remove_loop(self, synthetic_project):
         """Standard rule lifecycle."""
-        rule_src = (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "rules"
-            / "project"
-            / "rule1.md"
-        )
+        rule_src = synthetic_project / ".vaultspec" / "rules" / "rules" / "rule1.md"
         rule_src.write_text("---\nname: rule1\n---\n\nOriginal body", encoding="utf-8")
 
         # 1. Add
@@ -42,14 +35,7 @@ class TestIncrementalRules:
 
     def test_idempotent_resync(self, synthetic_project):
         """Syncing with no changes doesn't update files."""
-        rule_src = (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "rules"
-            / "project"
-            / "stable.md"
-        )
+        rule_src = synthetic_project / ".vaultspec" / "rules" / "rules" / "stable.md"
         rule_src.write_text("---\nname: stable\n---\n\nBody", encoding="utf-8")
         rules_sync()
         dest = synthetic_project / ".claude" / "rules" / "stable.md"
@@ -61,14 +47,9 @@ class TestIncrementalRules:
 
     def test_cross_destination_consistency(self, synthetic_project):
         """Rules are synced to all available tool destinations."""
-        (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "rules"
-            / "project"
-            / "shared.md"
-        ).write_text("---\nname: shared\n---\n\nShared rule", encoding="utf-8")
+        (synthetic_project / ".vaultspec" / "rules" / "rules" / "shared.md").write_text(
+            "---\nname: shared\n---\n\nShared rule", encoding="utf-8"
+        )
         rules_sync()
         for tool_dir in [".claude", ".gemini"]:
             p = synthetic_project / tool_dir / "rules" / "shared.md"
@@ -80,7 +61,7 @@ class TestIncrementalRules:
         dest = synthetic_project / ".claude" / "rules" / "churn.md"
 
         for i in range(5):
-            (rules_dir / "project" / "churn.md").write_text(
+            (rules_dir / "churn.md").write_text(
                 f"---\nname: churn\n---\n\nPass {i}", encoding="utf-8"
             )
             rules_sync()
@@ -255,10 +236,10 @@ class TestMixedOperations:
         system_dir = synthetic_project / ".vaultspec" / "rules" / "system"
 
         # --- Setup: add everything ---
-        (rules_dir / "project" / "r1.md").write_text(
+        (rules_dir / "r1.md").write_text(
             "---\nname: r1\n---\n\nRule 1", encoding="utf-8"
         )
-        (rules_dir / "project" / "r2.md").write_text(
+        (rules_dir / "r2.md").write_text(
             "---\nname: r2\n---\n\nRule 2", encoding="utf-8"
         )
         (skills_dir / "vaultspec-s1").mkdir(parents=True)
@@ -279,10 +260,10 @@ class TestMixedOperations:
         assert (synthetic_project / ".gemini" / "SYSTEM.md").exists()
 
         # --- Churn: Modify r1, delete r2, add s2 ---
-        (rules_dir / "project" / "r1.md").write_text(
+        (rules_dir / "r1.md").write_text(
             "---\nname: r1\n---\n\nMODIFIED", encoding="utf-8"
         )
-        (rules_dir / "project" / "r2.md").unlink()
+        (rules_dir / "r2.md").unlink()
         (skills_dir / "vaultspec-s2").mkdir(parents=True)
         (skills_dir / "vaultspec-s2" / "SKILL.md").write_text(
             "---\ndescription: s2\n---\n\n# s2", encoding="utf-8"
