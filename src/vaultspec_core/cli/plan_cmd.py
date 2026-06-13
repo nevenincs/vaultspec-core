@@ -58,6 +58,45 @@ def _render_user_errors[F: Callable[..., None]](func: F) -> F:
     return cast("F", wrapper)
 
 
+def _resolve_vault_root(plan_path: Path) -> Path | None:
+    """Return the vault root that owns *plan_path*, or ``None``.
+
+    A plan document lives under ``<root>/<docs_dir>/plan/...``.  The mutation
+    verbs operate on a bare path argument and never initialise the workspace
+    :class:`~contextvars.ContextVar`, so the root is derived from the path:
+    the nearest ancestor whose final component is the configured ``docs_dir``
+    has that ancestor's parent as the root.  Falls back to the active
+    workspace context, then to ``None`` when neither resolves.
+    """
+    from vaultspec_core.config import get_config
+
+    docs_dir_name = Path(get_config().docs_dir).name
+    resolved = plan_path.resolve()
+    for ancestor in resolved.parents:
+        if ancestor.name == docs_dir_name:
+            return ancestor.parent
+
+    from vaultspec_core.core.types import get_context
+
+    try:
+        return get_context().target_dir
+    except LookupError:
+        return None
+
+
+def _invalidate_graph_cache_for_plan(plan_path: Path) -> None:
+    """Drop the graph cache for the vault owning *plan_path*.
+
+    Never raises: a successful plan write must not be turned into a non-zero
+    exit by a best-effort post-save cache drop (issue #157).
+    """
+    from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+
+    root = _resolve_vault_root(plan_path)
+    if root is not None:
+        invalidate_graph_cache(root)
+
+
 def _save_plan_or_dry_run(
     path: Path,
     plan: Any,
@@ -149,18 +188,7 @@ def _save_plan_or_dry_run(
         preserved_count = 0 if canonicalise else len(plan.unknown_blocks)
         typer.echo(f"{success_msg} (Preserved {preserved_count} unknown blocks)")
         if wrote:
-            from vaultspec_core.cli._cache_hook import invalidate_graph_cache
-            from vaultspec_core.core.types import get_context as _get_ctx
-
-            # Plan mutators do not take --target, so the workspace context is
-            # only initialised when another command set it earlier in-process.
-            # Bare invocations fall back to the cwd, which is what
-            # apply_target(None) would have resolved.
-            try:
-                target_dir = _get_ctx().target_dir
-            except LookupError:
-                target_dir = Path.cwd()
-            invalidate_graph_cache(target_dir)
+            _invalidate_graph_cache_for_plan(path)
 
 
 plan_app = typer.Typer(
@@ -200,6 +228,15 @@ tier_app = typer.Typer(
     no_args_is_help=True,
 )
 plan_app.add_typer(tier_app, name="tier")
+
+trailer_app = typer.Typer(
+    help=(
+        "Commit-linkage trailers: emit a well-formed trailer, or validate "
+        "the trailers in a commit message (advisory; always exits 0)."
+    ),
+    no_args_is_help=True,
+)
+plan_app.add_typer(trailer_app, name="trailer")
 
 
 # ---- Read commands ----------------------------------------------------------
@@ -1417,3 +1454,126 @@ def cmd_tier_demote(
         success_msg=f"Tier demoted to {new_tier.value}.",
         expected_retired=expected_retired,
     )
+
+
+# ---- Commit-linkage trailers ------------------------------------------------
+
+
+@trailer_app.command("emit")
+@_render_user_errors
+def cmd_trailer_emit(
+    step: Annotated[
+        str | None,
+        typer.Option(
+            "--step",
+            help="Step or Phase display path (e.g. W01.P02.S06 or P02)",
+        ),
+    ] = None,
+    feature: Annotated[
+        str | None,
+        typer.Option(
+            "--feature",
+            help="Feature tag (kebab-case; leading '#' optional)",
+        ),
+    ] = None,
+) -> None:
+    """Print a well-formed commit-linkage trailer line.
+
+    Exactly one of ``--step`` or ``--feature`` is required. The emitted line
+    is suitable for scripting into a commit template or appending to a commit
+    message. Invalid input is a usage error (exit 1); emission never produces
+    a malformed trailer.
+    """
+    from vaultspec_core.plan.commands._errors import PlanCommandError
+    from vaultspec_core.plan.trailer import (
+        format_feature_trailer,
+        format_step_trailer,
+    )
+
+    if (step is None) == (feature is None):
+        raise PlanCommandError("provide exactly one of --step or --feature.")
+
+    try:
+        if step is not None:
+            typer.echo(format_step_trailer(step))
+        else:
+            assert feature is not None
+            typer.echo(format_feature_trailer(feature))
+    except ValueError as exc:
+        raise PlanCommandError(str(exc)) from exc
+
+
+@trailer_app.command("validate")
+def cmd_trailer_validate(
+    message_file: Annotated[
+        Path,
+        typer.Argument(
+            help="Path to a commit-message file (e.g. .git/COMMIT_EDITMSG)",
+        ),
+    ],
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Emit findings as JSON")
+    ] = False,
+) -> None:
+    """Validate the commit-linkage trailers in a commit-message file.
+
+    Reports any malformed ``Vaultspec-Step`` / ``Vaultspec-Feature`` trailer
+    and **always exits zero**, so it is safe to wire as an advisory
+    ``commit-msg`` hook: a malformed or absent trailer never blocks a commit
+    (the convention is enrichment, never a prerequisite). An unreadable
+    message file is likewise reported and tolerated.
+    """
+    from vaultspec_core.plan.trailer import validate_message
+
+    try:
+        message = message_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        if json_output:
+            from vaultspec_core.cli.rendering import json_envelope
+
+            typer.echo(
+                json.dumps(
+                    json_envelope(
+                        "vault.plan.trailer.validate",
+                        "unchanged",
+                        {"unreadable": str(message_file), "problems": []},
+                    ),
+                    indent=2,
+                )
+            )
+        else:
+            typer.echo(f"trailer: could not read {message_file}: {exc}", err=True)
+        return
+
+    problems = validate_message(message)
+
+    if json_output:
+        from vaultspec_core.cli.rendering import json_envelope
+
+        payload = {
+            "problems": [
+                {
+                    "key": p.key,
+                    "value": p.value,
+                    "line": p.line_number,
+                    "reason": p.reason,
+                }
+                for p in problems
+            ]
+        }
+        typer.echo(
+            json.dumps(
+                json_envelope("vault.plan.trailer.validate", "unchanged", payload),
+                indent=2,
+            )
+        )
+        return
+
+    if not problems:
+        return
+    for problem in problems:
+        typer.echo(
+            f"trailer (advisory) line {problem.line_number}: "
+            f"{problem.key}: {problem.value!r} - {problem.reason}",
+            err=True,
+        )

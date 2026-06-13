@@ -539,10 +539,13 @@ def collect_content_integrity(tool_value: str) -> dict[str, ContentSignal]:
     dest_dir = cfg.rules_dir
     source_dir = ctx.rules_src_dir
 
-    # Collect files from destination
+    # Collect files from destination. Glob recursively to match the source
+    # side: custom rules under a subdirectory (e.g. ``rules/project/foo.md``)
+    # are synced into the provider dir preserving that subpath, so a flat
+    # ``*.md`` glob would miss them and falsely flag them as stale or missing.
     dest_files: set[str] = set()
     if dest_dir.is_dir():
-        dest_files = {f.name for f in dest_dir.glob("*.md")}
+        dest_files = {f.name for f in dest_dir.glob("**/*.md")}
 
     # Collect files from source
     source_files: set[str] = set()

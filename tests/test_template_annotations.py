@@ -49,6 +49,7 @@ def test_template_frontmatter_contains_only_data_fields() -> None:
     allowed_keys = {
         "date",
         "generated",
+        "modified",
         "related",
         "step_id",
         "tags",

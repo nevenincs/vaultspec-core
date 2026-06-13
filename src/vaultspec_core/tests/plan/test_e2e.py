@@ -519,3 +519,75 @@ related: []
 
     assert "unexpected retirement of active plan items" in str(exc_info.value)
     assert "S01" in str(exc_info.value)
+
+
+def test_resolve_vault_root_from_plan_path_under_docs_dir(tmp_path) -> None:
+    """``_resolve_vault_root`` derives the root from a plan under ``.vault/plan/``.
+
+    Regression for issue #157: the mutation verbs never initialise the
+    workspace context, so the cache root must be recoverable from the plan
+    path alone.
+    """
+    from vaultspec_core.cli.plan_cmd import _resolve_vault_root
+
+    plan_path = tmp_path / ".vault" / "plan" / "2026-06-13-x-plan.md"
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_path.write_text("# x plan\n", encoding="utf-8")
+
+    assert _resolve_vault_root(plan_path) == tmp_path.resolve()
+
+
+def test_step_check_in_empty_context_exits_zero(tmp_path) -> None:
+    """A mutation verb run with no workspace context must still exit 0.
+
+    Regression for issue #157: every ``vault plan`` mutation verb performed
+    its write correctly but then crashed in the post-save cache-invalidation
+    hook with a ``LookupError`` because the workspace ``ContextVar`` was never
+    initialised, exiting 1 despite a successful write. A fresh
+    ``contextvars.Context`` faithfully reproduces that unset-context condition
+    without mocking.
+    """
+    import contextvars
+
+    from vaultspec_core.plan.parser import parse_plan
+
+    rng = random.Random(157)
+    spec = make_clean_plan("L1", rng=rng, steps=3)
+    plan_path = tmp_path / ".vault" / "plan" / "2026-06-13-bugfix-plan.md"
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_path.write_text(spec.render(), encoding="utf-8")
+
+    runner = CliRunner(env={"NO_COLOR": "1"})
+    empty_ctx = contextvars.Context()
+    result = empty_ctx.run(
+        runner.invoke,
+        app,
+        ["vault", "plan", "step", "check", str(plan_path), "S02"],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    plan = parse_plan(plan_path)
+    target = next(s for s in plan.steps if s.canonical_id == "S02")
+    assert target.checked is True
+
+
+def test_invalidate_graph_cache_for_plan_drops_cache_without_context(tmp_path) -> None:
+    """The post-save hook drops the right cache file even with no context."""
+    import contextvars
+
+    from vaultspec_core.cli.plan_cmd import _invalidate_graph_cache_for_plan
+    from vaultspec_core.graph.cache import cache_path
+
+    plan_path = tmp_path / ".vault" / "plan" / "2026-06-13-cache-plan.md"
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_path.write_text("# cache plan\n", encoding="utf-8")
+
+    def _seed_and_invalidate():
+        cache_file = cache_path(tmp_path)
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        cache_file.write_text("{}", encoding="utf-8")
+        _invalidate_graph_cache_for_plan(plan_path)
+        return cache_file
+
+    cache_file = contextvars.Context().run(_seed_and_invalidate)
+    assert not cache_file.exists()

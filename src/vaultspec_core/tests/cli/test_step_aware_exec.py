@@ -101,8 +101,8 @@ def test_step_aware_mutual_exclusion(runner, synthetic_project):
     )
     assert result.exit_code != 0
     assert (
-        "Error: --step and --all-steps options are only valid when creating 'exec' "
-        "documents." in result.output
+        "Error: --step, --all-steps, and --summary options are only valid when "
+        "creating 'exec' documents." in result.output
     )
 
 
@@ -398,3 +398,186 @@ def test_step_aware_status_hinting(runner, synthetic_project):
     assert result2.exit_code == 0
     assert "S01" not in result2.output
     assert "S02" in result2.output
+
+
+def test_summary_requires_phase(runner, synthetic_project):
+    """``--summary`` without ``--phase`` is a clean error (issue #158)."""
+    setup_test_plan(synthetic_project)
+    result = runner.invoke(
+        app,
+        [
+            "--target",
+            str(synthetic_project),
+            "vault",
+            "add",
+            "exec",
+            "--feature",
+            "test-feature",
+            "--summary",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "--summary requires --phase" in result.output
+
+
+def test_summary_rejected_on_non_exec_type(runner, synthetic_project):
+    """``--summary`` is only valid for exec documents (issue #158)."""
+    result = runner.invoke(
+        app,
+        [
+            "--target",
+            str(synthetic_project),
+            "vault",
+            "add",
+            "adr",
+            "--feature",
+            "test-feature",
+            "--summary",
+            "--phase",
+            "P01",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "only" in result.output and "exec" in result.output
+
+
+def test_summary_mutually_exclusive_with_step(runner, synthetic_project):
+    """``--summary`` cannot combine with ``--step`` (issue #158)."""
+    setup_test_plan(synthetic_project)
+    result = runner.invoke(
+        app,
+        [
+            "--target",
+            str(synthetic_project),
+            "vault",
+            "add",
+            "exec",
+            "--feature",
+            "test-feature",
+            "--summary",
+            "--phase",
+            "P01",
+            "--step",
+            "P01.S01",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "--summary cannot be combined with --step" in result.output
+
+
+def test_phase_requires_summary(runner, synthetic_project):
+    """``--phase`` without ``--summary`` is a clean error (issue #158)."""
+    setup_test_plan(synthetic_project)
+    result = runner.invoke(
+        app,
+        [
+            "--target",
+            str(synthetic_project),
+            "vault",
+            "add",
+            "exec",
+            "--feature",
+            "test-feature",
+            "--phase",
+            "P01",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "--phase is only valid together with --summary" in result.output
+
+
+def test_summary_unknown_phase_errors_cleanly(runner, synthetic_project):
+    """A non-existent Phase id reports a clean error, not a traceback (#158)."""
+    setup_test_plan(synthetic_project)
+    result = runner.invoke(
+        app,
+        [
+            "--target",
+            str(synthetic_project),
+            "vault",
+            "add",
+            "exec",
+            "--feature",
+            "test-feature",
+            "--summary",
+            "--phase",
+            "P99",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "P99" in result.output
+    assert "Traceback" not in result.output
+
+
+def _setup_test_plan_with_phase(project_dir: Path) -> Path:
+    """Write an ADR and an L2 plan whose Phase the parser recognises.
+
+    The parser registers a Phase only from a canonical ``### Phase`` heading
+    followed by an intent paragraph, so the summary scaffolder (which calls
+    ``find_phase``) needs a plan shaped this way rather than the flat
+    ``## Phase`` heading used by :func:`setup_test_plan`.
+    """
+    adr_dir = project_dir / ".vault" / "adr"
+    adr_dir.mkdir(parents=True, exist_ok=True)
+    (adr_dir / "2026-05-17-test-feature-adr.md").write_text(
+        "---\ntags:\n  - '#adr'\n  - '#test-feature'\n"
+        "date: '2026-05-17'\n---\n\n# `test-feature` adr: Architectural Decision\n",
+        encoding="utf-8",
+    )
+
+    plan_dir = project_dir / ".vault" / "plan"
+    plan_dir.mkdir(parents=True, exist_ok=True)
+    plan_file = plan_dir / "2026-05-17-test-feature-plan.md"
+    plan_file.write_text(
+        "---\ntags:\n  - '#plan'\n  - '#test-feature'\n"
+        "date: '2026-05-17'\ntier: L2\n---\n\n"
+        "# `test-feature` plan\n\n"
+        "### Phase `P01` - Test Phase\n\n"
+        "Phase P01 delivers a coherent slice of the work.\n\n"
+        "- [x] `P01.S01` - First step; `src/foo.py`.\n"
+        "- [ ] `P01.S02` - Second step; `src/bar.py`.\n",
+        encoding="utf-8",
+    )
+    return plan_file
+
+
+def test_summary_scaffolds_phase_summary(runner, synthetic_project):
+    """``--summary --phase`` scaffolds the canonical Phase-summary record (#158)."""
+    _setup_test_plan_with_phase(synthetic_project)
+    result = runner.invoke(
+        app,
+        [
+            "--target",
+            str(synthetic_project),
+            "vault",
+            "add",
+            "exec",
+            "--feature",
+            "test-feature",
+            "--summary",
+            "--phase",
+            "P01",
+        ],
+    )
+    assert result.exit_code == 0, f"Command failed: {result.output}"
+
+    target_file = (
+        synthetic_project
+        / ".vault"
+        / "exec"
+        / "2026-05-17-test-feature"
+        / "2026-05-17-test-feature-P01-summary.md"
+    )
+    assert target_file.exists()
+
+    content = target_file.read_text(encoding="utf-8")
+    # Frontmatter: directory + feature tags, plan back-link injected.
+    assert "- '#exec'" in content
+    assert "- '#test-feature'" in content
+    assert '- "[[2026-05-17-test-feature-plan]]"' in content
+    # Heading hydrated with the Phase display path, not the title alias.
+    assert "# `test-feature` `P01` summary" in content
+    assert "## Description" in content
+    # No unhydrated placeholders survive.
+    assert "{phase}" not in content
+    assert "{feature}" not in content

@@ -72,7 +72,14 @@ class DocNode:
     metadata so that consumers never need to re-read the filesystem.
 
     Attributes:
-        path: Filesystem path to the document file, or ``None`` for phantoms.
+        path: Filesystem path to the document file, or ``None`` for phantoms
+            and for ref-scoped nodes (which have no working-tree path; their
+            virtual location is carried by ``tree_path`` instead).
+        tree_path: For a ref-scoped node (issue #160), the repo-relative POSIX
+            tree path of the blob (e.g. ``.vault/adr/foo.md``); ``None`` for a
+            working-tree node, whose location is ``path``. Serialised as the
+            node's ``path`` attribute so a consumer sees one ``path`` field
+            regardless of build source.
         name: Document stem (filename without extension), used as graph key.
         doc_type: Categorised document type from vault folder location.
         feature: Feature tag (without ``#`` prefix), or ``None``.
@@ -95,6 +102,7 @@ class DocNode:
     path: pathlib.Path | None
     name: str
     doc_type: DocType | None = None
+    tree_path: str | None = None
     feature: str | None = None
     date: str | None = None
     modified: str | None = None
@@ -120,7 +128,14 @@ class DocNode:
         """
         return {
             "name": self.name,
-            "path": str(self.path) if self.path else None,
+            # A ref-scoped node carries its virtual tree path; a working-tree
+            # node carries the stringified filesystem path. Either way the
+            # serialised attribute is a single ``path`` field.
+            "path": (
+                self.tree_path
+                if self.tree_path is not None
+                else (str(self.path) if self.path else None)
+            ),
             "doc_type": (self.doc_type.value if self.doc_type else None),
             "feature": self.feature,
             "date": self.date,
@@ -446,11 +461,57 @@ class VaultGraph:
 
     def __init__(self, root_dir: pathlib.Path, *, use_cache: bool = True) -> None:
         self.root_dir = root_dir
+        #: The git ref this graph was built from, or ``None`` for a
+        #: working-tree build. Set only via :meth:`from_ref`.
+        self.ref: str | None = None
         self.nodes: dict[str, DocNode] = {}
         self._digraph: nx.DiGraph = nx.DiGraph()
         self._dangling_links: list[tuple[str, str]] = []
         self._stem_index: dict[str, list[str]] = {}
         self._build_graph(use_cache=use_cache)
+
+    @classmethod
+    def from_ref(cls, root_dir: pathlib.Path, ref: str) -> VaultGraph:
+        """Build a graph from the vault corpus at a git *ref*, without a checkout.
+
+        Reads the vault documents from the git object database at *ref* (issue
+        #160) instead of the working tree. The build runs with the graph cache
+        disabled and the working-tree migration pass skipped - a read-only view
+        of history must neither be served stale working-tree data nor write
+        working-tree state (the ``ref-scoped-reads-bypass-worktree-cache``
+        rule). Document-type classification reads each blob's tree path rather
+        than a filesystem location, so the resulting graph is structurally
+        identical to a working-tree build of the same corpus.
+
+        Args:
+            root_dir: Repository working directory (used for ``git -C`` and as
+                the envelope ``root``).
+            ref: A branch name, tag, or commit-ish to read the corpus from.
+
+        Returns:
+            A :class:`VaultGraph` over the corpus as it stood at *ref*.
+
+        Raises:
+            RefScanError: When *root_dir* is not a git repository or *ref*
+                does not resolve to a commit.
+        """
+        import pathlib
+
+        from ..config import get_config
+        from .refscan import read_vault_at_ref
+
+        graph = cls.__new__(cls)
+        graph.root_dir = root_dir
+        graph.ref = ref
+        graph.nodes = {}
+        graph._digraph = nx.DiGraph()
+        graph._dangling_links = []
+        graph._stem_index = {}
+
+        docs_dir_name = pathlib.Path(get_config().docs_dir).name
+        corpus = read_vault_at_ref(root_dir, ref, docs_dir_name)
+        graph._rebuild_from_corpus(corpus, docs_dir_name)
+        return graph
 
     # -- Construction --------------------------------------------------------
 
@@ -603,17 +664,7 @@ class VaultGraph:
 
             try:
                 content = path.read_text(encoding="utf-8")
-                metadata, body = parse_vault_metadata(content)
-                raw_fm, _ = parse_frontmatter(content)
-
-                node.tags = set(metadata.tags)
-                node.date = metadata.date
-                node.modified = metadata.modified
-                node.feature = _extract_feature(node.tags)
-                node.frontmatter = raw_fm
-                node.body = body
-                node.word_count = len(body.split())
-                node.title = _extract_title(body)
+                self._populate_node_from_content(node, content)
             except (OSError, UnicodeDecodeError) as e:
                 logger.warning(
                     "Failed to read metadata from %s: %s",
@@ -623,6 +674,80 @@ class VaultGraph:
 
             by_stem.setdefault(stem, []).append(node)
 
+        self._assemble_from_by_stem(by_stem)
+
+    def _rebuild_from_corpus(
+        self, corpus: list[tuple[str, str]], docs_dir_name: str
+    ) -> None:
+        """Rebuild the graph from in-memory ``(tree_path, content)`` pairs.
+
+        The ref-scoped build path (issue #160): instead of walking the working
+        tree, the corpus is read from the git object database by
+        :func:`vaultspec_core.graph.refscan.read_vault_at_ref`. Each pair
+        carries a virtual tree path (e.g. ``.vault/adr/foo.md``) and the blob's
+        UTF-8 text. Document-type classification reads the tree path via
+        :func:`vaultspec_core.vaultcore.scanner.get_doc_type_from_tree_path`,
+        and the node ``path`` is the virtual tree path. After Pass 1a the build
+        is identical to the working-tree path, so the graph is structurally the
+        same as a checkout-based build of the same corpus.
+
+        Args:
+            corpus: ``(tree_path, content)`` pairs for the ref's vault docs.
+            docs_dir_name: The configured docs directory name (e.g. ``.vault``).
+        """
+        import pathlib
+
+        from ..vaultcore.scanner import get_doc_type_from_tree_path
+
+        self.nodes = {}
+        self._digraph = nx.DiGraph()
+        self._dangling_links = []
+
+        by_stem: dict[str, list[DocNode]] = {}
+        for tree_path, content in corpus:
+            stem = pathlib.PurePosixPath(tree_path).stem
+            doc_type = get_doc_type_from_tree_path(tree_path, docs_dir_name)
+            node = DocNode(path=None, name=stem, doc_type=doc_type, tree_path=tree_path)
+            try:
+                self._populate_node_from_content(node, content)
+            except (ValueError, KeyError) as e:
+                logger.warning("Failed to parse blob %s: %s", tree_path, e)
+            by_stem.setdefault(stem, []).append(node)
+
+        self._assemble_from_by_stem(by_stem)
+
+    @staticmethod
+    def _populate_node_from_content(node: DocNode, content: str) -> None:
+        """Parse a document's *content* and populate *node*'s metadata fields.
+
+        Shared by the working-tree and ref-scoped build paths so both derive
+        tags, dates, feature, frontmatter, body, word count, and title from
+        the same content-bound parsers (which never touch the filesystem).
+        """
+        metadata, body = parse_vault_metadata(content)
+        raw_fm, _ = parse_frontmatter(content)
+
+        node.tags = set(metadata.tags)
+        node.date = metadata.date
+        node.modified = metadata.modified
+        node.feature = _extract_feature(node.tags)
+        node.frontmatter = raw_fm
+        node.body = body
+        node.word_count = len(body.split())
+        node.title = _extract_title(body)
+
+    def _assemble_from_by_stem(self, by_stem: dict[str, list[DocNode]]) -> None:
+        """Run the shared graph-assembly passes over the collected nodes.
+
+        Passes 1b through 4 (key assignment / collision qualification, edge
+        extraction, in/out-link sync, and node-size hints) are identical for
+        the working-tree and ref-scoped build paths, which differ only in how
+        Pass 1a's ``by_stem`` map is produced.
+
+        Args:
+            by_stem: Map of bare stem to the :class:`DocNode` instances that
+                share it, as produced by the Pass-1a collectors.
+        """
         # Pass 1b: assign unique keys  - qualify colliding stems with
         # their doc-type prefix, build a stem-to-keys index for link
         # resolution in pass 2.
@@ -1039,6 +1164,10 @@ class VaultGraph:
 
         snapshot: VaultSnapshot = {}
         for node in self.nodes.values():
+            # A working-tree snapshot is keyed by concrete filesystem paths.
+            # Phantoms and ref-scoped nodes (which carry a virtual tree_path,
+            # not a filesystem path) have ``path is None`` and are excluded so
+            # the snapshot only ever describes real on-disk documents.
             if node.phantom or node.path is None:
                 continue
             raw_related = node.frontmatter.get("related", [])
@@ -1351,8 +1480,10 @@ class VaultGraph:
 
         Returns:
             Dictionary with ``directed``, ``multigraph``, ``graph``,
-            ``nodes``, ``edges``, ``derived_edges``, ``root``, ``feature``,
-            and ``metrics`` keys.
+            ``nodes``, ``edges``, ``derived_edges``, ``root``, ``ref``,
+            ``feature``, and ``metrics`` keys. ``ref`` names the git ref for a
+            ref-scoped build (issue #160) and is ``None`` for a working-tree
+            build.
         """
         if node is not None:
             g = self.ego_subgraph(node, depth=depth)
@@ -1396,6 +1527,10 @@ class VaultGraph:
         # subgraph() traversal inside metrics().
         m = self.metrics(feature=feature, _g=g)
         data["root"] = str(self.root_dir)
+        # Ref-scoped builds (issue #160) name the snapshot here; a working-tree
+        # build carries ``ref: null`` so the v2 envelope stays self-describing
+        # without changing any node or edge shape.
+        data["ref"] = self.ref
         data["feature"] = feature
         data["metrics"] = m.to_dict()
 

@@ -96,6 +96,8 @@ vaultspec-core vault plan epic intent edit [OPTIONS] PATH
 vaultspec-core vault plan tier show [OPTIONS] PATH
 vaultspec-core vault plan tier promote [OPTIONS] PATH
 vaultspec-core vault plan tier demote [OPTIONS] PATH
+vaultspec-core vault plan trailer emit [OPTIONS]
+vaultspec-core vault plan trailer validate [OPTIONS] MESSAGE_FILE
 vaultspec-core vault link list [OPTIONS] [SRC]
 vaultspec-core vault link add [OPTIONS] SRC DST
 vaultspec-core vault link remove [OPTIONS] SRC DST
@@ -232,6 +234,8 @@ Create a `.vault/` document from a template.
 | `--tier TIER`   | -     | `L1`    | Plan tier (`L1`..`L4`). Ignored for non-plan document types.         |
 | `--step ID`     | -     | None    | Canonical ID or display path of the Step to scaffold (exec records). |
 | `--all-steps`   | -     | off     | Scaffold execution records for all Steps in the parent plan.         |
+| `--summary`     | -     | off     | Scaffold a Phase summary (exec records); requires `--phase`.         |
+| `--phase P##`   | -     | None    | Canonical Phase ID to summarise; used with `--summary`.              |
 
 ### vaultspec-core vault status
 
@@ -312,12 +316,20 @@ by feature and type.
 | `--node STEM`            | -     | None    | Scope JSON to a node's local (ego) neighbourhood. |
 | `--depth N`              | -     | 1       | Ego-graph radius in hops; only used with --node.  |
 | `--derived/--no-derived` | -     | on      | Include the derived relatedness edge set in JSON. |
+| `--ref REF`              | -     | None    | Read the corpus from a git ref (branch/tag/sha).  |
 
 The `--json` payload (schema `vaultspec.vault.graph.v2`) carries typed weighted explicit
 edges (`kind`, `multiplicity`, `weight`), node-size hints (`pagerank`, `in_degree`), and
 a separate `derived_edges` array of implicit relatedness edges that is never mixed into
 the canonical `edges` array. A missing `--node` stem fails with exit code 1 and a
 `failed` envelope.
+
+`--ref <branch|sha>` reads the corpus from the git object database at that ref without a
+checkout (read-only: the working-tree cache is neither read nor written, and the
+migration pass is skipped). The envelope stays `vaultspec.vault.graph.v2` with a
+top-level `ref` key naming the snapshot (`null` for a working-tree build) and each
+node's `path` set to the virtual tree path. A non-git workspace or an unresolvable ref
+exits 1 with a typed error instead of falling back to a working-tree read.
 
 ### vaultspec-core vault repair
 
