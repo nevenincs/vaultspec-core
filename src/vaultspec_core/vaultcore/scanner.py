@@ -17,7 +17,12 @@ from typing import TYPE_CHECKING
 
 from .models import DocType
 
-__all__ = ["get_doc_type", "list_features", "scan_vault"]
+__all__ = [
+    "get_doc_type",
+    "get_doc_type_from_tree_path",
+    "list_features",
+    "scan_vault",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -148,4 +153,41 @@ def get_doc_type(path: pathlib.Path, root_dir: pathlib.Path) -> DocType | None:
         return doc_type
     except (ValueError, KeyError) as e:
         logger.debug("Failed to determine doc type for %s: %s", path.name, e)
+        return None
+
+
+def get_doc_type_from_tree_path(tree_path: str, docs_dir_name: str) -> DocType | None:
+    """Classify a vault document from a git tree-path string.
+
+    The ref-scoped graph build (issue #160) reads documents from the git
+    object database, where each blob is known by its repo-relative POSIX
+    tree path (e.g. ``.vault/adr/foo.md``) rather than a filesystem
+    :class:`~pathlib.Path`. This reproduces :func:`get_doc_type`'s
+    classification - the first path component after the docs directory names
+    the type, with the legacy root-level ``<feature>.index.md`` case
+    preserved - from that string alone, so a ref build classifies documents
+    identically to a working-tree build without a checkout.
+
+    Args:
+        tree_path: Repo-relative POSIX path of the document
+            (e.g. ``.vault/adr/foo.md``).
+        docs_dir_name: The configured docs directory name (e.g. ``.vault``).
+
+    Returns:
+        The :class:`DocType` inferred from the first component after the docs
+        directory, or ``None`` when the path does not match a known type.
+    """
+    from pathlib import PurePosixPath
+
+    parts = PurePosixPath(tree_path).parts
+    if docs_dir_name not in parts:
+        return None
+    rest = parts[parts.index(docs_dir_name) + 1 :]
+    if len(rest) < 2:
+        if rest and rest[-1].endswith(".index.md"):
+            return DocType.INDEX
+        return None
+    try:
+        return DocType(rest[0])
+    except (ValueError, KeyError):
         return None

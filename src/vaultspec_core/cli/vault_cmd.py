@@ -48,7 +48,7 @@ sanitize_app = typer.Typer(
 vault_app.add_typer(sanitize_app, name="sanitize")
 
 rule_app = typer.Typer(
-    help="Manage project rules.",
+    help="Manage custom team-shared rules.",
     no_args_is_help=True,
 )
 vault_app.add_typer(rule_app, name="rule")
@@ -133,6 +133,20 @@ def cmd_add(
             help="Scaffold execution records for all steps in parent plan",
         ),
     ] = False,
+    summary: Annotated[
+        bool,
+        typer.Option(
+            "--summary",
+            help="Scaffold a Phase summary (exec only; requires --phase)",
+        ),
+    ] = False,
+    phase: Annotated[
+        str | None,
+        typer.Option(
+            "--phase",
+            help="Canonical Phase ID (e.g. P01) to summarise; used with --summary",
+        ),
+    ] = None,
     target: TargetOption = None,
 ) -> None:
     """Create a new .vault/ document from a template.
@@ -173,16 +187,35 @@ def cmd_add(
         raise typer.Exit(code=1)
 
     # Validate step-aware flags
-    if (step is not None or all_steps) and dt is not DocType.EXEC:
+    if (step is not None or all_steps or summary) and dt is not DocType.EXEC:
         console.print(
-            "[red]Error: --step and --all-steps options are only valid when "
-            "creating 'exec' documents.[/red]"
+            "[red]Error: --step, --all-steps, and --summary options are only "
+            "valid when creating 'exec' documents.[/red]"
         )
         raise typer.Exit(code=1)
 
     if step is not None and all_steps:
         console.print(
             "[red]Error: --step and --all-steps options are mutually exclusive.[/red]"
+        )
+        raise typer.Exit(code=1)
+
+    if summary and (step is not None or all_steps):
+        console.print(
+            "[red]Error: --summary cannot be combined with --step or --all-steps.[/red]"
+        )
+        raise typer.Exit(code=1)
+
+    if summary and phase is None:
+        console.print(
+            "[red]Error: --summary requires --phase <P##> naming the Phase "
+            "to summarise.[/red]"
+        )
+        raise typer.Exit(code=1)
+
+    if phase is not None and not summary:
+        console.print(
+            "[red]Error: --phase is only valid together with --summary.[/red]"
         )
         raise typer.Exit(code=1)
 
@@ -274,8 +307,9 @@ def cmd_add(
     step_display_path_arg = None
     step_scope_arg = None
     step_action_arg = None
+    phase_display_arg = None
 
-    if dt is DocType.EXEC and (step is not None or all_steps):
+    if dt is DocType.EXEC and (step is not None or all_steps or summary):
         from vaultspec_core.vaultcore.query import list_documents
 
         parent_plan_doc = None
@@ -336,6 +370,23 @@ def cmd_add(
             step_display_path_arg = target_step.display_path
             step_scope_arg = target_step.scope
             step_action_arg = target_step.action
+
+        elif summary:
+            from vaultspec_core.plan.commands.phase_ops import (
+                PhaseNotFoundError,
+                find_phase,
+            )
+
+            # The "--summary requires --phase" validation above guarantees a
+            # non-None phase id by the time this branch runs.
+            assert phase is not None
+            try:
+                target_phase = find_phase(parsed_plan, phase)
+            except PhaseNotFoundError as exc:
+                console.print(f"[red]Error: {exc}[/red]")
+                raise typer.Exit(code=1) from None
+
+            phase_display_arg = target_phase.display_path
 
         elif all_steps:
             # Bulk scaffolding loop
@@ -467,6 +518,8 @@ def cmd_add(
                 step_action=step_action_arg,
                 plan_date=plan_date_arg,
                 plan_stem=plan_stem_arg,
+                summary=summary,
+                phase_display_path=phase_display_arg,
             )
         except FileNotFoundError as exc:
             _handle_error(exc, json_output=json_output)
@@ -1102,6 +1155,16 @@ def cmd_graph(
             help="Include the derived relatedness edge set in JSON output",
         ),
     ] = True,
+    ref: Annotated[
+        str | None,
+        typer.Option(
+            "--ref",
+            help=(
+                "Read the vault corpus from this git ref (branch/tag/sha) via "
+                "the object database, without a working-tree checkout"
+            ),
+        ),
+    ] = None,
     target: TargetOption = None,
 ) -> None:
     """Render the vault document graph.
@@ -1114,15 +1177,28 @@ def cmd_graph(
     For JSON output, --node <stem> with --depth N scopes the payload to a
     node's local (ego) neighbourhood, and --no-derived omits the derived
     relatedness edge set.
+
+    Use --ref <branch|sha> to read the corpus from the git object database at
+    that ref instead of the working tree (read-only; no checkout, no cache
+    write). The JSON envelope stays ``vaultspec.vault.graph.v2`` with a
+    top-level ``ref`` key naming the snapshot. A non-git workspace or an
+    unresolvable ref fails with a typed error rather than a working-tree read.
     """
     apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.graph import VaultGraph
+    from vaultspec_core.graph.refscan import RefScanError
 
     console = get_console()
     try:
-        graph = VaultGraph(_get_ctx().target_dir)
+        if ref is not None:
+            graph = VaultGraph.from_ref(_get_ctx().target_dir, ref)
+        else:
+            graph = VaultGraph(_get_ctx().target_dir)
+    except RefScanError as exc:
+        console.print(f"[red]Error reading ref {ref!r}: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
     except OSError as exc:
         console.print(f"[red]Error reading vault: {exc}[/red]")
         raise typer.Exit(code=1) from exc
@@ -2319,7 +2395,7 @@ def cmd_rule_promote(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Promote an audit finding to a project-level rule."""
+    """Promote an audit finding to a team-shared rule."""
     apply_target(target)
     import json
 

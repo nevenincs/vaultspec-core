@@ -47,16 +47,14 @@ def collect_rules(
         ``(source_path, frontmatter_dict, body_text)``.
     """
     rules_src_dir = _t.get_context().rules_src_dir
-    migrate_flat_custom_rules(rules_src_dir)
+    flatten_nested_custom_rules(rules_src_dir)
     raw_sources = collect_md_resources(rules_src_dir, warnings=warnings)
+    # Rule sources are flat after sanitization; reduce any residual nested key
+    # (e.g. a basename collision the flattener could not resolve) to its
+    # basename so the collected name is always the flat rule name.
     sources = {}
     for k, v in raw_sources.items():
-        if k.startswith("project/"):
-            sources[k[len("project/") :]] = v
-        elif k.startswith("project\\"):
-            sources[k[len("project\\") :]] = v
-        else:
-            sources[k] = v
+        sources[k.replace("\\", "/").rsplit("/", 1)[-1]] = v
     return sources
 
 
@@ -93,7 +91,7 @@ def rules_list() -> list[dict[str, str]]:
     items: list[dict[str, str]] = []
     rules_src_dir = _t.get_context().rules_src_dir
     if rules_src_dir.exists():
-        migrate_flat_custom_rules(rules_src_dir)
+        flatten_nested_custom_rules(rules_src_dir)
         for f in sorted(rules_src_dir.glob("**/*.md")):
             rel_name = f.relative_to(rules_src_dir).as_posix()
             source = "Built-in" if f.name.endswith(".builtin.md") else "Custom"
@@ -128,13 +126,17 @@ def rules_add(
         ResourceExistsError: If the rule exists and *force* is ``False``.
     """
     rules_src_dir = _t.get_context().rules_src_dir
-    ensure_dir(rules_src_dir / "project")
+    ensure_dir(rules_src_dir)
 
-    file_name = name if name.endswith(".md") else f"{name}.md"
-    if not (file_name.startswith("project/") or file_name.startswith("project\\")):
-        file_path = rules_src_dir / "project" / file_name
-    else:
-        file_path = rules_src_dir / file_name
+    # Custom rules live flat directly under the rules root alongside the
+    # ``*.builtin.md`` builtins; nested rule folders are not supported. Reduce
+    # the requested name to its basename so any directory components (including
+    # a legacy ``project/`` prefix) are sanitized away rather than creating a
+    # nested rule.
+    base_name = Path(name.replace("\\", "/")).name
+    file_name = base_name if base_name.endswith(".md") else f"{base_name}.md"
+    rule_stem = file_name[:-3]
+    file_path = rules_src_dir / file_name
 
     if file_path.exists() and not force:
         raise ResourceExistsError(
@@ -154,7 +156,7 @@ def rules_add(
             from ..config import get_config
 
             editor = get_config().editor
-            scaffold = f"---\nname: {name}\n---\n\n# Rule content\n"
+            scaffold = f"---\nname: {rule_stem}\n---\n\n# Rule content\n"
             atomic_write(file_path, scaffold)
             logger.info("Opening editor (%s) for %s...", editor, file_path)
             try:
@@ -166,7 +168,7 @@ def rules_add(
         else:
             rule_content = sys.stdin.read()
 
-    fm = {"name": name}
+    fm = {"name": rule_stem}
     full = build_file(fm, (rule_content or "").lstrip())
     atomic_write(file_path, full)
     logger.info("Created custom rule: %s", file_path)
@@ -266,22 +268,55 @@ def converge_spec_layer_gitignore(rules_src_dir: Path) -> bool:
     return True
 
 
-def migrate_flat_custom_rules(rules_src_dir: Path) -> None:
-    """Migrate flat custom rules to project/ subdirectory."""
+def flatten_nested_custom_rules(rules_src_dir: Path) -> None:
+    """Flatten any nested custom rule to the rules root; sanitize nesting.
+
+    Custom rules are team-shared markdown files that live FLAT directly under
+    ``.vaultspec/rules/rules/`` alongside the ``*.builtin.md`` builtins; nested
+    rule folders (notably the historical ``project/`` subdir) are not
+    supported. This heals the source tree idempotently: every non-builtin
+    ``*.md`` found below the rules root is moved up to ``<root>/<basename>`` and
+    the emptied subdirectories are removed. A basename collision with an
+    existing flat rule is left in place and logged rather than overwriting the
+    operator's file. Runs on every collect / sync so authored or previously
+    migrated nesting is sanitized automatically.
+    """
     if not rules_src_dir.exists():
         return
     import shutil
 
-    for f in rules_src_dir.glob("*.md"):
-        if f.is_file() and not f.name.endswith(".builtin.md"):
-            project_dir = rules_src_dir / "project"
-            project_dir.mkdir(parents=True, exist_ok=True)
-            dest_file = project_dir / f.name
-            try:
-                shutil.move(str(f), str(dest_file))
-                logger.info("Migrated flat custom rule %s to %s", f, dest_file)
-            except Exception as e:
-                logger.error("Failed to migrate flat custom rule %s: %s", f, e)
+    for f in sorted(rules_src_dir.glob("**/*.md")):
+        if not f.is_file() or f.parent == rules_src_dir:
+            continue  # already flat
+        if f.name.endswith(".builtin.md"):
+            continue  # builtins are flat by contract
+        dest_file = rules_src_dir / f.name
+        if dest_file.exists():
+            logger.warning(
+                "Cannot flatten nested rule %s: %s already exists; leaving nested",
+                f,
+                dest_file,
+            )
+            continue
+        try:
+            shutil.move(str(f), str(dest_file))
+            logger.info("Flattened nested custom rule %s to %s", f, dest_file)
+        except OSError as e:
+            logger.error("Failed to flatten nested custom rule %s: %s", f, e)
+
+    # Remove now-empty nested directories (e.g. the legacy ``project/`` subdir),
+    # deepest first so parents empty out after their children.
+    nested_dirs = sorted(
+        (p for p in rules_src_dir.glob("**/*") if p.is_dir()),
+        key=lambda p: len(p.parts),
+        reverse=True,
+    )
+    for d in nested_dirs:
+        try:
+            if not any(d.iterdir()):
+                d.rmdir()
+        except OSError:
+            pass
 
 
 def rule_promote(
@@ -290,9 +325,9 @@ def rule_promote(
     force: bool = False,
     dry_run: bool = False,
 ) -> Path:
-    """Promote an audit finding to a project-level rule.
+    """Promote an audit finding to a team-shared rule.
 
-    Scaffolds a new rule under `.vaultspec/rules/rules/project/` and appends
+    Scaffolds a new rule flat under `.vaultspec/rules/rules/` and appends
     the rule to the originating audit's ``promoted_to`` frontmatter field.
 
     Args:
@@ -332,9 +367,9 @@ def rule_promote(
             "(lowercase letters, numbers, and hyphens)."
         )
 
-    # 3. Define target rule file path
+    # 3. Define target rule file path (flat; nested rule folders unsupported)
     rules_src_dir = _t.get_context().rules_src_dir
-    rule_file = rules_src_dir / "project" / f"{rule_name_stem}.md"
+    rule_file = rules_src_dir / f"{rule_name_stem}.md"
 
     if rule_file.exists() and not force:
         raise ResourceExistsError(

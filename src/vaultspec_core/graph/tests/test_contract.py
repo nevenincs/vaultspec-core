@@ -32,6 +32,9 @@ _EXPECTED_DATA_KEYS = frozenset(
         "edges",
         "derived_edges",
         "root",
+        # Additive in the v2 envelope (issue #160): names the git ref a
+        # ref-scoped build read from, and is ``None`` for a working-tree build.
+        "ref",
         "feature",
         "metrics",
     }

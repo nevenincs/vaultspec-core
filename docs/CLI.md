@@ -155,6 +155,8 @@ vaultspec-core vault plan epic intent edit [OPTIONS] PATH
 vaultspec-core vault plan tier show [OPTIONS] PATH
 vaultspec-core vault plan tier promote [OPTIONS] PATH
 vaultspec-core vault plan tier demote [OPTIONS] PATH
+vaultspec-core vault plan trailer emit [OPTIONS]
+vaultspec-core vault plan trailer validate [OPTIONS] MESSAGE_FILE
 vaultspec-core vault link list [OPTIONS] [SRC]
 vaultspec-core vault link add [OPTIONS] SRC DST
 vaultspec-core vault link remove [OPTIONS] SRC DST
@@ -347,19 +349,21 @@ Create a new `.vault/` document from a template.
 
 #### Options
 
-| Option          | Short | Default         | Description                                                                           |
-| --------------- | ----- | --------------- | ------------------------------------------------------------------------------------- |
-| `--feature TAG` | `-f`  | None (required) | Feature tag (kebab-case, lowercase letters, digits, hyphens).                         |
-| `--date DATE`   | -     | today           | Override date (ISO 8601, e.g., YYYY-MM-DD).                                           |
-| `--title TITLE` | -     | None            | Document title. For execution records, overrides the default heading.                 |
-| `--related DOC` | `-r`  | None            | Related document(s). Accepts path, filename, stem, or `[[wiki-link]]`. Repeatable.    |
-| `--tags TAG`    | -     | None            | Additional tags beyond the required directory and feature tags. Repeatable.           |
-| `--force`       | -     | off             | Overwrite an existing document at the resolved path.                                  |
-| `--dry-run`     | -     | off             | Preview without writing files.                                                        |
-| `--json`        | -     | off             | Emit machine-readable JSON output in standard envelope.                               |
-| `--tier TIER`   | -     | L1              | Plan tier (`L1`, `L2`, `L3`, `L4`). (Ignored for non-plan types).                     |
-| `--step STEP`   | -     | None            | Canonical ID or display path of a specific step to scaffold. (Only valid for `exec`). |
-| `--all-steps`   | -     | off             | Scaffold execution records for all steps in parent plan. (Only valid for `exec`).     |
+| Option          | Short | Default         | Description                                                                                            |
+| --------------- | ----- | --------------- | ------------------------------------------------------------------------------------------------------ |
+| `--feature TAG` | `-f`  | None (required) | Feature tag (kebab-case, lowercase letters, digits, hyphens).                                          |
+| `--date DATE`   | -     | today           | Override date (ISO 8601, e.g., YYYY-MM-DD).                                                            |
+| `--title TITLE` | -     | None            | Document title. For execution records, overrides the default heading.                                  |
+| `--related DOC` | `-r`  | None            | Related document(s). Accepts path, filename, stem, or `[[wiki-link]]`. Repeatable.                     |
+| `--tags TAG`    | -     | None            | Additional tags beyond the required directory and feature tags. Repeatable.                            |
+| `--force`       | -     | off             | Overwrite an existing document at the resolved path.                                                   |
+| `--dry-run`     | -     | off             | Preview without writing files.                                                                         |
+| `--json`        | -     | off             | Emit machine-readable JSON output in standard envelope.                                                |
+| `--tier TIER`   | -     | L1              | Plan tier (`L1`, `L2`, `L3`, `L4`). (Ignored for non-plan types).                                      |
+| `--step STEP`   | -     | None            | Canonical ID or display path of a specific step to scaffold. (Only valid for `exec`).                  |
+| `--all-steps`   | -     | off             | Scaffold execution records for all steps in parent plan. (Only valid for `exec`).                      |
+| `--summary`     | -     | off             | Scaffold a Phase summary record instead of a Step record. Requires `--phase`. (Only valid for `exec`). |
+| `--phase P##`   | -     | None            | Canonical Phase ID to summarise; used with `--summary`. (Only valid for `exec`).                       |
 
 #### Step-Aware Execution Scaffolding (`DOC_TYPE=exec`)
 
@@ -369,8 +373,14 @@ target individual or bulk steps from the parent plan.
 ##### Option Gating and Fallbacks
 
 - **Mutual Exclusion**: `--step` and `--all-steps` are strictly mutually exclusive. If
-  both are provided, or if either is passed with a document type other than `exec`, the
-  CLI aborts with exit code `1`.
+  both are provided, or if any of `--step`, `--all-steps`, or `--summary` is passed with
+  a document type other than `exec`, the CLI aborts with exit code `1`.
+- **Phase Summary**: `--summary --phase P##` scaffolds the Phase-summary record from the
+  `exec-summary.md` template into the feature's exec folder as
+  `{date}-{feature}-{phase}-summary.md` (the `{phase}` segment carries the Phase display
+  path, e.g. `P01` or `W01-P01`). `--summary` requires `--phase`, `--phase` requires
+  `--summary`, and `--summary` may not combine with `--step` or `--all-steps`. An
+  unknown Phase id aborts with exit code `1`.
 - **Legacy Fallback**: If neither option is provided when creating an `exec` document,
   the CLI displays a yellow warning:
   `Deprecation Warning: Scaffolding flat (non-step-aware) execution records is deprecated. Use --step or --all-steps.`
@@ -602,11 +612,23 @@ Outputs a hierarchical tree grouped by feature and type.
 | `--node STEM`            | -     | None    | Scope JSON to a node's local (ego) neighbourhood |
 | `--depth N`              | -     | 1       | Ego-graph radius in hops; only used with --node  |
 | `--derived/--no-derived` | -     | on      | Include the derived relatedness edge set in JSON |
+| `--ref REF`              | -     | None    | Read the corpus from a git ref (branch/tag/sha)  |
 
 The `--json` payload (schema `vaultspec.vault.graph.v2`) carries typed weighted explicit
 edges (`kind`, `multiplicity`, `weight`), node-size hints (`pagerank`, `in_degree`), and
 a separate `derived_edges` array of implicit relatedness edges kept out of the canonical
-`edges` array. A missing `--node` stem exits 1 with a `failed` envelope.
+`edges` array. Each node's `path` is a vault-relative POSIX path (e.g.
+`.vault/adr/foo.md`); no absolute filesystem path is emitted, and the format is
+identical for working-tree and ref-scoped builds. A missing `--node` stem exits 1 with a
+`failed` envelope.
+
+`--ref <branch|sha>` reads the vault corpus from the git object database at that ref
+instead of the working tree, without a checkout. The read is read-only: the working-tree
+graph cache is neither consulted nor written, and the working-tree migration pass is
+skipped. The envelope stays `vaultspec.vault.graph.v2` with a top-level `ref` key naming
+the snapshot (it is `null` for a working-tree build). A non-git workspace or an
+unresolvable ref exits 1 with a typed error rather than silently reading the working
+tree.
 
 #### Examples
 
@@ -1318,6 +1340,53 @@ A self-referential move (`step move S01 --before S01`) is rejected with the rele
 to a hidden `<!-- RETIRED: ... -->` ledger embedded in the plan body. `next_available_*`
 consults this ledger so retired identifiers are never reused, even across
 `parse / serialize` round-trips invoked by `--fix`.
+
+#### Commit-linkage trailers
+
+The `vaultspec-core vault plan trailer` verbs define an **opt-in** convention for
+carrying vaultspec identifiers in git commit metadata, so tooling that correlates
+commits to vault records can resolve a link deterministically instead of heuristically.
+Two trailer keys are defined: `Vaultspec-Step` carries a Step or Phase display path
+(`S06`, `P02.S06`, `W01.P02.S06`, or the phase-only `P02`), and `Vaultspec-Feature`
+carries a kebab-case feature tag (with an optional leading `#`).
+
+The convention is **enrichment, never a prerequisite**: a missing or malformed trailer
+must never block a commit or fail any command. `trailer validate` reports malformed
+trailers and **always exits 0**, which is what makes it safe to wire as an advisory
+`commit-msg` hook.
+
+- **Emit a trailer line** (for scripting into a commit template):
+
+  ```bash
+  vaultspec-core vault plan trailer emit --step W01.P02.S06
+  vaultspec-core vault plan trailer emit --feature auth-refactor
+  ```
+
+  Exactly one of `--step` / `--feature` is required; invalid input is a usage error
+  (exit 1).
+
+- **Validate the trailers in a commit-message file** (advisory; always exit 0):
+
+  ```bash
+  vaultspec-core vault plan trailer validate .git/COMMIT_EDITMSG
+  ```
+
+- **Opt-in `commit-msg` pre-commit hook**: teams that want the advisory check add the
+  following `repo: local` hook at the `commit-msg` stage to their
+  `.pre-commit-config.yaml`, then run the one-time `prek install --hook-type commit-msg`
+  (or `pre-commit install --hook-type commit-msg`). Teams that do not are unaffected.
+
+  ```yaml
+  - repo: local
+    hooks:
+      - id: vaultspec-commit-trailer
+        name: vaultspec commit-linkage trailer (advisory)
+        entry: vaultspec-core vault plan trailer validate
+        language: system
+        stages: [commit-msg]
+        always_run: true
+        verbose: true
+  ```
 
 ## Spec commands
 
