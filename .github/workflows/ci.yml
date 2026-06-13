@@ -153,12 +153,14 @@ jobs:
         run: just dev deps sync
 
       - name: Bootstrap framework
-        # The source repo no longer tracks .vaultspec/ (collapsed into the
-        # package source tree at src/vaultspec_core/builtins/). A fresh
-        # checkout has no .vaultspec/, so `vault check all` would fail with
-        # `vaultspec_dir does not exist`. Run install first to scaffold the
-        # workspace the same way any consumer would.
-        run: just prod install
+        # The source repo tracks .vaultspec/ framework config, but the install
+        # manifest (.vaultspec/providers.json) stays gitignored. A fresh
+        # checkout therefore has the framework dir without a manifest, which
+        # the diagnosis engine classifies as CORRUPTED. Run install with
+        # --force to repair/create the manifest from the tracked config and
+        # scaffold provider outputs, the way a consumer recovering a missing
+        # manifest would.
+        run: just prod install --force
 
       - name: Verify vault structure and links
         run: just prod vault check all
