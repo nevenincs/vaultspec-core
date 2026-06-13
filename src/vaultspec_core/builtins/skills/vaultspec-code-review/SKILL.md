@@ -1,8 +1,6 @@
 ---
 name: vaultspec-code-review
-description: >-
-  Skill to conduct a formal code review. Audits code for safety, intent, and
-  quality. Mandates loading the vaultspec-code-reviewer agent persona.
+description: Run a formal code review for safety, intent, and quality. Use to verify completed work before marking it done.
 ---
 
 # Code review skill (vaultspec-code-review)

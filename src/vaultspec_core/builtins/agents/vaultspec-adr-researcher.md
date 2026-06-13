@@ -1,5 +1,5 @@
 ---
-description: Specialist agent that conducts `<Research>`, synthesizes technical implementation pathways, and formalizes architectural decisions into an `<ADR>`.
+description: Research a problem and formalize the decision as an ADR. Use to turn open questions into an ADR.
 tier: HIGH
 mode: read-only
 tools: [Glob, Grep, Read, WebFetch, WebSearch, Bash]

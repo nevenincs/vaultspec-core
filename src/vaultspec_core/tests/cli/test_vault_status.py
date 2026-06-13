@@ -1,4 +1,4 @@
-"""Integration tests for the ``vault status`` CLI verb.
+"""Integration tests for the top-level ``status`` CLI verb.
 
 Implements the verification surface for the vault-orientation ADR's
 decisions D1, D2, D4, D5, and D7: the rollup mode lists in-flight plans
@@ -34,9 +34,9 @@ pytestmark = [pytest.mark.integration]
 
 
 def _run(root: Path, *args: str):
-    """Invoke ``vault status`` against *root* via the root ``-t`` target."""
+    """Invoke the top-level ``status`` verb against *root* via root ``-t``."""
     runner = CliRunner(env={"NO_COLOR": "1"})
-    return runner.invoke(app, ["-t", str(root), "vault", "status", *args])
+    return runner.invoke(app, ["-t", str(root), "status", *args])
 
 
 def _write(path: Path, text: str) -> None:
@@ -239,9 +239,9 @@ class TestRollup:
         assert result.exit_code == 0, result.output
         assert "Plans in flight" in result.output
         assert ids["plan"] in result.output
-        # Two closed of three total, one open: counts are rendered.
-        assert "2/3 done" in result.output
-        assert "1 open" in result.output
+        # The clean plan line renders tier, the step fraction, and the cursor.
+        assert "2/3 steps" in result.output
+        assert "next P01.S03" in result.output
 
     def test_renders_stems_only_no_absolute_paths(self, tmp_path: Path) -> None:
         ids = _build_vault(tmp_path)
@@ -262,20 +262,25 @@ class TestRollup:
         assert "exec/" not in result.output
         assert "\\" not in result.output
 
-    def test_limit_narrows_the_recent_set(self, tmp_path: Path) -> None:
+    def test_limit_narrows_each_type_group(self, tmp_path: Path) -> None:
         ids = _build_vault(tmp_path)
+        # A second, older research document. The limit applies per type, so
+        # at --limit 1 the research group keeps only its newest member.
+        old_research = "2026-01-01-widget-old-research"
+        _write(
+            tmp_path / ".vault" / "research" / f"{old_research}.md",
+            _grounding("research", "widget", date="2026-01-01", modified="2026-01-01"),
+        )
 
-        # Limit of 1 keeps only the single most-recent document: the plan
-        # (modified 2026-03-15), dropping the older research document.
         result = _run(tmp_path, "--limit", "1")
 
         assert result.exit_code == 0, result.output
-        # The plan stem still appears under "Plans in flight" regardless,
-        # so assert on a recency-only document instead: research is older
-        # than the top document and must be excluded from the recent set.
-        recent_section = result.output.split("Active features")[0]
-        recent_block = recent_section.split("Recent changes")[1]
-        assert ids["research"] not in recent_block
+        recent_block = result.output.split("Active features")[0].split(
+            "Recent changes"
+        )[1]
+        # The newest research survives; the older one is dropped by the cap.
+        assert ids["research"] in recent_block
+        assert old_research not in recent_block
 
     def test_since_window_filters_by_day_distance(self, tmp_path: Path) -> None:
         ids = _build_vault(tmp_path)
@@ -303,7 +308,7 @@ class TestRollup:
 
         assert result.exit_code == 0, result.output
         assert "Suggested Next Step" in result.output
-        assert "vaultspec-core vault status" in result.output
+        assert "vaultspec-core status" in result.output
         assert "vaultspec-core spec doctor" in result.output
 
     def test_no_hints_suppresses_hint_block(self, tmp_path: Path) -> None:
@@ -332,7 +337,7 @@ class TestRollup:
         assert in_flight["total_steps"] == 3
         assert "hints" in payload
         commands = [h["command"] for h in payload["hints"]["next_steps"]]
-        assert any("vault status" in c for c in commands)
+        assert any("vaultspec-core status" in c for c in commands)
         assert any("spec doctor" in c for c in commands)
 
 
@@ -360,9 +365,13 @@ class TestTrace:
         result = _run(tmp_path, ids["plan"])
 
         assert result.exit_code == 0, result.output
-        # S03 is open and has no execution record.
+        # S03 is open and has no execution record. The plan-line header also
+        # names the cursor ("next P01.S03"), so select the step row by its
+        # checkbox glyph rather than the first line mentioning the id.
         s03_line = next(
-            line for line in result.output.splitlines() if "P01.S03" in line
+            line
+            for line in result.output.splitlines()
+            if "P01.S03" in line and "[ ]" in line
         )
         assert "no record" in s03_line
 
@@ -524,3 +533,219 @@ class TestReviewRefinements:
         # The JSON payload stays uncapped: 12 fillers plus the widget feature.
         assert len(features) == 13
         assert ids["feature"] in {f["name"] for f in features}
+
+
+# ---------------------------------------------------------------------------
+# Clean plan line, recently-completed bucket, file paths, index exclusion
+# ---------------------------------------------------------------------------
+
+
+def _build_completed_vault(root: Path) -> dict[str, str]:
+    """Build a vault whose single plan is 100% complete and grounded."""
+    vault = root / ".vault"
+    (root / ".vaultspec").mkdir(parents=True, exist_ok=True)
+    feature = "gizmo"
+    plan_stem = f"2026-04-01-{feature}-plan"
+    _write(
+        vault / "plan" / f"{plan_stem}.md",
+        _plan(
+            feature,
+            date="2026-04-01",
+            modified="2026-04-20",
+            steps=[("S01", True), ("S02", True)],
+        ),
+    )
+    for step in ("S01", "S02"):
+        _write(
+            vault
+            / "exec"
+            / f"2026-04-01-{feature}"
+            / f"2026-04-01-{feature}-P01-{step}.md",
+            _exec(
+                feature,
+                date="2026-04-02",
+                modified="2026-04-02",
+                step_id=step,
+                plan_stem=plan_stem,
+            ),
+        )
+    return {"feature": feature, "plan": plan_stem}
+
+
+class TestPlanLineAndDiscovery:
+    """The clean plan line, recently-completed bucket, paths, and index drop."""
+
+    def test_recently_completed_bucket_lists_finished_plan(
+        self, tmp_path: Path
+    ) -> None:
+        ids = _build_completed_vault(tmp_path)
+
+        result = _run(tmp_path)
+
+        assert result.exit_code == 0, result.output
+        assert "Recently completed" in result.output
+        completed = result.output.split("Recently completed")[1]
+        assert ids["plan"] in completed
+        # A finished plan shows the 'complete' cursor and 100%.
+        assert "complete" in completed
+        assert "2/2 steps" in completed
+        # A complete plan is not also listed as in flight.
+        in_flight = result.output.split("Recently completed")[0]
+        assert ids["plan"] not in in_flight.split("Plans in flight")[1]
+
+    def test_recently_completed_in_json(self, tmp_path: Path) -> None:
+        ids = _build_completed_vault(tmp_path)
+
+        payload = json.loads(_run(tmp_path, "--json").output)
+
+        completed = payload["data"]["recently_completed"]
+        assert ids["plan"] in {p["stem"] for p in completed}
+        entry = next(p for p in completed if p["stem"] == ids["plan"])
+        assert entry["open_steps"] == 0
+        assert entry["completion_percent"] == 100.0
+        assert entry["next_open_step"] is None
+
+    def test_active_feature_row_shows_plan_tail(self, tmp_path: Path) -> None:
+        _build_vault(tmp_path)
+
+        result = _run(tmp_path)
+
+        assert result.exit_code == 0, result.output
+        active = result.output.split("Active features")[1]
+        # Condensed tail: tier and step fraction on the feature row.
+        assert "L2 2/3" in active
+
+    def test_trace_header_is_clean_plan_line(self, tmp_path: Path) -> None:
+        ids = _build_vault(tmp_path)
+
+        result = _run(tmp_path, ids["plan"])
+
+        assert result.exit_code == 0, result.output
+        header = next(
+            line
+            for line in result.output.splitlines()
+            if ids["plan"] in line and "2/3 steps" in line
+        )
+        assert "L2" in header
+        assert "next P01.S03" in header
+
+    def test_trace_cursor_marks_next_open_step(self, tmp_path: Path) -> None:
+        ids = _build_vault(tmp_path)
+
+        result = _run(tmp_path, ids["plan"])
+
+        assert result.exit_code == 0, result.output
+        s03_row = next(
+            line
+            for line in result.output.splitlines()
+            if "P01.S03" in line and "[ ]" in line
+        )
+        assert s03_row.lstrip().startswith(">")
+
+    def test_paths_flag_surfaces_record_path(self, tmp_path: Path) -> None:
+        ids = _build_vault(tmp_path)
+
+        without = _run(tmp_path, ids["plan"])
+        withp = _run(tmp_path, ids["plan"], "--paths")
+
+        assert without.exit_code == 0 and withp.exit_code == 0
+        # Default mode stays stems-only; --paths reveals the repo-relative file.
+        assert ".vault/exec" not in without.output
+        assert ".vault/exec" in withp.output
+        assert f"{ids['exec_s01']}.md" in withp.output
+
+    def test_paths_in_trace_json(self, tmp_path: Path) -> None:
+        ids = _build_vault(tmp_path)
+
+        payload = json.loads(_run(tmp_path, ids["plan"], "--paths", "--json").output)
+
+        paths = payload["data"]["paths"]
+        assert ids["exec_s01"] in paths
+        assert paths[ids["exec_s01"]].endswith(f"{ids['exec_s01']}.md")
+        assert paths[ids["exec_s01"]].startswith(".vault/")
+
+    def test_index_documents_excluded_from_rollup(self, tmp_path: Path) -> None:
+        _build_vault(tmp_path)
+        # A derived index aggregate must not relist the feature's docs.
+        _write(
+            tmp_path / ".vault" / "index" / "widget.index.md",
+            "---\ntags:\n  - '#index'\n  - '#widget'\n"
+            "date: '2026-03-20'\nmodified: '2026-03-20'\n---\n\n# widget index\n",
+        )
+
+        payload = json.loads(_run(tmp_path, "--json").output)
+
+        assert "index" not in payload["data"]["recent_documents"]
+        human = _run(tmp_path)
+        assert "widget.index" not in human.output
+
+
+class TestExecMissingFlag:
+    """A checked step lacking an execution record flags the plan line."""
+
+    def test_plan_line_flags_checked_step_without_record(self, tmp_path: Path) -> None:
+        (tmp_path / ".vaultspec").mkdir(parents=True, exist_ok=True)
+        feature = "gadget"
+        stem = f"2026-05-01-{feature}-plan"
+        _write(
+            tmp_path / ".vault" / "plan" / f"{stem}.md",
+            _plan(
+                feature,
+                date="2026-05-01",
+                modified="2026-05-20",
+                # S01 is closed but has no execution record; S02 stays open.
+                steps=[("S01", True), ("S02", False)],
+            ),
+        )
+
+        result = _run(tmp_path)
+
+        assert result.exit_code == 0, result.output
+        in_flight = result.output.split("Recent changes")[0]
+        assert stem in in_flight
+        # One checked-but-ungrounded step surfaces as a !1 flag on the line.
+        assert "!1" in in_flight
+
+
+class TestRecencyHygiene:
+    """Execution records collapse per feature unless verbosely requested."""
+
+    def test_exec_collapsed_per_feature_by_default(self, tmp_path: Path) -> None:
+        ids = _build_vault(tmp_path)
+
+        result = _run(tmp_path)
+
+        assert result.exit_code == 0, result.output
+        assert "Execution activity" in result.output
+        # The widget feature has three exec records, summarised on one line.
+        assert "3 records" in result.output
+        # Individual exec stems do not flood the recent view.
+        assert ids["exec_s01"] not in result.output
+
+    def test_exec_collapse_in_json(self, tmp_path: Path) -> None:
+        _build_vault(tmp_path)
+
+        payload = json.loads(_run(tmp_path, "--json").output)["data"]
+
+        assert "exec" not in payload["recent_documents"]
+        activity = payload["exec_activity"]
+        widget = next(a for a in activity if a["feature"] == "widget")
+        assert widget["count"] == 3
+
+    def test_verbose_exec_lists_records(self, tmp_path: Path) -> None:
+        ids = _build_vault(tmp_path)
+
+        result = _run(tmp_path, "--verbose-exec")
+
+        assert result.exit_code == 0, result.output
+        # Verbose mode lists exec records individually and drops the collapse.
+        assert ids["exec_s01"] in result.output
+        assert "Execution activity" not in result.output
+
+    def test_verbose_exec_json_includes_exec_group(self, tmp_path: Path) -> None:
+        _build_vault(tmp_path)
+
+        payload = json.loads(_run(tmp_path, "--verbose-exec", "--json").output)["data"]
+
+        assert "exec" in payload["recent_documents"]
+        assert payload["exec_activity"] == []

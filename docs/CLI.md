@@ -5,11 +5,12 @@ Complete command-line interface (CLI) reference for `vaultspec-core`. See the
 
 ## Entry points
 
-| Command                                          | Description                                                                                            |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| `vaultspec-core`                                 | Workspace management, vault operations, resource sync.                                                 |
-| `vaultspec-mcp`                                  | Console script that launches the stdio Model Context Protocol (MCP) server.                            |
-| `uv run python -m vaultspec_core.mcp_server.app` | Module invocation of the MCP server (avoids binary locking on Windows). See [MCP reference](./MCP.md). |
+| Command | Description | | ------------------------------------------------ |
+\------------------------------------------------------------------------------------------------------
+| | `vaultspec-core` | Workspace management, vault operations, resource sync. | |
+`vaultspec-mcp` | Console script that launches the stdio Model Context Protocol (MCP)
+server. | | `uv run python -m vaultspec_core.mcp_server.app` | Module invocation of the
+MCP server (avoids binary locking on Windows). See [MCP reference](./MCP.md). |
 
 ## Global options
 
@@ -19,11 +20,12 @@ top-level only. `--target` is accepted by target-aware workspace commands,
 `vaultspec-core migrations ...`. `--json` is command-specific and appears only on
 commands that support JavaScript Object Notation (JSON) output.
 
-| Option         | Short | Default | Description                                                                                                                |
-| -------------- | ----- | ------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `--target DIR` | `-t`  | cwd     | Target workspace directory. Overrides `VAULTSPEC_TARGET_DIR`. Defaults to the current working directory if neither is set. |
-| `--debug`      | `-d`  | off     | Enable DEBUG-level logging (top-level flag).                                                                               |
-| `--version`    | `-V`  | -       | Print version and exit (top-level flag).                                                                                   |
+| Option | Short | Default | Description | | -------------- | ----- | ------- |
+\--------------------------------------------------------------------------------------------------------------------------
+| | `--target DIR` | `-t` | cwd | Target workspace directory. Overrides
+`VAULTSPEC_TARGET_DIR`. Defaults to the current working directory if neither is set. | |
+`--debug` | `-d` | off | Enable DEBUG-level logging (top-level flag). | | `--version` |
+`-V` | - | Print version and exit (top-level flag). |
 
 ## Outcome vocabulary
 
@@ -36,15 +38,14 @@ print one glyph-prefixed line per item followed by a per-outcome count summary. 
 below): `data.items` is the per-item array, each item carries its own `outcome`, and the
 envelope's top-level `status` is the outcome for the whole invocation.
 
-| Outcome     | Glyph | Meaning                                                                     |
-| ----------- | ----- | --------------------------------------------------------------------------- |
-| `created`   | `+`   | A destination that did not exist now exists.                                |
-| `updated`   | `~`   | A destination that existed was changed.                                     |
-| `unchanged` | `=`   | The destination already matched the source; no write happened.              |
-| `removed`   | `-`   | A destination that existed no longer does.                                  |
-| `restored`  | `*`   | A destination was reset to its canonical version.                           |
-| `skipped`   | `s`   | A destination was not touched because a precondition or policy excluded it. |
-| `failed`    | `x`   | A write was attempted and an error was encountered.                         |
+| Outcome | Glyph | Meaning | | ----------- | ----- |
+\--------------------------------------------------------------------------- | |
+`created` | `+` | A destination that did not exist now exists. | | `updated` | `~` | A
+destination that existed was changed. | | `unchanged` | `=` | The destination already
+matched the source; no write happened. | | `removed` | `-` | A destination that existed
+no longer does. | | `restored` | `*` | A destination was reset to its canonical version.
+| | `skipped` | `s` | A destination was not touched because a precondition or policy
+excluded it. | | `failed` | `x` | A write was attempted and an error was encountered. |
 
 A `--json` `status` of `mixed` means a single invocation produced items with more than
 one distinct outcome. An `unchanged` status is the honest summary of a no-op run, not a
@@ -65,12 +66,14 @@ shape regardless of which command produced it:
 }
 ```
 
-| Field    | Required | Meaning                                                                                          |
-| -------- | -------- | ------------------------------------------------------------------------------------------------ |
-| `schema` | yes      | Namespaced identifier of the command plus a monotonic version integer.                           |
-| `status` | yes      | The canonical outcome word for the whole invocation (one of the seven words above, or `mixed`).  |
-| `data`   | yes      | The command-specific payload. Read-only commands report their content here under stable keys.    |
-| `hints`  | no       | Structured next-step guidance. Absent when no hint applies; its presence never changes `status`. |
+| Field | Required | Meaning | | -------- | -------- |
+\------------------------------------------------------------------------------------------------
+| | `schema` | yes | Namespaced identifier of the command plus a monotonic version
+integer. | | `status` | yes | The canonical outcome word for the whole invocation (one
+of the seven words above, or `mixed`). | | `data` | yes | The command-specific payload.
+Read-only commands report their content here under stable keys. | | `hints` | no |
+Structured next-step guidance. Absent when no hint applies; its presence never changes
+`status`. |
 
 The `schema` value follows the convention `vaultspec.<dotted-command-path>.v1` - for
 example `vaultspec.sync.v1`, `vaultspec.vault.stats.v1`, or
@@ -102,9 +105,9 @@ vaultspec-core install [OPTIONS] [PROVIDER]
 vaultspec-core uninstall [OPTIONS] [PROVIDER]
 vaultspec-core sync [OPTIONS] [PROVIDER]
 vaultspec-core doctor [OPTIONS]
+vaultspec-core status [OPTIONS] [TARGET]
 vaultspec-core vault add [OPTIONS] DOC_TYPE
 vaultspec-core vault stats [OPTIONS]
-vaultspec-core vault status [OPTIONS] [TARGET]
 vaultspec-core vault list [OPTIONS] [DOC_TYPE]
 vaultspec-core vault graph [OPTIONS]
 vaultspec-core vault repair [OPTIONS]
@@ -226,19 +229,17 @@ Deploy the vaultspec framework into the target directory.
 
 #### Arguments
 
-| Argument   | Default | Description                                               |
-| ---------- | ------- | --------------------------------------------------------- |
-| `PROVIDER` | `all`   | `all`, `core`, `claude`, `gemini`, `antigravity`, `codex` |
+| Argument | Default | Description | | ---------- | ------- |
+--------------------------------------------------------- | | `PROVIDER` | `all` |
+`all`, `core`, `claude`, `gemini`, `antigravity`, `codex` |
 
 #### Options
 
-| Option      | Default | Description                             |
-| ----------- | ------- | --------------------------------------- |
-| `--upgrade` | off     | Re-sync builtins without re-scaffolding |
-| `--dry-run` | off     | Preview without writing                 |
-| `--force`   | off     | Overwrite existing installation         |
-| `--skip`    | `[]`    | Skip specific sync passes (repeatable)  |
-| `--json`    | off     | Emit machine-readable output            |
+| Option | Default | Description | | ----------- | ------- |
+--------------------------------------- | | `--upgrade` | off | Re-sync builtins without
+re-scaffolding | | `--dry-run` | off | Preview without writing | | `--force` | off |
+Overwrite existing installation | | `--skip` | `[]` | Skip specific sync passes
+(repeatable) | | `--json` | off | Emit machine-readable output |
 
 `core` installs `.vaultspec/` only, without any provider config.
 
@@ -263,19 +264,17 @@ Remove the vaultspec framework from the target directory.
 
 #### Arguments
 
-| Argument   | Default | Description                                               |
-| ---------- | ------- | --------------------------------------------------------- |
-| `PROVIDER` | `all`   | `all`, `core`, `claude`, `gemini`, `antigravity`, `codex` |
+| Argument | Default | Description | | ---------- | ------- |
+--------------------------------------------------------- | | `PROVIDER` | `all` |
+`all`, `core`, `claude`, `gemini`, `antigravity`, `codex` |
 
 #### Options
 
-| Option           | Default | Description                                    |
-| ---------------- | ------- | ---------------------------------------------- |
-| `--remove-vault` | off     | Also remove `.vault/`                          |
-| `--dry-run`      | off     | Preview without deleting                       |
-| `--force`        | off     | Required to execute (uninstall is destructive) |
-| `--skip`         | `[]`    | Skip specific removal passes (repeatable)      |
-| `--json`         | off     | Emit machine-readable output                   |
+| Option | Default | Description | | ---------------- | ------- |
+---------------------------------------------- | | `--remove-vault` | off | Also remove
+`.vault/` | | `--dry-run` | off | Preview without deleting | | `--force` | off |
+Required to execute (uninstall is destructive) | | `--skip` | `[]` | Skip specific
+removal passes (repeatable) | | `--json` | off | Emit machine-readable output |
 
 `.vault/` is preserved by default. Pass `--remove-vault` to delete it.
 
@@ -301,9 +300,9 @@ adding framework source files, this is the normal propagation command.
 
 #### Arguments
 
-| Argument   | Default | Description                                       |
-| ---------- | ------- | ------------------------------------------------- |
-| `PROVIDER` | `all`   | `all`, `claude`, `gemini`, `antigravity`, `codex` |
+| Argument | Default | Description | | ---------- | ------- |
+------------------------------------------------- | | `PROVIDER` | `all` | `all`,
+`claude`, `gemini`, `antigravity`, `codex` |
 
 `core` is not a valid sync target because sync reads from `.vaultspec/`. Use
 `vaultspec-core install --upgrade` or `vaultspec-core install --force` for
@@ -312,12 +311,11 @@ edits.
 
 #### Options
 
-| Option      | Default | Description                                           |
-| ----------- | ------- | ----------------------------------------------------- |
-| `--dry-run` | off     | Preview changes without writing                       |
-| `--force`   | off     | Prune stale files and overwrite user-authored content |
-| `--skip`    | `[]`    | Skip specific sync passes (repeatable)                |
-| `--json`    | off     | Emit machine-readable output                          |
+| Option | Default | Description | | ----------- | ------- |
+----------------------------------------------------- | | `--dry-run` | off | Preview
+changes without writing | | `--force` | off | Prune stale files and overwrite
+user-authored content | | `--skip` | `[]` | Skip specific sync passes (repeatable) | |
+`--json` | off | Emit machine-readable output |
 
 #### Examples
 
@@ -341,25 +339,27 @@ Create a new `.vault/` document from a template.
 
 #### Arguments
 
-| Argument   | Description                                             |
-| ---------- | ------------------------------------------------------- |
-| `DOC_TYPE` | `adr`, `audit`, `exec`, `plan`, `reference`, `research` |
+| Argument | Description | | ---------- |
+------------------------------------------------------- | | `DOC_TYPE` | `adr`, `audit`,
+`exec`, `plan`, `reference`, `research` |
 
 #### Options
 
-| Option          | Short | Default         | Description                                                                           |
-| --------------- | ----- | --------------- | ------------------------------------------------------------------------------------- |
-| `--feature TAG` | `-f`  | None (required) | Feature tag (kebab-case, lowercase letters, digits, hyphens).                         |
-| `--date DATE`   | -     | today           | Override date (ISO 8601, e.g., YYYY-MM-DD).                                           |
-| `--title TITLE` | -     | None            | Document title. For execution records, overrides the default heading.                 |
-| `--related DOC` | `-r`  | None            | Related document(s). Accepts path, filename, stem, or `[[wiki-link]]`. Repeatable.    |
-| `--tags TAG`    | -     | None            | Additional tags beyond the required directory and feature tags. Repeatable.           |
-| `--force`       | -     | off             | Overwrite an existing document at the resolved path.                                  |
-| `--dry-run`     | -     | off             | Preview without writing files.                                                        |
-| `--json`        | -     | off             | Emit machine-readable JSON output in standard envelope.                               |
-| `--tier TIER`   | -     | L1              | Plan tier (`L1`, `L2`, `L3`, `L4`). (Ignored for non-plan types).                     |
-| `--step STEP`   | -     | None            | Canonical ID or display path of a specific step to scaffold. (Only valid for `exec`). |
-| `--all-steps`   | -     | off             | Scaffold execution records for all steps in parent plan. (Only valid for `exec`).     |
+| Option | Short | Default | Description | | --------------- | ----- | --------------- |
+\------------------------------------------------------------------------------------- |
+| `--feature TAG` | `-f` | None (required) | Feature tag (kebab-case, lowercase letters,
+digits, hyphens). | | `--date DATE` | - | today | Override date (ISO 8601, e.g.,
+YYYY-MM-DD). | | `--title TITLE` | - | None | Document title. For execution records,
+overrides the default heading. | | `--related DOC` | `-r` | None | Related document(s).
+Accepts path, filename, stem, or `[[wiki-link]]`. Repeatable. | | `--tags TAG` | - |
+None | Additional tags beyond the required directory and feature tags. Repeatable. | |
+`--force` | - | off | Overwrite an existing document at the resolved path. | |
+`--dry-run` | - | off | Preview without writing files. | | `--json` | - | off | Emit
+machine-readable JSON output in standard envelope. | | `--tier TIER` | - | L1 | Plan
+tier (`L1`, `L2`, `L3`, `L4`). (Ignored for non-plan types). | | `--step STEP` | - |
+None | Canonical ID or display path of a specific step to scaffold. (Only valid for
+`exec`). | | `--all-steps` | - | off | Scaffold execution records for all steps in
+parent plan. (Only valid for `exec`). |
 
 #### Step-Aware Execution Scaffolding (`DOC_TYPE=exec`)
 
@@ -461,39 +461,43 @@ vaultspec-core vault add exec --feature test-feature --step P01.S01
 
 ______________________________________________________________________
 
-### vaultspec-core vault status
+### vaultspec-core status
 
 ```bash
-vaultspec-core vault status [OPTIONS] [TARGET]
+vaultspec-core status [OPTIONS] [TARGET]
 ```
 
-Orient in a vaultspec vault: rollup or a grounding trace for a target. Read-only - it
-never writes and produces no artifact.
+Orient in a vaultspec vault: rollup or a grounding trace for a target. This is the
+top-level zeroth move. Read-only - it never writes and produces no artifact.
 
-**Rollup mode** (no `TARGET`): reports in-flight plans with open/closed step counts and
-completion percent, recently modified documents grouped by type, active features, and
-vault totals. Outcome semantics: always `unchanged` (read-only verb). Advisory hints
-point at the targeted form and at `vaultspec-core spec doctor` for framework health.
+**Rollup mode** (no `TARGET`): reports plans in flight, each with a one-line overview
+(tier, completed waves and phases, step completion, and the next open step); plans
+recently completed; recent changes grouped by type with execution records collapsed per
+feature; active features; and vault totals. Outcome semantics: always `unchanged`
+(read-only verb). Advisory hints point at the targeted form and at
+`vaultspec-core spec doctor` for framework health.
 
-**Targeted mode** (`TARGET` is a plan stem, plan path, or feature tag): renders the
-grounding trace - each plan step (canonical id, display path, open or closed) mapped to
-its execution-record stem, or `no record` for open steps without one, or `unlinked` for
-exec records that reference the plan but lack a resolvable `step_id:`. Grounding
-documents are grouped by type beneath the step list. A feature-tag target traces every
-plan under that feature.
+**Targeted mode** (`TARGET` is a plan stem, plan path, or feature handle): renders the
+grounding trace - a plan-line header, then each step (display path, checkbox state, a
+cursor on the next open step) mapped to its execution-record stem, or `no record` for
+open steps without one, or `unlinked` for exec records that reference the plan but lack
+a resolvable `step_id:`. Grounding documents are grouped by type beneath the step list.
+A feature handle traces every plan under that feature.
 
-`vaultspec-core vault status` is orientation, not auditing: it describes what exists
-without judging conformance. Use `vaultspec-core vault check` to audit and
+`vaultspec-core status` is orientation, not auditing: it describes what exists without
+judging conformance. Use `vaultspec-core vault check` to audit and
 `vaultspec-core spec doctor` for framework health.
 
 #### Options
 
-| Option       | Default | Description                                                 |
-| ------------ | ------- | ----------------------------------------------------------- |
-| `--limit N`  | `10`    | Number of recently modified documents to show.              |
-| `--since N`  | None    | Show documents modified within the last N days.             |
-| `--json`     | off     | Emit machine-readable output (`vaultspec.vault.status.v1`). |
-| `--no-hints` | off     | Suppress next-step advisory hints.                          |
+| Option | Default | Description | | ---------------- | ------- |
+-------------------------------------------------------------- | | `--limit N` | `10` |
+Recently modified documents to show, per type. | | `--since N` | None | Show documents
+modified within the last N days. | | `--paths` | off | Show each referenced document's
+path (targeted mode). | | `--verbose-exec` | off | List execution records instead of
+collapsing them per feature. | | `--json` | off | Emit machine-readable output
+(`vaultspec.vault.status.v1`). | | `--no-hints` | off | Suppress next-step advisory
+hints. |
 
 `--limit` and `--since` apply only in rollup mode. `--since` switches from a last-N
 count to a day-window query.
@@ -503,19 +507,19 @@ count to a day-window query.
 - **Get a vault-wide orientation rollup (in-flight plans and recent changes)**:
 
   ```bash
-  vaultspec-core vault status
+  vaultspec-core status
   ```
 
 - **Trace a specific plan to its execution records and grounding documents**:
 
   ```bash
-  vaultspec-core vault status 2026-05-17-test-feature-plan
+  vaultspec-core status 2026-05-17-test-feature-plan
   ```
 
 - **Show only documents modified in the last 7 days**:
 
   ```bash
-  vaultspec-core vault status --since 7
+  vaultspec-core status --since 7
   ```
 
 ______________________________________________________________________
@@ -530,17 +534,15 @@ List vault documents.
 
 #### Arguments
 
-| Argument   | Default | Description             |
-| ---------- | ------- | ----------------------- |
-| `DOC_TYPE` | None    | Filter by document type |
+| Argument | Default | Description | | ---------- | ------- | ----------------------- |
+| `DOC_TYPE` | None | Filter by document type |
 
 #### Options
 
-| Option          | Short | Default | Description                   |
-| --------------- | ----- | ------- | ----------------------------- |
-| `--feature TAG` | `-f`  | None    | Filter by feature tag         |
-| `--date DATE`   | -     | None    | Filter by date                |
-| `--json`        | -     | off     | Emit machine-readable output. |
+| Option | Short | Default | Description | | --------------- | ----- | ------- |
+----------------------------- | | `--feature TAG` | `-f` | None | Filter by feature tag
+| | `--date DATE` | - | None | Filter by date | | `--json` | - | off | Emit
+machine-readable output. |
 
 #### Examples
 
@@ -562,14 +564,12 @@ Show vault statistics and document counts.
 
 #### Options
 
-| Option          | Short | Default | Description                            |
-| --------------- | ----- | ------- | -------------------------------------- |
-| `--feature TAG` | `-f`  | None    | Filter by feature tag                  |
-| `--date DATE`   | -     | None    | Filter by date                         |
-| `--type TYPE`   | -     | None    | Filter by document type                |
-| `--invalid`     | -     | off     | Show only documents with invalid links |
-| `--orphaned`    | -     | off     | Show only orphaned documents           |
-| `--json`        | -     | off     | Emit machine-readable output.          |
+| Option | Short | Default | Description | | --------------- | ----- | ------- |
+-------------------------------------- | | `--feature TAG` | `-f` | None | Filter by
+feature tag | | `--date DATE` | - | None | Filter by date | | `--type TYPE` | - | None |
+Filter by document type | | `--invalid` | - | off | Show only documents with invalid
+links | | `--orphaned` | - | off | Show only orphaned documents | | `--json` | - | off |
+Emit machine-readable output. |
 
 #### Examples
 
@@ -592,16 +592,14 @@ Outputs a hierarchical tree grouped by feature and type.
 
 #### Options
 
-| Option                   | Short | Default | Description                                      |
-| ------------------------ | ----- | ------- | ------------------------------------------------ |
-| `--feature TAG`          | `-f`  | None    | Scope to a single feature                        |
-| `--json`                 | -     | off     | Output as networkx node-link JSON                |
-| `--metrics`              | `-m`  | off     | Show aggregate graph metrics                     |
-| `--ascii`                | -     | off     | Render ASCII topology                            |
-| `--body`                 | -     | off     | Include document body in JSON output             |
-| `--node STEM`            | -     | None    | Scope JSON to a node's local (ego) neighbourhood |
-| `--depth N`              | -     | 1       | Ego-graph radius in hops; only used with --node  |
-| `--derived/--no-derived` | -     | on      | Include the derived relatedness edge set in JSON |
+| Option | Short | Default | Description | | ------------------------ | ----- | -------
+| ------------------------------------------------ | | `--feature TAG` | `-f` | None |
+Scope to a single feature | | `--json` | - | off | Output as networkx node-link JSON | |
+`--metrics` | `-m` | off | Show aggregate graph metrics | | `--ascii` | - | off | Render
+ASCII topology | | `--body` | - | off | Include document body in JSON output | |
+`--node STEM` | - | None | Scope JSON to a node's local (ego) neighbourhood | |
+`--depth N` | - | 1 | Ego-graph radius in hops; only used with --node | |
+`--derived/--no-derived` | - | on | Include the derived relatedness edge set in JSON |
 
 The `--json` payload (schema `vaultspec.vault.graph.v2`) carries typed weighted explicit
 edges (`kind`, `multiplicity`, `weight`), node-size hints (`pagerank`, `in_degree`), and
@@ -638,24 +636,24 @@ embedded in prose are preserved.
 
 #### Options
 
-| Option                       | Short | Default | Description                                      |
-| ---------------------------- | ----- | ------- | ------------------------------------------------ |
-| `--dry-run`                  | -     | off     | Preview repair actions without writing           |
-| `--include-index/--no-index` | -     | on      | Refresh generated feature indexes during repair  |
-| `--feature TAG`              | `-f`  | None    | Scope repair and index refresh to one feature    |
-| `--verbose`                  | `-v`  | off     | Show INFO-level diagnostics and detailed paths   |
-| `--json`                     | -     | off     | Emit machine-readable phase and summary payloads |
+| Option | Short | Default | Description | | ---------------------------- | ----- |
+------- | ------------------------------------------------ | | `--dry-run` | - | off |
+Preview repair actions without writing | | `--include-index/--no-index` | - | on |
+Refresh generated feature indexes during repair | | `--feature TAG` | `-f` | None |
+Scope repair and index refresh to one feature | | `--verbose` | `-v` | off | Show
+INFO-level diagnostics and detailed paths | | `--json` | - | off | Emit machine-readable
+phase and summary payloads |
 
 #### Phases
 
-| Phase       | Purpose                                                               |
-| ----------- | --------------------------------------------------------------------- |
-| `preflight` | Report migration status and platform path behavior                    |
-| `check`     | Run the current vault health suite without mutation                   |
-| `fix`       | Apply supported safe check-level fixes, or report planned fixes       |
-| `index`     | Refresh or preview generated `.vault/index/<feature>.index.md` files  |
-| `postcheck` | Rebuild graph state and rerun checks after mutation                   |
-| `summary`   | Report changed files, generated indexes, unresolved work, root causes |
+| Phase | Purpose | | ----------- |
+--------------------------------------------------------------------- | | `preflight` |
+Report migration status and platform path behavior | | `check` | Run the current vault
+health suite without mutation | | `fix` | Apply supported safe check-level fixes, or
+report planned fixes | | `index` | Refresh or preview generated
+`.vault/index/<feature>.index.md` files | | `postcheck` | Rebuild graph state and rerun
+checks after mutation | | `summary` | Report changed files, generated indexes,
+unresolved work, root causes |
 
 Dry-run mode never writes generated indexes or check fixes. If migrations are pending,
 dry-run reports that state instead of entering the vault scan path that would apply lazy
@@ -687,12 +685,11 @@ and machine-owned comments such as retired plan markers.
 
 #### Options
 
-| Option          | Short | Default | Description                          |
-| --------------- | ----- | ------- | ------------------------------------ |
-| `--feature TAG` | `-f`  | None    | Sanitize documents for one feature   |
-| `--dry-run`     | -     | off     | Preview annotation removals          |
-| `--verbose`     | `-v`  | off     | Show stripped files                  |
-| `--json`        | -     | off     | Emit machine-readable check payloads |
+| Option | Short | Default | Description | | --------------- | ----- | ------- |
+------------------------------------ | | `--feature TAG` | `-f` | None | Sanitize
+documents for one feature | | `--dry-run` | - | off | Preview annotation removals | |
+`--verbose` | `-v` | off | Show stripped files | | `--json` | - | off | Emit
+machine-readable check payloads |
 
 #### Examples
 
@@ -715,12 +712,10 @@ List all feature tags in the vault.
 
 #### Options
 
-| Option        | Default | Description                               |
-| ------------- | ------- | ----------------------------------------- |
-| `--date DATE` | None    | Filter by date                            |
-| `--orphaned`  | off     | Show only features with no incoming links |
-| `--type TYPE` | None    | Filter by document type                   |
-| `--json`      | off     | Emit machine-readable output.             |
+| Option | Default | Description | | ------------- | ------- |
+----------------------------------------- | | `--date DATE` | None | Filter by date | |
+`--orphaned` | off | Show only features with no incoming links | | `--type TYPE` | None
+| Filter by document type | | `--json` | off | Emit machine-readable output. |
 
 #### Examples
 
@@ -745,10 +740,9 @@ auto-managed.
 
 #### Options
 
-| Option          | Short | Default | Description                           |
-| --------------- | ----- | ------- | ------------------------------------- |
-| `--feature TAG` | `-f`  | None    | Generate index for a specific feature |
-| `--json`        | -     | off     | Emit machine-readable output.         |
+| Option | Short | Default | Description | | --------------- | ----- | ------- |
+------------------------------------- | | `--feature TAG` | `-f` | None | Generate index
+for a specific feature | | `--json` | - | off | Emit machine-readable output. |
 
 #### Examples
 
@@ -770,11 +764,10 @@ Move all documents for a feature tag to the archive.
 
 #### Options
 
-| Option      | Short | Default | Description                                              |
-| ----------- | ----- | ------- | -------------------------------------------------------- |
-| `--dry-run` | -     | off     | Preview planned changes.                                 |
-| `--json`    | -     | off     | Emit machine-readable output.                            |
-| `--target`  | `-t`  | None    | Target directory (defaults to current working directory) |
+| Option | Short | Default | Description | | ----------- | ----- | ------- |
+-------------------------------------------------------- | | `--dry-run` | - | off |
+Preview planned changes. | | `--json` | - | off | Emit machine-readable output. | |
+`--target` | `-t` | None | Target directory (defaults to current working directory) |
 
 #### Examples
 
@@ -796,11 +789,10 @@ Restore all archived documents for a feature tag.
 
 #### Options
 
-| Option      | Short | Default | Description                                              |
-| ----------- | ----- | ------- | -------------------------------------------------------- |
-| `--dry-run` | -     | off     | Preview planned changes.                                 |
-| `--json`    | -     | off     | Emit machine-readable output.                            |
-| `--target`  | `-t`  | None    | Target directory (defaults to current working directory) |
+| Option | Short | Default | Description | | ----------- | ----- | ------- |
+-------------------------------------------------------- | | `--dry-run` | - | off |
+Preview planned changes. | | `--json` | - | off | Emit machine-readable output. | |
+`--target` | `-t` | None | Target directory (defaults to current working directory) |
 
 #### Examples
 
@@ -822,18 +814,16 @@ Supersede an old ADR with a new ADR.
 
 #### Arguments
 
-| Argument  | Description               |
-| --------- | ------------------------- |
-| `OLD_ADR` | Old ADR stem to supersede |
+| Argument | Description | | --------- | ------------------------- | | `OLD_ADR` | Old
+ADR stem to supersede |
 
 #### Options
 
-| Option      | Short | Default | Description                                              |
-| ----------- | ----- | ------- | -------------------------------------------------------- |
-| `--by`      | -     | None    | New ADR stem that supersedes the old one                 |
-| `--dry-run` | -     | off     | Preview without writing                                  |
-| `--json`    | -     | off     | Output as JSON                                           |
-| `--target`  | `-t`  | None    | Target directory (defaults to current working directory) |
+| Option | Short | Default | Description | | ----------- | ----- | ------- |
+-------------------------------------------------------- | | `--by` | - | None | New ADR
+stem that supersedes the old one | | `--dry-run` | - | off | Preview without writing | |
+`--json` | - | off | Output as JSON | | `--target` | `-t` | None | Target directory
+(defaults to current working directory) |
 
 #### Examples
 
@@ -855,14 +845,12 @@ Promote an audit finding to a project-level rule.
 
 #### Options
 
-| Option      | Short | Default | Description                                              |
-| ----------- | ----- | ------- | -------------------------------------------------------- |
-| `--from`    | -     | None    | Audit stem to promote from (required)                    |
-| `--as`      | -     | None    | Kebab-case name of the promoted rule (required)          |
-| `--force`   | -     | off     | Overwrite existing rule source                           |
-| `--dry-run` | -     | off     | Preview without writing                                  |
-| `--json`    | -     | off     | Output as JSON                                           |
-| `--target`  | `-t`  | None    | Target directory (defaults to current working directory) |
+| Option | Short | Default | Description | | ----------- | ----- | ------- |
+-------------------------------------------------------- | | `--from` | - | None | Audit
+stem to promote from (required) | | `--as` | - | None | Kebab-case name of the promoted
+rule (required) | | `--force` | - | off | Overwrite existing rule source | | `--dry-run`
+| - | off | Preview without writing | | `--json` | - | off | Output as JSON | |
+`--target` | `-t` | None | Target directory (defaults to current working directory) |
 
 #### Examples
 
@@ -884,29 +872,29 @@ Run health checks on `.vault/`. Exits with code `1` if errors are found.
 
 #### Shared options
 
-| Option          | Short | Default | Description                      |
-| --------------- | ----- | ------- | -------------------------------- |
-| `--fix`         | -     | off     | Apply auto-fixes where supported |
-| `--feature TAG` | `-f`  | None    | Limit to a specific feature      |
-| `--verbose`     | `-v`  | off     | Show INFO-level diagnostics      |
+| Option | Short | Default | Description | | --------------- | ----- | ------- |
+-------------------------------- | | `--fix` | - | off | Apply auto-fixes where
+supported | | `--feature TAG` | `-f` | None | Limit to a specific feature | |
+`--verbose` | `-v` | off | Show INFO-level diagnostics |
 
 #### Subcommands
 
-| Subcommand         | `--fix` | `--feature` | Description                                                                                |
-| ------------------ | ------- | ----------- | ------------------------------------------------------------------------------------------ |
-| `all`              | partial | yes         | Run every check in sequence                                                                |
-| `annotations`      | yes     | yes         | Find generated template annotations                                                        |
-| `body-links`       | no      | yes         | Find wiki-links and markdown path links in document body text                              |
-| `dangling`         | yes     | yes         | Find `related:` wiki-links that resolve to no document                                     |
-| `frontmatter`      | yes     | yes         | Validate frontmatter against vault schema                                                  |
-| `links`            | yes     | yes         | Check wiki-links follow Obsidian convention (no `.md` extension)                           |
-| `orphans`          | no      | yes         | Find documents with no incoming wiki-links                                                 |
-| `features`         | no      | yes         | Check feature tag completeness (missing doc types)                                         |
-| `modified-stamp`   | yes     | yes         | Flag missing, unparseable, or stale `modified:` stamps; `--fix` normalizes to `yyyy-mm-dd` |
-| `references`       | yes     | yes         | Check cross-references within features                                                     |
-| `schema`           | yes     | yes         | Enforce dependency rules (ADR refs research, plan refs ADR)                                |
-| `structure`        | yes     | no          | Check directory structure and filename conventions                                         |
-| `rename-integrity` | yes     | no          | Check name/filename integrity for rules, skills, and agents                                |
+| Subcommand | `--fix` | `--feature` | Description | | ------------------ | ------- |
+\----------- |
+\------------------------------------------------------------------------------------------
+| | `all` | partial | yes | Run every check in sequence | | `annotations` | yes | yes |
+Find generated template annotations | | `body-links` | no | yes | Find wiki-links and
+markdown path links in document body text | | `dangling` | yes | yes | Find `related:`
+wiki-links that resolve to no document | | `frontmatter` | yes | yes | Validate
+frontmatter against vault schema | | `links` | yes | yes | Check wiki-links follow
+Obsidian convention (no `.md` extension) | | `orphans` | no | yes | Find documents with
+no incoming wiki-links | | `features` | no | yes | Check feature tag completeness
+(missing doc types) | | `modified-stamp` | yes | yes | Flag missing, unparseable, or
+stale `modified:` stamps; `--fix` normalizes to `yyyy-mm-dd` | | `references` | yes |
+yes | Check cross-references within features | | `schema` | yes | yes | Enforce
+dependency rules (ADR refs research, plan refs ADR) | | `structure` | yes | no | Check
+directory structure and filename conventions | | `rename-integrity` | yes | no | Check
+name/filename integrity for rules, skills, and agents |
 
 `yes` = fully supported, `partial` = only the sub-checks that accept `--fix` apply fixes
 (`all` dispatches to every check), `no` = flag rejected with error. `structure` does not
@@ -1161,11 +1149,12 @@ Canonical identifiers (`S##`, `P##`, `W##`) remain append-only and gap-no-reuse.
 
 #### Read commands
 
-| Subcommand | Description                                                                              |
-| ---------- | ---------------------------------------------------------------------------------------- |
-| `status`   | Report plan health, structure, and completion. `--json` emits a machine-readable payload |
-| `check`    | Validate convention compliance; with `--fix`, apply autofixable transformations          |
-| `query`    | Filter Step rows by `--phase`/`--wave` scope and `--open`/`--closed` predicate           |
+| Subcommand | Description | | ---------- |
+\----------------------------------------------------------------------------------------
+| | `status` | Report plan health, structure, and completion. `--json` emits a
+machine-readable payload | | `check` | Validate convention compliance; with `--fix`,
+apply autofixable transformations | | `query` | Filter Step rows by `--phase`/`--wave`
+scope and `--open`/`--closed` predicate |
 
 `vaultspec-core vault plan check` exits `1` when at least one ERROR-severity finding is
 present.
@@ -1183,15 +1172,14 @@ records.
 
 ##### Arguments
 
-| Argument | Description                                      |
-| -------- | ------------------------------------------------ |
-| `PATH`   | Path to the `.vault/plan/...-plan.md` plan file. |
+| Argument | Description | | -------- | ------------------------------------------------
+| | `PATH` | Path to the `.vault/plan/...-plan.md` plan file. |
 
 ##### Options
 
-| Option   | Short | Default | Description                           |
-| -------- | ----- | ------- | ------------------------------------- |
-| `--json` | -     | off     | Emit machine-readable status payload. |
+| Option | Short | Default | Description | | -------- | ----- | ------- |
+------------------------------------- | | `--json` | - | off | Emit machine-readable
+status payload. |
 
 ##### General Output
 
@@ -1250,27 +1238,27 @@ ______________________________________________________________________
 
 #### Step commands
 
-| Subcommand | Description                                                                       |
-| ---------- | --------------------------------------------------------------------------------- |
-| `add`      | Append a Step at the next-available `S##`. Requires `--action` and `--scope`      |
-| `insert`   | Insert at a named position with `--before`/`--after`; parent inferred from anchor |
-| `edit`     | Replace `--action`, `--scope`, or both without changing the canonical identifier  |
-| `move`     | Re-parent (`--to-phase`), re-position (`--before`/`--after`), or both             |
-| `remove`   | Retire the Step's canonical id permanently; the next-available counter skips it   |
-| `check`    | Mark the Step closed (`[x]`); idempotent                                          |
-| `uncheck`  | Mark the Step open (`[ ]`); idempotent                                            |
-| `toggle`   | Flip the Step's checkbox state                                                    |
+| Subcommand | Description | | ---------- |
+\--------------------------------------------------------------------------------- | |
+`add` | Append a Step at the next-available `S##`. Requires `--action` and `--scope` | |
+`insert` | Insert at a named position with `--before`/`--after`; parent inferred from
+anchor | | `edit` | Replace `--action`, `--scope`, or both without changing the
+canonical identifier | | `move` | Re-parent (`--to-phase`), re-position
+(`--before`/`--after`), or both | | `remove` | Retire the Step's canonical id
+permanently; the next-available counter skips it | | `check` | Mark the Step closed
+(`[x]`); idempotent | | `uncheck` | Mark the Step open (`[ ]`); idempotent | | `toggle`
+| Flip the Step's checkbox state |
 
 #### Phase commands
 
-| Subcommand | Description                                                                   |
-| ---------- | ----------------------------------------------------------------------------- |
-| `add`      | Append a Phase at the next-available `P##`. Requires `--title` and `--intent` |
-| `insert`   | Insert at a named position with `--before`/`--after`                          |
-| `edit`     | Replace `--title`, `--intent`, or both in place                               |
-| `move`     | Re-parent (`--to-wave`), re-position (`--before`/`--after`), or both          |
-| `renumber` | Remediate a duplicated id via `--to <P##>`; refuses live / retired collisions |
-| `remove`   | Retire the Phase plus every descendant Step (cascading retirement)            |
+| Subcommand | Description | | ---------- |
+----------------------------------------------------------------------------- | | `add`
+| Append a Phase at the next-available `P##`. Requires `--title` and `--intent` | |
+`insert` | Insert at a named position with `--before`/`--after` | | `edit` | Replace
+`--title`, `--intent`, or both in place | | `move` | Re-parent (`--to-wave`),
+re-position (`--before`/`--after`), or both | | `renumber` | Remediate a duplicated id
+via `--to <P##>`; refuses live / retired collisions | | `remove` | Retire the Phase plus
+every descendant Step (cascading retirement) |
 
 `phase renumber` is the audited remediation surface for collisions inherited from legacy
 plans. One example is a writer who treated `P##` as Wave-scoped rather than
@@ -1285,18 +1273,21 @@ Identical shape to Phase, but the parent is implicit (Epic frame). Only
 
 #### Epic intent (L4 only)
 
-| Subcommand    | Description                                                                                      |
-| ------------- | ------------------------------------------------------------------------------------------------ |
-| `intent show` | Print the Epic intent paragraph                                                                  |
-| `intent edit` | Replace the Epic intent paragraph; `--text` must declare the project-management (PM) association |
+| Subcommand | Description | | ------------- |
+\------------------------------------------------------------------------------------------------
+| | `intent show` | Print the Epic intent paragraph | | `intent edit` | Replace the Epic
+intent paragraph; `--text` must declare the project-management (PM) association |
 
 #### Tier commands
 
-| Subcommand | Description                                                                                                                                                                                  |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `show`     | Print the plan's declared tier                                                                                                                                                               |
-| `promote`  | Advance the tier transitively, for example L1 -> L4 in one call. Synthesized containers use `--phase-title`/`--phase-intent`/`--wave-title`/`--wave-intent`/`--epic-intent` for placeholders |
-| `demote`   | Step the tier down. Refuses with an error when the collapsing layer holds more than one container; pass `--force` to retire the dropped ids and proceed                                      |
+| Subcommand | Description | | ---------- |
+\--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| | `show` | Print the plan's declared tier | | `promote` | Advance the tier
+transitively, for example L1 -> L4 in one call. Synthesized containers use
+`--phase-title`/`--phase-intent`/`--wave-title`/`--wave-intent`/`--epic-intent` for
+placeholders | | `demote` | Step the tier down. Refuses with an error when the
+collapsing layer holds more than one container; pass `--force` to retire the dropped ids
+and proceed |
 
 #### Move-flag precedence
 
@@ -1341,10 +1332,10 @@ reported as warnings and are not modified.
 
 #### Options
 
-| Option         | Short | Default | Description                                      |
-| -------------- | ----- | ------- | ------------------------------------------------ |
-| `--target DIR` | `-t`  | cwd     | Diagnose a directory other than the current one. |
-| `--json`       | -     | off     | Emit the diagnosis as JSON.                      |
+| Option | Short | Default | Description | | -------------- | ----- | ------- |
+------------------------------------------------ | | `--target DIR` | `-t` | cwd |
+Diagnose a directory other than the current one. | | `--json` | - | off | Emit the
+diagnosis as JSON. |
 
 Exit codes: `0` = all ok, `1` = warnings, `2` = errors.
 
@@ -1371,17 +1362,19 @@ vaultspec-core spec agents [OPTIONS] COMMAND [ARGS]...
 
 #### Subcommands
 
-| Subcommand | Signature                                                     | Description                                                                                  |
-| ---------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `list`     | -                                                             | List all resources                                                                           |
-| `add`      | `NAME [--body BODY] [--from-file FILE] [--force] [--dry-run]` | Create a resource.                                                                           |
-| `show`     | `NAME`                                                        | Print resource content to stdout                                                             |
-| `edit`     | `NAME [--editor EDITOR]`                                      | Open in configured editor. Resolution order: --editor flag, local config, VISUAL, EDITOR, vi |
-| `remove`   | `NAME [--yes\|--force]` (`-y`)                                | Delete a resource. Prompts unless confirmed.                                                 |
-| `rename`   | `OLD_NAME NEW_NAME`                                           | Rename a resource                                                                            |
-| `sync`     | `[--dry-run] [--force]`                                       | Resource-scoped sync; use top-level `vaultspec-core sync` for a complete provider refresh    |
-| `restore`  | `FILENAME`                                                    | Restore to snapshotted original                                                              |
-| `status`   | `[--json]`                                                    | Report dry-run sync with prune enabled, returning missing/drifted/stale status               |
+| Subcommand | Signature | Description | | ---------- |
+\------------------------------------------------------------- |
+\--------------------------------------------------------------------------------------------
+| | `list` | - | List all resources | | `add` |
+`NAME [--body BODY] [--from-file FILE] [--force] [--dry-run]` | Create a resource. | |
+`show` | `NAME` | Print resource content to stdout | | `edit` | `NAME [--editor EDITOR]`
+| Open in configured editor. Resolution order: --editor flag, local config, VISUAL,
+EDITOR, vi | | `remove` | `NAME [--yes\|--force]` (`-y`) | Delete a resource. Prompts
+unless confirmed. | | `rename` | `OLD_NAME NEW_NAME` | Rename a resource | | `sync` |
+`[--dry-run] [--force]` | Resource-scoped sync; use top-level `vaultspec-core sync` for
+a complete provider refresh | | `restore` | `FILENAME` | Restore to snapshotted original
+| | `status` | `[--json]` | Report dry-run sync with prune enabled, returning
+missing/drifted/stale status |
 
 `edit` accepts the `--editor` option to override the editor binary for this invocation.
 `add` accepts the unified `--body` flag for direct content or `--from-file` to read from
@@ -1471,10 +1464,10 @@ vaultspec-core spec system [OPTIONS] COMMAND [ARGS]...
 
 #### Subcommands
 
-| Subcommand | Options                 | Description                                        |
-| ---------- | ----------------------- | -------------------------------------------------- |
-| `show`     | -                       | Display system prompt parts and generation targets |
-| `sync`     | `[--dry-run] [--force]` | Resource-scoped system prompt sync                 |
+| Subcommand | Options | Description | | ---------- | ----------------------- |
+-------------------------------------------------- | | `show` | - | Display system
+prompt parts and generation targets | | `sync` | `[--dry-run] [--force]` |
+Resource-scoped system prompt sync |
 
 #### Examples
 
@@ -1500,18 +1493,21 @@ vaultspec-core spec hooks [OPTIONS] COMMAND [ARGS]...
 
 #### Subcommands
 
-| Subcommand | Signature                                                                                       | Description                                                                                                           |
-| ---------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `list`     | -                                                                                               | List hooks with name, status, event, and action count                                                                 |
-| `add`      | `[NAME] [--event EVENT] [--command CMD] [--body BODY] [--from-file FILE] [--force] [--dry-run]` | Add a new custom hook definition.                                                                                     |
-| `show`     | `NAME`                                                                                          | Display a hook's content.                                                                                             |
-| `edit`     | `NAME [--editor EDITOR]`                                                                        | Open a hook in the configured editor.                                                                                 |
-| `rename`   | `OLD_NAME NEW_NAME`                                                                             | Rename an existing hook atomically.                                                                                   |
-| `remove`   | `NAME [--yes\|--force]`                                                                         | Delete a hook.                                                                                                        |
-| `restore`  | `FILENAME`                                                                                      | Restore a hook (not supported for custom hooks, exits with error 1).                                                  |
-| `sync`     | `[--dry-run] [--force]`                                                                         | Sync only hooks files.                                                                                                |
-| `status`   | `[--json]`                                                                                      | Report declarative hooks parsing and taxonomy compliance status.                                                      |
-| `run`      | `EVENT [--path PATH]`                                                                           | Trigger enabled hooks for the given event. Valid events: `vault.document.created`, `config.synced`, `audit.completed` |
+| Subcommand | Signature | Description | | ---------- |
+\-----------------------------------------------------------------------------------------------
+|
+\---------------------------------------------------------------------------------------------------------------------
+| | `list` | - | List hooks with name, status, event, and action count | | `add` |
+`[NAME] [--event EVENT] [--command CMD] [--body BODY] [--from-file FILE] [--force] [--dry-run]`
+| Add a new custom hook definition. | | `show` | `NAME` | Display a hook's content. | |
+`edit` | `NAME [--editor EDITOR]` | Open a hook in the configured editor. | | `rename` |
+`OLD_NAME NEW_NAME` | Rename an existing hook atomically. | | `remove` |
+`NAME [--yes\|--force]` | Delete a hook. | | `restore` | `FILENAME` | Restore a hook
+(not supported for custom hooks, exits with error 1). | | `sync` |
+`[--dry-run] [--force]` | Sync only hooks files. | | `status` | `[--json]` | Report
+declarative hooks parsing and taxonomy compliance status. | | `run` |
+`EVENT [--path PATH]` | Trigger enabled hooks for the given event. Valid events:
+`vault.document.created`, `config.synced`, `audit.completed` |
 
 #### Examples
 
@@ -1589,13 +1585,14 @@ complete refresh across all provider-facing outputs.
 
 #### Subcommands
 
-| Subcommand | Signature                               | Description                                                    |
-| ---------- | --------------------------------------- | -------------------------------------------------------------- |
-| `list`     | -                                       | List all registered MCP server definitions                     |
-| `status`   | `[--json]`                              | Validate MCP definitions against `.mcp.json`                   |
-| `add`      | `--name NAME [--config JSON] [--force]` | Add a new custom MCP server definition                         |
-| `remove`   | `NAME [--force]`                        | Remove an MCP server definition (`--force` skips confirmation) |
-| `sync`     | `[--dry-run] [--force]`                 | Sync MCP definitions to `.mcp.json`                            |
+| Subcommand | Signature | Description | | ---------- |
+\--------------------------------------- |
+-------------------------------------------------------------- | | `list` | - | List all
+registered MCP server definitions | | `status` | `[--json]` | Validate MCP definitions
+against `.mcp.json` | | `add` | `--name NAME [--config JSON] [--force]` | Add a new
+custom MCP server definition | | `remove` | `NAME [--force]` | Remove an MCP server
+definition (`--force` skips confirmation) | | `sync` | `[--dry-run] [--force]` | Sync
+MCP definitions to `.mcp.json` |
 
 `vaultspec-core spec mcps status` exits `0` only when MCP config status is `ok`,
 otherwise `1`. It checks config health only and does not start or probe MCP server
@@ -1645,10 +1642,10 @@ The reference is a hybrid of hand-written prose and generator-owned zones delimi
 `vaultspec:generated` HTML-comment markers; this verb rewrites only the managed zones
 and leaves the prose untouched.
 
-| Option    | Default | Description                                                                                   |
-| --------- | ------- | --------------------------------------------------------------------------------------------- |
-| `--check` | off     | Render in memory, diff against the committed file, exit non-zero on mismatch without writing. |
-| `--json`  | off     | Emit machine-readable output.                                                                 |
+| Option | Default | Description | | --------- | ------- |
+\---------------------------------------------------------------------------------------------
+| | `--check` | off | Render in memory, diff against the committed file, exit non-zero
+on mismatch without writing. | | `--json` | off | Emit machine-readable output. |
 
 Default (write) mode rewrites the bundled reference in place when the managed regions
 have drifted. `--check` mode is the CI and pre-commit entry point: it renders into
@@ -1691,10 +1688,10 @@ manifest. Read-only; never mutates.
 
 #### Options
 
-| Option         | Short | Default | Description                                             |
-| -------------- | ----- | ------- | ------------------------------------------------------- |
-| `--target DIR` | `-t`  | cwd     | Inspect a workspace other than the current directory.   |
-| `--json`       | -     | off     | Emit status, registered list, and pending list as JSON. |
+| Option | Short | Default | Description | | -------------- | ----- | ------- |
+------------------------------------------------------- | | `--target DIR` | `-t` | cwd
+| Inspect a workspace other than the current directory. | | `--json` | - | off | Emit
+status, registered list, and pending list as JSON. |
 
 Exit codes: `0` when up to date or workspace has no manifest, `1` when migrations are
 pending.
@@ -1721,10 +1718,10 @@ unchanged so the next invocation re-attempts it.
 
 #### Options
 
-| Option         | Short | Default | Description                                           |
-| -------------- | ----- | ------- | ----------------------------------------------------- |
-| `--target DIR` | `-t`  | cwd     | Migrate a workspace other than the current directory. |
-| `--json`       | -     | off     | Emit per-entry summaries and counts as JSON.          |
+| Option | Short | Default | Description | | -------------- | ----- | ------- |
+----------------------------------------------------- | | `--target DIR` | `-t` | cwd |
+Migrate a workspace other than the current directory. | | `--json` | - | off | Emit
+per-entry summaries and counts as JSON. |
 
 Exit codes: `0` on success (including the no-pending no-op), `1` if any migration
 failed.
@@ -1819,25 +1816,32 @@ ______________________________________________________________________
 All variables are prefixed `VAULTSPEC_`. Environment variables override defaults but are
 overridden by the `--target` flag.
 
-| Variable                          | Type | Default      | Description                                                                                                                                                                                                                                               |
-| --------------------------------- | ---- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `VAULTSPEC_TARGET_DIR`            | path | cwd          | Root workspace directory (where `.vault/` and `.vaultspec/` live). Equivalent to `--target` on the CLI. Also used by `vaultspec-mcp` to locate the workspace. Defaults to the current working directory if unset.                                         |
-| `VAULTSPEC_DOCS_DIR`              | str  | `.vault`     | Vault directory name                                                                                                                                                                                                                                      |
-| `VAULTSPEC_FRAMEWORK_DIR`         | str  | `.vaultspec` | Framework directory name                                                                                                                                                                                                                                  |
-| `VAULTSPEC_CLAUDE_DIR`            | str  | `.claude`    | Claude tool directory name                                                                                                                                                                                                                                |
-| `VAULTSPEC_GEMINI_DIR`            | str  | `.gemini`    | Gemini tool directory name                                                                                                                                                                                                                                |
-| `VAULTSPEC_ANTIGRAVITY_DIR`       | str  | `.agents`    | Antigravity directory name                                                                                                                                                                                                                                |
-| `VAULTSPEC_IO_BUFFER_SIZE`        | int  | `8192`       | I/O read buffer size in bytes                                                                                                                                                                                                                             |
-| `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int  | `1000000`    | Subprocess stdout capture limit in bytes                                                                                                                                                                                                                  |
-| `VAULTSPEC_LOG_LEVEL`             | str  | `INFO`       | Root log level for the CLI, for example `DEBUG`, `INFO`, or `WARNING`. Overridden by `--debug` when set.                                                                                                                                                  |
-| `VAULTSPEC_EDITOR`                | str  | `zed -w`     | Editor command for `vaultspec-core spec {rules\|skills\|agents} edit`. Overridden by the project-local config `editor` value, and the `--editor` flag. Resolved in order: `--editor` flag, project config, `$VISUAL`, `$EDITOR`/`VAULTSPEC_EDITOR`, `vi`. |
+| Variable | Type | Default | Description | | --------------------------------- | ---- |
+\------------ |
+\---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| | `VAULTSPEC_TARGET_DIR` | path | cwd | Root workspace directory (where `.vault/` and
+`.vaultspec/` live). Equivalent to `--target` on the CLI. Also used by `vaultspec-mcp`
+to locate the workspace. Defaults to the current working directory if unset. | |
+`VAULTSPEC_DOCS_DIR` | str | `.vault` | Vault directory name | |
+`VAULTSPEC_FRAMEWORK_DIR` | str | `.vaultspec` | Framework directory name | |
+`VAULTSPEC_CLAUDE_DIR` | str | `.claude` | Claude tool directory name | |
+`VAULTSPEC_GEMINI_DIR` | str | `.gemini` | Gemini tool directory name | |
+`VAULTSPEC_ANTIGRAVITY_DIR` | str | `.agents` | Antigravity directory name | |
+`VAULTSPEC_IO_BUFFER_SIZE` | int | `8192` | I/O read buffer size in bytes | |
+`VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int | `1000000` | Subprocess stdout capture limit in
+bytes | | `VAULTSPEC_LOG_LEVEL` | str | `INFO` | Root log level for the CLI, for example
+`DEBUG`, `INFO`, or `WARNING`. Overridden by `--debug` when set. | | `VAULTSPEC_EDITOR`
+| str | `zed -w` | Editor command for
+`vaultspec-core spec {rules\|skills\|agents} edit`. Overridden by the project-local
+config `editor` value, and the `--editor` flag. Resolved in order: `--editor` flag,
+project config, `$VISUAL`, `$EDITOR`/`VAULTSPEC_EDITOR`, `vi`. |
 
 ## See also
 
-| Document                           | What it covers                                  |
-| ---------------------------------- | ----------------------------------------------- |
-| [Framework manual](./framework.md) | Development workflow, skills, and customization |
-| [MCP reference](./MCP.md)          | MCP server tools, setup, and configuration      |
+| Document | What it covers | | ---------------------------------- |
+----------------------------------------------- | | [Framework manual](./framework.md) |
+Development workflow, skills, and customization | | [MCP reference](./MCP.md) | MCP
+server tools, setup, and configuration |
 
 For bug reports and feature requests, open an issue on the
 [vaultspec-core issue tracker](https://github.com/wgergely/vaultspec-core/issues).

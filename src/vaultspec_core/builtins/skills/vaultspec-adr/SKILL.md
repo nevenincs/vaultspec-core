@@ -1,9 +1,6 @@
 ---
 name: vaultspec-adr
-description: >-
-  Use this skill to persist Architecture Decision Records (ADRs) after
-  completing research. ADRs document significant architectural choices,
-  their context, and consequences.
+description: Capture an architectural decision as an ADR in .vault/adr/. Use after research, before planning, when a significant design choice and its trade-offs must be recorded.
 ---
 
 # ADR writing skill (vaultspec-adr)

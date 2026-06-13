@@ -1,10 +1,6 @@
 ---
 name: vaultspec-code-research
-description: >-
-  Skill for grounding coding tasks by researching projects, code snippets,
-  reference implementations. Highly recommended for complex feature
-  implementation, or where documentation coverage is insufficient and
-  direct source-code referencing is required.
+description: Ground a coding task in real source code, reference implementations, and library docs. Use before implementing a complex feature or when documentation is thin.
 ---
 
 # Code research skill (vaultspec-code-research)

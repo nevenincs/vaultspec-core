@@ -165,22 +165,31 @@ def cmd_config_list(
                 )
             )
         else:
-            from rich import box
-            from rich.table import Table
+            from vaultspec_core.cli.rendering import (
+                Cell,
+                Column,
+                render_listing,
+                summary_line,
+            )
 
-            from vaultspec_core.console import get_console
-
-            console = get_console()
-            table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
-            table.add_column("Key", no_wrap=True)
-            table.add_column("Value")
-            table.add_column("Status")
-
+            rows = []
             for key, val in entries.items():
                 if val is not None:
-                    table.add_row(key, str(val), "set")
+                    rows.append({"key": key, "value": str(val), "status": "set"})
                 else:
-                    table.add_row(key, "<unset>", "default")
-            console.print(table)
+                    rows.append(
+                        {
+                            "key": key,
+                            "value": Cell("<unset>", style="dim"),
+                            "status": Cell("default", style="dim"),
+                        }
+                    )
+            render_listing(
+                rows,
+                [Column("key"), Column("value"), Column("status")],
+                title="config",
+                summary=summary_line(len(rows), "config keys"),
+                empty="no config keys defined",
+            )
     except Exception as exc:
         _handle_error(exc, json_output=json_output)

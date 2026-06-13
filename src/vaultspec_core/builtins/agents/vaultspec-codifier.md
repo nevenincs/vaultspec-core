@@ -1,5 +1,5 @@
 ---
-description: Specialist agent that promotes durable lessons from `<Audit>` and `<ADR>` documents into project-shared rules under `.vaultspec/rules/rules/`.
+description: Promote durable lessons from audits and ADRs into shared project rules. Use to codify a recurring rule.
 tier: STANDARD
 mode: read-write
 tools: [Glob, Grep, Read, Write, Edit, Bash]

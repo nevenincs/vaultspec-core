@@ -292,6 +292,40 @@ def _replace_region(text: str, region: ManagedRegion, body: str) -> str:
     return f"{before}\n\n{body}\n\n{after}"
 
 
+def _mdformat_normalise(text: str) -> str:
+    """Normalise rendered reference text to the project's mdformat layout.
+
+    The generated reference is checked by the mdformat pre-commit hooks (the
+    plain pass and the ``--wrap 88`` user-facing pass). Running the same
+    formatter here makes a freshly rendered file mdformat-clean by construction,
+    so ``spec reference generate --check`` and the mdformat hooks can never
+    disagree on a layout detail the generator cannot anticipate (a command's
+    prose wrap point, an option-table column width). mdformat is idempotent, so
+    re-rendering is stable; the managed-region markers are HTML comments mdformat
+    preserves verbatim, so region replacement still resolves afterwards.
+
+    The mdformat *CLI* is invoked rather than the ``mdformat.text`` API on
+    purpose: only the CLI reads the project ``.mdformat.toml``, and the two
+    surfaces escape and wrap a handful of edge cases differently. Shelling out to
+    the same command the hooks run guarantees byte-for-byte agreement with them.
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[3]
+    result = subprocess.run(
+        [sys.executable, "-m", "mdformat", "--wrap", "88", "-"],
+        input=text,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=repo_root,
+        check=True,
+    )
+    return result.stdout
+
+
 def render_reference(
     committed_text: str,
     typer_app: typer.Typer,
@@ -300,14 +334,16 @@ def render_reference(
     """Return *committed_text* with every managed region freshly rendered.
 
     Prose zones outside the markers are carried through verbatim; only the
-    content between each region's markers is replaced with generator output.
-    *regions* defaults to the bundled-reference region set; a caller may pass a
-    file-specific region tuple from the :data:`MANAGED_FILES` registry.
+    content between each region's markers is replaced with generator output. The
+    whole result is then normalised through :func:`_mdformat_normalise` so the
+    file is mdformat-clean by construction. *regions* defaults to the
+    bundled-reference region set; a caller may pass a file-specific region tuple
+    from the :data:`MANAGED_FILES` registry.
     """
     text = committed_text
     for region in regions:
         text = _replace_region(text, region, region.render(typer_app))
-    return text
+    return _mdformat_normalise(text)
 
 
 # ---------------------------------------------------------------------------

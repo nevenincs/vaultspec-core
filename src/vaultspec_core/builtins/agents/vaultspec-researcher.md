@@ -1,5 +1,5 @@
 ---
-description: General-purpose research agent for information gathering, analysis, and synthesis tasks.
+description: Gather, analyze, and synthesize information on a question. Use for general research.
 tier: STANDARD
 mode: read-only
 tools: [Glob, Grep, Read, WebFetch, WebSearch, Bash]

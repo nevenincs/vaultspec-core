@@ -54,6 +54,13 @@ class PlanStatus:
             is zero.
         has_epic_intent: ``True`` when an L4 plan declares its Epic
             intent block.
+        waves_completed: Number of Waves whose every Step is checked; ``0``
+            at L1/L2 (no Waves) or when no Wave is fully closed.
+        phases_completed: Number of Phases whose every Step is checked;
+            ``0`` at L1 (no Phases) or when no Phase is fully closed.
+        next_open_step: The tier-conditional display path of the first
+            unchecked Step in document order (the "you are here" cursor),
+            or ``None`` when the plan has no open steps.
         exec_missing_ids: Canonical IDs of checked steps lacking an execution
             record.
     """
@@ -66,6 +73,9 @@ class PlanStatus:
     steps_completed: int
     completion_percent: float
     has_epic_intent: bool
+    waves_completed: int
+    phases_completed: int
+    next_open_step: str | None
     exec_missing_ids: list[str] = field(default_factory=list)
 
 
@@ -162,6 +172,43 @@ def _plan_feature(plan: Plan) -> str | None:
     return None
 
 
+def _container_completion(plan: Plan) -> tuple[int, int, str | None]:
+    """Derive per-container completion and the first-open-step cursor.
+
+    All three facts come from the already-parsed container chains
+    (:attr:`Plan.waves`, :attr:`Plan.phases`, :attr:`Plan.steps`); no
+    rescan or extra traversal is performed, so this stays inside the
+    single batched status pass.
+
+    A Wave or Phase counts as completed only when it holds at least one
+    Step and every Step it holds is checked, so an empty container is
+    never miscounted as done. The cursor is the first unchecked Step in
+    document order, reported as its tier-conditional display path.
+
+    Args:
+        plan: Parsed :class:`Plan` model.
+
+    Returns:
+        A ``(waves_completed, phases_completed, next_open_step)`` tuple.
+    """
+    waves_completed = 0
+    for wave in plan.waves:
+        wave_steps = [step for phase in wave.phases for step in phase.steps]
+        if wave_steps and all(step.checked for step in wave_steps):
+            waves_completed += 1
+
+    phases_completed = sum(
+        1
+        for phase in plan.phases
+        if phase.steps and all(step.checked for step in phase.steps)
+    )
+
+    next_open_step = next(
+        (step.display_path for step in plan.steps if not step.checked), None
+    )
+    return waves_completed, phases_completed, next_open_step
+
+
 def collect_status(
     plan: Plan,
     root_dir: Path | None = None,
@@ -204,6 +251,8 @@ def collect_status(
                 ):
                     exec_missing_ids.append(step.canonical_id)
 
+    waves_completed, phases_completed, next_open_step = _container_completion(plan)
+
     return PlanStatus(
         tier=plan.frontmatter.tier,
         legacy_tier_default=plan.frontmatter.legacy_tier_default,
@@ -213,6 +262,9 @@ def collect_status(
         steps_completed=steps_completed,
         completion_percent=round(completion, 1),
         has_epic_intent=plan.epic_intent is not None,
+        waves_completed=waves_completed,
+        phases_completed=phases_completed,
+        next_open_step=next_open_step,
         exec_missing_ids=exec_missing_ids,
     )
 
@@ -295,7 +347,8 @@ def status_to_json_dict(status: PlanStatus) -> dict[str, object]:
         Dict with keys ``tier``, ``legacy_tier_default``,
         ``wave_count``, ``phase_count``, ``step_count``,
         ``steps_completed``, ``completion_percent``,
-        ``has_epic_intent``, ``exec_missing_ids``.
+        ``has_epic_intent``, ``waves_completed``, ``phases_completed``,
+        ``next_open_step``, ``exec_missing_ids``.
     """
     return {
         "tier": status.tier.value,
@@ -306,5 +359,8 @@ def status_to_json_dict(status: PlanStatus) -> dict[str, object]:
         "steps_completed": status.steps_completed,
         "completion_percent": status.completion_percent,
         "has_epic_intent": status.has_epic_intent,
+        "waves_completed": status.waves_completed,
+        "phases_completed": status.phases_completed,
+        "next_open_step": status.next_open_step,
         "exec_missing_ids": status.exec_missing_ids,
     }

@@ -1,10 +1,6 @@
 ---
 name: vaultspec-execute
-description: >-
-  Skill to execute implementation plans. Loads specialized agent personas for
-  focused work, or coordinates multiple personas through the host environment
-  for complex multi-agent execution. Use when you have a plan document to
-  execute.
+description: Execute an approved implementation plan, dispatching agent personas per step. Use when a plan document is ready to build.
 ---
 
 # Plan execution skill (vaultspec-execute)

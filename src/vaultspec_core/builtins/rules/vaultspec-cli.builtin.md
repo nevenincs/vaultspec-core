@@ -21,16 +21,17 @@ drift that `vaultspec-core vault check` and `vaultspec-core spec doctor` will fl
 ## Orientation
 
 Before starting work in a vaultspec-managed project you have no session context for, run
-`vaultspec-core vault status` and read the in-flight plans it names. The targeted form
-`vaultspec-core vault status <plan-or-feature>` traces a plan to its steps, execution
-records, and grounding documents. Orientation is descriptive and read-only: it is the
-zeroth move, not a pipeline phase, and produces no artifact.
+`vaultspec-core status` and read the in-flight plans it names. Each in-flight plan shows
+a one-line overview: tier, completed waves and phases, step completion, and the next
+open step. The targeted form `vaultspec-core status <plan-or-feature>` traces a plan to
+its steps, execution records, and grounding documents. Orientation is descriptive and
+read-only: it is the zeroth move, not a pipeline phase, and produces no artifact.
 
 ## Commands
 
 | Task                                                  | Run                                                                       |
 | ----------------------------------------------------- | ------------------------------------------------------------------------- |
-| Orient in an unknown or resumed project               | `vaultspec-core vault status [TARGET]`                                    |
+| Orient in an unknown or resumed project               | `vaultspec-core status [TARGET]`                                          |
 | Create a `.vault/` document                           | `vaultspec-core vault add <type> --feature <tag>`                         |
 | List or filter vault documents                        | `vaultspec-core vault list [DOC_TYPE] [--feature <tag>]`                  |
 | Show statistics, invalid, or orphan documents         | `vaultspec-core vault stats [--invalid] [--orphaned]`                     |

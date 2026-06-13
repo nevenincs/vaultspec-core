@@ -1,9 +1,6 @@
 ---
 name: vaultspec-projectmanager
-description: >-
-  Manage GitHub Projects, triage issues, track milestones, provision
-  worktrees, coordinate release cycles, and query roadmaps. Operates
-  outside the vaultspec pipeline as a project coordination layer.
+description: 'Coordinate GitHub Projects: triage issues, track milestones, provision worktrees, manage releases. Use for project management outside the pipeline.'
 ---
 
 # Project manager skill (vaultspec-projectmanager)

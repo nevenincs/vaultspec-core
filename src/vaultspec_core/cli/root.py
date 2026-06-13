@@ -983,7 +983,12 @@ def _register_subcommands() -> None:
     from .config_cmd import config_app
     from .migrations_cmd import migrations_app
     from .spec_cmd import spec_app
+    from .status_cmd import register as register_status
     from .vault_cmd import vault_app
+
+    # The zeroth-move orientation verb is top-level, not nested
+    # under `vault`; it is the most reachable command for an unknown project.
+    register_status(app)
 
     app.add_typer(vault_app, name="vault")
     app.add_typer(spec_app, name="spec")

@@ -1,13 +1,6 @@
 ---
 name: vaultspec-documentation
-description: >-
-  Agent-driven documentation writer that produces polished, user-facing docs through a
-  structured pipeline: wireframe -> refinement -> approval -> context gathering -> drafting ->
-  technical review -> editorial review -> user approval. Use this skill whenever the user wants
-  to create or rewrite user documentation, README files, getting-started guides, feature docs,
-  or any principal user-facing document. Also trigger when the user mentions "write docs",
-  "documentation pipeline", "doc wireframe", or asks for help structuring a user guide.
-  This skill produces ONE high-quality document per invocation -- it is not for bulk/batch doc generation.
+description: Write one polished user-facing document through a structured pipeline. Use to create or rewrite a README, guide, or feature doc.
 ---
 
 # Documentation Pipeline

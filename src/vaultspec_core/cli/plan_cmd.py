@@ -20,7 +20,7 @@ from typing import Annotated, Any, cast
 
 import typer
 
-from vaultspec_core.cli._target import TargetOption
+from vaultspec_core.cli._target import PlanPathArg, TargetOption
 
 __all__ = ["plan_app"]
 
@@ -52,10 +52,37 @@ def _render_user_errors[F: Callable[..., None]](func: F) -> F:
         try:
             func(*args, **kwargs)
         except PlanCommandError as exc:
+            if kwargs.get("json_output"):
+                from vaultspec_core.cli.rendering import json_envelope
+
+                typer.echo(
+                    json.dumps(
+                        json_envelope(
+                            "vault.plan.mutate", "failed", {"message": str(exc)}
+                        ),
+                        indent=2,
+                    )
+                )
+                raise typer.Exit(1) from exc
             typer.echo(f"error: {exc}", err=True)
             raise typer.Exit(1) from exc
 
     return cast("F", wrapper)
+
+
+def _emit_plan_mutation_json(
+    command: str, *, status: str, data: dict[str, object]
+) -> None:
+    """Emit a plan-mutation result as the canonical ``--json`` envelope.
+
+    Maps a structural plan edit onto the shared envelope so every mutator
+    carries a machine surface (cli-output-standardization ADR): ``status`` is a
+    canonical :class:`~vaultspec_core.cli.rendering.Outcome` word (``updated``
+    when the file changed, ``unchanged`` for an idempotent edit or a dry-run).
+    """
+    from vaultspec_core.cli.rendering import json_envelope
+
+    typer.echo(json.dumps(json_envelope(command, status, data), indent=2))
 
 
 def _save_plan_or_dry_run(
@@ -66,10 +93,16 @@ def _save_plan_or_dry_run(
     canonicalise: bool,
     success_msg: str,
     expected_retired: set[str] | None = None,
+    *,
+    json_output: bool = False,
+    command: str = "vault.plan.mutate",
 ) -> None:
-    """Helper to serialise plan and output a unified diff on dry-run.
+    """Serialise the plan and emit the result as text or the JSON envelope.
 
-    Or write to disk on apply.
+    On dry-run, emits a unified diff (text) or a ``diff`` payload (JSON) and
+    writes nothing. On apply, writes the file when it changed and reports the
+    outcome. The text and JSON surfaces describe the same mutation, so they
+    cannot drift.
     """
     import datetime as _dt
 
@@ -138,29 +171,56 @@ def _save_plan_or_dry_run(
             tofile=f"b/{path.name}",
         )
         diff_str = "".join(diff)
+        if json_output:
+            _emit_plan_mutation_json(
+                command,
+                status="unchanged",
+                data={
+                    "dry_run": True,
+                    "changed": bool(diff_str),
+                    "path": str(path),
+                    "diff": diff_str,
+                    "message": success_msg,
+                },
+            )
+            return
         if diff_str:
             typer.echo(diff_str)
         else:
             typer.echo("No changes.")
-    else:
-        wrote = new_text != original_text
-        if wrote:
-            path.write_text(new_text, encoding="utf-8")
-        preserved_count = 0 if canonicalise else len(plan.unknown_blocks)
-        typer.echo(f"{success_msg} (Preserved {preserved_count} unknown blocks)")
-        if wrote:
-            from vaultspec_core.cli._cache_hook import invalidate_graph_cache
-            from vaultspec_core.core.types import get_context as _get_ctx
+        return
 
-            # Plan mutators do not take --target, so the workspace context is
-            # only initialised when another command set it earlier in-process.
-            # Bare invocations fall back to the cwd, which is what
-            # apply_target(None) would have resolved.
-            try:
-                target_dir = _get_ctx().target_dir
-            except LookupError:
-                target_dir = Path.cwd()
-            invalidate_graph_cache(target_dir)
+    wrote = new_text != original_text
+    if wrote:
+        path.write_text(new_text, encoding="utf-8")
+    preserved_count = 0 if canonicalise else len(plan.unknown_blocks)
+    if json_output:
+        _emit_plan_mutation_json(
+            command,
+            status="updated" if wrote else "unchanged",
+            data={
+                "dry_run": False,
+                "changed": wrote,
+                "path": str(path),
+                "preserved_blocks": preserved_count,
+                "message": success_msg,
+            },
+        )
+    else:
+        typer.echo(f"{success_msg} (Preserved {preserved_count} unknown blocks)")
+    if wrote:
+        from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+        from vaultspec_core.core.types import get_context as _get_ctx
+
+        # Plan mutators do not take --target, so the workspace context is
+        # only initialised when another command set it earlier in-process.
+        # Bare invocations fall back to the cwd, which is what
+        # apply_target(None) would have resolved.
+        try:
+            target_dir = _get_ctx().target_dir
+        except LookupError:
+            target_dir = Path.cwd()
+        invalidate_graph_cache(target_dir)
 
 
 plan_app = typer.Typer(
@@ -207,7 +267,7 @@ plan_app.add_typer(tier_app, name="tier")
 
 @plan_app.command("status")
 def cmd_status(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     json_output: Annotated[
         bool, typer.Option("--json", help="Emit JSON instead of human form")
     ] = False,
@@ -260,7 +320,7 @@ def cmd_status(
 
 @plan_app.command("check")
 def cmd_check(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     fix: Annotated[
         bool,
         typer.Option("--fix", help="Apply autofixable transformations idempotently"),
@@ -323,7 +383,7 @@ def cmd_check(
 
 @plan_app.command("query")
 def cmd_query(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     open_only: Annotated[
         bool, typer.Option("--open", help="Only Steps with [ ] checkbox")
     ] = False,
@@ -339,10 +399,14 @@ def cmd_query(
     json_output: Annotated[
         bool, typer.Option("--json", help="Emit matched Steps as JSON")
     ] = False,
+    target: TargetOption = None,
 ) -> None:
     """Filter Step rows by container scope and open/closed predicate."""
+    from vaultspec_core.cli._target import apply_target
     from vaultspec_core.plan.parser import parse_plan
     from vaultspec_core.plan.query import QueryFilter, query_steps
+
+    apply_target(target)
 
     plan = parse_plan(path)
     result = query_steps(
@@ -390,7 +454,7 @@ def cmd_query(
 @step_app.command("toggle")
 @_render_user_errors
 def cmd_step_toggle(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
     dry_run: Annotated[
         bool,
@@ -402,6 +466,7 @@ def cmd_step_toggle(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Flip the Step's checkbox state."""
     from vaultspec_core.plan.commands.step_ops import toggle_step
@@ -418,13 +483,15 @@ def cmd_step_toggle(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Toggled Step `{step.canonical_id}` to {new_state}.",
+        json_output=json_output,
+        command="vault.plan.step.toggle",
     )
 
 
 @step_app.command("check")
 @_render_user_errors
 def cmd_step_check(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
     dry_run: Annotated[
         bool,
@@ -436,6 +503,7 @@ def cmd_step_check(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Mark the Step closed (idempotent)."""
     from vaultspec_core.plan.commands.step_ops import check_step
@@ -451,13 +519,15 @@ def cmd_step_check(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Closed Step `{step_id}`.",
+        json_output=json_output,
+        command="vault.plan.step.check",
     )
 
 
 @step_app.command("uncheck")
 @_render_user_errors
 def cmd_step_uncheck(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
     dry_run: Annotated[
         bool,
@@ -469,6 +539,7 @@ def cmd_step_uncheck(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Mark the Step open (idempotent)."""
     from vaultspec_core.plan.commands.step_ops import uncheck_step
@@ -484,6 +555,8 @@ def cmd_step_uncheck(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Re-opened Step `{step_id}`.",
+        json_output=json_output,
+        command="vault.plan.step.uncheck",
     )
 
 
@@ -493,7 +566,7 @@ def cmd_step_uncheck(
 @step_app.command("add")
 @_render_user_errors
 def cmd_step_add(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     action: Annotated[str, typer.Option("--action", help="Imperative-verb statement")],
     scope: Annotated[str, typer.Option("--scope", help="`path/to/file` scope clause")],
     phase_id: Annotated[
@@ -513,6 +586,7 @@ def cmd_step_add(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Append a new Step at the next-available canonical id."""
     from vaultspec_core.plan.commands.step_ops import add_step
@@ -528,13 +602,15 @@ def cmd_step_add(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Added Step `{step.display_path}`.",
+        json_output=json_output,
+        command="vault.plan.step.add",
     )
 
 
 @step_app.command("insert")
 @_render_user_errors
 def cmd_step_insert(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     action: Annotated[str, typer.Option("--action", help="Imperative-verb statement")],
     scope: Annotated[str, typer.Option("--scope", help="`path/to/file` scope clause")],
     before: Annotated[
@@ -555,6 +631,7 @@ def cmd_step_insert(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Insert a Step at a named position relative to an existing anchor."""
     from vaultspec_core.plan.commands.step_ops import insert_step
@@ -570,13 +647,15 @@ def cmd_step_insert(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Inserted Step `{step.display_path}`.",
+        json_output=json_output,
+        command="vault.plan.step.insert",
     )
 
 
 @step_app.command("edit")
 @_render_user_errors
 def cmd_step_edit(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
     action: Annotated[
         str | None, typer.Option("--action", help="New imperative-verb statement")
@@ -594,6 +673,7 @@ def cmd_step_edit(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Edit the Step's action and / or scope without changing its identifier."""
     from vaultspec_core.plan.commands.step_ops import edit_step
@@ -609,13 +689,15 @@ def cmd_step_edit(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Edited Step `{step_id}`.",
+        json_output=json_output,
+        command="vault.plan.step.edit",
     )
 
 
 @step_app.command("move")
 @_render_user_errors
 def cmd_step_move(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
     to_phase: Annotated[
         str | None, typer.Option("--to-phase", help="Re-parent under this Phase id")
@@ -636,6 +718,7 @@ def cmd_step_move(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Re-parent and / or re-position a Step per the move-flag precedence rule."""
     from vaultspec_core.plan.commands.step_ops import move_step
@@ -651,13 +734,15 @@ def cmd_step_move(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Moved Step `{step.display_path}`.",
+        json_output=json_output,
+        command="vault.plan.step.move",
     )
 
 
 @step_app.command("remove")
 @_render_user_errors
 def cmd_step_remove(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
     dry_run: Annotated[
         bool,
@@ -669,6 +754,7 @@ def cmd_step_remove(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Remove a Step; its identifier is retired and never reused."""
     from vaultspec_core.plan.commands.step_ops import remove_step
@@ -685,6 +771,8 @@ def cmd_step_remove(
         canonicalise=canonicalise,
         success_msg=f"Retired Step `{retired}`.",
         expected_retired={retired},
+        json_output=json_output,
+        command="vault.plan.step.remove",
     )
 
 
@@ -694,7 +782,7 @@ def cmd_step_remove(
 @phase_app.command("add")
 @_render_user_errors
 def cmd_phase_add(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     title: Annotated[str, typer.Option("--title", help="Phase heading title")],
     intent: Annotated[str, typer.Option("--intent", help="Phase intent paragraph")],
     wave_id: Annotated[
@@ -710,6 +798,7 @@ def cmd_phase_add(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Append a new Phase at the next-available canonical id."""
     from vaultspec_core.plan.commands.phase_ops import add_phase
@@ -725,13 +814,15 @@ def cmd_phase_add(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Added Phase `{phase.display_path}`.",
+        json_output=json_output,
+        command="vault.plan.phase.add",
     )
 
 
 @phase_app.command("insert")
 @_render_user_errors
 def cmd_phase_insert(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     title: Annotated[str, typer.Option("--title", help="Phase heading title")],
     intent: Annotated[str, typer.Option("--intent", help="Phase intent paragraph")],
     before: Annotated[
@@ -752,6 +843,7 @@ def cmd_phase_insert(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Insert a Phase at a named position; parent Wave inferred from anchor."""
     from vaultspec_core.plan.commands.phase_ops import insert_phase
@@ -767,13 +859,15 @@ def cmd_phase_insert(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Inserted Phase `{phase.display_path}`.",
+        json_output=json_output,
+        command="vault.plan.phase.insert",
     )
 
 
 @phase_app.command("edit")
 @_render_user_errors
 def cmd_phase_edit(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     phase_id: Annotated[str, typer.Argument(help="Phase canonical id (P##)")],
     title: Annotated[
         str | None, typer.Option("--title", help="New Phase heading title")
@@ -791,6 +885,7 @@ def cmd_phase_edit(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Edit the Phase's title and / or intent paragraph in place."""
     from vaultspec_core.plan.commands.phase_ops import edit_phase
@@ -806,13 +901,15 @@ def cmd_phase_edit(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Edited Phase `{phase_id}`.",
+        json_output=json_output,
+        command="vault.plan.phase.edit",
     )
 
 
 @phase_app.command("move")
 @_render_user_errors
 def cmd_phase_move(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     phase_id: Annotated[str, typer.Argument(help="Phase canonical id (P##)")],
     to_wave: Annotated[
         str | None, typer.Option("--to-wave", help="Re-parent under this Wave id")
@@ -833,6 +930,7 @@ def cmd_phase_move(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Re-parent and / or re-position a Phase."""
     from vaultspec_core.plan.commands.phase_ops import move_phase
@@ -848,13 +946,15 @@ def cmd_phase_move(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Moved Phase `{phase.display_path}`.",
+        json_output=json_output,
+        command="vault.plan.phase.move",
     )
 
 
 @phase_app.command("renumber")
 @_render_user_errors
 def cmd_phase_renumber(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     phase_id: Annotated[str, typer.Argument(help="Existing Phase canonical id (P##)")],
     to: Annotated[
         str,
@@ -873,6 +973,7 @@ def cmd_phase_renumber(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Reassign a Phase's canonical id; descendant Step display paths recompute."""
     from vaultspec_core.plan.commands.phase_ops import renumber_phase
@@ -888,13 +989,15 @@ def cmd_phase_renumber(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Renumbered Phase `{phase_id}` to `{phase.canonical_id}`.",
+        json_output=json_output,
+        command="vault.plan.phase.renumber",
     )
 
 
 @phase_app.command("remove")
 @_render_user_errors
 def cmd_phase_remove(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     phase_id: Annotated[str, typer.Argument(help="Phase canonical id (P##)")],
     dry_run: Annotated[
         bool,
@@ -906,6 +1009,7 @@ def cmd_phase_remove(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Remove a Phase; descendant Step ids cascade-retire."""
     from vaultspec_core.plan.commands.phase_ops import remove_phase
@@ -923,6 +1027,8 @@ def cmd_phase_remove(
         canonicalise=canonicalise,
         success_msg=f"Retired Phase `{retired_phase}`; cascaded Steps: {cascaded_str}.",
         expected_retired={retired_phase} | set(retired_steps),
+        json_output=json_output,
+        command="vault.plan.phase.remove",
     )
 
 
@@ -932,7 +1038,7 @@ def cmd_phase_remove(
 @wave_app.command("add")
 @_render_user_errors
 def cmd_wave_add(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     title: Annotated[str, typer.Option("--title", help="Wave heading title")],
     intent: Annotated[str, typer.Option("--intent", help="Wave intent paragraph")],
     dry_run: Annotated[
@@ -945,6 +1051,7 @@ def cmd_wave_add(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Append a new Wave at the next-available canonical id (L3+ only)."""
     from vaultspec_core.plan.commands.wave_ops import add_wave
@@ -960,13 +1067,15 @@ def cmd_wave_add(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Added Wave `{wave.canonical_id}`.",
+        json_output=json_output,
+        command="vault.plan.wave.add",
     )
 
 
 @wave_app.command("insert")
 @_render_user_errors
 def cmd_wave_insert(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     title: Annotated[str, typer.Option("--title", help="Wave heading title")],
     intent: Annotated[str, typer.Option("--intent", help="Wave intent paragraph")],
     before: Annotated[
@@ -987,6 +1096,7 @@ def cmd_wave_insert(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Insert a Wave at a named position relative to an existing anchor."""
     from vaultspec_core.plan.commands.wave_ops import insert_wave
@@ -1002,13 +1112,15 @@ def cmd_wave_insert(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Inserted Wave `{wave.canonical_id}`.",
+        json_output=json_output,
+        command="vault.plan.wave.insert",
     )
 
 
 @wave_app.command("edit")
 @_render_user_errors
 def cmd_wave_edit(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     wave_id: Annotated[str, typer.Argument(help="Wave canonical id (W##)")],
     title: Annotated[
         str | None, typer.Option("--title", help="New Wave heading title")
@@ -1026,6 +1138,7 @@ def cmd_wave_edit(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Edit the Wave's title and / or intent paragraph in place."""
     from vaultspec_core.plan.commands.wave_ops import edit_wave
@@ -1041,13 +1154,15 @@ def cmd_wave_edit(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Edited Wave `{wave_id}`.",
+        json_output=json_output,
+        command="vault.plan.wave.edit",
     )
 
 
 @wave_app.command("move")
 @_render_user_errors
 def cmd_wave_move(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     wave_id: Annotated[str, typer.Argument(help="Wave canonical id (W##)")],
     before: Annotated[
         str | None, typer.Option("--before", help="Place before this anchor Wave")
@@ -1065,6 +1180,7 @@ def cmd_wave_move(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Re-position a Wave in document order."""
     from vaultspec_core.plan.commands.wave_ops import move_wave
@@ -1080,13 +1196,15 @@ def cmd_wave_move(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Moved Wave `{wave.canonical_id}`.",
+        json_output=json_output,
+        command="vault.plan.wave.move",
     )
 
 
 @wave_app.command("remove")
 @_render_user_errors
 def cmd_wave_remove(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     wave_id: Annotated[str, typer.Argument(help="Wave canonical id (W##)")],
     dry_run: Annotated[
         bool,
@@ -1098,6 +1216,7 @@ def cmd_wave_remove(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Remove a Wave; descendant Phase and Step ids cascade-retire."""
     from vaultspec_core.plan.commands.wave_ops import remove_wave
@@ -1119,6 +1238,8 @@ def cmd_wave_remove(
             f"cascaded Steps: {steps_str}."
         ),
         expected_retired={retired_wave} | set(retired_phases) | set(retired_steps),
+        json_output=json_output,
+        command="vault.plan.wave.remove",
     )
 
 
@@ -1134,7 +1255,7 @@ epic_app.add_typer(epic_intent_app, name="intent")
 
 @epic_intent_app.command("show")
 def cmd_epic_intent_show(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
 ) -> None:
     """Print the Epic intent paragraph (L4 plans only)."""
     from vaultspec_core.plan.commands.epic_ops import show_epic_intent
@@ -1147,7 +1268,7 @@ def cmd_epic_intent_show(
 @epic_intent_app.command("edit")
 @_render_user_errors
 def cmd_epic_intent_edit(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     text: Annotated[
         str,
         typer.Option(
@@ -1164,6 +1285,7 @@ def cmd_epic_intent_edit(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Replace the Epic intent paragraph (L4 plans only)."""
     from vaultspec_core.plan.commands.epic_ops import edit_epic_intent
@@ -1179,6 +1301,8 @@ def cmd_epic_intent_edit(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg="Edited Epic intent.",
+        json_output=json_output,
+        command="vault.plan.epic.intent.edit",
     )
 
 
@@ -1187,7 +1311,7 @@ def cmd_epic_intent_edit(
 
 @tier_app.command("show")
 def cmd_tier_show(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     json_output: Annotated[
         bool, typer.Option("--json", help="Emit the tier as JSON")
     ] = False,
@@ -1214,7 +1338,7 @@ def cmd_tier_show(
 @tier_app.command("promote")
 @_render_user_errors
 def cmd_tier_promote(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     target: Annotated[
         str | None,
         typer.Option(
@@ -1255,6 +1379,7 @@ def cmd_tier_promote(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Promote the plan tier transitively (L1 -> ... -> L4).
 
@@ -1350,13 +1475,15 @@ def cmd_tier_promote(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Tier promoted to {new_tier.value}.",
+        json_output=json_output,
+        command="vault.plan.tier.promote",
     )
 
 
 @tier_app.command("demote")
 @_render_user_errors
 def cmd_tier_demote(
-    path: Annotated[Path, typer.Argument(help="Plan document path")],
+    path: PlanPathArg,
     target: Annotated[
         str | None,
         typer.Option(
@@ -1381,6 +1508,7 @@ def cmd_tier_demote(
             "--canonicalise", help="Strip unknown prose blocks during serialization"
         ),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Demote the plan tier; refuses multi-child collapse without ``--force``."""
     from vaultspec_core.plan.commands.tier_ops import demote_tier
@@ -1416,4 +1544,6 @@ def cmd_tier_demote(
         canonicalise=canonicalise,
         success_msg=f"Tier demoted to {new_tier.value}.",
         expected_retired=expected_retired,
+        json_output=json_output,
+        command="vault.plan.tier.demote",
     )

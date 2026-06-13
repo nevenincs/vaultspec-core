@@ -1,9 +1,6 @@
 ---
 name: vaultspec-research
-description: >-
-  Use this skill for structured research and brainstorming when unsure how to
-  proceed with a complex feature, refactor, or debugging task and options need
-  exploring before implementation.
+description: Explore an unfamiliar problem and weigh options before committing. Use when unsure how to approach a complex feature, refactor, or bug.
 ---
 
 # Research and brainstorm skill (vaultspec-research)

@@ -1,6 +1,6 @@
 ---
 name: vaultspec-team
-description: Skill to start coding teams for tackling difficult coding challenges.
+description: Start a multi-agent coding team for a hard challenge. Use when a problem is too large for a single agent.
 ---
 
 # Team coordination skill (vaultspec-team)

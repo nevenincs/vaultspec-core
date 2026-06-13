@@ -1,5 +1,5 @@
 ---
-description: High-tier implementation specialist for complex architectural changes, core logic refactors, and advanced feature implementation. Use for Steps requiring high reasoning depth and sophisticated design decisions.
+description: 'Implement complex, high-reasoning steps: core refactors, architecture, advanced features. Use for the hardest steps.'
 tier: HIGH
 mode: read-write
 tools: [Glob, Grep, Read, Write, Edit, Bash]

@@ -1,10 +1,6 @@
 ---
 name: vaultspec-curate
-description: >-
-  Use this skill to audit and clean the .vault/ documentation vault. Validates frontmatter,
-  wiki-links, naming conventions, template compliance, and directory
-  structure. Fixes violations through the CLI repair paths and produces an
-  audit report.
+description: 'Audit and repair the .vault/ vault: frontmatter, wiki-links, naming, templates, structure. Use to clean the vault or fix schema violations.'
 ---
 
 # Documentation curation skill (vaultspec-curate)

@@ -16,19 +16,19 @@ execute, and review. You approve each phase before the next begins.
 ### Orientation - the zeroth move
 
 Before starting any work in a vaultspec-managed project you have no session context for,
-run `vaultspec-core vault status` and read the in-flight plans it names. This is the
-zeroth move - it produces no artifact and belongs to no pipeline phase.
+run `vaultspec-core status` and read the in-flight plans it names. This is the zeroth
+move - it produces no artifact and belongs to no pipeline phase.
 
-With no argument, `vaultspec-core vault status` shows a vault-wide rollup: plans with
-open steps and their completion percent, recently modified documents grouped by type,
-and active features. With a plan stem, path, or feature tag as a `TARGET`, it renders a
+With no argument, `vaultspec-core status` shows a vault-wide rollup: plans with open
+steps and their completion percent, recently modified documents grouped by type, and
+active features. With a plan stem, path, or feature tag as a `TARGET`, it renders a
 grounding trace - each plan step mapped to its execution-record stem, plus grounding
 documents grouped by type. This targeted form is how you trace a plan through its steps,
 execution records, and the research, reference, and audit documents that ground them.
 
-Orientation is distinct from auditing. `vaultspec-core vault status` describes what
-exists without judging conformance. Use `vaultspec-core vault check` when you want the
-vault scored against its structural rules.
+Orientation is distinct from auditing. `vaultspec-core status` describes what exists
+without judging conformance. Use `vaultspec-core vault check` when you want the vault
+scored against its structural rules.
 
 ### Research
 
@@ -266,9 +266,8 @@ it automatically whenever a mutating verb touches the document - plan structural
 changes, ADR supersession, link mutations, and the repair and fix paths all update the
 stamp without any manual action. Agents and authors must never hand-edit `modified:`;
 the correct path for body-prose edits is to let `vaultspec-core vault check all --fix`
-reconcile the stamp after the edit. The `vaultspec-core vault status` rollup reads
-`modified:` to determine recency order, falling back to `date:` when the stamp is
-absent.
+reconcile the stamp after the edit. The `vaultspec-core status` rollup reads `modified:`
+to determine recency order, falling back to `date:` when the stamp is absent.
 
 ## Model Context Protocol integration
 

@@ -109,6 +109,84 @@ def test_status_to_json_dict_round_trips_through_json_module() -> None:
     assert restored["has_epic_intent"] is True
 
 
+def test_enrichment_partial_l3_counts_completed_containers() -> None:
+    """Closing the first Wave's Steps yields one completed Wave, two Phases,
+    and a cursor on the first open Step of the next Wave."""
+    rng = random.Random(10)
+    spec = make_clean_plan("L3", rng=rng, waves=2, phases=2, steps=2)
+    # W01 owns S01-S04 (P01: S01,S02 / P02: S03,S04); close exactly those.
+    for step in spec.steps[:4]:
+        step.checked = True
+    plan = parse_plan(spec.render())
+
+    status = collect_status(plan)
+
+    assert status.waves_completed == 1
+    assert status.phases_completed == 2
+    assert status.next_open_step == "W02.P03.S05"
+
+
+def test_enrichment_complete_plan_has_no_cursor() -> None:
+    """A fully-checked plan reports every container complete and no cursor."""
+    rng = random.Random(11)
+    spec = make_clean_plan("L3", rng=rng, waves=2, phases=2, steps=2)
+    for step in spec.steps:
+        step.checked = True
+    plan = parse_plan(spec.render())
+
+    status = collect_status(plan)
+
+    assert status.waves_completed == 2
+    assert status.phases_completed == 4
+    assert status.next_open_step is None
+
+
+def test_enrichment_l2_has_phases_but_no_completed_waves() -> None:
+    """An L2 plan never reports completed Waves; Phase completion still counts."""
+    rng = random.Random(12)
+    spec = make_clean_plan("L2", rng=rng, phases=2, steps=2)
+    for step in spec.steps[:2]:  # close the first Phase only
+        step.checked = True
+    plan = parse_plan(spec.render())
+
+    status = collect_status(plan)
+
+    assert status.wave_count == 0
+    assert status.waves_completed == 0
+    assert status.phases_completed == 1
+    assert status.next_open_step == "P02.S03"
+
+
+def test_enrichment_l1_cursor_is_first_open_flat_step() -> None:
+    """An L1 plan has no containers; the cursor is the first open flat Step."""
+    rng = random.Random(13)
+    spec = make_clean_plan("L1", rng=rng, steps=3)
+    spec.steps[0].checked = True
+    plan = parse_plan(spec.render())
+
+    status = collect_status(plan)
+
+    assert status.waves_completed == 0
+    assert status.phases_completed == 0
+    assert status.next_open_step == "S02"
+
+
+def test_enrichment_fields_serialise_to_json() -> None:
+    """The new enrichment fields survive JSON round-tripping."""
+    rng = random.Random(14)
+    spec = make_clean_plan("L3", rng=rng, waves=2, phases=1, steps=2)
+    for step in spec.steps[:2]:
+        step.checked = True
+    plan = parse_plan(spec.render())
+
+    payload = status_to_json_dict(collect_status(plan))
+    restored = json.loads(json.dumps(payload))
+
+    assert restored["waves_completed"] == 1
+    assert restored["phases_completed"] == 1
+    assert restored["next_open_step"] == "W02.P02.S03"
+
+
 def test_status_collect_missing_exec_records(tmp_path: Path) -> None:
     """``collect_status`` finds checked plan steps lacking execution records."""
     body = (

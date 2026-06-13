@@ -1,5 +1,5 @@
 ---
-description: Low-tier implementation specialist for straightforward edits, documentation updates, and low-risk logic changes. Use for clear-cut Steps that follow well-defined patterns.
+description: 'Implement clear-cut, low-risk steps: small edits, docs, simple logic. Use for routine steps.'
 tier: LOW
 mode: read-write
 tools: [Glob, Grep, Read, Write, Edit, Bash]

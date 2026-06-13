@@ -1,5 +1,5 @@
 ---
-description: Specialized agent used for auditing codebases to produce a `<Reference>`. Discovers features, concrete code patterns, and best practices.
+description: Audit a codebase to produce a Reference of features, patterns, and best practices. Use to document how code works.
 tier: STANDARD
 mode: read-only
 tools: [Glob, Grep, Read, Bash]
