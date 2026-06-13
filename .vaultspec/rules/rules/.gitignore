@@ -1,0 +1,3 @@
+# Authored rules in this directory are team-shared (cli-spec-gitignore ADR):
+# both builtin *.builtin.md files and project-authored *.md rules are
+# committed to git so teammates inherit the project's full rule set.

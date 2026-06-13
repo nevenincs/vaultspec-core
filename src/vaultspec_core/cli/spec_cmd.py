@@ -227,21 +227,24 @@ def _spec_status_command(result: "SyncResult", label: str, json_output: bool) ->
         _emit_json(f"spec.{label.lower()}.status", status_str, data)
         raise typer.Exit(0 if status_str == "ok" else 1)
 
-    from rich import box
-    from rich.table import Table
-
+    from vaultspec_core.cli.rendering import Field, render_record
     from vaultspec_core.console import get_console
 
+    status_style = (
+        "red"
+        if status_str == "error"
+        else ("yellow" if status_str == "drifted" else "green")
+    )
+    fields = [
+        Field("status", status_str, style=status_style),
+        Field("missing", ", ".join(missing) or "none"),
+        Field("drifted", ", ".join(drifted) or "none"),
+        Field("stale", ", ".join(stale) or "none"),
+        Field("up_to_date", f"{len(up_to_date)} files" if up_to_date else "none"),
+    ]
+    render_record(fields, title=f"{label} status")
+
     console = get_console()
-    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
-    table.add_column("Field", no_wrap=True)
-    table.add_column("Value")
-    table.add_row("status", status_str)
-    table.add_row("missing", ", ".join(missing) or "none")
-    table.add_row("drifted", ", ".join(drifted) or "none")
-    table.add_row("stale", ", ".join(stale) or "none")
-    table.add_row("up_to_date", f"{len(up_to_date)} files" if up_to_date else "none")
-    console.print(table)
     for w in result.warnings:
         console.print(f"  [yellow]•[/yellow] {w}")
     for e in errors:
@@ -277,10 +280,6 @@ def cmd_rules_list(
 ) -> None:
     """List all available rules."""
     apply_target(target)
-    from rich import box
-    from rich.table import Table
-
-    from vaultspec_core.console import get_console
     from vaultspec_core.core import rules_list
 
     items = rules_list()
@@ -289,14 +288,16 @@ def cmd_rules_list(
         _emit_json("spec.rules.list", "unchanged", {"items": items})
         raise typer.Exit(0)
 
-    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
-    table.add_column("Name", no_wrap=True)
-    table.add_column("Source")
+    from vaultspec_core.cli.rendering import Column, render_listing, summary_line
 
-    for item in items:
-        table.add_row(item["name"], item["source"])
-
-    get_console().print(table)
+    rows = [{"name": item["name"], "source": item["source"]} for item in items]
+    render_listing(
+        rows,
+        [Column("name"), Column("source")],
+        title="rules",
+        summary=summary_line(len(rows), "rules"),
+        empty="no rules",
+    )
 
 
 @rules_app.command("add")
@@ -560,10 +561,6 @@ def cmd_skills_list(
 ) -> None:
     """List all available skills."""
     apply_target(target)
-    from rich import box
-    from rich.table import Table
-
-    from vaultspec_core.console import get_console
     from vaultspec_core.core import skills_list
 
     items = skills_list()
@@ -572,19 +569,24 @@ def cmd_skills_list(
         _emit_json("spec.skills.list", "unchanged", {"items": items})
         raise typer.Exit(0)
 
-    console = get_console()
-    if not items:
-        console.print("No managed skills found.")
-        return
+    from vaultspec_core.cli.rendering import (
+        Column,
+        render_listing,
+        summary_line,
+        truncate,
+    )
 
-    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
-    table.add_column("Name", no_wrap=True)
-    table.add_column("Description", max_width=60, overflow="ellipsis")
-
-    for item in items:
-        table.add_row(item["name"], item["description"])
-
-    console.print(table)
+    rows = [
+        {"name": item["name"], "description": truncate(item["description"], 60)}
+        for item in items
+    ]
+    render_listing(
+        rows,
+        [Column("name"), Column("description")],
+        title="skills",
+        summary=summary_line(len(rows), "skills"),
+        empty="no skills",
+    )
 
 
 @skills_app.command("add")
@@ -861,10 +863,6 @@ def cmd_agents_list(
 ) -> None:
     """List all available agents."""
     apply_target(target)
-    from rich import box
-    from rich.table import Table
-
-    from vaultspec_core.console import get_console
     from vaultspec_core.core import agents_list
 
     items = agents_list()
@@ -873,19 +871,24 @@ def cmd_agents_list(
         _emit_json("spec.agents.list", "unchanged", {"items": items})
         raise typer.Exit(0)
 
-    console = get_console()
-    if not items:
-        console.print("No managed agents found.")
-        return
+    from vaultspec_core.cli.rendering import (
+        Column,
+        render_listing,
+        summary_line,
+        truncate,
+    )
 
-    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
-    table.add_column("Name", no_wrap=True)
-    table.add_column("Description", max_width=50, overflow="ellipsis")
-
-    for item in items:
-        table.add_row(item["name"], item["description"])
-
-    console.print(table)
+    rows = [
+        {"name": item["name"], "description": truncate(item["description"], 50)}
+        for item in items
+    ]
+    render_listing(
+        rows,
+        [Column("name"), Column("description")],
+        title="agents",
+        summary=summary_line(len(rows), "agents"),
+        empty="no agents",
+    )
 
 
 @agents_app.command("add")
@@ -1156,10 +1159,6 @@ def cmd_system_show(
 ) -> None:
     """Display system prompt parts and targets."""
     apply_target(target)
-    from rich import box
-    from rich.table import Table
-
-    from vaultspec_core.console import get_console
     from vaultspec_core.core import system_show
 
     data = system_show()
@@ -1168,36 +1167,43 @@ def cmd_system_show(
         _emit_json("spec.system.show", "unchanged", data)
         raise typer.Exit(0)
 
-    console = get_console()
+    from vaultspec_core.cli.rendering import Column, render_listing, summary_line
+    from vaultspec_core.console import get_console
 
     if not data["parts"]:
-        console.print("[dim]No system parts found in .vaultspec/rules/system/[/dim]")
+        get_console().print(
+            "[dim]No system parts found in .vaultspec/rules/system/[/dim]"
+        )
         return
 
-    parts_table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
-    parts_table.add_column("Name", no_wrap=True)
-    parts_table.add_column("Tool Filter")
-    parts_table.add_column("Lines", justify="right")
-
-    for part in data["parts"]:
-        parts_table.add_row(part["name"], part["tool_filter"], str(part["lines"]))
-
-    console.print(parts_table)
+    parts_rows = [
+        {
+            "name": part["name"],
+            "tool_filter": part["tool_filter"],
+            "lines": str(part["lines"]),
+        }
+        for part in data["parts"]
+    ]
+    render_listing(
+        parts_rows,
+        [Column("name"), Column("tool_filter"), Column("lines")],
+        title="system parts",
+        summary=summary_line(len(parts_rows), "parts"),
+        empty="no parts",
+    )
 
     if data["targets"]:
-        console.print()
-        console.print("Generation targets:", style="bold")
-        targets_table = Table(
-            box=None, show_header=False, show_edge=False, padding=(0, 1)
+        targets_rows = [
+            {"tool": t["tool"], "path": t["path"], "status": f"[{t['managed']}]"}
+            for t in data["targets"]
+        ]
+        render_listing(
+            targets_rows,
+            [Column("tool"), Column("path"), Column("status")],
+            title="generation targets",
+            summary=summary_line(len(targets_rows), "targets"),
+            empty="no targets",
         )
-        targets_table.add_column("Tool")
-        targets_table.add_column("Path")
-        targets_table.add_column("Status", style="dim")
-        for target in data["targets"]:
-            targets_table.add_row(
-                target["tool"], target["path"], f"[{target['managed']}]"
-            )
-        console.print(targets_table)
 
 
 @system_app.command("sync")
@@ -1245,10 +1251,6 @@ def cmd_hooks_list(
 ) -> None:
     """List all defined hooks."""
     apply_target(target)
-    from rich import box
-    from rich.table import Table
-
-    from vaultspec_core.console import get_console
     from vaultspec_core.core.commands import hooks_list_data
 
     data = hooks_list_data()
@@ -1257,8 +1259,11 @@ def cmd_hooks_list(
         _emit_json("spec.hooks.list", "unchanged", data)
         raise typer.Exit(0)
 
-    console = get_console()
+    from vaultspec_core.cli.rendering import Cell, Column, render_listing, summary_line
+    from vaultspec_core.console import get_console
+
     hooks = data["hooks"]
+    console = get_console()
 
     if not hooks:
         console.print("No hooks defined.")
@@ -1270,20 +1275,24 @@ def cmd_hooks_list(
         )
         return
 
-    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
-    table.add_column("Name", no_wrap=True)
-    table.add_column("Status")
-    table.add_column("Event")
-    table.add_column("Actions")
-
-    for hook in hooks:
-        if hook["enabled"]:
-            status = "[bold green]enabled[/bold green]"
-        else:
-            status = "[dim]disabled[/dim]"
-        table.add_row(hook["name"], status, hook["event"], hook["actions"])
-
-    console.print(table)
+    rows = [
+        {
+            "name": hook["name"],
+            "status": Cell("enabled", style="bold green")
+            if hook["enabled"]
+            else Cell("disabled", style="dim"),
+            "event": hook["event"],
+            "actions": hook["actions"],
+        }
+        for hook in hooks
+    ]
+    render_listing(
+        rows,
+        [Column("name"), Column("status"), Column("event"), Column("actions")],
+        title="hooks",
+        summary=summary_line(len(rows), "hooks"),
+        empty="no hooks",
+    )
 
 
 @hooks_app.command("add")
@@ -1536,10 +1545,6 @@ def cmd_hooks_status(
 ) -> None:
     """Report declarative hooks parsing and taxonomy compliance status."""
     apply_target(target)
-    from rich import box
-    from rich.table import Table
-
-    from vaultspec_core.console import get_console
     from vaultspec_core.core import hooks_status
 
     status = hooks_status()
@@ -1548,15 +1553,21 @@ def cmd_hooks_status(
         _emit_json("spec.hooks.status", status["status"], status)
         raise typer.Exit(0 if status["status"] == "ok" else 1)
 
-    console = get_console()
-    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
-    table.add_column("Field", no_wrap=True)
-    table.add_column("Value")
-    table.add_row("status", str(status["status"]))
-    table.add_row("hooks_dir", str(status["hooks_dir"]))
-    table.add_row("definitions", ", ".join(status["definitions"]) or "none")
-    console.print(table)
+    from vaultspec_core.cli.rendering import Field, render_record
+    from vaultspec_core.console import get_console
 
+    status_str = str(status["status"])
+    status_style = (
+        "green" if status_str == "ok" else ("yellow" if status_str == "warn" else "red")
+    )
+    fields = [
+        Field("status", status_str, style=status_style),
+        Field("hooks_dir", str(status["hooks_dir"])),
+        Field("definitions", ", ".join(status["definitions"]) or "none"),
+    ]
+    render_record(fields, title="hooks status")
+
+    console = get_console()
     for warning in status["warnings"]:
         console.print(f"  [yellow]•[/yellow] {warning}")
     for error in status["errors"]:
@@ -1626,10 +1637,6 @@ def cmd_mcps_list(
 ) -> None:
     """List all registered MCP server definitions."""
     apply_target(target)
-    from rich import box
-    from rich.table import Table
-
-    from vaultspec_core.console import get_console
     from vaultspec_core.core import mcp_list
 
     items = mcp_list()
@@ -1638,19 +1645,16 @@ def cmd_mcps_list(
         _emit_json("spec.mcps.list", "unchanged", {"items": items})
         raise typer.Exit(0)
 
-    console = get_console()
-    if not items:
-        console.print("No MCP server definitions found.")
-        return
+    from vaultspec_core.cli.rendering import Column, render_listing, summary_line
 
-    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
-    table.add_column("Name", no_wrap=True)
-    table.add_column("Source")
-
-    for item in items:
-        table.add_row(item["name"], item["source"])
-
-    console.print(table)
+    rows = [{"name": item["name"], "source": item["source"]} for item in items]
+    render_listing(
+        rows,
+        [Column("name"), Column("source")],
+        title="mcps",
+        summary=summary_line(len(rows), "mcps"),
+        empty="no mcps",
+    )
 
 
 @mcps_app.command("status")
@@ -1660,10 +1664,6 @@ def cmd_mcps_status(
 ) -> None:
     """Report focused MCP definition and .mcp.json sync status."""
     apply_target(target)
-    from rich import box
-    from rich.table import Table
-
-    from vaultspec_core.console import get_console
     from vaultspec_core.core import mcp_status
 
     status = mcp_status()
@@ -1672,23 +1672,29 @@ def cmd_mcps_status(
         _emit_json("spec.mcps.status", "unchanged", status)
         raise typer.Exit(0 if status["status"] == "ok" else 1)
 
-    console = get_console()
-    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
-    table.add_column("Field", no_wrap=True)
-    table.add_column("Value")
-    table.add_row("status", str(status["status"]))
-    table.add_row("config", str(status["config_path"]))
-    table.add_row("definitions", ", ".join(status["definitions"]) or "none")
-    table.add_row("configured", ", ".join(status["configured"]) or "none")
-    table.add_row("managed", ", ".join(status["managed"]) or "none")
-    if status["missing"]:
-        table.add_row("missing", ", ".join(status["missing"]))
-    if status["drifted"]:
-        table.add_row("drifted", ", ".join(status["drifted"]))
-    if status["stale_managed"]:
-        table.add_row("stale managed", ", ".join(status["stale_managed"]))
-    console.print(table)
+    from vaultspec_core.cli.rendering import Field, render_record
+    from vaultspec_core.console import get_console
 
+    status_str = str(status["status"])
+    status_style = (
+        "green" if status_str == "ok" else ("yellow" if status_str == "warn" else "red")
+    )
+    fields: list[Field] = [
+        Field("status", status_str, style=status_style),
+        Field("config", str(status["config_path"])),
+        Field("definitions", ", ".join(status["definitions"]) or "none"),
+        Field("configured", ", ".join(status["configured"]) or "none"),
+        Field("managed", ", ".join(status["managed"]) or "none"),
+    ]
+    if status["missing"]:
+        fields.append(Field("missing", ", ".join(status["missing"])))
+    if status["drifted"]:
+        fields.append(Field("drifted", ", ".join(status["drifted"])))
+    if status["stale_managed"]:
+        fields.append(Field("stale managed", ", ".join(status["stale_managed"])))
+    render_record(fields, title="mcps status")
+
+    console = get_console()
     for warning in status["warnings"]:
         console.print(f"  [yellow]•[/yellow] {warning}")
     if status["status"] != "ok":
@@ -1983,10 +1989,13 @@ def cmd_reference_generate(
     raise typer.Exit(0)
 
 
-def _render_diagnosis_table(console, diag: "WorkspaceDiagnosis") -> None:
-    """Render the workspace diagnosis table."""
-    from rich.table import Table
+def _render_diagnosis_table(_console, diag: "WorkspaceDiagnosis") -> None:
+    """Render the workspace diagnosis as a box-free listing.
 
+    The ``_console`` argument is retained for call-site compatibility; the
+    listing renderer resolves the shared console itself.
+    """
+    from vaultspec_core.cli.rendering import Cell, Column, render_listing
     from vaultspec_core.core.diagnosis import (
         BuiltinVersionSignal,
         ConfigSignal,
@@ -2000,10 +2009,7 @@ def _render_diagnosis_table(console, diag: "WorkspaceDiagnosis") -> None:
         VaultContentSignal,
     )
 
-    table = Table(show_header=True, show_edge=False, pad_edge=False)
-    table.add_column("Component", style="bold", min_width=16)
-    table.add_column("Status", min_width=8)
-    table.add_column("Detail")
+    rows: list[dict] = []
 
     # Framework row
     fw_status, fw_style = _signal_status(
@@ -2019,10 +2025,12 @@ def _render_diagnosis_table(console, diag: "WorkspaceDiagnosis") -> None:
         FrameworkSignal.MISSING: ".vaultspec/ not found",
         FrameworkSignal.CORRUPTED: ".vaultspec/ corrupted manifest",
     }.get(diag.framework, str(diag.framework))
-    table.add_row(
-        "framework",
-        f"[{fw_style}]{fw_status}[/{fw_style}]",
-        fw_detail,
+    rows.append(
+        {
+            "component": "framework",
+            "status": Cell(fw_status, style=fw_style),
+            "detail": fw_detail,
+        }
     )
 
     # Provider rows
@@ -2040,10 +2048,12 @@ def _render_diagnosis_table(console, diag: "WorkspaceDiagnosis") -> None:
         stale = sum(1 for s in prov.content.values() if s != ContentSignal.CLEAN)
         if stale:
             details.append(f"{stale} file(s) need attention")
-        table.add_row(
-            tool.value,
-            f"[{prov_style}]{prov_status}[/{prov_style}]",
-            ", ".join(details),
+        rows.append(
+            {
+                "component": tool.value,
+                "status": Cell(prov_status, style=prov_style),
+                "detail": ", ".join(details),
+            }
         )
 
     # Builtins row
@@ -2056,10 +2066,12 @@ def _render_diagnosis_table(console, diag: "WorkspaceDiagnosis") -> None:
             BuiltinVersionSignal.NO_SNAPSHOTS: ("info", "dim"),
         },
     )
-    table.add_row(
-        "builtins",
-        f"[{bv_style}]{bv_status}[/{bv_style}]",
-        diag.builtin_version.value,
+    rows.append(
+        {
+            "component": "builtins",
+            "status": Cell(bv_status, style=bv_style),
+            "detail": diag.builtin_version.value,
+        }
     )
 
     # Gitignore row
@@ -2073,10 +2085,12 @@ def _render_diagnosis_table(console, diag: "WorkspaceDiagnosis") -> None:
             GitignoreSignal.CORRUPTED: ("error", "red"),
         },
     )
-    table.add_row(
-        "gitignore",
-        f"[{gi_style}]{gi_status}[/{gi_style}]",
-        diag.gitignore.value,
+    rows.append(
+        {
+            "component": "gitignore",
+            "status": Cell(gi_status, style=gi_style),
+            "detail": diag.gitignore.value,
+        }
     )
 
     # Gitattributes row
@@ -2090,10 +2104,12 @@ def _render_diagnosis_table(console, diag: "WorkspaceDiagnosis") -> None:
             GitattributesSignal.CORRUPTED: ("error", "red"),
         },
     )
-    table.add_row(
-        "gitattributes",
-        f"[{ga_style}]{ga_status}[/{ga_style}]",
-        diag.gitattributes.value,
+    rows.append(
+        {
+            "component": "gitattributes",
+            "status": Cell(ga_status, style=ga_style),
+            "detail": diag.gitattributes.value,
+        }
     )
 
     # MCP row
@@ -2116,10 +2132,12 @@ def _render_diagnosis_table(console, diag: "WorkspaceDiagnosis") -> None:
         ConfigSignal.FOREIGN: ".mcp.json present (no vaultspec entry)",
         ConfigSignal.REGISTRY_DRIFT: ".mcp.json entries differ from registry",
     }.get(diag.mcp, str(diag.mcp))
-    table.add_row(
-        "mcp",
-        f"[{mcp_style}]{mcp_status}[/{mcp_style}]",
-        mcp_detail,
+    rows.append(
+        {
+            "component": "mcp",
+            "status": Cell(mcp_status, style=mcp_style),
+            "detail": mcp_detail,
+        }
     )
 
     # Migration row - sourced from the registry collector.
@@ -2134,10 +2152,12 @@ def _render_diagnosis_table(console, diag: "WorkspaceDiagnosis") -> None:
     else:
         mig_status_label, mig_style = ("info", "dim")
         mig_detail = "no manifest; not installed"
-    table.add_row(
-        "migration",
-        f"[{mig_style}]{mig_status_label}[/{mig_style}]",
-        mig_detail,
+    rows.append(
+        {
+            "component": "migration",
+            "status": Cell(mig_status_label, style=mig_style),
+            "detail": mig_detail,
+        }
     )
 
     # Vault content row - read-only annotation signal.
@@ -2167,10 +2187,12 @@ def _render_diagnosis_table(console, diag: "WorkspaceDiagnosis") -> None:
         and diag.vault_unreadable_count
     ):
         vc_detail += f"; {diag.vault_unreadable_count} markdown file(s) unreadable"
-    table.add_row(
-        "vault content",
-        f"[{vc_style}]{vc_status}[/{vc_style}]",
-        vc_detail,
+    rows.append(
+        {
+            "component": "vault content",
+            "status": Cell(vc_status, style=vc_style),
+            "detail": vc_detail,
+        }
     )
 
     # Pre-commit row
@@ -2191,10 +2213,12 @@ def _render_diagnosis_table(console, diag: "WorkspaceDiagnosis") -> None:
         PrecommitSignal.NO_HOOKS: "no vaultspec hooks found",
         PrecommitSignal.NO_FILE: "no .pre-commit-config.yaml",
     }.get(diag.precommit, str(diag.precommit))
-    table.add_row(
-        "precommit",
-        f"[{pc_style}]{pc_status}[/{pc_style}]",
-        pc_detail,
+    rows.append(
+        {
+            "component": "precommit",
+            "status": Cell(pc_status, style=pc_style),
+            "detail": pc_detail,
+        }
     )
 
     # Rename integrity row
@@ -2217,13 +2241,20 @@ def _render_diagnosis_table(console, diag: "WorkspaceDiagnosis") -> None:
         RenameIntegritySignal.ERROR: "failed to evaluate name/filename integrity",
     }
     ri_detail = ri_details.get(diag.rename_integrity, str(diag.rename_integrity))
-    table.add_row(
-        "rename integrity",
-        f"[{ri_style}]{ri_status}[/{ri_style}]",
-        ri_detail,
+    rows.append(
+        {
+            "component": "rename integrity",
+            "status": Cell(ri_status, style=ri_style),
+            "detail": ri_detail,
+        }
     )
 
-    console.print(table)
+    render_listing(
+        rows,
+        [Column("component"), Column("status"), Column("detail")],
+        title="workspace diagnosis",
+        empty="no components",
+    )
 
 
 def _signal_status(

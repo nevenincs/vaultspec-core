@@ -243,7 +243,7 @@ def list_feature_details(
     Returns:
         List of dicts sorted by feature name, each with keys: ``name``,
         ``doc_count``, ``types`` (sorted list), ``earliest_date``,
-        ``has_plan``.
+        ``latest_activity``, ``has_plan``.
     """
     docs = _scan_all(root_dir)
 
@@ -276,6 +276,7 @@ def list_feature_details(
 
         dates = [d.date for d in feat_docs if d.date]
         earliest = min(dates) if dates else None
+        latest = max(dates) if dates else None
 
         if date and earliest and earliest > date:
             continue
@@ -286,6 +287,7 @@ def list_feature_details(
                 "doc_count": len(feat_docs),
                 "types": sorted(types),
                 "earliest_date": earliest,
+                "latest_activity": latest,
                 "has_plan": "plan" in types,
             }
         )

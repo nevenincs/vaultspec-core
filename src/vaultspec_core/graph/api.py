@@ -3,16 +3,16 @@
 Turns ``vaultcore`` scanning, metadata parsing, and wiki-link extraction into
 a queryable directed graph of ``.vault/`` documents backed by
 ``networkx.DiGraph``. Delegates rendering to ``phart`` (ASCII topology) and
-``rich`` (hierarchical tree), and serialisation to
-``networkx.readwrite.json_graph``.
+:func:`~vaultspec_core.cli.rendering.render_tree` (box-free hierarchical tree),
+and serialisation to ``networkx.readwrite.json_graph``.
 
 Example::
 
     graph = VaultGraph(root_dir)
-    tree  = graph.render_tree(feature="my-feature")   # Rich Tree
-    ascii = graph.render_ascii(feature="my-feature")  # phart ASCII
-    data  = graph.to_dict(feature="my-feature")       # JSON-ready dict
-    stats = graph.metrics()                           # GraphMetrics
+    lines = graph.render_tree_lines(feature="my-feature")  # list[TreeLine]
+    ascii = graph.render_ascii(feature="my-feature")       # phart ASCII
+    data  = graph.to_dict(feature="my-feature")            # JSON-ready dict
+    stats = graph.metrics()                                # GraphMetrics
 
 Exports:
     :class:`DocNode`: Node carrying full frontmatter, body, and link metadata.
@@ -46,7 +46,7 @@ from .derived import compute_derived_edges
 if TYPE_CHECKING:
     import pathlib
 
-    from rich.tree import Tree
+    from vaultspec_core.cli.rendering import TreeLine
 
     from ..vaultcore.checks._base import VaultSnapshot
     from . import cache
@@ -1324,78 +1324,112 @@ class VaultGraph:
         renderer = ASCIIRenderer(g)
         return renderer.render()
 
-    # -- Hierarchical tree rendering (Rich) ----------------------------------
+    # -- Hierarchical tree rendering (box-free) --------------------------------
 
-    def render_tree(
+    def render_tree_lines(
         self,
         feature: str | None = None,
-    ) -> Tree:
-        """Build a Rich :class:`~rich.tree.Tree` for terminal display.
+    ) -> list[TreeLine]:
+        """Build a box-free :class:`~vaultspec_core.cli.rendering.TreeLine` list.
 
         Renders the vault as a hierarchical tree grouped by feature and
-        doc-type.  This is complementary to :meth:`render_ascii` which
-        shows the actual graph topology.
+        doc-type, using the plain-text shape vocabulary.  This is
+        complementary to :meth:`render_ascii` which shows the actual graph
+        topology.
 
         Args:
             feature: Optional feature name to scope the tree.
 
         Returns:
-            A ``rich.tree.Tree`` ready for ``console.print()``.
+            A list of :class:`~vaultspec_core.cli.rendering.TreeLine` objects
+            ready for :func:`~vaultspec_core.cli.rendering.render_tree`.
         """
-        from rich.tree import Tree as RichTree
+        from vaultspec_core.cli.rendering import TreeLine
+
+        lines: list[TreeLine] = []
 
         if feature:
-            return self._render_feature_tree(feature)
-
-        m = self.metrics()
-        root = RichTree(
-            f"[bold].vault[/bold]  "
-            f"[dim]{m.total_nodes} docs, "
-            f"{m.total_edges} links, "
-            f"{m.total_features} features[/dim]"
-        )
+            nodes = self.get_feature_nodes(feature)
+            lines.extend(self._build_typed_node_lines(nodes, depth=0))
+            return lines
 
         for feat in self.get_features():
             feat_nodes = self.get_feature_nodes(feat)
-            feat_branch = root.add(
-                f"[bold cyan]#{feat}[/bold cyan]  [dim]{len(feat_nodes)} docs[/dim]"
+            lines.append(
+                TreeLine(
+                    f"#{feat}  {len(feat_nodes)} docs",
+                    depth=0,
+                    style="bold cyan",
+                )
             )
-            self._add_typed_nodes(feat_branch, feat_nodes)
+            lines.extend(self._build_typed_node_lines(feat_nodes, depth=1))
 
         untagged = [n for n in self.nodes.values() if not n.feature and not n.phantom]
         if untagged:
-            branch = root.add(
-                "[bold yellow](untagged)[/bold yellow]"
-                f"  [dim]{len(untagged)} docs[/dim]"
+            lines.append(
+                TreeLine(
+                    f"(untagged)  {len(untagged)} docs",
+                    depth=0,
+                    style="bold yellow",
+                )
             )
-            self._add_typed_nodes(
-                branch,
-                sorted(untagged, key=lambda n: n.name),
+            lines.extend(
+                self._build_typed_node_lines(
+                    sorted(untagged, key=lambda n: n.name), depth=1
+                )
             )
 
-        return root
+        return lines
 
-    def _render_feature_tree(self, feature: str) -> Tree:
-        """Render a tree scoped to a single feature."""
-        from rich.tree import Tree as RichTree
-
-        nodes = self.get_feature_nodes(feature)
-        m = self.metrics(feature=feature)
-
-        root = RichTree(
-            f"[bold cyan]#{feature}[/bold cyan]  "
-            f"[dim]{m.total_nodes} docs, "
-            f"{m.total_edges} links[/dim]"
-        )
-        self._add_typed_nodes(root, nodes)
-        return root
-
-    def _add_typed_nodes(
+    def render_tree(
         self,
-        parent: Tree,
-        nodes: list[DocNode],
+        feature: str | None = None,
     ) -> None:
-        """Group *nodes* by doc_type under *parent*."""
+        """Print a box-free hierarchical tree to the console.
+
+        Renders the vault grouped by feature and doc-type via the plain-text
+        shape vocabulary.  This is complementary to :meth:`render_ascii` which
+        shows the actual graph topology.
+
+        Args:
+            feature: Optional feature name to scope the tree.
+        """
+        from vaultspec_core.cli.rendering import render_tree as _render_tree
+
+        if feature:
+            m = self.metrics(feature=feature)
+            title = f"#{feature}  {m.total_nodes} docs, {m.total_edges} links"
+        else:
+            m = self.metrics()
+            title = (
+                f".vault  {m.total_nodes} docs, "
+                f"{m.total_edges} links, {m.total_features} features"
+            )
+
+        _render_tree(self.render_tree_lines(feature=feature), title=title)
+
+    def _build_typed_node_lines(
+        self,
+        nodes: list[DocNode],
+        depth: int,
+    ) -> list[TreeLine]:
+        """Build :class:`~vaultspec_core.cli.rendering.TreeLine` rows for *nodes*.
+
+        Groups *nodes* by doc_type and emits one sub-heading per type
+        followed by per-node rows and their out-link annotations.
+
+        Args:
+            nodes: The nodes to render.
+            depth: Nesting depth of the type sub-heading rows (node rows are
+                one level deeper, link rows two levels deeper).
+
+        Returns:
+            A flat list of :class:`~vaultspec_core.cli.rendering.TreeLine`
+            entries in pre-order.
+        """
+        from vaultspec_core.cli.rendering import TreeLine
+
+        lines: list[TreeLine] = []
         by_type: dict[str, list[DocNode]] = {}
         for node in nodes:
             key = node.doc_type.value if node.doc_type else "unknown"
@@ -1403,44 +1437,74 @@ class VaultGraph:
 
         for type_name in sorted(by_type):
             type_nodes = by_type[type_name]
-            type_branch = parent.add(
-                f"[bold]{type_name}[/bold]  [dim]({len(type_nodes)})[/dim]"
+            lines.append(
+                TreeLine(
+                    f"{type_name}  ({len(type_nodes)})",
+                    depth=depth,
+                    style="bold",
+                )
             )
             for node in type_nodes:
-                label = self._node_label(node)
-                node_branch = type_branch.add(label)
+                label = self._node_label_plain(node)
+                lines.append(TreeLine(label, depth=depth + 1))
 
                 for target in sorted(node.out_links):
                     target_node = self.nodes.get(target)
                     if target_node and target_node.phantom:
-                        node_branch.add(
-                            f"[dim]-> {target}[/dim]  "
-                            f"[yellow italic](not created)[/yellow italic]"
+                        lines.append(
+                            TreeLine(
+                                f"-> {target}  (not created)",
+                                depth=depth + 2,
+                                style="yellow",
+                            )
                         )
                     elif target_node:
                         dt_val = (
                             target_node.doc_type.value if target_node.doc_type else "?"
                         )
-                        node_branch.add(
-                            f"[dim]-> {target}[/dim]  [dim italic]{dt_val}[/dim italic]"
+                        lines.append(
+                            TreeLine(
+                                f"-> {target}  {dt_val}",
+                                depth=depth + 2,
+                                style="dim",
+                            )
                         )
                     else:
-                        node_branch.add(f"[red dim]-> {target} (dangling)[/red dim]")
+                        lines.append(
+                            TreeLine(
+                                f"-> {target} (dangling)",
+                                depth=depth + 2,
+                                style="red",
+                            )
+                        )
+
+        return lines
 
     @staticmethod
-    def _node_label(node: DocNode) -> str:
-        """Format a single-line Rich label for a node."""
-        parts = [f"[bold]{node.name}[/bold]"]
+    def _node_label_plain(node: DocNode) -> str:
+        """Format a single-line plain-text label for a node.
+
+        Returns a space-separated string with the node name, optional title,
+        optional date, and a parenthetical of word-count and link counts.
+        No Rich markup sequences are included.
+
+        Args:
+            node: The node to label.
+
+        Returns:
+            A human-readable single-line label string.
+        """
+        parts = [node.name]
         if node.title:
-            parts.append(f"[italic]{node.title}[/italic]")
+            parts.append(node.title)
         if node.date:
-            parts.append(f"[dim]{node.date}[/dim]")
+            parts.append(node.date)
         meta = []
         if node.word_count:
             meta.append(f"{node.word_count}w")
         meta.append(f"{len(node.in_links)}in")
         meta.append(f"{len(node.out_links)}out")
-        parts.append(f"[dim]({', '.join(meta)})[/dim]")
+        parts.append(f"({', '.join(meta)})")
         return "  ".join(parts)
 
     # -- JSON serialisation (networkx node_link_data) ------------------------

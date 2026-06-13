@@ -151,16 +151,155 @@ def apply_target(
         init_paths(layout)
         _workspace_initialized = True
     except WorkspaceError as e:
+        hint = _nearest_vaultspec_hint(effective or Path.cwd())
         if json_output:
             import json
 
             from vaultspec_core.cli.rendering import json_envelope
 
-            envelope = json_envelope("error", "failed", {"message": str(e)})
+            envelope = json_envelope(
+                "error", "failed", {"message": str(e), "hint": hint}
+            )
             print(json.dumps(envelope, indent=2))
         else:
-            typer.echo(f"Error: {e}", err=True)
+            typer.echo(f"Error: {e}\n{hint}", err=True)
         raise typer.Exit(code=1) from e
+
+
+def _nearest_vaultspec_hint(start: Path) -> str:
+    """Return a discovery hint pointing at the nearest vaultspec workspace.
+
+    A worktree can hold a ``.vault/`` corpus without the ``.vaultspec/``
+    framework directory the commands resolve against, so a bare "not found"
+    error strands the operator. This walks up from *start* and then scans
+    its siblings for a ``.vaultspec/`` directory and names the first it
+    finds with a ready-to-paste ``--target``; otherwise it gives generic
+    guidance instead of failing silently.
+    """
+    for candidate in (start, *start.parents):
+        if (candidate / ".vaultspec").is_dir():
+            return (
+                f"  Hint: a vaultspec workspace exists at {candidate}; "
+                f"pass --target {candidate}."
+            )
+    try:
+        for sibling in sorted(start.parent.iterdir()):
+            if sibling.is_dir() and (sibling / ".vaultspec").is_dir():
+                return (
+                    f"  Hint: a vaultspec workspace exists at {sibling}; "
+                    f"pass --target {sibling}."
+                )
+    except OSError:
+        pass
+    return (
+        "  Hint: run from a directory containing .vaultspec/, "
+        "or pass --target <workspace>."
+    )
+
+
+def _vault_base() -> Path:
+    """Return the base directory whose ``.vault/`` holds the plan documents.
+
+    Resolution uses the root ``-t`` target captured by :func:`set_root_target`
+    when present, else the current working directory. Plan commands operate
+    on the local repository, so this matches how an operator invokes them.
+    """
+    return _root_target or Path.cwd()
+
+
+def _plan_documents(base: Path) -> list:
+    """List the vault's plan documents, or ``[]`` when none are scannable."""
+    from vaultspec_core.vaultcore.query import list_documents
+
+    try:
+        return list_documents(base, doc_type="plan")
+    except (OSError, ValueError):
+        return []
+
+
+def _plan_near_matches(base: Path, raw: str) -> list[str]:
+    """Return up to five plan stems / feature tags resembling *raw*."""
+    needle = raw.lstrip("#").lower()
+    if not needle:
+        return []
+    matches: set[str] = set()
+    for doc in _plan_documents(base):
+        if needle in doc.name.lower():
+            matches.add(doc.name)
+        if doc.feature and needle in doc.feature.lower():
+            matches.add(f"#{doc.feature}")
+    return sorted(matches)[:5]
+
+
+def resolve_plan_target(value: Path) -> Path:
+    """Resolve a plan stem, plan path, or feature handle to a plan file.
+
+    Accepts (in precedence order): an existing literal path (absolute or
+    relative); a plan ``stem`` or ``stem.md`` under the vault's
+    ``.vault/plan/``; or a feature name / ``#feature`` tag, which resolves
+    to that feature's single plan (one plan per feature). An
+    unresolvable value raises :class:`typer.BadParameter` carrying
+    near-matches, never a raw ``FileNotFoundError`` traceback.
+
+    Args:
+        value: The raw argument as Typer parsed it into a path.
+
+    Returns:
+        The resolved plan-document path.
+
+    Raises:
+        typer.BadParameter: When the value resolves to no plan, with a
+            "Did you mean: ..." hint when near-matches exist.
+    """
+    if value.exists():
+        return value
+
+    raw = str(value)
+    base = _vault_base()
+    plan_dir = base / ".vault" / "plan"
+
+    stem = Path(raw).name
+    if stem.endswith(".md"):
+        stem = stem[:-3]
+    candidate = plan_dir / f"{stem}.md"
+    if candidate.exists():
+        return candidate
+
+    feature = raw.lstrip("#")
+    feature_plans = [
+        doc.path for doc in _plan_documents(base) if doc.feature == feature
+    ]
+    if len(feature_plans) == 1:
+        return feature_plans[0]
+    if len(feature_plans) > 1:
+        stems = ", ".join(sorted(p.stem for p in feature_plans))
+        raise typer.BadParameter(
+            f"feature {feature!r} resolves to multiple plans ({stems}); "
+            "pass the plan stem or path instead."
+        )
+
+    near = _plan_near_matches(base, raw)
+    hint = f" Did you mean: {', '.join(near)}?" if near else ""
+    raise typer.BadParameter(f"could not resolve plan target {raw!r}.{hint}")
+
+
+def _resolve_plan_path_callback(value: Path | None) -> Path | None:
+    """Typer ``Argument`` callback that resolves a plan target."""
+    if value is None:
+        return None
+    return resolve_plan_target(value)
+
+
+#: Reusable plan-document positional argument that accepts a literal path,
+#: a plan stem, or a feature handle, resolving them uniformly with a clean
+#: near-match error. Swap-in for a bare ``Path`` argument.
+PlanPathArg = Annotated[
+    Path,
+    typer.Argument(
+        help="Plan document path, stem, or feature handle",
+        callback=_resolve_plan_path_callback,
+    ),
+]
 
 
 def apply_target_install(target: Path | None) -> Path:

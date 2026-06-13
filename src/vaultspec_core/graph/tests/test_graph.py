@@ -432,24 +432,27 @@ class TestVaultGraphASCII:
 
 
 # ---------------------------------------------------------------------------
-# VaultGraph  - tree rendering (Rich)
+# VaultGraph  - tree rendering (box-free)
 # ---------------------------------------------------------------------------
 
 
 class TestVaultGraphRendering:
     def test_render_tree_full_vault(self, vault_root):
-        from rich.tree import Tree
+        from vaultspec_core.cli.rendering import TreeLine
 
         graph = VaultGraph(vault_root)
-        tree = graph.render_tree()
-        assert isinstance(tree, Tree)
+        lines = graph.render_tree_lines()
+        assert isinstance(lines, list)
+        assert all(isinstance(line, TreeLine) for line in lines)
+        assert len(lines) > 0
 
     def test_render_tree_feature_scoped(self, vault_root):
-        from rich.tree import Tree
+        from vaultspec_core.cli.rendering import TreeLine
 
         graph = VaultGraph(vault_root)
-        tree = graph.render_tree(feature="editor-demo")
-        assert isinstance(tree, Tree)
+        lines = graph.render_tree_lines(feature="editor-demo")
+        assert isinstance(lines, list)
+        assert all(isinstance(line, TreeLine) for line in lines)
 
 
 # ---------------------------------------------------------------------------
@@ -626,17 +629,10 @@ class TestVaultGraphPhantom:
         assert any("no references to ADR" in d.message for d in plan_diags)
 
     def test_tree_rendering_shows_not_created_for_phantoms(self, vault_root):
-        from io import StringIO
-
-        from rich.console import Console
-
         graph = VaultGraph(vault_root)
-        tree = graph.render_tree()
-        buf = StringIO()
-        console = Console(file=buf, force_terminal=True, width=200)
-        console.print(tree)
-        output = buf.getvalue()
-        assert "(not created)" in output
+        lines = graph.render_tree_lines()
+        texts = [line.text for line in lines]
+        assert any("(not created)" in t for t in texts)
 
     def test_json_output_includes_phantom_flag(self, vault_root):
         graph = VaultGraph(vault_root)

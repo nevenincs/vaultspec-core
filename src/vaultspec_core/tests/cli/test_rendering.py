@@ -9,24 +9,42 @@ from __future__ import annotations
 
 import dataclasses
 import json
-from typing import cast
+from typing import ClassVar, cast
 
 import pytest
 
 from vaultspec_core.cli.rendering import (
     OUTCOME_STYLE,
+    Cell,
+    Column,
+    Field,
     Outcome,
     OutcomeItem,
+    TreeLine,
     aggregate_outcome,
     count_outcomes,
+    emit_listing,
     emit_outcomes,
+    emit_record,
     json_envelope,
+    listing_as_json,
     outcomes_as_json,
+    record_as_json,
+    render_listing,
     render_outcomes,
+    render_record,
+    render_tree,
+    summary_line,
     sync_outcomes,
+    truncate,
 )
 from vaultspec_core.console import reset_console
 from vaultspec_core.core.types import SyncResult
+
+
+def _has_box_drawing(text: str) -> bool:
+    """True if any Unicode box-drawing glyph (U+2500..U+257F) appears."""
+    return any("─" <= ch <= "╿" for ch in text)
 
 
 @pytest.mark.unit
@@ -305,3 +323,172 @@ class TestEmitOutcomes:
         code = emit_outcomes(items, command="sync", title="Sync", json_output=True)
         assert code == 1
         assert json.loads(capsys.readouterr().out)["status"] == "failed"
+
+
+@pytest.mark.unit
+class TestTruncate:
+    def test_value_within_budget_is_unchanged(self):
+        assert truncate("short", 10) == "short"
+
+    def test_value_over_budget_is_marked(self):
+        out = truncate("a very long description indeed", 12)
+        assert len(out) == 12
+        assert out.endswith("...")
+        assert out == "a very lo..."
+
+    def test_budget_smaller_than_marker_degrades_gracefully(self):
+        assert truncate("anything", 2) == ".."
+
+    def test_truncation_is_width_independent(self):
+        # Same input + same budget => same bytes, regardless of any console.
+        assert truncate("x" * 100, 20) == truncate("x" * 100, 20)
+
+
+@pytest.mark.unit
+class TestSummaryLine:
+    def test_count_and_noun(self):
+        assert summary_line(3, "rules") == "3 rules"
+
+    def test_breakdown_is_parenthesized(self):
+        assert (
+            summary_line(3, "rules", [(2, "project"), (1, "builtin")])
+            == "3 rules (2 project, 1 builtin)"
+        )
+
+    def test_zero_count_breakdown_entries_are_dropped(self):
+        assert summary_line(2, "rules", [(2, "project"), (0, "builtin")]) == (
+            "2 rules (2 project)"
+        )
+
+    def test_caller_owns_singular_noun(self):
+        assert summary_line(1, "rule") == "1 rule"
+
+
+@pytest.mark.unit
+class TestRecord:
+    def setup_method(self):
+        reset_console()
+
+    def teardown_method(self):
+        reset_console()
+
+    def test_fields_render_as_key_value_lines(self, capsys):
+        fields = [Field("status", "drifted"), Field("missing", "0")]
+        render_record(fields, title="Rules status")
+        out = capsys.readouterr().out
+        assert "Rules status" in out
+        assert "status: drifted" in out
+        assert "missing: 0" in out
+        assert not _has_box_drawing(out)
+
+    def test_json_keys_equal_field_keys(self):
+        fields = [Field("status", "ok"), Field("drifted", "none", style="yellow")]
+        # Decorative style never reaches the machine surface.
+        assert record_as_json(fields) == {"status": "ok", "drifted": "none"}
+
+    def test_emit_record_json_envelope_shares_field_payload(self, capsys):
+        fields = [Field("status", "ok")]
+        emit_record(
+            fields, command="spec.rules.status", title="Rules", json_output=True
+        )
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["schema"] == "vaultspec.spec.rules.status.v1"
+        assert payload["data"]["status"] == "ok"
+
+    def test_markup_in_values_does_not_break_rendering(self, capsys):
+        render_record([Field("expr", "list[int]")], title="T")
+        # A '[' in the value must survive as literal text, not a markup tag.
+        assert "list[int]" in capsys.readouterr().out
+
+
+@pytest.mark.unit
+class TestListing:
+    def setup_method(self):
+        reset_console()
+
+    def teardown_method(self):
+        reset_console()
+
+    COLUMNS: ClassVar = [Column("name"), Column("source")]
+
+    def test_rows_render_single_space_separated(self, capsys):
+        rows = [
+            {"name": "vaultspec-system", "source": "builtin"},
+            {"name": "live-test", "source": "project"},
+        ]
+        render_listing(
+            rows,
+            self.COLUMNS,
+            title="Rules",
+            summary=summary_line(2, "rules", [(1, "project"), (1, "builtin")]),
+        )
+        out = capsys.readouterr().out
+        assert "vaultspec-system builtin" in out
+        assert "live-test project" in out
+        assert "2 rules (1 project, 1 builtin)" in out
+        assert not _has_box_drawing(out)
+
+    def test_empty_listing_collapses_to_one_line(self, capsys):
+        render_listing([], self.COLUMNS, title="Rules", empty="no rules")
+        out = capsys.readouterr().out
+        assert "no rules" in out
+        assert not _has_box_drawing(out)
+
+    def test_text_and_json_consume_one_column_order(self, capsys):
+        rows = [{"name": "a", "source": "builtin"}]
+        render_listing(rows, self.COLUMNS, title="Rules")
+        text = capsys.readouterr().out
+        payload = listing_as_json(rows, self.COLUMNS)
+        # Both surfaces carry the same values under the same column identity.
+        assert payload == [{"name": "a", "source": "builtin"}]
+        assert "a builtin" in text
+
+    def test_styled_cell_drops_style_in_json(self):
+        rows = [{"name": "a", "source": Cell("builtin", style="dim")}]
+        assert listing_as_json(rows, self.COLUMNS) == [
+            {"name": "a", "source": "builtin"}
+        ]
+
+    def test_emit_listing_json_envelope_wraps_items(self, capsys):
+        rows = [{"name": "a", "source": "builtin"}]
+        emit_listing(
+            rows,
+            self.COLUMNS,
+            command="spec.rules.list",
+            title="Rules",
+            json_output=True,
+        )
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["schema"] == "vaultspec.spec.rules.list.v1"
+        assert payload["data"]["items"] == [{"name": "a", "source": "builtin"}]
+
+
+@pytest.mark.unit
+class TestRenderTree:
+    def setup_method(self):
+        reset_console()
+
+    def teardown_method(self):
+        reset_console()
+
+    def test_depth_renders_as_indentation_not_connectors(self, capsys):
+        lines = [
+            TreeLine("feature-a", depth=0),
+            TreeLine("plan.md", depth=1, glyph="+"),
+        ]
+        render_tree(lines, title="Graph")
+        out = capsys.readouterr().out
+        assert "Graph" in out
+        assert "feature-a" in out
+        assert "+ plan.md" in out
+        # Hierarchy is indentation only - never box-drawing connectors.
+        assert not _has_box_drawing(out)
+
+    def test_deeper_nodes_indent_further(self, capsys):
+        render_tree([TreeLine("root", depth=0), TreeLine("child", depth=2)], title="T")
+        lines = capsys.readouterr().out.splitlines()
+        root_line = next(line for line in lines if "root" in line)
+        child_line = next(line for line in lines if "child" in line)
+        assert len(child_line) - len(child_line.lstrip()) > (
+            len(root_line) - len(root_line.lstrip())
+        )
