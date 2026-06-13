@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.30](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.29...vaultspec-core-v0.1.30) (2026-06-13)
+
+
+### Features
+
+* **vault:** ref-scoped graph, commit-linkage trailers, phase-summary scaffold, doctor + plan-mutator fixes ([c209baf](https://github.com/wgergely/vaultspec-core/commit/c209baf3cefe2b9c57be0bd3f5b3e85750292567))
+* **vault:** ref-scoped graph, commit-linkage trailers, phase-summary scaffold, doctor and plan-mutator fixes ([dc984ff](https://github.com/wgergely/vaultspec-core/commit/dc984ffdcd0e5bedd1664fb2dbe48e1c6ef15f12)), closes [#153](https://github.com/wgergely/vaultspec-core/issues/153) [#157](https://github.com/wgergely/vaultspec-core/issues/157) [#158](https://github.com/wgergely/vaultspec-core/issues/158) [#159](https://github.com/wgergely/vaultspec-core/issues/159) [#160](https://github.com/wgergely/vaultspec-core/issues/160)
+
 ## [0.1.29](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.28...vaultspec-core-v0.1.29) (2026-06-12)
 
 
