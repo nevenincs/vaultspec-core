@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.31](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.30...vaultspec-core-v0.1.31) (2026-06-13)
+
+
+### Features
+
+* **cli:** plain-text output contract and status-discovery hardening ([7d71a7f](https://github.com/wgergely/vaultspec-core/commit/7d71a7f76a0e7a0a343054f43a6b061cf8ba8239))
+
 ## [0.1.30](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.29...vaultspec-core-v0.1.30) (2026-06-13)
 
 
