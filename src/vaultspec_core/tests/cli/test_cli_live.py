@@ -435,7 +435,6 @@ class TestSpecRules:
             / ".vaultspec"
             / "rules"
             / "rules"
-            / "project"
             / "lifecycle-test-rule.md"
         )
         assert rule_path.exists()
@@ -481,14 +480,7 @@ class TestSpecRules:
             "rename-dst",
         )
         assert result.exit_code == 0
-        dst = (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "rules"
-            / "project"
-            / "rename-dst.md"
-        )
+        dst = synthetic_project / ".vaultspec" / "rules" / "rules" / "rename-dst.md"
         assert dst.exists()
 
     def test_add_force_overwrites(self, cli, synthetic_project):
@@ -515,12 +507,7 @@ class TestSpecRules:
         )
         assert result.exit_code == 0
         content = (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "rules"
-            / "project"
-            / "overwrite-me.md"
+            synthetic_project / ".vaultspec" / "rules" / "rules" / "overwrite-me.md"
         ).read_text(encoding="utf-8")
         assert "v2" in content
 

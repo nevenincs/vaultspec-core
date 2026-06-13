@@ -40,6 +40,11 @@ _TEMPLATE_NAMES = {
     DocType.INDEX: "index.md",
 }
 
+# The exec document type has two templates: the Step-record template (above)
+# and the Phase-summary template, selected via the ``summary`` flag on
+# :func:`get_template_path` / :func:`create_vault_doc`.
+_EXEC_SUMMARY_TEMPLATE = "exec-summary.md"
+
 # Prior on-disk filenames for templates that have since been renamed in the
 # source tree. A deployed mirror that predates the rename still ships the old
 # filename; :func:`get_template_path` falls back to these so the scaffolder
@@ -71,6 +76,7 @@ def hydrate_template(
     step_scope: str | None = None,
     step_action: str | None = None,
     plan_stem: str | None = None,
+    phase: str | None = None,
 ) -> str:
     """Replace placeholders in a template string with actual values.
 
@@ -100,6 +106,10 @@ def hydrate_template(
         step_scope: Optional file or area scope of the step.
         step_action: Optional verbatim action of the step.
         plan_stem: Optional parent plan stem used in wiki-links.
+        phase: Optional Phase identifier (display path, e.g. ``P01`` or
+            ``W01.P01``) substituted into the ``{phase}`` placeholder of the
+            exec-summary template. Takes precedence over the ``{phase}``
+            alias derived from *title*.
 
     Returns:
         The fully-hydrated document string.
@@ -117,6 +127,10 @@ def hydrate_template(
         placeholders["topic"] = title  # alias used in research template
         placeholders["phase"] = title  # alias used in plan/exec templates
         placeholders["step"] = title  # alias used in exec template
+    if phase is not None:
+        # Explicit Phase identifier wins over the title-derived alias; the
+        # exec-summary heading is `# {feature} {phase} summary`.
+        placeholders["phase"] = phase
     if tier:
         placeholders["tier"] = tier
 
@@ -320,6 +334,8 @@ def create_vault_doc(
     step_action: str | None = None,
     plan_date: str | None = None,
     plan_stem: str | None = None,
+    summary: bool = False,
+    phase_display_path: str | None = None,
 ) -> pathlib.Path:
     """Scaffold a new vault document from the appropriate template.
 
@@ -344,6 +360,12 @@ def create_vault_doc(
         step_action: Optional verbatim action of the step.
         plan_date: Optional parent plan date.
         plan_stem: Optional parent plan stem used in wiki-links.
+        summary: When ``True`` and *doc_type* is :attr:`DocType.EXEC`,
+            scaffold a Phase-summary record from the ``exec-summary.md``
+            template instead of a Step record. Requires *phase_display_path*.
+        phase_display_path: Display path of the summarised Phase (e.g.
+            ``P01`` or ``W01.P01``); fills the ``{phase}`` placeholder and the
+            summary filename's identifier segment.
 
     Returns:
         Path to the newly created (or would-be-created) document.
@@ -355,7 +377,9 @@ def create_vault_doc(
     """
     from ..config import get_config
 
-    template_path = get_template_path(root_dir, doc_type, content_root=content_root)
+    template_path = get_template_path(
+        root_dir, doc_type, content_root=content_root, summary=summary
+    )
     if template_path is None:
         raise FileNotFoundError(
             f"No template found for type '{doc_type.value}'. The deployed "
@@ -385,9 +409,19 @@ def create_vault_doc(
         step_scope=step_scope,
         step_action=step_action,
         plan_stem=plan_stem,
+        phase=phase_display_path if summary else None,
     )
 
-    if doc_type is DocType.EXEC and step_id is not None:
+    if doc_type is DocType.EXEC and summary:
+        suffix = (phase_display_path or "P01").replace(".", "-")
+        filename = f"{plan_date or date_str}-{feature}-{suffix}-summary.md"
+        target_dir = (
+            root_dir
+            / get_config().docs_dir
+            / doc_type.value
+            / f"{plan_date or date_str}-{feature}"
+        )
+    elif doc_type is DocType.EXEC and step_id is not None:
         suffix = step_display_path.replace(".", "-") if step_display_path else "S01"
         filename = f"{plan_date or date_str}-{feature}-{suffix}.md"
         target_dir = (
@@ -490,6 +524,7 @@ def get_template_path(
     doc_type: DocType,
     *,
     content_root: pathlib.Path | None = None,
+    summary: bool = False,
 ) -> pathlib.Path | None:
     """Return the filesystem path of the template file for a given DocType.
 
@@ -500,6 +535,9 @@ def get_template_path(
         content_root: Explicit content root (e.g. ``.vaultspec/``). Templates
             live in the content tree. When ``None``, falls back to
             ``root_dir / framework_dir``.
+        summary: When ``True`` and *doc_type* is :attr:`DocType.EXEC`, resolve
+            the Phase-summary template (``exec-summary.md``) instead of the
+            Step-record template (``exec-step.md``).
 
     Returns:
         Path to the template file, or ``None`` if the type has no mapping or
@@ -507,7 +545,10 @@ def get_template_path(
     """
     from ..config import get_config
 
-    name = _TEMPLATE_NAMES.get(doc_type)
+    if summary and doc_type is DocType.EXEC:
+        name: str | None = _EXEC_SUMMARY_TEMPLATE
+    else:
+        name = _TEMPLATE_NAMES.get(doc_type)
     if not name:
         return None
 

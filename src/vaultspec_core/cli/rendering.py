@@ -871,7 +871,7 @@ _NEXT_STEP_HINTS: dict[tuple[str, str], tuple[str, str]] = {
     ),
     ("vault.add.audit", "created"): (
         "vaultspec-core vault rule promote --from {audit_stem} --as {rule_name}",
-        "Promote your audit findings to a project-shared rule",
+        "Promote your audit findings to a team-shared rule",
     ),
     ("vault.check.all", "unchanged"): (
         'git commit -m "Commit changes after successful vault checks"',

@@ -256,16 +256,12 @@ def resource_rename(
         return new_path
 
     else:
-        old_canonical, old_path = _resolve_path(old_name, base_dir, is_dir)
+        _old_canonical, old_path = _resolve_path(old_name, base_dir, is_dir)
         new_file = new_name if new_name.endswith(".md") else f"{new_name}.md"
-        if (
-            "project/" in old_canonical
-            or "project\\" in old_canonical
-            or old_path.parent.name == "project"
-        ):
-            new_path = base_dir / "project" / new_file
-        else:
-            new_path = base_dir / new_file
+        # Always rename to the flat root: nested resource folders (e.g. a
+        # legacy ``project/`` rule subdir) are not supported, so a rename also
+        # de-nests rather than re-creating the nested location.
+        new_path = base_dir / new_file
 
         if not old_path.exists():
             raise ResourceNotFoundError(f"{label} '{old_name}' not found.")

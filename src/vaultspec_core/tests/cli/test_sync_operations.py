@@ -548,12 +548,7 @@ class TestEndToEnd:
         """Create sources -> sync -> verify destinations."""
         # Set up source files
         (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "rules"
-            / "project"
-            / "no-swear.md"
+            synthetic_project / ".vaultspec" / "rules" / "rules" / "no-swear.md"
         ).write_text("---\nname: no-swear\n---\n\nDo not swear.", encoding="utf-8")
         (synthetic_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Base system prompt", encoding="utf-8"
@@ -571,14 +566,7 @@ class TestEndToEnd:
         assert (synthetic_project / ".gemini" / "SYSTEM.md").exists()
 
     def test_modify_resync_cycle(self, synthetic_project):
-        rule_src = (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "rules"
-            / "project"
-            / "rule1.md"
-        )
+        rule_src = synthetic_project / ".vaultspec" / "rules" / "rules" / "rule1.md"
         rule_src.write_text("---\nname: rule1\n---\n\nOriginal body.", encoding="utf-8")
         rules_sync()
         dest = synthetic_project / ".claude" / "rules" / "rule1.md"
@@ -589,14 +577,7 @@ class TestEndToEnd:
         assert "MODIFIED" in dest.read_text(encoding="utf-8")
 
     def test_prune_cycle(self, synthetic_project):
-        rule_src = (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "rules"
-            / "project"
-            / "ephemeral.md"
-        )
+        rule_src = synthetic_project / ".vaultspec" / "rules" / "rules" / "ephemeral.md"
         rule_src.write_text("---\nname: ephemeral\n---\n\nGone soon.", encoding="utf-8")
         rules_sync()
         dest = synthetic_project / ".claude" / "rules" / "ephemeral.md"
@@ -632,12 +613,7 @@ class TestEndToEndAllDestinations:
         """Full sync produces the correct file tree for every destination."""
         # Set up sources
         (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "rules"
-            / "project"
-            / "no-swear.md"
+            synthetic_project / ".vaultspec" / "rules" / "rules" / "no-swear.md"
         ).write_text("---\nname: no-swear\n---\n\nDo not swear.", encoding="utf-8")
         (
             synthetic_project / ".vaultspec" / "rules" / "system" / "codex-cfg.md"
@@ -732,12 +708,7 @@ class TestEndToEndAllDestinations:
     def test_dry_run_writes_nothing(self, synthetic_project):
         """dry_run=True must not create any destination files or directories."""
         (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "rules"
-            / "project"
-            / "dry-rule.md"
+            synthetic_project / ".vaultspec" / "rules" / "rules" / "dry-rule.md"
         ).write_text("---\nname: dry-rule\n---\n\nDry run test.", encoding="utf-8")
         (
             synthetic_project / ".vaultspec" / "rules" / "system" / "codex-cfg.md"
@@ -786,12 +757,7 @@ class TestDryRunReturnsItems:
 
     def test_rules_sync_dry_run_returns_items(self, synthetic_project):
         (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "rules"
-            / "project"
-            / "my-rule.md"
+            synthetic_project / ".vaultspec" / "rules" / "rules" / "my-rule.md"
         ).write_text("---\nname: my-rule\n---\n\nRule body.", encoding="utf-8")
         result = rules_sync(dry_run=True)
         assert result.items, "dry-run must populate items list"
@@ -800,12 +766,7 @@ class TestDryRunReturnsItems:
 
     def test_dry_run_items_have_correct_actions(self, synthetic_project):
         (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "rules"
-            / "project"
-            / "new-rule.md"
+            synthetic_project / ".vaultspec" / "rules" / "rules" / "new-rule.md"
         ).write_text("---\nname: new-rule\n---\n\nNew.", encoding="utf-8")
         result = rules_sync(dry_run=True)
         new_rule_actions = [a for p, a in result.items if "new-rule" in p]
