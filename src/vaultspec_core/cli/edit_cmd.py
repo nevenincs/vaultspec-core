@@ -413,7 +413,11 @@ def _read_body_channel(
         return None
 
     if body_stdin:
-        return sys.stdin.read()
+        # Normalize CRLF to LF identically to the --body-file branch below. The
+        # engine write channel always uses --body-stdin, so an un-normalized
+        # \r\n would flow into the LF-contract compose/validate/write path and
+        # corrupt CRLF files (\r\r\n) or leave stray \r\n in LF documents.
+        return sys.stdin.read().replace("\r\n", "\n")
 
     assert body_file is not None
     try:

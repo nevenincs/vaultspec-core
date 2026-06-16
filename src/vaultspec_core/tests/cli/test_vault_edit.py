@@ -165,6 +165,32 @@ class TestSetBody:
         assert _envelope(result)["status"] == "updated"
         assert b"From stdin." in _doc(root).read_bytes()
 
+    def test_stdin_channel_normalizes_crlf(self, runner, tmp_path):
+        # The engine write channel always uses --body-stdin; a CRLF draft must be
+        # normalized to LF identically to --body-file, never persisted as \r\n
+        # (which on an LF document is stray-CR corruption, and on a CRLF file
+        # would become \r\r\n in the source-newline restore).
+        root = _make_vault(tmp_path)
+        result = _run(
+            runner,
+            "vault",
+            "set-body",
+            "2026-01-01-alpha-adr",
+            "--body-stdin",
+            "--json",
+            target=root,
+            stdin="\r\n# Demo ADR\r\n\r\nCRLF from stdin.\r\n",
+        )
+        assert result.exit_code == 0, result.output
+        assert _envelope(result)["status"] == "updated"
+        on_disk = _doc(root).read_bytes()
+        assert b"CRLF from stdin." in on_disk
+        # The stdin body is normalized to LF before compose/validate/write, then
+        # restored to the SOURCE newline once. No double-CR (\r\r\n) corruption —
+        # the exact failure that an un-normalized stdin \r\n produces when the
+        # write path re-applies a CRLF source newline.
+        assert b"\r\r" not in on_disk
+
     def test_refuse_on_error_leaves_file_unchanged(self, runner, tmp_path):
         root = _make_vault(tmp_path)
         # Corrupt the fixture's frontmatter so the proposed content is invalid
