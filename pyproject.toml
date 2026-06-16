@@ -146,6 +146,9 @@ target-version = "py313"
     "**/tests/**/*.py" = ["ARG"]
     # Core CLI modules use argparse/Path as runtime parameter types - no need to move to TYPE_CHECKING
     "src/vaultspec_core/core/*.py" = ["TC003"]
+    # The edit verbs declare Path-typed Typer options, which Typer introspects at
+    # runtime; Path must stay a runtime import, not move to a TYPE_CHECKING block.
+    "src/vaultspec_core/cli/edit_cmd.py" = ["TC003"]
     # Synthetic vault generator uses Path at runtime in dataclass fields and function args.
     "src/vaultspec_core/testing/synthetic.py" = ["TC003"]
     # Diagnosis dataclasses use Tool as runtime dict key and for JSON serialization.
