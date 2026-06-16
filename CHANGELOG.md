@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.32](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.31...vaultspec-core-v0.1.32) (2026-06-16)
+
+
+### Features
+
+* **vault:** add set-body/set-frontmatter/edit verbs with blob-hash concurrency and conformance validation ([#168](https://github.com/wgergely/vaultspec-core/issues/168)) ([d375710](https://github.com/wgergely/vaultspec-core/commit/d3757108850cf41fcb657062e805ad9c1340b9d3))
+
 ## [0.1.31](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.30...vaultspec-core-v0.1.31) (2026-06-13)
 
 
