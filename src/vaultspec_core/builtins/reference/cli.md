@@ -46,6 +46,7 @@ vaultspec-core status [OPTIONS] [TARGET]
 vaultspec-core vault set-body [OPTIONS] REF
 vaultspec-core vault set-frontmatter [OPTIONS] REF
 vaultspec-core vault edit [OPTIONS] REF
+vaultspec-core vault rename [OPTIONS] REF
 vaultspec-core vault add [OPTIONS] DOC_TYPE
 vaultspec-core vault stats [OPTIONS]
 vaultspec-core vault list [OPTIONS] [DOC_TYPE]

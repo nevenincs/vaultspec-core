@@ -67,9 +67,13 @@ from vaultspec_core.cli.link_cmd import link_app  # noqa: E402
 
 vault_app.add_typer(link_app, name="link")
 
-from vaultspec_core.cli.edit_cmd import register_edit_commands  # noqa: E402
+from vaultspec_core.cli.edit_cmd import (  # noqa: E402
+    register_edit_commands,
+    register_rename_command,
+)
 
 register_edit_commands(vault_app)
+register_rename_command(vault_app)
 
 
 # ---- vault add ---------------------------------------------------------------

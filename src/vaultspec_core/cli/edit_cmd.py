@@ -57,7 +57,7 @@ if TYPE_CHECKING:
     from vaultspec_core.vaultcore.checks._base import CheckDiagnostic
     from vaultspec_core.vaultcore.models import DocumentMetadata
 
-__all__ = ["register_edit_commands"]
+__all__ = ["register_edit_commands", "register_rename_command"]
 
 
 # ---------------------------------------------------------------------------
@@ -728,6 +728,287 @@ def _resolve_related_or_fail(related: list[str], root_dir: Path) -> list[str]:
             f"Cannot resolve related document(s): {'; '.join(exc.failures)}",
             {"errors": list(exc.failures)},
         ) from exc
+
+
+def _validate_target_stem(new_stem: str) -> None:
+    """Validate a rename target stem before any mutation (cursory pre-check).
+
+    The target is the new identity-bearing filename stem (without ``.md``). It
+    must be a bounded single-segment name - never a path, a flag, or empty - so
+    the rename cannot escape the document's directory or inject a CLI argument.
+
+    Args:
+        new_stem: The proposed new stem.
+
+    Raises:
+        _EditError: When the stem is empty, flag-shaped, ``.md``-suffixed, or
+            carries a path separator or parent-dir token.
+    """
+    import re
+
+    bad = (
+        not new_stem
+        or new_stem.startswith("-")
+        or "/" in new_stem
+        or "\\" in new_stem
+        or new_stem in {".", ".."}
+        or new_stem.endswith(".md")
+        or re.fullmatch(r"[A-Za-z0-9._-]+", new_stem) is None
+    )
+    if bad:
+        raise _EditError(
+            f"Invalid rename target stem '{new_stem}': must be a single-segment "
+            "name (letters, digits, '.', '-', '_'; no path separator, no leading "
+            "'-', no '.md' suffix)",
+            {"target": new_stem},
+        )
+
+
+def _find_incoming_refs(root_dir: Path, old_stem: str) -> list[Path]:
+    """Return documents whose outgoing links reference *old_stem*.
+
+    Built from the vault graph's outgoing-link index so the scan is the same
+    truth the rest of the toolchain sees.
+
+    Args:
+        root_dir: Project root.
+        old_stem: The stem being renamed away from.
+
+    Returns:
+        Backing paths of documents linking to *old_stem*.
+    """
+    from vaultspec_core.graph.api import VaultGraph
+
+    graph = VaultGraph(root_dir)
+    refs: list[Path] = []
+    for _name, node in graph.nodes.items():
+        if node.path is not None and old_stem in node.out_links:
+            refs.append(node.path)
+    return refs
+
+
+def _rewrite_incoming_related(refs: list[Path], old_stem: str, new_stem: str) -> int:
+    """Re-point each referencing doc's ``related:`` from *old_stem* to *new_stem*.
+
+    Each rewrite removes the old ``related:`` entry and appends the new
+    ``[[new_stem]]`` link, refreshing that doc's ``modified:`` stamp (both
+    helpers do so internally). A doc whose only reference was a body link (not a
+    ``related:`` entry) is left untouched.
+
+    Args:
+        refs: Documents referencing *old_stem* (from :func:`_find_incoming_refs`).
+        old_stem: The stem being renamed away from.
+        new_stem: The stem being renamed to.
+
+    Returns:
+        The number of documents actually rewritten.
+    """
+    from vaultspec_core.vaultcore.checks.references import _add_related_link
+    from vaultspec_core.vaultcore.related_surgery import remove_related_entries
+
+    rewritten = 0
+    for path in refs:
+        removed = remove_related_entries(path, [old_stem])
+        added = _add_related_link(path, new_stem)
+        if removed or added:
+            rewritten += 1
+    return rewritten
+
+
+def _execute_rename(
+    *,
+    ref: str,
+    new_stem: str,
+    expected_blob_hash: str | None,
+    run_checks: bool,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Rename a document's identity-bearing file and re-point incoming links.
+
+    Cursory pre-checks (blob-hash concurrency, target-stem grammar, collision)
+    run BEFORE any mutation. Then incoming ``related:`` references are rewritten,
+    the file is physically renamed, and its ``modified:`` stamp refreshed. The
+    renamed document's post-rename conformance diagnostics ride the envelope.
+
+    Args:
+        ref: The document to rename (stem, filename, path, or wiki-link).
+        new_stem: The new identity-bearing stem (filename without ``.md``).
+        expected_blob_hash: Pre-rename concurrency guard, or ``None``.
+        run_checks: Whether to report conformance checks on the renamed doc.
+        dry_run: When ``True``, do everything except mutate.
+        json_output: When ``True``, emit the JSON envelope.
+    """
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.blob_hash import git_blob_oid
+    from vaultspec_core.vaultcore.models import refresh_modified_stamp
+    from vaultspec_core.vaultcore.related_surgery import (
+        _atomic_write_restore,
+        _read_preserve_newlines,
+    )
+
+    command = "vault.rename"
+    root_dir = _get_ctx().target_dir
+
+    try:
+        old_path = _resolve_doc_path(ref, root_dir)
+        old_stem = old_path.stem
+
+        # Cursory pre-checks, before any mutation.
+        _enforce_blob_hash(old_path, expected_blob_hash)
+        _validate_target_stem(new_stem)
+
+        if new_stem == old_stem:
+            _emit(
+                command,
+                "unchanged",
+                {
+                    "old_path": str(old_path),
+                    "new_path": str(old_path),
+                    "new_node_id": f"doc:{old_stem}",
+                    "incoming_rewritten": 0,
+                    "checks": [],
+                },
+                json_output=json_output,
+            )
+            return
+
+        new_path = old_path.parent / f"{new_stem}.md"
+        if new_path.exists():
+            raise _EditError(
+                f"Rename target already exists: {new_path.name}",
+                {
+                    "old_path": str(old_path),
+                    "new_path": str(new_path),
+                    "collision": True,
+                },
+            )
+
+        old_blob = git_blob_oid(old_path.read_bytes())
+        refs = _find_incoming_refs(root_dir, old_stem)
+
+        if dry_run:
+            _emit(
+                command,
+                "updated",
+                {
+                    "old_path": str(old_path),
+                    "new_path": str(new_path),
+                    "old_blob_hash": old_blob,
+                    "new_node_id": f"doc:{new_stem}",
+                    "incoming_rewritten": len(refs),
+                    "dry_run": True,
+                },
+                json_output=json_output,
+            )
+            return
+
+        # Re-point incoming links, physically rename, then refresh modified.
+        rewritten = _rewrite_incoming_related(refs, old_stem, new_stem)
+        old_path.replace(new_path)
+        text_lf, newline = _read_preserve_newlines(new_path)
+        stamped = refresh_modified_stamp(text_lf, _dt.date.today())
+        if stamped != text_lf:
+            _atomic_write_restore(
+                new_path,
+                stamped if newline == "\n" else stamped.replace("\n", newline),
+            )
+
+        checks: list[dict] = []
+        if run_checks:
+            content_lf, _ = _read_preserve_newlines(new_path)
+            checks = _validate_proposed(new_path, root_dir, content_lf)
+
+        _invalidate_cache(root_dir)
+        new_blob = git_blob_oid(new_path.read_bytes())
+        _emit(
+            command,
+            "updated",
+            {
+                "old_path": str(old_path),
+                "new_path": str(new_path),
+                "old_blob_hash": old_blob,
+                "new_blob_hash": new_blob,
+                "new_node_id": f"doc:{new_stem}",
+                "incoming_rewritten": rewritten,
+                "checks": checks,
+            },
+            json_output=json_output,
+        )
+    except _EditError as exc:
+        _emit(
+            command,
+            "failed",
+            {"message": exc.message, **exc.data},
+            json_output=json_output,
+        )
+        raise typer.Exit(code=1) from exc
+
+
+def register_rename_command(vault_app: _typer.Typer) -> None:
+    """Register the ``rename`` verb on *vault_app*.
+
+    Args:
+        vault_app: The ``vault`` command group to mount the verb on.
+    """
+
+    @vault_app.command("rename")
+    def cmd_rename(  # pyright: ignore[reportUnusedFunction]
+        ref: Annotated[
+            str,
+            typer.Argument(
+                help=(
+                    "Document to rename. Accepts stem, filename, path, or "
+                    "[[wiki-link]]."
+                )
+            ),
+        ],
+        to: Annotated[
+            str,
+            typer.Option(
+                "--to",
+                help="New identity-bearing stem (filename without .md).",
+            ),
+        ],
+        expected_blob_hash: Annotated[
+            str | None,
+            typer.Option(
+                "--expected-blob-hash",
+                help="Refuse the rename unless the on-disk blob OID matches.",
+            ),
+        ] = None,
+        check: Annotated[
+            bool,
+            typer.Option(
+                "--check/--no-check",
+                help="Report conformance checks on the renamed doc (default on).",
+            ),
+        ] = True,
+        dry_run: Annotated[
+            bool, typer.Option("--dry-run", help="Preview without writing.")
+        ] = False,
+        json_output: Annotated[
+            bool, typer.Option("--json", help="Output as JSON.")
+        ] = False,
+        target: TargetOption = None,
+    ) -> None:
+        """Rename a document's file and re-point incoming related references.
+
+        Physically renames the document to ``<--to>.md`` in the same directory,
+        rewrites every other document's ``related: [[old-stem]]`` to the new
+        stem, and refreshes the ``modified:`` stamp. Cursory pre-checks (blob
+        hash, target grammar, collision) run before any mutation; the renamed
+        document's conformance diagnostics ride the envelope.
+        """
+        apply_target(target, json_output=json_output)
+        _execute_rename(
+            ref=ref,
+            new_stem=to,
+            expected_blob_hash=expected_blob_hash,
+            run_checks=check,
+            dry_run=dry_run,
+            json_output=json_output,
+        )
 
 
 def register_edit_commands(vault_app: _typer.Typer) -> None:
