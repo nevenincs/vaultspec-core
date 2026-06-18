@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.33](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.32...vaultspec-core-v0.1.33) (2026-06-18)
+
+
+### Features
+
+* **vault:** add rename verb for document file-rename with incoming-link rewrite ([#172](https://github.com/wgergely/vaultspec-core/issues/172)) ([c1f2bca](https://github.com/wgergely/vaultspec-core/commit/c1f2bca1c1619c65d11aab37d6b314cda22fa8af))
+
 ## [0.1.32](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.31...vaultspec-core-v0.1.32) (2026-06-16)
 
 
