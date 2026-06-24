@@ -17,6 +17,13 @@ Use this skill:
 
 ## Required steps
 
+- **Ground the decision in existing intent first.** Before drafting, retrieve the prior
+  decisions that bind this area: `vaultspec-rag search "<intent>" --type vault` surfaces
+  related ADRs, audits, and research (architect on top of them, and supersede explicitly
+  rather than silently contradicting), and `vaultspec-rag search "<intent>" --type code`
+  shows the implementation sites the decision will touch. Fall back to
+  `vaultspec-core vault list` and grep when `vaultspec-rag` is not installed.
+
 - **Read and use the template** at `.vaultspec/rules/templates/adr.md`; its embedded
   hint blocks govern the body structure.
 
