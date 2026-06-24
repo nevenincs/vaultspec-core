@@ -56,6 +56,10 @@ class ToolConfig:
             as a rule file when ``system_file`` is absent.
         workflows_dir: Directory where workflow definitions live, or ``None``
             if the tool does not support workflows.
+        mcp_config_file: Path to a provider-native MCP server config file
+            (for example Antigravity's ``.agents/mcp_config.json``), or
+            ``None`` when the provider reads the shared workspace ``.mcp.json``
+            instead. Uses the same ``{"mcpServers": {...}}`` schema.
         capabilities: Declared provider capabilities.  Used by install, sync,
             and dry-run to reason about what each provider supports.
     """
@@ -71,6 +75,7 @@ class ToolConfig:
     system_file: Path | None = None
     emit_system_rule: bool = True
     workflows_dir: Path | None = None
+    mcp_config_file: Path | None = None
     capabilities: frozenset[ProviderCapability] = frozenset()
 
 
@@ -275,6 +280,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
             system_file=None,
             emit_system_rule=False,
             workflows_dir=shared_agents_root / Resource.WORKFLOWS.value,
+            mcp_config_file=shared_agents_root / FileName.MCP_CONFIG.value,
             capabilities=frozenset(
                 {
                     _pc.RULES,

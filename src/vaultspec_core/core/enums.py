@@ -208,6 +208,7 @@ class FileName(StrEnum):
     AGENTS = "AGENTS.md"
     SKILL = "SKILL.md"
     SYSTEM = "SYSTEM.md"
+    MCP_CONFIG = "mcp_config.json"
 
 
 class DirName(StrEnum):

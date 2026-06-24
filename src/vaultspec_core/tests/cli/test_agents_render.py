@@ -43,8 +43,18 @@ _GEMINI_TOOL_SET = frozenset(t.value for t in GeminiBuiltinTool)
 # tool name string constants. The live drift test below fetches this
 # file and asserts every `GeminiBuiltinTool` enum value still matches
 # the corresponding `*_TOOL_NAME` constant.
+#
+# Pinned to a specific release tag rather than `main`. The Gemini CLI
+# consumer service was retired 2026-06-18 (transitioning to the Antigravity
+# CLI), and Google declined to commit to the repo's long-term future, so a
+# `main` ref is no longer a stable contract: it could break on upstream
+# archival/rewrite rather than on a real drift. v0.47.0 (published
+# 2026-06-18) is the verified-current release; bump this tag intentionally
+# when revalidating the tool vocabulary against a newer Gemini CLI / agy.
+_UPSTREAM_GEMINI_CLI_REF = "v0.47.0"
 _UPSTREAM_BASE_DECLARATIONS_URL = (
-    "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/"
+    f"https://raw.githubusercontent.com/google-gemini/gemini-cli/"
+    f"{_UPSTREAM_GEMINI_CLI_REF}/"
     "packages/core/src/tools/definitions/base-declarations.ts"
 )
 
