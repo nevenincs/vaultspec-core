@@ -120,7 +120,7 @@ class TestMigrationStatusUnknownBaseline:
             app, ["migrations", "status", "--target", str(tmp_path)]
         )
         assert result.exit_code == 0, result.output
-        assert "(unset)" in result.output
+        assert "unset" in result.output
         # Without a baseline the applied state is unknowable; never claim applied.
         assert "applied" not in result.output
         assert "unknown" in result.output

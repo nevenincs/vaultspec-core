@@ -974,21 +974,21 @@ def register_rename_command(vault_app: _typer.Typer) -> None:
             str | None,
             typer.Option(
                 "--expected-blob-hash",
-                help="Refuse the rename unless the on-disk blob OID matches.",
+                help="Refuse the rename unless the on-disk blob OID matches",
             ),
         ] = None,
         check: Annotated[
             bool,
             typer.Option(
                 "--check/--no-check",
-                help="Report conformance checks on the renamed doc (default on).",
+                help="Report conformance checks on the renamed doc (default on)",
             ),
         ] = True,
         dry_run: Annotated[
-            bool, typer.Option("--dry-run", help="Preview without writing.")
+            bool, typer.Option("--dry-run", help="Preview without writing")
         ] = False,
         json_output: Annotated[
-            bool, typer.Option("--json", help="Output as JSON.")
+            bool, typer.Option("--json", help="Output as JSON")
         ] = False,
         target: TargetOption = None,
     ) -> None:
@@ -1032,7 +1032,7 @@ def register_edit_commands(vault_app: _typer.Typer) -> None:
             Path | None,
             typer.Option(
                 "--body-file",
-                help="Read the new body text from this file.",
+                help="Read the new body text from this file",
                 dir_okay=False,
                 file_okay=True,
                 resolve_path=True,
@@ -1040,27 +1040,27 @@ def register_edit_commands(vault_app: _typer.Typer) -> None:
         ] = None,
         body_stdin: Annotated[
             bool,
-            typer.Option("--body-stdin", help="Read the new body text from stdin."),
+            typer.Option("--body-stdin", help="Read the new body text from stdin"),
         ] = False,
         expected_blob_hash: Annotated[
             str | None,
             typer.Option(
                 "--expected-blob-hash",
-                help="Refuse the write unless the on-disk blob OID matches.",
+                help="Refuse the write unless the on-disk blob OID matches",
             ),
         ] = None,
         check: Annotated[
             bool,
             typer.Option(
                 "--check/--no-check",
-                help="Run conformance checks before writing (default on).",
+                help="Run conformance checks before writing (default on)",
             ),
         ] = True,
         dry_run: Annotated[
-            bool, typer.Option("--dry-run", help="Preview without writing.")
+            bool, typer.Option("--dry-run", help="Preview without writing")
         ] = False,
         json_output: Annotated[
-            bool, typer.Option("--json", help="Output as JSON.")
+            bool, typer.Option("--json", help="Output as JSON")
         ] = False,
         target: TargetOption = None,
     ) -> None:
@@ -1108,13 +1108,13 @@ def register_edit_commands(vault_app: _typer.Typer) -> None:
             ),
         ],
         date: Annotated[
-            str | None, typer.Option("--date", help="Set the date field (YYYY-MM-DD).")
+            str | None, typer.Option("--date", help="Set the date field (YYYY-MM-DD)")
         ] = None,
         tags: Annotated[
             list[str] | None,
             typer.Option(
                 "--tags",
-                help="Set the tags list (repeatable; replaces the whole list).",
+                help="Set the tags list (repeatable; replaces the whole list)",
             ),
         ] = None,
         related: Annotated[
@@ -1132,14 +1132,14 @@ def register_edit_commands(vault_app: _typer.Typer) -> None:
             str | None,
             typer.Option(
                 "--expected-blob-hash",
-                help="Refuse the write unless the on-disk blob OID matches.",
+                help="Refuse the write unless the on-disk blob OID matches",
             ),
         ] = None,
         dry_run: Annotated[
-            bool, typer.Option("--dry-run", help="Preview without writing.")
+            bool, typer.Option("--dry-run", help="Preview without writing")
         ] = False,
         json_output: Annotated[
-            bool, typer.Option("--json", help="Output as JSON.")
+            bool, typer.Option("--json", help="Output as JSON")
         ] = False,
         target: TargetOption = None,
     ) -> None:
@@ -1218,7 +1218,7 @@ def register_edit_commands(vault_app: _typer.Typer) -> None:
             Path | None,
             typer.Option(
                 "--body-file",
-                help="Read the new body text from this file.",
+                help="Read the new body text from this file",
                 dir_okay=False,
                 file_okay=True,
                 resolve_path=True,
@@ -1226,16 +1226,16 @@ def register_edit_commands(vault_app: _typer.Typer) -> None:
         ] = None,
         body_stdin: Annotated[
             bool,
-            typer.Option("--body-stdin", help="Read the new body text from stdin."),
+            typer.Option("--body-stdin", help="Read the new body text from stdin"),
         ] = False,
         date: Annotated[
-            str | None, typer.Option("--date", help="Set the date field (YYYY-MM-DD).")
+            str | None, typer.Option("--date", help="Set the date field (YYYY-MM-DD)")
         ] = None,
         tags: Annotated[
             list[str] | None,
             typer.Option(
                 "--tags",
-                help="Set the tags list (repeatable; replaces the whole list).",
+                help="Set the tags list (repeatable; replaces the whole list)",
             ),
         ] = None,
         related: Annotated[
@@ -1253,21 +1253,21 @@ def register_edit_commands(vault_app: _typer.Typer) -> None:
             str | None,
             typer.Option(
                 "--expected-blob-hash",
-                help="Refuse the write unless the on-disk blob OID matches.",
+                help="Refuse the write unless the on-disk blob OID matches",
             ),
         ] = None,
         check: Annotated[
             bool,
             typer.Option(
                 "--check/--no-check",
-                help="Run conformance checks before writing (default on).",
+                help="Run conformance checks before writing (default on)",
             ),
         ] = True,
         dry_run: Annotated[
-            bool, typer.Option("--dry-run", help="Preview without writing.")
+            bool, typer.Option("--dry-run", help="Preview without writing")
         ] = False,
         json_output: Annotated[
-            bool, typer.Option("--json", help="Output as JSON.")
+            bool, typer.Option("--json", help="Output as JSON")
         ] = False,
         target: TargetOption = None,
     ) -> None:

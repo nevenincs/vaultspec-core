@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import (
     TargetOption,
@@ -31,16 +32,14 @@ logger = logging.getLogger(__name__)
 
 # Main app definition must precede sub-app imports to enable them to
 # reference it if needed (and to satisfy Typer's module-level discovery).
-app = typer.Typer(
+app = make_app(
     help=(
-        "vaultspec-core: Workspace runtime for vaultspec-managed projects.\n\n"
-        "All commands default to the current directory. Use --target / -t\n"
-        "to operate on a different directory.\n\n"
-        "Examples:\n"
-        "  vaultspec-core install\n"
-        "  vaultspec-core install --target ./my-project claude\n"
-        "  vaultspec-core sync --target ./my-project\n"
-        "  vaultspec-core spec rules list\n"
+        "vaultspec-core: Workspace runtime for vaultspec-managed projects. "
+        "All commands default to the current directory; use --target / -t to "
+        "operate on a different directory. Run 'vaultspec-core install' to set "
+        "up a project, then 'vaultspec-core vault add research --feature <tag>' "
+        "to start the first feature. See 'vaultspec-core spec reference' for "
+        "worked command examples."
     ),
     no_args_is_help=True,
     add_completion=False,
@@ -65,7 +64,7 @@ def main(
         typer.Option(
             "--target",
             "-t",
-            help="Target directory (defaults to current working directory).",
+            help="Target directory (defaults to current working directory)",
             dir_okay=True,
             file_okay=False,
             resolve_path=True,
@@ -162,7 +161,7 @@ def _run_preflight(
             if sr.success:
                 console.print(f"  [green]ok[/green] {sr.step.reason}")
             else:
-                console.print(f"  [red]FAIL[/red] {sr.step.reason}: {sr.error}")
+                console.print(f"  [red]x[/red] {sr.step.reason}: {sr.error}")
 
         if exec_result.failed and not dry_run:
             raise typer.Exit(code=1)
@@ -230,15 +229,6 @@ def cmd_install(
     Scaffolds the workspace structure and syncs all managed resources.
     Use --upgrade to update builtin rules without re-scaffolding.
     Use --skip to exclude components on retry (e.g. --skip core --skip claude).
-
-    Examples:\n
-      vaultspec-core install                       # install all providers in cwd\n
-      vaultspec-core install core                  # framework only, no providers\n
-      vaultspec-core install claude                # framework + claude\n
-      vaultspec-core install --target ./my-project # install in specific directory\n
-      vaultspec-core install --upgrade             # re-seed builtins + sync\n
-      vaultspec-core install claude --dry-run      # preview what would be created\n
-      vaultspec-core install --skip claude         # install all except claude\n
     """
     from vaultspec_core.core.commands import install_run
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -327,7 +317,7 @@ def cmd_install(
         # something changed.
         version = get_version()
         verb = "Upgrade preview" if result.get("dry_run") else "Upgrade"
-        title = f"{verb} {version} → {path}"
+        title = f"{verb} {version} -> {path}"
 
         hint_dict = emit_next_step_hint(
             command="install",
@@ -390,7 +380,7 @@ def cmd_install(
             )
             for rel, label in items
         ]
-        render_dry_run_tree(dry_items, title=f"Install preview → {path}")
+        render_dry_run_tree(dry_items, title=f"Install preview -> {path}")
     else:
         from vaultspec_core.cli.rendering import (
             emit_next_step_hint,
@@ -451,14 +441,6 @@ def cmd_uninstall(
     The .vault/ documentation corpus is preserved by default.
     Use a provider name to remove only that provider's artifacts.
     Use --skip to exclude components (e.g. --skip claude --skip codex).
-
-    Examples:\n
-      vaultspec-core uninstall                    # remove framework, keep .vault/\n
-      vaultspec-core uninstall claude             # remove only claude\n
-      vaultspec-core uninstall --target ./proj    # remove from specific directory\n
-      vaultspec-core uninstall --remove-vault     # also remove .vault/ docs\n
-      vaultspec-core uninstall --dry-run          # preview what would be removed\n
-      vaultspec-core uninstall --skip codex       # remove all except codex\n
     """
     from vaultspec_core.core.commands import uninstall_run
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -526,7 +508,7 @@ def cmd_uninstall(
             DryRunItem(path=item_path, status=DryRunStatus.DELETE, label=label)
             for item_path, label in removed
         ]
-        render_dry_run_tree(dry_items, title=f"Uninstall preview → {path}")
+        render_dry_run_tree(dry_items, title=f"Uninstall preview -> {path}")
     elif removed:
         from vaultspec_core.cli.rendering import render_uninstall_summary
 
@@ -664,9 +646,9 @@ def cmd_sync(
                 )
         if all_items:
             _target_dir = get_context().target_dir
-            title = f"Sync preview → {_target_dir}"
+            title = f"Sync preview -> {_target_dir}"
             if provider != "all":
-                title = f"Sync preview ({provider}) → {_target_dir}"
+                title = f"Sync preview ({provider}) -> {_target_dir}"
             render_dry_run_tree(all_items, title=title)
         else:
             console.print("[dim]Sync preview: no changes[/dim]")
@@ -725,10 +707,17 @@ def cmd_sync(
                 f"vaultspec-core package are newer than .vaultspec/:"
             )
             for path in outdated:
-                console.print(f"  [yellow]•[/yellow] {path}")
-            console.print(
-                "\n  Run [bold]vaultspec-core install --upgrade[/bold] "
-                "to update, then [bold]vaultspec-core sync[/bold] again."
+                console.print(f"  [yellow]-[/yellow] {path}")
+            from vaultspec_core.cli.rendering import render_next_actions
+
+            render_next_actions(
+                [
+                    (
+                        "Update builtins to the packaged version",
+                        "vaultspec-core install --upgrade",
+                    ),
+                    ("Re-sync after upgrading", "vaultspec-core sync"),
+                ]
             )
 
         if all_warnings:
@@ -739,7 +728,7 @@ def cmd_sync(
                 f"Use [bold]--force[/bold] to resolve:"
             )
             for warning in all_warnings:
-                console.print(f"  [yellow]•[/yellow] {warning}")
+                console.print(f"  [yellow]-[/yellow] {warning}")
 
         # Warn only when a clean run genuinely found nothing to project:
         # no changes, no skips, and no files already in place.
@@ -756,9 +745,12 @@ def cmd_sync(
         ):
             console.print(
                 "\n[bold yellow]Warning:[/bold yellow] Sync produced 0 files. "
-                "The .vaultspec/rules/ source directories may be empty.\n"
-                "  Run [bold]vaultspec-core install --upgrade[/bold] "
-                "to re-seed builtin content."
+                "The .vaultspec/rules/ source directories may be empty."
+            )
+            from vaultspec_core.cli.rendering import render_next_actions
+
+            render_next_actions(
+                [("Re-seed builtin content", "vaultspec-core install --upgrade")]
             )
 
     raise typer.Exit(code)

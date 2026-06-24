@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from vaultspec_core.cli._app import make_app
+
 if TYPE_CHECKING:
     from vaultspec_core.core.diagnosis import ProviderDiagnosis, WorkspaceDiagnosis
     from vaultspec_core.core.types import SyncResult
@@ -76,7 +78,7 @@ def _emit_sync_result(
 
         console = get_console()
         for warning in result.warnings:
-            console.print(f"  [yellow]•[/yellow] {warning}")
+            console.print(f"  [yellow]-[/yellow] {warning}")
 
     raise typer.Exit(code)
 
@@ -246,14 +248,14 @@ def _spec_status_command(result: "SyncResult", label: str, json_output: bool) ->
 
     console = get_console()
     for w in result.warnings:
-        console.print(f"  [yellow]•[/yellow] {w}")
+        console.print(f"  [yellow]-[/yellow] {w}")
     for e in errors:
-        console.print(f"  [red]•[/red] {e}")
+        console.print(f"  [red]-[/red] {e}")
     if status_str != "ok":
         raise typer.Exit(1)
 
 
-spec_app = typer.Typer(
+spec_app = make_app(
     help=(
         "Manage framework resources: rules, skills, agents, system prompts, hooks, "
         "and MCPs."
@@ -266,8 +268,8 @@ spec_app = typer.Typer(
 # Rules
 # =============================================================================
 
-rules_app = typer.Typer(
-    help="Manage framework rule sources and synced rule outputs.",
+rules_app = make_app(
+    help="Manage framework rule sources and synced rule outputs",
     no_args_is_help=True,
 )
 spec_app.add_typer(rules_app, name="rules")
@@ -547,8 +549,8 @@ def cmd_rules_status(
 # Skills
 # =============================================================================
 
-skills_app = typer.Typer(
-    help="Manage workflow skills and synced skill outputs.",
+skills_app = make_app(
+    help="Manage workflow skills and synced skill outputs",
     no_args_is_help=True,
 )
 spec_app.add_typer(skills_app, name="skills")
@@ -849,8 +851,8 @@ def cmd_skills_status(
 # Agents
 # =============================================================================
 
-agents_app = typer.Typer(
-    help="Manage agent definitions and synced agent outputs.",
+agents_app = make_app(
+    help="Manage agent definitions and synced agent outputs",
     no_args_is_help=True,
 )
 spec_app.add_typer(agents_app, name="agents")
@@ -1145,8 +1147,8 @@ def cmd_agents_status(
 # System
 # =============================================================================
 
-system_app = typer.Typer(
-    help="Inspect and sync assembled system prompt outputs.",
+system_app = make_app(
+    help="Inspect and sync assembled system prompt outputs",
     no_args_is_help=True,
 )
 spec_app.add_typer(system_app, name="system")
@@ -1237,8 +1239,8 @@ def cmd_system_sync(
 # Hooks
 # =============================================================================
 
-hooks_app = typer.Typer(
-    help="List and run shell-based workspace hooks.",
+hooks_app = make_app(
+    help="List and run shell-based workspace hooks",
     no_args_is_help=True,
 )
 spec_app.add_typer(hooks_app, name="hooks")
@@ -1569,9 +1571,9 @@ def cmd_hooks_status(
 
     console = get_console()
     for warning in status["warnings"]:
-        console.print(f"  [yellow]•[/yellow] {warning}")
+        console.print(f"  [yellow]-[/yellow] {warning}")
     for error in status["errors"]:
-        console.print(f"  [red]•[/red] {error}")
+        console.print(f"  [red]-[/red] {error}")
     if status["status"] != "ok":
         raise typer.Exit(code=1)
 
@@ -1623,7 +1625,7 @@ def cmd_hooks_run(
 # MCPs
 # =============================================================================
 
-mcps_app = typer.Typer(
+mcps_app = make_app(
     help="Manage MCP server definitions and synced .mcp.json entries.",
     no_args_is_help=True,
 )
@@ -1696,7 +1698,7 @@ def cmd_mcps_status(
 
     console = get_console()
     for warning in status["warnings"]:
-        console.print(f"  [yellow]•[/yellow] {warning}")
+        console.print(f"  [yellow]-[/yellow] {warning}")
     if status["status"] != "ok":
         raise typer.Exit(code=1)
 
@@ -1813,11 +1815,6 @@ def cmd_doctor(
     providers, builtins, gitignore, and configuration files.
 
     Exit codes: 0 = all ok, 1 = warnings, 2 = errors.
-
-    Examples:\n
-      vaultspec-core spec doctor                        # diagnose current directory\n
-      vaultspec-core spec doctor --target ./my-project  # diagnose specific directory\n
-      vaultspec-core spec doctor --json                 # machine-readable output\n
     """
     import dataclasses
 
@@ -1873,8 +1870,8 @@ def cmd_doctor(
 # Reference (generated documentation)
 # =============================================================================
 
-reference_app = typer.Typer(
-    help="Generate the derivable regions of the bundled CLI reference.",
+reference_app = make_app(
+    help="Generate the derivable regions of the bundled CLI reference",
     no_args_is_help=True,
 )
 spec_app.add_typer(reference_app, name="reference")

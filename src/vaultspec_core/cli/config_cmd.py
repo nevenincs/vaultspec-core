@@ -7,6 +7,7 @@ from typing import Annotated
 
 import typer
 
+from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target_install
 from vaultspec_core.core import (
@@ -18,7 +19,7 @@ from vaultspec_core.core import (
     unset_config_value,
 )
 
-config_app = typer.Typer(
+config_app = make_app(
     help=(
         "Manage local project configuration settings.\n\n"
         "Configuration is stored in .vaultspec/config.toml at the workspace "
@@ -38,10 +39,6 @@ def cmd_config_get(
     """Read a local configuration value.
 
     Reads from the project's .vaultspec/config.toml.
-
-    Examples:
-      vaultspec-core config get editor
-      vaultspec-core config get editor --json
     """
     effective_target = apply_target_install(target)
     try:
@@ -77,10 +74,6 @@ def cmd_config_set(
     """Write a local configuration value.
 
     Writes to the project's .vaultspec/config.toml.
-
-    Examples:
-      vaultspec-core config set editor "nano"
-      vaultspec-core config set editor "code --wait" --json
     """
     effective_target = apply_target_install(target)
     try:
@@ -113,10 +106,6 @@ def cmd_config_unset(
     """Clear a local configuration entry.
 
     Removes the entry from the project's .vaultspec/config.toml.
-
-    Examples:
-      vaultspec-core config unset editor
-      vaultspec-core config unset editor --json
     """
     effective_target = apply_target_install(target)
     try:
@@ -143,10 +132,6 @@ def cmd_config_list(
     """Enumerate all known configuration entries and current values.
 
     Displays keys and values from the project's .vaultspec/config.toml.
-
-    Examples:
-      vaultspec-core config list
-      vaultspec-core config list --json
     """
     effective_target = apply_target_install(target)
     try:

@@ -50,20 +50,20 @@ def cmd_status(
     ] = None,
     limit: Annotated[
         int,
-        typer.Option("--limit", help="Number of recent documents to show (rollup)."),
+        typer.Option("--limit", help="Number of recent documents to show (rollup)"),
     ] = 10,
     since: Annotated[
         int | None,
         typer.Option(
             "--since",
-            help="Show documents modified within this many days (rollup).",
+            help="Show documents modified within this many days (rollup)",
         ),
     ] = None,
     paths: Annotated[
         bool,
         typer.Option(
             "--paths",
-            help="Show each referenced document's path in the trace (target mode).",
+            help="Show each referenced document's path in the trace (target mode)",
         ),
     ] = False,
     verbose_exec: Annotated[
@@ -168,25 +168,20 @@ def _status_trace_hints(trace: GroundingTrace) -> tuple[tuple[str, str], ...]:
 
 
 def _emit_status_hints(
-    console: Console,
     pairs: tuple[tuple[str, str], ...],
     *,
     json_output: bool,
     no_hints: bool,
 ) -> list[dict[str, str]] | None:
     """Render advisory hint lines for status, returning the JSON shape."""
-    import os
+    from vaultspec_core.cli.rendering import hints_suppressed, render_next_actions
 
-    if no_hints or os.environ.get("VAULTSPEC_NO_HINTS") == "1":
+    if hints_suppressed(no_hints):
         return None
 
     hints = [{"text": text, "command": command} for text, command in pairs]
     if not json_output:
-        console.print()
-        console.print("[bold cyan]Suggested Next Step:[/bold cyan]")
-        for text, command in pairs:
-            console.print(f"  {text}")
-            console.print(f"  [bold cyan]>[/bold cyan] [bold]{command}[/bold]")
+        render_next_actions(pairs)
     return hints
 
 
@@ -246,7 +241,7 @@ def _emit_status_rollup(
         from vaultspec_core.cli.rendering import json_envelope
 
         hints = _emit_status_hints(
-            console, _STATUS_ROLLUP_HINTS, json_output=True, no_hints=no_hints
+            _STATUS_ROLLUP_HINTS, json_output=True, no_hints=no_hints
         )
         envelope = json_envelope(
             "vault.status",
@@ -337,9 +332,7 @@ def _emit_status_rollup(
     console.print(f"  Total documents: {totals.get('total_docs', 0)}")
     console.print(f"  Total features:  {totals.get('total_features', 0)}")
 
-    _emit_status_hints(
-        console, _STATUS_ROLLUP_HINTS, json_output=False, no_hints=no_hints
-    )
+    _emit_status_hints(_STATUS_ROLLUP_HINTS, json_output=False, no_hints=no_hints)
 
 
 def _plan_trace_payload(plan: PlanTrace) -> dict:
@@ -404,9 +397,7 @@ def _emit_status_trace(
 
         from vaultspec_core.cli.rendering import json_envelope
 
-        hints = _emit_status_hints(
-            console, hint_pairs, json_output=True, no_hints=no_hints
-        )
+        hints = _emit_status_hints(hint_pairs, json_output=True, no_hints=no_hints)
         envelope = json_envelope(
             "vault.status",
             "unchanged",
@@ -474,7 +465,7 @@ def _emit_status_trace(
                     )
                     console.print(f"    [dim]{doc_type}[/dim]  {stem}{path}")
 
-    _emit_status_hints(console, hint_pairs, json_output=False, no_hints=no_hints)
+    _emit_status_hints(hint_pairs, json_output=False, no_hints=no_hints)
 
 
 def _emit_stem_group(

@@ -903,6 +903,48 @@ class SafeDict(dict):
         return f"{{{key}}}"
 
 
+def hints_suppressed(no_hints: bool = False) -> bool:
+    """Report whether next-step hints are suppressed for this invocation.
+
+    Hints are advisory and must be silenceable for scripted contexts, per
+    the cli-next-step-hints ADR. They are off when the caller passes
+    ``--no-hints`` or the ``VAULTSPEC_NO_HINTS=1`` environment variable is
+    set. This is the one predicate every hint surface consults so the
+    suppression contract cannot drift per command.
+    """
+    import os
+
+    return no_hints or os.environ.get("VAULTSPEC_NO_HINTS") == "1"
+
+
+def render_next_actions(pairs: Sequence[tuple[str, str]]) -> None:
+    """Print next-step hints in the one uniform footer form.
+
+    Per the cli-presentation-uniformity ADR every next-step hint, from
+    every command, renders identically: a ``Next action:`` header (or
+    ``Next actions:`` for more than one) at column 0, then each hint as a
+    two-space-indented description with its command indented a further two
+    spaces. This mirrors the plain footer of ``vaultspec-rag`` and
+    replaces the divergent ``Suggested Next Step:`` forms.
+
+    Args:
+        pairs: ``(description, command)`` hints in display order. An empty
+            sequence prints nothing.
+    """
+    from rich.markup import escape
+
+    items = list(pairs)
+    if not items:
+        return
+    console = get_console()
+    console.print()
+    header = "Next action:" if len(items) == 1 else "Next actions:"
+    console.print(f"[bold]{header}[/bold]")
+    for description, command in items:
+        console.print(f"  {escape(description)}")
+        console.print(f"    [cyan]{escape(command)}[/cyan]")
+
+
 def emit_next_step_hint(
     command: str,
     outcome: str,
@@ -919,9 +961,7 @@ def emit_next_step_hint(
         A dict matching {"text": str, "command": str} for JSON, or None.
         Also prints to the console if not json_output.
     """
-    import os
-
-    if no_hints or os.environ.get("VAULTSPEC_NO_HINTS") == "1":
+    if hints_suppressed(no_hints):
         return None
 
     hint = _NEXT_STEP_HINTS.get((command, outcome))
@@ -934,12 +974,7 @@ def emit_next_step_hint(
     formatted_command = cmd_template.format_map(safe_vars)
 
     if not json_output:
-        console = get_console()
-        console.print()
-        console.print("[bold cyan]Suggested Next Step:[/bold cyan]")
-        console.print(f"  {description}")
-        console.print(f"  [bold cyan]>[/bold cyan] [bold]{formatted_command}[/bold]")
-        console.print()
+        render_next_actions([(description, formatted_command)])
 
     return {"text": description, "command": formatted_command}
 
