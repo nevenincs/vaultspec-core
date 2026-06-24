@@ -146,20 +146,24 @@ class TestComposeOwnership:
         payload1 = render_hooks_payload(
             [_spec(HookEvent.PRE_TOOL_USE, command="v1")], Tool.CLAUDE
         )
-        composed1 = _compose_flat_hooks(existing, payload1)
+        native1, managed1 = _compose_flat_hooks(existing, {}, payload1)
         # User group preserved, vaultspec group added, unrelated key intact.
-        assert user_group in composed1["hooks"]["PreToolUse"]
-        assert composed1["otherSetting"] is True
+        assert user_group in native1["hooks"]["PreToolUse"]
+        assert native1["otherSetting"] is True
+        # The native file must stay schema-pure: no in-file ownership key
+        # (codex rejects unknown top-level fields and discards the whole file).
+        assert "_vaultspecManagedHooks" not in native1
         assert any(
-            g["hooks"][0]["command"] == "v1" for g in composed1["hooks"]["PreToolUse"]
+            g["hooks"][0]["command"] == "v1" for g in native1["hooks"]["PreToolUse"]
         )
 
-        # Re-sync with a changed command must drop the old managed group, keep user's.
+        # Re-sync with a changed command: drop the old managed group (via the
+        # sidecar record), keep the user's.
         payload2 = render_hooks_payload(
             [_spec(HookEvent.PRE_TOOL_USE, command="v2")], Tool.CLAUDE
         )
-        composed2 = _compose_flat_hooks(composed1, payload2)
-        cmds = [g["hooks"][0]["command"] for g in composed2["hooks"]["PreToolUse"]]
+        native2, _managed2 = _compose_flat_hooks(native1, managed1, payload2)
+        cmds = [g["hooks"][0]["command"] for g in native2["hooks"]["PreToolUse"]]
         assert "user" in cmds and "v2" in cmds and "v1" not in cmds
 
     def test_removing_all_managed_clears_hooks_but_keeps_user(self):
@@ -169,10 +173,11 @@ class TestComposeOwnership:
         payload = render_hooks_payload(
             [_spec(HookEvent.STOP, command="v1")], Tool.CLAUDE
         )
-        with_managed = _compose_flat_hooks(existing, payload)
-        cleared = _compose_flat_hooks(with_managed, None)
+        with_managed, managed = _compose_flat_hooks(existing, {}, payload)
+        cleared, managed_after = _compose_flat_hooks(with_managed, managed, None)
         cmds = [g["hooks"][0]["command"] for g in cleared["hooks"]["Stop"]]
         assert cmds == ["user"]
+        assert managed_after == {}
 
 
 class TestEndToEndSync:
@@ -195,6 +200,12 @@ class TestEndToEndSync:
             (tmp_path / ".codex" / "hooks.json").read_text(encoding="utf-8")
         )
         assert "PreToolUse" in codex["hooks"]
+        # Regression: codex rejects unknown top-level keys and discards the
+        # whole hooks file. The native file must carry only ``hooks``;
+        # ownership lives in a sidecar beside it.
+        assert "_vaultspecManagedHooks" not in codex
+        assert set(codex) == {"hooks"}
+        assert (tmp_path / ".codex" / ".vaultspec-hooks.json").exists()
 
         claude = json.loads(
             (tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8")

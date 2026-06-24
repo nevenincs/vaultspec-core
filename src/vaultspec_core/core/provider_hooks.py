@@ -327,10 +327,13 @@ _HOOK_FILES: dict[Tool, tuple[str, str]] = {
     Tool.ANTIGRAVITY: (DirName.ANTIGRAVITY.value, "hooks.json"),
 }
 
-# Sidecar key recording the exact vaultspec-managed groups per native event, so
-# a re-sync removes precisely what it wrote before and never disturbs
-# user-authored hooks. Mirrors the ``.mcp.json`` ownership pattern.
-_MANAGED_KEY = "_vaultspecManagedHooks"
+# Per-provider ownership record. It lives in a sidecar file *beside* (not
+# inside) the native hook config, because some providers - notably codex -
+# enforce a strict schema and reject the entire hooks file if it carries an
+# unknown top-level key. The sidecar records exactly the groups vaultspec wrote
+# last sync so a re-sync removes precisely those and never disturbs
+# user-authored hooks. agy needs no sidecar: it owns a named hookset.
+_SIDECAR_NAME = ".vaultspec-hooks.json"
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -344,21 +347,23 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _compose_flat_hooks(
-    existing: dict[str, Any], payload: dict[str, Any] | None
-) -> dict[str, Any]:
-    """Compose the next on-disk dict for a ``hooks``-keyed provider file.
+    existing: dict[str, Any],
+    prev_managed: dict[str, Any],
+    payload: dict[str, Any] | None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Compose the next native dict for a ``hooks``-keyed provider file.
 
-    Removes the previously vaultspec-managed groups (tracked in
-    :data:`_MANAGED_KEY`), re-adds the current payload, and preserves every
-    user-authored group and unrelated top-level key.
+    Removes the previously vaultspec-managed groups (*prev_managed*, read from
+    the sidecar), re-adds the current *payload*, and preserves every
+    user-authored group and unrelated top-level key. The returned native dict
+    carries **no** vaultspec ownership key. Returns ``(native, new_managed)``
+    where *new_managed* is the ownership record to persist in the sidecar.
     """
     out = dict(existing)
     raw_hooks = out.get("hooks")
     hooks: dict[str, Any] = dict(raw_hooks) if isinstance(raw_hooks, dict) else {}
-    raw_prev = out.get(_MANAGED_KEY)
-    prev: dict[str, Any] = raw_prev if isinstance(raw_prev, dict) else {}
 
-    for event, groups in prev.items():
+    for event, groups in prev_managed.items():
         if event in hooks and isinstance(hooks[event], list):
             kept = [g for g in hooks[event] if g not in groups]
             if kept:
@@ -382,11 +387,9 @@ def _compose_flat_hooks(
         out["hooks"] = hooks
     else:
         out.pop("hooks", None)
-    if new_managed:
-        out[_MANAGED_KEY] = new_managed
-    else:
-        out.pop(_MANAGED_KEY, None)
-    return out
+    # Defensive: strip any legacy in-file ownership key from older syncs.
+    out.pop("_vaultspecManagedHooks", None)
+    return out, new_managed
 
 
 def _compose_agy_hooks(
@@ -399,6 +402,27 @@ def _compose_agy_hooks(
     else:
         out.pop(_AGY_HOOKSET_NAME, None)
     return out
+
+
+def _write_or_remove(
+    path: Path, content: dict[str, Any], previously_existed: bool, *, dry_run: bool
+) -> str | None:
+    """Write *content* (or remove the file when empty). Returns the action.
+
+    Returns ``None`` when nothing changed. Used for both native files and
+    sidecar ownership files.
+    """
+    if not content:
+        if path.exists():
+            if not dry_run:
+                path.unlink()
+            return "[DELETE]"
+        return None
+    action = "[UPDATE]" if previously_existed else "[ADD]"
+    if not dry_run:
+        ensure_dir(path.parent)
+        atomic_write(path, json.dumps(content, indent=2) + "\n")
+    return action
 
 
 def _sync_one(
@@ -414,37 +438,48 @@ def _sync_one(
     result.warnings.extend(render_warnings)
 
     existing = _read_json(path)
+    existed = path.exists()
+
     if tool is Tool.ANTIGRAVITY:
         composed = _compose_agy_hooks(existing, payload)
+        sidecar_path: Path | None = None
+        prev_managed: dict[str, Any] = {}
+        new_managed: dict[str, Any] = {}
     else:
-        composed = _compose_flat_hooks(existing, payload)
+        sidecar_path = target_dir / subdir / _SIDECAR_NAME
+        prev_managed = _read_json(sidecar_path)
+        composed, new_managed = _compose_flat_hooks(existing, prev_managed, payload)
 
-    if composed == existing:
+    native_changed = composed != existing
+    sidecar_changed = sidecar_path is not None and new_managed != prev_managed
+
+    if not native_changed and not sidecar_changed:
         result.unchanged = 1
         return result
 
-    if not composed:
-        # Nothing left to persist - remove an orphan file we own.
-        if path.exists():
-            if dry_run:
-                result.items.append((rel, "[DELETE]"))
-            else:
-                path.unlink()
-            result.pruned = 1
-        else:
-            result.unchanged = 1
-        return result
+    action = (
+        _write_or_remove(path, composed, existed, dry_run=dry_run)
+        if native_changed
+        else None
+    )
+    if sidecar_changed and sidecar_path is not None:
+        _write_or_remove(
+            sidecar_path, new_managed, sidecar_path.exists(), dry_run=dry_run
+        )
 
-    action = "[UPDATE]" if path.exists() else "[ADD]"
-    if dry_run:
-        result.items.append((rel, action))
-    else:
-        ensure_dir(path.parent)
-        atomic_write(path, json.dumps(composed, indent=2) + "\n")
-    if action == "[UPDATE]":
+    if action == "[DELETE]":
+        result.pruned = 1
+        result.items.append((rel, "[DELETE]"))
+    elif action == "[UPDATE]" or (action is None and sidecar_changed):
         result.updated = 1
-    else:
+        if dry_run and action is not None:
+            result.items.append((rel, action))
+    elif action == "[ADD]":
         result.added = 1
+        if dry_run:
+            result.items.append((rel, action))
+    else:
+        result.unchanged = 1
     return result
 
 
