@@ -17,60 +17,124 @@ class CapabilityLevel(IntEnum):
     MEDIUM = 2
     HIGH = 3
 
+    @classmethod
+    def from_tier(cls, tier: str | None) -> CapabilityLevel:
+        """Resolve a persona ``tier:`` frontmatter string to a capability level.
 
-class ClaudeModels(StrEnum):
-    """Single source of truth for Claude model identifiers."""
+        Agent personas author a coarse ``tier`` (``LOW``, ``STANDARD``,
+        ``HIGH``) rather than a numeric level. ``STANDARD`` is the persona
+        vocabulary for the middle tier and maps to :attr:`MEDIUM`; the legacy
+        ``MEDIUM`` spelling is accepted for backwards compatibility. The match
+        is case-insensitive and whitespace-tolerant.
 
-    HIGH = "claude-opus-4-6"
+        Args:
+            tier: Raw ``tier`` value from persona frontmatter, or ``None``.
+
+        Returns:
+            The corresponding :class:`CapabilityLevel`; defaults to
+            :attr:`MEDIUM` for any missing or unrecognized value.
+        """
+        normalized = (tier or "").strip().upper()
+        aliases = {
+            "LOW": cls.LOW,
+            "STANDARD": cls.MEDIUM,
+            "MEDIUM": cls.MEDIUM,
+            "HIGH": cls.HIGH,
+        }
+        return aliases.get(normalized, cls.MEDIUM)
+
+
+class _TieredModelRegistry(StrEnum):
+    """Base for per-provider model registries keyed by capability tier.
+
+    Each concrete registry declares ``HIGH``, ``MEDIUM``, and ``LOW`` members
+    whose values are the provider's current model identifier strings. Members
+    are named after :class:`CapabilityLevel` members so :meth:`from_level` can
+    resolve a level to a model by name without a per-registry mapping table.
+    """
+
+    @classmethod
+    def from_level(cls, level: CapabilityLevel) -> _TieredModelRegistry:
+        """Return the model identifier for a given :class:`CapabilityLevel`.
+
+        Args:
+            level: Desired capability tier.
+
+        Returns:
+            The registry member whose name matches *level*; defaults to
+            ``MEDIUM`` for any level without a matching member.
+        """
+        try:
+            return cls[level.name]
+        except KeyError:
+            return cls["MEDIUM"]
+
+
+class ClaudeModels(_TieredModelRegistry):
+    """Single source of truth for Claude model identifiers.
+
+    Verified against Anthropic's published model lineup (mid-2026): Opus 4.8
+    is the current flagship, with Sonnet 4.6 and Haiku 4.5 as the mid and fast
+    tiers respectively.
+    """
+
+    HIGH = "claude-opus-4-8"
     MEDIUM = "claude-sonnet-4-6"
     LOW = "claude-haiku-4-5"
 
-    @classmethod
-    def from_level(cls, level: CapabilityLevel) -> ClaudeModels:
-        """Return the Claude model for a given :class:`CapabilityLevel`.
 
-        Args:
-            level: Desired capability tier.
+class GeminiModels(_TieredModelRegistry):
+    """Single source of truth for Gemini model identifiers.
 
-        Returns:
-            Corresponding :class:`ClaudeModels` member; defaults to ``MEDIUM``
-            for any unmapped level.
-        """
-        mapping = {
-            CapabilityLevel.HIGH: cls.HIGH,
-            CapabilityLevel.MEDIUM: cls.MEDIUM,
-            CapabilityLevel.LOW: cls.LOW,
-        }
-        return mapping.get(level, cls.MEDIUM)
+    Verified against Google's published Gemini API model list (mid-2026). The
+    prior ``gemini-3-pro-preview`` was shut down 2026-03-09, ``-3-flash-preview``
+    was superseded, and ``gemini-2.5-flash`` is deprecated (shutdown
+    2026-10-16); all three are replaced by the identifiers below.
+    """
+
+    HIGH = "gemini-3.1-pro-preview"
+    MEDIUM = "gemini-3.5-flash"
+    LOW = "gemini-3.1-flash-lite"
 
 
-class GeminiModels(StrEnum):
-    """Single source of truth for Gemini model identifiers."""
+class CodexModels(_TieredModelRegistry):
+    """Single source of truth for OpenAI Codex model identifiers.
 
-    HIGH = "gemini-3-pro-preview"
-    MEDIUM = "gemini-3-flash-preview"
-    LOW = "gemini-2.5-flash"
+    Verified against OpenAI's published Codex model list (mid-2026). ``gpt-5.5``
+    is the recommended flagship default; the older ``gpt-5-codex`` family is
+    deprecated (API shutdown 2026-07-23) in favour of ``gpt-5.5``. Reasoning
+    depth is controlled separately via the Codex ``model_reasoning_effort``
+    setting rather than a distinct per-tier model identifier.
+    """
 
-    @classmethod
-    def from_level(cls, level: CapabilityLevel) -> GeminiModels:
-        """Return the Gemini model for a given :class:`CapabilityLevel`.
-
-        Args:
-            level: Desired capability tier.
-
-        Returns:
-            Corresponding :class:`GeminiModels` member; defaults to ``MEDIUM``
-            for any unmapped level.
-        """
-        mapping = {
-            CapabilityLevel.HIGH: cls.HIGH,
-            CapabilityLevel.MEDIUM: cls.MEDIUM,
-            CapabilityLevel.LOW: cls.LOW,
-        }
-        return mapping.get(level, cls.MEDIUM)
+    HIGH = "gpt-5.5"
+    MEDIUM = "gpt-5.4"
+    LOW = "gpt-5.4-mini"
 
 
-ModelRegistry = type[ClaudeModels] | type[GeminiModels]
+class AntigravityModels(_TieredModelRegistry):
+    """Reference registry of model identifiers for Google Antigravity.
+
+    Antigravity is model-optional and multi-vendor: the active model is chosen
+    at runtime (``agy --model`` or the in-editor model picker), not codified in
+    synced agent or skill files. Antigravity does not consume a ``model``
+    frontmatter field, so this registry is reference-only and is never emitted
+    into provider artifacts. The values mirror Antigravity's default
+    Gemini-class lineup so a single source of truth still exists for tooling
+    that wants to display or validate a default tier.
+    """
+
+    HIGH = "gemini-3.1-pro-preview"
+    MEDIUM = "gemini-3.5-flash"
+    LOW = "gemini-3.1-flash-lite"
+
+
+ModelRegistry = (
+    type[ClaudeModels]
+    | type[GeminiModels]
+    | type[CodexModels]
+    | type[AntigravityModels]
+)
 
 
 class Tool(StrEnum):
