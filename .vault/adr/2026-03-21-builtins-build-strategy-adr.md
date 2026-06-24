@@ -9,7 +9,7 @@ related:
   - '[[2026-02-21-packaging-restructure-adr]]'
 ---
 
-# `builtins-build-strategy` adr: `builtins-build-strategy` | (**status:** `{accepted|rejected|deprecated}`)
+# `builtins-build-strategy` adr: `builtins-build-strategy` | (**status:** `accepted`)
 
 ______________________________________________________________________
 

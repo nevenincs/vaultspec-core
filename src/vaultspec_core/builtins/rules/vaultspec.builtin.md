@@ -4,32 +4,36 @@ name: vaultspec
 
 # Spec Skills
 
-This project follows agent-driven development with `<ADR>`-backed `<Plan>`s.
+This project follows a spec driven development framework and mandates a vaultspec
+pipeline of: research -> decision (ADR) -> plan -> verify (+ audit either as closeout or
+pipeline start).
 
-The workflow persists the following documents:
-
-- `.vault/plan/yyyy-mm-dd-<feature>-plan.md`: The `<Plan>` to execute.
+The workflow persists the following documents, bound by a single feature tag:
 
 - `.vault/research/yyyy-mm-dd-<feature>-research.md`: The `<Research>` findings.
 
+- `.vault/reference/yyyy-mm-dd-<feature>-reference.md`: A project, code, or research
+  grounding `<Reference>`, useful for grounding implementation details prior to ADR
+  authoring.
+
 - `.vault/adr/yyyy-mm-dd-<feature>-adr.md`: Research-derived `<ADR>`.
 
-- `.vault/reference/yyyy-mm-dd-<feature>-reference.md`: The implementation
-  `<Reference>`.
-
-- `.vault/audit/yyyy-mm-dd-<feature>-audit.md`: The `<Audit>` report. A feature with
-  multiple audits disambiguates each with an optional narrative infix:
-  `yyyy-mm-dd-<feature>-<topic>-audit.md`.
+- `.vault/plan/yyyy-mm-dd-<feature>-plan.md`: The `<Plan>` to execute, authored and
+  managed by the vaultspec-core CLI (`vaultspec-core vault plan`).
 
 - `.vault/exec/yyyy-mm-dd-<feature>/.../<step>.md`: The individual `<Step Record>`.
 
 - `.vault/exec/yyyy-mm-dd-<feature>/...-summary.md`: The `<Phase Summary>`.
 
+- `.vault/audit/yyyy-mm-dd-<feature>-audit.md`: The `<Audit>` report. A feature with
+  multiple audits disambiguates each with an optional narrative infix:
+  `yyyy-mm-dd-<feature>-<topic>-audit.md`.
+
 - `.vault/index/<feature>.index.md`: The auto-generated `<Feature Index>` linking every
   document for a feature. Managed by `vaultspec-core vault feature index`; do not author
   by hand.
 
-Where appropriate, use the following skills:
+Use the following pipeline skills:
 
 - `vaultspec-research`
 - `vaultspec-code-research`
@@ -37,7 +41,9 @@ Where appropriate, use the following skills:
 - `vaultspec-write`
 - `vaultspec-execute`
 - `vaultspec-code-review`
-- `vaultspec-codify`
+
+The following helper skills are available:
+
 - `vaultspec-curate`
 - `vaultspec-documentation`
 - `vaultspec-team`
@@ -134,8 +140,9 @@ Every document in `.vault/` MUST include the required tag pair in the frontmatte
   e.g., `#editor-demo`)
 
 **CRITICAL:** No structural tags like `#step`, `#summary`, `#phase*`, or `#design` are
-allowed. The required pair is one directory tag plus the `#{feature}` tag; optional
-extra tags may be appended when the template allows them.
+allowed. Every document carries exactly one directory tag plus exactly one `#{feature}`
+tag - no more, no less. Any additional tag is read as a second feature tag and fails
+validation.
 
 ### Directory Tags (Required for ALL documents)
 
@@ -153,8 +160,8 @@ The directory tag is determined by the file's location in `.vault/`:
 
 ### Tag Format
 
-All documents use YAML list syntax with at least 2 tags (one directory tag, one feature
-tag; additional tags are allowed):
+All documents use YAML list syntax with exactly 2 tags (one directory tag, one feature
+tag):
 
 ```yaml
 ---
@@ -274,4 +281,8 @@ instead.
     `2026-02-04-editor-demo-W01-P01-summary.md`) inside the feature folder.
 
 - **Replace ALL placeholders**: No template should be committed with `{...}`
-  placeholders remaining
+  placeholders remaining. Run `vaultspec-core vault check all --fix` to validate and
+  format documents before committing - it reconciles frontmatter, strips leftover
+  template annotations, and applies markdown hygiene fixes. The dedicated
+  `vaultspec-core vault check placeholders` check surfaces any `{...}` residue left in
+  body prose, which must be filled in by hand or by the owning CLI verb.

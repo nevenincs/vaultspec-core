@@ -8,7 +8,7 @@ related:
   - '[[2026-03-23-cli-target-refactor-research]]'
 ---
 
-# `cli-target-refactor` adr: `cli target refactor` | (**status:** `{accepted|rejected|deprecated}`)
+# `cli-target-refactor` adr: `cli target refactor` | (**status:** `accepted`)
 
 ## Problem Statement
 

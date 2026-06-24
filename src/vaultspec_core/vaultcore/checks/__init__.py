@@ -27,8 +27,10 @@ from .dangling import check_dangling
 from .features import check_features
 from .frontmatter import check_frontmatter
 from .links import check_links
+from .markdown import check_markdown
 from .modified_stamp import check_modified_stamp
 from .orphans import check_orphans
+from .placeholders import check_placeholders
 from .references import check_references, check_schema
 from .rename_integrity import check_rename_integrity
 from .structure import check_structure
@@ -48,8 +50,10 @@ __all__ = [
     "check_features",
     "check_frontmatter",
     "check_links",
+    "check_markdown",
     "check_modified_stamp",
     "check_orphans",
+    "check_placeholders",
     "check_references",
     "check_rename_integrity",
     "check_schema",
@@ -67,9 +71,9 @@ def run_all_checks(
 ) -> list[CheckResult]:
     """Run all vault health checkers and return their results.
 
-    Executes structure, frontmatter, modified-stamp, annotations, links,
-    dangling, body-links, orphans, features, references, and schema checks
-    in order. Builds a single
+    Executes structure, frontmatter, modified-stamp, annotations, markdown,
+    links, dangling, body-links, placeholders, orphans, features, references,
+    schema, and rename-integrity checks in order. Builds a single
     :class:`~vaultspec_core.graph.VaultGraph` and shares it across
     graph-consuming checkers to avoid redundant I/O.
 
@@ -94,9 +98,11 @@ def run_all_checks(
                 root_dir, snapshot=snapshot, feature=feature, fix=False
             ),
             check_annotations(root_dir, feature=feature, fix=False),
+            check_markdown(root_dir, feature=feature, fix=False),
             check_links(root_dir, snapshot=snapshot, feature=feature, fix=False),
             check_dangling(root_dir, graph=graph, feature=feature, fix=False),
             check_body_links(root_dir, snapshot=snapshot, feature=feature),
+            check_placeholders(root_dir, snapshot=snapshot, feature=feature),
             check_orphans(root_dir, graph=graph, feature=feature),
             check_features(root_dir, snapshot=snapshot, feature=feature),
             check_references(root_dir, graph=graph, feature=feature, fix=False),
@@ -144,6 +150,12 @@ def run_all_checks(
     result = check_annotations(root_dir, feature=feature, fix=True)
     append_and_refresh(result)
 
+    # Markdown hygiene rewrites only line whitespace and blank runs - it never
+    # touches frontmatter, links, or filenames, so it cannot invalidate the
+    # graph. Run it after annotations so blank lines left by stripped comment
+    # blocks are collapsed in the same pass.
+    results.append(check_markdown(root_dir, feature=feature, fix=True))
+
     result = check_links(
         root_dir, snapshot=graph.to_snapshot(), feature=feature, fix=True
     )
@@ -154,6 +166,9 @@ def run_all_checks(
 
     results.append(
         check_body_links(root_dir, snapshot=graph.to_snapshot(), feature=feature)
+    )
+    results.append(
+        check_placeholders(root_dir, snapshot=graph.to_snapshot(), feature=feature)
     )
     results.append(check_orphans(root_dir, graph=graph, feature=feature))
     results.append(

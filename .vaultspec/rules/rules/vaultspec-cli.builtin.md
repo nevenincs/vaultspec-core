@@ -5,9 +5,7 @@ name: vaultspec-cli
 # Vaultspec Core CLI
 
 This project is vaultspec-managed. See `vaultspec.builtin.md` for framework rules and
-the
-[framework manual](https://github.com/wgergely/vaultspec-core/blob/main/docs/framework.md)
-for workflow concepts.
+workflow concepts.
 
 ## Mandate
 
@@ -29,29 +27,51 @@ read-only: it is the zeroth move, not a pipeline phase, and produces no artifact
 
 ## Commands
 
-| Task                                                  | Run                                                                       |
-| ----------------------------------------------------- | ------------------------------------------------------------------------- |
-| Orient in an unknown or resumed project               | `vaultspec-core status [TARGET]`                                          |
-| Create a `.vault/` document                           | `vaultspec-core vault add <type> --feature <tag>`                         |
-| List or filter vault documents                        | `vaultspec-core vault list [DOC_TYPE] [--feature <tag>]`                  |
-| Show statistics, invalid, or orphan documents         | `vaultspec-core vault stats [--invalid] [--orphaned]`                     |
-| Visualize the vault dependency graph                  | `vaultspec-core vault graph [--feature <tag>]`                            |
-| Audit drift, broken links, or missing references      | `vaultspec-core vault check all [--fix]`                                  |
-| Strip generated template annotations                  | `vaultspec-core vault sanitize annotations [--feature <tag>] [--dry-run]` |
-| Confirm required documents exist for a feature        | `vaultspec-core vault check features --feature <tag>`                     |
-| Archive a completed feature                           | `vaultspec-core vault feature archive <tag>`                              |
-| Promote an audit finding to a project rule            | `vaultspec-core vault rule promote --from <audit-stem> --as <rule-name>`  |
-| List registered rules, skills, agents, hooks, or MCPs | `vaultspec-core spec <resource> list`                                     |
-| Verify MCP config health                              | `vaultspec-core spec mcps status --json`                                  |
-| Inspect the assembled system prompt                   | `vaultspec-core spec system show`                                         |
-| Propagate edits under `.vaultspec/rules/...`          | `vaultspec-core sync`                                                     |
-| Diagnose overall workspace health                     | `vaultspec-core spec doctor`                                              |
-| Inspect or run pending schema migrations              | `vaultspec-core migrations status` / `vaultspec-core migrations run`      |
+### Orient
+
+- `vaultspec-core status [TARGET]` - orient in an unknown or resumed project
+- `vaultspec-core vault feature list` - list feature tags in the vault
+- `vaultspec-core vault list [DOC_TYPE] [--feature <tag>]` - list or filter vault
+  documents
+
+### Author the pipeline
+
+- `vaultspec-core vault add <type> --feature <tag>` - create a `.vault/` document
+
+### Verify & audit
+
+- `vaultspec-core vault check all [--fix]` - audit drift, broken links, or missing
+  references
+- `vaultspec-core vault check features --feature <tag>` - confirm required documents
+  exist for a feature
+- `vaultspec-core vault sanitize annotations [--feature <tag>] [--dry-run]` - strip
+  generated template annotations
+
+### Advanced vault inspection
+
+- `vaultspec-core vault stats [--invalid] [--orphaned]` - show statistics, invalid, or
+  orphan documents
+- `vaultspec-core vault graph [--feature <tag>]` - visualize the vault dependency graph
+
+### Workspace & maintenance
+
+- `vaultspec-core spec <resource> list` - list registered rules, skills, agents, hooks,
+  or MCPs
+- `vaultspec-core spec mcps status --json` - verify MCP config health
+- `vaultspec-core spec system show` - inspect the assembled system prompt
+- `vaultspec-core sync` - propagate edits under `.vaultspec/rules/...`
+- `vaultspec-core spec doctor` - diagnose overall workspace health
+- `vaultspec-core migrations status` / `vaultspec-core migrations run` - inspect or run
+  pending schema migrations
+- `vaultspec-core vault feature archive <tag>` - archive a feature so it no longer
+  exists in the active project
+- `vaultspec-core vault rule promote --from <audit-stem> --as <rule-name>` - promote an
+  audit finding to a project rule
 
 `<resource>` is one of `rules`, `skills`, `agents`, `hooks`, or `mcps` for `list`; one
-of `rules`, `skills`, `agents`, `mcps`, or `system` for resource-scoped maintenance
-sync. Use top-level `vaultspec-core sync` as the authoritative complete propagation
-command after source-side changes.
+of `rules`, `skills`, `agents`, `hooks`, `mcps`, or `system` for resource-scoped
+maintenance sync. Use top-level `vaultspec-core sync` as the authoritative complete
+propagation command after source-side changes.
 
 ## Runtime
 
@@ -85,28 +105,8 @@ Forbidden:
 - Editing files inside generated provider directories; `vaultspec-core sync` regenerates
   them.
 
-## Maintaining the bundled CLI reference
-
-The machine-facing reference at `reference/cli.md` is part hand-written prose and part
-generator-owned. The derivable zones (today, the command-inventory signature block) sit
-between `vaultspec:generated:begin` / `vaultspec:generated:end` HTML-comment markers and
-are owned by the generator: never hand-edit between the markers, because the next
-generate overwrites those edits. The prose outside the markers (the entry-point table,
-global-options narrative, per-command option tables, and the rest) stays hand-authored.
-
-Run `vaultspec-core spec reference generate` to rewrite the managed regions from the
-live Typer command surface; this is the canonical way to update the bundled reference
-after a command, flag, or argument changes. The `--check` variant renders in memory,
-diffs against the committed file, and exits non-zero on mismatch without writing - it is
-wired into pre-commit and gates CI, so a drifted reference fails the build until the
-generator is re-run.
-
 ## References
 
 - `.vaultspec/rules/reference/cli.md` - locally-resident machine-facing CLI reference:
   command inventory, options, argument enumerations, exit codes, and environment
   variables. Read this first; no network round-trip needed.
-- [CLI reference](https://github.com/wgergely/vaultspec-core/blob/main/docs/CLI.md) -
-  human-facing prose reference: every command, subcommand, option, and exit code.
-- [Framework manual](https://github.com/wgergely/vaultspec-core/blob/main/docs/framework.md)
-  \- framework concepts, workflow, and skill catalog.

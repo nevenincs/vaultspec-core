@@ -43,6 +43,10 @@ vaultspec-core uninstall [OPTIONS] [PROVIDER]
 vaultspec-core sync [OPTIONS] [PROVIDER]
 vaultspec-core doctor [OPTIONS]
 vaultspec-core status [OPTIONS] [TARGET]
+vaultspec-core vault set-body [OPTIONS] REF
+vaultspec-core vault set-frontmatter [OPTIONS] REF
+vaultspec-core vault edit [OPTIONS] REF
+vaultspec-core vault rename [OPTIONS] REF
 vaultspec-core vault add [OPTIONS] DOC_TYPE
 vaultspec-core vault stats [OPTIONS]
 vaultspec-core vault list [OPTIONS] [DOC_TYPE]
@@ -55,6 +59,8 @@ vaultspec-core vault feature unarchive [OPTIONS] FEATURE_TAG
 vaultspec-core vault check all [OPTIONS]
 vaultspec-core vault check body-links [OPTIONS]
 vaultspec-core vault check annotations [OPTIONS]
+vaultspec-core vault check markdown [OPTIONS]
+vaultspec-core vault check placeholders [OPTIONS]
 vaultspec-core vault check dangling [OPTIONS]
 vaultspec-core vault check orphans [OPTIONS]
 vaultspec-core vault check frontmatter [OPTIONS]
@@ -95,6 +101,8 @@ vaultspec-core vault plan epic intent edit [OPTIONS] PATH
 vaultspec-core vault plan tier show [OPTIONS] PATH
 vaultspec-core vault plan tier promote [OPTIONS] PATH
 vaultspec-core vault plan tier demote [OPTIONS] PATH
+vaultspec-core vault plan trailer emit [OPTIONS]
+vaultspec-core vault plan trailer validate [OPTIONS] MESSAGE_FILE
 vaultspec-core vault link list [OPTIONS] [SRC]
 vaultspec-core vault link add [OPTIONS] SRC DST
 vaultspec-core vault link remove [OPTIONS] SRC DST
@@ -370,12 +378,15 @@ on `.vault/`. Exits `1` if errors are found.
 Shared options: `--fix` (apply auto-fixes), `--feature TAG` / `-f` (limit to a feature),
 `--verbose` / `-v` (INFO diagnostics).
 
-Subcommands: `all`, `annotations`, `body-links`, `dangling`, `frontmatter`,
-`modified-stamp`, `links`, `orphans`, `features`, `references`, `schema`, `structure`,
-`rename-integrity`. The `structure` subcommand does not support `--feature`. The
-`rename-integrity` subcommand checks name/filename integrity for rules, skills, and
-agents. The `modified-stamp` subcommand flags missing, unparseable, or stale `modified:`
-stamps; with `--fix` it normalizes parsed values to canonical `yyyy-mm-dd` form.
+Subcommands: `all`, `annotations`, `markdown`, `placeholders`, `body-links`, `dangling`,
+`frontmatter`, `modified-stamp`, `links`, `orphans`, `features`, `references`, `schema`,
+`structure`, `rename-integrity`. The `structure` subcommand does not support
+`--feature`. The `rename-integrity` subcommand checks name/filename integrity for rules,
+skills, and agents. The `modified-stamp` subcommand flags missing, unparseable, or stale
+`modified:` stamps; with `--fix` it normalizes parsed values to canonical `yyyy-mm-dd`
+form. The `markdown` subcommand checks markdown hygiene (trailing whitespace, blank-line
+runs, final newline) and repairs it with `--fix`. The `placeholders` subcommand finds
+unreplaced `{...}` template placeholders left in document body prose (detection only).
 
 ### vaultspec-core vault plan
 

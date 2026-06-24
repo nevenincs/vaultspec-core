@@ -40,30 +40,3 @@ related:
 ## Recommendations
 
 <!-- Actionable recommendations -->
-
-## Codification candidates
-
-<!-- Findings that satisfy the three durability criteria
-(cross-session, constraint-shaped, project-bound) and should be
-promoted into project-shared rules under `.vaultspec/rules/rules/`
-via `vaultspec-core vault rule promote --from <this-audit-stem>
---as <rule-name>`.
-
-Each candidate names the finding it derives from, the proposed
-rule slug (kebab-case, naming the constraint's subject not the
-failure), and a one-sentence statement of the rule.
-
-Most audits produce zero codification candidates. Some produce one.
-Only the rare framework-wide-pattern audit produces several. If
-none of the findings above meet the bar, state that explicitly and
-move on -- an empty Codification candidates section is a positive
-signal, not a failure. -->
-
-<!-- Example:
-
-- **Source:** finding S04 (destructive verbs lack preview).
-  **Rule slug:** `destructive-verbs-need-dry-run`.
-  **Rule:** Every CLI verb that writes or removes state must
-  accept `--dry-run` and emit a usable preview before applying.
-
--->

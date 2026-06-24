@@ -1397,6 +1397,60 @@ def cmd_check_annotations(
     )
 
 
+@check_app.command("markdown")
+def cmd_check_markdown(
+    fix: Annotated[
+        bool,
+        typer.Option("--fix", help="Repair markdown hygiene issues"),
+    ] = False,
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Check and optionally fix markdown hygiene (trailing whitespace, blank
+    runs, final newline)."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.checks import check_markdown
+
+    result = check_markdown(_get_ctx().target_dir, feature=feature, fix=fix)
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.markdown"
+    )
+
+
+@check_app.command("placeholders")
+def cmd_check_placeholders(
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Find unreplaced {...} template placeholders in document body prose."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
+    from vaultspec_core.vaultcore.checks import check_placeholders
+
+    graph = VaultGraph(_get_ctx().target_dir)
+    snapshot = graph.to_snapshot()
+    result = check_placeholders(
+        _get_ctx().target_dir, snapshot=snapshot, feature=feature
+    )
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.placeholders"
+    )
+
+
 @sanitize_app.command("annotations")
 def cmd_sanitize_annotations(
     feature: Annotated[

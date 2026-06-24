@@ -63,27 +63,3 @@ Do not add code; code references must be persisted in a separate `{reference}` d
 ## Consequences
 
 <!-- Gains, but framed honestly. Difficulties. Pathways this feature opens. Pitfalls. -->
-
-## Codification candidates
-
-<!-- If this decision introduces a durable cross-session constraint
-that should bind future agents (an obligation, a prohibition, a
-discipline that survives this feature's lifecycle), name it here as
-a candidate for promotion into a project rule under
-`.vaultspec/rules/rules/` via the codify pipeline phase.
-
-Each candidate names the proposed rule slug (kebab-case, naming the
-constraint's subject) and a one-sentence statement of the rule.
-
-Not every ADR produces a codification candidate. Decisions that are
-local to one feature, or that describe rather than constrain, leave
-this section empty. An empty Codification candidates section is a
-positive signal, not a failure. -->
-
-<!-- Example:
-
-- **Rule slug:** `destructive-verbs-need-dry-run`.
-  **Rule:** Every CLI verb that writes or removes state must
-  accept `--dry-run` and emit a usable preview before applying.
-
--->

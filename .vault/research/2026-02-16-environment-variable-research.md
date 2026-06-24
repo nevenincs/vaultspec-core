@@ -232,7 +232,6 @@ ______________________________________________________________________
 
 # Duplicated in multiple conftest.py files:
 
-
 TEST_PROJECT = <path> / "test-project"
 GPU_FAST_CORPUS_STEMS = frozenset([...])  # 13 representative docs
 HAS_RAG = <bool>                          # Check if RAG deps available
@@ -315,11 +314,9 @@ def rag_components():  # Uses .lance-fast/
 def rag_components_full():  # Uses .lance-full/ (full corpus)
     ...
 
-
 **Issue:** Separate lance directories prevent corruption but add complexity.
 
 ### 5.2 Cleanup Patterns
-
 
 **Vault reset (session cleanup):**
 

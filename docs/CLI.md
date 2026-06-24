@@ -122,6 +122,8 @@ vaultspec-core vault feature unarchive [OPTIONS] FEATURE_TAG
 vaultspec-core vault check all [OPTIONS]
 vaultspec-core vault check body-links [OPTIONS]
 vaultspec-core vault check annotations [OPTIONS]
+vaultspec-core vault check markdown [OPTIONS]
+vaultspec-core vault check placeholders [OPTIONS]
 vaultspec-core vault check dangling [OPTIONS]
 vaultspec-core vault check orphans [OPTIONS]
 vaultspec-core vault check frontmatter [OPTIONS]

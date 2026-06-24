@@ -8,7 +8,7 @@ related:
   - '[[2026-03-23-docs-curation-research]]'
 ---
 
-# `docs-curation` adr: `docs curation` | (**status:** `{accepted|rejected|deprecated}`)
+# `docs-curation` adr: `docs curation` | (**status:** `accepted`)
 
 ## Problem Statement
 
