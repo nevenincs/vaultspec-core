@@ -1,0 +1,207 @@
+"""Tests for the provider-hooks subsystem (author once, render per provider).
+
+Covers canonical-event rendering for every provider, the source loader, the
+ownership-preserving compose step, and an end-to-end sync that writes each
+provider's native hook-config file.
+"""
+
+from __future__ import annotations
+
+import json
+from typing import TYPE_CHECKING
+
+import pytest
+
+from vaultspec_core.core.enums import Tool
+from vaultspec_core.core.provider_hooks import (
+    HookEvent,
+    HookSpec,
+    _compose_flat_hooks,
+    load_provider_hook_specs,
+    render_hooks_payload,
+    supported_events,
+)
+from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+pytestmark = [pytest.mark.unit]
+
+
+def _spec(event: HookEvent, **kw) -> HookSpec:
+    return HookSpec(
+        name=kw.pop("name", "h"), event=event, command=kw.pop("command", "echo x"), **kw
+    )
+
+
+class TestRenderPayload:
+    def test_claude_uses_pretooluse_and_seconds(self):
+        specs = [_spec(HookEvent.PRE_TOOL_USE, matcher="Bash", timeout=30)]
+        payload = render_hooks_payload(specs, Tool.CLAUDE)
+        assert payload is not None
+        group = payload["PreToolUse"][0]
+        assert group["matcher"] == "Bash"
+        assert group["hooks"][0] == {
+            "type": "command",
+            "command": "echo x",
+            "timeout": 30,
+        }
+
+    def test_gemini_maps_to_beforetool_and_milliseconds(self):
+        specs = [_spec(HookEvent.PRE_TOOL_USE, timeout=30)]
+        payload = render_hooks_payload(specs, Tool.GEMINI)
+        assert payload is not None
+        assert "BeforeTool" in payload
+        assert "PreToolUse" not in payload
+        assert payload["BeforeTool"][0]["hooks"][0]["timeout"] == 30000
+
+    def test_post_tool_use_maps_to_aftertool_for_gemini(self):
+        payload = render_hooks_payload([_spec(HookEvent.POST_TOOL_USE)], Tool.GEMINI)
+        assert payload is not None and "AfterTool" in payload
+
+    def test_antigravity_wraps_in_named_hookset(self):
+        payload = render_hooks_payload(
+            [_spec(HookEvent.PRE_TOOL_USE)], Tool.ANTIGRAVITY
+        )
+        assert payload is not None
+        assert set(payload) == {"vaultspec"}
+        assert payload["vaultspec"]["enabled"] is True
+        assert "PreToolUse" in payload["vaultspec"]
+
+    def test_unsupported_event_skipped_with_warning(self):
+        # Codex has no Notification event; Gemini has no Stop event.
+        warnings: list[str] = []
+        assert (
+            render_hooks_payload([_spec(HookEvent.NOTIFICATION)], Tool.CODEX, warnings)
+            is None
+        )
+        assert any("codex" in w for w in warnings)
+
+        warnings.clear()
+        assert (
+            render_hooks_payload([_spec(HookEvent.STOP)], Tool.GEMINI, warnings) is None
+        )
+        assert any("gemini" in w for w in warnings)
+
+    def test_empty_matcher_is_omitted(self):
+        payload = render_hooks_payload([_spec(HookEvent.SESSION_START)], Tool.CLAUDE)
+        assert payload is not None
+        assert "matcher" not in payload["SessionStart"][0]
+
+    def test_disabled_spec_not_rendered(self):
+        assert (
+            render_hooks_payload(
+                [_spec(HookEvent.PRE_TOOL_USE, enabled=False)], Tool.CLAUDE
+            )
+            is None
+        )
+
+    def test_supported_events_matrix(self):
+        assert HookEvent.STOP in supported_events(Tool.CLAUDE)
+        assert HookEvent.STOP not in supported_events(Tool.GEMINI)
+        assert HookEvent.NOTIFICATION not in supported_events(Tool.CODEX)
+        assert HookEvent.USER_PROMPT_SUBMIT not in supported_events(Tool.ANTIGRAVITY)
+
+
+class TestLoader:
+    def test_loads_canonical_events_and_ignores_lifecycle(self, tmp_path: Path):
+        (tmp_path / "guard.yaml").write_text(
+            "event: pre_tool_use\nmatcher: Bash\ncommand: echo guard\ntimeout: 5\n",
+            encoding="utf-8",
+        )
+        # A CLI-lifecycle hook (non-canonical event) must be ignored here.
+        (tmp_path / "lifecycle.yaml").write_text(
+            "event: vault.document.created\n"
+            "actions:\n  - type: shell\n    command: echo doc\n",
+            encoding="utf-8",
+        )
+        specs = load_provider_hook_specs(tmp_path)
+        assert [s.name for s in specs] == ["guard"]
+        assert specs[0].event is HookEvent.PRE_TOOL_USE
+        assert specs[0].matcher == "Bash"
+        assert specs[0].timeout == 5
+
+    def test_command_from_actions_list(self, tmp_path: Path):
+        (tmp_path / "a.yaml").write_text(
+            "event: stop\nactions:\n  - type: shell\n    command: echo via-actions\n",
+            encoding="utf-8",
+        )
+        specs = load_provider_hook_specs(tmp_path)
+        assert specs[0].command == "echo via-actions"
+
+    def test_missing_command_skipped(self, tmp_path: Path):
+        (tmp_path / "bad.yaml").write_text("event: stop\n", encoding="utf-8")
+        assert load_provider_hook_specs(tmp_path) == []
+
+
+class TestComposeOwnership:
+    def test_preserves_user_hooks_and_replaces_managed(self):
+        user_group = {
+            "matcher": "Write",
+            "hooks": [{"type": "command", "command": "user"}],
+        }
+        existing = {"hooks": {"PreToolUse": [user_group]}, "otherSetting": True}
+
+        payload1 = render_hooks_payload(
+            [_spec(HookEvent.PRE_TOOL_USE, command="v1")], Tool.CLAUDE
+        )
+        composed1 = _compose_flat_hooks(existing, payload1)
+        # User group preserved, vaultspec group added, unrelated key intact.
+        assert user_group in composed1["hooks"]["PreToolUse"]
+        assert composed1["otherSetting"] is True
+        assert any(
+            g["hooks"][0]["command"] == "v1" for g in composed1["hooks"]["PreToolUse"]
+        )
+
+        # Re-sync with a changed command must drop the old managed group, keep user's.
+        payload2 = render_hooks_payload(
+            [_spec(HookEvent.PRE_TOOL_USE, command="v2")], Tool.CLAUDE
+        )
+        composed2 = _compose_flat_hooks(composed1, payload2)
+        cmds = [g["hooks"][0]["command"] for g in composed2["hooks"]["PreToolUse"]]
+        assert "user" in cmds and "v2" in cmds and "v1" not in cmds
+
+    def test_removing_all_managed_clears_hooks_but_keeps_user(self):
+        existing = {
+            "hooks": {"Stop": [{"hooks": [{"type": "command", "command": "user"}]}]}
+        }
+        payload = render_hooks_payload(
+            [_spec(HookEvent.STOP, command="v1")], Tool.CLAUDE
+        )
+        with_managed = _compose_flat_hooks(existing, payload)
+        cleared = _compose_flat_hooks(with_managed, None)
+        cmds = [g["hooks"][0]["command"] for g in cleared["hooks"]["Stop"]]
+        assert cmds == ["user"]
+
+
+class TestEndToEndSync:
+    def test_sync_writes_native_files_per_provider(self, tmp_path: Path):
+        factory = WorkspaceFactory(tmp_path).install("all")
+        hooks_dir = tmp_path / ".vaultspec" / "rules" / "hooks"
+        hooks_dir.mkdir(parents=True, exist_ok=True)
+        (hooks_dir / "guard.yaml").write_text(
+            "event: pre_tool_use\nmatcher: run_command\ncommand: echo GUARD\n",
+            encoding="utf-8",
+        )
+        factory.sync("all")
+
+        agy = json.loads(
+            (tmp_path / ".agents" / "hooks.json").read_text(encoding="utf-8")
+        )
+        assert agy["vaultspec"]["PreToolUse"][0]["matcher"] == "run_command"
+
+        codex = json.loads(
+            (tmp_path / ".codex" / "hooks.json").read_text(encoding="utf-8")
+        )
+        assert "PreToolUse" in codex["hooks"]
+
+        claude = json.loads(
+            (tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8")
+        )
+        assert "PreToolUse" in claude["hooks"]
+
+        gemini = json.loads(
+            (tmp_path / ".gemini" / "settings.json").read_text(encoding="utf-8")
+        )
+        assert "BeforeTool" in gemini["hooks"]

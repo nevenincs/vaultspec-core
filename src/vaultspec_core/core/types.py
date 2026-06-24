@@ -297,6 +297,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
                     _pc.SKILLS,
                     _pc.ROOT_CONFIG,
                     _pc.WORKFLOWS,
+                    _pc.HOOKS,
                 }
             ),
         ),
@@ -318,6 +319,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
                     _pc.SKILLS,
                     _pc.AGENTS,
                     _pc.ROOT_CONFIG,
+                    _pc.HOOKS,
                 }
             ),
         ),

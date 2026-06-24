@@ -1649,6 +1649,10 @@ def sync_provider(
                     "mcps",
                 )
             )
+        if "hooks" not in skip:
+            from .provider_hooks import provider_hooks_sync
+
+            sync_passes.append((lambda: provider_hooks_sync(dry_run=dry_run), "hooks"))
         for sync_fn, label in sync_passes:
             try:
                 results.append(sync_fn())
