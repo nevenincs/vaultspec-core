@@ -35,7 +35,14 @@ related:
 
 ## Findings
 
-<!-- Key findings organized by severity -->
+<!-- A rolling log of findings: append one subsection per finding, grouped or ordered by
+     severity, using the heading form
+
+       ### {topic} | {level} | {summary}
+
+     followed by a paragraph carrying the detail. {topic} is a concise kebab-case slug,
+     {level} is the severity (critical, high, medium, low), and {summary} is a one-line
+     statement. Append continuously as findings surface; do not rewrite settled entries. -->
 
 ## Recommendations
 

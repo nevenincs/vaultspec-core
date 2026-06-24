@@ -34,6 +34,25 @@ Use:
 
 - **Synthesize** findings into a cohesive `<Reference>` document.
 
+## Reference quality bar
+
+A good `<Reference>` is a re-usable blueprint judged by decision value, not coverage.
+Every reference you return is:
+
+- **Faithful** - cite the exact module and `file:line`, and pin the reference's version
+  or commit, so a reader reaches the source without you reproducing it.
+- **Pattern-level, not copied** - capture abstractions, architectural boundaries, and
+  module interactions, never pasted implementation.
+- **Mapped to our codebase** - show how the pattern translates to our architecture, not
+  a generic tour of the reference.
+- **Load-bearing only** - the decisive abstractions a re-implementation needs, not an
+  exhaustive walk.
+- **Honest about divergence** - name where the reference's approach will not fit us, and
+  why.
+
+Write it lean: claim-first, link don't copy, one pass, technical-reader default. Context
+is valuable; length is not.
+
 ## Reference persistence
 
 You are read-only and do not write the `<Reference>` document to disk.

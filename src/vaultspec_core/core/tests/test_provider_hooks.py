@@ -180,6 +180,33 @@ class TestComposeOwnership:
         assert managed_after == {}
 
 
+class TestLifecycleCoexistence:
+    """Provider hooks and CLI-lifecycle hooks share a directory cleanly."""
+
+    def test_lifecycle_loader_silently_skips_provider_events(self, tmp_path: Path):
+        from vaultspec_core.hooks import load_hooks
+        from vaultspec_core.hooks.engine import _is_provider_hook_event
+
+        assert _is_provider_hook_event("session_start") is True
+        assert _is_provider_hook_event("vault.document.created") is False
+
+        # A provider hook and a lifecycle hook side by side.
+        (tmp_path / "orient.yaml").write_text(
+            "event: session_start\nactions:\n  - type: shell\n    command: echo hi\n",
+            encoding="utf-8",
+        )
+        (tmp_path / "doc.yaml").write_text(
+            "event: vault.document.created\n"
+            "actions:\n  - type: shell\n    command: echo doc\n",
+            encoding="utf-8",
+        )
+        # The lifecycle engine loads only its own event; the provider hook is
+        # skipped (not surfaced as an unsupported-event hook).
+        loaded = load_hooks(tmp_path)
+        events = {h.event for h in loaded}
+        assert events == {"vault.document.created"}
+
+
 class TestEndToEndSync:
     def test_sync_writes_native_files_per_provider(self, tmp_path: Path):
         factory = WorkspaceFactory(tmp_path).install("all")

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "beautiful-prose": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/beautiful-prose/SKILL.md",
+      "computedHash": "ae6f8f8cf576d62321da58eca3aff032bc0cd216732ced92c69075ed636d6cf4"
+    }
+  }
+}

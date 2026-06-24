@@ -43,6 +43,14 @@ Describe why the ADR is being persisted. Is this a new feature? Result of an aud
 
 <!-- Key factors, constraints, requirements. Tech/libraries considered. -->
 
+## Considered options
+
+<!-- Name each alternative evaluated, compared at the same level of abstraction, with its
+key pros and cons and why it was kept or rejected. Naming the rejected options - not only
+the chosen one - is what lets a future reader reconstruct the decision. Keep each option
+to a terse claim-first line or two; the chosen option's full reasoning belongs under
+Rationale. -->
+
 ## Constraints
 
 <!-- Technical limitations, e.g.: depends on non-mature library, frontier feature, requires rigorous research. 'Frontier' risk, e.g. technology is new and falls outside the implementing model's training cutoff.

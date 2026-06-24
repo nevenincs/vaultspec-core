@@ -153,6 +153,21 @@ def load_hooks(hooks_dir: Path) -> list[Hook]:
     return hooks
 
 
+def _is_provider_hook_event(event: str) -> bool:
+    """Return ``True`` for canonical provider-hook events handled elsewhere.
+
+    Provider (agent-runtime) hooks live alongside CLI-lifecycle hooks in the
+    same directory but are rendered into per-provider native configs by
+    :mod:`vaultspec_core.core.provider_hooks`. The lifecycle loader must treat
+    their events as "not mine" and skip them silently, never as unsupported.
+    """
+    try:
+        from vaultspec_core.core.provider_hooks import HookEvent
+    except ImportError:
+        return False
+    return event in {member.value for member in HookEvent}
+
+
 def _parse_hook(path: Path, data: dict[str, Any]) -> Hook | None:
     """Parse a hook definition dict into a Hook object.
 
@@ -171,6 +186,11 @@ def _parse_hook(path: Path, data: dict[str, Any]) -> Hook | None:
         return None
 
     if event not in SUPPORTED_EVENTS:
+        if _is_provider_hook_event(event):
+            # Provider (agent-runtime) hooks share this directory but are
+            # rendered by vaultspec_core.core.provider_hooks, not fired by this
+            # CLI-lifecycle engine. Skip silently rather than warn.
+            return None
         logger.warning("Hook %s has unsupported event: %s", path.name, event)
         return None
 
