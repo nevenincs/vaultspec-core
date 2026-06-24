@@ -35,6 +35,11 @@ research and brainstorming."
   verify after scaffolding with `vaultspec-core vault check all` rather than
   hand-editing frontmatter.
 
+- **Persist sources:** record every finding's source as a re-fetchable locator (URL,
+  `file:line`, commit SHA, `package@version`, RFC number); ground code in a
+  `<Reference>` via `vaultspec-code-research` and link it. Keep the artifact lean by
+  pointing to sources, not reproducing them.
+
 ## Workflow
 
 Research is the upstream precursor for a feature: it produces `<Research>` grounding for

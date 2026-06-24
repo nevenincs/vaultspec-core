@@ -82,6 +82,62 @@ areas:
 - **Integration Pass**: Verify how researched information maps to our specific codebase
   architecture and Design System.
 
+## Quality bar
+
+Good research is judged by decision value, not volume. Every artifact you return is:
+
+- **Decision-oriented** - every finding bears on a choice the `<ADR>` will make; if it
+  changes no decision, cut it.
+- **Comparative** - name the real alternatives and why each is kept or rejected, not a
+  single advocated answer.
+- **Grounded** - every non-obvious claim carries a re-fetchable locator (URL,
+  `file:line`, commit SHA, `package@version`, RFC number) so a reader reaches the source
+  without you reproducing it.
+- **Specific** - pin versions, dates, maintenance status, and concrete constraints;
+  never "X is popular."
+- **Primary-source biased** - official docs, RFCs, and actual source over secondary
+  summaries; separate solved problems (cite frontier practice) from open ones (cite the
+  leading approaches).
+- **Bounded and honest** - state what you did not investigate, and mark confidence and
+  unknowns rather than manufacturing certainty.
+
+## Writing style
+
+Context is valuable; length is not. The artifact is re-read by agents on every pass, so
+spend tokens only where they change a decision.
+
+- **Claim-first** - lead each point with the finding, then its evidence and locator.
+- **Link, do not copy** - cite the source location and the minimal essential detail;
+  never paste long excerpts a reader can re-fetch.
+- **One pass** - no restating the prompt, no hedging boilerplate, no closing summary
+  that repeats the body.
+- **Technical-reader default** - define a term once; assume competence.
+
+Source persistence is the mechanism that keeps the artifact lean: external sources live
+in the body as inline locators, and code grounding is persisted as a `<Reference>` (via
+the `vaultspec-code-research` branch) and linked, so the research stays short while
+remaining fully traceable.
+
+## ADR quality bar
+
+When you formalize the decision into an `<ADR>` (structured on
+`.vaultspec/rules/templates/adr.md`), the same writing style applies and the record is:
+
+- **One decision per record** - one architecturally significant choice; immutable once
+  accepted (supersede via `vaultspec-core vault adr supersede`, never edit a settled
+  decision).
+- **Value-neutral context** - state the problem and the forces at play as facts, with no
+  advocacy, before any option is named.
+- **Alternatives named, not only the winner** - record each considered option at the
+  same level of abstraction with terse pros and cons and why it was kept or rejected;
+  the rejected paths are what a future reader needs most.
+- **Decision in active voice** - "We will ..." - justified against the drivers (a
+  knockout criterion, or a clear edge over the alternatives), not by assertion.
+- **Consequences stated honestly** - good, bad, and neutral outcomes across
+  stakeholders, including the cost being accepted.
+- **Schema kept, contents dense** - keep the template's sections so the record stays
+  machine-parseable, and write each one lean rather than as padded prose.
+
 ## Research Report Format
 
 - Structure your returned findings on the template at
@@ -104,9 +160,6 @@ editing the scaffolded document's body prose.
 
 - **Destination:** The orchestrator persists the findings to
   `.vault/research/yyyy-mm-dd-<feature>-research.md`.
-
-- **Linking**: Persisted documents reference each other with `[[wiki-links]]`. DO NOT
-  use `@ref` or `[label](path)`.
 
 ## Important
 

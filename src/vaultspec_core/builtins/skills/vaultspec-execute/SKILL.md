@@ -58,8 +58,8 @@ Assume the persona of a delegator.
   `.vaultspec/rules/templates/exec-step.md`.
 
 - **Frontmatter:** the scaffold owns the filename and frontmatter of every artifact
-  (Step Record, Summary, Review); the full schema is defined in the `vaultspec` rule.
-  Verify with `vaultspec-core vault check all` rather than hand-editing.
+  (Step Record, Summary); the full schema is defined in the `vaultspec` rule. Verify
+  with `vaultspec-core vault check all` rather than hand-editing.
 
 ### Mandatory code review
 
