@@ -5,18 +5,28 @@ description: Promote a durable lesson from an audit or ADR into a shared project
 
 # Rule authoring skill (vaultspec-codify)
 
-Use this skill:
+Engage this skill **only when the user explicitly requests codification** - "codify
+this", "promote this to a rule". The framework never triggers it on its own initiative;
+saving a project rule is a user decision, not a routine output of doing work. If no
+explicit request was made, do not engage; the durable decision belongs in the vault and
+is reached by retrieval (`vaultspec-rag search "<intent>" --type vault`).
 
-- After a `vaultspec-code-review` session, a `vaultspec-execute` run, or an `<Audit>`
-  document surfaces a lesson that must bind future agents across sessions.
+Once the user has asked, use this skill when:
 
-- When the lesson is constraint-shaped (renderable as "always X" or "never Y") and
+- A `vaultspec-code-review` session, a `vaultspec-execute` run, or an `<Audit>` document
+  surfaced the lesson the user wants bound across sessions.
+
+- The lesson is constraint-shaped (renderable as "always X" or "never Y") and
   project-bound (specific to this project's conventions, not generic engineering
   advice).
 
-- When no existing rule already covers the intent.
+- No existing rule already covers the intent, and - confirmed first by
+  `vaultspec-rag search "<intent>" --type vault` - the constraint is not already
+  adequately captured as a discoverable vault decision.
 
 Do NOT use this skill:
+
+- Without an explicit user request to codify.
 
 - On the first encounter with a constraint. Wait until the constraint has held across at
   least one full execution cycle.

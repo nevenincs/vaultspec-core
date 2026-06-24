@@ -66,19 +66,18 @@ Do not add code; code references must be persisted in a separate `{reference}` d
 
 ## Codification candidates
 
-<!-- If this decision introduces a durable cross-session constraint
-that should bind future agents (an obligation, a prohibition, a
-discipline that survives this feature's lifecycle), name it here as
-a candidate for promotion into a project rule under
-`.vaultspec/rules/rules/` via the codify pipeline phase.
+<!-- Leave this section empty by default. Codification is not a
+routine output of an ADR: the framework ships its operating rules
+and never asks you to manufacture new ones. The durable decision
+this ADR records already lives in the vault and is reached by
+retrieval (`vaultspec-rag search "<intent>" --type vault`).
 
-Each candidate names the proposed rule slug (kebab-case, naming the
-constraint's subject) and a one-sentence statement of the rule.
-
-Not every ADR produces a codification candidate. Decisions that are
-local to one feature, or that describe rather than constrain, leave
-this section empty. An empty Codification candidates section is a
-positive signal, not a failure. -->
+Name a candidate here ONLY if the user has explicitly asked to
+codify a constraint from this decision. In that case give the
+proposed rule slug (kebab-case, naming the constraint's subject)
+and a one-sentence statement of the rule, and author it via the
+on-demand `vaultspec-codify` skill. An empty section is the
+expected, positive default. -->
 
 <!-- Example:
 

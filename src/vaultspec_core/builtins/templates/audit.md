@@ -43,21 +43,19 @@ related:
 
 ## Codification candidates
 
-<!-- Findings that satisfy the three durability criteria
-(cross-session, constraint-shaped, project-bound) and should be
-promoted into project-shared rules under `.vaultspec/rules/rules/`
-via `vaultspec-core vault rule promote --from <this-audit-stem>
---as <rule-name>`.
+<!-- Leave this section empty by default. An audit records its
+findings in the vault for discovery; it does not oblige you to mint
+standing rules. The framework ships its operating rules and never
+asks you to manufacture new ones as routine output.
 
-Each candidate names the finding it derives from, the proposed
-rule slug (kebab-case, naming the constraint's subject not the
-failure), and a one-sentence statement of the rule.
-
-Most audits produce zero codification candidates. Some produce one.
-Only the rare framework-wide-pattern audit produces several. If
-none of the findings above meet the bar, state that explicitly and
-move on -- an empty Codification candidates section is a positive
-signal, not a failure. -->
+Name a candidate here ONLY if the user has explicitly asked to
+codify a finding from this audit. In that case give the source
+finding, the proposed rule slug (kebab-case, naming the
+constraint's subject not the failure), and a one-sentence statement
+of the rule, then author it via the on-demand `vaultspec-codify`
+skill (`vaultspec-core vault rule promote --from <this-audit-stem>
+--as <rule-name>`). An empty section is the expected, positive
+default. -->
 
 <!-- Example:
 

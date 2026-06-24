@@ -21,6 +21,13 @@ explicitly requires direct code referencing.
 
 ## Required steps
 
+- **Ground in existing intent first.** Before the code deep dive, retrieve what the
+  project already decided and built: `vaultspec-rag search "<intent>" --type vault`
+  surfaces the ADRs, audits, and references that bind this area, and
+  `vaultspec-rag search "<intent>" --type code` locates the semantically matching
+  implementation sites to anchor the audit. Fall back to `vaultspec-core vault list` and
+  grep when `vaultspec-rag` is not installed.
+
 - **Read and use the template** at `.vaultspec/rules/templates/reference.md`; its
   embedded hint blocks govern the body structure.
 
