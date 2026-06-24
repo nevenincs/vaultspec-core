@@ -8,9 +8,7 @@ configuration via :func:`~vaultspec_core.config.get_config`.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import sys
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
@@ -99,10 +97,9 @@ def _serve(ctx_obj: dict | None = None) -> None:
 
     mcp = create_server()
 
-    if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-
-    # FastMCP run() is synchronous, but we can call it here.
+    # FastMCP run() is synchronous, but we can call it here. On Windows the
+    # default event loop has been the Proactor loop since Python 3.8, which the
+    # MCP stdio transport requires, so no explicit policy override is needed.
     mcp.run()
 
 

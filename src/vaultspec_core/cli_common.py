@@ -41,9 +41,9 @@ def get_version() -> str:
 def run_async[T](coro: Coroutine[Any, Any, T], *, debug: bool = False) -> T:
     """Run a coroutine on a new event loop with Windows-safe teardown.
 
-    Applies ``WindowsProactorEventLoopPolicy`` on Windows and suppresses
-    ``ResourceWarning`` during the run. A short grace period is added on
-    Windows before loop close to flush pending pipe callbacks.
+    Uses a ``ProactorEventLoop`` on Windows and suppresses ``ResourceWarning``
+    during the run. A short grace period is added on Windows before loop close
+    to flush pending pipe callbacks.
 
     On unhandled exceptions (other than ``KeyboardInterrupt`` / ``SystemExit``),
     logs the error and calls ``sys.exit(1)``.
@@ -56,9 +56,9 @@ def run_async[T](coro: Coroutine[Any, Any, T], *, debug: bool = False) -> T:
         The return value of the coroutine.
     """
     if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-
-    loop = asyncio.new_event_loop()
+        loop: asyncio.AbstractEventLoop = asyncio.ProactorEventLoop()
+    else:
+        loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
     try:

@@ -41,8 +41,9 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-    import click
     import typer
+    from typer._click.core import Command as ClickCommand
+    from typer._click.core import Context as ClickContext
 
 # Marker grammar. The region id is interpolated between the fixed prefix and
 # suffix so a single regex-free string search locates each managed zone.
@@ -116,25 +117,25 @@ def _leaf_commands_in_order(
 
 
 def _resolve_click_command(
-    root: click.Command, root_ctx: click.Context, path: tuple[str, ...]
-) -> tuple[click.Command, click.Context]:
+    root: ClickCommand, root_ctx: ClickContext, path: tuple[str, ...]
+) -> tuple[ClickCommand, ClickContext]:
     """Descend the Click command tree to the command at *path*."""
-    import click
+    from typer.core import TyperGroup
 
     command = root
     ctx = root_ctx
     for segment in path:
-        assert isinstance(command, click.Group)
+        assert isinstance(command, TyperGroup)
         sub = command.get_command(ctx, segment)
         if sub is None:
             raise KeyError(f"Click command not found for path: {' '.join(path)}")
         command = sub
-        ctx = click.Context(sub, info_name=segment, parent=ctx)
+        ctx = sub.context_class(sub, info_name=segment, parent=ctx)
     return command, ctx
 
 
 def _command_signature(
-    command: click.Command, ctx: click.Context, path: tuple[str, ...]
+    command: ClickCommand, ctx: ClickContext, path: tuple[str, ...]
 ) -> str:
     """Render one leaf signature line: ``vaultspec-core <path> [OPTIONS] ARGS``.
 
@@ -143,22 +144,23 @@ def _command_signature(
     through Click's own ``make_metavar`` so optional arguments keep their
     ``[BRACKETS]`` and required ones stay bare.
     """
-    import click
-
     parts = ["vaultspec-core", *path, "[OPTIONS]"]
     for param in command.get_params(ctx):
-        if isinstance(param, click.Argument):
+        if param.param_type_name == "argument":
             parts.append(param.make_metavar(ctx))
     return " ".join(parts)
 
 
 def collect_leaf_signatures(typer_app: typer.Typer) -> list[str]:
     """Return every visible leaf-command signature line in registration order."""
-    import click
     from typer.main import get_command
 
+    # Typer 0.26 vendors its own Click (`typer._click`); `get_command` returns
+    # objects from that vendored Click, so the descent uses Typer's public
+    # ``TyperGroup`` type and each command's own ``context_class`` rather than
+    # the installed ``click`` package's classes.
     root = get_command(typer_app)
-    root_ctx = click.Context(root, info_name="vaultspec-core")
+    root_ctx = root.context_class(root, info_name="vaultspec-core")
 
     signatures: list[str] = []
     for path in _leaf_commands_in_order(typer_app, ()):

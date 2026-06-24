@@ -29,7 +29,7 @@ from vaultspec_core.core.enums import DirName, FileName
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from click.testing import Result
+    from typer.testing import Result
 
     from vaultspec_core.core.manifest import ManifestData
 
