@@ -708,17 +708,21 @@ def cmd_sync(
             )
             for path in outdated:
                 console.print(f"  [yellow]-[/yellow] {path}")
-            from vaultspec_core.cli.rendering import render_next_actions
-
-            render_next_actions(
-                [
-                    (
-                        "Update builtins to the packaged version",
-                        "vaultspec-core install --upgrade",
-                    ),
-                    ("Re-sync after upgrading", "vaultspec-core sync"),
-                ]
+            from vaultspec_core.cli.rendering import (
+                hints_suppressed,
+                render_next_actions,
             )
+
+            if not hints_suppressed():
+                render_next_actions(
+                    [
+                        (
+                            "Update builtins to the packaged version",
+                            "vaultspec-core install --upgrade",
+                        ),
+                        ("Re-sync after upgrading", "vaultspec-core sync"),
+                    ]
+                )
 
         if all_warnings:
             console.print()
@@ -747,11 +751,15 @@ def cmd_sync(
                 "\n[bold yellow]Warning:[/bold yellow] Sync produced 0 files. "
                 "The .vaultspec/rules/ source directories may be empty."
             )
-            from vaultspec_core.cli.rendering import render_next_actions
-
-            render_next_actions(
-                [("Re-seed builtin content", "vaultspec-core install --upgrade")]
+            from vaultspec_core.cli.rendering import (
+                hints_suppressed,
+                render_next_actions,
             )
+
+            if not hints_suppressed():
+                render_next_actions(
+                    [("Re-seed builtin content", "vaultspec-core install --upgrade")]
+                )
 
     raise typer.Exit(code)
 
