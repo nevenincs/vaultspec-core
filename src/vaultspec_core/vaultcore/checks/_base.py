@@ -162,10 +162,13 @@ _SEVERITY_STYLE = {
     Severity.INFO: "dim",
 }
 
+# ASCII-only status markers per the cli-presentation-uniformity ADR: the data
+# path emits no box-drawing or non-ASCII glyphs, so output survives a cp1252
+# stdout byte-for-byte and reads uniformly with the outcome vocabulary.
 _SEVERITY_ICON = {
-    Severity.ERROR: "✗",
+    Severity.ERROR: "x",
     Severity.WARNING: "!",
-    Severity.INFO: "·",
+    Severity.INFO: "-",
 }
 
 
@@ -187,9 +190,7 @@ def render_check_result(
     # When not verbose, INFO-only results are effectively clean.
     visible_issues = result.error_count + result.warning_count
     if result.is_clean or (not verbose and not visible_issues):
-        console.print(
-            f"  [green]\u2713[/green] {result.check_name}: [green]clean[/green]"
-        )
+        console.print(f"  [green]ok[/green] {result.check_name}: [green]clean[/green]")
         return
 
     errors = result.error_count
@@ -210,7 +211,7 @@ def render_check_result(
     if result.fixed_count:
         summary += f" ([green]{result.fixed_count} fixed[/green])"
 
-    icon = "[red]✗[/red]" if errors else "[yellow]![/yellow]"
+    icon = "[red]x[/red]" if errors else "[yellow]![/yellow]"
     console.print(f"  {icon} {result.check_name}: {summary}")
 
     if summary_only:

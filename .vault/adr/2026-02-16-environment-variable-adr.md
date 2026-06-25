@@ -1475,17 +1475,13 @@ cp .env.example .env.local
 
 # Edit for your environment
 
-
 vim .env.local****
 
-
 # Load configuration
-
 
 export $(cat .env.local | xargs)
 
 # Run application
-
 
 python .vaultspec/scripts/cli.py
 
@@ -1505,16 +1501,13 @@ See `.env.example` for complete list with descriptions.
 
 ````
 
-
 2. **Create config reference documentation** (`.vault/reference/environment-variables.md`):
-
 
    - Description of each variable
    - Use cases and examples
 
    - Common configurations (development, CI/CD, production)
    - Troubleshooting guide
-
 
 3. **Create validation checklist**:
 

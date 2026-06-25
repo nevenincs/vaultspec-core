@@ -307,7 +307,7 @@ class TestRollup:
         result = _run(tmp_path)
 
         assert result.exit_code == 0, result.output
-        assert "Suggested Next Step" in result.output
+        assert "Next action" in result.output
         assert "vaultspec-core status" in result.output
         assert "vaultspec-core spec doctor" in result.output
 
@@ -317,7 +317,7 @@ class TestRollup:
         result = _run(tmp_path, "--no-hints")
 
         assert result.exit_code == 0, result.output
-        assert "Suggested Next Step" not in result.output
+        assert "Next action" not in result.output
 
     def test_json_envelope_shape(self, tmp_path: Path) -> None:
         ids = _build_vault(tmp_path)
@@ -421,7 +421,7 @@ class TestTrace:
         result = _run(tmp_path, ids["plan"])
 
         assert result.exit_code == 0, result.output
-        assert "Suggested Next Step" in result.output
+        assert "Next action" in result.output
         assert f"vaultspec-core vault graph --feature {ids['feature']}" in result.output
         assert "vaultspec-core vault plan status" in result.output
 

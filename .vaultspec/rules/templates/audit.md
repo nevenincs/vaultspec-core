@@ -35,33 +35,15 @@ related:
 
 ## Findings
 
-<!-- Key findings organized by severity -->
+<!-- A rolling log of findings: append one subsection per finding, grouped or ordered by
+     severity, using the heading form
+
+       ### {topic} | {level} | {summary}
+
+     followed by a paragraph carrying the detail. {topic} is a concise kebab-case slug,
+     {level} is the severity (critical, high, medium, low), and {summary} is a one-line
+     statement. Append continuously as findings surface; do not rewrite settled entries. -->
 
 ## Recommendations
 
 <!-- Actionable recommendations -->
-
-## Codification candidates
-
-<!-- Leave this section empty by default. An audit records its
-findings in the vault for discovery; it does not oblige you to mint
-standing rules. The framework ships its operating rules and never
-asks you to manufacture new ones as routine output.
-
-Name a candidate here ONLY if the user has explicitly asked to
-codify a finding from this audit. In that case give the source
-finding, the proposed rule slug (kebab-case, naming the
-constraint's subject not the failure), and a one-sentence statement
-of the rule, then author it via the on-demand `vaultspec-codify`
-skill (`vaultspec-core vault rule promote --from <this-audit-stem>
---as <rule-name>`). An empty section is the expected, positive
-default. -->
-
-<!-- Example:
-
-- **Source:** finding S04 (destructive verbs lack preview).
-  **Rule slug:** `destructive-verbs-need-dry-run`.
-  **Rule:** Every CLI verb that writes or removes state must
-  accept `--dry-run` and emit a usable preview before applying.
-
--->

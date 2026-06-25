@@ -43,11 +43,26 @@ research and brainstorming."
   verify after scaffolding with `vaultspec-core vault check all` rather than
   hand-editing frontmatter.
 
+- **Persist sources:** record every finding's source as a re-fetchable locator (URL,
+  `file:line`, commit SHA, `package@version`, RFC number); ground code in a
+  `<Reference>` via `vaultspec-code-research` and link it. Keep the artifact lean by
+  pointing to sources, not reproducing them.
+
 ## Workflow
 
-- Research and brainstorm might be followed by:
-  - User approval -> proceed with `vaultspec-adr` to create and persist the ADR.
-  - No approval -> prompt the user to refine goal and constraints, then re-run research.
+Research is the upstream precursor for a feature: it produces `<Research>` grounding for
+a decision, not an implementation. From here the work branches:
+
+- **Forward to the decision** -> on user approval, proceed with the `vaultspec-adr`
+  skill to create and persist the `<ADR>` the research supports.
+
+- **Out to grounding** -> when the decision needs grounding in real source code,
+  reference implementations, or library docs, branch to the `vaultspec-code-research`
+  skill (which can dispatch the `vaultspec-reference-auditor` agent) to produce a
+  `<Reference>`, then fold its findings back into the research or ADR.
+
+- **Back to refinement** -> without approval, prompt the user to refine goal and
+  constraints, then re-run research.
 
 ## Artifact linking
 

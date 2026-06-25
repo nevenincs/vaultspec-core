@@ -186,26 +186,59 @@ def _render_codex_config_lines(meta: dict[str, object]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+def _read_rule_content(config_file: Path, ref: str) -> str | None:
+    """Read a referenced rule file's content for inline embedding.
+
+    *ref* is a config-file-relative include string (as produced by
+    :func:`_collect_rule_refs`); it is resolved against the config file's
+    parent directory. Returns the file's stripped text, or ``None`` when the
+    file is missing or unreadable.
+    """
+    candidate = (config_file.parent / ref).resolve()
+    try:
+        if candidate.is_file():
+            return candidate.read_text(encoding="utf-8").strip()
+    except OSError:
+        logger.warning("Cannot read rule file for embedding: %s", candidate)
+    return None
+
+
+def _render_rules_body(
+    config_file: Path, refs: list[str], *, embed: bool
+) -> str | None:
+    """Render the managed rules block body for a root config file.
+
+    When *embed* is ``False`` (the default for include-expanding tools such as
+    Claude Code and gemini-cli), each rule is emitted as an ``@ref`` include
+    line. When *embed* is ``True`` (required for the Antigravity CLI, which
+    does not expand ``@`` includes), the referenced rule files are inlined
+    verbatim instead. Returns ``None`` when there is nothing to emit.
+    """
+    if not refs:
+        return None
+
+    body_parts = [_RULES_HEADER, "", _RULES_PREAMBLE, ""]
+    if embed:
+        chunks: list[str] = []
+        for ref in refs:
+            content = _read_rule_content(config_file, ref)
+            if content:
+                chunks.append(content)
+        if not chunks:
+            return None
+        body_parts.append("\n\n".join(chunks))
+    else:
+        body_parts.extend(f"@{ref}" for ref in refs)
+
+    return "\n".join(body_parts)
+
+
 def _generate_config_body(cfg: ToolConfig) -> str | None:
     """Assemble the managed block body for a tool's root config file."""
     if cfg.config_file is None:
         return None
-
-    body_parts: list[str] = []
-
     refs = _collect_rule_refs(cfg)
-    if refs:
-        body_parts.append(_RULES_HEADER)
-        body_parts.append("")
-        body_parts.append(_RULES_PREAMBLE)
-        body_parts.append("")
-        for ref in refs:
-            body_parts.append(f"@{ref}")
-
-    if not body_parts:
-        return None
-
-    return "\n".join(body_parts)
+    return _render_rules_body(cfg.config_file, refs, embed=cfg.embed_rules)
 
 
 def _generate_rule_ref_body(cfg: ToolConfig) -> str | None:
@@ -395,9 +428,17 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
 
     # --- Map config_file -> list of tool names sharing it ---
     config_file_to_tools: dict[Path, list[str]] = {}
+    # A config_file embeds rule content (rather than @-references) when ANY
+    # provider sharing it requires embedding (e.g. antigravity/agy, which does
+    # not expand @ includes). Embedded content is still valid for the other
+    # providers sharing the file, which simply read it inline.
+    config_file_embed: dict[Path, bool] = {}
     for _tool_type, cfg in active_configs.items():
         if cfg.config_file:
             config_file_to_tools.setdefault(cfg.config_file, []).append(cfg.name)
+            config_file_embed[cfg.config_file] = (
+                config_file_embed.get(cfg.config_file, False) or cfg.embed_rules
+            )
 
     # --- Markdown root config files ---
     # Aggregate rule refs from all providers sharing the same config_file
@@ -436,15 +477,13 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
             seen_basenames[basename] = len(seen_refs)
             seen_refs.append(ref)
 
-        body_parts = [
-            _RULES_HEADER,
-            "",
-            _RULES_PREAMBLE,
-            "",
-        ]
-        for ref in seen_refs:
-            body_parts.append(f"@{ref}")
-        body = "\n".join(body_parts)
+        body = _render_rules_body(
+            cfg.config_file,
+            seen_refs,
+            embed=config_file_embed.get(cfg.config_file, False),
+        )
+        if body is None:
+            continue
 
         action = _sync_managed_md(
             cfg.config_file,

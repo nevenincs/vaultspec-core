@@ -292,7 +292,7 @@ def hooks_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
 def hooks_status() -> dict[str, Any]:
     """Perform deep compliancy verification of YAML hook definitions."""
     from vaultspec_core.hooks import SUPPORTED_EVENTS
-    from vaultspec_core.hooks.engine import _parse_yaml
+    from vaultspec_core.hooks.engine import _is_provider_hook_event, _parse_yaml
 
     hooks_dir = _t.get_context().hooks_dir
 
@@ -312,12 +312,16 @@ def hooks_status() -> dict[str, Any]:
 
     for ext in ("*.yaml", "*.yml"):
         for path in sorted(hooks_dir.glob(ext)):
-            definitions.append(path.name)
             try:
                 raw_text = path.read_text(encoding="utf-8")
                 data = _parse_yaml(raw_text)
 
                 event = data.get("event", "")
+                if _is_provider_hook_event(event):
+                    # Provider (agent-runtime) hook; rendered by
+                    # provider_hooks, not a CLI-lifecycle hook. Not our concern.
+                    continue
+                definitions.append(path.name)
                 if not event:
                     warnings.append(f"Hook '{path.name}' is missing the 'event' field.")
                 elif event not in SUPPORTED_EVENTS:
@@ -351,6 +355,9 @@ def hooks_status() -> dict[str, Any]:
                                 )
 
             except Exception as e:
+                # A hook that fails to parse cannot be classified; list it and
+                # report the parse error.
+                definitions.append(path.name)
                 errors.append(f"Failed to parse hook '{path.name}': {e}")
 
     if errors:

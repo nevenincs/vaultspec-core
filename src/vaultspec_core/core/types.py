@@ -56,6 +56,18 @@ class ToolConfig:
             as a rule file when ``system_file`` is absent.
         workflows_dir: Directory where workflow definitions live, or ``None``
             if the tool does not support workflows.
+        mcp_config_file: Path to a provider-native MCP server config file
+            (for example Antigravity's ``.agents/mcp_config.json``), or
+            ``None`` when the provider reads the shared workspace ``.mcp.json``
+            instead. Uses the same ``{"mcpServers": {...}}`` schema.
+        embed_rules: When ``True``, the provider's root ``config_file`` carries
+            rule content inlined verbatim rather than ``@rules/...`` include
+            references. Required for tools that do not expand include
+            directives - notably the Antigravity CLI (``agy``), which reads
+            ``GEMINI.md`` prose but silently ignores ``@`` includes. When any
+            provider sharing a ``config_file`` sets this, that file is
+            generated with embedded rules (still valid for include-expanding
+            tools like gemini-cli, which simply read the inlined content).
         capabilities: Declared provider capabilities.  Used by install, sync,
             and dry-run to reason about what each provider supports.
     """
@@ -71,6 +83,8 @@ class ToolConfig:
     system_file: Path | None = None
     emit_system_rule: bool = True
     workflows_dir: Path | None = None
+    mcp_config_file: Path | None = None
+    embed_rules: bool = False
     capabilities: frozenset[ProviderCapability] = frozenset()
 
 
@@ -275,12 +289,15 @@ def init_paths(layout: Any) -> WorkspaceContext:
             system_file=None,
             emit_system_rule=False,
             workflows_dir=shared_agents_root / Resource.WORKFLOWS.value,
+            mcp_config_file=shared_agents_root / FileName.MCP_CONFIG.value,
+            embed_rules=True,
             capabilities=frozenset(
                 {
                     _pc.RULES,
                     _pc.SKILLS,
                     _pc.ROOT_CONFIG,
                     _pc.WORKFLOWS,
+                    _pc.HOOKS,
                 }
             ),
         ),
@@ -302,6 +319,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
                     _pc.SKILLS,
                     _pc.AGENTS,
                     _pc.ROOT_CONFIG,
+                    _pc.HOOKS,
                 }
             ),
         ),

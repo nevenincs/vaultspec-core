@@ -203,14 +203,17 @@ class TestGenerateConfig:
         assert content is not None
         assert "@.claude/rules/my-rule.md" in content
 
-    def test_antigravity_uses_workspace_rules_for_root_gemini(self, synthetic_project):
+    def test_antigravity_embeds_workspace_rules_in_root_gemini(self, synthetic_project):
+        # agy reads GEMINI.md prose but does not expand @ includes, so the
+        # antigravity config embeds rule content inline rather than referencing.
         (synthetic_project / ".agents" / "rules").mkdir(parents=True, exist_ok=True)
         (synthetic_project / ".agents" / "rules" / "workspace-rule.md").write_text(
-            "rule content", encoding="utf-8"
+            "distinctive embedded rule body", encoding="utf-8"
         )
         content = _generate_config_body(_cfg(Tool.ANTIGRAVITY))
         assert content is not None
-        assert "@.agents/rules/workspace-rule.md" in content
+        assert "distinctive embedded rule body" in content
+        assert "@.agents/rules/workspace-rule.md" not in content
 
     def test_codex_native_config_uses_explicit_frontmatter(self, synthetic_project):
         (

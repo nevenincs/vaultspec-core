@@ -45,14 +45,6 @@ Phases 1a and 1b are parallel entry points: Research explores the problem space,
 Reference grounds the work in existing source code. A feature needs at least one of the
 two; complex features benefit from both.
 
-Saving a project rule is **not** a phase of this pipeline and **not** a routine output
-of doing work. The framework ships the builtin rules that describe how to work; it never
-asks you to manufacture new rules on your own initiative. Author a project rule only
-when the user **explicitly** requests it ("codify this", "promote this to a rule") -
-then, and only then, invoke the on-demand `vaultspec-codify` skill. Absent that explicit
-request, the durable decision belongs in the vault and is reached by retrieval
-(`vaultspec-rag search "<intent>" --type vault`), not restated as a standing rule.
-
 The pipeline scales with the work. Trivial, single-file fixes with no architectural
 weight may proceed directly with user approval; state explicitly that the pipeline is
 being skipped and why. Everything else follows the phases above.
@@ -93,7 +85,6 @@ Supporting skills, invoked when appropriate:
 | "Plan the implementation"           | vaultspec-write         |
 | "Execute the plan" / "Build it"     | vaultspec-execute       |
 | "Review the code" / "Verify"        | vaultspec-code-review   |
-| "Codify X" / "Promote X to a rule"  | vaultspec-codify        |
 | "Clean up docs" / "Curate"          | vaultspec-curate        |
 | "Start a new feature" (broad)       | vaultspec-research      |
 | "Write documentation for {subject}" | vaultspec-documentation |

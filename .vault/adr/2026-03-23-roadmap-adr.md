@@ -8,7 +8,7 @@ related:
   - '[[2026-03-23-roadmap-research]]'
 ---
 
-# `roadmap` adr: `roadmap` | (**status:** `{accepted|rejected|deprecated}`)
+# `roadmap` adr: `roadmap` | (**status:** `accepted`)
 
 ## Problem Statement
 

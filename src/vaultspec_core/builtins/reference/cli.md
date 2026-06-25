@@ -59,6 +59,8 @@ vaultspec-core vault feature unarchive [OPTIONS] FEATURE_TAG
 vaultspec-core vault check all [OPTIONS]
 vaultspec-core vault check body-links [OPTIONS]
 vaultspec-core vault check annotations [OPTIONS]
+vaultspec-core vault check markdown [OPTIONS]
+vaultspec-core vault check placeholders [OPTIONS]
 vaultspec-core vault check dangling [OPTIONS]
 vaultspec-core vault check orphans [OPTIONS]
 vaultspec-core vault check frontmatter [OPTIONS]
@@ -376,12 +378,15 @@ on `.vault/`. Exits `1` if errors are found.
 Shared options: `--fix` (apply auto-fixes), `--feature TAG` / `-f` (limit to a feature),
 `--verbose` / `-v` (INFO diagnostics).
 
-Subcommands: `all`, `annotations`, `body-links`, `dangling`, `frontmatter`,
-`modified-stamp`, `links`, `orphans`, `features`, `references`, `schema`, `structure`,
-`rename-integrity`. The `structure` subcommand does not support `--feature`. The
-`rename-integrity` subcommand checks name/filename integrity for rules, skills, and
-agents. The `modified-stamp` subcommand flags missing, unparseable, or stale `modified:`
-stamps; with `--fix` it normalizes parsed values to canonical `yyyy-mm-dd` form.
+Subcommands: `all`, `annotations`, `markdown`, `placeholders`, `body-links`, `dangling`,
+`frontmatter`, `modified-stamp`, `links`, `orphans`, `features`, `references`, `schema`,
+`structure`, `rename-integrity`. The `structure` subcommand does not support
+`--feature`. The `rename-integrity` subcommand checks name/filename integrity for rules,
+skills, and agents. The `modified-stamp` subcommand flags missing, unparseable, or stale
+`modified:` stamps; with `--fix` it normalizes parsed values to canonical `yyyy-mm-dd`
+form. The `markdown` subcommand checks markdown hygiene (trailing whitespace, blank-line
+runs, final newline) and repairs it with `--fix`. The `placeholders` subcommand finds
+unreplaced `{...}` template placeholders left in document body prose (detection only).
 
 ### vaultspec-core vault plan
 

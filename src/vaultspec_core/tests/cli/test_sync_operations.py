@@ -453,16 +453,18 @@ class TestConfigSync:
         # Create rule files in shared .agents/rules/ for antigravity/codex config
         (synthetic_project / ".agents" / "rules").mkdir(parents=True, exist_ok=True)
         (synthetic_project / ".agents" / "rules" / "antigravity-rule.md").write_text(
-            "---\nname: antigravity\n---\n\nRule", encoding="utf-8"
+            "---\nname: antigravity\n---\n\nAntigravity-specific embedded rule text.",
+            encoding="utf-8",
         )
 
         config_sync()
 
         antigravity_config = synthetic_project / "GEMINI.md"
         assert antigravity_config.exists()
-        assert "@.agents/rules/antigravity-rule.md" in antigravity_config.read_text(
-            encoding="utf-8"
-        )
+        # agy does not expand @ includes: GEMINI.md embeds the rule body inline.
+        content = antigravity_config.read_text(encoding="utf-8")
+        assert "Antigravity-specific embedded rule text." in content
+        assert "@.agents/rules/antigravity-rule.md" not in content
 
     def test_codex_writes_managed_top_level_config_block(self, synthetic_project):
         (
@@ -671,8 +673,10 @@ class TestEndToEndAllDestinations:
         antigravity_config = synthetic_project / "GEMINI.md"
         assert antigravity_config.exists()
         ag_content = antigravity_config.read_text(encoding="utf-8")
-        # Config body now only contains rule references
-        assert "@.agents/rules/no-swear.md" in ag_content
+        # agy does not expand @ includes: GEMINI.md embeds the rule body inline
+        # rather than referencing .agents/rules/.
+        assert "Do not swear." in ag_content
+        assert "@.agents/rules/no-swear.md" not in ag_content
         assert (synthetic_project / ".agents" / "rules" / "no-swear.md").exists()
         # Antigravity must NOT get system builtin rule (emit_system_rule=False)
         assert not (

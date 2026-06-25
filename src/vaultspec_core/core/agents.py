@@ -15,7 +15,13 @@ from typing import Any, Protocol
 
 from . import types as _t
 from .config_gen import _toml_quote
-from .enums import GeminiBuiltinTool, Tool
+from .enums import (
+    CapabilityLevel,
+    ClaudeModels,
+    CodexModels,
+    GeminiBuiltinTool,
+    Tool,
+)
 from .exceptions import ResourceExistsError
 from .helpers import (
     _launch_editor,
@@ -78,6 +84,31 @@ def _render_passthrough_agent(
     return build_file(meta, body)
 
 
+def _resolve_tier_model(
+    meta: dict[str, Any], registry: type[ClaudeModels | CodexModels]
+) -> str | None:
+    """Resolve a persona ``tier`` to a provider model identifier.
+
+    Maps the authoring ``tier`` (``LOW``/``STANDARD``/``HIGH``) to a
+    :class:`~vaultspec_core.core.enums.CapabilityLevel` and looks the model up
+    in *registry*. Returns ``None`` when no ``tier`` is authored, so personas
+    that omit the field emit no ``model`` rather than a defaulted one.
+
+    Args:
+        meta: Frontmatter dict from the agent source file.
+        registry: The provider model registry to resolve against.
+
+    Returns:
+        The provider model identifier string, or ``None`` when ``tier`` is
+        absent or blank.
+    """
+    tier = meta.get("tier")
+    if not isinstance(tier, str) or not tier.strip():
+        return None
+    level = CapabilityLevel.from_tier(tier)
+    return registry.from_level(level).value
+
+
 def _render_claude_agent(
     name: str,
     meta: dict[str, Any],
@@ -87,10 +118,13 @@ def _render_claude_agent(
 ) -> str:
     """Render an agent definition for Claude.
 
-    Stamps ``name`` from the filename stem, preserves ``description``,
-    ``tools`` (verbatim, in the Claude vocabulary), and ``model`` if set.
-    Drops vaultspec authoring keys (``tier``, ``mode``) so the file
-    Claude reads is clean rather than merely tolerated.
+    Stamps ``name`` from the filename stem, preserves ``description`` and
+    ``tools`` (verbatim, in the Claude vocabulary), and resolves ``model``:
+    an explicit ``model`` in the source wins, otherwise the authoring
+    ``tier`` is mapped to the current Claude model via
+    :class:`~vaultspec_core.core.enums.ClaudeModels`. Drops vaultspec
+    authoring keys (``tier``, ``mode``) so the file Claude reads is clean
+    rather than merely tolerated.
     """
     fm: dict[str, Any] = {"name": _stem(name)}
     description = meta.get("description")
@@ -104,6 +138,10 @@ def _render_claude_agent(
     model = meta.get("model")
     if isinstance(model, str) and model.strip():
         fm["model"] = model.strip()
+    else:
+        resolved = _resolve_tier_model(meta, ClaudeModels)
+        if resolved is not None:
+            fm["model"] = resolved
 
     return build_file(fm, body)
 
@@ -234,6 +272,15 @@ def _toml_multiline(value: str) -> str:
 
 
 def _coerce_codex_model(meta: dict[str, Any]) -> str | None:
+    """Resolve the Codex model identifier for an agent.
+
+    Resolution precedence: an explicit ``codex_model`` wins; otherwise a
+    generic ``model`` is reused only when it is already an OpenAI identifier
+    (``gpt-*`` or one carrying ``codex``); otherwise the authoring ``tier`` is
+    mapped to the current Codex model via
+    :class:`~vaultspec_core.core.enums.CodexModels`. Returns ``None`` when none
+    of these apply, so the rendered agent table omits the ``model`` key.
+    """
     explicit = meta.get("codex_model")
     if isinstance(explicit, str) and explicit.strip():
         return explicit.strip()
@@ -244,7 +291,7 @@ def _coerce_codex_model(meta: dict[str, Any]) -> str | None:
         if model.startswith("gpt-") or "codex" in model:
             return model
 
-    return None
+    return _resolve_tier_model(meta, CodexModels)
 
 
 def _coerce_codex_string(meta: dict[str, Any], key: str) -> str | None:

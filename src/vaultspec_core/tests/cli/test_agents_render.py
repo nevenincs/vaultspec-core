@@ -43,8 +43,18 @@ _GEMINI_TOOL_SET = frozenset(t.value for t in GeminiBuiltinTool)
 # tool name string constants. The live drift test below fetches this
 # file and asserts every `GeminiBuiltinTool` enum value still matches
 # the corresponding `*_TOOL_NAME` constant.
+#
+# Pinned to a specific release tag rather than `main`. The Gemini CLI
+# consumer service was retired 2026-06-18 (transitioning to the Antigravity
+# CLI), and Google declined to commit to the repo's long-term future, so a
+# `main` ref is no longer a stable contract: it could break on upstream
+# archival/rewrite rather than on a real drift. v0.47.0 (published
+# 2026-06-18) is the verified-current release; bump this tag intentionally
+# when revalidating the tool vocabulary against a newer Gemini CLI / agy.
+_UPSTREAM_GEMINI_CLI_REF = "v0.47.0"
 _UPSTREAM_BASE_DECLARATIONS_URL = (
-    "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/"
+    f"https://raw.githubusercontent.com/google-gemini/gemini-cli/"
+    f"{_UPSTREAM_GEMINI_CLI_REF}/"
     "packages/core/src/tools/definitions/base-declarations.ts"
 )
 
@@ -94,13 +104,28 @@ class TestRenderClaudeAgent:
         assert "tier" not in rendered_meta
         assert "mode" not in rendered_meta
 
-    def test_preserves_model_when_set(self):
-        out = _render_claude_agent("x.md", {"model": "claude-opus-4-6"}, "body")
-        assert _fm(out)["model"] == "claude-opus-4-6"
+    def test_explicit_model_wins_over_tier(self):
+        # An explicit model overrides the tier-derived default.
+        meta = {"model": "claude-opus-4-8", "tier": "LOW"}
+        out = _render_claude_agent("x.md", meta, "body")
+        assert _fm(out)["model"] == "claude-opus-4-8"
 
-    def test_omits_optional_keys_when_absent(self):
+    @pytest.mark.parametrize(
+        ("tier", "expected"),
+        [
+            ("HIGH", "claude-opus-4-8"),
+            ("STANDARD", "claude-sonnet-4-6"),
+            ("LOW", "claude-haiku-4-5"),
+        ],
+    )
+    def test_tier_resolves_to_current_model(self, tier: str, expected: str):
+        out = _render_claude_agent("x.md", {"tier": tier}, "body")
+        assert _fm(out)["model"] == expected
+
+    def test_omits_model_when_no_tier_or_model(self):
         rendered_meta = _fm(_render_claude_agent("x.md", {}, "body"))
         assert rendered_meta == {"name": "x"}
+        assert "model" not in rendered_meta
 
     def test_body_is_preserved(self):
         out = _render_claude_agent("x.md", {}, "# Heading\n\ncontent")
@@ -183,6 +208,42 @@ class TestCodexMultilinePrompt:
     def test_body_with_backslashes_and_quotes_round_trips(self):
         body = "path C:\\x '''y''' \"z\""
         assert self._roundtrip(body) == body + "\n"
+
+
+class TestCodexModelResolution:
+    """Codex agent ``model`` resolution: explicit -> generic gpt -> tier."""
+
+    @staticmethod
+    def _model(meta: dict[str, object]) -> object:
+        rendered = _render_codex_agent(
+            "worker.md", {**meta, "description": "d"}, "body"
+        )
+        return tomllib.loads(rendered)["agents"]["worker"].get("model")
+
+    def test_explicit_codex_model_wins_over_tier(self):
+        assert self._model({"codex_model": "gpt-5.5", "tier": "LOW"}) == "gpt-5.5"
+
+    def test_generic_openai_model_is_reused(self):
+        assert self._model({"model": "gpt-5.4-mini"}) == "gpt-5.4-mini"
+
+    @pytest.mark.parametrize(
+        ("tier", "expected"),
+        [
+            ("HIGH", "gpt-5.5"),
+            ("STANDARD", "gpt-5.4"),
+            ("LOW", "gpt-5.4-mini"),
+        ],
+    )
+    def test_tier_resolves_to_current_model(self, tier: str, expected: str):
+        assert self._model({"tier": tier}) == expected
+
+    def test_non_openai_generic_model_without_tier_yields_no_model(self):
+        # A Claude identifier in the generic field is not an OpenAI model and
+        # there is no tier to fall back on, so no model key is emitted.
+        assert self._model({"model": "claude-opus-4-8"}) is None
+
+    def test_no_model_without_tier_or_model(self):
+        assert self._model({}) is None
 
 
 class TestTransformAgentDispatch:

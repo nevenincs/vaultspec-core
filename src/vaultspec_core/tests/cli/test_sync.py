@@ -375,10 +375,12 @@ class TestSyncAuthority:
         finally:
             os.chdir(old_cwd)
 
+        # Claude and Codex expand @ includes (reference form); agy does not, so
+        # GEMINI.md embeds the rule body inline instead of referencing it.
         expected = {
             "AGENTS.md": f"@.codex/rules/{rule_name}.md",
             "CLAUDE.md": f"@.claude/rules/{rule_name}.md",
-            "GEMINI.md": f"{rule_name}.md",
+            "GEMINI.md": "Surface this rule in provider config stubs.",
         }
         for filename, marker in expected.items():
             path = synthetic_project / filename

@@ -8,7 +8,7 @@ related:
   - '[[2026-03-23-cli-test-coverage-research]]'
 ---
 
-# `cli-test-coverage` adr: `cli test coverage` | (**status:** `{accepted|rejected|deprecated}`)
+# `cli-test-coverage` adr: `cli test coverage` | (**status:** `accepted`)
 
 ## Problem Statement
 

@@ -186,3 +186,131 @@ class TestEncodingInvariance:
         out = capsys.readouterr().out
         assert out.isascii()
         assert "..." not in out  # short labels are not truncated
+
+
+# =============================================================================
+# Help and hint guarantees (cli-presentation-uniformity ADR).
+#
+# Help renders as plain Click - Usage/Options/Commands sections, no Rich panels
+# or box-drawing - at every command depth, and wraps to the terminal width.
+# Next-step hints render in exactly one Next action: footer form.
+# =============================================================================
+
+
+def _all_command_paths() -> list[tuple[str, ...]]:
+    """Every group and leaf command path in the live app, root first."""
+    import typer
+    from typer._click.core import Context as ClickContext
+    from typer.core import TyperGroup
+
+    from vaultspec_core.cli import app
+
+    root = typer.main.get_command(app)
+    paths: list[tuple[str, ...]] = [()]
+
+    def walk(command, prefix: tuple[str, ...]) -> None:
+        if isinstance(command, TyperGroup):
+            ctx = ClickContext(command)
+            for name in command.list_commands(ctx):
+                sub = command.get_command(ctx, name)
+                paths.append((*prefix, name))
+                walk(sub, (*prefix, name))
+
+    walk(root, ())
+    return paths
+
+
+@pytest.mark.unit
+class TestPlainClickHelp:
+    """Every command's --help is bog-standard plain Click, never a Rich panel."""
+
+    def test_no_help_screen_has_box_drawing(self):
+        from typer.testing import CliRunner
+
+        from vaultspec_core.cli import app
+
+        runner = CliRunner()
+        offenders: list[str] = []
+        for path in _all_command_paths():
+            result = runner.invoke(app, [*path, "--help"])
+            if _box_glyphs(result.output):
+                offenders.append(" ".join(path) or "(root)")
+        assert not offenders, f"box-drawing in help for: {offenders}"
+
+    def test_group_help_uses_plain_section_headers(self):
+        from typer.testing import CliRunner
+
+        from vaultspec_core.cli import app
+
+        result = CliRunner().invoke(app, ["--help"])
+        assert result.output.startswith("Usage:")
+        # Plain Click section headers, not Rich panel titles (e.g. "╭─ Options").
+        assert "\nOptions:\n" in result.output
+        assert "\nCommands:\n" in result.output
+
+    def test_help_word_wraps_prose_within_the_column_budget(self):
+        # Click's plain help formatter word-wraps prose to the terminal width
+        # (80 in the test runner) instead of emitting one long line or a Rich
+        # panel. A real narrow terminal wraps tighter via COLUMNS; the runner
+        # pins 80, so the invariant asserted here is "wrapping is engaged and no
+        # line overflows the budget", which a Rich panel or an unwrapped line
+        # would both violate.
+        from typer.testing import CliRunner
+
+        from vaultspec_core.cli import app
+
+        output = CliRunner().invoke(app, ["install", "--help"]).output
+        lines = output.splitlines()
+        # The multi-sentence install description wraps onto more than one line.
+        assert sum("Scaffolds" in ln or "upgrade to update" in ln for ln in lines) >= 1
+        assert any(ln.startswith("  ") and "re-scaffolding" in ln for ln in lines), (
+            "description did not wrap onto a continuation line"
+        )
+        # No help line overflows the 80-column budget the runner renders at.
+        assert all(len(ln) <= 80 for ln in lines), [ln for ln in lines if len(ln) > 80]
+
+
+@pytest.mark.unit
+class TestHintUniformity:
+    """Every next-step hint renders in the one Next action: footer form."""
+
+    def setup_method(self):
+        reset_console()
+
+    def teardown_method(self):
+        reset_console()
+
+    def test_single_hint_uses_next_action_header(self, capsys):
+        from vaultspec_core.cli.rendering import render_next_actions
+
+        render_next_actions([("Define an ADR", "vaultspec-core vault add adr")])
+        out = capsys.readouterr().out
+        assert "Next action:" in out
+        assert "Next actions:" not in out
+        # The superseded forms must not reappear.
+        assert "Suggested Next Step" not in out
+        assert "> " not in out
+        assert "vaultspec-core vault add adr" in out
+
+    def test_multiple_hints_use_plural_header(self, capsys):
+        from vaultspec_core.cli.rendering import render_next_actions
+
+        render_next_actions(
+            [("Trace a plan", "vaultspec-core status x"), ("Diagnose", "x doctor")]
+        )
+        out = capsys.readouterr().out
+        assert "Next actions:" in out
+
+    def test_hint_footer_is_box_free_and_ascii(self, capsys):
+        from vaultspec_core.cli.rendering import render_next_actions
+
+        render_next_actions([("Re-sync", "vaultspec-core sync")])
+        out = capsys.readouterr().out
+        assert _box_glyphs(out) == set()
+        assert out.isascii()
+
+    def test_empty_hint_list_prints_nothing(self, capsys):
+        from vaultspec_core.cli.rendering import render_next_actions
+
+        render_next_actions([])
+        assert capsys.readouterr().out == ""

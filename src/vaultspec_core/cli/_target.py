@@ -38,7 +38,7 @@ TargetOption = Annotated[
     typer.Option(
         "--target",
         "-t",
-        help="Target directory (defaults to current working directory).",
+        help="Target directory (defaults to current working directory)",
         dir_okay=True,
         file_okay=False,
         resolve_path=True,

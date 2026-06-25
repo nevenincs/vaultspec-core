@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
 
@@ -24,37 +25,37 @@ if TYPE_CHECKING:
     from vaultspec_core.vaultcore.repair import RepairRun
 
 
-vault_app = typer.Typer(
+vault_app = make_app(
     help="Create, query, and audit records in the .vault/ project history.",
     no_args_is_help=True,
 )
 
-feature_app = typer.Typer(
-    help="Manage vault feature tags.",
+feature_app = make_app(
+    help="Manage vault feature tags",
     no_args_is_help=True,
 )
 vault_app.add_typer(feature_app, name="feature")
 
-check_app = typer.Typer(
-    help="Run vault health checks with optional auto-fix.",
+check_app = make_app(
+    help="Run vault health checks with optional auto-fix",
     no_args_is_help=True,
 )
 vault_app.add_typer(check_app, name="check")
 
-sanitize_app = typer.Typer(
-    help="Run explicit vault sanitizers.",
+sanitize_app = make_app(
+    help="Run explicit vault sanitizers",
     no_args_is_help=True,
 )
 vault_app.add_typer(sanitize_app, name="sanitize")
 
-rule_app = typer.Typer(
-    help="Manage custom team-shared rules.",
+rule_app = make_app(
+    help="Manage custom team-shared rules",
     no_args_is_help=True,
 )
 vault_app.add_typer(rule_app, name="rule")
 
-adr_app = typer.Typer(
-    help="Manage Architecture Decision Records (ADRs).",
+adr_app = make_app(
+    help="Manage Architecture Decision Records (ADRs)",
     no_args_is_help=True,
 )
 vault_app.add_typer(adr_app, name="adr")
@@ -104,7 +105,7 @@ def cmd_add(
         list[str] | None,
         typer.Option(
             "--tags",
-            help="Additional tags beyond the required directory and feature tags.",
+            help="Additional tags beyond the required directory and feature tags",
         ),
     ] = None,
     force: Annotated[
@@ -685,18 +686,32 @@ def cmd_stats(
             )
         )
         raise typer.Exit(0)
-    console.print("[bold]Vault Statistics[/bold]")
-    console.print(f"  Total documents: {stats['total_docs']}")
-    console.print(f"  Total features:  {stats['total_features']}")
-    if stats["counts_by_type"]:
-        console.print("  By type:")
-        for dt, count in sorted(stats["counts_by_type"].items()):
-            console.print(f"    {dt}: {count}")
-    if orphaned or invalid:
-        if orphaned:
-            console.print(f"  Orphaned docs: {stats['orphaned_count']}")
-        if invalid:
-            console.print(f"  Dangling links: {stats['dangling_link_count']}")
+    from vaultspec_core.cli.rendering import (
+        Column,
+        Field,
+        render_listing,
+        render_record,
+        summary_line,
+    )
+
+    fields = [
+        Field("total documents", str(stats["total_docs"])),
+        Field("total features", str(stats["total_features"])),
+    ]
+    if orphaned:
+        fields.append(Field("orphaned docs", str(stats["orphaned_count"])))
+    if invalid:
+        fields.append(Field("dangling links", str(stats["dangling_link_count"])))
+    render_record(fields, title="Vault statistics")
+
+    by_type = sorted(stats["counts_by_type"].items())
+    if by_type:
+        render_listing(
+            [{"type": dt, "count": str(count)} for dt, count in by_type],
+            [Column("type"), Column("count")],
+            title="By type",
+            summary=summary_line(sum(count for _, count in by_type), "documents"),
+        )
 
 
 # ---- vault list --------------------------------------------------------------
@@ -766,17 +781,29 @@ def cmd_list(
             )
         )
         raise typer.Exit(0)
-    if not docs:
-        console.print("[dim]No documents found.[/dim]")
-        return
-    for d in docs:
-        parts = [f"[bold]{d.name}[/bold]"]
-        parts.append(f"[dim]{d.doc_type}[/dim]")
-        if d.feature:
-            parts.append(f"#{d.feature}")
-        if d.date:
-            parts.append(d.date)
-        console.print("  ".join(parts))
+    from vaultspec_core.cli.rendering import (
+        Cell,
+        Column,
+        render_listing,
+        summary_line,
+    )
+
+    rows = [
+        {
+            "name": Cell(d.name, "bold"),
+            "type": Cell(d.doc_type, "dim"),
+            "feature": f"#{d.feature}" if d.feature else "",
+            "date": d.date or "",
+        }
+        for d in docs
+    ]
+    render_listing(
+        rows,
+        [Column("name"), Column("type"), Column("feature"), Column("date")],
+        title="Vault documents",
+        summary=summary_line(len(docs), "documents"),
+        empty="no documents found",
+    )
 
 
 # ---- vault graph ------------------------------------------------------------
@@ -920,7 +947,7 @@ def cmd_graph(
         raise typer.Exit(code=0)
 
     if metrics:
-        _print_metrics(console, graph, feature=feature)
+        _print_metrics(graph, feature=feature)
         return
 
     if ascii_graph:
@@ -932,11 +959,10 @@ def cmd_graph(
 
 
 def _print_metrics(
-    console: Console,
     graph: VaultGraph,
     feature: str | None = None,
 ) -> None:
-    """Render graph metrics through the box-free Record shape."""
+    """Render graph metrics through the box-free Record and Listing shapes."""
     from vaultspec_core.cli.rendering import Field, render_record
 
     m = graph.metrics(feature=feature)
@@ -967,25 +993,46 @@ def _print_metrics(
 
     render_record(fields, title=title)
 
+    from vaultspec_core.cli.rendering import Column, render_listing, summary_line
+
     if m.nodes_by_type:
-        console.print("\n[bold]By type[/bold]")
-        for dt, count in m.nodes_by_type.items():
-            console.print(f"  {dt}: {count}")
+        render_listing(
+            [{"type": dt, "count": str(c)} for dt, c in m.nodes_by_type.items()],
+            [Column("type"), Column("count")],
+            title="By type",
+            summary=summary_line(sum(m.nodes_by_type.values()), "documents"),
+        )
 
     if m.nodes_by_feature and not feature:
-        console.print("\n[bold]By feature[/bold]")
-        for feat, count in m.nodes_by_feature.items():
-            console.print(f"  #{feat}: {count}")
+        render_listing(
+            [
+                {"feature": f"#{f}", "count": str(c)}
+                for f, c in m.nodes_by_feature.items()
+            ],
+            [Column("feature"), Column("count")],
+            title="By feature",
+            summary=summary_line(len(m.nodes_by_feature), "features"),
+        )
 
     if m.in_degree_centrality:
-        console.print("\n[bold]In-degree centrality (top 10)[/bold]")
-        for name, score in m.in_degree_centrality.items():
-            console.print(f"  {name}: {score:.4f}")
+        render_listing(
+            [
+                {"document": n, "score": f"{s:.4f}"}
+                for n, s in m.in_degree_centrality.items()
+            ],
+            [Column("document"), Column("score")],
+            title="In-degree centrality (top 10)",
+        )
 
     if m.betweenness_centrality:
-        console.print("\n[bold]Betweenness centrality (top 10)[/bold]")
-        for name, score in m.betweenness_centrality.items():
-            console.print(f"  {name}: {score:.4f}")
+        render_listing(
+            [
+                {"document": n, "score": f"{s:.4f}"}
+                for n, s in m.betweenness_centrality.items()
+            ],
+            [Column("document"), Column("score")],
+            title="Betweenness centrality (top 10)",
+        )
 
 
 # ---- vault check subcommands ------------------------------------------------
@@ -1058,7 +1105,7 @@ def cmd_repair(
         bool,
         typer.Option(
             "--include-index/--no-index",
-            help="Refresh generated feature indexes during repair.",
+            help="Refresh generated feature indexes during repair",
         ),
     ] = True,
     feature: Annotated[
@@ -1394,6 +1441,60 @@ def cmd_check_annotations(
     result = check_annotations(_get_ctx().target_dir, feature=feature, fix=fix)
     _render_and_exit(
         result, verbose, json_output=json_output, command="vault.check.annotations"
+    )
+
+
+@check_app.command("markdown")
+def cmd_check_markdown(
+    fix: Annotated[
+        bool,
+        typer.Option("--fix", help="Repair markdown hygiene issues"),
+    ] = False,
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Check and optionally fix markdown hygiene (trailing whitespace, blank
+    runs, final newline)."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.checks import check_markdown
+
+    result = check_markdown(_get_ctx().target_dir, feature=feature, fix=fix)
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.markdown"
+    )
+
+
+@check_app.command("placeholders")
+def cmd_check_placeholders(
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Find unreplaced {...} template placeholders in document body prose."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
+    from vaultspec_core.vaultcore.checks import check_placeholders
+
+    graph = VaultGraph(_get_ctx().target_dir)
+    snapshot = graph.to_snapshot()
+    result = check_placeholders(
+        _get_ctx().target_dir, snapshot=snapshot, feature=feature
+    )
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.placeholders"
     )
 
 
@@ -1756,7 +1857,7 @@ def cmd_feature_list(
         int | None,
         typer.Option(
             "--stale-days",
-            help="Show only features whose latest activity is older than N days.",
+            help="Show only features whose latest activity is older than N days",
         ),
     ] = None,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,

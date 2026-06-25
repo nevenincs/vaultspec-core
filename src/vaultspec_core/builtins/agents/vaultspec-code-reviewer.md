@@ -87,8 +87,8 @@ as your final message to the dispatching orchestrator, which persists it by scaf
 document's body prose.
 
 - **Template:** Structure your returned report on the template at
-  `.vaultspec/rules/templates/code-review.md` so the orchestrator can transfer it into
-  the scaffolded body without rework.
+  `.vaultspec/rules/templates/audit.md` so the orchestrator can transfer it into the
+  scaffolded body without rework.
 
 - **Destination:** The orchestrator persists the report to
   `.vault/audit/yyyy-mm-dd-<feature>-audit.md`. When the feature already carries an

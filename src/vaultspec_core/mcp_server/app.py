@@ -19,11 +19,16 @@ if TYPE_CHECKING:
 
 from mcp.server.fastmcp import FastMCP
 
+from vaultspec_core.cli._app import make_app
+
 from .vault_tools import register_tools as register_vault_tools
 
 logger = logging.getLogger(__name__)
 
-app = typer.Typer(help="Run the Vaultspec MCP server.")
+# Plain-Click help to match the rest of the CLI (cli-presentation-uniformity
+# ADR). ``no_args_is_help`` stays off so the no-argument invocation still runs
+# the server via the ``invoke_without_command`` callback below.
+app = make_app(help="Run the Vaultspec MCP server.", no_args_is_help=False)
 
 
 @asynccontextmanager

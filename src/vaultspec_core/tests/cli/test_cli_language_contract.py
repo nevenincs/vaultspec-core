@@ -13,7 +13,6 @@ import re
 from functools import cache
 from pathlib import Path
 
-import click
 import pytest
 import typer.main
 from typer.testing import CliRunner
@@ -179,10 +178,16 @@ def _longest_registered_command(
 
 
 def _click_command_for_path(command_path: tuple[str, ...]):
+    # Typer 0.26 vendors its own Click (`typer._click`); `get_command` returns
+    # vendored group/command types, so descent must use the vendored Group and
+    # Context rather than the top-level `click` package.
+    from typer._click.core import Context as ClickContext
+    from typer.core import TyperGroup
+
     command = typer.main.get_command(app)
     for segment in command_path:
-        assert isinstance(command, click.Group), command_path
-        command = command.get_command(click.Context(command), segment)
+        assert isinstance(command, TyperGroup), command_path
+        command = command.get_command(ClickContext(command), segment)
         assert command is not None, command_path
     return command
 

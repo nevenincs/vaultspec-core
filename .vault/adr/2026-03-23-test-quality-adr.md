@@ -8,7 +8,7 @@ related:
   - '[[2026-03-23-test-quality-research]]'
 ---
 
-# `test-quality` adr: `test quality` | (**status:** `{accepted|rejected|deprecated}`)
+# `test-quality` adr: `test quality` | (**status:** `accepted`)
 
 ## Problem Statement
 

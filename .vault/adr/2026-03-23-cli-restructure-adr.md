@@ -8,7 +8,7 @@ related:
   - '[[2026-03-23-cli-restructure-research]]'
 ---
 
-# `cli-restructure` adr: `cli restructure` | (**status:** `{accepted|rejected|deprecated}`)
+# `cli-restructure` adr: `cli restructure` | (**status:** `accepted`)
 
 ## Problem Statement
 

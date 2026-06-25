@@ -22,12 +22,13 @@ from typing import Annotated
 
 import typer
 
+from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._target import TargetOption, apply_target
 
 __all__ = ["link_app"]
 
-link_app = typer.Typer(
-    help="Inspect and mutate vault document edges via related: frontmatter.",
+link_app = make_app(
+    help="Inspect and mutate vault document edges via related: frontmatter",
     no_args_is_help=True,
 )
 

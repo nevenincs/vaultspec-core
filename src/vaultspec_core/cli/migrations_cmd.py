@@ -13,12 +13,13 @@ from typing import Annotated
 
 import typer
 
+from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._target import TargetOption, apply_target
 
 logger = logging.getLogger(__name__)
 
-migrations_app = typer.Typer(
-    help="Inspect and run vaultspec-core schema migrations.",
+migrations_app = make_app(
+    help="Inspect and run vaultspec-core schema migrations",
     no_args_is_help=True,
     add_completion=False,
 )
@@ -37,10 +38,6 @@ def cmd_migrations_status(
 
     Exit codes: ``0`` when the workspace is up to date or has no
     manifest, ``1`` when migrations are pending.
-
-    Examples:\n
-      vaultspec-core migrations status\n
-      vaultspec-core migrations status --json\n
     """
     apply_target(target)
 
@@ -77,28 +74,52 @@ def cmd_migrations_status(
         typer.echo(_json.dumps(envelope, indent=2))
         raise typer.Exit(code=0 if status != MigrationStatus.PENDING else 1)
 
-    from vaultspec_core.console import get_console
+    from vaultspec_core.cli.rendering import (
+        Cell,
+        Column,
+        render_listing,
+        summary_line,
+    )
 
-    console = get_console()
-    console.print(f"[bold]migration status[/bold]: {status.value}")
-    console.print(f"  manifest version: {manifest_version or '(unset)'}")
-    console.print(f"  registered: {len(REGISTRY)}")
+    # No manifest baseline: applied state is genuinely unknowable, so do not
+    # assert that any entry has been applied (issue #121). Labelling everything
+    # "applied" here previously hid truly-pending migrations.
+    state_style = {"unknown": "dim", "pending": "yellow", "applied": "green"}
+    states: list[str] = []
+    rows: list[dict[str, object]] = []
     for m in REGISTRY:
         if status == MigrationStatus.UNKNOWN:
-            # No manifest baseline: applied state is genuinely unknowable, so do
-            # not assert that any entry has been applied (issue #121). Labelling
-            # everything "applied" here previously hid truly-pending migrations.
-            marker = "[dim]unknown[/dim]"
+            state = "unknown"
         elif m in pending:
-            marker = "[yellow]pending[/yellow]"
+            state = "pending"
         else:
-            marker = "[green]applied[/green]"
-        console.print(f"    {marker} {m.target_version}  {m.name}")
-    if status == MigrationStatus.PENDING:
-        console.print()
-        console.print(
-            "  Run [bold]vaultspec-core migrations run[/bold] to apply pending entries."
+            state = "applied"
+        states.append(state)
+        rows.append(
+            {
+                "state": Cell(state, state_style[state]),
+                "version": m.target_version,
+                "name": m.name,
+            }
         )
+    breakdown = [
+        (states.count(label), label) for label in ("applied", "pending", "unknown")
+    ]
+    render_listing(
+        rows,
+        [Column("state"), Column("version"), Column("name")],
+        title=f"Migrations  (status {status.value}, manifest "
+        f"{manifest_version or 'unset'})",
+        summary=summary_line(len(rows), "registered", breakdown),
+        empty="no migrations registered",
+    )
+    if status == MigrationStatus.PENDING:
+        from vaultspec_core.cli.rendering import hints_suppressed, render_next_actions
+
+        if not hints_suppressed():
+            render_next_actions(
+                [("Apply the pending migrations", "vaultspec-core migrations run")]
+            )
         raise typer.Exit(code=1)
     raise typer.Exit(code=0)
 
@@ -118,10 +139,6 @@ def cmd_migrations_run(
 
     Exit codes: ``0`` on success (including the no-pending no-op),
     ``1`` if any migration raised.
-
-    Examples:\n
-      vaultspec-core migrations run\n
-      vaultspec-core migrations run --json\n
     """
     apply_target(target)
 

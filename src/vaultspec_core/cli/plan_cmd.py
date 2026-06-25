@@ -20,6 +20,7 @@ from typing import Annotated, Any, cast
 
 import typer
 
+from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._target import PlanPathArg, TargetOption
 
 __all__ = ["plan_app"]
@@ -251,12 +252,12 @@ def _save_plan_or_dry_run(
         _invalidate_graph_cache_for_plan(path)
 
 
-plan_app = typer.Typer(
-    help="Plan-document inspection and manipulation per the plan-hardening convention.",
+plan_app = make_app(
+    help="Plan-document inspection and manipulation per the plan-hardening convention",
     no_args_is_help=True,
 )
 
-step_app = typer.Typer(
+step_app = make_app(
     help=(
         "Step-level operations "
         "(add / insert / move / remove / check / uncheck / toggle / edit)."
@@ -265,31 +266,31 @@ step_app = typer.Typer(
 )
 plan_app.add_typer(step_app, name="step")
 
-phase_app = typer.Typer(
-    help="Phase-level operations (add / insert / move / remove / edit).",
+phase_app = make_app(
+    help="Phase-level operations (add / insert / move / remove / edit)",
     no_args_is_help=True,
 )
 plan_app.add_typer(phase_app, name="phase")
 
-wave_app = typer.Typer(
-    help="Wave-level operations (add / insert / move / remove / edit).",
+wave_app = make_app(
+    help="Wave-level operations (add / insert / move / remove / edit)",
     no_args_is_help=True,
 )
 plan_app.add_typer(wave_app, name="wave")
 
-epic_app = typer.Typer(
-    help="Epic-level operations (intent show / edit; L4 only).",
+epic_app = make_app(
+    help="Epic-level operations (intent show / edit; L4 only)",
     no_args_is_help=True,
 )
 plan_app.add_typer(epic_app, name="epic")
 
-tier_app = typer.Typer(
-    help="Tier inspection and promotion / demotion.",
+tier_app = make_app(
+    help="Tier inspection and promotion / demotion",
     no_args_is_help=True,
 )
 plan_app.add_typer(tier_app, name="tier")
 
-trailer_app = typer.Typer(
+trailer_app = make_app(
     help=(
         "Commit-linkage trailers: emit a well-formed trailer, or validate "
         "the trailers in a commit message (advisory; always exits 0)."
@@ -1283,8 +1284,8 @@ def cmd_wave_remove(
 # ---- Epic intent (L4 only) -------------------------------------------------
 
 
-epic_intent_app = typer.Typer(
-    help="Show or edit the L4 plan's Epic intent paragraph.",
+epic_intent_app = make_app(
+    help="Show or edit the L4 plan's Epic intent paragraph",
     no_args_is_help=True,
 )
 epic_app.add_typer(epic_intent_app, name="intent")
