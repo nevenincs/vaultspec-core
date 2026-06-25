@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.34](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.33...vaultspec-core-v0.1.34) (2026-06-25)
+
+
+### Features
+
+* **cli:** bog-standard plain-Click help, uniform hints, no table-like output ([0cb6031](https://github.com/nevenincs/vaultspec-core/commit/0cb6031c2438d3e83212a2a3b6c6ad153ae30025))
+* **firmware:** make codify user-triggered, mandate rag-grounded discovery ([055eb80](https://github.com/nevenincs/vaultspec-core/commit/055eb8072eb8ccc44f89313800b7288c54410fda))
+* **hooks:** author agent-runtime hooks once, render per provider ([c26c03a](https://github.com/nevenincs/vaultspec-core/commit/c26c03aea51828787398d87650661d7f80d1e15e))
+* model registries + Gemini/agy verification + provider hooks ([e655363](https://github.com/nevenincs/vaultspec-core/commit/e655363ed55fcaeae86c7c0f378b681e524c81da))
+* **models:** refresh provider model registries and wire tier-based selection ([c40a90d](https://github.com/nevenincs/vaultspec-core/commit/c40a90d0fbf211489188c943db7c550e9d2abc28))
+* **providers:** add Antigravity (agy) MCP config emission and pin Gemini drift test ([749623b](https://github.com/nevenincs/vaultspec-core/commit/749623b021b5b599411b48ecb9d2f4257fd44b2d))
+* **providers:** embed rules inline in GEMINI.md so agy receives them ([db05fce](https://github.com/nevenincs/vaultspec-core/commit/db05fceeb033dcf4cfa897d7a1557892825c6311))
+* **vault:** add placeholder/markdown checks and remove codify phase ([c552c8f](https://github.com/nevenincs/vaultspec-core/commit/c552c8fe0a3adf4da628829ba64028166882b6dd))
+
+
+### Bug Fixes
+
+* **cli:** adapt to typer 0.26 vendored click and drop deprecated loop policy ([50a5f22](https://github.com/nevenincs/vaultspec-core/commit/50a5f221d3ef1c16ff5f2351a31fbaa8a9803797))
+* **cli:** gate sync next-action footers on hint suppression ([9bb776c](https://github.com/nevenincs/vaultspec-core/commit/9bb776ccebdcc7183c552665889f2f3620479f35))
+* **hooks:** track hook ownership in a sidecar, not inside the native file ([e1fa036](https://github.com/nevenincs/vaultspec-core/commit/e1fa036346635f49b197c00e887dce2d67b37d69))
+* **mcp:** render vaultspec-mcp help as plain Click, not a Rich panel ([87d0140](https://github.com/nevenincs/vaultspec-core/commit/87d0140d3b1f25a565e52968a4f4463a553b8537))
+
 ## [0.1.33](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.32...vaultspec-core-v0.1.33) (2026-06-18)
 
 
