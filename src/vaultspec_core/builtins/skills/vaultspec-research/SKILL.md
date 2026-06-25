@@ -18,6 +18,14 @@ research and brainstorming."
 
 ## Required steps
 
+- **Ground in existing intent first.** Before exploring options, retrieve what the
+  project already decided: `vaultspec-rag search "<intent>" --type vault` surfaces the
+  ADRs, audits, and prior research that bind this area, and
+  `vaultspec-rag search "<intent>" --type code` locates the implementation sites that
+  match semantically. Read the records this surfaces and check for overlap before adding
+  new findings. Fall back to `vaultspec-core vault list` and grep when `vaultspec-rag`
+  is not installed.
+
 - **Read and use the template** at `.vaultspec/rules/templates/research.md`; its
   embedded hint blocks govern the body structure.
 

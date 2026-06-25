@@ -20,6 +20,16 @@ before invoking any pipeline skill. Read the in-flight plans it names, then ente
 pipeline at the right phase: resume an in-flight plan via `vaultspec-execute`, or start
 fresh at Research.
 
+**Ground in existing intent.** Before researching or implementing a feature, retrieve
+what the project already decided rather than reconstructing it from these always-on
+rules. Run `vaultspec-rag search "<intent>" --type vault` first: the project's
+architecture intent - its ADRs, audits, and decisions - is semantically indexed, and
+`--type vault` surfaces the records that already bind the area you are about to touch.
+Follow with `vaultspec-rag search "<intent>" --type code` to locate the implementation
+sites that match semantically. When `vaultspec-rag` is not installed, fall back to
+`vaultspec-core vault list` and grep. Retrieval is the grounding step; prefer it over
+re-deriving intent from memory or prose.
+
 All significant work must follow this pipeline:
 
 | Phase        | Skill                   | Artifact              | Requires          |
