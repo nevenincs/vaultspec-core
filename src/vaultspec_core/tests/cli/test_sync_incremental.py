@@ -12,7 +12,7 @@ pytestmark = [pytest.mark.unit]
 class TestIncrementalRules:
     def test_add_modify_remove_loop(self, synthetic_project):
         """Standard rule lifecycle."""
-        rule_src = synthetic_project / ".vaultspec" / "rules" / "rules" / "rule1.md"
+        rule_src = synthetic_project / ".vaultspec" / "rules" / "rule1.md"
         rule_src.write_text("---\nname: rule1\n---\n\nOriginal body", encoding="utf-8")
 
         # 1. Add
@@ -35,7 +35,7 @@ class TestIncrementalRules:
 
     def test_idempotent_resync(self, synthetic_project):
         """Syncing with no changes doesn't update files."""
-        rule_src = synthetic_project / ".vaultspec" / "rules" / "rules" / "stable.md"
+        rule_src = synthetic_project / ".vaultspec" / "rules" / "stable.md"
         rule_src.write_text("---\nname: stable\n---\n\nBody", encoding="utf-8")
         rules_sync()
         dest = synthetic_project / ".claude" / "rules" / "stable.md"
@@ -47,7 +47,7 @@ class TestIncrementalRules:
 
     def test_cross_destination_consistency(self, synthetic_project):
         """Rules are synced to all available tool destinations."""
-        (synthetic_project / ".vaultspec" / "rules" / "rules" / "shared.md").write_text(
+        (synthetic_project / ".vaultspec" / "rules" / "shared.md").write_text(
             "---\nname: shared\n---\n\nShared rule", encoding="utf-8"
         )
         rules_sync()
@@ -57,7 +57,7 @@ class TestIncrementalRules:
 
     def test_five_pass_churn(self, synthetic_project):
         """Simulate rapid changes across multiple sync passes."""
-        rules_dir = synthetic_project / ".vaultspec" / "rules" / "rules"
+        rules_dir = synthetic_project / ".vaultspec" / "rules"
         dest = synthetic_project / ".claude" / "rules" / "churn.md"
 
         for i in range(5):
@@ -71,9 +71,7 @@ class TestIncrementalRules:
 class TestIncrementalSkills:
     def test_skill_lifecycle(self, synthetic_project):
         """Skill directory and SKILL.md lifecycle."""
-        skill_dir = (
-            synthetic_project / ".vaultspec" / "rules" / "skills" / "vaultspec-test"
-        )
+        skill_dir = synthetic_project / ".vaultspec" / "skills" / "vaultspec-test"
         skill_dir.mkdir(parents=True)
         (skill_dir / "SKILL.md").write_text(
             "---\ndescription: v1\n---\n\n# v1", encoding="utf-8"
@@ -102,7 +100,7 @@ class TestIncrementalSkills:
 class TestIncrementalSystem:
     def test_system_add_modify_cycle(self, synthetic_project):
         """System prompt assembly lifecycle."""
-        base_src = synthetic_project / ".vaultspec" / "rules" / "system" / "base.md"
+        base_src = synthetic_project / ".vaultspec" / "system" / "base.md"
         base_src.write_text("---\n---\n\n# Base v1", encoding="utf-8")
 
         # 1. Initial sync
@@ -118,7 +116,7 @@ class TestIncrementalSystem:
 
     def test_system_idempotent(self, synthetic_project):
         """Syncing system twice with no changes produces identical output."""
-        (synthetic_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+        (synthetic_project / ".vaultspec" / "system" / "base.md").write_text(
             "---\n---\n\n# Stable base", encoding="utf-8"
         )
         system_sync(force=True)
@@ -177,7 +175,7 @@ class TestIncrementalConfig:
         assert codex_cfg.exists()
 
     def test_codex_native_config_tracks_frontmatter_changes(self, synthetic_project):
-        sys_dir = synthetic_project / ".vaultspec" / "rules" / "system"
+        sys_dir = synthetic_project / ".vaultspec" / "system"
         (sys_dir / "codex-settings.md").write_text(
             "---\n"
             "pipeline: config\n"
@@ -199,7 +197,7 @@ class TestIncrementalConfig:
         assert 'approval_policy = "never"' in content
 
     def test_codex_reasoning_settings_track_changes(self, synthetic_project):
-        sys_dir = synthetic_project / ".vaultspec" / "rules" / "system"
+        sys_dir = synthetic_project / ".vaultspec" / "system"
         (sys_dir / "codex-reasoning.md").write_text(
             "---\n"
             "pipeline: config\n"
@@ -231,9 +229,9 @@ class TestIncrementalConfig:
 class TestMixedOperations:
     def test_full_mixed_lifecycle(self, synthetic_project):
         """Add rules+skills, sync, modify+remove some, resync."""
-        rules_dir = synthetic_project / ".vaultspec" / "rules" / "rules"
-        skills_dir = synthetic_project / ".vaultspec" / "rules" / "skills"
-        system_dir = synthetic_project / ".vaultspec" / "rules" / "system"
+        rules_dir = synthetic_project / ".vaultspec" / "rules"
+        skills_dir = synthetic_project / ".vaultspec" / "skills"
+        system_dir = synthetic_project / ".vaultspec" / "system"
 
         # --- Setup: add everything ---
         (rules_dir / "r1.md").write_text(
@@ -284,7 +282,7 @@ class TestMixedOperations:
 
 class TestIncrementalAgents:
     def test_codex_agent_block_tracks_add_modify_remove(self, synthetic_project):
-        agents_dir = synthetic_project / ".vaultspec" / "rules" / "agents"
+        agents_dir = synthetic_project / ".vaultspec" / "agents"
         agents_dir.mkdir(parents=True, exist_ok=True)
         agent_path = agents_dir / "vaultspec-worker.md"
         agent_path.write_text(
@@ -334,7 +332,7 @@ other-config = 123
 """
         codex_cfg.write_text(initial_toml, encoding="utf-8")
 
-        agents_dir = synthetic_project / ".vaultspec" / "rules" / "agents"
+        agents_dir = synthetic_project / ".vaultspec" / "agents"
         agents_dir.mkdir(parents=True, exist_ok=True)
         agent_path = agents_dir / "vaultspec-worker.md"
         agent_path.write_text(

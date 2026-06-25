@@ -192,7 +192,7 @@ class TestUpgradeEdgeCases:
     def test_upgrade_reseeds_builtins(self, factory: WorkspaceFactory) -> None:
         factory.install().delete_builtins()
         # Verify builtins were deleted
-        rules_src = factory.path / ".vaultspec" / "rules" / "rules"
+        rules_src = factory.path / ".vaultspec" / "rules"
         assert not list(rules_src.glob("*.builtin.md")), (
             "Builtins still exist after delete_builtins"
         )
@@ -261,9 +261,7 @@ class TestInstallSkip:
 
     def test_skip_core_installs_provider_only(self, factory: WorkspaceFactory) -> None:
         # Pre-create .vaultspec/ so core scaffold is present
-        (factory.root / ".vaultspec" / "rules" / "rules").mkdir(
-            parents=True, exist_ok=True
-        )
+        (factory.root / ".vaultspec" / "rules").mkdir(parents=True, exist_ok=True)
         factory.create_gitignore()
         factory.install(skip={"core"})
         # At least one provider dir should exist
@@ -286,9 +284,7 @@ class TestInstallSkip:
         import logging
 
         # Pre-create .vaultspec/ so core scaffold is present.
-        (factory.root / ".vaultspec" / "rules" / "rules").mkdir(
-            parents=True, exist_ok=True
-        )
+        (factory.root / ".vaultspec" / "rules").mkdir(parents=True, exist_ok=True)
         factory.create_gitignore()
 
         caplog.set_level(logging.WARNING, logger="vaultspec_core.core.commands")

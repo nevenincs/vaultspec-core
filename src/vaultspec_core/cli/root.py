@@ -697,8 +697,8 @@ def cmd_sync(
     if not json_output:
         from vaultspec_core.builtins import check_outdated
 
-        vaultspec_rules = sync_target / ".vaultspec" / "rules"
-        outdated = check_outdated(vaultspec_rules) if vaultspec_rules.is_dir() else []
+        vaultspec_dir = sync_target / ".vaultspec"
+        outdated = check_outdated(vaultspec_dir) if vaultspec_dir.is_dir() else []
         if outdated:
             console.print()
             console.print(
@@ -749,7 +749,7 @@ def cmd_sync(
         ):
             console.print(
                 "\n[bold yellow]Warning:[/bold yellow] Sync produced 0 files. "
-                "The .vaultspec/rules/ source directories may be empty."
+                "The .vaultspec/ source directories may be empty."
             )
             from vaultspec_core.cli.rendering import (
                 hints_suppressed,

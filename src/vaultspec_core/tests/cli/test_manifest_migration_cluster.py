@@ -135,7 +135,15 @@ _STALE_NESTED_GITIGNORE = (
 
 
 def _nested_gitignore(root: Path) -> Path:
+    # Pre-flatten layout: the gitignore_reversal migration (0.1.20) runs before
+    # the framework-flatten migration, so it still targets the nested
+    # rules/rules path.
     return root / ".vaultspec" / "rules" / "rules" / ".gitignore"
+
+
+def _rules_gitignore(root: Path) -> Path:
+    # Post-flatten layout: the spec-layer gitignore lives in the flat rules dir.
+    return root / ".vaultspec" / "rules" / ".gitignore"
 
 
 def _shipped_policy() -> str:
@@ -147,20 +155,20 @@ def _shipped_policy() -> str:
 class TestNestedGitignoreConvergence:
     def test_sync_converges_stale_nested_gitignore(self, tmp_path: Path) -> None:
         WorkspaceFactory(tmp_path).install("core")
-        nested = _nested_gitignore(tmp_path)
-        nested.parent.mkdir(parents=True, exist_ok=True)
-        nested.write_text(_STALE_NESTED_GITIGNORE, encoding="utf-8")
+        gitignore = _rules_gitignore(tmp_path)
+        gitignore.parent.mkdir(parents=True, exist_ok=True)
+        gitignore.write_text(_STALE_NESTED_GITIGNORE, encoding="utf-8")
 
         WorkspaceFactory(tmp_path).sync("all")
 
-        assert nested.read_text(encoding="utf-8") == _shipped_policy()
+        assert gitignore.read_text(encoding="utf-8") == _shipped_policy()
 
     def test_convergence_leaves_operator_customised_file_untouched(
         self, tmp_path: Path
     ) -> None:
         from vaultspec_core.core.rules import converge_spec_layer_gitignore
 
-        rules_src = tmp_path / ".vaultspec" / "rules" / "rules"
+        rules_src = tmp_path / ".vaultspec" / "rules"
         rules_src.mkdir(parents=True, exist_ok=True)
         custom = "# our policy\nsecrets/*.md\n"
         (rules_src / ".gitignore").write_text(custom, encoding="utf-8")
@@ -173,7 +181,7 @@ class TestNestedGitignoreConvergence:
     def test_convergence_is_idempotent(self, tmp_path: Path) -> None:
         from vaultspec_core.core.rules import converge_spec_layer_gitignore
 
-        rules_src = tmp_path / ".vaultspec" / "rules" / "rules"
+        rules_src = tmp_path / ".vaultspec" / "rules"
         rules_src.mkdir(parents=True, exist_ok=True)
         (rules_src / ".gitignore").write_text(_STALE_NESTED_GITIGNORE, encoding="utf-8")
 

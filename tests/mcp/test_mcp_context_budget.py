@@ -55,7 +55,7 @@ def mcp_tools(tmp_path):
         (tmp_path / ".vault" / dt.value).mkdir(parents=True)
 
     for subdir in ("templates", "agents", "rules", "skills"):
-        (tmp_path / ".vaultspec" / "rules" / subdir).mkdir(parents=True)
+        (tmp_path / ".vaultspec" / subdir).mkdir(parents=True)
 
     init_paths(tmp_path)
 

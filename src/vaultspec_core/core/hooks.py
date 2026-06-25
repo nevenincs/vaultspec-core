@@ -1,6 +1,6 @@
 """Manage canonical hook definitions and lifecycle CRUD commands.
 
-Hooks are stored as YAML definitions under ``.vaultspec/rules/hooks/``.
+Hooks are stored as YAML definitions under ``.vaultspec/hooks/``.
 This module provides first-class CRUD, sync, and status compliance
 verification for hooks.
 """

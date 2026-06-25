@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 def collect_rules(
     warnings: list[str] | None = None,
 ) -> dict[str, tuple[Path, dict[str, Any], str]]:
-    """Collect rule definitions from .vaultspec/rules/rules/.
+    """Collect rule definitions from .vaultspec/rules/.
 
     Includes both built-in rules (``*.builtin.md``) and custom user rules
     (``*.md``).
@@ -217,7 +217,7 @@ def converge_spec_layer_gitignore(rules_src_dir: Path) -> bool:
     """Refresh the nested ``rules/.gitignore`` to the shipped team-shared policy.
 
     Pre-0.1.20 installs left a ``*.md`` / ``!*.builtin.md`` policy in
-    ``.vaultspec/rules/rules/.gitignore`` that silently un-tracks the
+    ``.vaultspec/rules/.gitignore`` that silently un-tracks the
     project-authored rule sources now relocated under ``project/`` - the exact
     failure the ``gitignore_reversal`` migration was meant to end. Only
     ``install --force`` previously refreshed it; this convergence lets ``sync``
@@ -272,7 +272,7 @@ def flatten_nested_custom_rules(rules_src_dir: Path) -> None:
     """Flatten any nested custom rule to the rules root; sanitize nesting.
 
     Custom rules are team-shared markdown files that live FLAT directly under
-    ``.vaultspec/rules/rules/`` alongside the ``*.builtin.md`` builtins; nested
+    ``.vaultspec/rules/`` alongside the ``*.builtin.md`` builtins; nested
     rule folders (notably the historical ``project/`` subdir) are not
     supported. This heals the source tree idempotently: every non-builtin
     ``*.md`` found below the rules root is moved up to ``<root>/<basename>`` and
@@ -327,7 +327,7 @@ def rule_promote(
 ) -> Path:
     """Promote an audit finding to a team-shared rule.
 
-    Scaffolds a new rule flat under `.vaultspec/rules/rules/` and appends
+    Scaffolds a new rule flat under `.vaultspec/rules/` and appends
     the rule to the originating audit's ``promoted_to`` frontmatter field.
 
     Args:

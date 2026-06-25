@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 def _build_minimal_workspace(root: Path) -> None:
     """Create the minimal workspace structure needed for MCP startup."""
     (root / ".vault").mkdir()
-    templates_dir = root / ".vaultspec" / "rules" / "templates"
+    templates_dir = root / ".vaultspec" / "templates"
     templates_dir.mkdir(parents=True)
     (templates_dir / "research.md").write_text(
         "---\n"

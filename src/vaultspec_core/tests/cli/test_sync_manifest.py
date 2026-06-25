@@ -38,17 +38,17 @@ def sync_workspace(tmp_path):
         )
 
     # Create a workspace context with these configs
-    rules_src = tmp_path / ".vaultspec" / "rules" / "rules"
+    rules_src = tmp_path / ".vaultspec" / "rules"
     rules_src.mkdir(parents=True, exist_ok=True)
     ctx = WorkspaceContext(
         root_dir=tmp_path,
         target_dir=tmp_path,
         rules_src_dir=rules_src,
-        skills_src_dir=tmp_path / ".vaultspec" / "rules" / "skills",
-        agents_src_dir=tmp_path / ".vaultspec" / "rules" / "agents",
-        system_src_dir=tmp_path / ".vaultspec" / "rules" / "system",
-        templates_dir=tmp_path / ".vaultspec" / "rules" / "templates",
-        hooks_dir=tmp_path / ".vaultspec" / "rules" / "hooks",
+        skills_src_dir=tmp_path / ".vaultspec" / "skills",
+        agents_src_dir=tmp_path / ".vaultspec" / "agents",
+        system_src_dir=tmp_path / ".vaultspec" / "system",
+        templates_dir=tmp_path / ".vaultspec" / "templates",
+        hooks_dir=tmp_path / ".vaultspec" / "hooks",
         tool_configs=tool_configs,
     )
     token = _t._workspace_ctx.set(ctx)

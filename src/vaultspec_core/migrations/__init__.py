@@ -1,7 +1,8 @@
 """Versioned migration registry for vaultspec-managed workspaces.
 
-Schema migrations relocate or rewrite ``.vault/`` content when a new
-release of vaultspec-core changes the on-disk shape. Each migration
+Schema migrations relocate or rewrite workspace content - ``.vault/``
+documents or the ``.vaultspec/`` framework tree - when a new release of
+vaultspec-core changes the on-disk shape. Each migration
 declares its target release version and exposes an idempotent
 ``migrate(workspace) -> MigrationResult`` callable. The driver
 :func:`run_pending_migrations` reads the workspace manifest, runs every
@@ -170,6 +171,7 @@ def _build_registry() -> list[Migration]:
     from .m_0_1_21_frontmatter_lifecycle import MIGRATION as M_FRONTMATTER_LIFECYCLE
     from .m_0_1_24_codex_agents_dedup import MIGRATION as M_CODEX_AGENTS_DEDUP
     from .m_0_1_29_modified_stamp_backfill import MIGRATION as M_MODIFIED_STAMP_BACKFILL
+    from .m_0_1_35_framework_flatten import MIGRATION as M_FRAMEWORK_FLATTEN
 
     entries: list[Migration] = [
         M_INDEX_SUBFOLDER,
@@ -177,6 +179,7 @@ def _build_registry() -> list[Migration]:
         M_FRONTMATTER_LIFECYCLE,
         M_CODEX_AGENTS_DEDUP,
         M_MODIFIED_STAMP_BACKFILL,
+        M_FRAMEWORK_FLATTEN,
     ]
     return sorted(entries, key=lambda m: parse_version_tuple(m.target_version))
 
@@ -276,9 +279,11 @@ def run_pending_migrations(
     so the read-modify-write cycle stays atomic across concurrent
     invocations. Migration bodies must not invoke any wrapper that
     re-enters the lock (e.g. :func:`add_providers`,
-    :func:`remove_provider`, or :func:`write_manifest`); the first
-    entry (``index_subfolder``) only mutates ``.vault/`` content,
-    which is the documented contract for every entry that follows.
+    :func:`remove_provider`, or :func:`write_manifest`); entries
+    mutate workspace content - ``.vault/`` documents or, for the
+    ``framework_flatten`` entry, the ``.vaultspec/`` framework tree -
+    but never the manifest, which is the documented contract for
+    every entry.
 
     Performance. The lazy-trigger caller passes ``use_cache=True``;
     after the first up-to-date observation per workspace per process,

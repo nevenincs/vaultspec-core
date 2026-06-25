@@ -17,23 +17,23 @@ pytestmark = [pytest.mark.unit]
 def vaultspec_dir(tmp_path):
     """Create a minimal .vaultspec structure with builtin files."""
     vs = tmp_path / ".vaultspec"
-    rules_rules = vs / "rules" / "rules"
-    rules_rules.mkdir(parents=True)
+    rules_dir = vs / "rules"
+    rules_dir.mkdir(parents=True)
 
     # Create a builtin rule
-    builtin = rules_rules / "governance.builtin.md"
+    builtin = rules_dir / "governance.builtin.md"
     builtin.write_text(
         "---\nname: governance\n---\nOriginal content.\n", encoding="utf-8"
     )
 
     # Create a custom rule (not builtin)
-    custom = rules_rules / "my-rule.md"
+    custom = rules_dir / "my-rule.md"
     custom.write_text("Custom rule content.", encoding="utf-8")
 
     # Create a builtin in skills category
-    rules_skills = vs / "rules" / "skills"
-    rules_skills.mkdir(parents=True)
-    skill_builtin = rules_skills / "code-review.builtin.md"
+    skills_dir = vs / "skills"
+    skills_dir.mkdir(parents=True)
+    skill_builtin = skills_dir / "code-review.builtin.md"
     skill_builtin.write_text(
         "---\nname: code-review\n---\nOriginal skill.\n", encoding="utf-8"
     )
@@ -75,7 +75,7 @@ class TestSnapshotBuiltins:
     def test_snapshot_overwrites_existing(self, vaultspec_dir):
         snapshot_builtins(vaultspec_dir)
         # Modify the source
-        (vaultspec_dir / "rules" / "rules" / "governance.builtin.md").write_text(
+        (vaultspec_dir / "rules" / "governance.builtin.md").write_text(
             "Modified.", encoding="utf-8"
         )
         # Re-snapshot
@@ -107,7 +107,7 @@ class TestRevertResource:
     def test_reverts_modified_builtin(self, vaultspec_dir):
         snapshot_builtins(vaultspec_dir)
         # Modify the file
-        target = vaultspec_dir / "rules" / "rules" / "governance.builtin.md"
+        target = vaultspec_dir / "rules" / "governance.builtin.md"
         target.write_text("USER MODIFIED THIS.", encoding="utf-8")
 
         result = revert_resource(vaultspec_dir, "rules", "governance.builtin.md")
@@ -133,7 +133,7 @@ class TestListModifiedBuiltins:
     def test_detects_modified(self, vaultspec_dir):
         snapshot_builtins(vaultspec_dir)
         # Modify one
-        (vaultspec_dir / "rules" / "rules" / "governance.builtin.md").write_text(
+        (vaultspec_dir / "rules" / "governance.builtin.md").write_text(
             "CHANGED.", encoding="utf-8"
         )
 
@@ -145,7 +145,7 @@ class TestListModifiedBuiltins:
     def test_detects_missing(self, vaultspec_dir):
         snapshot_builtins(vaultspec_dir)
         # Delete one
-        (vaultspec_dir / "rules" / "rules" / "governance.builtin.md").unlink()
+        (vaultspec_dir / "rules" / "governance.builtin.md").unlink()
 
         modified = list_modified_builtins(vaultspec_dir)
         statuses = {m["filename"]: m["status"] for m in modified}

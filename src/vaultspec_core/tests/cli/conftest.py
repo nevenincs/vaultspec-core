@@ -28,7 +28,7 @@ typer.rich_utils.COLOR_SYSTEM = None
 
 def setup_rules_dir(root):
     """Setup rules source directory in the given root."""
-    (root / ".vaultspec" / "rules" / "rules").mkdir(parents=True, exist_ok=True)
+    (root / ".vaultspec" / "rules").mkdir(parents=True, exist_ok=True)
 
 
 @pytest.fixture(scope="session")
