@@ -65,6 +65,10 @@ read-only: it is the zeroth move, not a pipeline phase, and produces no artifact
   pending schema migrations
 - `vaultspec-core vault feature archive <tag>` - archive a feature so it no longer
   exists in the active project
+- `vaultspec-core vault feature rename <old> <new>` - rename a feature tag across every
+  binding surface (document filenames, the exec folder, the `#feature` tag, `related:`
+  wiki-links, and the regenerated feature index); applies atomically with rollback, and
+  `--force` merges the source into an existing target feature
 - `vaultspec-core vault rule promote --from <audit-stem> --as <rule-name>` - promote an
   audit finding to a project rule
 

@@ -66,9 +66,9 @@ Cover the backend and command with real-filesystem, factory-based tests for ever
 
 Conform the firmware to document the new rename verb and propagate it through sync.
 
-- [ ] `P05.S22` - Document the vault feature rename verb in the CLI mandate rule; `.vaultspec/rules/rules/vaultspec-cli.builtin.md`.
-- [ ] `P05.S23` - Add the rename verb to the local CLI reference; `.vaultspec/rules/reference/cli.md`.
-- [ ] `P05.S24` - Propagate firmware edits with vaultspec-core sync and confirm mirrors regenerate clean; `.claude/rules/vaultspec-cli.builtin.md`.
+- [x] `P05.S22` - Document the vault feature rename verb in the CLI mandate rule; `.vaultspec/rules/rules/vaultspec-cli.builtin.md`.
+- [x] `P05.S23` - Add the rename verb to the local CLI reference; `.vaultspec/rules/reference/cli.md`.
+- [x] `P05.S24` - Propagate firmware edits with vaultspec-core sync and confirm mirrors regenerate clean; `.claude/rules/vaultspec-cli.builtin.md`.
 
 ## Parallelization
 

@@ -27,6 +27,9 @@ related:
   - '[[2026-06-26-uniform-rename-P04-S19]]'
   - '[[2026-06-26-uniform-rename-P04-S20]]'
   - '[[2026-06-26-uniform-rename-P04-S21]]'
+  - '[[2026-06-26-uniform-rename-P05-S22]]'
+  - '[[2026-06-26-uniform-rename-P05-S23]]'
+  - '[[2026-06-26-uniform-rename-P05-S24]]'
   - '[[2026-06-26-uniform-rename-adr]]'
   - '[[2026-06-26-uniform-rename-plan]]'
   - '[[2026-06-26-uniform-rename-reference]]'
@@ -66,6 +69,9 @@ Auto-generated index of all documents tagged with `#uniform-rename`.
 - `2026-06-26-uniform-rename-P04-S19` - Test force-merge into an existing feature and refusal on per-file path collision
 - `2026-06-26-uniform-rename-P04-S20` - Test flow-style tags normalization and feature index delete-and-regenerate
 - `2026-06-26-uniform-rename-P04-S21` - Test the rename command end-to-end including the json envelope
+- `2026-06-26-uniform-rename-P05-S22` - Document the vault feature rename verb in the CLI mandate rule
+- `2026-06-26-uniform-rename-P05-S23` - Add the rename verb to the local CLI reference
+- `2026-06-26-uniform-rename-P05-S24` - Propagate firmware edits with vaultspec-core sync and confirm mirrors regenerate clean
 
 ### plan
 
