@@ -34,11 +34,11 @@ Extract the case-safe path rename and related-link rewrite primitives into a sha
 
 Implement the rename_feature backend with validation, plan computation, and reverse-journal apply that restores original state on any failure.
 
-- [ ] `P02.S05` - Add feature-tag validation helpers for kebab-case, schema tag form, and reserved DocType names; `src/vaultspec_core/vaultcore/query.py`.
-- [ ] `P02.S06` - Implement the anchored date-keyed feature-segment path transform for docs, exec folder, and exec records; `src/vaultspec_core/vaultcore/query.py`.
-- [ ] `P02.S07` - Implement the old-to-new tag-block rewriter with flow-to-block normalization; `src/vaultspec_core/vaultcore/query.py`.
-- [ ] `P02.S08` - Implement rename_feature plan computation and collision detection with refuse-default and force-merge; `src/vaultspec_core/vaultcore/query.py`.
-- [ ] `P02.S09` - Implement reverse-journal apply with rollback, index regeneration, stamp refresh, and graph-cache invalidation; `src/vaultspec_core/vaultcore/query.py`.
+- [x] `P02.S05` - Add feature-tag validation helpers for kebab-case, schema tag form, and reserved DocType names; `src/vaultspec_core/vaultcore/query.py`.
+- [x] `P02.S06` - Implement the anchored date-keyed feature-segment path transform for docs, exec folder, and exec records; `src/vaultspec_core/vaultcore/query.py`.
+- [x] `P02.S07` - Implement the old-to-new tag-block rewriter with flow-to-block normalization; `src/vaultspec_core/vaultcore/query.py`.
+- [x] `P02.S08` - Implement rename_feature plan computation and collision detection with refuse-default and force-merge; `src/vaultspec_core/vaultcore/query.py`.
+- [x] `P02.S09` - Implement reverse-journal apply with rollback, index regeneration, stamp refresh, and graph-cache invalidation; `src/vaultspec_core/vaultcore/query.py`.
 
 ### Phase `P03` - CLI command
 

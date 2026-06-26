@@ -10,6 +10,11 @@ related:
   - '[[2026-06-26-uniform-rename-P01-S02]]'
   - '[[2026-06-26-uniform-rename-P01-S03]]'
   - '[[2026-06-26-uniform-rename-P01-S04]]'
+  - '[[2026-06-26-uniform-rename-P02-S05]]'
+  - '[[2026-06-26-uniform-rename-P02-S06]]'
+  - '[[2026-06-26-uniform-rename-P02-S07]]'
+  - '[[2026-06-26-uniform-rename-P02-S08]]'
+  - '[[2026-06-26-uniform-rename-P02-S09]]'
   - '[[2026-06-26-uniform-rename-adr]]'
   - '[[2026-06-26-uniform-rename-plan]]'
   - '[[2026-06-26-uniform-rename-reference]]'
@@ -32,6 +37,11 @@ Auto-generated index of all documents tagged with `#uniform-rename`.
 - `2026-06-26-uniform-rename-P01-S02` - Move the related-link rewrite engine and its regexes into the shared module
 - `2026-06-26-uniform-rename-P01-S03` - Re-point the structure check to import the rename primitives from the shared module
 - `2026-06-26-uniform-rename-P01-S04` - Run the structure case-rename suite to confirm no behavior change
+- `2026-06-26-uniform-rename-P02-S05` - Add feature-tag validation helpers for kebab-case, schema tag form, and reserved DocType names
+- `2026-06-26-uniform-rename-P02-S06` - Implement the anchored date-keyed feature-segment path transform for docs, exec folder, and exec records
+- `2026-06-26-uniform-rename-P02-S07` - Implement the old-to-new tag-block rewriter with flow-to-block normalization
+- `2026-06-26-uniform-rename-P02-S08` - Implement rename_feature plan computation and collision detection with refuse-default and force-merge
+- `2026-06-26-uniform-rename-P02-S09` - Implement reverse-journal apply with rollback, index regeneration, stamp refresh, and graph-cache invalidation
 
 ### plan
 
