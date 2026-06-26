@@ -1,97 +1,129 @@
 # Vaultspec framework manual
 
-This manual covers developing a feature with vaultspec, from idea to shipped, reviewed
-code. Every stage leaves a durable record in `.vault/`, so intent survives across
-sessions, agents, and teammates. It assumes vaultspec is already installed and
-provisioned (you have run `vaultspec-core install`); if not, start with the
-[README](../README.md).
+This manual covers operating the vaultspec workflow in a project that is already set up.
+For what vaultspec is and how to install it, see the [README](../README.md). In one
+line: `.vault/` holds the documents your features produce, and `.vaultspec/` holds the
+framework policy.
 
-## How the pieces fit (read this first)
+## How a feature flows into the vault
 
-Vaultspec is a spec-driven harness for coding agents. You drive a coding agent (Claude
-Code, Codex, Gemini); it invokes vaultspec skills (slash-commands like
-`/vaultspec-research`), which call the `vaultspec-core` CLI to read and write the
-records.
+You begin a pipeline with one request, and the framework drives five stages (plus an
+optional code-grounding step). A skill runs each stage and persists a document to
+`.vault/`, pausing for your approval before the next:
 
-Two directories define it. `.vault/` holds the documents your features produce -
-research, decisions, plans, execution records, audits. `.vaultspec/` holds the policy -
-rules, skills, agent personas, system prompts - that shapes how the agent behaves.
+| Stage                       | Skill                      | Persists to         |
+| --------------------------- | -------------------------- | ------------------- |
+| Research                    | `/vaultspec-research`      | `.vault/research/`  |
+| Ground in code *(optional)* | `/vaultspec-code-research` | `.vault/reference/` |
+| Decide                      | `/vaultspec-adr`           | `.vault/adr/`       |
+| Plan                        | `/vaultspec-write`         | `.vault/plan/`      |
+| Execute                     | `/vaultspec-execute`       | `.vault/exec/`      |
+| Review                      | `/vaultspec-code-review`   | `.vault/audit/`     |
 
-You write down and approve the research, decision, and plan before any code, so every
-agent - even one in an isolated sandbox - builds toward the same goal.
+The framework runs research, execute, and review; the rest of this manual covers where
+you step in: orienting, finding documents, shaping the ADR and plan, and day-to-day
+operation.
 
-## Orientation - the zeroth move
+## Begin a pipeline
 
-In a project you have no context for, run `vaultspec-core status` first. This zeroth
-move is read-only and describes what exists; it produces no artifact and belongs to no
-phase.
+Tell your coding agent what to build, in plain language:
 
-With no argument it shows a vault-wide rollup: every plan with open steps and its
-completion percentage, recently modified documents by type, and the features in flight.
+> "Begin a vaultspec pipeline to implement full-text search for the API."
 
-Pass a `TARGET` (plan stem, path, or feature tag) and it becomes a grounding trace -
-each plan step mapped to its execution record, with the feature's research, reference,
-and audit documents nested underneath. This traces a plan forward to its records and
-back to the decisions behind it.
+To enter at one stage instead, invoke its skill directly, for example
+`/vaultspec-research`.
 
-Orientation describes; it does not score. For that, use `vaultspec-core vault check`,
-covered under [Managing vault records](#managing-vault-records).
+## Orient: see what is in flight
 
-## Developing a feature, stage by stage
+Run `vaultspec-core status` to see where work stands. With no argument it prints a
+vault-wide rollup:
 
-A feature moves through five stages - research, decide, plan, execute, review - and you
-approve each before the next. Here is how to run them, followed through one example:
-adding full-text search to an API.
+```text
+$ vaultspec-core status
+Vault Status
 
-### Research
+Plans in flight  (at least one open step)
+  2026-06-26-search-api-plan   L2   -   P1/3   4/12 steps   33%   next P02.S05   2026-06-26
 
-Ask your coding agent to explore the problem in natural language, with enough context to
-compare real options:
+Recent changes
+  research
+    2026-06-26-search-api-research  2026-06-26
+  adr
+    2026-06-26-search-api-adr  2026-06-26
 
-> "Research options for adding full-text search to the API - compare PostgreSQL
-> full-text search, a dedicated search service, and an embedded index."
+Active features
+  search-api  3 docs plan  L2 4/12 33%  2026-06-26
+```
 
-The `vaultspec-research` skill weighs trade-offs and writes structured findings to
-`.vault/research/`. Review, correct gaps, and approve. Complex features take several
-rounds, each its own record that later stages reference.
+Pass a feature (or plan) as the target for its grounding trace - every step mapped to
+its execution record, with the feature's documents grouped underneath:
 
-### Grounding research in code
+```text
+$ vaultspec-core status search-api
+Grounding Trace  search-api (feature)
 
-To ground research in existing code, invoke `vaultspec-code-research` before deciding:
+2026-06-26-search-api-plan   L2   -   P1/3   4/12 steps   33%   next P02.S05
+    [x] P01.S01  2026-06-26-search-api-P01-S01
+    [x] P01.S02  2026-06-26-search-api-P01-S02
+  > [ ] P02.S05  no record
+  grounding
+    adr  2026-06-26-search-api-adr
+    research  2026-06-26-search-api-research
+```
 
-> "How does the API currently store and query the records we want to search? Show me the
-> data-access layer."
+## Find a feature's documents
 
-It writes a `.vault/reference/` record of real snippets, patterns, and observations from
-the codebase. Greenfield work may skip it, but for features touching existing systems it
-stops decisions built on guesswork.
+List a feature's records directly, optionally by type:
 
-### Architectural decisions
+```text
+$ vaultspec-core vault list --feature search-api
+Vault documents
+  2026-06-26-search-api-research research #search-api 2026-06-26
+  2026-06-26-search-api-adr adr #search-api 2026-06-26
+  2026-06-26-search-api-plan plan #search-api 2026-06-26
+```
 
-With enough context, formalize the decision into an Architecture Decision Record (ADR)
-via `vaultspec-adr`:
+When you do not know the name, search by meaning:
 
-> "Create an ADR recommending PostgreSQL full-text search for the API based on the
-> research findings."
+```bash
+vaultspec-rag search "full-text ranking and tokenizer" --type vault
+```
 
-The ADR lands in `.vault/adr/`, capturing the context, decision, and consequences,
-linked back to the research that informed it. ADRs are binding - they set the boundaries
-the plan must obey - so review and sign off before planning.
+## Find and amend an ADR
 
-### Planning
+A decision lives in an Architecture Decision Record (ADR). Find it by feature:
 
-From an approved ADR, `vaultspec-write` produces an implementation plan in
-`.vault/plan/`:
+```bash
+vaultspec-core vault list adr --feature search-api
+```
 
-> "Write an implementation plan for the search feature based on the ADR."
+Amend it either way: ask the agent to revise the decision - it reopens the ADR and
+supersedes it if the direction changes - or edit the ADR's body prose and reconcile its
+frontmatter and links:
 
-Plans use an `Epic > Wave > Phase > Step` hierarchy, and the frontmatter `tier` (`L1`
-through `L4`) sets which containers exist: `L1` Steps only; `L2` Steps under Phases;
-`L3` Phases under Waves; `L4` an Epic frame for multi-week, multi-team work. A `Step` is
-the leaf row at every tier - one checkbox pairing one prompt-run with one commit. The
-full tier table and identifier rules are in the [CLI reference](./CLI.md).
+```bash
+vaultspec-core vault check all --fix
+```
 
-A fragment for the search feature:
+ADRs are binding, so a change can ripple into the plan that depends on it.
+
+## Make a plan and set its tier
+
+From an approved ADR, `/vaultspec-write` produces the plan in `.vault/plan/`:
+
+> "Write the implementation plan from the ADR."
+
+A plan's tier sets its structure: **L1** for a single-session fix (Steps only), **L2**
+for multi-step work in one subsystem (Steps under Phases), **L3** for interdependent
+batches (Phases under Waves), and **L4** for multi-week, multi-team work (an Epic
+frame). Ask for the tier you want, or let the skill choose from the scope and adjust
+later:
+
+```bash
+vaultspec-core vault plan tier promote .vault/plan/2026-06-26-search-api-plan.md --target L3
+```
+
+Each Step pairs one file with one commit:
 
 ```markdown
 ### Phase `P01` - rewrite the search index
@@ -99,134 +131,32 @@ A fragment for the search feature:
 - [ ] `P01.S02` - replace inline scoring with the new ranker; `src/search/ranker.py`.
 ```
 
-### Working the plan with the vault plan CLI
+Every structural change goes through `vaultspec-core vault plan` rather than the editor,
+keeping identifiers (`S##`, `P##`, `W##`) append-only. The full surface is in the
+[CLI reference](./CLI.md).
 
-Make every structural change through `vaultspec-core vault plan`, not the editor. It
-keeps identifiers (`S##`, `P##`, `W##`) append-only: a removed Step's number retires for
-good, never reused. Hand-editing a checkbox or display path bypasses that guarantee, and
-`vault plan check` flags it.
+## Operate day to day
 
-Representative operations:
-
-```bash
-# Mark a step complete
-vaultspec-core vault plan step check <plan> S07
-
-# Add a step to a phase
-vaultspec-core vault plan step add <plan> --action "draft the connector module" --scope src/lib/connector.py --phase P02
-
-# Promote the plan's complexity tier
-vaultspec-core vault plan tier promote <plan> --target L3
-```
-
-Read-only views: `vault plan status` (completion and tier), `vault plan query` (filter
-Steps), `vault plan check` (validate; `--fix` autofixes before commit). Full surface in
-the [CLI reference](./CLI.md).
-
-### Execution
-
-With the plan approved, run it directly or in parallel. `vaultspec-execute` works the
-plan step by step, delegating to agent personas - each with a role and tool-access
-level, some writing files, some read-only. Step records land in `.vault/exec/`.
-
-> "Execute the search implementation plan."
-
-Independent Steps can run as several agents at once. Either way, code review is
-mandatory afterward.
-
-### Review and auditing
-
-After execution, `vaultspec-code-review` audits the work for safety, intent, and
-quality:
-
-> "Review the changes from the search implementation."
-
-It writes a `.vault/audit/` record with issues by severity (`critical`, `high`,
-`medium`, `low`); resolve every `critical` and `high` before closing. A clean review
-ships.
-
-For ongoing upkeep - broken links, frontmatter, stale references - use
-`vaultspec-curate`. `vaultspec-core vault sanitize annotations` strips generated
-template guidance (`--dry-run` to preview).
-
-## Extending and operating the framework
-
-The remaining sections cover operating concerns: customizing, sharing, maintaining the
-vault, and MCP integration.
-
-### Customizing the framework
-
-Edit resources under `.vaultspec/rules/` through `vaultspec-core spec`, not by hand:
+**Customize.** Edit resources under `.vaultspec/rules/` through `vaultspec-core spec`,
+then sync them to each provider (a coding-agent integration such as Claude, Codex, or
+Gemini):
 
 ```bash
 vaultspec-core spec rules add my-project-conventions
-vaultspec-core spec skills add my-deploy --description "Deploy to staging"
-
-vaultspec-core spec rules list
-vaultspec-core spec skills list
-vaultspec-core spec agents list
+vaultspec-core sync                       # writes .claude/, .gemini/, .codex/, and the shared .agents/
 ```
 
-After any change, `sync` pushes generated resources to each provider - `.claude/`,
-`.gemini/`, the shared `.agents/`, and `.codex/`:
+**Share.** Commit `.vaultspec/` so a teammate inherits the policy on clone; the managed
+`.gitignore` block keeps per-machine by-products local.
+`vaultspec-core install --upgrade` carries an older workspace onto the shared policy.
 
-```bash
-vaultspec-core sync                  # all installed providers
-vaultspec-core sync claude           # one provider
-vaultspec-core sync --dry-run        # preview changes without writing
-```
+**Maintain.** `vaultspec-core vault check all --fix` validates and repairs the vault,
+and `vault graph --feature search-api` visualizes a feature. The CLI maintains each
+document's `modified:` and `date:` stamps; never hand-edit them.
 
-Full surface in the [CLI reference](./CLI.md).
-
-### Sharing policy
-
-The spec layer is team-shared by default: anyone who clones the project inherits its
-policy, so codifying a rule reaches every teammate and every continuous integration (CI)
-run.
-
-Authored content - `.vaultspec/` rules, skills, agents, and system prompts, plus the
-synthesized `CLAUDE.md`, `.mcp.json`, and generated provider directories - belongs in
-git. Only per-machine by-products stay local: `install` and `sync` write a managed
-`.gitignore` block (marked `# >>> vaultspec-managed (do not edit this block) >>>`) that
-ignores the snapshot directory, lock sentinels, the install manifest
-(`.vaultspec/providers.json`), and the vault's caches.
-
-`vaultspec-core install --upgrade` carries an older workspace onto this policy,
-rewriting a stale managed block while leaving a hand-edited one untouched.
-
-### Managing vault records
-
-The `vaultspec-core vault` group is the authoritative surface for vault documents: it
-creates them from templates, lists and filters records, validates links and frontmatter,
-and graphs dependencies. `vault check` (orientation) and `vault sanitize annotations`
-(review) both belong to it. Full surface in the [CLI reference](./CLI.md).
-
-One frontmatter detail: `date:` is creation, `modified:` is last change. The CLI
-maintains `modified:` automatically (mutating verbs and `vault check all --fix` update
-it); never hand-edit it.
-
-### Model Context Protocol integration
-
-The Model Context Protocol (MCP) server is an alternative to file-based sync for clients
-like Claude Code: it exposes vault discovery and document creation over stdio, so
-clients work through tool calls instead of reading files.
-
-`vaultspec-core install` scaffolds an `.mcp.json` that invokes the server with:
-
-```bash
-uv run python -m vaultspec_core.mcp_server.app
-```
-
-Module invocation (`python -m`) avoids the Windows binary lock that a console-script
-entry point would hold.
-
-Verify configuration health at any time:
-
-```bash
-vaultspec-core spec mcps status --json
-```
-
-See the [MCP reference](./MCP.md) for setup and tool documentation.
+**Connect MCP clients.** `install` scaffolds an `.mcp.json` exposing vault discovery and
+authoring to Model Context Protocol (MCP) clients over stdio. Verify it with
+`vaultspec-core spec mcps status --json`; see the [MCP reference](./MCP.md).
 
 ## Related documentation
 
