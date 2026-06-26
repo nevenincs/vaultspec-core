@@ -119,6 +119,7 @@ vaultspec-core vault feature list [OPTIONS]
 vaultspec-core vault feature index [OPTIONS]
 vaultspec-core vault feature archive [OPTIONS] FEATURE_TAG
 vaultspec-core vault feature unarchive [OPTIONS] FEATURE_TAG
+vaultspec-core vault feature rename [OPTIONS] OLD_FEATURE NEW_FEATURE
 vaultspec-core vault check all [OPTIONS]
 vaultspec-core vault check body-links [OPTIONS]
 vaultspec-core vault check annotations [OPTIONS]

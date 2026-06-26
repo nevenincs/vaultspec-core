@@ -44,9 +44,9 @@ Implement the rename_feature backend with validation, plan computation, and reve
 
 Expose the backend as the vault feature rename CLI command with human and JSON output mirroring the archive verb.
 
-- [ ] `P03.S10` - Add the cmd_feature_rename command with two positionals and dry-run, force, json, no-hints, and target options; `src/vaultspec_core/cli/vault_cmd.py`.
-- [ ] `P03.S11` - Render human output with renamed count, old-to-new paths, cross-link rewrite count, collision warnings, and a next-step hint; `src/vaultspec_core/cli/vault_cmd.py`.
-- [ ] `P03.S12` - Emit the versioned json envelope vaultspec.vault.feature.rename.v1 with canonical status; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `P03.S10` - Add the cmd_feature_rename command with two positionals and dry-run, force, json, no-hints, and target options; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `P03.S11` - Render human output with renamed count, old-to-new paths, cross-link rewrite count, collision warnings, and a next-step hint; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `P03.S12` - Emit the versioned json envelope vaultspec.vault.feature.rename.v1 with canonical status; `src/vaultspec_core/cli/vault_cmd.py`.
 
 ### Phase `P04` - Tests
 

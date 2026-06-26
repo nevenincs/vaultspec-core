@@ -15,6 +15,9 @@ related:
   - '[[2026-06-26-uniform-rename-P02-S07]]'
   - '[[2026-06-26-uniform-rename-P02-S08]]'
   - '[[2026-06-26-uniform-rename-P02-S09]]'
+  - '[[2026-06-26-uniform-rename-P03-S10]]'
+  - '[[2026-06-26-uniform-rename-P03-S11]]'
+  - '[[2026-06-26-uniform-rename-P03-S12]]'
   - '[[2026-06-26-uniform-rename-adr]]'
   - '[[2026-06-26-uniform-rename-plan]]'
   - '[[2026-06-26-uniform-rename-reference]]'
@@ -42,6 +45,9 @@ Auto-generated index of all documents tagged with `#uniform-rename`.
 - `2026-06-26-uniform-rename-P02-S07` - Implement the old-to-new tag-block rewriter with flow-to-block normalization
 - `2026-06-26-uniform-rename-P02-S08` - Implement rename_feature plan computation and collision detection with refuse-default and force-merge
 - `2026-06-26-uniform-rename-P02-S09` - Implement reverse-journal apply with rollback, index regeneration, stamp refresh, and graph-cache invalidation
+- `2026-06-26-uniform-rename-P03-S10` - Add the cmd_feature_rename command with two positionals and dry-run, force, json, no-hints, and target options
+- `2026-06-26-uniform-rename-P03-S11` - Render human output with renamed count, old-to-new paths, cross-link rewrite count, collision warnings, and a next-step hint
+- `2026-06-26-uniform-rename-P03-S12` - Emit the versioned json envelope vaultspec.vault.feature.rename.v1 with canonical status
 
 ### plan
 

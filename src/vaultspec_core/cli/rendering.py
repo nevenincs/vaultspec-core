@@ -893,6 +893,10 @@ _NEXT_STEP_HINTS: dict[tuple[str, str], tuple[str, str]] = {
         "vaultspec-core vault check all",
         "Verify your vault remains completely clean after archiving",
     ),
+    ("vault.feature.rename", "updated"): (
+        "vaultspec-core vault check all",
+        "Verify your vault is completely clean after renaming the feature",
+    ),
 }
 
 
