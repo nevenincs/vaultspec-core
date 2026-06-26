@@ -1,246 +1,217 @@
 # vaultspec-core
 
-[![Python](https://img.shields.io/badge/python-3.13%2B-blue.svg)](./pyproject.toml)
-[![Continuous integration](https://github.com/wgergely/vaultspec-core/actions/workflows/ci.yml/badge.svg)](https://github.com/wgergely/vaultspec-core/actions/workflows/ci.yml)
-[![Docker](https://github.com/wgergely/vaultspec-core/actions/workflows/docker.yml/badge.svg)](https://github.com/wgergely/vaultspec-core/actions/workflows/docker.yml)
+[![Continuous integration](https://github.com/nevenincs/vaultspec-core/actions/workflows/ci.yml/badge.svg)](https://github.com/nevenincs/vaultspec-core/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/vaultspec-core.svg)](https://pypi.org/project/vaultspec-core/)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://www.python.org/)
 [![Model Context Protocol](https://img.shields.io/badge/MCP-vaultspec--mcp-informational)](./docs/MCP.md)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
-______________________________________________________________________
+Vaultspec is a spec-driven harness for coding agents (and us, the humans!).
 
-## A research-driven framework for coding agents with a paper trail
+Every feature moves through
+`[R] Research → [D] Decide → [P] Plan → [E] Execute → [V] Review`. A feature is bound
+together by its tag and document references in a persistent vault. Think a folder of
+Markdown files. It holds the intent, decisions, and history that govern the project - a
+second brain shared by developers and coding agents.
 
-Vaultspec is a spec-driven development rulebook for artificial intelligence (AI) coding
-agents. It enforces a structured pipeline around AI-assisted development: research,
-decide, plan, execute, and review.
+We maintain persistent records of the pipeline steps, decisions in a git tracked
+`vault`. We research, ground, and decide before writing a plan, and we enforce that
+sequence before any code is written - so every coding agent adheres to the same goal,
+even working in an isolated sandbox. See the [framework manual](./docs/framework.md) for
+the CLI and plan-management capabilities behind this.
 
-Each stage writes durable markdown artifacts in your repository. AI coding agents use
-those records to share context, and you use them to track development progress.
+## The vaultspec ecosystem
 
-______________________________________________________________________
+vaultspec-core is the hub of a small family of projects.
+[vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) adds semantic search over
+both the vault and your codebase, so coding agents can retrieve relevant decisions and
+code by meaning rather than by keyword. vaultspec-dashboard provides a visual interface
+(UI) for browsing and navigating the vault. vaultspec-a2a handles orchestration across
+multiple coding agents working on the same project in parallel.
 
-## How it works
+## The pipeline at a glance
 
-vaultspec-core structures AI-assisted development into a repeatable pipeline centered
-around `features`. Two directories form the backbone:
+```
+[R] Research  →  [D] Decide  →  [P] Plan  →  [E] Execute  →  [V] Review
+```
 
-- **`.vaultspec/`** holds the framework configuration - rules, templates, agent
-  personas, and system prompts that shape how AI tools behave.
-- **`.vault/`** is the paper trail - research notes, architecture decision records
-  (ADRs), implementation plans, execution logs, and review and audit trails.
+| Stage    | What it produces                                       | You                                            |
+| -------- | ------------------------------------------------------ | ---------------------------------------------- |
+| Research | Options and findings in `.vault/research/`             | Review and approve the findings                |
+| Decide   | An Architecture Decision Record (ADR) in `.vault/adr/` | Approve the decision                           |
+| Plan     | An implementation plan in `.vault/plan/`               | Review and approve the plan                    |
+| Execute  | Execution records in `.vault/exec/`                    | Stay available while the agent works each step |
+| Review   | A review and audit report in `.vault/audit/`           | Read the report and decide if the work ships   |
 
-Two entry points ship with the framework:
-
-- **`vaultspec-core`** is the command-line interface (CLI) that manages your workspace.
-  It installs, syncs, and validates framework resources. See the
-  [CLI reference](./docs/CLI.md) for the full command surface.
-- **MCP server** exposes vault discovery and document creation to Model Context Protocol
-  (MCP) clients like Claude Code. Invoke it with
-  `uv run python -m vaultspec_core.mcp_server.app`. A `vaultspec-mcp` console script is
-  also installed, but module invocation avoids binary locking on Windows. See the
-  [MCP reference](./docs/MCP.md) for setup and tool documentation.
-
-The [framework manual](./docs/framework.md) walks through the development workflow and
-explains how to customize rules, skills, agents, and system prompts.
-
-______________________________________________________________________
+You approve each checkpoint before the next stage begins, so you stay in control of
+every consequential choice in the project.
 
 ## Getting started
 
-### Prerequisites
+### Install the CLI
 
-- Python 3.13 or later
-- `pip` for the published package, or [uv](https://github.com/astral-sh/uv) for source
-  development
+The only prerequisite is [uv](https://docs.astral.sh/uv/getting-started/installation/),
+the Python package manager and tool runner that provides `uvx`.
 
-### Install
-
-Install the published package:
+With uv in place, choose how you want to use vaultspec-core:
 
 ```bash
-pip install vaultspec-core
-vaultspec-core --version
+# Run once without installing
+uvx vaultspec-core
+
+# Install as a global tool
+uv tool install vaultspec-core
+
+# Add as a project dependency
+uv add vaultspec-core
 ```
 
-For source development:
+### Provision your project
+
+Installing the CLI is separate from setting it up in a project. Run the install command
+once inside your project root to provision the framework:
 
 ```bash
-git clone https://github.com/wgergely/vaultspec-core.git
-cd vaultspec-core
-uv sync
-uv run vaultspec-core --version
+uvx vaultspec-core install
+uvx vaultspec-core install --upgrade
 ```
 
-### Initialize a workspace
+This sets up the framework for the supported coding agents: Claude, Codex, Gemini, and
+Antigravity. It also creates two folders in your project: `.vault/` for your documents
+and `.vaultspec/` for the framework configuration. Pass `--upgrade` to re-seed the
+bundled builtins.
+
+> [!NOTE] `uv add` writes vaultspec-core into your `pyproject.toml`.
+> `vaultspec-core install` handles the rest of the project integration separately: it
+> manages a block in your `.gitignore` and `.gitattributes`, writes pre-commit hooks,
+> and drops an `.mcp.json` for Model Context Protocol clients.
+
+### Drive your first feature
+
+Open your coding agent - such as Claude Code, Codex, or Gemini - in the project root,
+then describe the work you want done in natural language:
+
+> "Research options for adding full-text search to the API."
+
+The synced rules guide the agent through the pipeline stage by stage, writing documents
+into `.vault/` as it goes: a research note, then a decision record, a plan, execution
+records, and a final review. You approve each checkpoint before the agent moves on.
+
+Invoke a stage skill directly - for example `/vaultspec-research` - to enter the
+pipeline at a specific stage. See the [bundled skills](#skills) for the full set, or the
+[framework manual](./docs/framework.md) for how each one works.
+
+## What vaultspec-core contains
+
+vaultspec-core bundles everything needed to run the spec-driven pipeline: a command-line
+tool, a set of skills, agent personas, shared policy rules, and an MCP server.
+
+### The CLI
+
+`vaultspec-core` is the runtime that ties the framework together. It installs and syncs
+the framework configuration, validates vault documents, and manages plans through their
+full lifecycle - from authoring steps to checking completion. See the
+[CLI reference](./docs/CLI.md) for the full command inventory.
+
+### Skills
+
+Skills are the slash-commands that drive each stage of the pipeline. Six map to the
+pipeline stages; two helpers - curate and documentation - cover everyday upkeep. The
+[framework manual](./docs/framework.md) gives full guidance on each, plus two further
+skills for team coordination and project management.
+
+**Which skill, when**
+
+| When you want to                              | Skill                      |
+| :-------------------------------------------- | :------------------------- |
+| Explore a problem and weigh options           | `/vaultspec-research`      |
+| Ground the work in the existing codebase      | `/vaultspec-code-research` |
+| Record the decision and its consequences      | `/vaultspec-adr`           |
+| Turn the decision into an implementation plan | `/vaultspec-write`         |
+| Work through the plan, step by step           | `/vaultspec-execute`       |
+| Audit the finished work by severity           | `/vaultspec-code-review`   |
+| Repair vault links, frontmatter, and naming   | `/vaultspec-curate`        |
+| Draft user-facing documentation               | `/vaultspec-documentation` |
+
+### Agents
+
+Agents are the personas that execution delegates to. Each has a defined role and a
+declared tool-access level: some write files and run commands, others only read and
+return findings. Execution dispatches independent plan steps to several agents in
+parallel, which keeps long plans moving instead of blocking on each step in sequence.
+
+### Rules and system prompts
+
+The `.vaultspec/` directory holds the policy that shapes how agents behave: rules, skill
+definitions, agent declarations, and system prompt fragments. This configuration is
+team-shared by default and syncs into each provider on demand. Use `vaultspec-core spec`
+to inspect, update, and propagate changes across the workspace.
+
+### MCP server
+
+The MCP server exposes vault discovery and document creation over the Model Context
+Protocol (MCP) to clients such as Claude Code via stdio. It's an alternative to
+file-based sync for environments where a live connection to the vault is more convenient
+than reading files directly. See the [MCP reference](./docs/MCP.md) for setup and
+available tools.
+
+## Working in the vault
+
+### Where work lives
+
+`.vault/` holds every document your features produce, organized by type: `research/`,
+`reference/`, `adr/`, `plan/`, `exec/`, `audit/`, and an auto-generated `index/`. Each
+document carries a feature tag, and wiki-links bind a feature's documents together
+across its lifecycle. Everything is Markdown committed to git, so the record travels
+with the code.
+
+> [!TIP] The vault is plain Markdown with wiki-links, so it opens directly in
+> [Obsidian](https://obsidian.md). Point an Obsidian vault at `.vault/` and its feature
+> tags and document links render as a navigable graph network.
+
+### Managing documents from the CLI
+
+Documents are created and maintained through the `vaultspec-core vault` command group -
+never hand-written. The CLI enforces templates, tag taxonomy, and wiki-link resolution
+so your vault stays consistent.
 
 ```bash
-vaultspec-core install --target ./my-project
-```
-
-This scaffolds `.vaultspec/` and `.vault/` inside the target directory. It seeds builtin
-resources such as rules, agents, skills, system prompts, templates, hooks, and MCP
-definitions. It also syncs generated provider resources to the configured provider
-destinations and writes an `.mcp.json` for MCP-capable clients.
-
-Verify MCP config pickup with `vaultspec-core spec mcps status --json`; if the status is
-not `ok`, run `vaultspec-core sync` and rerun the status command.
-
-To install the framework plus one provider destination:
-
-```bash
-vaultspec-core install claude --target ./my-project
-```
-
-After editing any framework files under `.vaultspec/`, re-sync to push changes to
-provider destinations:
-
-```bash
-vaultspec-core sync
-```
-
-### Start using it
-
-Open your AI tool in the project directory. The `install` step synced rules, skills,
-system prompts, and agent personas into provider-specific destinations such as
-`.claude/`, `.gemini/`, shared `.agents/`, and `.codex/`. It also wrote an `.mcp.json`
-for MCP-capable clients. Your AI tool will pick these up automatically.
-
-The framework requires research and architectural decisions before coding begins.
-Describe what you want to build in natural language:
-
-> "Research options for adding full-text search to the API"
-
-The synced rules guide the AI through the pipeline. They produce structured research
-findings in `.vault/research/`, then progress through architectural decisions, planning,
-execution, and review. Each stage writes records to `.vault/` and references the output
-of earlier stages.
-
-You can also invoke skills explicitly to start a specific stage. The pipeline skills
-(`vaultspec-research`, `vaultspec-adr`, `vaultspec-write`, `vaultspec-execute`,
-`vaultspec-code-review`) read the relevant vault records and structure the AI's output
-accordingly. Supporting skills round out the workflow: `vaultspec-code-research` grounds
-work in real reference implementations, `vaultspec-documentation` drafts user-facing
-docs, and `vaultspec-curate` keeps the vault's links and tags healthy.
-
-The [framework manual](./docs/framework.md) walks through each stage in detail with
-examples.
-
-______________________________________________________________________
-
-## The development workflow
-
-Every feature flows through five stages. The AI does the analytical work; you approve
-each checkpoint before the next stage starts.
-
-| Stage        | You                                          | The AI                                  |
-| ------------ | -------------------------------------------- | --------------------------------------- |
-| **Research** | Review and approve the findings              | Explores the problem, documents options |
-| **Decide**   | Approve the decision record                  | Drafts an ADR based on research         |
-| **Plan**     | Review and approve the implementation plan   | Breaks the decision into concrete steps |
-| **Execute**  | Stay available if the AI gets stuck          | Works through each step autonomously    |
-| **Review**   | Read the report and decide if the work ships | Audits the result, flags any issues     |
-
-Everything produced - findings, ADRs, plans, execution records, and review reports - is
-saved in `.vault/`.
-
-______________________________________________________________________
-
-## Working with the vault
-
-The `vaultspec-core vault` command group manages documents in `.vault/`. A few common
-operations:
-
-```bash
-# Scaffold a new document from a template
+# Scaffold a document from a template
 vaultspec-core vault add research --feature search-api
 
-# List and inspect documents
+# Find and inspect documents
 vaultspec-core vault list --feature search-api
-vaultspec-core vault stats --feature search-api
 
 # Validate frontmatter, links, and cross-references (--fix to auto-repair)
 vaultspec-core vault check all --fix
 
-# Visualize the dependency graph for a feature
+# Visualize a feature's dependency graph
 vaultspec-core vault graph --feature search-api
 ```
 
-Valid document types are `adr`, `audit`, `exec`, `plan`, `reference`, and `research`.
-Generated feature indexes live in `.vault/index/` and are managed by
-`vaultspec-core vault feature index`. See the
-[CLI reference](./docs/CLI.md#vault-commands) for the full command surface.
+Plans carry deeper structure - waves, phases, and steps. The
+[framework manual](./docs/framework.md) covers that structure.
 
-______________________________________________________________________
+## Learn more
 
-## Planning and execution
+| Guide                                   | What it covers                                              |
+| --------------------------------------- | ----------------------------------------------------------- |
+| [Framework manual](./docs/framework.md) | The development workflow, skills, agents, and customization |
+| [CLI reference](./docs/CLI.md)          | Every command, flag, and option for vaultspec-core          |
+| [MCP reference](./docs/MCP.md)          | The MCP server tools, setup, and configuration              |
 
-Implementation plans carry structure beyond a flat checklist. A plan declares a
-complexity tier (`L1` through `L4`) and organises work into an
-`Epic > Wave > Phase > Step` hierarchy, so a large feature stays navigable as it grows.
-The `vaultspec-core vault plan` command group is the canonical surface for that
-structure:
+The companion projects extend the framework:
+[vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) adds semantic search over
+your vault and codebase,
+[vaultspec-dashboard](https://github.com/nevenincs/vaultspec-dashboard) provides a
+visual UI, and [vaultspec-a2a](https://github.com/nevenincs/vaultspec-a2a) handles agent
+orchestration.
 
-```bash
-# Inspect a plan's tier, counts, and completion
-vaultspec-core vault plan status .vault/plan/2026-06-01-search-api-plan.md
+## Status, help, and license
 
-# Validate convention compliance, then apply autofixes
-vaultspec-core vault plan check .vault/plan/2026-06-01-search-api-plan.md --fix
-```
-
-Steps, phases, and waves are added, moved, and checked off through the
-`vaultspec-core vault plan step`, `vaultspec-core vault plan phase`, and
-`vaultspec-core vault plan wave` subcommands, which preserve canonical identifiers so
-existing references never shift when work is inserted or removed. Completed features are
-archived with `vaultspec-core vault feature archive` and restored with
-`vaultspec-core vault feature unarchive`.
-
-______________________________________________________________________
-
-## Schema migrations
-
-When a release of `vaultspec-core` changes the on-disk shape of `.vault/`, a versioned
-migration registry delivers the new layout. The registry replaces recurring pre-commit
-migration hooks. Each registered migration runs once per upgrade and never again.
-
-Three triggers cover every consumer path:
-
-- `vaultspec-core install --upgrade` runs every pending migration after re-seeding
-  builtins.
-- Any `vaultspec-core vault ...` command, for example `vaultspec-core vault add`,
-  `vaultspec-core vault feature index`, or `vaultspec-core vault check`, lazily applies
-  pending migrations before its primary action.
-- `vaultspec-core migrations status` and `vaultspec-core migrations run` give explicit
-  control for operators who prefer manual application.
-
-The lazy path keeps consumers current even if they never run
-`vaultspec-core install --upgrade`.
-
-The registry compares each migration's `target_version` against the workspace manifest's
-`vaultspec_version`. Entries whose target exceeds the manifest run in version order. The
-manifest version is bumped only after success. A migration that fails leaves the
-manifest version unchanged, so the next invocation re-attempts it.
-
-______________________________________________________________________
-
-## Further reading
-
-| Guide                                   | What it covers                                        |
-| --------------------------------------- | ----------------------------------------------------- |
-| [Framework manual](./docs/framework.md) | Development workflow, skills, and customization       |
-| [CLI reference](./docs/CLI.md)          | All commands, flags, and options for `vaultspec-core` |
-| [MCP reference](./docs/MCP.md)          | MCP server tools, setup, and configuration            |
-
-### Getting help
-
-Open an issue on [GitHub](https://github.com/wgergely/vaultspec-core/issues).
-
-______________________________________________________________________
-
-## Contributing and license
-
-We welcome bug reports, feature ideas, and pull requests. Browse what's in progress on
-[GitHub Issues](https://github.com/wgergely/vaultspec-core/issues).
-
-vaultspec-core is released under the [MIT License](./LICENSE).
+vaultspec-core is actively developed. The version badge shows the current release. File
+bugs and questions on the
+[issue tracker](https://github.com/nevenincs/vaultspec-core/issues). Bug reports,
+feature ideas, and pull requests are welcome. vaultspec-core is released under the
+[MIT License](./LICENSE).
