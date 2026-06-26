@@ -55,10 +55,20 @@ containers exist:
   association is declared in the Epic intent block.
 
 Full criteria, the row contract, identifier rules, and ordering rules are embedded as
-markdown-comment hint blocks in `.vaultspec/rules/templates/plan.md`. The skill defers
-to those canonical sources rather than restating them.
+markdown-comment hint blocks in `.vaultspec/templates/plan.md`. The skill defers to
+those canonical sources rather than restating them.
 
 ## Rules
+
+- **Ground the plan in real code first.** Map the implementation surface the plan will
+  touch before writing Steps - it is what lets Steps name real files and real symbols
+  rather than assumed paths. Lead with `vaultspec-rag search "<intent>" --type code` to
+  locate the sites (read the epicenter or nearest existing analogue in full, then
+  confirm exact symbols and insertion points with grep),
+  `vaultspec-rag search "<intent>" --type vault --doc-type adr` to confirm the governing
+  decisions, and `vaultspec-core status`/`vault list` - first-class for orientation - to
+  map plans and records. Where `vaultspec-rag` is not installed, the `vaultspec-core`
+  discovery verbs and grep carry the same sequence.
 
 - **Must reference research and ADRs**. Read these in full prior to writing the plan.
 
@@ -114,8 +124,8 @@ frontmatter.
 
 - **Drafting**: If working with sub-agents, load the `vaultspec-writer` agent persona.
   Instruct it to "Create an implementation plan for `{feature}` based on
-  `[[...-adr.md]]`. Use the template at `.vaultspec/rules/templates/plan.md` and conform
-  to the embedded HIERARCHY AND TIERS, IDENTIFIERS AND ROW CONTRACT, and NO COMPRESSION
+  `[[...-adr.md]]`. Use the template at `.vaultspec/templates/plan.md` and conform to
+  the embedded HIERARCHY AND TIERS, IDENTIFIERS AND ROW CONTRACT, and NO COMPRESSION
   hint blocks. The plan's tier (`L1`/`L2`/`L3`/`L4`) is already set in frontmatter by
   the `--tier` flag at scaffold time."
 

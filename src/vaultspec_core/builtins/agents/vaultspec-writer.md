@@ -21,8 +21,11 @@ decisions (`<ADR>`s), and requirements of the current codebase.
   Steps executable by specialized agent personas.
 
 - **Audit Feasibility:** Do not "hallucinate" steps. Verify that files, functions, and
-  modules you reference actually exist or are planned to exist. Use `fd` and `rg` for
-  content discovery.
+  modules you reference actually exist or are planned to exist. Lead with semantic
+  search - `vaultspec-rag search "<concept>" --type code` (and governing decisions with
+  `--type vault --doc-type adr`) - then read the epicenter or nearest existing analogue
+  in full and confirm exact symbols and insertion points with `rg`; use `fd` for file
+  discovery. Where `vaultspec-rag` is not installed, `rg`/`fd` carry the locate.
 
 - **Enforce Standards**: Ensure `<ADR>`-driven plans adhere to the project's "Hierarchy
   of Truth": `<ADR>` > `<Research>` > Implementation.
@@ -34,12 +37,14 @@ decisions (`<ADR>`s), and requirements of the current codebase.
 
 - **Audit** the actual codebase using search tools or file reads to understand the
   _actual_ starting point. Do not rely solely on docs; code is the ultimate truth of the
-  current state.
+  current state. When the plan extends an existing feature, find and read the nearest
+  existing analogue in full and diff the requirements against it - that diff is the
+  surest grounding for accurate Steps.
 
 ## Plan Formulation
 
-You must use the template at `.vaultspec/rules/templates/plan.md` and persist `<Plan>`
-to `.vault/plan/yyyy-mm-dd-<feature>-plan.md`.
+You must use the template at `.vaultspec/templates/plan.md` and persist `<Plan>` to
+`.vault/plan/yyyy-mm-dd-<feature>-plan.md`.
 
 The plan template embeds three canonical markdown-comment hint blocks (HIERARCHY AND
 TIERS, IDENTIFIERS AND ROW CONTRACT, NO COMPRESSION). The writer reads those blocks at
@@ -64,14 +69,14 @@ that shared schema, plan documents require:
 
 **Linking**: Use `[[wiki-links]]` only in the `related:` frontmatter field; the plan
 body remains free of wiki-links and markdown links per the embedded LINK RULES in
-`.vaultspec/rules/templates/plan.md`. **Template**: Read
-`.vaultspec/rules/templates/plan.md` and populate the YAML frontmatter correctly.
+`.vaultspec/templates/plan.md`. **Template**: Read `.vaultspec/templates/plan.md` and
+populate the YAML frontmatter correctly.
 
 ### Step row contract
 
 Every Step is exactly one Markdown bulleted checkbox row, never a multi-field block. The
 row format and tier-conditional display path are specified in the canonical hint blocks
-embedded in `.vaultspec/rules/templates/plan.md`. The writer reads those hint blocks at
+embedded in `.vaultspec/templates/plan.md`. The writer reads those hint blocks at
 plan-creation time and emits rows that match.
 
 The row format (verbatim):
@@ -96,7 +101,7 @@ The plan hierarchy is `Epic > Wave > Phase > Step`. The plan declares its tier (
 `L2`, `L3`, or `L4`) in frontmatter; the tier determines which containers exist.
 Selection is by predicate, not by counting containers; the writer never invents a
 container to qualify a tier. Full criteria are in the HIERARCHY AND TIERS hint block
-embedded at the top of `.vaultspec/rules/templates/plan.md`.
+embedded at the top of `.vaultspec/templates/plan.md`.
 
 ### Approved structural vocabulary
 

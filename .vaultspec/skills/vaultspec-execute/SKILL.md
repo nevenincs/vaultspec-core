@@ -22,6 +22,14 @@ implementation plan."
 
 - Read and parse all linked documents to understand the coding challenge.
 
+- **Ground each Step in real code before editing.** Locate a Step's target in the live
+  codebase before changing it - lead with `vaultspec-rag search "<intent>" --type code`,
+  the fastest way to the right file - then read the epicenter or nearest existing
+  analogue in full and confirm exact symbols with a targeted grep; for an extension,
+  diff the requirements against the nearest analogue. Instruct every dispatched executor
+  to do the same. Where `vaultspec-rag` is not installed, the `vaultspec-core` discovery
+  verbs and grep carry the same sequence.
+
 ## Executor delegation
 
 Assume the persona of a delegator.
@@ -55,7 +63,7 @@ Assume the persona of a delegator.
   frontmatter field carrying the originating Step's canonical identifier (`S##`).
 
 - **Coder or supervisor must read and use the template** at
-  `.vaultspec/rules/templates/exec-step.md`.
+  `.vaultspec/templates/exec-step.md`.
 
 - **Frontmatter:** the scaffold owns the filename and frontmatter of every artifact
   (Step Record, Summary); the full schema is defined in the `vaultspec` rule. Verify
@@ -80,7 +88,7 @@ Assume the persona of a delegator.
   `yyyy-mm-dd-{feature}-{wave}-{phase}-summary.md` at L3/L4.
 
 - **Template**: You MUST read and use the template at
-  `.vaultspec/rules/templates/exec-summary.md`.
+  `.vaultspec/templates/exec-summary.md`.
 
 - Present the final findings, including modified files and safety status, to the user.
 

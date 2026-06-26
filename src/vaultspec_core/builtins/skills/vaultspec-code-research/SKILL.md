@@ -21,15 +21,18 @@ explicitly requires direct code referencing.
 
 ## Required steps
 
-- **Ground in existing intent first.** Before the code deep dive, retrieve what the
-  project already decided and built: `vaultspec-rag search "<intent>" --type vault`
-  surfaces the ADRs, audits, and references that bind this area, and
+- **Ground in existing intent first.** Lead the code deep dive with semantic search:
   `vaultspec-rag search "<intent>" --type code` locates the semantically matching
-  implementation sites to anchor the audit. Fall back to `vaultspec-core vault list` and
-  grep when `vaultspec-rag` is not installed.
+  implementation sites - read the epicenter or nearest analogue in full, then confirm
+  exact symbols with a targeted grep, which is sharper at exact-symbol lookup. Retrieve
+  the governing decisions with
+  `vaultspec-rag search "<intent>" --type vault --doc-type adr` (the directed ADR
+  filter, sharper than catch-all `--type vault`) to anchor the audit. Where
+  `vaultspec-rag` is not installed, the `vaultspec-core` discovery verbs and grep carry
+  the same sequence.
 
-- **Read and use the template** at `.vaultspec/rules/templates/reference.md`; its
-  embedded hint blocks govern the body structure.
+- **Read and use the template** at `.vaultspec/templates/reference.md`; its embedded
+  hint blocks govern the body structure.
 
 - **Load the `vaultspec-reference-auditor` agent persona** for the focused code deep
   dives. Instruct it to locate and audit the `{Feature}` implementation in the reference

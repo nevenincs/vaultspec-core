@@ -18,16 +18,21 @@ research and brainstorming."
 
 ## Required steps
 
-- **Ground in existing intent first.** Before exploring options, retrieve what the
-  project already decided: `vaultspec-rag search "<intent>" --type vault` surfaces the
-  ADRs, audits, and prior research that bind this area, and
-  `vaultspec-rag search "<intent>" --type code` locates the implementation sites that
-  match semantically. Read the records this surfaces and check for overlap before adding
-  new findings. Fall back to `vaultspec-core vault list` and grep when `vaultspec-rag`
-  is not installed.
+- **Ground in existing intent first.** Begin by grounding via semantic search - the
+  fastest, cheapest way to surface what the project already decided and built. Follow
+  the validated sequence: locate, read whole, confirm. Retrieve governing decisions with
+  `vaultspec-rag search "<intent>" --type vault --doc-type adr` (the directed ADR
+  filter, sharper than catch-all `--type vault`), prior exploration with
+  `vaultspec-rag search "<intent>" --type vault` (or `--doc-type research`), and the
+  implementation sites with `vaultspec-rag search "<intent>" --type code`. Lean on
+  `vaultspec-core status` and `vaultspec-core vault list` - first-class for orientation
+  \- to map in-flight plans and records. Read what this surfaces in full and check for
+  overlap before adding new findings; round out decision recall by listing `.vault/adr/`
+  and filtering by feature. Where `vaultspec-rag` is not installed, the `vaultspec-core`
+  discovery verbs and grep carry the same sequence.
 
-- **Read and use the template** at `.vaultspec/rules/templates/research.md`; its
-  embedded hint blocks govern the body structure.
+- **Read and use the template** at `.vaultspec/templates/research.md`; its embedded hint
+  blocks govern the body structure.
 
 - **Load the `vaultspec-adr-researcher` agent persona** for focused work. When the task
   benefits from multiple researchers, load the generic `vaultspec-researcher` agent

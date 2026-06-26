@@ -20,15 +20,8 @@ before invoking any pipeline skill. Read the in-flight plans it names, then ente
 pipeline at the right phase: resume an in-flight plan via `vaultspec-execute`, or start
 fresh at Research.
 
-**Ground in existing intent.** Before researching or implementing a feature, retrieve
-what the project already decided rather than reconstructing it from these always-on
-rules. Run `vaultspec-rag search "<intent>" --type vault` first: the project's
-architecture intent - its ADRs, audits, and decisions - is semantically indexed, and
-`--type vault` surfaces the records that already bind the area you are about to touch.
-Follow with `vaultspec-rag search "<intent>" --type code` to locate the implementation
-sites that match semantically. When `vaultspec-rag` is not installed, fall back to
-`vaultspec-core vault list` and grep. Retrieval is the grounding step; prefer it over
-re-deriving intent from memory or prose.
+Ground every pipeline phase in what the project already decided and built before acting;
+the always-on `vaultspec-discovery` rule defines the canonical discovery sequence.
 
 All significant work must follow this pipeline:
 
@@ -56,7 +49,7 @@ adds Waves; `L4` adds an Epic frame and requires an external project-management
 association declared in the Epic intent block. The leaf row at every tier is named
 `Step`; the Execution Record artifact retains the name `<Step Record>` and maps
 one-to-one to a Step. Full conventions live in the Markdown comment hint blocks embedded
-in `.vaultspec/rules/templates/plan.md`.
+in `.vaultspec/templates/plan.md`.
 
 The `vaultspec-core vault plan` CLI is the canonical surface for structural manipulation
 of plan documents. Writers and executors MUST use the `vaultspec-core vault plan ...`
@@ -91,7 +84,7 @@ Supporting skills, invoked when appropriate:
 
 ## Agents
 
-Agent personas are defined in `.vaultspec/rules/agents/`. Two mechanisms are available
+Agent personas are defined in `.vaultspec/agents/`. Two mechanisms are available
 depending on plan complexity:
 
 - **Parallel sub-agents** for focused, managed work

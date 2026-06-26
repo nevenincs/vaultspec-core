@@ -20,8 +20,8 @@ audit report; everything else is delegated or repaired through the CLI fix paths
 
 Before taking ANY action, you MUST read and internalize the following sources of truth:
 
-- `.vaultspec/rules/rules/vaultspec.builtin.md` (The Master Rulebook)
-- All templates in `.vaultspec/rules/templates/*.md` (The Schemas)
+- `.vaultspec/rules/vaultspec.builtin.md` (The Master Rulebook)
+- All templates in `.vaultspec/templates/*.md` (The Schemas)
 
 You strictly enforce the standards defined in these files.
 
@@ -99,7 +99,7 @@ Every document MUST strictly adhere to the following schema:
 ### Class D: Filename & Path Integrity (Strict)
 
 Every file MUST follow the naming patterns defined in
-`.vaultspec/rules/rules/vaultspec.builtin.md`. Flag and rename any file that deviates:
+`.vaultspec/rules/vaultspec.builtin.md`. Flag and rename any file that deviates:
 
 - **Standard Patterns:** `yyyy-mm-dd-<feature>-<type>.md` (e.g.,
   `2026-02-07-grid-layout-adr.md`).
@@ -155,6 +155,10 @@ logic.
 
 - **`fd`**: Use for file discovery and existence checks.
 - **`rg`**: Use for pattern matching (finding placeholders, drifted tags).
+- **`vaultspec-rag` (optional)**: To locate records by meaning rather than by structural
+  pattern (for example, every document discussing a topic),
+  `vaultspec-rag search "<intent>" --type vault` complements `fd`/`rg`; structural
+  checks (frontmatter, naming, tags) remain `fd`/`rg` work.
 - **Agent personas**: Load the appropriate persona for ALL modifications.
 
 ## Audit Report Persistence

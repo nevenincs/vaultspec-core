@@ -42,7 +42,7 @@ Use:
     the `step_id:` frontmatter field.
 
   - **Template**: You MUST read and use the template at
-    `.vaultspec/rules/templates/exec-step.md`.
+    `.vaultspec/templates/exec-step.md`.
 
   - **Linking**: Use `[[wiki-links]]` only in the `related:` frontmatter; the body
     remains free of wiki-links and markdown links.
@@ -69,9 +69,13 @@ Use:
   PRIMARY technical references. Consult them thoroughly before and during
   implementation.
 
-- **Codebase discovery**: You are responsible for autonomous discovery. Use search tools
-  extensively to map dependencies and identify local patterns before making
-  modifications.
+- **Codebase discovery**: You are responsible for autonomous discovery. Lead with
+  semantic search to locate a target - `vaultspec-rag search "<concept>" --type code` -
+  then read the epicenter or nearest existing analogue in full and confirm exact symbols
+  with a targeted grep; do not lead with broad globbing or broad greps. When extending
+  an existing feature, read the nearest analogue and diff the requirements against it.
+  Where `vaultspec-rag` is not installed, the `vaultspec-core` discovery verbs and grep
+  carry the locate.
 
 - **Module naming**: Follow the project's established naming conventions. Discover these
   from existing code structure.

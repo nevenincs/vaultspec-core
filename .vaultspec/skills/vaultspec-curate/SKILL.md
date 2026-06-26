@@ -7,7 +7,7 @@ description: 'Audit and repair the .vault/ vault: frontmatter, wiki-links, namin
 
 This skill governs the autonomous auditing and maintenance of the `.vault/`
 documentation vault. It ensures every artifact conforms to the project's documentation
-standards as defined in `.vaultspec/rules/rules/vaultspec.builtin.md`.
+standards as defined in `.vaultspec/rules/vaultspec.builtin.md`.
 
 **Announce at start:** "I'm using the `vaultspec-curate` skill to audit and clean the
 documentation vault."
@@ -72,7 +72,7 @@ judgment to the user.
 ## Standards
 
 The curator validates every document against the frontmatter schema defined in the
-`vaultspec` rule (`.vaultspec/rules/rules/vaultspec.builtin.md`): the required tag pair,
+`vaultspec` rule (`.vaultspec/rules/vaultspec.builtin.md`): the required tag pair,
 quoted wiki-links in `related:`, `yyyy-mm-dd` dates, and no `feature` key. The
 `vaultspec-core vault add` scaffold produces conforming frontmatter for new documents;
 violations in existing documents are repaired via `vaultspec-core vault check all --fix`
@@ -87,4 +87,4 @@ rather than hand edits.
 - **Traceability**: Every modification is logged in the audit report.
 
 - **Standards-first**: All fixes trace back to rules in
-  `.vaultspec/rules/rules/vaultspec.builtin.md` and the canonical templates.
+  `.vaultspec/rules/vaultspec.builtin.md` and the canonical templates.

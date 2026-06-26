@@ -1,7 +1,7 @@
 # vaultspec-core CLI reference (bundled)
 
 Machine-facing command reference for `vaultspec-core`, bundled into every consumer
-project on install and seeded to `.vaultspec/rules/reference/cli.md`. This is a
+project on install and seeded to `.vaultspec/reference/cli.md`. This is a
 locally-resident lookup for AI agents: command inventory, options, argument
 enumerations, exit codes, and environment variables. The human-facing prose reference is
 `docs/CLI.md` in the source repository.

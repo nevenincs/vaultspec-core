@@ -18,14 +18,20 @@ Use this skill:
 ## Required steps
 
 - **Ground the decision in existing intent first.** Before drafting, retrieve the prior
-  decisions that bind this area: `vaultspec-rag search "<intent>" --type vault` surfaces
-  related ADRs, audits, and research (architect on top of them, and supersede explicitly
-  rather than silently contradicting), and `vaultspec-rag search "<intent>" --type code`
-  shows the implementation sites the decision will touch. Fall back to
-  `vaultspec-core vault list` and grep when `vaultspec-rag` is not installed.
+  decisions that bind this area - the surest way to architect on top of them rather than
+  silently contradicting them. Lead with
+  `vaultspec-rag search "<intent>" --type vault --doc-type adr` (the directed ADR
+  filter, sharper than catch-all `--type vault`); read each in full and supersede
+  explicitly. Use `vaultspec-rag search "<intent>" --type code` for the implementation
+  sites the decision will touch, then confirm exact symbols with grep, and lean on
+  `vaultspec-core status` and `vaultspec-core vault list` - first-class for orientation
+  \- to map related records. Round out decision recall by listing `.vault/adr/` and
+  filtering by feature - search can miss lower-ranked or opaquely-named records. Where
+  `vaultspec-rag` is not installed, the `vaultspec-core` discovery verbs and grep carry
+  the same sequence.
 
-- **Read and use the template** at `.vaultspec/rules/templates/adr.md`; its embedded
-  hint blocks govern the body structure.
+- **Read and use the template** at `.vaultspec/templates/adr.md`; its embedded hint
+  blocks govern the body structure.
 
 - **Scaffold via the CLI:**
   `vaultspec-core vault add adr --feature {feature} --related <research-stem>`, then

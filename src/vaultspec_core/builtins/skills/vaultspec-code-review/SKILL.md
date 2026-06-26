@@ -40,9 +40,9 @@ When to use this skill:
 
 ## Important
 
-- **Template:** You MUST read and use the template at
-  `.vaultspec/rules/templates/audit.md`; its embedded hint blocks govern the body
-  structure, and its `## Findings` section carries the rolling per-finding log format.
+- **Template:** You MUST read and use the template at `.vaultspec/templates/audit.md`;
+  its embedded hint blocks govern the body structure, and its `## Findings` section
+  carries the rolling per-finding log format.
 
 - **Location:** the scaffold creates `.vault/audit/yyyy-mm-dd-{feature}-audit.md`; never
   hand-write the filename or frontmatter. When the feature already carries an audit,
