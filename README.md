@@ -82,7 +82,7 @@ Antigravity. It also creates two folders in your project: `.vault/` for your doc
 and `.vaultspec/` for the framework configuration. Pass `--upgrade` to re-seed the
 bundled builtins.
 
-> [!NOTE] `uv add` writes vaultspec-core into your `pyproject.toml`.
+> **Note:** `uv add` writes vaultspec-core into your `pyproject.toml`.
 > `vaultspec-core install` handles the rest of the project integration separately: it
 > manages a block in your `.gitignore` and `.gitattributes`, writes pre-commit hooks,
 > and drops an `.mcp.json` for Model Context Protocol clients.
@@ -166,7 +166,7 @@ document carries a feature tag, and wiki-links bind a feature's documents togeth
 across its lifecycle. Everything is Markdown committed to git, so the record travels
 with the code.
 
-> [!TIP] The vault is plain Markdown with wiki-links, so it opens directly in
+> **Tip:** The vault is plain Markdown with wiki-links, so it opens directly in
 > [Obsidian](https://obsidian.md). Point an Obsidian vault at `.vault/` and its feature
 > tags and document links render as a navigable graph network.
 
