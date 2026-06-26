@@ -184,8 +184,19 @@ UTF-8): a new read-only `check_encoding` walks the docs tree directly (a non-UTF
 from the snapshot) and reports each non-UTF-8 file as an ERROR to convert by hand; wired into
 `run_all_checks` (so `vault check all` surfaces it) and exposed as `vault check encoding`. A
 plain UTF-8 and a UTF-8-BOM file both pass. Proven by tests (UTF-16 + Latin-1 flagged; clean vault
-green; `_archive`/`.obsidian` skipped). Remaining low gap (not corruption, separate tracking):
-`refresh_modified_stamp` does not refresh a CR-only doc's stamp.
+green; `_archive`/`.obsidian` skipped).
+
+### enc-cr-only-stamp-noop | low | refresh_modified_stamp did not refresh a classic-Mac CR-only doc's stamp
+
+`refresh_modified_stamp` located the frontmatter and its `modified:`/`date:` lines with
+`re.MULTILINE` regexes, which only recognize `\n` as a line boundary, so a CR-only (`\r`)
+document matched as a single line and the stamp was silently left stale (and the
+date-as-last-line case was a no-op too). RESOLVED: the function now splits the frontmatter
+via `split_keepends` (the same `\r\n`/`\r`/`\n` splitter the rewriters use) and rewrites or
+inserts the stamp line-by-line, preserving every line's exact ending. The two unused
+MULTILINE regexes were removed. Covered by a new `TestRefreshModifiedStamp` suite
+(LF/CRLF/CR-only rewrite-and-insert, BOM+CRLF, no-frontmatter), and the 34-test
+modified-stamp regression stays green.
 
 ## Recommendations
 
@@ -211,5 +222,6 @@ A fourth pass then closed the two discovery-layer gaps that the third pass had d
 the shared parser now strips a leading BOM (so UTF-8-BOM authored docs are discovered and
 renamed with their BOM preserved), and a new read-only `check_encoding` surfaces non-UTF-8
 docs as errors (wired into `vault check all` and exposed as `vault check encoding`) rather
-than letting them be silently excluded. The only remaining noted item is a low,
-non-corruption `refresh_modified_stamp` no-op on classic-Mac CR-only docs.
+than letting them be silently excluded. A final touch resolved the last low item: the shared
+`refresh_modified_stamp` now refreshes classic-Mac CR-only docs (via `split_keepends`),
+closing every encoding/line-ending follow-up surfaced by the hardening passes.
