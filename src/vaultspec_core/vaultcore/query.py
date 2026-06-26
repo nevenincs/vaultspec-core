@@ -982,7 +982,10 @@ def _analyze_cross_feature_links(
     try:
         from ..graph import VaultGraph
 
-        graph = VaultGraph(root_dir)
+        # ``use_cache=False`` so this read-only reporting pass never persists a
+        # graph cache to disk - a dry-run must mutate nothing, and a real run
+        # invalidates the cache from the CLI afterwards regardless.
+        graph = VaultGraph(root_dir, use_cache=False)
         for doc in docs:
             node = graph.nodes.get(doc.name) or graph.nodes.get(
                 f"{doc.doc_type}/{doc.name}"
@@ -1300,9 +1303,13 @@ def _apply_rename_plan(root_dir: Path, plan: _RenamePlan, old: str, new: str) ->
         if plan.index_old_path is not None and plan.index_old_path.exists():
             plan.index_old_path.unlink()
 
-        # (6) Cascade ``related:`` wiki-link rewrites across the whole vault.
+        # (6) Cascade ``related:`` wiki-link rewrites across the vault, skipping
+        #     ``_archive`` so a rename never mutates archived documents - they
+        #     are out of scope per the ADR and are not snapshotted for rollback.
         cascade = CheckResult(check_name="feature-rename")
-        rewrite_incoming_refs(root_dir, plan.stem_renames, cascade)
+        rewrite_incoming_refs(
+            root_dir, plan.stem_renames, cascade, exclude_dirs=frozenset({"_archive"})
+        )
         related_rewrites = cascade.fixed_count
         cascade_paths: set[Path] = set()
         for diag in cascade.diagnostics:

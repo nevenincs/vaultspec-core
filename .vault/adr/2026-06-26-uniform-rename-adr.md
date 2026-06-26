@@ -191,7 +191,11 @@ per-file collision handling that must fail safely.
 Honest limits: rename does not touch archived docs or free-form prose, so a body
 mention of the old feature name becomes silent drift - a read-only advisory
 listing such occurrences is a possible future enhancement; flow-style frontmatter
-beyond `tags:` and `related:` is out of scope.
+beyond `tags:` and `related:` is out of scope. The reverse journal is held in
+memory, so it rolls back on an exception raised during apply but not across a
+hard process kill or power loss, which can still leave a partial rename;
+crash-durable atomicity would require a write-ahead log and is out of scope for
+this decision.
 
 Pathways opened: a feature-rename-integrity check, a body-occurrence advisory,
 and eventual unification of the spec-resource rename verbs onto the same shared

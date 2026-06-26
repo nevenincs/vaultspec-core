@@ -460,6 +460,44 @@ class TestCrossFeatureLinks:
 
 
 # ---------------------------------------------------------------------------
+# Archived documents are out of scope and must never be mutated by a rename.
+# ---------------------------------------------------------------------------
+
+
+class TestArchivedDocsUntouched:
+    OLD = "widget-engine"
+    NEW = "gadget-engine"
+
+    def _archived_doc(self, root: Path) -> Path:
+        """Write an archived doc whose related: points into the renamed feature."""
+        folder = root / ".vault" / "_archive" / "research"
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / "2026-01-01-bygone-research.md"
+        fm = _frontmatter(
+            ["#research", "#bygone"],
+            "2026-01-01",
+            [f"{DATE}-{self.OLD}-adr"],
+            flow_tags=False,
+            extra_fm="",
+        )
+        path.write_text(f"{fm}\n# bygone\n\nArchived body.\n", encoding="utf-8")
+        return path
+
+    def test_archived_doc_bytes_unchanged_by_rename(self, tmp_path: Path):
+        _authored_doc(tmp_path, "adr", self.OLD)
+        archived = self._archived_doc(tmp_path)
+        before = archived.read_bytes()
+
+        result = rename_feature(tmp_path, self.OLD, self.NEW)
+        assert result["status"] == "updated"
+
+        # The archived back-reference and its modified stamp are left intact:
+        # archived documents are out of rename scope, so neither the related:
+        # cascade nor the stamp refresh may touch them.
+        assert archived.read_bytes() == before
+
+
+# ---------------------------------------------------------------------------
 # S18 - reverse-journal rollback on an induced mid-apply failure
 # ---------------------------------------------------------------------------
 

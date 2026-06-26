@@ -371,6 +371,19 @@ feature tag to the archive. Options: `--dry-run` (preview planned changes), `--j
 documents for a feature tag. Options: `--dry-run` (preview planned changes), `--json`.
 The `--no-hints` flag is not accepted here.
 
+### vaultspec-core vault feature rename
+
+`vaultspec-core vault feature rename [OPTIONS] OLD_FEATURE NEW_FEATURE` - rename a
+feature tag across every binding surface: document filenames, the exec folder and exec
+record filenames, the `#feature` frontmatter tag, `related:` wiki-links, and the
+regenerated feature index. Free-form body prose and archived documents are never
+changed. The apply phase keeps a reverse journal, so an error while applying rolls the
+changes back to the pre-rename state. Refuses when the target feature already exists
+unless `--force` is given, which merges the source into the target (per-file path
+collisions still refuse). Options: `--dry-run` (preview the full plan without writing),
+`--force` (merge into an existing target), `--json`, `--no-hints` (suppress next-step
+advisory hints), `--target DIR` / `-t`.
+
 ### vaultspec-core vault check
 
 Signature: `vaultspec-core vault check [OPTIONS] COMMAND [ARGS]...`. Run health checks

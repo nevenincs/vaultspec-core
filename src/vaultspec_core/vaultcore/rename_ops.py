@@ -119,6 +119,8 @@ def rewrite_incoming_refs(
     root_dir: Path,
     renames: list[tuple[str, str]],
     result: CheckResult,
+    *,
+    exclude_dirs: frozenset[str] = frozenset(),
 ) -> None:
     """Rewrite ``[[old_stem]]`` -> ``[[new_stem]]`` in ``related:`` frontmatter.
 
@@ -148,6 +150,12 @@ def rewrite_incoming_refs(
             :func:`~vaultspec_core.vaultcore.checks.structure._fix_filename`.
         result: :class:`CheckResult` to accumulate diagnostics and fix
             counts into.
+        exclude_dirs: Top-level ``<docs_dir>`` subdirectory names to skip in
+            addition to the always-skipped ``data``/``logs`` and dot-prefixed
+            directories. The feature-rename backend passes ``{"_archive"}`` so a
+            rename never mutates archived documents (which it also does not
+            snapshot for rollback); the structure check passes nothing, keeping
+            its whole-vault behaviour unchanged.
     """
     from .checks._base import CheckDiagnostic, Severity
 
@@ -200,7 +208,7 @@ def rewrite_incoming_refs(
     # are skipped to avoid scanning large or non-vault files.  Hidden
     # directories (``.obsidian/``, ``.trash/``, ...) are skipped
     # by the dot-prefix filter below.
-    non_schema_dirs = frozenset({"data", "logs"})
+    non_schema_dirs = frozenset({"data", "logs"}) | exclude_dirs
 
     for md_path in sorted(vault_root.rglob("*.md")):
         # Skip hidden internal directories (e.g. ``.obsidian/``,

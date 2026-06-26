@@ -31,6 +31,7 @@ related:
   - '[[2026-06-26-uniform-rename-P05-S23]]'
   - '[[2026-06-26-uniform-rename-P05-S24]]'
   - '[[2026-06-26-uniform-rename-adr]]'
+  - '[[2026-06-26-uniform-rename-audit]]'
   - '[[2026-06-26-uniform-rename-plan]]'
   - '[[2026-06-26-uniform-rename-reference]]'
   - '[[2026-06-26-uniform-rename-research]]'
@@ -45,6 +46,10 @@ Auto-generated index of all documents tagged with `#uniform-rename`.
 ### adr
 
 - `2026-06-26-uniform-rename-adr` - `uniform-rename` adr: `uniform feature rename verb with atomic multi-surface rewrite` | (**status:** `accepted`)
+
+### audit
+
+- `2026-06-26-uniform-rename-audit` - `uniform-rename` audit: `uniform feature rename verb implementation review`
 
 ### exec
 

@@ -2210,8 +2210,8 @@ def cmd_feature_rename(
     the #feature frontmatter tag, related: wiki-links, and the regenerated
     feature index.  Free-form body prose is never changed.
 
-    A reverse journal is kept during the apply phase; any mid-apply failure
-    rolls back all changes, leaving the vault byte-identical to its pre-rename
+    A reverse journal is kept during the apply phase; if an error is raised
+    while applying, the changes made so far are rolled back to the pre-rename
     state.  Use --force to merge the source feature into an existing target
     feature (per-file path collisions still refuse).
     """
@@ -2328,7 +2328,7 @@ def cmd_feature_rename(
             rel_count = result.get("related_rewrites", 0)
             console.print(
                 f"[dim]{tag_count} tag rewrite(s), "
-                f"{rel_count} cross-feature related-link rewrite(s)[/dim]"
+                f"{rel_count} related-link rewrite(s)[/dim]"
             )
 
 
