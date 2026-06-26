@@ -6,6 +6,10 @@ tags:
 date: '2026-06-26'
 modified: '2026-06-26'
 related:
+  - '[[2026-06-26-uniform-rename-P01-S01]]'
+  - '[[2026-06-26-uniform-rename-P01-S02]]'
+  - '[[2026-06-26-uniform-rename-P01-S03]]'
+  - '[[2026-06-26-uniform-rename-P01-S04]]'
   - '[[2026-06-26-uniform-rename-adr]]'
   - '[[2026-06-26-uniform-rename-plan]]'
   - '[[2026-06-26-uniform-rename-reference]]'
@@ -21,6 +25,13 @@ Auto-generated index of all documents tagged with `#uniform-rename`.
 ### adr
 
 - `2026-06-26-uniform-rename-adr` - `uniform-rename` adr: `uniform feature rename verb with atomic multi-surface rewrite` | (**status:** `accepted`)
+
+### exec
+
+- `2026-06-26-uniform-rename-P01-S01` - Create the shared rename-primitives module and move the case-safe path renamer into it
+- `2026-06-26-uniform-rename-P01-S02` - Move the related-link rewrite engine and its regexes into the shared module
+- `2026-06-26-uniform-rename-P01-S03` - Re-point the structure check to import the rename primitives from the shared module
+- `2026-06-26-uniform-rename-P01-S04` - Run the structure case-rename suite to confirm no behavior change
 
 ### plan
 

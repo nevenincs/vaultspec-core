@@ -25,10 +25,10 @@ This plan implements the accepted ADR for a uniform feature rename. Phase P01 ex
 
 Extract the case-safe path rename and related-link rewrite primitives into a shared module so the structure check and the rename backend call one implementation.
 
-- [ ] `P01.S01` - Create the shared rename-primitives module and move the case-safe path renamer into it; `src/vaultspec_core/vaultcore/rename_ops.py`.
-- [ ] `P01.S02` - Move the related-link rewrite engine and its regexes into the shared module; `src/vaultspec_core/vaultcore/rename_ops.py`.
-- [ ] `P01.S03` - Re-point the structure check to import the rename primitives from the shared module; `src/vaultspec_core/vaultcore/checks/structure.py`.
-- [ ] `P01.S04` - Run the structure case-rename suite to confirm no behavior change; `src/vaultspec_core/vaultcore/checks/tests/test_structure_case_rename.py`.
+- [x] `P01.S01` - Create the shared rename-primitives module and move the case-safe path renamer into it; `src/vaultspec_core/vaultcore/rename_ops.py`.
+- [x] `P01.S02` - Move the related-link rewrite engine and its regexes into the shared module; `src/vaultspec_core/vaultcore/rename_ops.py`.
+- [x] `P01.S03` - Re-point the structure check to import the rename primitives from the shared module; `src/vaultspec_core/vaultcore/checks/structure.py`.
+- [x] `P01.S04` - Run the structure case-rename suite to confirm no behavior change; `src/vaultspec_core/vaultcore/checks/tests/test_structure_case_rename.py`.
 
 ### Phase `P02` - Backend rename_feature
 
