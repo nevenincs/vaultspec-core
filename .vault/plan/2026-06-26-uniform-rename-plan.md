@@ -52,15 +52,15 @@ Expose the backend as the vault feature rename CLI command with human and JSON o
 
 Cover the backend and command with real-filesystem, factory-based tests for every guard, the happy path, rollback, and merge.
 
-- [ ] `P04.S13` - Test validation guards for empty, invalid, reserved target, missing source, and collision refusal; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
-- [ ] `P04.S14` - Test dry-run returns the full plan and mutates nothing on disk; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
-- [ ] `P04.S15` - Test happy-path rewrite of filenames, the feature tag, and related links; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
-- [ ] `P04.S16` - Test exec folder and exec record rename with preserved plan-date prefix; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
-- [ ] `P04.S17` - Test cross-feature incoming wiki-link rewrite in other features documents; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
-- [ ] `P04.S18` - Test reverse-journal rollback restores original state after an induced mid-apply failure; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
-- [ ] `P04.S19` - Test force-merge into an existing feature and refusal on per-file path collision; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
-- [ ] `P04.S20` - Test flow-style tags normalization and feature index delete-and-regenerate; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
-- [ ] `P04.S21` - Test the rename command end-to-end including the json envelope; `src/vaultspec_core/tests/cli/test_feature_rename_cli.py`.
+- [x] `P04.S13` - Test validation guards for empty, invalid, reserved target, missing source, and collision refusal; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
+- [x] `P04.S14` - Test dry-run returns the full plan and mutates nothing on disk; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
+- [x] `P04.S15` - Test happy-path rewrite of filenames, the feature tag, and related links; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
+- [x] `P04.S16` - Test exec folder and exec record rename with preserved plan-date prefix; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
+- [x] `P04.S17` - Test cross-feature incoming wiki-link rewrite in other features documents; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
+- [x] `P04.S18` - Test reverse-journal rollback restores original state after an induced mid-apply failure; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
+- [x] `P04.S19` - Test force-merge into an existing feature and refusal on per-file path collision; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
+- [x] `P04.S20` - Test flow-style tags normalization and feature index delete-and-regenerate; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
+- [x] `P04.S21` - Test the rename command end-to-end including the json envelope; `src/vaultspec_core/tests/cli/test_feature_rename_cli.py`.
 
 ### Phase `P05` - Firmware conformance
 

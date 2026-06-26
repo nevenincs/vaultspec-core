@@ -18,6 +18,15 @@ related:
   - '[[2026-06-26-uniform-rename-P03-S10]]'
   - '[[2026-06-26-uniform-rename-P03-S11]]'
   - '[[2026-06-26-uniform-rename-P03-S12]]'
+  - '[[2026-06-26-uniform-rename-P04-S13]]'
+  - '[[2026-06-26-uniform-rename-P04-S14]]'
+  - '[[2026-06-26-uniform-rename-P04-S15]]'
+  - '[[2026-06-26-uniform-rename-P04-S16]]'
+  - '[[2026-06-26-uniform-rename-P04-S17]]'
+  - '[[2026-06-26-uniform-rename-P04-S18]]'
+  - '[[2026-06-26-uniform-rename-P04-S19]]'
+  - '[[2026-06-26-uniform-rename-P04-S20]]'
+  - '[[2026-06-26-uniform-rename-P04-S21]]'
   - '[[2026-06-26-uniform-rename-adr]]'
   - '[[2026-06-26-uniform-rename-plan]]'
   - '[[2026-06-26-uniform-rename-reference]]'
@@ -48,6 +57,15 @@ Auto-generated index of all documents tagged with `#uniform-rename`.
 - `2026-06-26-uniform-rename-P03-S10` - Add the cmd_feature_rename command with two positionals and dry-run, force, json, no-hints, and target options
 - `2026-06-26-uniform-rename-P03-S11` - Render human output with renamed count, old-to-new paths, cross-link rewrite count, collision warnings, and a next-step hint
 - `2026-06-26-uniform-rename-P03-S12` - Emit the versioned json envelope vaultspec.vault.feature.rename.v1 with canonical status
+- `2026-06-26-uniform-rename-P04-S13` - Test validation guards for empty, invalid, reserved target, missing source, and collision refusal
+- `2026-06-26-uniform-rename-P04-S14` - Test dry-run returns the full plan and mutates nothing on disk
+- `2026-06-26-uniform-rename-P04-S15` - Test happy-path rewrite of filenames, the feature tag, and related links
+- `2026-06-26-uniform-rename-P04-S16` - Test exec folder and exec record rename with preserved plan-date prefix
+- `2026-06-26-uniform-rename-P04-S17` - Test cross-feature incoming wiki-link rewrite in other features documents
+- `2026-06-26-uniform-rename-P04-S18` - Test reverse-journal rollback restores original state after an induced mid-apply failure
+- `2026-06-26-uniform-rename-P04-S19` - Test force-merge into an existing feature and refusal on per-file path collision
+- `2026-06-26-uniform-rename-P04-S20` - Test flow-style tags normalization and feature index delete-and-regenerate
+- `2026-06-26-uniform-rename-P04-S21` - Test the rename command end-to-end including the json envelope
 
 ### plan
 
