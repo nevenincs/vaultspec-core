@@ -154,8 +154,13 @@ def normalize_date(value: object) -> str | None:
 
 
 #: Frontmatter ``modified:`` line, capturing leading whitespace so an
-#: indented key is rewritten in place rather than duplicated.
-_MODIFIED_LINE_RE = re.compile(r"^(?P<indent>[ \t]*)modified:[^\n]*$", re.MULTILINE)
+#: indented key is rewritten in place rather than duplicated, plus any
+#: trailing carriage return so a CRLF line ending is preserved byte-for-byte
+#: when the value is rewritten (``[^\r\n]*`` deliberately stops before the
+#: ``\r`` so ``(?P<cr>\r?)`` can carry it through to the replacement).
+_MODIFIED_LINE_RE = re.compile(
+    r"^(?P<indent>[ \t]*)modified:[^\r\n]*(?P<cr>\r?)$", re.MULTILINE
+)
 
 #: Frontmatter ``date:`` line, used as the insertion anchor when no
 #: ``modified:`` field exists yet (the stamp lands directly after it).
@@ -217,7 +222,8 @@ def refresh_modified_stamp(text: str, today: _dt.date) -> str:
     existing = _MODIFIED_LINE_RE.search(frontmatter)
     if existing is not None:
         indent = existing.group("indent")
-        replacement = f"{indent}modified: {canonical}"
+        cr = existing.group("cr")
+        replacement = f"{indent}modified: {canonical}{cr}"
         new_frontmatter = (
             frontmatter[: existing.start()]
             + replacement

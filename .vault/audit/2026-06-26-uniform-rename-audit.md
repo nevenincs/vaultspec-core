@@ -87,11 +87,68 @@ the shared JSON envelope; and the 25 tests are genuine real-filesystem assertion
 no mocks, stubs, skips, or tautologies (the rollback test induces a real
 directory-at-destination failure and asserts true byte-identity).
 
+### sec-rollback-symlink-write-through | high | rollback could write through a `.md` symlink to an out-of-bounds target
+
+A dedicated defensive security pass (filesystem-mutation threat model) demonstrated that
+`_snapshot_docs` captured bytes through a `.md` file-symlink (via `is_file()`) and
+`_rollback_rename` restored with raw `write_bytes`, which follows a surviving symlink and
+clobbers the external target. RESOLVED: the snapshot, the cascade, and the dry-run
+predictor now skip `is_symlink()` documents, and rollback restores via `_safe_restore_bytes`
+(unlinks a symlink first, never writes through it). Proven by real-symlink tests.
+
+### sec-dir-symlink-write-escape | high | index/exec writes could escape `.vault/` via a directory symlink
+
+Demonstrated: with `.vault/index` symlinked to an external directory, the raw
+`mkdir(exist_ok=True)` plus `atomic_write` wrote the regenerated index outside the vault.
+RESOLVED: a containment guard `_assert_within_docs` resolves symlinks and `..` and refuses
+any source/destination that escapes the docs tree; it runs before every exec-folder mkdir,
+every file rename (both endpoints), and the index regen. Proven by a real directory-symlink
+escape test that asserts refusal plus byte-identical rollback.
+
+### sec-symlink-unbounded-read | medium | symlink-target reads were unbounded and pulled external bytes into the vault
+
+`_snapshot_docs`/`_predict_rewrites` read every `.md` including symlink targets, an OOM/DoS
+and information-exposure channel. RESOLVED by the same `is_symlink()` skips above. The
+adversarial re-verification surfaced one further read-only residual - the dry-run
+tag-rewrite count loop still read a symlinked source's target - which was closed by an
+`is_symlink()` skip there too, so dry-run and apply are symmetric and no out-of-bounds
+read remains on the rename path.
+
+### sec-arg-injection-and-collision | low | source unvalidated; case-insensitive collisions under-reported; Windows device names accepted
+
+RESOLVED: `_validate_feature_rename` now shape-gates `old` with the kebab grammar and rejects
+Windows reserved device names for `new`; collision detection keys on `os.path.normcase`; and
+`_rewrite_feature_tag_block` refuses to persist a rewrite of a document whose frontmatter
+never closes. Covered by 48 adversarial real-filesystem tests (argument injection with
+`../`, separators, NUL, newline, regex metacharacters, unicode homoglyphs; reserved names;
+malformed and non-UTF8 content; collision data-loss).
+
+### sec-no-cross-process-lock | medium | concurrent mutators are not serialized (accepted, documented)
+
+`rename_feature` takes no vault-wide advisory lock, so a concurrent mutating command could
+interleave with the snapshot/apply/rollback and cause a lost update. ACCEPTED as a documented
+limitation: there is no established vault-wide lock target and a partial lock would be
+inconsistent with the single-file `advisory_lock` convention. Recommended follow-up: a shared
+vault-level advisory lock adopted by all mutating vault commands.
+
+### sec-crlf-stamp-fidelity | medium | the shared modified-stamp helper corrupted CRLF line endings
+
+Surfaced by the CRLF security/fidelity tests: `refresh_modified_stamp` rewrote a CRLF
+`modified:` line to LF because `[^\n]*$` consumed the trailing `\r`. RESOLVED at root cause in
+`models.py` (the regex now stops at `[^\r\n]*` and captures `(?P<cr>\r?)` to re-append it).
+This is a shared helper used beyond rename; the 122-test modified-stamp regression set and the
+full gate stay green.
+
 ## Recommendations
 
-The high finding and both medium findings are resolved in this round; re-run the unit
-gate and a second backend review pass to confirm the archive fix. The accepted low
-layering note (`backend-cache-invalidation-layering`) and a future
-`feature-rename-integrity` check are reasonable follow-ons but do not block sign-off.
-The public `docs/CLI.md` detail block should be folded into the separate user-docs
-rework.
+The first-round high and medium findings are resolved. A subsequent defensive security
+pass against a filesystem-mutation threat model found two further HIGH out-of-bounds
+write vectors (symlink-based) plus medium/low issues; all are resolved and proven by 48
+adversarial real-filesystem tests (real OS symlinks, argument injection, malformed input,
+collision data-loss), and the fixes were adversarially re-verified. The full unit gate is
+green at 1451. Two items are accepted as documented follow-ups rather than blockers: a
+vault-wide advisory lock for concurrent mutators (`sec-no-cross-process-lock`) and the
+backend-vs-CLI cache-invalidation layering note. A future `feature-rename-integrity`
+check and the public `docs/CLI.md` detail block (folded into the separate user-docs
+rework) remain reasonable follow-ons. No residual out-of-bounds, symlink, or data-loss
+vector remains.

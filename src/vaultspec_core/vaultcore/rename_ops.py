@@ -225,6 +225,11 @@ def rewrite_incoming_refs(
             part.startswith(".") or part in non_schema_dirs for part in rel_parts[:-1]
         ):
             continue
+        # Never rewrite through a symlinked document: a symlinked ``*.md`` is not
+        # a legitimate vault file, and reading/writing it would touch an
+        # out-of-bounds target (or pull its bytes into the vault).
+        if md_path.is_symlink():
+            continue
         try:
             # Read as bytes first so CRLF endings survive the decode;
             # ``read_text`` collapses them via universal newlines.

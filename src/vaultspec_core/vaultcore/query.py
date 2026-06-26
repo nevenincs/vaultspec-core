@@ -11,6 +11,7 @@ Exports :class:`VaultDocument`, :func:`list_documents`, :func:`get_stats`,
 from __future__ import annotations
 
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -503,6 +504,61 @@ _FEATURE_TAG_LINE_RE = re.compile(r"^(\s*-\s*)(['\"]?)(#[\w-]+)\2(\s*)$")
 #: dry-run predictor to estimate how many incoming links would be rewritten.
 _RELATED_LINK_RE = re.compile(r'^\s*-\s*["\']?\[\[(.+?)\]\]["\']?.*$')
 
+#: Windows reserved device base names. A feature whose name is one of these
+#: produces an index path (``<name>.index.md``) the OS treats as a device,
+#: which would fail mid-apply; rename rejects them up front.
+_WINDOWS_RESERVED_NAMES = frozenset(
+    {"con", "prn", "aux", "nul"}
+    | {f"com{i}" for i in range(1, 10)}
+    | {f"lpt{i}" for i in range(1, 10)}
+)
+
+
+def _assert_within_docs(docs_dir: Path, path: Path) -> Path:
+    """Return *path* iff its real location is inside *docs_dir*, else raise.
+
+    Resolves every symlink and ``..`` segment in *path* (and in any existing
+    ancestor of a not-yet-created destination) and refuses the operation when
+    the result escapes the vault's document tree.  This is the containment
+    backstop that prevents a rename from reading, writing, moving, or deleting
+    a file whose true location is outside ``.vault/`` - including the case
+    where a vault subdirectory (e.g. ``index/``) or a document is itself a
+    symlink pointing outside the project.
+
+    Args:
+        docs_dir: The vault document root (``<root>/<docs_dir>``).
+        path: A candidate source or destination path inside the rename plan.
+
+    Returns:
+        *path* unchanged when it is contained.
+
+    Raises:
+        VaultSpecError: When *path* resolves outside *docs_dir*.
+    """
+    from ..core.exceptions import VaultSpecError
+
+    real_docs = docs_dir.resolve(strict=False)
+    real_path = path.resolve(strict=False)
+    if real_path != real_docs and real_docs not in real_path.parents:
+        raise VaultSpecError(
+            "Refusing to operate on a path outside the vault document tree "
+            f"(possible symlink or traversal escape): {path}"
+        )
+    return path
+
+
+def _safe_restore_bytes(path: Path, original: bytes) -> None:
+    """Restore *original* bytes to *path* without writing through a symlink.
+
+    A symlinked rollback target is unlinked first so the bytes land on a
+    fresh regular file at the in-vault path rather than following the link
+    to an out-of-bounds destination.
+    """
+    if path.is_symlink():
+        path.unlink()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(original)
+
 
 @dataclass
 class _RenamePlan:
@@ -612,6 +668,16 @@ def _validate_feature_rename(
             f"Source and target feature are identical ('{old_clean}'); there "
             "is nothing to rename."
         )
+    # Shape-gate the SOURCE too (defense in depth): a well-formed feature tag is
+    # kebab-case by schema, so a source carrying path separators, ``..``, control
+    # characters, or other metacharacters is never a real feature and must be
+    # rejected explicitly rather than relying on it incidentally matching zero
+    # documents.
+    if not _FEATURE_KEBAB_RE.match(old_clean):
+        raise VaultSpecError(
+            f"Source feature '{old_clean}' is not a valid feature tag. It must "
+            "be kebab-case matching ^[a-z0-9][a-z0-9-]*$."
+        )
     if not _FEATURE_KEBAB_RE.match(new_clean) or not _FEATURE_TAG_FORM_RE.match(
         f"#{new_clean}"
     ):
@@ -625,6 +691,11 @@ def _validate_feature_rename(
             f"Target feature '{new_clean}' is a reserved document-type name "
             f"({', '.join(sorted(reserved))}). A feature tag with that name is "
             "invisible to the feature scanner; choose a different name."
+        )
+    if new_clean in _WINDOWS_RESERVED_NAMES:
+        raise VaultSpecError(
+            f"Target feature '{new_clean}' is a reserved device name on Windows; "
+            "the regenerated index filename would be invalid. Choose another name."
         )
 
     src_docs = list_documents(root_dir, feature=old_clean)
@@ -772,6 +843,7 @@ def _rewrite_feature_tag_block(content: str, old: str, new: str) -> tuple[str, b
     out: list[str] = []
     changed = False
     in_frontmatter = False
+    closed = False
     fence = 0
     i = 0
     n = len(lines)
@@ -788,6 +860,7 @@ def _rewrite_feature_tag_block(content: str, old: str, new: str) -> tuple[str, b
                 in_frontmatter = True
                 continue
             # Closing fence reached: copy the remainder of the file verbatim.
+            closed = True
             out.extend(lines[i:])
             break
 
@@ -831,6 +904,13 @@ def _rewrite_feature_tag_block(content: str, old: str, new: str) -> tuple[str, b
 
         out.append(line)
         i += 1
+
+    # Refuse to persist a rewrite of a document whose frontmatter never closed:
+    # an opening ``---`` with no terminating fence is malformed, and treating the
+    # whole file as frontmatter could mutate body lines that merely look like
+    # tag entries. Mirror the closing-fence guard in ``rewrite_incoming_refs``.
+    if in_frontmatter and not closed:
+        return content, False
 
     result = bom + newline.join(out)
     if had_trailing:
@@ -922,18 +1002,22 @@ def _compute_rename_plan(
     # Collision detection: two sources mapping to one destination, or a file
     # already sitting at a destination (the merge hazard under --force).
     collisions: list[dict] = []
-    seen_dest: dict[Path, Path] = {}
+    # Key on the normalised-case path so two sources whose destinations differ
+    # only by case (which collide to one file on a case-insensitive filesystem)
+    # are detected up front rather than only at apply time.
+    seen_dest: dict[str, Path] = {}
     for src, dst in file_renames:
-        if dst in seen_dest:
+        dkey = os.path.normcase(str(dst))
+        if dkey in seen_dest:
             collisions.append(
                 {
                     "destination": _rel(dst, root_dir),
-                    "sources": [_rel(seen_dest[dst], root_dir), _rel(src, root_dir)],
+                    "sources": [_rel(seen_dest[dkey], root_dir), _rel(src, root_dir)],
                     "reason": "two source files map to the same destination",
                 }
             )
         else:
-            seen_dest[dst] = src
+            seen_dest[dkey] = src
         if dst.is_file() and not _same_file(src, dst):
             collisions.append(
                 {
@@ -1032,6 +1116,12 @@ def _predict_rewrites(
 
     tag_rewrites = 0
     for src, _dst in plan.file_renames:
+        # Never read through a symlinked source during the dry-run preview: the
+        # apply path refuses it via ``_assert_within_docs``, so the preview must
+        # not read its out-of-bounds target either (mirrors the related-count
+        # loop below and keeps dry-run and apply symmetric).
+        if src.is_symlink():
+            continue
         try:
             text = src.read_bytes().decode("utf-8")
         except (OSError, UnicodeDecodeError):
@@ -1049,7 +1139,7 @@ def _predict_rewrites(
                 rel_parts = md.relative_to(docs_dir).parts
                 if any(p == "_archive" or p.startswith(".") for p in rel_parts):
                     continue
-                if not md.is_file():
+                if md.is_symlink() or not md.is_file():
                     continue
                 related_rewrites += _count_related_refs(md, old_stems)
 
@@ -1123,7 +1213,10 @@ def _snapshot_docs(root_dir: Path, journal: _RenameJournal) -> None:
             continue
         if any(p == "_archive" or p.startswith(".") for p in rel_parts):
             continue
-        if not md.is_file():
+        # Skip symlinks: a symlinked ``.md`` is not a legitimate vault document,
+        # and snapshotting it would pull an out-of-bounds target's bytes into the
+        # rollback journal (then potentially restore them through the link).
+        if md.is_symlink() or not md.is_file():
             continue
         try:
             journal.snapshots[md] = md.read_bytes()
@@ -1153,7 +1246,12 @@ def _regenerate_feature_index(
     from .index import generate_feature_index
 
     cfg = get_config()
-    index_path = root_dir / cfg.docs_dir / cfg.index_dir / f"{new}.index.md"
+    docs_dir = root_dir / cfg.docs_dir
+    index_path = docs_dir / cfg.index_dir / f"{new}.index.md"
+    # Refuse to regenerate the index outside the vault: if ``index/`` is a
+    # directory symlink pointing elsewhere, the resolved index path escapes
+    # ``docs_dir`` and the write would land out of bounds.
+    _assert_within_docs(docs_dir, index_path)
     existed = index_path.exists()
 
     graph = VaultGraph(root_dir, use_cache=False)
@@ -1233,9 +1331,13 @@ def _rollback_rename(journal: _RenameJournal) -> None:
 
     for path, original in journal.snapshots.items():
         try:
-            if not path.exists() or path.read_bytes() != original:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(original)
+            # If the key became a symlink since the snapshot, restore through a
+            # fresh regular file (never write through the link to an
+            # out-of-bounds target). Otherwise restore only when content drifted.
+            # ``is_symlink()`` is checked first so the short-circuit avoids a
+            # symlink-following ``read_bytes()``.
+            if path.is_symlink() or not path.exists() or path.read_bytes() != original:
+                _safe_restore_bytes(path, original)
         except OSError as exc:
             logger.warning("Rollback could not restore %s: %s", path, exc)
 
@@ -1264,18 +1366,24 @@ def _apply_rename_plan(root_dir: Path, plan: _RenamePlan, old: str, new: str) ->
     _snapshot_docs(root_dir, journal)
 
     cfg = get_config()
-    index_dir = root_dir / cfg.docs_dir / cfg.index_dir
+    docs_dir = root_dir / cfg.docs_dir
+    index_dir = docs_dir / cfg.index_dir
     index_dir_existed = index_dir.exists()
 
     try:
         # (1) Ensure destination exec folders exist before any record moves.
         for _old_folder, new_folder, _date in plan.exec_dir_renames:
+            _assert_within_docs(docs_dir, new_folder)
             if not new_folder.exists():
                 new_folder.mkdir(parents=True, exist_ok=True)
                 journal.created_dirs.append(new_folder)
 
-        # (2) Rename every authored doc and exec record.
+        # (2) Rename every authored doc and exec record. Both endpoints are
+        #     containment-checked so a symlinked source or destination can never
+        #     move a file out of (or into the vault from) outside the tree.
         for src, dst in plan.file_renames:
+            _assert_within_docs(docs_dir, src)
+            _assert_within_docs(docs_dir, dst)
             if not rename_document_path(src, dst):
                 raise VaultSpecError(
                     f"Filesystem rename failed: {_rel(src, root_dir)} -> "
