@@ -14,31 +14,27 @@ yet, start with the [repository README](../README.md) for installation and an ov
 Vaultspec is a spec-driven harness for coding agents. You drive a coding agent - Claude
 Code, Codex, or Gemini - and it invokes vaultspec skills, which are slash-commands such
 as `/vaultspec-research`. Those skills call the `vaultspec-core` command-line tool
-(CLI), which reads and writes durable records on your behalf. The agent does the work;
-vaultspec keeps the work grounded.
+(CLI), which reads and writes the durable records on your behalf.
 
 Two directories define the framework. `.vault/` holds every document your features
 produce: research findings, decisions, plans, execution records, and audits.
 `.vaultspec/` holds the framework policy - rules, skills, agent personas, and system
-prompts - that shapes how the coding agent behaves in your project. You read and write
-documents in `.vault/`; you configure behavior in `.vaultspec/`.
+prompts - that shapes how the coding agent behaves in your project.
 
-The split is deliberate. You write down and approve research, decisions, and plans
-before any code is written. Every coding agent - even one working in an isolated sandbox
-\- then builds toward the same agreed goal. The records in `.vault/` carry that agreement
-forward across sessions, agents, and contributors.
+You write down and approve research, decisions, and plans before any code is written.
+Every coding agent - even one working in an isolated sandbox - then builds toward the
+same agreed goal. The records in `.vault/` carry that agreement forward across sessions,
+agents, and contributors.
 
 ## Orientation - the zeroth move
 
 Before you start work in a project you have no session context for, run
-`vaultspec-core status`. Orientation is the zeroth move: it's read-only, produces no
-artifact, and belongs to no pipeline phase. It describes what exists. It does not change
-anything.
+`vaultspec-core status`. Orientation is the zeroth move: read-only, no artifact, no
+pipeline phase. It describes what exists.
 
 With no argument, `vaultspec-core status` shows a vault-wide rollup. You see every plan
 with open steps and its completion percentage, recently modified documents grouped by
-type, and the features in flight. That's enough to know where work stands before you
-touch anything.
+type, and the features in flight.
 
 Pass a `TARGET` - a plan stem, a file path, or a feature tag - and the output shifts
 from rollup to grounding trace. Each plan step appears mapped to its execution-record
@@ -186,9 +182,7 @@ integrating over the Model Context Protocol.
 ### Customizing the framework
 
 Edit resources under `.vaultspec/rules/` through the `vaultspec-core spec` command group
-rather than touching files directly. The `spec` group adds and lists rules, skills, and
-agents consistently, and its output feeds the sync step that writes provider
-destinations.
+rather than touching files directly.
 
 ```bash
 vaultspec-core spec rules add my-project-conventions
