@@ -34,9 +34,57 @@ if TYPE_CHECKING:
 
     from .checks._base import CheckResult
 
-__all__ = ["rename_document_path", "rewrite_incoming_refs"]
+__all__ = ["rename_document_path", "rewrite_incoming_refs", "split_keepends"]
 
 logger = logging.getLogger(__name__)
+
+
+# Split only on the three canonical hard line breaks - LF, CRLF, and the
+# classic-Mac bare CR - and NEVER on the exotic Unicode line separators that
+# ``str.splitlines`` also treats as breaks (form feed U+000C, vertical tab
+# U+000B, NEL U+0085, LS U+2028, PS U+2029). Those exotic characters occur
+# inside body prose and must survive a rename byte-for-byte; treating them as
+# line breaks is exactly the corruption this module exists to prevent.
+_LINE_SPLIT_RE = re.compile(r"(\r\n|\r|\n)")
+
+
+def split_keepends(text: str) -> list[list[str]]:
+    r"""Split *text* into mutable ``[content, ending]`` pairs.
+
+    Breaks only on ``\r\n`` / ``\r`` / ``\n`` (never the exotic Unicode line
+    separators), so ``"".join(c + e for c, e in pairs)`` reproduces *text*
+    byte-for-byte. Editing only specific ``content`` values while keeping each
+    ``ending`` intact therefore cannot normalize endings or fabricate line
+    breaks out of in-line form feeds, vertical tabs, NEL, LS, or PS.
+
+    Examples:
+        ``"a\nb\n"`` -> ``[["a", "\n"], ["b", "\n"]]``;
+        ``"a\nb"`` -> ``[["a", "\n"], ["b", ""]]``;
+        ``""`` -> ``[]``;
+        ``"\n"`` -> ``[["", "\n"]]``.
+
+    Args:
+        text: The text to split.
+
+    Returns:
+        A list of ``[content, ending]`` pairs where ``ending`` is the exact
+        terminator that followed ``content`` (``""`` for a final unterminated
+        line).
+    """
+    if not text:
+        return []
+    # ``parts`` is ``[c0, sep0, c1, sep1, ..., cLast]`` because the regex group
+    # captures the separator: every odd index is a terminator, every even index
+    # is the content that preceded it.
+    parts = _LINE_SPLIT_RE.split(text)
+    pairs: list[list[str]] = [
+        [parts[i], parts[i + 1]] for i in range(0, len(parts) - 1, 2)
+    ]
+    # ``parts[-1]`` is the trailing content after the final terminator; append
+    # it with an empty ending only when the text did not end on a break.
+    if parts[-1]:
+        pairs.append([parts[-1], ""])
+    return pairs
 
 
 def _paths_refer_to_same_file(src: Path, dst: Path) -> bool:
@@ -248,10 +296,11 @@ def rewrite_incoming_refs(
             bom = "\ufeff"
             content = content[1:]
 
-        # Preserve the file's line-ending convention across the rewrite
-        # so we do not ship mixed CRLF/LF endings back to disk.
-        newline = "\r\n" if "\r\n" in content else "\n"
-        lines = content.splitlines()
+        # Model each line as a mutable ``[content, ending]`` pair so the
+        # rewrite touches only the content of the lines it targets and every
+        # other byte - including exotic in-line separators and a CR-only or
+        # absent trailing terminator - survives verbatim.
+        pairs = split_keepends(content)
         in_frontmatter = False
         in_related = False
         changed = False
@@ -266,14 +315,16 @@ def rewrite_incoming_refs(
         seen_targets: set[str] = set()
         drop_idx: list[int] = []
 
-        for idx, line in enumerate(lines):
+        for idx, pair in enumerate(pairs):
             # Guard against a missing closing fence: if the file is not
             # a real vault document, bail out of the scan after a fixed
-            # line budget rather than scanning prose forever.
+            # line budget rather than scanning prose forever. ``idx`` indexes
+            # logical lines (the pairs), matching the pre-pair behaviour.
             if in_frontmatter and idx > _FRONTMATTER_LINE_BUDGET:
                 budget_exceeded = True
                 break
 
+            line = pair[0]
             stripped = line.strip()
             if stripped == "---":
                 if not in_frontmatter:
@@ -358,7 +409,7 @@ def rewrite_incoming_refs(
                 )
                 continue
 
-            lines[idx] = f"{match.group(1)}{new_target}{match.group(3)}"
+            pair[0] = f"{match.group(1)}{new_target}{match.group(3)}"
             seen_targets.add(new_target)
             changed = True
             result.fixed_count += 1
@@ -398,9 +449,11 @@ def rewrite_incoming_refs(
             continue
 
         # Drop duplicate-collapsed lines in descending order so the
-        # surviving indices stay stable while we mutate the list.
+        # surviving indices stay stable while we mutate the list. Deleting the
+        # whole ``[content, ending]`` pair removes the line's terminator with
+        # it, so no stray blank line or doubled terminator is left behind.
         for del_idx in sorted(drop_idx, reverse=True):
-            del lines[del_idx]
+            del pairs[del_idx]
 
         # If the scan never saw a closing fence we are in unknown
         # territory; skip writing rather than risk corrupting a file
@@ -412,11 +465,10 @@ def rewrite_incoming_refs(
             )
             continue
 
-        new_content = bom + newline.join(lines)
-        # Preserve a trailing newline convention: if the original ended
-        # with the detected newline, keep it.
-        if content.endswith(newline):
-            new_content += newline
+        # Reassemble from the pairs: each line carries its own original
+        # terminator, so the trailing newline (or its absence) and every
+        # mixed/CR-only ending are reproduced exactly. The BOM is re-prepended.
+        new_content = bom + "".join(c + e for c, e in pairs)
         try:
             atomic_write(md_path, new_content)
         except OSError as exc:

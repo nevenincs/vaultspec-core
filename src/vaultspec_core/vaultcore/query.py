@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 from ..core.helpers import atomic_write
 from .models import DocType, refresh_modified_stamp
 from .parser import parse_frontmatter
-from .rename_ops import rename_document_path, rewrite_incoming_refs
+from .rename_ops import rename_document_path, rewrite_incoming_refs, split_keepends
 from .scanner import get_doc_type, scan_vault
 
 if TYPE_CHECKING:
@@ -836,36 +836,40 @@ def _rewrite_feature_tag_block(content: str, old: str, new: str) -> tuple[str, b
     if body.startswith("\ufeff"):
         bom = "\ufeff"
         body = body[1:]
-    newline = "\r\n" if "\r\n" in body else "\n"
-    had_trailing = body.endswith(("\r\n", "\n"))
-    lines = body.splitlines()
+    # Model each line as a mutable ``[content, ending]`` pair so the rewrite
+    # replaces only the content of the single tag line it targets while every
+    # other byte - including mixed/CR-only endings, an absent trailing
+    # terminator, and exotic in-line separators in body prose - survives
+    # verbatim. Splitting on \r\n / \r / \n only (never the exotic Unicode
+    # separators) is what fixes the corruption.
+    pairs = split_keepends(body)
 
-    out: list[str] = []
+    out: list[list[str]] = []
     changed = False
     in_frontmatter = False
     closed = False
     fence = 0
     i = 0
-    n = len(lines)
+    n = len(pairs)
 
     while i < n:
-        line = lines[i]
+        line, ending = pairs[i]
         stripped = line.strip()
 
         if stripped == "---":
             fence += 1
-            out.append(line)
+            out.append([line, ending])
             i += 1
             if fence == 1:
                 in_frontmatter = True
                 continue
             # Closing fence reached: copy the remainder of the file verbatim.
             closed = True
-            out.extend(lines[i:])
+            out.extend(pairs[i:])
             break
 
         if not in_frontmatter:
-            out.append(line)
+            out.append([line, ending])
             i += 1
             continue
 
@@ -874,35 +878,44 @@ def _rewrite_feature_tag_block(content: str, old: str, new: str) -> tuple[str, b
             indent = line[: len(line) - len(line.lstrip())]
             if after and after != "[]":
                 # Inline / flow form: normalise to block form, swapping the
-                # feature tag in the process.
+                # feature tag in the process. Every synthesized block line
+                # inherits the original ``tags:`` line's ending so a CRLF doc
+                # yields CRLF block entries (``ending or "\n"`` guards the
+                # degenerate case of the tag line lacking a terminator).
                 tag_list = _parse_inline_tags(after)
                 new_list = [new_tag if t == old_tag else t for t in tag_list]
                 if new_list != tag_list:
                     changed = True
-                out.append(f"{indent}tags:")
-                out.extend(f"{indent}  - '{t}'" for t in new_list)
+                synth = ending or "\n"
+                out.append([f"{indent}tags:", synth])
+                out.extend([f"{indent}  - '{t}'", synth] for t in new_list)
                 i += 1
                 continue
             # Block form: walk the indented dash entries and rewrite the one
             # carrying the feature tag.
-            out.append(line)
+            out.append([line, ending])
             i += 1
             while i < n:
-                entry = lines[i]
+                entry, entry_ending = pairs[i]
                 if entry.startswith((" ", "\t")) and entry.lstrip().startswith("-"):
                     m = _FEATURE_TAG_LINE_RE.match(entry)
                     if m is not None and m.group(3) == old_tag:
                         quote = m.group(2)
-                        out.append(f"{m.group(1)}{quote}{new_tag}{quote}{m.group(4)}")
+                        out.append(
+                            [
+                                f"{m.group(1)}{quote}{new_tag}{quote}{m.group(4)}",
+                                entry_ending,
+                            ]
+                        )
                         changed = True
                     else:
-                        out.append(entry)
+                        out.append([entry, entry_ending])
                     i += 1
                     continue
                 break
             continue
 
-        out.append(line)
+        out.append([line, ending])
         i += 1
 
     # Refuse to persist a rewrite of a document whose frontmatter never closed:
@@ -912,9 +925,10 @@ def _rewrite_feature_tag_block(content: str, old: str, new: str) -> tuple[str, b
     if in_frontmatter and not closed:
         return content, False
 
-    result = bom + newline.join(out)
-    if had_trailing:
-        result += newline
+    # Reassemble from the pairs: each line carries its own original terminator,
+    # so the trailing newline (or its absence) and every mixed ending are
+    # reproduced exactly. The BOM is re-prepended.
+    result = bom + "".join(c + e for c, e in out)
     return result, changed
 
 
@@ -1156,7 +1170,10 @@ def _count_related_refs(md_path: Path, old_stems_lower: set[str]) -> int:
     count = 0
     in_frontmatter = False
     in_related = False
-    for line in text.splitlines():
+    # Use the same canonical line-splitting as the cascade (only \r\n / \r / \n,
+    # never the exotic Unicode separators) so the dry-run predicted count matches
+    # what ``rewrite_incoming_refs`` would actually rewrite.
+    for line, _ending in split_keepends(text):
         stripped = line.strip()
         if stripped == "---":
             if not in_frontmatter:

@@ -139,6 +139,42 @@ Surfaced by the CRLF security/fidelity tests: `refresh_modified_stamp` rewrote a
 This is a shared helper used beyond rename; the 122-test modified-stamp regression set and the
 full gate stay green.
 
+### enc-tag-rewriter-eol-normalization | high | the tag rewriter normalized mixed/CR line endings and converted exotic separators
+
+A dedicated encoding/line-ending content-fidelity pass (cross-platform vaults mix LF, CRLF,
+classic-Mac CR, and exotic in-line separators) demonstrated that `_rewrite_feature_tag_block`
+used `splitlines()` (which breaks on every Unicode line boundary) plus a single detected
+newline and `newline.join()`, so on every renamed doc with non-uniform endings it silently
+re-terminated every line, converted in-body form feeds / vertical tabs / NEL / LS / PS to
+newlines, and dropped a CR-only file's trailing CR. RESOLVED: a new `split_keepends` helper
+(splits only on `\r\n`/`\r`/`\n`, models lines as `[content, ending]` pairs) lets the rewriter
+edit only the targeted line's content and keep every other line byte-for-byte; reassembly is a
+plain concatenation. Output is byte-identical to before on uniform docs.
+
+### enc-cascade-eol-normalization | high | the vault-wide related: cascade normalized endings and dropped trailing newlines
+
+Same root cause in the shared `rewrite_incoming_refs`, with a wider blast radius (it runs over
+every doc in the vault) and an extra defect: it dropped the trailing newline whenever the
+file's final terminator differed from the detected newline. RESOLVED by the same `split_keepends`
+refactor, handling the four interaction sites (duplicate-line drop removes the whole pair; the
+frontmatter line budget and indexing iterate logical lines; the closing-fence guard is intact;
+flow-to-block tag synthesis assigns each new line the original `tags:` line's ending). The
+structure check shares this function; its regression suite stays green. The read-only dry-run
+counter `_count_related_refs` was also switched to `split_keepends` for prediction consistency.
+Proven by 34 byte-exact tests (LF/CRLF/CR-only/mixed/exotic/no-trailing-newline/frontmatter-only/
+BOM), adversarially re-verified.
+
+### enc-bom-subject-not-discovered | medium | a UTF-8-BOM authored doc carrying the old feature is invisible to the scanner (accepted follow-up)
+
+The shared parser's `content.lstrip()` does not strip a leading `﻿`, so a BOM-prefixed
+authored doc's frontmatter is not recognized and the doc is silently excluded from a rename
+(and from the regenerated index) - a silent partial rename. NOT fixed here: the remedy is a
+shared parser/scanner change (read via `utf-8-sig` or strip the BOM before the `---` check) with
+a vault-wide blast radius, deliberately out of scope of this rename hardening pass. Documented as
+a follow-up, alongside the related low gaps (non-UTF-8 docs are likewise invisible to the scanner
+so they are skipped rather than corrupted; `refresh_modified_stamp` does not refresh a CR-only
+doc's stamp). None of these are byte-corruption vectors.
+
 ## Recommendations
 
 The first-round high and medium findings are resolved. A subsequent defensive security
@@ -152,3 +188,12 @@ backend-vs-CLI cache-invalidation layering note. A future `feature-rename-integr
 check and the public `docs/CLI.md` detail block (folded into the separate user-docs
 rework) remain reasonable follow-ons. No residual out-of-bounds, symlink, or data-loss
 vector remains.
+
+A third pass audited encoding and line-ending contamination for cross-platform vaults
+(mixed LF/CRLF/CR and exotic separators). It found two further HIGH byte-corruption
+defects in the content rewriters, both resolved by the `split_keepends` terminator-
+preserving refactor and proven by 34 byte-exact tests plus adversarial re-verification;
+the structure-check regression stays green. Three orthogonal discovery-layer gaps
+(BOM-prefixed and non-UTF-8 authored docs being invisible to the shared scanner; the
+CR-only modified-stamp no-op) are documented as follow-ups because their fix is a
+shared parser change outside this rename hardening pass; none are byte-corruption vectors.
