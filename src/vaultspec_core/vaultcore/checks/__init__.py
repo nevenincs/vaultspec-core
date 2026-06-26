@@ -24,6 +24,7 @@ from ._base import (
 from .annotations import check_annotations
 from .body_links import check_body_links
 from .dangling import check_dangling
+from .encoding import check_encoding
 from .features import check_features
 from .frontmatter import check_frontmatter
 from .links import check_links
@@ -47,6 +48,7 @@ __all__ = [
     "check_annotations",
     "check_body_links",
     "check_dangling",
+    "check_encoding",
     "check_features",
     "check_frontmatter",
     "check_links",
@@ -73,7 +75,7 @@ def run_all_checks(
 
     Executes structure, frontmatter, modified-stamp, annotations, markdown,
     links, dangling, body-links, placeholders, orphans, features, references,
-    schema, and rename-integrity checks in order. Builds a single
+    schema, rename-integrity, and encoding checks in order. Builds a single
     :class:`~vaultspec_core.graph.VaultGraph` and shares it across
     graph-consuming checkers to avoid redundant I/O.
 
@@ -108,6 +110,7 @@ def run_all_checks(
             check_references(root_dir, graph=graph, feature=feature, fix=False),
             check_schema(root_dir, graph=graph, feature=feature, fix=False),
             check_rename_integrity(root_dir, fix=False),
+            check_encoding(root_dir),
         ]
 
     # Mutating checks can rename files or rewrite frontmatter. Refresh graph
@@ -180,4 +183,7 @@ def run_all_checks(
 
     results.append(check_schema(root_dir, graph=graph, feature=feature, fix=True))
     results.append(check_rename_integrity(root_dir, fix=True))
+    # Encoding is read-only (non-UTF-8 cannot be auto-rewritten without silently
+    # mutating bytes); it runs identically in both modes.
+    results.append(check_encoding(root_dir))
     return results

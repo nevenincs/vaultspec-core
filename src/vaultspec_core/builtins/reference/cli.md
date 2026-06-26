@@ -72,6 +72,7 @@ vaultspec-core vault check references [OPTIONS]
 vaultspec-core vault check schema [OPTIONS]
 vaultspec-core vault check structure [OPTIONS]
 vaultspec-core vault check rename-integrity [OPTIONS]
+vaultspec-core vault check encoding [OPTIONS]
 vaultspec-core vault sanitize annotations [OPTIONS]
 vaultspec-core vault rule promote [OPTIONS]
 vaultspec-core vault adr supersede [OPTIONS] OLD_ADR
@@ -394,13 +395,16 @@ Shared options: `--fix` (apply auto-fixes), `--feature TAG` / `-f` (limit to a f
 
 Subcommands: `all`, `annotations`, `markdown`, `placeholders`, `body-links`, `dangling`,
 `frontmatter`, `modified-stamp`, `links`, `orphans`, `features`, `references`, `schema`,
-`structure`, `rename-integrity`. The `structure` subcommand does not support
+`structure`, `rename-integrity`, `encoding`. The `structure` subcommand does not support
 `--feature`. The `rename-integrity` subcommand checks name/filename integrity for rules,
 skills, and agents. The `modified-stamp` subcommand flags missing, unparseable, or stale
 `modified:` stamps; with `--fix` it normalizes parsed values to canonical `yyyy-mm-dd`
 form. The `markdown` subcommand checks markdown hygiene (trailing whitespace, blank-line
 runs, final newline) and repairs it with `--fix`. The `placeholders` subcommand finds
 unreplaced `{...}` template placeholders left in document body prose (detection only).
+The `encoding` subcommand surfaces `.vault/` documents that are not valid UTF-8 - a
+non-UTF-8 file is silently excluded from feature scans, indexes, and renames - reporting
+each as an error to convert by hand (detection only; a UTF-8-BOM file is accepted).
 
 ### vaultspec-core vault plan
 

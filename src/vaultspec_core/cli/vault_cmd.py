@@ -1841,6 +1841,29 @@ def cmd_check_rename_integrity(
     )
 
 
+@check_app.command("encoding")
+def cmd_check_encoding(
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Surface .vault/ documents that are not valid UTF-8 (detection only).
+
+    Encoding is validated vault-wide and takes no ``--feature`` filter: a
+    non-UTF-8 document has no parseable feature tag to scope by.
+    """
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.checks import check_encoding
+
+    result = check_encoding(_get_ctx().target_dir)
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.encoding"
+    )
+
+
 # ---- vault feature list ------------------------------------------------------
 
 

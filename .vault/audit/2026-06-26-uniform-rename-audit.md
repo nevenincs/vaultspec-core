@@ -164,16 +164,28 @@ counter `_count_related_refs` was also switched to `split_keepends` for predicti
 Proven by 34 byte-exact tests (LF/CRLF/CR-only/mixed/exotic/no-trailing-newline/frontmatter-only/
 BOM), adversarially re-verified.
 
-### enc-bom-subject-not-discovered | medium | a UTF-8-BOM authored doc carrying the old feature is invisible to the scanner (accepted follow-up)
+### enc-bom-subject-not-discovered | medium | a UTF-8-BOM authored doc carrying the old feature was invisible to the scanner
 
-The shared parser's `content.lstrip()` does not strip a leading `﻿`, so a BOM-prefixed
-authored doc's frontmatter is not recognized and the doc is silently excluded from a rename
-(and from the regenerated index) - a silent partial rename. NOT fixed here: the remedy is a
-shared parser/scanner change (read via `utf-8-sig` or strip the BOM before the `---` check) with
-a vault-wide blast radius, deliberately out of scope of this rename hardening pass. Documented as
-a follow-up, alongside the related low gaps (non-UTF-8 docs are likewise invisible to the scanner
-so they are skipped rather than corrupted; `refresh_modified_stamp` does not refresh a CR-only
-doc's stamp). None of these are byte-corruption vectors.
+The shared parser's `content.lstrip()` did not strip a leading `﻿`, so a BOM-prefixed
+authored doc's frontmatter was not recognized and the doc was silently excluded from a rename
+(and from the regenerated index) - a silent partial rename. RESOLVED: both `parse_frontmatter`
+and `parse_vault_metadata` now strip a single leading BOM before the `---` check, so BOM-prefixed
+UTF-8 docs are discovered everywhere the parser runs (vault scan, feature listing, graph build,
+every check). A UTF-8-BOM doc is valid UTF-8, so this one central fix is sufficient; the rename
+rewriters already preserve the BOM byte-for-byte on write. Proven end-to-end (a BOM doc is now
+discovered, renamed, and keeps its BOM) plus parser unit tests.
+
+### enc-non-utf8-invisible | medium | non-UTF-8 docs were silently skipped by every reader
+
+A UTF-16 / Latin-1 `.md` fails `read_text(encoding="utf-8")` and was silently dropped by
+`_scan_all`/`list_features`, so a rename silently omitted it. RESOLVED by surfacing rather than
+auto-decoding (decoding an arbitrary encoding and rewriting it would silently convert the file to
+UTF-8): a new read-only `check_encoding` walks the docs tree directly (a non-UTF-8 doc is absent
+from the snapshot) and reports each non-UTF-8 file as an ERROR to convert by hand; wired into
+`run_all_checks` (so `vault check all` surfaces it) and exposed as `vault check encoding`. A
+plain UTF-8 and a UTF-8-BOM file both pass. Proven by tests (UTF-16 + Latin-1 flagged; clean vault
+green; `_archive`/`.obsidian` skipped). Remaining low gap (not corruption, separate tracking):
+`refresh_modified_stamp` does not refresh a CR-only doc's stamp.
 
 ## Recommendations
 
@@ -193,7 +205,11 @@ A third pass audited encoding and line-ending contamination for cross-platform v
 (mixed LF/CRLF/CR and exotic separators). It found two further HIGH byte-corruption
 defects in the content rewriters, both resolved by the `split_keepends` terminator-
 preserving refactor and proven by 34 byte-exact tests plus adversarial re-verification;
-the structure-check regression stays green. Three orthogonal discovery-layer gaps
-(BOM-prefixed and non-UTF-8 authored docs being invisible to the shared scanner; the
-CR-only modified-stamp no-op) are documented as follow-ups because their fix is a
-shared parser change outside this rename hardening pass; none are byte-corruption vectors.
+the structure-check regression stays green.
+
+A fourth pass then closed the two discovery-layer gaps that the third pass had deferred:
+the shared parser now strips a leading BOM (so UTF-8-BOM authored docs are discovered and
+renamed with their BOM preserved), and a new read-only `check_encoding` surfaces non-UTF-8
+docs as errors (wired into `vault check all` and exposed as `vault check encoding`) rather
+than letting them be silently excluded. The only remaining noted item is a low,
+non-corruption `refresh_modified_stamp` no-op on classic-Mac CR-only docs.
