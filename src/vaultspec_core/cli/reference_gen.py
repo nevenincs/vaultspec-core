@@ -174,16 +174,62 @@ def collect_leaf_signatures(typer_app: typer.Typer) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def render_command_inventory(typer_app: typer.Typer) -> str:
-    """Render the command-inventory fenced block body (without markers).
+def _collect_leaf_help(typer_app: typer.Typer) -> list[tuple[tuple[str, ...], str]]:
+    """Return ``(path, short-help)`` for every visible leaf command, in tree order."""
+    from typer.main import get_command
 
-    The body is a single ``text`` fenced block listing every leaf signature,
-    surrounded by the blank lines mdformat keeps between the markers and the
-    block so generated output equals the formatted committed artifact.
+    root = get_command(typer_app)
+    root_ctx = root.context_class(root, info_name="vaultspec-core")
+
+    entries: list[tuple[tuple[str, ...], str]] = []
+    for path in _leaf_commands_in_order(typer_app, ()):
+        command, _ctx = _resolve_click_command(root, root_ctx, path)
+        # Take the docstring's first line directly: Click's short-help helper
+        # splits on the first period, which truncates summaries that contain a
+        # literal ellipsis (for example "L1 -> ... -> L4").
+        help_text = (command.help or "").strip()
+        short = help_text.splitlines()[0].strip() if help_text else ""
+        entries.append((path, short))
+    return entries
+
+
+def render_command_inventory(typer_app: typer.Typer) -> str:
+    """Render the command index: a grouped, described listing of every command.
+
+    Each top-level group (``vault``, ``spec``, ...) is a ``### <Group>`` heading
+    and every nested group (``feature``, ``rules``, ...) a ``#### <Sub-group>``
+    heading, so related commands stay titled and grouped. Every command is one
+    bullet showing its full runnable form (``vaultspec-core spec rules list``)
+    plus a one-line summary from the live ``--help``. Entries keep
+    :func:`_leaf_commands_in_order` order.
     """
-    signatures = collect_leaf_signatures(typer_app)
-    lines = ["```text", *signatures, "```"]
-    return "\n".join(lines)
+    group_names = {
+        group.name
+        for group in typer_app.registered_groups
+        if group.name and not group.hidden
+    }
+
+    # Top heading -> ordered {sub-group name (or None for direct leaves): bullets}.
+    tree: dict[str, dict[str | None, list[str]]] = {}
+    for path, short in _collect_leaf_help(typer_app):
+        if path[0] in group_names:
+            top = path[0].capitalize()
+            sub: str | None = path[1] if len(path) >= 3 else None
+        else:
+            top = "Top-level commands"
+            sub = None
+        command = "vaultspec-core " + " ".join(path)
+        bullet = f"- `{command}`" + (f" - {short}" if short else "")
+        tree.setdefault(top, {}).setdefault(sub, []).append(bullet)
+
+    blocks: list[str] = []
+    for top, sub_groups in tree.items():
+        blocks.extend((f"### {top}", ""))
+        for sub, bullets in sub_groups.items():
+            if sub is not None:
+                blocks.extend((f"#### {sub.capitalize()}", ""))
+            blocks.extend((*bullets, ""))
+    return "\n".join(blocks).rstrip("\n")
 
 
 @dataclass(frozen=True)

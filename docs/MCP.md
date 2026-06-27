@@ -54,9 +54,8 @@ For standalone setups where the working directory isn't the workspace, set
 
 See the [CLI reference](./CLI.md) for all `VAULTSPEC_` environment variables.
 
-**Note:** `vaultspec-core install` always scaffolds `.mcp.json` regardless of which
-provider is selected. MCP configuration is part of the core install and is not tied to
-any specific provider.
+**Note:** `vaultspec-core install` always scaffolds `.mcp.json`: MCP configuration is
+part of the core install, not tied to any provider (coding-agent integration).
 
 ## Verification
 
@@ -75,10 +74,10 @@ for broader workspace diagnosis.
 
 Read-only, idempotent. Discovers vault documents or lists features.
 
-**With no arguments**, returns all features with document count and graph weight score
-(based on incoming link count via `VaultGraph`).
+**With no arguments**, returns all features with their document count and a graph-weight
+score (a feature's incoming-link count; higher means more referenced).
 
-**With filters**, returns matching documents.
+**With filters** (for example `find(feature="auth")`), returns matching documents.
 
 | Parameter | Type               | Default | Description                                                                                                                                                                 |
 | --------- | ------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -121,12 +120,13 @@ ______________________________________________________________________
 
 ### `create`
 
-Non-destructive, idempotent. Creates a new vault document from a type template.
+Non-destructive, idempotent. Creates a new vault document from a type template (for
+example `create(feature="auth", type="adr", title="token-storage")`).
 
 | Parameter | Type               | Default      | Description                                                                                                         |
 | --------- | ------------------ | ------------ | ------------------------------------------------------------------------------------------------------------------- |
 | `feature` | `string`           | —            | **Required.** Feature tag for the document (leading `#` is stripped).                                               |
-| `type`    | `string \| null`   | `"research"` | Document type. Must be one of: `adr`, `audit`, `exec`, `plan`, `reference`, `research`.                             |
+| `type`    | `string \| null`   | `"research"` | Document type. Must be one of: `adr`, `audit`, `plan`, `reference`, `research`.                                     |
 | `date`    | `string \| null`   | today        | ISO-8601 date (`YYYY-MM-DD`). Defaults to the current date.                                                         |
 | `title`   | `string \| null`   | `null`       | Document title / topic slug. Defaults to `feature` when omitted.                                                    |
 | `content` | `string \| null`   | `null`       | Optional additional content appended under a `## Context` heading.                                                  |
@@ -137,10 +137,7 @@ The tool reads the template at `.vaultspec/templates/{type}.md`, replaces `{feat
 `{yyyy-mm-dd}`, `{topic}`, and `{title}` placeholders, then writes to
 `.vault/{type}/{filename}`.
 
-**Filename format:**
-
-- Standard: `{date}-{feature}-{type}.md`
-- For `exec` type: `{date}-{feature}-exec-{title}.md`
+**Filename format:** `{date}-{feature}-{type}.md`
 
 **Success response:**
 
@@ -167,10 +164,9 @@ destination directory not found, file already exists, write failure.
 ## Logging
 
 All server logs are written to **stderr**. **stdout is reserved for the JSON-RPC
-protocol stream** and must not receive non-protocol output. This separation is enforced
-at startup by `configure_logging()`.
+protocol stream** and must not receive non-protocol output.
 
-## See Also
+## Related documentation
 
 | Document                           | What it covers                                        |
 | ---------------------------------- | ----------------------------------------------------- |
@@ -179,4 +175,4 @@ at startup by `configure_logging()`.
 | [CLI Reference](./CLI.md)          | All commands, flags, and options for `vaultspec-core` |
 
 For bug reports and feature requests, open an issue on the
-[vaultspec-core issue tracker](https://github.com/wgergely/vaultspec-core/issues).
+[vaultspec-core issue tracker](https://github.com/nevenincs/vaultspec-core/issues).

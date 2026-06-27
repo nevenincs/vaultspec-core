@@ -355,16 +355,26 @@ def test_markdown_cli_signatures_match_live_usage() -> None:
     )
 
 
-def test_cli_handbook_contains_every_live_leaf_signature() -> None:
+def test_cli_handbook_documents_every_command() -> None:
+    """docs/CLI.md's command index shows the full command for every leaf.
+
+    The handbook documents commands by their full runnable form grouped under
+    titled sections: every visible leaf command appears as
+    ``vaultspec-core <path>`` with a one-line summary. This guards coverage - no
+    command is missing - while signature snippets that carry options or
+    arguments are checked for exactness by
+    ``test_markdown_cli_signatures_match_live_usage``.
+    """
     handbook = (_REPO_ROOT / "docs" / "CLI.md").read_text(encoding="utf-8")
+
     missing = [
-        _usage_for_command_path(command_path)
+        f"vaultspec-core {' '.join(command_path)}"
         for command_path in _collect_leaf_command_paths(app)
-        if _usage_for_command_path(command_path) not in handbook
+        if f"`vaultspec-core {' '.join(command_path)}`" not in handbook
     ]
 
     assert not missing, (
-        "CLI.md must contain the exact live usage signature for every visible "
+        "CLI.md's command index must show the full command for every visible "
         "leaf command:\n  - " + "\n  - ".join(missing)
     )
 
