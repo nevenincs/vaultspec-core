@@ -615,9 +615,11 @@ class TestVaultRepair:
             "placeholders",
             "orphans",
             "features",
+            "feature-rename-integrity",
             "references",
             "schema",
             "rename-integrity",
+            "encoding",
         ]
 
         factory.run("vault", "feature", "index", "--feature", "info-visibility")

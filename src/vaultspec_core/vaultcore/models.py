@@ -153,17 +153,6 @@ def normalize_date(value: object) -> str | None:
     return parsed.isoformat() if parsed is not None else None
 
 
-#: Frontmatter ``modified:`` line, capturing leading whitespace so an
-#: indented key is rewritten in place rather than duplicated.
-_MODIFIED_LINE_RE = re.compile(r"^(?P<indent>[ \t]*)modified:[^\n]*$", re.MULTILINE)
-
-#: Frontmatter ``date:`` line, used as the insertion anchor when no
-#: ``modified:`` field exists yet (the stamp lands directly after it).
-_DATE_LINE_RE = re.compile(
-    r"^(?P<indent>[ \t]*)date:[^\n]*(?P<eol>\r\n|\n)", re.MULTILINE
-)
-
-
 def refresh_modified_stamp(text: str, today: _dt.date) -> str:
     """Refresh (or add) the frontmatter ``modified:`` stamp to *today*.
 
@@ -205,35 +194,44 @@ def refresh_modified_stamp(text: str, today: _dt.date) -> str:
         :func:`vaultspec_core.vaultcore.hydration._inject_modified` for
         the scaffold-time half of decision D3.
     """
-    fence = re.match(r"^(﻿?)---[ \t]*(?:\r\n|\n)(.*?)(?:\r\n|\n)---", text, re.DOTALL)
+    from .rename_ops import split_keepends
+
+    # Match the leading frontmatter fence, tolerating LF, CRLF, and classic-Mac
+    # CR line endings. A per-line regex scan with ``re.MULTILINE`` would silently
+    # skip a CR-only document because Python only recognises ``\n`` as a line
+    # boundary; instead, capture the frontmatter body (group 2) INCLUDING the
+    # trailing EOL of its last line, then operate line-by-line via
+    # ``split_keepends`` so every line's exact terminator is preserved.
+    fence = re.match(
+        r"^(﻿?)---[ \t]*(?:\r\n|\r|\n)(.*?(?:\r\n|\r|\n))---", text, re.DOTALL
+    )
     if not fence:
         return text
 
     block_start = fence.start(2)
     block_end = fence.end(2)
-    frontmatter = text[block_start:block_end]
+    pairs = split_keepends(text[block_start:block_end])
     canonical = f"'{today.isoformat()}'"
 
-    existing = _MODIFIED_LINE_RE.search(frontmatter)
-    if existing is not None:
-        indent = existing.group("indent")
-        replacement = f"{indent}modified: {canonical}"
-        new_frontmatter = (
-            frontmatter[: existing.start()]
-            + replacement
-            + frontmatter[existing.end() :]
-        )
-        return text[:block_start] + new_frontmatter + text[block_end:]
+    # Rewrite an existing ``modified:`` line in place, preserving its ending.
+    for pair in pairs:
+        m = re.match(r"^(?P<indent>[ \t]*)modified:.*$", pair[0])
+        if m is not None:
+            pair[0] = f"{m.group('indent')}modified: {canonical}"
+            new_block = "".join(content + ending for content, ending in pairs)
+            return text[:block_start] + new_block + text[block_end:]
 
-    date_line = _DATE_LINE_RE.search(frontmatter)
-    if date_line is None:
-        return text
+    # Otherwise insert the stamp directly after the ``date:`` anchor line,
+    # matching that line's indentation and line ending.
+    for idx, pair in enumerate(pairs):
+        dm = re.match(r"^(?P<indent>[ \t]*)date:.*$", pair[0])
+        if dm is not None:
+            indent = dm.group("indent")
+            pairs.insert(idx + 1, [f"{indent}modified: {canonical}", pair[1] or "\n"])
+            new_block = "".join(content + ending for content, ending in pairs)
+            return text[:block_start] + new_block + text[block_end:]
 
-    indent = date_line.group("indent")
-    eol = date_line.group("eol")
-    insert_at = block_start + date_line.end()
-    stamp_line = f"{indent}modified: {canonical}{eol}"
-    return text[:insert_at] + stamp_line + text[insert_at:]
+    return text
 
 
 class DocType(StrEnum):

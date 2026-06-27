@@ -1841,6 +1841,57 @@ def cmd_check_rename_integrity(
     )
 
 
+@check_app.command("encoding")
+def cmd_check_encoding(
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Surface .vault/ documents that are not valid UTF-8 (detection only).
+
+    Encoding is validated vault-wide and takes no ``--feature`` filter: a
+    non-UTF-8 document has no parseable feature tag to scope by.
+    """
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.checks import check_encoding
+
+    result = check_encoding(_get_ctx().target_dir)
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.encoding"
+    )
+
+
+@check_app.command("feature-rename-integrity")
+def cmd_check_feature_rename_integrity(
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Surface exec folders whose feature disagrees with their records' tag.
+
+    Detection only: it reports post-rename drift between an exec folder name
+    and the ``#feature`` tag of the records inside it. It is vault-wide and
+    takes no ``--feature`` filter; index/staleness defer to ``check_features``
+    and filename/directory grammar to ``check_structure``.
+    """
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.checks import check_feature_rename_integrity
+
+    result = check_feature_rename_integrity(_get_ctx().target_dir)
+    _render_and_exit(
+        result,
+        verbose,
+        json_output=json_output,
+        command="vault.check.feature-rename-integrity",
+    )
+
+
 # ---- vault feature list ------------------------------------------------------
 
 
@@ -2176,6 +2227,160 @@ def cmd_feature_unarchive(
             )
             for p in result["paths"]:
                 console.print(f"  {p}")
+
+
+# ---- vault feature rename ----------------------------------------------------
+
+
+@feature_app.command("rename")
+def cmd_feature_rename(
+    old_feature: Annotated[str, typer.Argument(help="Current feature tag to rename")],
+    new_feature: Annotated[str, typer.Argument(help="New feature tag name")],
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview planned changes without writing")
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help=(
+                "Merge source into an existing target feature "
+                "(per-file path collisions still refuse)"
+            ),
+        ),
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    no_hints: Annotated[
+        bool, typer.Option("--no-hints", help="Suppress next-step advisory hints")
+    ] = False,
+    target: TargetOption = None,
+) -> None:
+    """Atomically rename a feature tag across every vault surface.
+
+    Rewrites document filenames, the exec folder and exec record filenames,
+    the #feature frontmatter tag, related: wiki-links, and the regenerated
+    feature index.  Free-form body prose is never changed.
+
+    A reverse journal is kept during the apply phase; if an error is raised
+    while applying, the changes made so far are rolled back to the pre-rename
+    state.  Use --force to merge the source feature into an existing target
+    feature (per-file path collisions still refuse).
+    """
+    apply_target(target)
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.query import rename_feature
+
+    console = get_console()
+
+    try:
+        result = rename_feature(
+            _get_ctx().target_dir,
+            old_feature,
+            new_feature,
+            dry_run=dry_run,
+            force=force,
+        )
+    except (VaultSpecError, OSError) as exc:
+        _handle_error(exc, json_output=json_output)
+        return
+
+    if not dry_run and result["renamed_count"] > 0:
+        from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+
+        invalidate_graph_cache(_get_ctx().target_dir)
+
+    outcome = (
+        "updated" if (result["renamed_count"] > 0 and not dry_run) else "unchanged"
+    )
+
+    from vaultspec_core.cli.rendering import emit_next_step_hint
+
+    hint_dict = emit_next_step_hint(
+        command="vault.feature.rename",
+        outcome=outcome,
+        json_output=json_output,
+        no_hints=no_hints,
+    )
+
+    if json_output:
+        import json
+
+        from vaultspec_core.cli.rendering import json_envelope
+
+        rename_status = (
+            "updated" if (result["renamed_count"] > 0 and not dry_run) else "unchanged"
+        )
+        typer.echo(
+            json.dumps(
+                json_envelope(
+                    "vault.feature.rename",
+                    rename_status,
+                    result,
+                    hints=hint_dict,
+                ),
+                indent=2,
+                default=str,
+            )
+        )
+        raise typer.Exit(0)
+
+    if dry_run:
+        console.print(
+            f"[yellow]Dry-run: Previewing feature rename "
+            f"'{old_feature}' -> '{new_feature}'[/yellow]"
+        )
+        if result["paths"]:
+            n = result["renamed_count"]
+            console.print(f"[yellow]Planned renames ({n} documents):[/yellow]")
+            for p in result["paths"]:
+                console.print(f"  {p['old']}  ->  {p['new']}")
+        else:
+            console.print("[dim]No documents found for this feature.[/dim]")
+
+        if result.get("exec_folders"):
+            console.print("[yellow]Exec folder renames:[/yellow]")
+            for ef in result["exec_folders"]:
+                console.print(f"  {ef['old']}  ->  {ef['new']}")
+
+        tag_count = result.get("tag_rewrites", 0)
+        rel_count = result.get("related_rewrites", 0)
+        console.print(
+            f"[dim]Predicted: {tag_count} tag rewrite(s), "
+            f"{rel_count} related-link rewrite(s)[/dim]"
+        )
+
+        if result.get("cross_links"):
+            console.print(
+                "[yellow]Cross-feature incoming links (will be rewritten):[/yellow]"
+            )
+            for link in result["cross_links"]:
+                console.print(f"  {link['source_path']} -> {link['target']}")
+        else:
+            console.print("[green]No incoming cross-feature links found.[/green]")
+    else:
+        if result["renamed_count"] == 0:
+            console.print(f"[dim]No documents found for feature '{old_feature}'.[/dim]")
+        else:
+            console.print(
+                f"[green]Renamed {result['renamed_count']} documents "
+                f"'{old_feature}' -> '{new_feature}'.[/green]"
+            )
+            for p in result["paths"]:
+                console.print(f"  {p['old']}  ->  {p['new']}")
+
+            if result.get("exec_folders"):
+                console.print("[green]Exec folder renamed:[/green]")
+                for ef in result["exec_folders"]:
+                    console.print(f"  {ef['old']}  ->  {ef['new']}")
+
+            tag_count = result.get("tag_rewrites", 0)
+            rel_count = result.get("related_rewrites", 0)
+            console.print(
+                f"[dim]{tag_count} tag rewrite(s), "
+                f"{rel_count} related-link rewrite(s)[/dim]"
+            )
 
 
 # ---- vault rule promote ------------------------------------------------------
