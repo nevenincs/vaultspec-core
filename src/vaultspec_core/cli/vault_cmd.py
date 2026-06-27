@@ -1864,6 +1864,34 @@ def cmd_check_encoding(
     )
 
 
+@check_app.command("feature-rename-integrity")
+def cmd_check_feature_rename_integrity(
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Surface exec folders whose feature disagrees with their records' tag.
+
+    Detection only: it reports post-rename drift between an exec folder name
+    and the ``#feature`` tag of the records inside it. It is vault-wide and
+    takes no ``--feature`` filter; index/staleness defer to ``check_features``
+    and filename/directory grammar to ``check_structure``.
+    """
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.checks import check_feature_rename_integrity
+
+    result = check_feature_rename_integrity(_get_ctx().target_dir)
+    _render_and_exit(
+        result,
+        verbose,
+        json_output=json_output,
+        command="vault.check.feature-rename-integrity",
+    )
+
+
 # ---- vault feature list ------------------------------------------------------
 
 

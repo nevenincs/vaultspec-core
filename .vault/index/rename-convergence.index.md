@@ -18,6 +18,12 @@ related:
   - '[[2026-06-27-rename-convergence-W03-P05-S10]]'
   - '[[2026-06-27-rename-convergence-W03-P06-S11]]'
   - '[[2026-06-27-rename-convergence-W03-P06-S12]]'
+  - '[[2026-06-27-rename-convergence-W04-P07-S13]]'
+  - '[[2026-06-27-rename-convergence-W04-P07-S14]]'
+  - '[[2026-06-27-rename-convergence-W04-P07-S15]]'
+  - '[[2026-06-27-rename-convergence-W04-P07-S16]]'
+  - '[[2026-06-27-rename-convergence-W04-P08-S17]]'
+  - '[[2026-06-27-rename-convergence-W04-P08-S18]]'
   - '[[2026-06-27-rename-convergence-adr]]'
   - '[[2026-06-27-rename-convergence-plan]]'
   - '[[2026-06-27-rename-convergence-reference]]'
@@ -48,6 +54,12 @@ Auto-generated index of all documents tagged with `#rename-convergence`.
 - `2026-06-27-rename-convergence-W03-P05-S10` - Migrate the vault.rename envelope incoming_rewritten to per-link counting and update its test
 - `2026-06-27-rename-convergence-W03-P06-S11` - Acquire the docs-domain lock in the structure-rename cascade fix path
 - `2026-06-27-rename-convergence-W03-P06-S12` - Add concurrency-safety tests asserting serialized renames cause no lost update or partial state
+- `2026-06-27-rename-convergence-W04-P07-S13` - Implement check_feature_rename_integrity for segment-vs-tag, exec-folder-vs-tag, and orphaned old-feature drift
+- `2026-06-27-rename-convergence-W04-P07-S14` - Wire check_feature_rename_integrity into run_all_checks and the checks package exports
+- `2026-06-27-rename-convergence-W04-P07-S15` - Add the vault check feature-rename-integrity CLI command
+- `2026-06-27-rename-convergence-W04-P07-S16` - Add real-filesystem tests for each drift class plus a clean-vault pass
+- `2026-06-27-rename-convergence-W04-P08-S17` - Document the converged rename verbs and the new check in the CLI mandate rule
+- `2026-06-27-rename-convergence-W04-P08-S18` - Regenerate the CLI reference, re-seed the workspace, and run the full unit gate green
 
 ### plan
 

@@ -136,6 +136,7 @@ vaultspec-core vault check schema [OPTIONS]
 vaultspec-core vault check structure [OPTIONS]
 vaultspec-core vault check rename-integrity [OPTIONS]
 vaultspec-core vault check encoding [OPTIONS]
+vaultspec-core vault check feature-rename-integrity [OPTIONS]
 vaultspec-core vault sanitize annotations [OPTIONS]
 vaultspec-core vault rule promote [OPTIONS]
 vaultspec-core vault adr supersede [OPTIONS] OLD_ADR

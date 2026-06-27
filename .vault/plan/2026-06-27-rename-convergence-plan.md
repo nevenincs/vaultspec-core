@@ -83,17 +83,17 @@ Add the read-only feature-rename-integrity check (segment-vs-tag, exec-folder-vs
 
 Add the read-only drift checker, wire into run_all_checks and the CLI, with real-filesystem tests.
 
-- [ ] `W04.P07.S13` - Implement check_feature_rename_integrity for segment-vs-tag, exec-folder-vs-tag, and orphaned old-feature drift; `src/vaultspec_core/vaultcore/checks/feature_rename_integrity.py`.
-- [ ] `W04.P07.S14` - Wire check_feature_rename_integrity into run_all_checks and the checks package exports; `src/vaultspec_core/vaultcore/checks/__init__.py`.
-- [ ] `W04.P07.S15` - Add the vault check feature-rename-integrity CLI command; `src/vaultspec_core/cli/vault_cmd.py`.
-- [ ] `W04.P07.S16` - Add real-filesystem tests for each drift class plus a clean-vault pass; `src/vaultspec_core/vaultcore/checks/tests/test_feature_rename_integrity.py`.
+- [x] `W04.P07.S13` - Implement check_feature_rename_integrity for segment-vs-tag, exec-folder-vs-tag, and orphaned old-feature drift; `src/vaultspec_core/vaultcore/checks/feature_rename_integrity.py`.
+- [x] `W04.P07.S14` - Wire check_feature_rename_integrity into run_all_checks and the checks package exports; `src/vaultspec_core/vaultcore/checks/__init__.py`.
+- [x] `W04.P07.S15` - Add the vault check feature-rename-integrity CLI command; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `W04.P07.S16` - Add real-filesystem tests for each drift class plus a clean-vault pass; `src/vaultspec_core/vaultcore/checks/tests/test_feature_rename_integrity.py`.
 
 ### Phase `W04.P08` - Firmware conformance and verification
 
 Document new verbs/checks in firmware, regenerate the reference, run the full gate, and close the audit.
 
-- [ ] `W04.P08.S17` - Document the converged rename verbs and the new check in the CLI mandate rule; `src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md`.
-- [ ] `W04.P08.S18` - Regenerate the CLI reference, re-seed the workspace, and run the full unit gate green; `src/vaultspec_core/builtins/reference/cli.md`.
+- [x] `W04.P08.S17` - Document the converged rename verbs and the new check in the CLI mandate rule; `src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md`.
+- [x] `W04.P08.S18` - Regenerate the CLI reference, re-seed the workspace, and run the full unit gate green; `src/vaultspec_core/builtins/reference/cli.md`.
 
 ## Parallelization
 
