@@ -237,7 +237,13 @@ def hooks_remove(
 
 
 def hooks_rename(old_name: str, new_name: str) -> Path:
-    """Rename a hook file atomically.
+    """Rename a hook file atomically through the shared rename engine.
+
+    The move is driven through a :class:`RenameTransaction` bound to the hooks
+    directory and serialized on the shared ``.vaultspec`` resource lock, so the
+    endpoints are containment-checked, the rename is case-safe, and a failed
+    rename rolls the hooks file back byte-for-byte.  The observable contract is
+    unchanged: the same new path is returned and the same error types are raised.
 
     Returns:
         The new path after renaming.
@@ -245,19 +251,37 @@ def hooks_rename(old_name: str, new_name: str) -> Path:
     Raises:
         ResourceNotFoundError: If the source does not exist.
         ResourceExistsError: If the destination already exists.
+        VaultSpecError: If an endpoint escapes the hooks directory or the
+            on-disk rename fails.
     """
-    old_path = _resolve_hook_path(old_name)
-    if not old_path.exists():
-        raise ResourceNotFoundError(f"Hook '{old_name}' not found.")
+    from ..vaultcore.rename_engine import (
+        RenameTransaction,
+        _assert_within,
+        resource_lock_target,
+    )
 
+    hooks_dir = _t.get_context().hooks_dir
+
+    old_path = _resolve_hook_path(old_name)
     ext = old_path.suffix
     new_file = new_name if new_name.endswith((".yaml", ".yml")) else f"{new_name}{ext}"
-    new_path = _t.get_context().hooks_dir / new_file
+    new_path = hooks_dir / new_file
+
+    _assert_within(hooks_dir, old_path)
+    _assert_within(hooks_dir, new_path)
+
+    if not old_path.exists():
+        raise ResourceNotFoundError(f"Hook '{old_name}' not found.")
 
     if new_path.exists():
         raise ResourceExistsError(f"Destination '{new_name}' already exists.")
 
-    shutil.move(str(old_path), str(new_path))
+    lock_target = resource_lock_target(hooks_dir.parent.parent)
+    with RenameTransaction(hooks_dir, lock_target=lock_target) as tx:
+        tx.snapshot([old_path])
+        if not tx.rename(old_path, new_path):
+            raise ResourceExistsError(f"Destination '{new_name}' already exists.")
+
     logger.info("Renamed Hook '%s' to '%s'.", old_name, new_name)
     return new_path
 

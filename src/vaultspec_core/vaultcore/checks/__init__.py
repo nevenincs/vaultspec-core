@@ -24,6 +24,8 @@ from ._base import (
 from .annotations import check_annotations
 from .body_links import check_body_links
 from .dangling import check_dangling
+from .encoding import check_encoding
+from .feature_rename_integrity import check_feature_rename_integrity
 from .features import check_features
 from .frontmatter import check_frontmatter
 from .links import check_links
@@ -47,6 +49,8 @@ __all__ = [
     "check_annotations",
     "check_body_links",
     "check_dangling",
+    "check_encoding",
+    "check_feature_rename_integrity",
     "check_features",
     "check_frontmatter",
     "check_links",
@@ -72,8 +76,9 @@ def run_all_checks(
     """Run all vault health checkers and return their results.
 
     Executes structure, frontmatter, modified-stamp, annotations, markdown,
-    links, dangling, body-links, placeholders, orphans, features, references,
-    schema, and rename-integrity checks in order. Builds a single
+    links, dangling, body-links, placeholders, orphans, features,
+    feature-rename-integrity, references, schema, rename-integrity, and
+    encoding checks in order. Builds a single
     :class:`~vaultspec_core.graph.VaultGraph` and shares it across
     graph-consuming checkers to avoid redundant I/O.
 
@@ -105,9 +110,11 @@ def run_all_checks(
             check_placeholders(root_dir, snapshot=snapshot, feature=feature),
             check_orphans(root_dir, graph=graph, feature=feature),
             check_features(root_dir, snapshot=snapshot, feature=feature),
+            check_feature_rename_integrity(root_dir),
             check_references(root_dir, graph=graph, feature=feature, fix=False),
             check_schema(root_dir, graph=graph, feature=feature, fix=False),
             check_rename_integrity(root_dir, fix=False),
+            check_encoding(root_dir),
         ]
 
     # Mutating checks can rename files or rewrite frontmatter. Refresh graph
@@ -174,10 +181,16 @@ def run_all_checks(
     results.append(
         check_features(root_dir, snapshot=graph.to_snapshot(), feature=feature)
     )
+    # Feature-rename-integrity is read-only (reconciling drift is a feature
+    # rename, not a frontmatter rewrite); it runs identically in both modes.
+    results.append(check_feature_rename_integrity(root_dir))
 
     result = check_references(root_dir, graph=graph, feature=feature, fix=True)
     append_and_refresh(result)
 
     results.append(check_schema(root_dir, graph=graph, feature=feature, fix=True))
     results.append(check_rename_integrity(root_dir, fix=True))
+    # Encoding is read-only (non-UTF-8 cannot be auto-rewritten without silently
+    # mutating bytes); it runs identically in both modes.
+    results.append(check_encoding(root_dir))
     return results

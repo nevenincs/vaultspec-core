@@ -56,6 +56,7 @@ vaultspec-core vault feature list [OPTIONS]
 vaultspec-core vault feature index [OPTIONS]
 vaultspec-core vault feature archive [OPTIONS] FEATURE_TAG
 vaultspec-core vault feature unarchive [OPTIONS] FEATURE_TAG
+vaultspec-core vault feature rename [OPTIONS] OLD_FEATURE NEW_FEATURE
 vaultspec-core vault check all [OPTIONS]
 vaultspec-core vault check body-links [OPTIONS]
 vaultspec-core vault check annotations [OPTIONS]
@@ -71,6 +72,8 @@ vaultspec-core vault check references [OPTIONS]
 vaultspec-core vault check schema [OPTIONS]
 vaultspec-core vault check structure [OPTIONS]
 vaultspec-core vault check rename-integrity [OPTIONS]
+vaultspec-core vault check encoding [OPTIONS]
+vaultspec-core vault check feature-rename-integrity [OPTIONS]
 vaultspec-core vault sanitize annotations [OPTIONS]
 vaultspec-core vault rule promote [OPTIONS]
 vaultspec-core vault adr supersede [OPTIONS] OLD_ADR
@@ -370,6 +373,19 @@ feature tag to the archive. Options: `--dry-run` (preview planned changes), `--j
 documents for a feature tag. Options: `--dry-run` (preview planned changes), `--json`.
 The `--no-hints` flag is not accepted here.
 
+### vaultspec-core vault feature rename
+
+`vaultspec-core vault feature rename [OPTIONS] OLD_FEATURE NEW_FEATURE` - rename a
+feature tag across every binding surface: document filenames, the exec folder and exec
+record filenames, the `#feature` frontmatter tag, `related:` wiki-links, and the
+regenerated feature index. Free-form body prose and archived documents are never
+changed. The apply phase keeps a reverse journal, so an error while applying rolls the
+changes back to the pre-rename state. Refuses when the target feature already exists
+unless `--force` is given, which merges the source into the target (per-file path
+collisions still refuse). Options: `--dry-run` (preview the full plan without writing),
+`--force` (merge into an existing target), `--json`, `--no-hints` (suppress next-step
+advisory hints), `--target DIR` / `-t`.
+
 ### vaultspec-core vault check
 
 Signature: `vaultspec-core vault check [OPTIONS] COMMAND [ARGS]...`. Run health checks
@@ -380,13 +396,16 @@ Shared options: `--fix` (apply auto-fixes), `--feature TAG` / `-f` (limit to a f
 
 Subcommands: `all`, `annotations`, `markdown`, `placeholders`, `body-links`, `dangling`,
 `frontmatter`, `modified-stamp`, `links`, `orphans`, `features`, `references`, `schema`,
-`structure`, `rename-integrity`. The `structure` subcommand does not support
+`structure`, `rename-integrity`, `encoding`. The `structure` subcommand does not support
 `--feature`. The `rename-integrity` subcommand checks name/filename integrity for rules,
 skills, and agents. The `modified-stamp` subcommand flags missing, unparseable, or stale
 `modified:` stamps; with `--fix` it normalizes parsed values to canonical `yyyy-mm-dd`
 form. The `markdown` subcommand checks markdown hygiene (trailing whitespace, blank-line
 runs, final newline) and repairs it with `--fix`. The `placeholders` subcommand finds
 unreplaced `{...}` template placeholders left in document body prose (detection only).
+The `encoding` subcommand surfaces `.vault/` documents that are not valid UTF-8 - a
+non-UTF-8 file is silently excluded from feature scans, indexes, and renames - reporting
+each as an error to convert by hand (detection only; a UTF-8-BOM file is accepted).
 
 ### vaultspec-core vault plan
 

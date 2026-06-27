@@ -103,6 +103,13 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
         markdown content after the closing ``---`` fence, or the full content
         if no frontmatter is present.
     """
+    # A UTF-8 BOM (U+FEFF) is not whitespace, so ``str.lstrip`` leaves it in
+    # place and the ``---`` fence check below would fail - silently classifying
+    # a perfectly valid BOM-prefixed document as having no frontmatter. Strip a
+    # single leading BOM first so BOM docs are discovered everywhere this parser
+    # runs (vault scan, feature listing, graph build, every check).
+    if content.startswith("\ufeff"):
+        content = content[1:]
     content = content.lstrip()
     frontmatter: dict[str, Any] = {}
     body = content
@@ -138,6 +145,12 @@ def parse_vault_metadata(content: str) -> tuple[DocumentMetadata, str]:
         markdown content that follows the closing ``---`` fence, or the full
         content if no frontmatter is present.
     """
+    # Strip a single leading UTF-8 BOM (U+FEFF) before whitespace: it is not
+    # whitespace, so ``str.lstrip`` would leave it in front of the ``---`` fence
+    # and the document would parse as having no metadata - silently dropping its
+    # tags and making it invisible to every feature scan and check.
+    if content.startswith("\ufeff"):
+        content = content[1:]
     content = content.lstrip()
     metadata = DocumentMetadata()
     body = content

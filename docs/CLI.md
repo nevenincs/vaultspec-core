@@ -119,6 +119,7 @@ vaultspec-core vault feature list [OPTIONS]
 vaultspec-core vault feature index [OPTIONS]
 vaultspec-core vault feature archive [OPTIONS] FEATURE_TAG
 vaultspec-core vault feature unarchive [OPTIONS] FEATURE_TAG
+vaultspec-core vault feature rename [OPTIONS] OLD_FEATURE NEW_FEATURE
 vaultspec-core vault check all [OPTIONS]
 vaultspec-core vault check body-links [OPTIONS]
 vaultspec-core vault check annotations [OPTIONS]
@@ -134,6 +135,8 @@ vaultspec-core vault check references [OPTIONS]
 vaultspec-core vault check schema [OPTIONS]
 vaultspec-core vault check structure [OPTIONS]
 vaultspec-core vault check rename-integrity [OPTIONS]
+vaultspec-core vault check encoding [OPTIONS]
+vaultspec-core vault check feature-rename-integrity [OPTIONS]
 vaultspec-core vault sanitize annotations [OPTIONS]
 vaultspec-core vault rule promote [OPTIONS]
 vaultspec-core vault adr supersede [OPTIONS] OLD_ADR
