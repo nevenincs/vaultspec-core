@@ -175,15 +175,38 @@ def collect_leaf_signatures(typer_app: typer.Typer) -> list[str]:
 
 
 def render_command_inventory(typer_app: typer.Typer) -> str:
-    """Render the command-inventory fenced block body (without markers).
+    """Render the command-inventory body, grouped by top-level command group.
 
-    The body is a single ``text`` fenced block listing every leaf signature,
-    surrounded by the blank lines mdformat keeps between the markers and the
-    block so generated output equals the formatted committed artifact.
+    Each top-level group (``vault``, ``spec``, ...) gets a ``### <Group>``
+    heading over a ``text`` fenced block of its leaf signatures; the top-level
+    leaf commands collect under "Top-level commands". Signatures stay in
+    :func:`collect_leaf_signatures` order both within and across buckets - that
+    walk already emits each group's leaves contiguously - so the flattened
+    ``vaultspec-core ...`` line sequence still equals the live tree, which the
+    drift guard relies on.
     """
     signatures = collect_leaf_signatures(typer_app)
-    lines = ["```text", *signatures, "```"]
-    return "\n".join(lines)
+    group_names = {
+        group.name
+        for group in typer_app.registered_groups
+        if group.name and not group.hidden
+    }
+
+    buckets: dict[str, list[str]] = {}
+    for signature in signatures:
+        # signature is "vaultspec-core <segment> ..."; the second token is the
+        # top-level group for a grouped command or the command name for a
+        # top-level leaf.
+        segment = signature.split()[1]
+        bucket = segment if segment in group_names else "Top-level commands"
+        buckets.setdefault(bucket, []).append(signature)
+
+    blocks: list[str] = []
+    for bucket, group_signatures in buckets.items():
+        blocks.extend(
+            (f"### {bucket.capitalize()}", "", "```text", *group_signatures, "```", "")
+        )
+    return "\n".join(blocks).rstrip("\n")
 
 
 @dataclass(frozen=True)

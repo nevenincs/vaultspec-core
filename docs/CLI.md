@@ -95,12 +95,19 @@ full options.
 
 <!-- vaultspec:generated:begin command-inventory -->
 
+### Top-level commands
+
 ```text
 vaultspec-core install [OPTIONS] [PROVIDER]
 vaultspec-core uninstall [OPTIONS] [PROVIDER]
 vaultspec-core sync [OPTIONS] [PROVIDER]
 vaultspec-core doctor [OPTIONS]
 vaultspec-core status [OPTIONS] [TARGET]
+```
+
+### Vault
+
+```text
 vaultspec-core vault set-body [OPTIONS] REF
 vaultspec-core vault set-frontmatter [OPTIONS] REF
 vaultspec-core vault edit [OPTIONS] REF
@@ -164,6 +171,11 @@ vaultspec-core vault plan trailer validate [OPTIONS] MESSAGE_FILE
 vaultspec-core vault link list [OPTIONS] [SRC]
 vaultspec-core vault link add [OPTIONS] SRC DST
 vaultspec-core vault link remove [OPTIONS] SRC DST
+```
+
+### Spec
+
+```text
 vaultspec-core spec doctor [OPTIONS]
 vaultspec-core spec rules list [OPTIONS]
 vaultspec-core spec rules add [OPTIONS] NAME
@@ -210,8 +222,18 @@ vaultspec-core spec mcps add [OPTIONS]
 vaultspec-core spec mcps remove [OPTIONS] NAME
 vaultspec-core spec mcps sync [OPTIONS] [PROVIDER]
 vaultspec-core spec reference generate [OPTIONS]
+```
+
+### Migrations
+
+```text
 vaultspec-core migrations status [OPTIONS]
 vaultspec-core migrations run [OPTIONS]
+```
+
+### Config
+
+```text
 vaultspec-core config get [OPTIONS] KEY
 vaultspec-core config set [OPTIONS] KEY VALUE
 vaultspec-core config unset [OPTIONS] KEY
