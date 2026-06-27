@@ -110,7 +110,7 @@ def resolve(
 
     _resolve_framework(plan, diagnosis.framework, fw_action, force=force)
     _resolve_version_warning(plan, diagnosis)
-    # Builtins live in .vaultspec/rules/ - framework content. Under
+    # Builtins live directly under .vaultspec/ - framework content. Under
     # `install --upgrade` they are re-seeded unconditionally, so the
     # builtin-version signal must resolve with framework semantics; using
     # prov_action (SYNC) would wrongly tell the operator to pass --force
@@ -511,7 +511,7 @@ def _resolve_builtin_version(
 
     if signal == BuiltinVersionSignal.DELETED:
         plan.warnings.append(
-            "Builtin resources have been deleted from .vaultspec/rules/. "
+            "Builtin resources have been deleted from .vaultspec/. "
             "Run 'vaultspec-core install --upgrade' to restore."
         )
         if force and action == CliAction.SYNC:

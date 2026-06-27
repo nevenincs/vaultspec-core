@@ -117,7 +117,7 @@ def apply_target(
     Args:
         target: Subcommand-level ``--target`` value (may be ``None``).
         split_source: When ``True`` **and** ``--target`` points to a
-            different directory, the source content (``.vaultspec/rules/``)
+            different directory, the source content (``.vaultspec/``)
             is read from the CWD workspace while the destination (tool
             directories, provider manifest) is at the target.  This is the
             correct model for ``sync``  - like ``rsync src/ dest/``.  Other

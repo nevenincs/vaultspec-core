@@ -193,15 +193,31 @@ def resource_rename(
 ) -> Path:
     """Rename a resource on disk atomically across filename and frontmatter.
 
+    The move is driven through a :class:`RenameTransaction` bound to the
+    resource's own ``base_dir`` (the per-scan-group root, which may be a
+    provider mirror) and serialized on the shared ``.vaultspec`` resource lock,
+    so every endpoint is containment-checked, the rename is case-safe, and any
+    mid-apply failure rolls the resource tree back byte-for-byte before the
+    error propagates.  The observable contract is unchanged: the same new path
+    is returned and the same error types are raised.
+
     Returns:
         The new path after renaming.
 
     Raises:
         ResourceNotFoundError: If the source resource does not exist.
         ResourceExistsError: If the destination already exists.
+        VaultSpecError: If an endpoint escapes ``base_dir``, the frontmatter
+            cannot be parsed, or the on-disk rename fails.
     """
     from ..vaultcore import parse_frontmatter
+    from ..vaultcore.rename_engine import (
+        RenameTransaction,
+        _assert_within,
+        resource_lock_target,
+    )
     from .helpers import atomic_write, build_file
+    from .types import get_context
 
     def _get_frontmatter_name(name_str: str) -> str:
         stem = name_str
@@ -211,9 +227,25 @@ def resource_rename(
             stem = stem[:-8]
         return stem
 
+    # Serialize every resource mutator on the one shared ``.vaultspec`` sentinel
+    # regardless of whether ``base_dir`` is the source tree or a provider mirror.
+    # When no workspace context is active (a direct unit-test call), run
+    # lock-free; ``advisory_lock`` no-ops anyway when the sentinel's parent dir
+    # is absent.
+    try:
+        lock_target: Path | None = resource_lock_target(
+            get_context().rules_src_dir.parent.parent
+        )
+    except LookupError:
+        lock_target = None
+
     if is_dir:
         old_path = base_dir / old_name
         new_path = base_dir / new_name
+
+        # Contain the directory endpoints (not just SKILL.md) before any work.
+        _assert_within(base_dir, old_path)
+        _assert_within(base_dir, new_path)
 
         if not old_path.exists():
             raise ResourceNotFoundError(f"{label} '{old_name}' not found.")
@@ -239,18 +271,15 @@ def resource_rename(
         new_content = build_file(fm, body)
 
         ensure_dir(base_dir)
-        shutil.move(str(old_path), str(new_path))
-        try:
-            atomic_write(new_path / "SKILL.md", new_content)
-        except Exception as exc:
-            # Rollback
-            try:
-                shutil.move(str(new_path), str(old_path))
-            except Exception as rollback_exc:
-                logger.error(
-                    "Failed to rollback directory move during rename: %s", rollback_exc
+        with RenameTransaction(base_dir, lock_target=lock_target) as tx:
+            tx.snapshot([old_file])
+            if not tx.rename(old_path, new_path):
+                raise VaultSpecError(
+                    f"Failed to rename {label.lower()} '{old_name}' to '{new_name}'."
                 )
-            raise exc
+            new_skill_file = new_path / "SKILL.md"
+            tx.record_created_file(new_skill_file)
+            atomic_write(new_skill_file, new_content)
 
         logger.info("Renamed %s '%s' to '%s'.", label, old_name, new_name)
         return new_path
@@ -262,6 +291,9 @@ def resource_rename(
         # legacy ``project/`` rule subdir) are not supported, so a rename also
         # de-nests rather than re-creating the nested location.
         new_path = base_dir / new_file
+
+        _assert_within(base_dir, old_path)
+        _assert_within(base_dir, new_path)
 
         if not old_path.exists():
             raise ResourceNotFoundError(f"{label} '{old_name}' not found.")
@@ -281,18 +313,14 @@ def resource_rename(
         new_content = build_file(fm, body)
 
         ensure_dir(new_path.parent)
-        atomic_write(new_path, new_content)
-        try:
-            old_path.unlink()
-        except Exception as exc:
-            # Rollback write
-            try:
-                new_path.unlink()
-            except Exception as rollback_exc:
-                logger.error(
-                    "Failed to rollback file write during rename: %s", rollback_exc
+        with RenameTransaction(base_dir, lock_target=lock_target) as tx:
+            tx.snapshot([old_path])
+            if not tx.rename(old_path, new_path):
+                raise VaultSpecError(
+                    f"Failed to rename {label.lower()} '{old_name}' to '{new_name}'."
                 )
-            raise exc
+            tx.record_created_file(new_path)
+            atomic_write(new_path, new_content)
 
         logger.info("Renamed %s '%s' to '%s'.", label, old_name, new_name)
         return new_path

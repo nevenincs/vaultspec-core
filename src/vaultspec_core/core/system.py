@@ -29,7 +29,7 @@ SYSTEM_BUILTIN_RULE = "vaultspec-system.builtin.md"
 def collect_system_parts(
     warnings: list[str] | None = None,
 ) -> dict[str, tuple[Path, dict[str, Any], str]]:
-    """Collect system prompt parts from .vaultspec/rules/system/.
+    """Collect system prompt parts from .vaultspec/system/.
 
     Args:
         warnings: Optional list to append parse-error messages to, so callers

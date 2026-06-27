@@ -13,10 +13,10 @@ from vaultspec_core.config import reset_config
 
 
 def _make_workspace(tmp: object = None):
-    """Create a minimal workspace with .vaultspec/rules/mcps/ directory."""
+    """Create a minimal workspace with .vaultspec/mcps/ directory."""
     path = PROJECT_ROOT / ".pytest-tmp" / f"mcps-{uuid4().hex}"
     path.mkdir(parents=True, exist_ok=True)
-    mcps_dir = path / ".vaultspec" / "rules" / "mcps"
+    mcps_dir = path / ".vaultspec" / "mcps"
     mcps_dir.mkdir(parents=True, exist_ok=True)
     return path, mcps_dir
 
@@ -707,7 +707,7 @@ class TestUninstallRemovesCustomMcps:
             )
 
             # Add a custom MCP definition post-install
-            mcps_dir = path / ".vaultspec" / "rules" / "mcps"
+            mcps_dir = path / ".vaultspec" / "mcps"
             (mcps_dir / "custom-rag.json").write_text(
                 json.dumps({"command": "uv", "args": ["run", "rag-server"]}),
                 encoding="utf-8",
@@ -1069,7 +1069,7 @@ class TestMcpSyncPrune:
             )
 
             # Simulate a companion package dropping a source file
-            mcps_dir = path / ".vaultspec" / "rules" / "mcps"
+            mcps_dir = path / ".vaultspec" / "mcps"
             (mcps_dir / "companion.builtin.json").write_text(
                 json.dumps({"command": "uv", "args": ["run", "companion"]}),
                 encoding="utf-8",

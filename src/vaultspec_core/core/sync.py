@@ -34,7 +34,7 @@ def _sync_supporting_files(
 
     Args:
         src_dir: Source skill directory (e.g.
-            ``.vaultspec/rules/skills/vaultspec-documentation``).
+            ``.vaultspec/skills/vaultspec-documentation``).
         dest_dir: Destination skill directory (e.g.
             ``.claude/skills/vaultspec-documentation``).
         dry_run: When ``True``, skip all writes.

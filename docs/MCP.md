@@ -60,9 +60,9 @@ part of the core install, not tied to any provider (coding-agent integration).
 ## Verification
 
 Run `vaultspec-core spec mcps status --json` to validate MCP source definitions in
-`.vaultspec/rules/mcps/` against `.mcp.json`. This checks configuration health only; it
-does not start or probe MCP server processes. The command exits `0` only when `status`
-is `ok`, otherwise `1`.
+`.vaultspec/mcps/` against `.mcp.json`. This checks configuration health only; it does
+not start or probe MCP server processes. The command exits `0` only when `status` is
+`ok`, otherwise `1`.
 
 If status is not `ok`, inspect `missing`, `drifted`, `stale_managed`, and `warnings`,
 then run `vaultspec-core sync` and rerun status. Use `vaultspec-core spec doctor --json`
@@ -133,8 +133,8 @@ example `create(feature="auth", type="adr", title="token-storage")`).
 | `related` | `string[] \| null` | `null`       | Related document(s). Accepts path, filename, stem, or `[[wiki-link]]`. Resolved to wiki-link format in frontmatter. |
 | `tags`    | `string[] \| null` | `null`       | Additional freeform tags beyond the required directory and feature tags.                                            |
 
-The tool reads the template at `.vaultspec/rules/templates/{type}.md`, replaces
-`{feature}`, `{yyyy-mm-dd}`, `{topic}`, and `{title}` placeholders, then writes to
+The tool reads the template at `.vaultspec/templates/{type}.md`, replaces `{feature}`,
+`{yyyy-mm-dd}`, `{topic}`, and `{title}` placeholders, then writes to
 `.vault/{type}/{filename}`.
 
 **Filename format:** `{date}-{feature}-{type}.md`

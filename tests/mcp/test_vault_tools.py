@@ -58,7 +58,7 @@ def vault_root(tmp_path):
     for dt in DocType:
         (vault_dir / dt.value).mkdir(parents=True)
 
-    rules_dir = tmp_path / ".vaultspec" / "rules"
+    rules_dir = tmp_path / ".vaultspec"
     rules_dir.mkdir(parents=True)
     seed_builtins(rules_dir, force=True)
 

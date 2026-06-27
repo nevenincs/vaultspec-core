@@ -4,7 +4,7 @@ Covers the renderer factory in :mod:`vaultspec_core.core.agents`:
 ``transform_agent`` dispatch, ``_render_claude_agent``,
 ``_render_gemini_agent``, the Claude->Gemini tool mapping, and a
 parametrized regression guard over every source agent under
-``.vaultspec/rules/agents/``.
+``.vaultspec/agents/``.
 """
 
 from __future__ import annotations
@@ -424,7 +424,7 @@ class TestUpstreamGeminiToolPin:
 class TestGeminiCliLoadsRenderedAgents:
     """Live load test: invoke real `gemini` CLI against rendered agents.
 
-    For each source agent under `.vaultspec/rules/agents/`:
+    For each source agent under `.vaultspec/agents/`:
       1. render via :func:`vaultspec_core.core.agents.transform_agent`
       2. write the result into a tmp ``.gemini/agents/`` directory
       3. invoke ``gemini --skip-trust skills list`` with the tmp dir as

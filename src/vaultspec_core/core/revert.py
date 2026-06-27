@@ -32,10 +32,12 @@ def is_builtin(filename: str) -> bool:
 
 
 def snapshot_builtins(vaultspec_dir: Path) -> int:
-    """Snapshot all .builtin.md files from .vaultspec/rules/ into _snapshots/.
+    """Snapshot all .builtin.md files under .vaultspec/ into _snapshots/.
 
     Called during install to capture the pristine state. Overwrites any
-    existing snapshots.
+    existing snapshots. The ``_snapshots/`` tree is skipped during the walk
+    so snapshot copies (themselves ``.builtin.md`` files) are never
+    re-snapshotted now that resources sit directly under the framework root.
 
     Args:
         vaultspec_dir: The .vaultspec directory.
@@ -43,15 +45,16 @@ def snapshot_builtins(vaultspec_dir: Path) -> int:
     Returns:
         Number of files snapshotted.
     """
-    rules_dir = vaultspec_dir / "rules"
     snapshot_dir = vaultspec_dir / _SNAPSHOT_DIR
 
-    if not rules_dir.exists():
+    if not vaultspec_dir.exists():
         return 0
 
     count = 0
-    for builtin in rules_dir.rglob(f"*{_BUILTIN_SUFFIX}"):
-        rel = builtin.relative_to(rules_dir)
+    for builtin in vaultspec_dir.rglob(f"*{_BUILTIN_SUFFIX}"):
+        if snapshot_dir in builtin.parents:
+            continue
+        rel = builtin.relative_to(vaultspec_dir)
         dest = snapshot_dir / rel
         try:
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -72,7 +75,8 @@ def get_snapshot_content(
 
     Args:
         vaultspec_dir: The .vaultspec directory.
-        category: Subdirectory under rules/ (e.g., "rules", "skills", "agents").
+        category: Resource subdirectory under .vaultspec/ (e.g., "rules",
+            "skills", "agents").
         filename: The builtin filename.
 
     Returns:
@@ -93,7 +97,8 @@ def revert_resource(vaultspec_dir: Path, category: str, filename: str) -> dict:
 
     Args:
         vaultspec_dir: The .vaultspec directory.
-        category: Subdirectory under rules/ (e.g., "rules", "skills", "agents").
+        category: Resource subdirectory under .vaultspec/ (e.g., "rules",
+            "skills", "agents").
         filename: The resource name. A bare name or a ``.builtin`` stem is
             resolved to its canonical ``.builtin.md`` form; a name already
             ending in ``.md`` is left as given (so a custom resource still
@@ -126,7 +131,7 @@ def revert_resource(vaultspec_dir: Path, category: str, filename: str) -> dict:
             "reason": f"No snapshot found for {category}/{filename}. Was install run?",
         }
 
-    target = vaultspec_dir / "rules" / category / filename
+    target = vaultspec_dir / category / filename
     target.parent.mkdir(parents=True, exist_ok=True)
     atomic_write(target, original)
     logger.info("Reverted %s/%s to snapshot original.", category, filename)
@@ -150,7 +155,6 @@ def list_modified_builtins(vaultspec_dir: Path) -> list[dict]:
         exist.
     """
     snapshot_dir = vaultspec_dir / _SNAPSHOT_DIR
-    rules_dir = vaultspec_dir / "rules"
     results = []
 
     if not snapshot_dir.exists():
@@ -159,7 +163,7 @@ def list_modified_builtins(vaultspec_dir: Path) -> list[dict]:
     for snapshot in snapshot_dir.rglob(f"*{_BUILTIN_SUFFIX}"):
         rel = snapshot.relative_to(snapshot_dir)
         category = rel.parts[0] if len(rel.parts) > 1 else ""
-        current = rules_dir / rel
+        current = vaultspec_dir / rel
 
         if not current.exists():
             status = "missing"

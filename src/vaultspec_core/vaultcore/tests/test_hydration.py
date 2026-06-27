@@ -14,7 +14,7 @@ pytestmark = [pytest.mark.unit]
 
 def _make_templates_dir(content_root):
     """Create the ``rules/templates`` tree under a content root and return it."""
-    templates_dir = content_root / "rules" / "templates"
+    templates_dir = content_root / "templates"
     templates_dir.mkdir(parents=True, exist_ok=True)
     return templates_dir
 
@@ -222,7 +222,7 @@ def test_create_vault_doc_plan_substitutes_tier(tmp_path):
     """End-to-end: vault add plan with tier writes the supplied tier value."""
     from vaultspec_core.builtins import seed_builtins
 
-    rules_dir = tmp_path / ".vaultspec" / "rules"
+    rules_dir = tmp_path / ".vaultspec"
     rules_dir.mkdir(parents=True)
     seed_builtins(rules_dir, force=True)
     for dt in DocType:
@@ -256,7 +256,7 @@ def test_emit_time_validator_rejects_invalid_plan_tier(tmp_path):
         _assert_scaffolded_content_valid,
     )
 
-    rules_dir = tmp_path / ".vaultspec" / "rules"
+    rules_dir = tmp_path / ".vaultspec"
     rules_dir.mkdir(parents=True)
     seed_builtins(rules_dir, force=True)
 
@@ -300,7 +300,7 @@ def test_create_vault_doc_plan_default_tier_l1(tmp_path):
     """Plan scaffolded without explicit tier still hydrates cleanly when L1 passed."""
     from vaultspec_core.builtins import seed_builtins
 
-    rules_dir = tmp_path / ".vaultspec" / "rules"
+    rules_dir = tmp_path / ".vaultspec"
     rules_dir.mkdir(parents=True)
     seed_builtins(rules_dir, force=True)
     for dt in DocType:
@@ -330,7 +330,7 @@ class TestCreateVaultDocStemCollision:
         """
         from vaultspec_core.builtins import seed_builtins
 
-        rules_dir = tmp_path / ".vaultspec" / "rules"
+        rules_dir = tmp_path / ".vaultspec"
         rules_dir.mkdir(parents=True)
         seed_builtins(rules_dir, force=True)
 

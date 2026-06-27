@@ -150,6 +150,7 @@ cython_debug/
 # Claude Code
 .claude/
 CLAUDE.md
+.mcp.json
 
 # Gemini CLI
 .gemini/
@@ -192,3 +193,6 @@ tmp-ref/
 /.mcp.json.lock
 /.pre-commit-config.yaml.lock
 # <<< vaultspec-managed <<<
+
+# Local benchmark working data (raw campaign logs)
+campaign-data/

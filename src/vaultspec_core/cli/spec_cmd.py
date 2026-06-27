@@ -1173,9 +1173,7 @@ def cmd_system_show(
     from vaultspec_core.console import get_console
 
     if not data["parts"]:
-        get_console().print(
-            "[dim]No system parts found in .vaultspec/rules/system/[/dim]"
-        )
+        get_console().print("[dim]No system parts found in .vaultspec/system/[/dim]")
         return
 
     parts_rows = [

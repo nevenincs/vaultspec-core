@@ -232,7 +232,7 @@ def test_provider_artifact_patterns_catch_known_files() -> None:
         "src/commands.py",
         "tests/test_foo.py",
         ".vault/adr/my-adr.md",
-        ".vaultspec/rules/my-rule.md",
+        ".vaultspec/my-rule.md",
         "pyproject.toml",
     ]
 

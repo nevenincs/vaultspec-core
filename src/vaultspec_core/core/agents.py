@@ -37,11 +37,11 @@ logger = logging.getLogger(__name__)
 
 
 # Static mapping from the Claude tool vocabulary used in
-# .vaultspec/rules/agents/*.md to Gemini CLI's first-party tool identifiers.
+# .vaultspec/agents/*.md to Gemini CLI's first-party tool identifiers.
 # Source agents are authored against Claude names; the Gemini renderer maps
 # at sync time so the source files stay single-authored.
 # Mapping from the Claude tool vocabulary used in
-# `.vaultspec/rules/agents/*.md` to canonical Gemini built-in tool
+# `.vaultspec/agents/*.md` to canonical Gemini built-in tool
 # identifiers (`GeminiBuiltinTool` enum members). The enum values are
 # pinned to upstream gemini-cli constants by a live drift test in
 # `tests/cli/test_agents_render.py::TestUpstreamGeminiToolPin`.
@@ -206,7 +206,7 @@ _AGENT_RENDERERS: dict[Tool, _AgentRenderer] = {
 def collect_agents(
     warnings: list[str] | None = None,
 ) -> dict[str, tuple[Path, dict[str, Any], str]]:
-    """Collect agent definitions from .vaultspec/rules/agents/.
+    """Collect agent definitions from .vaultspec/agents/.
 
     Args:
         warnings: Optional list to append parse-error messages to, so callers

@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.35](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.34...vaultspec-core-v0.1.35) (2026-06-27)
+
+
+### Features
+
+* **builtins:** enrol rag-led hybrid discovery into the firmware ([ff647fe](https://github.com/nevenincs/vaultspec-core/commit/ff647fe310dae4c8b360ae7cb41a912b71a7b860))
+* **builtins:** enrol rag-led hybrid discovery into the firmware ([475d40c](https://github.com/nevenincs/vaultspec-core/commit/475d40ce21953a99a10880a85baacac581826384))
+* **rename:** add vault feature rename CLI command ([1b2dda1](https://github.com/nevenincs/vaultspec-core/commit/1b2dda1dc0371fda9e9570c19c99eb9a752ae6f1))
+* **rename:** implement rename_feature backend with reverse-journal rollback ([eea3565](https://github.com/nevenincs/vaultspec-core/commit/eea35657146c162730435131446e6e18459a93bb))
+* **rename:** uniform vault feature rename verb ([3b6b2c6](https://github.com/nevenincs/vaultspec-core/commit/3b6b2c63568088aa4e25a054f53a4a4871018512))
+* **vault:** add read-only feature-rename-integrity check ([cb26096](https://github.com/nevenincs/vaultspec-core/commit/cb26096e021b56239cfd5944ec0312d8fb32f26a))
+* **vault:** discover BOM docs and surface non-UTF-8 docs ([2538100](https://github.com/nevenincs/vaultspec-core/commit/253810076021592765c032b487c566a3f6702c4e))
+
+
+### Bug Fixes
+
+* **rename:** exclude archived docs from rename; tighten docs and dry-run ([4da78a9](https://github.com/nevenincs/vaultspec-core/commit/4da78a979e859c64f5288d8787213eec4da42974))
+* **rename:** harden against out-of-bounds, symlink, and injection vectors ([e955be7](https://github.com/nevenincs/vaultspec-core/commit/e955be75442df725013b489d4f8d86265114c144))
+* **rename:** preserve line endings and encodings byte-for-byte ([488c620](https://github.com/nevenincs/vaultspec-core/commit/488c620a0458b283c5f1d47954aa469137560b94))
+* **rename:** resolve rename-convergence review findings ([25a6a78](https://github.com/nevenincs/vaultspec-core/commit/25a6a7832dba38e99eab81219e45e952a3250907))
+* **vault:** refresh modified-stamp on classic-Mac CR-only documents ([f55ab0b](https://github.com/nevenincs/vaultspec-core/commit/f55ab0bf17f1a612bb545302bd944933f2cf5247))
+
 ## [0.1.34](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.33...vaultspec-core-v0.1.34) (2026-06-25)
 
 

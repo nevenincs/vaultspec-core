@@ -139,6 +139,8 @@ full options.
 - `vaultspec-core vault feature archive` - Archive all documents for a feature tag.
 - `vaultspec-core vault feature unarchive` - Restore all archived documents for a
   feature tag.
+- `vaultspec-core vault feature rename` - Atomically rename a feature tag across every
+  vault surface.
 
 #### Check
 
@@ -170,6 +172,10 @@ full options.
   conventions.
 - `vaultspec-core vault check rename-integrity` - Check name/filename integrity for
   rules, skills, and agents.
+- `vaultspec-core vault check encoding` - Surface .vault/ documents that are not valid
+  UTF-8 (detection only).
+- `vaultspec-core vault check feature-rename-integrity` - Surface exec folders whose
+  feature disagrees with their records' tag.
 
 #### Sanitize
 

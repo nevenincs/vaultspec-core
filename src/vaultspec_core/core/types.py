@@ -227,13 +227,13 @@ def init_paths(layout: Any) -> WorkspaceContext:
     target = layout.target_dir
     vaultspec = layout.vaultspec_dir
 
-    rules_src_dir = vaultspec / Resource.RULES.value / Resource.RULES.value
-    skills_src_dir = vaultspec / Resource.RULES.value / Resource.SKILLS.value
-    agents_src_dir = vaultspec / Resource.RULES.value / Resource.AGENTS.value
-    system_src_dir = vaultspec / Resource.RULES.value / Resource.SYSTEM.value
-    templates_dir = vaultspec / Resource.RULES.value / Resource.TEMPLATES.value
-    hooks_dir = vaultspec / Resource.RULES.value / Resource.HOOKS.value
-    mcps_src_dir = vaultspec / Resource.RULES.value / Resource.MCPS.value
+    rules_src_dir = vaultspec / Resource.RULES.value
+    skills_src_dir = vaultspec / Resource.SKILLS.value
+    agents_src_dir = vaultspec / Resource.AGENTS.value
+    system_src_dir = vaultspec / Resource.SYSTEM.value
+    templates_dir = vaultspec / Resource.TEMPLATES.value
+    hooks_dir = vaultspec / Resource.HOOKS.value
+    mcps_src_dir = vaultspec / Resource.MCPS.value
     shared_agents_root = target / DirName.ANTIGRAVITY.value
 
     gemini_dir = target / cfg.gemini_dir

@@ -137,8 +137,8 @@ keeping identifiers (`S##`, `P##`, `W##`) append-only. The full surface is in th
 
 ## Operate day to day
 
-**Customize.** Edit resources under `.vaultspec/rules/` through `vaultspec-core spec`,
-then sync them to each provider (a coding-agent integration such as Claude, Codex, or
+**Customize.** Edit resources under `.vaultspec/` through `vaultspec-core spec`, then
+sync them to each provider (a coding-agent integration such as Claude, Codex, or
 Gemini):
 
 ```bash

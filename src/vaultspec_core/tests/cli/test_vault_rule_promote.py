@@ -21,7 +21,7 @@ def test_project(tmp_path):
 
     # Create required directory structure
     (project_dir / ".vault" / "audit").mkdir(parents=True, exist_ok=True)
-    (project_dir / ".vaultspec" / "rules" / "rules").mkdir(parents=True, exist_ok=True)
+    (project_dir / ".vaultspec" / "rules").mkdir(parents=True, exist_ok=True)
 
     from vaultspec_core.config.workspace import resolve_workspace
 
@@ -88,7 +88,7 @@ def test_rule_promote_existing_rule_fails_unless_forced(runner, test_project):
     )
 
     # Create the rule file beforehand (flat under the rules root).
-    rule_dir = test_project / ".vaultspec" / "rules" / "rules"
+    rule_dir = test_project / ".vaultspec" / "rules"
     rule_dir.mkdir(parents=True, exist_ok=True)
     rule_file = rule_dir / "my-rule.md"
     rule_file.write_text("# Existing Rule", encoding="utf-8")
@@ -164,9 +164,9 @@ def test_rule_promote_success_mutates_audit_and_creates_rule(runner, test_projec
     assert result.exit_code == 0
 
     # Check rule file exists flat under the rules root (no project/ subdir).
-    rule_file = test_project / ".vaultspec" / "rules" / "rules" / "promoted-rule.md"
+    rule_file = test_project / ".vaultspec" / "rules" / "promoted-rule.md"
     assert rule_file.exists()
-    assert not (test_project / ".vaultspec" / "rules" / "rules" / "project").exists()
+    assert not (test_project / ".vaultspec" / "rules" / "project").exists()
     rule_content = rule_file.read_text(encoding="utf-8")
     assert 'derived_from:\n  - "audit:2026-05-17-test-audit"' in rule_content
     assert "# Rule" in rule_content
@@ -208,7 +208,7 @@ def test_rule_promote_dry_run(runner, test_project):
     assert "Would promote rule:" in result.output
 
     # Check files are NOT created or mutated
-    rule_file = test_project / ".vaultspec" / "rules" / "rules" / "dry-run-rule.md"
+    rule_file = test_project / ".vaultspec" / "rules" / "dry-run-rule.md"
     assert not rule_file.exists()
 
     audit_content = audit_file.read_text(encoding="utf-8")
@@ -252,7 +252,7 @@ def test_nested_custom_rules_are_flattened(runner, test_project):
     sanitizer, which flattens any nested custom rule up to the rules root,
     removes the emptied subdir, and never touches builtins.
     """
-    rules_dir = test_project / ".vaultspec" / "rules" / "rules"
+    rules_dir = test_project / ".vaultspec" / "rules"
 
     # A custom rule authored under the legacy project/ subdir (nested).
     nested_rule_file = rules_dir / "project" / "nested-custom-rule.md"

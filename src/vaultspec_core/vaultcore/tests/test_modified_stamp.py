@@ -27,11 +27,77 @@ from vaultspec_core.vaultcore import (
     parse_vault_metadata,
 )
 from vaultspec_core.vaultcore.hydration import create_vault_doc, hydrate_template
+from vaultspec_core.vaultcore.models import refresh_modified_stamp
 
 if TYPE_CHECKING:
     from collections.abc import Generator
 
 pytestmark = [pytest.mark.unit]
+
+
+class TestRefreshModifiedStamp:
+    """``refresh_modified_stamp`` rewrites/adds the stamp preserving every other
+    byte, across LF, CRLF, and classic-Mac CR line endings."""
+
+    TODAY = datetime.date(2026, 6, 26)
+
+    def test_lf_rewrites_existing_in_place(self):
+        text = (
+            "---\ntags:\n  - '#x'\ndate: '2026-01-01'\n"
+            "modified: '2026-01-01'\n---\n\nBody.\n"
+        )
+        out = refresh_modified_stamp(text, self.TODAY)
+        assert out == text.replace("modified: '2026-01-01'", "modified: '2026-06-26'")
+
+    def test_crlf_rewrites_existing_preserving_crlf(self):
+        text = (
+            "---\r\ntags:\r\n  - '#x'\r\ndate: '2026-01-01'\r\n"
+            "modified: '2026-01-01'\r\n---\r\n\r\nBody.\r\n"
+        )
+        out = refresh_modified_stamp(text, self.TODAY)
+        assert out == text.replace("modified: '2026-01-01'", "modified: '2026-06-26'")
+        assert "\r\n" in out and "\n" not in out.replace("\r\n", "")
+
+    def test_cr_only_rewrites_existing_preserving_cr(self):
+        # Classic-Mac CR-only document: the stamp must still be refreshed and the
+        # bare-CR endings preserved (no LF introduced).
+        text = (
+            "---\rtags:\r  - '#x'\rdate: '2026-01-01'\r"
+            "modified: '2026-01-01'\r---\rBody.\r"
+        )
+        out = refresh_modified_stamp(text, self.TODAY)
+        assert out == text.replace("modified: '2026-01-01'", "modified: '2026-06-26'")
+        assert "\n" not in out
+
+    def test_cr_only_inserts_after_date_when_absent(self):
+        # No modified: field -> insert after date:, preserving CR endings.
+        text = "---\rtags:\r  - '#x'\rdate: '2026-01-01'\r---\rBody.\r"
+        out = refresh_modified_stamp(text, self.TODAY)
+        assert "modified: '2026-06-26'\r" in out
+        assert out == (
+            "---\rtags:\r  - '#x'\rdate: '2026-01-01'\r"
+            "modified: '2026-06-26'\r---\rBody.\r"
+        )
+        assert "\n" not in out
+
+    def test_lf_inserts_after_date_when_absent(self):
+        text = "---\ntags:\n  - '#x'\ndate: '2026-01-01'\n---\n\nBody.\n"
+        out = refresh_modified_stamp(text, self.TODAY)
+        assert out == (
+            "---\ntags:\n  - '#x'\ndate: '2026-01-01'\n"
+            "modified: '2026-06-26'\n---\n\nBody.\n"
+        )
+
+    def test_no_frontmatter_unchanged(self):
+        text = "# Just a body\n\nNo frontmatter here.\n"
+        assert refresh_modified_stamp(text, self.TODAY) == text
+
+    def test_bom_crlf_preserved(self):
+        text = "﻿---\r\ndate: '2026-01-01'\r\nmodified: '2026-01-01'\r\n---\r\nBody.\r\n"
+        out = refresh_modified_stamp(text, self.TODAY)
+        assert out.startswith("﻿")
+        assert out == text.replace("modified: '2026-01-01'", "modified: '2026-06-26'")
+
 
 _BUILTIN_TEMPLATES = Path(vaultspec_core.__file__).parent / "builtins" / "templates"
 
@@ -212,7 +278,7 @@ class TestScaffoldStamp:
     def _content_root(tmp_path: Path) -> Path:
         """Mirror the real shipped templates into a workspace content root."""
         content_root = tmp_path / ".vaultspec"
-        templates_dir = content_root / "rules" / "templates"
+        templates_dir = content_root / "templates"
         templates_dir.mkdir(parents=True)
         for template in _BUILTIN_TEMPLATES.glob("*.md"):
             shutil.copy(template, templates_dir / template.name)
