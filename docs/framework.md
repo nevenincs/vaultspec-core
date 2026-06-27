@@ -151,8 +151,8 @@ vaultspec-core sync                       # writes .claude/, .gemini/, .codex/, 
 `vaultspec-core install --upgrade` carries an older workspace onto the shared policy.
 
 **Maintain.** `vaultspec-core vault check all --fix` validates and repairs the vault,
-and `vault graph --feature search-api` visualizes a feature. The CLI maintains each
-document's `modified:` and `date:` stamps; never hand-edit them.
+and `vaultspec-core vault graph --feature search-api` visualizes a feature. The CLI
+maintains each document's `modified:` and `date:` stamps; never hand-edit them.
 
 **Connect MCP clients.** `install` scaffolds an `.mcp.json` exposing vault discovery and
 authoring to Model Context Protocol (MCP) clients over stdio. Verify it with
