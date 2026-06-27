@@ -78,9 +78,17 @@ Advisory lock:
 
 feature-rename-integrity check:
 
-- Read-only, owns only uncovered drift classes (chosen) - segment-vs-tag, exec-folder-vs-tag,
-  orphaned old-feature artifacts; defers index/staleness to `check_features` and filename
-  grammar to `check_structure`.
+- Read-only, owns only uncovered drift classes (chosen) - defers index/staleness to
+  `check_features` and filename grammar to `check_structure`. Scope correction discovered
+  in execution: of the three classes originally listed (segment-vs-tag, exec-folder-vs-tag,
+  orphaned old-feature artifacts), only **exec-folder-vs-tag** ships. The
+  authored-filename-segment-vs-tag class was DROPPED because vault authored filenames
+  legitimately use narrative segments distinct from the `#feature` tag (about a third of
+  this repo's features have such docs, all ratified clean by `vault check`), so that
+  "drift" is structurally indistinguishable from legitimate naming without rename history -
+  flagging it false-positives on a clean vault. The orphaned-old-feature class collapses
+  into exec-folder-vs-tag (a leftover old-feature artifact surfaces as a folder/tag
+  disagreement). Negative-guard tests lock the deferral in so it cannot silently reappear.
 - Bundle a filename-wins `--fix` (rejected for now) - reconciliation is ambiguous (which
   side is canonical) and dangerous unattended across many files; a separate later decision.
 
@@ -154,10 +162,13 @@ separately). Grounding is in the linked research and reference.
 ## Consequences
 
 Gains: every rename surface becomes atomic with byte-for-byte rollback, concurrency-safe
-within its domain, and case/symlink/line-ending safe; `vault rename`'s dangling-link
-defect and its duplicate link engine are both eliminated; post-rename drift becomes
-detectable; and `resource_rename`/`hooks_rename` gain their first real safety and first
-unit tests.
+within its domain, and symlink/line-ending safe; `vault rename`'s dangling-link defect
+and its duplicate link engine are both eliminated; post-rename drift becomes detectable;
+and `resource_rename`/`hooks_rename` gain their first real safety and first unit tests.
+(Case-only-rename safety via the engine's two-hop is available but NOT yet realized for
+the single-file callers: their `new_path.exists()` collision pre-check rejects a case-only
+rename on case-insensitive filesystems before the two-hop runs - unchanged from prior
+behavior, noted as a follow-on rather than a claimed gain.)
 
 Costs and difficulties: the engine extraction touches the most safety-critical code in
 the feature and must keep the adversarial suites byte-identical (the chief risk); the
@@ -167,10 +178,21 @@ target, so partial adoption would give false assurance.
 
 Honest limits: the per-domain lock serializes unrelated concurrent edits in a domain
 (coarse but sound); `vault add` is not yet brought under the lock (a noted follow-on);
-the integrity check is detection-only at first; and crash-durability is still bounded by
-the in-memory journal (a hard kill mid-apply is not covered), inherited from the
-uniform-rename decision.
+the integrity check is detection-only at first; dry-run paths do not acquire the lock
+(read-only, so consistent-snapshot reads are best-effort - the ADR's earlier "dry-run
+acquires the lock" intent is relaxed to match the read-only-takes-no-lock convention);
+and crash-durability is still bounded by the in-memory journal (a hard kill mid-apply is
+not covered), inherited from the uniform-rename decision. Separately surfaced by this
+work but NOT a convergence defect: `vault feature rename` REFUSES (fails safe, no
+mutation) for any feature whose authored documents use narrative filename segments that
+do not encode the feature tag - a large fraction of real features. The shipped verb only
+renames features whose filenames follow the strict `{date}-{feature}-{type}` convention.
+Making rename rewrite the tag/`related:`/index for narrative-named docs while preserving
+their filenames is a real contract change to the uniform-rename feature and is left as an
+explicit follow-on decision (the verb now reports this limitation clearly instead of as a
+malformed-filename error).
 
 Pathways opened: a single place to harden every future rename, an eventual filename-wins
-`--fix` for the integrity check, and bringing the remaining docs mutators (`vault add`)
-under the docs lock.
+`--fix` for the integrity check, bringing the remaining docs mutators (`vault add`) under
+the docs lock, delivering case-only-rename support for the single-file callers, and
+deciding whether `vault feature rename` should handle narrative-named documents.

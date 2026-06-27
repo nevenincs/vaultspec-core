@@ -25,6 +25,7 @@ related:
   - '[[2026-06-27-rename-convergence-W04-P08-S17]]'
   - '[[2026-06-27-rename-convergence-W04-P08-S18]]'
   - '[[2026-06-27-rename-convergence-adr]]'
+  - '[[2026-06-27-rename-convergence-audit]]'
   - '[[2026-06-27-rename-convergence-plan]]'
   - '[[2026-06-27-rename-convergence-reference]]'
   - '[[2026-06-27-rename-convergence-research]]'
@@ -39,6 +40,10 @@ Auto-generated index of all documents tagged with `#rename-convergence`.
 ### adr
 
 - `2026-06-27-rename-convergence-adr` - `rename-convergence` adr: `converge all rename CRUDs onto one transactional engine with domain locks and drift checks` | (**status:** `accepted`)
+
+### audit
+
+- `2026-06-27-rename-convergence-audit` - `rename-convergence` audit: `converged rename engine, domain locks, and drift check review`
 
 ### exec
 

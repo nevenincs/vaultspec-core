@@ -77,16 +77,16 @@ Bring the structure-rename cascade under the docs lock; assert serialized concur
 
 ## Wave `W04` - Drift check and firmware conformance
 
-Add the read-only feature-rename-integrity check (segment-vs-tag, exec-folder-vs-tag, orphaned old-feature artifacts; defers index/grammar to existing checks), wire it into run_all_checks and the CLI, then conform the firmware and verify green.
+Add the read-only feature-rename-integrity check (exec-folder-vs-tag drift; authored filename-segment-vs-tag deferred because narrative filenames are legitimate; defers index/grammar to existing checks), wire it into run_all_checks and the CLI, then conform the firmware and verify green.
 
 ### Phase `W04.P07` - feature-rename-integrity check
 
 Add the read-only drift checker, wire into run_all_checks and the CLI, with real-filesystem tests.
 
-- [x] `W04.P07.S13` - Implement check_feature_rename_integrity for segment-vs-tag, exec-folder-vs-tag, and orphaned old-feature drift; `src/vaultspec_core/vaultcore/checks/feature_rename_integrity.py`.
+- [x] `W04.P07.S13` - Implement check_feature_rename_integrity for exec-folder-vs-tag drift; defer authored filename-segment-vs-tag since narrative filenames are legitimate; `src/vaultspec_core/vaultcore/checks/feature_rename_integrity.py`.
 - [x] `W04.P07.S14` - Wire check_feature_rename_integrity into run_all_checks and the checks package exports; `src/vaultspec_core/vaultcore/checks/__init__.py`.
 - [x] `W04.P07.S15` - Add the vault check feature-rename-integrity CLI command; `src/vaultspec_core/cli/vault_cmd.py`.
-- [x] `W04.P07.S16` - Add real-filesystem tests for each drift class plus a clean-vault pass; `src/vaultspec_core/vaultcore/checks/tests/test_feature_rename_integrity.py`.
+- [x] `W04.P07.S16` - Add real-filesystem tests for the exec-folder drift class, the skip rules, and negative guards locking in the authored-filename deferral; `src/vaultspec_core/vaultcore/checks/tests/test_feature_rename_integrity.py`.
 
 ### Phase `W04.P08` - Firmware conformance and verification
 
@@ -106,6 +106,6 @@ Waves are strictly sequential: W02-W04 each depend on the shared engine from W01
 - All four rename paths (`resource_rename`, `_execute_rename`, `rename_feature`, `hooks_rename`) drive the shared `RenameTransaction`: each is containment-guarded, case-safe, symlink-safe, and rolls back byte-for-byte on an induced mid-apply failure.
 - `vault rename` uses the shared `rewrite_incoming_refs` (no duplicate link-rewriter remains) and never leaves a dangling link on failure.
 - Concurrent renames in a domain serialize on the domain lock with no lost update or partial state.
-- `vault check feature-rename-integrity` flags each drift class on a drifted vault and passes on a clean one; `vault check all` surfaces it; it does not duplicate `check_features`/`check_structure`.
+- `vault check feature-rename-integrity` flags exec-folder-vs-tag drift on a drifted vault and passes on a clean one (authored filename-segment-vs-tag deferred, with negative-guard tests); `vault check all` surfaces it; it does not duplicate `check_features`/`check_structure`.
 - Firmware documents the converged verbs and the new check; `vaultspec-core sync` regenerates provider mirrors clean.
 - vaultspec-code-review signs off in the closeout audit.
