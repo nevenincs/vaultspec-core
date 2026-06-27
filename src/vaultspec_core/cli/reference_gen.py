@@ -194,15 +194,14 @@ def _collect_leaf_help(typer_app: typer.Typer) -> list[tuple[tuple[str, ...], st
 
 
 def render_command_inventory(typer_app: typer.Typer) -> str:
-    """Render the command index: a two-level, described listing of every command.
+    """Render the command index: a grouped, described listing of every command.
 
-    Each top-level group (``vault``, ``spec``, ...) becomes a ``### <Group>``
-    heading, and every sub-group below it (``feature``, ``check``, ``rules``,
-    ...) becomes its own ``#### <Sub-group>`` heading so related commands stay
-    titled and broken apart. Every command is one bullet - its path relative to
-    its nearest heading plus a one-line summary from the live ``--help`` - so the
-    index says what each command does without repeating ``vaultspec-core``.
-    Entries keep :func:`_leaf_commands_in_order` order.
+    Each top-level group (``vault``, ``spec``, ...) is a ``### <Group>`` heading
+    and every nested group (``feature``, ``rules``, ...) a ``#### <Sub-group>``
+    heading, so related commands stay titled and grouped. Every command is one
+    bullet showing its full runnable form (``vaultspec-core spec rules list``)
+    plus a one-line summary from the live ``--help``. Entries keep
+    :func:`_leaf_commands_in_order` order.
     """
     group_names = {
         group.name
@@ -215,17 +214,12 @@ def render_command_inventory(typer_app: typer.Typer) -> str:
     for path, short in _collect_leaf_help(typer_app):
         if path[0] in group_names:
             top = path[0].capitalize()
-            if len(path) >= 3:
-                sub: str | None = path[1]
-                display = " ".join(path[2:])
-            else:
-                sub = None
-                display = path[1]
+            sub: str | None = path[1] if len(path) >= 3 else None
         else:
             top = "Top-level commands"
             sub = None
-            display = path[0]
-        bullet = f"- `{display}`" + (f" - {short}" if short else "")
+        command = "vaultspec-core " + " ".join(path)
+        bullet = f"- `{command}`" + (f" - {short}" if short else "")
         tree.setdefault(top, {}).setdefault(sub, []).append(bullet)
 
     blocks: list[str] = []

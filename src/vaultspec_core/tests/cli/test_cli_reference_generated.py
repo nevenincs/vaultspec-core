@@ -126,7 +126,7 @@ def test_generate_preserves_unmanaged_prose_verbatim(tmp_path: Path) -> None:
     assert "## trailing prose section that the generator must not touch" in rewritten
     # The stale managed body is gone; the live inventory replaced it.
     assert "stale content" not in rewritten
-    assert "- `install`" in rewritten
+    assert "- `vaultspec-core install`" in rewritten
 
 
 def test_render_reference_is_idempotent(tmp_path: Path) -> None:
@@ -142,8 +142,8 @@ def test_check_detects_corrupted_managed_region(tmp_path: Path) -> None:
 
     # Corrupt one signature line inside the managed zone only.
     corrupted = committed.replace(
-        "- `install`",
-        "- `install` [TAMPERED]",
+        "- `vaultspec-core install`",
+        "- `vaultspec-core install` [TAMPERED]",
         1,
     )
     assert corrupted != committed, "fixture corruption did not apply"
@@ -313,8 +313,8 @@ def test_corrupted_handbook_region_is_detected(tmp_path: Path) -> None:
     """A hand-edit inside docs/CLI.md's managed region is caught by check."""
     committed = docs_handbook_path().read_text(encoding="utf-8")
     corrupted = committed.replace(
-        "- `install`",
-        "- `install` [TAMPERED]",
+        "- `vaultspec-core install`",
+        "- `vaultspec-core install` [TAMPERED]",
         1,
     )
     assert corrupted != committed, "fixture corruption did not apply"
@@ -359,7 +359,7 @@ def test_handbook_prose_outside_region_survives_regenerate(tmp_path: Path) -> No
     assert sentinel_before in rewritten
     assert sentinel_after in rewritten
     assert "vaultspec-core stale [OPTIONS]" not in rewritten
-    assert "- `install`" in rewritten
+    assert "- `vaultspec-core install`" in rewritten
 
 
 def region_tuple() -> tuple:

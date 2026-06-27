@@ -356,37 +356,26 @@ def test_markdown_cli_signatures_match_live_usage() -> None:
 
 
 def test_cli_handbook_documents_every_command() -> None:
-    """docs/CLI.md's command index names every visible leaf command.
+    """docs/CLI.md's command index shows the full command for every leaf.
 
-    The handbook documents commands by description, not by dumping every exact
-    usage signature: the generated command index lists each command by its path
-    within its nearest group heading (``install``; ``all`` under Check; ``step
-    toggle`` under Plan) with a one-line summary. This guards coverage - every
-    live leaf command is named - while the per-command signature snippets that
-    do appear are checked for
-    exactness by ``test_markdown_cli_signatures_match_live_usage``.
+    The handbook documents commands by their full runnable form grouped under
+    titled sections: every visible leaf command appears as
+    ``vaultspec-core <path>`` with a one-line summary. This guards coverage - no
+    command is missing - while signature snippets that carry options or
+    arguments are checked for exactness by
+    ``test_markdown_cli_signatures_match_live_usage``.
     """
     handbook = (_REPO_ROOT / "docs" / "CLI.md").read_text(encoding="utf-8")
-    group_names = {
-        group.name for group in app.registered_groups if group.name and not group.hidden
-    }
 
-    missing: list[str] = []
-    for command_path in _collect_leaf_command_paths(app):
-        if command_path[0] in group_names:
-            display = (
-                " ".join(command_path[2:])
-                if len(command_path) >= 3
-                else command_path[1]
-            )
-        else:
-            display = command_path[0]
-        if f"`{display}`" not in handbook:
-            missing.append(" ".join(command_path))
+    missing = [
+        f"vaultspec-core {' '.join(command_path)}"
+        for command_path in _collect_leaf_command_paths(app)
+        if f"`vaultspec-core {' '.join(command_path)}`" not in handbook
+    ]
 
     assert not missing, (
-        "CLI.md's command index must name every visible leaf command:\n  - "
-        + "\n  - ".join(missing)
+        "CLI.md's command index must show the full command for every visible "
+        "leaf command:\n  - " + "\n  - ".join(missing)
     )
 
 
