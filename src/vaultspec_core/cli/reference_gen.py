@@ -184,7 +184,11 @@ def _collect_leaf_help(typer_app: typer.Typer) -> list[tuple[tuple[str, ...], st
     entries: list[tuple[tuple[str, ...], str]] = []
     for path in _leaf_commands_in_order(typer_app, ()):
         command, _ctx = _resolve_click_command(root, root_ctx, path)
-        short = command.get_short_help_str(limit=200).strip()
+        # Take the docstring's first line directly: Click's short-help helper
+        # splits on the first period, which truncates summaries that contain a
+        # literal ellipsis (for example "L1 -> ... -> L4").
+        help_text = (command.help or "").strip()
+        short = help_text.splitlines()[0].strip() if help_text else ""
         entries.append((path, short))
     return entries
 

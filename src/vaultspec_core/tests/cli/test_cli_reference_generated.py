@@ -142,8 +142,8 @@ def test_check_detects_corrupted_managed_region(tmp_path: Path) -> None:
 
     # Corrupt one signature line inside the managed zone only.
     corrupted = committed.replace(
-        "- `install` - Deploy",
-        "- `install` - [TAMPERED] Deploy",
+        "- `install`",
+        "- `install` [TAMPERED]",
         1,
     )
     assert corrupted != committed, "fixture corruption did not apply"
@@ -313,8 +313,8 @@ def test_corrupted_handbook_region_is_detected(tmp_path: Path) -> None:
     """A hand-edit inside docs/CLI.md's managed region is caught by check."""
     committed = docs_handbook_path().read_text(encoding="utf-8")
     corrupted = committed.replace(
-        "- `install` - Deploy",
-        "- `install` - [TAMPERED] Deploy",
+        "- `install`",
+        "- `install` [TAMPERED]",
         1,
     )
     assert corrupted != committed, "fixture corruption did not apply"

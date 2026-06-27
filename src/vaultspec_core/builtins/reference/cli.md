@@ -70,7 +70,6 @@ hand-edit between the markers.
 - `body-links` - Find wiki-links and markdown path links in document body text.
 - `annotations` - Find generated template annotations in vault documents.
 - `markdown` - Check and optionally fix markdown hygiene (trailing whitespace, blank
-  runs, final newline).
 - `placeholders` - Find unreplaced {...} template placeholders in document body prose.
 - `dangling` - Find wiki-links in related: frontmatter that resolve to no document.
 - `orphans` - Find documents with no incoming wiki-links.
@@ -124,7 +123,7 @@ hand-edit between the markers.
 - `epic intent show` - Print the Epic intent paragraph (L4 plans only).
 - `epic intent edit` - Replace the Epic intent paragraph (L4 plans only).
 - `tier show` - Print the plan's declared tier.
-- `tier promote` - Promote the plan tier transitively (L1 -> ...
+- `tier promote` - Promote the plan tier transitively (L1 -> ... -> L4).
 - `tier demote` - Demote the plan tier; refuses multi-child collapse without `--force`.
 - `trailer emit` - Print a well-formed commit-linkage trailer line.
 - `trailer validate` - Validate the commit-linkage trailers in a commit-message file.
