@@ -23,7 +23,6 @@ from .rename_ops import rewrite_incoming_refs, split_keepends
 from .scanner import get_doc_type, scan_vault
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
     from pathlib import Path
 
     from .rename_engine import RenameTransaction
@@ -934,9 +933,14 @@ def _compute_rename_plan(
             continue
         new_name = _swap_authored_filename(doc.path.name, old, new)
         if new_name is None:
+            date_seg = f"{doc.date}-" if doc.date else ""
             raise VaultSpecError(
-                f"Cannot derive a renamed filename for '{doc.path.name}': it "
-                f"does not match the expected '{{date}}-{old}-<type>.md' shape."
+                f"Cannot rename feature '{old}': document '{doc.path.name}' is "
+                f"tagged '#{old}' but its filename does not begin with the "
+                f"feature segment '{date_seg}{old}-' (its filename uses a "
+                "narrative segment). 'vault feature rename' currently only "
+                "renames features whose document filenames encode the feature "
+                "tag; rename is refused to avoid a partial rename."
             )
         authored_renames.append((doc.path, doc.path.with_name(new_name)))
 
@@ -1164,40 +1168,6 @@ def _count_related_refs(md_path: Path, old_stems_lower: set[str]) -> int:
 # -- S09: reverse-journal apply with rollback -------------------------------
 
 
-def _iter_snapshot_docs(docs_dir: Path) -> Iterator[Path]:
-    """Yield every non-archive ``*.md`` under *docs_dir* for snapshotting.
-
-    Produces the exact set the former ``_snapshot_docs`` captured - every
-    ``*.md`` under the docs tree except those inside ``_archive`` or any
-    dot-prefixed directory - and hands it to
-    :meth:`~vaultspec_core.vaultcore.rename_engine.RenameTransaction.snapshot`,
-    which applies the symlink/non-file skip and read-failure handling per file.
-    The split keeps the docs-specific traversal here (the caller decides the
-    set) while the byte capture lives in the shared engine.
-
-    A feature rename touches the whole docs tree (filename moves, tag-block
-    rewrites, the vault-wide ``related:`` cascade, the modified-stamp refresh,
-    and the deleted old index), so the whole tree is the correct snapshot basis
-    for byte-for-byte rollback.
-
-    Args:
-        docs_dir: The vault document root (``<root>/<docs_dir>``).
-
-    Yields:
-        Each candidate document path, in ``rglob`` order.
-    """
-    if not docs_dir.is_dir():
-        return
-    for md in docs_dir.rglob("*.md"):
-        try:
-            rel_parts = md.relative_to(docs_dir).parts
-        except ValueError:
-            continue
-        if any(p == "_archive" or p.startswith(".") for p in rel_parts):
-            continue
-        yield md
-
-
 def _regenerate_feature_index(
     root_dir: Path, new: str, tx: RenameTransaction, index_dir_existed: bool
 ) -> Path:
@@ -1294,7 +1264,11 @@ def _apply_rename_plan(root_dir: Path, plan: _RenamePlan, old: str, new: str) ->
     from ..config import get_config
     from ..core.exceptions import VaultSpecError
     from .checks._base import CheckResult
-    from .rename_engine import RenameTransaction, docs_lock_target
+    from .rename_engine import (
+        RenameTransaction,
+        docs_lock_target,
+        iter_snapshot_docs,
+    )
 
     cfg = get_config()
     docs_dir = root_dir / cfg.docs_dir
@@ -1306,7 +1280,7 @@ def _apply_rename_plan(root_dir: Path, plan: _RenamePlan, old: str, new: str) ->
         with RenameTransaction(docs_dir, lock_target=lock_target) as tx:
             # Snapshot the whole non-archive docs tree under the lock so the
             # reverse journal can restore any moved/rewritten file byte-for-byte.
-            tx.snapshot(_iter_snapshot_docs(docs_dir))
+            tx.snapshot(iter_snapshot_docs(docs_dir))
 
             # (1) Ensure destination exec folders exist before any record moves.
             for _old_folder, new_folder, _date in plan.exec_dir_renames:

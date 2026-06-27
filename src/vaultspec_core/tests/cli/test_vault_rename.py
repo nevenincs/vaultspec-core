@@ -353,3 +353,48 @@ class TestVaultRename:
         beta_text = beta.read_text(encoding="utf-8")
         assert "[[2026-01-01-alpha-adr]]" in beta_text
         assert "[[2026-01-01-gamma-adr]]" not in beta_text
+
+    def test_archived_doc_bytes_unchanged_by_rename(self, runner, tmp_path):
+        """An archived doc referencing the renamed stem is never mutated.
+
+        A document under ``.vault/_archive/`` is out of rename scope: the
+        cascade must skip it (``exclude_dirs={'_archive'}``) and the rollback
+        snapshot must not capture or stamp it. Its bytes - both the ``related:``
+        wiki-link to the renamed stem AND the ``modified:`` stamp - stay
+        byte-identical across a ``vault rename``. Mirrors the feature-rename
+        suite's ``test_archived_doc_bytes_unchanged_by_rename``.
+        """
+        root = _make_vault(tmp_path)
+        archived = root / ".vault" / "_archive" / "adr" / "2026-01-01-bygone-adr.md"
+        archived.parent.mkdir(parents=True, exist_ok=True)
+        archived.write_text(
+            "---\n"
+            "tags:\n"
+            "  - '#adr'\n"
+            "  - '#bygone'\n"
+            "date: '2026-01-01'\n"
+            "modified: '2026-01-01'\n"
+            "related:\n"
+            "  - '[[2026-01-01-alpha-adr]]'\n"
+            "---\n"
+            "\n# Bygone ADR\n\nArchived body.\n",
+            encoding="utf-8",
+        )
+        before = archived.read_bytes()
+
+        result = _run(
+            runner,
+            "vault",
+            "rename",
+            "2026-01-01-alpha-adr",
+            "--to",
+            "2026-01-01-gamma-adr",
+            "--json",
+            target=root,
+        )
+        assert result.exit_code == 0, result.output
+        assert _env(result)["status"] == "updated"
+        # The archived back-reference and its modified stamp are intact: the
+        # cascade excludes _archive and the rollback snapshot never captures it,
+        # so neither the related: rewrite nor the stamp refresh may touch it.
+        assert archived.read_bytes() == before

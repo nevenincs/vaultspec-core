@@ -27,7 +27,7 @@ from ..core.helpers import advisory_lock
 from .rename_ops import rename_document_path
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Iterator
     from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ def _assert_within(managed_root: Path, path: Path) -> Path:
     real_path = path.resolve(strict=False)
     if real_path != real_docs and real_docs not in real_path.parents:
         raise VaultSpecError(
-            "Refusing to operate on a path outside the vault document tree "
+            "Refusing to operate on a path outside the managed directory tree "
             f"(possible symlink or traversal escape): {path}"
         )
     return path
@@ -101,6 +101,45 @@ def resource_lock_target(vaultspec_dir: Path) -> Path:
     MUST pass this exact value to serialize on one sentinel.
     """
     return vaultspec_dir / ".resources"
+
+
+def iter_snapshot_docs(managed_root: Path) -> Iterator[Path]:
+    """Yield every non-archive ``*.md`` under *managed_root* for snapshotting.
+
+    This is the canonical transaction-snapshot basis shared by every docs-domain
+    rename: every ``*.md`` under the managed root except those inside an
+    ``_archive`` subtree or any dot-prefixed directory (``.obsidian``,
+    ``.trash``, ...). The set is handed to
+    :meth:`RenameTransaction.snapshot`, which applies the per-file
+    symlink/non-file skip and read-failure handling.
+
+    Both the feature rename (whole-tree mutation) and the single-document rename
+    (file move plus ``related:`` cascade) snapshot this exact set so the rollback
+    journal is a guaranteed superset of what the apply can mutate: the
+    ``related:`` cascade
+    (:func:`~vaultspec_core.vaultcore.rename_ops.rewrite_incoming_refs`) also
+    excludes ``_archive`` and dot-prefixed directories, so a document the cascade
+    can rewrite is always one this iterator captures - and an archived or hidden
+    document is never rewritten *nor* snapshotted. Deriving the snapshot from a
+    stale graph cache instead would risk missing a rewritten doc and leaving the
+    rollback journal incomplete.
+
+    Args:
+        managed_root: The vault document root (``<root>/<docs_dir>``).
+
+    Yields:
+        Each candidate document path, in ``rglob`` order.
+    """
+    if not managed_root.is_dir():
+        return
+    for md in managed_root.rglob("*.md"):
+        try:
+            rel_parts = md.relative_to(managed_root).parts
+        except ValueError:
+            continue
+        if any(p == "_archive" or p.startswith(".") for p in rel_parts):
+            continue
+        yield md
 
 
 class RenameTransaction:

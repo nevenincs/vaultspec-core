@@ -4,7 +4,7 @@ These tests prove the hardening applied to
 :mod:`vaultspec_core.vaultcore.query` and
 :mod:`vaultspec_core.vaultcore.rename_ops` cannot be defeated: a feature
 rename can never read, write, move, or delete a file whose true location is
-outside the vault document tree, can never lose or overwrite document data,
+outside the managed directory tree, can never lose or overwrite document data,
 and can never be steered out of bounds through a crafted ``old``/``new``
 argument, a planted symlink, or malformed document content.
 
@@ -282,14 +282,14 @@ class TestContainmentGuardUnit:
     def test_sibling_outside_docs_raises(self, tmp_path: Path):
         docs_dir = tmp_path / ".vault"
         docs_dir.mkdir()
-        with pytest.raises(VaultSpecError, match="outside the vault document tree"):
+        with pytest.raises(VaultSpecError, match="outside the managed directory tree"):
             _assert_within_docs(docs_dir, docs_dir.parent / "outside.md")
 
     def test_parent_traversal_raises(self, tmp_path: Path):
         docs_dir = tmp_path / ".vault"
         docs_dir.mkdir()
         traversal = docs_dir / "adr" / ".." / ".." / "outside.md"
-        with pytest.raises(VaultSpecError, match="outside the vault document tree"):
+        with pytest.raises(VaultSpecError, match="outside the managed directory tree"):
             _assert_within_docs(docs_dir, traversal)
 
 
@@ -345,7 +345,7 @@ class TestSymlinkOutOfBounds:
         before = _snapshot_real_md(tmp_path)
         with pytest.raises(VaultSpecError) as excinfo:
             rename_feature(tmp_path, "real-feature", "new-feature")
-        assert "outside the vault document tree" in str(excinfo.value.__cause__)
+        assert "outside the managed directory tree" in str(excinfo.value.__cause__)
 
         after = _snapshot_real_md(tmp_path)
         assert set(after) == set(before)
@@ -389,7 +389,7 @@ class TestSymlinkOutOfBounds:
         before = _snapshot_real_md(tmp_path)
         with pytest.raises(VaultSpecError) as excinfo:
             rename_feature(tmp_path, "real-feature", "new-feature")
-        assert "outside the vault document tree" in str(excinfo.value.__cause__)
+        assert "outside the managed directory tree" in str(excinfo.value.__cause__)
 
         # No index file was written to the escaped external directory.
         assert list(external_index.glob("*.index.md")) == []

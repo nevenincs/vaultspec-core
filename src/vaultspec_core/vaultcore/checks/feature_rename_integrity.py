@@ -14,7 +14,11 @@ This checker walks the exec tree directly (mirroring ``scan_vault``'s
 exclusions: ``.obsidian``/``_archive`` subtrees and symlinks are skipped) and
 reports each exec folder whose feature segment disagrees with the ``#feature``
 tag of the records it contains, as an ``ERROR`` carrying the observed-vs-
-expected names and a ``vault feature rename`` remediation hint. It is
+expected names and a descriptive remediation hint (reconcile the folder name
+and the records' tag so they agree). The hint is deliberately not a runnable
+``vault feature rename`` command: on this drift class that command errors in
+both directions (the folder feature has zero matching tagged docs, and the tag
+feature's docs do not all live under a single folder of that shape). It is
 read-only: reconciling the drift is a feature rename, not a frontmatter
 rewrite, and which side is canonical (folder vs tag) is a deliberate operator
 decision the cli-rename-integrity ADR defers.
@@ -151,9 +155,10 @@ def check_feature_rename_integrity(root_dir: Path) -> CheckResult:
                 ),
                 severity=Severity.ERROR,
                 fix_description=(
-                    "Reconcile with vaultspec-core vault feature rename "
-                    f"{folder_feature} {conflicting_tags[0]} so the folder name "
-                    "matches its records' feature tag."
+                    "Reconcile the exec folder name and its records' #feature "
+                    f"tag so they agree (the records are tagged "
+                    f"'#{conflicting_tags[0]}' but live under a "
+                    f"'{folder_feature}' folder)."
                 ),
             )
         )

@@ -133,7 +133,13 @@ class TestExecFolderTagDrift:
         assert "#new" in diag.message
         assert drifted.name in diag.message
         assert diag.fix_description is not None
-        assert "vault feature rename old new" in diag.fix_description
+        # The remediation is descriptive, never a non-runnable command: on this
+        # drift class a `vault feature rename` invocation would error in both
+        # directions, so it must not be suggested.
+        assert "vault feature rename" not in diag.fix_description
+        assert "Reconcile" in diag.fix_description
+        assert "#new" in diag.fix_description
+        assert "old" in diag.fix_description
 
     def test_one_error_per_folder_even_with_many_drifted_records(self, tmp_path: Path):
         _exec_record(tmp_path, "old", f"{DATE}-old-P01-S01", "new")

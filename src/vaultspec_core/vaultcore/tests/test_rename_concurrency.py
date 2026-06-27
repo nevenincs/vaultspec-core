@@ -276,3 +276,58 @@ def test_document_rename_blocks_on_held_docs_lock(tmp_path: Path) -> None:
     beta_text = beta.read_text(encoding="utf-8")
     assert "[[2026-01-01-gamma-adr]]" in beta_text
     assert "[[2026-01-01-alpha-adr]]" not in beta_text
+
+
+def test_feature_rename_blocks_on_held_docs_lock(tmp_path: Path) -> None:
+    """``rename_feature`` serializes on the docs sentinel.
+
+    Builds a real two-document feature vault and drives the real
+    ``rename_feature`` backend (not a stand-in): with the docs sentinel held it
+    cannot proceed, and once released it completes with a consistent final
+    state - the authored docs are renamed to the new feature, the old-feature
+    files are gone, and the incoming ``related:`` link is re-pointed to the
+    renamed stem. This pins the third docs-domain mutator the module docstring
+    claims, alongside ``vault rename`` and the structure cascade.
+    """
+    from ..query import rename_feature
+
+    root = tmp_path / "project"
+    docs_dir = root / ".vault"
+    research_dir = docs_dir / "research"
+    adr_dir = docs_dir / "adr"
+    research_dir.mkdir(parents=True)
+    adr_dir.mkdir(parents=True)
+
+    research = research_dir / "2026-01-01-alpha-feature-research.md"
+    adr = adr_dir / "2026-01-01-alpha-feature-adr.md"
+    _write(
+        research,
+        "---\ntags:\n  - '#research'\n  - '#alpha-feature'\n"
+        "date: '2026-01-01'\nmodified: '2026-01-01'\nrelated: []\n---\n\n# Alpha\n",
+    )
+    _write(
+        adr,
+        "---\ntags:\n  - '#adr'\n  - '#alpha-feature'\n"
+        "date: '2026-01-01'\nmodified: '2026-01-01'\n"
+        "related:\n  - '[[2026-01-01-alpha-feature-research]]'\n---\n\n# Alpha ADR\n",
+    )
+    # Materialise the lock-file parent so the advisory lock actually engages.
+    (docs_dir / "data").mkdir(parents=True, exist_ok=True)
+
+    renamed_research = research_dir / "2026-01-01-beta-feature-research.md"
+    renamed_adr = adr_dir / "2026-01-01-beta-feature-adr.md"
+
+    def _run_rename() -> None:
+        result = rename_feature(root, "alpha-feature", "beta-feature")
+        assert result["status"] == "updated"
+
+    _prove_serialized_by(docs_lock_target(docs_dir), _run_rename)
+
+    # The rename ran to completion after the lock was released.
+    assert renamed_research.exists()
+    assert renamed_adr.exists()
+    assert not research.exists()
+    assert not adr.exists()
+    adr_text = renamed_adr.read_text(encoding="utf-8")
+    assert "[[2026-01-01-beta-feature-research]]" in adr_text
+    assert "[[2026-01-01-alpha-feature-research]]" not in adr_text

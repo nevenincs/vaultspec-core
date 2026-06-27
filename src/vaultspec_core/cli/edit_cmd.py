@@ -870,6 +870,7 @@ def _execute_rename(
     from vaultspec_core.vaultcore.rename_engine import (
         RenameTransaction,
         docs_lock_target,
+        iter_snapshot_docs,
     )
     from vaultspec_core.vaultcore.rename_ops import rewrite_incoming_refs
 
@@ -912,9 +913,13 @@ def _execute_rename(
             )
 
         old_blob = git_blob_oid(old_path.read_bytes())
-        refs = _find_incoming_refs(root_dir, old_stem)
 
         if dry_run:
+            # The graph-derived incoming-ref list is a preview-only count here;
+            # the applied path reports the cascade's per-link ``fixed_count``
+            # (the two agree except in the rare dedup-drop case the preview
+            # cannot observe without writing).
+            refs = _find_incoming_refs(root_dir, old_stem)
             _emit(
                 command,
                 "updated",
@@ -923,10 +928,6 @@ def _execute_rename(
                     "new_path": str(new_path),
                     "old_blob_hash": old_blob,
                     "new_node_id": f"doc:{new_stem}",
-                    # Dry-run preview: the per-doc incoming-ref count. The applied
-                    # path below reports the cascade's per-link ``fixed_count``;
-                    # the two agree except in the rare dedup-drop case the preview
-                    # cannot observe without writing.
                     "incoming_rewritten": len(refs),
                     "dry_run": True,
                 },
@@ -938,9 +939,19 @@ def _execute_rename(
         # domain. Ordering is deliberate: snapshot the participating files, then
         # rename the file BEFORE the cascade so a failure rolls back rather than
         # leaving rewritten links pointing at a now-missing stem.
+        #
+        # The snapshot is the whole non-archive docs tree (the same basis
+        # ``rename_feature`` uses) rather than the graph-derived incoming-ref
+        # list, so the rollback journal is a guaranteed SUPERSET of what the
+        # apply mutates: the cascade below excludes ``_archive`` and rewrites
+        # every other ``related:`` referrer, and a stale graph cache could omit
+        # a referrer from the ref list that the on-disk cascade still rewrites.
+        # ``_archive`` is excluded from BOTH the snapshot and the cascade so a
+        # document rename never mutates an archived doc (matching
+        # ``rename_feature``).
         cascade = CheckResult(check_name="vault-rename")
         with RenameTransaction(docs_dir, lock_target=docs_lock_target(docs_dir)) as tx:
-            tx.snapshot([old_path, *refs])
+            tx.snapshot(iter_snapshot_docs(docs_dir))
             if not tx.rename(old_path, new_path):
                 raise _EditError(
                     f"Filesystem rename failed: {old_path.name} -> {new_path.name}",
@@ -950,7 +961,12 @@ def _execute_rename(
                         "collision": True,
                     },
                 )
-            rewrite_incoming_refs(root_dir, [(old_stem, new_stem)], cascade)
+            rewrite_incoming_refs(
+                root_dir,
+                [(old_stem, new_stem)],
+                cascade,
+                exclude_dirs=frozenset({"_archive"}),
+            )
             _refresh_doc_stamps([new_path, *_cascade_paths(cascade, root_dir)])
 
         # The shared cascade counts per-link rewrites (dedup drops are reported
