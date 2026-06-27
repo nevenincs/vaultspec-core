@@ -29,15 +29,15 @@ Extract the reverse-journal, symlink-safe restore, root-generalized containment,
 
 Create the shared engine with generalized containment, journal, symlink-safe restore, and lock acquisition.
 
-- [ ] `W01.P01.S01` - Create the shared rename-engine module with root-generalized \_assert_within and the symlink-safe restore helper; `src/vaultspec_core/vaultcore/rename_engine.py`.
-- [ ] `W01.P01.S02` - Implement RenameTransaction: caller-supplied snapshot, containment-checked case-safe rename, record-write/create/dir, context-manager rollback, and domain-lock acquisition; `src/vaultspec_core/vaultcore/rename_engine.py`.
+- [x] `W01.P01.S01` - Create the shared rename-engine module with root-generalized \_assert_within and the symlink-safe restore helper; `src/vaultspec_core/vaultcore/rename_engine.py`.
+- [x] `W01.P01.S02` - Implement RenameTransaction: caller-supplied snapshot, containment-checked case-safe rename, record-write/create/dir, context-manager rollback, and domain-lock acquisition; `src/vaultspec_core/vaultcore/rename_engine.py`.
 
 ### Phase `W01.P02` - Converge rename_feature
 
 Drive rename_feature through the engine with no behavior change; rename/structure suites stay byte-identical green.
 
-- [ ] `W01.P02.S03` - Drive rename_feature through RenameTransaction, passing its non-archive snapshot set, with no behavior change; `src/vaultspec_core/vaultcore/query.py`.
-- [ ] `W01.P02.S04` - Run the rename_feature and structure case-rename suites to confirm byte-identical behavior; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
+- [x] `W01.P02.S03` - Drive rename_feature through RenameTransaction, passing its non-archive snapshot set, with no behavior change; `src/vaultspec_core/vaultcore/query.py`.
+- [x] `W01.P02.S04` - Run the rename_feature and structure case-rename suites to confirm byte-identical behavior; `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`.
 
 ## Wave `W02` - Converge resource and hook renames
 

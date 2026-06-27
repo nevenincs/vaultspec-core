@@ -13,17 +13,20 @@ from __future__ import annotations
 import logging
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ..core.helpers import atomic_write
 from .models import DocType, refresh_modified_stamp
 from .parser import parse_frontmatter
-from .rename_ops import rename_document_path, rewrite_incoming_refs, split_keepends
+from .rename_ops import rewrite_incoming_refs, split_keepends
 from .scanner import get_doc_type, scan_vault
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
+
+    from .rename_engine import RenameTransaction
 
 logger = logging.getLogger(__name__)
 
@@ -517,13 +520,10 @@ _WINDOWS_RESERVED_NAMES = frozenset(
 def _assert_within_docs(docs_dir: Path, path: Path) -> Path:
     """Return *path* iff its real location is inside *docs_dir*, else raise.
 
-    Resolves every symlink and ``..`` segment in *path* (and in any existing
-    ancestor of a not-yet-created destination) and refuses the operation when
-    the result escapes the vault's document tree.  This is the containment
-    backstop that prevents a rename from reading, writing, moving, or deleting
-    a file whose true location is outside ``.vault/`` - including the case
-    where a vault subdirectory (e.g. ``index/``) or a document is itself a
-    symlink pointing outside the project.
+    Thin docs-scoped wrapper over the root-generalized
+    :func:`~vaultspec_core.vaultcore.rename_engine._assert_within`; retained as
+    a stable import surface for callers and tests that bind the containment
+    guard to the vault document root.
 
     Args:
         docs_dir: The vault document root (``<root>/<docs_dir>``).
@@ -535,29 +535,9 @@ def _assert_within_docs(docs_dir: Path, path: Path) -> Path:
     Raises:
         VaultSpecError: When *path* resolves outside *docs_dir*.
     """
-    from ..core.exceptions import VaultSpecError
+    from .rename_engine import _assert_within
 
-    real_docs = docs_dir.resolve(strict=False)
-    real_path = path.resolve(strict=False)
-    if real_path != real_docs and real_docs not in real_path.parents:
-        raise VaultSpecError(
-            "Refusing to operate on a path outside the vault document tree "
-            f"(possible symlink or traversal escape): {path}"
-        )
-    return path
-
-
-def _safe_restore_bytes(path: Path, original: bytes) -> None:
-    """Restore *original* bytes to *path* without writing through a symlink.
-
-    A symlinked rollback target is unlinked first so the bytes land on a
-    fresh regular file at the in-vault path rather than following the link
-    to an out-of-bounds destination.
-    """
-    if path.is_symlink():
-        path.unlink()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(original)
+    return _assert_within(docs_dir, path)
 
 
 @dataclass
@@ -582,27 +562,6 @@ class _RenamePlan:
     index_new_path: Path
     stem_renames: list[tuple[str, str]]
     collisions: list[dict]
-
-
-@dataclass
-class _RenameJournal:
-    """Reverse-journal capturing enough state to undo a partial apply.
-
-    Attributes:
-        file_renames: ``(src, dst)`` renames actually applied, in order.
-        created_dirs: Directories created during apply (new exec folders,
-            a freshly-created index directory).
-        removed_dirs: Old exec folders removed once emptied during apply.
-        created_files: Files created during apply (a brand-new index).
-        snapshots: Original bytes of every file the apply may move or
-            mutate, keyed by their pre-rename path.
-    """
-
-    file_renames: list[tuple[Path, Path]] = field(default_factory=list)
-    created_dirs: list[Path] = field(default_factory=list)
-    removed_dirs: list[Path] = field(default_factory=list)
-    created_files: list[Path] = field(default_factory=list)
-    snapshots: dict[Path, bytes] = field(default_factory=dict)
 
 
 def _rel(path: Path, root_dir: Path) -> str:
@@ -1205,22 +1164,28 @@ def _count_related_refs(md_path: Path, old_stems_lower: set[str]) -> int:
 # -- S09: reverse-journal apply with rollback -------------------------------
 
 
-def _snapshot_docs(root_dir: Path, journal: _RenameJournal) -> None:
-    """Snapshot the original bytes of every non-archive ``*.md`` under docs.
+def _iter_snapshot_docs(docs_dir: Path) -> Iterator[Path]:
+    """Yield every non-archive ``*.md`` under *docs_dir* for snapshotting.
 
-    This is the simplest correct basis for rollback: any file the apply may
-    move (renamed docs) or rewrite (the renamed docs' tag blocks, the
-    vault-wide ``related:`` cascade, the modified-stamp refresh, the deleted
-    old index) is captured by its pre-rename path so the reverse walk can
-    restore it byte-for-byte.
+    Produces the exact set the former ``_snapshot_docs`` captured - every
+    ``*.md`` under the docs tree except those inside ``_archive`` or any
+    dot-prefixed directory - and hands it to
+    :meth:`~vaultspec_core.vaultcore.rename_engine.RenameTransaction.snapshot`,
+    which applies the symlink/non-file skip and read-failure handling per file.
+    The split keeps the docs-specific traversal here (the caller decides the
+    set) while the byte capture lives in the shared engine.
+
+    A feature rename touches the whole docs tree (filename moves, tag-block
+    rewrites, the vault-wide ``related:`` cascade, the modified-stamp refresh,
+    and the deleted old index), so the whole tree is the correct snapshot basis
+    for byte-for-byte rollback.
 
     Args:
-        root_dir: Project root directory.
-        journal: The journal to populate.
-    """
-    from ..config import get_config
+        docs_dir: The vault document root (``<root>/<docs_dir>``).
 
-    docs_dir = root_dir / get_config().docs_dir
+    Yields:
+        Each candidate document path, in ``rglob`` order.
+    """
     if not docs_dir.is_dir():
         return
     for md in docs_dir.rglob("*.md"):
@@ -1230,19 +1195,11 @@ def _snapshot_docs(root_dir: Path, journal: _RenameJournal) -> None:
             continue
         if any(p == "_archive" or p.startswith(".") for p in rel_parts):
             continue
-        # Skip symlinks: a symlinked ``.md`` is not a legitimate vault document,
-        # and snapshotting it would pull an out-of-bounds target's bytes into the
-        # rollback journal (then potentially restore them through the link).
-        if md.is_symlink() or not md.is_file():
-            continue
-        try:
-            journal.snapshots[md] = md.read_bytes()
-        except OSError as exc:
-            logger.warning("Could not snapshot %s for rollback: %s", md, exc)
+        yield md
 
 
 def _regenerate_feature_index(
-    root_dir: Path, new: str, journal: _RenameJournal, index_dir_existed: bool
+    root_dir: Path, new: str, tx: RenameTransaction, index_dir_existed: bool
 ) -> Path:
     """Regenerate the feature index for *new* from a freshly-built graph.
 
@@ -1252,7 +1209,7 @@ def _regenerate_feature_index(
     Args:
         root_dir: Project root directory.
         new: Normalised target feature name.
-        journal: Journal to record a created index file / directory into.
+        tx: Transaction to record a created index file / directory into.
         index_dir_existed: Whether the index directory existed before apply.
 
     Returns:
@@ -1275,9 +1232,9 @@ def _regenerate_feature_index(
     nodes = graph.get_feature_nodes(new)
     path = generate_feature_index(root_dir, new, nodes=nodes)
     if not index_dir_existed and path.parent.is_dir():
-        journal.created_dirs.append(path.parent)
+        tx.record_created_dir(path.parent)
     if not existed:
-        journal.created_files.append(path)
+        tx.record_created_file(path)
     return path
 
 
@@ -1309,58 +1266,17 @@ def _refresh_rename_stamps(
                 logger.warning("Failed to refresh modified stamp for %s: %s", path, exc)
 
 
-def _rollback_rename(journal: _RenameJournal) -> None:
-    """Walk *journal* in reverse to restore the pre-rename vault state.
-
-    The order is deliberate: delete created files first, recreate removed
-    exec folders so renamed records have a home to return to, reverse the
-    file renames (LIFO), drop any directories created during apply, and
-    finally restore every snapshot's original bytes (which also recreates
-    the deleted old index).
-
-    Args:
-        journal: The populated reverse journal.
-    """
-    import contextlib
-    import shutil
-
-    for path in journal.created_files:
-        with contextlib.suppress(OSError):
-            if path.is_file():
-                path.unlink()
-
-    for directory in journal.removed_dirs:
-        with contextlib.suppress(OSError):
-            directory.mkdir(parents=True, exist_ok=True)
-
-    for src, dst in reversed(journal.file_renames):
-        if not dst.exists():
-            continue
-        if rename_document_path(dst, src):
-            continue
-        with contextlib.suppress(OSError):
-            shutil.move(str(dst), str(src))
-
-    for directory in reversed(journal.created_dirs):
-        with contextlib.suppress(OSError):
-            if directory.is_dir() and not any(directory.iterdir()):
-                directory.rmdir()
-
-    for path, original in journal.snapshots.items():
-        try:
-            # If the key became a symlink since the snapshot, restore through a
-            # fresh regular file (never write through the link to an
-            # out-of-bounds target). Otherwise restore only when content drifted.
-            # ``is_symlink()`` is checked first so the short-circuit avoids a
-            # symlink-following ``read_bytes()``.
-            if path.is_symlink() or not path.exists() or path.read_bytes() != original:
-                _safe_restore_bytes(path, original)
-        except OSError as exc:
-            logger.warning("Rollback could not restore %s: %s", path, exc)
-
-
 def _apply_rename_plan(root_dir: Path, plan: _RenamePlan, old: str, new: str) -> dict:
-    """Apply *plan* under a reverse journal, rolling back on any failure.
+    """Apply *plan* through a :class:`RenameTransaction`, rolling back on failure.
+
+    The transaction is bound to the docs root (every rename endpoint is
+    containment-checked against it) and acquires the docs-domain advisory lock
+    for its lifetime; ``advisory_lock`` no-ops when ``.vault/data`` is absent,
+    and the transaction never creates it. The caller-supplied snapshot set is
+    the whole non-archive docs tree because a feature rename touches all of it.
+    Any exception inside the ``with`` block triggers the transaction's reverse
+    journal (restoring the vault byte-for-byte) before the wrapped error is
+    raised.
 
     Args:
         root_dir: Project root directory.
@@ -1378,86 +1294,93 @@ def _apply_rename_plan(root_dir: Path, plan: _RenamePlan, old: str, new: str) ->
     from ..config import get_config
     from ..core.exceptions import VaultSpecError
     from .checks._base import CheckResult
-
-    journal = _RenameJournal()
-    _snapshot_docs(root_dir, journal)
+    from .rename_engine import RenameTransaction, docs_lock_target
 
     cfg = get_config()
     docs_dir = root_dir / cfg.docs_dir
     index_dir = docs_dir / cfg.index_dir
     index_dir_existed = index_dir.exists()
+    lock_target = docs_lock_target(docs_dir)
 
     try:
-        # (1) Ensure destination exec folders exist before any record moves.
-        for _old_folder, new_folder, _date in plan.exec_dir_renames:
-            _assert_within_docs(docs_dir, new_folder)
-            if not new_folder.exists():
-                new_folder.mkdir(parents=True, exist_ok=True)
-                journal.created_dirs.append(new_folder)
+        with RenameTransaction(docs_dir, lock_target=lock_target) as tx:
+            # Snapshot the whole non-archive docs tree under the lock so the
+            # reverse journal can restore any moved/rewritten file byte-for-byte.
+            tx.snapshot(_iter_snapshot_docs(docs_dir))
 
-        # (2) Rename every authored doc and exec record. Both endpoints are
-        #     containment-checked so a symlinked source or destination can never
-        #     move a file out of (or into the vault from) outside the tree.
-        for src, dst in plan.file_renames:
-            _assert_within_docs(docs_dir, src)
-            _assert_within_docs(docs_dir, dst)
-            if not rename_document_path(src, dst):
-                raise VaultSpecError(
-                    f"Filesystem rename failed: {_rel(src, root_dir)} -> "
-                    f"{_rel(dst, root_dir)} (destination may already exist)."
+            # (1) Ensure destination exec folders exist before any record moves.
+            for _old_folder, new_folder, _date in plan.exec_dir_renames:
+                _assert_within_docs(docs_dir, new_folder)
+                if not new_folder.exists():
+                    new_folder.mkdir(parents=True, exist_ok=True)
+                    tx.record_created_dir(new_folder)
+
+            # (2) Rename every authored doc and exec record. Both endpoints are
+            #     containment-checked inside ``tx.rename`` so a symlinked source
+            #     or destination can never move a file out of (or into the vault
+            #     from) outside the tree.
+            for src, dst in plan.file_renames:
+                if not tx.rename(src, dst):
+                    raise VaultSpecError(
+                        f"Filesystem rename failed: {_rel(src, root_dir)} -> "
+                        f"{_rel(dst, root_dir)} (destination may already exist)."
+                    )
+
+            # (3) Remove now-empty old exec folders.
+            for old_folder, _new_folder, _date in plan.exec_dir_renames:
+                if old_folder.is_dir() and not any(old_folder.iterdir()):
+                    old_folder.rmdir()
+                    tx.record_removed_dir(old_folder)
+
+            # (4) Rewrite the #old -> #new tag block in each renamed document.
+            tag_rewrites = 0
+            for _src, dst in plan.file_renames:
+                text = dst.read_bytes().decode("utf-8")
+                new_text, changed = _rewrite_feature_tag_block(text, old, new)
+                if changed:
+                    atomic_write(dst, new_text)
+                    tag_rewrites += 1
+
+            # (5) Delete the stale index before the cascade so its soon-discarded
+            #     rewrites do not inflate the reported count.
+            if plan.index_old_path is not None and plan.index_old_path.exists():
+                plan.index_old_path.unlink()
+
+            # (6) Cascade ``related:`` wiki-link rewrites across the vault,
+            #     skipping ``_archive`` so a rename never mutates archived
+            #     documents - they are out of scope per the ADR and are not
+            #     snapshotted for rollback.
+            cascade = CheckResult(check_name="feature-rename")
+            rewrite_incoming_refs(
+                root_dir,
+                plan.stem_renames,
+                cascade,
+                exclude_dirs=frozenset({"_archive"}),
+            )
+            related_rewrites = cascade.fixed_count
+            cascade_paths: set[Path] = set()
+            for diag in cascade.diagnostics:
+                if diag.path is None:
+                    continue
+                abs_path = (
+                    diag.path if diag.path.is_absolute() else root_dir / diag.path
                 )
-            journal.file_renames.append((src, dst))
+                cascade_paths.add(abs_path)
 
-        # (3) Remove now-empty old exec folders.
-        for old_folder, _new_folder, _date in plan.exec_dir_renames:
-            if old_folder.is_dir() and not any(old_folder.iterdir()):
-                old_folder.rmdir()
-                journal.removed_dirs.append(old_folder)
+            # (7) Regenerate the index for the new feature from a fresh graph.
+            new_index_path = _regenerate_feature_index(
+                root_dir, new, tx, index_dir_existed
+            )
 
-        # (4) Rewrite the #old -> #new tag block in each renamed document.
-        tag_rewrites = 0
-        for _src, dst in plan.file_renames:
-            text = dst.read_bytes().decode("utf-8")
-            new_text, changed = _rewrite_feature_tag_block(text, old, new)
-            if changed:
-                atomic_write(dst, new_text)
-                tag_rewrites += 1
+            # (8) Refresh the modified stamp on every renamed or relinked doc.
+            _refresh_rename_stamps(plan.file_renames, cascade_paths)
 
-        # (5) Delete the stale index before the cascade so its soon-discarded
-        #     rewrites do not inflate the reported count.
-        if plan.index_old_path is not None and plan.index_old_path.exists():
-            plan.index_old_path.unlink()
-
-        # (6) Cascade ``related:`` wiki-link rewrites across the vault, skipping
-        #     ``_archive`` so a rename never mutates archived documents - they
-        #     are out of scope per the ADR and are not snapshotted for rollback.
-        cascade = CheckResult(check_name="feature-rename")
-        rewrite_incoming_refs(
-            root_dir, plan.stem_renames, cascade, exclude_dirs=frozenset({"_archive"})
-        )
-        related_rewrites = cascade.fixed_count
-        cascade_paths: set[Path] = set()
-        for diag in cascade.diagnostics:
-            if diag.path is None:
-                continue
-            abs_path = diag.path if diag.path.is_absolute() else root_dir / diag.path
-            cascade_paths.add(abs_path)
-
-        # (7) Regenerate the index for the new feature from a fresh graph.
-        new_index_path = _regenerate_feature_index(
-            root_dir, new, journal, index_dir_existed
-        )
-
-        # (8) Refresh the modified stamp on every renamed or relinked doc.
-        _refresh_rename_stamps(plan.file_renames, cascade_paths)
-
-        return {
-            "tag_rewrites": tag_rewrites,
-            "related_rewrites": related_rewrites,
-            "new_index_path": new_index_path,
-        }
+            return {
+                "tag_rewrites": tag_rewrites,
+                "related_rewrites": related_rewrites,
+                "new_index_path": new_index_path,
+            }
     except Exception as exc:
-        _rollback_rename(journal)
         raise VaultSpecError(
             f"Feature rename '{old}' -> '{new}' failed and was rolled back to "
             f"the pre-rename state: {exc}"
