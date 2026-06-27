@@ -39,148 +39,184 @@ hand-edit between the markers.
 
 ### Top-level commands
 
-```text
-vaultspec-core install [OPTIONS] [PROVIDER]
-vaultspec-core uninstall [OPTIONS] [PROVIDER]
-vaultspec-core sync [OPTIONS] [PROVIDER]
-vaultspec-core doctor [OPTIONS]
-vaultspec-core status [OPTIONS] [TARGET]
-```
+- `install` - Deploy the vaultspec framework to the target directory.
+- `uninstall` - Remove the vaultspec framework from the target directory.
+- `sync` - Sync rules, skills, agents, configs, system prompts, and MCPs.
+- `doctor` - Diagnose overall workspace and vault health.
+- `status` - Orient in a vaultspec vault: rollup, or a grounding trace for a target.
 
 ### Vault
 
-```text
-vaultspec-core vault set-body [OPTIONS] REF
-vaultspec-core vault set-frontmatter [OPTIONS] REF
-vaultspec-core vault edit [OPTIONS] REF
-vaultspec-core vault rename [OPTIONS] REF
-vaultspec-core vault add [OPTIONS] DOC_TYPE
-vaultspec-core vault stats [OPTIONS]
-vaultspec-core vault list [OPTIONS] [DOC_TYPE]
-vaultspec-core vault graph [OPTIONS]
-vaultspec-core vault repair [OPTIONS]
-vaultspec-core vault feature list [OPTIONS]
-vaultspec-core vault feature index [OPTIONS]
-vaultspec-core vault feature archive [OPTIONS] FEATURE_TAG
-vaultspec-core vault feature unarchive [OPTIONS] FEATURE_TAG
-vaultspec-core vault check all [OPTIONS]
-vaultspec-core vault check body-links [OPTIONS]
-vaultspec-core vault check annotations [OPTIONS]
-vaultspec-core vault check markdown [OPTIONS]
-vaultspec-core vault check placeholders [OPTIONS]
-vaultspec-core vault check dangling [OPTIONS]
-vaultspec-core vault check orphans [OPTIONS]
-vaultspec-core vault check frontmatter [OPTIONS]
-vaultspec-core vault check modified-stamp [OPTIONS]
-vaultspec-core vault check links [OPTIONS]
-vaultspec-core vault check features [OPTIONS]
-vaultspec-core vault check references [OPTIONS]
-vaultspec-core vault check schema [OPTIONS]
-vaultspec-core vault check structure [OPTIONS]
-vaultspec-core vault check rename-integrity [OPTIONS]
-vaultspec-core vault sanitize annotations [OPTIONS]
-vaultspec-core vault rule promote [OPTIONS]
-vaultspec-core vault adr supersede [OPTIONS] OLD_ADR
-vaultspec-core vault plan status [OPTIONS] PATH
-vaultspec-core vault plan check [OPTIONS] PATH
-vaultspec-core vault plan query [OPTIONS] PATH
-vaultspec-core vault plan step toggle [OPTIONS] PATH STEP_ID
-vaultspec-core vault plan step check [OPTIONS] PATH STEP_ID
-vaultspec-core vault plan step uncheck [OPTIONS] PATH STEP_ID
-vaultspec-core vault plan step add [OPTIONS] PATH
-vaultspec-core vault plan step insert [OPTIONS] PATH
-vaultspec-core vault plan step edit [OPTIONS] PATH STEP_ID
-vaultspec-core vault plan step move [OPTIONS] PATH STEP_ID
-vaultspec-core vault plan step remove [OPTIONS] PATH STEP_ID
-vaultspec-core vault plan phase add [OPTIONS] PATH
-vaultspec-core vault plan phase insert [OPTIONS] PATH
-vaultspec-core vault plan phase edit [OPTIONS] PATH PHASE_ID
-vaultspec-core vault plan phase move [OPTIONS] PATH PHASE_ID
-vaultspec-core vault plan phase renumber [OPTIONS] PATH PHASE_ID
-vaultspec-core vault plan phase remove [OPTIONS] PATH PHASE_ID
-vaultspec-core vault plan wave add [OPTIONS] PATH
-vaultspec-core vault plan wave insert [OPTIONS] PATH
-vaultspec-core vault plan wave edit [OPTIONS] PATH WAVE_ID
-vaultspec-core vault plan wave move [OPTIONS] PATH WAVE_ID
-vaultspec-core vault plan wave remove [OPTIONS] PATH WAVE_ID
-vaultspec-core vault plan epic intent show [OPTIONS] PATH
-vaultspec-core vault plan epic intent edit [OPTIONS] PATH
-vaultspec-core vault plan tier show [OPTIONS] PATH
-vaultspec-core vault plan tier promote [OPTIONS] PATH
-vaultspec-core vault plan tier demote [OPTIONS] PATH
-vaultspec-core vault plan trailer emit [OPTIONS]
-vaultspec-core vault plan trailer validate [OPTIONS] MESSAGE_FILE
-vaultspec-core vault link list [OPTIONS] [SRC]
-vaultspec-core vault link add [OPTIONS] SRC DST
-vaultspec-core vault link remove [OPTIONS] SRC DST
-```
+- `set-body` - Replace only the body prose of a document, keeping its frontmatter.
+- `set-frontmatter` - Edit selected frontmatter fields, keeping the body byte-for-byte.
+- `edit` - Set body and/or frontmatter in one atomic write (single round-trip).
+- `rename` - Rename a document's file and re-point incoming related references.
+- `add` - Create a new .vault/ document from a template.
+- `stats` - Show vault statistics and metrics.
+- `list` - List vault documents, optionally filtered by type.
+- `graph` - Render the vault document graph.
+- `repair` - Run the operator repair pipeline for vault content.
+
+#### Feature
+
+- `list` - List all feature tags in the vault.
+- `index` - Generate or update feature index documents.
+- `archive` - Archive all documents for a feature tag.
+- `unarchive` - Restore all archived documents for a feature tag.
+
+#### Check
+
+- `all` - Run all vault health checks.
+- `body-links` - Find wiki-links and markdown path links in document body text.
+- `annotations` - Find generated template annotations in vault documents.
+- `markdown` - Check and optionally fix markdown hygiene (trailing whitespace, blank
+  runs, final newline).
+- `placeholders` - Find unreplaced {...} template placeholders in document body prose.
+- `dangling` - Find wiki-links in related: frontmatter that resolve to no document.
+- `orphans` - Find documents with no incoming wiki-links.
+- `frontmatter` - Validate document frontmatter against vault schema.
+- `modified-stamp` - Validate and reconcile the modified recency stamp on every
+  document.
+- `links` - Check wiki-links follow Obsidian convention (no .md extension).
+- `features` - Check feature tag completeness - missing doc types.
+- `references` - Check for missing cross-references within features.
+- `schema` - Enforce schema rules: ADRs must ref research, plans must ref ADRs.
+- `structure` - Check vault directory structure and filename conventions.
+- `rename-integrity` - Check name/filename integrity for rules, skills, and agents.
+
+#### Sanitize
+
+- `annotations` - Strip generated template annotations from vault documents.
+
+#### Rule
+
+- `promote` - Promote an audit finding to a team-shared rule.
+
+#### Adr
+
+- `supersede` - Supersede an old ADR with a new ADR.
+
+#### Plan
+
+- `status` - Report plan health, structure, and completion.
+- `check` - Validate convention compliance; with `--fix`, apply autofixes.
+- `query` - Filter Step rows by container scope and open/closed predicate.
+- `step toggle` - Flip the Step's checkbox state.
+- `step check` - Mark the Step closed (idempotent).
+- `step uncheck` - Mark the Step open (idempotent).
+- `step add` - Append a new Step at the next-available canonical id.
+- `step insert` - Insert a Step at a named position relative to an existing anchor.
+- `step edit` - Edit the Step's action and / or scope without changing its identifier.
+- `step move` - Re-parent and / or re-position a Step per the move-flag precedence rule.
+- `step remove` - Remove a Step; its identifier is retired and never reused.
+- `phase add` - Append a new Phase at the next-available canonical id.
+- `phase insert` - Insert a Phase at a named position; parent Wave inferred from anchor.
+- `phase edit` - Edit the Phase's title and / or intent paragraph in place.
+- `phase move` - Re-parent and / or re-position a Phase.
+- `phase renumber` - Reassign a Phase's canonical id; descendant Step display paths
+  recompute.
+- `phase remove` - Remove a Phase; descendant Step ids cascade-retire.
+- `wave add` - Append a new Wave at the next-available canonical id (L3+ only).
+- `wave insert` - Insert a Wave at a named position relative to an existing anchor.
+- `wave edit` - Edit the Wave's title and / or intent paragraph in place.
+- `wave move` - Re-position a Wave in document order.
+- `wave remove` - Remove a Wave; descendant Phase and Step ids cascade-retire.
+- `epic intent show` - Print the Epic intent paragraph (L4 plans only).
+- `epic intent edit` - Replace the Epic intent paragraph (L4 plans only).
+- `tier show` - Print the plan's declared tier.
+- `tier promote` - Promote the plan tier transitively (L1 -> ...
+- `tier demote` - Demote the plan tier; refuses multi-child collapse without `--force`.
+- `trailer emit` - Print a well-formed commit-linkage trailer line.
+- `trailer validate` - Validate the commit-linkage trailers in a commit-message file.
+
+#### Link
+
+- `list` - List related: edges in the vault document graph.
+- `add` - Add a related: edge from *src* to *dst*.
+- `remove` - Remove a related: edge from *src* to *dst*.
 
 ### Spec
 
-```text
-vaultspec-core spec doctor [OPTIONS]
-vaultspec-core spec rules list [OPTIONS]
-vaultspec-core spec rules add [OPTIONS] NAME
-vaultspec-core spec rules show [OPTIONS] NAME
-vaultspec-core spec rules edit [OPTIONS] NAME
-vaultspec-core spec rules remove [OPTIONS] NAME
-vaultspec-core spec rules rename [OPTIONS] OLD_NAME NEW_NAME
-vaultspec-core spec rules sync [OPTIONS] [PROVIDER]
-vaultspec-core spec rules restore [OPTIONS] FILENAME
-vaultspec-core spec rules status [OPTIONS]
-vaultspec-core spec skills list [OPTIONS]
-vaultspec-core spec skills add [OPTIONS] NAME
-vaultspec-core spec skills show [OPTIONS] NAME
-vaultspec-core spec skills edit [OPTIONS] NAME
-vaultspec-core spec skills remove [OPTIONS] NAME
-vaultspec-core spec skills rename [OPTIONS] OLD_NAME NEW_NAME
-vaultspec-core spec skills sync [OPTIONS] [PROVIDER]
-vaultspec-core spec skills restore [OPTIONS] FILENAME
-vaultspec-core spec skills status [OPTIONS]
-vaultspec-core spec agents list [OPTIONS]
-vaultspec-core spec agents add [OPTIONS] NAME
-vaultspec-core spec agents show [OPTIONS] NAME
-vaultspec-core spec agents edit [OPTIONS] NAME
-vaultspec-core spec agents remove [OPTIONS] NAME
-vaultspec-core spec agents rename [OPTIONS] OLD_NAME NEW_NAME
-vaultspec-core spec agents sync [OPTIONS] [PROVIDER]
-vaultspec-core spec agents restore [OPTIONS] FILENAME
-vaultspec-core spec agents status [OPTIONS]
-vaultspec-core spec system show [OPTIONS]
-vaultspec-core spec system sync [OPTIONS] [PROVIDER]
-vaultspec-core spec hooks list [OPTIONS]
-vaultspec-core spec hooks add [OPTIONS] NAME
-vaultspec-core spec hooks show [OPTIONS] NAME
-vaultspec-core spec hooks edit [OPTIONS] NAME
-vaultspec-core spec hooks rename [OPTIONS] OLD_NAME NEW_NAME
-vaultspec-core spec hooks remove [OPTIONS] NAME
-vaultspec-core spec hooks restore [OPTIONS] FILENAME
-vaultspec-core spec hooks sync [OPTIONS] [PROVIDER]
-vaultspec-core spec hooks status [OPTIONS]
-vaultspec-core spec hooks run [OPTIONS] EVENT
-vaultspec-core spec mcps list [OPTIONS]
-vaultspec-core spec mcps status [OPTIONS]
-vaultspec-core spec mcps add [OPTIONS]
-vaultspec-core spec mcps remove [OPTIONS] NAME
-vaultspec-core spec mcps sync [OPTIONS] [PROVIDER]
-vaultspec-core spec reference generate [OPTIONS]
-```
+- `doctor` - Diagnose workspace health and report issues.
+
+#### Rules
+
+- `list` - List all available rules.
+- `add` - Add a new custom rule source under .vaultspec/.
+- `show` - Display a rule's content.
+- `edit` - Open a rule in the configured editor.
+- `remove` - Delete a rule.
+- `rename` - Rename an existing rule atomically.
+- `sync` - Sync only rule files; use vaultspec-core sync for complete refresh.
+- `restore` - Restore a rule to its snapshotted original.
+- `status` - Report rules sync status against provider destinations.
+
+#### Skills
+
+- `list` - List all available skills.
+- `add` - Add a new skill.
+- `show` - Display a skill's content.
+- `edit` - Open a skill in the configured editor.
+- `remove` - Delete a skill.
+- `rename` - Rename an existing skill atomically.
+- `sync` - Sync only skill files; use vaultspec-core sync for complete refresh.
+- `restore` - Restore a skill to its snapshotted original.
+- `status` - Report skills sync status against provider destinations.
+
+#### Agents
+
+- `list` - List all available agents.
+- `add` - Add a new agent definition.
+- `show` - Display an agent's content.
+- `edit` - Open an agent in the configured editor.
+- `remove` - Delete an agent definition.
+- `rename` - Rename an existing agent definition atomically.
+- `sync` - Sync only agent files; use vaultspec-core sync for complete refresh.
+- `restore` - Restore an agent to its snapshotted original.
+- `status` - Report agents sync status against provider destinations.
+
+#### System
+
+- `show` - Display system prompt parts and targets.
+- `sync` - Sync only system prompts; use vaultspec-core sync for complete refresh.
+
+#### Hooks
+
+- `list` - List all defined hooks.
+- `add` - Add a new declarative hook under .vaultspec/.
+- `show` - Display a hook's content.
+- `edit` - Open a hook in the configured editor.
+- `rename` - Rename an existing hook atomically.
+- `remove` - Delete a hook.
+- `restore` - Restore a hook to its snapshotted original (not supported for custom
+  hooks).
+- `sync` - Sync only hooks files; use vaultspec-core sync for complete refresh.
+- `status` - Report declarative hooks parsing and taxonomy compliance status.
+- `run` - Trigger hooks for a specific event.
+
+#### Mcps
+
+- `list` - List all registered MCP server definitions.
+- `status` - Report focused MCP definition and .mcp.json sync status.
+- `add` - Add a new custom MCP server definition.
+- `remove` - Remove an MCP server definition.
+- `sync` - Sync only MCP definitions to .mcp.json.
+
+#### Reference
+
+- `generate` - Regenerate the generator-owned regions of the bundled CLI reference.
 
 ### Migrations
 
-```text
-vaultspec-core migrations status [OPTIONS]
-vaultspec-core migrations run [OPTIONS]
-```
+- `status` - Show registered migrations and which entries are pending.
+- `run` - Run pending schema migrations and bump the manifest version.
 
 ### Config
 
-```text
-vaultspec-core config get [OPTIONS] KEY
-vaultspec-core config set [OPTIONS] KEY VALUE
-vaultspec-core config unset [OPTIONS] KEY
-vaultspec-core config list [OPTIONS]
-```
+- `get` - Read a local configuration value.
+- `set` - Write a local configuration value.
+- `unset` - Clear a local configuration entry.
+- `list` - Enumerate all known configuration entries and current values.
 
 <!-- vaultspec:generated:end command-inventory -->
 

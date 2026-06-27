@@ -355,17 +355,38 @@ def test_markdown_cli_signatures_match_live_usage() -> None:
     )
 
 
-def test_cli_handbook_contains_every_live_leaf_signature() -> None:
+def test_cli_handbook_documents_every_command() -> None:
+    """docs/CLI.md's command index names every visible leaf command.
+
+    The handbook documents commands by description, not by dumping every exact
+    usage signature: the generated command index lists each command by its path
+    within its nearest group heading (``install``; ``all`` under Check; ``step
+    toggle`` under Plan) with a one-line summary. This guards coverage - every
+    live leaf command is named - while the per-command signature snippets that
+    do appear are checked for
+    exactness by ``test_markdown_cli_signatures_match_live_usage``.
+    """
     handbook = (_REPO_ROOT / "docs" / "CLI.md").read_text(encoding="utf-8")
-    missing = [
-        _usage_for_command_path(command_path)
-        for command_path in _collect_leaf_command_paths(app)
-        if _usage_for_command_path(command_path) not in handbook
-    ]
+    group_names = {
+        group.name for group in app.registered_groups if group.name and not group.hidden
+    }
+
+    missing: list[str] = []
+    for command_path in _collect_leaf_command_paths(app):
+        if command_path[0] in group_names:
+            display = (
+                " ".join(command_path[2:])
+                if len(command_path) >= 3
+                else command_path[1]
+            )
+        else:
+            display = command_path[0]
+        if f"`{display}`" not in handbook:
+            missing.append(" ".join(command_path))
 
     assert not missing, (
-        "CLI.md must contain the exact live usage signature for every visible "
-        "leaf command:\n  - " + "\n  - ".join(missing)
+        "CLI.md's command index must name every visible leaf command:\n  - "
+        + "\n  - ".join(missing)
     )
 
 

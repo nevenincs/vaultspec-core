@@ -174,38 +174,63 @@ def collect_leaf_signatures(typer_app: typer.Typer) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def render_command_inventory(typer_app: typer.Typer) -> str:
-    """Render the command-inventory body, grouped by top-level command group.
+def _collect_leaf_help(typer_app: typer.Typer) -> list[tuple[tuple[str, ...], str]]:
+    """Return ``(path, short-help)`` for every visible leaf command, in tree order."""
+    from typer.main import get_command
 
-    Each top-level group (``vault``, ``spec``, ...) gets a ``### <Group>``
-    heading over a ``text`` fenced block of its leaf signatures; the top-level
-    leaf commands collect under "Top-level commands". Signatures stay in
-    :func:`collect_leaf_signatures` order both within and across buckets - that
-    walk already emits each group's leaves contiguously - so the flattened
-    ``vaultspec-core ...`` line sequence still equals the live tree, which the
-    drift guard relies on.
+    root = get_command(typer_app)
+    root_ctx = root.context_class(root, info_name="vaultspec-core")
+
+    entries: list[tuple[tuple[str, ...], str]] = []
+    for path in _leaf_commands_in_order(typer_app, ()):
+        command, _ctx = _resolve_click_command(root, root_ctx, path)
+        short = command.get_short_help_str(limit=200).strip()
+        entries.append((path, short))
+    return entries
+
+
+def render_command_inventory(typer_app: typer.Typer) -> str:
+    """Render the command index: a two-level, described listing of every command.
+
+    Each top-level group (``vault``, ``spec``, ...) becomes a ``### <Group>``
+    heading, and every sub-group below it (``feature``, ``check``, ``rules``,
+    ...) becomes its own ``#### <Sub-group>`` heading so related commands stay
+    titled and broken apart. Every command is one bullet - its path relative to
+    its nearest heading plus a one-line summary from the live ``--help`` - so the
+    index says what each command does without repeating ``vaultspec-core``.
+    Entries keep :func:`_leaf_commands_in_order` order.
     """
-    signatures = collect_leaf_signatures(typer_app)
     group_names = {
         group.name
         for group in typer_app.registered_groups
         if group.name and not group.hidden
     }
 
-    buckets: dict[str, list[str]] = {}
-    for signature in signatures:
-        # signature is "vaultspec-core <segment> ..."; the second token is the
-        # top-level group for a grouped command or the command name for a
-        # top-level leaf.
-        segment = signature.split()[1]
-        bucket = segment if segment in group_names else "Top-level commands"
-        buckets.setdefault(bucket, []).append(signature)
+    # Top heading -> ordered {sub-group name (or None for direct leaves): bullets}.
+    tree: dict[str, dict[str | None, list[str]]] = {}
+    for path, short in _collect_leaf_help(typer_app):
+        if path[0] in group_names:
+            top = path[0].capitalize()
+            if len(path) >= 3:
+                sub: str | None = path[1]
+                display = " ".join(path[2:])
+            else:
+                sub = None
+                display = path[1]
+        else:
+            top = "Top-level commands"
+            sub = None
+            display = path[0]
+        bullet = f"- `{display}`" + (f" - {short}" if short else "")
+        tree.setdefault(top, {}).setdefault(sub, []).append(bullet)
 
     blocks: list[str] = []
-    for bucket, group_signatures in buckets.items():
-        blocks.extend(
-            (f"### {bucket.capitalize()}", "", "```text", *group_signatures, "```", "")
-        )
+    for top, sub_groups in tree.items():
+        blocks.extend((f"### {top}", ""))
+        for sub, bullets in sub_groups.items():
+            if sub is not None:
+                blocks.extend((f"#### {sub.capitalize()}", ""))
+            blocks.extend((*bullets, ""))
     return "\n".join(blocks).rstrip("\n")
 
 

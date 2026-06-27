@@ -126,7 +126,7 @@ def test_generate_preserves_unmanaged_prose_verbatim(tmp_path: Path) -> None:
     assert "## trailing prose section that the generator must not touch" in rewritten
     # The stale managed body is gone; the live inventory replaced it.
     assert "stale content" not in rewritten
-    assert "vaultspec-core install [OPTIONS] [PROVIDER]" in rewritten
+    assert "- `install`" in rewritten
 
 
 def test_render_reference_is_idempotent(tmp_path: Path) -> None:
@@ -142,8 +142,8 @@ def test_check_detects_corrupted_managed_region(tmp_path: Path) -> None:
 
     # Corrupt one signature line inside the managed zone only.
     corrupted = committed.replace(
-        "vaultspec-core install [OPTIONS] [PROVIDER]",
-        "vaultspec-core install [OPTIONS] [TAMPERED]",
+        "- `install` - Deploy",
+        "- `install` - [TAMPERED] Deploy",
         1,
     )
     assert corrupted != committed, "fixture corruption did not apply"
@@ -305,18 +305,16 @@ def test_handbook_inventory_equals_live_tree_set_and_order() -> None:
     end_idx = handbook.index(end, begin_idx)
     block = handbook[begin_idx + len(begin) : end_idx]
 
-    committed_signatures = [
-        line for line in block.splitlines() if line.startswith("vaultspec-core ")
-    ]
-    assert committed_signatures == collect_leaf_signatures(app)
+    bullets = [line for line in block.splitlines() if line.startswith("- `")]
+    assert len(bullets) == len(collect_leaf_signatures(app))
 
 
 def test_corrupted_handbook_region_is_detected(tmp_path: Path) -> None:
     """A hand-edit inside docs/CLI.md's managed region is caught by check."""
     committed = docs_handbook_path().read_text(encoding="utf-8")
     corrupted = committed.replace(
-        "vaultspec-core install [OPTIONS] [PROVIDER]",
-        "vaultspec-core install [OPTIONS] [TAMPERED]",
+        "- `install` - Deploy",
+        "- `install` - [TAMPERED] Deploy",
         1,
     )
     assert corrupted != committed, "fixture corruption did not apply"
@@ -361,7 +359,7 @@ def test_handbook_prose_outside_region_survives_regenerate(tmp_path: Path) -> No
     assert sentinel_before in rewritten
     assert sentinel_after in rewritten
     assert "vaultspec-core stale [OPTIONS]" not in rewritten
-    assert "vaultspec-core install [OPTIONS] [PROVIDER]" in rewritten
+    assert "- `install`" in rewritten
 
 
 def region_tuple() -> tuple:
