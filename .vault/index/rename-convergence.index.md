@@ -14,6 +14,10 @@ related:
   - '[[2026-06-27-rename-convergence-W02-P03-S06]]'
   - '[[2026-06-27-rename-convergence-W02-P04-S07]]'
   - '[[2026-06-27-rename-convergence-W02-P04-S08]]'
+  - '[[2026-06-27-rename-convergence-W03-P05-S09]]'
+  - '[[2026-06-27-rename-convergence-W03-P05-S10]]'
+  - '[[2026-06-27-rename-convergence-W03-P06-S11]]'
+  - '[[2026-06-27-rename-convergence-W03-P06-S12]]'
   - '[[2026-06-27-rename-convergence-adr]]'
   - '[[2026-06-27-rename-convergence-plan]]'
   - '[[2026-06-27-rename-convergence-reference]]'
@@ -40,6 +44,10 @@ Auto-generated index of all documents tagged with `#rename-convergence`.
 - `2026-06-27-rename-convergence-W02-P03-S06` - Add real-filesystem resource_rename tests (rules/skills/agents, rollback, preserved envelopes)
 - `2026-06-27-rename-convergence-W02-P04-S07` - Route hooks_rename through the engine on the resource domain
 - `2026-06-27-rename-convergence-W02-P04-S08` - Add real-filesystem hooks_rename tests (move plus induced-failure rollback)
+- `2026-06-27-rename-convergence-W03-P05-S09` - Route \_execute_rename through the engine and switch its incoming-link rewrite to the shared rewrite_incoming_refs
+- `2026-06-27-rename-convergence-W03-P05-S10` - Migrate the vault.rename envelope incoming_rewritten to per-link counting and update its test
+- `2026-06-27-rename-convergence-W03-P06-S11` - Acquire the docs-domain lock in the structure-rename cascade fix path
+- `2026-06-27-rename-convergence-W03-P06-S12` - Add concurrency-safety tests asserting serialized renames cause no lost update or partial state
 
 ### plan
 

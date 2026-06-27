@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import re
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -27,6 +28,7 @@ from ._base import (
 )
 
 if TYPE_CHECKING:
+    from contextlib import AbstractContextManager
     from pathlib import Path
 
 __all__ = ["check_structure"]
@@ -390,43 +392,63 @@ def check_structure(
     # surfaces pending-migration warnings irrespective of --fix.
     _detect_legacy_root_indexes(root_dir, snapshot, result)
 
-    for doc_path in snapshot:
-        # Skip generated index files (non-standard naming convention)
-        if is_generated_index(doc_path):
-            continue
+    # Serialise the whole mutating cascade (the ``--fix`` file renames in
+    # ``_fix_filename`` plus the follow-up ``related:`` ref-rewrite) against the
+    # other docs-domain mutators (``rename_feature``, ``vault rename``) on the
+    # single docs sentinel. The lock is acquired only on a fix run; read-only
+    # passes (``fix=False``) take no lock. ``advisory_lock`` no-ops when
+    # ``.vault/data`` is absent and this path never creates it, so the lock is a
+    # no-op in un-provisioned trees and a real serialiser wherever ``data/``
+    # exists.
+    from ...config import get_config
+    from ...core.helpers import advisory_lock
+    from ..rename_engine import docs_lock_target
 
-        doc_type = get_doc_type(doc_path, root_dir)
-        errors = VaultConstants.validate_filename(doc_path.name, doc_type)
+    docs_dir = root_dir / get_config().docs_dir
+    cascade_lock: AbstractContextManager[object] = (
+        advisory_lock(docs_lock_target(docs_dir)) if fix else nullcontext()
+    )
 
-        if errors and fix:
-            renames, final_path = _fix_filename(doc_path, root_dir, result)
-            all_renames.extend(renames)
-            # ``final_path`` tracks the on-disk location after any
-            # renames performed by ``_fix_filename``; the original
-            # ``doc_path`` reference is stale after a successful rename
-            # and would cause the post-fix validation to be skipped.
-            if final_path.exists():
-                remaining = VaultConstants.validate_filename(final_path.name, doc_type)
-                for msg in remaining:
+    with cascade_lock:
+        for doc_path in snapshot:
+            # Skip generated index files (non-standard naming convention)
+            if is_generated_index(doc_path):
+                continue
+
+            doc_type = get_doc_type(doc_path, root_dir)
+            errors = VaultConstants.validate_filename(doc_path.name, doc_type)
+
+            if errors and fix:
+                renames, final_path = _fix_filename(doc_path, root_dir, result)
+                all_renames.extend(renames)
+                # ``final_path`` tracks the on-disk location after any
+                # renames performed by ``_fix_filename``; the original
+                # ``doc_path`` reference is stale after a successful rename
+                # and would cause the post-fix validation to be skipped.
+                if final_path.exists():
+                    remaining = VaultConstants.validate_filename(
+                        final_path.name, doc_type
+                    )
+                    for msg in remaining:
+                        result.diagnostics.append(
+                            CheckDiagnostic(
+                                path=final_path.relative_to(root_dir),
+                                message=msg,
+                                severity=Severity.ERROR,
+                            )
+                        )
+            else:
+                for msg in errors:
                     result.diagnostics.append(
                         CheckDiagnostic(
-                            path=final_path.relative_to(root_dir),
+                            path=doc_path.relative_to(root_dir),
                             message=msg,
                             severity=Severity.ERROR,
+                            fixable=True,
                         )
                     )
-        else:
-            for msg in errors:
-                result.diagnostics.append(
-                    CheckDiagnostic(
-                        path=doc_path.relative_to(root_dir),
-                        message=msg,
-                        severity=Severity.ERROR,
-                        fixable=True,
-                    )
-                )
 
-    if fix and all_renames:
-        _rewrite_incoming_refs(root_dir, all_renames, result)
+        if fix and all_renames:
+            _rewrite_incoming_refs(root_dir, all_renames, result)
 
     return result

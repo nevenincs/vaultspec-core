@@ -54,7 +54,7 @@ from vaultspec_core.cli._target import TargetOption, apply_target
 if TYPE_CHECKING:
     import typer as _typer
 
-    from vaultspec_core.vaultcore.checks._base import CheckDiagnostic
+    from vaultspec_core.vaultcore.checks._base import CheckDiagnostic, CheckResult
     from vaultspec_core.vaultcore.models import DocumentMetadata
 
 __all__ = ["register_edit_commands", "register_rename_command"]
@@ -787,32 +787,48 @@ def _find_incoming_refs(root_dir: Path, old_stem: str) -> list[Path]:
     return refs
 
 
-def _rewrite_incoming_related(refs: list[Path], old_stem: str, new_stem: str) -> int:
-    """Re-point each referencing doc's ``related:`` from *old_stem* to *new_stem*.
+def _refresh_doc_stamps(paths: list[Path]) -> None:
+    """Refresh the ``modified:`` stamp on each touched document.
 
-    Each rewrite removes the old ``related:`` entry and appends the new
-    ``[[new_stem]]`` link, refreshing that doc's ``modified:`` stamp (both
-    helpers do so internally). A doc whose only reference was a body link (not a
-    ``related:`` entry) is left untouched.
+    Mirrors the feature-rename backend's
+    :func:`~vaultspec_core.vaultcore.query._refresh_rename_stamps`: the shared
+    ``related:`` cascade rewrites wiki-links but does not bump the modified
+    stamp, so the renamed document and every relinked document are stamped here
+    (vault-orientation ADR decision D3 - a link mutation refreshes the target's
+    stamp). Newlines are preserved byte-for-byte and an unwritable document logs
+    rather than aborting, so this never raises out of the rename transaction.
 
     Args:
-        refs: Documents referencing *old_stem* (from :func:`_find_incoming_refs`).
-        old_stem: The stem being renamed away from.
-        new_stem: The stem being renamed to.
-
-    Returns:
-        The number of documents actually rewritten.
+        paths: Absolute paths to stamp; non-files and duplicates are skipped.
     """
-    from vaultspec_core.vaultcore.checks.references import _add_related_link
-    from vaultspec_core.vaultcore.related_surgery import remove_related_entries
+    from vaultspec_core.vaultcore.models import refresh_modified_stamp
+    from vaultspec_core.vaultcore.related_surgery import (
+        _atomic_write_restore,
+        _read_preserve_newlines,
+    )
 
-    rewritten = 0
-    for path in refs:
-        removed = remove_related_entries(path, [old_stem])
-        added = _add_related_link(path, new_stem)
-        if removed or added:
-            rewritten += 1
-    return rewritten
+    today = _dt.date.today()
+    seen: set[Path] = set()
+    for path in paths:
+        if path in seen or not path.is_file():
+            continue
+        seen.add(path)
+        try:
+            text_lf, newline = _read_preserve_newlines(path)
+        except (OSError, UnicodeDecodeError):
+            continue
+        stamped = refresh_modified_stamp(text_lf, today)
+        if stamped == text_lf:
+            continue
+        out = stamped if newline == "\n" else stamped.replace("\n", newline)
+        try:
+            _atomic_write_restore(path, out)
+        except OSError as exc:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Failed to refresh modified stamp for %s: %s", path, exc
+            )
 
 
 def _execute_rename(
@@ -827,9 +843,16 @@ def _execute_rename(
     """Rename a document's identity-bearing file and re-point incoming links.
 
     Cursory pre-checks (blob-hash concurrency, target-stem grammar, collision)
-    run BEFORE any mutation. Then incoming ``related:`` references are rewritten,
-    the file is physically renamed, and its ``modified:`` stamp refreshed. The
-    renamed document's post-rename conformance diagnostics ride the envelope.
+    run BEFORE any mutation. The mutation then drives the shared
+    :class:`~vaultspec_core.vaultcore.rename_engine.RenameTransaction` on the
+    docs domain: it acquires the docs advisory lock, snapshots the renamed doc
+    plus every doc carrying an incoming ``related:`` link, physically renames
+    the file FIRST (closing the prior dangling-link window where links were
+    rewritten before the rename), then runs the shared
+    :func:`~vaultspec_core.vaultcore.rename_ops.rewrite_incoming_refs` cascade
+    and refreshes the ``modified:`` stamp on every touched doc. Any failure
+    inside the transaction rolls the vault back byte-for-byte. The renamed
+    document's post-rename conformance diagnostics ride the envelope.
 
     Args:
         ref: The document to rename (stem, filename, path, or wiki-link).
@@ -839,16 +862,20 @@ def _execute_rename(
         dry_run: When ``True``, do everything except mutate.
         json_output: When ``True``, emit the JSON envelope.
     """
+    from vaultspec_core.config import get_config
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.blob_hash import git_blob_oid
-    from vaultspec_core.vaultcore.models import refresh_modified_stamp
-    from vaultspec_core.vaultcore.related_surgery import (
-        _atomic_write_restore,
-        _read_preserve_newlines,
+    from vaultspec_core.vaultcore.checks._base import CheckResult
+    from vaultspec_core.vaultcore.related_surgery import _read_preserve_newlines
+    from vaultspec_core.vaultcore.rename_engine import (
+        RenameTransaction,
+        docs_lock_target,
     )
+    from vaultspec_core.vaultcore.rename_ops import rewrite_incoming_refs
 
     command = "vault.rename"
     root_dir = _get_ctx().target_dir
+    docs_dir = root_dir / get_config().docs_dir
 
     try:
         old_path = _resolve_doc_path(ref, root_dir)
@@ -896,6 +923,10 @@ def _execute_rename(
                     "new_path": str(new_path),
                     "old_blob_hash": old_blob,
                     "new_node_id": f"doc:{new_stem}",
+                    # Dry-run preview: the per-doc incoming-ref count. The applied
+                    # path below reports the cascade's per-link ``fixed_count``;
+                    # the two agree except in the rare dedup-drop case the preview
+                    # cannot observe without writing.
                     "incoming_rewritten": len(refs),
                     "dry_run": True,
                 },
@@ -903,16 +934,29 @@ def _execute_rename(
             )
             return
 
-        # Re-point incoming links, physically rename, then refresh modified.
-        rewritten = _rewrite_incoming_related(refs, old_stem, new_stem)
-        old_path.replace(new_path)
-        text_lf, newline = _read_preserve_newlines(new_path)
-        stamped = refresh_modified_stamp(text_lf, _dt.date.today())
-        if stamped != text_lf:
-            _atomic_write_restore(
-                new_path,
-                stamped if newline == "\n" else stamped.replace("\n", newline),
-            )
+        # Drive the rename through the shared transactional engine on the docs
+        # domain. Ordering is deliberate: snapshot the participating files, then
+        # rename the file BEFORE the cascade so a failure rolls back rather than
+        # leaving rewritten links pointing at a now-missing stem.
+        cascade = CheckResult(check_name="vault-rename")
+        with RenameTransaction(docs_dir, lock_target=docs_lock_target(docs_dir)) as tx:
+            tx.snapshot([old_path, *refs])
+            if not tx.rename(old_path, new_path):
+                raise _EditError(
+                    f"Filesystem rename failed: {old_path.name} -> {new_path.name}",
+                    {
+                        "old_path": str(old_path),
+                        "new_path": str(new_path),
+                        "collision": True,
+                    },
+                )
+            rewrite_incoming_refs(root_dir, [(old_stem, new_stem)], cascade)
+            _refresh_doc_stamps([new_path, *_cascade_paths(cascade, root_dir)])
+
+        # The shared cascade counts per-link rewrites (dedup drops are reported
+        # but not counted), so ``incoming_rewritten`` is now per-link rather than
+        # the former per-document tally.
+        rewritten = cascade.fixed_count
 
         checks: list[dict] = []
         if run_checks:
@@ -943,6 +987,25 @@ def _execute_rename(
             json_output=json_output,
         )
         raise typer.Exit(code=1) from exc
+
+
+def _cascade_paths(cascade: CheckResult, root_dir: Path) -> list[Path]:
+    """Resolve the cascade's diagnostic paths to absolute touched-doc paths.
+
+    Args:
+        cascade: The :class:`CheckResult` populated by
+            :func:`~vaultspec_core.vaultcore.rename_ops.rewrite_incoming_refs`.
+        root_dir: Project root the diagnostics are relativised against.
+
+    Returns:
+        Absolute paths of the documents the cascade rewrote.
+    """
+    paths: list[Path] = []
+    for diag in cascade.diagnostics:
+        if diag.path is None:
+            continue
+        paths.append(diag.path if diag.path.is_absolute() else root_dir / diag.path)
+    return paths
 
 
 def register_rename_command(vault_app: _typer.Typer) -> None:

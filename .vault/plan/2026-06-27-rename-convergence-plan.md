@@ -65,15 +65,15 @@ Route vault rename (\_execute_rename) through the engine, retiring its duplicate
 
 Route \_execute_rename through the engine, switch to the shared link cascade, gain rollback and case-safe rename.
 
-- [ ] `W03.P05.S09` - Route \_execute_rename through the engine and switch its incoming-link rewrite to the shared rewrite_incoming_refs; `src/vaultspec_core/cli/edit_cmd.py`.
-- [ ] `W03.P05.S10` - Migrate the vault.rename envelope incoming_rewritten to per-link counting and update its test; `src/vaultspec_core/tests/cli/test_vault_rename.py`.
+- [x] `W03.P05.S09` - Route \_execute_rename through the engine and switch its incoming-link rewrite to the shared rewrite_incoming_refs; `src/vaultspec_core/cli/edit_cmd.py`.
+- [x] `W03.P05.S10` - Migrate the vault.rename envelope incoming_rewritten to per-link counting and update its test; `src/vaultspec_core/tests/cli/test_vault_rename.py`.
 
 ### Phase `W03.P06` - Cascade lock and concurrency safety
 
 Bring the structure-rename cascade under the docs lock; assert serialized concurrency safety.
 
-- [ ] `W03.P06.S11` - Acquire the docs-domain lock in the structure-rename cascade fix path; `src/vaultspec_core/vaultcore/checks/structure.py`.
-- [ ] `W03.P06.S12` - Add concurrency-safety tests asserting serialized renames cause no lost update or partial state; `src/vaultspec_core/vaultcore/tests/test_rename_concurrency.py`.
+- [x] `W03.P06.S11` - Acquire the docs-domain lock in the structure-rename cascade fix path; `src/vaultspec_core/vaultcore/checks/structure.py`.
+- [x] `W03.P06.S12` - Add concurrency-safety tests asserting serialized renames cause no lost update or partial state; `src/vaultspec_core/vaultcore/tests/test_rename_concurrency.py`.
 
 ## Wave `W04` - Drift check and firmware conformance
 
