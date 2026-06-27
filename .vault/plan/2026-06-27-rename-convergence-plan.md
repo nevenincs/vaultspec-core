@@ -47,15 +47,15 @@ Route resource_rename (spec rules/skills/agents) and hooks_rename through the en
 
 Route spec rules/skills/agents rename through the engine on the resource domain, preserving envelopes.
 
-- [ ] `W02.P03.S05` - Route resource_rename through the engine with per-base_dir containment, case-safe rename, resource-domain lock, and rollback; `src/vaultspec_core/core/resources.py`.
-- [ ] `W02.P03.S06` - Add real-filesystem resource_rename tests (rules/skills/agents, rollback, preserved envelopes); `src/vaultspec_core/core/tests/test_resource_rename.py`.
+- [x] `W02.P03.S05` - Route resource_rename through the engine with per-base_dir containment, case-safe rename, resource-domain lock, and rollback; `src/vaultspec_core/core/resources.py`.
+- [x] `W02.P03.S06` - Add real-filesystem resource_rename tests (rules/skills/agents, rollback, preserved envelopes); `src/vaultspec_core/core/tests/test_resource_rename.py`.
 
 ### Phase `W02.P04` - Converge hooks_rename
 
 Route the hooks rename through the engine with containment, case-safe rename, and lock-protected rollback.
 
-- [ ] `W02.P04.S07` - Route hooks_rename through the engine on the resource domain; `src/vaultspec_core/core/hooks.py`.
-- [ ] `W02.P04.S08` - Add real-filesystem hooks_rename tests (move plus induced-failure rollback); `src/vaultspec_core/core/tests/test_hooks_rename.py`.
+- [x] `W02.P04.S07` - Route hooks_rename through the engine on the resource domain; `src/vaultspec_core/core/hooks.py`.
+- [x] `W02.P04.S08` - Add real-filesystem hooks_rename tests (move plus induced-failure rollback); `src/vaultspec_core/core/tests/test_hooks_rename.py`.
 
 ## Wave `W03` - Converge document rename and cascade lock
 

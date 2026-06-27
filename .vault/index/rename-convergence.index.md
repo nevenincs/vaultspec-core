@@ -10,6 +10,10 @@ related:
   - '[[2026-06-27-rename-convergence-W01-P01-S02]]'
   - '[[2026-06-27-rename-convergence-W01-P02-S03]]'
   - '[[2026-06-27-rename-convergence-W01-P02-S04]]'
+  - '[[2026-06-27-rename-convergence-W02-P03-S05]]'
+  - '[[2026-06-27-rename-convergence-W02-P03-S06]]'
+  - '[[2026-06-27-rename-convergence-W02-P04-S07]]'
+  - '[[2026-06-27-rename-convergence-W02-P04-S08]]'
   - '[[2026-06-27-rename-convergence-adr]]'
   - '[[2026-06-27-rename-convergence-plan]]'
   - '[[2026-06-27-rename-convergence-reference]]'
@@ -32,6 +36,10 @@ Auto-generated index of all documents tagged with `#rename-convergence`.
 - `2026-06-27-rename-convergence-W01-P01-S02` - Implement RenameTransaction: caller-supplied snapshot, containment-checked case-safe rename, record-write/create/dir, context-manager rollback, and domain-lock acquisition
 - `2026-06-27-rename-convergence-W01-P02-S03` - Drive rename_feature through RenameTransaction, passing its non-archive snapshot set, with no behavior change
 - `2026-06-27-rename-convergence-W01-P02-S04` - Run the rename_feature and structure case-rename suites to confirm byte-identical behavior
+- `2026-06-27-rename-convergence-W02-P03-S05` - Route resource_rename through the engine with per-base_dir containment, case-safe rename, resource-domain lock, and rollback
+- `2026-06-27-rename-convergence-W02-P03-S06` - Add real-filesystem resource_rename tests (rules/skills/agents, rollback, preserved envelopes)
+- `2026-06-27-rename-convergence-W02-P04-S07` - Route hooks_rename through the engine on the resource domain
+- `2026-06-27-rename-convergence-W02-P04-S08` - Add real-filesystem hooks_rename tests (move plus induced-failure rollback)
 
 ### plan
 
