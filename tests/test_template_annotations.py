@@ -10,7 +10,7 @@ pytestmark = [pytest.mark.unit]
 
 
 def _template_paths() -> list:
-    templates_dir = PROJECT_ROOT / ".vaultspec" / "rules" / "templates"
+    templates_dir = PROJECT_ROOT / ".vaultspec" / "templates"
     return sorted(templates_dir.glob("*.md"))
 
 

@@ -1,7 +1,7 @@
 """Manage canonical skill definitions and sync them into tool-specific layouts.
 
 The module treats skills as directory-shaped resources rooted at
-``.vaultspec/rules/skills``. It collects their ``SKILL.md`` entrypoints,
+``.vaultspec/skills``. It collects their ``SKILL.md`` entrypoints,
 scaffolds new skill directories, and adapts them to destination layouts used
 by external tools.
 """
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 def collect_skills(
     warnings: list[str] | None = None,
 ) -> dict[str, tuple[Path, dict[str, Any], str]]:
-    """Collect skill definitions from .vaultspec/rules/skills/*/SKILL.md.
+    """Collect skill definitions from .vaultspec/skills/*/SKILL.md.
 
     Any subdirectory of the skills source directory that contains a
     ``SKILL.md`` file is treated as a skill - no naming convention is

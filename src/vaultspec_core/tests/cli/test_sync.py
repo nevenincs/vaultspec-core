@@ -365,9 +365,7 @@ class TestSyncAuthority:
             )
             assert add_result.exit_code == 0, add_result.output
 
-            source_rule = (
-                synthetic_project / ".vaultspec" / "rules" / "rules" / f"{rule_name}.md"
-            )
+            source_rule = synthetic_project / ".vaultspec" / "rules" / f"{rule_name}.md"
             assert source_rule.exists(), f"Rule source missing: {source_rule}"
 
             sync_result = runner.invoke(app, ["sync"])
@@ -397,11 +395,7 @@ class TestSyncAuthority:
         """Forced sync repairs managed MCP drift without deleting user servers."""
         mcp_path = synthetic_project / ".mcp.json"
         source_path = (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "mcps"
-            / "vaultspec-core.builtin.json"
+            synthetic_project / ".vaultspec" / "mcps" / "vaultspec-core.builtin.json"
         )
         expected_config = json.loads(source_path.read_text(encoding="utf-8"))
 
@@ -461,11 +455,7 @@ class TestSyncAuthority:
         """
         mcp_path = synthetic_project / ".mcp.json"
         source_path = (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "mcps"
-            / "vaultspec-core.builtin.json"
+            synthetic_project / ".vaultspec" / "mcps" / "vaultspec-core.builtin.json"
         )
         expected_config = json.loads(source_path.read_text(encoding="utf-8"))
 

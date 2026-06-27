@@ -91,7 +91,7 @@ def _existing_source_server_names() -> set[str]:
 def collect_mcp_servers(
     warnings: list[str] | None = None,
 ) -> dict[str, tuple[Path, dict[str, Any]]]:
-    """Collect MCP server definitions from ``.vaultspec/rules/mcps/``.
+    """Collect MCP server definitions from ``.vaultspec/mcps/``.
 
     Reads and parses every ``.json`` file in the MCP source directory,
     returning a mapping of server name to (source path, parsed config).
@@ -159,7 +159,7 @@ def mcp_status() -> dict[str, Any]:
     """Return focused status for MCP definitions and the synced config file.
 
     This is intentionally narrower than ``spec doctor``: it reports only
-    whether source definitions under ``.vaultspec/rules/mcps/`` are represented
+    whether source definitions under ``.vaultspec/mcps/`` are represented
     in the workspace ``.mcp.json`` and whether managed entries have drifted.
     """
     parse_warnings: list[str] = []

@@ -55,7 +55,7 @@ def _make_degraded(root: Path, corruption: str) -> Path:
         mdata.installed.discard("claude")
         write_manifest_data(root, mdata)
     elif corruption == "missing_builtins":
-        for f in (root / ".vaultspec" / "rules" / "rules").glob("*.builtin.md"):
+        for f in (root / ".vaultspec" / "rules").glob("*.builtin.md"):
             f.unlink()
             break
     elif corruption == "stale_content":

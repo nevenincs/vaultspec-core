@@ -28,7 +28,7 @@ def vault_project(tmp_path: Path) -> Path:
     """
     from vaultspec_core.builtins import seed_builtins
 
-    rules_dir = tmp_path / ".vaultspec" / "rules"
+    rules_dir = tmp_path / ".vaultspec"
     rules_dir.mkdir(parents=True)
     seed_builtins(rules_dir, force=True)
 
@@ -301,7 +301,7 @@ class TestCreateVaultDocWithRelated:
         """
         from vaultspec_core.builtins import seed_builtins
 
-        rules_dir = tmp_path / ".vaultspec" / "rules"
+        rules_dir = tmp_path / ".vaultspec"
         rules_dir.mkdir(parents=True)
         seed_builtins(rules_dir, force=True)
 

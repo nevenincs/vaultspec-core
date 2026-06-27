@@ -1,7 +1,7 @@
 """Bundled builtin resources deployed during ``vaultspec-core install``.
 
 Contains canonical rules, skills, agents, system prompts, templates, and hooks
-seeded into ``.vaultspec/rules/`` on first install. Consumed by
+seeded directly into ``.vaultspec/`` on first install. Consumed by
 :mod:`vaultspec_core.cli.root` via :func:`seed_builtins` and :func:`list_builtins`.
 Uses :mod:`importlib.resources` for package-relative file access.
 """
@@ -22,14 +22,14 @@ def _builtins_root() -> Path:
 
 
 def seed_builtins(
-    target_rules_dir: Path, *, force: bool = False, dry_run: bool = False
+    target_dir: Path, *, force: bool = False, dry_run: bool = False
 ) -> list[tuple[str, str]]:
-    """Copy bundled builtins into a target ``.vaultspec/rules/`` directory.
+    """Copy bundled builtins into a target ``.vaultspec/`` directory.
 
     Files that already exist are left untouched unless *force* is True.
 
     Args:
-        target_rules_dir: The ``.vaultspec/rules/`` directory to populate.
+        target_dir: The ``.vaultspec/`` framework directory to populate.
         force: Overwrite existing files.
         dry_run: Classify every builtin without writing anything - used to
             preview an ``install --upgrade`` run.
@@ -55,7 +55,7 @@ def seed_builtins(
             continue
 
         rel = src_file.relative_to(src)
-        dest = target_rules_dir / rel
+        dest = target_dir / rel
         rel_str = str(rel).replace("\\", "/")
 
         if dest.exists() and not force:
@@ -104,8 +104,8 @@ def list_builtins() -> list[str]:
     return paths
 
 
-def check_outdated(target_rules_dir: Path) -> list[str]:
-    """Compare bundled builtins against a deployed ``.vaultspec/rules/`` tree.
+def check_outdated(target_dir: Path) -> list[str]:
+    """Compare bundled builtins against a deployed ``.vaultspec/`` tree.
 
     Returns:
         List of relative paths (forward-slash separated) present in the
@@ -121,7 +121,7 @@ def check_outdated(target_rules_dir: Path) -> list[str]:
         ):
             continue
         rel = src_file.relative_to(src)
-        dest = target_rules_dir / rel
+        dest = target_dir / rel
         if not dest.exists():
             outdated.append(str(rel).replace("\\", "/"))
             continue

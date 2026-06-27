@@ -210,7 +210,7 @@ class TestLifecycleCoexistence:
 class TestEndToEndSync:
     def test_sync_writes_native_files_per_provider(self, tmp_path: Path):
         factory = WorkspaceFactory(tmp_path).install("all")
-        hooks_dir = tmp_path / ".vaultspec" / "rules" / "hooks"
+        hooks_dir = tmp_path / ".vaultspec" / "hooks"
         hooks_dir.mkdir(parents=True, exist_ok=True)
         (hooks_dir / "guard.yaml").write_text(
             "event: pre_tool_use\nmatcher: run_command\ncommand: echo GUARD\n",

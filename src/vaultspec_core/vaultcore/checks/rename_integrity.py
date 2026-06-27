@@ -65,9 +65,9 @@ def check_rename_integrity(
         from ...core.types import init_paths
 
         vaultspec_dir = layout.vaultspec_dir
-        rules_src_dir = vaultspec_dir / "rules" / "rules"
-        skills_src_dir = vaultspec_dir / "rules" / "skills"
-        agents_src_dir = vaultspec_dir / "rules" / "agents"
+        rules_src_dir = vaultspec_dir / "rules"
+        skills_src_dir = vaultspec_dir / "skills"
+        agents_src_dir = vaultspec_dir / "agents"
 
         if rules_src_dir.exists():
             scan_groups.append(("Rule", False, rules_src_dir))

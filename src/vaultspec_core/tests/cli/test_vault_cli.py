@@ -128,7 +128,7 @@ class TestAddSubcommand:
         from vaultspec_core.core.types import init_paths
 
         # Seed real templates from the repo into the tmp workspace
-        rules_dir = tmp_path / ".vaultspec" / "rules"
+        rules_dir = tmp_path / ".vaultspec"
         rules_dir.mkdir(parents=True)
         seed_builtins(rules_dir, force=True)
 
@@ -180,7 +180,7 @@ class TestAddSubcommand:
         from vaultspec_core.builtins import seed_builtins
         from vaultspec_core.core.types import init_paths
 
-        rules_dir = tmp_path / ".vaultspec" / "rules"
+        rules_dir = tmp_path / ".vaultspec"
         rules_dir.mkdir(parents=True)
         seed_builtins(rules_dir, force=True)
         for dt in DocType:

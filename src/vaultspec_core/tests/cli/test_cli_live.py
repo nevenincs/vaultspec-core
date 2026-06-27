@@ -431,11 +431,7 @@ class TestSpecRules:
         )
         assert result.exit_code == 0
         rule_path = (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "rules"
-            / "lifecycle-test-rule.md"
+            synthetic_project / ".vaultspec" / "rules" / "lifecycle-test-rule.md"
         )
         assert rule_path.exists()
 
@@ -480,7 +476,7 @@ class TestSpecRules:
             "rename-dst",
         )
         assert result.exit_code == 0
-        dst = synthetic_project / ".vaultspec" / "rules" / "rules" / "rename-dst.md"
+        dst = synthetic_project / ".vaultspec" / "rules" / "rename-dst.md"
         assert dst.exists()
 
     def test_add_force_overwrites(self, cli, synthetic_project):
@@ -507,7 +503,7 @@ class TestSpecRules:
         )
         assert result.exit_code == 0
         content = (
-            synthetic_project / ".vaultspec" / "rules" / "rules" / "overwrite-me.md"
+            synthetic_project / ".vaultspec" / "rules" / "overwrite-me.md"
         ).read_text(encoding="utf-8")
         assert "v2" in content
 
@@ -541,13 +537,7 @@ class TestSpecSkills:
             "Live skill test",
         )
         assert result.exit_code == 0
-        skill_dir = (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "skills"
-            / "vaultspec-live-skill"
-        )
+        skill_dir = synthetic_project / ".vaultspec" / "skills" / "vaultspec-live-skill"
         assert skill_dir.is_dir()
 
         # show
@@ -590,13 +580,7 @@ class TestSpecSkills:
             "vaultspec-new-skill",
         )
         assert result.exit_code == 0
-        new = (
-            synthetic_project
-            / ".vaultspec"
-            / "rules"
-            / "skills"
-            / "vaultspec-new-skill"
-        )
+        new = synthetic_project / ".vaultspec" / "skills" / "vaultspec-new-skill"
         assert new.is_dir()
 
     @pytest.mark.parametrize("subcmd", ["show", "edit"])
@@ -626,9 +610,7 @@ class TestSpecAgents:
             "Live agent test",
         )
         assert result.exit_code == 0
-        agent_path = (
-            synthetic_project / ".vaultspec" / "rules" / "agents" / "live-agent.md"
-        )
+        agent_path = synthetic_project / ".vaultspec" / "agents" / "live-agent.md"
         assert agent_path.exists()
 
         # show
@@ -669,7 +651,7 @@ class TestSpecAgents:
             "new-agent",
         )
         assert result.exit_code == 0
-        new = synthetic_project / ".vaultspec" / "rules" / "agents" / "new-agent.md"
+        new = synthetic_project / ".vaultspec" / "agents" / "new-agent.md"
         assert new.exists()
 
     def test_show_missing_fails(self, cli, synthetic_project):

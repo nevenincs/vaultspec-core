@@ -204,9 +204,8 @@ reports a read-only warning when those annotations are still present.
 
 ## Customizing the framework
 
-Edit resources under `.vaultspec/rules/` to customize the framework. The
-`vaultspec-core spec` command group manages these resources without requiring you to
-touch files directly:
+Edit resources under `.vaultspec/` to customize the framework. The `vaultspec-core spec`
+command group manages these resources without requiring you to touch files directly:
 
 ```bash
 # Add a custom rule

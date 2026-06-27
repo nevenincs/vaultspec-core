@@ -1,0 +1,7 @@
+{
+  "command": "uv",
+  "args": [
+    "run",
+    "vaultspec-search-mcp"
+  ]
+}

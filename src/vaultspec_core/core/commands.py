@@ -120,11 +120,11 @@ def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, st
     created: list[tuple[str, str]] = []
 
     # Ensure the framework root exists unconditionally before builtins
-    # discovery.  In editable installs _builtins_root() resolves to
-    # .vaultspec/rules/ which may not yet exist after a full uninstall.
+    # discovery.  Resources are seeded directly under .vaultspec/ (no
+    # intermediate rules/ wrapper), so the framework root must exist first.
     if not dry_run:
-        ensure_dir(fw_dir / "rules")
-    created.append((_rel(target, fw_dir / "rules"), "core (.vaultspec)"))
+        ensure_dir(fw_dir)
+    created.append((_rel(target, fw_dir), "core (.vaultspec)"))
 
     # Dynamically discover resource categories from the builtins package
     # so that new categories (e.g. hooks) are scaffolded automatically.
@@ -132,7 +132,7 @@ def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, st
 
     builtins_root = _builtins_root()
     subdirs = sorted(
-        f"rules/{d.name}"
+        d.name
         for d in builtins_root.iterdir()
         if d.is_dir() and d.name not in ("__pycache__",)
     )
@@ -705,13 +705,12 @@ def init_run(
 
         created = _scaffold_core(target)
 
-        # Seed builtin content into .vaultspec/rules/
+        # Seed builtin content directly into .vaultspec/
         from vaultspec_core.builtins import seed_builtins
 
-        rules_dir = fw_dir / "rules"
-        seeded = seed_builtins(rules_dir, force=force)
+        seeded = seed_builtins(fw_dir, force=force)
         for rel, _action in seeded:
-            created.append((f".vaultspec/rules/{rel}", "builtin"))
+            created.append((f".vaultspec/{rel}", "builtin"))
 
         # Snapshot builtins for revert support
         from .revert import snapshot_builtins
@@ -866,9 +865,7 @@ def install_run(
         if not skip_core:
             from vaultspec_core.builtins import seed_builtins
 
-            items = seed_builtins(
-                path / ".vaultspec" / "rules", force=True, dry_run=True
-            )
+            items = seed_builtins(path / ".vaultspec", force=True, dry_run=True)
 
         # The real upgrade re-seeds builtins AND runs the provider sync, which
         # backfills new provider files and structural directories. Preview that
@@ -912,7 +909,7 @@ def install_run(
             from vaultspec_core.builtins import list_builtins
 
             for builtin_rel in list_builtins():
-                manifest.append((f".vaultspec/rules/{builtin_rel}", "builtin"))
+                manifest.append((f".vaultspec/{builtin_rel}", "builtin"))
 
         tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
         for tool in tools:
@@ -949,7 +946,7 @@ def install_run(
             from vaultspec_core.builtins import seed_builtins
 
             fw_dir = path / ".vaultspec"
-            seeded = seed_builtins(fw_dir / "rules", force=True)
+            seeded = seed_builtins(fw_dir, force=True)
 
             # Re-snapshot builtins for revert support
             from .revert import snapshot_builtins
@@ -1260,7 +1257,7 @@ def uninstall_run(
         ]
 
         # Surgical .mcp.json cleanup BEFORE directory removal so the
-        # registry in .vaultspec/rules/mcps/ is still readable.
+        # registry in .vaultspec/mcps/ is still readable.
         mcp_path = path / ".mcp.json"
         if "mcp" not in skip:
             from .mcps import mcp_uninstall

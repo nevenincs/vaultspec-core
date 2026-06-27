@@ -278,7 +278,7 @@ class TestScaffoldStamp:
     def _content_root(tmp_path: Path) -> Path:
         """Mirror the real shipped templates into a workspace content root."""
         content_root = tmp_path / ".vaultspec"
-        templates_dir = content_root / "rules" / "templates"
+        templates_dir = content_root / "templates"
         templates_dir.mkdir(parents=True)
         for template in _BUILTIN_TEMPLATES.glob("*.md"):
             shutil.copy(template, templates_dir / template.name)
