@@ -26,28 +26,25 @@ commands that support JavaScript Object Notation (JSON) output.
 
 ## Outcome vocabulary
 
-State-changing commands report results with one shared seven-word vocabulary, so a
-result reads the same regardless of which command produced it. Sync-shaped surfaces -
-`vaultspec-core install`, `vaultspec-core sync`, the resource-scoped
+Commands that change files report what happened to each one with the same set of words,
+so results read the same no matter which command ran. The sync-style commands -
+`vaultspec-core install`, `vaultspec-core sync`, the
 `vaultspec-core spec <resource> sync` commands, and `vaultspec-core migrations run` -
-print one glyph-prefixed line per item followed by a per-outcome count summary. With
-`--json` the summary is nested inside the standard envelope (see "JSON output envelope"
-below): `data.items` is the per-item array, each item carries its own `outcome`, and the
-envelope's top-level `status` is the outcome for the whole invocation.
+print one line per file, each marked with its glyph, then a count of each outcome. With
+`--json`, those per-file outcomes appear under `data.items`, and the envelope's
+top-level `status` is the outcome for the whole run.
 
-- `created` (`+`) - A destination that did not exist now exists.
-- `updated` (`~`) - A destination that existed was changed.
-- `unchanged` (`=`) - The destination already matched the source; no write happened.
-- `removed` (`-`) - A destination that existed no longer does.
-- `restored` (`*`) - A destination was reset to its canonical version.
-- `skipped` (`s`) - A destination was not touched because a precondition or policy
-  excluded it.
-- `failed` (`x`) - A write was attempted and an error was encountered.
+- `created` (`+`) - A new file or directory was written.
+- `updated` (`~`) - An existing file was changed.
+- `unchanged` (`=`) - The file already matched its source, so nothing was written.
+- `removed` (`-`) - An existing file was deleted.
+- `restored` (`*`) - A file was reset to its original version.
+- `skipped` (`s`) - A file was left untouched because a rule or precondition excluded
+  it; the reason is always reported.
+- `failed` (`x`) - A write was attempted and failed.
 
-A `--json` `status` of `mixed` means a single invocation produced items with more than
-one distinct outcome. An `unchanged` status is the honest summary of a no-op run, not a
-failure. A `skipped` outcome always carries a reason and is safe to interrogate. A
-`failed` outcome is the only one that stops a pipeline.
+A `--json` `status` of `mixed` means one run produced more than one outcome. `unchanged`
+is a successful no-op, not a failure. Only `failed` stops a pipeline.
 
 ## JSON output envelope
 
