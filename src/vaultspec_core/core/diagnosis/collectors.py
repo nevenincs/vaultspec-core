@@ -228,6 +228,12 @@ def collect_provider_dir_state(target: Path, tool_value: str) -> ProviderDirSign
         known_paths.add(cfg.native_config_file)
     if cfg.system_file is not None:
         known_paths.add(cfg.system_file)
+    # The provider-native MCP config (e.g. Antigravity's .agents/mcp_config.json)
+    # is written by mcp_sync. Read the same ToolConfig field the writer uses so
+    # the doctor and the writer share one notion of what legitimately lives in a
+    # provider directory, rather than maintaining a divergent hardcoded list.
+    if cfg.mcp_config_file is not None:
+        known_paths.add(cfg.mcp_config_file)
 
     all_present = True
     for d in content_dirs:
@@ -262,6 +268,10 @@ def collect_provider_dir_state(target: Path, tool_value: str) -> ProviderDirSign
         # Host-tool-native files (e.g. Claude Code's settings.local.json) are
         # benign and must not classify the directory as MIXED (issue #122).
         if child.is_file() and _is_host_native(tool_value, child.name):
+            continue
+        # Advisory-lock byproducts (e.g. mcp_config.json.lock) are local runtime
+        # artefacts the framework itself writes; they are not foreign content.
+        if child.is_file() and child.name.endswith(".lock"):
             continue
         # If we reach here, the child is not a known resource
         has_foreign = True
@@ -521,8 +531,11 @@ def collect_content_integrity(tool_value: str) -> dict[str, ContentSignal]:
         :class:`~vaultspec_core.core.diagnosis.signals.ContentSignal`.
     """
     from ..enums import Tool
+    from ..helpers import collect_md_resources
+    from ..rules import transform_rule
+    from ..sync import apply_file_sync
     from ..system import SYSTEM_BUILTIN_RULE
-    from ..types import get_context
+    from ..types import SyncResult, get_context
 
     tool = Tool(tool_value)
     result: dict[str, ContentSignal] = {}
@@ -539,36 +552,51 @@ def collect_content_integrity(tool_value: str) -> dict[str, ContentSignal]:
     dest_dir = cfg.rules_dir
     source_dir = ctx.rules_src_dir
 
-    # Provider rule directories are flat: nesting is not supported and sync
-    # sanitizes it (custom rules authored under ``rules/project/`` are
-    # flattened into the provider root, the ``project/`` prefix stripped). So
-    # the destination is globbed flat. The source is globbed recursively only
-    # to discover those project-authored sources by basename - the same
-    # basename the flattened destination carries - so a custom project rule is
-    # matched against its flat deployment and reported clean, not stale (#153).
+    # Content integrity is decided by the same comparator sync uses, not by
+    # filename presence. The ambiguous-states resolver ADR specified that this
+    # collector reuse the sync infrastructure and compare expected transformed
+    # output against the actual destination; a prior name-only implementation
+    # drifted from that, reporting a content-drifted file as CLEAN while sync
+    # would rewrite it. We render each managed rule through the same
+    # ``transform_rule`` the sync engine applies, then route it through
+    # ``apply_file_sync`` in dry-run mode (no write) so the doctor's verdict and
+    # sync's verdict come from one decision. Content drift now surfaces as
+    # DIVERGED instead of a false CLEAN.
+    #
+    # Source rules are globbed read-only and reduced to their flat basename -
+    # the same name the flat provider deployment carries. The recursive glob in
+    # ``collect_md_resources`` discovers any project-authored source one level
+    # down (#153) without the flattening side effect of ``collect_rules`` (the
+    # doctor must not mutate the source tree).
+    expected: dict[str, str] = {}
+    if source_dir.is_dir():
+        raw_sources = collect_md_resources(source_dir)
+        for key, (_src_path, meta, body) in raw_sources.items():
+            name = key.replace("\\", "/").rsplit("/", 1)[-1]
+            expected[name] = transform_rule(tool, name, meta, body)
+
     dest_files: set[str] = set()
     if dest_dir.is_dir():
         dest_files = {f.name for f in dest_dir.glob("*.md")}
 
-    # Collect files from source (recursive: project-authored rules live one
-    # level down, but only their basename matters for the flat comparison).
-    source_files: set[str] = set()
-    if source_dir.is_dir():
-        source_files = {f.name for f in source_dir.glob("**/*.md")}
+    # Files with a source: dry-run the canonical comparator and map its action.
+    # [UNCHANGED] -> CLEAN, [UPDATE] -> DIVERGED, [ADD] (dest absent) -> MISSING.
+    for name, content in expected.items():
+        probe = SyncResult()
+        action = apply_file_sync(probe, dest_dir / name, content, dry_run=True)
+        if action == "[UNCHANGED]":
+            result[name] = ContentSignal.CLEAN
+        elif action == "[ADD]":
+            result[name] = ContentSignal.MISSING
+        else:  # [UPDATE]
+            result[name] = ContentSignal.DIVERGED
 
-    # Files in both
-    for name in dest_files & source_files:
-        result[name] = ContentSignal.CLEAN
-
-    # Files only in destination
-    for name in dest_files - source_files:
+    # Files only in destination: an orphan with no source (e.g. a retired
+    # builtin's leftover deployment). The synthesized system rule has no source.
+    for name in dest_files - set(expected):
         if name == SYSTEM_BUILTIN_RULE:
             continue  # Synthesized by system_sync(), not sourced
         result[name] = ContentSignal.STALE
-
-    # Files only in source
-    for name in source_files - dest_files:
-        result[name] = ContentSignal.MISSING
 
     return result
 

@@ -169,7 +169,8 @@ def _scaffold_provider(
         Deduplicated list of ``(relative_path, label)`` tuples, one per
         directory or file created (or that would be created).
     """
-    cfg = _t.get_context().tool_configs.get(tool)
+    ctx = _t.get_context()
+    cfg = ctx.tool_configs.get(tool)
     if cfg is None:
         return []
 
@@ -183,20 +184,46 @@ def _scaffold_provider(
             seen_rels.add(rel)
             created.append((rel, f"{label} ({sublabel})"))
 
+    def _add_dir_or_files(
+        dest_dir: Path, sublabel: str, src_dir: Path | None, *, is_skill: bool = False
+    ) -> None:
+        # The dry-run preview lists the individual files sync would deploy, so it
+        # matches the per-file granularity of ``sync --dry-run`` instead of
+        # understating provider work as a single directory line. Real install
+        # only needs the directory created; file content is deployed by the
+        # subsequent sync pass. Sources are read read-only (no flattening side
+        # effect). When sources are absent (a true fresh install before the
+        # builtins are seeded) the directory line is the honest preview.
+        names: list[str] = []
+        if dry_run and src_dir is not None and src_dir.is_dir():
+            if is_skill:
+                names = sorted(
+                    p.name
+                    for p in src_dir.iterdir()
+                    if p.is_dir() and (p / "SKILL.md").exists()
+                )
+            else:
+                names = sorted(p.name for p in src_dir.glob("*.md"))
+        if names:
+            for name in names:
+                _add(_rel(target, dest_dir / name), sublabel)
+        else:
+            _add(_rel(target, dest_dir), sublabel)
+
     if ProviderCapability.RULES in caps and cfg.rules_dir:
         if not dry_run:
             ensure_dir(cfg.rules_dir)
-        _add(_rel(target, cfg.rules_dir), "rules")
+        _add_dir_or_files(cfg.rules_dir, "rules", ctx.rules_src_dir)
 
     if ProviderCapability.SKILLS in caps and cfg.skills_dir:
         if not dry_run:
             ensure_dir(cfg.skills_dir)
-        _add(_rel(target, cfg.skills_dir), "skills")
+        _add_dir_or_files(cfg.skills_dir, "skills", ctx.skills_src_dir, is_skill=True)
 
     if ProviderCapability.AGENTS in caps and cfg.agents_dir:
         if not dry_run:
             ensure_dir(cfg.agents_dir)
-        _add(_rel(target, cfg.agents_dir), "agents")
+        _add_dir_or_files(cfg.agents_dir, "agents", ctx.agents_src_dir)
 
     if ProviderCapability.WORKFLOWS in caps and cfg.workflows_dir:
         if not dry_run:
