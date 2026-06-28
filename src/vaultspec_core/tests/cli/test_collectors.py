@@ -293,6 +293,40 @@ class TestProviderDirState:
             == ProviderDirSignal.MISSING
         )
 
+    def test_provider_native_mcp_config_is_not_mixed(
+        self, synthetic_project: Path
+    ) -> None:
+        """A provider-native mcp_config.json (and its .lock) is not foreign.
+
+        The MCP writer deploys mcp_config.json into providers such as
+        Antigravity's .agents/ dir; the doctor must read the same ToolConfig
+        field the writer uses instead of flagging the framework's own artefact
+        as MIXED.
+        """
+        from vaultspec_core.core.types import get_context
+
+        ctx = get_context()
+        tool = next(
+            (
+                t
+                for t, cfg in ctx.tool_configs.items()
+                if cfg.mcp_config_file is not None
+            ),
+            None,
+        )
+        assert tool is not None, "expected a provider with a native MCP config"
+        mcp_path = ctx.tool_configs[tool].mcp_config_file
+        assert mcp_path is not None
+
+        baseline = collect_provider_dir_state(synthetic_project, tool.value)
+        mcp_path.parent.mkdir(parents=True, exist_ok=True)
+        mcp_path.write_text('{"mcpServers": {}}\n', encoding="utf-8")
+        (mcp_path.parent / f"{mcp_path.name}.lock").write_text("", encoding="utf-8")
+
+        after = collect_provider_dir_state(synthetic_project, tool.value)
+        assert after != ProviderDirSignal.MIXED
+        assert after == baseline
+
 
 # ---------------------------------------------------------------------------
 # collect_builtin_version_state
@@ -338,6 +372,34 @@ class TestBuiltinVersionState:
         # No corresponding file in rules/
 
         assert collect_builtin_version_state(tmp_path) == BuiltinVersionSignal.DELETED
+
+    def test_prune_orphan_snapshots_recovers_from_deleted(self, tmp_path: Path) -> None:
+        """Pruning an orphan snapshot returns builtin_version from DELETED to clean.
+
+        A builtin retired from the framework leaves its snapshot behind, which
+        pins builtin_version at DELETED forever. prune_orphan_snapshots removes
+        the snapshot whose live builtin is gone, restoring a clean state.
+        """
+        from vaultspec_core.core.revert import prune_orphan_snapshots
+
+        vs = tmp_path / ".vaultspec"
+        snap = vs / "_snapshots" / "rules"
+        snap.mkdir(parents=True)
+        rules = vs / "rules"
+        rules.mkdir(parents=True)
+
+        # A live builtin (kept) and an orphan snapshot (retired builtin).
+        (snap / "live.builtin.md").write_text("content", encoding="utf-8")
+        (rules / "live.builtin.md").write_text("content", encoding="utf-8")
+        (snap / "retired.builtin.md").write_text("gone", encoding="utf-8")
+
+        assert collect_builtin_version_state(tmp_path) == BuiltinVersionSignal.DELETED
+
+        removed = prune_orphan_snapshots(vs)
+        assert removed == 1
+        assert not (snap / "retired.builtin.md").exists()
+        assert (snap / "live.builtin.md").exists()
+        assert collect_builtin_version_state(tmp_path) == BuiltinVersionSignal.CURRENT
 
 
 # ---------------------------------------------------------------------------
@@ -480,6 +542,7 @@ class TestContentIntegrity:
         deployment and report CLEAN, rather than flagging the source as
         STALE/MISSING because the destination has no ``project/`` subdir.
         """
+        from vaultspec_core.core.rules import rules_sync
         from vaultspec_core.core.types import get_context
 
         ctx = get_context()
@@ -491,13 +554,48 @@ class TestContentIntegrity:
         src_rule.parent.mkdir(parents=True, exist_ok=True)
         src_rule.write_text("# custom rule\n", encoding="utf-8")
 
-        # Destination: flattened into the provider rules root (what sync emits).
-        dest_rule = cfg.rules_dir / "custom-rule.md"
-        dest_rule.parent.mkdir(parents=True, exist_ok=True)
-        dest_rule.write_text("# custom rule\n", encoding="utf-8")
+        # Deploy through the real sync path (which flattens the nesting and
+        # writes the transformed content) rather than hand-writing raw bytes:
+        # content integrity now compares rendered content, so the destination
+        # must hold what sync actually emits to read CLEAN.
+        rules_sync()
 
         result = collect_content_integrity("claude")
         assert result["custom-rule.md"] == ContentSignal.CLEAN
+
+    def test_content_drift_reports_diverged_and_agrees_with_sync(
+        self, synthetic_project: Path
+    ) -> None:
+        """A content-drifted deployed rule reads DIVERGED, and sync would update it.
+
+        Regression for the install/sync/doctor disagreement: the prior
+        name-only check reported a content-drifted file as CLEAN while sync
+        would rewrite it. The collector now routes through the same comparator
+        sync uses, so the two surfaces agree.
+        """
+        from vaultspec_core.core.rules import rules_sync
+        from vaultspec_core.core.types import get_context
+
+        ctx = get_context()
+        cfg = ctx.tool_configs.get(Tool.CLAUDE)
+        assert cfg is not None and cfg.rules_dir is not None
+
+        # A real, synced builtin rule whose deployed copy we corrupt in place.
+        target = cfg.rules_dir / "vaultspec.builtin.md"
+        assert target.exists()
+        target.write_text("# drifted content not matching source\n", encoding="utf-8")
+
+        # Doctor: the file is DIVERGED, not a false CLEAN.
+        result = collect_content_integrity("claude")
+        assert result["vaultspec.builtin.md"] == ContentSignal.DIVERGED
+
+        # Sync: claude's copy of the same file is queued for [UPDATE]. The two
+        # surfaces agree. (Other providers share the basename but were not
+        # drifted, so match on the exact claude destination path.)
+        sync_result = rules_sync(dry_run=True)
+        target_str = str(target).replace("\\", "/")
+        claude_actions = [a for p, a in sync_result.items if p == target_str]
+        assert claude_actions == ["[UPDATE]"]
 
 
 # ---------------------------------------------------------------------------

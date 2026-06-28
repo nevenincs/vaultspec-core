@@ -55,6 +55,21 @@ class TestInstallDryRun:
         assert result.exit_code == 0
         assert len(result.output.strip()) > 0
 
+    def test_dry_run_lists_individual_provider_files(self, synthetic_project, runner):
+        """On an installed workspace, the preview lists provider files, not just dirs.
+
+        Regression for the sparse install --dry-run output: provider work was
+        previewed at directory granularity (a single ``claude (rules)`` line)
+        while sync previewed per file. The preview now enumerates the files
+        sync would deploy, matching sync's granularity.
+        """
+        result = runner.invoke(
+            app, ["-t", str(synthetic_project), "install", "--force", "--dry-run"]
+        )
+        assert result.exit_code == 0, result.output
+        # An individual builtin rule file appears, not only the directory line.
+        assert "vaultspec-cli.builtin.md" in result.output
+
 
 class TestInstallPathSafety:
     def test_deep_nonexistent_path_rejected(self, tmp_path, runner):

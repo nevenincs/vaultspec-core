@@ -65,7 +65,59 @@ def snapshot_builtins(vaultspec_dir: Path) -> int:
         count += 1
         logger.debug("Snapshotted %s", rel)
 
+    # A snapshot refresh is copy-current plus prune-orphans: a builtin retired
+    # from the framework must not leave a snapshot behind, or list_modified_builtins
+    # reports it ``missing`` forever and builtin_version stays DELETED.
+    prune_orphan_snapshots(vaultspec_dir)
+
     return count
+
+
+def prune_orphan_snapshots(vaultspec_dir: Path) -> int:
+    """Remove snapshots whose live builtin no longer exists under *vaultspec_dir*.
+
+    When a builtin is retired from the framework its install-time snapshot is
+    left behind. That makes :func:`list_modified_builtins` report the snapshot as
+    ``missing`` and :func:`collect_builtin_version_state` return ``DELETED``
+    permanently, with no in-workspace remedy. Pruning the orphan snapshot
+    restores a clean version state and keeps the snapshot tree tracking the live
+    builtin set. Now-empty snapshot subdirectories are removed afterwards.
+
+    Args:
+        vaultspec_dir: The ``.vaultspec`` directory.
+
+    Returns:
+        Number of orphan snapshot files removed.
+    """
+    snapshot_dir = vaultspec_dir / _SNAPSHOT_DIR
+    if not snapshot_dir.exists():
+        return 0
+
+    removed = 0
+    for snapshot in snapshot_dir.rglob(f"*{_BUILTIN_SUFFIX}"):
+        rel = snapshot.relative_to(snapshot_dir)
+        if (vaultspec_dir / rel).exists():
+            continue
+        try:
+            snapshot.unlink()
+            removed += 1
+            logger.debug("Pruned orphan snapshot %s", rel)
+        except OSError as exc:
+            logger.warning("Failed to prune orphan snapshot %s: %s", rel, exc)
+
+    # Remove now-empty snapshot subdirectories, deepest first.
+    for directory in sorted(
+        (p for p in snapshot_dir.rglob("*") if p.is_dir()),
+        key=lambda p: len(p.parts),
+        reverse=True,
+    ):
+        try:
+            if not any(directory.iterdir()):
+                directory.rmdir()
+        except OSError:
+            pass
+
+    return removed
 
 
 def get_snapshot_content(
