@@ -9,7 +9,7 @@ related:
   - '[[2026-04-12-gemini-agent-render-plan]]'
 ---
 
-# gemini-agent-render adr
+# gemini-agent-render adr | (**status:** `accepted`)
 
 ## status
 

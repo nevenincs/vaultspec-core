@@ -19,9 +19,11 @@ related:
      refreshed by mutating CLI verbs and vault check fix; never hand-edit.
 
      Status convention: the H1 status value is one of proposed, accepted,
-     rejected, or deprecated. A new ADR starts as proposed; it moves to
-     accepted or rejected when the decision is made, and to deprecated
-     when a later ADR supersedes it.
+     rejected, superseded, or deprecated. A new ADR starts as proposed; it
+     moves to accepted or rejected when the decision is made; it becomes
+     superseded when a later ADR replaces it (set by vault adr supersede,
+     which also records superseded_by); and deprecated when it is retired
+     without a direct successor.
 
      DO NOT add fields beyond those scaffolded; metadata lives
      only in the frontmatter. -->
@@ -32,7 +34,7 @@ related:
      - NEVER reference file paths in the body. If you must name a source file,
        class, or function, use inline backtick code: `src/module.py`. -->
 
-# `{feature}` adr: `{title}` | (**status:** `{proposed|accepted|rejected|deprecated}`)
+# `{feature}` adr: `{title}` | (**status:** `{proposed|accepted|rejected|superseded|deprecated}`)
 
 ## Problem Statement
 

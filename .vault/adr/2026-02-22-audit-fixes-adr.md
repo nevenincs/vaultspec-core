@@ -9,7 +9,7 @@ related:
   - '[[2026-02-22-codebase-audit-research]]'
 ---
 
-# ADR: Audit Remediations (Logging & Robustness)
+# ADR: Audit Remediations (Logging & Robustness) | (**status:** `accepted`)
 
 ## Context
 

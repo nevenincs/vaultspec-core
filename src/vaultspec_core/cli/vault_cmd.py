@@ -1774,6 +1774,36 @@ def cmd_check_schema(
     )
 
 
+@check_app.command("adr-status")
+def cmd_check_adr_status(
+    fix: Annotated[
+        bool, typer.Option("--fix", help="Apply safe auto-corrections to vault content")
+    ] = False,
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Validate ADR status against the canonical taxonomy."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
+    from vaultspec_core.vaultcore.checks import check_adr_status
+
+    graph = VaultGraph(_get_ctx().target_dir)
+    snapshot = graph.to_snapshot()
+    result = check_adr_status(
+        _get_ctx().target_dir, snapshot=snapshot, feature=feature, fix=fix
+    )
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.adr-status"
+    )
+
+
 @check_app.command("structure")
 def cmd_check_structure(
     fix: Annotated[

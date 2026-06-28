@@ -8,7 +8,7 @@ related:
   - '[[2026-02-22-skill-audit-research]]'
 ---
 
-# ADR: Standardize Skill Structure
+# ADR: Standardize Skill Structure | (**status:** `accepted`)
 
 ## Context
 

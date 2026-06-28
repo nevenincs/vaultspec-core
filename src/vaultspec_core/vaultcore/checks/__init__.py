@@ -21,6 +21,7 @@ from ._base import (
     VaultSnapshot,
     render_check_result,
 )
+from .adr_status import check_adr_status
 from .annotations import check_annotations
 from .body_links import check_body_links
 from .dangling import check_dangling
@@ -46,6 +47,7 @@ __all__ = [
     "Severity",
     "VaultDocData",
     "VaultSnapshot",
+    "check_adr_status",
     "check_annotations",
     "check_body_links",
     "check_dangling",
@@ -77,8 +79,8 @@ def run_all_checks(
 
     Executes structure, frontmatter, modified-stamp, annotations, markdown,
     links, dangling, body-links, placeholders, orphans, features,
-    feature-rename-integrity, references, schema, rename-integrity, and
-    encoding checks in order. Builds a single
+    feature-rename-integrity, references, schema, adr-status,
+    rename-integrity, and encoding checks in order. Builds a single
     :class:`~vaultspec_core.graph.VaultGraph` and shares it across
     graph-consuming checkers to avoid redundant I/O.
 
@@ -113,6 +115,7 @@ def run_all_checks(
             check_feature_rename_integrity(root_dir),
             check_references(root_dir, graph=graph, feature=feature, fix=False),
             check_schema(root_dir, graph=graph, feature=feature, fix=False),
+            check_adr_status(root_dir, snapshot=snapshot, feature=feature, fix=False),
             check_rename_integrity(root_dir, fix=False),
             check_encoding(root_dir),
         ]
@@ -189,6 +192,15 @@ def run_all_checks(
     append_and_refresh(result)
 
     results.append(check_schema(root_dir, graph=graph, feature=feature, fix=True))
+
+    # adr-status fix only rewrites the H1 status token's backtick quoting; it
+    # never touches frontmatter, links, or filenames, so it cannot invalidate
+    # the graph. Refresh anyway when it mutates, to keep the snapshot honest.
+    result = check_adr_status(
+        root_dir, snapshot=graph.to_snapshot(), feature=feature, fix=True
+    )
+    append_and_refresh(result)
+
     results.append(check_rename_integrity(root_dir, fix=True))
     # Encoding is read-only (non-UTF-8 cannot be auto-rewritten without silently
     # mutating bytes); it runs identically in both modes.

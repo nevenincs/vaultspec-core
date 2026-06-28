@@ -11,11 +11,7 @@ related:
   - '[[2026-02-22-cli-ecosystem-factoring-research]]'
 ---
 
-# ADR: CLI Parsing Engine Migration (Typer + Rich)
-
-## Status
-
-Accepted
+# ADR: CLI Parsing Engine Migration (Typer + Rich) | (**status:** `accepted`)
 
 ## Context
 

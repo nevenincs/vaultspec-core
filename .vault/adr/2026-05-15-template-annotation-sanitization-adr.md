@@ -8,7 +8,7 @@ related:
   - '[[2026-05-15-template-annotation-sanitization-research]]'
 ---
 
-# template-annotation-sanitization adr: explicit generated annotation sanitation | status: accepted
+# template-annotation-sanitization adr: explicit generated annotation sanitation | (**status:** `accepted`)
 
 ## Problem Statement
 

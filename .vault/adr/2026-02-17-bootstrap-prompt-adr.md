@@ -9,7 +9,7 @@ related:
   - '[[2026-02-17-framework-plan]]'
 ---
 
-# bootstrap-prompt adr: framework bootstrap prompt redesign | (**status:** accepted)
+# bootstrap-prompt adr: framework bootstrap prompt redesign | (**status:** `accepted`)
 
 ## Problem Statement
 
