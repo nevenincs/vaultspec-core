@@ -1174,11 +1174,16 @@ class VaultGraph:
             if not isinstance(raw_related, list):
                 raw_related = []
             related = [str(r) for r in raw_related if isinstance(r, str)]
+            raw_superseded_by = node.frontmatter.get("superseded_by")
+            superseded_by = (
+                raw_superseded_by if isinstance(raw_superseded_by, str) else None
+            )
             metadata = DocumentMetadata(
                 tags=sorted(node.tags),
                 date=node.date,
                 modified=node.modified,
                 related=related,
+                superseded_by=superseded_by,
             )
             snapshot[node.path] = (metadata, node.body)
         return snapshot

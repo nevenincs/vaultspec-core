@@ -18,12 +18,14 @@ Surfaces, all as warnings so the suite never hard-fails an existing corpus:
 
 from __future__ import annotations
 
+import datetime as _dt
 import logging
 import re
 from typing import TYPE_CHECKING
 
 from ...core.enums import AdrStatus
 from ...core.helpers import atomic_write
+from ..models import refresh_modified_stamp
 from ._base import CheckDiagnostic, CheckResult, Severity
 
 if TYPE_CHECKING:
@@ -64,10 +66,14 @@ def _find_h1_status(body: str) -> tuple[int, str, bool] | None:
     for index, line in enumerate(body.split("\n")):
         if not line.startswith("# "):
             continue
+        # Anchor to the document's first H1: status lives on the title line, so
+        # a title without a status marker means "no parseable status" rather
+        # than deferring to some later heading that happens to carry one.
         match = _H1_STATUS_RE.match(line)
         if match:
             quoted = bool(match.group("open")) and bool(match.group("close"))
             return index, match.group("token").strip(), quoted
+        return None
     return None
 
 
@@ -82,7 +88,8 @@ def _normalize_h1_quote(doc_path: Path, token: str) -> bool:
         ``True`` when the file was modified.
     """
     try:
-        raw = doc_path.read_bytes().decode("utf-8")
+        raw_bytes = doc_path.read_bytes()
+        raw = raw_bytes.decode("utf-8")
     except (OSError, UnicodeDecodeError):
         return False
 
@@ -96,7 +103,7 @@ def _normalize_h1_quote(doc_path: Path, token: str) -> bool:
             continue
         match = _H1_STATUS_RE.match(line)
         if not match:
-            continue
+            break
         prefix = line[: match.start("open")]
         suffix = line[match.end("close") :]
         lines[index] = f"{prefix}`{token}`{suffix}"
@@ -107,9 +114,13 @@ def _normalize_h1_quote(doc_path: Path, token: str) -> bool:
         return False
 
     rendered = "\n".join(lines)
+    # The quoting rewrite is a content mutation, so refresh the recency stamp in
+    # the same pass (mirroring adr_supersede); the helper preserves the line
+    # ending convention, so apply it before reapplying CRLF below.
+    rendered = refresh_modified_stamp(rendered, _dt.date.today())
     new_content = rendered if newline == "\n" else rendered.replace("\n", newline)
     bak = doc_path.with_suffix(doc_path.suffix + ".bak")
-    bak.write_bytes(doc_path.read_bytes())
+    bak.write_bytes(raw_bytes)
     try:
         atomic_write(doc_path, new_content)
     except Exception:

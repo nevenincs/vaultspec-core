@@ -3,6 +3,7 @@
 import pytest
 
 from ....core.enums import AdrStatus
+from ....graph import VaultGraph
 from ...models import DocumentMetadata
 from .._base import Severity
 from ..adr_status import check_adr_status
@@ -151,3 +152,37 @@ class TestScoping:
         )
         result = check_adr_status(tmp_path, snapshot=snap, feature="demo")
         assert result.is_clean
+
+
+class TestGraphPath:
+    """Exercise the production call path: snapshot built via VaultGraph.
+
+    Guards against the snapshot dropping ``superseded_by``, which would make
+    the supersession-divergence detection dead in production while the
+    hand-built-snapshot tests still pass.
+    """
+
+    def test_supersession_divergence_detected_through_graph(self, tmp_path):
+        adr_dir = tmp_path / ".vault" / "adr"
+        adr_dir.mkdir(parents=True)
+        (adr_dir / "2026-01-01-demo-adr.md").write_text(
+            "---\n"
+            "tags:\n"
+            "  - '#adr'\n"
+            "  - '#demo'\n"
+            "date: '2026-01-01'\n"
+            "modified: '2026-01-01'\n"
+            "superseded_by: '2026-02-02-next-adr'\n"
+            "related: []\n"
+            "---\n\n"
+            "# `demo` adr: `Title` | (**status:** `accepted`)\n",
+            encoding="utf-8",
+        )
+
+        snapshot = VaultGraph(tmp_path).to_snapshot()
+        result = check_adr_status(tmp_path, snapshot=snapshot)
+
+        assert any(
+            "superseded_by" in d.message and "not 'superseded'" in d.message
+            for d in result.diagnostics
+        )

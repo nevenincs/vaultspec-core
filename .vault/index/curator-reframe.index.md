@@ -7,6 +7,7 @@ date: '2026-06-28'
 modified: '2026-06-28'
 related:
   - '[[2026-06-28-curator-reframe-adr]]'
+  - '[[2026-06-28-curator-reframe-audit]]'
   - '[[2026-06-28-curator-reframe-plan]]'
   - '[[2026-06-28-curator-reframe-research]]'
 ---
@@ -20,6 +21,10 @@ Auto-generated index of all documents tagged with `#curator-reframe`.
 ### adr
 
 - `2026-06-28-curator-reframe-adr` - `curator-reframe` adr: `canonical ADR status taxonomy and reconciliation curator` | (**status:** `accepted`)
+
+### audit
+
+- `2026-06-28-curator-reframe-audit` - `curator-reframe` audit: `curator reframe code review`
 
 ### plan
 
