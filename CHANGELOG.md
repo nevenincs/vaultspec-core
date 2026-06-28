@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.36](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.35...vaultspec-core-v0.1.36) (2026-06-28)
+
+
+### Features
+
+* **curator:** ADR architecture reconciliation + canonical status taxonomy ([e9e3f8d](https://github.com/nevenincs/vaultspec-core/commit/e9e3f8d62cf53700a6ab28124ec8be68481f8daa))
+* **curator:** reframe curator as ADR architecture reconciliation + status taxonomy ([cc9b967](https://github.com/nevenincs/vaultspec-core/commit/cc9b967ad1d1eb8da8384335a382742b4d6131da))
+
+
+### Bug Fixes
+
+* **curator:** remediate code-review findings + add Verify audit ([4cd16fe](https://github.com/nevenincs/vaultspec-core/commit/4cd16fea0fe48e8fb5ad78f35f00a7d71f782774))
+* **diagnosis:** route doctor parity through the canonical sync comparator ([5f72904](https://github.com/nevenincs/vaultspec-core/commit/5f729043f4889d72fbca7c509c2568f371f3404e))
+* **diagnosis:** single comparator for install/sync/doctor parity ([fb7902c](https://github.com/nevenincs/vaultspec-core/commit/fb7902c029e4c54ed647a74044ef364d2a270e02))
+
 ## [0.1.35](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.34...vaultspec-core-v0.1.35) (2026-06-27)
 
 
