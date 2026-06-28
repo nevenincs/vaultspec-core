@@ -36,6 +36,16 @@ class TestCanonicalStatus:
         result = check_adr_status(tmp_path, snapshot=snap)
         assert result.is_clean
 
+    def test_title_with_pipe_is_parsed(self, tmp_path):
+        """A pipe inside the title must not defeat the status match."""
+        _, snap = _snapshot(
+            tmp_path,
+            "2026-01-01-demo-adr",
+            _adr_body("# `demo` adr: `A | B choice` | (**status:** `accepted`)"),
+        )
+        result = check_adr_status(tmp_path, snapshot=snap)
+        assert result.is_clean
+
     def test_every_canonical_value_is_clean(self, tmp_path):
         for value in (s.value for s in AdrStatus):
             _, snap = _snapshot(
@@ -133,6 +143,25 @@ class TestQuotingFix:
         assert result.fixed_count == 1
         content = path.read_text(encoding="utf-8")
         assert "(**status:** `accepted`)" in content
+
+    def test_fix_preserves_crlf(self, tmp_path):
+        adr_dir = tmp_path / ".vault" / "adr"
+        adr_dir.mkdir(parents=True)
+        path = adr_dir / "2026-01-01-demo-adr.md"
+        body = _adr_body("# `demo` adr: `Title` | (**status:** accepted)")
+        text = "---\ntags:\n  - '#adr'\n  - '#demo'\n---\n\n" + body
+        path.write_bytes(text.replace("\n", "\r\n").encode("utf-8"))
+        meta = DocumentMetadata(tags=["#adr", "#demo"])
+        snapshot = {path: (meta, body)}
+
+        result = check_adr_status(tmp_path, snapshot=snapshot, fix=True)
+
+        assert result.fixed_count == 1
+        raw = path.read_bytes()
+        assert b"(**status:** `accepted`)" in raw
+        # The CRLF convention must survive the rewrite (no lone LF introduced).
+        assert b"\r\n" in raw
+        assert raw.replace(b"\r\n", b"").find(b"\n") == -1
 
 
 class TestScoping:
