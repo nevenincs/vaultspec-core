@@ -86,18 +86,17 @@ def _fresh_install_schema_version() -> str:
     return max(candidates, key=parse_version_tuple)
 
 
-# Valid provider arguments for install/uninstall commands.
-VALID_PROVIDERS = {"all", "core", "claude", "gemini", "antigravity", "codex"}
+# Map provider argument names to Tool enum members. The per-tool entries derive
+# from the Tool enum so adding a provider is a single-site change; "all" selects
+# every tool and "core" selects none (framework-only). VALID_PROVIDERS and
+# SYNC_PROVIDERS are derived from this map so the provider vocabulary has one
+# source of truth.
+_PROVIDER_TO_TOOLS: dict[str, list[Tool]] = {t.value: [t] for t in Tool}
+_PROVIDER_TO_TOOLS["all"] = list(Tool)
+_PROVIDER_TO_TOOLS["core"] = []
 
-# Map provider argument names to Tool enum members.
-_PROVIDER_TO_TOOLS: dict[str, list[Tool]] = {
-    "claude": [Tool.CLAUDE],
-    "gemini": [Tool.GEMINI],
-    "antigravity": [Tool.ANTIGRAVITY],
-    "codex": [Tool.CODEX],
-    "all": [Tool.CLAUDE, Tool.GEMINI, Tool.ANTIGRAVITY, Tool.CODEX],
-    "core": [],
-}
+# Valid provider arguments for install/uninstall commands (every selector).
+VALID_PROVIDERS = set(_PROVIDER_TO_TOOLS)
 
 
 def _rel(target: Path, p: Path) -> str:
@@ -1559,7 +1558,7 @@ def hooks_run(event: str, path: str | None = None) -> list[dict[str, Any]]:
 
 
 # Valid sync provider targets exposed to the CLI.
-SYNC_PROVIDERS = {"all", "claude", "gemini", "antigravity", "codex"}
+SYNC_PROVIDERS = VALID_PROVIDERS - {"core"}
 
 
 def sync_provider(

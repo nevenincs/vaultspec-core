@@ -117,15 +117,12 @@ def _apply_provider_filter(provider: str) -> None:
         )
         raise typer.Exit(code=1)
 
-    requested: set[Tool] = set()
-    if provider == "claude":
-        requested = {Tool.CLAUDE}
-    elif provider == "gemini":
-        requested = {Tool.GEMINI}
-    elif provider == "antigravity":
-        requested = {Tool.ANTIGRAVITY}
-    elif provider == "codex":
-        requested = {Tool.CODEX}
+    # Reuse the single provider-to-tool map rather than re-deriving it here, so
+    # the CLI filter cannot drift from the install/sync mapping. "all" is handled
+    # by the early return above; "core" never reaches here (not in SYNC_PROVIDERS).
+    from vaultspec_core.core.commands import _PROVIDER_TO_TOOLS
+
+    requested: set[Tool] = set(_PROVIDER_TO_TOOLS.get(provider, []))
 
     narrowed = {k: v for k, v in ctx.tool_configs.items() if k in requested}
     set_context(replace(ctx, tool_configs=narrowed))

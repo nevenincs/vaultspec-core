@@ -15,6 +15,28 @@ def runner():
     return CliRunner()
 
 
+class TestProviderRegistry:
+    """The provider vocabulary derives from one source (the Tool enum)."""
+
+    def test_provider_sets_derive_from_tool_enum(self):
+        from vaultspec_core.core.commands import (
+            _PROVIDER_TO_TOOLS,
+            SYNC_PROVIDERS,
+            VALID_PROVIDERS,
+        )
+        from vaultspec_core.core.enums import Tool
+
+        # Every tool has a single-tool entry; the aggregate selectors are present.
+        for tool in Tool:
+            assert _PROVIDER_TO_TOOLS[tool.value] == [tool]
+        assert _PROVIDER_TO_TOOLS["all"] == list(Tool)
+        assert _PROVIDER_TO_TOOLS["core"] == []
+
+        # Derived sets stay consistent with the map - no second hand-listed copy.
+        assert set(_PROVIDER_TO_TOOLS) == VALID_PROVIDERS
+        assert VALID_PROVIDERS - {"core"} == SYNC_PROVIDERS
+
+
 class TestInstallForce:
     def test_install_without_force_fails_if_exists(self, tmp_path, runner):
         """Without --force, install must fail if .vaultspec/ exists."""
