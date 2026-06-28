@@ -98,6 +98,8 @@ hand-edit between the markers.
   features.
 - `vaultspec-core vault check schema` - Enforce schema rules: ADRs must ref research,
   plans must ref ADRs.
+- `vaultspec-core vault check adr-status` - Validate ADR status against the canonical
+  taxonomy.
 - `vaultspec-core vault check structure` - Check vault directory structure and filename
   conventions.
 - `vaultspec-core vault check rename-integrity` - Check name/filename integrity for

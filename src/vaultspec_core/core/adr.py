@@ -9,6 +9,7 @@ from pathlib import Path
 
 from ..vaultcore import VaultConstants, parse_vault_metadata, refresh_modified_stamp
 from . import types as _t
+from .enums import AdrStatus
 from .exceptions import ResourceNotFoundError, VaultSpecError
 from .helpers import atomic_write
 
@@ -72,7 +73,9 @@ def adr_supersede(
                 r"^(#\s+.*\|\s+\(\*\*status:\*\*\s+`?)([^`)]+)(`?\)\s*)$", line
             )
             if match:
-                lines_list[i] = f"{match.group(1)}superseded{match.group(3)}"
+                lines_list[i] = (
+                    f"{match.group(1)}{AdrStatus.SUPERSEDED.value}{match.group(3)}"
+                )
                 break
 
     old_normalized_body = "\n".join(lines_list)

@@ -44,6 +44,56 @@ class CapabilityLevel(IntEnum):
         return aliases.get(normalized, cls.MEDIUM)
 
 
+class AdrStatus(StrEnum):
+    """Canonical lifecycle status for an Architecture Decision Record.
+
+    Single source of truth for ADR status across the project: the ADR template,
+    the :func:`~vaultspec_core.core.adr.adr_supersede` writer, and the
+    ``adr-status`` vault check all derive their vocabulary from these members.
+    Status is recorded in an ADR's body H1 (for example
+    ``... | (**status:** `accepted`)``), so this enum is a validation vocabulary
+    and writer constant rather than a frontmatter field.
+
+    Members:
+        PROPOSED: Drafted but not yet ratified; the scaffold default.
+        ACCEPTED: Ratified and governing the codebase.
+        REJECTED: Considered and declined; retained for the record.
+        SUPERSEDED: Replaced by a specific successor ADR; the superseded
+            document carries ``superseded_by``. Written by
+            :func:`~vaultspec_core.core.adr.adr_supersede`.
+        DEPRECATED: Retired without a direct successor ADR.
+    """
+
+    PROPOSED = "proposed"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    SUPERSEDED = "superseded"
+    DEPRECATED = "deprecated"
+
+    @classmethod
+    def from_token(cls, token: str | None) -> AdrStatus | None:
+        """Resolve a raw status token to a canonical member, leniently.
+
+        The match is case-insensitive and tolerant of surrounding whitespace and
+        backtick quoting, so ``accepted``, ``Accepted``, and `` `accepted` `` all
+        resolve to :attr:`ACCEPTED`.
+
+        Args:
+            token: Raw status token parsed from an ADR body, or ``None``.
+
+        Returns:
+            The matching :class:`AdrStatus`, or ``None`` when *token* is missing
+            or falls outside the canonical set.
+        """
+        if token is None:
+            return None
+        normalized = token.strip().strip("`").strip().lower()
+        try:
+            return cls(normalized)
+        except ValueError:
+            return None
+
+
 class _TieredModelRegistry(StrEnum):
     """Base for per-provider model registries keyed by capability tier.
 

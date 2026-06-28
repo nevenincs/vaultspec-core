@@ -1,90 +1,121 @@
 ---
 name: vaultspec-curate
-description: 'Audit and repair the .vault/ vault: frontmatter, wiki-links, naming, templates, structure. Use to clean the vault or fix schema violations.'
+description: 'Reconcile the ADR architecture corpus against the codebase so decisions stay a single curated, non-contradictory set. Use to audit ADR status and supersession, find ADR-vs-ADR and ADR-vs-code conflicts, and action them. Mechanical .vault/ hygiene is the CLI''s job; this skill does the semantic reconciliation the CLI cannot.'
 ---
 
-# Documentation curation skill (vaultspec-curate)
+# ADR architecture reconciliation skill (vaultspec-curate)
 
-This skill governs the autonomous auditing and maintenance of the `.vault/`
-documentation vault. It ensures every artifact conforms to the project's documentation
-standards as defined in `.vaultspec/rules/vaultspec.builtin.md`.
+**Announce at start:** "I'm using the `vaultspec-curate` skill to reconcile the ADR
+architecture corpus against the codebase."
 
-**Announce at start:** "I'm using the `vaultspec-curate` skill to audit and clean the
-documentation vault."
+This skill keeps the architecture decision record (ADR) corpus and the code it governs a
+single, curated, internally-consistent set of decisions. It reconciles each decision's
+declared status and supersession against reality, finds where decisions contradict each
+other or the codebase, and actions the result: propagating status, amending wording, and
+surfacing gaps, conflicts, and errors that need human judgment.
+
+Mechanical `.vault/` hygiene - frontmatter, wiki-links, filenames, tag pairs, template
+compliance - is no longer this skill's work. The `vaultspec-core` CLI owns it
+deterministically. This skill spends its judgment on what no check can decide: whether
+an `accepted` decision is actually implemented, whether two ADRs disagree, and whether a
+superseded decision still governs the code.
 
 ## When to use
 
-- After completing a feature (post `vaultspec-execute`) to verify documentation trail
-  integrity.
+- Periodically, to keep the ADR corpus a trustworthy map of the architecture.
+- After a feature lands, to confirm the decisions it claimed are reflected in the code.
+- When ADRs are suspected to contradict each other, or to lag behind what was built.
+- Before a release or audit that depends on the decision record being accurate.
+- For a project adopting the pipeline late, to reconcile an existing codebase against a
+  thin or absent ADR corpus (the ADR-from-codebase retrofit; human-requested only - see
+  Autonomy boundaries).
 
-- Periodically as vault hygiene maintenance.
+## Preconditions (cede the mechanical layer first)
 
-- When broken links, missing frontmatter, or organizational drift is suspected.
+Reconciliation reasons over a structurally-correct corpus and a populated semantic
+index. Before any semantic work:
 
-- Before onboarding a new feature to ensure the vault baseline is clean.
+- **Structural hygiene to the CLI.** Run `vaultspec-core vault check all --fix`. This
+  repairs frontmatter, links, names, stamps, and template drift. Never hand-fix these;
+  the CLI is the source of truth for mechanical correctness.
+- **Ensure the semantic index is live.** `vaultspec-rag` powers decision and code
+  recall, but a freshly checked-out worktree is often unindexed. Confirm with
+  `vaultspec-rag server doctor`; if the vault or code index is empty, populate it with
+  `vaultspec-rag index --type vault` and `vaultspec-rag index --type code` before
+  relying on search. Where rag is unavailable, fall back to the CLI discovery verbs and
+  grep.
 
 ## Workflow
 
-### Dispatch the curator
+Dispatch the `vaultspec-docs-curator` agent persona to run the reconciliation. Instruct
+it to: "Reconcile the ADR architecture corpus against the codebase. Establish the
+decision inventory and declared status, reconcile decisions against each other and
+against the code, action the mechanically-safe findings, and surface the rest in an
+audit report."
 
-Load the `vaultspec-docs-curator` agent persona. Instruct it to "Perform a full vault
-audit of `.vault/`. Validate frontmatter, wiki-links, naming conventions, template
-compliance, and directory structure. Repair violations through
-`vaultspec-core vault check all --fix` and the CLI repair paths rather than hand edits,
-and produce an audit report."
+The persona operates a **Ground -> Reconcile -> Act -> Verify** loop, the discovery-rule
+sequence (locate by meaning, read the epicenter whole, confirm with grep) applied to
+decisions:
 
-The curator's operating mode is **Audit -> Delegate -> Verify**: it identifies
-violations with precision and orchestrates fixes through the CLI fix paths and loaded
-agent personas rather than editing documents in-place itself, then re-scans after every
-delegated repair. The one document the curator authors directly is its own audit report.
+- **Ground.** Build the decision inventory: `vaultspec-core vault list adr --json` for
+  the set, the body H1 (and any legacy status section) for each declared status, and
+  `vaultspec-core vault graph --json` for the supersession and relatedness edges.
+- **Reconcile decision-vs-decision.** Use
+  `vaultspec-rag search "<intent>" --type vault --doc-type adr` to surface ADRs covering
+  the same concept, read them whole, and judge agreement, duplication, or contradiction.
+- **Reconcile decision-vs-code.** For each live decision,
+  `vaultspec-rag search "<concept and domain nouns>" --type code`, read the epicenter
+  file whole, and confirm the decision is implemented; grep to confirm exact symbols.
+- **Act and Verify.** Apply the safe actions, surface the rest, re-run
+  `vaultspec-core vault check all`, and re-scan until clean.
 
-For targeted audits, scope the audit accordingly (e.g., "Audit only `.vault/exec/...`").
+The full query patterns, the conflict taxonomy, and the per-class actions live in
+`references/reconciliation-playbook.md`. Read it before reconciling.
 
-### Review the audit report
+## Canonical status taxonomy
 
-The curator scaffolds its report with
-`vaultspec-core vault add audit --feature docs-curation` and authors the findings into
-the scaffolded body itself. The CLI owns the filename
-(`.vault/audit/yyyy-mm-dd-docs-curation-audit.md`) and the frontmatter; never hand-write
-either.
+The curator enforces one canonical ADR status set and one supersession convention. The
+authoritative definition - the values, their meaning, the canonical encoding, and the
+divergences the curator must detect - is in `references/adr-status-taxonomy.md`. Read it
+before judging any status. This set is the single source of truth the core library, the
+ADR template, and the supersede tool all derive from; where the corpus or tooling
+diverges, the curator reconciles toward it.
 
-Review the report for:
+## Actions and autonomy boundaries
 
-- **Auto-fixed** items (renames, link corrections, frontmatter additions applied by
-  `vaultspec-core vault check all --fix`).
-- **Flagged** items requiring author input (missing template sections, ambiguous file
-  placement).
+The curator acts on what is mechanically safe and proposes what needs judgment.
 
-### Act on flagged items
+- **Act directly (mechanically safe).** Status propagation through
+  `vaultspec-core vault adr supersede OLD --by NEW`; status-encoding and stamp
+  normalization. Prefer the CLI mutators (`vault adr supersede`, `vault set-body`,
+  `vault edit`, `vault link`) over raw file edits so the frontmatter contract and the
+  `modified` stamp stay canonical.
+- **Propose for approval (judgment).** Rephrasing or amending conflicting ADR wording,
+  and any contradiction whose resolution is not obvious, are written into the audit as
+  recommendations, not applied unprompted.
+- **Never auto-retrofit ADRs to code.** ADRs drive codebase rollout, not the reverse.
+  The curator reports decision-vs-code drift as a finding but does not rewrite an ADR to
+  match the code on its own. Amending an ADR to reflect existing code (the legitimate
+  ADR-from-codebase retrofit for late-adopting projects) is offered and executed **only
+  on explicit human request**.
 
-Items the curator cannot auto-fix are listed under **Recommendations**. Orchestrate
-these per the delegate model: dispatch the appropriate agent persona (e.g.,
-`vaultspec-low-executor` for adding missing sections), or surface items needing author
-judgment to the user.
+## Audit persistence
+
+Persist findings as an audit report. Scaffold it with
+`vaultspec-core vault add audit --feature <feature>` so the CLI owns the filename and
+frontmatter, then author the body: the decision inventory, the conflicts found by class,
+the actions applied, and the recommendations requiring author judgment. The audit report
+is the one document the curator authors directly.
 
 ## Artifact linking
 
-- Any persisted markdown files must be linked against other persisted documents using
-  quoted `'[[wiki-links]]'`.
+- Link persisted documents with quoted `'[[wiki-links]]'` in the `related:` frontmatter
+  field.
+- Do not use `@ref` links or `[label](path)` links for internal vault pages.
 
-- DO NOT use `@ref` style links or `[label](path)` style links.
+## Additional resources
 
-## Standards
-
-The curator validates every document against the frontmatter schema defined in the
-`vaultspec` rule (`.vaultspec/rules/vaultspec.builtin.md`): the required tag pair,
-quoted wiki-links in `related:`, `yyyy-mm-dd` dates, and no `feature` key. The
-`vaultspec-core vault add` scaffold produces conforming frontmatter for new documents;
-violations in existing documents are repaired via `vaultspec-core vault check all --fix`
-rather than hand edits.
-
-## Requirements
-
-- **Non-destructive**: The curator never deletes files. It repairs through the CLI fix
-  paths (renames, link and frontmatter corrections), delegates semantic repairs to
-  loaded personas, and flags what neither path can fix.
-
-- **Traceability**: Every modification is logged in the audit report.
-
-- **Standards-first**: All fixes trace back to rules in
-  `.vaultspec/rules/vaultspec.builtin.md` and the canonical templates.
+- `references/adr-status-taxonomy.md` - the canonical status set, encodings,
+  supersession convention, and the divergences to detect.
+- `references/reconciliation-playbook.md` - the Ground/Reconcile/Act/Verify loop in
+  detail: query patterns, the conflict taxonomy, and the action for each class.

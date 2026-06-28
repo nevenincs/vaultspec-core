@@ -10,7 +10,7 @@ related:
   - '[[2026-02-18-system-prompt-restructure-plan]]'
 ---
 
-# system-prompt adr: restructure system/ for tool-agnostic composition | (**status:** accepted)
+# system-prompt adr: restructure system/ for tool-agnostic composition | (**status:** `accepted`)
 
 ## Problem Statement
 

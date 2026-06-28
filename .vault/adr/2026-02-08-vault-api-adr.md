@@ -9,7 +9,7 @@ related:
   - '[[2026-02-08-vault-api-research]]'
 ---
 
-# vault-api adr: Modular Docs API and Auditing System | (**status:** accepted)
+# vault-api adr: Modular Docs API and Auditing System | (**status:** `accepted`)
 
 ## Problem Statement
 

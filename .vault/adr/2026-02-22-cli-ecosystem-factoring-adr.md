@@ -9,7 +9,7 @@ related:
   - '[[2026-02-23-cli-test-coverage-plan]]'
 ---
 
-# cli-ecosystem-factoring adr: module hierarchy restructuring | (**status:** accepted)
+# cli-ecosystem-factoring adr: module hierarchy restructuring | (**status:** `accepted`)
 
 ## Problem Statement
 

@@ -101,7 +101,7 @@ def _write_state_mutation_workspace(root: Path) -> None:
         "  - '#state-mutation'\n"
         "date: '2026-05-15'\n"
         "related: []\n"
-        "---\n\n# ADR\n",
+        "---\n\n# `state-mutation` adr: `State Mutation` | (**status:** `accepted`)\n",
         encoding="utf-8",
     )
 
@@ -618,6 +618,7 @@ class TestVaultRepair:
             "feature-rename-integrity",
             "references",
             "schema",
+            "adr-status",
             "rename-integrity",
             "encoding",
         ]

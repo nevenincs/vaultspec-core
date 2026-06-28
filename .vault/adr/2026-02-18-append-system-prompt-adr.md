@@ -9,7 +9,7 @@ related:
   - '[[2026-02-18-system-prompt-restructure-adr]]'
 ---
 
-# system-prompt adr: use append mode for Claude sub-agent system prompts | (**status:** accepted)
+# system-prompt adr: use append mode for Claude sub-agent system prompts | (**status:** `accepted`)
 
 ## Problem Statement
 

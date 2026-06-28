@@ -9,7 +9,7 @@ related:
   - '[[2026-02-20-marketing-and-documentation-p1-plan]]'
 ---
 
-# marketing-and-documentation adr | (**status:** accepted)
+# marketing-and-documentation adr | (**status:** `accepted`)
 
 ## Problem Statement
 
