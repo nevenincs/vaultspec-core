@@ -8,7 +8,7 @@ related:
   - '[[2026-02-22-system-prompt-injection-research]]'
 ---
 
-# ADR: XML-Based System Prompt Injection
+# ADR: XML-Based System Prompt Injection | (**status:** `accepted`)
 
 ## Context
 

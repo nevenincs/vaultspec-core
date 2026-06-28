@@ -10,7 +10,7 @@ related:
   - '[[2026-03-27-cli-ambiguous-states-gitignore-adr]]'
 ---
 
-# `flow-bugs` adr: install-layer hygiene contract
+# `flow-bugs` adr: install-layer hygiene contract | (**status:** `accepted`)
 
 Status: Accepted
 Supersedes: n/a

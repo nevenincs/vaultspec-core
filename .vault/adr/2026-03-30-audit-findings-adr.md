@@ -13,7 +13,7 @@ related:
   - '[[2026-03-27-cli-ambiguous-states-prior-art-research]]'
 ---
 
-# `audit-findings` adr: triage charter for the 91-finding rolling audit
+# `audit-findings` adr: triage charter for the 91-finding rolling audit | (**status:** `accepted`)
 
 Status: Accepted
 Supersedes: n/a

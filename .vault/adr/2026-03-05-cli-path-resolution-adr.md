@@ -10,11 +10,7 @@ related:
   - '[[2026-02-22-cli-ecosystem-factoring-research]]'
 ---
 
-# ADR: CLI Path Resolution & Provider Initialization Overhaul
-
-## Status
-
-Accepted
+# ADR: CLI Path Resolution & Provider Initialization Overhaul | (**status:** `accepted`)
 
 ## Context
 

@@ -10,6 +10,8 @@ related:
   - '[[2026-02-16-environment-variable-research]]'
 ---
 
+# `framework` adr: `Environment Variable Standardization` | (**status:** `accepted`)
+
 ## Environment Variable Standardization Blueprint
 
 ## Executive Summary
