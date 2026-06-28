@@ -147,6 +147,13 @@ def _collect_provider_artifacts(
     if cfg and cfg.native_config_file and cfg.native_config_file.parent not in dirs:
         dirs.append(cfg.native_config_file.parent)
 
+    # The provider-native MCP config (e.g. .agents/mcp_config.json) is a managed
+    # artefact written by mcp_sync; protect it explicitly so per-provider
+    # uninstall and gitignore reconciliation own it rather than relying on it
+    # happening to sit under a removed provider directory.
+    if cfg and cfg.mcp_config_file and cfg.mcp_config_file not in files:
+        files.append(cfg.mcp_config_file)
+
     return dirs, files
 
 

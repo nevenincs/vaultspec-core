@@ -308,6 +308,39 @@ class TestReadOnlyGitignore:
             gi.chmod(stat.S_IREAD | stat.S_IWRITE)
 
 
+class TestProviderArtifactOwnership:
+    """Provider-native managed artefacts are claimed by artifact collection."""
+
+    def test_mcp_config_file_is_a_collected_provider_artifact(
+        self, synthetic_project: Path
+    ) -> None:
+        """The provider-native mcp_config.json is owned, not orphan-able.
+
+        Lifecycle gap fix: a provider with an mcp_config_file (e.g. Antigravity's
+        .agents/mcp_config.json) must have that file claimed by
+        _collect_provider_artifacts so per-provider uninstall and gitignore
+        reconciliation own it, rather than relying on it sitting under a removed
+        directory.
+        """
+        from vaultspec_core.core.gitignore import _collect_provider_artifacts
+        from vaultspec_core.core.types import get_context
+
+        ctx = get_context()
+        tool = next(
+            (
+                t
+                for t, cfg in ctx.tool_configs.items()
+                if cfg.mcp_config_file is not None
+            ),
+            None,
+        )
+        assert tool is not None, "expected a provider with a native MCP config"
+        mcp_path = ctx.tool_configs[tool].mcp_config_file
+
+        _dirs, files = _collect_provider_artifacts(synthetic_project, tool)
+        assert mcp_path in files
+
+
 class TestRecommendedEntries:
     """Verify .vault/ is not blanket-ignored; only generated subdirs are."""
 
