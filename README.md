@@ -20,7 +20,8 @@ frameworks (Superpowers!)
 All work leaves a papertrail in the project's `.vault`. Documents are bound together by tags,
 and references. Together, they represents the project's decision and execution history.
 
-> [!TIP] The vault is plain Markdown with wiki-links, so it opens directly in
+> [!TIP]
+> The vault is plain Markdown with wiki-links, so it opens directly in
 > [Obsidian](https://obsidian.md). Point an Obsidian vault at `.vault/` and its feature
 > tags and document links render as a navigable graph network.
 
