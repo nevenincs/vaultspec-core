@@ -72,7 +72,7 @@ See the [CLI reference](./docs/CLI.md) for installation options.
 
 The harness supports Claude, Codex, Gemini/Angtigravity.
 
-All development paper trail live in `.vault` as markdown files.
+All development paper trails live in `.vault` as markdown files.
 Rules, agents, skills are seeded from the `.vaultspec` via:
 
 ```bash
