@@ -7,14 +7,14 @@
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
----
+______________________________________________________________________
 
 **Vaultspec is a spec-driven harness for coding agents (and us, the humans).**
 
----
+______________________________________________________________________
 
 Vaultspec guides agents through a
-```Research → Decide → Plan → Code → Verify``` pipeline not dissimilar to other spec driven
+`Research → Decide → Plan → Code → Verify` pipeline not dissimilar to other spec driven
 frameworks (Superpowers!)
 
 All work leaves a papertrail in the project's `.vault`. Documents are bound together by tags,
@@ -25,11 +25,10 @@ and references. Together, they represents the project's decision and execution h
 > [Obsidian](https://obsidian.md). Point an Obsidian vault at `.vault/` and its feature
 > tags and document links render as a navigable graph network.
 
-
 ## What is included?
 
 `vaultspec-core` implements the natural language description of the workflow. It ships rules,
-skills and agents, and a CLI to manage vault health, planning and rules. See 
+skills and agents, and a CLI to manage vault health, planning and rules. See
 [framework manual](./docs/framework.md) for more info.
 
 > [!TIP]
@@ -73,7 +72,7 @@ See the [CLI reference](./docs/CLI.md) for installation options.
 
 The harness supports Claude, Codex, Gemini/Angtigravity.
 
-All development paper trail  live in `.vault` as markdown files.
+All development paper trails live in `.vault` as markdown files.
 Rules, agents, skills are seeded from the `.vaultspec` via:
 
 ```bash
@@ -82,12 +81,13 @@ uv run --no-sync vaultspec-core sync
 
 > [!TIP]
 > Make sure to run
+>
 > ```bash
 > uv run --no-sync vaultspec-core install --upgrade
 > ```
+>
 > after a library update as the shipped agent, skill and rules
 > might change between library versions.
-
 
 ## The pipeline at a glance
 
@@ -126,12 +126,10 @@ skills for team coordination and project management.
 | Repair vault links, frontmatter, and naming   | `/vaultspec-curate`        |
 | Draft user-facing documentation               | `/vaultspec-documentation` |
 
-
 ### MCP server
 
 We ship an MCP but the current implementation strongly favours direct cli calls.
 [MCP reference](./docs/MCP.md) for setup and available tools.
-
 
 ## Tips
 
