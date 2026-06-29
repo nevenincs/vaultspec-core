@@ -7,33 +7,37 @@
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
-Vaultspec is a spec-driven harness for coding agents (and us, the humans!).
+---
 
-Every feature moves through
-`[R] Research → [D] Decide → [P] Plan → [E] Execute → [V] Review`. A feature is bound
-together by its tag and document references in a persistent vault. Think a folder of
-Markdown files. It holds the intent, decisions, and history that govern the project - a
-second brain shared by developers and coding agents.
+**Vaultspec is a spec-driven harness for coding agents (and us, the humans).**
 
-We maintain persistent records of the pipeline steps, decisions in a git tracked
-`vault`. We research, ground, and decide before writing a plan, and we enforce that
-sequence before any code is written - so every coding agent adheres to the same goal,
-even working in an isolated sandbox. See the [framework manual](./docs/framework.md) for
-the CLI and plan-management capabilities behind this.
+---
 
-## The vaultspec ecosystem
+Vaultspec guides agents through a
+```Research → Decide → Plan → Code → Verify``` pipeline not dissimilar to other spec driven
+frameworks (Superpowerers!)
 
-vaultspec-core is the hub of a small family of projects.
-[vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) adds semantic search over
-both the vault and your codebase, so coding agents can retrieve relevant decisions and
-code by meaning rather than by keyword. vaultspec-dashboard provides a visual interface
-(UI) for browsing and navigating the vault. vaultspec-a2a handles orchestration across
-multiple coding agents working on the same project in parallel.
+All work leaves a papertrail in the project's `.vault`. Documents are bound together by tags,
+and references. Together, they represents the project's decision and execution history.
+
+> [!TIP]
+> Point Obsidian at the `.vault` for browsing and graphing document.
+
+
+## What is included?
+
+`vaultspec-core` implements natural language codification of the workflow. It ships rules,
+skills and agents, and a CLI to manage vault health, work tracking, and and the shipped harness. See 
+[framework manual](./docs/framework.md) for more info.
+
+> [!TIP]
+> The framework favours semantic search via the core's sister project,
+> [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) 
 
 ## The pipeline at a glance
 
 ```
-[R] Research  →  [D] Decide  →  [P] Plan  →  [E] Execute  →  [V] Review
+[R] Research  →  [D] Decide (ADR)  →  [P] Plan  →  [E] Code (Exec)  →  [V] Review (Code Review, Audit)
 ```
 
 | Stage    | What it produces                                       | You                                            |
@@ -44,37 +48,31 @@ multiple coding agents working on the same project in parallel.
 | Execute  | Execution records in `.vault/exec/`                    | Stay available while the agent works each step |
 | Review   | A review and audit report in `.vault/audit/`           | Read the report and decide if the work ships   |
 
-You approve each checkpoint before the next stage begins, so you stay in control of
-every consequential choice in the project.
 
 ## Getting started
 
-### Install the CLI
+### 1. Install
 
-The only prerequisite is [uv](https://docs.astral.sh/uv/getting-started/installation/),
-the Python package manager and tool runner that provides `uvx`.
-
-With uv in place, choose how you want to use vaultspec-core:
-
-```bash
-# Run once without installing
-uvx vaultspec-core
-
-# Install as a global tool
-uv tool install vaultspec-core
-
-# Add as a project dependency
-uv add vaultspec-core
-```
-
-### Provision your project
-
-Installing the CLI is separate from setting it up in a project. Run the install command
-once inside your project root to provision the framework:
+For the quickest, dependency-free project bootstrap, run:
 
 ```bash
 uvx vaultspec-core install
-uvx vaultspec-core install --upgrade
+```
+
+Or use it as a tool or dependency:
+
+```
+# You can add it as a local tool
+uv tool install vaultspec-core
+
+# Or a project dependency
+uv add vaultspec-core
+```
+
+### 2. Bootstrap
+
+```bash
+uv run --no-sync vaultspec-core install [--upgrade]
 ```
 
 This sets up the framework for the supported coding agents: Claude, Codex, Gemini, and
@@ -82,10 +80,11 @@ Antigravity. It also creates two folders in your project: `.vault/` for your doc
 and `.vaultspec/` for the framework configuration. Pass `--upgrade` to re-seed the
 bundled builtins.
 
-> **Note:** `uv add` writes vaultspec-core into your `pyproject.toml`.
+> [!NOTE]
+> `uv add` writes vaultspec-core into your `pyproject.toml`.
 > `vaultspec-core install` handles the rest of the project integration separately: it
 > manages a block in your `.gitignore` and `.gitattributes`, writes pre-commit hooks,
-> and drops an `.mcp.json` for Model Context Protocol clients.
+> and drops an `.mcp.json` for Model Context Protocol clients by deafult.
 
 ### Drive your first feature
 
