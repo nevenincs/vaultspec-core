@@ -20,7 +20,7 @@
 </div>
 
 <p align="center">
-<img src="docs/assets/term-status.svg" alt="vaultspec-core status - live output from this repository's own vault" width="880" />
+<img src="docs/assets/demo.gif" alt="vaultspec pipeline demo - provisioning a project, scaffolding research, ADR, and plan, then checking and graphing the vault" width="880" />
 </p>
 
 Vaultspec guides agents through a `Research → Decide (ADRs) → Plan → Code → Verify`
@@ -32,7 +32,11 @@ your agents read before they write.
 
 We hold ourselves to it, too: vaultspec-core is developed with vaultspec. Its own
 `.vault` currently holds 800+ CLI-scaffolded documents across 100+ features, and every
-terminal render on this page is real output against that live vault.
+terminal render on this page is real output against that live vault:
+
+<p align="center">
+<img src="docs/assets/term-status.svg" alt="vaultspec-core status - live output from this repository's own vault" width="880" />
+</p>
 
 ## What is included?
 
