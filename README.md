@@ -157,10 +157,19 @@ records, and audit - into a linked graph the CLI can trace, validate, and visual
 <img src="docs/assets/term-graph.svg" alt="vaultspec-core vault graph - a feature's document graph" width="880" />
 </p>
 
-> [!TIP]
-> The vault is plain Markdown with wiki-links, so it opens directly in
-> [Obsidian](https://obsidian.md). Point an Obsidian vault at `.vault/` and its feature
-> tags and document links render as a navigable graph network.
+### The vault, rendered in Obsidian
+
+The vault is plain Markdown with wiki-links, so it opens directly in
+[Obsidian](https://obsidian.md): point a vault at `.vault/` and the feature tags and
+document links render as a navigable graph network, while every document's frontmatter -
+tags, dates, and `related:` wiki-links - shows up as first-class properties.
+
+<p align="center">
+<img src="docs/assets/obsidian-vault.png" alt="A vaultspec vault opened in Obsidian - the document corpus as a graph network on the left, an accepted ADR with its tags, dates, and related wiki-links on the right" width="880" />
+</p>
+
+A vaultspec project's vault in Obsidian: the whole document corpus as a graph, and an
+accepted ADR open beside it with its tags and related records one click away.
 
 ## A vault that audits itself
 
