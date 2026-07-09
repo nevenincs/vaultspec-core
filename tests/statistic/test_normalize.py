@@ -204,3 +204,20 @@ def test_for_loop_extract_produces_three_call_records() -> None:
     records = extract_records(command, _context(), _inventory())
     assert len(records) == 3
     assert len({r.command_hash for r in records}) == 3
+
+
+def test_for_loop_item_with_backslashes_is_inserted_literally() -> None:
+    """A loop item carrying a Windows path substitutes literally, not as a regex.
+
+    Real transcripts fire ``for`` loops whose items are backslash Windows paths.
+    Those backslashes must be inserted verbatim rather than parsed as regex
+    replacement escapes, which previously raised ``re.PatternError``.
+    """
+    command = (
+        r"for d in C:\work\a C:\work\b; do "
+        r"uv run --no-sync vaultspec-core vault list -t $d; done"
+    )
+    segments = candidate_segments(command)
+    assert len(segments) == 2
+    assert r"C:\work\a" in segments[0]
+    assert r"C:\work\b" in segments[1]

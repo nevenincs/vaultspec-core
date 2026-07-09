@@ -124,7 +124,12 @@ def unroll_for_loops(text: str) -> str:
         reference = re.compile(
             r"\$\{" + re.escape(var) + r"\}|\$" + re.escape(var) + r"\b"
         )
-        return "\n".join(reference.sub(item, body) for item in items)
+        # Substitute each item with a callable replacement so backslashes in the
+        # value (Windows paths in a real loop) are inserted literally rather than
+        # parsed as regex replacement escapes.
+        return "\n".join(
+            reference.sub(lambda _, value=item: value, body) for item in items
+        )
 
     return _FOR_RE.sub(expand, text)
 
