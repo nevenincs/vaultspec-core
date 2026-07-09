@@ -156,8 +156,9 @@ target-version = "py313"
     # Diagnosis dataclasses use Tool as runtime dict key and for JSON serialization.
     "src/vaultspec_core/core/diagnosis/diagnosis.py" = ["TC001"]
     # FastMCP inspects tool annotations at runtime, so Context must be importable.
-    "src/vaultspec_core/mcp_server/vault_tools.py" = ["TC002"]
     "src/vaultspec_core/mcp_server/tools/documents.py" = ["TC002"]
+    "src/vaultspec_core/mcp_server/tools/orientation.py" = ["TC002"]
+    "src/vaultspec_core/mcp_server/tools/plan.py" = ["TC002"]
     # Pydantic resolves field annotations from module globals at model-build time,
     # so the CallRecord field types must stay runtime imports, not TYPE_CHECKING.
     "statistic/normalize/models.py" = ["TC001", "TC003"]

@@ -56,7 +56,49 @@ __all__ = [
     "TargetResolutionError",
     "compute_rollup",
     "compute_trace",
+    "feature_lifecycle_status",
 ]
+
+
+def feature_lifecycle_status(feature: ActiveFeature, doc_types: set[str]) -> str:
+    """Derive a feature's lifecycle status from its orientation state.
+
+    The single source of the human lifecycle word the ``find`` MCP tool
+    surfaces, sited in the orientation core so the MCP layer performs no
+    second inference (the drift class the reconciliation reference
+    eliminates). Plan progress is read from the richer :class:`ActiveFeature`
+    state (which already folds the parsed plan status), and the document-type
+    presence resolves the pre-plan phases:
+
+    - ``In Progress`` - the feature has execution records, or its plan has at
+      least one closed step.
+    - ``Completed`` - the feature's plan has steps and every step is closed.
+    - ``Planned`` - the feature has a plan with no closed steps yet.
+    - ``Specified`` - no plan, but an ADR exists.
+    - ``Researching`` - no plan or ADR, but research exists.
+    - ``Unknown`` - none of the above.
+
+    Args:
+        feature: The feature's rollup entry, carrying its plan facts.
+        doc_types: The document-type value strings present for the feature
+            (e.g. ``{"adr", "plan"}``).
+
+    Returns:
+        The lifecycle status word.
+    """
+    if "exec" in doc_types:
+        return "In Progress"
+    if feature.has_plan:
+        if feature.plan_step_count > 0 and feature.plan_completion_percent >= 100.0:
+            return "Completed"
+        if feature.plan_steps_completed > 0:
+            return "In Progress"
+        return "Planned"
+    if "adr" in doc_types:
+        return "Specified"
+    if "research" in doc_types:
+        return "Researching"
+    return "Unknown"
 
 
 #: ``yyyy-mm-dd`` prefix on a vault filename stem, the third recency

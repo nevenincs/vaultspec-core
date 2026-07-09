@@ -21,8 +21,11 @@ from mcp.server.fastmcp import FastMCP
 
 from vaultspec_core.cli._app import make_app
 
-from .tools import register_document_tools
-from .vault_tools import register_tools as register_vault_tools
+from .tools import (
+    register_document_tools,
+    register_orientation_tools,
+    register_plan_tools,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +45,10 @@ def create_server() -> FastMCP:
     """Create and configure the FastMCP server instance.
 
     Instantiates :class:`~mcp.server.fastmcp.FastMCP` and registers the vault
-    tool surface via :func:`~vaultspec_core.mcp_server.vault_tools.register_tools`.
-    Each tool handler runs in a copied :class:`contextvars.Context` so that
-    per-request mutations do not leak between concurrent requests.
+    tool surface via the domain ``register_*_tools`` functions in
+    :mod:`vaultspec_core.mcp_server.tools`. Each tool handler runs in a copied
+    :class:`contextvars.Context` so that per-request mutations do not leak
+    between concurrent requests.
 
     Returns:
         Configured :class:`~mcp.server.fastmcp.FastMCP` instance ready to serve.
@@ -57,9 +61,13 @@ def create_server() -> FastMCP:
         lifespan=_lifespan,
     )
 
-    # Register tool surface: find (vault_tools) + create/edit (tools.documents)
-    register_vault_tools(mcp)
+    # Register the tool surface: find/create/edit (documents), status/check
+    # (orientation), and plan_progress/plan_edit (plan). The gateway tools
+    # land in a later phase. The final bootstrap and instructions string are
+    # finalised in the cross-cutting closeout phase.
     register_document_tools(mcp)
+    register_orientation_tools(mcp)
+    register_plan_tools(mcp)
 
     return mcp
 

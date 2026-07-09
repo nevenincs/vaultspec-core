@@ -16,9 +16,7 @@ batch) raise to the protocol ``isError`` layer.
 
 from __future__ import annotations
 
-import contextvars
 import datetime
-import functools
 import logging
 import re
 from typing import TYPE_CHECKING, Any
@@ -29,10 +27,10 @@ from pydantic import BaseModel, Field
 
 from ...core.types import get_context as _get_ctx
 from ...vaultcore.models import DocType
+from ..isolation import isolated_context as _isolated_context
 from ..results import BatchResult, ItemResult, build_batch, build_item
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Coroutine
     from pathlib import Path
 
     from mcp.server.fastmcp import FastMCP
@@ -42,30 +40,70 @@ logger = logging.getLogger(__name__)
 __all__ = ["register_document_tools"]
 
 
-def _isolated_context(
-    fn: Callable[..., Coroutine[Any, Any, Any]],
-) -> Callable[..., Coroutine[Any, Any, Any]]:
-    """Wrap an async tool handler so it runs in a copied context.
+# ---------------------------------------------------------------------------
+# find: document discovery and feature listing
+# ---------------------------------------------------------------------------
 
-    Each invocation snapshots all :mod:`contextvars` state via
-    :func:`contextvars.copy_context` and runs the handler inside that
-    snapshot, so per-request path mutations never leak between concurrent
-    MCP requests.
+#: The default document-search types when the caller supplies no ``type``
+#: filter; exec and audit are excluded unless explicitly requested.
+_DEFAULT_TYPES = ["adr", "plan", "research", "reference"]
 
-    Args:
-        fn: The async tool handler to wrap.
 
-    Returns:
-        The wrapped handler that executes in an isolated context copy.
+class FindEntry(BaseModel):
+    """One ``find`` result row, covering both find modes as a superset.
+
+    Feature-listing mode populates the feature fields (``doc_count`` /
+    ``weight`` / ``status`` / ``types`` / ``earliest_date`` / ``has_plan``);
+    document-search mode populates the document fields (``type`` /
+    ``feature`` / ``date`` / ``path`` / ``blob_hash`` / ``resource_uri`` and
+    the optional inline ``body``). ``name`` is always present. A single
+    superset model lets ``find`` declare one ``outputSchema`` while keeping
+    the flat-list return shape both modes have always had.
+
+    Attributes:
+        name: Feature name (listing mode) or document stem (search mode).
+        doc_count: Document count for the feature (listing mode).
+        weight: Graph-weight ranking score for the feature (listing mode).
+        status: Lifecycle status sourced from
+            :func:`~vaultspec_core.vaultcore.orientation.feature_lifecycle_status`
+            (listing mode, ``json`` only).
+        types: The document-type values present for the feature (listing
+            mode, ``json`` only).
+        earliest_date: The feature's earliest document date (listing mode,
+            ``json`` only).
+        has_plan: Whether the feature has a plan (listing mode, ``json``
+            only).
+        note: An advisory note (e.g. graph ranking unavailable).
+        type: The document type value (search mode).
+        feature: The document's feature tag without ``#`` (search mode).
+        date: The document's date string (search mode).
+        path: The document path relative to the project root (search mode).
+        blob_hash: The git blob OID of the document's current bytes, so a
+            read-then-edit chain avoids a re-read (search mode).
+        resource_uri: A ``file://`` resource-link URI for the document body,
+            the ``resource_link``-style return with inline ``body`` as the
+            fallback (search mode).
+        body: The full document text, present only when ``body=True`` was
+            requested (search mode).
     """
 
-    @functools.wraps(fn)
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        ctx_copy = contextvars.copy_context()
-        coro = ctx_copy.run(fn, *args, **kwargs)
-        return await coro
-
-    return wrapper
+    name: str
+    # Feature-listing mode.
+    doc_count: int | None = None
+    weight: int | None = None
+    status: str | None = None
+    types: list[str] | None = None
+    earliest_date: str | None = None
+    has_plan: bool | None = None
+    note: str | None = None
+    # Document-search mode.
+    type: str | None = None
+    feature: str | None = None
+    date: str | None = None
+    path: str | None = None
+    blob_hash: str | None = None
+    resource_uri: str | None = None
+    body: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -564,18 +602,198 @@ def _regenerate_indexes(root_dir: Path, features: set[str]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def register_document_tools(mcp: FastMCP) -> None:
-    """Register the ``create`` and ``edit`` document tools on *mcp*.
+def _find_features(limit: int, want_json: bool) -> list[FindEntry]:
+    """Build the feature-listing ``find`` result rows.
 
-    ``create`` is non-read-only, non-destructive, and non-idempotent
-    (recreating an existing document fails); ``edit`` is non-read-only,
-    destructive (``set_body`` / ``replace_section`` overwrite prose), and
-    non-idempotent.  Both declare their structured output through the
-    :class:`~vaultspec_core.mcp_server.results.BatchResult` return type.
+    The lifecycle ``status`` is sourced from the orientation core
+    (:func:`~vaultspec_core.vaultcore.orientation.feature_lifecycle_status`
+    over :func:`~vaultspec_core.vaultcore.orientation.compute_rollup`), never
+    a local inference, so the MCP surface and ``vaultspec-core status`` agree.
+
+    Args:
+        limit: Maximum number of features to return.
+        want_json: When ``True``, enrich each row with lifecycle status,
+            types, earliest date, and the plan flag.
+
+    Returns:
+        The feature-listing rows, ordered as
+        :func:`~vaultspec_core.vaultcore.query.list_feature_details` returns
+        them and capped at *limit*.
+    """
+    from ...graph import VaultGraph
+    from ...vaultcore.orientation import compute_rollup, feature_lifecycle_status
+    from ...vaultcore.query import list_feature_details
+
+    root_dir = _get_ctx().target_dir
+    features = list_feature_details(root_dir)
+
+    graph_unavailable = False
+    try:
+        graph = VaultGraph(root_dir)
+        rankings = dict(graph.get_feature_rankings(limit=100))
+    except (OSError, ValueError) as exc:
+        logger.warning("Failed to load vault graph rankings: %s", exc)
+        rankings = {}
+        graph_unavailable = True
+
+    active_by_name: dict[str, Any] = {}
+    if want_json:
+        # The orientation rollup is only needed for the enriched lifecycle
+        # status; the cheap listing path skips building the graph twice.
+        rollup = compute_rollup(
+            root_dir, graph=graph if not graph_unavailable else None
+        )
+        active_by_name = {f.name: f for f in rollup.active_features}
+
+    rows: list[FindEntry] = []
+    for feat in features[:limit]:
+        entry = FindEntry(
+            name=feat["name"],
+            doc_count=feat["doc_count"],
+            weight=rankings.get(feat["name"], 0),
+            note="graph ranking unavailable" if graph_unavailable else None,
+        )
+        if want_json:
+            active = active_by_name.get(feat["name"])
+            entry.status = (
+                feature_lifecycle_status(active, set(feat["types"]))
+                if active is not None
+                else "Unknown"
+            )
+            entry.types = feat["types"]
+            entry.earliest_date = feat["earliest_date"]
+            entry.has_plan = feat["has_plan"]
+        rows.append(entry)
+    return rows
+
+
+def _find_documents(
+    feature: str | None,
+    types: list[str] | None,
+    date: str | None,
+    body: bool,
+    limit: int,
+) -> list[FindEntry]:
+    """Build the document-search ``find`` result rows.
+
+    Each row carries the document's current ``blob_hash`` (so a
+    read-then-edit chain avoids a re-read) and a ``resource_uri``
+    resource-link, with the full ``body`` inlined only when requested.
+
+    Args:
+        feature: Feature filter without ``#``, or ``None``.
+        types: Document-type filter, or ``None`` for the default set.
+        date: Exact-date filter, or ``None``.
+        body: When ``True``, inline the full document text.
+        limit: Maximum number of documents to return.
+
+    Returns:
+        The document rows, capped at *limit*.
+    """
+    from ...vaultcore.blob_hash import git_blob_oid
+    from ...vaultcore.query import list_documents
+
+    root_dir = _get_ctx().target_dir
+    effective_types = types if types else _DEFAULT_TYPES
+
+    all_docs = []
+    for dt in effective_types:
+        all_docs.extend(
+            list_documents(root_dir, doc_type=dt, feature=feature, date=date)
+        )
+
+    rows: list[FindEntry] = []
+    for doc in all_docs[:limit]:
+        raw: bytes | None = None
+        try:
+            raw = doc.path.read_bytes()
+        except OSError:
+            logger.warning("Failed to read %s for blob hash", doc.name)
+        entry = FindEntry(
+            name=doc.name,
+            type=doc.doc_type,
+            feature=doc.feature,
+            date=doc.date,
+            path=str(doc.path.relative_to(root_dir)),
+            blob_hash=git_blob_oid(raw) if raw is not None else None,
+            resource_uri=doc.path.as_uri(),
+        )
+        if body:
+            entry.body = (
+                raw.decode("utf-8", errors="replace") if raw is not None else ""
+            )
+        rows.append(entry)
+    return rows
+
+
+def register_document_tools(mcp: FastMCP) -> None:
+    """Register the ``find``, ``create``, and ``edit`` document tools on *mcp*.
+
+    ``find`` is read-only and idempotent; ``create`` is non-read-only,
+    non-destructive, and non-idempotent (recreating an existing document
+    fails); ``edit`` is non-read-only, destructive (``set_body`` /
+    ``replace_section`` overwrite prose), and non-idempotent.  ``create`` and
+    ``edit`` declare their structured output through the
+    :class:`~vaultspec_core.mcp_server.results.BatchResult` return type;
+    ``find`` declares its output through the :class:`FindEntry` list return.
 
     Args:
         mcp: The :class:`~mcp.server.fastmcp.FastMCP` instance to decorate.
     """
+
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
+    @_isolated_context
+    async def find(
+        ctx: Context,
+        feature: str | None = None,
+        type: list[str] | None = None,
+        date: str | None = None,
+        body: bool = False,
+        json: bool = False,
+        limit: int = 20,
+    ) -> list[FindEntry]:
+        """Find vault documents or list features.
+
+        With no filters, returns every feature with its document count and
+        graph-weight score; add ``json`` for the orientation-sourced
+        lifecycle status and richer metadata.  With any of ``feature`` /
+        ``type`` / ``date``, switches to document search: each result carries
+        the document's current ``blob_hash`` and a ``resource_uri``
+        resource-link, with the full ``body`` inlined only on request.  The
+        ``type`` filter defaults to adr, plan, research, reference; exec and
+        audit are excluded unless explicitly requested.
+
+        Args:
+            ctx: The MCP request context.
+            feature: Feature filter without ``#`` (switches to search mode).
+            type: Document-type filter (switches to search mode).
+            date: Exact-date filter (switches to search mode).
+            body: Inline the full document text in search mode.
+            json: Enrich the feature listing with lifecycle status.
+            limit: Maximum number of rows to return.
+
+        Returns:
+            The result rows, one :class:`FindEntry` each.
+        """
+        await ctx.info(
+            f"find: feature={feature!r} type={type!r} date={date!r} "
+            f"body={body} json={json} limit={limit}"
+        )
+
+        if not feature and not type and not date:
+            rows = _find_features(limit, json)
+            await ctx.debug(f"Listed {len(rows)} features.")
+            return rows
+
+        rows = _find_documents(feature, type, date, body, limit)
+        await ctx.debug(f"Found {len(rows)} documents.")
+        return rows
 
     @mcp.tool(
         annotations=ToolAnnotations(
