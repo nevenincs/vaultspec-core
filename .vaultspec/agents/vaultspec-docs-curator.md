@@ -30,7 +30,7 @@ Before any reconciliation, read and internalize:
 Then establish the preconditions, because reconciliation reasons over a clean corpus and
 a live index:
 
-- Run `vaultspec-core vault check all --fix` to cede mechanical hygiene to the CLI.
+- Cede mechanical hygiene to the CLI with `vaultspec-core vault check all --fix`.
 - Confirm the semantic index is live with `vaultspec-rag server doctor`; if the vault or
   code index is empty (common in a fresh worktree), populate it with
   `vaultspec-rag index --type vault` and `vaultspec-rag index --type code`. Where rag is
@@ -40,12 +40,13 @@ a live index:
 
 Build a complete inventory before judging anything:
 
-- `vaultspec-core vault list adr --json` for the ADR set (status is not in the listing -
-  it lives in the body).
+- Inventory the ADR set with `vaultspec-core vault list adr --json` (status is not in
+  the listing - it lives in the body).
 - Parse each declared status from the body H1 and any legacy `## Status` section per the
   taxonomy; record the `superseded_by` / `supersedes` frontmatter edges.
-- `vaultspec-core vault graph --json` (optionally `--feature` or `--node <stem>`) for
-  the supersession and relatedness topology: chains, forks, and stranded decisions.
+- Map the supersession and relatedness topology - chains, forks, and stranded decisions
+  - with `vaultspec-core vault graph --json` (optionally `--feature` or
+    `--node <stem>`).
 
 ## Reconcile: decision-vs-decision and decision-vs-code
 

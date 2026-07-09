@@ -36,10 +36,10 @@ Use:
   path (`S##`, `P##-S##`, or `W##-P##-S##`). The originating Step's canonical identifier
   (`S##`) is recorded in the Step Record's `step_id:` frontmatter field.
 
-  - **Scaffold**: Create the record with
-    `vaultspec-core vault add exec --feature <tag> --step <S##> --related <plan-stem>`,
-    then author the body prose; the verb machine-fills the tier-conditional filename and
-    the `step_id:` frontmatter field.
+  - **Scaffold**: Scaffold the Step Record before authoring its body prose, so the
+    tier-conditional filename and the `step_id:` frontmatter field are machine-filled
+    rather than hand-written. This persona scaffolds it with
+    `vaultspec-core vault add exec --feature <tag> --step <S##> --related <plan-stem>`.
 
   - **Template**: You MUST read and use the template at
     `.vaultspec/templates/exec-step.md`.
@@ -49,12 +49,12 @@ Use:
 
   - **Content**: List the modified files and give a concise summary of key changes.
 
-- **CLI usage mandate**: You MUST update the originating Step's state via
-  `vaultspec-core vault plan step check` (close),
-  `vaultspec-core vault plan step uncheck` (re-open), or
-  `vaultspec-core vault plan step toggle` on completion. Hand-editing the checkbox glyph
-  is forbidden because it bypasses the CLI's idempotency guarantees and display-path
-  recomputation, and is flagged by `vaultspec-core vault plan check`.
+- **Step-state mandate**: On completion you MUST update the originating Step's state
+  through the owning plan verb, never by hand-editing the checkbox glyph - hand edits
+  bypass the CLI's idempotency guarantees and display-path recomputation and are flagged
+  by `vaultspec-core vault plan check`. This persona sets state with
+  `vaultspec-core vault plan step check` to close and
+  `vaultspec-core vault plan step uncheck` to re-open.
 
 ## Standards and tooling
 

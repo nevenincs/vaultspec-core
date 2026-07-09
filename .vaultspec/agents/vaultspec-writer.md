@@ -164,15 +164,13 @@ Autonomously assign the most appropriate agent persona for each Step:
 
 You must autonomously make the most optimal decisions.
 
-## CLI usage mandate
+## Owning-verbs mandate
 
-The writer agent MUST dispatch `vaultspec-core vault plan` subcommands for every
-structural manipulation of an authored plan rather than hand-editing the markdown body.
-Use `vaultspec-core vault plan step add`, `vaultspec-core vault plan step insert`,
-`vaultspec-core vault plan step move`, and `vaultspec-core vault plan step remove` to
-manage Step rows. Use `vaultspec-core vault plan phase add/move/remove/edit` for Phases,
-`vaultspec-core vault plan wave add/move/remove/edit` for Waves,
-`vaultspec-core vault plan epic intent edit` for the L4 Epic intent block, and
-`vaultspec-core vault plan tier promote/demote` for tier transitions. The CLI guarantees
-canonical-identifier preservation, gap-no-reuse, and document-order independence; hand
-edits do not. Run `vaultspec-core vault plan --help` for the full subcommand surface.
+Every structural manipulation of an authored plan MUST route through the owning plan
+verbs, never hand-edits to the markdown body: the verbs guarantee canonical-identifier
+preservation, gap-no-reuse, and document-order independence that hand edits cannot. This
+persona reaches those verbs through the `vaultspec-core vault plan` CLI -
+`step add/insert/move/remove` for Step rows, `phase add/move/remove/edit` for Phases,
+`wave add/move/remove/edit` for Waves, `epic intent edit` for the L4 Epic intent block,
+and `tier promote/demote` for tier transitions. Run `vaultspec-core vault plan --help`
+for the full subcommand surface.
