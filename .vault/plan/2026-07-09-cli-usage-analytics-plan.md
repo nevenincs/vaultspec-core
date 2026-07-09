@@ -64,14 +64,14 @@ Implement the ClaudeSource and CodexSource adapters against committed redacted f
 
 Implement the seven metric families as pure functions, the records.jsonl and report.md renderers, the python -m statistic entrypoint, and a real end-to-end run over the operator corpus.
 
-- [ ] `P05.S15` - Implement the verb-hotspots metric as a pure function counting each (verb, subcommand) leaf over the CallRecord stream; `statistic/metrics/hotspots.py, tests/statistic/test_metrics.py`.
-- [ ] `P05.S16` - Implement the command-and-flag n-gram metric as a pure function over the canonical flag and token sequence; `statistic/metrics/ngrams.py, tests/statistic/test_metrics.py`.
-- [ ] `P05.S17` - Implement the features-utilized metric as a pure function intersecting distinct (verb, subcommand) pairs with the capability inventory; `statistic/metrics/features.py, tests/statistic/test_metrics.py`.
-- [ ] `P05.S18` - Implement the feature-tag-usage metric as a pure function distributing --feature and -f values; `statistic/metrics/feature_tags.py, tests/statistic/test_metrics.py`.
-- [ ] `P05.S19` - Implement the tool-call-misses metric as a pure function sequencing records by retry_key to separate corrected retries and genuine misses from by-design non-zero exits; `statistic/metrics/misses.py, tests/statistic/test_metrics.py`.
-- [ ] `P05.S20` - Implement the overuse-and-dead-surface metric as a pure function comparing observed counts against the declared-capability denominator; `statistic/metrics/surface.py, tests/statistic/test_metrics.py`.
-- [ ] `P05.S21` - Implement the token-and-turn-cost-per-class metric as a pure function grouping cost by verb class; `statistic/metrics/cost.py, tests/statistic/test_metrics.py`.
-- [ ] `P05.S22` - Implement the report renderers writing records.jsonl as the full CallRecord stream and report.md as the seven metric families, both aggregates and hashes only with no raw command bodies; `statistic/report/render.py, tests/statistic/test_report.py`.
+- [x] `P05.S15` - Implement the verb-hotspots metric as a pure function counting each (verb, subcommand) leaf over the CallRecord stream; `statistic/metrics/hotspots.py, tests/statistic/test_metrics.py`.
+- [x] `P05.S16` - Implement the command-and-flag n-gram metric as a pure function over the canonical flag and token sequence; `statistic/metrics/ngrams.py, tests/statistic/test_metrics.py`.
+- [x] `P05.S17` - Implement the features-utilized metric as a pure function intersecting distinct (verb, subcommand) pairs with the capability inventory; `statistic/metrics/features.py, tests/statistic/test_metrics.py`.
+- [x] `P05.S18` - Implement the feature-tag-usage metric as a pure function distributing --feature and -f values; `statistic/metrics/feature_tags.py, tests/statistic/test_metrics.py`.
+- [x] `P05.S19` - Implement the tool-call-misses metric as a pure function sequencing records by retry_key to separate corrected retries and genuine misses from by-design non-zero exits; `statistic/metrics/misses.py, tests/statistic/test_metrics.py`.
+- [x] `P05.S20` - Implement the overuse-and-dead-surface metric as a pure function comparing observed counts against the declared-capability denominator; `statistic/metrics/surface.py, tests/statistic/test_metrics.py`.
+- [x] `P05.S21` - Implement the token-and-turn-cost-per-class metric as a pure function grouping cost by verb class; `statistic/metrics/cost.py, tests/statistic/test_metrics.py`.
+- [x] `P05.S22` - Implement the report renderers writing records.jsonl as the full CallRecord stream and report.md as the seven metric families, both aggregates and hashes only with no raw command bodies; `statistic/report/render.py, tests/statistic/test_report.py`.
 - [ ] `P05.S23` - Implement the python -m statistic entrypoint wiring source discovery, normalization, metrics, and report rendering into the full pipeline; `statistic/__main__.py, tests/statistic/test_main.py`.
 - [ ] `P05.S24` - Run python -m statistic over the operator in-window corpus and verify it emits the real records.jsonl and report.md into gitignored statistic/out/; `statistic/out/records.jsonl, statistic/out/report.md`.
 
