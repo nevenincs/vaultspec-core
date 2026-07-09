@@ -7,6 +7,7 @@ date: '2026-07-09'
 modified: '2026-07-09'
 related:
   - '[[2026-07-09-mcp-tool-schema-adr]]'
+  - '[[2026-07-09-mcp-tool-schema-reference]]'
   - '[[2026-07-09-mcp-tool-schema-research]]'
 ---
 
@@ -19,6 +20,10 @@ Auto-generated index of all documents tagged with `#mcp-tool-schema`.
 ### adr
 
 - `2026-07-09-mcp-tool-schema-adr` - `mcp-tool-schema` adr: tiered hot-tool surface with a stateless discover/invoke gateway | (**status:** `accepted`)
+
+### reference
+
+- `2026-07-09-mcp-tool-schema-reference` - `mcp-tool-schema` reference: implementation reconciliation against the current MCP server
 
 ### research
 
