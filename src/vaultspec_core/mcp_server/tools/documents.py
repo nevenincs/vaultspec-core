@@ -680,15 +680,22 @@ def _find_documents(
     read-then-edit chain avoids a re-read) and a ``resource_uri``
     resource-link, with the full ``body`` inlined only when requested.
 
+    The types are searched in the order given (or the default order) and
+    ``limit`` is a single *global* cap applied to the concatenated result, not
+    a per-type quota: an early type that fills the cap can crowd out later
+    types, so a caller who needs a fair spread across types should page by
+    calling once per type.
+
     Args:
         feature: Feature filter without ``#``, or ``None``.
         types: Document-type filter, or ``None`` for the default set.
         date: Exact-date filter, or ``None``.
         body: When ``True``, inline the full document text.
-        limit: Maximum number of documents to return.
+        limit: Maximum number of documents to return across all types combined.
 
     Returns:
-        The document rows, capped at *limit*.
+        The document rows, ordered by the type list and capped globally at
+        *limit*.
     """
     from ...vaultcore.blob_hash import git_blob_oid
     from ...vaultcore.query import list_documents
@@ -776,7 +783,9 @@ def register_document_tools(mcp: FastMCP) -> None:
             date: Exact-date filter (switches to search mode).
             body: Inline the full document text in search mode.
             json: Enrich the feature listing with lifecycle status.
-            limit: Maximum number of rows to return.
+            limit: Maximum number of rows to return. In search mode this is a
+                global cap across all requested types in type-list order, not
+                a per-type quota.
 
         Returns:
             The result rows, one :class:`FindEntry` each.
