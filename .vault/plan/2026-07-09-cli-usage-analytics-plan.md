@@ -72,7 +72,7 @@ Implement the seven metric families as pure functions, the records.jsonl and rep
 - [x] `P05.S20` - Implement the overuse-and-dead-surface metric as a pure function comparing observed counts against the declared-capability denominator; `statistic/metrics/surface.py, tests/statistic/test_metrics.py`.
 - [x] `P05.S21` - Implement the token-and-turn-cost-per-class metric as a pure function grouping cost by verb class; `statistic/metrics/cost.py, tests/statistic/test_metrics.py`.
 - [x] `P05.S22` - Implement the report renderers writing records.jsonl as the full CallRecord stream and report.md as the seven metric families, both aggregates and hashes only with no raw command bodies; `statistic/report/render.py, tests/statistic/test_report.py`.
-- [ ] `P05.S23` - Implement the python -m statistic entrypoint wiring source discovery, normalization, metrics, and report rendering into the full pipeline; `statistic/__main__.py, tests/statistic/test_main.py`.
+- [x] `P05.S23` - Implement the python -m statistic entrypoint wiring source discovery, normalization, metrics, and report rendering into the full pipeline; `statistic/__main__.py, tests/statistic/test_main.py`.
 - [ ] `P05.S24` - Run python -m statistic over the operator in-window corpus and verify it emits the real records.jsonl and report.md into gitignored statistic/out/; `statistic/out/records.jsonl, statistic/out/report.md`.
 
 ## Parallelization
