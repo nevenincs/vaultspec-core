@@ -11,6 +11,11 @@ related:
   - '[[2026-07-09-mcp-tool-schema-P01-S03]]'
   - '[[2026-07-09-mcp-tool-schema-P01-S04]]'
   - '[[2026-07-09-mcp-tool-schema-P01-S05]]'
+  - '[[2026-07-09-mcp-tool-schema-P02-S06]]'
+  - '[[2026-07-09-mcp-tool-schema-P02-S07]]'
+  - '[[2026-07-09-mcp-tool-schema-P02-S08]]'
+  - '[[2026-07-09-mcp-tool-schema-P02-S09]]'
+  - '[[2026-07-09-mcp-tool-schema-P02-S10]]'
   - '[[2026-07-09-mcp-tool-schema-adr]]'
   - '[[2026-07-09-mcp-tool-schema-plan]]'
   - '[[2026-07-09-mcp-tool-schema-reference]]'
@@ -34,6 +39,11 @@ Auto-generated index of all documents tagged with `#mcp-tool-schema`.
 - `2026-07-09-mcp-tool-schema-P01-S03` - Add a single kebab-case feature-and-tag normalizer to vaultcore that strips a leading hash, lowercases, rejects path-traversal, and validates the canonical pattern, returning a typed result (agent: vaultspec-standard-executor)
 - `2026-07-09-mcp-tool-schema-P01-S04` - Re-point cmd_add feature and tag validation at the new normalizer, deleting the inline regex copy so the CLI and the MCP surface share one validator (agent: vaultspec-low-executor)
 - `2026-07-09-mcp-tool-schema-P01-S05` - Add WorkspaceFactory edit-engine unit tests (resolve, blob-hash conflict, compose, validate-refusal, write) and the normalizer tests, and confirm the existing set-body/set-frontmatter/edit CLI tests stay green (agent: vaultspec-standard-executor)
+- `2026-07-09-mcp-tool-schema-P02-S06` - Add the shared per-item result envelope module: a build helper producing the canonical item shape (index, target, status of created/updated/unchanged/failed, path, blob_hash, structured error, warnings) and an aggregate reducer returning ok/mixed/failed, matching the CLI sync-envelope vocabulary (agent: vaultspec-standard-executor)
+- `2026-07-09-mcp-tool-schema-P02-S07` - Rebuild create as a batch-native tool: delete the inline hydrate/filename/atomic_write path, normalize each spec via the shared normalizer, resolve_related_inputs, validate_feature_dependencies against vault state including earlier same-batch items, call create_vault_doc per item, then generate_feature_index for affected features, emitting the shared per-item envelope (agent: vaultspec-high-executor)
+- `2026-07-09-mcp-tool-schema-P02-S08` - Implement the new edit tool: batch body-prose operations (append_section, replace_section, set_body) addressed by stem or path, each composing the full body and flowing through the extracted execute_edit engine with the optional expected_blob_hash guard and the post-write blob_hash in the per-item result, section miss reported as section_not_found (agent: vaultspec-high-executor)
+- `2026-07-09-mcp-tool-schema-P02-S09` - Add WorkspaceFactory tests for batch create: intra-batch lifecycle dependency validation, per-item partial-failure envelope, and automatic feature-index regeneration for affected features (agent: vaultspec-standard-executor)
+- `2026-07-09-mcp-tool-schema-P02-S10` - Add WorkspaceFactory tests for the edit tool: the blob-hash conflict path, intra-batch same-document sequencing with the hash set on the first op only, section_not_found, and the post-write hash chaining from one op to the next (agent: vaultspec-standard-executor)
 
 ### plan
 
