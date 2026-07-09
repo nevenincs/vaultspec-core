@@ -55,10 +55,10 @@ Build the two-stage command tokenizer and extractor that turn a raw command stri
 
 Implement the ClaudeSource and CodexSource adapters against committed redacted fixture trees, each owning its own linkage, exit-status derivation, and cost attribution.
 
-- [ ] `P04.S11` - Implement the ClaudeSource adapter: discover project and subagent session files, apply the per-line 30-day window filter, link tool_use to tool_result, infer exit status from is_error plus result text with the distutils-precedence.pth venv-noise guard, and attribute per-message token cost; `statistic/parsers/claude.py`.
-- [ ] `P04.S12` - Implement the CodexSource adapter: discover rollout and archived sessions via session_index.jsonl, apply the per-line window filter, decode JSON-string function_call arguments, link function_call to function_call_output by call_id, extract the numeric Exit code, and derive token cost from cumulative snapshot deltas; `statistic/parsers/codex.py`.
-- [ ] `P04.S13` - Commit a synthetic redacted Claude project fixture tree exercising every schema edge and assert ClaudeSource record counts, hashes, exit statuses, and subagent attribution; `tests/statistic/fixtures/claude, tests/statistic/test_claude_source.py`.
-- [ ] `P04.S14` - Commit a synthetic redacted Codex session fixture tree exercising every schema edge and assert CodexSource record counts, hashes, exit codes, and token-delta costs; `tests/statistic/fixtures/codex, tests/statistic/test_codex_source.py`.
+- [x] `P04.S11` - Implement the ClaudeSource adapter: discover project and subagent session files, apply the per-line 30-day window filter, link tool_use to tool_result, infer exit status from is_error plus result text with the distutils-precedence.pth venv-noise guard, and attribute per-message token cost; `statistic/parsers/claude.py`.
+- [x] `P04.S12` - Implement the CodexSource adapter: discover rollout and archived sessions via session_index.jsonl, apply the per-line window filter, decode JSON-string function_call arguments, link function_call to function_call_output by call_id, extract the numeric Exit code, and derive token cost from cumulative snapshot deltas; `statistic/parsers/codex.py`.
+- [x] `P04.S13` - Commit a synthetic redacted Claude project fixture tree exercising every schema edge and assert ClaudeSource record counts, hashes, exit statuses, and subagent attribution; `tests/statistic/fixtures/claude, tests/statistic/test_claude_source.py`.
+- [x] `P04.S14` - Commit a synthetic redacted Codex session fixture tree exercising every schema edge and assert CodexSource record counts, hashes, exit codes, and token-delta costs; `tests/statistic/fixtures/codex, tests/statistic/test_codex_source.py`.
 
 ### Phase `P05` - Metrics, report, and entrypoint
 
