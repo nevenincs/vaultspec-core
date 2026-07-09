@@ -159,6 +159,13 @@ def _retry_corrections(records: list[CallRecord]) -> tuple[RetryCorrection, ...]
     Records are grouped by session and ordered by activity timestamp; an
     adjacent pair whose first element errored, whose verbs match, and whose flag
     name sets differ is a correction.
+
+    The sequence is intentionally keyed off ``session_id`` plus ``timestamp``,
+    not off :attr:`~statistic.normalize.models.CallRecord.retry_key`. That field
+    is a per-call linkage anchor - on the Codex side the per-call-unique
+    ``call_id`` - so literal ordering by it is meaningless; wall-clock order
+    within a session is the correct and portable sequencing signal across both
+    corpora. ``retry_key`` is retained for record linkage, not for this ordering.
     """
     by_session: defaultdict[str, list[CallRecord]] = defaultdict(list)
     for record in records:
