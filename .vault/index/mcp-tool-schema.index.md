@@ -35,7 +35,9 @@ related:
   - '[[2026-07-09-mcp-tool-schema-P05-S27]]'
   - '[[2026-07-09-mcp-tool-schema-P05-S28]]'
   - '[[2026-07-09-mcp-tool-schema-P05-S29]]'
+  - '[[2026-07-09-mcp-tool-schema-P05-S30]]'
   - '[[2026-07-09-mcp-tool-schema-adr]]'
+  - '[[2026-07-09-mcp-tool-schema-audit]]'
   - '[[2026-07-09-mcp-tool-schema-plan]]'
   - '[[2026-07-09-mcp-tool-schema-reference]]'
   - '[[2026-07-09-mcp-tool-schema-research]]'
@@ -50,6 +52,10 @@ Auto-generated index of all documents tagged with `#mcp-tool-schema`.
 ### adr
 
 - `2026-07-09-mcp-tool-schema-adr` - `mcp-tool-schema` adr: tiered hot-tool surface with a stateless discover/invoke gateway | (**status:** `accepted`)
+
+### audit
+
+- `2026-07-09-mcp-tool-schema-audit` - `mcp-tool-schema` audit: `nine-tool MCP server rebuild review`
 
 ### exec
 
@@ -82,6 +88,7 @@ Auto-generated index of all documents tagged with `#mcp-tool-schema`.
 - `2026-07-09-mcp-tool-schema-P05-S27` - Wrap every new handler in \_isolated_context and extend the server instructions string to name the nine-tool surface and the tool-schema version, registering all tools through the updated register_tools bootstrap (agent: vaultspec-low-executor)
 - `2026-07-09-mcp-tool-schema-P05-S28` - Audit and tighten the hot-verb help strings in the CLI reference so the discover payload reads well verbatim, regenerating the inventory between the vaultspec:generated markers (agent: vaultspec-low-executor)
 - `2026-07-09-mcp-tool-schema-P05-S29` - Add the nine-tool integration test asserting registration of all nine tools, outputSchema presence, corrected annotations, and isError on a whole-call failure (agent: vaultspec-standard-executor)
+- `2026-07-09-mcp-tool-schema-P05-S30` - Review the full nine-tool surface for ADR and reference fidelity: owning-verb routing, isError and envelope contract, annotations, and the subprocess injection guard (agent: vaultspec-code-reviewer)
 
 ### plan
 
