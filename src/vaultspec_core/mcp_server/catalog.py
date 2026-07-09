@@ -42,6 +42,7 @@ if TYPE_CHECKING:
 __all__ = [
     "DENYLIST",
     "CatalogEntry",
+    "CommandArgument",
     "CommandCatalog",
     "CommandFlag",
     "build_catalog",
@@ -102,8 +103,32 @@ class CommandFlag:
 
 
 @dataclass(frozen=True)
+class CommandArgument:
+    """One declared positional argument of a cataloged verb.
+
+    Positional arguments are the ordered operands a verb consumes after its
+    options - ``vault add <TYPE>``, ``vault plan status <TARGET>``,
+    ``vault plan step check <PLAN> <STEP>``, ``vault feature rename <OLD>
+    <NEW>``. ``invoke`` renders the caller's ordered ``positionals`` list into
+    exactly these slots, so verbs that need operands are callable.
+
+    Attributes:
+        name: The argument's declared metavar/name (lower-cased), for the
+            ``discover`` payload; positional order, not name, drives argv.
+        required: ``True`` when the verb declares the argument as required.
+        variadic: ``True`` when the argument consumes the rest (``nargs == -1``);
+            a verb with a variadic tail accepts any number of trailing
+            positionals.
+    """
+
+    name: str
+    required: bool
+    variadic: bool = False
+
+
+@dataclass(frozen=True)
 class CatalogEntry:
-    """A single cataloged verb: its path, description, and flag schema.
+    """A single cataloged verb: its path, description, and parameter schema.
 
     Attributes:
         verb_path: The verb path as a tuple of segments, e.g.
@@ -112,6 +137,8 @@ class CatalogEntry:
             address it through ``discover`` and ``invoke``.
         description: The curated help text from the CLI reference marker block.
         flags: The verb's declared options, in name order.
+        arguments: The verb's declared positional arguments, in declaration
+            (left-to-right) order.
         supports_json: Whether the verb accepts ``--json`` for structured
             output; when ``True`` ``invoke`` appends it and parses stdout as
             JSON.
@@ -121,7 +148,31 @@ class CatalogEntry:
     verb: str
     description: str
     flags: tuple[CommandFlag, ...] = ()
+    arguments: tuple[CommandArgument, ...] = ()
     supports_json: bool = False
+
+    @property
+    def accepts_positionals(self) -> bool:
+        """Report whether the verb declares any positional argument."""
+        return bool(self.arguments)
+
+    @property
+    def has_variadic_argument(self) -> bool:
+        """Report whether the verb declares a rest-consuming argument."""
+        return any(arg.variadic for arg in self.arguments)
+
+    def max_positionals(self) -> int | None:
+        """Return the positional-count ceiling, or ``None`` when unbounded.
+
+        A verb with a variadic (``nargs == -1``) argument accepts any number of
+        trailing positionals; otherwise the ceiling is the declared count.
+
+        Returns:
+            The maximum accepted positional count, or ``None`` when unbounded.
+        """
+        if self.has_variadic_argument:
+            return None
+        return len(self.arguments)
 
     def flag(self, name: str) -> CommandFlag | None:
         """Return the declared :class:`CommandFlag` for *name*, or ``None``.
@@ -339,28 +390,31 @@ def _bullet_description(bullet: str) -> str:
     return bullet.strip()
 
 
-def _collect_option_schemas(
+def _collect_command_schemas(
     typer_app: typer.Typer,
-) -> dict[tuple[str, ...], tuple[CommandFlag, ...]]:
-    """Introspect the installed Typer app for each leaf verb's option schema.
+) -> dict[tuple[str, ...], tuple[tuple[CommandFlag, ...], tuple[CommandArgument, ...]]]:
+    """Introspect the installed Typer app for each leaf verb's parameter schema.
 
     Walks the Click command tree the CLI builds - the same tree the marker
     block is generated from - collecting every leaf command's long-form
-    options, whether each takes a value, and its help text. This is read-only
-    and runs once at catalog build.
+    options and its ordered positional arguments. This is read-only and runs
+    once at catalog build.
 
     Args:
         typer_app: The root Typer application to introspect.
 
     Returns:
-        Each leaf verb path mapped to its declared flags in name order.
+        Each leaf verb path mapped to a ``(flags, arguments)`` pair, flags in
+        name order and arguments in declaration order.
     """
     import typer.main
     from typer.core import TyperGroup
 
     root = typer.main.get_command(typer_app)
     root_ctx = root.context_class(root, info_name=_EXECUTABLE)
-    schemas: dict[tuple[str, ...], tuple[CommandFlag, ...]] = {}
+    schemas: dict[
+        tuple[str, ...], tuple[tuple[CommandFlag, ...], tuple[CommandArgument, ...]]
+    ] = {}
 
     def walk(command: ClickCommand, ctx: ClickContext, prefix: tuple[str, ...]) -> None:
         if isinstance(command, TyperGroup):
@@ -371,7 +425,7 @@ def _collect_option_schemas(
                 sub_ctx = sub.context_class(sub, info_name=name, parent=ctx)
                 walk(sub, sub_ctx, (*prefix, name))
             return
-        schemas[prefix] = _flags_of(command, ctx)
+        schemas[prefix] = (_flags_of(command, ctx), _arguments_of(command, ctx))
 
     walk(root, root_ctx, ())
     return schemas
@@ -400,6 +454,36 @@ def _flags_of(command: ClickCommand, ctx: ClickContext) -> tuple[CommandFlag, ..
     return tuple(flags)
 
 
+def _arguments_of(
+    command: ClickCommand, ctx: ClickContext
+) -> tuple[CommandArgument, ...]:
+    """Extract the ordered positional arguments of a resolved Click leaf command.
+
+    Preserves declaration order (the order the operands must be supplied on the
+    command line), recording each argument's name, whether it is required, and
+    whether it is the rest-consuming variadic tail (``nargs == -1``). Options
+    are ignored here; :func:`_flags_of` owns them.
+
+    Args:
+        command: The resolved Click leaf command.
+        ctx: The command's Click context.
+
+    Returns:
+        The declared positional arguments in left-to-right order.
+    """
+    arguments: list[CommandArgument] = []
+    for param in command.get_params(ctx):
+        if param.param_type_name != "argument":
+            continue
+        name = str(getattr(param, "name", "") or "").lower()
+        required = bool(getattr(param, "required", False))
+        variadic = getattr(param, "nargs", 1) == -1
+        arguments.append(
+            CommandArgument(name=name, required=required, variadic=variadic)
+        )
+    return tuple(arguments)
+
+
 def build_catalog(
     reference_path: Path,
     *,
@@ -410,8 +494,9 @@ def build_catalog(
     The verb-existence set and descriptions come from the ``vaultspec:generated``
     marker block in *reference_path* (the ADR-authoritative source), with the
     static :data:`DENYLIST` removed. Each surviving verb is enriched with the
-    option schema and ``--json`` support introspected from *typer_app* so the
-    gateway can present accurate parameter schemas and build correct argv.
+    option schema, its ordered positional arguments, and ``--json`` support
+    introspected from *typer_app* so the gateway can present accurate parameter
+    schemas and build correct argv (flags and positionals alike).
 
     Args:
         reference_path: Path to the shipped CLI reference (``cli.md``).
@@ -428,19 +513,20 @@ def build_catalog(
         from vaultspec_core.cli import app as typer_app
 
     descriptions = _parse_inventory(reference_path)
-    option_schemas = _collect_option_schemas(typer_app)
+    command_schemas = _collect_command_schemas(typer_app)
 
     entries: dict[tuple[str, ...], CatalogEntry] = {}
     for verb_path, description in descriptions.items():
         if verb_path in DENYLIST:
             continue
-        flags = option_schemas.get(verb_path, ())
+        flags, arguments = command_schemas.get(verb_path, ((), ()))
         supports_json = any(flag.name == _JSON_FLAG for flag in flags)
         entries[verb_path] = CatalogEntry(
             verb_path=verb_path,
             verb=" ".join(verb_path),
             description=description,
             flags=flags,
+            arguments=arguments,
             supports_json=supports_json,
         )
 

@@ -19,15 +19,47 @@ if TYPE_CHECKING:
 
 from mcp.server.fastmcp import FastMCP
 
+from vaultspec_core import __version__
 from vaultspec_core.cli._app import make_app
 
 from .tools import (
     register_document_tools,
+    register_gateway_tools,
     register_orientation_tools,
     register_plan_tools,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _build_instructions() -> str:
+    """Compose the server ``instructions`` string naming the nine-tool surface.
+
+    Names each first-class tool so a host that surfaces server instructions can
+    orient an agent without a round-trip, and carries the tool-schema version
+    (the package version per ADR Q8) as a third channel alongside the
+    ``initialize`` implementation info and the ``status`` structured output, so
+    the version survives the stateless protocol where ``initialize`` disappears.
+
+    Returns:
+        The assembled instructions string.
+    """
+    return (
+        "Vaultspec-core MCP server (tool-schema version "
+        f"{__version__}). Nine tools cover the vaultspec workflow. Hot path: "
+        "'status' (project orientation and grounding traces), 'find' (document "
+        "and feature discovery with blob hashes and resource links), 'create' "
+        "(batch document scaffolding from templates), 'edit' (batch body-prose "
+        "editing with optimistic-concurrency guards), 'plan_progress' (mark "
+        "plan steps checked/unchecked), 'plan_edit' (add/insert/edit/remove "
+        "plan steps), and 'check' (vault health checks with optional fix). "
+        "Long tail: 'discover' searches the full verb catalog and returns "
+        "parameter schemas on demand, and 'invoke' runs any cataloged verb "
+        "against the installed binary. Prefer the hot tools; reach for "
+        "discover/invoke for everything else. Mutations route through the "
+        "owning verb logic, so canonical identifiers, frontmatter, and "
+        "filenames are never hand-authored."
+    )
 
 # Plain-Click help to match the rest of the CLI (cli-presentation-uniformity
 # ADR). ``no_args_is_help`` stays off so the no-argument invocation still runs
@@ -55,19 +87,18 @@ def create_server() -> FastMCP:
     """
     mcp = FastMCP(
         name="vaultspec-mcp",
-        instructions=(
-            "Vault document discovery and authoring for vaultspec-managed projects."
-        ),
+        instructions=_build_instructions(),
         lifespan=_lifespan,
     )
 
-    # Register the tool surface: find/create/edit (documents), status/check
-    # (orientation), and plan_progress/plan_edit (plan). The gateway tools
-    # land in a later phase. The final bootstrap and instructions string are
-    # finalised in the cross-cutting closeout phase.
+    # Register the full nine-tool surface: find/create/edit (documents),
+    # status/check (orientation), plan_progress/plan_edit (plan), and the
+    # discover/invoke gateway. Every handler runs in a copied context for
+    # concurrent-request isolation.
     register_document_tools(mcp)
     register_orientation_tools(mcp)
     register_plan_tools(mcp)
+    register_gateway_tools(mcp)
 
     return mcp
 

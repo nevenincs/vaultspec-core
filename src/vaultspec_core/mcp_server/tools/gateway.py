@@ -37,7 +37,7 @@ from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
 from ...core.types import get_context as _get_ctx
-from ..catalog import RESERVED_FLAGS, CommandCatalog, build_catalog
+from ..catalog import RESERVED_FLAGS, CatalogEntry, CommandCatalog, build_catalog
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
@@ -74,6 +74,21 @@ class FlagSchema(BaseModel):
     help: str = ""
 
 
+class ArgumentSchema(BaseModel):
+    """One declared positional argument of a discovered verb.
+
+    Attributes:
+        name: The argument's declared name/metavar, for agent readability;
+            positional order, not name, is what ``invoke`` renders.
+        required: Whether the verb declares the argument as required.
+        variadic: Whether the argument consumes the rest of the operands.
+    """
+
+    name: str
+    required: bool
+    variadic: bool = False
+
+
 class VerbSchema(BaseModel):
     """A ranked verb returned by ``discover`` with its full parameter schema.
 
@@ -83,6 +98,8 @@ class VerbSchema(BaseModel):
         score: The ranking score against the query (higher is closer).
         supports_json: Whether ``invoke`` will request and parse JSON output.
         flags: The verb's declared options.
+        arguments: The verb's ordered positional operands, so a caller knows
+            what to pass in ``invoke``'s ``positionals`` list and in what order.
     """
 
     verb: str
@@ -90,6 +107,7 @@ class VerbSchema(BaseModel):
     score: float
     supports_json: bool
     flags: list[FlagSchema] = Field(default_factory=list)
+    arguments: list[ArgumentSchema] = Field(default_factory=list)
 
 
 class DiscoverResult(BaseModel):
@@ -199,10 +217,10 @@ def _reference_path() -> Path:
 
 
 def _build_argv(
-    entry_verb_path: tuple[str, ...],
-    entry_flags_lookup: Any,
+    entry: CatalogEntry,
     supports_json: bool,
     arguments: dict[str, Any],
+    positionals: list[str],
     root_dir: Path,
 ) -> list[str]:
     """Build the interpreter-prefixed argv list for a validated verb call.
@@ -211,13 +229,17 @@ def _build_argv(
     (``sys.executable -m vaultspec_core``), so the gateway invokes the same
     command surface whether installed as a console script or run from this
     development environment. ``--target`` is injected at the global position;
-    ``--json`` is appended last when supported.
+    the caller's ordered positionals are placed immediately after the verb
+    path (their canonical operand slots, ahead of any options so a value-flag
+    never swallows an operand); rendered flags follow; ``--json`` is appended
+    last when supported.
 
     Args:
-        entry_verb_path: The validated verb path segments.
-        entry_flags_lookup: The entry's ``flag(name)`` resolver.
+        entry: The validated catalog entry for the verb.
         supports_json: Whether to append ``--json``.
-        arguments: The caller's validated argument object.
+        arguments: The caller's validated argument object (options).
+        positionals: The caller's ordered positional operands, already
+            count-validated against the verb's declared arguments.
         root_dir: The server root injected via ``--target``.
 
     Returns:
@@ -232,12 +254,48 @@ def _build_argv(
         "vaultspec_core",
         "--target",
         str(root_dir),
-        *entry_verb_path,
+        *entry.verb_path,
     ]
-    argv.extend(_render_flags(entry_flags_lookup, arguments) if arguments else [])
+    argv.extend(str(item) for item in positionals)
+    argv.extend(_render_flags(entry.flag, arguments) if arguments else [])
     if supports_json:
         argv.append("--json")
     return argv
+
+
+def _validate_positionals(entry: CatalogEntry, positionals: list[str]) -> None:
+    """Reject a positional list the verb cannot accept, before any spawn.
+
+    The values are always discrete argv items so no positional can inject a
+    shell command; this guard is the catalog-validation half - it refuses
+    operands a verb does not declare (a verb that takes none, or more operands
+    than a non-variadic verb accepts), so ``invoke`` cannot smuggle stray
+    tokens onto a verb's command line.
+
+    Args:
+        entry: The validated catalog entry for the verb.
+        positionals: The caller's ordered positional operands.
+
+    Raises:
+        ValueError: When the verb declares no positional arguments but some
+            were supplied, or more were supplied than a non-variadic verb
+            accepts.
+    """
+    if not positionals:
+        return
+    if not entry.accepts_positionals:
+        msg = (
+            f"verb {entry.verb!r} takes no positional arguments, "
+            f"but {len(positionals)} were supplied"
+        )
+        raise ValueError(msg)
+    ceiling = entry.max_positionals()
+    if ceiling is not None and len(positionals) > ceiling:
+        msg = (
+            f"verb {entry.verb!r} accepts at most {ceiling} positional "
+            f"argument(s), but {len(positionals)} were supplied"
+        )
+        raise ValueError(msg)
 
 
 def _render_flags(flag_lookup: Any, arguments: dict[str, Any]) -> list[str]:
@@ -348,6 +406,14 @@ def register_gateway_tools(mcp: FastMCP) -> None:
                     )
                     for flag in entry.flags
                 ],
+                arguments=[
+                    ArgumentSchema(
+                        name=arg.name,
+                        required=arg.required,
+                        variadic=arg.variadic,
+                    )
+                    for arg in entry.arguments
+                ],
             )
             for score, entry in ranked
         ]
@@ -366,6 +432,7 @@ def register_gateway_tools(mcp: FastMCP) -> None:
         ctx: Context,
         verb: str,
         arguments: dict[str, Any] | None = None,
+        positionals: list[str] | None = None,
         timeout: float = _DEFAULT_TIMEOUT,
     ) -> InvokeResult:
         """Execute one cataloged long-tail verb against the installed binary.
@@ -384,6 +451,11 @@ def register_gateway_tools(mcp: FastMCP) -> None:
                 value-taking flags may pass a list to repeat, boolean flags
                 pass ``True``. ``--target`` and ``--json`` are server-managed
                 and must not be supplied.
+            positionals: The verb's ordered positional operands (e.g. the
+                ``TYPE`` of ``vault add``, the ``PLAN`` and ``STEP`` of
+                ``vault plan step check``, the ``OLD`` and ``NEW`` of ``vault
+                feature rename``), in command-line order. Validated against the
+                verb's declared argument count before any spawn.
             timeout: The subprocess wall-clock budget in seconds.
 
         Returns:
@@ -391,9 +463,10 @@ def register_gateway_tools(mcp: FastMCP) -> None:
             structured error payload for a verb that ran and failed.
 
         Raises:
-            ValueError: When the verb is unknown, denied, or an argument names
-                a reserved or undeclared flag - surfaced as a protocol error
-                before any process is spawned.
+            ValueError: When the verb is unknown, denied, an argument names a
+                reserved or undeclared flag, or the positionals do not fit the
+                verb's declared arguments - surfaced as a protocol error before
+                any process is spawned.
         """
         verb_path = _parse_verb(verb)
         catalog = _load_catalog(_reference_path())
@@ -406,15 +479,21 @@ def register_gateway_tools(mcp: FastMCP) -> None:
             msg = f"unknown verb {verb!r}; use discover to find a valid verb path"
             raise ValueError(msg)
 
+        ordered_positionals = list(positionals or [])
+        _validate_positionals(entry, ordered_positionals)
+
         root_dir = _get_ctx().target_dir
         argv = _build_argv(
-            entry.verb_path,
-            entry.flag,
+            entry,
             entry.supports_json,
             arguments or {},
+            ordered_positionals,
             root_dir,
         )
-        await ctx.info(f"invoke: verb={verb!r} json={entry.supports_json}")
+        await ctx.info(
+            f"invoke: verb={verb!r} json={entry.supports_json} "
+            f"positionals={len(ordered_positionals)}"
+        )
 
         command = ["vaultspec-core", *argv[argv.index("--target") :]]
         try:

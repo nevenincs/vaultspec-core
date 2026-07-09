@@ -27,9 +27,9 @@ pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 def _gateway_server() -> FastMCP:
     """Build a FastMCP server exposing only the two gateway tools.
 
-    P04 does not wire the gateway into ``create_server`` (that bootstrap edit
-    is the P05 closeout); registering onto a local instance exercises the real
-    handlers end-to-end through the same session transport.
+    Registering onto a local instance exercises the gateway handlers in
+    isolation end-to-end through the same session transport; the full
+    nine-tool ``create_server`` wiring is covered by the surface test.
     """
     mcp = FastMCP(name="vaultspec-mcp-gateway-test")
     register_gateway_tools(mcp)
@@ -129,6 +129,59 @@ async def test_invoke_value_flag_passed_through(vault_root):  # noqa: F811
         assert payload["ok"] is True
         assert "--feature" in payload["command"]
         assert "no-such-feature" in payload["command"]
+
+
+async def test_invoke_positional_verb_runs_end_to_end(vault_root):  # noqa: F811
+    """A verb needing a positional operand is callable via ``positionals``.
+
+    ``vault add <DOC_TYPE> --feature <tag>`` needs the document type as an
+    ordered positional; the gateway must place it in the operand slot ahead of
+    the ``--feature`` flag and the injected ``--json`` for the real binary to
+    scaffold the document and exit clean.
+    """
+    mcp = _gateway_server()
+    async with create_connected_server_and_client_session(mcp) as client:
+        result = await client.call_tool(
+            "invoke",
+            {
+                "verb": "vault add",
+                "positionals": ["research"],
+                "arguments": {"feature": "gateway-positional-probe"},
+            },
+        )
+        payload = data_of(result)
+        assert payload["ok"] is True, payload
+        assert payload["exit_code"] == 0
+        assert payload["format"] == "json"
+        # The positional lands in the operand slot: right after the verb path
+        # (which itself follows the injected --target) and before the flags.
+        command = payload["command"]
+        add_index = command.index("add")
+        assert command[add_index - 1] == "vault"
+        assert command[add_index + 1] == "research"
+        feature_index = command.index("--feature")
+        assert feature_index > add_index + 1
+        # The verb really ran: a research document now exists for the feature.
+        created = list(
+            (vault_root / ".vault" / "research").glob(
+                "*gateway-positional-probe*.md"
+            )
+        )
+        assert created, "invoke did not scaffold the research document"
+
+
+async def test_invoke_rejects_positional_for_argless_verb(vault_root):  # noqa: F811
+    """A positional supplied to a verb that declares none is rejected pre-spawn."""
+    mcp = _gateway_server()
+    async with create_connected_server_and_client_session(mcp) as client:
+        # ``vault stats`` declares no positional arguments; a stray operand
+        # is refused by catalog validation before any process spawns.
+        result = await client.call_tool(
+            "invoke", {"verb": "vault stats", "positionals": ["stray"]}
+        )
+        assert result.isError
+        text = _error_text(result)
+        assert "no positional" in text
 
 
 async def test_discover_returns_ranked_schemas(vault_root):  # noqa: F811
