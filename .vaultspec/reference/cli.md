@@ -6,6 +6,12 @@ locally-resident lookup for AI agents: command inventory, options, argument
 enumerations, exit codes, and environment variables. The human-facing prose reference is
 `docs/CLI.md` in the source repository.
 
+This reference serves two roles. It is the CLI-fallback command lookup for agents and
+sessions where the vaultspec MCP server is not connected, resolving verbs, options, and
+argument shapes from one local read. It is also the authoritative verb-existence source
+the MCP `discover` and `invoke` gateway parses: the `vaultspec:generated`
+command-inventory block below enumerates every leaf command the gateway will accept.
+
 This file is a reference document, not a rule. It is not assembled into any provider
 configuration.
 

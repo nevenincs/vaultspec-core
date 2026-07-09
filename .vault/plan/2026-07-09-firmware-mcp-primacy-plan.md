@@ -55,9 +55,9 @@ Reword the five write-capable personas to capability-first framing with the CLI 
 
 Add the dual-role header prose to the CLI reference at the generator source and regenerate, so the human-facing lookup gains its MCP-gateway-catalog framing while the generated marker block stays byte-stable and the drift test stays green.
 
-- [ ] `P04.S15` - Edit the emitted header prose at the reference generator source to add the Q5 dual-role paragraph naming the CLI-fallback lookup and MCP-gateway verb-existence roles, leaving the marker-block emission untouched; `src/vaultspec_core/cli/reference_gen.py`.
-- [ ] `P04.S16` - Regenerate the bundled CLI reference via vaultspec-core spec reference generate so the new header prose lands while the generated command-inventory marker block stays byte-identical; `src/vaultspec_core/builtins/reference/cli.md`.
-- [ ] `P04.S17` - Run test_committed_reference_is_in_sync_with_live_surface and confirm it stays green, proving only prose outside the markers changed; `src/vaultspec_core/tests/cli/test_cli_reference_generated.py`.
+- [x] `P04.S15` - Edit the emitted header prose at the reference generator source to add the Q5 dual-role paragraph naming the CLI-fallback lookup and MCP-gateway verb-existence roles, leaving the marker-block emission untouched; `src/vaultspec_core/cli/reference_gen.py`.
+- [x] `P04.S16` - Regenerate the bundled CLI reference via vaultspec-core spec reference generate so the new header prose lands while the generated command-inventory marker block stays byte-identical; `src/vaultspec_core/builtins/reference/cli.md`.
+- [x] `P04.S17` - Run test_committed_reference_is_in_sync_with_live_surface and confirm it stays green, proving only prose outside the markers changed; `src/vaultspec_core/tests/cli/test_cli_reference_generated.py`.
 
 ### Phase `P05` - Sync and verification closeout
 

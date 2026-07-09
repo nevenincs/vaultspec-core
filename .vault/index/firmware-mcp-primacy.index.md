@@ -20,6 +20,9 @@ related:
   - '[[2026-07-09-firmware-mcp-primacy-P03-S12]]'
   - '[[2026-07-09-firmware-mcp-primacy-P03-S13]]'
   - '[[2026-07-09-firmware-mcp-primacy-P03-S14]]'
+  - '[[2026-07-09-firmware-mcp-primacy-P04-S15]]'
+  - '[[2026-07-09-firmware-mcp-primacy-P04-S16]]'
+  - '[[2026-07-09-firmware-mcp-primacy-P04-S17]]'
   - '[[2026-07-09-firmware-mcp-primacy-adr]]'
   - '[[2026-07-09-firmware-mcp-primacy-plan]]'
   - '[[2026-07-09-firmware-mcp-primacy-research]]'
@@ -51,6 +54,9 @@ Auto-generated index of all documents tagged with `#firmware-mcp-primacy`.
 - `2026-07-09-firmware-mcp-primacy-P03-S12` - Reword the high-executor Scaffold and step-state mandates to lead with the capability sentence while keeping the exact vault add exec and vault plan step check/uncheck verbs, dropping toggle from the recommended set, leaving the tools allowlist byte-identical
 - `2026-07-09-firmware-mcp-primacy-P03-S13` - Apply the capability-first pass over the docs-curator's seven CLI references, retaining every verb and leaving the tools allowlist byte-identical
 - `2026-07-09-firmware-mcp-primacy-P03-S14` - Diff each reworded persona against its prior version to confirm every tools allowlist is byte-identical, every exact CLI verb is retained, and toggle is dropped only from the three executors' recommended set
+- `2026-07-09-firmware-mcp-primacy-P04-S15` - Edit the emitted header prose at the reference generator source to add the Q5 dual-role paragraph naming the CLI-fallback lookup and MCP-gateway verb-existence roles, leaving the marker-block emission untouched
+- `2026-07-09-firmware-mcp-primacy-P04-S16` - Regenerate the bundled CLI reference via vaultspec-core spec reference generate so the new header prose lands while the generated command-inventory marker block stays byte-identical
+- `2026-07-09-firmware-mcp-primacy-P04-S17` - Run test_committed_reference_is_in_sync_with_live_surface and confirm it stays green, proving only prose outside the markers changed
 
 ### plan
 
