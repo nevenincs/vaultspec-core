@@ -4,18 +4,20 @@ Two artifacts land in the gitignored ``statistic/out/`` directory. The
 ``records.jsonl`` stream is the full normalized
 :class:`~statistic.normalize.models.CallRecord` set, one JSON object per line,
 written for re-analysis; the command itself survives only as its hash, since the
-model never carried raw text. The ``report.md`` document renders the seven metric
-families for human reading and, by strict contract, carries *only* aggregates,
-hashes, verb paths, tag values, counts, and costs - never a raw command body,
-secret, or personal path.
+model never carried raw text, and the ``cwd``/``project`` path fields are passed
+through :func:`redact_home` at serialization so a home-directory prefix collapses
+to ``~`` while the project signal beneath it survives. The ``report.md`` document
+renders the seven metric families for human reading and, by strict contract,
+carries *only* aggregates, hashes, verb paths, tag values, counts, and costs -
+never a raw command body, secret, or personal path.
 
 The Markdown renderer is a pure function of the records and the inventory: it
 reads no clock and touches no filesystem, so a fixed input yields a byte-stable
-document that the report tests can assert exactly. As a defensive measure any
-path-shaped value that reaches the report is passed through :func:`redact_home`,
-which strips a home-directory prefix down to a ``~`` marker; the renderer does not
-surface path fields today, so this never fires in practice, but it guarantees the
-report cannot leak a home path even if a future edit surfaced one.
+document that the report tests can assert exactly. Every path-shaped value that
+leaves the layer - both the surfaced report fields and the serialized
+``records.jsonl`` ``cwd``/``project`` - is passed through :func:`redact_home`,
+which strips a home-directory prefix down to a ``~`` marker, so neither artifact
+can leak a home path.
 """
 
 from __future__ import annotations
@@ -67,6 +69,11 @@ def redact_home(path: str) -> str:
 def write_records_jsonl(records: Iterable[CallRecord], path: Path) -> int:
     """Write the normalized record stream as one JSON object per line.
 
+    Each record's ``cwd`` and ``project`` are routed through :func:`redact_home`
+    before serialization, so a home-rooted working directory lands in the file as
+    a ``~``-prefixed path rather than a raw personal one, satisfying the plan's
+    no-personal-paths contract for the artifact while keeping the project signal.
+
     Args:
         records: The records to serialize. Iterated once.
         path: The destination ``records.jsonl`` path; parent directories are
@@ -79,7 +86,13 @@ def write_records_jsonl(records: Iterable[CallRecord], path: Path) -> int:
     written = 0
     with path.open("w", encoding="utf-8", newline="\n") as handle:
         for record in records:
-            handle.write(record.model_dump_json())
+            redacted = record.model_copy(
+                update={
+                    "cwd": redact_home(record.cwd),
+                    "project": redact_home(record.project),
+                }
+            )
+            handle.write(redacted.model_dump_json())
             handle.write("\n")
             written += 1
     return written

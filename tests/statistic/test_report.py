@@ -126,6 +126,39 @@ def test_records_jsonl_round_trips_without_raw_command() -> None:
             assert obj["command_hash"].startswith("deadbeef")
 
 
+def test_records_jsonl_redacts_home_rooted_cwd() -> None:
+    """A home-rooted ``cwd`` is collapsed to ``~`` in the emitted JSONL stream.
+
+    ``records.jsonl`` lands next to committed code (gitignored), so its
+    ``cwd``/``project`` fields must not carry a raw personal home path. The writer
+    routes both through :func:`redact_home`, keeping the project signal beneath
+    the prefix while stripping the home directory itself.
+    """
+    home_cwd = "C:/Users/someone/code/myproject"
+    records = [
+        CallRecord(
+            source="claude",
+            session_id="s1",
+            timestamp=_ANCHOR,
+            project="C:/Users/someone/code/myproject",
+            cwd=home_cwd,
+            verb="vault",
+            subcommand=("vault", "list"),
+            flags={},
+            command_hash="deadbeef0000",
+            exit_status=ExitStatus.OK,
+        )
+    ]
+    for out in _out_dir():
+        path = out / "records.jsonl"
+        write_records_jsonl(records, path)
+        raw = path.read_text(encoding="utf-8")
+        assert "someone" not in raw
+        obj = json.loads(raw.splitlines()[0])
+        assert obj["cwd"] == "~/code/myproject"
+        assert obj["project"] == "~/code/myproject"
+
+
 def test_report_renders_all_seven_families() -> None:
     """The report names each of the seven metric families as a section."""
     report = render_report_markdown(_records(), _inventory(), window_days=30)
