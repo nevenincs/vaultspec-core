@@ -25,14 +25,6 @@ from vaultspec_core.cli._target import PlanPathArg, TargetOption
 
 __all__ = ["plan_app"]
 
-# Defensive ceiling for serialised plan output (issue #125). A legitimate
-# single structural edit never multiplies a plan several times over, so output
-# beyond ``max(_PLAN_GROWTH_FLOOR, _PLAN_GROWTH_FACTOR * len(source))`` signals a
-# serialiser fault and the write is refused. The floor keeps tiny plans editable.
-_PLAN_GROWTH_FLOOR = 65_536
-_PLAN_GROWTH_FACTOR = 4
-
-
 def _render_user_errors[F: Callable[..., None]](func: F) -> F:
     """Render handler-raised typed errors as one-line CLI messages.
 
@@ -146,9 +138,8 @@ def _save_plan_or_dry_run(
     """
     import datetime as _dt
 
-    from vaultspec_core.plan.commands._errors import PlanCommandError
-    from vaultspec_core.plan.parser import parse_plan
     from vaultspec_core.plan.serialiser import serialise_plan
+    from vaultspec_core.plan.write_guard import guard_plan_write
     from vaultspec_core.vaultcore import refresh_modified_stamp
 
     new_text = serialise_plan(plan, canonicalise=canonicalise)
@@ -160,46 +151,12 @@ def _save_plan_or_dry_run(
     # carries it. A pure dry-run still writes nothing.
     new_text = refresh_modified_stamp(new_text, _dt.date.today())
 
-    # Issue 150: Verify that no unexpected elements are retired during this mutation
-    try:
-        old_plan = parse_plan(original_text)
-        new_plan = parse_plan(new_text)
-    except Exception as exc:
-        raise PlanCommandError(f"Plan validation failed during parsing: {exc}") from exc
-
-    old_retired = (
-        old_plan.retired_step_ids
-        | old_plan.retired_phase_ids
-        | old_plan.retired_wave_ids
-    )
-    new_retired = (
-        new_plan.retired_step_ids
-        | new_plan.retired_phase_ids
-        | new_plan.retired_wave_ids
-    )
-    newly_retired = new_retired - old_retired
-
-    expected = expected_retired if expected_retired is not None else set()
-    unexpected = newly_retired - expected
-    if unexpected:
-        sorted_unexpected = sorted(unexpected)
-        raise PlanCommandError(
-            f"mutation aborted: unexpected retirement of active plan items: "
-            f"{', '.join(sorted_unexpected)}. This indicates a serialization conflict."
-        )
-
-    # Defence in depth against a serialiser regression that multiplies authored
-    # prose (issue #125): a single structural edit never grows a plan several
-    # times over, so refuse to persist pathological output rather than corrupt
-    # the file or exhaust the disk. The byte floor keeps tiny plans editable.
-    growth_ceiling = max(_PLAN_GROWTH_FLOOR, _PLAN_GROWTH_FACTOR * len(original_text))
-    if len(new_text) > growth_ceiling:
-        raise PlanCommandError(
-            f"refusing to write {path.name}: serialised output "
-            f"({len(new_text)} bytes) is implausibly larger than the source "
-            f"({len(original_text)} bytes); this indicates a serialiser fault, "
-            "not an intended edit. The file on disk was left unchanged."
-        )
+    # Integrity guards shared with the MCP plan tools (issues #150 and #125):
+    # refuse any write that retires an active identifier outside the expected
+    # set (a serialisation conflict) or grows the document implausibly (a
+    # serialiser fault). The guards run before the dry-run branch so a preview
+    # never advertises a write the apply path would refuse.
+    guard_plan_write(original_text, new_text, expected_retired, path_name=path.name)
 
     if dry_run:
         import difflib

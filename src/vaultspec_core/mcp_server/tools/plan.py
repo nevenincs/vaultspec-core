@@ -189,28 +189,47 @@ def _load_plan(path: Path) -> tuple[Plan, str]:
     return parse_plan(original_text), original_text
 
 
-def _save_plan(path: Path, plan: Plan, original_text: str) -> bool:
+def _save_plan(
+    path: Path,
+    plan: Plan,
+    original_text: str,
+    expected_retired: set[str] | None = None,
+) -> bool:
     """Serialise *plan* and write it back through the owning serialiser.
 
     Mirrors the CLI plan-mutation write path: the plan is serialised with
     unknown blocks preserved, its ``modified:`` stamp is refreshed to today,
-    and the file is written atomically only when the bytes actually changed
-    (so an all-no-op batch never bumps the stamp).
+    the shared integrity guards run over the pending text, and the file is
+    written atomically only when the bytes actually changed (so an all-no-op
+    batch never bumps the stamp). Routing through
+    :func:`~vaultspec_core.plan.write_guard.guard_plan_write` gives the MCP
+    surface the same unexpected-retirement and growth-ceiling protection the
+    CLI enforces, so a serialisation conflict that would silently drop a live
+    step surfaces as a whole-call ``isError`` rather than a corrupt write.
 
     Args:
         path: The plan document path.
         plan: The mutated :class:`Plan` to serialise.
         original_text: The document's pre-mutation text.
+        expected_retired: Canonical identifiers the batch legitimately retired
+            (the ``remove`` operations' targets), or ``None`` for a mutation
+            that retires nothing.
 
     Returns:
         ``True`` when the file was rewritten, ``False`` on a no-op.
+
+    Raises:
+        PlanWriteGuardError: When the pending text retires an identifier
+            outside *expected_retired* or exceeds the growth ceiling.
     """
     from ...core.helpers import atomic_write
     from ...plan.serialiser import serialise_plan
+    from ...plan.write_guard import guard_plan_write
     from ...vaultcore import refresh_modified_stamp
 
     new_text = serialise_plan(plan, canonicalise=False)
     new_text = refresh_modified_stamp(new_text, datetime.date.today())
+    guard_plan_write(original_text, new_text, expected_retired, path_name=path.name)
     if new_text == original_text:
         return False
     atomic_write(path, new_text)
@@ -426,6 +445,7 @@ def register_plan_tools(mcp: FastMCP) -> None:
 
         parsed, original_text = _load_plan(resolved.path)
         items: list[PlanEditItemResult] = []
+        expected_retired: set[str] = set()
         changed = False
 
         for op in operations:
@@ -433,9 +453,16 @@ def register_plan_tools(mcp: FastMCP) -> None:
             items.append(item)
             if item.status != "failed":
                 changed = True
+                # A ``remove`` legitimately retires its target id; declaring it
+                # here keeps the shared write guard from mistaking the intended
+                # retirement for a serialisation conflict.
+                if item.status == "removed" and item.step_id is not None:
+                    expected_retired.add(item.step_id)
 
         if changed:
-            _save_plan(resolved.path, parsed, original_text)
+            _save_plan(
+                resolved.path, parsed, original_text, expected_retired=expected_retired
+            )
 
         total, completed, _percent, next_open = _progress_summary(parsed)
         return PlanEditResult(
