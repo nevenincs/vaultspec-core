@@ -23,6 +23,10 @@ related:
   - '[[2026-07-09-firmware-mcp-primacy-P04-S15]]'
   - '[[2026-07-09-firmware-mcp-primacy-P04-S16]]'
   - '[[2026-07-09-firmware-mcp-primacy-P04-S17]]'
+  - '[[2026-07-09-firmware-mcp-primacy-P05-S18]]'
+  - '[[2026-07-09-firmware-mcp-primacy-P05-S19]]'
+  - '[[2026-07-09-firmware-mcp-primacy-P05-S20]]'
+  - '[[2026-07-09-firmware-mcp-primacy-P05-S21]]'
   - '[[2026-07-09-firmware-mcp-primacy-adr]]'
   - '[[2026-07-09-firmware-mcp-primacy-plan]]'
   - '[[2026-07-09-firmware-mcp-primacy-research]]'
@@ -57,6 +61,10 @@ Auto-generated index of all documents tagged with `#firmware-mcp-primacy`.
 - `2026-07-09-firmware-mcp-primacy-P04-S15` - Edit the emitted header prose at the reference generator source to add the Q5 dual-role paragraph naming the CLI-fallback lookup and MCP-gateway verb-existence roles, leaving the marker-block emission untouched
 - `2026-07-09-firmware-mcp-primacy-P04-S16` - Regenerate the bundled CLI reference via vaultspec-core spec reference generate so the new header prose lands while the generated command-inventory marker block stays byte-identical
 - `2026-07-09-firmware-mcp-primacy-P04-S17` - Run test_committed_reference_is_in_sync_with_live_surface and confirm it stays green, proving only prose outside the markers changed
+- `2026-07-09-firmware-mcp-primacy-P05-S18` - Run vaultspec-core sync to propagate the reworded builtins into this repo's .claude provider directories and read the sync result for created/updated/unchanged status with no failures
+- `2026-07-09-firmware-mcp-primacy-P05-S19` - Run vaultspec-core vault check all and confirm clean, regenerating the feature index if warned
+- `2026-07-09-firmware-mcp-primacy-P05-S20` - Run the full unit gate pytest src/vaultspec_core -m unit and confirm it passes, catching any builtins-guarding test that the reword touched
+- `2026-07-09-firmware-mcp-primacy-P05-S21` - Confirm the MCP gateway catalog is byte-unchanged by verifying the command-inventory marker block did not move, reading catalog.py parse against the regenerated reference
 
 ### plan
 

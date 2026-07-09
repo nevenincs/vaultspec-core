@@ -63,10 +63,10 @@ Add the dual-role header prose to the CLI reference at the generator source and 
 
 Propagate the reword into this repo's provider directories via sync and run the full verification suite, confirming vault check, the unit gate, the reference drift test, the byte-unchanged gateway catalog, and a mandatory code review before ship.
 
-- [ ] `P05.S18` - Run vaultspec-core sync to propagate the reworded builtins into this repo's .claude provider directories and read the sync result for created/updated/unchanged status with no failures; `.claude/rules/vaultspec-cli.builtin.md`.
-- [ ] `P05.S19` - Run vaultspec-core vault check all and confirm clean, regenerating the feature index if warned; `src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md`.
-- [ ] `P05.S20` - Run the full unit gate pytest src/vaultspec_core -m unit and confirm it passes, catching any builtins-guarding test that the reword touched; `src/vaultspec_core/tests`.
-- [ ] `P05.S21` - Confirm the MCP gateway catalog is byte-unchanged by verifying the command-inventory marker block did not move, reading catalog.py parse against the regenerated reference; `src/vaultspec_core/mcp_server/catalog.py`.
+- [x] `P05.S18` - Run vaultspec-core sync to propagate the reworded builtins into this repo's .claude provider directories and read the sync result for created/updated/unchanged status with no failures; `.claude/rules/vaultspec-cli.builtin.md`.
+- [x] `P05.S19` - Run vaultspec-core vault check all and confirm clean, regenerating the feature index if warned; `src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md`.
+- [x] `P05.S20` - Run the full unit gate pytest src/vaultspec_core -m unit and confirm it passes, catching any builtins-guarding test that the reword touched; `src/vaultspec_core/tests`.
+- [x] `P05.S21` - Confirm the MCP gateway catalog is byte-unchanged by verifying the command-inventory marker block did not move, reading catalog.py parse against the regenerated reference; `src/vaultspec_core/mcp_server/catalog.py`.
 - [ ] `P05.S22` - Perform the mandatory closeout code review of the full reworded firmware set, confirming per-surface primacy split, three-band honesty, byte-stable gateway catalog, and unchanged allowlists against the ADR constraints; `src/vaultspec_core/builtins`.
 
 ## Parallelization
