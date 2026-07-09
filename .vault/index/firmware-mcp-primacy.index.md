@@ -27,7 +27,9 @@ related:
   - '[[2026-07-09-firmware-mcp-primacy-P05-S19]]'
   - '[[2026-07-09-firmware-mcp-primacy-P05-S20]]'
   - '[[2026-07-09-firmware-mcp-primacy-P05-S21]]'
+  - '[[2026-07-09-firmware-mcp-primacy-P05-S22]]'
   - '[[2026-07-09-firmware-mcp-primacy-adr]]'
+  - '[[2026-07-09-firmware-mcp-primacy-audit]]'
   - '[[2026-07-09-firmware-mcp-primacy-plan]]'
   - '[[2026-07-09-firmware-mcp-primacy-research]]'
 ---
@@ -41,6 +43,10 @@ Auto-generated index of all documents tagged with `#firmware-mcp-primacy`.
 ### adr
 
 - `2026-07-09-firmware-mcp-primacy-adr` - `firmware-mcp-primacy` adr: per-surface MCP primacy - capability-worded firmware, MCP tools primary at the orchestrator, CLI mechanism retained in personas | (**status:** `accepted`)
+
+### audit
+
+- `2026-07-09-firmware-mcp-primacy-audit` - `firmware-mcp-primacy` audit: `firmware reword MCP-primacy fidelity`
 
 ### exec
 
@@ -65,6 +71,7 @@ Auto-generated index of all documents tagged with `#firmware-mcp-primacy`.
 - `2026-07-09-firmware-mcp-primacy-P05-S19` - Run vaultspec-core vault check all and confirm clean, regenerating the feature index if warned
 - `2026-07-09-firmware-mcp-primacy-P05-S20` - Run the full unit gate pytest src/vaultspec_core -m unit and confirm it passes, catching any builtins-guarding test that the reword touched
 - `2026-07-09-firmware-mcp-primacy-P05-S21` - Confirm the MCP gateway catalog is byte-unchanged by verifying the command-inventory marker block did not move, reading catalog.py parse against the regenerated reference
+- `2026-07-09-firmware-mcp-primacy-P05-S22` - Perform the mandatory closeout code review of the full reworded firmware set, confirming per-surface primacy split, three-band honesty, byte-stable gateway catalog, and unchanged allowlists against the ADR constraints
 
 ### plan
 
