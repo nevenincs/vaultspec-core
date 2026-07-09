@@ -8,7 +8,8 @@ the Claude-specific schema quirks entirely, as the ADR mandates: ``tool_use`` to
 ``tool_result`` linkage by ``tool_use_id``, exit-status inference from the
 ``is_error`` boolean plus result-text patterns with the recurring
 ``distutils-precedence.pth`` venv-noise guard, and per-message token-cost
-attribution divided across the shell tool calls a single message emits.
+attribution divided across the expanded records a single message emits (a
+``for``-loop iteration counting as its own record, not the physical tool call).
 
 The corpus root is always an injected constructor parameter defaulting to the
 operator's ``~/.claude/projects`` directory, so tests point the adapter at a
@@ -301,8 +302,9 @@ class ClaudeSource:
         Results are collected first so a ``tool_use`` can be linked to its
         ``tool_result`` regardless of line order, then each assistant line's
         shell tool calls are parsed. Per-message token cost is divided across the
-        vaultspec-core shell calls the message emits, and the exit status is
-        inferred per record so a by-design non-zero verb never reads as a miss.
+        expanded records the message emits - each ``for``-loop iteration its own
+        record - and the exit status is inferred per record so a by-design
+        non-zero verb never reads as a miss.
 
         Args:
             session: A handle previously yielded by :meth:`iter_sessions`.
@@ -330,11 +332,38 @@ class ClaudeSource:
             calls = self._shell_calls(message)
             if not calls:
                 continue
-            per_call_cost = self._per_call_cost(message, len(calls))
-            for entry in calls:
-                yield from self._records_for_call(
-                    entry, obj, message, timestamp, per_call_cost, results, session
+            records = [
+                record
+                for entry in calls
+                for record in self._records_for_call(
+                    entry, obj, message, timestamp, results, session
                 )
+            ]
+            yield from self._attribute_cost(records, message)
+
+    @staticmethod
+    def _attribute_cost(
+        records: list[CallRecord], message: dict[str, Any]
+    ) -> Iterator[CallRecord]:
+        """Divide a message's token usage evenly across its expanded records.
+
+        The Claude ``message.usage`` object is per assistant message, so its cost
+        is split across every logical record the message emits - counting each
+        ``for``-loop iteration as its own record, not each physical ``tool_use``.
+        Attributing the full message cost per physical call would multiply the
+        cost N-fold on exactly the loop shapes this module measures.
+
+        Args:
+            records: The message's expanded records, already exit-status stamped.
+            message: The assistant line's ``message`` object.
+
+        Returns:
+            The records re-stamped with their share of the message token cost.
+        """
+        total = ClaudeSource._message_usage_total(message)
+        per_record = total // len(records) if total is not None and records else None
+        for record in records:
+            yield record.model_copy(update={"token_cost": per_record})
 
     def _records_for_call(
         self,
@@ -342,19 +371,20 @@ class ClaudeSource:
         obj: dict[str, Any],
         message: dict[str, Any],
         timestamp: datetime,
-        token_cost: int | None,
         results: dict[str, _Result],
         session: ClaudeSession,
     ) -> Iterator[CallRecord]:
         """Emit the records for one ``tool_use`` shell call.
+
+        Token cost is left unset here; it is attributed once per message in
+        :meth:`_attribute_cost` after every call's records are expanded, so a
+        ``for``-loop iteration is costed as its own record.
 
         Args:
             entry: The ``tool_use`` content entry.
             obj: The enclosing assistant line.
             message: The line's ``message`` object.
             timestamp: The parsed in-window activity timestamp.
-            token_cost: The per-call token cost already divided across the
-                message's shell calls.
             results: The tool-use-id to result map for this session.
             session: The owning session handle.
 
@@ -374,7 +404,6 @@ class ClaudeSource:
             cwd=self._text_or_none(obj.get("cwd")) or "",
             exit_status=ExitStatus.OK,
             git_branch=self._text_or_none(obj.get("gitBranch")),
-            token_cost=token_cost,
             subagent_role=session.subagent_role,
             model=self._text_or_none(message.get("model")),
             cli_version=self._text_or_none(obj.get("version")),
@@ -456,21 +485,20 @@ class ClaudeSource:
         return value if isinstance(value, str) else None
 
     @staticmethod
-    def _per_call_cost(message: dict[str, Any], call_count: int) -> int | None:
-        """Divide a message's total token usage across its shell calls.
+    def _message_usage_total(message: dict[str, Any]) -> int | None:
+        """Sum a message's recorded token usage across every usage field.
 
-        The Claude ``message.usage`` object is per assistant message, so when one
-        message emits several tool calls the cost is split evenly across them.
+        The division of this total across the message's expanded records happens
+        in :meth:`_attribute_cost`; this returns the undivided per-message total.
 
         Args:
             message: The assistant line's ``message`` object.
-            call_count: The number of vaultspec-core shell calls in the message.
 
         Returns:
-            The per-call token cost, or ``None`` when no usage is recorded.
+            The total recorded token cost, or ``None`` when no usage is recorded.
         """
         usage = message.get("usage")
-        if not isinstance(usage, dict) or call_count <= 0:
+        if not isinstance(usage, dict):
             return None
         total = 0
         found = False
@@ -486,7 +514,7 @@ class ClaudeSource:
                 found = True
         if not found:
             return None
-        return total // call_count
+        return total
 
     @staticmethod
     def _exit_status(result: _Result | None, subcommand: tuple[str, ...]) -> ExitStatus:

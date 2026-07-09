@@ -246,6 +246,50 @@ def test_out_of_window_line_is_excluded(work_root: Path) -> None:
     assert set(by_call) == {"call-1", "call-2", "call-3"}
 
 
+def test_for_loop_bracket_delta_splits_across_expanded_records(
+    work_root: Path,
+) -> None:
+    """A 300-token bracket delta on a 3-iteration loop costs 100 per record.
+
+    One physical ``function_call`` carries a ``for`` loop expanding into three
+    records. The token delta bracketing the call - 1300 minus 1000, i.e. 300 -
+    must be divided across the three expanded records at 100 each, not charged in
+    full to every record, which would triple the attributed cost.
+    """
+    sessions = work_root / "sessions" / "cycle" / "batch"
+    sessions.mkdir(parents=True)
+    loop_command = (
+        "for s in S01 S02 S03; do "
+        "uv run --no-sync vaultspec-core vault plan step check PLAN $s; done"
+    )
+    lines = [
+        _line(
+            _IN_WINDOW,
+            "session_meta",
+            {"session_id": "codex-loop", "cwd": "/work/proj", "cli_version": "5.5.0"},
+        ),
+        _line(_IN_WINDOW, "turn_context", {"cwd": "/work/proj", "model": "gpt-5.5"}),
+        _token_count(_IN_WINDOW, 1000),
+        _function_call(_IN_WINDOW, "call-loop", loop_command),
+        _function_output(_IN_WINDOW, "call-loop", 0),
+        _token_count(_IN_WINDOW, 1300),
+    ]
+    (sessions / "rollout-loop.jsonl").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8"
+    )
+
+    source = CodexSource(root=work_root, inventory=_inventory())
+    records = [
+        record
+        for session in source.iter_sessions()
+        for record in source.iter_calls(session)
+    ]
+    assert len(records) == 3
+    assert all(r.subcommand == ("vault", "plan", "step", "check") for r in records)
+    assert [r.token_cost for r in records] == [100, 100, 100]
+    assert sum(r.token_cost or 0 for r in records) == 300
+
+
 def test_subagent_role_from_session_meta(work_root: Path) -> None:
     """An archived subagent rollout attributes its ``agent_role``."""
     _build_corpus(work_root)

@@ -9,7 +9,9 @@ quirks entirely, as the ADR mandates: ``function_call`` payloads whose
 ``arguments`` field is a JSON *string* to be decoded, ``function_call_output``
 linkage by ``call_id`` carrying an explicit ``Exit code: N`` line, and token
 cost derived from the deltas between the cumulative ``token_count`` snapshots
-bracketing a call.
+bracketing a call, that bracket delta then divided across the expanded records
+the call produces so a ``for``-loop iteration is never charged the whole
+physical call's cost.
 
 The corpus root is always an injected constructor parameter. Its default honors
 the ``CODEX_HOME`` environment variable when set and otherwise falls back to the
@@ -279,6 +281,10 @@ class CodexSource:
     ) -> Iterator[CallRecord]:
         """Emit the records for one ``function_call`` shell call.
 
+        The call's bracketed token delta is divided evenly across the records it
+        expands into, so a single physical call carrying a ``for`` loop charges
+        each iteration its share rather than the whole delta N times.
+
         Args:
             obj: The enclosing rollout line.
             payload: The line's ``function_call`` payload.
@@ -315,16 +321,22 @@ class CodexSource:
             exit_status=ExitStatus.OK,
             git_branch=None,
             raw_exit_code=exit_code,
-            token_cost=self._bracket_delta(index, snapshots),
             subagent_role=subagent_role,
             model=model,
             cli_version=cli_version,
             retry_key=call_id,
         )
-        for record in extract_records(command, context, self._inventory):
+        records = list(extract_records(command, context, self._inventory))
+        delta = self._bracket_delta(index, snapshots)
+        per_record = delta // len(records) if delta is not None and records else None
+        for record in records:
             status = self._exit_status(exit_code, record.subcommand)
             yield record.model_copy(
-                update={"exit_status": status, "raw_exit_code": exit_code}
+                update={
+                    "exit_status": status,
+                    "raw_exit_code": exit_code,
+                    "token_cost": per_record,
+                }
             )
 
     @staticmethod
@@ -472,7 +484,7 @@ class CodexSource:
         role = payload.get("agent_role")
         if is_subagent and isinstance(role, str):
             return role
-        return role if isinstance(role, str) else None
+        return None
 
     @staticmethod
     def _text_or_none(value: object) -> str | None:

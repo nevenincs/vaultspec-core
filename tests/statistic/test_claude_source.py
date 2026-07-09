@@ -291,6 +291,41 @@ def test_distutils_noise_line_is_not_an_error(work_root: Path) -> None:
     assert len(noisy) == 1
 
 
+def test_for_loop_message_cost_splits_across_expanded_records(
+    work_root: Path,
+) -> None:
+    """A 300-token message whose single call is a 3-iteration loop costs 100 each.
+
+    The physical message emits one ``tool_use`` carrying a ``for`` loop that
+    expands into three logical records. Its 300-token usage must be divided by
+    the three expanded records - 100 each, 300 total - not attributed in full to
+    each record, which would triple the cost to 900.
+    """
+    project = work_root / "projects" / "loop-proj"
+    project.mkdir(parents=True)
+    loop_command = (
+        "for s in S01 S02 S03; do "
+        "uv run --no-sync vaultspec-core vault plan step check PLAN $s; done"
+    )
+    line = _assistant(
+        _IN_WINDOW,
+        [_tool_use("toolu-loop", loop_command)],
+        usage={"input_tokens": 300, "output_tokens": 0},
+    )
+    (project / "session-loop.jsonl").write_text(line + "\n", encoding="utf-8")
+
+    source = ClaudeSource(root=work_root / "projects", inventory=_inventory())
+    records = [
+        record
+        for session in source.iter_sessions()
+        for record in source.iter_calls(session)
+    ]
+    assert len(records) == 3
+    assert all(r.subcommand == ("vault", "plan", "step", "check") for r in records)
+    assert [r.token_cost for r in records] == [100, 100, 100]
+    assert sum(r.token_cost or 0 for r in records) == 300
+
+
 def test_subagent_transcript_attributes_role(work_root: Path) -> None:
     """The subagent transcript carries its role while parent turns do not."""
     _build_corpus(work_root)
