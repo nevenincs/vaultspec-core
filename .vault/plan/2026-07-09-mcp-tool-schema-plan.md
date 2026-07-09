@@ -11,6 +11,7 @@ related:
   - '[[2026-07-09-mcp-tool-schema-research]]'
 ---
 
+
 # `mcp-tool-schema` plan
 
 Rebuild the vaultspec-core MCP server into the accepted nine-tool tiered surface by converging every mutation onto the shared cores that already exist, with one blocking edit-engine extraction ahead of the tool work.
@@ -73,8 +74,8 @@ Build the stateless gateway: a catalog module parsing the vaultspec:generated ma
 Migrate whole-call failures to protocol isError, declare outputSchema/structuredContent and corrected annotations on all nine tools, confirm the isolation wrapper and server instructions string, audit the hot-verb help strings that become the discover payload, and add the nine-tool integration test plus code review.
 
 - [x] `P05.S24` - Migrate whole-call failures across every tool handler from the success-dict idiom to protocol isError, raising through FastMCP for invalid arguments, unknown verbs, and unresolvable targets while keeping per-item status only inside batch result arrays (agent: vaultspec-standard-executor); `src/vaultspec_core/mcp_server/tools`.
-- [ ] `P05.S25` - Declare outputSchema and return structuredContent via FastMCP return-type derivation on all nine tools, replacing loose dict returns with typed result models (agent: vaultspec-standard-executor); `src/vaultspec_core/mcp_server/tools`.
-- [ ] `P05.S26` - Correct the ToolAnnotations per ADR Q6: fix create's wrong idempotent hint to non-idempotent, mark edit and plan_edit and invoke destructive, keep plan_progress idempotent with explicit checked/unchecked only, and set status/find/discover read-only idempotent (agent: vaultspec-low-executor); `src/vaultspec_core/mcp_server/tools`.
+- [x] `P05.S25` - Declare outputSchema and return structuredContent via FastMCP return-type derivation on all nine tools, replacing loose dict returns with typed result models (agent: vaultspec-standard-executor); `src/vaultspec_core/mcp_server/tools`.
+- [x] `P05.S26` - Correct the ToolAnnotations per ADR Q6: fix create's wrong idempotent hint to non-idempotent, mark edit and plan_edit and invoke destructive, keep plan_progress idempotent with explicit checked/unchecked only, and set status/find/discover read-only idempotent (agent: vaultspec-low-executor); `src/vaultspec_core/mcp_server/tools`.
 - [ ] `P05.S27` - Wrap every new handler in \_isolated_context and extend the server instructions string to name the nine-tool surface and the tool-schema version, registering all tools through the updated register_tools bootstrap (agent: vaultspec-low-executor); `src/vaultspec_core/mcp_server/app.py`.
 - [ ] `P05.S28` - Audit and tighten the hot-verb help strings in the CLI reference so the discover payload reads well verbatim, regenerating the inventory between the vaultspec:generated markers (agent: vaultspec-low-executor); `.vaultspec/reference/cli.md`.
 - [ ] `P05.S29` - Add the nine-tool integration test asserting registration of all nine tools, outputSchema presence, corrected annotations, and isError on a whole-call failure (agent: vaultspec-standard-executor); `tests/unit/mcp_server/test_tool_surface.py`.
