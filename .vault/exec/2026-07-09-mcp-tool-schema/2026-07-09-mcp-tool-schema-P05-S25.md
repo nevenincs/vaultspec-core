@@ -9,9 +9,6 @@ related:
   - "[[2026-07-09-mcp-tool-schema-plan]]"
 ---
 
-
-
-
 # Declare outputSchema and return structuredContent via FastMCP return-type derivation on all nine tools, replacing loose dict returns with typed result models (agent: vaultspec-standard-executor)
 
 ## Scope

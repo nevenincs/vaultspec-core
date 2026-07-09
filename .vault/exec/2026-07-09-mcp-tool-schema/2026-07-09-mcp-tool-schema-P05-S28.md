@@ -9,9 +9,6 @@ related:
   - "[[2026-07-09-mcp-tool-schema-plan]]"
 ---
 
-
-
-
 # Audit and tighten the hot-verb help strings in the CLI reference so the discover payload reads well verbatim, regenerating the inventory between the vaultspec:generated markers (agent: vaultspec-low-executor)
 
 ## Scope

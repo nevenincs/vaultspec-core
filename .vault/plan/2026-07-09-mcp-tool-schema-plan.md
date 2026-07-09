@@ -11,7 +11,6 @@ related:
   - '[[2026-07-09-mcp-tool-schema-research]]'
 ---
 
-
 # `mcp-tool-schema` plan
 
 Rebuild the vaultspec-core MCP server into the accepted nine-tool tiered surface by converging every mutation onto the shared cores that already exist, with one blocking edit-engine extraction ahead of the tool work.

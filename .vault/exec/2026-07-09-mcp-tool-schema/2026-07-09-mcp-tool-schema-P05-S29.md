@@ -9,9 +9,6 @@ related:
   - "[[2026-07-09-mcp-tool-schema-plan]]"
 ---
 
-
-
-
 # Add the nine-tool integration test asserting registration of all nine tools, outputSchema presence, corrected annotations, and isError on a whole-call failure (agent: vaultspec-standard-executor)
 
 ## Scope

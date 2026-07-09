@@ -9,9 +9,6 @@ related:
   - "[[2026-07-09-mcp-tool-schema-plan]]"
 ---
 
-
-
-
 # Wrap every new handler in \_isolated_context and extend the server instructions string to name the nine-tool surface and the tool-schema version, registering all tools through the updated register_tools bootstrap (agent: vaultspec-low-executor)
 
 ## Scope

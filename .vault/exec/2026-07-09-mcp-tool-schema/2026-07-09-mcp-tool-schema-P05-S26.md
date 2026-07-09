@@ -9,9 +9,6 @@ related:
   - "[[2026-07-09-mcp-tool-schema-plan]]"
 ---
 
-
-
-
 # Correct the ToolAnnotations per ADR Q6: fix create's wrong idempotent hint to non-idempotent, mark edit and plan_edit and invoke destructive, keep plan_progress idempotent with explicit checked/unchecked only, and set status/find/discover read-only idempotent (agent: vaultspec-low-executor)
 
 ## Scope
