@@ -17,6 +17,7 @@ related:
   - '[[2026-07-09-cli-usage-analytics-P05-S23]]'
   - '[[2026-07-09-cli-usage-analytics-P05-S24]]'
   - '[[2026-07-09-cli-usage-analytics-adr]]'
+  - '[[2026-07-09-cli-usage-analytics-audit]]'
   - '[[2026-07-09-cli-usage-analytics-plan]]'
   - '[[2026-07-09-cli-usage-analytics-research]]'
 ---
@@ -30,6 +31,10 @@ Auto-generated index of all documents tagged with `#cli-usage-analytics`.
 ### adr
 
 - `2026-07-09-cli-usage-analytics-adr` - `cli-usage-analytics` adr: dev-only transcript analytics module for empirical CLI usage grounding | (**status:** `accepted`)
+
+### audit
+
+- `2026-07-09-cli-usage-analytics-audit` - `cli-usage-analytics` audit: `dev-only transcript analytics module`
 
 ### exec
 
