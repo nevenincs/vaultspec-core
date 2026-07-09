@@ -58,12 +58,14 @@ def normalize_feature_tag(raw: str, *, label: str = "feature tag") -> NormalizeR
     """Normalize and validate a kebab-case feature handle or ``#tag``.
 
     Strips a single leading ``#``, trims surrounding whitespace, lowercases,
-    folds any path-separator into a hyphen and drops parent-directory
-    tokens, then validates the canonical kebab-case pattern
-    (:data:`KEBAB_CASE_PATTERN`). The returned :class:`NormalizeResult`
-    carries the ``#``-free token on success (the caller re-applies ``#``
-    where a stored tag needs it) and a rendered *label*-scoped message on
-    failure.
+    and folds any path-separator into a hyphen, then validates the canonical
+    kebab-case pattern (:data:`KEBAB_CASE_PATTERN`). A traversal token such as
+    ``..`` is *rejected*, not silently repaired: the pattern forbids ``.`` so a
+    residual dot (e.g. ``a..b`` or ``a.b``) fails validation rather than being
+    deleted into a valid-but-different token that could mask a typo. The
+    returned :class:`NormalizeResult` carries the ``#``-free token on success
+    (the caller re-applies ``#`` where a stored tag needs it) and a rendered
+    *label*-scoped message on failure.
 
     Args:
         raw: The user-supplied handle or tag (with or without a leading
@@ -77,7 +79,7 @@ def normalize_feature_tag(raw: str, *, label: str = "feature tag") -> NormalizeR
         or ``ok=False`` with an ``error`` and a ``None`` value.
     """
     cleaned = raw.lstrip("#").strip().lower()
-    cleaned = _TRAVERSAL_CHARS.sub("-", cleaned).replace("..", "")
+    cleaned = _TRAVERSAL_CHARS.sub("-", cleaned)
 
     if not cleaned:
         return NormalizeResult(
