@@ -21,6 +21,7 @@ from mcp.server.fastmcp import FastMCP
 
 from vaultspec_core.cli._app import make_app
 
+from .tools import register_document_tools
 from .vault_tools import register_tools as register_vault_tools
 
 logger = logging.getLogger(__name__)
@@ -56,8 +57,9 @@ def create_server() -> FastMCP:
         lifespan=_lifespan,
     )
 
-    # Register tool surface (find + create)
+    # Register tool surface: find (vault_tools) + create/edit (tools.documents)
     register_vault_tools(mcp)
+    register_document_tools(mcp)
 
     return mcp
 
