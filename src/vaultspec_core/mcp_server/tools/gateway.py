@@ -509,6 +509,7 @@ def register_gateway_tools(mcp: FastMCP) -> None:
         try:
             completed = subprocess.run(
                 argv,
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
