@@ -163,9 +163,7 @@ async def test_invoke_positional_verb_runs_end_to_end(vault_root):  # noqa: F811
         assert feature_index > add_index + 1
         # The verb really ran: a research document now exists for the feature.
         created = list(
-            (vault_root / ".vault" / "research").glob(
-                "*gateway-positional-probe*.md"
-            )
+            (vault_root / ".vault" / "research").glob("*gateway-positional-probe*.md")
         )
         assert created, "invoke did not scaffold the research document"
 
@@ -182,6 +180,36 @@ async def test_invoke_rejects_positional_for_argless_verb(vault_root):  # noqa: 
         assert result.isError
         text = _error_text(result)
         assert "no positional" in text
+
+
+async def test_invoke_rejects_dash_leading_positional(vault_root):  # noqa: F811
+    """A ``-``-leading positional is refused pre-spawn, closing flag smuggling.
+
+    ``vault add`` accepts a positional DOC_TYPE, but a positional that looks
+    like an option (``--json``, ``-x``) would be parsed by Click as a flag, so
+    the gateway must reject it before any process spawns rather than let a
+    reserved or unknown flag ride in through the operand slot.
+    """
+    mcp = _gateway_server()
+    async with create_connected_server_and_client_session(mcp) as client:
+        for smuggled in ("--json", "-x", "--target"):
+            result = await client.call_tool(
+                "invoke",
+                {
+                    "verb": "vault add",
+                    "positionals": [smuggled],
+                    "arguments": {"feature": "dash-probe"},
+                },
+            )
+            assert result.isError, smuggled
+            text = _error_text(result)
+            assert "begins with '-'" in text or "must not look like options" in text, (
+                smuggled,
+                text,
+            )
+        # No document was scaffolded: the reserved flag never reached the binary.
+        research = vault_root / ".vault" / "research"
+        assert not list(research.glob("*dash-probe*.md"))
 
 
 async def test_discover_returns_ranked_schemas(vault_root):  # noqa: F811

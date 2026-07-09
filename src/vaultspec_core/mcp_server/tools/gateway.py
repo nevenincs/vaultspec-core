@@ -269,20 +269,30 @@ def _validate_positionals(entry: CatalogEntry, positionals: list[str]) -> None:
     The values are always discrete argv items so no positional can inject a
     shell command; this guard is the catalog-validation half - it refuses
     operands a verb does not declare (a verb that takes none, or more operands
-    than a non-variadic verb accepts), so ``invoke`` cannot smuggle stray
-    tokens onto a verb's command line.
+    than a non-variadic verb accepts), and it refuses any operand that begins
+    with ``-``: Click would parse such a token as an option rather than an
+    operand, so rejecting it before spawn keeps a caller from smuggling a
+    reserved or unknown flag through the positional slot.
 
     Args:
         entry: The validated catalog entry for the verb.
         positionals: The caller's ordered positional operands.
 
     Raises:
-        ValueError: When the verb declares no positional arguments but some
-            were supplied, or more were supplied than a non-variadic verb
-            accepts.
+        ValueError: When a positional begins with ``-``, the verb declares no
+            positional arguments but some were supplied, or more were supplied
+            than a non-variadic verb accepts.
     """
     if not positionals:
         return
+    for item in positionals:
+        if item.startswith("-"):
+            msg = (
+                f"positional {item!r} begins with '-'; positional operands "
+                "must not look like options (the gateway would otherwise let "
+                "a flag be smuggled through the positional slot)"
+            )
+            raise ValueError(msg)
     if not entry.accepts_positionals:
         msg = (
             f"verb {entry.verb!r} takes no positional arguments, "
