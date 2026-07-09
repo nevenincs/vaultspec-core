@@ -80,6 +80,12 @@ class ParsedCommand:
             ``None``.
         command_hash: SHA-256 hex digest of the normalized command tokens, never
             the raw text.
+        unresolved: ``True`` when the segment could not be tokenized under either
+            quoting rule and was parsed by the whitespace fallback of last
+            resort. The ADR's no-silent-drop contract means such a segment must
+            still surface as a record; the caller stamps it
+            :attr:`~statistic.normalize.exit_status.ExitStatus.UNKNOWN` rather
+            than trusting its inferred context status.
     """
 
     verb: str
@@ -87,6 +93,7 @@ class ParsedCommand:
     flags: dict[str, str | bool]
     feature_tag: str | None
     command_hash: str
+    unresolved: bool = False
 
 
 @dataclass(frozen=True)
@@ -305,25 +312,25 @@ def _hash_command(verb_path: tuple[str, ...], canonical_remainder: list[str]) ->
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
-def _parse_segment(
-    segment: str,
+def _build_parsed(
+    tokens: list[str],
     inventory: CapabilityInventory | None,
+    *,
+    unresolved: bool,
 ) -> ParsedCommand | None:
-    """Parse one candidate segment into a :class:`ParsedCommand`.
+    """Assemble a :class:`ParsedCommand` from a located token list.
 
     Args:
-        segment: A candidate segment mentioning the executable.
+        tokens: The tokenized (or whitespace-split) segment.
         inventory: The declared-capability denominator, or ``None``.
+        unresolved: Whether these tokens came from the whitespace fallback rather
+            than a clean ``shlex`` tokenization.
 
     Returns:
-        The parsed command, or ``None`` when the segment cannot be tokenized,
-        holds no locatable executable argv, or resolves to a bare executable
-        mention with neither a verb nor a flag (for example, the word appearing
-        as an argument to another command).
+        The parsed command, or ``None`` when no executable argv is locatable or
+        the segment resolves to a bare executable mention with neither a verb nor
+        a flag.
     """
-    tokens = _split_segment(segment)
-    if tokens is None:
-        return None
     argv = _locate_executable(tokens)
     if argv is None:
         return None
@@ -340,7 +347,37 @@ def _parse_segment(
         flags=flags,
         feature_tag=feature_tag,
         command_hash=_hash_command(verb_path, canonical),
+        unresolved=unresolved,
     )
+
+
+def _parse_segment(
+    segment: str,
+    inventory: CapabilityInventory | None,
+) -> ParsedCommand | None:
+    """Parse one candidate segment into a :class:`ParsedCommand`.
+
+    When the segment tokenizes cleanly the parse is exact. When it cannot be
+    tokenized under either quoting rule - a pathological quoting shape - the
+    segment is not dropped: a whitespace fallback locates the executable and
+    resolves a best-effort verb of last resort, flagged ``unresolved`` so the
+    caller records it as ``UNKNOWN`` instead of silently discarding it, honoring
+    the ADR's no-silent-drop contract.
+
+    Args:
+        segment: A candidate segment mentioning the executable.
+        inventory: The declared-capability denominator, or ``None``.
+
+    Returns:
+        The parsed command, or ``None`` when the segment holds no locatable
+        executable argv or resolves to a bare executable mention with neither a
+        verb nor a flag (for example, the word appearing as an argument to
+        another command).
+    """
+    tokens = _split_segment(segment)
+    if tokens is not None:
+        return _build_parsed(tokens, inventory, unresolved=False)
+    return _build_parsed(segment.split(), inventory, unresolved=True)
 
 
 def parse_command(
@@ -361,8 +398,10 @@ def parse_command(
             heuristic.
 
     Returns:
-        The parsed commands in order, skipping any segment that could not be
-        tokenized or held no locatable executable argv.
+        The parsed commands in order. A segment that cannot be tokenized is
+        recovered by the whitespace fallback and flagged ``unresolved`` rather
+        than dropped; only a segment holding no locatable executable argv (or a
+        bare mention with neither verb nor flag) yields nothing.
     """
     parsed: list[ParsedCommand] = []
     for segment in candidate_segments(command):
@@ -406,7 +445,9 @@ def extract_records(
             flags=parsed.flags,
             feature_tag=parsed.feature_tag,
             command_hash=parsed.command_hash,
-            exit_status=context.exit_status,
+            exit_status=(
+                ExitStatus.UNKNOWN if parsed.unresolved else context.exit_status
+            ),
             raw_exit_code=context.raw_exit_code,
             token_cost=context.token_cost,
             subagent_role=context.subagent_role,

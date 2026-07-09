@@ -206,6 +206,41 @@ def test_for_loop_extract_produces_three_call_records() -> None:
     assert len({r.command_hash for r in records}) == 3
 
 
+def test_connector_char_inside_quotes_keeps_one_record() -> None:
+    """Connector chars inside a quoted argument never sever the invocation.
+
+    ``--title "one; two | three"`` embeds ``;`` and ``|`` inside a double-quoted
+    value; a quote-blind split would cut the segment mid-quote and drop the whole
+    call, so the quote-aware split must yield exactly one intact record.
+    """
+    command = (
+        "uv run --no-sync vaultspec-core vault add adr "
+        '--feature x --title "one; two | three"'
+    )
+    segments = candidate_segments(command)
+    assert len(segments) == 1
+    parsed = parse_command(command, _inventory())
+    assert len(parsed) == 1
+    assert parsed[0].subcommand == ("vault", "add")
+    assert parsed[0].feature_tag == "x"
+
+
+def test_untokenizable_executable_segment_yields_unknown_record() -> None:
+    """A segment shlex cannot tokenize surfaces as UNKNOWN, never as zero records.
+
+    An unbalanced quote defeats both POSIX and non-POSIX ``shlex`` parsing. The
+    ADR's no-silent-drop contract requires the executable-bearing segment to
+    still surface; the whitespace fallback resolves a best-effort verb and the
+    record is stamped :attr:`ExitStatus.UNKNOWN` rather than dropped.
+    """
+    command = 'uv run --no-sync vaultspec-core vault list --title "unclosed'
+    records = extract_records(command, _context(), _inventory())
+    assert len(records) == 1
+    assert records[0].subcommand == ("vault", "list")
+    # the synthetic context declares OK; the untokenizable segment overrides it.
+    assert records[0].exit_status is ExitStatus.UNKNOWN
+
+
 def test_for_loop_item_with_backslashes_is_inserted_literally() -> None:
     """A loop item carrying a Windows path substitutes literally, not as a regex.
 

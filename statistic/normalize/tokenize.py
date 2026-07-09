@@ -12,7 +12,7 @@ resolves that surface before any argv parsing happens, in a fixed pipeline:
 #. unroll a single-line ``for var in A B C; do ... $var ...; done`` into N
    logical segments,
 #. split the remainder on shell connectors (``&&``, ``||``, ``;``, ``|``, and
-   newline),
+   newline), skipping any connector that sits inside a quoted argument,
 #. yield only the segments that actually mention ``vaultspec-core``.
 
 The output is a list of candidate segment strings. Locating the executable argv
@@ -43,11 +43,10 @@ _FOR_RE = re.compile(
     re.DOTALL,
 )
 
-#: Splits a command on shell connectors. ``&&`` and ``||`` are matched before
-#: their single-character counterparts so a two-character connector is never cut
-#: in half; a bare ``|`` separates a pipe tail into its own segment, which then
-#: falls out because it never mentions the executable.
-_CONNECTOR_RE = re.compile(r"&&|\|\||;|\n|\|")
+#: The single-character shell connectors a command splits on outside quotes. The
+#: two-character ``&&``/``||`` forms are handled ahead of these in
+#: :func:`split_on_connectors` so a two-character connector is never cut in half.
+_SINGLE_CONNECTORS: frozenset[str] = frozenset({";", "|", "\n"})
 
 
 def strip_ansi(text: str) -> str:
@@ -134,6 +133,56 @@ def unroll_for_loops(text: str) -> str:
     return _FOR_RE.sub(expand, text)
 
 
+def split_on_connectors(text: str) -> list[str]:
+    """Split *text* on shell connectors, never cutting inside a quoted span.
+
+    A connector character sitting inside a single- or double-quoted argument is
+    part of that argument, not a statement boundary, so a scan that ignored
+    quoting would sever ``--title "one; two | three"`` into three fragments and
+    drop the whole invocation when the fragments fail to tokenize. This scanner
+    tracks quote state and only honors a connector - ``&&``, ``||``, ``;``,
+    ``|``, or a newline - while outside quotes.
+
+    Args:
+        text: A command string after heredoc masking and ``for``-loop unrolling.
+
+    Returns:
+        The connector-delimited segments, in order, with quoting preserved.
+    """
+    segments: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    index = 0
+    length = len(text)
+    while index < length:
+        char = text[index]
+        if quote is not None:
+            current.append(char)
+            if char == quote:
+                quote = None
+            index += 1
+            continue
+        if char in ("'", '"'):
+            quote = char
+            current.append(char)
+            index += 1
+            continue
+        if text.startswith(("&&", "||"), index):
+            segments.append("".join(current))
+            current = []
+            index += 2
+            continue
+        if char in _SINGLE_CONNECTORS:
+            segments.append("".join(current))
+            current = []
+            index += 1
+            continue
+        current.append(char)
+        index += 1
+    segments.append("".join(current))
+    return segments
+
+
 def candidate_segments(command: str) -> list[str]:
     """Reduce a raw command string to the segments that invoke the executable.
 
@@ -154,5 +203,5 @@ def candidate_segments(command: str) -> list[str]:
     text = normalize_newlines(text)
     text = mask_heredocs(text)
     text = unroll_for_loops(text)
-    segments = (segment.strip() for segment in _CONNECTOR_RE.split(text))
+    segments = (segment.strip() for segment in split_on_connectors(text))
     return [segment for segment in segments if EXECUTABLE in segment]
