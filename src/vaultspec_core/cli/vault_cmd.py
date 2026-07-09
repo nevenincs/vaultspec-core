@@ -1452,8 +1452,7 @@ def cmd_check_markdown(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Check and optionally fix markdown hygiene (trailing whitespace, blank
-    runs, final newline)."""
+    """Check and optionally fix markdown hygiene (whitespace, blank runs, newline)."""
     apply_target(target)
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.checks import check_markdown
