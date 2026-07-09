@@ -6,6 +6,11 @@ tags:
 date: '2026-07-09'
 modified: '2026-07-09'
 related:
+  - '[[2026-07-09-mcp-tool-schema-P01-S01]]'
+  - '[[2026-07-09-mcp-tool-schema-P01-S02]]'
+  - '[[2026-07-09-mcp-tool-schema-P01-S03]]'
+  - '[[2026-07-09-mcp-tool-schema-P01-S04]]'
+  - '[[2026-07-09-mcp-tool-schema-P01-S05]]'
   - '[[2026-07-09-mcp-tool-schema-adr]]'
   - '[[2026-07-09-mcp-tool-schema-plan]]'
   - '[[2026-07-09-mcp-tool-schema-reference]]'
@@ -21,6 +26,14 @@ Auto-generated index of all documents tagged with `#mcp-tool-schema`.
 ### adr
 
 - `2026-07-09-mcp-tool-schema-adr` - `mcp-tool-schema` adr: tiered hot-tool surface with a stateless discover/invoke gateway | (**status:** `accepted`)
+
+### exec
+
+- `2026-07-09-mcp-tool-schema-P01-S01` - Create the vaultcore edit-engine module: move \_resolve_doc_path, \_split_document, \_enforce_blob_hash, \_compose_new_text, \_validate_proposed, \_write_proposed, and \_EditError verbatim, and add a result-returning execute_edit core plus a typed EditResult dataclass (status, path, blob_hash, error, warnings) with no Typer or console coupling (agent: vaultspec-high-executor)
+- `2026-07-09-mcp-tool-schema-P01-S02` - Re-point cmd_set_body, cmd_set_frontmatter, and cmd_edit at the extracted engine as thin renderers that call execute_edit and render the canonical envelope via \_emit, deleting the now-migrated helper bodies (agent: vaultspec-standard-executor)
+- `2026-07-09-mcp-tool-schema-P01-S03` - Add a single kebab-case feature-and-tag normalizer to vaultcore that strips a leading hash, lowercases, rejects path-traversal, and validates the canonical pattern, returning a typed result (agent: vaultspec-standard-executor)
+- `2026-07-09-mcp-tool-schema-P01-S04` - Re-point cmd_add feature and tag validation at the new normalizer, deleting the inline regex copy so the CLI and the MCP surface share one validator (agent: vaultspec-low-executor)
+- `2026-07-09-mcp-tool-schema-P01-S05` - Add WorkspaceFactory edit-engine unit tests (resolve, blob-hash conflict, compose, validate-refusal, write) and the normalizer tests, and confirm the existing set-body/set-frontmatter/edit CLI tests stay green (agent: vaultspec-standard-executor)
 
 ### plan
 
