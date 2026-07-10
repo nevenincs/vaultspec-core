@@ -25,6 +25,7 @@ from vaultspec_core.cli._target import PlanPathArg, TargetOption
 
 __all__ = ["plan_app"]
 
+
 def _render_user_errors[F: Callable[..., None]](func: F) -> F:
     """Render handler-raised typed errors as one-line CLI messages.
 

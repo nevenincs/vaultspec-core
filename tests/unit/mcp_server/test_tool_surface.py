@@ -194,20 +194,14 @@ async def test_surface_representative_call_per_tool(vault_root):  # noqa: F811
         # find: feature listing and document search both answer.
         listed = data_of(await client.call_tool("find", {}))
         assert any(row["name"] == "surface-probe" for row in listed)
-        searched = data_of(
-            await client.call_tool("find", {"feature": "surface-probe"})
-        )
-        assert searched and all(
-            row.get("blob_hash") for row in searched
-        ), searched
+        searched = data_of(await client.call_tool("find", {"feature": "surface-probe"}))
+        assert searched and all(row.get("blob_hash") for row in searched), searched
 
         # status: project rollup and a targeted trace.
         rollup = data_of(await client.call_tool("status", {}))
         assert rollup["kind"] == "rollup"
         assert rollup["tool_schema_version"] == __version__
-        trace = data_of(
-            await client.call_tool("status", {"target": "surface-probe"})
-        )
+        trace = data_of(await client.call_tool("status", {"target": "surface-probe"}))
         assert trace["kind"] == "trace"
 
         # check: run the health suite over the vault.

@@ -61,6 +61,7 @@ def _build_instructions() -> str:
         "filenames are never hand-authored."
     )
 
+
 # Plain-Click help to match the rest of the CLI (cli-presentation-uniformity
 # ADR). ``no_args_is_help`` stays off so the no-argument invocation still runs
 # the server via the ``invoke_without_command`` callback below.
