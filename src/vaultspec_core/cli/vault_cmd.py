@@ -163,13 +163,13 @@ def cmd_add(
     Supported types: adr, audit, exec, plan, reference, research.
     """
     apply_target(target)
-    import re
     from datetime import UTC, datetime
 
     from vaultspec_core.console import get_console
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.hydration import create_vault_doc
     from vaultspec_core.vaultcore.models import DocType
+    from vaultspec_core.vaultcore.normalize import normalize_feature_tag
     from vaultspec_core.vaultcore.resolve import (
         RelatedResolutionError,
         resolve_related_inputs,
@@ -235,34 +235,27 @@ def cmd_add(
         )
         raise typer.Exit(code=1)
 
-    # Validate feature tag
-    feat = feature.lstrip("#").strip()
-    if not feat:
-        console.print("[red]--feature / -f is required (e.g. -f my-feature)[/red]")
+    # Validate feature tag through the shared vaultcore normalizer (the one
+    # validator the MCP surface also converges on).
+    feature_result = normalize_feature_tag(feature)
+    if not feature_result.ok or feature_result.value is None:
+        console.print(f"[red]{feature_result.error}[/red]")
         raise typer.Exit(code=1)
-    if not re.match(r"^[a-z0-9][a-z0-9-]*$", feat):
-        console.print(
-            f"[red]Invalid feature tag '{feat}'. "
-            "Must be kebab-case (lowercase, digits, hyphens).[/red]"
-        )
-        raise typer.Exit(code=1)
+    feat = feature_result.value
 
     # Default date to today (UTC for deterministic vault doc dates)
     date_str = date or datetime.now(UTC).strftime("%Y-%m-%d")
 
-    # Validate extra tags format
+    # Validate extra tags format through the same shared normalizer.
     extra_tags: list[str] | None = None
     if tags:
         extra_tags = []
         for tag in tags:
-            normalized = tag.lstrip("#").strip()
-            if not re.match(r"^[a-z0-9][a-z0-9-]*$", normalized):
-                console.print(
-                    f"[red]Invalid tag '{tag}'. "
-                    "Must be kebab-case (lowercase, digits, hyphens).[/red]"
-                )
+            tag_result = normalize_feature_tag(tag, label="tag")
+            if not tag_result.ok:
+                console.print(f"[red]{tag_result.error}[/red]")
                 raise typer.Exit(code=1)
-            extra_tags.append(f"#{normalized}")
+            extra_tags.append(f"#{tag_result.value}")
 
     # Resolve related paths to wiki-links
     resolved_related: list[str] | None = None
@@ -1459,8 +1452,7 @@ def cmd_check_markdown(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Check and optionally fix markdown hygiene (trailing whitespace, blank
-    runs, final newline)."""
+    """Check and optionally fix markdown hygiene (whitespace, blank runs, newline)."""
     apply_target(target)
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.checks import check_markdown

@@ -12,13 +12,14 @@ order: 3
 - **MUST read before starting a new pipeline phase** relevant `.vault/` documents. Check
   for any previous audit or adr overlap. All authored records live in `.vault/` under
   `adr/`, `audit/`, `exec/`, `plan/`, `reference/`, and `research/`. Auto-generated
-  feature indexes live in `.vault/index/` and are managed by
-  `vaultspec-core vault feature index`; do not author them by hand.
+  feature indexes live in `.vault/index/`; they regenerate as a side effect of the
+  `create` and `edit` tools, or manually via `vaultspec-core vault feature index` when
+  working through the CLI, and are never authored by hand.
 
-**Orient first.** In a project with no session context, run `vaultspec-core status`
-before invoking any pipeline skill. Read the in-flight plans it names, then enter the
-pipeline at the right phase: resume an in-flight plan via `vaultspec-execute`, or start
-fresh at Research.
+**Orient first.** In a project with no session context, orient with the `status` tool
+(CLI: `vaultspec-core status`) before invoking any pipeline skill. Read the in-flight
+plans it names, then enter the pipeline at the right phase: resume an in-flight plan via
+`vaultspec-execute`, or start fresh at Research.
 
 Ground every pipeline phase in what the project already decided and built before acting;
 the always-on `vaultspec-discovery` rule defines the canonical discovery sequence.
@@ -51,13 +52,12 @@ association declared in the Epic intent block. The leaf row at every tier is nam
 one-to-one to a Step. Full conventions live in the Markdown comment hint blocks embedded
 in `.vaultspec/templates/plan.md`.
 
-The `vaultspec-core vault plan` CLI is the canonical surface for structural manipulation
-of plan documents. Writers and executors MUST use the `vaultspec-core vault plan ...`
-CLI verbs (`step add/insert/move/remove/check/uncheck/toggle/edit`, `phase`/`wave`
-equivalents, `epic intent`, `tier promote/demote`) for every identifier-affecting change
-rather than hand-editing the markdown body. The CLI guarantees canonical-identifier
-preservation, gap-no-reuse, and display-path consistency that hand edits cannot. Run
-`vaultspec-core vault plan --help` for the full subcommand surface.
+Every identifier-affecting plan change MUST route through the owning plan verbs, never
+hand-edits: mark Step completion with the `plan_progress` tool and author Step rows with
+the `plan_edit` tool; structural changes above Step level (`phase`, `wave`,
+`epic intent`, `tier promote/demote`) and any session without the MCP server use the
+`vaultspec-core vault plan ...` CLI verbs, which guarantee the same canonical-identifier
+preservation and gap-no-reuse.
 
 Supporting skills, invoked when appropriate:
 
@@ -98,6 +98,9 @@ the harness file tools (Write/Edit) or through stateful commands such as `gh` an
 the dispatching orchestrator to persist (scaffold via `vaultspec-core vault add`, then
 body-prose edit). The declaration is intent, not a sandbox - Bash can technically write
 files in either mode - so honoring it is persona discipline, not tooling enforcement.
+
+Dispatched personas operate vaultspec through the CLI; MCP tools are not assumed inside
+subagents.
 
 Artifacts are persisted in `.vault/`. The user must approve plans before execution
 proceeds. Code review via vaultspec-code-review is mandatory after execution.

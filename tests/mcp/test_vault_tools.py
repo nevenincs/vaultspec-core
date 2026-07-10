@@ -1,8 +1,11 @@
-"""Tests for MCP vault tools (find + create) using a real FastMCP server."""
+"""Tests for the MCP ``find`` vault tool using a real FastMCP server.
+
+The batch ``create`` and ``edit`` tools are covered by
+``tests/unit/mcp_server/test_create_tool.py`` and ``test_edit_tool.py``.
+"""
 
 from __future__ import annotations
 
-import datetime
 from typing import Any
 
 import pytest
@@ -193,83 +196,3 @@ async def test_find_respects_limit(vault_root):
         result = await client.call_tool("find", {"type": ["adr"], "limit": 1})
         docs = _data(result)
         assert len(docs) == 1
-
-
-@pytest.mark.asyncio
-async def test_create_document(vault_root):
-    today = datetime.date.today().isoformat()
-    mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
-        result = await client.call_tool(
-            "create",
-            {"feature": "new-feat", "type": "adr", "title": "new-architecture"},
-        )
-        data = _data(result)
-        assert data["success"] is True
-        assert (vault_root / ".vault" / "adr" / f"{today}-new-feat-adr.md").exists()
-
-
-@pytest.mark.asyncio
-async def test_create_defaults_to_research(vault_root):
-    today = datetime.date.today().isoformat()
-    mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
-        result = await client.call_tool("create", {"feature": "default-type-feat"})
-        data = _data(result)
-        assert data["success"] is True
-        assert (
-            vault_root
-            / ".vault"
-            / "research"
-            / f"{today}-default-type-feat-research.md"
-        ).exists()
-
-
-@pytest.mark.asyncio
-async def test_create_duplicate_fails(vault_root):
-    mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
-        await client.call_tool(
-            "create", {"feature": "dup-feat", "type": "adr", "title": "dup"}
-        )
-        result = await client.call_tool(
-            "create",
-            {"feature": "dup-feat", "type": "adr", "title": "dup"},
-        )
-        data = _data(result)
-        assert data["success"] is False
-        assert "already exists" in data["message"]
-
-
-@pytest.mark.asyncio
-async def test_create_invalid_type(vault_root):
-    mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
-        result = await client.call_tool(
-            "create",
-            {"feature": "feat", "type": "invalid", "title": "title"},
-        )
-        data = _data(result)
-        assert data["success"] is False
-        assert "Invalid document type" in data["message"]
-
-
-@pytest.mark.asyncio
-async def test_create_with_content(vault_root):
-    today = datetime.date.today().isoformat()
-    mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
-        result = await client.call_tool(
-            "create",
-            {
-                "feature": "content-feat",
-                "type": "adr",
-                "title": "with-content",
-                "content": "Extra context here.",
-            },
-        )
-        data = _data(result)
-        assert data["success"] is True
-        path = vault_root / ".vault" / "adr" / f"{today}-content-feat-adr.md"
-        text = path.read_text(encoding="utf-8")
-        assert "Extra context here." in text
