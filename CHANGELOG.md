@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.1.37](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.36...vaultspec-core-v0.1.37) (2026-07-10)
+
+
+### Features
+
+* **mcp:** add discover/invoke gateway tools over the verb catalog ([fcdb460](https://github.com/nevenincs/vaultspec-core/commit/fcdb460bbb7af0a93ea564ce2fbb027bf080576f))
+* **mcp:** add gateway command catalog parsed from CLI reference markers ([87c1176](https://github.com/nevenincs/vaultspec-core/commit/87c1176e22806714ddd18a72b3bff758373baaf6))
+* **mcp:** add shared per-item batch result envelope ([1f8217c](https://github.com/nevenincs/vaultspec-core/commit/1f8217ce618a1fee708f8ab3aa2c443bdbdb21e0))
+* **mcp:** extend find and add status/check/plan tools over shared cores ([4ae33cd](https://github.com/nevenincs/vaultspec-core/commit/4ae33cd2486f6d4ac122b66e4d70dbedeb43e706))
+* **mcp:** extract plan-write integrity guards into shared core ([69dad8b](https://github.com/nevenincs/vaultspec-core/commit/69dad8b5b873fb547829674d76910efb8822e6a6))
+* **mcp:** rebuild create batch-native and add the edit tool ([5fe7430](https://github.com/nevenincs/vaultspec-core/commit/5fe743086dc0b81dc282c18181fc860f130afd3a))
+* **mcp:** wire the gateway into the nine-tool surface with positionals ([d0bebf7](https://github.com/nevenincs/vaultspec-core/commit/d0bebf71fb2a2533d467c0241d283c56de006a7f))
+* **statistic:** add CallRecord model and ExitStatus enum (P01.S02, P01.S03) ([5e0f4ba](https://github.com/nevenincs/vaultspec-core/commit/5e0f4bad3b202d8eec05f39118f828a95bd2fd3c))
+* **statistic:** add ClaudeSource transcript adapter (P04 S11, S13) ([66165ab](https://github.com/nevenincs/vaultspec-core/commit/66165abbd5eeceba2299f64c9f126171a3a23f9c))
+* **statistic:** add CodexSource rollout adapter (P04 S12, S14) ([8da2990](https://github.com/nevenincs/vaultspec-core/commit/8da29905a1faddbce9374687d086eef0e67ec1cb))
+* **statistic:** add python -m statistic pipeline entrypoint (P05 S23) ([06211df](https://github.com/nevenincs/vaultspec-core/commit/06211df87604923353f083ad27ed23448ea37f6d))
+* **statistic:** add seven metric families and report renderers (P05 S15-S22) ([434f6ba](https://github.com/nevenincs/vaultspec-core/commit/434f6ba22dad61e7fc9b4942d9f30deb6f283205))
+* **statistic:** add stage-one command tokenizer (P03.S08) ([9e2f8ad](https://github.com/nevenincs/vaultspec-core/commit/9e2f8adb5487ff69a120158300423f5949ff14a7))
+* **statistic:** add stage-two argv extractor (P03.S09) ([63b1ba4](https://github.com/nevenincs/vaultspec-core/commit/63b1ba4b1ef3440b87e958d5fcd7e94d284cfde2))
+* **statistic:** add TranscriptSource protocol (P01.S04) ([ac7befe](https://github.com/nevenincs/vaultspec-core/commit/ac7befe6efc475942b3209e673ecb9d9d5d16240))
+* **statistic:** parse declared-capability denominator from cli.md ([f4d4426](https://github.com/nevenincs/vaultspec-core/commit/f4d4426650e7de8631d193570dda71e3ac7c334d))
+* **statistic:** scaffold dev-only analytics package tree (P01.S01) ([7dcecf1](https://github.com/nevenincs/vaultspec-core/commit/7dcecf1a6fb1af66e6f975764d6eb6f875a8bb4d))
+
+
+### Bug Fixes
+
+* **cli:** un-truncate the check markdown help for the discover payload ([4cdadc7](https://github.com/nevenincs/vaultspec-core/commit/4cdadc7c223c54ef060d27e1cd1a78e26a47bc10))
+* **mcp:** pass stdin=DEVNULL so invoke does not inherit the server's JSON-RPC stdin ([f9727a0](https://github.com/nevenincs/vaultspec-core/commit/f9727a0f4a63993a783bd2d6963d1913b0205af2))
+* **mcp:** reject dash-leading positionals in the invoke gateway ([7e544a4](https://github.com/nevenincs/vaultspec-core/commit/7e544a48a78f1d29fb47991b0c7847c64c121601))
+* **mcp:** run handler body inside copied context for real request isolation ([7a2a5c1](https://github.com/nevenincs/vaultspec-core/commit/7a2a5c1a2af500e38dca60dcb4a7f732236155eb))
+* normalize README markdown formatting ([f3a578a](https://github.com/nevenincs/vaultspec-core/commit/f3a578acbbf092603ff6b3bdc30746907d6ce584))
+* **statistic:** divide loop token cost across expanded records; drop dead guard ([7ad37c1](https://github.com/nevenincs/vaultspec-core/commit/7ad37c13cc0accb887387fdddde58846b712507f))
+* **statistic:** quote-aware connector split with no-silent-drop fallback ([1bfee11](https://github.com/nevenincs/vaultspec-core/commit/1bfee11730a8f2d82f453b69d37fdb58db55eeb2))
+* **statistic:** redact home prefix from records.jsonl cwd and project ([e5058f0](https://github.com/nevenincs/vaultspec-core/commit/e5058f0bb1684b6f36d5831d66b4baee521de75d))
+* **statistic:** substitute for-loop items literally; run real corpus (P05 S24) ([346849e](https://github.com/nevenincs/vaultspec-core/commit/346849e9966d8bf859d33eea91f75d9800688e50))
+* **vaultcore:** reject embedded dots in feature/tag normalization ([bdae446](https://github.com/nevenincs/vaultspec-core/commit/bdae44638d773b3b452f84c3f92fe7eb67759c5d))
+
 ## [0.1.36](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.35...vaultspec-core-v0.1.36) (2026-06-28)
 
 
