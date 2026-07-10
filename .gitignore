@@ -181,6 +181,9 @@ test-project/
 
 # Temporary reference files
 tmp-ref/
+
+# Dev-only transcript analytics outputs (personal-data-derived, never committed)
+statistic/out/
 # >>> vaultspec-managed (do not edit this block) >>>
 .vault/.obsidian/
 .vault/.trash/

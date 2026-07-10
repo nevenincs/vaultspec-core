@@ -150,7 +150,7 @@ full options.
 - `vaultspec-core vault check annotations` - Find generated template annotations in
   vault documents.
 - `vaultspec-core vault check markdown` - Check and optionally fix markdown hygiene
-  (trailing whitespace, blank
+  (whitespace, blank runs, newline).
 - `vaultspec-core vault check placeholders` - Find unreplaced {...} template
   placeholders in document body prose.
 - `vaultspec-core vault check dangling` - Find wiki-links in related: frontmatter that

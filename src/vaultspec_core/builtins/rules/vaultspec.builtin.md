@@ -19,7 +19,8 @@ The workflow persists the following documents, bound by a single feature tag:
 - `.vault/adr/yyyy-mm-dd-<feature>-adr.md`: Research-derived `<ADR>`.
 
 - `.vault/plan/yyyy-mm-dd-<feature>-plan.md`: The `<Plan>` to execute, authored and
-  managed by the vaultspec-core CLI (`vaultspec-core vault plan`).
+  managed through the plan verbs - the `plan_progress` and `plan_edit` MCP tools where
+  connected, the `vaultspec-core vault plan` CLI otherwise.
 
 - `.vault/exec/yyyy-mm-dd-<feature>/.../<step>.md`: The individual `<Step Record>`.
 
@@ -30,8 +31,9 @@ The workflow persists the following documents, bound by a single feature tag:
   `yyyy-mm-dd-<feature>-<topic>-audit.md`.
 
 - `.vault/index/<feature>.index.md`: The auto-generated `<Feature Index>` linking every
-  document for a feature. Managed by `vaultspec-core vault feature index`; do not author
-  by hand.
+  document for a feature. The index regenerates as a side effect of the `create` and
+  `edit` tools; regenerate it manually with `vaultspec-core vault feature index` when
+  working through the CLI, and never author it by hand.
 
 Use the following pipeline skills:
 
@@ -102,7 +104,9 @@ hierarchy should reference those above them.
 
 - **Feature Indexes** (`.vault/index/{feature}.index.md`)
 
-  - *Auto-generated* by `vaultspec-core vault feature index`; never authored by hand.
+  - *Auto-generated* as a side effect of the `create` and `edit` tools; regenerate
+    manually with `vaultspec-core vault feature index` when working through the CLI,
+    never authored by hand.
   - *Filename:* `{feature}.index.md` (no date prefix).
   - *Example:* `.vault/index/editor-demo.index.md`
 

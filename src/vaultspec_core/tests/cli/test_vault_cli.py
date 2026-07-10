@@ -6,7 +6,7 @@ Covers vault add, vault stats, vault check, etc.
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
@@ -63,7 +63,7 @@ class TestAddSubcommand:
     """Verify 'vault add' behavior."""
 
     def test_add_generates_correct_filename(self, runner, synthetic_project):
-        date_str = datetime.now().strftime("%Y-%m-%d")
+        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
 
         # Cleanup potential leftover from previous failed tests
         expected_path = (
@@ -91,7 +91,7 @@ class TestAddSubcommand:
 
     def test_add_strips_hash_from_feature(self, runner, synthetic_project):
         """Creating with #feature should strip the hash."""
-        date_str = datetime.now().strftime("%Y-%m-%d")
+        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
 
         expected_path = (
             synthetic_project / ".vault" / "adr" / f"{date_str}-my-feat-adr.md"
@@ -211,7 +211,7 @@ class TestAddSubcommand:
         """Created documents must pass the project's own frontmatter validation."""
         from vaultspec_core.vaultcore.parser import parse_vault_metadata
 
-        date_str = datetime.now().strftime("%Y-%m-%d")
+        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
         expected_path = (
             synthetic_project
             / ".vault"
@@ -248,7 +248,7 @@ class TestAddSubcommand:
         self, runner, synthetic_project
     ):
         """Hydration must not strip agent-facing template instructions."""
-        date_str = datetime.now().strftime("%Y-%m-%d")
+        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
         expected_path = (
             synthetic_project
             / ".vault"
