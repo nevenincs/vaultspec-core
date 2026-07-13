@@ -35,6 +35,7 @@ import subprocess
 import sys
 import tempfile
 
+from render_readme_assets import VAULTSPEC_THEME
 from rich.console import Console
 from rich.text import Text
 
@@ -47,17 +48,30 @@ ROWS = 30
 FEATURE = "search-api"
 REDACTED = "~/code/search-api"
 
-TEAL = "\x1b[38;2;143;188;181m"
-DIM = "\x1b[38;2;110;102;94m"
+
+def _hex(rgb: tuple[int, int, int]) -> str:
+    return "".join(f"{c:02x}" for c in rgb)
+
+
+def _fg(rgb: tuple[int, int, int]) -> str:
+    return "\x1b[38;2;{};{};{}m".format(*rgb)
+
+
+# Derived from the single palette source in render_readme_assets so the
+# demo GIF and the SVG stills can never drift apart.
+TEAL = _fg(VAULTSPEC_THEME.ansi_colors[6])
+DIM = _fg(VAULTSPEC_THEME.ansi_colors[8])
 RESET = "\x1b[0m"
 PROMPT = f"{TEAL}❯{RESET} "  # noqa: RUF001
 
-# bg, fg, then ANSI colors 0-15 (vaultspec logo palette; see
-# render_readme_assets.VAULTSPEC_THEME).
-AGG_THEME = (
-    "1e1b18,f2ece4,"
-    "1e1b18,c98a8a,a3b18a,d9b98a,8a9fc9,b5a8c9,8fbcb5,f2ece4,"
-    "6e665e,dea0a0,b9c7a0,e9cda0,a0b5de,cbbede,a5d2cb,faf7f2"
+# agg theme string: bg, fg, then ANSI colors 0-15.
+AGG_THEME = ",".join(
+    _hex(c)
+    for c in (
+        VAULTSPEC_THEME.background_color,
+        VAULTSPEC_THEME.foreground_color,
+        *VAULTSPEC_THEME.ansi_colors,
+    )
 )
 
 
