@@ -19,6 +19,7 @@ from .signals import (
     GitattributesSignal,
     GitignoreSignal,
     ManifestEntrySignal,
+    ModeMismatchSignal,
     PrecommitSignal,
     ProviderDirSignal,
     RenameIntegritySignal,
@@ -73,6 +74,8 @@ class WorkspaceDiagnosis:
             by the annotation probe.
         rename_integrity: Observed state of name/filename mismatches.
         rename_mismatch_count: Count of name/filename mismatches.
+        mode_mismatch: Coherence between the persisted install-mode declaration
+            and the shape of the provisioned hook and MCP artifacts.
     """
 
     framework: FrameworkSignal
@@ -89,6 +92,7 @@ class WorkspaceDiagnosis:
     vault_unreadable_count: int = 0
     rename_integrity: RenameIntegritySignal = RenameIntegritySignal.CLEAN
     rename_mismatch_count: int = 0
+    mode_mismatch: ModeMismatchSignal = ModeMismatchSignal.CLEAN
 
 
 def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
@@ -176,6 +180,12 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
             logger.warning("Rename integrity collector failed", exc_info=True)
             rename_integrity = RenameIntegritySignal.ERROR
 
+    # Mode-mismatch is threaded through the orchestrator here; the concrete
+    # collector that compares the persisted declaration against the observed
+    # artifact shapes is wired in below. A failed probe is neutral (CLEAN),
+    # never a crash, matching the other always-collected signals.
+    mode_mismatch = ModeMismatchSignal.CLEAN
+
     diag = WorkspaceDiagnosis(
         framework=framework,
         gitignore=gitignore,
@@ -187,6 +197,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         vault_unreadable_count=vault_unreadable_count,
         rename_integrity=rename_integrity,
         rename_mismatch_count=rename_mismatch_count,
+        mode_mismatch=mode_mismatch,
     )
 
     if framework == FrameworkSignal.MISSING:
