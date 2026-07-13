@@ -95,6 +95,13 @@ See the [CLI reference](./docs/CLI.md) for installation options.
 > your `.gitignore` and `.gitattributes`, writes pre-commit hooks, and drops an
 > `.mcp.json` for Model Context Protocol clients by default.
 
+Install picks a mode for how the pre-commit hooks and the MCP server launch. Tool mode
+is the default and runs vaultspec-core through `uvx`, so it never enters your project's
+dependency set; dependency mode runs it through `uv run` and is selected automatically
+when your `pyproject.toml` lists vaultspec-core. Pin either with `install --mode tool`
+or `install --mode dependency`. An existing workspace has its mode inferred and recorded
+the next time you run `install --upgrade`.
+
 ### 3. Sync
 
 All development paper trails live in `.vault` as markdown files. Rules, agents, and
@@ -229,7 +236,9 @@ its `.mcp.json` by default. Seven tools cover the everyday surface - `find`, `cr
 `edit`, `status`, `check`, `plan_progress`, `plan_edit` - and a `discover`/`invoke`
 gateway reaches the rest of the CLI. Where the server is connected, the synced rules
 treat it as the primary transport, falling back to CLI verbs for structural and sync
-operations. See the [MCP reference](./docs/MCP.md) for setup and the tool catalog.
+operations. The launch command in `.mcp.json` follows the install mode - `uvx` in tool
+mode, `uv run` in dependency mode. See the [MCP reference](./docs/MCP.md) for setup and
+the tool catalog.
 
 ## Learn more
 
