@@ -88,7 +88,7 @@ Infer and persist mode for legacy workspaces on install --upgrade, update mode-a
 - [x] `P05.S29` - Update the getting-started and MCP touchpoints to describe install mode selection and the tool-mode default; `README.md`.
 - [x] `P05.S30` - Update the framework overview to document the mode axis alongside the existing provisioning concepts; `docs/framework.md`.
 - [x] `P05.S31` - Regenerate the CLI reference so the install --mode option and its help text appear in the generator-managed reference; `src/vaultspec_core/builtins/reference/cli.md`.
-- [ ] `P05.S32` - Run the full unit gate and fix any regressions surfaced by the mode-awareness changes; `src/vaultspec_core`.
+- [x] `P05.S32` - Run the full unit gate and fix any regressions surfaced by the mode-awareness changes; `src/vaultspec_core`.
 - [ ] `P05.S33` - Review the complete mode-awareness surface against the ADR's Q1 through Q6 decisions and close out any deviations found; `.vault/adr/2026-07-13-install-mode-adr.md`.
 
 ## Parallelization
