@@ -548,6 +548,13 @@ Tier commands: `tier show`, `tier promote`, `tier demote`. The `promote` command
 `--phase-title`, `--phase-intent`, `--wave-title`, `--wave-intent`, `--epic-intent` for
 synthesized containers. The `demote` command takes `--force`.
 
+Trailer commands: `trailer emit` (takes exactly one of `--step` or `--feature`; prints a
+well-formed `Vaultspec-Step` or `Vaultspec-Feature` commit-linkage trailer line),
+`trailer validate MESSAGE_FILE` (reports malformed trailers in a commit-message file and
+always exits `0`, so it is safe as an opt-in `commit-msg`-stage pre-commit hook). The
+trailer convention is advisory enrichment only: absence or malformation never blocks a
+commit or fails a core command.
+
 ## Spec commands
 
 Signature: `vaultspec-core spec [OPTIONS] COMMAND [ARGS]...`. Framework resource
