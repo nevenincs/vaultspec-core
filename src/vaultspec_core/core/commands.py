@@ -927,10 +927,14 @@ def install_run(
             hint="Install core first, then use --skip core on subsequent installs.",
         )
 
-    # Resolve the provisioning mode once, at provision time. The Q5 precedence
-    # chain and conflict refusal are layered onto this resolution in a later
-    # step; here an explicit request wins and the default is tool mode.
-    resolved_mode = mode if mode is not None else InstallMode.TOOL
+    # Resolve the provisioning mode once, at provision time, via the Q5
+    # precedence chain (explicit flag, persisted declaration, pyproject
+    # detection, default tool mode). An explicit request that names an
+    # impossible combination - dependency mode with no pyproject.toml - raises a
+    # loud, typed refusal here rather than silently falling back.
+    from .workspace_mode import resolve_install_mode
+
+    resolved_mode = resolve_install_mode(path, explicit=mode)
 
     if upgrade and dry_run:
         _ensure_tool_configs(path)

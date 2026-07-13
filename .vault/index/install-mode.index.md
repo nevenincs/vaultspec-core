@@ -13,6 +13,7 @@ related:
   - '[[2026-07-13-install-mode-P01-S05]]'
   - '[[2026-07-13-install-mode-P02-S06]]'
   - '[[2026-07-13-install-mode-P02-S07]]'
+  - '[[2026-07-13-install-mode-P02-S08]]'
   - '[[2026-07-13-install-mode-adr]]'
   - '[[2026-07-13-install-mode-plan]]'
   - '[[2026-07-13-install-mode-research]]'
@@ -37,6 +38,7 @@ Auto-generated index of all documents tagged with `#install-mode`.
 - `2026-07-13-install-mode-P01-S05` - Extend the manifest tests with the ManifestData resolved_mode and resolved_floor_version echo fields, covering read, write, and legacy-manifest backward compatibility
 - `2026-07-13-install-mode-P02-S06` - Add the --mode option to cmd_install accepting tool and dependency values and thread it through to install_run
 - `2026-07-13-install-mode-P02-S07` - Add resolve_install_mode implementing the Q5 precedence chain (explicit flag, persisted declaration, pyproject.toml detection, default tool mode) plus the pyproject.toml dependency probe helper
+- `2026-07-13-install-mode-P02-S08` - Wire resolve_install_mode into install_run so the mode is resolved once at provision time, persisted to workspace.json, and an explicit --mode request that conflicts with detection raises a loud VaultSpecError refusal
 
 ### plan
 
