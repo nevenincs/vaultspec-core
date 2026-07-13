@@ -292,7 +292,28 @@ def _scaffold_provider(
     return created
 
 
-CANONICAL_ENTRY_PREFIX = "uv run --no-sync vaultspec-core"
+# The canonical CLI-invocation prefix each pre-commit hook entry is built from,
+# keyed by provisioning mode. Dependency mode resolves ``vaultspec-core`` through
+# the target project's own venv via ``uv run`` (byte-identical to the single
+# prefix that existed before mode-awareness); tool mode resolves it through an
+# ephemeral ``uvx`` invocation so it never enters the project's dependency set.
+_MODE_ENTRY_PREFIX: dict[InstallMode, str] = {
+    InstallMode.DEPENDENCY: "uv run --no-sync vaultspec-core",
+    InstallMode.TOOL: "uvx --from vaultspec-core vaultspec-core",
+}
+
+
+def entry_prefix_for_mode(mode: InstallMode) -> str:
+    """Return the canonical hook-entry command prefix for *mode*."""
+    return _MODE_ENTRY_PREFIX[mode]
+
+
+#: Backward-compatible module-level prefix, pinned to dependency mode. Modules
+#: and diagnostics that still assume a single prefix (the doctor's
+#: canonical-entry check) read this until they are made mode-aware; the
+#: mode-parameterized renderers derive their prefix from
+#: :func:`entry_prefix_for_mode` instead.
+CANONICAL_ENTRY_PREFIX = entry_prefix_for_mode(InstallMode.DEPENDENCY)
 
 
 def _is_git_repo(target: Path) -> bool:
@@ -526,47 +547,88 @@ def check_staged_provider_artifacts(cwd: Path | None = None) -> list[str]:
     return violations
 
 
-# Hook definitions keyed by PrecommitHook enum.
-# Each value is a dict of pre-commit hook fields (merged with defaults).
-_HOOK_DEFS: dict[PrecommitHook, dict[str, object]] = {
-    PrecommitHook.VAULT_FIX: {
-        "name": "Vault fix",
-        "entry": f"{CANONICAL_ENTRY_PREFIX} vault check all --fix",
-        "types": ["markdown"],
-    },
+# Mode-independent pre-commit hook metadata: the CLI subcommand each hook
+# invokes plus its non-entry pre-commit fields. The ``entry`` is derived per
+# mode by prefixing the subcommand with the mode's canonical entry prefix. The
+# insertion order here is the order hooks are scaffolded into
+# ``.pre-commit-config.yaml`` and must be preserved.
+_HOOK_SUBCOMMAND: dict[PrecommitHook, str] = {
+    PrecommitHook.VAULT_FIX: "vault check all --fix",
+    PrecommitHook.VAULT_SANITIZE_ANNOTATIONS: "vault sanitize annotations",
+    PrecommitHook.CHECK_PROVIDER_ARTIFACTS: "check-providers",
+    PrecommitHook.SPEC_CHECK: "spec doctor",
+}
+_HOOK_META: dict[PrecommitHook, dict[str, object]] = {
+    PrecommitHook.VAULT_FIX: {"name": "Vault fix", "types": ["markdown"]},
     PrecommitHook.VAULT_SANITIZE_ANNOTATIONS: {
         "name": "Vault sanitize annotations",
-        "entry": f"{CANONICAL_ENTRY_PREFIX} vault sanitize annotations",
         "types": ["markdown"],
     },
     PrecommitHook.CHECK_PROVIDER_ARTIFACTS: {
         "name": "Check provider artifacts",
-        "entry": f"{CANONICAL_ENTRY_PREFIX} check-providers",
         "always_run": True,
     },
-    PrecommitHook.SPEC_CHECK: {
-        "name": "Spec check",
-        "entry": f"{CANONICAL_ENTRY_PREFIX} spec doctor",
-        "types": ["markdown"],
-    },
+    PrecommitHook.SPEC_CHECK: {"name": "Spec check", "types": ["markdown"]},
 }
 
-CANONICAL_PRECOMMIT_HOOKS: list[dict[str, object]] = [
-    {
-        "id": hook.value,
-        **meta,
-        "language": "system",
-        "pass_filenames": False,
+
+def hook_defs_for_mode(mode: InstallMode) -> dict[PrecommitHook, dict[str, object]]:
+    """Return the hook-field map for *mode*, keyed by :class:`PrecommitHook`.
+
+    Each value merges the mode-independent metadata (name, filter fields) with
+    an ``entry`` built from the mode's canonical prefix and the hook's
+    subcommand, so dependency mode renders ``uv run --no-sync vaultspec-core
+    ...`` and tool mode renders ``uvx --from vaultspec-core vaultspec-core
+    ...``.
+    """
+    prefix = entry_prefix_for_mode(mode)
+    defs: dict[PrecommitHook, dict[str, object]] = {}
+    for hook, meta in _HOOK_META.items():
+        # Preserve the original field order (name, entry, then the hook's
+        # filter field) so the scaffolded YAML is byte-stable across modes.
+        value: dict[str, object] = {"name": meta["name"]}
+        value["entry"] = f"{prefix} {_HOOK_SUBCOMMAND[hook]}"
+        for key, field in meta.items():
+            if key != "name":
+                value[key] = field
+        defs[hook] = value
+    return defs
+
+
+def canonical_precommit_hooks_for_mode(mode: InstallMode) -> list[dict[str, object]]:
+    """Return the full canonical pre-commit hook list rendered for *mode*."""
+    return [
+        {
+            "id": hook.value,
+            **meta,
+            "language": "system",
+            "pass_filenames": False,
+        }
+        for hook, meta in hook_defs_for_mode(mode).items()
+    ]
+
+
+def canonical_hook_entries_for_mode(mode: InstallMode) -> dict[str, str]:
+    """Return each canonical hook ID mapped to its expected entry for *mode*."""
+    return {
+        hook.value: str(meta["entry"])
+        for hook, meta in hook_defs_for_mode(mode).items()
     }
-    for hook, meta in _HOOK_DEFS.items()
-]
+
 
 CANONICAL_HOOK_IDS: frozenset[str] = frozenset(h.value for h in PrecommitHook)
 
-# Maps each canonical hook ID to its expected entry command.
-CANONICAL_HOOK_ENTRIES: dict[str, str] = {
-    hook.value: str(meta["entry"]) for hook, meta in _HOOK_DEFS.items()
-}
+#: Backward-compatible module-level canonical hooks and entries, pinned to
+#: dependency mode. The doctor's canonical-entry check still imports
+#: ``CANONICAL_HOOK_ENTRIES`` and compares against the single dependency-mode
+#: shape; making that check mode-aware is the next phase. ``_scaffold_precommit``
+#: renders through :func:`canonical_precommit_hooks_for_mode` instead.
+CANONICAL_PRECOMMIT_HOOKS: list[dict[str, object]] = canonical_precommit_hooks_for_mode(
+    InstallMode.DEPENDENCY
+)
+CANONICAL_HOOK_ENTRIES: dict[str, str] = canonical_hook_entries_for_mode(
+    InstallMode.DEPENDENCY
+)
 
 # All managed hook IDs for uninstall filtering.
 _ALL_MANAGED_HOOK_IDS: frozenset[str] = CANONICAL_HOOK_IDS
