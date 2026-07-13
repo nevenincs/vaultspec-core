@@ -21,8 +21,12 @@ trailing newline, UTF-8) so the committed file diffs cleanly.
 from __future__ import annotations
 
 import json
+import re
+import tomllib
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from .enums import InstallMode
 from .exceptions import VaultSpecError
@@ -30,6 +34,14 @@ from .helpers import advisory_lock, atomic_write
 
 WORKSPACE_FILENAME = "workspace.json"
 WORKSPACE_SCHEMA_VERSION = "1.0"
+
+#: Distribution name detection keys on; canonicalized per PEP 503 so that
+#: ``vaultspec_core`` and ``vaultspec-core`` compare equal.
+_DISTRIBUTION_NAME = "vaultspec-core"
+
+#: Split a PEP 508 requirement string at the first character that terminates
+#: the distribution name (version specifier, extras, marker, or whitespace).
+_REQUIREMENT_NAME_BOUNDARY = re.compile(r"[<>=!~;\[\s(]")
 
 
 @dataclass
@@ -139,3 +151,160 @@ def write_workspace_declaration(
         payload["minimum_vaultspec_version"] = declaration.minimum_vaultspec_version
     with advisory_lock(path):
         atomic_write(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+def _canonical_distribution_name(name: str) -> str:
+    """Canonicalize a distribution name for comparison per PEP 503.
+
+    Lowercases and collapses any run of ``-``, ``_``, or ``.`` to a single
+    ``-`` so that spellings such as ``vaultspec_core`` and ``VaultSpec-Core``
+    all compare equal to :data:`_DISTRIBUTION_NAME`.
+
+    Args:
+        name: Raw distribution name token.
+
+    Returns:
+        The normalized name.
+    """
+    return re.sub(r"[-_.]+", "-", name.strip().lower())
+
+
+def _requirement_names(entries: Iterable[Any]) -> Iterator[str]:
+    """Yield the canonical distribution name of each PEP 508 requirement.
+
+    Non-string entries (for example the ``{include-group = ...}`` tables a
+    :pep:`735` dependency group may hold) are skipped rather than parsed, since
+    detection only cares about direct requirement strings.
+
+    Args:
+        entries: Iterable of raw dependency entries from a parsed
+            ``pyproject.toml``.
+
+    Yields:
+        The canonicalized leading distribution name of each string entry.
+    """
+    for entry in entries:
+        if not isinstance(entry, str):
+            continue
+        head = _REQUIREMENT_NAME_BOUNDARY.split(entry.strip(), maxsplit=1)[0]
+        if head:
+            yield _canonical_distribution_name(head)
+
+
+def _pyproject_declares_vaultspec_dependency(pyproject: Path) -> bool:
+    """Return whether ``vaultspec-core`` is declared in *pyproject*.
+
+    Probes leniently across every place a project can declare the dependency:
+    :pep:`621` ``[project.dependencies]`` and ``[project.optional-dependencies]``,
+    :pep:`735` ``[dependency-groups]``, and the legacy
+    ``[tool.uv.dev-dependencies]`` list. A malformed or unreadable file is
+    treated as "no dependency declared" rather than raising, because detection
+    is advisory evidence layered beneath explicit and persisted precedence and
+    must not turn a broken manifest into a hard failure.
+
+    Args:
+        pyproject: Path to the target's ``pyproject.toml``.
+
+    Returns:
+        ``True`` if any dependency set lists ``vaultspec-core``.
+    """
+    try:
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError):
+        return False
+
+    candidates: list[Any] = []
+
+    project = data.get("project")
+    if isinstance(project, dict):
+        deps = project.get("dependencies")
+        if isinstance(deps, list):
+            candidates.extend(deps)
+        optional = project.get("optional-dependencies")
+        if isinstance(optional, dict):
+            for group in optional.values():
+                if isinstance(group, list):
+                    candidates.extend(group)
+
+    groups = data.get("dependency-groups")
+    if isinstance(groups, dict):
+        for group in groups.values():
+            if isinstance(group, list):
+                candidates.extend(group)
+
+    tool = data.get("tool")
+    if isinstance(tool, dict):
+        uv = tool.get("uv")
+        if isinstance(uv, dict):
+            dev = uv.get("dev-dependencies")
+            if isinstance(dev, list):
+                candidates.extend(dev)
+
+    return any(name == _DISTRIBUTION_NAME for name in _requirement_names(candidates))
+
+
+def resolve_install_mode(
+    target: Path,
+    explicit: InstallMode | None = None,
+) -> InstallMode:
+    """Resolve the effective provisioning mode via the Q5 precedence chain.
+
+    Precedence, highest first:
+
+    1. *explicit* - the ``--mode`` flag, when supplied.
+    2. The persisted committed declaration
+       (:func:`read_workspace_declaration`), when one exists.
+    3. Detection against the target's ``pyproject.toml``.
+    4. The default, :attr:`~vaultspec_core.core.enums.InstallMode.TOOL`.
+
+    Detection reads two signals: the absence of any ``pyproject.toml`` forces
+    :attr:`~vaultspec_core.core.enums.InstallMode.TOOL` because nothing exists to
+    resolve a dependency against; the presence of ``vaultspec-core`` in the
+    project's dependencies or any dev-dependency group is evidence of deliberate
+    :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY` mode. Absent both,
+    the default tool mode stands.
+
+    Only impossible combinations refuse. Requesting
+    :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY` in a target with no
+    ``pyproject.toml`` has nothing to resolve the dependency against and raises,
+    rather than silently falling back to tool mode and deferring the failure to
+    hook or MCP runtime. An explicit mode that merely differs from detection
+    evidence - a ``pyproject.toml`` exists but does not yet list
+    ``vaultspec-core`` while ``--mode dependency`` is requested - is permitted,
+    since the contributor may be about to add the dependency.
+
+    Args:
+        target: Workspace root directory.
+        explicit: The mode requested via ``--mode``, or ``None`` to fall through
+            to the persisted declaration, detection, and default in turn.
+
+    Returns:
+        The resolved :class:`~vaultspec_core.core.enums.InstallMode`.
+
+    Raises:
+        VaultSpecError: If *explicit* is
+            :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY` but the
+            target has no ``pyproject.toml``, or if a present declaration is
+            malformed (propagated from :func:`read_workspace_declaration`).
+    """
+    pyproject = target / "pyproject.toml"
+    has_pyproject = pyproject.is_file()
+
+    if explicit is not None:
+        if explicit is InstallMode.DEPENDENCY and not has_pyproject:
+            raise VaultSpecError(
+                f"Cannot provision in dependency mode: no pyproject.toml at {target}.",
+                hint="Add a pyproject.toml that declares vaultspec-core as a "
+                "dependency, or re-run with '--mode tool'.",
+            )
+        return explicit
+
+    declaration = read_workspace_declaration(target)
+    if declaration is not None:
+        return declaration.install_mode
+
+    if not has_pyproject:
+        return InstallMode.TOOL
+    if _pyproject_declares_vaultspec_dependency(pyproject):
+        return InstallMode.DEPENDENCY
+    return InstallMode.TOOL
