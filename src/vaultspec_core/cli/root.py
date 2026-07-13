@@ -127,6 +127,7 @@ def _run_preflight(
     *dry_run* is ``False``, or if any preflight execution step fails.
     """
     from vaultspec_core.core.diagnosis import diagnose
+    from vaultspec_core.core.exceptions import VaultSpecError
     from vaultspec_core.core.executor import PREFLIGHT_ACTIONS, execute_plan
     from vaultspec_core.core.resolver import resolve
 
@@ -136,7 +137,16 @@ def _run_preflight(
         logger.warning("Pre-flight diagnosis failed", exc_info=True)
         return
 
-    plan = resolve(diag, action, provider, force=force, dry_run=dry_run)
+    # resolve() raises a typed VaultSpecError for a refuse-and-tell condition
+    # such as the below-floor version constraint. Route it through the same
+    # clean error path the downstream mutating calls use rather than letting a
+    # raw traceback escape preflight. render is the human-console flag, so its
+    # inverse selects the machine-readable json error envelope.
+    try:
+        plan = resolve(diag, action, provider, force=force, dry_run=dry_run)
+    except (VaultSpecError, OSError) as exc:
+        _handle_error(exc, json_output=not render)
+        return  # unreachable: _handle_error raises typer.Exit
 
     if not plan.warnings and not plan.conflicts and not plan.steps:
         return

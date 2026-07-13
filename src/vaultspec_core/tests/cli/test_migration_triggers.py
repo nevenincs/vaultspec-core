@@ -427,3 +427,58 @@ class TestFloorConstraint:
 
         plan = self._diagnose_and_resolve(tmp_path)
         assert isinstance(plan, ResolutionPlan)
+
+
+class TestFloorConstraintCli:
+    """The floor refusal must surface as a clean CLI error, not a traceback.
+
+    The preflight resolve() runs before the mutating command; a below-floor
+    workspace must exit non-zero with the remediation message rather than
+    letting the raw VaultSpecError escape as an unhandled crash.
+    """
+
+    def _floored_workspace(self, workspace: Path) -> None:
+        from vaultspec_core.core.enums import InstallMode
+        from vaultspec_core.core.workspace_mode import (
+            WorkspaceDeclaration,
+            write_workspace_declaration,
+        )
+
+        WorkspaceFactory(workspace).install("core")
+        write_workspace_declaration(
+            workspace,
+            WorkspaceDeclaration(
+                install_mode=InstallMode.TOOL,
+                minimum_vaultspec_version="999.999.999",
+            ),
+        )
+
+    @staticmethod
+    def _combined(result) -> str:
+        return (result.stdout or "") + "\n" + (result.stderr or "")
+
+    def test_sync_below_floor_exits_clean(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.exceptions import VaultSpecError
+
+        self._floored_workspace(tmp_path)
+        result = WorkspaceFactory(tmp_path).run("sync")
+
+        assert result.exit_code != 0
+        combined = self._combined(result)
+        assert "999.999.999" in combined
+        assert _running_version() in combined
+        # No raw traceback: the refusal was routed through _handle_error, so the
+        # captured exception is a clean typer.Exit, never the domain error.
+        assert not isinstance(result.exception, VaultSpecError)
+
+    def test_upgrade_below_floor_exits_clean(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.exceptions import VaultSpecError
+
+        self._floored_workspace(tmp_path)
+        result = WorkspaceFactory(tmp_path).run("install", "--upgrade")
+
+        assert result.exit_code != 0
+        combined = self._combined(result)
+        assert "999.999.999" in combined
+        assert _running_version() in combined
+        assert not isinstance(result.exception, VaultSpecError)
