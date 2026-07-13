@@ -1430,6 +1430,56 @@ to a hidden `<!-- RETIRED: ... -->` ledger embedded in the plan body. `next_avai
 consults this ledger so retired identifiers are never reused, even across
 `parse / serialize` round-trips invoked by `--fix`.
 
+#### Trailer commands
+
+- `emit` - Print a well-formed `Vaultspec-Step` or `Vaultspec-Feature` commit-linkage
+  trailer line. Takes exactly one of `--step` (a Step or Phase display path, e.g.
+  `W01.P02.S06` or `P02`) or `--feature` (a kebab-case feature tag, leading `#`
+  optional).
+- `validate` - Validate the commit-linkage trailers found in a commit-message file.
+  Always exits `0`.
+
+The commit-linkage trailer is an opt-in, advisory convention (per the accepted
+`commit-linkage` ADR): a malformed or absent trailer never blocks a commit and never
+fails a core command. `validate` reports each malformed trailer to stderr and always
+exits `0`, which makes it safe to wire up as a `commit-msg`-stage pre-commit hook. Teams
+that want the check add a local hook entry to their `.pre-commit-config.yaml`; teams
+that do not are unaffected:
+
+```yaml
+- repo: local
+  hooks:
+    - id: vaultspec-plan-trailer
+      name: Validate vaultspec commit-linkage trailers
+      language: system
+      stages: [commit-msg]
+      entry: uv run --no-sync vaultspec-core vault plan trailer validate
+```
+
+At the `commit-msg` stage, pre-commit passes the path to the commit-message file (for
+example `.git/COMMIT_EDITMSG`) as the hook's positional argument, which lines up with
+`validate`'s `MESSAGE_FILE` argument - no extra flag is needed.
+
+##### Examples
+
+- **Emit a Step trailer for a commit template**:
+
+  ```bash
+  vaultspec-core vault plan trailer emit --step P02.S06
+  ```
+
+- **Emit a feature trailer**:
+
+  ```bash
+  vaultspec-core vault plan trailer emit --feature commit-linkage
+  ```
+
+- **Validate a commit message file directly**:
+
+  ```bash
+  vaultspec-core vault plan trailer validate .git/COMMIT_EDITMSG
+  ```
+
 ## Spec commands
 
 Group command: `vaultspec-core spec [OPTIONS] COMMAND [ARGS]...`

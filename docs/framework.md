@@ -154,9 +154,11 @@ vaultspec-core sync                       # writes .claude/, .gemini/, .codex/, 
 and `vaultspec-core vault graph --feature search-api` visualizes a feature. The CLI
 maintains each document's `modified:` and `date:` stamps; never hand-edit them.
 
-**Connect MCP clients.** `install` scaffolds an `.mcp.json` exposing vault discovery and
-authoring to Model Context Protocol (MCP) clients over stdio. Verify it with
-`vaultspec-core spec mcps status --json`; see the [MCP reference](./MCP.md).
+**Connect MCP clients.** `install` scaffolds an `.mcp.json` exposing the workflow to
+Model Context Protocol (MCP) clients over stdio: nine tools covering orientation,
+discovery, scaffolding, prose edits, checks, and plan progress, plus a gateway to the
+rest of the CLI. Verify the configuration with `vaultspec-core spec mcps status --json`;
+see the [MCP reference](./MCP.md).
 
 ## Related documentation
 

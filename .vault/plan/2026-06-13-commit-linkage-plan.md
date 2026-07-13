@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#commit-linkage'
 date: '2026-06-13'
-modified: '2026-06-13'
+modified: '2026-07-13'
 tier: L1
 related:
   - '[[2026-06-13-commit-linkage-adr]]'
@@ -12,10 +12,10 @@ related:
 
 # `commit-linkage` plan
 
-- [ ] `S01` - add the trailer module with keys, value regexes, and pure parse, format, and validate helpers; `src/vaultspec_core/plan/trailer.py`.
-- [ ] `S02` - add vault plan trailer emit and validate verbs that always exit zero; `src/vaultspec_core/cli/plan_cmd.py`.
-- [ ] `S03` - document the opt-in commit-msg pre-commit hook and update the bundled reference and docs; `docs/CLI.md`.
-- [ ] `S04` - cover the trailer module and both verbs with tests including malformed-trailer exit-zero; `src/vaultspec_core/tests/plan/test_trailer.py`.
+- [x] `S01` - add the trailer module with keys, value regexes, and pure parse, format, and validate helpers; `src/vaultspec_core/plan/trailer.py`.
+- [x] `S02` - add vault plan trailer emit and validate verbs that always exit zero; `src/vaultspec_core/cli/plan_cmd.py`.
+- [x] `S03` - document the opt-in commit-msg pre-commit hook and update the bundled reference and docs; `docs/CLI.md`.
+- [x] `S04` - cover the trailer module and both verbs with tests including malformed-trailer exit-zero; `src/vaultspec_core/tests/plan/test_trailer.py`.
 
 ## Description
 

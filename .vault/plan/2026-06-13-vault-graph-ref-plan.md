@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#vault-graph-ref'
 date: '2026-06-13'
-modified: '2026-06-13'
+modified: '2026-07-13'
 tier: L1
 related:
   - '[[2026-06-13-vault-graph-ref-adr]]'
@@ -12,10 +12,10 @@ related:
 
 # `vault-graph-ref` plan
 
-- [ ] `S01` - add a git blob corpus reader enumerating and reading vault blobs at a ref via subprocess git; `src/vaultspec_core/graph/refscan.py`.
-- [ ] `S02` - add a VaultGraph ref-construction path with cache disabled, migrations skipped, doc-type from the tree path; `src/vaultspec_core/graph/api.py`.
-- [ ] `S03` - add --ref to the graph verb with typed errors and add the ref envelope key; `src/vaultspec_core/cli/vault_cmd.py`.
-- [ ] `S04` - cover the ref path with real-git tests and update the bundled reference and docs; `src/vaultspec_core/tests/cli/test_graph_ref.py`.
+- [x] `S01` - add a git blob corpus reader enumerating and reading vault blobs at a ref via subprocess git; `src/vaultspec_core/graph/refscan.py`.
+- [x] `S02` - add a VaultGraph ref-construction path with cache disabled, migrations skipped, doc-type from the tree path; `src/vaultspec_core/graph/api.py`.
+- [x] `S03` - add --ref to the graph verb with typed errors and add the ref envelope key; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `S04` - cover the ref path with real-git tests and update the bundled reference and docs; `src/vaultspec_core/tests/cli/test_graph_ref.py`.
 
 ## Description
 
