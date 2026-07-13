@@ -894,6 +894,60 @@ def _resolve_mode_mismatch(
 # ---------------------------------------------------------------------------
 
 
+def _enforce_version_floor(target: Path, running_version: str) -> None:
+    """Refuse when the running version is below the workspace floor constraint.
+
+    Reads the committed ``.vaultspec/workspace.json`` declaration's
+    ``minimum_vaultspec_version`` and hard-refuses, refuse-and-tell per the
+    pre-commit/Terraform precedent, when the running package version is below
+    it. A workspace that declares no floor, or whose declaration cannot be read,
+    imposes no constraint. This is the hard guarantee tool mode leans on once
+    the running CLI and the hooks/MCP runtime are no longer the same install;
+    the softer manifest-stamp warning below remains an informational drift
+    signal beneath it.
+
+    Args:
+        target: Workspace root directory.
+        running_version: The running ``vaultspec-core`` package version string.
+
+    Raises:
+        VaultSpecError: When the running version is below the declared floor.
+    """
+    from .exceptions import VaultSpecError
+    from .workspace_mode import read_workspace_declaration
+
+    try:
+        declaration = read_workspace_declaration(target)
+    except VaultSpecError:
+        # A corrupt declaration surfaces through the explicit install/mode
+        # paths that must refuse on it; do not raise a second, differently
+        # shaped error from the version-check area.
+        logger.debug("Could not read declaration for floor check", exc_info=True)
+        return
+
+    if declaration is None or declaration.minimum_vaultspec_version is None:
+        return
+
+    floor = declaration.minimum_vaultspec_version
+    try:
+        running_parts = parse_version_tuple(running_version)
+        floor_parts = parse_version_tuple(floor)
+    except Exception:
+        logger.debug("Could not parse versions for floor check", exc_info=True)
+        return
+
+    if running_parts < floor_parts:
+        raise VaultSpecError(
+            f"vaultspec-core {running_version} is below the workspace floor "
+            f"{floor} declared in .vaultspec/workspace.json.",
+            hint=(
+                f"Upgrade to at least {floor}: 'uv tool upgrade vaultspec-core' "
+                f"(or 'uv sync --upgrade-package vaultspec-core' when used as a "
+                f"project dependency)."
+            ),
+        )
+
+
 def _resolve_version_warning(
     plan: ResolutionPlan,
     diagnosis: WorkspaceDiagnosis,
@@ -920,6 +974,10 @@ def _resolve_version_warning(
     except LookupError:
         logger.debug("No workspace context available for version check", exc_info=True)
         return
+
+    # Hard floor constraint first: a running version below the declared
+    # minimum refuses outright, before the softer manifest-stamp drift warning.
+    _enforce_version_floor(target, running_version)
 
     try:
         from .manifest import read_manifest_data
