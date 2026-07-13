@@ -739,7 +739,10 @@ def _filter_tools(tools: list[Tool], skip: set[str]) -> list[Tool]:
 
 
 def init_run(
-    force: bool = False, provider: str = "all", skip: set[str] | None = None
+    force: bool = False,
+    provider: str = "all",
+    skip: set[str] | None = None,
+    mode: InstallMode | None = None,
 ) -> list[tuple[str, str]]:
     """Scaffold the .vaultspec/ and .vault/ directory structure.
 
@@ -747,6 +750,11 @@ def init_run(
         force: Override contents if already exists.
         provider: Provider to install.
         skip: Set of component names to skip (``core`` and/or provider names).
+        mode: Resolved provisioning mode used to render the MCP definition and
+            pre-commit hook entries. The fresh-install caller passes this
+            explicitly because the committed workspace declaration is written
+            only after scaffolding; ``None`` lets the renderers fall back to
+            the declaration (dependency mode for a legacy workspace).
 
     Returns:
         A deduplicated list of ``(relative_path, label)`` tuples for all
@@ -800,7 +808,7 @@ def init_run(
     if "mcp" not in skip:
         from .mcps import mcp_sync
 
-        mcp_result = mcp_sync()
+        mcp_result = mcp_sync(mode=mode)
         if mcp_result.items:
             created.append((".mcp.json", "mcp"))
     if "precommit" not in skip:
@@ -1001,7 +1009,7 @@ def install_run(
         if "mcp" not in skip:
             from .mcps import mcp_sync
 
-            mcp_result = mcp_sync(dry_run=True)
+            mcp_result = mcp_sync(dry_run=True, mode=resolved_mode)
             if mcp_result.items:
                 manifest.append((".mcp.json", "mcp"))
         if "precommit" not in skip:
@@ -1109,11 +1117,22 @@ def install_run(
             f"first with 'vaultspec-core uninstall {path}'."
         )
 
-    created = init_run(force=force, provider=provider, skip=skip)
+    created = init_run(force=force, provider=provider, skip=skip, mode=resolved_mode)
 
     reset_config()
     layout = resolve_workspace(target_override=path)
     init_paths(layout)
+
+    # Persist the committed declaration before the provider sync below re-renders
+    # the MCP config and pre-commit hooks. Those renderers resolve their mode
+    # from the declaration; writing it here means the just-resolved mode governs
+    # the sync pass instead of the legacy-absent dependency bridge, which would
+    # otherwise clobber the tool-mode artifacts init_run just wrote. The manifest
+    # echo and floor reconciliation still happen once, later, via
+    # _persist_resolved_mode after the manifest is read.
+    from .workspace_mode import WorkspaceDeclaration, write_workspace_declaration
+
+    write_workspace_declaration(path, WorkspaceDeclaration(install_mode=resolved_mode))
 
     post_errors: list[str] = []
 

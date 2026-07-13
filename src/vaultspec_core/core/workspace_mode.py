@@ -322,3 +322,45 @@ def resolve_install_mode(
     if _pyproject_declares_vaultspec_dependency(pyproject):
         return InstallMode.DEPENDENCY
     return InstallMode.TOOL
+
+
+def resolve_render_mode(target: Path) -> InstallMode:
+    """Resolve the mode downstream renderers target for a provisioned workspace.
+
+    Distinct from :func:`resolve_install_mode`, which resolves the mode at
+    *provision* time and defaults an undeclared workspace to
+    :attr:`~vaultspec_core.core.enums.InstallMode.TOOL`. This resolves the mode
+    for *rendering* artifacts (the MCP launch command, the pre-commit hook
+    entries) into an already-provisioned workspace, where the absence of a
+    declaration carries the opposite meaning: the workspace predates the
+    ``install-mode`` decision and was therefore provisioned in the only shape
+    that existed before it, dependency mode.
+
+    Returning :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY` on an
+    absent declaration is the Q6 migration bridge: it keeps ``sync`` and
+    ``doctor`` byte-identical to their pre-``install-mode`` output on a legacy
+    workspace until ``install --upgrade`` infers and records a mode. Without
+    it, syncing a legacy dependency-mode workspace would silently rewrite its
+    ``uv run`` launch command and hook entries to the ``uvx`` tool-mode shape
+    and diagnose the workspace as drifted against a mode it never chose.
+
+    The provision-time entry points (fresh ``install``) pass their resolved
+    mode explicitly rather than relying on this fallback, since the committed
+    declaration is only written after scaffolding renders its artifacts.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        The declared :class:`~vaultspec_core.core.enums.InstallMode` when a
+        well-formed declaration exists, else
+        :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY`.
+
+    Raises:
+        VaultSpecError: If a declaration exists but is malformed (propagated
+            from :func:`read_workspace_declaration`).
+    """
+    declaration = read_workspace_declaration(target)
+    if declaration is not None:
+        return declaration.install_mode
+    return InstallMode.DEPENDENCY

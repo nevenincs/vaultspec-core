@@ -9,6 +9,8 @@ from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
 from vaultspec_core.core.manifest import read_manifest_data, write_manifest_data
+from vaultspec_core.core.mcps import render_mcp_definition_for_mode
+from vaultspec_core.core.workspace_mode import resolve_render_mode
 
 pytestmark = [pytest.mark.unit]
 
@@ -397,7 +399,13 @@ class TestSyncAuthority:
         source_path = (
             synthetic_project / ".vaultspec" / "mcps" / "vaultspec-core.builtin.json"
         )
-        expected_config = json.loads(source_path.read_text(encoding="utf-8"))
+        # The seeded builtin is mode-neutral (placeholder tokens); a workspace's
+        # .mcp.json holds the launch command rendered for its resolved mode, so
+        # the expected entry is the source rendered for that same mode.
+        expected_config = render_mcp_definition_for_mode(
+            json.loads(source_path.read_text(encoding="utf-8")),
+            resolve_render_mode(synthetic_project),
+        )
 
         payload = json.loads(mcp_path.read_text(encoding="utf-8"))
         payload["mcpServers"]["vaultspec-core"]["args"] = ["run", "broken-server"]
@@ -457,7 +465,13 @@ class TestSyncAuthority:
         source_path = (
             synthetic_project / ".vaultspec" / "mcps" / "vaultspec-core.builtin.json"
         )
-        expected_config = json.loads(source_path.read_text(encoding="utf-8"))
+        # The seeded builtin is mode-neutral (placeholder tokens); a workspace's
+        # .mcp.json holds the launch command rendered for its resolved mode, so
+        # the expected entry is the source rendered for that same mode.
+        expected_config = render_mcp_definition_for_mode(
+            json.loads(source_path.read_text(encoding="utf-8")),
+            resolve_render_mode(synthetic_project),
+        )
 
         # _vaultspecManaged present but empty: vaultspec-core collides with the
         # source yet is unmanaged, the exact state the issue reports.
