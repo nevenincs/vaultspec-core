@@ -635,7 +635,7 @@ _ALL_MANAGED_HOOK_IDS: frozenset[str] = CANONICAL_HOOK_IDS
 
 
 def _scaffold_precommit(
-    target: Path, *, dry_run: bool = False
+    target: Path, *, dry_run: bool = False, mode: InstallMode | None = None
 ) -> list[tuple[str, str]]:
     """Scaffold or merge vaultspec-core hooks into .pre-commit-config.yaml.
 
@@ -643,12 +643,27 @@ def _scaffold_precommit(
     patterns.  Existing hooks with matching IDs are updated to the
     canonical entry; missing hooks are appended.
 
+    The entry each hook is rendered with follows the resolved provisioning
+    mode: dependency mode keeps the ``uv run --no-sync vaultspec-core`` prefix,
+    tool mode uses ``uvx --from vaultspec-core vaultspec-core``. When *mode* is
+    ``None`` it is resolved from the committed workspace declaration via
+    :func:`~vaultspec_core.core.workspace_mode.resolve_render_mode`, whose
+    legacy-absent rule renders dependency mode so a workspace provisioned
+    before ``install-mode`` keeps its existing hook entries. The fresh-install
+    caller passes its resolved mode explicitly, because the declaration is
+    written only after scaffolding.
+
     Skips scaffolding entirely when ``prek.toml`` is present at *target*:
     prek treats ``.pre-commit-config.yaml`` as a duplicate configuration
     source and emits a warning, and writing both would cause neither tool
     to execute our hooks.  The operator is expected to transplant hooks
     into ``prek.toml`` manually.
     """
+    if mode is None:
+        from .workspace_mode import resolve_render_mode
+
+        mode = resolve_render_mode(target)
+    canonical_hooks = canonical_precommit_hooks_for_mode(mode)
 
     if (target / "prek.toml").exists():
         logger.info(
@@ -698,7 +713,7 @@ def _scaffold_precommit(
 
                 changed = False
 
-                for canonical in CANONICAL_PRECOMMIT_HOOKS:
+                for canonical in canonical_hooks:
                     hook_id = str(canonical["id"])
                     if hook_id in existing_by_id:
                         existing = existing_by_id[hook_id]
@@ -721,7 +736,7 @@ def _scaffold_precommit(
                 repos.append(
                     {
                         "repo": "local",
-                        "hooks": [dict(h) for h in CANONICAL_PRECOMMIT_HOOKS],
+                        "hooks": [dict(h) for h in canonical_hooks],
                     }
                 )
 
@@ -742,7 +757,7 @@ def _scaffold_precommit(
                 "repos": [
                     {
                         "repo": "local",
-                        "hooks": [dict(h) for h in CANONICAL_PRECOMMIT_HOOKS],
+                        "hooks": [dict(h) for h in canonical_hooks],
                     }
                 ]
             }
@@ -874,7 +889,7 @@ def init_run(
         if mcp_result.items:
             created.append((".mcp.json", "mcp"))
     if "precommit" not in skip:
-        created.extend(_scaffold_precommit(target))
+        created.extend(_scaffold_precommit(target, mode=mode))
 
     # Write provider manifest
     provider_names = [t.value for t in tools]
@@ -1075,7 +1090,7 @@ def install_run(
             if mcp_result.items:
                 manifest.append((".mcp.json", "mcp"))
         if "precommit" not in skip:
-            manifest.extend(_scaffold_precommit(path, dry_run=True))
+            manifest.extend(_scaffold_precommit(path, dry_run=True, mode=resolved_mode))
 
         # Deduplicate preserving order (by relative path)
         seen: dict[str, str] = {}

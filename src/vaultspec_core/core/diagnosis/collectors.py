@@ -659,7 +659,15 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
     """
     import yaml
 
-    from ..commands import CANONICAL_HOOK_ENTRIES, CANONICAL_HOOK_IDS
+    from ..commands import CANONICAL_HOOK_IDS, canonical_hook_entries_for_mode
+    from ..workspace_mode import resolve_render_mode
+
+    # Derive the expected hook entries from the workspace's resolved mode so a
+    # correctly-provisioned tool-mode workspace (uvx entries) is not diagnosed
+    # as non-canonical against the dependency-mode shape. resolve_render_mode's
+    # legacy-absent rule keeps a pre-install-mode workspace on dependency-shaped
+    # expectations. P04 layers a dedicated mode-mismatch signal on top of this.
+    expected_entries = canonical_hook_entries_for_mode(resolve_render_mode(target))
 
     config_path = target / ".pre-commit-config.yaml"
     if not config_path.exists():
@@ -701,7 +709,7 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
         hook_id = hook.get("id")
         if hook_id in CANONICAL_HOOK_IDS:
             entry = str(hook.get("entry", ""))
-            expected = CANONICAL_HOOK_ENTRIES.get(str(hook_id), "")
+            expected = expected_entries.get(str(hook_id), "")
             if entry != expected:
                 return PrecommitSignal.NON_CANONICAL
 
