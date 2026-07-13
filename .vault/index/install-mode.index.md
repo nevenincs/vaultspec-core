@@ -10,6 +10,7 @@ related:
   - '[[2026-07-13-install-mode-P01-S02]]'
   - '[[2026-07-13-install-mode-P01-S03]]'
   - '[[2026-07-13-install-mode-P01-S04]]'
+  - '[[2026-07-13-install-mode-P01-S05]]'
   - '[[2026-07-13-install-mode-adr]]'
   - '[[2026-07-13-install-mode-plan]]'
   - '[[2026-07-13-install-mode-research]]'
@@ -31,6 +32,7 @@ Auto-generated index of all documents tagged with `#install-mode`.
 - `2026-07-13-install-mode-P01-S02` - Add the WorkspaceDeclaration dataclass and read_workspace_declaration/write_workspace_declaration functions for the committed .vaultspec/workspace.json surface, including the minimum_vaultspec_version floor field
 - `2026-07-13-install-mode-P01-S03` - Extend ManifestData with resolved_mode and resolved_floor_version echo fields plus their read and write round trip in read_manifest_data and write_manifest_data
 - `2026-07-13-install-mode-P01-S04` - Add WorkspaceFactory-based tests covering workspace.json round trip, missing-file default, corrupted JSON, and malformed mode value handling
+- `2026-07-13-install-mode-P01-S05` - Extend the manifest tests with the ManifestData resolved_mode and resolved_floor_version echo fields, covering read, write, and legacy-manifest backward compatibility
 
 ### plan
 

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from vaultspec_core.core.enums import InstallMode
 from vaultspec_core.core.manifest import (
     MANIFEST_VERSION,
     ManifestData,
@@ -223,6 +224,68 @@ class TestRemoveProvider:
         assert "claude" not in data.installed
         assert "claude" not in data.provider_state
         assert "gemini" in data.provider_state
+
+
+class TestModeEcho:
+    def test_write_round_trips_mode_and_floor(self, tmp_path):
+        data = ManifestData(
+            installed={"claude"},
+            resolved_mode=InstallMode.DEPENDENCY,
+            resolved_floor_version="0.1.37",
+        )
+        write_manifest_data(tmp_path, data)
+
+        result = read_manifest_data(tmp_path)
+        assert result.resolved_mode is InstallMode.DEPENDENCY
+        assert result.resolved_floor_version == "0.1.37"
+
+    def test_write_serializes_mode_as_string_value(self, tmp_path):
+        write_manifest_data(tmp_path, ManifestData(resolved_mode=InstallMode.TOOL))
+
+        raw = json.loads(_manifest_path(tmp_path).read_text(encoding="utf-8"))
+        assert raw["resolved_mode"] == "tool"
+        assert raw["resolved_floor_version"] is None
+
+    def test_unset_mode_serializes_as_null(self, tmp_path):
+        write_manifest_data(tmp_path, ManifestData())
+
+        raw = json.loads(_manifest_path(tmp_path).read_text(encoding="utf-8"))
+        assert raw["resolved_mode"] is None
+        assert raw["resolved_floor_version"] is None
+
+    def test_legacy_manifest_without_echo_fields(self, tmp_path):
+        _write_raw(tmp_path, {"version": "2.0", "installed": ["claude"]})
+
+        data = read_manifest_data(tmp_path)
+        assert data.installed == {"claude"}
+        assert data.resolved_mode is None
+        assert data.resolved_floor_version is None
+
+    def test_malformed_mode_token_reads_as_none(self, tmp_path):
+        _write_raw(
+            tmp_path,
+            {"version": "2.0", "installed": ["claude"], "resolved_mode": "hybrid"},
+        )
+
+        data = read_manifest_data(tmp_path)
+        assert data.resolved_mode is None
+
+    def test_echo_preserved_across_add_providers(self, tmp_path):
+        write_manifest_data(
+            tmp_path,
+            ManifestData(
+                installed={"claude"},
+                resolved_mode=InstallMode.TOOL,
+                resolved_floor_version="0.1.37",
+            ),
+        )
+
+        add_providers(tmp_path, ["gemini"])
+
+        data = read_manifest_data(tmp_path)
+        assert data.installed == {"claude", "gemini"}
+        assert data.resolved_mode is InstallMode.TOOL
+        assert data.resolved_floor_version == "0.1.37"
 
 
 class TestMalformedSerial:
