@@ -557,6 +557,53 @@ class TestModeMismatchState:
         )
         assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.MISMATCH
 
+    def test_missing_precommit_config_no_false_mismatch(self, tmp_path: Path) -> None:
+        """With the hook config absent, the hook shape is unobservable; the
+        remaining MCP artifact still matches the declaration, so CLEAN, not a
+        false MISMATCH.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        (tmp_path / ".pre-commit-config.yaml").unlink()
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.CLEAN
+
+    def test_missing_mcp_config_no_false_mismatch(self, tmp_path: Path) -> None:
+        """With .mcp.json absent, the MCP shape is unobservable; the remaining
+        hook entries still match the declaration, so CLEAN.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        (tmp_path / ".mcp.json").unlink()
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.CLEAN
+
+    def test_no_observable_artifacts_no_false_mismatch(self, tmp_path: Path) -> None:
+        """A workspace whose hooks are managed outside .pre-commit-config.yaml
+        (e.g. a prek.toml-managed setup) and with no .mcp.json has nothing to
+        contradict the declaration, so CLEAN rather than a false MISMATCH.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        (tmp_path / ".pre-commit-config.yaml").unlink()
+        (tmp_path / ".mcp.json").unlink()
+        (tmp_path / "prek.toml").write_text("# hooks managed here\n", encoding="utf-8")
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.CLEAN
+
+    def test_mixed_partial_shapes_is_mismatch(self, tmp_path: Path) -> None:
+        """A single contradicting artifact is enough: tool-shaped hooks but a
+        dependency-shaped MCP command in a tool-declared workspace is MISMATCH.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        # Rewrite only the MCP launch to the dependency-mode shape, leaving the
+        # tool-mode hook entries intact.
+        mcp = tmp_path / ".mcp.json"
+        payload = json.loads(mcp.read_text(encoding="utf-8"))
+        payload["mcpServers"]["vaultspec-core"]["command"] = "uv"
+        payload["mcpServers"]["vaultspec-core"]["args"] = [
+            "run",
+            "python",
+            "-m",
+            "vaultspec_core.mcp_server.app",
+        ]
+        mcp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.MISMATCH
+
 
 # ---------------------------------------------------------------------------
 # resolver mode-mismatch advisory and precommit completeness
