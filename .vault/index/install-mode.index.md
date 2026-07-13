@@ -16,6 +16,7 @@ related:
   - '[[2026-07-13-install-mode-P02-S08]]'
   - '[[2026-07-13-install-mode-P02-S09]]'
   - '[[2026-07-13-install-mode-P02-S10]]'
+  - '[[2026-07-13-install-mode-P02-S11]]'
   - '[[2026-07-13-install-mode-adr]]'
   - '[[2026-07-13-install-mode-plan]]'
   - '[[2026-07-13-install-mode-research]]'
@@ -43,6 +44,7 @@ Auto-generated index of all documents tagged with `#install-mode`.
 - `2026-07-13-install-mode-P02-S08` - Wire resolve_install_mode into install_run so the mode is resolved once at provision time, persisted to workspace.json, and an explicit --mode request that conflicts with detection raises a loud VaultSpecError refusal
 - `2026-07-13-install-mode-P02-S09` - Add WorkspaceFactory-based tests for resolve_install_mode precedence ordering: explicit overrides persisted and detected, persisted overrides detected, and detected overrides default
 - `2026-07-13-install-mode-P02-S10` - Add WorkspaceFactory-based tests for the detection signals: absence of pyproject.toml forces tool mode, vaultspec-core listed in project dependencies forces dependency-mode evidence, and absence of both defaults to tool mode
+- `2026-07-13-install-mode-P02-S11` - Add a WorkspaceFactory-based install_run test asserting a hard refusal with a remediation message when --mode dependency is requested in a repo with no pyproject.toml
 
 ### plan
 
