@@ -350,6 +350,131 @@ class TestMigrationsCli:
         assert "up_to_date" in result.stdout
 
 
+class TestUpgradeModeInference:
+    """Q6 migration inference on ``install --upgrade`` for legacy workspaces.
+
+    A legacy workspace carries no ``.vaultspec/workspace.json`` declaration
+    (it predates the ``install-mode`` decision). These tests provision a real
+    mode-shaped workspace, strip the declaration to reproduce that legacy
+    state, and drive ``install --upgrade`` through the inference path, asserting
+    against the on-disk declaration and the deployed artifact shapes. No mocks;
+    every mode shape is rendered by the real install/sync path.
+    """
+
+    def _write_pyproject_with_dependency(self, root: Path) -> None:
+        (root / "pyproject.toml").write_text(
+            "[project]\n"
+            'name = "downstream"\n'
+            'version = "0.1.0"\n'
+            'dependencies = ["vaultspec-core>=0.1.0"]\n',
+            encoding="utf-8",
+        )
+
+    def _read_declaration(self, root: Path):
+        from vaultspec_core.core.workspace_mode import read_workspace_declaration
+
+        return read_workspace_declaration(root)
+
+    def _make_legacy(self, root: Path) -> None:
+        """Remove the committed declaration to reproduce a pre-install-mode state."""
+        decl = root / ".vaultspec" / "workspace.json"
+        if decl.exists():
+            decl.unlink()
+
+    def test_legacy_dependency_workspace_infers_dependency(
+        self, tmp_path: Path
+    ) -> None:
+        from vaultspec_core.core.diagnosis.collectors import (
+            _observed_precommit_mode,
+            collect_mode_mismatch_state,
+        )
+        from vaultspec_core.core.diagnosis.signals import ModeMismatchSignal
+        from vaultspec_core.core.enums import InstallMode
+
+        # A real dependency-mode provision: uv-run hooks, a uv-run MCP command,
+        # and a pyproject that lists vaultspec-core. Stripping the declaration
+        # leaves exactly the legacy dependency shape Q6 must recognize.
+        self._write_pyproject_with_dependency(tmp_path)
+        factory = WorkspaceFactory(tmp_path).install("all", mode=InstallMode.DEPENDENCY)
+        assert _observed_precommit_mode(tmp_path) is InstallMode.DEPENDENCY
+        self._make_legacy(tmp_path)
+        assert self._read_declaration(tmp_path) is None
+
+        factory.install("all", upgrade=True)
+
+        decl = self._read_declaration(tmp_path)
+        assert decl is not None
+        assert decl.install_mode is InstallMode.DEPENDENCY
+        # The inferred mode matches the deployed shape, so the workspace stays
+        # coherent: no artifact was flipped and diagnosis is clean.
+        assert _observed_precommit_mode(tmp_path) is InstallMode.DEPENDENCY
+        assert collect_mode_mismatch_state(tmp_path) is ModeMismatchSignal.CLEAN
+
+    def test_legacy_tool_shaped_workspace_infers_tool_and_renders_uvx(
+        self, tmp_path: Path
+    ) -> None:
+        # Ordering pin: when inference lands tool mode, the SAME upgrade run must
+        # render uvx-shaped artifacts. The declaration is written before the
+        # provider sync and hook scaffold, so both renderers read the inferred
+        # tool mode instead of the legacy-absent dependency bridge. If the
+        # declaration were written after those calls, the hooks would render
+        # uv-run and contradict the tool declaration recorded moments later.
+        from vaultspec_core.core.diagnosis.collectors import (
+            _observed_mcp_mode,
+            _observed_precommit_mode,
+            collect_mode_mismatch_state,
+        )
+        from vaultspec_core.core.diagnosis.signals import ModeMismatchSignal
+        from vaultspec_core.core.enums import InstallMode
+
+        # Provision dependency-shaped (uv-run hooks), then strip the pyproject,
+        # the declaration, and the MCP config. Detection now forces tool mode
+        # (no pyproject) while the deployed hooks are still uv-run: the legacy
+        # shape whose inference conjunction resolves to tool.
+        self._write_pyproject_with_dependency(tmp_path)
+        factory = WorkspaceFactory(tmp_path).install("all", mode=InstallMode.DEPENDENCY)
+        assert _observed_precommit_mode(tmp_path) is InstallMode.DEPENDENCY
+        self._make_legacy(tmp_path)
+        (tmp_path / "pyproject.toml").unlink()
+        # A pre-existing managed MCP entry that diverges from the target mode is
+        # governed by the separate force-gate sync policy; removing it isolates
+        # the render-mode path the ordering fix governs, so the re-added entry
+        # reflects the inferred mode.
+        (tmp_path / ".mcp.json").unlink()
+
+        factory.install("all", upgrade=True)
+
+        decl = self._read_declaration(tmp_path)
+        assert decl is not None
+        assert decl.install_mode is InstallMode.TOOL
+        # Both the hooks and the freshly-added MCP command were rendered to the
+        # tool shape in this same run.
+        assert _observed_precommit_mode(tmp_path) is InstallMode.TOOL
+        assert _observed_mcp_mode(tmp_path) is InstallMode.TOOL
+        assert collect_mode_mismatch_state(tmp_path) is ModeMismatchSignal.CLEAN
+
+    def test_second_upgrade_is_content_idempotent(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.enums import InstallMode
+
+        self._write_pyproject_with_dependency(tmp_path)
+        factory = WorkspaceFactory(tmp_path).install("all", mode=InstallMode.DEPENDENCY)
+        self._make_legacy(tmp_path)
+
+        factory.install("all", upgrade=True)
+        decl_path = tmp_path / ".vaultspec" / "workspace.json"
+        first = decl_path.read_bytes()
+        assert self._read_declaration(tmp_path).install_mode is InstallMode.DEPENDENCY
+
+        # The second upgrade re-derives the now-persisted mode and rewrites the
+        # deterministic declaration to byte-identical content: idempotent at the
+        # content level even though the writer does not skip the write.
+        factory.install("all", upgrade=True)
+        second = decl_path.read_bytes()
+
+        assert second == first
+        assert self._read_declaration(tmp_path).install_mode is InstallMode.DEPENDENCY
+
+
 class TestFloorConstraint:
     """The minimum_vaultspec_version refuse-and-tell floor in the resolver."""
 
