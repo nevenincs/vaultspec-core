@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from vaultspec_core.core.enums import InstallMode
+from vaultspec_core.core.workspace_mode import WORKSPACE_FILENAME
 from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
 if TYPE_CHECKING:
@@ -21,10 +23,72 @@ if TYPE_CHECKING:
 
 pytestmark = [pytest.mark.unit]
 
+# The exact MCP-server launch each mode must render into .mcp.json. Asserted
+# whole (command plus full args list), never by substring, so a regression in
+# either the command or a single arg is caught.
+_DEPENDENCY_LAUNCH = {
+    "command": "uv",
+    "args": ["run", "python", "-m", "vaultspec_core.mcp_server.app"],
+}
+_TOOL_LAUNCH = {
+    "command": "uvx",
+    "args": [
+        "--from",
+        "vaultspec-core",
+        "python",
+        "-m",
+        "vaultspec_core.mcp_server.app",
+    ],
+}
+
 
 def _servers(path: Path) -> dict:
     raw = json.loads(path.read_text(encoding="utf-8"))
     return raw.get("mcpServers", {})
+
+
+def _write_dependency_pyproject(root: Path) -> None:
+    """Give *root* a pyproject that declares vaultspec-core as a dependency.
+
+    Dependency mode is only coherent when something can resolve the dependency,
+    so an explicit ``--mode dependency`` install requires this to exist.
+    """
+    (root / "pyproject.toml").write_text(
+        '[project]\nname = "x"\nversion = "0"\ndependencies = ["vaultspec-core"]\n',
+        encoding="utf-8",
+    )
+
+
+class TestMcpModeRendering:
+    def test_dependency_mode_renders_uv_run_launch(self, tmp_path: Path):
+        _write_dependency_pyproject(tmp_path)
+        WorkspaceFactory(tmp_path).install("all", mode=InstallMode.DEPENDENCY)
+        assert _servers(tmp_path / ".mcp.json")["vaultspec-core"] == _DEPENDENCY_LAUNCH
+
+    def test_tool_mode_renders_uvx_launch(self, tmp_path: Path):
+        WorkspaceFactory(tmp_path).install("all", mode=InstallMode.TOOL)
+        assert _servers(tmp_path / ".mcp.json")["vaultspec-core"] == _TOOL_LAUNCH
+
+    def test_provider_native_config_matches_mode(self, tmp_path: Path):
+        """The provider-native MCP config renders the same mode as .mcp.json."""
+        WorkspaceFactory(tmp_path).install("all", mode=InstallMode.TOOL)
+        agy = tmp_path / ".agents" / "mcp_config.json"
+        assert _servers(agy)["vaultspec-core"] == _TOOL_LAUNCH
+
+    def test_absent_declaration_renders_dependency_on_sync(self, tmp_path: Path):
+        """The Q6 migration bridge: a workspace whose declaration is absent
+        (provisioned before install-mode) must render the dependency launch on
+        sync, never silently flip to the uvx tool form.
+        """
+        factory = WorkspaceFactory(tmp_path).install("all", mode=InstallMode.TOOL)
+        assert _servers(tmp_path / ".mcp.json")["vaultspec-core"] == _TOOL_LAUNCH
+
+        # Remove the committed declaration to mimic a legacy, pre-install-mode
+        # workspace, then re-sync with --force so the managed entry is rewritten:
+        # the render must fall back to the dependency launch.
+        (tmp_path / ".vaultspec" / WORKSPACE_FILENAME).unlink()
+        factory.sync("all", force=True)
+        assert _servers(tmp_path / ".mcp.json")["vaultspec-core"] == _DEPENDENCY_LAUNCH
 
 
 class TestAgyMcpConfig:
