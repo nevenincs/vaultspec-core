@@ -17,6 +17,12 @@ related:
   - '[[2026-07-13-install-mode-P02-S09]]'
   - '[[2026-07-13-install-mode-P02-S10]]'
   - '[[2026-07-13-install-mode-P02-S11]]'
+  - '[[2026-07-13-install-mode-P03-S12]]'
+  - '[[2026-07-13-install-mode-P03-S13]]'
+  - '[[2026-07-13-install-mode-P03-S14]]'
+  - '[[2026-07-13-install-mode-P03-S15]]'
+  - '[[2026-07-13-install-mode-P03-S16]]'
+  - '[[2026-07-13-install-mode-P03-S17]]'
   - '[[2026-07-13-install-mode-adr]]'
   - '[[2026-07-13-install-mode-plan]]'
   - '[[2026-07-13-install-mode-research]]'
@@ -45,6 +51,12 @@ Auto-generated index of all documents tagged with `#install-mode`.
 - `2026-07-13-install-mode-P02-S09` - Add WorkspaceFactory-based tests for resolve_install_mode precedence ordering: explicit overrides persisted and detected, persisted overrides detected, and detected overrides default
 - `2026-07-13-install-mode-P02-S10` - Add WorkspaceFactory-based tests for the detection signals: absence of pyproject.toml forces tool mode, vaultspec-core listed in project dependencies forces dependency-mode evidence, and absence of both defaults to tool mode
 - `2026-07-13-install-mode-P02-S11` - Add a WorkspaceFactory-based install_run test asserting a hard refusal with a remediation message when --mode dependency is requested in a repo with no pyproject.toml
+- `2026-07-13-install-mode-P03-S12` - Introduce mode placeholder tokens in the builtin MCP definition command and args fields, keeping the seeded builtin snapshot mode-neutral for drift-detection hashing
+- `2026-07-13-install-mode-P03-S13` - Add a render_mcp_definition_for_mode function that substitutes the placeholder command and args with the uv run python -m form in dependency mode and the uvx --from vaultspec-core python -m form in tool mode, and apply it in collect_mcp_servers before merge
+- `2026-07-13-install-mode-P03-S14` - Turn CANONICAL_ENTRY_PREFIX, the \_HOOK_DEFS entry values, CANONICAL_PRECOMMIT_HOOKS, and CANONICAL_HOOK_ENTRIES into functions of the resolved InstallMode, rendering uv run --no-sync vaultspec-core in dependency mode and uvx --from vaultspec-core vaultspec-core in tool mode
+- `2026-07-13-install-mode-P03-S15` - Update \_scaffold_precommit to read the resolved workspace mode and render hook entries through the mode-parameterized hook definitions
+- `2026-07-13-install-mode-P03-S16` - Add WorkspaceFactory-based tests asserting the MCP definition renders the uv run command form in dependency mode and the uvx --from form in tool mode after sync
+- `2026-07-13-install-mode-P03-S17` - Add WorkspaceFactory-based tests asserting all four canonical hook entries render the uv run --no-sync vaultspec-core prefix in dependency mode and the uvx --from vaultspec-core vaultspec-core prefix in tool mode
 
 ### plan
 
