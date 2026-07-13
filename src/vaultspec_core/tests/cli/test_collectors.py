@@ -19,10 +19,11 @@ from vaultspec_core.core.diagnosis.collectors import (
     collect_manifest_coherence,
     collect_mcp_config_state,
     collect_mode_mismatch_state,
+    collect_precommit_state,
     collect_provider_dir_state,
     collect_vault_content_state,
 )
-from vaultspec_core.core.diagnosis.diagnosis import diagnose
+from vaultspec_core.core.diagnosis.diagnosis import WorkspaceDiagnosis, diagnose
 from vaultspec_core.core.diagnosis.signals import (
     BuiltinVersionSignal,
     ConfigSignal,
@@ -31,11 +32,13 @@ from vaultspec_core.core.diagnosis.signals import (
     GitignoreSignal,
     ManifestEntrySignal,
     ModeMismatchSignal,
+    PrecommitSignal,
     ProviderDirSignal,
     VaultContentSignal,
 )
-from vaultspec_core.core.enums import InstallMode, Tool
+from vaultspec_core.core.enums import CliAction, InstallMode, Tool
 from vaultspec_core.core.gitignore import DEFAULT_ENTRIES, MARKER_BEGIN, MARKER_END
+from vaultspec_core.core.resolver import resolve
 from vaultspec_core.core.workspace_mode import (
     WorkspaceDeclaration,
     write_workspace_declaration,
@@ -553,6 +556,55 @@ class TestModeMismatchState:
             tmp_path, WorkspaceDeclaration(install_mode=InstallMode.DEPENDENCY)
         )
         assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.MISMATCH
+
+
+# ---------------------------------------------------------------------------
+# resolver mode-mismatch advisory and precommit completeness
+# ---------------------------------------------------------------------------
+class TestModeMismatchResolution:
+    def _clean_diagnosis(self, mode_mismatch: ModeMismatchSignal) -> WorkspaceDiagnosis:
+        """A diagnosis whose only non-clean axis is the mode-mismatch signal."""
+        return WorkspaceDiagnosis(
+            framework=FrameworkSignal.PRESENT,
+            builtin_version=BuiltinVersionSignal.CURRENT,
+            gitignore=GitignoreSignal.COMPLETE,
+            precommit=PrecommitSignal.COMPLETE,
+            mode_mismatch=mode_mismatch,
+        )
+
+    def test_mismatch_emits_fix_hint_warning(self) -> None:
+        """A MISMATCH diagnosis makes the resolver warn with both remediation
+        targets: install --upgrade and an explicit --mode re-run.
+        """
+        plan = resolve(
+            self._clean_diagnosis(ModeMismatchSignal.MISMATCH), CliAction.SYNC
+        )
+        mode_warnings = [w for w in plan.warnings if "workspace.json" in w]
+        assert len(mode_warnings) == 1
+        warning = mode_warnings[0]
+        assert "install --upgrade" in warning
+        assert "install --mode" in warning
+
+    def test_clean_emits_no_mode_warning(self) -> None:
+        """A CLEAN mode-mismatch signal produces no mode advisory."""
+        plan = resolve(self._clean_diagnosis(ModeMismatchSignal.CLEAN), CliAction.SYNC)
+        assert not [w for w in plan.warnings if "workspace.json" in w]
+
+    def test_unknown_emits_no_mode_warning(self) -> None:
+        """UNKNOWN (a legacy, undeclared workspace) is not a warning."""
+        plan = resolve(
+            self._clean_diagnosis(ModeMismatchSignal.UNKNOWN), CliAction.SYNC
+        )
+        assert not [w for w in plan.warnings if "workspace.json" in w]
+
+    def test_tool_mode_workspace_precommit_is_complete(self, tmp_path: Path) -> None:
+        """A correctly-provisioned tool-mode workspace renders uvx hook entries,
+        and collect_precommit_state derives its expected entries from the
+        persisted tool mode, so the workspace diagnoses COMPLETE rather than
+        NON_CANONICAL against the dependency-mode shape.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        assert collect_precommit_state(tmp_path) == PrecommitSignal.COMPLETE
 
 
 # ---------------------------------------------------------------------------

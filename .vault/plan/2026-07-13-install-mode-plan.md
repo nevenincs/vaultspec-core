@@ -75,7 +75,7 @@ Route the precommit canonical-entry check and a new mode-mismatch signal through
 - [x] `P04.S21` - Add a resolution step for ModeMismatchSignal.MISMATCH with a fix hint pointing at install --upgrade or an explicit --mode re-run, and reword the non-canonical precommit warning to be mode-aware; `src/vaultspec_core/core/resolver.py`.
 - [x] `P04.S22` - Layer a minimum_vaultspec_version refuse-and-tell check onto \_resolve_version_warning that hard-refuses with a remediation message when the running package version is below the persisted floor constraint; `src/vaultspec_core/core/resolver.py`.
 - [x] `P04.S23` - Add WorkspaceFactory-based tests for collect_mode_mismatch_state detecting uv run hook entries and a non-uvx MCP command in a tool-mode workspace, and the reverse mismatch in a dependency-mode workspace; `src/vaultspec_core/tests/cli/test_collectors.py`.
-- [ ] `P04.S24` - Add WorkspaceFactory-based tests asserting the resolver emits a mode-mismatch fix-hint step with the correct remediation target and that collect_precommit_state reports COMPLETE for a correctly-provisioned tool-mode workspace; `src/vaultspec_core/tests/cli/test_collectors.py`.
+- [x] `P04.S24` - Add WorkspaceFactory-based tests asserting the resolver emits a mode-mismatch fix-hint step with the correct remediation target and that collect_precommit_state reports COMPLETE for a correctly-provisioned tool-mode workspace; `src/vaultspec_core/tests/cli/test_collectors.py`.
 - [ ] `P04.S25` - Add WorkspaceFactory-based tests asserting the floor-constraint refusal fires when the running package version is below minimum_vaultspec_version and passes when at or above it; `src/vaultspec_core/tests/cli/test_migration_triggers.py`.
 
 ### Phase `P05` - migration, docs, and hardening
