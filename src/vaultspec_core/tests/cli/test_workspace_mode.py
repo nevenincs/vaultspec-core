@@ -13,6 +13,7 @@ from vaultspec_core.core.workspace_mode import (
     WORKSPACE_SCHEMA_VERSION,
     WorkspaceDeclaration,
     read_workspace_declaration,
+    resolve_install_mode,
     write_workspace_declaration,
 )
 
@@ -30,6 +31,15 @@ def _write_raw(root: Path, text: str) -> None:
     path = _declaration_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def _write_pyproject(root: Path, *, dependencies: list[str] | None = None) -> None:
+    """Write a minimal ``pyproject.toml`` declaring *dependencies*."""
+    lines = ["[project]", 'name = "example"', 'version = "0.0.0"']
+    if dependencies is not None:
+        rendered = ", ".join(f'"{dep}"' for dep in dependencies)
+        lines.append(f"dependencies = [{rendered}]")
+    (root / "pyproject.toml").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 class TestRoundTrip:
@@ -124,3 +134,34 @@ class TestCorruptDeclaration:
 
         with pytest.raises(VaultSpecError, match="Invalid install_mode"):
             read_workspace_declaration(factory.root)
+
+
+class TestResolvePrecedence:
+    """The Q5 precedence chain: explicit > persisted > detected > default."""
+
+    def test_explicit_overrides_persisted_and_detected(self, factory):
+        # Detection and the persisted declaration both point at dependency
+        # mode; the explicit flag must still win and flip the result to tool.
+        _write_pyproject(factory.root, dependencies=["vaultspec-core>=0.1"])
+        write_workspace_declaration(
+            factory.root, WorkspaceDeclaration(install_mode=InstallMode.DEPENDENCY)
+        )
+
+        assert resolve_install_mode(factory.root, InstallMode.TOOL) is InstallMode.TOOL
+
+    def test_persisted_overrides_detected(self, factory):
+        # Detection would read dependency evidence from pyproject, but the
+        # persisted declaration names tool mode and outranks detection.
+        _write_pyproject(factory.root, dependencies=["vaultspec-core>=0.1"])
+        write_workspace_declaration(
+            factory.root, WorkspaceDeclaration(install_mode=InstallMode.TOOL)
+        )
+
+        assert resolve_install_mode(factory.root) is InstallMode.TOOL
+
+    def test_detected_overrides_default(self, factory):
+        # No explicit flag and no persisted declaration, so dependency
+        # evidence in pyproject outranks the tool-mode default.
+        _write_pyproject(factory.root, dependencies=["vaultspec-core>=0.1"])
+
+        assert resolve_install_mode(factory.root) is InstallMode.DEPENDENCY
