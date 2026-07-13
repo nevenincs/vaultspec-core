@@ -390,9 +390,15 @@ def collect_mcp_config_state(target: Path) -> ConfigSignal:
         return ConfigSignal.PARTIAL_MCP
 
     # Check registry drift: compare deployed entries against definitions
+    # rendered for the workspace's resolved mode. The seeded builtin carries
+    # mode-neutral placeholder tokens, so an unrendered registry entry can never
+    # equal the rendered .mcp.json launch and would report drift on every
+    # workspace. resolve_render_mode's legacy-absent rule keeps a pre-install-mode
+    # workspace on the dependency-shaped expectation.
     from ..mcps import collect_mcp_servers
+    from ..workspace_mode import resolve_render_mode
 
-    registry = collect_mcp_servers()
+    registry = collect_mcp_servers(mode=resolve_render_mode(target))
     if registry:
         managed_names = set(registry.keys())
         for name, (_path, expected_config) in registry.items():

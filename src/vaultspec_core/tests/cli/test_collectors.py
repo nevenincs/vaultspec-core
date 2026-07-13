@@ -32,10 +32,28 @@ from vaultspec_core.core.diagnosis.signals import (
     ProviderDirSignal,
     VaultContentSignal,
 )
-from vaultspec_core.core.enums import Tool
+from vaultspec_core.core.enums import InstallMode, Tool
 from vaultspec_core.core.gitignore import DEFAULT_ENTRIES, MARKER_BEGIN, MARKER_END
 
 pytestmark = [pytest.mark.unit]
+
+
+def _install_and_init(root: Path, mode: InstallMode) -> None:
+    """Provision *root* in *mode* and bind the workspace context to it.
+
+    ``collect_mcp_config_state`` reads the MCP registry through the active
+    workspace context, so the context must point at the freshly-installed
+    workspace for the registry-drift comparison to run against real
+    definitions.
+    """
+    from vaultspec_core.config import reset_config
+    from vaultspec_core.config.workspace import resolve_workspace
+    from vaultspec_core.core.types import init_paths
+    from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+    WorkspaceFactory(root).install("all", mode=mode)
+    reset_config()
+    init_paths(resolve_workspace(target_override=root))
 
 
 def _write_manifest(root: Path, installed: list[str]) -> None:
@@ -453,6 +471,37 @@ class TestMcpConfigState:
         }
         mcp.write_text(json.dumps(payload), encoding="utf-8")
         assert collect_mcp_config_state(tmp_path) == ConfigSignal.USER_MCP
+
+    def test_tool_mode_install_is_ok(self, tmp_path: Path) -> None:
+        """A real tool-mode install must diagnose clean: the registry drift
+        comparison renders the mode-neutral builtin for the workspace's mode,
+        so the uvx-shaped .mcp.json entry matches its rendered definition.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        assert collect_mcp_config_state(tmp_path) == ConfigSignal.OK
+
+    def test_dependency_mode_install_is_ok(self, tmp_path: Path) -> None:
+        """A real dependency-mode install must diagnose clean the same way,
+        with the uv-run-shaped .mcp.json entry matching its rendered
+        definition.
+        """
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "x"\nversion = "0"\ndependencies = ["vaultspec-core"]\n',
+            encoding="utf-8",
+        )
+        _install_and_init(tmp_path, InstallMode.DEPENDENCY)
+        assert collect_mcp_config_state(tmp_path) == ConfigSignal.OK
+
+    def test_hand_altered_entry_is_registry_drift(self, tmp_path: Path) -> None:
+        """The comparator still has teeth: a hand-altered managed entry that no
+        longer matches its rendered definition is reported as drift.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        mcp = tmp_path / ".mcp.json"
+        payload = json.loads(mcp.read_text(encoding="utf-8"))
+        payload["mcpServers"]["vaultspec-core"]["command"] = "totally-wrong"
+        mcp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        assert collect_mcp_config_state(tmp_path) == ConfigSignal.REGISTRY_DRIFT
 
 
 # ---------------------------------------------------------------------------
