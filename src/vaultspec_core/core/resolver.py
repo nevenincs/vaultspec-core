@@ -21,6 +21,7 @@ from .diagnosis.signals import (
     GitattributesSignal,
     GitignoreSignal,
     ManifestEntrySignal,
+    ModeMismatchSignal,
     PrecommitSignal,
     ProviderDirSignal,
     ResolutionAction,
@@ -137,13 +138,31 @@ def resolve(
         except Exception:
             pc_managed = True
 
+    # The canonical entry prefix the non-canonical precommit advisory names is
+    # mode-dependent: a tool-mode workspace should be told to use the uvx form,
+    # not the dependency-mode uv-run form. Resolve it from the persisted mode,
+    # falling back to the dependency-mode prefix if the mode cannot be read.
+    expected_entry_prefix = "uv run --no-sync vaultspec-core"
+    if target is not None:
+        try:
+            from .commands import entry_prefix_for_mode
+            from .workspace_mode import resolve_render_mode
+
+            expected_entry_prefix = entry_prefix_for_mode(resolve_render_mode(target))
+        except Exception:
+            logger.debug(
+                "Could not resolve render mode for precommit advisory", exc_info=True
+            )
+
     _resolve_precommit(
         plan,
         diagnosis.precommit,
         prov_action,
         force=force,
         precommit_managed=pc_managed,
+        expected_entry_prefix=expected_entry_prefix,
     )
+    _resolve_mode_mismatch(plan, diagnosis.mode_mismatch)
 
     # Per-provider rules
     for tool, prov_diag in diagnosis.providers.items():
@@ -780,6 +799,7 @@ def _resolve_precommit(
     *,
     force: bool,
     precommit_managed: bool = True,
+    expected_entry_prefix: str = "uv run --no-sync vaultspec-core",
 ) -> None:
     """Apply pre-commit hook resolution rules."""
     _ = force  # precommit repairs are unconditional
@@ -829,13 +849,44 @@ def _resolve_precommit(
                     target=".pre-commit-config.yaml",
                     reason=(
                         "Hook entries use non-canonical pattern; "
-                        "should use 'uv run --no-sync vaultspec-core'"
+                        f"should use '{expected_entry_prefix}'"
                     ),
                 )
             )
         return
 
     logger.warning("Unknown PrecommitSignal member: %s (action=%s)", signal, action)
+
+
+# ---------------------------------------------------------------------------
+# Install-mode mismatch
+# ---------------------------------------------------------------------------
+
+
+def _resolve_mode_mismatch(
+    plan: ResolutionPlan,
+    signal: ModeMismatchSignal,
+) -> None:
+    """Warn when provisioned artifacts disagree with the declared install mode.
+
+    A :attr:`~vaultspec_core.core.diagnosis.signals.ModeMismatchSignal.MISMATCH`
+    means the committed declaration names one mode but the deployed hook entries
+    or MCP launch command are shaped for the other. This is advisory rather than
+    auto-repaired: reconciling it re-provisions the workspace, which is an
+    explicit operator decision, so the plan carries a fix hint pointing at
+    ``install --upgrade`` or an explicit ``--mode`` re-run rather than a silent
+    corrective step. ``CLEAN`` and ``UNKNOWN`` (the legacy, undeclared workspace)
+    are no-ops.
+    """
+    if signal != ModeMismatchSignal.MISMATCH:
+        return
+    plan.warnings.append(
+        "Provisioned hook entries or MCP launch command do not match the "
+        "install mode declared in .vaultspec/workspace.json. Re-run "
+        "'vaultspec-core install --upgrade' to reconcile them, or "
+        "'vaultspec-core install --mode <tool|dependency>' to re-provision "
+        "for a specific mode."
+    )
 
 
 # ---------------------------------------------------------------------------
