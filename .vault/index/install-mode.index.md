@@ -7,6 +7,7 @@ date: '2026-07-13'
 modified: '2026-07-13'
 related:
   - '[[2026-07-13-install-mode-P01-S01]]'
+  - '[[2026-07-13-install-mode-P01-S02]]'
   - '[[2026-07-13-install-mode-adr]]'
   - '[[2026-07-13-install-mode-plan]]'
   - '[[2026-07-13-install-mode-research]]'
@@ -25,6 +26,7 @@ Auto-generated index of all documents tagged with `#install-mode`.
 ### exec
 
 - `2026-07-13-install-mode-P01-S01` - Add the InstallMode enum with TOOL and DEPENDENCY members
+- `2026-07-13-install-mode-P01-S02` - Add the WorkspaceDeclaration dataclass and read_workspace_declaration/write_workspace_declaration functions for the committed .vaultspec/workspace.json surface, including the minimum_vaultspec_version floor field
 
 ### plan
 
