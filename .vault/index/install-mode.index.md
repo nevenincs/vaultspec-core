@@ -6,6 +6,7 @@ tags:
 date: '2026-07-13'
 modified: '2026-07-13'
 related:
+  - '[[2026-07-13-install-mode-P01-S01]]'
   - '[[2026-07-13-install-mode-adr]]'
   - '[[2026-07-13-install-mode-plan]]'
   - '[[2026-07-13-install-mode-research]]'
@@ -20,6 +21,10 @@ Auto-generated index of all documents tagged with `#install-mode`.
 ### adr
 
 - `2026-07-13-install-mode-adr` - `install-mode` adr: `provisioning is mode-aware and tool-first` | (**status:** `accepted`)
+
+### exec
+
+- `2026-07-13-install-mode-P01-S01` - Add the InstallMode enum with TOOL and DEPENDENCY members
 
 ### plan
 
