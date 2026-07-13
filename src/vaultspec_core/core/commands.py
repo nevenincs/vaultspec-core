@@ -1221,6 +1221,22 @@ def install_run(
         # floor reconciliation still run once, later, via _persist_resolved_mode.
         _write_mode_declaration(path, resolved_mode)
 
+        # Detect a mode flip before the sync below re-renders any artifact.
+        # The pre-commit and declaration renderers rewrite unconditionally, but
+        # the MCP sync runs force-gated: a pre-existing MANAGED vaultspec-core
+        # entry still carrying the old mode's launch shape is skipped unless
+        # --force, which would leave the migration non-atomic across the three
+        # renderers until a later forced re-sync (mode-flip-force-asymmetry
+        # audit finding). Captured here against the still-old .mcp.json, this
+        # flags whether the deployed MCP launch shape disagrees with the mode
+        # this upgrade resolved to; the targeted force below closes the gap.
+        from .diagnosis.collectors import _observed_mcp_mode
+
+        observed_mcp_mode = _observed_mcp_mode(path)
+        mcp_mode_flipped = (
+            observed_mcp_mode is not None and observed_mcp_mode != resolved_mode
+        )
+
         sync_target = provider if provider not in ("all", "core") else "all"
         # `sync_provider` rejects `core` in its skip set (`allow_core=False`).
         # `install_run` accepts `core` because it skips the framework scaffold;
@@ -1234,6 +1250,23 @@ def install_run(
 
         if "precommit" not in skip:
             _scaffold_precommit(path, mode=resolved_mode)
+
+        # Close the mode-flip force-gate asymmetry: when the mode flipped, the
+        # force-gated MCP pass above skipped the stale managed vaultspec-core
+        # entry. Force just that one managed entry into the new mode's launch
+        # shape so all three renderers migrate atomically in this run. Scoped to
+        # the managed vaultspec-core entry only, so user-owned entries and the
+        # foreign-entry discipline are untouched. Skipped when --force already
+        # rewrote it, when the mode did not flip (preserving today's force-gated
+        # semantics for a same-mode divergent entry), or when mcp sync is
+        # skipped outright.
+        if mcp_mode_flipped and not force and "mcp" not in skip:
+            from .mcps import mcp_sync
+
+            mcp_sync(
+                mode=resolved_mode,
+                force_managed=frozenset({"vaultspec-core"}),
+            )
 
         # Update manifest timestamps and version
         import datetime

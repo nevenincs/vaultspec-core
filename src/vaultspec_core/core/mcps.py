@@ -446,6 +446,7 @@ def _apply_mcp_merge(
     prune: bool,
     result: SyncResult,
     label: str,
+    force_managed: frozenset[str] = frozenset(),
 ) -> bool:
     """Merge *sources* into the *existing* MCP config dict in place.
 
@@ -455,6 +456,18 @@ def _apply_mcp_merge(
     and the ``_vaultspecManaged`` ownership sidecar) and records actions and
     warnings on *result*.
 
+    *force_managed* is a surgical, per-entry escalation of *force* scoped to
+    the named already-managed servers only. It exists for the ``install
+    --upgrade`` mode-flip case: when an upgrade flips the workspace's install
+    mode, the pre-commit and declaration renderers rewrite unconditionally but
+    an unforced MCP sync would skip a pre-existing managed ``vaultspec-core``
+    entry still carrying the old mode's launch shape, leaving the migration
+    non-atomic across the three renderers. Naming that entry in *force_managed*
+    updates it in the same run without escalating the whole sync to *force*.
+    Because it gates only the ``name in managed`` branch, a user-owned entry
+    that shares a name with a source is never adopted or overwritten by it, so
+    the foreign-entry discipline stays intact.
+
     Args:
         existing: Parsed target config; mutated in place.
         sources: Collected MCP definitions keyed by server name.
@@ -463,6 +476,9 @@ def _apply_mcp_merge(
         result: Accumulator for counters, items, and warnings.
         label: Human label for the target (e.g. ``".mcp.json"``) used in
             warning messages.
+        force_managed: Names of already-managed servers to overwrite when they
+            diverge from their source, even when *force* is ``False``. Ignored
+            for any name not currently in the managed set.
 
     Returns:
         ``True`` when *existing* was modified, else ``False``.
@@ -510,7 +526,7 @@ def _apply_mcp_merge(
             if servers[name] == config:
                 result.unchanged += 1
                 result.items.append((name, "[UNCHANGED]"))
-            elif force:
+            elif force or name in force_managed:
                 servers[name] = config
                 result.updated += 1
                 result.items.append((name, "[UPDATE]"))
@@ -592,6 +608,7 @@ def _sync_mcp_target(
     prune: bool,
     result: SyncResult,
     label: str,
+    force_managed: frozenset[str] = frozenset(),
 ) -> None:
     """Merge *sources* into a single MCP config file at *path*.
 
@@ -599,6 +616,9 @@ def _sync_mcp_target(
     :func:`_apply_mcp_merge`, and writes the result. When pruning empties
     the file and no user-defined top-level keys remain, the file is removed
     rather than left as an orphan ``{"mcpServers": {}}`` artefact.
+
+    *force_managed* is forwarded verbatim to :func:`_apply_mcp_merge`; see its
+    docstring for the narrowly-scoped mode-flip escalation it performs.
     """
     with advisory_lock(path):
         existing: dict[str, Any] = {}
@@ -611,7 +631,13 @@ def _sync_mcp_target(
                 result.warnings.append(f"Cannot parse existing {label}: {exc}")
 
         changed = _apply_mcp_merge(
-            existing, sources, force=force, prune=prune, result=result, label=label
+            existing,
+            sources,
+            force=force,
+            prune=prune,
+            result=result,
+            label=label,
+            force_managed=force_managed,
         )
 
         if changed and not dry_run:
@@ -645,6 +671,7 @@ def mcp_sync(
     force: bool = False,
     prune: bool = False,
     mode: InstallMode | None = None,
+    force_managed: frozenset[str] = frozenset(),
 ) -> SyncResult:
     """Sync MCP server definitions into every MCP config target.
 
@@ -678,6 +705,13 @@ def mcp_sync(
             been deleted. Mirrors ``rules_sync``/``agents_sync``.
         mode: Provisioning mode to render definitions for, or ``None`` to
             resolve it from the committed workspace declaration.
+        force_managed: Names of already-managed servers to overwrite when they
+            diverge from their source, even when *force* is ``False``. This is
+            the ``install --upgrade`` mode-flip seam: it lets the caller migrate
+            a specific managed entry (the ``vaultspec-core`` launch command) to
+            the newly-resolved mode's shape in the same run without escalating
+            the whole sync to *force*. Scoped to managed entries only, so
+            user-owned entries stay untouched.
 
     Returns:
         :class:`~vaultspec_core.core.types.SyncResult` with sync statistics.
@@ -708,6 +742,7 @@ def mcp_sync(
         prune=prune,
         result=result,
         label=".mcp.json",
+        force_managed=force_managed,
     )
 
     for tool_name, mcp_path in sorted(_provider_mcp_targets().items()):
@@ -725,6 +760,7 @@ def mcp_sync(
             prune=prune,
             result=sub,
             label=rel.replace("\\", "/"),
+            force_managed=force_managed,
         )
         result.merge(sub)
         result.per_tool[tool_name] = sub
