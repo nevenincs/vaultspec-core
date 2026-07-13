@@ -58,7 +58,7 @@ Add the install --mode flag and the Q5 precedence chain (explicit, persisted, de
 
 Make the builtin MCP definition and the four canonical pre-commit hook entries mode-parameterized, rendering the uvx module-invocation form in tool mode and the existing uv run form in dependency mode.
 
-- [ ] `P03.S12` - Introduce mode placeholder tokens in the builtin MCP definition command and args fields, keeping the seeded builtin snapshot mode-neutral for drift-detection hashing; `src/vaultspec_core/builtins/mcps/vaultspec-core.builtin.json`.
+- [x] `P03.S12` - Introduce mode placeholder tokens in the builtin MCP definition command and args fields, keeping the seeded builtin snapshot mode-neutral for drift-detection hashing; `src/vaultspec_core/builtins/mcps/vaultspec-core.builtin.json`.
 - [ ] `P03.S13` - Add a render_mcp_definition_for_mode function that substitutes the placeholder command and args with the uv run python -m form in dependency mode and the uvx --from vaultspec-core python -m form in tool mode, and apply it in collect_mcp_servers before merge; `src/vaultspec_core/core/mcps.py`.
 - [ ] `P03.S14` - Turn CANONICAL_ENTRY_PREFIX, the \_HOOK_DEFS entry values, CANONICAL_PRECOMMIT_HOOKS, and CANONICAL_HOOK_ENTRIES into functions of the resolved InstallMode, rendering uv run --no-sync vaultspec-core in dependency mode and uvx --from vaultspec-core vaultspec-core in tool mode; `src/vaultspec_core/core/commands.py`.
 - [ ] `P03.S15` - Update \_scaffold_precommit to read the resolved workspace mode and render hook entries through the mode-parameterized hook definitions; `src/vaultspec_core/core/commands.py`.

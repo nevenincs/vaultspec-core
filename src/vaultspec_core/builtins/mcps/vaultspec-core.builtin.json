@@ -1,4 +1,4 @@
 {
-  "command": "uv",
-  "args": ["run", "python", "-m", "vaultspec_core.mcp_server.app"]
+  "command": "@@VAULTSPEC_INSTALL_MODE_COMMAND@@",
+  "args": ["@@VAULTSPEC_INSTALL_MODE_ARGS@@"]
 }
