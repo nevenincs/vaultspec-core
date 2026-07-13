@@ -273,6 +273,15 @@ def resolve_install_mode(
     ``vaultspec-core`` while ``--mode dependency`` is requested - is permitted,
     since the contributor may be about to add the dependency.
 
+    The persisted declaration is read and validated once at the top, regardless
+    of which precedence branch resolves the mode. This makes a corrupt
+    ``.vaultspec/workspace.json`` fail fast here - at the same point as the
+    impossible-combo refusal - rather than surfacing later inside
+    :func:`_persist_resolved_mode` after migrations, builtin re-seeding, and
+    provider sync have already run and left a partial-upgrade state. Callers may
+    therefore treat a successful return as proof the declaration is
+    well-formed.
+
     Args:
         target: Workspace root directory.
         explicit: The mode requested via ``--mode``, or ``None`` to fall through
@@ -290,6 +299,12 @@ def resolve_install_mode(
     pyproject = target / "pyproject.toml"
     has_pyproject = pyproject.is_file()
 
+    # Validate the persisted declaration first, on every path, so corruption
+    # surfaces fail-fast rather than mid-provision. An explicit request still
+    # outranks the parsed value; the read is for validation and the persisted
+    # precedence branch below.
+    declaration = read_workspace_declaration(target)
+
     if explicit is not None:
         if explicit is InstallMode.DEPENDENCY and not has_pyproject:
             raise VaultSpecError(
@@ -299,7 +314,6 @@ def resolve_install_mode(
             )
         return explicit
 
-    declaration = read_workspace_declaration(target)
     if declaration is not None:
         return declaration.install_mode
 

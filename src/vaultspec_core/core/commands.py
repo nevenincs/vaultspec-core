@@ -101,6 +101,13 @@ def _persist_resolved_mode(path: Path, mdata: ManifestData, mode: InstallMode) -
     not be called from within the manifest lock; *mdata* is mutated in place and
     persisted by the caller's own :func:`write_manifest_data` cycle.
 
+    Invariant: callers run this only after
+    :func:`~vaultspec_core.core.workspace_mode.resolve_install_mode`, which reads
+    and validates any persisted declaration fail-fast. The re-read here is
+    therefore expected to succeed - a corrupt declaration would already have
+    aborted the run before any mutation - so this does not reintroduce a
+    late-failure window.
+
     Args:
         path: Workspace root directory.
         mdata: Manifest data to stamp with the resolved mode echo; mutated in

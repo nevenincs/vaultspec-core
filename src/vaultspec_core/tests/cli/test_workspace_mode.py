@@ -202,8 +202,9 @@ class TestResolveRefusal:
     """The impossible-combo refusal, exercised in the CI unit gate.
 
     The end-to-end no-scaffold guarantee lives in the integration-marked
-    ``test_ambiguous_states.py``; this unit test gives the refusal path coverage
-    under the ``-m unit`` gate that the integration file is excluded from.
+    ``test_ambiguous_states.py``; these unit tests give the refusal and the
+    corrupt-declaration fail-fast path coverage under the ``-m unit`` gate that
+    the integration file is excluded from.
     """
 
     def test_dependency_without_pyproject_raises_with_hint(self, factory):
@@ -213,3 +214,15 @@ class TestResolveRefusal:
         assert "dependency mode" in str(excinfo.value)
         assert "--mode tool" in excinfo.value.hint
         assert "pyproject.toml" in excinfo.value.hint
+
+    def test_corrupt_declaration_raises_before_resolution_with_explicit_mode(
+        self, factory
+    ):
+        # An explicit request outranks the persisted declaration, but the
+        # declaration is still read and validated first, so a corrupt
+        # workspace.json fails fast at resolution rather than later inside the
+        # persistence path after migrations and provider sync have run.
+        _write_raw(factory.root, "{not valid json")
+
+        with pytest.raises(VaultSpecError, match="Corrupt workspace declaration"):
+            resolve_install_mode(factory.root, InstallMode.TOOL)
