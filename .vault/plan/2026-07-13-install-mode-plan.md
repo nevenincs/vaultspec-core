@@ -69,7 +69,7 @@ Make the builtin MCP definition and the four canonical pre-commit hook entries m
 
 Route the precommit canonical-entry check and a new mode-mismatch signal through the persisted mode, and layer a minimum_vaultspec_version refuse-and-tell floor constraint onto the existing version-warning comparator.
 
-- [ ] `P04.S18` - Add the ModeMismatchSignal enum with CLEAN, MISMATCH, and UNKNOWN members; `src/vaultspec_core/core/diagnosis/signals.py`.
+- [x] `P04.S18` - Add the ModeMismatchSignal enum with CLEAN, MISMATCH, and UNKNOWN members; `src/vaultspec_core/core/diagnosis/signals.py`.
 - [ ] `P04.S19` - Add the mode_mismatch field to WorkspaceDiagnosis and wire it through the diagnose orchestrator; `src/vaultspec_core/core/diagnosis/diagnosis.py`.
 - [ ] `P04.S20` - Add collect_mode_mismatch_state comparing the persisted workspace declaration mode against the observed hook-entry and MCP-command shape, and update collect_precommit_state to derive the expected canonical entries from the persisted mode instead of the hardcoded CANONICAL_HOOK_ENTRIES; `src/vaultspec_core/core/diagnosis/collectors.py`.
 - [ ] `P04.S21` - Add a resolution step for ModeMismatchSignal.MISMATCH with a fix hint pointing at install --upgrade or an explicit --mode re-run, and reword the non-canonical precommit warning to be mode-aware; `src/vaultspec_core/core/resolver.py`.

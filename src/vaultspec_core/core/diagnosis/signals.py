@@ -112,6 +112,29 @@ class RenameIntegritySignal(StrEnum):
     ERROR = "error"
 
 
+class ModeMismatchSignal(StrEnum):
+    """Coherence between the persisted install mode and observed artifacts.
+
+    Compares the mode named by the committed ``.vaultspec/workspace.json``
+    declaration against the shape of the provisioned artifacts (the canonical
+    pre-commit hook entries and the ``.mcp.json`` launch command).
+
+    Members:
+        CLEAN: The declaration and the observed artifacts agree, or there is
+            nothing to compare against.
+        MISMATCH: The declaration names one mode but the artifacts are shaped
+            for the other, e.g. ``uv run`` hook entries in a workspace whose
+            declaration names tool mode.
+        UNKNOWN: No mode is persisted (the legacy pre-``install-mode`` bridge
+            case); there is no declared mode to hold the artifacts against, so
+            this is not a warning.
+    """
+
+    CLEAN = "clean"
+    MISMATCH = "mismatch"
+    UNKNOWN = "unknown"
+
+
 class ResolutionAction(StrEnum):
     """Corrective action that a resolver can apply."""
 

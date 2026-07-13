@@ -23,6 +23,7 @@ related:
   - '[[2026-07-13-install-mode-P03-S15]]'
   - '[[2026-07-13-install-mode-P03-S16]]'
   - '[[2026-07-13-install-mode-P03-S17]]'
+  - '[[2026-07-13-install-mode-P04-S18]]'
   - '[[2026-07-13-install-mode-adr]]'
   - '[[2026-07-13-install-mode-plan]]'
   - '[[2026-07-13-install-mode-research]]'
@@ -57,6 +58,7 @@ Auto-generated index of all documents tagged with `#install-mode`.
 - `2026-07-13-install-mode-P03-S15` - Update \_scaffold_precommit to read the resolved workspace mode and render hook entries through the mode-parameterized hook definitions
 - `2026-07-13-install-mode-P03-S16` - Add WorkspaceFactory-based tests asserting the MCP definition renders the uv run command form in dependency mode and the uvx --from form in tool mode after sync
 - `2026-07-13-install-mode-P03-S17` - Add WorkspaceFactory-based tests asserting all four canonical hook entries render the uv run --no-sync vaultspec-core prefix in dependency mode and the uvx --from vaultspec-core vaultspec-core prefix in tool mode
+- `2026-07-13-install-mode-P04-S18` - Add the ModeMismatchSignal enum with CLEAN, MISMATCH, and UNKNOWN members
 
 ### plan
 
