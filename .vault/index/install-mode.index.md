@@ -24,6 +24,20 @@ related:
   - '[[2026-07-13-install-mode-P03-S16]]'
   - '[[2026-07-13-install-mode-P03-S17]]'
   - '[[2026-07-13-install-mode-P04-S18]]'
+  - '[[2026-07-13-install-mode-P04-S19]]'
+  - '[[2026-07-13-install-mode-P04-S20]]'
+  - '[[2026-07-13-install-mode-P04-S21]]'
+  - '[[2026-07-13-install-mode-P04-S22]]'
+  - '[[2026-07-13-install-mode-P04-S23]]'
+  - '[[2026-07-13-install-mode-P04-S24]]'
+  - '[[2026-07-13-install-mode-P04-S25]]'
+  - '[[2026-07-13-install-mode-P05-S26]]'
+  - '[[2026-07-13-install-mode-P05-S27]]'
+  - '[[2026-07-13-install-mode-P05-S28]]'
+  - '[[2026-07-13-install-mode-P05-S29]]'
+  - '[[2026-07-13-install-mode-P05-S30]]'
+  - '[[2026-07-13-install-mode-P05-S31]]'
+  - '[[2026-07-13-install-mode-P05-S32]]'
   - '[[2026-07-13-install-mode-adr]]'
   - '[[2026-07-13-install-mode-plan]]'
   - '[[2026-07-13-install-mode-research]]'
@@ -59,6 +73,20 @@ Auto-generated index of all documents tagged with `#install-mode`.
 - `2026-07-13-install-mode-P03-S16` - Add WorkspaceFactory-based tests asserting the MCP definition renders the uv run command form in dependency mode and the uvx --from form in tool mode after sync
 - `2026-07-13-install-mode-P03-S17` - Add WorkspaceFactory-based tests asserting all four canonical hook entries render the uv run --no-sync vaultspec-core prefix in dependency mode and the uvx --from vaultspec-core vaultspec-core prefix in tool mode
 - `2026-07-13-install-mode-P04-S18` - Add the ModeMismatchSignal enum with CLEAN, MISMATCH, and UNKNOWN members
+- `2026-07-13-install-mode-P04-S19` - Add the mode_mismatch field to WorkspaceDiagnosis and wire it through the diagnose orchestrator
+- `2026-07-13-install-mode-P04-S20` - Add collect_mode_mismatch_state comparing the persisted workspace declaration mode against the observed hook-entry and MCP-command shape, and update collect_precommit_state to derive the expected canonical entries from the persisted mode instead of the hardcoded CANONICAL_HOOK_ENTRIES
+- `2026-07-13-install-mode-P04-S21` - Add a resolution step for ModeMismatchSignal.MISMATCH with a fix hint pointing at install --upgrade or an explicit --mode re-run, and reword the non-canonical precommit warning to be mode-aware
+- `2026-07-13-install-mode-P04-S22` - Layer a minimum_vaultspec_version refuse-and-tell check onto \_resolve_version_warning that hard-refuses with a remediation message when the running package version is below the persisted floor constraint
+- `2026-07-13-install-mode-P04-S23` - Add WorkspaceFactory-based tests for collect_mode_mismatch_state detecting uv run hook entries and a non-uvx MCP command in a tool-mode workspace, and the reverse mismatch in a dependency-mode workspace
+- `2026-07-13-install-mode-P04-S24` - Add WorkspaceFactory-based tests asserting the resolver emits a mode-mismatch fix-hint step with the correct remediation target and that collect_precommit_state reports COMPLETE for a correctly-provisioned tool-mode workspace
+- `2026-07-13-install-mode-P04-S25` - Add WorkspaceFactory-based tests asserting the floor-constraint refusal fires when the running package version is below minimum_vaultspec_version and passes when at or above it
+- `2026-07-13-install-mode-P05-S26` - Implement Q6 migration inference in install_run so install --upgrade against a workspace with no persisted mode infers dependency mode from a uv run-shaped canonical hook entry and a pyproject.toml dependency listing, tool mode otherwise, and records the inferred declaration
+- `2026-07-13-install-mode-P05-S27` - Add WorkspaceFactory-based tests for the install --upgrade migration inference covering a legacy dependency-mode workspace, a legacy tool-shaped workspace, and idempotency on a second upgrade run
+- `2026-07-13-install-mode-P05-S28` - Update the MCP setup section with mode-aware launch command guidance for both tool mode and dependency mode
+- `2026-07-13-install-mode-P05-S29` - Update the getting-started and MCP touchpoints to describe install mode selection and the tool-mode default
+- `2026-07-13-install-mode-P05-S30` - Update the framework overview to document the mode axis alongside the existing provisioning concepts
+- `2026-07-13-install-mode-P05-S31` - Regenerate the CLI reference so the install --mode option and its help text appear in the generator-managed reference
+- `2026-07-13-install-mode-P05-S32` - Run the full unit gate and fix any regressions surfaced by the mode-awareness changes
 
 ### plan
 
