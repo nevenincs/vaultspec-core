@@ -34,6 +34,27 @@ if TYPE_CHECKING:
 pytestmark = [pytest.mark.unit]
 
 
+def _running_version() -> str:
+    """Return the installed ``vaultspec-core`` version string."""
+    from importlib.metadata import version
+
+    return version("vaultspec-core")
+
+
+def _bind_context(workspace: Path) -> None:
+    """Bind the active workspace context to *workspace*.
+
+    The floor constraint reads ``get_context().target_dir`` inside the
+    resolver, so the context must point at the workspace whose declaration
+    carries the floor.
+    """
+    from vaultspec_core.config.workspace import resolve_workspace
+    from vaultspec_core.core.types import init_paths
+
+    reset_config()
+    init_paths(resolve_workspace(target_override=workspace))
+
+
 @pytest.fixture(autouse=True)
 def _reset_caches():
     reset_config()
@@ -327,3 +348,82 @@ class TestMigrationsCli:
 
         assert result.exit_code == 0
         assert "up_to_date" in result.stdout
+
+
+class TestFloorConstraint:
+    """The minimum_vaultspec_version refuse-and-tell floor in the resolver."""
+
+    def _diagnose_and_resolve(self, workspace: Path):
+        from vaultspec_core.core.diagnosis.diagnosis import diagnose
+        from vaultspec_core.core.enums import CliAction
+        from vaultspec_core.core.resolver import resolve
+
+        diag = diagnose(workspace, scope="full")
+        return resolve(diag, CliAction.SYNC, target=workspace)
+
+    def test_below_floor_refuses(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.enums import InstallMode
+        from vaultspec_core.core.exceptions import VaultSpecError
+        from vaultspec_core.core.workspace_mode import (
+            WorkspaceDeclaration,
+            write_workspace_declaration,
+        )
+
+        WorkspaceFactory(tmp_path).install("core")
+        write_workspace_declaration(
+            tmp_path,
+            WorkspaceDeclaration(
+                install_mode=InstallMode.TOOL,
+                minimum_vaultspec_version="999.999.999",
+            ),
+        )
+        _bind_context(tmp_path)
+
+        with pytest.raises(VaultSpecError) as excinfo:
+            self._diagnose_and_resolve(tmp_path)
+
+        message = str(excinfo.value)
+        assert "999.999.999" in message
+        assert _running_version() in message
+
+    def test_at_floor_passes(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.enums import InstallMode
+        from vaultspec_core.core.resolver import ResolutionPlan
+        from vaultspec_core.core.workspace_mode import (
+            WorkspaceDeclaration,
+            write_workspace_declaration,
+        )
+
+        WorkspaceFactory(tmp_path).install("core")
+        write_workspace_declaration(
+            tmp_path,
+            WorkspaceDeclaration(
+                install_mode=InstallMode.TOOL,
+                minimum_vaultspec_version=_running_version(),
+            ),
+        )
+        _bind_context(tmp_path)
+
+        plan = self._diagnose_and_resolve(tmp_path)
+        assert isinstance(plan, ResolutionPlan)
+
+    def test_above_floor_passes(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.enums import InstallMode
+        from vaultspec_core.core.resolver import ResolutionPlan
+        from vaultspec_core.core.workspace_mode import (
+            WorkspaceDeclaration,
+            write_workspace_declaration,
+        )
+
+        WorkspaceFactory(tmp_path).install("core")
+        write_workspace_declaration(
+            tmp_path,
+            WorkspaceDeclaration(
+                install_mode=InstallMode.TOOL,
+                minimum_vaultspec_version="0.0.1",
+            ),
+        )
+        _bind_context(tmp_path)
+
+        plan = self._diagnose_and_resolve(tmp_path)
+        assert isinstance(plan, ResolutionPlan)
