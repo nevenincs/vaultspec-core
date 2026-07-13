@@ -3,7 +3,7 @@ tags:
   - '#exec'
   - '#cli-reference-automation'
 date: '2026-06-10'
-modified: '2026-06-10'
+modified: '2026-06-13'
 step_id: S05
 related:
   - '[[2026-06-10-cli-reference-automation-plan]]'

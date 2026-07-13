@@ -3,7 +3,7 @@ tags:
   - '#research'
   - '#cli-logging'
 date: '2026-02-22'
-modified: '2026-02-22'
+modified: '2026-06-13'
 ---
 
 # `cli-logging` research: standardize CLI logging with Rich

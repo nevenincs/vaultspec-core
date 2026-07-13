@@ -4,7 +4,7 @@ tags:
   - '#mcp-consolidation'
   - '#index'
 date: '2026-04-21'
-modified: '2026-04-21'
+modified: '2026-06-13'
 related:
   - '[[2026-02-22-mcp-consolidation-adr]]'
   - '[[2026-02-22-mcp-consolidation-plan]]'

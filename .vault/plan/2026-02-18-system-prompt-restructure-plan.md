@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#system-prompt'
 date: '2026-02-18'
-modified: '2026-02-18'
+modified: '2026-06-13'
 related:
   - '[[2026-02-18-system-prompt-restructure-adr]]'
   - '[[2026-02-18-system-prompt-architecture-research]]'

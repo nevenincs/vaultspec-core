@@ -3,7 +3,7 @@ tags:
   - '#adr'
   - '#vault-doctor-suite'
 date: '2026-02-24'
-modified: '2026-02-24'
+modified: '2026-06-13'
 related:
   - '[[2026-02-24-vault-doctor-suite-research]]'
   - '[[2026-02-24-vault-doctor-suite-p1-plan]]'

@@ -36,34 +36,41 @@ import vaultspec_core.console as vsconsole
 # recording consoles below are never a real terminal.
 os.environ.pop("NO_COLOR", None)
 
-# Palette derived from the vaultspec logo: cream foreground on warm
-# charcoal, with sage / teal / sand / dusty-rose / lavender accents.
+# Palette derived from the vaultspec logo, light variant: warm charcoal
+# foreground on cream paper, with the sage / teal / sand / dusty-rose /
+# lavender accents darkened to keep contrast on the light ground.
 VAULTSPEC_THEME = TerminalTheme(
-    background=(30, 27, 24),
-    foreground=(242, 236, 228),
+    background=(250, 247, 242),
+    foreground=(30, 27, 24),
     normal=[
         (30, 27, 24),
-        (201, 138, 138),
-        (163, 177, 138),
-        (217, 185, 138),
-        (138, 159, 201),
-        (181, 168, 201),
-        (143, 188, 181),
-        (242, 236, 228),
+        (166, 92, 92),
+        (106, 122, 77),
+        (163, 122, 58),
+        (86, 108, 158),
+        (124, 106, 156),
+        (74, 124, 116),
+        (94, 86, 78),
     ],
     bright=[
-        (110, 102, 94),
-        (222, 160, 160),
-        (185, 199, 160),
-        (233, 205, 160),
-        (160, 181, 222),
-        (203, 190, 222),
-        (165, 210, 203),
-        (250, 247, 242),
+        (145, 137, 129),
+        (146, 72, 72),
+        (88, 104, 60),
+        (140, 102, 42),
+        (66, 88, 140),
+        (104, 86, 138),
+        (56, 106, 98),
+        (30, 27, 24),
     ],
 )
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+# Rich hardcodes a white window border, invisible around a light terminal
+# on a light page; render_svg swaps it for a soft warm-charcoal line. The
+# literal lives inside rich's export_svg, so a rich upgrade can change it.
+RICH_STROKE = 'stroke="rgba(255,255,255,0.35)"'
+LIGHT_STROKE = 'stroke="rgba(30,27,24,0.22)"'
 
 
 def _recording_console(width: int) -> Console:
@@ -131,6 +138,11 @@ def render_svg(
     if truncated:
         out.print(Text("  …", style="bright_black"))
     svg = out.export_svg(title=title, theme=VAULTSPEC_THEME)
+    if RICH_STROKE not in svg:
+        raise RuntimeError(
+            "rich's window-border stroke literal changed; update RICH_STROKE"
+        )
+    svg = svg.replace(RICH_STROKE, LIGHT_STROKE)
     with open(out_path, "w", encoding="utf-8") as fh:
         fh.write(svg)
     print(f"wrote {out_path} ({len(lines)} lines)")
@@ -157,6 +169,7 @@ def main() -> None:
         f"{outdir}/term-check.svg",
         "vaultspec-core vault check all",
         112,
+        max_lines=40,
         start_match="Vault Check",
     )
     rag_query = "rollback journal for feature rename"

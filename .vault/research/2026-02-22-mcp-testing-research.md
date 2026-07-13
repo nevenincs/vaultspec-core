@@ -3,7 +3,7 @@ tags:
   - '#research'
   - '#mcp-testing'
 date: '2026-02-22'
-modified: '2026-02-22'
+modified: '2026-06-13'
 related:
   - '[[2026-02-22-mcp-consolidation-research]]'
   - '[[2026-02-22-mcp-consolidation-adr]]'

@@ -3,7 +3,7 @@ tags:
   - '#audit'
   - '#vault-orientation'
 date: '2026-06-12'
-modified: '2026-06-12'
+modified: '2026-06-13'
 related:
   - '[[2026-06-12-vault-orientation-plan]]'
   - '[[2026-06-12-vault-orientation-adr]]'

@@ -3,7 +3,7 @@ tags:
   - '#adr'
   - '#cli-presentation-uniformity'
 date: '2026-06-24'
-modified: '2026-06-24'
+modified: '2026-06-25'
 related:
   - "[[2026-06-13-cli-output-standardization-adr]]"
   - "[[2026-05-17-cli-next-step-hints-adr]]"

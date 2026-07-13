@@ -3,7 +3,7 @@ tags:
   - '#research'
   - '#uniform-rename'
 date: '2026-06-26'
-modified: '2026-06-26'
+modified: '2026-06-27'
 related:
   - "[[2026-06-26-uniform-rename-reference]]"
   - "[[2026-05-17-cli-rename-integrity-adr]]"

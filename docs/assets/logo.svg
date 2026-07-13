@@ -1,0 +1,44 @@
+<svg width="190" height="190" viewBox="0 0 190 190" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="vaultspec-core">
+  <!-- Vaultspec family tile: vector CO mark normalized to the shared README logo system. -->
+  <defs>
+    <filter id="blur" x="-80" y="-80" width="350" height="350" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="13" />
+    </filter>
+    <radialGradient id="rose" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(90 120) rotate(-30) scale(135 780)">
+      <stop stop-color="#B05A6B" stop-opacity="0.65" />
+      <stop offset="1" stop-color="#B05A6B" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="teal" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(34 82) rotate(57) scale(169)">
+      <stop stop-color="#3F9AA6" stop-opacity="0.65" />
+      <stop offset="1" stop-color="#3F9AA6" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="sand" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(167 130) rotate(-130) scale(106)">
+      <stop stop-color="#B3823C" stop-opacity="0.65" />
+      <stop offset="1" stop-color="#B3823C" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="amber" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(74 150) rotate(-126) scale(97 136)">
+      <stop stop-color="#B5703F" stop-opacity="0.65" />
+      <stop offset="1" stop-color="#B5703F" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="violet" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(68 116) scale(34)">
+      <stop stop-color="#8A72B5" stop-opacity="0.65" />
+      <stop offset="1" stop-color="#8A72B5" stop-opacity="0" />
+    </radialGradient>
+    <clipPath id="tile">
+      <rect width="190" height="190" rx="42" />
+    </clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="190" height="190" rx="42" fill="#ECE6DC" />
+    <g filter="url(#blur)">
+      <circle cx="155" cy="121" r="62" fill="url(#rose)" />
+      <circle cx="19" cy="98" r="76" fill="url(#teal)" />
+      <circle cx="113" cy="82" r="79" fill="url(#sand)" />
+      <circle cx="59" cy="124" r="79" fill="url(#amber)" />
+      <circle cx="35" cy="83" r="66" fill="url(#violet)" />
+    </g>
+    <path d="M1271.7 353Q1264.8 283.5 1225.8 215.4Q1186.8 147.2 1119 91.3Q1051.1 35.4 955.9 1.9Q860.7 -31.6 740.7 -31.6Q536 -31.6 387.1 61Q238.2 153.7 157.5 316.9Q76.7 480.1 76.7 692Q76.7 851.1 125.5 985.4Q174.4 1119.6 262.4 1219Q350.4 1318.4 469.1 1373.2Q587.7 1427.9 727.2 1427.9Q828.2 1427.9 892.2 1407.1Q956.2 1386.3 992 1365.3Q1027.8 1344.3 1043.1 1344.3Q1060.1 1344.3 1071 1363.4Q1081.9 1382.6 1093.9 1401.5Q1106 1420.5 1125.2 1420.5Q1140.1 1420.5 1148.9 1411.4Q1157.8 1402.4 1164.5 1378.3L1269.2 1033.2Q1275.2 1013.6 1266 998.5Q1256.8 983.4 1236.9 980.4Q1219.7 977.8 1205.6 986Q1191.5 994.2 1182.5 1014Q1130.8 1135 1066.9 1207.6Q1003 1280.2 924.9 1312.7Q846.8 1345.2 752 1345.2Q654.6 1345.2 572.8 1302.2Q491 1259.2 430.8 1179.4Q370.6 1099.7 337.4 988.6Q304.2 877.6 304.2 741.7Q304.2 538.6 370.6 395.3Q436.9 252 551.7 176.7Q666.4 101.3 812 101.3Q951.7 101.3 1052.3 167.5Q1152.9 233.7 1208.1 356.4Q1220.2 374 1230.7 380.6Q1241.3 387.2 1252.3 384.8Q1262.7 383.1 1267.6 374.6Q1272.5 366.2 1271.7 353ZM2085.6 1426.7Q2239.2 1426.7 2365.3 1372.9Q2491.5 1319 2582.9 1221.2Q2674.2 1123.4 2723.7 990.4Q2773.2 857.4 2773.2 698.8Q2773.2 537.8 2723.8 404.2Q2674.5 270.6 2583.5 173.6Q2492.6 76.5 2366.9 23.6Q2241.1 -29.3 2088.6 -29.3Q1936.1 -29.3 1810.4 24.4Q1684.6 78.1 1593.6 176.1Q1502.5 274.2 1453.1 408.3Q1403.7 542.5 1403.7 703.6Q1403.7 862 1452.9 994.4Q1502.1 1126.8 1592.8 1223.5Q1683.5 1320.3 1808.6 1373.5Q1933.8 1426.7 2085.6 1426.7ZM2544.8 573.1Q2544.8 698.7 2519.9 812.9Q2495 927 2449.3 1022.6Q2403.6 1118.2 2340.6 1188.7Q2277.6 1259.1 2200.9 1298Q2124.3 1337 2037.7 1337Q1917.5 1337 1826.4 1274.9Q1735.3 1212.8 1684.4 1098Q1633.5 983.3 1633.5 825.2Q1633.5 698.6 1658.4 584Q1683.2 469.3 1728.9 373.5Q1774.7 277.8 1837.5 207.3Q1900.3 136.7 1976.9 97.9Q2053.5 59.1 2139.5 59.1Q2260.2 59.1 2351.4 120.8Q2442.6 182.4 2493.7 297.5Q2544.8 412.5 2544.8 573.1Z" fill="#F4EFEA" transform="translate(22.5 133) scale(.052 -.052)" />
+    <circle cx="95" cy="33" r="17.5" fill="#F4EFEA" />
+    <circle cx="95" cy="159" r="17.5" fill="#F4EFEA" />
+  </g>
+</svg>

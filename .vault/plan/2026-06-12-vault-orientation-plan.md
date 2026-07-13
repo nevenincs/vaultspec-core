@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#vault-orientation'
 date: '2026-06-12'
-modified: '2026-06-12'
+modified: '2026-06-13'
 tier: L3
 related:
   - '[[2026-06-12-vault-orientation-adr]]'

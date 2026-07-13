@@ -4,7 +4,7 @@ tags:
   - '#gemini-agent-render'
   - '#index'
 date: '2026-04-21'
-modified: '2026-04-21'
+modified: '2026-06-13'
 related:
   - '[[2026-04-12-gemini-agent-render-adr]]'
   - '[[2026-04-12-gemini-agent-render-phase1-review-exec]]'

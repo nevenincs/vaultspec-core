@@ -4,7 +4,7 @@ tags:
   - '#pytest-e2e'
   - '#index'
 date: '2026-04-21'
-modified: '2026-04-21'
+modified: '2026-06-13'
 related:
   - '[[2026-02-21-pytest-e2e-impl-phase1-exec]]'
   - '[[2026-02-21-pytest-e2e-impl-phase2-exec]]'

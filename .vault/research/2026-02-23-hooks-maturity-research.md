@@ -3,7 +3,7 @@ tags:
   - '#research'
   - '#hooks-maturity'
 date: '2026-02-23'
-modified: '2026-02-23'
+modified: '2026-06-13'
 ---
 
 # hooks-maturity research: production-readiness audit

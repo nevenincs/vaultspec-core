@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#cli-output'
 date: '2026-02-23'
-modified: '2026-02-23'
+modified: '2026-06-13'
 related:
   - '[[2026-02-23-cli-output-architecture-adr]]'
   - '[[2026-02-23-cli-output-architecture-research]]'

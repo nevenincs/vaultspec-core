@@ -4,7 +4,7 @@ tags:
   - '#index'
   - '#mcp-tool-schema'
 date: '2026-07-09'
-modified: '2026-07-09'
+modified: '2026-07-10'
 related:
   - '[[2026-07-09-mcp-tool-schema-P01-S01]]'
   - '[[2026-07-09-mcp-tool-schema-P01-S02]]'

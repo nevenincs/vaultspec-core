@@ -4,7 +4,7 @@ tags:
   - '#index'
   - '#discovery-benchmark'
 date: '2026-06-26'
-modified: '2026-06-26'
+modified: '2026-06-27'
 related:
   - '[[2026-06-26-discovery-benchmark-reference]]'
   - '[[2026-06-26-discovery-benchmark-research]]'

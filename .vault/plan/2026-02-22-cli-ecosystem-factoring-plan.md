@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#cli-ecosystem-factoring'
 date: '2026-02-22'
-modified: '2026-02-22'
+modified: '2026-06-13'
 related:
   - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
   - '[[2026-02-22-cli-ecosystem-factoring-research]]'

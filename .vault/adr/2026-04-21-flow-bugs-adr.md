@@ -3,7 +3,7 @@ tags:
   - '#adr'
   - '#flow-bugs'
 date: '2026-04-21'
-modified: '2026-04-21'
+modified: '2026-06-28'
 related:
   - '[[2026-04-21-flow-bugs-research]]'
   - '[[2026-03-16-managed-content-blocks-adr]]'

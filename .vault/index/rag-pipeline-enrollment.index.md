@@ -4,7 +4,7 @@ tags:
   - '#index'
   - '#rag-pipeline-enrollment'
 date: '2026-06-26'
-modified: '2026-06-26'
+modified: '2026-06-27'
 related:
   - '[[2026-06-26-rag-pipeline-enrollment-adr]]'
   - '[[2026-06-26-rag-pipeline-enrollment-research]]'

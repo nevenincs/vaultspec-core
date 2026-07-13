@@ -3,7 +3,7 @@ tags:
   - '#adr'
   - '#audit-fixes'
 date: '2026-02-22'
-modified: '2026-02-22'
+modified: '2026-06-28'
 related:
   - '[[2026-02-22-codebase-audit]]'
   - '[[2026-02-22-codebase-audit-research]]'

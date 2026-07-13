@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#framework'
 date: '2026-02-17'
-modified: '2026-02-17'
+modified: '2026-06-13'
 related:
   - '[[2026-02-17-bootstrap-prompt-adr]]'
   - '[[2026-02-16-environment-variable-adr]]'

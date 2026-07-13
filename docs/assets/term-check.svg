@@ -32,11 +32,11 @@
         font-family: arial;
     }
 
-    .terminal-2087096281-r1 { fill: #f2ece4;font-weight: bold }
-.terminal-2087096281-r2 { fill: #f2ece4 }
-.terminal-2087096281-r3 { fill: #a3b18a }
-.terminal-2087096281-r4 { fill: #d9b98a }
-.terminal-2087096281-r5 { fill: #9d9892 }
+    .terminal-2087096281-r1 { fill: #1e1b18;font-weight: bold }
+.terminal-2087096281-r2 { fill: #1e1b18 }
+.terminal-2087096281-r3 { fill: #6a7a4d }
+.terminal-2087096281-r4 { fill: #a37a3a }
+.terminal-2087096281-r5 { fill: #76736f }
     </style>
 
     <defs>
@@ -126,7 +126,7 @@
             </clipPath>
     </defs>
 
-    <rect fill="#1e1b18" stroke="rgba(255,255,255,0.35)" stroke-width="1" x="1" y="1" width="1383" height="731.2" rx="8"/><text class="terminal-2087096281-title" fill="#f2ece4" text-anchor="middle" x="691" y="27">vaultspec-core&#160;vault&#160;check&#160;all</text>
+    <rect fill="#faf7f2" stroke="rgba(30,27,24,0.22)" stroke-width="1" x="1" y="1" width="1383" height="731.2" rx="8"/><text class="terminal-2087096281-title" fill="#1e1b18" text-anchor="middle" x="691" y="27">vaultspec-core&#160;vault&#160;check&#160;all</text>
             <g transform="translate(26,22)">
             <circle cx="0" cy="0" r="7" fill="#ff5f57"/>
             <circle cx="22" cy="0" r="7" fill="#febc2e"/>

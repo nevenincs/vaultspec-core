@@ -3,7 +3,7 @@ tags:
   - '#adr'
   - '#pre-existing-tests'
 date: '2026-05-01'
-modified: '2026-05-01'
+modified: '2026-06-13'
 related:
   - '[[2026-05-01-pre-existing-tests-research]]'
   - '[[2026-05-01-pre-existing-tests-plan]]'

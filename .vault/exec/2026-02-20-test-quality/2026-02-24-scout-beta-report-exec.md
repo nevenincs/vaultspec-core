@@ -3,7 +3,7 @@ tags:
   - '#exec'
   - '#test-quality'
 date: '2026-02-20'
-modified: '2026-02-20'
+modified: '2026-06-13'
 ---
 
 # Scout Beta Report: CLI, e2e, RAG, Core, Vault, Hooks Tests

@@ -4,7 +4,7 @@ tags:
   - '#index'
   - '#cli-spec-edit-safety'
 date: '2026-05-17'
-modified: '2026-05-17'
+modified: '2026-06-13'
 related:
   - '[[2026-05-17-cli-spec-edit-safety-adr]]'
   - '[[2026-05-17-cli-spec-edit-safety-research]]'

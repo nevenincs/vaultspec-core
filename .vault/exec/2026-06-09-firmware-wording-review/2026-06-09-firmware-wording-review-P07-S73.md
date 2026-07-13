@@ -3,7 +3,7 @@ tags:
   - '#exec'
   - '#firmware-wording-review'
 date: '2026-06-10'
-modified: '2026-06-10'
+modified: '2026-06-13'
 step_id: S73
 related:
   - '[[2026-06-09-firmware-wording-review-plan]]'

@@ -4,7 +4,7 @@ tags:
   - '#index'
   - '#cli-spec-crud-parity'
 date: '2026-05-17'
-modified: '2026-05-17'
+modified: '2026-06-13'
 related:
   - '[[2026-05-17-cli-spec-crud-parity-adr]]'
   - '[[2026-05-17-cli-spec-crud-parity-research]]'

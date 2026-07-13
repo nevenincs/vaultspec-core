@@ -4,7 +4,7 @@ tags:
   - '#module-exports'
   - '#index'
 date: '2026-04-21'
-modified: '2026-04-21'
+modified: '2026-06-13'
 related:
   - '[[2026-02-21-module-exports-adr]]'
   - '[[2026-02-21-module-exports-p1-step07-exec]]'

@@ -3,7 +3,7 @@ tags:
   - '#exec'
   - '#workspace-context'
 date: '2026-03-21'
-modified: '2026-03-21'
+modified: '2026-06-13'
 related:
   - '[[2026-03-21-workspace-context-plan]]'
 ---

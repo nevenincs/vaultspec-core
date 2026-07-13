@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#uniform-rename'
 date: '2026-06-26'
-modified: '2026-06-26'
+modified: '2026-06-27'
 tier: L2
 related:
   - '[[2026-06-26-uniform-rename-adr]]'

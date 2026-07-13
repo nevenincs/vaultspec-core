@@ -1,21 +1,20 @@
 <div align="center">
 
-<img src="docs/assets/logo.png" alt="vaultspec logo" width="150" />
+<img src="docs/assets/logo.svg" alt="vaultspec-core family logo" width="150" />
 
 # vaultspec-core
 
-**Vaultspec is a spec-driven harness for coding agents (and us, the humans).**
+**The governed development harness for coding agents and the humans who review their
+work.**
 
-[![Continuous integration](https://github.com/nevenincs/vaultspec-core/actions/workflows/ci.yml/badge.svg)](https://github.com/nevenincs/vaultspec-core/actions/workflows/ci.yml)
-[![PyPI version](https://img.shields.io/pypi/v/vaultspec-core.svg)](https://pypi.org/project/vaultspec-core/)
-[![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://www.python.org/)
-[![Model Context Protocol](https://img.shields.io/badge/MCP-vaultspec--mcp-informational)](./docs/MCP.md)
-[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+[![build](https://img.shields.io/github/actions/workflow/status/nevenincs/vaultspec-core/ci.yml?branch=main&style=flat&label=build&logo=githubactions&logoColor=white&labelColor=24292f)](https://github.com/nevenincs/vaultspec-core/actions/workflows/ci.yml)
+[![release](https://img.shields.io/pypi/v/vaultspec-core?style=flat&label=release&logo=pypi&logoColor=white&labelColor=24292f&color=8A72B5)](https://pypi.org/project/vaultspec-core/)
+[![runtime](https://img.shields.io/badge/runtime-Python%20%7C%203.13%2B-3F9AA6?style=flat&logo=python&logoColor=white&labelColor=24292f)](https://www.python.org/downloads/)
+[![license](https://img.shields.io/github/license/nevenincs/vaultspec-core?style=flat&label=license&logo=opensourceinitiative&logoColor=white&labelColor=24292f&color=B3823C)](./LICENSE)
 
-[Getting started](#getting-started) · [The pipeline](#the-pipeline-at-a-glance) ·
-[Framework manual](./docs/framework.md) · [CLI reference](./docs/CLI.md) ·
-[MCP](./docs/MCP.md)
+[Get started](#getting-started) · [Product](#the-pipeline-at-a-glance) ·
+[Documentation](#learn-more) · [Family](#the-vaultspec-family) ·
+[Support](#status-help-and-license)
 
 </div>
 
@@ -23,16 +22,17 @@
 <img src="docs/assets/demo.gif" alt="vaultspec pipeline demo - provisioning a project, scaffolding research, ADR, and plan, then checking and graphing the vault" width="880" />
 </p>
 
-Vaultspec guides agents through a `Research → Decide (ADRs) → Plan → Code → Verify`
-pipeline, not dissimilar to other spec-driven frameworks (Superpowers!) - with one
+Vaultspec guides agents through a `Research → Decide (ADRs) → Plan → Execute → Verify`
+pipeline, similar in spirit to spec-driven frameworks like Superpowers - with one
 difference: nothing is throwaway. All work leaves a papertrail in the project's
 `.vault`. Documents are bound together by feature tags and wiki-link references.
 Together, they represent the project's decision and execution history - a second brain
 your agents read before they write.
 
 We hold ourselves to it, too: vaultspec-core is developed with vaultspec. Its own
-`.vault` currently holds 800+ CLI-scaffolded documents across 100+ features, and every
-terminal render on this page is real output against that live vault:
+`.vault` currently holds 900+ CLI-scaffolded documents across 100+ features, and every
+terminal render on this page is real output - the stills against that live vault, the
+demo above against a scratch project:
 
 <p align="center">
 <img src="docs/assets/term-status.svg" alt="vaultspec-core status - live output from this repository's own vault" width="880" />
@@ -79,8 +79,10 @@ uv add vaultspec-core
 
 ### 2. Bootstrap
 
+If you added it as a project dependency, bootstrap from inside your environment:
+
 ```bash
-uv run --no-sync vaultspec-core install [--upgrade]
+uv run --no-sync vaultspec-core install
 ```
 
 See the [CLI reference](./docs/CLI.md) for installation options.
@@ -112,8 +114,10 @@ uv run --no-sync vaultspec-core sync
 ## The pipeline at a glance
 
 The pipeline breaks down into these steps:
-`[R] Research  →  [D] Decide (ADRs)  →  [P] Plan  →  [C] Code  →  [V] Verify`. Each step
-ships with its skills, agents and CLI verbs.
+`[R] Research  →  [D] Decide (ADRs)  →  [P] Plan  →  [E] Execute  →  [V] Verify`.
+Research has a parallel entry point - Reference (`/vaultspec-code-research`) - that
+grounds the work in existing source code; a feature starts from either, or both. Each
+step ships with its skills, agents and CLI verbs.
 
 To start using the framework describe the work you want done in natural language:
 
@@ -157,33 +161,10 @@ records, and audit - into a linked graph the CLI can trace, validate, and visual
 <img src="docs/assets/term-graph.svg" alt="vaultspec-core vault graph - a feature's document graph" width="880" />
 </p>
 
-### The vault, rendered in Obsidian
-
-The vault is plain Markdown with wiki-links, so it opens directly in
-[Obsidian](https://obsidian.md): point a vault at `.vault/` and the feature tags and
-document links render as a navigable graph network, while every document's frontmatter -
-tags, dates, and `related:` wiki-links - shows up as first-class properties.
-
-<p align="center">
-<img src="docs/assets/obsidian-vault.png" alt="A vaultspec vault opened in Obsidian - the document corpus as a graph network on the left, an accepted ADR with its tags, dates, and related wiki-links on the right" width="880" />
-</p>
-
-A vaultspec project's vault in Obsidian: the whole document corpus as a graph, and an
-accepted ADR open beside it with its tags and related records one click away.
-
-## A vault that audits itself
-
-Structure only helps if it holds. `vaultspec-core vault check` runs a battery of
-validators over the corpus - frontmatter, tags, links, dangling references, leftover
-placeholders, plan schema, encoding - and every finding ships with its fix:
-
-<p align="center">
-<img src="docs/assets/term-check.svg" alt="vaultspec-core vault check all - validators with fix hints" width="880" />
-</p>
-
-Documents are created and maintained through the `vaultspec-core vault` command group -
-never hand-written. The CLI enforces templates, tag taxonomy, and wiki-link resolution
-so your vault stays consistent.
+Documents are scaffolded and structurally maintained through the `vaultspec-core vault`
+command group - frontmatter, filenames, and plan structure are never hand-written, while
+the body prose stays yours to edit. The CLI enforces templates, tag taxonomy, and
+wiki-link resolution so your vault stays consistent.
 
 ```bash
 # Scaffold a document from a template
@@ -202,6 +183,31 @@ vaultspec-core vault graph --feature search-api
 Plans carry deeper structure - waves, phases, and steps. The
 [framework manual](./docs/framework.md) covers that structure.
 
+### The vault, rendered in Obsidian
+
+The vault is plain Markdown with wiki-links, so it opens directly in
+[Obsidian](https://obsidian.md): point a vault at `.vault/` and the feature tags and
+document links render as a navigable graph network, while every document's frontmatter -
+tags, dates, and `related:` wiki-links - shows up as first-class properties.
+
+<p align="center">
+<img src="docs/assets/obsidian-vault.png" alt="A vaultspec vault opened in Obsidian - the document corpus as a graph network on the left, an accepted ADR with its tags, dates, and related wiki-links on the right" width="880" />
+</p>
+
+A vaultspec project's vault in Obsidian: the whole document corpus as a graph, and an
+accepted ADR open beside it with its tags and related records one click away.
+
+## A vault that audits itself
+
+Structure only helps if it holds. `vaultspec-core vault check` runs a battery of
+validators over the corpus - frontmatter, tags, links, dangling references, leftover
+placeholders, plan schema, encoding - and every finding ships with a fix hint, with
+`--fix` applying the safe ones automatically:
+
+<p align="center">
+<img src="docs/assets/term-check.svg" alt="vaultspec-core vault check all - validators with fix hints" width="880" />
+</p>
+
 ## Ask your history questions
 
 A vault is only as useful as its recall. The optional sister project
@@ -215,8 +221,12 @@ decided and get the decision record back:
 
 ## MCP server
 
-We ship an MCP but the current implementation strongly favours direct CLI calls. See the
-[MCP reference](./docs/MCP.md) for setup and available tools.
+vaultspec-core ships a Model Context Protocol server, and `vaultspec-core install` drops
+its `.mcp.json` by default. Seven tools cover the everyday surface - `find`, `create`,
+`edit`, `status`, `check`, `plan_progress`, `plan_edit` - and a `discover`/`invoke`
+gateway reaches the rest of the CLI. Where the server is connected, the synced rules
+treat it as the primary transport, falling back to CLI verbs for structural and sync
+operations. See the [MCP reference](./docs/MCP.md) for setup and the tool catalog.
 
 ## Learn more
 
@@ -226,12 +236,13 @@ We ship an MCP but the current implementation strongly favours direct CLI calls.
 | [CLI reference](./docs/CLI.md)          | Every command, flag, and option for vaultspec-core          |
 | [MCP reference](./docs/MCP.md)          | The MCP server tools, setup, and configuration              |
 
-The companion projects extend the framework:
-[vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) adds semantic search over
-your vault and codebase,
-[vaultspec-dashboard](https://github.com/nevenincs/vaultspec-dashboard) provides a
-visual UI, and [vaultspec-a2a](https://github.com/nevenincs/vaultspec-a2a) handles agent
-orchestration.
+## The vaultspec family
+
+The family has three focused responsibilities: vaultspec-core governs the workflow and
+vault; [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) retrieves decisions
+and code by meaning; and
+[vaultspec-dashboard](https://github.com/nevenincs/vaultspec-dashboard) is the visual
+workspace that aggregates those views.
 
 ## Status, help, and license
 

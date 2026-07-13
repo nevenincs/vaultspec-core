@@ -4,7 +4,7 @@ tags:
   - '#marketing-audit'
   - '#index'
 date: '2026-04-21'
-modified: '2026-04-21'
+modified: '2026-06-13'
 related:
   - '[[2026-02-18-marketing-audit-competitor-landscape-research]]'
   - '[[2026-02-18-marketing-audit-documentation-quality-research]]'
