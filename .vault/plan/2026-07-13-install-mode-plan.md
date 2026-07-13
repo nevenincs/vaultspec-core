@@ -63,7 +63,7 @@ Make the builtin MCP definition and the four canonical pre-commit hook entries m
 - [x] `P03.S14` - Turn CANONICAL_ENTRY_PREFIX, the \_HOOK_DEFS entry values, CANONICAL_PRECOMMIT_HOOKS, and CANONICAL_HOOK_ENTRIES into functions of the resolved InstallMode, rendering uv run --no-sync vaultspec-core in dependency mode and uvx --from vaultspec-core vaultspec-core in tool mode; `src/vaultspec_core/core/commands.py`.
 - [x] `P03.S15` - Update \_scaffold_precommit to read the resolved workspace mode and render hook entries through the mode-parameterized hook definitions; `src/vaultspec_core/core/commands.py`.
 - [x] `P03.S16` - Add WorkspaceFactory-based tests asserting the MCP definition renders the uv run command form in dependency mode and the uvx --from form in tool mode after sync; `src/vaultspec_core/tests/cli/test_mcp_provider_files.py`.
-- [ ] `P03.S17` - Add WorkspaceFactory-based tests asserting all four canonical hook entries render the uv run --no-sync vaultspec-core prefix in dependency mode and the uvx --from vaultspec-core vaultspec-core prefix in tool mode; `src/vaultspec_core/tests/cli/test_flow_bugs.py`.
+- [x] `P03.S17` - Add WorkspaceFactory-based tests asserting all four canonical hook entries render the uv run --no-sync vaultspec-core prefix in dependency mode and the uvx --from vaultspec-core vaultspec-core prefix in tool mode; `src/vaultspec_core/tests/cli/test_flow_bugs.py`.
 
 ### Phase `P04` - mode-aware diagnosis and floor constraint
 
