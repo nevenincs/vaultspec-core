@@ -124,6 +124,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         collect_gitignore_state,
         collect_manifest_coherence,
         collect_mcp_config_state,
+        collect_mode_mismatch_state,
         collect_precommit_state,
         collect_provider_dir_state,
         collect_rename_integrity,
@@ -180,11 +181,14 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
             logger.warning("Rename integrity collector failed", exc_info=True)
             rename_integrity = RenameIntegritySignal.ERROR
 
-    # Mode-mismatch is threaded through the orchestrator here; the concrete
-    # collector that compares the persisted declaration against the observed
-    # artifact shapes is wired in below. A failed probe is neutral (CLEAN),
-    # never a crash, matching the other always-collected signals.
-    mode_mismatch = ModeMismatchSignal.CLEAN
+    # Mode-mismatch compares the persisted declaration against the observed
+    # hook and MCP artifact shapes. A failed probe is neutral (CLEAN), never a
+    # crash, matching the other always-collected signals.
+    try:
+        mode_mismatch = collect_mode_mismatch_state(target)
+    except Exception:
+        logger.warning("Mode mismatch collector failed", exc_info=True)
+        mode_mismatch = ModeMismatchSignal.CLEAN
 
     diag = WorkspaceDiagnosis(
         framework=framework,
