@@ -7,10 +7,13 @@
 **The governed development harness for coding agents and the humans who review their
 work.**
 
-[![build](https://img.shields.io/github/actions/workflow/status/nevenincs/vaultspec-core/ci.yml?branch=main&style=flat&label=build&logo=githubactions&logoColor=white&labelColor=24292f)](https://github.com/nevenincs/vaultspec-core/actions/workflows/ci.yml)
-[![release](https://img.shields.io/pypi/v/vaultspec-core?style=flat&label=release&logo=pypi&logoColor=white&labelColor=24292f&color=8A72B5)](https://pypi.org/project/vaultspec-core/)
-[![runtime](https://img.shields.io/badge/runtime-Python%20%7C%203.13%2B-3F9AA6?style=flat&logo=python&logoColor=white&labelColor=24292f)](https://www.python.org/downloads/)
-[![license](https://img.shields.io/github/license/nevenincs/vaultspec-core?style=flat&label=license&logo=opensourceinitiative&logoColor=white&labelColor=24292f&color=B3823C)](./LICENSE)
+[![build](https://img.shields.io/github/actions/workflow/status/nevenincs/vaultspec-core/ci.yml?branch=main&style=for-the-badge&label=build&logo=githubactions&logoColor=white&labelColor=1b1a16)](https://github.com/nevenincs/vaultspec-core/actions/workflows/ci.yml)
+[![release](https://img.shields.io/pypi/v/vaultspec-core?style=for-the-badge&label=release&logo=pypi&logoColor=white&labelColor=1b1a16&color=8A72B5)](https://pypi.org/project/vaultspec-core/)
+[![runtime](https://img.shields.io/badge/runtime-Python%203.13%2B-3F9AA6?style=for-the-badge&logo=python&logoColor=white&labelColor=1b1a16)](https://www.python.org/downloads/)
+[![license](https://img.shields.io/github/license/nevenincs/vaultspec-core?style=for-the-badge&label=license&logo=opensourceinitiative&logoColor=white&labelColor=1b1a16&color=B3823C)](./LICENSE)
+
+[![cli](https://img.shields.io/badge/cli-bundled-B5703F?style=for-the-badge&logo=gnubash&logoColor=white&labelColor=1b1a16)](./docs/CLI.md)
+[![mcp](https://img.shields.io/badge/mcp-bundled-B05A6B?style=for-the-badge&logo=modelcontextprotocol&logoColor=white&labelColor=1b1a16)](./docs/MCP.md)
 
 [Get started](#getting-started) · [Product](#the-pipeline-at-a-glance) ·
 [Documentation](#learn-more) · [Family](#the-vaultspec-family) ·
