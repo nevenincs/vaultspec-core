@@ -114,6 +114,28 @@ def _persist_resolved_mode(path: Path, mdata: ManifestData, mode: InstallMode) -
             place, not written here.
         mode: The resolved provisioning mode to persist.
     """
+    floor = _write_mode_declaration(path, mode)
+    mdata.resolved_mode = mode
+    mdata.resolved_floor_version = floor
+
+
+def _write_mode_declaration(path: Path, mode: InstallMode) -> str | None:
+    """Write the committed mode declaration, preserving any existing floor.
+
+    The provisioning mode and the ``minimum_vaultspec_version`` floor are
+    independent axes of the same committed declaration, so rewriting the mode
+    must never drop a floor a prior run recorded. The write is deterministic
+    (sorted keys, fixed indent) so re-writing the same mode leaves byte-identical
+    content, which is what makes a repeated ``install --upgrade`` idempotent.
+
+    Args:
+        path: Workspace root directory.
+        mode: The resolved provisioning mode to persist.
+
+    Returns:
+        The preserved floor constraint (or ``None``), so a caller echoing the
+        declaration into the manifest need not re-read it.
+    """
     from .workspace_mode import (
         WorkspaceDeclaration,
         read_workspace_declaration,
@@ -126,8 +148,52 @@ def _persist_resolved_mode(path: Path, mdata: ManifestData, mode: InstallMode) -
         path,
         WorkspaceDeclaration(install_mode=mode, minimum_vaultspec_version=floor),
     )
-    mdata.resolved_mode = mode
-    mdata.resolved_floor_version = floor
+    return floor
+
+
+def _infer_upgrade_mode(target: Path, explicit: InstallMode | None) -> InstallMode:
+    """Infer the provisioning mode for an ``install --upgrade`` (ADR Q6).
+
+    Precedence mirrors provision-time resolution at its top: an explicit
+    ``--mode`` flag wins (and is validated for impossible combinations), and an
+    already-persisted declaration wins next, so a second upgrade is idempotent
+    and a deliberate re-mode is honored. A legacy workspace with neither has its
+    mode inferred from its own deployed state: dependency mode only when the
+    canonical hook entries are ``uv run``-shaped *and* the target's
+    ``pyproject.toml`` lists ``vaultspec-core``; tool mode in every other case.
+
+    The hook-shape signal is read through the same ``_observed_precommit_mode``
+    collector the doctor's mode-mismatch check consumes, so migration and
+    diagnosis can never disagree on what a deployed artifact shape means - the
+    ``install-mode`` constraint against introducing a second comparator.
+
+    Args:
+        target: Workspace root directory.
+        explicit: The mode requested via ``--mode``, or ``None``.
+
+    Returns:
+        The inferred :class:`~vaultspec_core.core.enums.InstallMode` to persist
+        and render against for this upgrade.
+
+    Raises:
+        VaultSpecError: Propagated from
+            :func:`~vaultspec_core.core.workspace_mode.resolve_install_mode` when
+            *explicit* names an impossible combination or a persisted declaration
+            is malformed.
+    """
+    from .diagnosis.collectors import _observed_precommit_mode
+    from .workspace_mode import read_workspace_declaration, resolve_install_mode
+
+    if explicit is not None:
+        return resolve_install_mode(target, explicit=explicit)
+    if read_workspace_declaration(target) is not None:
+        return resolve_install_mode(target, explicit=None)
+
+    detected = resolve_install_mode(target, explicit=None)
+    observed = _observed_precommit_mode(target)
+    if detected is InstallMode.DEPENDENCY and observed is InstallMode.DEPENDENCY:
+        return InstallMode.DEPENDENCY
+    return InstallMode.TOOL
 
 
 # Map provider argument names to Tool enum members. The per-tool entries derive
@@ -1109,6 +1175,15 @@ def install_run(
                 hint=f"Run 'vaultspec-core install {path}' first.",
             ) from e
 
+        # Q6 migration: refine the provision-time resolution with this
+        # workspace's deployed state. A legacy workspace carries no persisted
+        # mode, so infer it from the observed hook shape and the pyproject
+        # dependency listing; a workspace that already declares a mode keeps it,
+        # which is what makes a repeated upgrade idempotent. This supersedes the
+        # value resolve_install_mode computed at entry, since only here is the
+        # deployed hook shape folded in.
+        resolved_mode = _infer_upgrade_mode(path, mode)
+
         seeded: list[tuple[str, str]] = []
         if not skip_core:
             # Re-seed builtins (force=True overwrites existing)
@@ -1135,6 +1210,17 @@ def install_run(
 
         run_pending_migrations(path)
 
+        # Persist the inferred declaration BEFORE the provider sync and the hook
+        # scaffold re-render their artifacts. Both renderers resolve their mode
+        # from the committed declaration (via resolve_render_mode); on a legacy
+        # workspace with no declaration that fallback renders dependency mode, so
+        # an inference that landed tool mode would otherwise leave uv-run-shaped
+        # artifacts contradicting the tool-mode declaration written moments
+        # later. Writing it here threads the inferred mode into this same run's
+        # rendering, mirroring the fresh-install ordering. The manifest echo and
+        # floor reconciliation still run once, later, via _persist_resolved_mode.
+        _write_mode_declaration(path, resolved_mode)
+
         sync_target = provider if provider not in ("all", "core") else "all"
         # `sync_provider` rejects `core` in its skip set (`allow_core=False`).
         # `install_run` accepts `core` because it skips the framework scaffold;
@@ -1147,7 +1233,7 @@ def install_run(
         sync_provider(sync_target, force=force, skip=skip - {"core"})
 
         if "precommit" not in skip:
-            _scaffold_precommit(path)
+            _scaffold_precommit(path, mode=resolved_mode)
 
         # Update manifest timestamps and version
         import datetime
@@ -1207,9 +1293,7 @@ def install_run(
     # otherwise clobber the tool-mode artifacts init_run just wrote. The manifest
     # echo and floor reconciliation still happen once, later, via
     # _persist_resolved_mode after the manifest is read.
-    from .workspace_mode import WorkspaceDeclaration, write_workspace_declaration
-
-    write_workspace_declaration(path, WorkspaceDeclaration(install_mode=resolved_mode))
+    _write_mode_declaration(path, resolved_mode)
 
     post_errors: list[str] = []
 

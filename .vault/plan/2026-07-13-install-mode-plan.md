@@ -82,7 +82,7 @@ Route the precommit canonical-entry check and a new mode-mismatch signal through
 
 Infer and persist mode for legacy workspaces on install --upgrade, update mode-aware documentation touchpoints, regenerate the CLI reference, and close with a full gate run and review.
 
-- [ ] `P05.S26` - Implement Q6 migration inference in install_run so install --upgrade against a workspace with no persisted mode infers dependency mode from a uv run-shaped canonical hook entry and a pyproject.toml dependency listing, tool mode otherwise, and records the inferred declaration; `src/vaultspec_core/core/commands.py`.
+- [x] `P05.S26` - Implement Q6 migration inference in install_run so install --upgrade against a workspace with no persisted mode infers dependency mode from a uv run-shaped canonical hook entry and a pyproject.toml dependency listing, tool mode otherwise, and records the inferred declaration; `src/vaultspec_core/core/commands.py`.
 - [ ] `P05.S27` - Add WorkspaceFactory-based tests for the install --upgrade migration inference covering a legacy dependency-mode workspace, a legacy tool-shaped workspace, and idempotency on a second upgrade run; `src/vaultspec_core/tests/cli/test_migration_triggers.py`.
 - [ ] `P05.S28` - Update the MCP setup section with mode-aware launch command guidance for both tool mode and dependency mode; `docs/MCP.md`.
 - [ ] `P05.S29` - Update the getting-started and MCP touchpoints to describe install mode selection and the tool-mode default; `README.md`.
