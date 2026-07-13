@@ -196,3 +196,20 @@ class TestDetectionSignals:
         _write_pyproject(factory.root, dependencies=["pytest", "rich"])
 
         assert resolve_install_mode(factory.root) is InstallMode.TOOL
+
+
+class TestResolveRefusal:
+    """The impossible-combo refusal, exercised in the CI unit gate.
+
+    The end-to-end no-scaffold guarantee lives in the integration-marked
+    ``test_ambiguous_states.py``; this unit test gives the refusal path coverage
+    under the ``-m unit`` gate that the integration file is excluded from.
+    """
+
+    def test_dependency_without_pyproject_raises_with_hint(self, factory):
+        with pytest.raises(VaultSpecError) as excinfo:
+            resolve_install_mode(factory.root, InstallMode.DEPENDENCY)
+
+        assert "dependency mode" in str(excinfo.value)
+        assert "--mode tool" in excinfo.value.hint
+        assert "pyproject.toml" in excinfo.value.hint

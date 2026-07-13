@@ -29,12 +29,19 @@ related:
 The hard refusal is covered end to end through `install_run` against a real
 factory-built workspace: the error message and remediation hint are asserted,
 and the absence of a scaffolded `.vaultspec/` proves the refusal fires ahead of
-provisioning rather than after a partial install. The suite passes (16 tests);
-ruff is clean.
+provisioning rather than after a partial install. This test lives in
+`test_ambiguous_states.py`, which is file-wide `pytest.mark.integration` and is
+therefore excluded from CI's `-m "unit and not gemini and not claude"` gate; run
+directly the file passes (16 tests). The gate-visible coverage of the refusal
+path is the unit-marked `TestResolveRefusal` in `test_workspace_mode.py`, added
+during P02 review, which calls `resolve_install_mode` with an explicit
+dependency request and no `pyproject.toml`. Ruff is clean.
 
 ## Notes
 
 The test uses the shared `factory` fixture and the real `install_run`, no mocks
 or stubs. Asserting on both the message and the `.vaultspec/` absence guards two
 distinct regressions: a silent fallback to tool mode, and a refusal that fires
-only after scaffolding has already run.
+only after scaffolding has already run. The integration test is intentionally
+retained as the end-to-end no-scaffold guarantee alongside the CI-visible unit
+test; see the P02 review follow-up commits.
