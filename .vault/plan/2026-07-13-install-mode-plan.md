@@ -47,7 +47,7 @@ Introduce the InstallMode enum, the committed workspace declaration surface unde
 
 Add the install --mode flag and the Q5 precedence chain (explicit, persisted, detection, default) that resolves and persists the workspace mode once at provision time, refusing loudly on conflicts.
 
-- [ ] `P02.S06` - Add the --mode option to cmd_install accepting tool and dependency values and thread it through to install_run; `src/vaultspec_core/cli/root.py`.
+- [x] `P02.S06` - Add the --mode option to cmd_install accepting tool and dependency values and thread it through to install_run; `src/vaultspec_core/cli/root.py`.
 - [ ] `P02.S07` - Add resolve_install_mode implementing the Q5 precedence chain (explicit flag, persisted declaration, pyproject.toml detection, default tool mode) plus the pyproject.toml dependency probe helper; `src/vaultspec_core/core/workspace_mode.py`.
 - [ ] `P02.S08` - Wire resolve_install_mode into install_run so the mode is resolved once at provision time, persisted to workspace.json, and an explicit --mode request that conflicts with detection raises a loud VaultSpecError refusal; `src/vaultspec_core/core/commands.py`.
 - [ ] `P02.S09` - Add WorkspaceFactory-based tests for resolve_install_mode precedence ordering: explicit overrides persisted and detected, persisted overrides detected, and detected overrides default; `src/vaultspec_core/tests/cli/test_workspace_mode.py`.

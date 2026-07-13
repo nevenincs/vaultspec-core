@@ -20,7 +20,7 @@ from typing import Any
 import yaml
 
 from . import types as _t
-from .enums import ManagedState, PrecommitHook, ProviderCapability, Tool
+from .enums import InstallMode, ManagedState, PrecommitHook, ProviderCapability, Tool
 from .exceptions import (
     ProviderError,
     ProviderNotInstalledError,
@@ -84,6 +84,43 @@ def _fresh_install_schema_version() -> str:
 
     candidates = [package_version(), *(m.target_version for m in REGISTRY)]
     return max(candidates, key=parse_version_tuple)
+
+
+def _persist_resolved_mode(path: Path, mdata: ManifestData, mode: InstallMode) -> None:
+    """Persist *mode* to the committed declaration and echo it into *mdata*.
+
+    Writes the shared source of truth (``.vaultspec/workspace.json`` via
+    :func:`~vaultspec_core.core.workspace_mode.write_workspace_declaration`) and
+    mirrors the resolved value into the gitignored per-machine manifest for
+    local bookkeeping. An existing floor constraint
+    (``minimum_vaultspec_version``) is preserved rather than dropped, since the
+    provisioning mode and the floor are independent axes of the same
+    declaration.
+
+    The declaration writer takes its own advisory lock, so this function must
+    not be called from within the manifest lock; *mdata* is mutated in place and
+    persisted by the caller's own :func:`write_manifest_data` cycle.
+
+    Args:
+        path: Workspace root directory.
+        mdata: Manifest data to stamp with the resolved mode echo; mutated in
+            place, not written here.
+        mode: The resolved provisioning mode to persist.
+    """
+    from .workspace_mode import (
+        WorkspaceDeclaration,
+        read_workspace_declaration,
+        write_workspace_declaration,
+    )
+
+    existing = read_workspace_declaration(path)
+    floor = existing.minimum_vaultspec_version if existing is not None else None
+    write_workspace_declaration(
+        path,
+        WorkspaceDeclaration(install_mode=mode, minimum_vaultspec_version=floor),
+    )
+    mdata.resolved_mode = mode
+    mdata.resolved_floor_version = floor
 
 
 # Map provider argument names to Tool enum members. The per-tool entries derive
@@ -833,6 +870,7 @@ def install_run(
     dry_run: bool = False,
     force: bool = False,
     skip: set[str] | None = None,
+    mode: InstallMode | None = None,
 ) -> dict[str, Any]:
     """Deploy the vaultspec framework to a project directory.
 
@@ -843,6 +881,10 @@ def install_run(
         dry_run: Preview the manifest of files that would be created.
         force: Override contents if installation already exists.
         skip: Set of component names to skip (``core`` and/or provider names).
+        mode: Explicit provisioning mode from the ``--mode`` flag, or ``None``
+            to let the workspace fall back to the default. The resolved mode is
+            persisted once at provision time to the committed workspace
+            declaration and echoed into the manifest.
 
     Returns:
         A dict describing the result:
@@ -884,6 +926,11 @@ def install_run(
             f"Cannot skip core: .vaultspec/ does not exist at {path}.",
             hint="Install core first, then use --skip core on subsequent installs.",
         )
+
+    # Resolve the provisioning mode once, at provision time. The Q5 precedence
+    # chain and conflict refusal are layered onto this resolution in a later
+    # step; here an explicit request wins and the default is tool mode.
+    resolved_mode = mode if mode is not None else InstallMode.TOOL
 
     if upgrade and dry_run:
         _ensure_tool_configs(path)
@@ -1032,6 +1079,7 @@ def install_run(
             PrecommitSignal.NO_HOOKS,
         )
 
+        _persist_resolved_mode(path, mdata, resolved_mode)
         write_manifest_data(path, mdata)
 
         # Reconcile git index with the managed gitignore block so that
@@ -1142,6 +1190,7 @@ def install_run(
     for name in provider_names:
         mdata.provider_state.setdefault(name, {})
         mdata.provider_state[name]["installed_at"] = mdata.installed_at
+    _persist_resolved_mode(path, mdata, resolved_mode)
     write_manifest_data(path, mdata)
 
     # Reconcile git index with the managed gitignore block so that

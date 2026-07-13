@@ -22,7 +22,7 @@ from vaultspec_core.cli._target import (
     apply_target,
     apply_target_install,
 )
-from vaultspec_core.core.enums import CliAction
+from vaultspec_core.core.enums import CliAction, InstallMode
 
 if TYPE_CHECKING:
     from vaultspec_core.cli.rendering import OutcomeItem
@@ -218,6 +218,17 @@ def cmd_install(
             help="Skip a component (core or provider name). Repeatable.",
         ),
     ] = None,
+    mode: Annotated[
+        InstallMode | None,
+        typer.Option(
+            "--mode",
+            help=(
+                "Provisioning mode: 'tool' (default, launched via uvx) or "
+                "'dependency' (resolved through the project's own venv). "
+                "Auto-detected from pyproject.toml when omitted."
+            ),
+        ),
+    ] = None,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     no_hints: Annotated[
         bool,
@@ -284,6 +295,7 @@ def cmd_install(
             dry_run=dry_run,
             force=force,
             skip=set(skip),
+            mode=mode,
         )
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc, json_output=json_output)

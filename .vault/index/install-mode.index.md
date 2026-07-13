@@ -11,6 +11,7 @@ related:
   - '[[2026-07-13-install-mode-P01-S03]]'
   - '[[2026-07-13-install-mode-P01-S04]]'
   - '[[2026-07-13-install-mode-P01-S05]]'
+  - '[[2026-07-13-install-mode-P02-S06]]'
   - '[[2026-07-13-install-mode-adr]]'
   - '[[2026-07-13-install-mode-plan]]'
   - '[[2026-07-13-install-mode-research]]'
@@ -33,6 +34,7 @@ Auto-generated index of all documents tagged with `#install-mode`.
 - `2026-07-13-install-mode-P01-S03` - Extend ManifestData with resolved_mode and resolved_floor_version echo fields plus their read and write round trip in read_manifest_data and write_manifest_data
 - `2026-07-13-install-mode-P01-S04` - Add WorkspaceFactory-based tests covering workspace.json round trip, missing-file default, corrupted JSON, and malformed mode value handling
 - `2026-07-13-install-mode-P01-S05` - Extend the manifest tests with the ManifestData resolved_mode and resolved_floor_version echo fields, covering read, write, and legacy-manifest backward compatibility
+- `2026-07-13-install-mode-P02-S06` - Add the --mode option to cmd_install accepting tool and dependency values and thread it through to install_run
 
 ### plan
 
