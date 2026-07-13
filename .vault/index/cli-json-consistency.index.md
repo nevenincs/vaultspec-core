@@ -4,7 +4,7 @@ tags:
   - '#index'
   - '#cli-json-consistency'
 date: '2026-05-17'
-modified: '2026-05-17'
+modified: '2026-06-13'
 related:
   - '[[2026-05-17-cli-json-consistency-adr]]'
   - '[[2026-05-17-cli-json-consistency-research]]'

@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#cli-logging'
 date: '2026-02-22'
-modified: '2026-02-22'
+modified: '2026-06-13'
 related:
   - '[[2026-02-22-cli-logging-adr]]'
   - '[[2026-02-22-cli-logging-research]]'

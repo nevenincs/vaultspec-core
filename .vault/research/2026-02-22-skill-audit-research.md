@@ -3,7 +3,7 @@ tags:
   - '#research'
   - '#skill-audit'
 date: '2026-02-22'
-modified: '2026-02-22'
+modified: '2026-06-13'
 ---
 
 # Skill Audit and Compliance Research

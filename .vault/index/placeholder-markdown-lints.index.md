@@ -4,7 +4,7 @@ tags:
   - '#index'
   - '#placeholder-markdown-lints'
 date: '2026-06-24'
-modified: '2026-06-24'
+modified: '2026-06-25'
 related:
   - '[[2026-06-24-placeholder-markdown-lints-adr]]'
   - '[[2026-06-24-placeholder-markdown-lints-research]]'

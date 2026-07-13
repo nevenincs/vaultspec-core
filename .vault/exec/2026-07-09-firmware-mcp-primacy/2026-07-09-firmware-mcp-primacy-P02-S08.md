@@ -3,7 +3,7 @@ tags:
   - '#exec'
   - '#firmware-mcp-primacy'
 date: '2026-07-09'
-modified: '2026-07-09'
+modified: '2026-07-10'
 step_id: 'S08'
 related:
   - "[[2026-07-09-firmware-mcp-primacy-plan]]"

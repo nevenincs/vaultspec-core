@@ -3,7 +3,7 @@ tags:
   - '#research'
   - '#rag-pipeline-enrollment'
 date: '2026-06-26'
-modified: '2026-06-26'
+modified: '2026-06-27'
 related:
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-25-framework-dir-flatten-adr]]'

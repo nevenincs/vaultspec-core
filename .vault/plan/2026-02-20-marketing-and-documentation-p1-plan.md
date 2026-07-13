@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#marketing-and-documentation'
 date: '2026-02-20'
-modified: '2026-02-20'
+modified: '2026-06-13'
 related:
   - '[[2026-02-20-marketing-and-documentation-research]]'
   - '[[2026-02-20-marketing-and-documentation-adr]]'

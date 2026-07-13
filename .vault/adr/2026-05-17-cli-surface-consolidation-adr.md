@@ -3,7 +3,7 @@ tags:
   - '#adr'
   - '#cli-surface-consolidation'
 date: '2026-05-17'
-modified: '2026-05-17'
+modified: '2026-06-13'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-surface-consolidation-research]]'

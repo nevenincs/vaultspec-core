@@ -3,7 +3,7 @@ tags:
   - '#research'
   - '#mcp-consolidation'
 date: '2026-02-22'
-modified: '2026-02-22'
+modified: '2026-06-13'
 related:
   - '[[2026-02-21-module-exports-part3-research]]'
   - '[[2026-02-22-cli-ecosystem-factoring-research]]'

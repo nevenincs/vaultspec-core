@@ -3,7 +3,7 @@ tags:
   - '#exec'
   - '#uniform-rename'
 date: '2026-06-26'
-modified: '2026-06-26'
+modified: '2026-06-27'
 step_id: 'S09'
 related:
   - "[[2026-06-26-uniform-rename-plan]]"

@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#cli-reference-automation'
 date: '2026-06-10'
-modified: '2026-06-10'
+modified: '2026-06-13'
 tier: L2
 related:
   - '[[2026-06-09-firmware-wording-review-adr]]'

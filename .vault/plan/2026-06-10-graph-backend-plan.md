@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#graph-backend'
 date: '2026-06-10'
-modified: '2026-06-10'
+modified: '2026-06-13'
 tier: L2
 related:
   - '[[2026-06-10-graph-backend-adr]]'

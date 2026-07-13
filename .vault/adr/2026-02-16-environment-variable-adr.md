@@ -3,7 +3,7 @@ tags:
   - '#adr'
   - '#framework'
 date: '2026-02-16'
-modified: '2026-02-16'
+modified: '2026-06-28'
 related:
   - '[[2026-02-16-env-var-research]]'
   - '[[2026-02-16-hardcoded-constants-research]]'

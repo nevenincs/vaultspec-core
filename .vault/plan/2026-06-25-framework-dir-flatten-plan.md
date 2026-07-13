@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#framework-dir-flatten'
 date: '2026-06-25'
-modified: '2026-06-25'
+modified: '2026-06-27'
 tier: L2
 related:
   - '[[2026-06-25-framework-dir-flatten-adr]]'

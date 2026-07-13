@@ -3,7 +3,7 @@ tags:
   - '#exec'
   - '#clci-release'
 date: '2026-03-22'
-modified: '2026-03-22'
+modified: '2026-06-13'
 related:
   - '[[2026-03-22-clci-release-phase1-plan]]'
 ---

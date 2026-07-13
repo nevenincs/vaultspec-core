@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#docs-curation'
 date: '2026-03-23'
-modified: '2026-03-23'
+modified: '2026-06-13'
 related:
   - '[[2026-03-23-docs-curation-adr]]'
   - '[[2026-03-23-docs-curation-research]]'

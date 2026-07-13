@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#mcp-tool-schema'
 date: '2026-07-09'
-modified: '2026-07-09'
+modified: '2026-07-10'
 tier: L2
 related:
   - '[[2026-07-09-mcp-tool-schema-adr]]'

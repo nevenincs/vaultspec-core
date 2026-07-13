@@ -4,7 +4,7 @@ tags:
   - '#index'
   - '#cli-presentation-uniformity'
 date: '2026-06-24'
-modified: '2026-06-24'
+modified: '2026-06-25'
 related:
   - '[[2026-06-24-cli-presentation-uniformity-adr]]'
   - '[[2026-06-24-cli-presentation-uniformity-plan]]'

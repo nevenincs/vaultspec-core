@@ -3,7 +3,7 @@ tags:
   - '#exec'
   - '#pytest-e2e'
 date: '2026-02-21'
-modified: '2026-02-21'
+modified: '2026-06-13'
 related:
   - '[[2026-02-21-pytest-e2e-observability-impl-plan]]'
   - '[[2026-02-21-pytest-e2e-observability-adr]]'

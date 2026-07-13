@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#cli-presentation-uniformity'
 date: '2026-06-24'
-modified: '2026-06-24'
+modified: '2026-06-25'
 tier: L2
 related:
   - '[[2026-06-24-cli-presentation-uniformity-adr]]'

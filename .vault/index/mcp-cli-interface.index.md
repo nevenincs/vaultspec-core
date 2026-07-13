@@ -4,7 +4,7 @@ tags:
   - '#mcp-cli-interface'
   - '#index'
 date: '2026-04-21'
-modified: '2026-04-21'
+modified: '2026-06-13'
 related:
   - '[[2026-03-11-mcp-cli-interface-audit]]'
   - '[[2026-03-17-mcp-interface-alignment-audit]]'

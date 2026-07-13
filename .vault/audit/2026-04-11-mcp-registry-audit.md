@@ -3,7 +3,7 @@ tags:
   - '#audit'
   - '#mcp-registry'
 date: '2026-04-11'
-modified: '2026-04-11'
+modified: '2026-06-13'
 related:
   - '[[2026-04-11-mcp-registry-adr]]'
   - '[[2026-04-11-mcp-registry-phase1-plan]]'

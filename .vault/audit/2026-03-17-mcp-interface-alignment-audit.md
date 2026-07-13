@@ -3,7 +3,7 @@ tags:
   - '#audit'
   - '#mcp-cli-interface'
 date: '2026-03-17'
-modified: '2026-03-17'
+modified: '2026-06-13'
 related:
   - '[[2026-03-11-mcp-cli-interface-audit]]'
   - '[[2026-02-22-mcp-consolidation-adr]]'

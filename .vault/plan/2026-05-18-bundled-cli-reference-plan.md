@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#bundled-cli-reference'
 date: '2026-05-18'
-modified: '2026-05-18'
+modified: '2026-06-13'
 tier: L1
 related:
   - '[[2026-05-18-bundled-cli-reference-adr]]'

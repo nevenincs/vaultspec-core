@@ -3,7 +3,7 @@ tags:
   - '#adr'
   - '#cli-target-refactor'
 date: '2026-03-23'
-modified: '2026-03-23'
+modified: '2026-06-25'
 related:
   - '[[2026-03-23-cli-target-refactor-research]]'
 ---

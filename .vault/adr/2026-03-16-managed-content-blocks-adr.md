@@ -3,7 +3,7 @@ tags:
   - '#adr'
   - '#install-cmds'
 date: '2026-03-16'
-modified: '2026-03-16'
+modified: '2026-06-13'
 related:
   - '[[2026-03-16-managed-content-blocks-research]]'
   - '[[2026-03-15-install-cmds-capability-audit]]'

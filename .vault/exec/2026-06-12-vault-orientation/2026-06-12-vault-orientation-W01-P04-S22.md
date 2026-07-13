@@ -3,7 +3,7 @@ tags:
   - '#exec'
   - '#vault-orientation'
 date: '2026-06-12'
-modified: '2026-06-12'
+modified: '2026-06-13'
 step_id: S22
 related:
   - '[[2026-06-12-vault-orientation-plan]]'

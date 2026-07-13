@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#plan-serializer-fixes'
 date: '2026-06-05'
-modified: '2026-06-05'
+modified: '2026-06-13'
 tier: L2
 related:
   - '[[2026-06-05-plan-serializer-fixes-adr]]'

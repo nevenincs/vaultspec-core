@@ -3,7 +3,7 @@ tags:
   - '#research'
   - '#framework'
 date: '2026-02-16'
-modified: '2026-02-16'
+modified: '2026-06-25'
 ---
 
 # Environment Variable Patterns Analysis — vaultspec
