@@ -165,3 +165,34 @@ class TestResolvePrecedence:
         _write_pyproject(factory.root, dependencies=["vaultspec-core>=0.1"])
 
         assert resolve_install_mode(factory.root) is InstallMode.DEPENDENCY
+
+
+class TestDetectionSignals:
+    """Detection inputs when no explicit flag or persisted declaration exists."""
+
+    def test_absence_of_pyproject_forces_tool(self, factory):
+        assert resolve_install_mode(factory.root) is InstallMode.TOOL
+
+    def test_vaultspec_in_project_dependencies_is_dependency_evidence(self, factory):
+        _write_pyproject(factory.root, dependencies=["vaultspec-core>=0.1.37"])
+
+        assert resolve_install_mode(factory.root) is InstallMode.DEPENDENCY
+
+    def test_vaultspec_in_dependency_group_is_dependency_evidence(self, factory):
+        # PEP 735 dependency group, underscore spelling, mixed with an
+        # unrelated requirement: the probe still recognizes the distribution.
+        (factory.root / "pyproject.toml").write_text(
+            '[project]\nname = "example"\nversion = "0.0.0"\n\n'
+            "[dependency-groups]\n"
+            'dev = ["pytest", "vaultspec_core==0.1.37"]\n',
+            encoding="utf-8",
+        )
+
+        assert resolve_install_mode(factory.root) is InstallMode.DEPENDENCY
+
+    def test_pyproject_without_vaultspec_defaults_to_tool(self, factory):
+        # A pyproject that exists but does not list vaultspec-core is the
+        # "absence of both signals" case and falls through to the default.
+        _write_pyproject(factory.root, dependencies=["pytest", "rich"])
+
+        assert resolve_install_mode(factory.root) is InstallMode.TOOL
