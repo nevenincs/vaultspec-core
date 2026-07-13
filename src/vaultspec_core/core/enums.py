@@ -296,6 +296,53 @@ class CliAction(StrEnum):
     DOCTOR = "doctor"
 
 
+class InstallMode(StrEnum):
+    """How vaultspec-core is provisioned into a governed workspace.
+
+    Vaultspec-core is development-harness tooling, not a runtime dependency of
+    the projects it governs, so provisioning is an explicit choice between two
+    equally first-class launch shapes rather than a single baked-in assumption.
+    The resolved mode is the source of truth every downstream renderer reads:
+    the builtin MCP definition, the four canonical pre-commit hook entries, and
+    the doctor's canonical-entry and version-skew checks all branch on it.
+
+    Members:
+        TOOL: The default. The CLI, hooks, and MCP server launch through an
+            ephemeral ``uvx`` invocation, so ``vaultspec-core`` never enters the
+            governed project's own dependency set.
+        DEPENDENCY: The explicit opt-in that this repository itself exercises
+            by self-hosting. The CLI, hooks, and MCP server resolve through the
+            target project's own venv via ``uv run``, so ``vaultspec-core`` is a
+            declared dependency of the project.
+    """
+
+    TOOL = "tool"
+    DEPENDENCY = "dependency"
+
+    @classmethod
+    def from_token(cls, token: str | None) -> InstallMode | None:
+        """Resolve a raw mode token to a canonical member, leniently.
+
+        The match is case-insensitive and tolerant of surrounding whitespace,
+        so ``tool``, ``Tool``, and `` tool `` all resolve to :attr:`TOOL`.
+
+        Args:
+            token: Raw mode token parsed from a declaration or flag, or
+                ``None``.
+
+        Returns:
+            The matching :class:`InstallMode`, or ``None`` when *token* is
+            missing or falls outside the canonical set.
+        """
+        if token is None:
+            return None
+        normalized = token.strip().lower()
+        try:
+            return cls(normalized)
+        except ValueError:
+            return None
+
+
 class PrecommitHook(StrEnum):
     """Canonical pre-commit hook IDs managed by vaultspec-core.
 

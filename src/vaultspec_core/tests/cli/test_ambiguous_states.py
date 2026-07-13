@@ -14,6 +14,8 @@ from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
 from vaultspec_core.core.commands import install_run, sync_provider, uninstall_run
+from vaultspec_core.core.enums import InstallMode
+from vaultspec_core.core.exceptions import VaultSpecError
 from vaultspec_core.core.gitignore import MARKER_BEGIN, MARKER_END
 from vaultspec_core.core.manifest import read_manifest_data, write_manifest_data
 
@@ -262,3 +264,26 @@ class TestDoctorDegradedWorkspaces:
             f"untracked directory reported but exit code masked as success: "
             f"exit={result.exit_code}\n{result.output}"
         )
+
+
+class TestInstallModeConflictRefusal:
+    """install refuses an impossible mode request instead of silent fallback."""
+
+    def test_dependency_mode_without_pyproject_refuses(self, factory):
+        # A repo with no pyproject.toml has nothing to resolve a dependency
+        # against, so an explicit dependency-mode request is a hard refusal
+        # rather than a silent fallback to tool mode.
+        factory.create_gitignore()
+        assert not (factory.root / "pyproject.toml").exists()
+
+        with pytest.raises(VaultSpecError) as excinfo:
+            install_run(path=factory.root, provider="all", mode=InstallMode.DEPENDENCY)
+
+        message = str(excinfo.value)
+        assert "dependency mode" in message
+        assert str(factory.root) in message
+        # The refusal must carry an actionable remediation, not just fail.
+        assert "--mode tool" in excinfo.value.hint
+        assert "pyproject.toml" in excinfo.value.hint
+        # Refusal happens before provisioning: no framework is scaffolded.
+        assert not (factory.root / ".vaultspec").exists()

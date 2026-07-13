@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .signals import (
     BuiltinVersionSignal,
@@ -19,11 +20,16 @@ from .signals import (
     GitattributesSignal,
     GitignoreSignal,
     ManifestEntrySignal,
+    ModeMismatchSignal,
     PrecommitSignal,
     ProviderDirSignal,
     RenameIntegritySignal,
     VaultContentSignal,
+    VersionFloorSignal,
 )
+
+if TYPE_CHECKING:
+    from ..enums import InstallMode
 
 logger = logging.getLogger(__name__)
 
@@ -390,9 +396,15 @@ def collect_mcp_config_state(target: Path) -> ConfigSignal:
         return ConfigSignal.PARTIAL_MCP
 
     # Check registry drift: compare deployed entries against definitions
+    # rendered for the workspace's resolved mode. The seeded builtin carries
+    # mode-neutral placeholder tokens, so an unrendered registry entry can never
+    # equal the rendered .mcp.json launch and would report drift on every
+    # workspace. resolve_render_mode's legacy-absent rule keeps a pre-install-mode
+    # workspace on the dependency-shaped expectation.
     from ..mcps import collect_mcp_servers
+    from ..workspace_mode import resolve_render_mode
 
-    registry = collect_mcp_servers()
+    registry = collect_mcp_servers(mode=resolve_render_mode(target))
     if registry:
         managed_names = set(registry.keys())
         for name, (_path, expected_config) in registry.items():
@@ -659,7 +671,15 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
     """
     import yaml
 
-    from ..commands import CANONICAL_HOOK_ENTRIES, CANONICAL_HOOK_IDS
+    from ..commands import CANONICAL_HOOK_IDS, canonical_hook_entries_for_mode
+    from ..workspace_mode import resolve_render_mode
+
+    # Derive the expected hook entries from the workspace's resolved mode so a
+    # correctly-provisioned tool-mode workspace (uvx entries) is not diagnosed
+    # as non-canonical against the dependency-mode shape. resolve_render_mode's
+    # legacy-absent rule keeps a pre-install-mode workspace on dependency-shaped
+    # expectations. P04 layers a dedicated mode-mismatch signal on top of this.
+    expected_entries = canonical_hook_entries_for_mode(resolve_render_mode(target))
 
     config_path = target / ".pre-commit-config.yaml"
     if not config_path.exists():
@@ -701,11 +721,216 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
         hook_id = hook.get("id")
         if hook_id in CANONICAL_HOOK_IDS:
             entry = str(hook.get("entry", ""))
-            expected = CANONICAL_HOOK_ENTRIES.get(str(hook_id), "")
+            expected = expected_entries.get(str(hook_id), "")
             if entry != expected:
                 return PrecommitSignal.NON_CANONICAL
 
     return PrecommitSignal.COMPLETE
+
+
+def _observed_precommit_mode(target: Path) -> InstallMode | None:
+    """Infer the install mode the deployed hook entries are shaped for.
+
+    Reads ``.pre-commit-config.yaml`` and inspects the canonical hook entries.
+    Each mode renders a distinct entry prefix (``uv run --no-sync
+    vaultspec-core`` for dependency mode, ``uvx --from vaultspec-core
+    vaultspec-core`` for tool mode), so the prefix a deployed entry carries
+    names the mode it was provisioned for. The prefixes are read from
+    :func:`~vaultspec_core.core.commands.entry_prefix_for_mode`, the same source
+    the renderer uses, so this never hardcodes a second copy of the shape.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        The single :class:`~vaultspec_core.core.enums.InstallMode` every
+        canonical hook entry agrees on, or ``None`` when there is no config, no
+        canonical hook, or the entries disagree (so no coherent shape can be
+        read).
+    """
+    import yaml
+
+    from ..commands import CANONICAL_HOOK_IDS, entry_prefix_for_mode
+    from ..enums import InstallMode
+
+    config_path = target / ".pre-commit-config.yaml"
+    if not config_path.exists():
+        return None
+    try:
+        data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    except (yaml.YAMLError, OSError) as exc:
+        logger.warning("Cannot read .pre-commit-config.yaml %s: %s", config_path, exc)
+        return None
+    if not isinstance(data, dict):
+        return None
+    repos = data.get("repos", [])
+    if not isinstance(repos, list):
+        return None
+
+    # Longest prefix first so tool mode's "uvx --from vaultspec-core
+    # vaultspec-core" is tested before any shorter prefix could partial-match.
+    prefixes = sorted(
+        ((entry_prefix_for_mode(m), m) for m in InstallMode),
+        key=lambda pair: len(pair[0]),
+        reverse=True,
+    )
+
+    observed: set[InstallMode] = set()
+    for repo in repos:
+        if not isinstance(repo, dict) or repo.get("repo") != "local":
+            continue
+        hooks = repo.get("hooks", [])
+        if not isinstance(hooks, list):
+            continue
+        for hook in hooks:
+            if not isinstance(hook, dict) or hook.get("id") not in CANONICAL_HOOK_IDS:
+                continue
+            entry = str(hook.get("entry", ""))
+            for prefix, mode in prefixes:
+                if entry.startswith(prefix):
+                    observed.add(mode)
+                    break
+
+    if len(observed) == 1:
+        return next(iter(observed))
+    return None
+
+
+def _observed_mcp_mode(target: Path) -> InstallMode | None:
+    """Infer the install mode the deployed MCP launch command is shaped for.
+
+    Reads ``.mcp.json`` and matches the ``vaultspec-core`` server's ``command``
+    and ``args`` against the concrete launch each mode renders (dependency mode
+    launches through ``uv run``, tool mode through ``uvx``). The launch shapes
+    are read from the renderer's own ``_MODE_MCP_LAUNCH`` table so this never
+    hardcodes a second copy of the command shape.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        The matching :class:`~vaultspec_core.core.enums.InstallMode`, or ``None``
+        when there is no config, no managed server entry, or the entry matches
+        no known launch shape.
+    """
+    from ..mcps import _MODE_MCP_LAUNCH
+
+    mcp_path = target / ".mcp.json"
+    if not mcp_path.exists():
+        return None
+    try:
+        raw = json.loads(mcp_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Cannot read MCP config %s: %s", mcp_path, exc)
+        return None
+    if not isinstance(raw, dict):
+        return None
+    servers = raw.get("mcpServers")
+    if not isinstance(servers, dict):
+        return None
+    entry = servers.get("vaultspec-core")
+    if not isinstance(entry, dict):
+        return None
+
+    command = entry.get("command")
+    args = entry.get("args")
+    for mode, (mode_command, mode_args) in _MODE_MCP_LAUNCH.items():
+        if command == mode_command and args == mode_args:
+            return mode
+    return None
+
+
+def collect_mode_mismatch_state(target: Path) -> ModeMismatchSignal:
+    """Compare the persisted install mode against the observed artifact shapes.
+
+    Reads the committed ``.vaultspec/workspace.json`` declaration and holds the
+    mode it names against the shape of the provisioned artifacts: the canonical
+    pre-commit hook entries and the ``.mcp.json`` launch command. When a
+    deployed artifact is shaped for a mode other than the declared one - a ``uv
+    run`` hook entry or a non-``uvx`` MCP command in a workspace whose
+    declaration names tool mode, or the reverse - the workspace is flagged
+    :attr:`~vaultspec_core.core.diagnosis.signals.ModeMismatchSignal.MISMATCH`
+    with the fix hint pointing at ``install --upgrade`` or an explicit
+    ``--mode`` re-run.
+
+    A workspace with no persisted declaration is
+    :attr:`~vaultspec_core.core.diagnosis.signals.ModeMismatchSignal.UNKNOWN`:
+    it predates the ``install-mode`` decision, so there is no declared mode to
+    hold its artifacts against and this is not a warning. Everything coherent -
+    or a declared workspace whose artifacts cannot be read - is
+    :attr:`~vaultspec_core.core.diagnosis.signals.ModeMismatchSignal.CLEAN`.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        The observed
+        :class:`~vaultspec_core.core.diagnosis.signals.ModeMismatchSignal`.
+
+    Raises:
+        VaultSpecError: If the declaration exists but is malformed (propagated
+            from
+            :func:`~vaultspec_core.core.workspace_mode.read_workspace_declaration`).
+    """
+    from ..workspace_mode import read_workspace_declaration
+
+    declaration = read_workspace_declaration(target)
+    if declaration is None:
+        return ModeMismatchSignal.UNKNOWN
+
+    declared = declaration.install_mode
+    observed = {
+        mode
+        for mode in (_observed_precommit_mode(target), _observed_mcp_mode(target))
+        if mode is not None
+    }
+    if any(mode != declared for mode in observed):
+        return ModeMismatchSignal.MISMATCH
+    return ModeMismatchSignal.CLEAN
+
+
+def collect_version_floor_state(target: Path) -> tuple[VersionFloorSignal, str, str]:
+    """Evaluate the committed floor constraint for the doctor's read-only view.
+
+    Runs the shared :func:`~vaultspec_core.core.workspace_mode.evaluate_version_floor`
+    comparator - the same one the resolver's refuse-and-tell path uses - so the
+    doctor reports exactly the condition install and sync refuse on. Unlike that
+    path, this never raises: a corrupt declaration or an unreadable version is
+    treated as "no constraint" so the read-only doctor surface stays crash-free.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        ``(signal, running_version, minimum_version)``. When the running
+        version is below the floor the signal is
+        :attr:`~vaultspec_core.core.diagnosis.signals.VersionFloorSignal.BELOW`
+        and the two version strings are populated; otherwise the signal is
+        :attr:`~vaultspec_core.core.diagnosis.signals.VersionFloorSignal.OK`
+        with empty strings.
+    """
+    from importlib.metadata import version as pkg_version
+
+    from ..exceptions import VaultSpecError
+    from ..workspace_mode import evaluate_version_floor
+
+    try:
+        running = pkg_version("vaultspec-core")
+    except Exception:
+        logger.debug("Could not determine running version for floor state")
+        return VersionFloorSignal.OK, "", ""
+
+    try:
+        violation = evaluate_version_floor(target, running)
+    except VaultSpecError:
+        logger.debug("Could not read declaration for floor state", exc_info=True)
+        return VersionFloorSignal.OK, "", ""
+
+    if violation is None:
+        return VersionFloorSignal.OK, "", ""
+
+    running_v, floor = violation
+    return VersionFloorSignal.BELOW, running_v, floor
 
 
 def collect_rename_integrity(target: Path) -> tuple[RenameIntegritySignal, int]:

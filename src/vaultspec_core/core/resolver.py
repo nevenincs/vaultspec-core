@@ -21,6 +21,7 @@ from .diagnosis.signals import (
     GitattributesSignal,
     GitignoreSignal,
     ManifestEntrySignal,
+    ModeMismatchSignal,
     PrecommitSignal,
     ProviderDirSignal,
     ResolutionAction,
@@ -137,13 +138,31 @@ def resolve(
         except Exception:
             pc_managed = True
 
+    # The canonical entry prefix the non-canonical precommit advisory names is
+    # mode-dependent: a tool-mode workspace should be told to use the uvx form,
+    # not the dependency-mode uv-run form. Resolve it from the persisted mode,
+    # falling back to the dependency-mode prefix if the mode cannot be read.
+    expected_entry_prefix = "uv run --no-sync vaultspec-core"
+    if target is not None:
+        try:
+            from .commands import entry_prefix_for_mode
+            from .workspace_mode import resolve_render_mode
+
+            expected_entry_prefix = entry_prefix_for_mode(resolve_render_mode(target))
+        except Exception:
+            logger.debug(
+                "Could not resolve render mode for precommit advisory", exc_info=True
+            )
+
     _resolve_precommit(
         plan,
         diagnosis.precommit,
         prov_action,
         force=force,
         precommit_managed=pc_managed,
+        expected_entry_prefix=expected_entry_prefix,
     )
+    _resolve_mode_mismatch(plan, diagnosis.mode_mismatch)
 
     # Per-provider rules
     for tool, prov_diag in diagnosis.providers.items():
@@ -780,6 +799,7 @@ def _resolve_precommit(
     *,
     force: bool,
     precommit_managed: bool = True,
+    expected_entry_prefix: str = "uv run --no-sync vaultspec-core",
 ) -> None:
     """Apply pre-commit hook resolution rules."""
     _ = force  # precommit repairs are unconditional
@@ -829,7 +849,7 @@ def _resolve_precommit(
                     target=".pre-commit-config.yaml",
                     reason=(
                         "Hook entries use non-canonical pattern; "
-                        "should use 'uv run --no-sync vaultspec-core'"
+                        f"should use '{expected_entry_prefix}'"
                     ),
                 )
             )
@@ -839,8 +859,85 @@ def _resolve_precommit(
 
 
 # ---------------------------------------------------------------------------
+# Install-mode mismatch
+# ---------------------------------------------------------------------------
+
+
+def _resolve_mode_mismatch(
+    plan: ResolutionPlan,
+    signal: ModeMismatchSignal,
+) -> None:
+    """Warn when provisioned artifacts disagree with the declared install mode.
+
+    A :attr:`~vaultspec_core.core.diagnosis.signals.ModeMismatchSignal.MISMATCH`
+    means the committed declaration names one mode but the deployed hook entries
+    or MCP launch command are shaped for the other. This is advisory rather than
+    auto-repaired: reconciling it re-provisions the workspace, which is an
+    explicit operator decision, so the plan carries a fix hint pointing at
+    ``install --upgrade`` or an explicit ``--mode`` re-run rather than a silent
+    corrective step. ``CLEAN`` and ``UNKNOWN`` (the legacy, undeclared workspace)
+    are no-ops.
+    """
+    if signal != ModeMismatchSignal.MISMATCH:
+        return
+    plan.warnings.append(
+        "Provisioned hook entries or MCP launch command do not match the "
+        "install mode declared in .vaultspec/workspace.json. Re-run "
+        "'vaultspec-core install --upgrade' to reconcile them, or "
+        "'vaultspec-core install --mode <tool|dependency>' to re-provision "
+        "for a specific mode."
+    )
+
+
+# ---------------------------------------------------------------------------
 # Version mismatch warning
 # ---------------------------------------------------------------------------
+
+
+def _enforce_version_floor(target: Path, running_version: str) -> None:
+    """Refuse when the running version is below the workspace floor constraint.
+
+    Reads the committed ``.vaultspec/workspace.json`` declaration's
+    ``minimum_vaultspec_version`` and hard-refuses, refuse-and-tell per the
+    pre-commit/Terraform precedent, when the running package version is below
+    it. A workspace that declares no floor, or whose declaration cannot be read,
+    imposes no constraint. This is the hard guarantee tool mode leans on once
+    the running CLI and the hooks/MCP runtime are no longer the same install;
+    the softer manifest-stamp warning below remains an informational drift
+    signal beneath it.
+
+    Args:
+        target: Workspace root directory.
+        running_version: The running ``vaultspec-core`` package version string.
+
+    Raises:
+        VaultSpecError: When the running version is below the declared floor.
+    """
+    from .exceptions import VaultSpecError
+    from .workspace_mode import evaluate_version_floor
+
+    try:
+        violation = evaluate_version_floor(target, running_version)
+    except VaultSpecError:
+        # A corrupt declaration surfaces through the explicit install/mode
+        # paths that must refuse on it; do not raise a second, differently
+        # shaped error from the version-check area.
+        logger.debug("Could not read declaration for floor check", exc_info=True)
+        return
+
+    if violation is None:
+        return
+
+    running, floor = violation
+    raise VaultSpecError(
+        f"vaultspec-core {running} is below the workspace floor "
+        f"{floor} declared in .vaultspec/workspace.json.",
+        hint=(
+            f"Upgrade to at least {floor}: 'uv tool upgrade vaultspec-core' "
+            f"(or 'uv sync --upgrade-package vaultspec-core' when used as a "
+            f"project dependency)."
+        ),
+    )
 
 
 def _resolve_version_warning(
@@ -869,6 +966,10 @@ def _resolve_version_warning(
     except LookupError:
         logger.debug("No workspace context available for version check", exc_info=True)
         return
+
+    # Hard floor constraint first: a running version below the declared
+    # minimum refuses outright, before the softer manifest-stamp drift warning.
+    _enforce_version_floor(target, running_version)
 
     try:
         from .manifest import read_manifest_data

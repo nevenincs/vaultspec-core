@@ -18,10 +18,12 @@ from vaultspec_core.core.diagnosis.collectors import (
     collect_gitignore_state,
     collect_manifest_coherence,
     collect_mcp_config_state,
+    collect_mode_mismatch_state,
+    collect_precommit_state,
     collect_provider_dir_state,
     collect_vault_content_state,
 )
-from vaultspec_core.core.diagnosis.diagnosis import diagnose
+from vaultspec_core.core.diagnosis.diagnosis import WorkspaceDiagnosis, diagnose
 from vaultspec_core.core.diagnosis.signals import (
     BuiltinVersionSignal,
     ConfigSignal,
@@ -29,13 +31,38 @@ from vaultspec_core.core.diagnosis.signals import (
     FrameworkSignal,
     GitignoreSignal,
     ManifestEntrySignal,
+    ModeMismatchSignal,
+    PrecommitSignal,
     ProviderDirSignal,
     VaultContentSignal,
 )
-from vaultspec_core.core.enums import Tool
+from vaultspec_core.core.enums import CliAction, InstallMode, Tool
 from vaultspec_core.core.gitignore import DEFAULT_ENTRIES, MARKER_BEGIN, MARKER_END
+from vaultspec_core.core.resolver import resolve
+from vaultspec_core.core.workspace_mode import (
+    WorkspaceDeclaration,
+    write_workspace_declaration,
+)
 
 pytestmark = [pytest.mark.unit]
+
+
+def _install_and_init(root: Path, mode: InstallMode) -> None:
+    """Provision *root* in *mode* and bind the workspace context to it.
+
+    ``collect_mcp_config_state`` reads the MCP registry through the active
+    workspace context, so the context must point at the freshly-installed
+    workspace for the registry-drift comparison to run against real
+    definitions.
+    """
+    from vaultspec_core.config import reset_config
+    from vaultspec_core.config.workspace import resolve_workspace
+    from vaultspec_core.core.types import init_paths
+    from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+    WorkspaceFactory(root).install("all", mode=mode)
+    reset_config()
+    init_paths(resolve_workspace(target_override=root))
 
 
 def _write_manifest(root: Path, installed: list[str]) -> None:
@@ -453,6 +480,245 @@ class TestMcpConfigState:
         }
         mcp.write_text(json.dumps(payload), encoding="utf-8")
         assert collect_mcp_config_state(tmp_path) == ConfigSignal.USER_MCP
+
+    def test_tool_mode_install_is_ok(self, tmp_path: Path) -> None:
+        """A real tool-mode install must diagnose clean: the registry drift
+        comparison renders the mode-neutral builtin for the workspace's mode,
+        so the uvx-shaped .mcp.json entry matches its rendered definition.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        assert collect_mcp_config_state(tmp_path) == ConfigSignal.OK
+
+    def test_dependency_mode_install_is_ok(self, tmp_path: Path) -> None:
+        """A real dependency-mode install must diagnose clean the same way,
+        with the uv-run-shaped .mcp.json entry matching its rendered
+        definition.
+        """
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "x"\nversion = "0"\ndependencies = ["vaultspec-core"]\n',
+            encoding="utf-8",
+        )
+        _install_and_init(tmp_path, InstallMode.DEPENDENCY)
+        assert collect_mcp_config_state(tmp_path) == ConfigSignal.OK
+
+    def test_hand_altered_entry_is_registry_drift(self, tmp_path: Path) -> None:
+        """The comparator still has teeth: a hand-altered managed entry that no
+        longer matches its rendered definition is reported as drift.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        mcp = tmp_path / ".mcp.json"
+        payload = json.loads(mcp.read_text(encoding="utf-8"))
+        payload["mcpServers"]["vaultspec-core"]["command"] = "totally-wrong"
+        mcp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        assert collect_mcp_config_state(tmp_path) == ConfigSignal.REGISTRY_DRIFT
+
+
+# ---------------------------------------------------------------------------
+# collect_mode_mismatch_state
+# ---------------------------------------------------------------------------
+class TestModeMismatchState:
+    def test_no_declaration_is_unknown(self, tmp_path: Path) -> None:
+        """A workspace with no committed declaration predates install-mode and
+        has no declared mode to hold its artifacts against: UNKNOWN, not a
+        warning.
+        """
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.UNKNOWN
+
+    def test_tool_declaration_with_dependency_artifacts_is_mismatch(
+        self, tmp_path: Path
+    ) -> None:
+        """Provision real dependency-mode artifacts (uv run hook entries and a
+        non-uvx MCP command), then declare tool mode: the declaration names one
+        mode while the deployed artifacts carry the other, so the workspace is
+        flagged MISMATCH.
+        """
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "x"\nversion = "0"\ndependencies = ["vaultspec-core"]\n',
+            encoding="utf-8",
+        )
+        _install_and_init(tmp_path, InstallMode.DEPENDENCY)
+        # Sanity: a coherent dependency-mode workspace is clean before the flip.
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.CLEAN
+        write_workspace_declaration(
+            tmp_path, WorkspaceDeclaration(install_mode=InstallMode.TOOL)
+        )
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.MISMATCH
+
+    def test_dependency_declaration_with_tool_artifacts_is_mismatch(
+        self, tmp_path: Path
+    ) -> None:
+        """The reverse: provision real tool-mode artifacts (uvx hook entries and
+        MCP command), then declare dependency mode, and confirm MISMATCH.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.CLEAN
+        write_workspace_declaration(
+            tmp_path, WorkspaceDeclaration(install_mode=InstallMode.DEPENDENCY)
+        )
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.MISMATCH
+
+    def test_missing_precommit_config_no_false_mismatch(self, tmp_path: Path) -> None:
+        """With the hook config absent, the hook shape is unobservable; the
+        remaining MCP artifact still matches the declaration, so CLEAN, not a
+        false MISMATCH.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        (tmp_path / ".pre-commit-config.yaml").unlink()
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.CLEAN
+
+    def test_missing_mcp_config_no_false_mismatch(self, tmp_path: Path) -> None:
+        """With .mcp.json absent, the MCP shape is unobservable; the remaining
+        hook entries still match the declaration, so CLEAN.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        (tmp_path / ".mcp.json").unlink()
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.CLEAN
+
+    def test_no_observable_artifacts_no_false_mismatch(self, tmp_path: Path) -> None:
+        """A workspace whose hooks are managed outside .pre-commit-config.yaml
+        (e.g. a prek.toml-managed setup) and with no .mcp.json has nothing to
+        contradict the declaration, so CLEAN rather than a false MISMATCH.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        (tmp_path / ".pre-commit-config.yaml").unlink()
+        (tmp_path / ".mcp.json").unlink()
+        (tmp_path / "prek.toml").write_text("# hooks managed here\n", encoding="utf-8")
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.CLEAN
+
+    def test_mixed_partial_shapes_is_mismatch(self, tmp_path: Path) -> None:
+        """A single contradicting artifact is enough: tool-shaped hooks but a
+        dependency-shaped MCP command in a tool-declared workspace is MISMATCH.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        # Rewrite only the MCP launch to the dependency-mode shape, leaving the
+        # tool-mode hook entries intact.
+        mcp = tmp_path / ".mcp.json"
+        payload = json.loads(mcp.read_text(encoding="utf-8"))
+        payload["mcpServers"]["vaultspec-core"]["command"] = "uv"
+        payload["mcpServers"]["vaultspec-core"]["args"] = [
+            "run",
+            "python",
+            "-m",
+            "vaultspec_core.mcp_server.app",
+        ]
+        mcp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.MISMATCH
+
+
+# ---------------------------------------------------------------------------
+# resolver mode-mismatch advisory and precommit completeness
+# ---------------------------------------------------------------------------
+class TestModeMismatchResolution:
+    def _clean_diagnosis(self, mode_mismatch: ModeMismatchSignal) -> WorkspaceDiagnosis:
+        """A diagnosis whose only non-clean axis is the mode-mismatch signal."""
+        return WorkspaceDiagnosis(
+            framework=FrameworkSignal.PRESENT,
+            builtin_version=BuiltinVersionSignal.CURRENT,
+            gitignore=GitignoreSignal.COMPLETE,
+            precommit=PrecommitSignal.COMPLETE,
+            mode_mismatch=mode_mismatch,
+        )
+
+    def test_mismatch_emits_fix_hint_warning(self) -> None:
+        """A MISMATCH diagnosis makes the resolver warn with both remediation
+        targets: install --upgrade and an explicit --mode re-run.
+        """
+        plan = resolve(
+            self._clean_diagnosis(ModeMismatchSignal.MISMATCH), CliAction.SYNC
+        )
+        mode_warnings = [w for w in plan.warnings if "workspace.json" in w]
+        assert len(mode_warnings) == 1
+        warning = mode_warnings[0]
+        assert "install --upgrade" in warning
+        assert "install --mode" in warning
+
+    def test_clean_emits_no_mode_warning(self) -> None:
+        """A CLEAN mode-mismatch signal produces no mode advisory."""
+        plan = resolve(self._clean_diagnosis(ModeMismatchSignal.CLEAN), CliAction.SYNC)
+        assert not [w for w in plan.warnings if "workspace.json" in w]
+
+    def test_unknown_emits_no_mode_warning(self) -> None:
+        """UNKNOWN (a legacy, undeclared workspace) is not a warning."""
+        plan = resolve(
+            self._clean_diagnosis(ModeMismatchSignal.UNKNOWN), CliAction.SYNC
+        )
+        assert not [w for w in plan.warnings if "workspace.json" in w]
+
+    def test_tool_mode_workspace_precommit_is_complete(self, tmp_path: Path) -> None:
+        """A correctly-provisioned tool-mode workspace renders uvx hook entries,
+        and collect_precommit_state derives its expected entries from the
+        persisted tool mode, so the workspace diagnoses COMPLETE rather than
+        NON_CANONICAL against the dependency-mode shape.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        assert collect_precommit_state(tmp_path) == PrecommitSignal.COMPLETE
+
+
+# ---------------------------------------------------------------------------
+# doctor table rows for the install-mode signals
+# ---------------------------------------------------------------------------
+class TestDoctorModeAndFloorRows:
+    @staticmethod
+    def _run_doctor(root: Path):
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        return WorkspaceFactory(root).run("doctor")
+
+    @staticmethod
+    def _combined(result) -> str:
+        return (result.stdout or "") + "\n" + (result.stderr or "")
+
+    def test_doctor_renders_mode_mismatch_row(self, tmp_path: Path) -> None:
+        """A declared-vs-observed mode mismatch surfaces as a warn-weighted
+        doctor row carrying the install --upgrade / --mode fix hint.
+        """
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "x"\nversion = "0"\ndependencies = ["vaultspec-core"]\n',
+            encoding="utf-8",
+        )
+        _install_and_init(tmp_path, InstallMode.DEPENDENCY)
+        write_workspace_declaration(
+            tmp_path, WorkspaceDeclaration(install_mode=InstallMode.TOOL)
+        )
+
+        result = self._run_doctor(tmp_path)
+        combined = self._combined(result)
+        assert "install mode" in combined
+        assert "install --upgrade" in combined
+        assert result.exit_code == 1
+
+    def test_doctor_renders_floor_row_as_error(self, tmp_path: Path) -> None:
+        """A below-floor workspace surfaces as an error-weighted doctor row
+        naming the running version, the floor, and the upgrade remediation.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        write_workspace_declaration(
+            tmp_path,
+            WorkspaceDeclaration(
+                install_mode=InstallMode.TOOL,
+                minimum_vaultspec_version="999.999.999",
+            ),
+        )
+
+        result = self._run_doctor(tmp_path)
+        combined = self._combined(result)
+        assert "version floor" in combined
+        assert "999.999.999" in combined
+        assert result.exit_code == 2
+
+    def test_clean_workspace_has_no_floor_row_and_exits_zero(
+        self, tmp_path: Path
+    ) -> None:
+        """A tool-mode workspace with no floor shows no floor row and, absent
+        other issues, does not go red on the new signals.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+
+        result = self._run_doctor(tmp_path)
+        combined = self._combined(result)
+        assert "version floor" not in combined
+        # The install-mode row is present and clean.
+        assert "install mode" in combined
 
 
 # ---------------------------------------------------------------------------

@@ -1202,3 +1202,81 @@ class TestPlanMutatorWithoutWorkspaceContext:
         mutated = plan_path.read_text(encoding="utf-8")
         assert mutated != original
         assert "fresh context wave" in mutated
+
+
+# The subcommand each canonical hook invokes, independent of mode. The full
+# expected entry is the mode prefix followed by the subcommand; asserting the
+# whole entry line (not a substring) catches a regression in either half.
+_HOOK_SUBCOMMANDS = {
+    "vault-fix": "vault check all --fix",
+    "vault-sanitize-annotations": "vault sanitize annotations",
+    "check-provider-artifacts": "check-providers",
+    "spec-check": "spec doctor",
+}
+_DEPENDENCY_HOOK_PREFIX = "uv run --no-sync vaultspec-core"
+_TOOL_HOOK_PREFIX = "uvx --from vaultspec-core vaultspec-core"
+
+
+def _canonical_hook_entries(root: Path) -> dict[str, str]:
+    """Return the ``id -> entry`` map of vaultspec's local pre-commit hooks."""
+    import yaml
+
+    data = yaml.safe_load(
+        (root / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+    )
+    local = next(r for r in data["repos"] if r.get("repo") == "local")
+    return {
+        h["id"]: h["entry"] for h in local["hooks"] if h.get("id") in _HOOK_SUBCOMMANDS
+    }
+
+
+def _expected_entries(prefix: str) -> dict[str, str]:
+    return {hid: f"{prefix} {sub}" for hid, sub in _HOOK_SUBCOMMANDS.items()}
+
+
+@pytest.mark.unit
+class TestHookEntryModeRendering:
+    """The four canonical hook entries render for the resolved install mode.
+
+    Marked ``unit`` (in addition to the module's ``integration`` mark) so the
+    unit gate exercises the mode-rendering guarantee directly; each test drives
+    a real install against the filesystem with no test doubles.
+    """
+
+    def test_dependency_mode_renders_uv_run_prefix(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.enums import InstallMode
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "x"\nversion = "0"\ndependencies = ["vaultspec-core"]\n',
+            encoding="utf-8",
+        )
+        WorkspaceFactory(tmp_path).install("all", mode=InstallMode.DEPENDENCY)
+        assert _canonical_hook_entries(tmp_path) == _expected_entries(
+            _DEPENDENCY_HOOK_PREFIX
+        )
+
+    def test_tool_mode_renders_uvx_prefix(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.enums import InstallMode
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        WorkspaceFactory(tmp_path).install("all", mode=InstallMode.TOOL)
+        assert _canonical_hook_entries(tmp_path) == _expected_entries(_TOOL_HOOK_PREFIX)
+
+    def test_absent_declaration_renders_dependency_on_sync(
+        self, tmp_path: Path
+    ) -> None:
+        """Q6 migration bridge: with the declaration removed, a re-sync renders
+        the dependency-mode hook entries, never the tool form."""
+        from vaultspec_core.core.enums import InstallMode
+        from vaultspec_core.core.workspace_mode import WORKSPACE_FILENAME
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        factory = WorkspaceFactory(tmp_path).install("all", mode=InstallMode.TOOL)
+        assert _canonical_hook_entries(tmp_path) == _expected_entries(_TOOL_HOOK_PREFIX)
+
+        (tmp_path / ".vaultspec" / WORKSPACE_FILENAME).unlink()
+        factory.sync("all")
+        assert _canonical_hook_entries(tmp_path) == _expected_entries(
+            _DEPENDENCY_HOOK_PREFIX
+        )

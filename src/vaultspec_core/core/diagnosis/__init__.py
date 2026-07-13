@@ -17,11 +17,13 @@ from .signals import (
     GitattributesSignal,
     GitignoreSignal,
     ManifestEntrySignal,
+    ModeMismatchSignal,
     PrecommitSignal,
     ProviderDirSignal,
     RenameIntegritySignal,
     ResolutionAction,
     VaultContentSignal,
+    VersionFloorSignal,
 )
 
 __all__ = [
@@ -32,6 +34,7 @@ __all__ = [
     "GitattributesSignal",
     "GitignoreSignal",
     "ManifestEntrySignal",
+    "ModeMismatchSignal",
     "PrecommitSignal",
     "ProviderDiagnosis",
     "ProviderDirSignal",
@@ -40,6 +43,7 @@ __all__ = [
     "ResolutionPlan",
     "ResolutionStep",
     "VaultContentSignal",
+    "VersionFloorSignal",
     "WorkspaceDiagnosis",
     "diagnose",
     "resolve",

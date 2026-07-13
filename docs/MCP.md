@@ -44,6 +44,37 @@ script. On Windows, MCP clients lock the console-script executable in `.venv/Scr
 which blocks `uv sync` and other package operations while the client is connected.
 Module invocation avoids the lock.
 
+### Install modes
+
+`vaultspec-core install` writes one of two launch shapes for this entry, matching how
+the workspace runs the tooling. Tool mode is the default and launches the server with
+`uvx`, resolving vaultspec-core on demand without adding it to your project's dependency
+set:
+
+```json
+{
+  "mcpServers": {
+    "vaultspec-core": {
+      "command": "uvx",
+      "args": ["--from", "vaultspec-core", "python", "-m", "vaultspec_core.mcp_server.app"]
+    }
+  }
+}
+```
+
+Dependency mode is the `uv run` shape shown at the top of this section: it resolves
+vaultspec-core from your project's own environment. Install selects it automatically
+when your `pyproject.toml` already lists vaultspec-core, and you can pin either shape
+with `install --mode tool` or `install --mode dependency`. Both shapes launch the server
+as a Python module for the same Windows-lock reason above, so neither one holds an
+executable open.
+
+A workspace set up before install modes existed carries no recorded choice. Running
+`vaultspec-core install --upgrade` infers the mode from how the workspace already runs -
+a `uv run`-shaped setup that lists vaultspec-core as a dependency stays in dependency
+mode, and anything else moves to tool mode - and records it, so the launch command stays
+stable from then on.
+
 ### Point the server at a different workspace
 
 When the client's working directory isn't the workspace you want - for example in a

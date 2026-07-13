@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Self
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
-from vaultspec_core.core.enums import DirName, FileName
+from vaultspec_core.core.enums import DirName, FileName, InstallMode
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -188,13 +188,15 @@ class WorkspaceFactory:
         force: bool = False,
         dry_run: bool = False,
         skip: set[str] | None = None,
+        mode: InstallMode | None = None,
     ) -> Self:
         """Run a real ``install_run``.
 
         Creates a minimal ``.gitignore`` first if one does not exist so
         the gitignore block writer has something to append to.  Pass
         ``skip_gitignore=True`` to suppress automatic ``.gitignore``
-        creation.
+        creation.  Pass ``mode`` to force an explicit provisioning mode
+        (``--mode``); ``None`` lets ``install_run`` resolve it.
         """
         from vaultspec_core.core.commands import install_run
 
@@ -207,6 +209,7 @@ class WorkspaceFactory:
             force=force,
             dry_run=dry_run,
             skip=skip,
+            mode=mode,
         )
         self._installed = True
         return self

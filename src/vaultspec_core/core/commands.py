@@ -20,7 +20,7 @@ from typing import Any
 import yaml
 
 from . import types as _t
-from .enums import ManagedState, PrecommitHook, ProviderCapability, Tool
+from .enums import InstallMode, ManagedState, PrecommitHook, ProviderCapability, Tool
 from .exceptions import (
     ProviderError,
     ProviderNotInstalledError,
@@ -84,6 +84,116 @@ def _fresh_install_schema_version() -> str:
 
     candidates = [package_version(), *(m.target_version for m in REGISTRY)]
     return max(candidates, key=parse_version_tuple)
+
+
+def _persist_resolved_mode(path: Path, mdata: ManifestData, mode: InstallMode) -> None:
+    """Persist *mode* to the committed declaration and echo it into *mdata*.
+
+    Writes the shared source of truth (``.vaultspec/workspace.json`` via
+    :func:`~vaultspec_core.core.workspace_mode.write_workspace_declaration`) and
+    mirrors the resolved value into the gitignored per-machine manifest for
+    local bookkeeping. An existing floor constraint
+    (``minimum_vaultspec_version``) is preserved rather than dropped, since the
+    provisioning mode and the floor are independent axes of the same
+    declaration.
+
+    The declaration writer takes its own advisory lock, so this function must
+    not be called from within the manifest lock; *mdata* is mutated in place and
+    persisted by the caller's own :func:`write_manifest_data` cycle.
+
+    Invariant: callers run this only after
+    :func:`~vaultspec_core.core.workspace_mode.resolve_install_mode`, which reads
+    and validates any persisted declaration fail-fast. The re-read here is
+    therefore expected to succeed - a corrupt declaration would already have
+    aborted the run before any mutation - so this does not reintroduce a
+    late-failure window.
+
+    Args:
+        path: Workspace root directory.
+        mdata: Manifest data to stamp with the resolved mode echo; mutated in
+            place, not written here.
+        mode: The resolved provisioning mode to persist.
+    """
+    floor = _write_mode_declaration(path, mode)
+    mdata.resolved_mode = mode
+    mdata.resolved_floor_version = floor
+
+
+def _write_mode_declaration(path: Path, mode: InstallMode) -> str | None:
+    """Write the committed mode declaration, preserving any existing floor.
+
+    The provisioning mode and the ``minimum_vaultspec_version`` floor are
+    independent axes of the same committed declaration, so rewriting the mode
+    must never drop a floor a prior run recorded. The write is deterministic
+    (sorted keys, fixed indent) so re-writing the same mode leaves byte-identical
+    content, which is what makes a repeated ``install --upgrade`` idempotent.
+
+    Args:
+        path: Workspace root directory.
+        mode: The resolved provisioning mode to persist.
+
+    Returns:
+        The preserved floor constraint (or ``None``), so a caller echoing the
+        declaration into the manifest need not re-read it.
+    """
+    from .workspace_mode import (
+        WorkspaceDeclaration,
+        read_workspace_declaration,
+        write_workspace_declaration,
+    )
+
+    existing = read_workspace_declaration(path)
+    floor = existing.minimum_vaultspec_version if existing is not None else None
+    write_workspace_declaration(
+        path,
+        WorkspaceDeclaration(install_mode=mode, minimum_vaultspec_version=floor),
+    )
+    return floor
+
+
+def _infer_upgrade_mode(target: Path, explicit: InstallMode | None) -> InstallMode:
+    """Infer the provisioning mode for an ``install --upgrade`` (ADR Q6).
+
+    Precedence mirrors provision-time resolution at its top: an explicit
+    ``--mode`` flag wins (and is validated for impossible combinations), and an
+    already-persisted declaration wins next, so a second upgrade is idempotent
+    and a deliberate re-mode is honored. A legacy workspace with neither has its
+    mode inferred from its own deployed state: dependency mode only when the
+    canonical hook entries are ``uv run``-shaped *and* the target's
+    ``pyproject.toml`` lists ``vaultspec-core``; tool mode in every other case.
+
+    The hook-shape signal is read through the same ``_observed_precommit_mode``
+    collector the doctor's mode-mismatch check consumes, so migration and
+    diagnosis can never disagree on what a deployed artifact shape means - the
+    ``install-mode`` constraint against introducing a second comparator.
+
+    Args:
+        target: Workspace root directory.
+        explicit: The mode requested via ``--mode``, or ``None``.
+
+    Returns:
+        The inferred :class:`~vaultspec_core.core.enums.InstallMode` to persist
+        and render against for this upgrade.
+
+    Raises:
+        VaultSpecError: Propagated from
+            :func:`~vaultspec_core.core.workspace_mode.resolve_install_mode` when
+            *explicit* names an impossible combination or a persisted declaration
+            is malformed.
+    """
+    from .diagnosis.collectors import _observed_precommit_mode
+    from .workspace_mode import read_workspace_declaration, resolve_install_mode
+
+    if explicit is not None:
+        return resolve_install_mode(target, explicit=explicit)
+    if read_workspace_declaration(target) is not None:
+        return resolve_install_mode(target, explicit=None)
+
+    detected = resolve_install_mode(target, explicit=None)
+    observed = _observed_precommit_mode(target)
+    if detected is InstallMode.DEPENDENCY and observed is InstallMode.DEPENDENCY:
+        return InstallMode.DEPENDENCY
+    return InstallMode.TOOL
 
 
 # Map provider argument names to Tool enum members. The per-tool entries derive
@@ -248,7 +358,28 @@ def _scaffold_provider(
     return created
 
 
-CANONICAL_ENTRY_PREFIX = "uv run --no-sync vaultspec-core"
+# The canonical CLI-invocation prefix each pre-commit hook entry is built from,
+# keyed by provisioning mode. Dependency mode resolves ``vaultspec-core`` through
+# the target project's own venv via ``uv run`` (byte-identical to the single
+# prefix that existed before mode-awareness); tool mode resolves it through an
+# ephemeral ``uvx`` invocation so it never enters the project's dependency set.
+_MODE_ENTRY_PREFIX: dict[InstallMode, str] = {
+    InstallMode.DEPENDENCY: "uv run --no-sync vaultspec-core",
+    InstallMode.TOOL: "uvx --from vaultspec-core vaultspec-core",
+}
+
+
+def entry_prefix_for_mode(mode: InstallMode) -> str:
+    """Return the canonical hook-entry command prefix for *mode*."""
+    return _MODE_ENTRY_PREFIX[mode]
+
+
+#: Backward-compatible module-level prefix, pinned to dependency mode. Modules
+#: and diagnostics that still assume a single prefix (the doctor's
+#: canonical-entry check) read this until they are made mode-aware; the
+#: mode-parameterized renderers derive their prefix from
+#: :func:`entry_prefix_for_mode` instead.
+CANONICAL_ENTRY_PREFIX = entry_prefix_for_mode(InstallMode.DEPENDENCY)
 
 
 def _is_git_repo(target: Path) -> bool:
@@ -482,54 +613,95 @@ def check_staged_provider_artifacts(cwd: Path | None = None) -> list[str]:
     return violations
 
 
-# Hook definitions keyed by PrecommitHook enum.
-# Each value is a dict of pre-commit hook fields (merged with defaults).
-_HOOK_DEFS: dict[PrecommitHook, dict[str, object]] = {
-    PrecommitHook.VAULT_FIX: {
-        "name": "Vault fix",
-        "entry": f"{CANONICAL_ENTRY_PREFIX} vault check all --fix",
-        "types": ["markdown"],
-    },
+# Mode-independent pre-commit hook metadata: the CLI subcommand each hook
+# invokes plus its non-entry pre-commit fields. The ``entry`` is derived per
+# mode by prefixing the subcommand with the mode's canonical entry prefix. The
+# insertion order here is the order hooks are scaffolded into
+# ``.pre-commit-config.yaml`` and must be preserved.
+_HOOK_SUBCOMMAND: dict[PrecommitHook, str] = {
+    PrecommitHook.VAULT_FIX: "vault check all --fix",
+    PrecommitHook.VAULT_SANITIZE_ANNOTATIONS: "vault sanitize annotations",
+    PrecommitHook.CHECK_PROVIDER_ARTIFACTS: "check-providers",
+    PrecommitHook.SPEC_CHECK: "spec doctor",
+}
+_HOOK_META: dict[PrecommitHook, dict[str, object]] = {
+    PrecommitHook.VAULT_FIX: {"name": "Vault fix", "types": ["markdown"]},
     PrecommitHook.VAULT_SANITIZE_ANNOTATIONS: {
         "name": "Vault sanitize annotations",
-        "entry": f"{CANONICAL_ENTRY_PREFIX} vault sanitize annotations",
         "types": ["markdown"],
     },
     PrecommitHook.CHECK_PROVIDER_ARTIFACTS: {
         "name": "Check provider artifacts",
-        "entry": f"{CANONICAL_ENTRY_PREFIX} check-providers",
         "always_run": True,
     },
-    PrecommitHook.SPEC_CHECK: {
-        "name": "Spec check",
-        "entry": f"{CANONICAL_ENTRY_PREFIX} spec doctor",
-        "types": ["markdown"],
-    },
+    PrecommitHook.SPEC_CHECK: {"name": "Spec check", "types": ["markdown"]},
 }
 
-CANONICAL_PRECOMMIT_HOOKS: list[dict[str, object]] = [
-    {
-        "id": hook.value,
-        **meta,
-        "language": "system",
-        "pass_filenames": False,
+
+def hook_defs_for_mode(mode: InstallMode) -> dict[PrecommitHook, dict[str, object]]:
+    """Return the hook-field map for *mode*, keyed by :class:`PrecommitHook`.
+
+    Each value merges the mode-independent metadata (name, filter fields) with
+    an ``entry`` built from the mode's canonical prefix and the hook's
+    subcommand, so dependency mode renders ``uv run --no-sync vaultspec-core
+    ...`` and tool mode renders ``uvx --from vaultspec-core vaultspec-core
+    ...``.
+    """
+    prefix = entry_prefix_for_mode(mode)
+    defs: dict[PrecommitHook, dict[str, object]] = {}
+    for hook, meta in _HOOK_META.items():
+        # Preserve the original field order (name, entry, then the hook's
+        # filter field) so the scaffolded YAML is byte-stable across modes.
+        value: dict[str, object] = {"name": meta["name"]}
+        value["entry"] = f"{prefix} {_HOOK_SUBCOMMAND[hook]}"
+        for key, field in meta.items():
+            if key != "name":
+                value[key] = field
+        defs[hook] = value
+    return defs
+
+
+def canonical_precommit_hooks_for_mode(mode: InstallMode) -> list[dict[str, object]]:
+    """Return the full canonical pre-commit hook list rendered for *mode*."""
+    return [
+        {
+            "id": hook.value,
+            **meta,
+            "language": "system",
+            "pass_filenames": False,
+        }
+        for hook, meta in hook_defs_for_mode(mode).items()
+    ]
+
+
+def canonical_hook_entries_for_mode(mode: InstallMode) -> dict[str, str]:
+    """Return each canonical hook ID mapped to its expected entry for *mode*."""
+    return {
+        hook.value: str(meta["entry"])
+        for hook, meta in hook_defs_for_mode(mode).items()
     }
-    for hook, meta in _HOOK_DEFS.items()
-]
+
 
 CANONICAL_HOOK_IDS: frozenset[str] = frozenset(h.value for h in PrecommitHook)
 
-# Maps each canonical hook ID to its expected entry command.
-CANONICAL_HOOK_ENTRIES: dict[str, str] = {
-    hook.value: str(meta["entry"]) for hook, meta in _HOOK_DEFS.items()
-}
+#: Backward-compatible module-level canonical hooks and entries, pinned to
+#: dependency mode. The doctor's canonical-entry check still imports
+#: ``CANONICAL_HOOK_ENTRIES`` and compares against the single dependency-mode
+#: shape; making that check mode-aware is the next phase. ``_scaffold_precommit``
+#: renders through :func:`canonical_precommit_hooks_for_mode` instead.
+CANONICAL_PRECOMMIT_HOOKS: list[dict[str, object]] = canonical_precommit_hooks_for_mode(
+    InstallMode.DEPENDENCY
+)
+CANONICAL_HOOK_ENTRIES: dict[str, str] = canonical_hook_entries_for_mode(
+    InstallMode.DEPENDENCY
+)
 
 # All managed hook IDs for uninstall filtering.
 _ALL_MANAGED_HOOK_IDS: frozenset[str] = CANONICAL_HOOK_IDS
 
 
 def _scaffold_precommit(
-    target: Path, *, dry_run: bool = False
+    target: Path, *, dry_run: bool = False, mode: InstallMode | None = None
 ) -> list[tuple[str, str]]:
     """Scaffold or merge vaultspec-core hooks into .pre-commit-config.yaml.
 
@@ -537,12 +709,27 @@ def _scaffold_precommit(
     patterns.  Existing hooks with matching IDs are updated to the
     canonical entry; missing hooks are appended.
 
+    The entry each hook is rendered with follows the resolved provisioning
+    mode: dependency mode keeps the ``uv run --no-sync vaultspec-core`` prefix,
+    tool mode uses ``uvx --from vaultspec-core vaultspec-core``. When *mode* is
+    ``None`` it is resolved from the committed workspace declaration via
+    :func:`~vaultspec_core.core.workspace_mode.resolve_render_mode`, whose
+    legacy-absent rule renders dependency mode so a workspace provisioned
+    before ``install-mode`` keeps its existing hook entries. The fresh-install
+    caller passes its resolved mode explicitly, because the declaration is
+    written only after scaffolding.
+
     Skips scaffolding entirely when ``prek.toml`` is present at *target*:
     prek treats ``.pre-commit-config.yaml`` as a duplicate configuration
     source and emits a warning, and writing both would cause neither tool
     to execute our hooks.  The operator is expected to transplant hooks
     into ``prek.toml`` manually.
     """
+    if mode is None:
+        from .workspace_mode import resolve_render_mode
+
+        mode = resolve_render_mode(target)
+    canonical_hooks = canonical_precommit_hooks_for_mode(mode)
 
     if (target / "prek.toml").exists():
         logger.info(
@@ -592,7 +779,7 @@ def _scaffold_precommit(
 
                 changed = False
 
-                for canonical in CANONICAL_PRECOMMIT_HOOKS:
+                for canonical in canonical_hooks:
                     hook_id = str(canonical["id"])
                     if hook_id in existing_by_id:
                         existing = existing_by_id[hook_id]
@@ -615,7 +802,7 @@ def _scaffold_precommit(
                 repos.append(
                     {
                         "repo": "local",
-                        "hooks": [dict(h) for h in CANONICAL_PRECOMMIT_HOOKS],
+                        "hooks": [dict(h) for h in canonical_hooks],
                     }
                 )
 
@@ -636,7 +823,7 @@ def _scaffold_precommit(
                 "repos": [
                     {
                         "repo": "local",
-                        "hooks": [dict(h) for h in CANONICAL_PRECOMMIT_HOOKS],
+                        "hooks": [dict(h) for h in canonical_hooks],
                     }
                 ]
             }
@@ -695,7 +882,10 @@ def _filter_tools(tools: list[Tool], skip: set[str]) -> list[Tool]:
 
 
 def init_run(
-    force: bool = False, provider: str = "all", skip: set[str] | None = None
+    force: bool = False,
+    provider: str = "all",
+    skip: set[str] | None = None,
+    mode: InstallMode | None = None,
 ) -> list[tuple[str, str]]:
     """Scaffold the .vaultspec/ and .vault/ directory structure.
 
@@ -703,6 +893,11 @@ def init_run(
         force: Override contents if already exists.
         provider: Provider to install.
         skip: Set of component names to skip (``core`` and/or provider names).
+        mode: Resolved provisioning mode used to render the MCP definition and
+            pre-commit hook entries. The fresh-install caller passes this
+            explicitly because the committed workspace declaration is written
+            only after scaffolding; ``None`` lets the renderers fall back to
+            the declaration (dependency mode for a legacy workspace).
 
     Returns:
         A deduplicated list of ``(relative_path, label)`` tuples for all
@@ -756,11 +951,11 @@ def init_run(
     if "mcp" not in skip:
         from .mcps import mcp_sync
 
-        mcp_result = mcp_sync()
+        mcp_result = mcp_sync(mode=mode)
         if mcp_result.items:
             created.append((".mcp.json", "mcp"))
     if "precommit" not in skip:
-        created.extend(_scaffold_precommit(target))
+        created.extend(_scaffold_precommit(target, mode=mode))
 
     # Write provider manifest
     provider_names = [t.value for t in tools]
@@ -833,6 +1028,7 @@ def install_run(
     dry_run: bool = False,
     force: bool = False,
     skip: set[str] | None = None,
+    mode: InstallMode | None = None,
 ) -> dict[str, Any]:
     """Deploy the vaultspec framework to a project directory.
 
@@ -843,6 +1039,10 @@ def install_run(
         dry_run: Preview the manifest of files that would be created.
         force: Override contents if installation already exists.
         skip: Set of component names to skip (``core`` and/or provider names).
+        mode: Explicit provisioning mode from the ``--mode`` flag, or ``None``
+            to let the workspace fall back to the default. The resolved mode is
+            persisted once at provision time to the committed workspace
+            declaration and echoed into the manifest.
 
     Returns:
         A dict describing the result:
@@ -884,6 +1084,15 @@ def install_run(
             f"Cannot skip core: .vaultspec/ does not exist at {path}.",
             hint="Install core first, then use --skip core on subsequent installs.",
         )
+
+    # Resolve the provisioning mode once, at provision time, via the Q5
+    # precedence chain (explicit flag, persisted declaration, pyproject
+    # detection, default tool mode). An explicit request that names an
+    # impossible combination - dependency mode with no pyproject.toml - raises a
+    # loud, typed refusal here rather than silently falling back.
+    from .workspace_mode import resolve_install_mode
+
+    resolved_mode = resolve_install_mode(path, explicit=mode)
 
     if upgrade and dry_run:
         _ensure_tool_configs(path)
@@ -943,11 +1152,11 @@ def install_run(
         if "mcp" not in skip:
             from .mcps import mcp_sync
 
-            mcp_result = mcp_sync(dry_run=True)
+            mcp_result = mcp_sync(dry_run=True, mode=resolved_mode)
             if mcp_result.items:
                 manifest.append((".mcp.json", "mcp"))
         if "precommit" not in skip:
-            manifest.extend(_scaffold_precommit(path, dry_run=True))
+            manifest.extend(_scaffold_precommit(path, dry_run=True, mode=resolved_mode))
 
         # Deduplicate preserving order (by relative path)
         seen: dict[str, str] = {}
@@ -965,6 +1174,15 @@ def install_run(
                 f"Cannot upgrade: {e}",
                 hint=f"Run 'vaultspec-core install {path}' first.",
             ) from e
+
+        # Q6 migration: refine the provision-time resolution with this
+        # workspace's deployed state. A legacy workspace carries no persisted
+        # mode, so infer it from the observed hook shape and the pyproject
+        # dependency listing; a workspace that already declares a mode keeps it,
+        # which is what makes a repeated upgrade idempotent. This supersedes the
+        # value resolve_install_mode computed at entry, since only here is the
+        # deployed hook shape folded in.
+        resolved_mode = _infer_upgrade_mode(path, mode)
 
         seeded: list[tuple[str, str]] = []
         if not skip_core:
@@ -992,6 +1210,17 @@ def install_run(
 
         run_pending_migrations(path)
 
+        # Persist the inferred declaration BEFORE the provider sync and the hook
+        # scaffold re-render their artifacts. Both renderers resolve their mode
+        # from the committed declaration (via resolve_render_mode); on a legacy
+        # workspace with no declaration that fallback renders dependency mode, so
+        # an inference that landed tool mode would otherwise leave uv-run-shaped
+        # artifacts contradicting the tool-mode declaration written moments
+        # later. Writing it here threads the inferred mode into this same run's
+        # rendering, mirroring the fresh-install ordering. The manifest echo and
+        # floor reconciliation still run once, later, via _persist_resolved_mode.
+        _write_mode_declaration(path, resolved_mode)
+
         sync_target = provider if provider not in ("all", "core") else "all"
         # `sync_provider` rejects `core` in its skip set (`allow_core=False`).
         # `install_run` accepts `core` because it skips the framework scaffold;
@@ -1004,7 +1233,7 @@ def install_run(
         sync_provider(sync_target, force=force, skip=skip - {"core"})
 
         if "precommit" not in skip:
-            _scaffold_precommit(path)
+            _scaffold_precommit(path, mode=resolved_mode)
 
         # Update manifest timestamps and version
         import datetime
@@ -1032,6 +1261,7 @@ def install_run(
             PrecommitSignal.NO_HOOKS,
         )
 
+        _persist_resolved_mode(path, mdata, resolved_mode)
         write_manifest_data(path, mdata)
 
         # Reconcile git index with the managed gitignore block so that
@@ -1050,11 +1280,20 @@ def install_run(
             f"first with 'vaultspec-core uninstall {path}'."
         )
 
-    created = init_run(force=force, provider=provider, skip=skip)
+    created = init_run(force=force, provider=provider, skip=skip, mode=resolved_mode)
 
     reset_config()
     layout = resolve_workspace(target_override=path)
     init_paths(layout)
+
+    # Persist the committed declaration before the provider sync below re-renders
+    # the MCP config and pre-commit hooks. Those renderers resolve their mode
+    # from the declaration; writing it here means the just-resolved mode governs
+    # the sync pass instead of the legacy-absent dependency bridge, which would
+    # otherwise clobber the tool-mode artifacts init_run just wrote. The manifest
+    # echo and floor reconciliation still happen once, later, via
+    # _persist_resolved_mode after the manifest is read.
+    _write_mode_declaration(path, resolved_mode)
 
     post_errors: list[str] = []
 
@@ -1142,6 +1381,7 @@ def install_run(
     for name in provider_names:
         mdata.provider_state.setdefault(name, {})
         mdata.provider_state[name]["installed_at"] = mdata.installed_at
+    _persist_resolved_mode(path, mdata, resolved_mode)
     write_manifest_data(path, mdata)
 
     # Reconcile git index with the managed gitignore block so that

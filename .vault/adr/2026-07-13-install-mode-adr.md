@@ -8,7 +8,7 @@ related:
   - "[[2026-07-13-install-mode-research]]"
 ---
 
-# `install-mode` adr: `provisioning is mode-aware and tool-first` | (**status:** `proposed`)
+# `install-mode` adr: `provisioning is mode-aware and tool-first` | (**status:** `accepted`)
 
 ## Problem Statement
 

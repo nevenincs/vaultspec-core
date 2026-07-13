@@ -15,11 +15,69 @@ from pathlib import Path
 from typing import Any
 
 from . import types as _t
+from .enums import InstallMode
 from .exceptions import ResourceExistsError, ResourceNotFoundError, VaultSpecError
 from .helpers import advisory_lock, atomic_write, ensure_dir
 from .types import SyncResult
 
 logger = logging.getLogger(__name__)
+
+#: Sentinel tokens carried by the mode-neutral builtin MCP definition
+#: (``builtins/mcps/vaultspec-core.builtin.json``). They are deliberately
+#: shaped so they cannot collide with any real command name or argument value,
+#: so :func:`render_mcp_definition_for_mode` can detect and substitute them
+#: unambiguously. The seeded ``.vaultspec/mcps/`` copy carries these same bytes
+#: (keeping the ``BuiltinVersionSignal`` snapshot hash stable); substitution
+#: happens only here, downstream, and only the substituted concrete command is
+#: ever written into a workspace ``.mcp.json``.
+_MODE_COMMAND_TOKEN = "@@VAULTSPEC_INSTALL_MODE_COMMAND@@"
+_MODE_ARGS_TOKEN = "@@VAULTSPEC_INSTALL_MODE_ARGS@@"
+
+#: The concrete MCP-server launch (``command``, ``args``) each mode renders to.
+#: Dependency mode reproduces byte-for-byte the launch every dependency-mode
+#: workspace has always synced, so existing installs see zero churn. Tool mode
+#: launches the same module entry point through an ephemeral ``uvx`` invocation
+#: so ``vaultspec-core`` never enters the governed project's dependency set.
+_MODE_MCP_LAUNCH: dict[InstallMode, tuple[str, list[str]]] = {
+    InstallMode.DEPENDENCY: (
+        "uv",
+        ["run", "python", "-m", "vaultspec_core.mcp_server.app"],
+    ),
+    InstallMode.TOOL: (
+        "uvx",
+        ["--from", "vaultspec-core", "python", "-m", "vaultspec_core.mcp_server.app"],
+    ),
+}
+
+
+def render_mcp_definition_for_mode(
+    definition: dict[str, Any], mode: InstallMode
+) -> dict[str, Any]:
+    """Return *definition* with its mode-neutral tokens substituted for *mode*.
+
+    Substitution is surgical and token-guarded: the ``command`` field is
+    rewritten only when it equals :data:`_MODE_COMMAND_TOKEN`, and the ``args``
+    field only when it equals the single-element token list
+    ``[_MODE_ARGS_TOKEN]``. A definition that carries neither token - a
+    user-authored custom MCP server, or an already-rendered entry - passes
+    through unchanged, so this is safe to apply to every collected definition
+    regardless of origin.
+
+    Args:
+        definition: A parsed MCP server definition (``command``/``args`` map).
+        mode: The provisioning mode whose concrete launch to substitute.
+
+    Returns:
+        A shallow copy of *definition* with the tokens replaced by the
+        mode-specific launch command and args. The input is not mutated.
+    """
+    command, args = _MODE_MCP_LAUNCH[mode]
+    rendered = dict(definition)
+    if rendered.get("command") == _MODE_COMMAND_TOKEN:
+        rendered["command"] = command
+    if rendered.get("args") == [_MODE_ARGS_TOKEN]:
+        rendered["args"] = list(args)
+    return rendered
 
 
 def _server_name(filename: str) -> str:
@@ -90,14 +148,27 @@ def _existing_source_server_names() -> set[str]:
 
 def collect_mcp_servers(
     warnings: list[str] | None = None,
+    mode: InstallMode | None = None,
 ) -> dict[str, tuple[Path, dict[str, Any]]]:
     """Collect MCP server definitions from ``.vaultspec/mcps/``.
 
     Reads and parses every ``.json`` file in the MCP source directory,
     returning a mapping of server name to (source path, parsed config).
 
+    When *mode* is supplied, each parsed definition is passed through
+    :func:`render_mcp_definition_for_mode` before being returned, so the
+    mode-neutral placeholder tokens in the builtin definition become the
+    concrete launch command for that mode. The merge pipeline that feeds
+    :func:`mcp_sync` therefore writes the mode-rendered form into every
+    ``.mcp.json`` target. When *mode* is ``None`` the raw (token-carrying)
+    definitions are returned unchanged - the correct behaviour for callers
+    that only inspect server *names* (uninstall, source counts) rather than
+    the launch command.
+
     Args:
         warnings: Optional list to append parse-error messages to.
+        mode: Provisioning mode to render each definition for, or ``None`` to
+            return the raw parsed definitions.
 
     Returns:
         Mapping of server name to ``(source_path, config_dict)``.
@@ -119,6 +190,8 @@ def collect_mcp_servers(
             name = _server_name(f.name)
             if not name:
                 continue
+            if mode is not None:
+                raw = render_mcp_definition_for_mode(raw, mode)
             sources[name] = (f, raw)
         except (json.JSONDecodeError, OSError) as e:
             msg = f"Failed to read/parse MCP definition {f}: {e}"
@@ -161,11 +234,14 @@ def mcp_status() -> dict[str, Any]:
     This is intentionally narrower than ``spec doctor``: it reports only
     whether source definitions under ``.vaultspec/mcps/`` are represented
     in the workspace ``.mcp.json`` and whether managed entries have drifted.
-    """
-    parse_warnings: list[str] = []
-    sources = collect_mcp_servers(warnings=parse_warnings)
-    definitions = sorted(sources)
 
+    Drift is judged mode-aware: definitions are rendered for the workspace's
+    resolved render mode (via
+    :func:`~vaultspec_core.core.workspace_mode.resolve_render_mode`) before
+    they are compared against the synced ``.mcp.json`` entries, so a
+    correctly-provisioned workspace in either mode is not reported as drifted
+    against the mode-neutral token form.
+    """
     try:
         target_dir = _t.get_context().target_dir
     except LookupError:
@@ -173,14 +249,21 @@ def mcp_status() -> dict[str, Any]:
             "status": "no_context",
             "config_path": None,
             "config_exists": False,
-            "definitions": definitions,
+            "definitions": [],
             "configured": [],
             "managed": [],
-            "missing": definitions,
+            "missing": [],
             "drifted": [],
             "stale_managed": [],
             "warnings": ["No workspace context available for MCP status."],
         }
+
+    from .workspace_mode import resolve_render_mode
+
+    render_mode = resolve_render_mode(target_dir)
+    parse_warnings: list[str] = []
+    sources = collect_mcp_servers(warnings=parse_warnings, mode=render_mode)
+    definitions = sorted(sources)
 
     mcp_json = target_dir / ".mcp.json"
     configured: list[str] = []
@@ -561,6 +644,7 @@ def mcp_sync(
     dry_run: bool = False,
     force: bool = False,
     prune: bool = False,
+    mode: InstallMode | None = None,
 ) -> SyncResult:
     """Sync MCP server definitions into every MCP config target.
 
@@ -578,26 +662,43 @@ def mcp_sync(
     even if they share a name with a current source. This mirrors the
     content-marker ownership pattern used by ``sync_files``.
 
+    The launch command each definition renders to is selected by *mode*. When
+    *mode* is ``None`` (every standalone ``sync``/``doctor`` caller) it is
+    resolved from the committed workspace declaration via
+    :func:`~vaultspec_core.core.workspace_mode.resolve_render_mode`, whose
+    legacy-absent rule renders dependency mode so a workspace provisioned
+    before ``install-mode`` is never silently flipped to the ``uvx`` shape. The
+    fresh-``install`` path passes its resolved mode explicitly, because the
+    declaration is written only after this render runs.
+
     Args:
         dry_run: If ``True``, compute changes without writing.
         force: Overwrite entries that differ from their definitions.
         prune: If ``True``, remove managed entries whose source files have
             been deleted. Mirrors ``rules_sync``/``agents_sync``.
+        mode: Provisioning mode to render definitions for, or ``None`` to
+            resolve it from the committed workspace declaration.
 
     Returns:
         :class:`~vaultspec_core.core.types.SyncResult` with sync statistics.
         Per-provider MCP-file results are recorded under ``per_tool``.
     """
     result = SyncResult()
-    parse_warnings: list[str] = []
-    sources = collect_mcp_servers(warnings=parse_warnings)
-    result.warnings.extend(parse_warnings)
 
     try:
         target_dir = _t.get_context().target_dir
     except LookupError:
         result.errors.append("No workspace context available for MCP sync.")
         return result
+
+    if mode is None:
+        from .workspace_mode import resolve_render_mode
+
+        mode = resolve_render_mode(target_dir)
+
+    parse_warnings: list[str] = []
+    sources = collect_mcp_servers(warnings=parse_warnings, mode=mode)
+    result.warnings.extend(parse_warnings)
 
     _sync_mcp_target(
         target_dir / ".mcp.json",
