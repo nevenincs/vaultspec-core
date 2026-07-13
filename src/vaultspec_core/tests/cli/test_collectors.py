@@ -18,6 +18,7 @@ from vaultspec_core.core.diagnosis.collectors import (
     collect_gitignore_state,
     collect_manifest_coherence,
     collect_mcp_config_state,
+    collect_mode_mismatch_state,
     collect_provider_dir_state,
     collect_vault_content_state,
 )
@@ -29,11 +30,16 @@ from vaultspec_core.core.diagnosis.signals import (
     FrameworkSignal,
     GitignoreSignal,
     ManifestEntrySignal,
+    ModeMismatchSignal,
     ProviderDirSignal,
     VaultContentSignal,
 )
 from vaultspec_core.core.enums import InstallMode, Tool
 from vaultspec_core.core.gitignore import DEFAULT_ENTRIES, MARKER_BEGIN, MARKER_END
+from vaultspec_core.core.workspace_mode import (
+    WorkspaceDeclaration,
+    write_workspace_declaration,
+)
 
 pytestmark = [pytest.mark.unit]
 
@@ -502,6 +508,51 @@ class TestMcpConfigState:
         payload["mcpServers"]["vaultspec-core"]["command"] = "totally-wrong"
         mcp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         assert collect_mcp_config_state(tmp_path) == ConfigSignal.REGISTRY_DRIFT
+
+
+# ---------------------------------------------------------------------------
+# collect_mode_mismatch_state
+# ---------------------------------------------------------------------------
+class TestModeMismatchState:
+    def test_no_declaration_is_unknown(self, tmp_path: Path) -> None:
+        """A workspace with no committed declaration predates install-mode and
+        has no declared mode to hold its artifacts against: UNKNOWN, not a
+        warning.
+        """
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.UNKNOWN
+
+    def test_tool_declaration_with_dependency_artifacts_is_mismatch(
+        self, tmp_path: Path
+    ) -> None:
+        """Provision real dependency-mode artifacts (uv run hook entries and a
+        non-uvx MCP command), then declare tool mode: the declaration names one
+        mode while the deployed artifacts carry the other, so the workspace is
+        flagged MISMATCH.
+        """
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "x"\nversion = "0"\ndependencies = ["vaultspec-core"]\n',
+            encoding="utf-8",
+        )
+        _install_and_init(tmp_path, InstallMode.DEPENDENCY)
+        # Sanity: a coherent dependency-mode workspace is clean before the flip.
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.CLEAN
+        write_workspace_declaration(
+            tmp_path, WorkspaceDeclaration(install_mode=InstallMode.TOOL)
+        )
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.MISMATCH
+
+    def test_dependency_declaration_with_tool_artifacts_is_mismatch(
+        self, tmp_path: Path
+    ) -> None:
+        """The reverse: provision real tool-mode artifacts (uvx hook entries and
+        MCP command), then declare dependency mode, and confirm MISMATCH.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.CLEAN
+        write_workspace_declaration(
+            tmp_path, WorkspaceDeclaration(install_mode=InstallMode.DEPENDENCY)
+        )
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.MISMATCH
 
 
 # ---------------------------------------------------------------------------
