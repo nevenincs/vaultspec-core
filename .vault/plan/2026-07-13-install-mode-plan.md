@@ -39,7 +39,7 @@ Introduce the InstallMode enum, the committed workspace declaration surface unde
 
 - [x] `P01.S01` - Add the InstallMode enum with TOOL and DEPENDENCY members; `src/vaultspec_core/core/enums.py`.
 - [x] `P01.S02` - Add the WorkspaceDeclaration dataclass and read_workspace_declaration/write_workspace_declaration functions for the committed .vaultspec/workspace.json surface, including the minimum_vaultspec_version floor field; `src/vaultspec_core/core/workspace_mode.py`.
-- [ ] `P01.S03` - Extend ManifestData with resolved_mode and resolved_floor_version echo fields plus their read and write round trip in read_manifest_data and write_manifest_data; `src/vaultspec_core/core/manifest.py`.
+- [x] `P01.S03` - Extend ManifestData with resolved_mode and resolved_floor_version echo fields plus their read and write round trip in read_manifest_data and write_manifest_data; `src/vaultspec_core/core/manifest.py`.
 - [ ] `P01.S04` - Add WorkspaceFactory-based tests covering workspace.json round trip, missing-file default, corrupted JSON, and malformed mode value handling; `src/vaultspec_core/tests/cli/test_workspace_mode.py`.
 - [ ] `P01.S05` - Extend the manifest tests with the ManifestData resolved_mode and resolved_floor_version echo fields, covering read, write, and legacy-manifest backward compatibility; `src/vaultspec_core/tests/cli/test_manifest_v2.py`.
 

@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .enums import Tool
+from .enums import InstallMode, Tool
 from .exceptions import VaultSpecError
 from .helpers import advisory_lock, atomic_write
 
@@ -41,6 +41,14 @@ class ManifestData:
             entries.
         precommit_managed: Whether vaultspec manages pre-commit hooks
             in ``.pre-commit-config.yaml``.
+        resolved_mode: Per-machine echo of the provisioning mode resolved at
+            the last install, mirroring the committed
+            ``.vaultspec/workspace.json`` declaration for local bookkeeping.
+            ``None`` on a legacy manifest written before mode-awareness.
+        resolved_floor_version: Per-machine echo of the
+            ``minimum_vaultspec_version`` floor constraint resolved at the last
+            install. ``None`` when no floor was declared or on a legacy
+            manifest.
     """
 
     version: str = "2.0"
@@ -52,6 +60,8 @@ class ManifestData:
     gitignore_managed: bool = False
     gitattributes_managed: bool = False
     precommit_managed: bool = False
+    resolved_mode: InstallMode | None = None
+    resolved_floor_version: str | None = None
 
 
 def _manifest_path(target: Path) -> Path:
@@ -124,6 +134,12 @@ def read_manifest_data(target: Path, *, strict: bool = False) -> ManifestData:
         gitignore_managed=bool(raw.get("gitignore_managed", False)),
         gitattributes_managed=bool(raw.get("gitattributes_managed", False)),
         precommit_managed=bool(raw.get("precommit_managed", False)),
+        resolved_mode=InstallMode.from_token(raw.get("resolved_mode")),
+        resolved_floor_version=(
+            str(floor_version)
+            if (floor_version := raw.get("resolved_floor_version")) is not None
+            else None
+        ),
     )
 
 
@@ -159,6 +175,12 @@ def write_manifest_data(target: Path, data: ManifestData) -> None:
         "gitignore_managed": data.gitignore_managed,
         "gitattributes_managed": data.gitattributes_managed,
         "precommit_managed": data.precommit_managed,
+        "resolved_mode": (
+            InstallMode(data.resolved_mode).value
+            if data.resolved_mode is not None
+            else None
+        ),
+        "resolved_floor_version": data.resolved_floor_version,
     }
     atomic_write(path, json.dumps(payload, indent=2) + "\n")
 
