@@ -135,6 +135,21 @@ class ModeMismatchSignal(StrEnum):
     UNKNOWN = "unknown"
 
 
+class VersionFloorSignal(StrEnum):
+    """State of the running version against the committed floor constraint.
+
+    Members:
+        OK: The running version is at or above the declared
+            ``minimum_vaultspec_version``, or the workspace declares no floor.
+        BELOW: The running version is strictly below the declared floor. On
+            install and sync this is a refuse-and-tell error; on doctor it is
+            reported as an error-weighted row without raising.
+    """
+
+    OK = "ok"
+    BELOW = "below"
+
+
 class ResolutionAction(StrEnum):
     """Corrective action that a resolver can apply."""
 

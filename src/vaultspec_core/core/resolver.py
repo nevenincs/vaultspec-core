@@ -914,10 +914,10 @@ def _enforce_version_floor(target: Path, running_version: str) -> None:
         VaultSpecError: When the running version is below the declared floor.
     """
     from .exceptions import VaultSpecError
-    from .workspace_mode import read_workspace_declaration
+    from .workspace_mode import evaluate_version_floor
 
     try:
-        declaration = read_workspace_declaration(target)
+        violation = evaluate_version_floor(target, running_version)
     except VaultSpecError:
         # A corrupt declaration surfaces through the explicit install/mode
         # paths that must refuse on it; do not raise a second, differently
@@ -925,27 +925,19 @@ def _enforce_version_floor(target: Path, running_version: str) -> None:
         logger.debug("Could not read declaration for floor check", exc_info=True)
         return
 
-    if declaration is None or declaration.minimum_vaultspec_version is None:
+    if violation is None:
         return
 
-    floor = declaration.minimum_vaultspec_version
-    try:
-        running_parts = parse_version_tuple(running_version)
-        floor_parts = parse_version_tuple(floor)
-    except Exception:
-        logger.debug("Could not parse versions for floor check", exc_info=True)
-        return
-
-    if running_parts < floor_parts:
-        raise VaultSpecError(
-            f"vaultspec-core {running_version} is below the workspace floor "
-            f"{floor} declared in .vaultspec/workspace.json.",
-            hint=(
-                f"Upgrade to at least {floor}: 'uv tool upgrade vaultspec-core' "
-                f"(or 'uv sync --upgrade-package vaultspec-core' when used as a "
-                f"project dependency)."
-            ),
-        )
+    running, floor = violation
+    raise VaultSpecError(
+        f"vaultspec-core {running} is below the workspace floor "
+        f"{floor} declared in .vaultspec/workspace.json.",
+        hint=(
+            f"Upgrade to at least {floor}: 'uv tool upgrade vaultspec-core' "
+            f"(or 'uv sync --upgrade-package vaultspec-core' when used as a "
+            f"project dependency)."
+        ),
+    )
 
 
 def _resolve_version_warning(

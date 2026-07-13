@@ -1996,9 +1996,11 @@ def _render_diagnosis_table(_console, diag: "WorkspaceDiagnosis") -> None:
         GitattributesSignal,
         GitignoreSignal,
         ManifestEntrySignal,
+        ModeMismatchSignal,
         PrecommitSignal,
         RenameIntegritySignal,
         VaultContentSignal,
+        VersionFloorSignal,
     )
 
     rows: list[dict] = []
@@ -2241,6 +2243,49 @@ def _render_diagnosis_table(_console, diag: "WorkspaceDiagnosis") -> None:
         }
     )
 
+    # Install-mode coherence row: the persisted declaration versus the shape of
+    # the provisioned hook and MCP artifacts. UNKNOWN is a legacy, undeclared
+    # workspace and is informational, not a warning.
+    mm_status, mm_style = _signal_status(
+        diag.mode_mismatch,
+        {
+            ModeMismatchSignal.CLEAN: ("ok", "green"),
+            ModeMismatchSignal.MISMATCH: ("warn", "yellow"),
+            ModeMismatchSignal.UNKNOWN: ("info", "dim"),
+        },
+    )
+    mm_detail = {
+        ModeMismatchSignal.CLEAN: "artifacts match the declared install mode",
+        ModeMismatchSignal.MISMATCH: (
+            "hook entries or MCP command do not match the declared mode; "
+            "run vaultspec-core install --upgrade, or install --mode to re-provision"
+        ),
+        ModeMismatchSignal.UNKNOWN: "no install mode declared (legacy workspace)",
+    }.get(diag.mode_mismatch, str(diag.mode_mismatch))
+    rows.append(
+        {
+            "component": "install mode",
+            "status": Cell(mm_status, style=mm_style),
+            "detail": mm_detail,
+        }
+    )
+
+    # Floor-constraint row: reported only when the running version is below the
+    # declared minimum. Doctor reports it as an error without refusing; install
+    # and sync refuse on the same condition.
+    if diag.version_floor == VersionFloorSignal.BELOW:
+        rows.append(
+            {
+                "component": "version floor",
+                "status": Cell("error", style="red"),
+                "detail": (
+                    f"running {diag.version_floor_running} is below the declared "
+                    f"floor {diag.version_floor_minimum}; upgrade with "
+                    f"uv tool upgrade vaultspec-core"
+                ),
+            }
+        )
+
     render_listing(
         rows,
         [Column("component"), Column("status"), Column("detail")],
@@ -2305,10 +2350,12 @@ def _doctor_exit_code(
         GitattributesSignal,
         GitignoreSignal,
         ManifestEntrySignal,
+        ModeMismatchSignal,
         PrecommitSignal,
         ProviderDirSignal,
         RenameIntegritySignal,
         VaultContentSignal,
+        VersionFloorSignal,
     )
 
     has_error = False
@@ -2346,6 +2393,16 @@ def _doctor_exit_code(
         has_error = True
     elif diag.rename_integrity == RenameIntegritySignal.MISMATCH:
         has_warn = True
+
+    # A declared-vs-observed install-mode mismatch is a warning; UNKNOWN (a
+    # legacy, undeclared workspace) and CLEAN are not.
+    if diag.mode_mismatch == ModeMismatchSignal.MISMATCH:
+        has_warn = True
+
+    # A running version below the committed floor is a hard error on doctor,
+    # mirroring the refuse-and-tell that install and sync raise.
+    if diag.version_floor == VersionFloorSignal.BELOW:
+        has_error = True
 
     for prov in diag.providers.values():
         if prov.manifest_entry == ManifestEntrySignal.NOT_INSTALLED:

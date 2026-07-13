@@ -24,6 +24,7 @@ from .signals import (
     ProviderDirSignal,
     RenameIntegritySignal,
     VaultContentSignal,
+    VersionFloorSignal,
 )
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,12 @@ class WorkspaceDiagnosis:
         rename_mismatch_count: Count of name/filename mismatches.
         mode_mismatch: Coherence between the persisted install-mode declaration
             and the shape of the provisioned hook and MCP artifacts.
+        version_floor: State of the running version against the committed
+            ``minimum_vaultspec_version`` floor constraint.
+        version_floor_running: Running version string, populated only when
+            ``version_floor`` is ``BELOW``.
+        version_floor_minimum: Declared floor string, populated only when
+            ``version_floor`` is ``BELOW``.
     """
 
     framework: FrameworkSignal
@@ -93,6 +100,9 @@ class WorkspaceDiagnosis:
     rename_integrity: RenameIntegritySignal = RenameIntegritySignal.CLEAN
     rename_mismatch_count: int = 0
     mode_mismatch: ModeMismatchSignal = ModeMismatchSignal.CLEAN
+    version_floor: VersionFloorSignal = VersionFloorSignal.OK
+    version_floor_running: str = ""
+    version_floor_minimum: str = ""
 
 
 def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
@@ -129,6 +139,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         collect_provider_dir_state,
         collect_rename_integrity,
         collect_vault_content_state,
+        collect_version_floor_state,
     )
 
     # Layer 1: always collected
@@ -190,6 +201,18 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         logger.warning("Mode mismatch collector failed", exc_info=True)
         mode_mismatch = ModeMismatchSignal.CLEAN
 
+    # Floor constraint is reported (not enforced) here: doctor surfaces a
+    # below-floor workspace without raising, sharing the resolver's comparator.
+    try:
+        version_floor, version_floor_running, version_floor_minimum = (
+            collect_version_floor_state(target)
+        )
+    except Exception:
+        logger.warning("Version floor collector failed", exc_info=True)
+        version_floor = VersionFloorSignal.OK
+        version_floor_running = ""
+        version_floor_minimum = ""
+
     diag = WorkspaceDiagnosis(
         framework=framework,
         gitignore=gitignore,
@@ -202,6 +225,9 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         rename_integrity=rename_integrity,
         rename_mismatch_count=rename_mismatch_count,
         mode_mismatch=mode_mismatch,
+        version_floor=version_floor,
+        version_floor_running=version_floor_running,
+        version_floor_minimum=version_floor_minimum,
     )
 
     if framework == FrameworkSignal.MISSING:

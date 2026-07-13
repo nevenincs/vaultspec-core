@@ -608,6 +608,73 @@ class TestModeMismatchResolution:
 
 
 # ---------------------------------------------------------------------------
+# doctor table rows for the install-mode signals
+# ---------------------------------------------------------------------------
+class TestDoctorModeAndFloorRows:
+    @staticmethod
+    def _run_doctor(root: Path):
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        return WorkspaceFactory(root).run("doctor")
+
+    @staticmethod
+    def _combined(result) -> str:
+        return (result.stdout or "") + "\n" + (result.stderr or "")
+
+    def test_doctor_renders_mode_mismatch_row(self, tmp_path: Path) -> None:
+        """A declared-vs-observed mode mismatch surfaces as a warn-weighted
+        doctor row carrying the install --upgrade / --mode fix hint.
+        """
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "x"\nversion = "0"\ndependencies = ["vaultspec-core"]\n',
+            encoding="utf-8",
+        )
+        _install_and_init(tmp_path, InstallMode.DEPENDENCY)
+        write_workspace_declaration(
+            tmp_path, WorkspaceDeclaration(install_mode=InstallMode.TOOL)
+        )
+
+        result = self._run_doctor(tmp_path)
+        combined = self._combined(result)
+        assert "install mode" in combined
+        assert "install --upgrade" in combined
+        assert result.exit_code == 1
+
+    def test_doctor_renders_floor_row_as_error(self, tmp_path: Path) -> None:
+        """A below-floor workspace surfaces as an error-weighted doctor row
+        naming the running version, the floor, and the upgrade remediation.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        write_workspace_declaration(
+            tmp_path,
+            WorkspaceDeclaration(
+                install_mode=InstallMode.TOOL,
+                minimum_vaultspec_version="999.999.999",
+            ),
+        )
+
+        result = self._run_doctor(tmp_path)
+        combined = self._combined(result)
+        assert "version floor" in combined
+        assert "999.999.999" in combined
+        assert result.exit_code == 2
+
+    def test_clean_workspace_has_no_floor_row_and_exits_zero(
+        self, tmp_path: Path
+    ) -> None:
+        """A tool-mode workspace with no floor shows no floor row and, absent
+        other issues, does not go red on the new signals.
+        """
+        _install_and_init(tmp_path, InstallMode.TOOL)
+
+        result = self._run_doctor(tmp_path)
+        combined = self._combined(result)
+        assert "version floor" not in combined
+        # The install-mode row is present and clean.
+        assert "install mode" in combined
+
+
+# ---------------------------------------------------------------------------
 # collect_gitignore_state
 # ---------------------------------------------------------------------------
 class TestGitignoreState:

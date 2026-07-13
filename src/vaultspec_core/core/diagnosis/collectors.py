@@ -25,6 +25,7 @@ from .signals import (
     ProviderDirSignal,
     RenameIntegritySignal,
     VaultContentSignal,
+    VersionFloorSignal,
 )
 
 if TYPE_CHECKING:
@@ -886,6 +887,50 @@ def collect_mode_mismatch_state(target: Path) -> ModeMismatchSignal:
     if any(mode != declared for mode in observed):
         return ModeMismatchSignal.MISMATCH
     return ModeMismatchSignal.CLEAN
+
+
+def collect_version_floor_state(target: Path) -> tuple[VersionFloorSignal, str, str]:
+    """Evaluate the committed floor constraint for the doctor's read-only view.
+
+    Runs the shared :func:`~vaultspec_core.core.workspace_mode.evaluate_version_floor`
+    comparator - the same one the resolver's refuse-and-tell path uses - so the
+    doctor reports exactly the condition install and sync refuse on. Unlike that
+    path, this never raises: a corrupt declaration or an unreadable version is
+    treated as "no constraint" so the read-only doctor surface stays crash-free.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        ``(signal, running_version, minimum_version)``. When the running
+        version is below the floor the signal is
+        :attr:`~vaultspec_core.core.diagnosis.signals.VersionFloorSignal.BELOW`
+        and the two version strings are populated; otherwise the signal is
+        :attr:`~vaultspec_core.core.diagnosis.signals.VersionFloorSignal.OK`
+        with empty strings.
+    """
+    from importlib.metadata import version as pkg_version
+
+    from ..exceptions import VaultSpecError
+    from ..workspace_mode import evaluate_version_floor
+
+    try:
+        running = pkg_version("vaultspec-core")
+    except Exception:
+        logger.debug("Could not determine running version for floor state")
+        return VersionFloorSignal.OK, "", ""
+
+    try:
+        violation = evaluate_version_floor(target, running)
+    except VaultSpecError:
+        logger.debug("Could not read declaration for floor state", exc_info=True)
+        return VersionFloorSignal.OK, "", ""
+
+    if violation is None:
+        return VersionFloorSignal.OK, "", ""
+
+    running_v, floor = violation
+    return VersionFloorSignal.BELOW, running_v, floor
 
 
 def collect_rename_integrity(target: Path) -> tuple[RenameIntegritySignal, int]:

@@ -16,11 +16,13 @@ from vaultspec_core.core.diagnosis.signals import (
     GitattributesSignal,
     GitignoreSignal,
     ManifestEntrySignal,
+    ModeMismatchSignal,
     PrecommitSignal,
     ProviderDirSignal,
     RenameIntegritySignal,
     ResolutionAction,
     VaultContentSignal,
+    VersionFloorSignal,
 )
 from vaultspec_core.core.enums import CliAction, PrecommitHook, Tool
 
@@ -243,3 +245,66 @@ class TestDoctorExitCode:
             manifest_entry=ManifestEntrySignal.COHERENT,
         )
         assert _doctor_exit_code(self._clean_workspace(prov)) == 1
+
+
+class TestDoctorModeAndFloorWeighting:
+    """Doctor weights the install-mode and floor signals correctly."""
+
+    def _prov(self) -> ProviderDiagnosis:
+        return ProviderDiagnosis(
+            tool=Tool.CLAUDE,
+            dir_state=ProviderDirSignal.COMPLETE,
+            manifest_entry=ManifestEntrySignal.COHERENT,
+        )
+
+    def _workspace(
+        self,
+        *,
+        mode_mismatch: ModeMismatchSignal = ModeMismatchSignal.CLEAN,
+        version_floor: VersionFloorSignal = VersionFloorSignal.OK,
+    ) -> WorkspaceDiagnosis:
+        return WorkspaceDiagnosis(
+            framework=FrameworkSignal.PRESENT,
+            providers={Tool.CLAUDE: self._prov()},
+            builtin_version=BuiltinVersionSignal.CURRENT,
+            gitignore=GitignoreSignal.COMPLETE,
+            gitattributes=GitattributesSignal.COMPLETE,
+            precommit=PrecommitSignal.COMPLETE,
+            migration_status="up_to_date",
+            vault_content=VaultContentSignal.CLEAN,
+            rename_integrity=RenameIntegritySignal.CLEAN,
+            mode_mismatch=mode_mismatch,
+            version_floor=version_floor,
+        )
+
+    def test_clean_mode_and_no_floor_exit_zero(self) -> None:
+        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+
+        assert _doctor_exit_code(self._workspace()) == 0
+
+    def test_unknown_mode_is_not_a_warning(self) -> None:
+        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+
+        diag = self._workspace(mode_mismatch=ModeMismatchSignal.UNKNOWN)
+        assert _doctor_exit_code(diag) == 0
+
+    def test_mode_mismatch_warns(self) -> None:
+        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+
+        diag = self._workspace(mode_mismatch=ModeMismatchSignal.MISMATCH)
+        assert _doctor_exit_code(diag) == 1
+
+    def test_below_floor_is_an_error(self) -> None:
+        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+
+        diag = self._workspace(version_floor=VersionFloorSignal.BELOW)
+        assert _doctor_exit_code(diag) == 2
+
+    def test_below_floor_outranks_mode_warning(self) -> None:
+        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+
+        diag = self._workspace(
+            mode_mismatch=ModeMismatchSignal.MISMATCH,
+            version_floor=VersionFloorSignal.BELOW,
+        )
+        assert _doctor_exit_code(diag) == 2

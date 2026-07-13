@@ -30,7 +30,7 @@ from typing import Any
 
 from .enums import InstallMode
 from .exceptions import VaultSpecError
-from .helpers import advisory_lock, atomic_write
+from .helpers import advisory_lock, atomic_write, parse_version_tuple
 
 WORKSPACE_FILENAME = "workspace.json"
 WORKSPACE_SCHEMA_VERSION = "1.0"
@@ -322,6 +322,49 @@ def resolve_install_mode(
     if _pyproject_declares_vaultspec_dependency(pyproject):
         return InstallMode.DEPENDENCY
     return InstallMode.TOOL
+
+
+def evaluate_version_floor(
+    target: Path, running_version: str
+) -> tuple[str, str] | None:
+    """Evaluate the committed floor constraint against *running_version*.
+
+    Reads the committed ``.vaultspec/workspace.json`` declaration's
+    ``minimum_vaultspec_version`` and compares it to *running_version*. This is
+    the single shared comparator behind both refuse-and-tell on install/sync
+    (which raises on a violation) and report-on-doctor (which renders a row
+    without raising), so the two surfaces cannot diverge on what "below the
+    floor" means.
+
+    A workspace that declares no floor, or whose versions cannot be parsed,
+    imposes no constraint and returns ``None``. A corrupt declaration
+    propagates :class:`~vaultspec_core.core.exceptions.VaultSpecError` from
+    :func:`read_workspace_declaration`; callers decide whether to surface or
+    swallow it.
+
+    Args:
+        target: Workspace root directory.
+        running_version: The running ``vaultspec-core`` package version string.
+
+    Returns:
+        ``(running_version, floor)`` when the running version is strictly below
+        the declared floor, else ``None``.
+
+    Raises:
+        VaultSpecError: If a declaration exists but is malformed (propagated
+            from :func:`read_workspace_declaration`).
+    """
+    declaration = read_workspace_declaration(target)
+    if declaration is None or declaration.minimum_vaultspec_version is None:
+        return None
+
+    floor = declaration.minimum_vaultspec_version
+    try:
+        if parse_version_tuple(running_version) < parse_version_tuple(floor):
+            return running_version, floor
+    except Exception:
+        return None
+    return None
 
 
 def resolve_render_mode(target: Path) -> InstallMode:
