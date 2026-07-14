@@ -34,7 +34,7 @@ Generalize dependency-vs-dev-group detection to a package parameter, add DEV to 
 
 - [x] `W01.P02.S08` - Generalize dependency detection to report both project-dependency and default-dev-group evidence for a named distribution, keeping a core-scoped wrapper for the existing call sites; `src/vaultspec_core/core/workspace_mode.py`.
 - [x] `W01.P02.S09` - Add a package parameter to resolve_install_mode and insert DEV into the Q5 precedence chain ahead of the TOOL default when dev-group evidence is found; `src/vaultspec_core/core/workspace_mode.py`.
-- [ ] `W01.P02.S10` - Accept dev as a valid --mode token for cmd_install and update its help text to document all three provisioning modes; `src/vaultspec_core/cli/root.py`.
+- [x] `W01.P02.S10` - Accept dev as a valid --mode token for cmd_install and update its help text to document all three provisioning modes; `src/vaultspec_core/cli/root.py`.
 - [ ] `W01.P02.S11` - Add a warn-only dependency-leak advisory to resolve() that appends a plan warning when a package's declared mode is DEPENDENCY, never refusing the placement; `src/vaultspec_core/core/resolver.py`.
 - [ ] `W01.P02.S12` - Add DEV precedence and dev-group detection tests covering both packages and the mixed dependency-plus-dev-group configuration; `src/vaultspec_core/tests/cli/test_workspace_mode.py`.
 - [ ] `W01.P02.S13` - Add resolver tests asserting the dependency-leak advisory fires for a DEPENDENCY-mode package and stays silent for TOOL or DEV mode; `src/vaultspec_core/tests/cli/test_resolver.py`.

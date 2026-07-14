@@ -233,9 +233,12 @@ def cmd_install(
         typer.Option(
             "--mode",
             help=(
-                "Provisioning mode: 'tool' (default, launched via uvx) or "
-                "'dependency' (resolved through the project's own venv). "
-                "Auto-detected from pyproject.toml when omitted."
+                "Provisioning mode: 'tool' (default, launched via uvx), "
+                "'dependency' (a runtime project dependency resolved through the "
+                "project's own venv, ships in built distributions), or 'dev' "
+                "(the default dev dependency group; renders like dependency but "
+                "does not ship in built distributions). Auto-detected from "
+                "pyproject.toml when omitted."
             ),
         ),
     ] = None,
