@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.43](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.42...vaultspec-core-v0.1.43) (2026-07-14)
+
+
+### Bug Fixes
+
+* **vault:** match block indent and dedupe aliases in link add ([#206](https://github.com/nevenincs/vaultspec-core/issues/206)) ([08d2252](https://github.com/nevenincs/vaultspec-core/commit/08d22528d9e3593e3083e22bb882b3b48d8ae5e5))
+
 ## [0.1.42](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.41...vaultspec-core-v0.1.42) (2026-07-14)
 
 
