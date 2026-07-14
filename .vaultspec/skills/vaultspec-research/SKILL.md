@@ -51,36 +51,30 @@ research and brainstorming."
   or an empty Findings section is not research - fill every section in the same session
   or do not create the document.
 
-- **Persist sources:** record every finding's source as a re-fetchable locator (URL,
-  `file:line`, commit SHA, `package@version`, RFC number) and collect them in the
-  closing `## Sources` section; ground code in a `<Reference>` via
-  `vaultspec-code-research` and link it. Keep the artifact lean by pointing to sources,
-  not reproducing them.
+- **Persist sources:** every finding's source is a re-fetchable locator (URL,
+  `file:line`, commit SHA, `package@version`, RFC number), cited inline and collected
+  once in the closing `## Sources` section; ground code in a `<Reference>` via
+  `vaultspec-code-research` and link it.
 
 ## Quality gate
 
-The artifact is judged by decision value per token, not volume; it is re-read by agents
-in every later pipeline phase, so every sentence must earn its place. Before persisting,
-hold the document to this bar:
+Judged by decision value per token; agents re-read the artifact in every later phase.
+Before persisting, hold the document to this bar:
 
-- **Answer-first.** The lead paragraph states the question, why it matters, and the
-  conclusion or recommendation; each finding opens with its claim, evidence after.
-- **Locator-anchored.** Every non-obvious claim carries a re-fetchable locator (URL,
-  `file:line`, commit SHA, `package@version`, RFC number); a claim without one is an
-  opinion and is marked as such.
-- **Comparative.** The real alternatives are named with why each was kept or rejected,
-  not a single advocated answer.
-- **Specific.** Versions, dates, numbers, and concrete constraints are pinned; never "X
-  is popular" or "widely used."
-- **Bounded and honest.** What was not investigated is stated; confidence and unknowns
-  are marked rather than certainty manufactured; general-knowledge claims not
-  re-verified are flagged.
-- **Lean.** Sources are linked, never reproduced; no hedging boilerplate, no restated
-  prompt, no closing summary repeating the body. A sentence whose removal loses no
-  decision input is cut.
+- **Answer-first.** Lead states question, stakes, and conclusion; each finding opens
+  with its claim, evidence after.
+- **Locator-anchored.** Every non-obvious claim carries a re-fetchable locator; an
+  unanchored claim is marked as opinion.
+- **Comparative.** Alternatives named, with why each was kept or rejected.
+- **Specific.** Versions, dates, and numbers pinned; never "popular" or "widely used."
+- **Deduplicated.** Each fact stated once. What a related vault document already records
+  is linked, not restated; what an earlier section establishes is not repeated.
+- **Bounded.** Uninvestigated areas stated; unverified general-knowledge claims flagged.
+- **Lean.** Link, do not copy; no hedging boilerplate, no restated prompt, no closing
+  summary.
 
-Dispatched researcher personas return findings held to the same bar; transfer them into
-the scaffolded body without diluting the locators.
+Dispatched researcher findings meet the same bar; transfer them into the scaffolded body
+without diluting the locators.
 
 ## Workflow
 

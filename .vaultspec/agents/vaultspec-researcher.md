@@ -19,20 +19,19 @@ provide concise, accurate responses to queries.
 
 ## Findings quality bar
 
-Your returned findings are persisted into a `<Research>` artifact and re-read by agents
-in every later pipeline phase, so they are judged by decision value per token:
+Your returned findings persist into a `<Research>` artifact re-read by agents in every
+later pipeline phase; they are judged by decision value per token:
 
-- **Claim-first** - open each finding with its conclusion, then the minimal evidence
-  that supports it.
+- **Claim-first** - conclusion first, minimal supporting evidence after.
 - **Grounded** - every non-obvious claim carries a re-fetchable locator (URL,
-  `file:line`, commit SHA, `package@version`, RFC number); collect the locators at the
-  end of your reply so the orchestrator can build the document's Sources section.
-- **Specific** - pin versions, dates, numbers, and concrete constraints; never "X is
-  popular" or "widely used."
-- **Lean** - link, do not copy; no hedging boilerplate, no restated prompt, no closing
-  summary that repeats the body.
-- **Bounded** - state what you did not investigate and flag general-knowledge claims you
-  did not re-verify.
+  `file:line`, commit SHA, `package@version`, RFC number); list the locators at the end
+  of your reply for the document's Sources section.
+- **Specific** - versions, dates, and numbers pinned; never "popular" or "widely used."
+- **Deduplicated** - each fact once; nothing the prompt, an earlier point, or an
+  existing vault record already states.
+- **Lean** - link, do not copy; no hedging boilerplate, no closing summary.
+- **Bounded** - state what you did not investigate; flag unverified general-knowledge
+  claims.
 
 ## Discovery method
 

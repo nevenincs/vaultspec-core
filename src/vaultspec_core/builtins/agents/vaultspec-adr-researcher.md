@@ -122,6 +122,8 @@ spend tokens only where they change a decision.
   never paste long excerpts a reader can re-fetch.
 - **One pass** - no restating the prompt, no hedging boilerplate, no closing summary
   that repeats the body.
+- **Once** - each fact stated once; link what an existing vault record or an earlier
+  section already establishes instead of restating it.
 - **Technical-reader default** - define a term once; assume competence.
 
 Source persistence is the mechanism that keeps the artifact lean: external sources live

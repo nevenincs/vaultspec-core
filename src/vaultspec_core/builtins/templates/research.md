@@ -30,25 +30,21 @@ related:
 
 # `{feature}` research: `{topic}`
 
-<!-- Lead paragraph: the question researched, why it matters to `{feature}`,
-     and the answer or recommendation stated up front. A reader who stops
-     here learns what was concluded, not merely what was attempted. -->
+<!-- Lead: the question, why it matters to `{feature}`, and the conclusion.
+     A reader who stops here knows what was concluded. -->
 
 ## Findings
 
-<!-- One ### subsection per line of inquiry. Claim first: open each finding
-     with its conclusion, follow with the minimal evidence that supports it,
-     and anchor every non-obvious claim to a re-fetchable locator (URL,
-     `file:line`, commit SHA, `package@version`, RFC number).
-     Density rules: link, do not copy - never paste excerpts a reader can
-     re-fetch; pin versions, dates, and numbers instead of "popular" or
-     "widely used"; cut anything that changes no downstream decision; no
-     hedging filler, no restated prompt, no closing summary repeating the
-     body. Name the alternatives weighed and why each was kept or rejected,
-     and state what was not investigated. -->
+<!-- One ### subsection per line of inquiry. Claim first, evidence after.
+     Anchor every non-obvious claim to a re-fetchable locator (URL,
+     `file:line`, commit SHA, `package@version`, RFC number). Link, do not
+     copy. Pin versions, dates, numbers. State each fact once: link what a
+     related vault document already records; do not repeat what an earlier
+     section establishes. Name alternatives and why kept or rejected. State
+     what was not investigated. Cut anything that changes no decision. -->
 
 ## Sources
 
-<!-- Every locator cited above, collected and re-fetchable: code as
-     `path:line` backtick locators, external references as bare URLs.
-     Mark claims taken from general knowledge and not re-verified. -->
+<!-- Each locator cited above, once: `path:line` backtick locators for code,
+     bare URLs for external references. Flag unverified general-knowledge
+     claims. -->
