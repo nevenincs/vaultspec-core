@@ -90,7 +90,10 @@ class TestRoundTrip:
         raw = json.loads(text)
         assert list(raw.keys()) == sorted(raw.keys())
         assert raw["schema_version"] == WORKSPACE_SCHEMA_VERSION
-        assert raw["install_mode"] == "dependency"
+        core_entry = raw["packages"]["vaultspec-core"]
+        assert list(core_entry.keys()) == sorted(core_entry.keys())
+        assert core_entry["install_mode"] == "dependency"
+        assert core_entry["minimum_version"] == "1.2.3"
 
     def test_schema_version_forced_on_write(self, factory):
         write_workspace_declaration(

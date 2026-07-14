@@ -263,32 +263,68 @@ def read_workspace_declaration(target: Path) -> WorkspaceDeclaration | None:
     )
 
 
-def write_workspace_declaration(
-    target: Path, declaration: WorkspaceDeclaration
-) -> None:
-    """Serialize *declaration* to ``.vaultspec/workspace.json``.
+def _write_packages_map(target: Path, packages: dict[str, PackageDeclaration]) -> None:
+    """Serialize *packages* to ``.vaultspec/workspace.json`` in schema 2.0 shape.
 
-    Forces :attr:`WorkspaceDeclaration.schema_version` to the current
-    :data:`WORKSPACE_SCHEMA_VERSION` and writes canonically: sorted keys,
-    two-space indent, and a trailing newline. The optional floor field is
-    omitted entirely when unset so the committed file stays minimal. Wraps the
-    read-modify-write cycle in an advisory lock so concurrent writers do not
-    clobber each other.
+    The single lock-free write primitive. Emits the ``{"schema_version": "2.0",
+    "packages": {...}}`` envelope canonically: ``json.dumps`` with
+    ``sort_keys=True`` orders the package names and every nested key
+    deterministically, two-space indent and a trailing newline keep the
+    committed file diff-clean. Each package entry carries its ``install_mode``
+    and, only when set, its ``minimum_version`` floor, so an unset floor never
+    writes a null. Callers that must not race a concurrent writer wrap this in
+    :func:`~vaultspec_core.core.helpers.advisory_lock`; this primitive itself
+    takes no lock so it can be composed inside a caller's own read-modify-write
+    critical section without re-entering a non-reentrant lock.
 
     Args:
         target: Workspace root directory.
-        declaration: :class:`WorkspaceDeclaration` instance to persist.
+        packages: Mapping of distribution name to :class:`PackageDeclaration`.
     """
     path = _workspace_path(target)
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload: dict[str, str] = {
+    packages_payload: dict[str, dict[str, str]] = {}
+    for name, decl in packages.items():
+        entry: dict[str, str] = {"install_mode": InstallMode(decl.install_mode).value}
+        if decl.minimum_version is not None:
+            entry["minimum_version"] = decl.minimum_version
+        packages_payload[name] = entry
+    payload = {
         "schema_version": WORKSPACE_SCHEMA_VERSION,
-        "install_mode": InstallMode(declaration.install_mode).value,
+        "packages": packages_payload,
     }
-    if declaration.minimum_vaultspec_version is not None:
-        payload["minimum_vaultspec_version"] = declaration.minimum_vaultspec_version
+    atomic_write(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+def write_workspace_declaration(
+    target: Path, declaration: WorkspaceDeclaration
+) -> None:
+    """Persist the ``vaultspec-core`` view to ``.vaultspec/workspace.json``.
+
+    The backward-compatible facade over the schema 2.0 write path: it upserts the
+    ``vaultspec-core`` entry in the ``packages`` map from a single-package
+    :class:`WorkspaceDeclaration` while leaving every companion package's entry
+    untouched. The whole read-modify-write cycle runs under a single advisory
+    lock so a concurrent writer of a sibling package's entry is serialized rather
+    than clobbered. The file is always rewritten in schema 2.0 shape, so a legacy
+    single-key file is migrated on the first write. The declaration's own
+    ``schema_version`` field is ignored on write; the on-disk version is always
+    :data:`WORKSPACE_SCHEMA_VERSION`.
+
+    Args:
+        target: Workspace root directory.
+        declaration: :class:`WorkspaceDeclaration` instance to persist as the
+            ``vaultspec-core`` entry.
+    """
+    path = _workspace_path(target)
+    entry = PackageDeclaration(
+        install_mode=InstallMode(declaration.install_mode),
+        minimum_version=declaration.minimum_vaultspec_version,
+    )
     with advisory_lock(path):
-        atomic_write(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+        packages = _read_packages_map(target) or {}
+        packages[_DISTRIBUTION_NAME] = entry
+        _write_packages_map(target, packages)
 
 
 def _canonical_distribution_name(name: str) -> str:

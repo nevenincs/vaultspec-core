@@ -24,7 +24,7 @@ Move WorkspaceDeclaration from a single-key schema to a per-package map at schem
 - [x] `W01.P01.S02` - Add a render_mode aliasing helper that maps DEV to DEPENDENCY and passes TOOL and DEPENDENCY through unchanged, as the single rendering-time comparator; `src/vaultspec_core/core/enums.py`.
 - [x] `W01.P01.S03` - Add a PackageDeclaration dataclass (mode, minimum_vaultspec_version) and bump WORKSPACE_SCHEMA_VERSION to 2.0 for the per-package packages map shape; `src/vaultspec_core/core/workspace_mode.py`.
 - [x] `W01.P01.S04` - Rewrite read_workspace_declaration to parse the v2 packages map and fold a legacy v1 single-key file into packages keyed to the current package on read; `src/vaultspec_core/core/workspace_mode.py`.
-- [ ] `W01.P01.S05` - Rewrite write_workspace_declaration to serialize the v2 packages map canonically with sorted keys and the schema_version 2.0 stamp; `src/vaultspec_core/core/workspace_mode.py`.
+- [x] `W01.P01.S05` - Rewrite write_workspace_declaration to serialize the v2 packages map canonically with sorted keys and the schema_version 2.0 stamp; `src/vaultspec_core/core/workspace_mode.py`.
 - [ ] `W01.P01.S06` - Add read_package_declaration and write_package_declaration helpers that read-modify-write a single package's entry under the advisory lock without clobbering sibling packages; `src/vaultspec_core/core/workspace_mode.py`.
 - [ ] `W01.P01.S07` - Add legacy v1-to-v2 fold tests and mixed-package configuration round-trip tests using WorkspaceFactory and real filesystem writes; `src/vaultspec_core/tests/cli/test_workspace_mode.py`.
 
