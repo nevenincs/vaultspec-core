@@ -47,9 +47,16 @@ WORKSPACE_SCHEMA_VERSION = "2.0"
 #: current shape on the next write.
 _LEGACY_SCHEMA_VERSION = "1.0"
 
-#: Distribution name detection keys on; canonicalized per PEP 503 so that
-#: ``vaultspec_core`` and ``vaultspec-core`` compare equal.
-_DISTRIBUTION_NAME = "vaultspec-core"
+#: The core distribution's canonical name, exported so callers outside this
+#: module can address core's own entry in the per-package map explicitly without
+#: reaching for a private. Detection and the read/write facades key on it;
+#: comparisons canonicalize per PEP 503 so that ``vaultspec_core`` and
+#: ``vaultspec-core`` compare equal.
+CORE_DISTRIBUTION_NAME = "vaultspec-core"
+
+#: Internal alias kept for the module's own dense call sites; identical to
+#: :data:`CORE_DISTRIBUTION_NAME`.
+_DISTRIBUTION_NAME = CORE_DISTRIBUTION_NAME
 
 #: Split a PEP 508 requirement string at the first character that terminates
 #: the distribution name (version specifier, extras, marker, or whitespace).
@@ -362,6 +369,33 @@ def read_package_declaration(target: Path, package: str) -> PackageDeclaration |
     if packages is None:
         return None
     return packages.get(_canonical_distribution_name(package))
+
+
+def read_package_declarations(target: Path) -> dict[str, PackageDeclaration]:
+    """Read every declared package's entry from the committed ``workspace.json``.
+
+    The public enumeration behind surfaces that must render or diagnose *each*
+    provisioned package independently - the doctor's per-package mode and floor
+    rows chief among them - rather than only core's own entry. Keys are
+    canonicalized distribution names; a legacy schema 1.0 file folds into a
+    single core-keyed entry, exactly as the per-entry read does.
+
+    A missing file yields an empty mapping (nothing declared yet); a present but
+    broken file raises, matching the fail-loud contract the rest of the read
+    surface honors.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        A mapping of canonicalized distribution name to
+        :class:`PackageDeclaration`, empty when no declaration file exists.
+
+    Raises:
+        VaultSpecError: If the file exists but is malformed (propagated from
+            :func:`_read_packages_map`).
+    """
+    return _read_packages_map(target) or {}
 
 
 def read_workspace_declaration(target: Path) -> WorkspaceDeclaration | None:
@@ -798,8 +832,8 @@ def evaluate_version_floor(
     return None
 
 
-def resolve_render_mode(target: Path) -> InstallMode:
-    """Resolve the mode downstream renderers target for a provisioned workspace.
+def resolve_render_mode(target: Path, package: str = _DISTRIBUTION_NAME) -> InstallMode:
+    """Resolve the mode downstream renderers target for a provisioned *package*.
 
     Distinct from :func:`resolve_install_mode`, which resolves the mode at
     *provision* time and defaults an undeclared workspace to
@@ -810,13 +844,20 @@ def resolve_render_mode(target: Path) -> InstallMode:
     ``install-mode`` decision and was therefore provisioned in the only shape
     that existed before it, dependency mode.
 
+    The lookup is per-package: only *package*'s own entry in the shared
+    ``packages`` map decides its render mode, so a mixed configuration (core in
+    one mode, a companion package in another) renders each independently. A
+    schema 2.0 file that carries only a *sibling* package's entry reads as
+    absent for *package* and falls through to the same dependency bridge as a
+    file that predates the declaration entirely.
+
     Returning :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY` on an
-    absent declaration is the Q6 migration bridge: it keeps ``sync`` and
-    ``doctor`` byte-identical to their pre-``install-mode`` output on a legacy
-    workspace until ``install --upgrade`` infers and records a mode. Without
-    it, syncing a legacy dependency-mode workspace would silently rewrite its
-    ``uv run`` launch command and hook entries to the ``uvx`` tool-mode shape
-    and diagnose the workspace as drifted against a mode it never chose.
+    absent entry is the Q6 migration bridge: it keeps ``sync`` and ``doctor``
+    byte-identical to their pre-``install-mode`` output on a legacy workspace
+    until ``install --upgrade`` infers and records a mode. Without it, syncing a
+    legacy dependency-mode workspace would silently rewrite its ``uv run``
+    launch command and hook entries to the ``uvx`` tool-mode shape and diagnose
+    the workspace as drifted against a mode it never chose.
 
     The provision-time entry points (fresh ``install``) pass their resolved
     mode explicitly rather than relying on this fallback, since the committed
@@ -824,17 +865,20 @@ def resolve_render_mode(target: Path) -> InstallMode:
 
     Args:
         target: Workspace root directory.
+        package: Distribution name whose render mode to resolve; defaults to
+            ``vaultspec-core``. Threaded so a companion package renders from its
+            own entry rather than core's.
 
     Returns:
-        The declared :class:`~vaultspec_core.core.enums.InstallMode` when a
-        well-formed declaration exists, else
+        The declared :class:`~vaultspec_core.core.enums.InstallMode` when
+        *package* has a well-formed entry, else
         :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY`.
 
     Raises:
         VaultSpecError: If a declaration exists but is malformed (propagated
-            from :func:`read_workspace_declaration`).
+            from :func:`read_package_declaration`).
     """
-    declaration = read_workspace_declaration(target)
+    declaration = read_package_declaration(target, package)
     if declaration is not None:
         return declaration.install_mode
     return InstallMode.DEPENDENCY
