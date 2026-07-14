@@ -27,6 +27,11 @@ related:
   - '[[2026-07-14-install-parity-W01-P03-S19]]'
   - '[[2026-07-14-install-parity-W01-P03-S20]]'
   - '[[2026-07-14-install-parity-W01-P03-S28]]'
+  - '[[2026-07-14-install-parity-W01-P04-S21]]'
+  - '[[2026-07-14-install-parity-W01-P04-S22]]'
+  - '[[2026-07-14-install-parity-W01-P04-S23]]'
+  - '[[2026-07-14-install-parity-W01-P04-S24]]'
+  - '[[2026-07-14-install-parity-W01-P04-S25]]'
   - '[[2026-07-14-install-parity-adr]]'
   - '[[2026-07-14-install-parity-plan]]'
   - '[[2026-07-14-install-parity-research]]'
@@ -65,6 +70,11 @@ Auto-generated index of all documents tagged with `#install-parity`.
 - `2026-07-14-install-parity-W01-P03-S19` - Update \_write_mode_declaration and \_infer_upgrade_mode to read and write core's own entry in the v2 packages map via the per-package helpers, preserving sibling package entries untouched
 - `2026-07-14-install-parity-W01-P03-S20` - Add renderer and doctor tests covering TOOL, DEPENDENCY, and DEV for the core package plus a mixed configuration where a companion package's entry differs, asserting no cross-package branch
 - `2026-07-14-install-parity-W01-P03-S28` - Generalize the MCP launch table from a single hardcoded vaultspec-core module entry to a package-and-module-parameterized render_launch_for_mode helper, keeping vaultspec-core's own launch as the default so companion packages can render through the same sentinel-substitution renderer
+- `2026-07-14-install-parity-W01-P04-S21` - Document the --mode dev flag, the DEV-renders-as-DEPENDENCY nuance, and the v2 per-package workspace.json shape in the MCP and install documentation
+- `2026-07-14-install-parity-W01-P04-S22` - Update the provisioning-mode section to describe the three-mode model and per-package declaration
+- `2026-07-14-install-parity-W01-P04-S23` - Regenerate the locally-resident CLI reference to reflect the dev mode token and updated --mode help text
+- `2026-07-14-install-parity-W01-P04-S24` - Run the full unit gate and perform an ADR-conformance review confirming the schema v2 migration, DEV mode, and per-package renderers match the install-parity ADR before the wave is released
+- `2026-07-14-install-parity-W01-P04-S25` - Update the framework overview's install-mode description to name the three-mode model
 
 ### plan
 
