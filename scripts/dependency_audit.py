@@ -42,12 +42,18 @@ from pathlib import Path
 # latest version). torch is dev-only tooling here (vaultspec-rag's
 # backend, never shipped in the wheel) and nothing in this repository
 # invokes torch.jit. Re-triage when a fixed torch release appears.
+# PYSEC-2026-3447 is a summary-less setuptools advisory fixed in 83.0.0;
+# setuptools 81.0.0 is held back transitively by torch 2.12.1 (upgrading
+# would drag torch to 2.13.0, an untested GPU-stack bump owned by its own
+# change). setuptools is dev-env build tooling, never shipped in the
+# wheel. Re-triage when torch moves to 2.13+ in a deliberate upgrade.
 IGNORED: frozenset[str] = frozenset(
     {
         "PYSEC-2025-183",
         "CVE-2025-45768",
         "GHSA-rrmf-rvhw-rf47",
         "CVE-2025-3000",
+        "PYSEC-2026-3447",
     }
 )
 
