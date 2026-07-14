@@ -130,13 +130,17 @@ def _persist_resolved_mode(path: Path, mdata: ManifestData, mode: InstallMode) -
 
 
 def _write_mode_declaration(path: Path, mode: InstallMode) -> str | None:
-    """Write the committed mode declaration, preserving any existing floor.
+    """Write core's committed mode entry, preserving its floor and any siblings.
 
-    The provisioning mode and the ``minimum_vaultspec_version`` floor are
-    independent axes of the same committed declaration, so rewriting the mode
-    must never drop a floor a prior run recorded. The write is deterministic
-    (sorted keys, fixed indent) so re-writing the same mode leaves byte-identical
-    content, which is what makes a repeated ``install --upgrade`` idempotent.
+    Reads and writes only ``vaultspec-core``'s own entry in the shared
+    per-package map through the per-package helpers, so a companion package's
+    entry (for example ``vaultspec-rag``) is never touched when core's mode is
+    rewritten. The provisioning mode and the per-package ``minimum_version``
+    floor are independent axes of the same entry, so rewriting the mode must
+    never drop a floor a prior run recorded. :func:`write_package_declaration`'s
+    read-modify-write under the advisory lock is deterministic (sorted keys,
+    fixed indent), so re-writing the same mode leaves byte-identical content,
+    which is what makes a repeated ``install --upgrade`` idempotent.
 
     Args:
         path: Workspace root directory.
@@ -147,16 +151,18 @@ def _write_mode_declaration(path: Path, mode: InstallMode) -> str | None:
         declaration into the manifest need not re-read it.
     """
     from .workspace_mode import (
-        WorkspaceDeclaration,
-        read_workspace_declaration,
-        write_workspace_declaration,
+        CORE_DISTRIBUTION_NAME,
+        PackageDeclaration,
+        read_package_declaration,
+        write_package_declaration,
     )
 
-    existing = read_workspace_declaration(path)
-    floor = existing.minimum_vaultspec_version if existing is not None else None
-    write_workspace_declaration(
+    existing = read_package_declaration(path, CORE_DISTRIBUTION_NAME)
+    floor = existing.minimum_version if existing is not None else None
+    write_package_declaration(
         path,
-        WorkspaceDeclaration(install_mode=mode, minimum_vaultspec_version=floor),
+        CORE_DISTRIBUTION_NAME,
+        PackageDeclaration(install_mode=mode, minimum_version=floor),
     )
     return floor
 
@@ -198,16 +204,17 @@ def _infer_upgrade_mode(target: Path, explicit: InstallMode | None) -> ResolvedM
     """
     from .diagnosis.collectors import _observed_precommit_mode
     from .workspace_mode import (
+        CORE_DISTRIBUTION_NAME,
         ModeProvenance,
         ResolvedMode,
-        read_workspace_declaration,
+        read_package_declaration,
         resolve_install_mode,
         resolve_install_mode_with_provenance,
     )
 
     if explicit is not None:
         return resolve_install_mode_with_provenance(target, explicit=explicit)
-    if read_workspace_declaration(target) is not None:
+    if read_package_declaration(target, CORE_DISTRIBUTION_NAME) is not None:
         return resolve_install_mode_with_provenance(target, explicit=None)
 
     detected = resolve_install_mode(target, explicit=None)
