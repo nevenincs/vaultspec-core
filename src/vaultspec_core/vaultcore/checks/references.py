@@ -2,7 +2,8 @@
 
 Two checks in one module:
 - references: feature docs that should reference each other but don't
-- schema: ADRs must reference research, plans must reference ADRs
+- schema: ADRs must reference grounding (research/reference/audit);
+  plans must reference ADRs
 
 Both support ``--fix`` to auto-add ``related:`` links in frontmatter.
 """
@@ -225,7 +226,8 @@ def check_schema(
 
     Rules enforced:
 
-    - ADR must reference at least one research document (ERROR).
+    - ADR must reference at least one grounding document - research,
+      reference, or audit (ERROR).
     - Plan must reference at least one ADR (ERROR).
     - Plan should reference research documents (WARNING).
 
@@ -287,13 +289,28 @@ def check_schema(
         feat_name = feat_tags[0].lstrip("#") if feat_tags else None
 
         if node.doc_type == DocType.ADR:
-            if "research" not in linked_types:
-                msg = "ADR has no references to research documents"
+            # The documentation hierarchy sanctions research, reference, and
+            # audit documents as ADR grounding; any one of them satisfies the
+            # check.
+            grounding_types = {"research", "reference", "audit"}
+            if not (linked_types & grounding_types):
+                msg = (
+                    "ADR has no grounding references "
+                    "(research, reference, or audit documents)"
+                )
                 if feat_name:
                     msg += f" (feature: {feat_name})"
 
                 if fix and feat_name:
-                    candidates = feat_type_index.get(feat_name, {}).get("research", [])
+                    by_type = feat_type_index.get(feat_name, {})
+                    candidates = next(
+                        (
+                            by_type[t]
+                            for t in ("research", "reference", "audit")
+                            if by_type.get(t)
+                        ),
+                        [],
+                    )
                     if candidates and _add_related_link(node.path, candidates[0].name):
                         result.fixed_count += 1
                         result.diagnostics.append(
