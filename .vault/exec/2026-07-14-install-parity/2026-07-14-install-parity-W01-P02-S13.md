@@ -29,4 +29,6 @@ The warn-only dependency-leak advisory is now pinned on both axes the ADR's D3 c
 
 ## Notes
 
-None.
+### Review refinement (ADR D3 moment-of-choice)
+
+P02 code review moved the advisory out of `resolve()` and into the install/upgrade command path so it fires only when a run newly elects dependency mode (see S11's review-refinement note). As a result the `TestDependencyLeakAdvisory` class first added here against `resolve()` no longer matches the mechanism and was removed, and `_signal_warnings` in `test_resolver.py` simplified back to filtering only the version-upgrade nudge. The advisory presence-and-absence coverage now lives where the behavior does: `test_install.py::TestDependencyLeakAdvisory` (explicit and detected dependency install warn; a persisted-declaration reinstall and an `install --dry-run` on a persisted workspace stay silent; tool mode stays silent), plus unit-level `test_workspace_mode.py::TestModeProvenance` and `TestNewlyEstablishesDependency` pinning the provenance tagging and the moment-of-choice predicate (persisted dependency is not newly established; dev and tool never are). All match the canonical advisory constant through one shared marker.

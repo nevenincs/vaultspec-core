@@ -164,12 +164,6 @@ def resolve(
     )
     _resolve_mode_mismatch(plan, diagnosis.mode_mismatch)
 
-    # Warn-only leak reminder for the full-leak dependency placement. Gated to
-    # provisioning actions so it fires when the operator is (re-)provisioning,
-    # not while uninstalling; doctor already returned above and never sees it.
-    if action in (CliAction.INSTALL, CliAction.SYNC, CliAction.UPGRADE):
-        _resolve_dependency_leak_advisory(plan, target)
-
     # Per-provider rules
     for tool, prov_diag in diagnosis.providers.items():
         if provider != "all" and tool.value != provider:
@@ -892,65 +886,6 @@ def _resolve_mode_mismatch(
         "'vaultspec-core install --upgrade' to reconcile them, or "
         "'vaultspec-core install --mode <tool|dependency>' to re-provision "
         "for a specific mode."
-    )
-
-
-def _resolve_dependency_leak_advisory(
-    plan: ResolutionPlan, target: Path | None
-) -> None:
-    """Note when the declared mode is the full-leak DEPENDENCY placement.
-
-    Warn-only guidance per the install-parity ADR's D3: a package declared in
-    :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY` mode ships into
-    built distributions, and an operator who meant the harness to be
-    development-only tooling gets a one-line pointer at the non-leaking
-    :attr:`~vaultspec_core.core.enums.InstallMode.DEV` and
-    :attr:`~vaultspec_core.core.enums.InstallMode.TOOL` alternatives. It never
-    refuses the placement - the ecosystem does not, and this repository itself
-    self-hosts in dependency mode by deliberate choice - and it never fires for
-    ``TOOL`` or ``DEV``.
-
-    This is a low-key notice on the resolve-time warning channel, not a doctor
-    finding: :func:`resolve` returns before this point for
-    :attr:`~vaultspec_core.core.enums.CliAction.DOCTOR`, so the advisory is
-    invisible to ``spec doctor`` and cannot change its exit weighting. That is
-    deliberate - a dependency-mode workspace is a fully legitimate, supported
-    configuration, so surfacing the leak reminder at provision time is enough
-    without degrading the doctor exit code of every such workspace.
-
-    The declared mode is read from vaultspec-core's own entry in the shared
-    per-package declaration, matching the "each surface consults its own entry"
-    discipline; the absent-declaration legacy bridge is deliberately *not*
-    consulted here, so a legacy undeclared workspace (which resolves to
-    dependency mode only as a migration default) is never nagged.
-
-    Args:
-        plan: The resolution plan to append the advisory to.
-        target: Workspace root directory, or ``None`` when unavailable.
-    """
-    if target is None:
-        return
-    try:
-        from .enums import InstallMode
-        from .workspace_mode import read_package_declaration
-
-        declaration = read_package_declaration(target, "vaultspec-core")
-    except Exception:
-        # Detection is advisory; a corrupt or unreadable declaration is surfaced
-        # fail-fast by the explicit install/mode paths, not re-reported here.
-        logger.debug("Could not read declaration for leak advisory", exc_info=True)
-        return
-
-    if declaration is None or declaration.install_mode is not InstallMode.DEPENDENCY:
-        return
-
-    plan.warnings.append(
-        "vaultspec-core is declared in 'dependency' mode in "
-        ".vaultspec/workspace.json, a runtime placement that ships it into built "
-        "distributions. If it is development-only tooling, '--mode dev' (the "
-        "default dev group, which does not leak downstream) or '--mode tool' (an "
-        "ephemeral uvx launch) avoids that. Dependency mode remains fully "
-        "supported; this is advisory only."
     )
 
 

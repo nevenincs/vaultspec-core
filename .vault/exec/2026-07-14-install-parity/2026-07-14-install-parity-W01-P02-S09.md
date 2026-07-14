@@ -31,3 +31,7 @@ related:
 ## Notes
 
 Per the one-commit-per-step contract, the single existing detection test whose expected outcome this behavior change inverts (`[dependency-groups].dev` placement, previously asserted DEPENDENCY) is corrected here so the commit stays green rather than landing red and being repaired one Step later. The comprehensive new taxonomy and DEV-precedence coverage still lands in `S12` as the plan sequences; this Step touches only the one test the change directly falsifies.
+
+### Review refinement (LOW)
+
+P02 code review noted the impossible-combo refusal hint hardcoded "declares vaultspec-core as a dependency" even when the refused mode was dev. The follow-up commit parameterizes the hint per refused mode via `_refusal_hint_for_mode`: dependency points at a runtime dependency, dev points at the default dev dependency group. The refusal message and its typed-error contract are otherwise unchanged.

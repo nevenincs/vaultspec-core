@@ -12,12 +12,16 @@ from vaultspec_core.core.exceptions import VaultSpecError
 from vaultspec_core.core.workspace_mode import (
     WORKSPACE_SCHEMA_VERSION,
     DependencyEvidence,
+    ModeProvenance,
     PackageDeclaration,
+    ResolvedMode,
     WorkspaceDeclaration,
     detect_package_evidence,
+    newly_establishes_dependency,
     read_package_declaration,
     read_workspace_declaration,
     resolve_install_mode,
+    resolve_install_mode_with_provenance,
     write_package_declaration,
     write_workspace_declaration,
 )
@@ -671,10 +675,98 @@ class TestDevPrecedence:
 class TestDevRefusal:
     """The impossible-combo refusal extends to DEV, which also needs a manifest."""
 
-    def test_explicit_dev_without_pyproject_raises_with_hint(self, factory):
+    def test_explicit_dev_without_pyproject_raises_with_dev_hint(self, factory):
         with pytest.raises(VaultSpecError) as excinfo:
             resolve_install_mode(factory.root, InstallMode.DEV)
 
         assert "dev mode" in str(excinfo.value)
         assert "pyproject.toml" in str(excinfo.value)
+        # The hint is parameterized per refused mode: dev points at the dev
+        # dependency group, not a runtime dependency.
+        assert "dev dependency group" in excinfo.value.hint
         assert "--mode tool" in excinfo.value.hint
+
+    def test_explicit_dependency_without_pyproject_raises_with_dependency_hint(
+        self, factory
+    ):
+        with pytest.raises(VaultSpecError) as excinfo:
+            resolve_install_mode(factory.root, InstallMode.DEPENDENCY)
+
+        assert "dependency mode" in str(excinfo.value)
+        # The dependency hint names a runtime dependency, not the dev group.
+        assert "as a dependency" in excinfo.value.hint
+        assert "dev dependency group" not in excinfo.value.hint
+
+
+class TestModeProvenance:
+    """resolve_install_mode_with_provenance tags how each mode was resolved."""
+
+    def test_explicit_flag_is_explicit_provenance(self, factory):
+        _pyproject(factory.root, 'dependencies = ["vaultspec-core>=0.1"]\n')
+
+        resolved = resolve_install_mode_with_provenance(
+            factory.root, InstallMode.DEPENDENCY
+        )
+        assert resolved == ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.EXPLICIT)
+
+    def test_persisted_declaration_is_persisted_provenance(self, factory):
+        _pyproject(factory.root, 'dependencies = ["vaultspec-core>=0.1"]\n')
+        write_package_declaration(
+            factory.root, "vaultspec-core", PackageDeclaration(InstallMode.DEPENDENCY)
+        )
+
+        resolved = resolve_install_mode_with_provenance(factory.root)
+        assert resolved.provenance is ModeProvenance.PERSISTED
+
+    def test_detected_runtime_is_detected_provenance(self, factory):
+        _pyproject(factory.root, 'dependencies = ["vaultspec-core>=0.1"]\n')
+
+        resolved = resolve_install_mode_with_provenance(factory.root)
+        assert resolved == ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.DETECTED)
+
+    def test_detected_dev_is_detected_provenance(self, factory):
+        _pyproject(factory.root, '[dependency-groups]\ndev = ["vaultspec-core>=0.1"]\n')
+
+        resolved = resolve_install_mode_with_provenance(factory.root)
+        assert resolved == ResolvedMode(InstallMode.DEV, ModeProvenance.DETECTED)
+
+    def test_no_pyproject_is_default_provenance(self, factory):
+        resolved = resolve_install_mode_with_provenance(factory.root)
+        assert resolved == ResolvedMode(InstallMode.TOOL, ModeProvenance.DEFAULT)
+
+    def test_pyproject_without_evidence_is_default_provenance(self, factory):
+        _pyproject(factory.root, 'dependencies = ["pytest"]\n')
+
+        resolved = resolve_install_mode_with_provenance(factory.root)
+        assert resolved == ResolvedMode(InstallMode.TOOL, ModeProvenance.DEFAULT)
+
+
+class TestNewlyEstablishesDependency:
+    """The moment-of-choice predicate behind the dependency-leak advisory."""
+
+    def test_explicit_dependency_is_newly_established(self):
+        resolved = ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.EXPLICIT)
+        assert newly_establishes_dependency(resolved)
+
+    def test_detected_dependency_is_newly_established(self):
+        resolved = ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.DETECTED)
+        assert newly_establishes_dependency(resolved)
+
+    def test_inferred_dependency_is_newly_established(self):
+        resolved = ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.INFERRED)
+        assert newly_establishes_dependency(resolved)
+
+    def test_persisted_dependency_is_not_newly_established(self):
+        # The core of the review fix: a persisted dependency read must not nag.
+        resolved = ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.PERSISTED)
+        assert not newly_establishes_dependency(resolved)
+
+    def test_dev_mode_is_never_newly_established(self):
+        for provenance in ModeProvenance:
+            resolved = ResolvedMode(InstallMode.DEV, provenance)
+            assert not newly_establishes_dependency(resolved)
+
+    def test_tool_mode_is_never_newly_established(self):
+        for provenance in ModeProvenance:
+            resolved = ResolvedMode(InstallMode.TOOL, provenance)
+            assert not newly_establishes_dependency(resolved)

@@ -88,6 +88,85 @@ class DependencyEvidence(StrEnum):
     NONE = "none"
 
 
+class ModeProvenance(StrEnum):
+    """How :func:`resolve_install_mode` arrived at a mode, for moment-of-choice logic.
+
+    The provisioning mode alone does not say whether *this* run is the one
+    establishing it. The dependency-leak advisory fires only at the moment of
+    choice - when a run newly resolves dependency mode by explicit flag,
+    detection, or upgrade inference - and stays silent when the mode is merely
+    read back from an existing committed declaration, so a workspace that already
+    chose dependency mode is not nagged on every subsequent install or sync.
+
+    Members:
+        EXPLICIT: Set by an explicit ``--mode`` flag on this run.
+        PERSISTED: Read from the committed declaration; not a fresh choice.
+        DETECTED: Inferred from ``pyproject.toml`` placement evidence on this run.
+        INFERRED: Inferred from a legacy workspace's deployed artifact shape
+            during ``install --upgrade`` (the Q6 migration path).
+        DEFAULT: Fell through to the tool-mode default with no signal.
+    """
+
+    EXPLICIT = "explicit"
+    PERSISTED = "persisted"
+    DETECTED = "detected"
+    INFERRED = "inferred"
+    DEFAULT = "default"
+
+
+#: The one-line, warn-only advisory shown when a run newly establishes the
+#: full-leak dependency placement. Shared by every surface that emits it, so a
+#: single marker identifies it in output and tests. Per the install-parity ADR's
+#: D3 this is guidance, never a refusal.
+DEPENDENCY_LEAK_ADVISORY = (
+    "vaultspec-core is being provisioned in 'dependency' mode, a runtime "
+    "placement that ships it into built distributions. If it is "
+    "development-only tooling, '--mode dev' (the default dev group, which does "
+    "not leak downstream) or '--mode tool' (an ephemeral uvx launch) avoids "
+    "that. Dependency mode remains fully supported; this is advisory only."
+)
+
+
+@dataclass
+class ResolvedMode:
+    """A resolved provisioning mode paired with the provenance that produced it.
+
+    Attributes:
+        mode: The resolved :class:`~vaultspec_core.core.enums.InstallMode`.
+        provenance: How the mode was arrived at, driving moment-of-choice
+            advisories that must distinguish a fresh choice from a persisted
+            read.
+    """
+
+    mode: InstallMode
+    provenance: ModeProvenance
+
+
+def newly_establishes_dependency(resolved: ResolvedMode) -> bool:
+    """Return whether *resolved* is a fresh choice of the full-leak dependency mode.
+
+    True only when the mode is
+    :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY` *and* the
+    provenance is a first-time establishment on this run (explicit flag,
+    detection, or upgrade inference), never a
+    :attr:`ModeProvenance.PERSISTED` read. This is the single predicate behind
+    the dependency-leak advisory, so every surface fires it identically.
+
+    Args:
+        resolved: The mode and provenance from
+            :func:`resolve_install_mode_with_provenance` or the upgrade-inference
+            path.
+
+    Returns:
+        ``True`` when the leak advisory should fire for *resolved*.
+    """
+    return resolved.mode is InstallMode.DEPENDENCY and resolved.provenance in (
+        ModeProvenance.EXPLICIT,
+        ModeProvenance.DETECTED,
+        ModeProvenance.INFERRED,
+    )
+
+
 @dataclass
 class PackageDeclaration:
     """One provisioned distribution's entry in the schema 2.0 ``packages`` map.
@@ -522,6 +601,89 @@ def detect_package_evidence(pyproject: Path, package: str) -> DependencyEvidence
     return DependencyEvidence.NONE
 
 
+def _refusal_hint_for_mode(explicit: InstallMode) -> str:
+    """Build the impossible-combo refusal hint tailored to the refused mode.
+
+    Both dependency and dev placements need a ``pyproject.toml`` to be declared
+    in, but they name different places within it, so the hint points the operator
+    at the right section rather than always naming a runtime dependency.
+
+    Args:
+        explicit: The refused mode (``DEPENDENCY`` or ``DEV``).
+
+    Returns:
+        A remediation hint string naming the placement appropriate to *explicit*.
+    """
+    if explicit is InstallMode.DEV:
+        placement = "in its default dev dependency group"
+    else:
+        placement = "as a dependency"
+    return (
+        f"Add a pyproject.toml that declares vaultspec-core {placement}, "
+        "or re-run with '--mode tool'."
+    )
+
+
+def resolve_install_mode_with_provenance(
+    target: Path,
+    explicit: InstallMode | None = None,
+    package: str = _DISTRIBUTION_NAME,
+) -> ResolvedMode:
+    """Resolve *package*'s provisioning mode and record how it was resolved.
+
+    The full Q5 precedence chain (explicit flag, persisted declaration, detection,
+    default) plus the :class:`ModeProvenance` tag that says which branch decided,
+    so a caller at the moment of choice can distinguish a fresh dependency-mode
+    election from a persisted read. See :func:`resolve_install_mode` for the
+    precedence, detection-to-mode mapping, and refusal semantics; this is the
+    provenance-carrying core it delegates to.
+
+    Args:
+        target: Workspace root directory.
+        explicit: The mode requested via ``--mode``, or ``None``.
+        package: Distribution name to resolve the mode for; defaults to
+            ``vaultspec-core``.
+
+    Returns:
+        The resolved mode paired with its :class:`ModeProvenance`.
+
+    Raises:
+        VaultSpecError: If *explicit* is
+            :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY` or
+            :attr:`~vaultspec_core.core.enums.InstallMode.DEV` but the target has
+            no ``pyproject.toml``, or if a present declaration is malformed.
+    """
+    pyproject = target / "pyproject.toml"
+    has_pyproject = pyproject.is_file()
+
+    # Validate the persisted declaration first, on every path, so corruption
+    # surfaces fail-fast rather than mid-provision. An explicit request still
+    # outranks the parsed value; the read is for validation and the persisted
+    # precedence branch below.
+    declaration = read_package_declaration(target, package)
+
+    if explicit is not None:
+        if explicit in (InstallMode.DEPENDENCY, InstallMode.DEV) and not has_pyproject:
+            raise VaultSpecError(
+                f"Cannot provision in {explicit.value} mode: "
+                f"no pyproject.toml at {target}.",
+                hint=_refusal_hint_for_mode(explicit),
+            )
+        return ResolvedMode(explicit, ModeProvenance.EXPLICIT)
+
+    if declaration is not None:
+        return ResolvedMode(declaration.install_mode, ModeProvenance.PERSISTED)
+
+    if not has_pyproject:
+        return ResolvedMode(InstallMode.TOOL, ModeProvenance.DEFAULT)
+    evidence = detect_package_evidence(pyproject, package)
+    if evidence is DependencyEvidence.RUNTIME:
+        return ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.DETECTED)
+    if evidence is DependencyEvidence.DEV:
+        return ResolvedMode(InstallMode.DEV, ModeProvenance.DETECTED)
+    return ResolvedMode(InstallMode.TOOL, ModeProvenance.DEFAULT)
+
+
 def resolve_install_mode(
     target: Path,
     explicit: InstallMode | None = None,
@@ -567,6 +729,10 @@ def resolve_install_mode(
     therefore treat a successful return as proof the declaration is
     well-formed.
 
+    This is the mode-only facade over
+    :func:`resolve_install_mode_with_provenance`; callers needing to know whether
+    the mode was a fresh choice or a persisted read use that variant directly.
+
     Args:
         target: Workspace root directory.
         explicit: The mode requested via ``--mode``, or ``None`` to fall through
@@ -586,36 +752,7 @@ def resolve_install_mode(
             no ``pyproject.toml``, or if a present declaration is malformed
             (propagated from :func:`read_package_declaration`).
     """
-    pyproject = target / "pyproject.toml"
-    has_pyproject = pyproject.is_file()
-
-    # Validate the persisted declaration first, on every path, so corruption
-    # surfaces fail-fast rather than mid-provision. An explicit request still
-    # outranks the parsed value; the read is for validation and the persisted
-    # precedence branch below.
-    declaration = read_package_declaration(target, package)
-
-    if explicit is not None:
-        if explicit in (InstallMode.DEPENDENCY, InstallMode.DEV) and not has_pyproject:
-            raise VaultSpecError(
-                f"Cannot provision in {explicit.value} mode: "
-                f"no pyproject.toml at {target}.",
-                hint="Add a pyproject.toml that declares vaultspec-core as a "
-                "dependency, or re-run with '--mode tool'.",
-            )
-        return explicit
-
-    if declaration is not None:
-        return declaration.install_mode
-
-    if not has_pyproject:
-        return InstallMode.TOOL
-    evidence = detect_package_evidence(pyproject, package)
-    if evidence is DependencyEvidence.RUNTIME:
-        return InstallMode.DEPENDENCY
-    if evidence is DependencyEvidence.DEV:
-        return InstallMode.DEV
-    return InstallMode.TOOL
+    return resolve_install_mode_with_provenance(target, explicit, package).mode
 
 
 def evaluate_version_floor(
