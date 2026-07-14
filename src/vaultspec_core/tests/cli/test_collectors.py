@@ -10,6 +10,10 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
+from vaultspec_core.core.commands import (
+    canonical_hook_entries_for_mode,
+    entry_prefix_for_mode,
+)
 from vaultspec_core.core.diagnosis.collectors import (
     collect_builtin_version_state,
     collect_config_state,
@@ -22,6 +26,7 @@ from vaultspec_core.core.diagnosis.collectors import (
     collect_precommit_state,
     collect_provider_dir_state,
     collect_vault_content_state,
+    collect_version_floor_state,
 )
 from vaultspec_core.core.diagnosis.diagnosis import WorkspaceDiagnosis, diagnose
 from vaultspec_core.core.diagnosis.signals import (
@@ -35,12 +40,25 @@ from vaultspec_core.core.diagnosis.signals import (
     PrecommitSignal,
     ProviderDirSignal,
     VaultContentSignal,
+    VersionFloorSignal,
 )
 from vaultspec_core.core.enums import CliAction, InstallMode, Tool
 from vaultspec_core.core.gitignore import DEFAULT_ENTRIES, MARKER_BEGIN, MARKER_END
+from vaultspec_core.core.mcps import (
+    _MODE_ARGS_TOKEN,
+    _MODE_COMMAND_TOKEN,
+    _MODE_MODULE_KEY,
+    _MODE_PACKAGE_KEY,
+    render_launch_for_mode,
+    render_mcp_definition_for_mode,
+)
 from vaultspec_core.core.resolver import resolve
 from vaultspec_core.core.workspace_mode import (
+    PackageDeclaration,
     WorkspaceDeclaration,
+    read_package_declaration,
+    resolve_render_mode,
+    write_package_declaration,
     write_workspace_declaration,
 )
 
@@ -952,3 +970,390 @@ class TestDiagnoseScopeValidation:
     def test_invalid_scope_raises_value_error(self, tmp_path: Path) -> None:
         with pytest.raises(ValueError, match="Invalid scope"):
             diagnose(tmp_path, scope="nonsense")
+
+
+_CORE_MODULE = "vaultspec_core.mcp_server.app"
+
+
+def _pyproject_with_core_dep(root: Path) -> None:
+    """Write a pyproject listing vaultspec-core as a runtime dependency."""
+    (root / "pyproject.toml").write_text(
+        '[project]\nname = "x"\nversion = "0"\ndependencies = ["vaultspec-core"]\n',
+        encoding="utf-8",
+    )
+
+
+# ---------------------------------------------------------------------------
+# render_launch_for_mode: the single launch comparator, all three modes
+# ---------------------------------------------------------------------------
+class TestRenderLaunchForMode:
+    def test_dependency_shape(self) -> None:
+        assert render_launch_for_mode(
+            InstallMode.DEPENDENCY, "vaultspec-core", _CORE_MODULE
+        ) == ("uv", ["run", "python", "-m", _CORE_MODULE])
+
+    def test_tool_shape(self) -> None:
+        assert render_launch_for_mode(
+            InstallMode.TOOL, "vaultspec-core", _CORE_MODULE
+        ) == ("uvx", ["--from", "vaultspec-core", "python", "-m", _CORE_MODULE])
+
+    def test_dev_renders_byte_identically_to_dependency(self) -> None:
+        assert render_launch_for_mode(
+            InstallMode.DEV, "vaultspec-core", _CORE_MODULE
+        ) == render_launch_for_mode(
+            InstallMode.DEPENDENCY, "vaultspec-core", _CORE_MODULE
+        )
+
+    def test_companion_package_and_module(self) -> None:
+        """A companion package renders its own package and module through the
+        same helper, no per-package table."""
+        assert render_launch_for_mode(
+            InstallMode.TOOL, "vaultspec-rag", "vaultspec_rag.server"
+        ) == (
+            "uvx",
+            ["--from", "vaultspec-rag", "python", "-m", "vaultspec_rag.server"],
+        )
+        assert render_launch_for_mode(
+            InstallMode.DEV, "vaultspec-rag", "vaultspec_rag.server"
+        ) == ("uv", ["run", "python", "-m", "vaultspec_rag.server"])
+
+
+# ---------------------------------------------------------------------------
+# render_mcp_definition_for_mode: token substitution across the three modes
+# ---------------------------------------------------------------------------
+class TestRenderMcpDefinitionForMode:
+    @staticmethod
+    def _tokened(**extra: str) -> dict:
+        return {"command": _MODE_COMMAND_TOKEN, "args": [_MODE_ARGS_TOKEN], **extra}
+
+    def test_core_tool_mode(self) -> None:
+        rendered = render_mcp_definition_for_mode(self._tokened(), InstallMode.TOOL)
+        assert rendered["command"] == "uvx"
+        assert rendered["args"] == [
+            "--from",
+            "vaultspec-core",
+            "python",
+            "-m",
+            _CORE_MODULE,
+        ]
+
+    def test_core_dependency_mode(self) -> None:
+        rendered = render_mcp_definition_for_mode(
+            self._tokened(), InstallMode.DEPENDENCY
+        )
+        assert rendered["command"] == "uv"
+        assert rendered["args"] == ["run", "python", "-m", _CORE_MODULE]
+
+    def test_dev_renders_byte_identically_to_dependency(self) -> None:
+        assert render_mcp_definition_for_mode(
+            self._tokened(), InstallMode.DEV
+        ) == render_mcp_definition_for_mode(self._tokened(), InstallMode.DEPENDENCY)
+
+    def test_companion_metadata_substituted_and_stripped(self) -> None:
+        """A definition carrying its own package/module keys renders that
+        package's launch, and the metadata keys never reach the output."""
+        definition = self._tokened(
+            **{
+                _MODE_PACKAGE_KEY: "vaultspec-rag",
+                _MODE_MODULE_KEY: "vaultspec_rag.server",
+            }
+        )
+        rendered = render_mcp_definition_for_mode(definition, InstallMode.TOOL)
+        assert rendered["command"] == "uvx"
+        assert rendered["args"] == [
+            "--from",
+            "vaultspec-rag",
+            "python",
+            "-m",
+            "vaultspec_rag.server",
+        ]
+        assert _MODE_PACKAGE_KEY not in rendered
+        assert _MODE_MODULE_KEY not in rendered
+
+    def test_user_definition_passes_through_unchanged(self) -> None:
+        definition = {"command": "node", "args": ["server.js"]}
+        assert (
+            render_mcp_definition_for_mode(definition, InstallMode.TOOL) == definition
+        )
+
+    def test_input_is_not_mutated(self) -> None:
+        definition = self._tokened()
+        render_mcp_definition_for_mode(definition, InstallMode.TOOL)
+        assert definition == {
+            "command": _MODE_COMMAND_TOKEN,
+            "args": [_MODE_ARGS_TOKEN],
+        }
+
+
+# ---------------------------------------------------------------------------
+# hook entry rendering across the three modes
+# ---------------------------------------------------------------------------
+class TestHookEntriesPerMode:
+    def test_dev_entries_match_dependency_entries(self) -> None:
+        assert canonical_hook_entries_for_mode(
+            InstallMode.DEV
+        ) == canonical_hook_entries_for_mode(InstallMode.DEPENDENCY)
+
+    def test_tool_prefix(self) -> None:
+        assert entry_prefix_for_mode(InstallMode.TOOL).startswith(
+            "uvx --from vaultspec-core"
+        )
+
+    def test_dependency_prefix(self) -> None:
+        assert entry_prefix_for_mode(InstallMode.DEPENDENCY).startswith(
+            "uv run --no-sync"
+        )
+
+    def test_dev_prefix_matches_dependency(self) -> None:
+        assert entry_prefix_for_mode(InstallMode.DEV) == entry_prefix_for_mode(
+            InstallMode.DEPENDENCY
+        )
+
+
+# ---------------------------------------------------------------------------
+# resolve_render_mode: reads each package's own entry
+# ---------------------------------------------------------------------------
+class TestResolveRenderModePerPackage:
+    def test_reads_the_named_package_entry(self, tmp_path: Path) -> None:
+        (tmp_path / ".vaultspec").mkdir()
+        write_package_declaration(
+            tmp_path,
+            "vaultspec-core",
+            PackageDeclaration(install_mode=InstallMode.DEPENDENCY),
+        )
+        write_package_declaration(
+            tmp_path,
+            "vaultspec-rag",
+            PackageDeclaration(install_mode=InstallMode.TOOL),
+        )
+        assert (
+            resolve_render_mode(tmp_path, package="vaultspec-core")
+            == InstallMode.DEPENDENCY
+        )
+        assert (
+            resolve_render_mode(tmp_path, package="vaultspec-rag") == InstallMode.TOOL
+        )
+
+    def test_dev_entry_resolves_to_dev_not_the_render_alias(
+        self, tmp_path: Path
+    ) -> None:
+        """resolve_render_mode returns the declared mode; the dev-to-dependency
+        collapse happens in the renderer, not here."""
+        (tmp_path / ".vaultspec").mkdir()
+        write_package_declaration(
+            tmp_path, "vaultspec-core", PackageDeclaration(install_mode=InstallMode.DEV)
+        )
+        assert (
+            resolve_render_mode(tmp_path, package="vaultspec-core") == InstallMode.DEV
+        )
+
+    def test_sibling_only_file_bridges_the_absent_package_to_dependency(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / ".vaultspec").mkdir()
+        write_package_declaration(
+            tmp_path, "vaultspec-rag", PackageDeclaration(install_mode=InstallMode.TOOL)
+        )
+        assert (
+            resolve_render_mode(tmp_path, package="vaultspec-core")
+            == InstallMode.DEPENDENCY
+        )
+
+    def test_absent_file_bridges_to_dependency(self, tmp_path: Path) -> None:
+        assert resolve_render_mode(tmp_path) == InstallMode.DEPENDENCY
+
+
+# ---------------------------------------------------------------------------
+# per-package mode mismatch: flag-1 regression and mixed configurations
+# ---------------------------------------------------------------------------
+class TestModeMismatchPerPackage:
+    def test_dev_declaration_with_dependency_artifacts_is_clean(
+        self, tmp_path: Path
+    ) -> None:
+        """The reproduced defect: a dev declaration renders byte-identically to
+        dependency, so dependency-shaped artifacts are coherent, not a false
+        MISMATCH."""
+        _pyproject_with_core_dep(tmp_path)
+        _install_and_init(tmp_path, InstallMode.DEPENDENCY)
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.CLEAN
+        write_package_declaration(
+            tmp_path, "vaultspec-core", PackageDeclaration(install_mode=InstallMode.DEV)
+        )
+        assert collect_mode_mismatch_state(tmp_path) == ModeMismatchSignal.CLEAN
+
+    def test_companion_package_without_own_artifacts_is_clean(
+        self, tmp_path: Path
+    ) -> None:
+        """A companion package with no MCP server in a core-only workspace has
+        no observable artifact to contradict its declaration, so CLEAN."""
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        write_package_declaration(
+            tmp_path,
+            "vaultspec-rag",
+            PackageDeclaration(install_mode=InstallMode.DEPENDENCY),
+        )
+        assert (
+            collect_mode_mismatch_state(tmp_path, package="vaultspec-rag")
+            == ModeMismatchSignal.CLEAN
+        )
+
+    def test_mixed_config_diagnoses_each_package_independently(
+        self, tmp_path: Path
+    ) -> None:
+        """Core declared tool against dependency-shaped artifacts is MISMATCH,
+        while the sibling rag entry stays CLEAN in the same map - no cross-package
+        branch."""
+        _pyproject_with_core_dep(tmp_path)
+        _install_and_init(tmp_path, InstallMode.DEPENDENCY)
+        write_package_declaration(
+            tmp_path, "vaultspec-rag", PackageDeclaration(install_mode=InstallMode.TOOL)
+        )
+        write_package_declaration(
+            tmp_path,
+            "vaultspec-core",
+            PackageDeclaration(install_mode=InstallMode.TOOL),
+        )
+        assert (
+            collect_mode_mismatch_state(tmp_path, package="vaultspec-core")
+            == ModeMismatchSignal.MISMATCH
+        )
+        assert (
+            collect_mode_mismatch_state(tmp_path, package="vaultspec-rag")
+            == ModeMismatchSignal.CLEAN
+        )
+
+
+# ---------------------------------------------------------------------------
+# per-package version floor
+# ---------------------------------------------------------------------------
+class TestVersionFloorPerPackage:
+    def test_core_below_its_own_floor(self, tmp_path: Path) -> None:
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        write_package_declaration(
+            tmp_path,
+            "vaultspec-core",
+            PackageDeclaration(
+                install_mode=InstallMode.TOOL, minimum_version="999.999.999"
+            ),
+        )
+        signal, _running, floor = collect_version_floor_state(
+            tmp_path, package="vaultspec-core"
+        )
+        assert signal == VersionFloorSignal.BELOW
+        assert floor == "999.999.999"
+
+    def test_no_floor_is_ok(self, tmp_path: Path) -> None:
+        _install_and_init(tmp_path, InstallMode.TOOL)
+        signal, _running, _floor = collect_version_floor_state(
+            tmp_path, package="vaultspec-core"
+        )
+        assert signal == VersionFloorSignal.OK
+
+
+# ---------------------------------------------------------------------------
+# diagnose() per-package map
+# ---------------------------------------------------------------------------
+class TestDiagnosePackagesMap:
+    def test_packages_map_carries_each_declared_package(self, tmp_path: Path) -> None:
+        _pyproject_with_core_dep(tmp_path)
+        _install_and_init(tmp_path, InstallMode.DEV)
+        write_package_declaration(
+            tmp_path,
+            "vaultspec-rag",
+            PackageDeclaration(
+                install_mode=InstallMode.TOOL, minimum_version="999.999.999"
+            ),
+        )
+        diag = diagnose(tmp_path, scope="full")
+
+        assert set(diag.packages) == {"vaultspec-core", "vaultspec-rag"}
+        core = diag.packages["vaultspec-core"]
+        assert core.declared_mode == InstallMode.DEV
+        assert core.mode_mismatch == ModeMismatchSignal.CLEAN
+        assert core.version_floor == VersionFloorSignal.OK
+
+        rag = diag.packages["vaultspec-rag"]
+        assert rag.declared_mode == InstallMode.TOOL
+        assert rag.version_floor == VersionFloorSignal.BELOW
+        assert rag.version_floor_minimum == "999.999.999"
+
+    def test_no_declaration_leaves_packages_empty(self, tmp_path: Path) -> None:
+        diag = diagnose(tmp_path, scope="full")
+        assert diag.packages == {}
+
+
+# ---------------------------------------------------------------------------
+# doctor multi-package rows and the install --mode dev end-to-end path
+# ---------------------------------------------------------------------------
+class TestInstallModeDevEndToEnd:
+    @staticmethod
+    def _factory(root: Path):
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        return WorkspaceFactory(root)
+
+    @staticmethod
+    def _combined(result) -> str:
+        return (result.stdout or "") + "\n" + (result.stderr or "")
+
+    def test_install_mode_dev_renders_dependency_and_doctor_is_clean(
+        self, tmp_path: Path
+    ) -> None:
+        """End to end: install --mode dev succeeds, writes dependency-shaped
+        artifacts, persists mode 'dev', and the doctor reports clean with a dev
+        label."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "x"\nversion = "0"\n\n'
+            '[dependency-groups]\ndev = ["vaultspec-core"]\n',
+            encoding="utf-8",
+        )
+        factory = self._factory(tmp_path)
+
+        install = factory.run("install", "--mode", "dev")
+        assert install.exit_code == 0, self._combined(install)
+
+        # Dependency-shaped MCP launch (uv run), not the uvx tool shape.
+        mcp = json.loads((tmp_path / ".mcp.json").read_text(encoding="utf-8"))
+        core_server = mcp["mcpServers"]["vaultspec-core"]
+        assert core_server["command"] == "uv"
+        assert core_server["args"] == ["run", "python", "-m", _CORE_MODULE]
+
+        # Dependency-shaped hook entries (uv run --no-sync).
+        precommit = (tmp_path / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+        assert "uv run --no-sync vaultspec-core" in precommit
+        assert "uvx --from vaultspec-core" not in precommit
+
+        # Mode persisted as dev, distinct from its dependency rendering.
+        decl = read_package_declaration(tmp_path, "vaultspec-core")
+        assert decl is not None
+        assert decl.install_mode == InstallMode.DEV
+
+        # Doctor is clean and labels the declared mode as dev.
+        doctor = factory.run("doctor")
+        combined = self._combined(doctor)
+        assert doctor.exit_code == 0, combined
+        assert "install mode (vaultspec-core)" in combined
+        assert "declared dev" in combined
+
+    def test_doctor_renders_a_row_per_declared_package(self, tmp_path: Path) -> None:
+        """A workspace declaring core and a companion package renders one
+        install-mode row per package, plus the companion's floor row when it is
+        violated."""
+        _pyproject_with_core_dep(tmp_path)
+        _install_and_init(tmp_path, InstallMode.DEPENDENCY)
+        write_package_declaration(
+            tmp_path,
+            "vaultspec-rag",
+            PackageDeclaration(
+                install_mode=InstallMode.TOOL, minimum_version="999.999.999"
+            ),
+        )
+
+        doctor = self._factory(tmp_path).run("doctor")
+        combined = self._combined(doctor)
+        assert "install mode (vaultspec-core)" in combined
+        assert "install mode (vaultspec-rag)" in combined
+        assert "version floor (vaultspec-rag)" in combined
+        assert "999.999.999" in combined
+        # The companion floor violation drives the error exit code.
+        assert doctor.exit_code == 2

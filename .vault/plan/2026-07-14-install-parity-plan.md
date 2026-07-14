@@ -50,7 +50,7 @@ Thread the package parameter through resolve_render_mode, the MCP and pre-commit
 - [x] `W01.P03.S17` - Add a package parameter to collect_mode_mismatch_state and collect_version_floor_state, reading the package's own declared mode and floor against its own observed artifact shape; `src/vaultspec_core/core/diagnosis/collectors.py`.
 - [x] `W01.P03.S18` - Thread the package parameter through the doctor's mode-mismatch and version-floor rows so core's own row reads core's own map entry; `src/vaultspec_core/core/diagnosis/diagnosis.py`.
 - [x] `W01.P03.S19` - Update \_write_mode_declaration and \_infer_upgrade_mode to read and write core's own entry in the v2 packages map via the per-package helpers, preserving sibling package entries untouched; `src/vaultspec_core/core/commands.py`.
-- [ ] `W01.P03.S20` - Add renderer and doctor tests covering TOOL, DEPENDENCY, and DEV for the core package plus a mixed configuration where a companion package's entry differs, asserting no cross-package branch; `src/vaultspec_core/tests/cli/test_collectors.py`.
+- [x] `W01.P03.S20` - Add renderer and doctor tests covering TOOL, DEPENDENCY, and DEV for the core package plus a mixed configuration where a companion package's entry differs, asserting no cross-package branch; `src/vaultspec_core/tests/cli/test_collectors.py`.
 
 ### Phase `W01.P04` - docs, reference, and gate
 
