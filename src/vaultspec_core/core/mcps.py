@@ -113,19 +113,37 @@ def render_mcp_definition_for_mode(
     through unchanged, so this is safe to apply to every collected definition
     regardless of origin.
 
+    The launch is produced by the generalized
+    :func:`render_launch_for_mode`, which routes *mode* through
+    :func:`~vaultspec_core.core.enums.render_mode` so the dev-scoped
+    :attr:`~vaultspec_core.core.enums.InstallMode.DEV` member renders
+    byte-identically to :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY`
+    rather than falling off a two-key table. The distribution and module the
+    launch targets come from the definition's own
+    :data:`_MODE_PACKAGE_KEY`/:data:`_MODE_MODULE_KEY` metadata, defaulting to
+    core's package and module when absent; those keys are stripped during
+    substitution so they never reach the written ``.mcp.json``.
+
     Args:
         definition: A parsed MCP server definition (``command``/``args`` map).
         mode: The provisioning mode whose concrete launch to substitute.
 
     Returns:
         A shallow copy of *definition* with the tokens replaced by the
-        mode-specific launch command and args. The input is not mutated.
+        mode-specific launch command and args and the substitution-metadata keys
+        removed. The input is not mutated.
     """
-    command, args = _MODE_MCP_LAUNCH[mode]
     rendered = dict(definition)
-    if rendered.get("command") == _MODE_COMMAND_TOKEN:
+    has_command_token = rendered.get("command") == _MODE_COMMAND_TOKEN
+    has_args_token = rendered.get("args") == [_MODE_ARGS_TOKEN]
+    if not (has_command_token or has_args_token):
+        return rendered
+    package = str(rendered.pop(_MODE_PACKAGE_KEY, _DEFAULT_MCP_PACKAGE))
+    module = str(rendered.pop(_MODE_MODULE_KEY, _DEFAULT_MCP_MODULE))
+    command, args = render_launch_for_mode(mode, package, module)
+    if has_command_token:
         rendered["command"] = command
-    if rendered.get("args") == [_MODE_ARGS_TOKEN]:
+    if has_args_token:
         rendered["args"] = list(args)
     return rendered
 
@@ -308,9 +326,9 @@ def mcp_status() -> dict[str, Any]:
             "warnings": ["No workspace context available for MCP status."],
         }
 
-    from .workspace_mode import resolve_render_mode
+    from .workspace_mode import CORE_DISTRIBUTION_NAME, resolve_render_mode
 
-    render_mode = resolve_render_mode(target_dir)
+    render_mode = resolve_render_mode(target_dir, package=CORE_DISTRIBUTION_NAME)
     parse_warnings: list[str] = []
     sources = collect_mcp_servers(warnings=parse_warnings, mode=render_mode)
     definitions = sorted(sources)
@@ -776,9 +794,9 @@ def mcp_sync(
         return result
 
     if mode is None:
-        from .workspace_mode import resolve_render_mode
+        from .workspace_mode import CORE_DISTRIBUTION_NAME, resolve_render_mode
 
-        mode = resolve_render_mode(target_dir)
+        mode = resolve_render_mode(target_dir, package=CORE_DISTRIBUTION_NAME)
 
     parse_warnings: list[str] = []
     sources = collect_mcp_servers(warnings=parse_warnings, mode=mode)
