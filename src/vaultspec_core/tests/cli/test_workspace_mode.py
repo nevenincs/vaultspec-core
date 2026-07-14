@@ -11,9 +11,12 @@ from vaultspec_core.core.enums import InstallMode
 from vaultspec_core.core.exceptions import VaultSpecError
 from vaultspec_core.core.workspace_mode import (
     WORKSPACE_SCHEMA_VERSION,
+    PackageDeclaration,
     WorkspaceDeclaration,
+    read_package_declaration,
     read_workspace_declaration,
     resolve_install_mode,
+    write_package_declaration,
     write_workspace_declaration,
 )
 
@@ -229,3 +232,229 @@ class TestResolveRefusal:
 
         with pytest.raises(VaultSpecError, match="Corrupt workspace declaration"):
             resolve_install_mode(factory.root, InstallMode.TOOL)
+
+
+class TestLegacyV1Fold:
+    """A schema 1.0 single-key file folds into the schema 2.0 core entry."""
+
+    def test_v1_single_key_file_folds_to_core_entry(self, factory):
+        _write_raw(
+            factory.root,
+            json.dumps(
+                {
+                    "install_mode": "dependency",
+                    "minimum_vaultspec_version": "0.1.37",
+                    "schema_version": "1.0",
+                }
+            ),
+        )
+
+        # The facade view and the per-package view agree, and the legacy
+        # top-level minimum_vaultspec_version floor is read as the
+        # package-relative minimum_version.
+        facade = read_workspace_declaration(factory.root)
+        assert facade is not None
+        assert facade.install_mode is InstallMode.DEPENDENCY
+        assert facade.minimum_vaultspec_version == "0.1.37"
+
+        core = read_package_declaration(factory.root, "vaultspec-core")
+        assert core is not None
+        assert core.install_mode is InstallMode.DEPENDENCY
+        assert core.minimum_version == "0.1.37"
+
+    def test_v1_fold_without_floor(self, factory):
+        _write_raw(
+            factory.root,
+            json.dumps({"install_mode": "tool", "schema_version": "1.0"}),
+        )
+
+        core = read_package_declaration(factory.root, "vaultspec-core")
+        assert core is not None
+        assert core.install_mode is InstallMode.TOOL
+        assert core.minimum_version is None
+
+    def test_next_write_migrates_legacy_file_to_v2_shape(self, factory):
+        # A legacy v1 file gains a rag entry: the folded core entry is preserved
+        # and the whole file is rewritten in schema 2.0 shape with no leftover
+        # top-level single-key fields.
+        _write_raw(
+            factory.root,
+            json.dumps({"install_mode": "tool", "schema_version": "1.0"}),
+        )
+
+        write_package_declaration(
+            factory.root, "vaultspec-rag", PackageDeclaration(InstallMode.TOOL)
+        )
+
+        raw = json.loads(_declaration_path(factory.root).read_text(encoding="utf-8"))
+        assert raw["schema_version"] == WORKSPACE_SCHEMA_VERSION
+        assert set(raw["packages"]) == {"vaultspec-core", "vaultspec-rag"}
+        assert raw["packages"]["vaultspec-core"]["install_mode"] == "tool"
+        assert "install_mode" not in raw
+        assert "minimum_vaultspec_version" not in raw
+
+
+class TestSchemaV2RoundTrip:
+    """The schema 2.0 per-package map round-trips through the public helpers."""
+
+    def test_dev_mode_round_trips(self, factory):
+        write_package_declaration(
+            factory.root, "vaultspec-core", PackageDeclaration(InstallMode.DEV)
+        )
+
+        core = read_package_declaration(factory.root, "vaultspec-core")
+        assert core is not None
+        assert core.install_mode is InstallMode.DEV
+
+        raw = json.loads(_declaration_path(factory.root).read_text(encoding="utf-8"))
+        assert raw["packages"]["vaultspec-core"]["install_mode"] == "dev"
+
+    def test_dev_mode_round_trips_through_facade(self, factory):
+        write_workspace_declaration(
+            factory.root, WorkspaceDeclaration(install_mode=InstallMode.DEV)
+        )
+
+        result = read_workspace_declaration(factory.root)
+        assert result is not None
+        assert result.install_mode is InstallMode.DEV
+
+    def test_per_package_floor_round_trips(self, factory):
+        write_package_declaration(
+            factory.root,
+            "vaultspec-rag",
+            PackageDeclaration(InstallMode.DEPENDENCY, minimum_version="2.0.0"),
+        )
+
+        rag = read_package_declaration(factory.root, "vaultspec-rag")
+        assert rag is not None
+        assert rag.minimum_version == "2.0.0"
+
+        raw = json.loads(_declaration_path(factory.root).read_text(encoding="utf-8"))
+        assert raw["packages"]["vaultspec-rag"]["minimum_version"] == "2.0.0"
+
+    def test_floor_omitted_when_unset_in_entry(self, factory):
+        write_package_declaration(
+            factory.root, "vaultspec-core", PackageDeclaration(InstallMode.TOOL)
+        )
+
+        raw = json.loads(_declaration_path(factory.root).read_text(encoding="utf-8"))
+        assert "minimum_version" not in raw["packages"]["vaultspec-core"]
+
+    def test_missing_package_entry_returns_none(self, factory):
+        write_package_declaration(
+            factory.root, "vaultspec-core", PackageDeclaration(InstallMode.TOOL)
+        )
+
+        assert read_package_declaration(factory.root, "vaultspec-rag") is None
+
+
+class TestMixedPackageConfig:
+    """A workspace declaring two packages resolves each independently."""
+
+    def test_core_dependency_rag_tool_read_independently(self, factory):
+        write_package_declaration(
+            factory.root,
+            "vaultspec-core",
+            PackageDeclaration(InstallMode.DEPENDENCY, minimum_version="0.1.37"),
+        )
+        write_package_declaration(
+            factory.root, "vaultspec-rag", PackageDeclaration(InstallMode.TOOL)
+        )
+
+        core = read_package_declaration(factory.root, "vaultspec-core")
+        rag = read_package_declaration(factory.root, "vaultspec-rag")
+        assert core is not None
+        assert rag is not None
+        assert core.install_mode is InstallMode.DEPENDENCY
+        assert core.minimum_version == "0.1.37"
+        assert rag.install_mode is InstallMode.TOOL
+        assert rag.minimum_version is None
+
+    def test_single_package_write_preserves_sibling(self, factory):
+        write_package_declaration(
+            factory.root, "vaultspec-core", PackageDeclaration(InstallMode.TOOL)
+        )
+        write_package_declaration(
+            factory.root,
+            "vaultspec-rag",
+            PackageDeclaration(InstallMode.DEPENDENCY, minimum_version="2.0.0"),
+        )
+
+        # Rewriting core's entry must not touch rag's.
+        write_package_declaration(
+            factory.root, "vaultspec-core", PackageDeclaration(InstallMode.DEV)
+        )
+
+        rag = read_package_declaration(factory.root, "vaultspec-rag")
+        assert rag is not None
+        assert rag.install_mode is InstallMode.DEPENDENCY
+        assert rag.minimum_version == "2.0.0"
+
+    def test_facade_write_preserves_sibling(self, factory):
+        write_package_declaration(
+            factory.root, "vaultspec-rag", PackageDeclaration(InstallMode.TOOL)
+        )
+        write_workspace_declaration(
+            factory.root, WorkspaceDeclaration(install_mode=InstallMode.DEPENDENCY)
+        )
+
+        rag = read_package_declaration(factory.root, "vaultspec-rag")
+        assert rag is not None
+        assert rag.install_mode is InstallMode.TOOL
+
+    def test_facade_returns_none_when_only_sibling_declared(self, factory):
+        write_package_declaration(
+            factory.root, "vaultspec-rag", PackageDeclaration(InstallMode.TOOL)
+        )
+
+        assert read_workspace_declaration(factory.root) is None
+
+    def test_pep503_spelling_writes_canonical_key(self, factory):
+        write_package_declaration(
+            factory.root, "vaultspec_rag", PackageDeclaration(InstallMode.TOOL)
+        )
+
+        assert read_package_declaration(factory.root, "vaultspec-rag") is not None
+        raw = json.loads(_declaration_path(factory.root).read_text(encoding="utf-8"))
+        assert "vaultspec-rag" in raw["packages"]
+
+
+class TestV2CorruptEntries:
+    """Broken schema 2.0 entries fail loud rather than silently dropping."""
+
+    def test_invalid_mode_in_package_entry_raises(self, factory):
+        _write_raw(
+            factory.root,
+            json.dumps(
+                {
+                    "schema_version": "2.0",
+                    "packages": {"vaultspec-core": {"install_mode": "hybrid"}},
+                }
+            ),
+        )
+
+        with pytest.raises(VaultSpecError, match="Invalid install_mode for package"):
+            read_workspace_declaration(factory.root)
+
+    def test_non_object_package_entry_raises(self, factory):
+        _write_raw(
+            factory.root,
+            json.dumps(
+                {
+                    "schema_version": "2.0",
+                    "packages": {"vaultspec-core": "tool"},
+                }
+            ),
+        )
+
+        with pytest.raises(VaultSpecError, match="Malformed package entry"):
+            read_workspace_declaration(factory.root)
+
+    def test_non_object_packages_map_raises(self, factory):
+        _write_raw(
+            factory.root,
+            json.dumps({"schema_version": "2.0", "packages": ["vaultspec-core"]}),
+        )
+
+        with pytest.raises(VaultSpecError, match="Malformed 'packages' map"):
+            read_workspace_declaration(factory.root)
