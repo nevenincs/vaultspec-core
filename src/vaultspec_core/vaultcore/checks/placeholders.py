@@ -73,12 +73,16 @@ KNOWN_PLACEHOLDERS = frozenset(
     }
 )
 
-# Fenced code blocks (``` or ~~~, with optional language tag) carry literal
-# brace usage (JSON, shell, config) that is not template residue.
-_CODE_FENCE_RE = re.compile(
-    r"^(?:```|~~~)[^\n]*\n.*?^(?:```|~~~)\s*$",
-    re.MULTILINE | re.DOTALL,
-)
+# Fenced code blocks (``` or ~~~, three or more of either character, with an
+# optional info string) carry literal brace usage (JSON, shell, config) that
+# is not template residue. Stripping them requires matching CommonMark fence
+# semantics rather than a fixed-length literal: a closing fence must reuse the
+# same character and be at least as long as the opening run, and a fence left
+# unclosed at end of document consumes the remainder of the document (a
+# document cannot "escape" a fence by ending inside one). See
+# ``_strip_code_fences`` for the scanner that enforces this.
+_FENCE_OPEN_RE = re.compile(r"^\s{0,3}(`{3,}|~{3,})(.*)$")
+_FENCE_CLOSE_RE = re.compile(r"^\s{0,3}(`+|~+)\s*$")
 
 # HTML comments (<!-- ... -->): placeholders here are template guidance and
 # are removed by the annotations checker; strip them to avoid double-reporting.
@@ -114,6 +118,52 @@ def is_template_placeholder(token: str) -> bool:
     return inner in KNOWN_PLACEHOLDERS
 
 
+def _strip_code_fences(body: str) -> str:
+    """Remove fenced code blocks, honouring CommonMark fence-close rules.
+
+    A fence opens on a line of three or more backticks or tildes. It closes on
+    the next line built from the same character, run at least as long as the
+    opening run; anything shorter, of the other character, or not a bare fence
+    line does not close it. A fence with no matching close consumes every
+    remaining line - a document cannot end "inside" an open fence and have the
+    tail treated as prose.
+
+    Args:
+        body: Document body text (everything after the frontmatter).
+
+    Returns:
+        Body text with fenced code blocks (open, content, and close lines)
+        removed.
+    """
+    lines = body.split("\n")
+    kept: list[str] = []
+    i = 0
+    total = len(lines)
+    while i < total:
+        open_match = _FENCE_OPEN_RE.match(lines[i])
+        if open_match is None:
+            kept.append(lines[i])
+            i += 1
+            continue
+
+        fence_char = open_match.group(1)[0]
+        fence_len = len(open_match.group(1))
+        j = i + 1
+        while j < total:
+            close_match = _FENCE_CLOSE_RE.match(lines[j])
+            if (
+                close_match is not None
+                and close_match.group(1)[0] == fence_char
+                and len(close_match.group(1)) >= fence_len
+            ):
+                break
+            j += 1
+        # j is the closing line index, or total if the fence never closes -
+        # either way everything through j is fenced and dropped.
+        i = j + 1
+    return "\n".join(kept)
+
+
 def _strip_non_prose(body: str) -> str:
     """Remove non-prose regions that legitimately contain ``{...}`` braces.
 
@@ -130,7 +180,7 @@ def _strip_non_prose(body: str) -> str:
     Returns:
         Body text with non-prose brace regions removed.
     """
-    stripped = _CODE_FENCE_RE.sub("", body)
+    stripped = _strip_code_fences(body)
     stripped = _HTML_COMMENT_RE.sub("", stripped)
     out_lines = []
     for line in stripped.split("\n"):

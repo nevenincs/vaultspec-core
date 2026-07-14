@@ -70,11 +70,60 @@ class TestCheckPlaceholders:
         result = check_placeholders(root, snapshot=snapshot)
         assert result.is_clean
 
+    def test_placeholder_in_prose_survives_sibling_inline_code_span(self):
+        # An inline code span earlier on the same line must not shield a real
+        # placeholder appearing later in prose on that line.
+        body = "Run `vaultspec-core sync` then replace {feature} with the tag."
+        root, snapshot = _snap("doc5b", body)
+        result = check_placeholders(root, snapshot=snapshot)
+        assert result.error_count == 1
+        assert "{feature}" in result.diagnostics[0].message
+
     def test_placeholder_in_fenced_code_block_is_ignored(self):
         body = "Text.\n\n```python\nschema = f'x.{feature}.y'\n```\n\nMore."
         root, snapshot = _snap("doc6", body)
         result = check_placeholders(root, snapshot=snapshot)
         assert result.is_clean
+
+    def test_placeholder_in_tilde_fenced_block_is_ignored(self):
+        body = "Text.\n\n~~~\nschema = f'x.{feature}.y'\n~~~\n\nMore."
+        root, snapshot = _snap("doc6b", body)
+        result = check_placeholders(root, snapshot=snapshot)
+        assert result.is_clean
+
+    def test_unclosed_fence_consumes_rest_of_document(self):
+        # CommonMark: a fence with no matching close runs to end of document -
+        # the tail is not prose just because the author forgot to close it.
+        body = "Text.\n\n```python\nschema = f'x.{feature}.y'\n"
+        root, snapshot = _snap("doc6c", body)
+        result = check_placeholders(root, snapshot=snapshot)
+        assert result.is_clean
+
+    def test_longer_fence_can_contain_shorter_fence_markers(self):
+        # A four-backtick fence's content may itself contain a literal triple-
+        # backtick run without closing the block early.
+        body = "Text.\n\n````\nsome ``` triple backticks with {feature}\n````\n\nMore."
+        root, snapshot = _snap("doc6d", body)
+        result = check_placeholders(root, snapshot=snapshot)
+        assert result.is_clean
+
+    def test_closing_fence_shorter_than_opening_does_not_close(self):
+        # A three-backtick line cannot close a four-backtick fence; the block
+        # keeps running (to the real close, or to EOF) per CommonMark.
+        body = (
+            "Text.\n\n````\ncode {feature}\n```\nstill code {topic}\n````\n\n"
+            "More clean."
+        )
+        root, snapshot = _snap("doc6e", body)
+        result = check_placeholders(root, snapshot=snapshot)
+        assert result.is_clean
+
+    def test_prose_placeholder_after_a_closed_fence_is_still_flagged(self):
+        body = "```python\nx = f'{feature}'\n```\n\nReplace {topic} for real."
+        root, snapshot = _snap("doc6f", body)
+        result = check_placeholders(root, snapshot=snapshot)
+        assert result.error_count == 1
+        assert "{topic}" in result.diagnostics[0].message
 
     def test_placeholder_in_html_comment_is_ignored(self):
         body = "<!-- Replace {feature} with a kebab-case tag. -->\n\nClean prose."
