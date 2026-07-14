@@ -222,6 +222,36 @@ def _read_packages_map(target: Path) -> dict[str, PackageDeclaration] | None:
     }
 
 
+def read_package_declaration(target: Path, package: str) -> PackageDeclaration | None:
+    """Read one named package's entry from the committed ``workspace.json``.
+
+    The per-package read the three-mode model is keyed on: each renderer and
+    doctor row consults only its own package's entry through this call, so a
+    mixed configuration (core dependency-mode, rag tool-mode) is read one package
+    at a time with no shared branch. The lookup is by canonicalized distribution
+    name, so any PEP 503 spelling of *package* resolves the same entry.
+
+    Read leniency and write-time strictness mirror the facade: a missing file or
+    an absent entry returns ``None``, a broken file raises.
+
+    Args:
+        target: Workspace root directory.
+        package: Distribution name whose entry to read (any PEP 503 spelling).
+
+    Returns:
+        The named package's :class:`PackageDeclaration`, or ``None`` when the
+        file is absent or declares no entry for *package*.
+
+    Raises:
+        VaultSpecError: If the file exists but is malformed (propagated from
+            :func:`_read_packages_map`).
+    """
+    packages = _read_packages_map(target)
+    if packages is None:
+        return None
+    return packages.get(_canonical_distribution_name(package))
+
+
 def read_workspace_declaration(target: Path) -> WorkspaceDeclaration | None:
     """Read the ``vaultspec-core`` view of the committed ``workspace.json``.
 
@@ -250,10 +280,7 @@ def read_workspace_declaration(target: Path) -> WorkspaceDeclaration | None:
             unreadable, or names an ``install_mode`` outside the canonical
             :class:`~vaultspec_core.core.enums.InstallMode` vocabulary.
     """
-    packages = _read_packages_map(target)
-    if packages is None:
-        return None
-    entry = packages.get(_DISTRIBUTION_NAME)
+    entry = read_package_declaration(target, _DISTRIBUTION_NAME)
     if entry is None:
         return None
     return WorkspaceDeclaration(
@@ -296,6 +323,32 @@ def _write_packages_map(target: Path, packages: dict[str, PackageDeclaration]) -
     atomic_write(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
+def write_package_declaration(
+    target: Path, package: str, declaration: PackageDeclaration
+) -> None:
+    """Upsert one named package's entry in the committed ``workspace.json``.
+
+    The per-package write that keeps a mixed configuration coherent: it replaces
+    only *package*'s entry and leaves every sibling package's entry untouched.
+    The whole read-modify-write cycle runs under a single advisory lock, so two
+    processes writing different packages' entries are serialized rather than
+    clobbering each other's map, and a legacy single-key file is migrated to
+    schema 2.0 shape on the first write. The entry is keyed by canonicalized
+    distribution name, matching :func:`read_package_declaration`.
+
+    Args:
+        target: Workspace root directory.
+        package: Distribution name whose entry to write (any PEP 503 spelling).
+        declaration: The :class:`PackageDeclaration` to persist for *package*.
+    """
+    path = _workspace_path(target)
+    key = _canonical_distribution_name(package)
+    with advisory_lock(path):
+        packages = _read_packages_map(target) or {}
+        packages[key] = declaration
+        _write_packages_map(target, packages)
+
+
 def write_workspace_declaration(
     target: Path, declaration: WorkspaceDeclaration
 ) -> None:
@@ -316,15 +369,14 @@ def write_workspace_declaration(
         declaration: :class:`WorkspaceDeclaration` instance to persist as the
             ``vaultspec-core`` entry.
     """
-    path = _workspace_path(target)
-    entry = PackageDeclaration(
-        install_mode=InstallMode(declaration.install_mode),
-        minimum_version=declaration.minimum_vaultspec_version,
+    write_package_declaration(
+        target,
+        _DISTRIBUTION_NAME,
+        PackageDeclaration(
+            install_mode=InstallMode(declaration.install_mode),
+            minimum_version=declaration.minimum_vaultspec_version,
+        ),
     )
-    with advisory_lock(path):
-        packages = _read_packages_map(target) or {}
-        packages[_DISTRIBUTION_NAME] = entry
-        _write_packages_map(target, packages)
 
 
 def _canonical_distribution_name(name: str) -> str:
