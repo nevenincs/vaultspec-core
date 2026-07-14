@@ -372,9 +372,10 @@ Deploy the vaultspec framework into the target directory.
 - `--dry-run` (default off) - Preview without writing.
 - `--force` (default off) - Overwrite existing installation.
 - `--skip` (default `[]`) - Skip specific sync passes (repeatable).
-- `--mode` (default auto) - Provisioning mode: `tool` (the default, launched via `uvx`)
-  or `dependency` (resolved through the project's own venv). Auto-detected from
-  `pyproject.toml` when omitted.
+- `--mode` (default auto) - Provisioning mode: `tool` (the default, launched via `uvx`),
+  `dependency` (resolved through the project's own venv, ships in built distributions),
+  or `dev` (the default dev dependency group; renders like dependency but does not ship
+  in built distributions). Auto-detected from `pyproject.toml` when omitted.
 - `--json` (default off) - Emit machine-readable output.
 
 `core` installs `.vaultspec/` only, without any provider config.
