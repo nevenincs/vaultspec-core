@@ -259,6 +259,43 @@ class TestAppendRelatedEntryLF:
         # Order must be preserved with the new entry LAST: [[x]], [[z]], [[y]]
         assert parsed["related"] == ["[[x]]", "[[z]]", "[[y]]"]
 
+    def test_append_matches_existing_block_indent(self, tmp_path):
+        """A new entry must reuse the block's indentation, not a fixed 2 spaces.
+
+        Appending a hardcoded 2-space item beneath a 4-space block produces a
+        mixed-indent sequence that strict YAML rejects while the vault's
+        lenient line-stripping readers silently accept it - the mis-indent
+        that broke `vault link add`.
+        """
+        doc = tmp_path / "doc.md"
+        _write_lf(doc, "---\nrelated:\n    - '[[a]]'\n---\nBody.\n")
+
+        appended = append_related_entry(doc, "[[b]]")
+
+        assert appended is True
+        text = doc.read_text(encoding="utf-8")
+        # The appended line carries the same 4-space indent as the existing one.
+        assert "\n    - '[[b]]'" in text
+        # Strict YAML - the parser the lenient readers mask - accepts it.
+        parsed = yaml.safe_load(text.split("---\n")[1])
+        assert parsed["related"] == ["[[a]]", "[[b]]"]
+
+    def test_append_aliased_stem_dedupes(self, tmp_path):
+        """A plain `[[foo]]` append must dedupe an aliased `[[foo|Foo]]` entry.
+
+        The idempotency guard compares the bare stem, so an aliased existing
+        entry is recognised and no duplicate line is written.
+        """
+        doc = tmp_path / "doc.md"
+        _write_lf(doc, "---\nrelated:\n  - '[[foo|Foo]]'\n---\nBody.\n")
+        original_bytes = doc.read_bytes()
+
+        appended = append_related_entry(doc, "[[foo]]")
+
+        assert appended is False
+        # No duplicate written - file is byte-identical.
+        assert doc.read_bytes() == original_bytes
+
     def test_idempotent_same_stem(self, tmp_path):
         doc = tmp_path / "doc.md"
         _write_lf(doc, "---\nrelated:\n  - '[[alpha]]'\n---\nBody.\n")
