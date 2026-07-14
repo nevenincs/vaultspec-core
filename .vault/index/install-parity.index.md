@@ -32,6 +32,7 @@ related:
   - '[[2026-07-14-install-parity-W01-P04-S23]]'
   - '[[2026-07-14-install-parity-W01-P04-S24]]'
   - '[[2026-07-14-install-parity-W01-P04-S25]]'
+  - '[[2026-07-14-install-parity-W02-P07-S39]]'
   - '[[2026-07-14-install-parity-adr]]'
   - '[[2026-07-14-install-parity-plan]]'
   - '[[2026-07-14-install-parity-research]]'
@@ -75,6 +76,7 @@ Auto-generated index of all documents tagged with `#install-parity`.
 - `2026-07-14-install-parity-W01-P04-S23` - Regenerate the locally-resident CLI reference to reflect the dev mode token and updated --mode help text
 - `2026-07-14-install-parity-W01-P04-S24` - Run the full unit gate and perform an ADR-conformance review confirming the schema v2 migration, DEV mode, and per-package renderers match the install-parity ADR before the wave is released
 - `2026-07-14-install-parity-W01-P04-S25` - Update the framework overview's install-mode description to name the three-mode model
+- `2026-07-14-install-parity-W02-P07-S39` - resolve each managed MCP definition's render mode from its own declaring package so mixed-mode workspaces sync stably
 
 ### plan
 

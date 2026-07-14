@@ -404,7 +404,7 @@ def collect_mcp_config_state(target: Path) -> ConfigSignal:
     from ..mcps import collect_mcp_servers
     from ..workspace_mode import resolve_render_mode
 
-    registry = collect_mcp_servers(mode=resolve_render_mode(target))
+    registry = collect_mcp_servers(mode=resolve_render_mode(target), target=target)
     if registry:
         managed_names = set(registry.keys())
         for name, (_path, expected_config) in registry.items():
