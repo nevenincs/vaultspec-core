@@ -25,6 +25,7 @@ import re
 import tomllib
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +54,38 @@ _DISTRIBUTION_NAME = "vaultspec-core"
 #: Split a PEP 508 requirement string at the first character that terminates
 #: the distribution name (version specifier, extras, marker, or whitespace).
 _REQUIREMENT_NAME_BOUNDARY = re.compile(r"[<>=!~;\[\s(]")
+
+
+class DependencyEvidence(StrEnum):
+    """How a ``pyproject.toml`` places a named distribution, for detection.
+
+    Detection classifies a distribution's declared placement into exactly one of
+    three states, mapping each to a provisioning mode in
+    :func:`resolve_install_mode`. The taxonomy tracks the *leak* boundary PEP 621
+    and PEP 735 draw, not merely presence-or-absence:
+
+    Members:
+        RUNTIME: The distribution ships in built artifacts. Evidence is presence
+            in :pep:`621` ``[project.dependencies]`` *or*
+            ``[project.optional-dependencies]``; optional dependencies are
+            runtime-leaking because they are written into the built
+            distribution's metadata and install with their extra. Maps to
+            :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY`.
+        DEV: Dev-scoped placement in the *default* :pep:`735` ``dev`` group
+            (``[dependency-groups].dev``) or the legacy
+            ``[tool.uv.dev-dependencies]`` list. Installs on every bare
+            ``uv sync``/``uv run`` yet does not leak into built distributions.
+            Maps to :attr:`~vaultspec_core.core.enums.InstallMode.DEV`.
+        NONE: No detectable placement. Absence entirely, or presence only in a
+            *named* (non-default) dependency group, which is out of detection's
+            scope: a named group is invisible until enabled with ``--group`` and
+            would require persisting a group name, not just a mode. Leaves the
+            mode to fall through to the tool-mode default.
+    """
+
+    RUNTIME = "runtime"
+    DEV = "dev"
+    NONE = "none"
 
 
 @dataclass
@@ -417,16 +450,85 @@ def _requirement_names(entries: Iterable[Any]) -> Iterator[str]:
             yield _canonical_distribution_name(head)
 
 
-def _pyproject_declares_vaultspec_dependency(pyproject: Path) -> bool:
-    """Return whether ``vaultspec-core`` is declared in *pyproject*.
+def detect_package_evidence(pyproject: Path, package: str) -> DependencyEvidence:
+    """Classify how *pyproject* places *package* into a :class:`DependencyEvidence`.
 
-    Probes leniently across every place a project can declare the dependency:
-    :pep:`621` ``[project.dependencies]`` and ``[project.optional-dependencies]``,
-    :pep:`735` ``[dependency-groups]``, and the legacy
-    ``[tool.uv.dev-dependencies]`` list. A malformed or unreadable file is
-    treated as "no dependency declared" rather than raising, because detection
-    is advisory evidence layered beneath explicit and persisted precedence and
-    must not turn a broken manifest into a hard failure.
+    Package-and-placement-aware detection: for the named distribution it reports
+    the single strongest placement signal, keyed on the leak boundary rather than
+    bare presence. Runtime placement outranks dev placement, so a distribution
+    that appears in both a runtime set and the dev group reads as
+    :attr:`DependencyEvidence.RUNTIME` - if it leaks, it leaks regardless of also
+    being dev-declared.
+
+    Runtime evidence is presence in :pep:`621` ``[project.dependencies]`` or
+    ``[project.optional-dependencies]`` (optional dependencies leak into built
+    metadata and so are runtime, not dev). Dev evidence is presence *only* in the
+    default :pep:`735` ``dev`` group (``[dependency-groups].dev``) or the legacy
+    ``[tool.uv.dev-dependencies]`` list. Presence solely in a named, non-default
+    group is deliberately unclassified (:attr:`DependencyEvidence.NONE`): a named
+    group is out of detection's scope because it stays inert until enabled with
+    ``--group`` and would demand persisting a group name.
+
+    A malformed or unreadable file is treated as
+    :attr:`DependencyEvidence.NONE` rather than raising, because detection is
+    advisory evidence layered beneath explicit and persisted precedence and must
+    not turn a broken manifest into a hard failure. Package matching is PEP 503
+    canonicalized, so any spelling of *package* compares equal.
+
+    Args:
+        pyproject: Path to the target's ``pyproject.toml``.
+        package: Distribution name to classify (any PEP 503 spelling).
+
+    Returns:
+        The :class:`DependencyEvidence` for *package* in *pyproject*.
+    """
+    try:
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError):
+        return DependencyEvidence.NONE
+
+    key = _canonical_distribution_name(package)
+
+    runtime_candidates: list[Any] = []
+    project = data.get("project")
+    if isinstance(project, dict):
+        deps = project.get("dependencies")
+        if isinstance(deps, list):
+            runtime_candidates.extend(deps)
+        optional = project.get("optional-dependencies")
+        if isinstance(optional, dict):
+            for group in optional.values():
+                if isinstance(group, list):
+                    runtime_candidates.extend(group)
+    if any(name == key for name in _requirement_names(runtime_candidates)):
+        return DependencyEvidence.RUNTIME
+
+    dev_candidates: list[Any] = []
+    groups = data.get("dependency-groups")
+    if isinstance(groups, dict):
+        dev_group = groups.get("dev")
+        if isinstance(dev_group, list):
+            dev_candidates.extend(dev_group)
+    tool = data.get("tool")
+    if isinstance(tool, dict):
+        uv = tool.get("uv")
+        if isinstance(uv, dict):
+            dev = uv.get("dev-dependencies")
+            if isinstance(dev, list):
+                dev_candidates.extend(dev)
+    if any(name == key for name in _requirement_names(dev_candidates)):
+        return DependencyEvidence.DEV
+
+    return DependencyEvidence.NONE
+
+
+def _pyproject_declares_vaultspec_dependency(pyproject: Path) -> bool:
+    """Return whether ``vaultspec-core`` has any detectable placement.
+
+    Backward-compatible boolean shim over :func:`detect_package_evidence`,
+    collapsing the three-valued placement taxonomy to the presence-or-absence
+    answer the two-mode resolver consumed before the ``dev`` placement was
+    distinguished. Any evidence (runtime or dev) reads as ``True``.
 
     Args:
         pyproject: Path to the target's ``pyproject.toml``.
@@ -434,39 +536,10 @@ def _pyproject_declares_vaultspec_dependency(pyproject: Path) -> bool:
     Returns:
         ``True`` if any dependency set lists ``vaultspec-core``.
     """
-    try:
-        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-    except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError):
-        return False
-
-    candidates: list[Any] = []
-
-    project = data.get("project")
-    if isinstance(project, dict):
-        deps = project.get("dependencies")
-        if isinstance(deps, list):
-            candidates.extend(deps)
-        optional = project.get("optional-dependencies")
-        if isinstance(optional, dict):
-            for group in optional.values():
-                if isinstance(group, list):
-                    candidates.extend(group)
-
-    groups = data.get("dependency-groups")
-    if isinstance(groups, dict):
-        for group in groups.values():
-            if isinstance(group, list):
-                candidates.extend(group)
-
-    tool = data.get("tool")
-    if isinstance(tool, dict):
-        uv = tool.get("uv")
-        if isinstance(uv, dict):
-            dev = uv.get("dev-dependencies")
-            if isinstance(dev, list):
-                candidates.extend(dev)
-
-    return any(name == _DISTRIBUTION_NAME for name in _requirement_names(candidates))
+    return (
+        detect_package_evidence(pyproject, _DISTRIBUTION_NAME)
+        is not DependencyEvidence.NONE
+    )
 
 
 def resolve_install_mode(
