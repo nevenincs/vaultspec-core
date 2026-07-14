@@ -20,7 +20,14 @@ from typing import Any
 import yaml
 
 from . import types as _t
-from .enums import InstallMode, ManagedState, PrecommitHook, ProviderCapability, Tool
+from .enums import (
+    InstallMode,
+    ManagedState,
+    PrecommitHook,
+    ProviderCapability,
+    Tool,
+    render_mode,
+)
 from .exceptions import (
     ProviderError,
     ProviderNotInstalledError,
@@ -370,8 +377,17 @@ _MODE_ENTRY_PREFIX: dict[InstallMode, str] = {
 
 
 def entry_prefix_for_mode(mode: InstallMode) -> str:
-    """Return the canonical hook-entry command prefix for *mode*."""
-    return _MODE_ENTRY_PREFIX[mode]
+    """Return the canonical hook-entry command prefix for *mode*.
+
+    The lookup is keyed by the *rendered* mode (via
+    :func:`~vaultspec_core.core.enums.render_mode`), so
+    :attr:`~vaultspec_core.core.enums.InstallMode.DEV` resolves to the same
+    ``uv run`` prefix as :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY`
+    rather than needing its own table entry. This keeps the prefix table a
+    two-shape render surface even as the mode vocabulary carries the third
+    dev-scoped bookkeeping member.
+    """
+    return _MODE_ENTRY_PREFIX[render_mode(mode)]
 
 
 #: Backward-compatible module-level prefix, pinned to dependency mode. Modules

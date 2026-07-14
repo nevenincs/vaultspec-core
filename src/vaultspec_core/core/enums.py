@@ -354,6 +354,31 @@ class InstallMode(StrEnum):
             return None
 
 
+def render_mode(mode: InstallMode) -> InstallMode:
+    """Collapse a declared mode to the mode its artifacts render as.
+
+    The single rendering-time comparator for the three-mode model.
+    :attr:`~InstallMode.DEV` is a bookkeeping distinction only - dev-scoped
+    placement in the default :pep:`735` ``dev`` group installs on every
+    ``uv sync`` and therefore launches through the same ``uv run`` resolution as
+    a full :attr:`~InstallMode.DEPENDENCY` - so every renderer (the MCP launch
+    command, the pre-commit hook entries) must treat ``DEV`` as
+    :attr:`~InstallMode.DEPENDENCY` and never grow a third branch.
+    :attr:`~InstallMode.TOOL` and :attr:`~InstallMode.DEPENDENCY` pass through
+    unchanged. Doctor labeling and the committed declaration keep reading the
+    declared mode directly, since there the ``DEV`` versus ``DEPENDENCY``
+    distinction is exactly the point.
+
+    Args:
+        mode: The declared :class:`InstallMode`.
+
+    Returns:
+        :attr:`~InstallMode.DEPENDENCY` when *mode* is
+        :attr:`~InstallMode.DEV`, otherwise *mode* unchanged.
+    """
+    return InstallMode.DEPENDENCY if mode is InstallMode.DEV else mode
+
+
 class PrecommitHook(StrEnum):
     """Canonical pre-commit hook IDs managed by vaultspec-core.
 

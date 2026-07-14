@@ -21,7 +21,7 @@ Amend the workspace declaration to a per-package schema v2, add the DEV install 
 Move WorkspaceDeclaration from a single-key schema to a per-package map at schema_version 2.0 with a legacy v1 read-fold, and add InstallMode.DEV alongside the single render_mode aliasing helper that lets every renderer treat DEV as DEPENDENCY without a third branch.
 
 - [x] `W01.P01.S01` - Add the DEV member to InstallMode with a docstring describing dev-scoped, non-leaking bookkeeping semantics; `src/vaultspec_core/core/enums.py`.
-- [ ] `W01.P01.S02` - Add a render_mode aliasing helper that maps DEV to DEPENDENCY and passes TOOL and DEPENDENCY through unchanged, as the single rendering-time comparator; `src/vaultspec_core/core/enums.py`.
+- [x] `W01.P01.S02` - Add a render_mode aliasing helper that maps DEV to DEPENDENCY and passes TOOL and DEPENDENCY through unchanged, as the single rendering-time comparator; `src/vaultspec_core/core/enums.py`.
 - [ ] `W01.P01.S03` - Add a PackageDeclaration dataclass (mode, minimum_vaultspec_version) and bump WORKSPACE_SCHEMA_VERSION to 2.0 for the per-package packages map shape; `src/vaultspec_core/core/workspace_mode.py`.
 - [ ] `W01.P01.S04` - Rewrite read_workspace_declaration to parse the v2 packages map and fold a legacy v1 single-key file into packages keyed to the current package on read; `src/vaultspec_core/core/workspace_mode.py`.
 - [ ] `W01.P01.S05` - Rewrite write_workspace_declaration to serialize the v2 packages map canonically with sorted keys and the schema_version 2.0 stamp; `src/vaultspec_core/core/workspace_mode.py`.
