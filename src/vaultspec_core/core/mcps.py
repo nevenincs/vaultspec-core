@@ -148,6 +148,50 @@ def render_mcp_definition_for_mode(
     return rendered
 
 
+def _render_definition_for_sync(
+    definition: dict[str, Any],
+    sync_mode: InstallMode,
+    target: Path | None,
+) -> dict[str, Any]:
+    """Render one collected definition at its own declaring package's mode.
+
+    The seam that keeps a mixed-mode workspace stable. A definition that names
+    its own declaring package through :data:`_MODE_PACKAGE_KEY` renders at *that*
+    package's committed render mode
+    (:func:`~vaultspec_core.core.workspace_mode.resolve_render_mode`), not the
+    sync-wide *sync_mode*, so a workspace that provisioned core as a dependency
+    and a companion package (for example ``vaultspec-rag``) as a tool syncs each
+    managed entry at its own declared shape rather than flattening every entry
+    onto whichever single mode the caller resolved for core. A definition
+    without the key - core's own token-only builtin - renders at *sync_mode*,
+    which stays the caller's fallback (a plain sync's core-resolved render mode)
+    or explicit override (the fresh-``install``/upgrade mode-flip value core
+    writes only after this render runs). When *target* is unavailable the
+    per-package lookup is skipped and every definition falls back to *sync_mode*,
+    preserving the pre-per-package behaviour for callers with no workspace
+    context.
+
+    Args:
+        definition: A parsed MCP server definition, possibly carrying the
+            mode-neutral tokens and the ``_vaultspec_mode_package`` metadata key.
+        sync_mode: The sync-wide mode, used for core's own definition and as the
+            fallback when a per-package lookup cannot run.
+        target: Workspace root directory for the per-package render-mode lookup,
+            or ``None`` to skip it.
+
+    Returns:
+        The mode-rendered definition (a copy; the input is not mutated).
+    """
+    package = definition.get(_MODE_PACKAGE_KEY)
+    if package is not None and target is not None:
+        from .workspace_mode import resolve_render_mode
+
+        def_mode = resolve_render_mode(target, package=str(package))
+    else:
+        def_mode = sync_mode
+    return render_mcp_definition_for_mode(definition, def_mode)
+
+
 def _server_name(filename: str) -> str:
     """Derive the MCP server name from a definition filename.
 
@@ -217,26 +261,37 @@ def _existing_source_server_names() -> set[str]:
 def collect_mcp_servers(
     warnings: list[str] | None = None,
     mode: InstallMode | None = None,
+    target: Path | None = None,
 ) -> dict[str, tuple[Path, dict[str, Any]]]:
     """Collect MCP server definitions from ``.vaultspec/mcps/``.
 
     Reads and parses every ``.json`` file in the MCP source directory,
     returning a mapping of server name to (source path, parsed config).
 
-    When *mode* is supplied, each parsed definition is passed through
-    :func:`render_mcp_definition_for_mode` before being returned, so the
-    mode-neutral placeholder tokens in the builtin definition become the
-    concrete launch command for that mode. The merge pipeline that feeds
-    :func:`mcp_sync` therefore writes the mode-rendered form into every
-    ``.mcp.json`` target. When *mode* is ``None`` the raw (token-carrying)
-    definitions are returned unchanged - the correct behaviour for callers
-    that only inspect server *names* (uninstall, source counts) rather than
-    the launch command.
+    When *mode* is supplied, each parsed definition is rendered before being
+    returned, so the mode-neutral placeholder tokens in a builtin definition
+    become a concrete launch command. Rendering is *per definition*, not
+    sync-wide: a definition that names its own declaring package renders at that
+    package's committed render mode, while a definition without that metadata -
+    core's own builtin - renders at *mode*. This keeps a mixed-mode workspace
+    (core as a dependency, a companion package as a tool) stable, since each
+    managed entry is written in its own declared shape rather than flattened
+    onto whichever single mode the caller resolved for core. See
+    :func:`_render_definition_for_sync` for the resolution rule. The merge
+    pipeline that feeds :func:`mcp_sync` therefore writes the correctly-shaped
+    form for every entry into every ``.mcp.json`` target. When *mode* is
+    ``None`` the raw (token-carrying) definitions are returned unchanged - the
+    correct behaviour for callers that only inspect server *names* (uninstall,
+    source counts) rather than the launch command.
 
     Args:
         warnings: Optional list to append parse-error messages to.
-        mode: Provisioning mode to render each definition for, or ``None`` to
-            return the raw parsed definitions.
+        mode: Provisioning mode to render *core's own* definition for, and the
+            fallback for any definition whose per-package mode cannot be
+            resolved, or ``None`` to return the raw parsed definitions.
+        target: Workspace root directory used to resolve each definition's own
+            declaring-package render mode when *mode* is supplied. ``None``
+            skips the per-package lookup, so every definition renders at *mode*.
 
     Returns:
         Mapping of server name to ``(source_path, config_dict)``.
@@ -259,7 +314,7 @@ def collect_mcp_servers(
             if not name:
                 continue
             if mode is not None:
-                raw = render_mcp_definition_for_mode(raw, mode)
+                raw = _render_definition_for_sync(raw, mode, target)
             sources[name] = (f, raw)
         except (json.JSONDecodeError, OSError) as e:
             msg = f"Failed to read/parse MCP definition {f}: {e}"
@@ -330,7 +385,9 @@ def mcp_status() -> dict[str, Any]:
 
     render_mode = resolve_render_mode(target_dir, package=CORE_DISTRIBUTION_NAME)
     parse_warnings: list[str] = []
-    sources = collect_mcp_servers(warnings=parse_warnings, mode=render_mode)
+    sources = collect_mcp_servers(
+        warnings=parse_warnings, mode=render_mode, target=target_dir
+    )
     definitions = sorted(sources)
 
     mcp_json = target_dir / ".mcp.json"
@@ -757,14 +814,20 @@ def mcp_sync(
     even if they share a name with a current source. This mirrors the
     content-marker ownership pattern used by ``sync_files``.
 
-    The launch command each definition renders to is selected by *mode*. When
-    *mode* is ``None`` (every standalone ``sync``/``doctor`` caller) it is
-    resolved from the committed workspace declaration via
+    The launch command *core's own* definition renders to is selected by
+    *mode*. When *mode* is ``None`` (every standalone ``sync``/``doctor``
+    caller) it is resolved from core's entry in the committed workspace
+    declaration via
     :func:`~vaultspec_core.core.workspace_mode.resolve_render_mode`, whose
     legacy-absent rule renders dependency mode so a workspace provisioned
     before ``install-mode`` is never silently flipped to the ``uvx`` shape. The
     fresh-``install`` path passes its resolved mode explicitly, because the
-    declaration is written only after this render runs.
+    declaration is written only after this render runs. Every *companion*
+    definition (one that names its own declaring package) instead renders at
+    that package's own committed render mode, so a mixed-mode workspace syncs
+    each managed entry in its own shape rather than flattening every entry onto
+    core's mode; see :func:`collect_mcp_servers` and
+    :func:`_render_definition_for_sync`.
 
     Args:
         dry_run: If ``True``, compute changes without writing.
@@ -799,7 +862,7 @@ def mcp_sync(
         mode = resolve_render_mode(target_dir, package=CORE_DISTRIBUTION_NAME)
 
     parse_warnings: list[str] = []
-    sources = collect_mcp_servers(warnings=parse_warnings, mode=mode)
+    sources = collect_mcp_servers(warnings=parse_warnings, mode=mode, target=target_dir)
     result.warnings.extend(parse_warnings)
 
     _sync_mcp_target(

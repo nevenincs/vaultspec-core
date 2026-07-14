@@ -10,12 +10,14 @@ import pytest
 from vaultspec_core.core.enums import InstallMode
 from vaultspec_core.core.exceptions import VaultSpecError
 from vaultspec_core.core.workspace_mode import (
+    DEPENDENCY_LEAK_ADVISORY,
     WORKSPACE_SCHEMA_VERSION,
     DependencyEvidence,
     ModeProvenance,
     PackageDeclaration,
     ResolvedMode,
     WorkspaceDeclaration,
+    dependency_leak_advisory,
     detect_package_evidence,
     newly_establishes_dependency,
     read_package_declaration,
@@ -770,3 +772,21 @@ class TestNewlyEstablishesDependency:
         for provenance in ModeProvenance:
             resolved = ResolvedMode(InstallMode.TOOL, provenance)
             assert not newly_establishes_dependency(resolved)
+
+
+class TestDependencyLeakAdvisoryText:
+    """The advisory names the package that actually elects dependency mode."""
+
+    def test_advisory_names_the_given_package(self):
+        text = dependency_leak_advisory("vaultspec-rag")
+        assert text.startswith("vaultspec-rag is being provisioned")
+        assert "vaultspec-core" not in text
+
+    def test_advisory_defaults_to_core(self):
+        assert dependency_leak_advisory().startswith(
+            "vaultspec-core is being provisioned"
+        )
+
+    def test_backcompat_constant_matches_core_rendering(self):
+        # vaultspec-rag consumers floored on 0.1.38 reference the constant.
+        assert dependency_leak_advisory() == DEPENDENCY_LEAK_ADVISORY
