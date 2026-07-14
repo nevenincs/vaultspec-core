@@ -2243,48 +2243,79 @@ def _render_diagnosis_table(_console, diag: "WorkspaceDiagnosis") -> None:
         }
     )
 
-    # Install-mode coherence row: the persisted declaration versus the shape of
-    # the provisioned hook and MCP artifacts. UNKNOWN is a legacy, undeclared
-    # workspace and is informational, not a warning.
-    mm_status, mm_style = _signal_status(
-        diag.mode_mismatch,
-        {
-            ModeMismatchSignal.CLEAN: ("ok", "green"),
-            ModeMismatchSignal.MISMATCH: ("warn", "yellow"),
-            ModeMismatchSignal.UNKNOWN: ("info", "dim"),
-        },
-    )
-    mm_detail = {
-        ModeMismatchSignal.CLEAN: "artifacts match the declared install mode",
-        ModeMismatchSignal.MISMATCH: (
-            "hook entries or MCP command do not match the declared mode; "
-            "run vaultspec-core install --upgrade, or install --mode to re-provision"
-        ),
-        ModeMismatchSignal.UNKNOWN: "no install mode declared (legacy workspace)",
-    }.get(diag.mode_mismatch, str(diag.mode_mismatch))
-    rows.append(
-        {
-            "component": "install mode",
-            "status": Cell(mm_status, style=mm_style),
-            "detail": mm_detail,
-        }
-    )
-
-    # Floor-constraint row: reported only when the running version is below the
-    # declared minimum. Doctor reports it as an error without refusing; install
-    # and sync refuse on the same condition.
-    if diag.version_floor == VersionFloorSignal.BELOW:
+    # Install-mode coherence rows: the persisted declaration versus the shape of
+    # the provisioned hook and MCP artifacts, one row per declared package. Each
+    # labels the honest declared mode (dev stays dev even though it renders like
+    # dependency) and flags whether that package's artifacts match. A floor row
+    # follows a package only when its running version is below its declared
+    # minimum. A workspace with no packages map (legacy, pre-install-mode) falls
+    # back to a single informational row from core's own view.
+    mode_map = {
+        ModeMismatchSignal.CLEAN: ("ok", "green"),
+        ModeMismatchSignal.MISMATCH: ("warn", "yellow"),
+        ModeMismatchSignal.UNKNOWN: ("info", "dim"),
+    }
+    if diag.packages:
+        for pkg_name, pkg_diag in sorted(diag.packages.items()):
+            pm_status, pm_style = _signal_status(pkg_diag.mode_mismatch, mode_map)
+            declared = pkg_diag.declared_mode.value
+            if pkg_diag.mode_mismatch == ModeMismatchSignal.MISMATCH:
+                pm_detail = (
+                    f"declared {declared}; hook entries or MCP command do not "
+                    "match; run vaultspec-core install --upgrade, or install "
+                    "--mode to re-provision"
+                )
+            else:
+                pm_detail = f"declared {declared}; artifacts match"
+            rows.append(
+                {
+                    "component": f"install mode ({pkg_name})",
+                    "status": Cell(pm_status, style=pm_style),
+                    "detail": pm_detail,
+                }
+            )
+            if pkg_diag.version_floor == VersionFloorSignal.BELOW:
+                rows.append(
+                    {
+                        "component": f"version floor ({pkg_name})",
+                        "status": Cell("error", style="red"),
+                        "detail": (
+                            f"running {pkg_diag.version_floor_running} is below "
+                            f"the declared floor {pkg_diag.version_floor_minimum}; "
+                            f"upgrade with uv tool upgrade {pkg_name}"
+                        ),
+                    }
+                )
+    else:
+        mm_status, mm_style = _signal_status(diag.mode_mismatch, mode_map)
+        mm_detail = {
+            ModeMismatchSignal.CLEAN: "artifacts match the declared install mode",
+            ModeMismatchSignal.MISMATCH: (
+                "hook entries or MCP command do not match the declared mode; "
+                "run vaultspec-core install --upgrade, or install --mode to "
+                "re-provision"
+            ),
+            ModeMismatchSignal.UNKNOWN: "no install mode declared (legacy workspace)",
+        }.get(diag.mode_mismatch, str(diag.mode_mismatch))
         rows.append(
             {
-                "component": "version floor",
-                "status": Cell("error", style="red"),
-                "detail": (
-                    f"running {diag.version_floor_running} is below the declared "
-                    f"floor {diag.version_floor_minimum}; upgrade with "
-                    f"uv tool upgrade vaultspec-core"
-                ),
+                "component": "install mode",
+                "status": Cell(mm_status, style=mm_style),
+                "detail": mm_detail,
             }
         )
+        if diag.version_floor == VersionFloorSignal.BELOW:
+            rows.append(
+                {
+                    "component": "version floor",
+                    "status": Cell("error", style="red"),
+                    "detail": (
+                        f"running {diag.version_floor_running} is below the declared "
+                        f"floor {diag.version_floor_minimum}; upgrade with "
+                        f"uv tool upgrade vaultspec-core"
+                    ),
+                }
+            )
 
     render_listing(
         rows,
@@ -2394,15 +2425,23 @@ def _doctor_exit_code(
     elif diag.rename_integrity == RenameIntegritySignal.MISMATCH:
         has_warn = True
 
-    # A declared-vs-observed install-mode mismatch is a warning; UNKNOWN (a
-    # legacy, undeclared workspace) and CLEAN are not.
-    if diag.mode_mismatch == ModeMismatchSignal.MISMATCH:
-        has_warn = True
-
-    # A running version below the committed floor is a hard error on doctor,
-    # mirroring the refuse-and-tell that install and sync raise.
-    if diag.version_floor == VersionFloorSignal.BELOW:
-        has_error = True
+    # A declared-vs-observed install-mode mismatch is a warning; a running
+    # version below the committed floor is a hard error on doctor, mirroring the
+    # refuse-and-tell that install and sync raise. Weighed per declared package
+    # when a packages map exists so a companion package's mismatch or floor
+    # violation counts; UNKNOWN and CLEAN are neither. A legacy workspace with no
+    # packages map falls back to core's own top-level view.
+    if diag.packages:
+        for pkg_diag in diag.packages.values():
+            if pkg_diag.mode_mismatch == ModeMismatchSignal.MISMATCH:
+                has_warn = True
+            if pkg_diag.version_floor == VersionFloorSignal.BELOW:
+                has_error = True
+    else:
+        if diag.mode_mismatch == ModeMismatchSignal.MISMATCH:
+            has_warn = True
+        if diag.version_floor == VersionFloorSignal.BELOW:
+            has_error = True
 
     for prov in diag.providers.values():
         if prov.manifest_entry == ManifestEntrySignal.NOT_INSTALLED:

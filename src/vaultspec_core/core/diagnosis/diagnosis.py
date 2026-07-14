@@ -10,7 +10,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..enums import Tool
+from ..enums import InstallMode, Tool
 from .signals import (
     BuiltinVersionSignal,
     ConfigSignal,
@@ -28,6 +28,42 @@ from .signals import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PackageModeDiagnosis:
+    """Per-package install-mode and version-floor diagnosis.
+
+    One entry per distribution declared in the shared
+    ``.vaultspec/workspace.json`` map, so the doctor can render an install-mode
+    row (and, when a floor is violated, a version-floor row) for each provisioned
+    package independently rather than only for core. A mixed configuration (core
+    in one mode, a companion package in another) produces one of these per
+    package, each read against that package's own declared entry and its own
+    observed artifacts.
+
+    Args:
+        package: The canonicalized distribution name.
+        declared_mode: The mode this package's map entry declares. Kept distinct
+            from the mode its artifacts render as (``dev`` renders like
+            ``dependency``) so the doctor row can label the honest declared
+            value.
+        mode_mismatch: Coherence between the declared mode and the observed
+            artifact shapes for this package.
+        version_floor: State of this package's running version against its own
+            declared floor.
+        version_floor_running: Running version string, populated only when
+            ``version_floor`` is ``BELOW``.
+        version_floor_minimum: Declared floor string, populated only when
+            ``version_floor`` is ``BELOW``.
+    """
+
+    package: str
+    declared_mode: InstallMode
+    mode_mismatch: ModeMismatchSignal
+    version_floor: VersionFloorSignal
+    version_floor_running: str = ""
+    version_floor_minimum: str = ""
 
 
 @dataclass
@@ -75,14 +111,22 @@ class WorkspaceDiagnosis:
             by the annotation probe.
         rename_integrity: Observed state of name/filename mismatches.
         rename_mismatch_count: Count of name/filename mismatches.
-        mode_mismatch: Coherence between the persisted install-mode declaration
-            and the shape of the provisioned hook and MCP artifacts.
-        version_floor: State of the running version against the committed
-            ``minimum_vaultspec_version`` floor constraint.
+        mode_mismatch: Coherence between core's persisted install-mode
+            declaration and the shape of core's provisioned hook and MCP
+            artifacts. This is core's own view, kept for the resolver's install
+            and sync plans; the per-package ``packages`` map below carries the
+            same axis for every declared package including core.
+        version_floor: State of core's running version against core's committed
+            floor constraint.
         version_floor_running: Running version string, populated only when
             ``version_floor`` is ``BELOW``.
         version_floor_minimum: Declared floor string, populated only when
             ``version_floor`` is ``BELOW``.
+        packages: Per-package install-mode and version-floor diagnosis, one
+            :class:`PackageModeDiagnosis` per distribution declared in the shared
+            workspace map, keyed by canonicalized distribution name. Empty when
+            no ``workspace.json`` declaration exists. Drives the doctor's
+            per-package install-mode and version-floor rows.
     """
 
     framework: FrameworkSignal
@@ -103,6 +147,7 @@ class WorkspaceDiagnosis:
     version_floor: VersionFloorSignal = VersionFloorSignal.OK
     version_floor_running: str = ""
     version_floor_minimum: str = ""
+    packages: dict[str, PackageModeDiagnosis] = field(default_factory=dict)
 
 
 def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
@@ -213,6 +258,47 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         version_floor_running = ""
         version_floor_minimum = ""
 
+    # Per-package mode and floor: one diagnosis per distribution declared in the
+    # shared workspace map, each read against its own entry. The top-level
+    # mode_mismatch/version_floor above stay core's own view (the resolver reads
+    # them); this map drives the doctor's per-package rows and covers companion
+    # packages core's view cannot represent.
+    package_diags: dict[str, PackageModeDiagnosis] = {}
+    try:
+        from ..workspace_mode import read_package_declarations
+
+        declared_packages = read_package_declarations(target)
+    except Exception:
+        logger.warning("Package declarations read failed", exc_info=True)
+        declared_packages = {}
+    for pkg_name, pkg_decl in sorted(declared_packages.items()):
+        try:
+            pkg_mode_mismatch = collect_mode_mismatch_state(target, package=pkg_name)
+        except Exception:
+            logger.warning(
+                "Mode mismatch collector failed for %s", pkg_name, exc_info=True
+            )
+            pkg_mode_mismatch = ModeMismatchSignal.CLEAN
+        try:
+            pkg_floor, pkg_floor_running, pkg_floor_minimum = (
+                collect_version_floor_state(target, package=pkg_name)
+            )
+        except Exception:
+            logger.warning(
+                "Version floor collector failed for %s", pkg_name, exc_info=True
+            )
+            pkg_floor = VersionFloorSignal.OK
+            pkg_floor_running = ""
+            pkg_floor_minimum = ""
+        package_diags[pkg_name] = PackageModeDiagnosis(
+            package=pkg_name,
+            declared_mode=pkg_decl.install_mode,
+            mode_mismatch=pkg_mode_mismatch,
+            version_floor=pkg_floor,
+            version_floor_running=pkg_floor_running,
+            version_floor_minimum=pkg_floor_minimum,
+        )
+
     diag = WorkspaceDiagnosis(
         framework=framework,
         gitignore=gitignore,
@@ -228,6 +314,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         version_floor=version_floor,
         version_floor_running=version_floor_running,
         version_floor_minimum=version_floor_minimum,
+        packages=package_diags,
     )
 
     if framework == FrameworkSignal.MISSING:
