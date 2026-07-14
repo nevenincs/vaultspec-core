@@ -47,9 +47,9 @@ Module invocation avoids the lock.
 ### Install modes
 
 `vaultspec-core install` writes one of two launch shapes for this entry, matching how
-the workspace runs the tooling. Tool mode is the default and launches the server with
-`uvx`, resolving vaultspec-core on demand without adding it to your project's dependency
-set:
+the workspace runs the tooling. Three modes select between them. Tool mode is the
+default and launches the server with `uvx`, resolving vaultspec-core on demand without
+adding it to your project's dependency set:
 
 ```json
 {
@@ -64,10 +64,24 @@ set:
 
 Dependency mode is the `uv run` shape shown at the top of this section: it resolves
 vaultspec-core from your project's own environment. Install selects it automatically
-when your `pyproject.toml` already lists vaultspec-core, and you can pin either shape
-with `install --mode tool` or `install --mode dependency`. Both shapes launch the server
-as a Python module for the same Windows-lock reason above, so neither one holds an
-executable open.
+when your `pyproject.toml` already lists vaultspec-core, and you can pin any of the
+three modes with `install --mode tool`, `install --mode dependency`, or
+`install --mode dev`. Both shapes launch the server as a Python module for the same
+Windows-lock reason above, so neither one holds an executable open.
+
+Dev mode is for vaultspec-core placed in your project's default `dev` dependency group.
+It renders exactly like dependency mode - the same `uv run` shape - because `uv run`
+resolves the default dev group identically to a project dependency. The distinction is
+that dependency mode ships vaultspec-core in your project's built distributions, while
+dev mode does not. Choosing dev records that non-leaking placement so the doctor and a
+fresh clone can read it, rather than inferring a full runtime dependency from an
+identical launch command.
+
+The chosen mode is recorded per package in the workspace's committed `workspace.json`,
+which keys each provisioned package to its own mode and version floor. A workspace that
+provisions both vaultspec-core and a companion package can therefore declare each in a
+different mode - one as a dependency, the other as a tool - without either overwriting
+the other's choice.
 
 A workspace set up before install modes existed carries no recorded choice. Running
 `vaultspec-core install --upgrade` infers the mode from how the workspace already runs -
