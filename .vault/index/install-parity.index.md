@@ -40,6 +40,10 @@ related:
   - '[[2026-07-14-install-parity-W02-P06-S32]]'
   - '[[2026-07-14-install-parity-W02-P06-S33]]'
   - '[[2026-07-14-install-parity-W02-P06-S34]]'
+  - '[[2026-07-14-install-parity-W02-P07-S35]]'
+  - '[[2026-07-14-install-parity-W02-P07-S36]]'
+  - '[[2026-07-14-install-parity-W02-P07-S37]]'
+  - '[[2026-07-14-install-parity-W02-P07-S38]]'
   - '[[2026-07-14-install-parity-W02-P07-S39]]'
   - '[[2026-07-14-install-parity-W02-P07-S40]]'
   - '[[2026-07-14-install-parity-adr]]'
@@ -93,6 +97,10 @@ Auto-generated index of all documents tagged with `#install-parity`.
 - `2026-07-14-install-parity-W02-P06-S32` - Add upgrade-time mode inference for the vaultspec-rag package, mirroring core's \_infer_upgrade_mode detection evidence and precedence
 - `2026-07-14-install-parity-W02-P06-S33` - Leave the --local-only flag and its per-host local-only.json marker unchanged as an orthogonal storage-backend choice, and add a regression test asserting it is not folded into the shared mode declaration
 - `2026-07-14-install-parity-W02-P06-S34` - Add tests covering --mode tool, dependency, and dev for the rag package, the mixed core-dependency-rag-tool configuration, and the tokenized MCP definition's rendered launch shape
+- `2026-07-14-install-parity-W02-P07-S35` - Add mode-and-floor rows to the doctor output for the vaultspec-rag entry, reading core's per-package mode-mismatch and version-floor collectors
+- `2026-07-14-install-parity-W02-P07-S36` - Document the --mode flag, the three provisioning modes, and the shared per-package workspace.json declaration in the installation guide
+- `2026-07-14-install-parity-W02-P07-S37` - Run rag's full test gate covering the new mode, renderer, and doctor tests
+- `2026-07-14-install-parity-W02-P07-S38` - Review both CLIs' install --help output side by side and confirm the --mode flag vocabulary, help text, and doctor row shape are parity-symmetric between vaultspec-core and vaultspec-rag
 - `2026-07-14-install-parity-W02-P07-S39` - resolve each managed MCP definition's render mode from its own declaring package so mixed-mode workspaces sync stably
 - `2026-07-14-install-parity-W02-P07-S40` - parameterize the dependency-leak advisory by package so companion installs name the right distribution
 

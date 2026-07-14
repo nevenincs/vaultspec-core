@@ -88,10 +88,10 @@ Add the --mode tool|dependency|dev flag to rag's install CLI, thread it through 
 
 Add mode-and-floor rows to rag's server doctor for the vaultspec-rag entry, update rag's README and docs, run rag's full test gate, and close the wave with a review confirming both CLIs' install --help surfaces are parity-symmetric.
 
-- [ ] `W02.P07.S35` - Add mode-and-floor rows to the doctor output for the vaultspec-rag entry, reading core's per-package mode-mismatch and version-floor collectors; `src/vaultspec_rag/cli/_service_doctor.py`.
-- [ ] `W02.P07.S36` - Document the --mode flag, the three provisioning modes, and the shared per-package workspace.json declaration in the installation guide; `docs/installation.md`.
-- [ ] `W02.P07.S37` - Run rag's full test gate covering the new mode, renderer, and doctor tests; `src/vaultspec_rag/tests`.
-- [ ] `W02.P07.S38` - Review both CLIs' install --help output side by side and confirm the --mode flag vocabulary, help text, and doctor row shape are parity-symmetric between vaultspec-core and vaultspec-rag; `src/vaultspec_core/cli/root.py`.
+- [x] `W02.P07.S35` - Add mode-and-floor rows to the doctor output for the vaultspec-rag entry, reading core's per-package mode-mismatch and version-floor collectors; `src/vaultspec_rag/cli/_service_doctor.py`.
+- [x] `W02.P07.S36` - Document the --mode flag, the three provisioning modes, and the shared per-package workspace.json declaration in the installation guide; `docs/installation.md`.
+- [x] `W02.P07.S37` - Run rag's full test gate covering the new mode, renderer, and doctor tests; `src/vaultspec_rag/tests`.
+- [x] `W02.P07.S38` - Review both CLIs' install --help output side by side and confirm the --mode flag vocabulary, help text, and doctor row shape are parity-symmetric between vaultspec-core and vaultspec-rag; `src/vaultspec_core/cli/root.py`.
 - [x] `W02.P07.S39` - resolve each managed MCP definition's render mode from its own declaring package so mixed-mode workspaces sync stably; `src/vaultspec_core/core/mcps.py`.
 - [x] `W02.P07.S40` - parameterize the dependency-leak advisory by package so companion installs name the right distribution; `src/vaultspec_core/core/workspace_mode.py`.
 
