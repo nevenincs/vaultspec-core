@@ -45,6 +45,19 @@ For each `accepted` decision (and each `superseded` / `deprecated` one, inverted
   approach no longer dominates the code. A retired decision still governing the codebase
   is drift.
 
+## Reconcile document-vs-document (lifecycle boundary)
+
+Each fact has one home: research grounds, the ADR decides, audits find. For each feature
+that has an ADR, enumerate its lifecycle documents
+(`vaultspec-core vault list --feature <feature> --json`, or the feature index), read
+them whole, and judge against the boundary:
+
+- An ADR passage whose substance the related research or reference already records is
+  restated grounding, not decision content.
+- Decision language in a research or audit body - a chosen option stated as settled, "we
+  will", a recommendation phrased as the decision - is a displaced decision.
+- The same fact carried by two documents with diverging substance is a forked fact.
+
 ## Conflict taxonomy
 
 Classify every finding into one of these, because the action differs by class:
@@ -63,6 +76,15 @@ Classify every finding into one of these, because the action differs by class:
   successor, or disconnected from the decision graph.
 - **Off-taxonomy or missing status (mechanical).** A status value outside the canonical
   set, or none at all.
+- **Restated grounding (content-preserving).** An ADR re-narrates evidence its grounding
+  documents record, substance identical. Safe to fix.
+- **Displaced decision (content-preserving when homed; judgment when homeless).** A
+  research or audit body records a decision. Safe to fix when an accepted ADR records
+  the same decision; a decision no ADR records is homeless - surface it.
+- **Forked fact (judgment, one exception).** The same fact in two documents with
+  diverging substance. Surface it - except where one side is an accepted ADR's decision
+  and the other a grounding document's recommendation: the ADR is authoritative, and the
+  grounding side is safe to fix.
 
 ## Act: the action for each class
 
@@ -81,11 +103,28 @@ Classify every finding into one of these, because the action differs by class:
   ADR-from-codebase retrofit (legitimate for late-adopting projects), amend the ADR's
   Implementation prose via `vault set-body` / `vault edit` and note it in the audit.
 - **Orphaned or stranded.** Surface in the audit with the graph evidence.
+- **Restated grounding.** Confirm the fact exists in the grounding document; if the ADR
+  is its only home, relocate it into the grounding body first. Then replace the ADR's
+  restatement with a stem citation (e.g. "per `2026-02-04-editor-demo-research`, ...")
+  via body-prose edit. The decision, the option set, the rationale's conclusions, and
+  the consequences must read semantically unchanged afterward; when unsure, propose
+  instead of applying.
+- **Displaced decision.** Where an accepted ADR records the decision, strip the decision
+  language from the research or audit body, leaving a one-line pointer to the ADR stem;
+  keep the evidence and option framing intact. Where no ADR records it, never author one
+  on your own - surface the homeless decision in the audit as an ADR candidate for the
+  human to take through `vaultspec-adr`.
+- **Forked fact.** ADR-vs-grounding: rewrite the grounding side to defer - keep its
+  evidence, drop the contradicted conclusion, point at the ADR stem. Any other fork:
+  record both locations and both readings in the audit; do not pick a winner.
 
 ## Verify
 
 - Re-run `vaultspec-core vault check all` and re-scan the touched ADRs' status and
   edges.
+- After boundary conformance edits, re-read each touched document pair whole and confirm
+  the invariants held: every removed fact still has a home, every citation resolves to a
+  document that carries the cited substance, and no decision changed.
 - Loop until the mechanical classes are clean and every judgment-class finding is
   recorded.
 - Persist the audit via `vaultspec-core vault add audit --feature <feature>`, then
