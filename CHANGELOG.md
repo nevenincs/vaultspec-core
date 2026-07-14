@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.42](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.41...vaultspec-core-v0.1.42) (2026-07-14)
+
+
+### Bug Fixes
+
+* **vault:** honor CommonMark fence-close rules in placeholder check ([8030dbb](https://github.com/nevenincs/vaultspec-core/commit/8030dbb7abcb6d27f6d24e6b512a1a9a65e39812))
+
 ## [0.1.41](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.40...vaultspec-core-v0.1.41) (2026-07-14)
 
 
