@@ -69,6 +69,9 @@ Before persisting, hold the document to this bar:
 - **Specific.** Versions, dates, and numbers pinned; never "popular" or "widely used."
 - **Deduplicated.** Each fact stated once. What a related vault document already records
   is linked, not restated; what an earlier section establishes is not repeated.
+- **Grounding, not deciding.** Frame options, evidence, and trade-offs; at most name the
+  option the evidence favors and what the `<ADR>` must settle. Decisions are recorded
+  only in the `<ADR>`.
 - **Bounded.** Uninvestigated areas stated; unverified general-knowledge claims flagged.
 - **Lean.** Link, do not copy; no hedging boilerplate, no restated prompt, no closing
   summary.

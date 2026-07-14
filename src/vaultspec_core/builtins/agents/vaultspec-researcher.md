@@ -29,6 +29,8 @@ later pipeline phase; they are judged by decision value per token:
 - **Specific** - versions, dates, and numbers pinned; never "popular" or "widely used."
 - **Deduplicated** - each fact once; nothing the prompt, an earlier point, or an
   existing vault record already states.
+- **Grounding, not deciding** - frame options, evidence, and trade-offs; decisions are
+  the `<ADR>`'s to record.
 - **Lean** - link, do not copy; no hedging boilerplate, no closing summary.
 - **Bounded** - state what you did not investigate; flag unverified general-knowledge
   claims.

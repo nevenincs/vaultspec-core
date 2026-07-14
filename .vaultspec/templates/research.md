@@ -28,10 +28,16 @@ related:
        standards as inline backtick locators: `src/module.py:42`, commit
        `abc1234`, `package@1.2.3`, RFC 9110. -->
 
+<!-- DOCUMENT BOUNDARY:
+     Research grounds; the ADR decides. Frame the option space with evidence
+     and trade-offs; at most name the option the evidence favors and what
+     the ADR must settle. Never record the decision here - a decision
+     outside the ADR forks and goes stale when the ADR chooses otherwise. -->
+
 # `{feature}` research: `{topic}`
 
-<!-- Lead: the question, why it matters to `{feature}`, and the conclusion.
-     A reader who stops here knows what was concluded. -->
+<!-- Lead: the question, why it matters to `{feature}`, and what was
+     concluded - the evidence picture, not a decision. -->
 
 ## Findings
 

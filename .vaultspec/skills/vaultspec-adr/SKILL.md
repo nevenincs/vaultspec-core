@@ -47,6 +47,16 @@ Use this skill:
 - **Terminate if related research is not found** and prompt the user to first invoke
   `vaultspec-research`.
 
+## Document boundary
+
+Each fact has one home: the research grounds, the ADR decides. The record cites research
+and reference findings by stem (e.g. `2026-02-04-editor-demo-research`) and never
+restates their evidence - a restated fact forks, bloats agent context, and goes stale
+silently. If drafting surfaces a fact the grounding lacks, add it to the research or
+`<Reference>` first, then cite it. Conversely, the decision lives only here: strip any
+decision language the grounding documents carry into this record rather than duplicating
+it.
+
 ## Workflow
 
 - **Derive from Research:** ADRs should always be preceded by a `vaultspec-research`

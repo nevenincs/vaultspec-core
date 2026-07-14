@@ -36,14 +36,23 @@ related:
 
 # `{feature}` adr: `{title}` | (**status:** `{proposed|accepted|rejected|superseded|deprecated}`)
 
+<!-- DOCUMENT BOUNDARY:
+     This record owns the decision and only the decision. Grounding evidence
+     lives in the related research/reference documents and is cited by stem
+     (e.g. `2026-02-04-editor-demo-research`), never restated - a restated
+     fact forks and goes stale. A fact this record needs but the grounding
+     lacks is added to the grounding first, then cited. -->
+
 ## Problem Statement
 
-<!-- Briefly describe the architectural problem or concern.
-Describe why the ADR is being persisted. Is this a new feature? Result of an audit? -->
+<!-- The problem and why a decision is needed now, in this record's own
+     terms. Do not re-narrate the research's evidence; cite it. -->
 
 ## Considerations
 
-<!-- Key factors, constraints, requirements. Tech/libraries considered. -->
+<!-- Only the forces that bear on the choice, each a terse line citing its
+     grounding by stem or locator. Nothing the research already
+     establishes is re-argued here. -->
 
 ## Considered options
 
@@ -68,7 +77,10 @@ Do not add code; code references must be persisted in a separate `{reference}` d
 
 ## Rationale
 
-<!-- Brief rationale why architecture decision was made. Reference `{research}` findings and grounding `{reference}`. -->
+<!-- Why this option wins against the drivers: a knockout criterion or a
+     clear edge over the alternatives. Cite `{research}` findings and
+     grounding `{reference}` by stem; do not restate them. A new fact
+     surfacing here first belongs in the grounding document. -->
 
 ## Consequences
 

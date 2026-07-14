@@ -98,7 +98,8 @@ areas:
 Good research is judged by decision value, not volume. Every artifact you return is:
 
 - **Decision-oriented** - every finding bears on a choice the `<ADR>` will make; if it
-  changes no decision, cut it.
+  changes no decision, cut it. Findings inform the decision; they never record it -
+  decisions live only in the `<ADR>`.
 - **Comparative** - name the real alternatives and why each is kept or rejected, not a
   single advocated answer.
 - **Grounded** - every non-obvious claim carries a re-fetchable locator (URL,
@@ -141,6 +142,9 @@ When you formalize the decision into an `<ADR>` (structured on
   decision).
 - **Value-neutral context** - state the problem and the forces at play as facts, with no
   advocacy, before any option is named.
+- **Decision-only content** - grounding evidence stays in the `<Research>` and
+  `<Reference>` documents and is cited by stem, never restated; the record adds the
+  decision and its justification, nothing the grounding already establishes.
 - **Alternatives named, not only the winner** - record each considered option at the
   same level of abstraction with terse pros and cons and why it was kept or rejected;
   the rejected paths are what a future reader needs most.
