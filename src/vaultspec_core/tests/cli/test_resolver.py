@@ -66,6 +66,24 @@ def _make_provider(
     )
 
 
+def _signal_warnings(plan: ResolutionPlan) -> list[str]:
+    """Drop context-derived advisories, keeping only signal-driven warnings.
+
+    ``resolve`` reads two advisories from the ambient workspace context rather
+    than the passed diagnosis: the newer-manifest upgrade nudge and the
+    install-parity dependency-leak reminder. When a test runs without an
+    explicit ``target``, ``resolve`` falls back to the real repository context,
+    which is itself declared in dependency mode, so both advisories surface
+    unbidden. Tests asserting that a given diagnosis produces no warnings mean no
+    *signal-driven* warnings, so filter the two context advisories out.
+    """
+    return [
+        w
+        for w in plan.warnings
+        if "Consider upgrading" not in w and "advisory only" not in w
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Framework rules
 # ---------------------------------------------------------------------------
@@ -79,8 +97,7 @@ class TestFrameworkRules:
         plan = resolve(diag, CliAction.INSTALL)
         assert not plan.blocked
         assert plan.steps == []
-        warnings = [w for w in plan.warnings if "Consider upgrading" not in w]
-        assert warnings == []
+        assert _signal_warnings(plan) == []
 
     def test_missing_sync_errors(self):
         diag = _make_diagnosis(framework=FrameworkSignal.MISSING)
@@ -246,8 +263,7 @@ class TestContentRules:
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
         plan = resolve(diag, CliAction.SYNC, provider="claude")
         assert plan.steps == []
-        warnings = [w for w in plan.warnings if "Consider upgrading" not in w]
-        assert warnings == []
+        assert _signal_warnings(plan) == []
 
 
 # ---------------------------------------------------------------------------
