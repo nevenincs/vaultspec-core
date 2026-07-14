@@ -167,11 +167,15 @@ def remove_related_entries(path: Path, targets: list[str]) -> int:
 def append_related_entry(path: Path, wiki_link: str) -> bool:
     """Append a ``[[wiki_link]]`` entry to the ``related:`` YAML field.
 
-    Appends the entry as ``  - '[[stem]]'`` at the end of the existing
-    ``related:`` list block.  If no ``related:`` key exists, one is
-    inserted before the closing ``---`` fence.  If the entry already
-    exists (case-insensitive stem match) the file is left unchanged and
-    ``False`` is returned.
+    Appends the entry at the end of the existing ``related:`` list block,
+    reusing that block's own indentation so the append cannot introduce a
+    mixed-indent (strict-YAML-invalid) sequence; when there is no existing
+    block item to copy from the canonical two-space indent is used.  If no
+    ``related:`` key exists, one is inserted before the closing ``---``
+    fence.  If the entry already exists - matched case-insensitively on the
+    bare stem, so an aliased ``[[stem|Label]]`` entry dedupes a plain
+    ``[[stem]]`` append - the file is left unchanged and ``False`` is
+    returned.
 
     Only the ``related:`` frontmatter block is touched; body text is never
     modified.  CRLF line endings are preserved.
@@ -209,6 +213,7 @@ def append_related_entry(path: Path, wiki_link: str) -> bool:
     in_related = False
     related_idx: int | None = None
     last_related_item_idx: int | None = None
+    last_related_indent: str | None = None
     frontmatter_close_idx: int | None = None
     inline_value: str | None = None
 
@@ -239,12 +244,24 @@ def append_related_entry(path: Path, wiki_link: str) -> bool:
                 else:
                     m = _RELATED_ENTRY_RE.match(line)
                     if m:
-                        # Idempotency check
-                        if m.group(1).lower() == stem.lower():
+                        # Idempotency check on the bare stem: an aliased
+                        # existing entry (`[[foo|Foo]]`) must dedupe against a
+                        # plain `[[foo]]` append, so compare only the stem
+                        # left of any `|` alias pipe.
+                        existing_stem = m.group(1).split("|", 1)[0].strip()
+                        if existing_stem.lower() == stem.lower():
                             return False
                         last_related_item_idx = i
+                        last_related_indent = line[: len(line) - len(line.lstrip())]
 
-    new_entry = f"  - '[[{stem}]]'"
+    # Match the existing block's indentation so the appended item cannot
+    # introduce a mixed-indent block sequence - invalid under strict YAML yet
+    # silently tolerated by the vault's lenient line-stripping readers, which
+    # is how a bad append passes `check` while breaking a strict parser. When
+    # no block item exists to copy from (fresh key, empty list, inline
+    # normalisation) fall back to the canonical two-space indent.
+    indent = last_related_indent if last_related_indent is not None else "  "
+    new_entry = f"{indent}- '[[{stem}]]'"
 
     new_lines = list(lines)
 
