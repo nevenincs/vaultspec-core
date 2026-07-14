@@ -70,8 +70,8 @@ Adopt the full analogue surface in vaultspec-rag once its vaultspec-core floor c
 
 Block the rest of the wave on a released vaultspec-core version that carries the DEV member and schema v2, then bump rag's own vaultspec-core floor to it.
 
-- [ ] `W02.P05.S26` - Verify the released vaultspec-core version on PyPI carries the DEV member and schema v2 API - this step blocks the remainder of the wave; `pyproject.toml`.
-- [ ] `W02.P05.S27` - Bump the vaultspec-core dependency floor and refresh uv.lock to the released version carrying the DEV member and schema v2; `pyproject.toml`.
+- [x] `W02.P05.S26` - Verify the released vaultspec-core version on PyPI carries the DEV member and schema v2 API - this step blocks the remainder of the wave; `pyproject.toml`.
+- [x] `W02.P05.S27` - Bump the vaultspec-core dependency floor and refresh uv.lock to the released version carrying the DEV member and schema v2; `pyproject.toml`.
 
 ### Phase `W02.P06` - rag mode adoption
 
