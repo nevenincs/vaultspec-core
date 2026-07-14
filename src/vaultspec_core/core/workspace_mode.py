@@ -522,55 +522,41 @@ def detect_package_evidence(pyproject: Path, package: str) -> DependencyEvidence
     return DependencyEvidence.NONE
 
 
-def _pyproject_declares_vaultspec_dependency(pyproject: Path) -> bool:
-    """Return whether ``vaultspec-core`` has any detectable placement.
-
-    Backward-compatible boolean shim over :func:`detect_package_evidence`,
-    collapsing the three-valued placement taxonomy to the presence-or-absence
-    answer the two-mode resolver consumed before the ``dev`` placement was
-    distinguished. Any evidence (runtime or dev) reads as ``True``.
-
-    Args:
-        pyproject: Path to the target's ``pyproject.toml``.
-
-    Returns:
-        ``True`` if any dependency set lists ``vaultspec-core``.
-    """
-    return (
-        detect_package_evidence(pyproject, _DISTRIBUTION_NAME)
-        is not DependencyEvidence.NONE
-    )
-
-
 def resolve_install_mode(
     target: Path,
     explicit: InstallMode | None = None,
+    package: str = _DISTRIBUTION_NAME,
 ) -> InstallMode:
-    """Resolve the effective provisioning mode via the Q5 precedence chain.
+    """Resolve *package*'s effective provisioning mode via the Q5 precedence chain.
 
     Precedence, highest first:
 
     1. *explicit* - the ``--mode`` flag, when supplied.
-    2. The persisted committed declaration
-       (:func:`read_workspace_declaration`), when one exists.
+    2. The persisted committed declaration for *package*
+       (:func:`read_package_declaration`), when one exists.
     3. Detection against the target's ``pyproject.toml``.
     4. The default, :attr:`~vaultspec_core.core.enums.InstallMode.TOOL`.
 
-    Detection reads two signals: the absence of any ``pyproject.toml`` forces
-    :attr:`~vaultspec_core.core.enums.InstallMode.TOOL` because nothing exists to
-    resolve a dependency against; the presence of ``vaultspec-core`` in the
-    project's dependencies or any dev-dependency group is evidence of deliberate
-    :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY` mode. Absent both,
-    the default tool mode stands.
+    Detection classifies *package*'s placement through
+    :func:`detect_package_evidence` and maps each evidence state to a mode:
+    runtime-leaking placement (project or optional dependencies) resolves to
+    :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY`, default-dev-group
+    placement resolves to the non-leaking
+    :attr:`~vaultspec_core.core.enums.InstallMode.DEV`, and no detectable
+    placement leaves the tool-mode default standing. The absence of any
+    ``pyproject.toml`` forces :attr:`~vaultspec_core.core.enums.InstallMode.TOOL`
+    because nothing exists to resolve a placement against.
 
-    Only impossible combinations refuse. Requesting
-    :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY` in a target with no
-    ``pyproject.toml`` has nothing to resolve the dependency against and raises,
+    Only impossible combinations refuse. Requesting either
+    :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY` or
+    :attr:`~vaultspec_core.core.enums.InstallMode.DEV` in a target with no
+    ``pyproject.toml`` has nothing to resolve a placement against and raises,
     rather than silently falling back to tool mode and deferring the failure to
-    hook or MCP runtime. An explicit mode that merely differs from detection
-    evidence - a ``pyproject.toml`` exists but does not yet list
-    ``vaultspec-core`` while ``--mode dependency`` is requested - is permitted,
-    since the contributor may be about to add the dependency.
+    hook or MCP runtime; both modes are declared placements inside a project
+    manifest and neither is expressible without one. An explicit mode that merely
+    differs from detection evidence - a ``pyproject.toml`` exists but does not yet
+    list *package* while ``--mode dependency`` or ``--mode dev`` is requested - is
+    permitted, since the contributor may be about to add the placement.
 
     The persisted declaration is read and validated once at the top, regardless
     of which precedence branch resolves the mode. This makes a corrupt
@@ -585,15 +571,20 @@ def resolve_install_mode(
         target: Workspace root directory.
         explicit: The mode requested via ``--mode``, or ``None`` to fall through
             to the persisted declaration, detection, and default in turn.
+        package: Distribution name to resolve the mode for; defaults to
+            ``vaultspec-core``. Threaded so a companion package (for example
+            ``vaultspec-rag``) resolves its own entry and its own detection
+            evidence through the same precedence chain.
 
     Returns:
         The resolved :class:`~vaultspec_core.core.enums.InstallMode`.
 
     Raises:
         VaultSpecError: If *explicit* is
-            :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY` but the
-            target has no ``pyproject.toml``, or if a present declaration is
-            malformed (propagated from :func:`read_workspace_declaration`).
+            :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY` or
+            :attr:`~vaultspec_core.core.enums.InstallMode.DEV` but the target has
+            no ``pyproject.toml``, or if a present declaration is malformed
+            (propagated from :func:`read_package_declaration`).
     """
     pyproject = target / "pyproject.toml"
     has_pyproject = pyproject.is_file()
@@ -602,12 +593,13 @@ def resolve_install_mode(
     # surfaces fail-fast rather than mid-provision. An explicit request still
     # outranks the parsed value; the read is for validation and the persisted
     # precedence branch below.
-    declaration = read_workspace_declaration(target)
+    declaration = read_package_declaration(target, package)
 
     if explicit is not None:
-        if explicit is InstallMode.DEPENDENCY and not has_pyproject:
+        if explicit in (InstallMode.DEPENDENCY, InstallMode.DEV) and not has_pyproject:
             raise VaultSpecError(
-                f"Cannot provision in dependency mode: no pyproject.toml at {target}.",
+                f"Cannot provision in {explicit.value} mode: "
+                f"no pyproject.toml at {target}.",
                 hint="Add a pyproject.toml that declares vaultspec-core as a "
                 "dependency, or re-run with '--mode tool'.",
             )
@@ -618,8 +610,11 @@ def resolve_install_mode(
 
     if not has_pyproject:
         return InstallMode.TOOL
-    if _pyproject_declares_vaultspec_dependency(pyproject):
+    evidence = detect_package_evidence(pyproject, package)
+    if evidence is DependencyEvidence.RUNTIME:
         return InstallMode.DEPENDENCY
+    if evidence is DependencyEvidence.DEV:
+        return InstallMode.DEV
     return InstallMode.TOOL
 
 

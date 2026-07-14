@@ -184,9 +184,10 @@ class TestDetectionSignals:
 
         assert resolve_install_mode(factory.root) is InstallMode.DEPENDENCY
 
-    def test_vaultspec_in_dependency_group_is_dependency_evidence(self, factory):
-        # PEP 735 dependency group, underscore spelling, mixed with an
-        # unrelated requirement: the probe still recognizes the distribution.
+    def test_vaultspec_in_default_dev_group_is_dev_evidence(self, factory):
+        # PEP 735 default dev group, underscore spelling, mixed with an
+        # unrelated requirement: the probe recognizes the distribution as
+        # dev-scoped, non-leaking placement and resolves to DEV, not DEPENDENCY.
         (factory.root / "pyproject.toml").write_text(
             '[project]\nname = "example"\nversion = "0.0.0"\n\n'
             "[dependency-groups]\n"
@@ -194,7 +195,7 @@ class TestDetectionSignals:
             encoding="utf-8",
         )
 
-        assert resolve_install_mode(factory.root) is InstallMode.DEPENDENCY
+        assert resolve_install_mode(factory.root) is InstallMode.DEV
 
     def test_pyproject_without_vaultspec_defaults_to_tool(self, factory):
         # A pyproject that exists but does not list vaultspec-core is the
