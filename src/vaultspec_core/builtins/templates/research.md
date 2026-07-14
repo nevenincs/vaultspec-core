@@ -23,15 +23,32 @@ related:
 
 <!-- LINK RULES:
      - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
-     - NEVER use [[wiki-links]] or markdown links in the document body.
-     - NEVER reference file paths in the body. If you must name a source file,
-       class, or function, use inline backtick code: `src/module.py`. -->
+     - NEVER use [[wiki-links]] or markdown [label](path) links in the document body.
+     - Cite external sources as bare URLs. Cite code, commits, packages, and
+       standards as inline backtick locators: `src/module.py:42`, commit
+       `abc1234`, `package@1.2.3`, RFC 9110. -->
 
 # `{feature}` research: `{topic}`
 
-<!-- Brief description of what was researched, why, and how it relates to
-`{feature}`. -->
+<!-- Lead paragraph: the question researched, why it matters to `{feature}`,
+     and the answer or recommendation stated up front. A reader who stops
+     here learns what was concluded, not merely what was attempted. -->
 
 ## Findings
 
-<!-- Adapt format based on content. -->
+<!-- One ### subsection per line of inquiry. Claim first: open each finding
+     with its conclusion, follow with the minimal evidence that supports it,
+     and anchor every non-obvious claim to a re-fetchable locator (URL,
+     `file:line`, commit SHA, `package@version`, RFC number).
+     Density rules: link, do not copy - never paste excerpts a reader can
+     re-fetch; pin versions, dates, and numbers instead of "popular" or
+     "widely used"; cut anything that changes no downstream decision; no
+     hedging filler, no restated prompt, no closing summary repeating the
+     body. Name the alternatives weighed and why each was kept or rejected,
+     and state what was not investigated. -->
+
+## Sources
+
+<!-- Every locator cited above, collected and re-fetchable: code as
+     `path:line` backtick locators, external references as bare URLs.
+     Mark claims taken from general knowledge and not re-verified. -->
