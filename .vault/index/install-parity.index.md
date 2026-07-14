@@ -18,6 +18,7 @@ related:
   - '[[2026-07-14-install-parity-W01-P02-S10]]'
   - '[[2026-07-14-install-parity-W01-P02-S11]]'
   - '[[2026-07-14-install-parity-W01-P02-S12]]'
+  - '[[2026-07-14-install-parity-W01-P02-S13]]'
   - '[[2026-07-14-install-parity-adr]]'
   - '[[2026-07-14-install-parity-plan]]'
   - '[[2026-07-14-install-parity-research]]'
@@ -47,6 +48,7 @@ Auto-generated index of all documents tagged with `#install-parity`.
 - `2026-07-14-install-parity-W01-P02-S10` - Accept dev as a valid --mode token for cmd_install and update its help text to document all three provisioning modes
 - `2026-07-14-install-parity-W01-P02-S11` - Add a warn-only dependency-leak advisory to resolve() that appends a plan warning when a package's declared mode is DEPENDENCY, never refusing the placement
 - `2026-07-14-install-parity-W01-P02-S12` - Add DEV precedence and dev-group detection tests covering both packages and the mixed dependency-plus-dev-group configuration
+- `2026-07-14-install-parity-W01-P02-S13` - Add resolver tests asserting the dependency-leak advisory fires for a DEPENDENCY-mode package and stays silent for TOOL or DEV mode
 
 ### plan
 

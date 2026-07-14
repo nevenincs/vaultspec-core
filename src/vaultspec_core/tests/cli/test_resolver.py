@@ -19,8 +19,12 @@ from vaultspec_core.core.diagnosis.signals import (
     ProviderDirSignal,
     ResolutionAction,
 )
-from vaultspec_core.core.enums import CliAction, Tool
+from vaultspec_core.core.enums import CliAction, InstallMode, Tool
 from vaultspec_core.core.resolver import ResolutionPlan, resolve
+from vaultspec_core.core.workspace_mode import (
+    PackageDeclaration,
+    write_package_declaration,
+)
 
 pytestmark = [pytest.mark.unit]
 
@@ -562,3 +566,83 @@ class TestUntrackedUninstall:
         assert not plan.blocked
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.REMOVE in actions
+
+
+# ---------------------------------------------------------------------------
+# Dependency-leak advisory
+# ---------------------------------------------------------------------------
+
+_LEAK_MARKER = "ships it into built distributions"
+
+
+def _has_leak_advisory(plan: ResolutionPlan) -> bool:
+    """Return whether the dependency-leak advisory is present in the plan."""
+    return any(_LEAK_MARKER in w for w in plan.warnings)
+
+
+class TestDependencyLeakAdvisory:
+    """The warn-only dependency-leak advisory per install-parity ADR D3.
+
+    Each case passes an explicit ``target`` at a factory workspace with a
+    written declaration, so the advisory is exercised deterministically against
+    a known mode rather than the ambient repository context.
+    """
+
+    def test_dependency_mode_emits_advisory_on_sync(self, factory):
+        write_package_declaration(
+            factory.root, "vaultspec-core", PackageDeclaration(InstallMode.DEPENDENCY)
+        )
+        plan = resolve(_make_diagnosis(), CliAction.SYNC, target=factory.root)
+        assert _has_leak_advisory(plan)
+
+    def test_dependency_mode_emits_advisory_on_install(self, factory):
+        write_package_declaration(
+            factory.root, "vaultspec-core", PackageDeclaration(InstallMode.DEPENDENCY)
+        )
+        plan = resolve(_make_diagnosis(), CliAction.INSTALL, target=factory.root)
+        assert _has_leak_advisory(plan)
+
+    def test_dependency_mode_never_refuses(self, factory):
+        write_package_declaration(
+            factory.root, "vaultspec-core", PackageDeclaration(InstallMode.DEPENDENCY)
+        )
+        plan = resolve(_make_diagnosis(), CliAction.SYNC, target=factory.root)
+        assert not plan.blocked
+
+    def test_tool_mode_is_silent(self, factory):
+        write_package_declaration(
+            factory.root, "vaultspec-core", PackageDeclaration(InstallMode.TOOL)
+        )
+        plan = resolve(_make_diagnosis(), CliAction.SYNC, target=factory.root)
+        assert not _has_leak_advisory(plan)
+
+    def test_dev_mode_is_silent(self, factory):
+        write_package_declaration(
+            factory.root, "vaultspec-core", PackageDeclaration(InstallMode.DEV)
+        )
+        plan = resolve(_make_diagnosis(), CliAction.SYNC, target=factory.root)
+        assert not _has_leak_advisory(plan)
+
+    def test_absent_declaration_is_silent(self, factory):
+        # A workspace with no declaration must not be nagged: the advisory reads
+        # the actual declared mode, not the legacy-absent dependency-mode bridge.
+        plan = resolve(_make_diagnosis(), CliAction.SYNC, target=factory.root)
+        assert not _has_leak_advisory(plan)
+
+    def test_doctor_action_is_silent_even_in_dependency_mode(self, factory):
+        # Doctor returns the empty plan before any rule runs, so the advisory
+        # cannot enter doctor output or shift its exit weighting.
+        write_package_declaration(
+            factory.root, "vaultspec-core", PackageDeclaration(InstallMode.DEPENDENCY)
+        )
+        plan = resolve(_make_diagnosis(), CliAction.DOCTOR, target=factory.root)
+        assert not _has_leak_advisory(plan)
+
+    def test_uninstall_does_not_emit_advisory(self, factory):
+        # The advisory is gated to provisioning actions; advising about a leak
+        # while removing the workspace would be noise.
+        write_package_declaration(
+            factory.root, "vaultspec-core", PackageDeclaration(InstallMode.DEPENDENCY)
+        )
+        plan = resolve(_make_diagnosis(), CliAction.UNINSTALL, target=factory.root)
+        assert not _has_leak_advisory(plan)
