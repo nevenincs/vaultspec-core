@@ -1,5 +1,63 @@
 # Changelog
 
+## [0.1.38](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.37...vaultspec-core-v0.1.38) (2026-07-14)
+
+
+### Features
+
+* **builtins:** amend-first ADR doctrine - one governing record per decision ([dc27844](https://github.com/nevenincs/vaultspec-core/commit/dc27844d971076ba6c83cf146c0515dede456a0d))
+* **builtins:** teach curate to enforce the single-home-fact boundary ([d74188f](https://github.com/nevenincs/vaultspec-core/commit/d74188fa1db50cbfe08b5d5814ce1c3749979a0b))
+* **cli:** document dev provisioning mode in install --mode help (install-parity W01.P02.S10) ([e0232f9](https://github.com/nevenincs/vaultspec-core/commit/e0232f907bf03f0230e55d6a6b8558ab32975ae0))
+* **core:** add collect_mode_mismatch_state and wire into diagnose (install-mode P04.S20) ([cf5def2](https://github.com/nevenincs/vaultspec-core/commit/cf5def21d907bdbba709735699d8b8deacea02a6))
+* **core:** add committed workspace mode declaration (install-mode P01.S02) ([867f36b](https://github.com/nevenincs/vaultspec-core/commit/867f36bf347a4c0d96c710f574d283218c780d45))
+* **core:** add install --mode flag and resolve/persist provisioning mode (install-mode P02.S06) ([d9b8d83](https://github.com/nevenincs/vaultspec-core/commit/d9b8d83de1b623d9254946e64a73456b092e3168))
+* **core:** add InstallMode enum (install-mode P01.S01) ([732c95e](https://github.com/nevenincs/vaultspec-core/commit/732c95eeaab334fb2cfa4cb7d6f9ab4f5730e5f9))
+* **core:** add InstallMode.DEV dev-scoped placement member (install-parity W01.P01.S01) ([9e0aa36](https://github.com/nevenincs/vaultspec-core/commit/9e0aa36046c376719c019002bccb3bce5a8c4600))
+* **core:** add ModeMismatchSignal enum (install-mode P04.S18) ([358b7d2](https://github.com/nevenincs/vaultspec-core/commit/358b7d21c091e53d5c307a76ad6969824559060f))
+* **core:** add PackageDeclaration and bump workspace schema to 2.0 (install-parity W01.P01.S03) ([b517fa4](https://github.com/nevenincs/vaultspec-core/commit/b517fa424aa5d2ba9a0042b9063e61bdfe0f3dcd))
+* **core:** add per-package read/write helpers preserving siblings (install-parity W01.P01.S06) ([56395a9](https://github.com/nevenincs/vaultspec-core/commit/56395a97b4ede3661fdec028aa3d75408c6c2bd9))
+* **core:** add render_mode aliasing helper collapsing DEV onto DEPENDENCY (install-parity W01.P01.S02) ([359a605](https://github.com/nevenincs/vaultspec-core/commit/359a6054ff10586774d64569e27537f137ef39f6))
+* **core:** add resolve_install_mode Q5 precedence chain and pyproject dependency probe (install-mode P02.S07) ([15eb133](https://github.com/nevenincs/vaultspec-core/commit/15eb1337ad4c233439de01d953fd4ebb1e9b9536))
+* **core:** echo resolved mode and floor in manifest (install-mode P01.S03) ([dad70a2](https://github.com/nevenincs/vaultspec-core/commit/dad70a20be7970fa6add0a247d161d2e68899e87))
+* **core:** enforce minimum_vaultspec_version floor constraint (install-mode P04.S22) ([43e23bd](https://github.com/nevenincs/vaultspec-core/commit/43e23bd292f5feda815b33e9531a5fd645d3a2a8))
+* **core:** infer and persist mode on install --upgrade (install-mode P05.S26) ([127d8f1](https://github.com/nevenincs/vaultspec-core/commit/127d8f19ac0b722faca91ba5285e70ae8ccbc54a))
+* **core:** install-parity W01 - DEV mode, per-package workspace declaration, parity renderers ([2bb9a9a](https://github.com/nevenincs/vaultspec-core/commit/2bb9a9a8692d35d079f16b9b70fc48be1b3ef58c))
+* **core:** key precommit scaffold render mode to core's own entry (install-parity W01.P03.S16) ([c089e8e](https://github.com/nevenincs/vaultspec-core/commit/c089e8e6f1c8bd93e741e0ee938fd9594e8ea281))
+* **core:** make builtin MCP definition mode-neutral via placeholder tokens (install-mode P03.S12) ([381a125](https://github.com/nevenincs/vaultspec-core/commit/381a1256d894af87ad8b24513720313f1771713c))
+* **core:** make canonical hook prefix and entries functions of install mode (install-mode P03.S14) ([30d4307](https://github.com/nevenincs/vaultspec-core/commit/30d4307c9f027b117045e27733ef43492eb940bd))
+* **core:** mode-aware provisioning - tool-first install (install-mode) ([b668e27](https://github.com/nevenincs/vaultspec-core/commit/b668e2769ce31dbadd53a4a985003d6e96877082))
+* **core:** package-aware resolve_install_mode with DEV precedence (install-parity W01.P02.S09) ([17bdf48](https://github.com/nevenincs/vaultspec-core/commit/17bdf48c05909538e0f64a068cf9548ed638ad02))
+* **core:** parameterize the MCP launch by package and module (install-parity W01.P03.S28) ([d89e7f9](https://github.com/nevenincs/vaultspec-core/commit/d89e7f9bb305f3c925b775994166b5606350d9b6))
+* **core:** parse v2 packages map with legacy v1 read-fold (install-parity W01.P01.S04) ([c8f1a4f](https://github.com/nevenincs/vaultspec-core/commit/c8f1a4ff1d8173bc65aa7af74fcb039747bcaf4c))
+* **core:** placement-aware dependency detection taxonomy (install-parity W01.P02.S08) ([292d688](https://github.com/nevenincs/vaultspec-core/commit/292d68843c09cc664db13c12401fad0d4e0970e6))
+* **core:** render doctor install-mode and floor rows per declared package (install-parity W01.P03.S18) ([19ad807](https://github.com/nevenincs/vaultspec-core/commit/19ad807194a99492782adc8de2cb6f209f30e670))
+* **core:** render MCP launch through the generalized helper (install-parity W01.P03.S15) ([c2f6023](https://github.com/nevenincs/vaultspec-core/commit/c2f6023941843d23a4d941b73c7a8a6521f10ce2))
+* **core:** render pre-commit hooks for the resolved install mode (install-mode P03.S15) ([494e8ad](https://github.com/nevenincs/vaultspec-core/commit/494e8adfcdf73ca078bc040067a743df7e26119e))
+* **core:** render the MCP definition for the resolved install mode (install-mode P03.S13) ([e09c5f7](https://github.com/nevenincs/vaultspec-core/commit/e09c5f777223e4185be0883368b0877417d7a3ec))
+* **core:** resolve install mode via Q5 precedence with loud conflict refusal (install-mode P02.S08) ([d3c82a4](https://github.com/nevenincs/vaultspec-core/commit/d3c82a4b42a6d6c7497697af17e963e8547f2482))
+* **core:** resolve mode mismatch and mode-aware precommit advisory (install-mode P04.S21) ([fe42635](https://github.com/nevenincs/vaultspec-core/commit/fe42635276c4a7eb3b177773d8a2500a15fe800d))
+* **core:** resolve_render_mode reads a package's own entry (install-parity W01.P03.S14) ([8b1b0ef](https://github.com/nevenincs/vaultspec-core/commit/8b1b0ef1c11355df586670324be5755c786f5627))
+* **core:** route upgrade-mode helpers through the per-package API (install-parity W01.P03.S19) ([b3b0c78](https://github.com/nevenincs/vaultspec-core/commit/b3b0c78a9375c832d9f28ea12b472cf8c10f77f3))
+* **core:** serialize canonical v2 packages map preserving siblings (install-parity W01.P01.S05) ([83dd6a1](https://github.com/nevenincs/vaultspec-core/commit/83dd6a145e46f23fcd609ea1c7cc8bc2d3cebe1d))
+* **core:** thread mode_mismatch field through diagnose (install-mode P04.S19) ([9b56f0f](https://github.com/nevenincs/vaultspec-core/commit/9b56f0f797f9be80b3819668360e2379183eb56d))
+* **core:** warn-only dependency-leak advisory at provision time (install-parity W01.P02.S11) ([8cc87db](https://github.com/nevenincs/vaultspec-core/commit/8cc87dbae6fcb596c5918cdf709b5fdb07a7eba8))
+
+
+### Bug Fixes
+
+* **builtins:** mandate single-home facts across the document boundary ([78f2e42](https://github.com/nevenincs/vaultspec-core/commit/78f2e4258356916398602fc0d4837f41d2f3abae))
+* **builtins:** raise the research-artifact density and sourcing bar ([837b640](https://github.com/nevenincs/vaultspec-core/commit/837b640d4049e55e950db40de22d4f7b479b468f))
+* **builtins:** word many-ADRs-to-one-plan cardinality into the plan surfaces ([4266e8c](https://github.com/nevenincs/vaultspec-core/commit/4266e8ce6ea5e0af15e20ac175beb96fae998cbe))
+* **core:** add unit coverage for install-mode refusal path (install-mode P02 review) ([f6ffde8](https://github.com/nevenincs/vaultspec-core/commit/f6ffde8c1fe45bbd664a581ea82f1727b263d3e7))
+* **core:** fire dependency-leak advisory only at moment of choice (install-parity W01.P02 review) ([a715e85](https://github.com/nevenincs/vaultspec-core/commit/a715e8565fd46b51b678433484c2403be9dad326))
+* **core:** force managed MCP entry on mode-flip upgrade (install-mode follow-up) ([a44e8b6](https://github.com/nevenincs/vaultspec-core/commit/a44e8b6c564d6f6b2f23c47e275a0c9b1d7f39f6))
+* **core:** force managed MCP entry on mode-flip upgrade; declare repo version floor ([d2a0f45](https://github.com/nevenincs/vaultspec-core/commit/d2a0f459be59b065a73af0e05d660f6b9afd2e28))
+* **core:** per-package mode-mismatch and floor collectors, dev renders clean (install-parity W01.P03.S17) ([58d7b73](https://github.com/nevenincs/vaultspec-core/commit/58d7b73b04d597b4ac02080222d366e7639c9157))
+* **core:** render MCP registry for resolved mode in doctor drift check (install-mode P03 review) ([8e72b6e](https://github.com/nevenincs/vaultspec-core/commit/8e72b6ec1f99dc4959b4eaac6e75444188f03cc2))
+* **core:** route preflight resolve() refusals through clean error handler (install-mode P04 review) ([ff75f3a](https://github.com/nevenincs/vaultspec-core/commit/ff75f3a3f923ef46541de0cb58952543ca9a0df0))
+* **core:** surface mode-mismatch and floor signals on doctor via shared evaluator (install-mode P04 review) ([d4c8f63](https://github.com/nevenincs/vaultspec-core/commit/d4c8f634834104f558b3e6c6867b0908f9d57747))
+* **core:** validate persisted declaration fail-fast in resolve_install_mode (install-mode P02 review) ([c721a77](https://github.com/nevenincs/vaultspec-core/commit/c721a77496d5b43940d790e76622b4f9982e1e40))
+
 ## [0.1.37](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.36...vaultspec-core-v0.1.37) (2026-07-10)
 
 
