@@ -98,9 +98,13 @@ See the [CLI reference](./docs/CLI.md) for installation options.
 Install picks a mode for how the pre-commit hooks and the MCP server launch. Tool mode
 is the default and runs vaultspec-core through `uvx`, so it never enters your project's
 dependency set; dependency mode runs it through `uv run` and is selected automatically
-when your `pyproject.toml` lists vaultspec-core. Pin either with `install --mode tool`
-or `install --mode dependency`. An existing workspace has its mode inferred and recorded
-the next time you run `install --upgrade`.
+when your `pyproject.toml` lists vaultspec-core; dev mode is for placement in the
+default `dev` dependency group, rendering like dependency mode but not shipping in your
+built distributions. Pin any with `install --mode tool`, `install --mode dependency`, or
+`install --mode dev`. The choice is recorded per package in a committed
+`workspace.json`, so a workspace running vaultspec-core alongside a companion package
+can declare each in its own mode. An existing workspace has its mode inferred and
+recorded the next time you run `install --upgrade`.
 
 ### 3. Sync
 

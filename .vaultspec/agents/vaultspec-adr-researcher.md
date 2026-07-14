@@ -78,8 +78,8 @@ areas:
   then confirm exact symbols with grep. Close decision recall by listing `.vault/adr/`
   and filtering by feature, since search misses lower-ranked records. Where
   `vaultspec-rag` is not installed, the `vaultspec-core` discovery verbs and grep carry
-  the same sequence. Architect on top of existing decisions and supersede them
-  explicitly rather than contradicting them silently.
+  the same sequence. Architect on top of existing decisions; refine them by amending in
+  place, pivot by explicit supersession, and never contradict them silently.
 
 - **Identity Phase**: Resolve exact library IDs and repository links using web and
   package metadata tools.
@@ -98,7 +98,8 @@ areas:
 Good research is judged by decision value, not volume. Every artifact you return is:
 
 - **Decision-oriented** - every finding bears on a choice the `<ADR>` will make; if it
-  changes no decision, cut it.
+  changes no decision, cut it. Findings inform the decision; they never record it -
+  decisions live only in the `<ADR>`.
 - **Comparative** - name the real alternatives and why each is kept or rejected, not a
   single advocated answer.
 - **Grounded** - every non-obvious claim carries a re-fetchable locator (URL,
@@ -122,6 +123,8 @@ spend tokens only where they change a decision.
   never paste long excerpts a reader can re-fetch.
 - **One pass** - no restating the prompt, no hedging boilerplate, no closing summary
   that repeats the body.
+- **Once** - each fact stated once; link what an existing vault record or an earlier
+  section already establishes instead of restating it.
 - **Technical-reader default** - define a term once; assume competence.
 
 Source persistence is the mechanism that keeps the artifact lean: external sources live
@@ -134,11 +137,17 @@ remaining fully traceable.
 When you formalize the decision into an `<ADR>` (structured on
 `.vaultspec/templates/adr.md`), the same writing style applies and the record is:
 
-- **One decision per record** - one architecturally significant choice; immutable once
-  accepted (supersede via `vaultspec-core vault adr supersede`, never edit a settled
-  decision).
+- **One decision per record, one record per decision** - one architecturally significant
+  choice, kept current in place. Refinements, concretization, and implementation-driven
+  parameter changes amend the accepted record's body (the `modified:` stamp carries the
+  revision); a new ADR - superseding via `vaultspec-core vault adr supersede` - is
+  reserved for a major pivot, where the decision reverses or the old rationale no longer
+  supports the choice. Never pile refinements onto a decision as sibling ADRs.
 - **Value-neutral context** - state the problem and the forces at play as facts, with no
   advocacy, before any option is named.
+- **Decision-only content** - grounding evidence stays in the `<Research>` and
+  `<Reference>` documents and is cited by stem, never restated; the record adds the
+  decision and its justification, nothing the grounding already establishes.
 - **Alternatives named, not only the winner** - record each considered option at the
   same level of abstraction with terse pros and cons and why it was kept or rejected;
   the rejected paths are what a future reader needs most.

@@ -233,9 +233,12 @@ def cmd_install(
         typer.Option(
             "--mode",
             help=(
-                "Provisioning mode: 'tool' (default, launched via uvx) or "
-                "'dependency' (resolved through the project's own venv). "
-                "Auto-detected from pyproject.toml when omitted."
+                "Provisioning mode: 'tool' (default, launched via uvx), "
+                "'dependency' (a runtime project dependency resolved through the "
+                "project's own venv, ships in built distributions), or 'dev' "
+                "(the default dev dependency group; renders like dependency but "
+                "does not ship in built distributions). Auto-detected from "
+                "pyproject.toml when omitted."
             ),
         ),
     ] = None,
@@ -311,6 +314,17 @@ def cmd_install(
         _handle_error(exc, json_output=json_output)
         return  # unreachable, but satisfies type checker
 
+    # Surface the moment-of-choice dependency-leak advisory (install-parity ADR
+    # D3): install_run emits it only when this run newly elects dependency mode,
+    # so a persisted-declaration workspace stays silent. On the JSON path it
+    # rides in the result envelope below rather than the human console.
+    if not json_output:
+        from vaultspec_core.console import get_console
+
+        _console = get_console()
+        for warning in result.get("warnings", []):
+            _console.print(f"  [yellow]![/yellow] {warning}")
+
     # The upgrade path re-seeds bundled builtins. Per the
     # cli-sync-vocabulary ADR it reports per-builtin canonical outcomes
     # (created/updated/unchanged) through the shared renderer instead of
@@ -353,7 +367,7 @@ def cmd_install(
             command="install",
             title=title,
             json_output=json_output,
-            extra_json={"version": version},
+            extra_json={"version": version, "warnings": result.get("warnings", [])},
             hints=hint_dict,
         )
         # Surface the new sharing policy when this upgrade carried the

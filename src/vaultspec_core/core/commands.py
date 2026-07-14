@@ -15,12 +15,19 @@ import subprocess
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
 from . import types as _t
-from .enums import InstallMode, ManagedState, PrecommitHook, ProviderCapability, Tool
+from .enums import (
+    InstallMode,
+    ManagedState,
+    PrecommitHook,
+    ProviderCapability,
+    Tool,
+    render_mode,
+)
 from .exceptions import (
     ProviderError,
     ProviderNotInstalledError,
@@ -53,6 +60,9 @@ from .manifest import (
     remove_provider,
     write_manifest_data,
 )
+
+if TYPE_CHECKING:
+    from .workspace_mode import ResolvedMode
 
 logger = logging.getLogger(__name__)
 
@@ -120,13 +130,17 @@ def _persist_resolved_mode(path: Path, mdata: ManifestData, mode: InstallMode) -
 
 
 def _write_mode_declaration(path: Path, mode: InstallMode) -> str | None:
-    """Write the committed mode declaration, preserving any existing floor.
+    """Write core's committed mode entry, preserving its floor and any siblings.
 
-    The provisioning mode and the ``minimum_vaultspec_version`` floor are
-    independent axes of the same committed declaration, so rewriting the mode
-    must never drop a floor a prior run recorded. The write is deterministic
-    (sorted keys, fixed indent) so re-writing the same mode leaves byte-identical
-    content, which is what makes a repeated ``install --upgrade`` idempotent.
+    Reads and writes only ``vaultspec-core``'s own entry in the shared
+    per-package map through the per-package helpers, so a companion package's
+    entry (for example ``vaultspec-rag``) is never touched when core's mode is
+    rewritten. The provisioning mode and the per-package ``minimum_version``
+    floor are independent axes of the same entry, so rewriting the mode must
+    never drop a floor a prior run recorded. :func:`write_package_declaration`'s
+    read-modify-write under the advisory lock is deterministic (sorted keys,
+    fixed indent), so re-writing the same mode leaves byte-identical content,
+    which is what makes a repeated ``install --upgrade`` idempotent.
 
     Args:
         path: Workspace root directory.
@@ -137,21 +151,23 @@ def _write_mode_declaration(path: Path, mode: InstallMode) -> str | None:
         declaration into the manifest need not re-read it.
     """
     from .workspace_mode import (
-        WorkspaceDeclaration,
-        read_workspace_declaration,
-        write_workspace_declaration,
+        CORE_DISTRIBUTION_NAME,
+        PackageDeclaration,
+        read_package_declaration,
+        write_package_declaration,
     )
 
-    existing = read_workspace_declaration(path)
-    floor = existing.minimum_vaultspec_version if existing is not None else None
-    write_workspace_declaration(
+    existing = read_package_declaration(path, CORE_DISTRIBUTION_NAME)
+    floor = existing.minimum_version if existing is not None else None
+    write_package_declaration(
         path,
-        WorkspaceDeclaration(install_mode=mode, minimum_vaultspec_version=floor),
+        CORE_DISTRIBUTION_NAME,
+        PackageDeclaration(install_mode=mode, minimum_version=floor),
     )
     return floor
 
 
-def _infer_upgrade_mode(target: Path, explicit: InstallMode | None) -> InstallMode:
+def _infer_upgrade_mode(target: Path, explicit: InstallMode | None) -> ResolvedMode:
     """Infer the provisioning mode for an ``install --upgrade`` (ADR Q6).
 
     Precedence mirrors provision-time resolution at its top: an explicit
@@ -167,33 +183,45 @@ def _infer_upgrade_mode(target: Path, explicit: InstallMode | None) -> InstallMo
     diagnosis can never disagree on what a deployed artifact shape means - the
     ``install-mode`` constraint against introducing a second comparator.
 
+    The returned :class:`~vaultspec_core.core.workspace_mode.ResolvedMode`
+    carries provenance so the caller can fire the dependency-leak advisory only
+    when this upgrade newly *infers* dependency mode for a legacy workspace, not
+    when it reads an already-persisted dependency declaration.
+
     Args:
         target: Workspace root directory.
         explicit: The mode requested via ``--mode``, or ``None``.
 
     Returns:
-        The inferred :class:`~vaultspec_core.core.enums.InstallMode` to persist
-        and render against for this upgrade.
+        The inferred mode paired with its
+        :class:`~vaultspec_core.core.workspace_mode.ModeProvenance`.
 
     Raises:
         VaultSpecError: Propagated from
-            :func:`~vaultspec_core.core.workspace_mode.resolve_install_mode` when
-            *explicit* names an impossible combination or a persisted declaration
-            is malformed.
+            :func:`~vaultspec_core.core.workspace_mode.resolve_install_mode_with_provenance`
+            when *explicit* names an impossible combination or a persisted
+            declaration is malformed.
     """
     from .diagnosis.collectors import _observed_precommit_mode
-    from .workspace_mode import read_workspace_declaration, resolve_install_mode
+    from .workspace_mode import (
+        CORE_DISTRIBUTION_NAME,
+        ModeProvenance,
+        ResolvedMode,
+        read_package_declaration,
+        resolve_install_mode,
+        resolve_install_mode_with_provenance,
+    )
 
     if explicit is not None:
-        return resolve_install_mode(target, explicit=explicit)
-    if read_workspace_declaration(target) is not None:
-        return resolve_install_mode(target, explicit=None)
+        return resolve_install_mode_with_provenance(target, explicit=explicit)
+    if read_package_declaration(target, CORE_DISTRIBUTION_NAME) is not None:
+        return resolve_install_mode_with_provenance(target, explicit=None)
 
     detected = resolve_install_mode(target, explicit=None)
     observed = _observed_precommit_mode(target)
     if detected is InstallMode.DEPENDENCY and observed is InstallMode.DEPENDENCY:
-        return InstallMode.DEPENDENCY
-    return InstallMode.TOOL
+        return ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.INFERRED)
+    return ResolvedMode(InstallMode.TOOL, ModeProvenance.INFERRED)
 
 
 # Map provider argument names to Tool enum members. The per-tool entries derive
@@ -370,8 +398,17 @@ _MODE_ENTRY_PREFIX: dict[InstallMode, str] = {
 
 
 def entry_prefix_for_mode(mode: InstallMode) -> str:
-    """Return the canonical hook-entry command prefix for *mode*."""
-    return _MODE_ENTRY_PREFIX[mode]
+    """Return the canonical hook-entry command prefix for *mode*.
+
+    The lookup is keyed by the *rendered* mode (via
+    :func:`~vaultspec_core.core.enums.render_mode`), so
+    :attr:`~vaultspec_core.core.enums.InstallMode.DEV` resolves to the same
+    ``uv run`` prefix as :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY`
+    rather than needing its own table entry. This keeps the prefix table a
+    two-shape render surface even as the mode vocabulary carries the third
+    dev-scoped bookkeeping member.
+    """
+    return _MODE_ENTRY_PREFIX[render_mode(mode)]
 
 
 #: Backward-compatible module-level prefix, pinned to dependency mode. Modules
@@ -726,9 +763,9 @@ def _scaffold_precommit(
     into ``prek.toml`` manually.
     """
     if mode is None:
-        from .workspace_mode import resolve_render_mode
+        from .workspace_mode import CORE_DISTRIBUTION_NAME, resolve_render_mode
 
-        mode = resolve_render_mode(target)
+        mode = resolve_render_mode(target, package=CORE_DISTRIBUTION_NAME)
     canonical_hooks = canonical_precommit_hooks_for_mode(mode)
 
     if (target / "prek.toml").exists():
@@ -1089,10 +1126,20 @@ def install_run(
     # precedence chain (explicit flag, persisted declaration, pyproject
     # detection, default tool mode). An explicit request that names an
     # impossible combination - dependency mode with no pyproject.toml - raises a
-    # loud, typed refusal here rather than silently falling back.
-    from .workspace_mode import resolve_install_mode
+    # loud, typed refusal here rather than silently falling back. The provenance
+    # rides along so the dependency-leak advisory fires only when this run is the
+    # one electing dependency mode, not on a persisted read.
+    from .workspace_mode import (
+        DEPENDENCY_LEAK_ADVISORY,
+        newly_establishes_dependency,
+        resolve_install_mode_with_provenance,
+    )
 
-    resolved_mode = resolve_install_mode(path, explicit=mode)
+    resolved = resolve_install_mode_with_provenance(path, explicit=mode)
+    resolved_mode = resolved.mode
+    leak_warnings = (
+        [DEPENDENCY_LEAK_ADVISORY] if newly_establishes_dependency(resolved) else []
+    )
 
     if upgrade and dry_run:
         _ensure_tool_configs(path)
@@ -1130,6 +1177,7 @@ def install_run(
             "items": items,
             "path": path,
             "dry_run": True,
+            "warnings": leak_warnings,
         }
 
     if dry_run:
@@ -1163,7 +1211,12 @@ def install_run(
         for rel, label in manifest:
             seen.setdefault(rel, label)
 
-        return {"action": "dry_run", "items": list(seen.items()), "path": path}
+        return {
+            "action": "dry_run",
+            "items": list(seen.items()),
+            "path": path,
+            "warnings": leak_warnings,
+        }
 
     if upgrade:
         try:
@@ -1181,8 +1234,14 @@ def install_run(
         # dependency listing; a workspace that already declares a mode keeps it,
         # which is what makes a repeated upgrade idempotent. This supersedes the
         # value resolve_install_mode computed at entry, since only here is the
-        # deployed hook shape folded in.
-        resolved_mode = _infer_upgrade_mode(path, mode)
+        # deployed hook shape folded in - so the leak advisory is recomputed from
+        # the inferred provenance too: a persisted dependency declaration stays
+        # silent, a freshly inferred one warns.
+        inferred = _infer_upgrade_mode(path, mode)
+        resolved_mode = inferred.mode
+        leak_warnings = (
+            [DEPENDENCY_LEAK_ADVISORY] if newly_establishes_dependency(inferred) else []
+        )
 
         seeded: list[tuple[str, str]] = []
         if not skip_core:
@@ -1303,7 +1362,12 @@ def install_run(
         # every subsequent run.
         _untrack_managed_paths(path, get_recommended_entries(path))
 
-        return {"action": "upgrade", "items": seeded, "path": path}
+        return {
+            "action": "upgrade",
+            "items": seeded,
+            "path": path,
+            "warnings": leak_warnings,
+        }
 
     fw_dir = path / ".vaultspec"
     if fw_dir.exists() and not force and not skip_core:
@@ -1430,6 +1494,7 @@ def install_run(
         "providers": provider_names,
         "has_mcp": has_mcp,
         "path": path,
+        "warnings": leak_warnings,
     }
     if post_errors:
         result["errors"] = post_errors

@@ -93,6 +93,91 @@ class TestInstallDryRun:
         assert "vaultspec-cli.builtin.md" in result.output
 
 
+def _write_pyproject_with_vaultspec(root, *, section: str) -> None:
+    """Write a pyproject.toml declaring vaultspec-core in *section*.
+
+    *section* is one of ``"runtime"`` (``[project.dependencies]``) or ``"dev"``
+    (the default ``[dependency-groups].dev`` group).
+    """
+    body = '[project]\nname = "example"\nversion = "0.0.0"\n'
+    if section == "runtime":
+        body += 'dependencies = ["vaultspec-core"]\n'
+    elif section == "dev":
+        body += '\n[dependency-groups]\ndev = ["vaultspec-core"]\n'
+    (root / "pyproject.toml").write_text(body, encoding="utf-8")
+
+
+def _advisory_present(output: str) -> bool:
+    """Return whether the canonical dependency-leak advisory is in *output*.
+
+    Both strings are whitespace-normalized so the console's line wrapping does
+    not break the match. The single canonical constant is the only marker, so
+    the advisory wording lives in exactly one place.
+    """
+    from vaultspec_core.core.workspace_mode import DEPENDENCY_LEAK_ADVISORY
+
+    normalized = " ".join(output.split())
+    return " ".join(DEPENDENCY_LEAK_ADVISORY.split()) in normalized
+
+
+class TestDependencyLeakAdvisory:
+    """Moment-of-choice dependency-leak advisory (install-parity ADR D3).
+
+    The advisory fires only when a run newly elects dependency mode - an
+    explicit ``--mode dependency`` flag or detection resolving to it - and stays
+    silent when the mode is merely read from an existing persisted declaration.
+    """
+
+    def test_explicit_dependency_install_warns(self, tmp_path, runner):
+        _write_pyproject_with_vaultspec(tmp_path, section="runtime")
+        result = runner.invoke(
+            app, ["-t", str(tmp_path), "install", "--mode", "dependency"]
+        )
+        assert result.exit_code == 0, result.output
+        assert _advisory_present(result.output)
+
+    def test_detected_dependency_install_warns(self, tmp_path, runner):
+        # No --mode flag: detection resolves dependency mode from the runtime
+        # dependency listing, which is still a fresh election.
+        _write_pyproject_with_vaultspec(tmp_path, section="runtime")
+        result = runner.invoke(app, ["-t", str(tmp_path), "install"])
+        assert result.exit_code == 0, result.output
+        assert _advisory_present(result.output)
+
+    def test_persisted_dependency_reinstall_is_silent(self, tmp_path, runner):
+        # First install elects dependency mode and persists it.
+        _write_pyproject_with_vaultspec(tmp_path, section="runtime")
+        first = runner.invoke(
+            app, ["-t", str(tmp_path), "install", "--mode", "dependency"]
+        )
+        assert first.exit_code == 0, first.output
+        assert _advisory_present(first.output)
+
+        # Second install reads the persisted declaration: no fresh choice, so no
+        # advisory. This is the core of the review fix.
+        second = runner.invoke(app, ["-t", str(tmp_path), "install", "--force"])
+        assert second.exit_code == 0, second.output
+        assert not _advisory_present(second.output)
+
+    def test_tool_mode_install_is_silent(self, tmp_path, runner):
+        result = runner.invoke(app, ["-t", str(tmp_path), "install", "--mode", "tool"])
+        assert result.exit_code == 0, result.output
+        assert not _advisory_present(result.output)
+
+    def test_dependency_dry_run_persisted_is_silent(self, tmp_path, runner):
+        # install --dry-run on a workspace already declaring dependency mode must
+        # not print the advisory (the review's explicit verify criterion).
+        _write_pyproject_with_vaultspec(tmp_path, section="runtime")
+        first = runner.invoke(
+            app, ["-t", str(tmp_path), "install", "--mode", "dependency"]
+        )
+        assert first.exit_code == 0, first.output
+
+        preview = runner.invoke(app, ["-t", str(tmp_path), "install", "--dry-run"])
+        assert preview.exit_code == 0, preview.output
+        assert not _advisory_present(preview.output)
+
+
 class TestInstallPathSafety:
     def test_deep_nonexistent_path_rejected(self, tmp_path, runner):
         """Installing to a deeply nested non-existent path must fail."""

@@ -300,9 +300,10 @@ Deploy the framework into the target directory.
 ---------------------------------------- | | `--upgrade` | off | Re-sync builtins
 without re-scaffolding. | | `--dry-run` | off | Preview without writing. | | `--force` |
 off | Overwrite an existing installation. | | `--skip` | `[]` | Skip a component
-(repeatable). | | `--mode` | auto | Provisioning mode: `tool` (uvx) or `dependency`
-(project venv); auto-detected from pyproject.toml. | | `--json` | off | Emit
-machine-readable output. |
+(repeatable). | | `--mode` | auto | Provisioning mode: `tool` (uvx), `dependency`
+(project venv, ships in built distributions), or `dev` (default dev group, renders like
+dependency but does not ship); auto-detected from pyproject.toml. | | `--json` | off |
+Emit machine-readable output. |
 
 ### vaultspec-core uninstall
 

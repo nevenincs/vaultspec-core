@@ -314,10 +314,21 @@ class InstallMode(StrEnum):
             by self-hosting. The CLI, hooks, and MCP server resolve through the
             target project's own venv via ``uv run``, so ``vaultspec-core`` is a
             declared dependency of the project.
+        DEV: Dev-scoped placement in the default :pep:`735` ``dev`` dependency
+            group. Renders byte-identically to :attr:`DEPENDENCY` - ``uv sync``
+            installs the default group on every invocation, so the launch shape
+            is the same ``uv run`` resolution - but declares distinct
+            bookkeeping: the harness is a development dependency that will *not*
+            leak into built distributions, versus :attr:`DEPENDENCY`'s runtime
+            dependency that will. The distinction is a sharper doctor label and
+            an honest committed declaration, never a second render path; every
+            renderer collapses ``DEV`` onto :attr:`DEPENDENCY` through the single
+            :func:`render_mode` aliasing helper.
     """
 
     TOOL = "tool"
     DEPENDENCY = "dependency"
+    DEV = "dev"
 
     @classmethod
     def from_token(cls, token: str | None) -> InstallMode | None:
@@ -341,6 +352,31 @@ class InstallMode(StrEnum):
             return cls(normalized)
         except ValueError:
             return None
+
+
+def render_mode(mode: InstallMode) -> InstallMode:
+    """Collapse a declared mode to the mode its artifacts render as.
+
+    The single rendering-time comparator for the three-mode model.
+    :attr:`~InstallMode.DEV` is a bookkeeping distinction only - dev-scoped
+    placement in the default :pep:`735` ``dev`` group installs on every
+    ``uv sync`` and therefore launches through the same ``uv run`` resolution as
+    a full :attr:`~InstallMode.DEPENDENCY` - so every renderer (the MCP launch
+    command, the pre-commit hook entries) must treat ``DEV`` as
+    :attr:`~InstallMode.DEPENDENCY` and never grow a third branch.
+    :attr:`~InstallMode.TOOL` and :attr:`~InstallMode.DEPENDENCY` pass through
+    unchanged. Doctor labeling and the committed declaration keep reading the
+    declared mode directly, since there the ``DEV`` versus ``DEPENDENCY``
+    distinction is exactly the point.
+
+    Args:
+        mode: The declared :class:`InstallMode`.
+
+    Returns:
+        :attr:`~InstallMode.DEPENDENCY` when *mode* is
+        :attr:`~InstallMode.DEV`, otherwise *mode* unchanged.
+    """
+    return InstallMode.DEPENDENCY if mode is InstallMode.DEV else mode
 
 
 class PrecommitHook(StrEnum):

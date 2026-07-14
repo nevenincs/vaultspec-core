@@ -66,6 +66,18 @@ def _make_provider(
     )
 
 
+def _signal_warnings(plan: ResolutionPlan) -> list[str]:
+    """Drop the context-derived version nudge, keeping signal-driven warnings.
+
+    ``resolve`` reads the newer-manifest upgrade nudge from the ambient workspace
+    context rather than the passed diagnosis. When a test runs without an
+    explicit ``target``, ``resolve`` falls back to the real repository context,
+    so that nudge can surface unbidden. Tests asserting that a given diagnosis
+    produces no warnings mean no *signal-driven* warnings, so filter it out.
+    """
+    return [w for w in plan.warnings if "Consider upgrading" not in w]
+
+
 # ---------------------------------------------------------------------------
 # Framework rules
 # ---------------------------------------------------------------------------
@@ -79,8 +91,7 @@ class TestFrameworkRules:
         plan = resolve(diag, CliAction.INSTALL)
         assert not plan.blocked
         assert plan.steps == []
-        warnings = [w for w in plan.warnings if "Consider upgrading" not in w]
-        assert warnings == []
+        assert _signal_warnings(plan) == []
 
     def test_missing_sync_errors(self):
         diag = _make_diagnosis(framework=FrameworkSignal.MISSING)
@@ -246,8 +257,7 @@ class TestContentRules:
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
         plan = resolve(diag, CliAction.SYNC, provider="claude")
         assert plan.steps == []
-        warnings = [w for w in plan.warnings if "Consider upgrading" not in w]
-        assert warnings == []
+        assert _signal_warnings(plan) == []
 
 
 # ---------------------------------------------------------------------------

@@ -32,7 +32,8 @@ research and brainstorming."
   discovery verbs and grep carry the same sequence.
 
 - **Read and use the template** at `.vaultspec/templates/research.md`; its embedded hint
-  blocks govern the body structure.
+  blocks govern the body structure: an answer-first lead paragraph, claim-first
+  `## Findings` subsections, and a closing `## Sources` section.
 
 - **Load the `vaultspec-adr-researcher` agent persona** for focused work. When the task
   benefits from multiple researchers, load the generic `vaultspec-researcher` agent
@@ -46,12 +47,37 @@ research and brainstorming."
   (`.vault/research/yyyy-mm-dd-{feature}-research.md`) and the frontmatter; never
   hand-write either. The full frontmatter schema is defined in the `vaultspec` rule;
   verify after scaffolding with `vaultspec-core vault check all` rather than
-  hand-editing frontmatter.
+  hand-editing frontmatter. A scaffold left with its hint text, an unfilled `{topic}`,
+  or an empty Findings section is not research - fill every section in the same session
+  or do not create the document.
 
-- **Persist sources:** record every finding's source as a re-fetchable locator (URL,
-  `file:line`, commit SHA, `package@version`, RFC number); ground code in a
-  `<Reference>` via `vaultspec-code-research` and link it. Keep the artifact lean by
-  pointing to sources, not reproducing them.
+- **Persist sources:** every finding's source is a re-fetchable locator (URL,
+  `file:line`, commit SHA, `package@version`, RFC number), cited inline and collected
+  once in the closing `## Sources` section; ground code in a `<Reference>` via
+  `vaultspec-code-research` and link it.
+
+## Quality gate
+
+Judged by decision value per token; agents re-read the artifact in every later phase.
+Before persisting, hold the document to this bar:
+
+- **Answer-first.** Lead states question, stakes, and conclusion; each finding opens
+  with its claim, evidence after.
+- **Locator-anchored.** Every non-obvious claim carries a re-fetchable locator; an
+  unanchored claim is marked as opinion.
+- **Comparative.** Alternatives named, with why each was kept or rejected.
+- **Specific.** Versions, dates, and numbers pinned; never "popular" or "widely used."
+- **Deduplicated.** Each fact stated once. What a related vault document already records
+  is linked, not restated; what an earlier section establishes is not repeated.
+- **Grounding, not deciding.** Frame options, evidence, and trade-offs; at most name the
+  option the evidence favors and what the `<ADR>` must settle. Decisions are recorded
+  only in the `<ADR>`.
+- **Bounded.** Uninvestigated areas stated; unverified general-knowledge claims flagged.
+- **Lean.** Link, do not copy; no hedging boilerplate, no restated prompt, no closing
+  summary.
+
+Dispatched researcher findings meet the same bar; transfer them into the scaffolded body
+without diluting the locators.
 
 ## Workflow
 

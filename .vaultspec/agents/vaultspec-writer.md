@@ -13,8 +13,11 @@ decisions (`<ADR>`s), and requirements of the current codebase.
 
 ## Mandate
 
-- **Synthesize Truth:** If provided, read the `<ADR>` and referenced `<Research>`
-  documents. If `<Research>` and `<ADR>` are not available, or you identify gaps,
+- **Synthesize Truth:** Read every authorizing `<ADR>` and referenced `<Research>`
+  document provided. A plan may execute a single decision or a cluster of `<ADR>`s -
+  multi-component work rolling up into one epic tracking plan is normal; read the whole
+  cluster and, when several feed the plan, state in the Description which Wave or Phase
+  each governs. If `<Research>` and `<ADR>` are not available, or you identify gaps,
   conduct research to ensure implementation remains grounded.
 
 - **Orchestrate Execution:** Break down complex goals into logical, atomic Phases and
@@ -154,7 +157,7 @@ Autonomously assign the most appropriate agent persona for each Step:
     `2026-...-<feature>-P01-summary.md` at L2; `2026-...-<feature>-W01-P01-summary.md`
     at L3 / L4).
 
-  - "Do Steps contradict the `<ADR>` and user goal?"
+  - "Do Steps contradict any authorizing `<ADR>` or the user goal?"
 
   - "Are the file paths correct?"
 

@@ -8,7 +8,12 @@ consumers can import directly from the package.
 from __future__ import annotations
 
 from ..resolver import ResolutionPlan, ResolutionStep, resolve
-from .diagnosis import ProviderDiagnosis, WorkspaceDiagnosis, diagnose
+from .diagnosis import (
+    PackageModeDiagnosis,
+    ProviderDiagnosis,
+    WorkspaceDiagnosis,
+    diagnose,
+)
 from .signals import (
     BuiltinVersionSignal,
     ConfigSignal,
@@ -35,6 +40,7 @@ __all__ = [
     "GitignoreSignal",
     "ManifestEntrySignal",
     "ModeMismatchSignal",
+    "PackageModeDiagnosis",
     "PrecommitSignal",
     "ProviderDiagnosis",
     "ProviderDirSignal",

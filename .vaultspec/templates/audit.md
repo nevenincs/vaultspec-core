@@ -46,4 +46,6 @@ related:
 
 ## Recommendations
 
-<!-- Actionable recommendations -->
+<!-- Actionable recommendations, each tied to a finding above. An
+     architecturally significant recommendation names the decision a
+     follow-on ADR must make; the decision itself is never recorded here. -->

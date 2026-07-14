@@ -150,15 +150,19 @@ vaultspec-core sync                       # writes .claude/, .gemini/, .codex/, 
 `.gitignore` block keeps per-machine by-products local.
 `vaultspec-core install --upgrade` carries an older workspace onto the shared policy.
 
-**Choose an install mode.** Provisioning is mode-aware. Tool mode, the default, wires
-the pre-commit hooks and the MCP launch command to run vaultspec-core through `uvx`, so
-a project adopts the framework without vaultspec-core ever entering its own dependency
-set. Dependency mode runs them through `uv run` and is selected when the project's
-`pyproject.toml` lists vaultspec-core; pin either with `install --mode tool` or
-`install --mode dependency`. The chosen mode is committed alongside `.vaultspec/`, so it
-travels with the workspace, and `install --upgrade` records one for a workspace
-provisioned before modes existed by inferring it from the existing hook and dependency
-shape.
+**Choose an install mode.** Provisioning is mode-aware, with three modes. Tool mode, the
+default, wires the pre-commit hooks and the MCP launch command to run vaultspec-core
+through `uvx`, so a project adopts the framework without vaultspec-core ever entering
+its own dependency set. Dependency mode runs them through `uv run` and is selected when
+the project's `pyproject.toml` lists vaultspec-core. Dev mode is for vaultspec-core
+placed in the default `dev` dependency group: it renders exactly like dependency mode
+but does not ship in the project's built distributions, so choosing it records that
+non-leaking placement as a distinct declared state. Pin any with `install --mode tool`,
+`install --mode dependency`, or `install --mode dev`. The chosen mode is committed
+alongside `.vaultspec/` in a per-package `workspace.json`, so it travels with the
+workspace and a project running vaultspec-core beside a companion package can declare
+each in its own mode; `install --upgrade` records a mode for a workspace provisioned
+before modes existed by inferring it from the existing hook and dependency shape.
 
 **Maintain.** `vaultspec-core vault check all --fix` validates and repairs the vault,
 and `vaultspec-core vault graph --feature search-api` visualizes a feature. The CLI

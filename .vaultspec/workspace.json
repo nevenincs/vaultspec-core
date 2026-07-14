@@ -1,5 +1,9 @@
 {
-  "install_mode": "dependency",
-  "minimum_vaultspec_version": "0.1.37",
-  "schema_version": "1.0"
+  "packages": {
+    "vaultspec-core": {
+      "install_mode": "dependency",
+      "minimum_version": "0.1.37"
+    }
+  },
+  "schema_version": "2.0"
 }

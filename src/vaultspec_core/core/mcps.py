@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from . import types as _t
-from .enums import InstallMode
+from .enums import InstallMode, render_mode
 from .exceptions import ResourceExistsError, ResourceNotFoundError, VaultSpecError
 from .helpers import advisory_lock, atomic_write, ensure_dir
 from .types import SyncResult
@@ -33,20 +33,70 @@ logger = logging.getLogger(__name__)
 _MODE_COMMAND_TOKEN = "@@VAULTSPEC_INSTALL_MODE_COMMAND@@"
 _MODE_ARGS_TOKEN = "@@VAULTSPEC_INSTALL_MODE_ARGS@@"
 
-#: The concrete MCP-server launch (``command``, ``args``) each mode renders to.
-#: Dependency mode reproduces byte-for-byte the launch every dependency-mode
-#: workspace has always synced, so existing installs see zero churn. Tool mode
-#: launches the same module entry point through an ephemeral ``uvx`` invocation
-#: so ``vaultspec-core`` never enters the governed project's dependency set.
+#: Optional metadata keys a mode-neutral MCP definition may carry alongside the
+#: sentinel tokens to name the distribution and runnable module its launch
+#: renders for. Absent on core's own builtin - which defaults to core's package
+#: and module below, keeping that file byte-identical - and present on a
+#: companion package's builtin so core's single sentinel-substitution renderer
+#: produces *that* package's ``uv run``/``uvx`` launch without a second renderer.
+#: They are consumed and stripped during substitution, so they never reach the
+#: written ``.mcp.json``.
+_MODE_PACKAGE_KEY = "_vaultspec_mode_package"
+_MODE_MODULE_KEY = "_vaultspec_mode_module"
+
+#: The distribution and module core's own MCP server launches through. Used as
+#: the substitution defaults when a definition omits the per-definition
+#: package/module keys, so core's token-only builtin renders exactly as before.
+_DEFAULT_MCP_PACKAGE = "vaultspec-core"
+_DEFAULT_MCP_MODULE = "vaultspec_core.mcp_server.app"
+
+
+def render_launch_for_mode(
+    mode: InstallMode, package: str, module: str
+) -> tuple[str, list[str]]:
+    """Return the concrete ``(command, args)`` launch a package+module renders to.
+
+    The single launch comparator for the three-mode model, parameterized by the
+    distribution *package* and the runnable *module* so any core-provisioned
+    package renders its MCP server through one shared shape rather than a
+    per-package table. This is the seam a companion package (for example
+    ``vaultspec-rag``) substitutes through: its mode-neutral builtin names its
+    own package and module, and this helper produces the right launch for it.
+
+    :attr:`~vaultspec_core.core.enums.InstallMode.DEV` is collapsed onto
+    :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY` through
+    :func:`~vaultspec_core.core.enums.render_mode` before the shape is chosen, so
+    the dev-scoped bookkeeping member never grows a third launch branch.
+
+    Dependency-rendered mode launches the module through the governed project's
+    own venv (``uv run python -m <module>``), byte-identical to the launch every
+    dependency-mode workspace has always synced. Tool mode launches the same
+    module through an ephemeral ``uvx --from <package>`` invocation so the
+    distribution never enters the governed project's dependency set.
+
+    Args:
+        mode: The provisioning mode whose launch to render.
+        package: Distribution name for the ``uvx --from`` tool-mode launch.
+        module: Fully-qualified module the MCP server runs as ``python -m``.
+
+    Returns:
+        The ``(command, args)`` pair for the rendered mode.
+    """
+    if render_mode(mode) is InstallMode.DEPENDENCY:
+        return "uv", ["run", "python", "-m", module]
+    return "uvx", ["--from", package, "python", "-m", module]
+
+
+#: Core's own concrete MCP-server launch per mode, derived from the generalized
+#: :func:`render_launch_for_mode` so this convenience table and the renderer can
+#: never drift. Dependency mode reproduces byte-for-byte the launch every
+#: dependency-mode workspace has always synced; tool mode launches the same
+#: module entry point through an ephemeral ``uvx`` invocation. Only the two
+#: rendered shapes are keyed (``DEV`` collapses onto ``DEPENDENCY``), which is
+#: what the observed-shape matcher and the mode-flip tests read.
 _MODE_MCP_LAUNCH: dict[InstallMode, tuple[str, list[str]]] = {
-    InstallMode.DEPENDENCY: (
-        "uv",
-        ["run", "python", "-m", "vaultspec_core.mcp_server.app"],
-    ),
-    InstallMode.TOOL: (
-        "uvx",
-        ["--from", "vaultspec-core", "python", "-m", "vaultspec_core.mcp_server.app"],
-    ),
+    mode: render_launch_for_mode(mode, _DEFAULT_MCP_PACKAGE, _DEFAULT_MCP_MODULE)
+    for mode in (InstallMode.DEPENDENCY, InstallMode.TOOL)
 }
 
 
@@ -63,19 +113,37 @@ def render_mcp_definition_for_mode(
     through unchanged, so this is safe to apply to every collected definition
     regardless of origin.
 
+    The launch is produced by the generalized
+    :func:`render_launch_for_mode`, which routes *mode* through
+    :func:`~vaultspec_core.core.enums.render_mode` so the dev-scoped
+    :attr:`~vaultspec_core.core.enums.InstallMode.DEV` member renders
+    byte-identically to :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY`
+    rather than falling off a two-key table. The distribution and module the
+    launch targets come from the definition's own
+    :data:`_MODE_PACKAGE_KEY`/:data:`_MODE_MODULE_KEY` metadata, defaulting to
+    core's package and module when absent; those keys are stripped during
+    substitution so they never reach the written ``.mcp.json``.
+
     Args:
         definition: A parsed MCP server definition (``command``/``args`` map).
         mode: The provisioning mode whose concrete launch to substitute.
 
     Returns:
         A shallow copy of *definition* with the tokens replaced by the
-        mode-specific launch command and args. The input is not mutated.
+        mode-specific launch command and args and the substitution-metadata keys
+        removed. The input is not mutated.
     """
-    command, args = _MODE_MCP_LAUNCH[mode]
     rendered = dict(definition)
-    if rendered.get("command") == _MODE_COMMAND_TOKEN:
+    has_command_token = rendered.get("command") == _MODE_COMMAND_TOKEN
+    has_args_token = rendered.get("args") == [_MODE_ARGS_TOKEN]
+    if not (has_command_token or has_args_token):
+        return rendered
+    package = str(rendered.pop(_MODE_PACKAGE_KEY, _DEFAULT_MCP_PACKAGE))
+    module = str(rendered.pop(_MODE_MODULE_KEY, _DEFAULT_MCP_MODULE))
+    command, args = render_launch_for_mode(mode, package, module)
+    if has_command_token:
         rendered["command"] = command
-    if rendered.get("args") == [_MODE_ARGS_TOKEN]:
+    if has_args_token:
         rendered["args"] = list(args)
     return rendered
 
@@ -258,9 +326,9 @@ def mcp_status() -> dict[str, Any]:
             "warnings": ["No workspace context available for MCP status."],
         }
 
-    from .workspace_mode import resolve_render_mode
+    from .workspace_mode import CORE_DISTRIBUTION_NAME, resolve_render_mode
 
-    render_mode = resolve_render_mode(target_dir)
+    render_mode = resolve_render_mode(target_dir, package=CORE_DISTRIBUTION_NAME)
     parse_warnings: list[str] = []
     sources = collect_mcp_servers(warnings=parse_warnings, mode=render_mode)
     definitions = sorted(sources)
@@ -726,9 +794,9 @@ def mcp_sync(
         return result
 
     if mode is None:
-        from .workspace_mode import resolve_render_mode
+        from .workspace_mode import CORE_DISTRIBUTION_NAME, resolve_render_mode
 
-        mode = resolve_render_mode(target_dir)
+        mode = resolve_render_mode(target_dir, package=CORE_DISTRIBUTION_NAME)
 
     parse_warnings: list[str] = []
     sources = collect_mcp_servers(warnings=parse_warnings, mode=mode)
