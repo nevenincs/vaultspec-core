@@ -11,8 +11,10 @@ from vaultspec_core.core.enums import InstallMode
 from vaultspec_core.core.exceptions import VaultSpecError
 from vaultspec_core.core.workspace_mode import (
     WORKSPACE_SCHEMA_VERSION,
+    DependencyEvidence,
     PackageDeclaration,
     WorkspaceDeclaration,
+    detect_package_evidence,
     read_package_declaration,
     read_workspace_declaration,
     resolve_install_mode,
@@ -459,3 +461,220 @@ class TestV2CorruptEntries:
 
         with pytest.raises(VaultSpecError, match="Malformed 'packages' map"):
             read_workspace_declaration(factory.root)
+
+
+def _pyproject(root: Path, body: str) -> Path:
+    """Write a ``pyproject.toml`` whose body follows a minimal project table."""
+    path = root / "pyproject.toml"
+    path.write_text(
+        '[project]\nname = "example"\nversion = "0.0.0"\n\n' + body,
+        encoding="utf-8",
+    )
+    return path
+
+
+class TestDetectionTaxonomy:
+    """detect_package_evidence classifies placement on the leak boundary.
+
+    The taxonomy the install-parity ADR draws: runtime-leaking placement
+    (project or optional dependencies) is RUNTIME, the default dev group is DEV,
+    and a named non-default group or absence is NONE.
+    """
+
+    def test_project_dependency_is_runtime(self, factory):
+        path = _pyproject(factory.root, 'dependencies = ["vaultspec-core>=0.1"]\n')
+
+        assert (
+            detect_package_evidence(path, "vaultspec-core")
+            is DependencyEvidence.RUNTIME
+        )
+
+    def test_optional_dependency_is_runtime(self, factory):
+        # optional-dependencies ship in built metadata and install with their
+        # extra, so they leak downstream and read as runtime, not dev.
+        path = _pyproject(
+            factory.root,
+            '[project.optional-dependencies]\nextra = ["vaultspec-core>=0.1"]\n',
+        )
+
+        assert (
+            detect_package_evidence(path, "vaultspec-core")
+            is DependencyEvidence.RUNTIME
+        )
+
+    def test_default_dev_group_is_dev(self, factory):
+        path = _pyproject(
+            factory.root,
+            '[dependency-groups]\ndev = ["vaultspec-core>=0.1"]\n',
+        )
+
+        assert detect_package_evidence(path, "vaultspec-core") is DependencyEvidence.DEV
+
+    def test_legacy_uv_dev_dependencies_is_dev(self, factory):
+        path = _pyproject(
+            factory.root,
+            '[tool.uv]\ndev-dependencies = ["vaultspec-core>=0.1"]\n',
+        )
+
+        assert detect_package_evidence(path, "vaultspec-core") is DependencyEvidence.DEV
+
+    def test_named_non_default_group_is_none(self, factory):
+        # A named group is out of detection's scope: it stays inert until
+        # enabled with --group, so it is deliberately unclassified.
+        path = _pyproject(
+            factory.root,
+            '[dependency-groups]\nlint = ["vaultspec-core>=0.1"]\n',
+        )
+
+        assert (
+            detect_package_evidence(path, "vaultspec-core") is DependencyEvidence.NONE
+        )
+
+    def test_runtime_outranks_dev_when_in_both(self, factory):
+        # Declared in both a runtime set and the dev group: a leaking placement
+        # is never masked by a dev declaration.
+        path = _pyproject(
+            factory.root,
+            'dependencies = ["vaultspec-core>=0.1"]\n\n'
+            '[dependency-groups]\ndev = ["vaultspec-core>=0.1"]\n',
+        )
+
+        assert (
+            detect_package_evidence(path, "vaultspec-core")
+            is DependencyEvidence.RUNTIME
+        )
+
+    def test_underscore_spelling_in_dev_group_matches(self, factory):
+        path = _pyproject(
+            factory.root,
+            '[dependency-groups]\ndev = ["vaultspec_core==0.1.37"]\n',
+        )
+
+        assert detect_package_evidence(path, "vaultspec-core") is DependencyEvidence.DEV
+
+    def test_absent_package_is_none(self, factory):
+        path = _pyproject(factory.root, 'dependencies = ["pytest", "rich"]\n')
+
+        assert (
+            detect_package_evidence(path, "vaultspec-core") is DependencyEvidence.NONE
+        )
+
+    def test_missing_file_is_none(self, factory):
+        assert (
+            detect_package_evidence(factory.root / "pyproject.toml", "vaultspec-core")
+            is DependencyEvidence.NONE
+        )
+
+    def test_malformed_file_is_none(self, factory):
+        path = factory.root / "pyproject.toml"
+        path.write_text("this is not valid toml = = =\n", encoding="utf-8")
+
+        assert (
+            detect_package_evidence(path, "vaultspec-core") is DependencyEvidence.NONE
+        )
+
+    def test_package_parameter_classifies_companion_independently(self, factory):
+        # core runtime, rag dev group: each distribution classifies on its own
+        # placement, not the file as a whole.
+        path = _pyproject(
+            factory.root,
+            'dependencies = ["vaultspec-core>=0.1"]\n\n'
+            '[dependency-groups]\ndev = ["vaultspec-rag>=0.1"]\n',
+        )
+
+        assert (
+            detect_package_evidence(path, "vaultspec-core")
+            is DependencyEvidence.RUNTIME
+        )
+        assert detect_package_evidence(path, "vaultspec-rag") is DependencyEvidence.DEV
+
+
+class TestDevPrecedence:
+    """DEV enters resolve_install_mode's precedence chain via detection."""
+
+    def test_detected_dev_group_resolves_to_dev(self, factory):
+        _pyproject(factory.root, '[dependency-groups]\ndev = ["vaultspec-core>=0.1"]\n')
+
+        assert resolve_install_mode(factory.root) is InstallMode.DEV
+
+    def test_detected_optional_dependency_resolves_to_dependency(self, factory):
+        _pyproject(
+            factory.root,
+            '[project.optional-dependencies]\nextra = ["vaultspec-core>=0.1"]\n',
+        )
+
+        assert resolve_install_mode(factory.root) is InstallMode.DEPENDENCY
+
+    def test_detected_named_group_falls_through_to_tool(self, factory):
+        _pyproject(
+            factory.root, '[dependency-groups]\nlint = ["vaultspec-core>=0.1"]\n'
+        )
+
+        assert resolve_install_mode(factory.root) is InstallMode.TOOL
+
+    def test_persisted_dev_outranks_runtime_detection(self, factory):
+        # Detection would read runtime evidence, but the persisted DEV
+        # declaration outranks detection.
+        _pyproject(factory.root, 'dependencies = ["vaultspec-core>=0.1"]\n')
+        write_package_declaration(
+            factory.root, "vaultspec-core", PackageDeclaration(InstallMode.DEV)
+        )
+
+        assert resolve_install_mode(factory.root) is InstallMode.DEV
+
+    def test_explicit_dev_with_pyproject_is_permitted(self, factory):
+        # A pyproject exists but does not yet list vaultspec-core; an explicit
+        # --mode dev is still honored since the contributor may be about to add
+        # the placement.
+        _pyproject(factory.root, 'dependencies = ["pytest"]\n')
+
+        assert resolve_install_mode(factory.root, InstallMode.DEV) is InstallMode.DEV
+
+    def test_explicit_dev_overrides_persisted_and_detected(self, factory):
+        _pyproject(factory.root, 'dependencies = ["vaultspec-core>=0.1"]\n')
+        write_package_declaration(
+            factory.root, "vaultspec-core", PackageDeclaration(InstallMode.TOOL)
+        )
+
+        assert resolve_install_mode(factory.root, InstallMode.DEV) is InstallMode.DEV
+
+    def test_package_parameter_resolves_companion_independently(self, factory):
+        # rag persisted DEV, core persisted DEPENDENCY: resolving each package
+        # reads only its own entry.
+        write_package_declaration(
+            factory.root, "vaultspec-core", PackageDeclaration(InstallMode.DEPENDENCY)
+        )
+        write_package_declaration(
+            factory.root, "vaultspec-rag", PackageDeclaration(InstallMode.DEV)
+        )
+
+        assert resolve_install_mode(factory.root) is InstallMode.DEPENDENCY
+        assert (
+            resolve_install_mode(factory.root, package="vaultspec-rag")
+            is InstallMode.DEV
+        )
+
+    def test_detection_uses_the_named_package(self, factory):
+        # Only rag is dev-declared; resolving rag detects DEV while core, absent
+        # from the manifest, falls through to the tool default.
+        _pyproject(factory.root, '[dependency-groups]\ndev = ["vaultspec-rag>=0.1"]\n')
+
+        assert (
+            resolve_install_mode(factory.root, package="vaultspec-rag")
+            is InstallMode.DEV
+        )
+        assert resolve_install_mode(factory.root, package="vaultspec-core") is (
+            InstallMode.TOOL
+        )
+
+
+class TestDevRefusal:
+    """The impossible-combo refusal extends to DEV, which also needs a manifest."""
+
+    def test_explicit_dev_without_pyproject_raises_with_hint(self, factory):
+        with pytest.raises(VaultSpecError) as excinfo:
+            resolve_install_mode(factory.root, InstallMode.DEV)
+
+        assert "dev mode" in str(excinfo.value)
+        assert "pyproject.toml" in str(excinfo.value)
+        assert "--mode tool" in excinfo.value.hint
