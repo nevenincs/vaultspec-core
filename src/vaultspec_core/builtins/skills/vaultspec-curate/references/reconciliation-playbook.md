@@ -29,6 +29,9 @@ For each cluster of decisions on a shared concept:
   Semantic recall finds same-topic ADRs that share no obvious filename or feature tag.
 - Read the candidate ADRs whole. Judge them against each other for the conflict classes
   below. Do not rely on titles; two ADRs can agree in title and contradict in Rationale.
+- Walk each feature's supersession chain end to end. A chain whose links are refinements
+  of one decision - not pivots - is a fragmented decision, even when every marker is
+  formally correct; so are sibling `accepted` records sharing one scope.
 
 ## Reconcile decision-vs-code
 
@@ -70,6 +73,10 @@ Classify every finding into one of these, because the action differs by class:
   concept, and neither supersedes the other. Needs human resolution.
 - **Duplication (judgment).** Two ADRs decide the same thing; one should supersede or
   reference the other.
+- **Fragmented decision (judgment).** Several ADRs in one feature cluster are
+  refinements of a single decision: a supersession chain of non-pivots, or sibling
+  `accepted` records - possibly contradictory - sharing one scope. The markers can all
+  be formally correct; the fragmentation itself is the finding.
 - **Decision-vs-code drift (advisory).** An `accepted` ADR is not reflected in the code,
   or a retired decision still governs it. Report only; never auto-amend the ADR.
 - **Orphaned or stranded decision (advisory).** A decision with no implementation and no
@@ -98,6 +105,11 @@ Classify every finding into one of these, because the action differs by class:
 - **Contradiction, duplication.** Do not silently rewrite. Record the conflicting ADRs,
   the nature of the contradiction, and a recommended resolution in the audit for human
   approval. Apply the chosen resolution only once approved.
+- **Fragmented decision.** Propose the consolidation in the audit: fold the chain's
+  refinements into the record that currently governs (amending its body in place, per
+  the amend-over-supersede rule the `vaultspec-adr` skill mandates) and supersede or
+  deprecate the rest, so exactly one record is `accepted` for the scope. Apply only once
+  approved.
 - **Decision-vs-code drift.** Report as a finding in the audit. ADRs drive rollout, so
   never retrofit the ADR to the code automatically. If the human explicitly requests the
   ADR-from-codebase retrofit (legitimate for late-adopting projects), amend the ADR's

@@ -54,8 +54,11 @@ Build a complete inventory before judging anything:
 
 - **Decision-vs-decision.** Surface same-concept clusters with
   `vaultspec-rag search "<intent>" --type vault --doc-type adr`, read the candidates
-  whole, and judge agreement, duplication, or contradiction. Titles lie; read the
-  Rationale.
+  whole, and judge agreement, duplication, contradiction, or fragmentation. Titles lie;
+  read the Rationale. Walk each feature's supersession chain end to end: links that are
+  refinements rather than pivots, or sibling `accepted` records on one scope, are a
+  fragmented decision even when every marker is formally correct - propose consolidation
+  into one governing record per the playbook.
 
 - **Decision-vs-code.** For each live decision, locate the implementation with
   `vaultspec-rag search "<concept and domain nouns>" --type code`, read the epicenter
@@ -86,9 +89,10 @@ You act on what is mechanically safe and propose what needs judgment.
   playbook's per-class actions. Two invariants bind every such edit: no fact is
   destroyed (text is removed only where its single home is confirmed, or created first
   by relocating the fact into its grounding document), and no edit changes what was
-  decided - changing a decision requires supersession. Copies diverging in substance are
-  forked facts, not restatements: surface them, except that an accepted ADR's decision
-  is authoritative over a grounding document's recommendation.
+  decided - decision changes belong to the `vaultspec-adr` amend-or-supersede path, on
+  human approval. Copies diverging in substance are forked facts, not restatements:
+  surface them, except that an accepted ADR's decision is authoritative over a grounding
+  document's recommendation.
 - **Propose, do not apply.** Rephrasing or amending conflicting ADR wording, homeless
   decisions (decision language no ADR records - an ADR candidate, never one you author
   yourself), and any contradiction or duplication whose resolution needs author

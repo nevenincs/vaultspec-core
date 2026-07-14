@@ -25,6 +25,11 @@ related:
      which also records superseded_by); and deprecated when it is retired
      without a direct successor.
 
+     Amend vs supersede: refinements and concretization rewrite the accepted
+     record's body in place (modified: carries the revision); a new ADR with
+     supersession is only for a major pivot. One accepted record per
+     decision.
+
      DO NOT add fields beyond those scaffolded; metadata lives
      only in the frontmatter. -->
 

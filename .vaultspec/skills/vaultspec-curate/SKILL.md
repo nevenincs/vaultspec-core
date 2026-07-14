@@ -30,6 +30,8 @@ superseded decision still governs the code.
 - Periodically, to keep the ADR corpus a trustworthy map of the architecture.
 - After a feature lands, to confirm the decisions it claimed are reflected in the code.
 - When ADRs are suspected to contradict each other, or to lag behind what was built.
+- When one decision's refinements have piled into a supersession chain or sibling
+  `accepted` records - correct markers included - instead of one governing record.
 - When lifecycle documents restate each other - ADRs re-narrating research evidence,
   research or audit documents carrying decision language.
 - Before a release or audit that depends on the decision record being accurate.
@@ -69,7 +71,8 @@ decisions:
   `vaultspec-core vault graph --json` for the supersession and relatedness edges.
 - **Reconcile decision-vs-decision.** Use
   `vaultspec-rag search "<intent>" --type vault --doc-type adr` to surface ADRs covering
-  the same concept, read them whole, and judge agreement, duplication, or contradiction.
+  the same concept, read them whole, and judge agreement, duplication, contradiction, or
+  fragmentation (a refinement chain or sibling accepted records on one scope).
 - **Reconcile decision-vs-code.** For each live decision,
   `vaultspec-rag search "<concept and domain nouns>" --type code`, read the epicenter
   file whole, and confirm the decision is implemented; grep to confirm exact symbols.
@@ -105,9 +108,10 @@ The curator acts on what is mechanically safe and proposes what needs judgment.
   research or audit body where an accepted ADR records the same decision, leaving a
   one-line pointer. Invariants: no fact is destroyed - text is removed only where its
   single home is confirmed, or created first by relocating the fact into its grounding
-  document; and no conformance edit ever changes what was decided - changing a decision
-  requires supersession. Where the two copies diverge in substance, it is a forked fact,
-  not a restatement: surface it instead.
+  document; and no conformance edit ever changes what was decided - decision changes
+  belong to the `vaultspec-adr` amend-or-supersede path, on human approval. Where the
+  two copies diverge in substance, it is a forked fact, not a restatement: surface it
+  instead.
 - **Propose for approval (judgment).** Rephrasing or amending conflicting ADR wording,
   and any contradiction whose resolution is not obvious, are written into the audit as
   recommendations, not applied unprompted.
