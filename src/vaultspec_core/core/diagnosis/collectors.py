@@ -728,7 +728,9 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
     return PrecommitSignal.COMPLETE
 
 
-def _observed_precommit_mode(target: Path) -> InstallMode | None:
+def _observed_precommit_mode(
+    target: Path, package: str | None = None
+) -> InstallMode | None:
     """Infer the install mode the deployed hook entries are shaped for.
 
     Reads ``.pre-commit-config.yaml`` and inspects the canonical hook entries.
@@ -739,19 +741,31 @@ def _observed_precommit_mode(target: Path) -> InstallMode | None:
     :func:`~vaultspec_core.core.commands.entry_prefix_for_mode`, the same source
     the renderer uses, so this never hardcodes a second copy of the shape.
 
+    The pre-commit hooks are core's own artifact: they invoke ``vaultspec-core``
+    regardless of which companion packages are provisioned, and a companion
+    package scaffolds no hooks of its own. So for any *package* other than
+    ``vaultspec-core`` this observes nothing (``None``) - that package's mode is
+    observable only through its MCP launch, not through hooks it does not own.
+
     Args:
         target: Workspace root directory.
+        package: Distribution name whose observed hook shape to read; ``None``
+            means ``vaultspec-core``. Any other package returns ``None``.
 
     Returns:
         The single :class:`~vaultspec_core.core.enums.InstallMode` every
         canonical hook entry agrees on, or ``None`` when there is no config, no
-        canonical hook, or the entries disagree (so no coherent shape can be
-        read).
+        canonical hook, the entries disagree, or *package* is not core.
     """
     import yaml
 
     from ..commands import CANONICAL_HOOK_IDS, entry_prefix_for_mode
     from ..enums import InstallMode
+    from ..workspace_mode import CORE_DISTRIBUTION_NAME, _canonical_distribution_name
+
+    pkg = package if package is not None else CORE_DISTRIBUTION_NAME
+    if _canonical_distribution_name(pkg) != CORE_DISTRIBUTION_NAME:
+        return None
 
     config_path = target / ".pre-commit-config.yaml"
     if not config_path.exists():
@@ -796,24 +810,33 @@ def _observed_precommit_mode(target: Path) -> InstallMode | None:
     return None
 
 
-def _observed_mcp_mode(target: Path) -> InstallMode | None:
-    """Infer the install mode the deployed MCP launch command is shaped for.
+def _observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode | None:
+    """Infer the install mode *package*'s deployed MCP launch command is shaped for.
 
-    Reads ``.mcp.json`` and matches the ``vaultspec-core`` server's ``command``
-    and ``args`` against the concrete launch each mode renders (dependency mode
-    launches through ``uv run``, tool mode through ``uvx``). The launch shapes
-    are read from the renderer's own ``_MODE_MCP_LAUNCH`` table so this never
-    hardcodes a second copy of the command shape.
+    Reads ``.mcp.json`` and matches *package*'s server entry (the server name is
+    the distribution name) against the concrete launch each mode renders
+    (dependency mode launches through ``uv run``, tool mode through ``uvx``). The
+    runnable module is recovered from the deployed ``args`` (the token after
+    ``-m``) and the two candidate shapes are reconstructed through the renderer's
+    own :func:`~vaultspec_core.core.mcps.render_launch_for_mode`, so this matches
+    against the single launch comparator rather than a second hardcoded copy and
+    works for any package's module without a per-package table.
 
     Args:
         target: Workspace root directory.
+        package: Distribution name whose server entry to read; ``None`` means
+            ``vaultspec-core``. The server name in ``.mcp.json`` is this name.
 
     Returns:
         The matching :class:`~vaultspec_core.core.enums.InstallMode`, or ``None``
-        when there is no config, no managed server entry, or the entry matches
-        no known launch shape.
+        when there is no config, no matching server entry, the module cannot be
+        recovered, or the entry matches neither rendered launch shape.
     """
-    from ..mcps import _MODE_MCP_LAUNCH
+    from ..enums import InstallMode
+    from ..mcps import render_launch_for_mode
+    from ..workspace_mode import CORE_DISTRIBUTION_NAME
+
+    pkg = package if package is not None else CORE_DISTRIBUTION_NAME
 
     mcp_path = target / ".mcp.json"
     if not mcp_path.exists():
@@ -828,40 +851,63 @@ def _observed_mcp_mode(target: Path) -> InstallMode | None:
     servers = raw.get("mcpServers")
     if not isinstance(servers, dict):
         return None
-    entry = servers.get("vaultspec-core")
+    entry = servers.get(pkg)
     if not isinstance(entry, dict):
         return None
 
     command = entry.get("command")
     args = entry.get("args")
-    for mode, (mode_command, mode_args) in _MODE_MCP_LAUNCH.items():
+    if not isinstance(args, list) or "-m" not in args:
+        return None
+    module_index = args.index("-m") + 1
+    if module_index >= len(args):
+        return None
+    module = args[module_index]
+    if not isinstance(module, str):
+        return None
+
+    for mode in (InstallMode.TOOL, InstallMode.DEPENDENCY):
+        mode_command, mode_args = render_launch_for_mode(mode, pkg, module)
         if command == mode_command and args == mode_args:
             return mode
     return None
 
 
-def collect_mode_mismatch_state(target: Path) -> ModeMismatchSignal:
-    """Compare the persisted install mode against the observed artifact shapes.
+def collect_mode_mismatch_state(
+    target: Path, package: str | None = None
+) -> ModeMismatchSignal:
+    """Compare *package*'s persisted install mode against its observed artifacts.
 
-    Reads the committed ``.vaultspec/workspace.json`` declaration and holds the
-    mode it names against the shape of the provisioned artifacts: the canonical
-    pre-commit hook entries and the ``.mcp.json`` launch command. When a
-    deployed artifact is shaped for a mode other than the declared one - a ``uv
-    run`` hook entry or a non-``uvx`` MCP command in a workspace whose
-    declaration names tool mode, or the reverse - the workspace is flagged
+    Reads *package*'s own entry in the committed ``.vaultspec/workspace.json``
+    declaration and holds the mode it names against the shape of that package's
+    provisioned artifacts: for core, the canonical pre-commit hook entries and
+    the ``.mcp.json`` launch command; for a companion package, only its own MCP
+    launch. When a deployed artifact is shaped for a mode other than the declared
+    one - a ``uv run`` hook entry or a non-``uvx`` MCP command in a workspace
+    whose declaration names tool mode, or the reverse - the workspace is flagged
     :attr:`~vaultspec_core.core.diagnosis.signals.ModeMismatchSignal.MISMATCH`
     with the fix hint pointing at ``install --upgrade`` or an explicit
     ``--mode`` re-run.
 
-    A workspace with no persisted declaration is
+    The declared mode is compared through
+    :func:`~vaultspec_core.core.enums.render_mode`, not raw, because that is the
+    mode the artifacts actually render as: a declared-``dev`` package renders
+    byte-identically to ``dependency``, so a ``dev`` declaration against
+    dependency-shaped artifacts is coherent, not a mismatch. Without this
+    collapse every ``dev``-mode workspace would falsely flag, since no artifact
+    ever carries a distinct ``dev`` shape.
+
+    A package with no persisted entry is
     :attr:`~vaultspec_core.core.diagnosis.signals.ModeMismatchSignal.UNKNOWN`:
-    it predates the ``install-mode`` decision, so there is no declared mode to
-    hold its artifacts against and this is not a warning. Everything coherent -
-    or a declared workspace whose artifacts cannot be read - is
-    :attr:`~vaultspec_core.core.diagnosis.signals.ModeMismatchSignal.CLEAN`.
+    it predates the ``install-mode`` decision (or is not provisioned), so there
+    is no declared mode to hold its artifacts against and this is not a warning.
+    Everything coherent - or a declared package whose artifacts cannot be read -
+    is :attr:`~vaultspec_core.core.diagnosis.signals.ModeMismatchSignal.CLEAN`.
 
     Args:
         target: Workspace root directory.
+        package: Distribution name whose mode coherence to assess; ``None`` means
+            ``vaultspec-core``.
 
     Returns:
         The observed
@@ -870,18 +916,23 @@ def collect_mode_mismatch_state(target: Path) -> ModeMismatchSignal:
     Raises:
         VaultSpecError: If the declaration exists but is malformed (propagated
             from
-            :func:`~vaultspec_core.core.workspace_mode.read_workspace_declaration`).
+            :func:`~vaultspec_core.core.workspace_mode.read_package_declaration`).
     """
-    from ..workspace_mode import read_workspace_declaration
+    from ..enums import render_mode
+    from ..workspace_mode import CORE_DISTRIBUTION_NAME, read_package_declaration
 
-    declaration = read_workspace_declaration(target)
+    pkg = package if package is not None else CORE_DISTRIBUTION_NAME
+    declaration = read_package_declaration(target, pkg)
     if declaration is None:
         return ModeMismatchSignal.UNKNOWN
 
-    declared = declaration.install_mode
+    declared = render_mode(declaration.install_mode)
     observed = {
         mode
-        for mode in (_observed_precommit_mode(target), _observed_mcp_mode(target))
+        for mode in (
+            _observed_precommit_mode(target, pkg),
+            _observed_mcp_mode(target, pkg),
+        )
         if mode is not None
     }
     if any(mode != declared for mode in observed):
@@ -889,17 +940,24 @@ def collect_mode_mismatch_state(target: Path) -> ModeMismatchSignal:
     return ModeMismatchSignal.CLEAN
 
 
-def collect_version_floor_state(target: Path) -> tuple[VersionFloorSignal, str, str]:
-    """Evaluate the committed floor constraint for the doctor's read-only view.
+def collect_version_floor_state(
+    target: Path, package: str | None = None
+) -> tuple[VersionFloorSignal, str, str]:
+    """Evaluate *package*'s committed floor constraint for the doctor's read-only view.
 
     Runs the shared :func:`~vaultspec_core.core.workspace_mode.evaluate_version_floor`
     comparator - the same one the resolver's refuse-and-tell path uses - so the
-    doctor reports exactly the condition install and sync refuse on. Unlike that
+    doctor reports exactly the condition install and sync refuse on. The running
+    version tested is *package*'s own installed version, and the floor is
+    *package*'s own entry in the shared map, so a companion package's floor is
+    diagnosed against its own release rather than core's. Unlike the enforcement
     path, this never raises: a corrupt declaration or an unreadable version is
     treated as "no constraint" so the read-only doctor surface stays crash-free.
 
     Args:
         target: Workspace root directory.
+        package: Distribution name whose floor to evaluate; ``None`` means
+            ``vaultspec-core``.
 
     Returns:
         ``(signal, running_version, minimum_version)``. When the running
@@ -912,16 +970,18 @@ def collect_version_floor_state(target: Path) -> tuple[VersionFloorSignal, str, 
     from importlib.metadata import version as pkg_version
 
     from ..exceptions import VaultSpecError
-    from ..workspace_mode import evaluate_version_floor
+    from ..workspace_mode import CORE_DISTRIBUTION_NAME, evaluate_version_floor
+
+    pkg = package if package is not None else CORE_DISTRIBUTION_NAME
 
     try:
-        running = pkg_version("vaultspec-core")
+        running = pkg_version(pkg)
     except Exception:
         logger.debug("Could not determine running version for floor state")
         return VersionFloorSignal.OK, "", ""
 
     try:
-        violation = evaluate_version_floor(target, running)
+        violation = evaluate_version_floor(target, running, package=pkg)
     except VaultSpecError:
         logger.debug("Could not read declaration for floor state", exc_info=True)
         return VersionFloorSignal.OK, "", ""

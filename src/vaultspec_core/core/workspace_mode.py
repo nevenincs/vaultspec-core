@@ -790,26 +790,29 @@ def resolve_install_mode(
 
 
 def evaluate_version_floor(
-    target: Path, running_version: str
+    target: Path, running_version: str, package: str = _DISTRIBUTION_NAME
 ) -> tuple[str, str] | None:
-    """Evaluate the committed floor constraint against *running_version*.
+    """Evaluate *package*'s committed floor constraint against *running_version*.
 
-    Reads the committed ``.vaultspec/workspace.json`` declaration's
-    ``minimum_vaultspec_version`` and compares it to *running_version*. This is
-    the single shared comparator behind both refuse-and-tell on install/sync
-    (which raises on a violation) and report-on-doctor (which renders a row
-    without raising), so the two surfaces cannot diverge on what "below the
-    floor" means.
+    Reads *package*'s own entry in the committed ``.vaultspec/workspace.json``
+    declaration and compares its ``minimum_version`` floor to *running_version*.
+    This is the single shared comparator behind both refuse-and-tell on
+    install/sync (which raises on a violation) and report-on-doctor (which
+    renders a row without raising), so the two surfaces cannot diverge on what
+    "below the floor" means. Keyed per package so a companion package's floor is
+    evaluated against its own running version and its own declared minimum.
 
-    A workspace that declares no floor, or whose versions cannot be parsed,
+    A package that declares no floor, or whose versions cannot be parsed,
     imposes no constraint and returns ``None``. A corrupt declaration
     propagates :class:`~vaultspec_core.core.exceptions.VaultSpecError` from
-    :func:`read_workspace_declaration`; callers decide whether to surface or
+    :func:`read_package_declaration`; callers decide whether to surface or
     swallow it.
 
     Args:
         target: Workspace root directory.
-        running_version: The running ``vaultspec-core`` package version string.
+        running_version: The running package version string to test.
+        package: Distribution name whose floor to evaluate; defaults to
+            ``vaultspec-core``.
 
     Returns:
         ``(running_version, floor)`` when the running version is strictly below
@@ -817,13 +820,13 @@ def evaluate_version_floor(
 
     Raises:
         VaultSpecError: If a declaration exists but is malformed (propagated
-            from :func:`read_workspace_declaration`).
+            from :func:`read_package_declaration`).
     """
-    declaration = read_workspace_declaration(target)
-    if declaration is None or declaration.minimum_vaultspec_version is None:
+    declaration = read_package_declaration(target, package)
+    if declaration is None or declaration.minimum_version is None:
         return None
 
-    floor = declaration.minimum_vaultspec_version
+    floor = declaration.minimum_version
     try:
         if parse_version_tuple(running_version) < parse_version_tuple(floor):
             return running_version, floor
