@@ -102,27 +102,73 @@ def _workspace_path(target: Path) -> Path:
     return target / ".vaultspec" / WORKSPACE_FILENAME
 
 
-def read_workspace_declaration(target: Path) -> WorkspaceDeclaration | None:
-    """Read the committed ``.vaultspec/workspace.json`` declaration.
+def _parse_package_entry(path: Path, name: object, entry: Any) -> PackageDeclaration:
+    """Parse one schema 2.0 ``packages`` entry into a :class:`PackageDeclaration`.
 
-    A missing file is lenient: it means no mode has been declared yet, so the
-    precedence chain that resolves an effective mode can fall through to
-    detection and the default. A present but broken file is strict: corrupt
-    JSON or an unrecognized ``install_mode`` value raises rather than pretending
-    no declaration exists, so an explicit but malformed choice never silently
-    resolves to the default.
+    Strict about a present but broken entry: a non-object entry or an
+    out-of-vocabulary ``install_mode`` raises rather than silently dropping the
+    package, matching the fail-loud contract the top-level read already honors.
+
+    Args:
+        path: The declaration file, named in error messages.
+        name: The package key the entry sits under, named in error messages.
+        entry: The raw entry value parsed from JSON.
+
+    Returns:
+        The parsed :class:`PackageDeclaration`.
+
+    Raises:
+        VaultSpecError: If *entry* is not an object or names an ``install_mode``
+            outside the canonical :class:`~vaultspec_core.core.enums.InstallMode`
+            vocabulary.
+    """
+    if not isinstance(entry, dict):
+        raise VaultSpecError(
+            f"Malformed package entry for {name!r} in workspace declaration at "
+            f"{path}: expected a JSON object.",
+            hint="Fix the JSON by hand or re-run 'vaultspec-core install --mode'.",
+        )
+    mode = InstallMode.from_token(entry.get("install_mode"))
+    if mode is None:
+        raise VaultSpecError(
+            f"Invalid install_mode for package {name!r} in workspace declaration "
+            f"at {path}: {entry.get('install_mode')!r}.",
+            hint="Set install_mode to 'tool', 'dependency', or 'dev', "
+            "or re-run 'vaultspec-core install --mode'.",
+        )
+    floor = entry.get("minimum_version")
+    minimum = str(floor) if floor is not None else None
+    return PackageDeclaration(install_mode=mode, minimum_version=minimum)
+
+
+def _read_packages_map(target: Path) -> dict[str, PackageDeclaration] | None:
+    """Read every package entry from the committed ``workspace.json``.
+
+    The single parse point behind the whole read surface. A missing file is
+    lenient (returns ``None``); a present but broken file is strict (raises).
+    Two on-disk shapes are recognized: the schema 2.0 ``packages`` map is parsed
+    entry by entry, and the legacy schema 1.0 single-key shape
+    (``install_mode`` plus optional ``minimum_vaultspec_version`` at the top
+    level) is folded into a one-entry map keyed to :data:`_DISTRIBUTION_NAME`,
+    renaming the top-level ``minimum_vaultspec_version`` floor to the
+    package-relative ``minimum_version``. The fold happens purely in memory; the
+    next write persists the file in schema 2.0 shape.
+
+    Package keys are canonicalized per PEP 503 so callers can look an entry up by
+    any spelling of a distribution name.
 
     Args:
         target: Workspace root directory.
 
     Returns:
-        The parsed :class:`WorkspaceDeclaration`, or ``None`` when the file is
-        absent.
+        A mapping of canonicalized distribution name to
+        :class:`PackageDeclaration`, or ``None`` when the file is absent.
 
     Raises:
         VaultSpecError: If the file exists but contains invalid JSON, is
-            unreadable, or names an ``install_mode`` outside the canonical
-            :class:`~vaultspec_core.core.enums.InstallMode` vocabulary.
+            unreadable, is not an object, or names an ``install_mode`` outside
+            the canonical :class:`~vaultspec_core.core.enums.InstallMode`
+            vocabulary.
     """
     path = _workspace_path(target)
     if not path.exists():
@@ -141,22 +187,79 @@ def read_workspace_declaration(target: Path) -> WorkspaceDeclaration | None:
             hint="Fix the JSON by hand or re-run 'vaultspec-core install --mode'.",
         )
 
+    packages_raw = raw.get("packages")
+    if packages_raw is not None:
+        if not isinstance(packages_raw, dict):
+            raise VaultSpecError(
+                f"Malformed 'packages' map in workspace declaration at {path}: "
+                "expected a JSON object.",
+                hint="Fix the JSON by hand or re-run 'vaultspec-core install --mode'.",
+            )
+        return {
+            _canonical_distribution_name(str(name)): _parse_package_entry(
+                path, name, entry
+            )
+            for name, entry in packages_raw.items()
+        }
+
+    # Legacy schema 1.0 single-key shape: fold into the default package entry,
+    # renaming the top-level minimum_vaultspec_version floor to the
+    # package-relative minimum_version.
     mode = InstallMode.from_token(raw.get("install_mode"))
     if mode is None:
         raise VaultSpecError(
             f"Invalid install_mode in workspace declaration at {path}: "
             f"{raw.get('install_mode')!r}.",
-            hint="Set install_mode to 'tool' or 'dependency', "
+            hint="Set install_mode to 'tool', 'dependency', or 'dev', "
             "or re-run 'vaultspec-core install --mode'.",
         )
-
     floor = raw.get("minimum_vaultspec_version")
     minimum = str(floor) if floor is not None else None
+    return {
+        _DISTRIBUTION_NAME: PackageDeclaration(
+            install_mode=mode, minimum_version=minimum
+        )
+    }
 
+
+def read_workspace_declaration(target: Path) -> WorkspaceDeclaration | None:
+    """Read the ``vaultspec-core`` view of the committed ``workspace.json``.
+
+    The backward-compatible facade over the schema 2.0 ``packages`` map: it
+    returns the ``vaultspec-core`` package's entry projected onto the
+    single-package :class:`WorkspaceDeclaration` shape every existing caller
+    already consumes. A legacy schema 1.0 file folds into exactly this entry, so
+    the facade is byte-transparent to callers written against the single-key
+    schema.
+
+    A missing file is lenient (returns ``None``, meaning no mode declared yet).
+    A file that exists but declares no ``vaultspec-core`` entry - a workspace
+    that provisioned only a companion package - also returns ``None`` here, since
+    core has no declaration of its own to report. A present but broken file is
+    strict and raises.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        The ``vaultspec-core`` entry as a :class:`WorkspaceDeclaration`, or
+        ``None`` when the file is absent or carries no ``vaultspec-core`` entry.
+
+    Raises:
+        VaultSpecError: If the file exists but contains invalid JSON, is
+            unreadable, or names an ``install_mode`` outside the canonical
+            :class:`~vaultspec_core.core.enums.InstallMode` vocabulary.
+    """
+    packages = _read_packages_map(target)
+    if packages is None:
+        return None
+    entry = packages.get(_DISTRIBUTION_NAME)
+    if entry is None:
+        return None
     return WorkspaceDeclaration(
-        install_mode=mode,
-        minimum_vaultspec_version=minimum,
-        schema_version=str(raw.get("schema_version", WORKSPACE_SCHEMA_VERSION)),
+        install_mode=entry.install_mode,
+        minimum_vaultspec_version=entry.minimum_version,
+        schema_version=WORKSPACE_SCHEMA_VERSION,
     )
 
 
