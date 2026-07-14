@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.40](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.39...vaultspec-core-v0.1.40) (2026-07-14)
+
+
+### Bug Fixes
+
+* **vault:** accept reference and audit documents as ADR grounding ([f1eaa38](https://github.com/nevenincs/vaultspec-core/commit/f1eaa389eb9949ed134d42c8e38173e0d8cde310))
+* **vault:** accept reference and audit documents as ADR grounding ([aba28af](https://github.com/nevenincs/vaultspec-core/commit/aba28af6ec85322ee71dfabcdab97a9274fb88e9))
+
 ## [0.1.39](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.38...vaultspec-core-v0.1.39) (2026-07-14)
 
 
