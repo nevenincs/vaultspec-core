@@ -1130,7 +1130,7 @@ def install_run(
     # rides along so the dependency-leak advisory fires only when this run is the
     # one electing dependency mode, not on a persisted read.
     from .workspace_mode import (
-        DEPENDENCY_LEAK_ADVISORY,
+        dependency_leak_advisory,
         newly_establishes_dependency,
         resolve_install_mode_with_provenance,
     )
@@ -1138,7 +1138,7 @@ def install_run(
     resolved = resolve_install_mode_with_provenance(path, explicit=mode)
     resolved_mode = resolved.mode
     leak_warnings = (
-        [DEPENDENCY_LEAK_ADVISORY] if newly_establishes_dependency(resolved) else []
+        [dependency_leak_advisory()] if newly_establishes_dependency(resolved) else []
     )
 
     if upgrade and dry_run:
@@ -1240,7 +1240,9 @@ def install_run(
         inferred = _infer_upgrade_mode(path, mode)
         resolved_mode = inferred.mode
         leak_warnings = (
-            [DEPENDENCY_LEAK_ADVISORY] if newly_establishes_dependency(inferred) else []
+            [dependency_leak_advisory()]
+            if newly_establishes_dependency(inferred)
+            else []
         )
 
         seeded: list[tuple[str, str]] = []

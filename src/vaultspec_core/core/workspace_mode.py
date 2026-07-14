@@ -121,17 +121,39 @@ class ModeProvenance(StrEnum):
     DEFAULT = "default"
 
 
-#: The one-line, warn-only advisory shown when a run newly establishes the
-#: full-leak dependency placement. Shared by every surface that emits it, so a
-#: single marker identifies it in output and tests. Per the install-parity ADR's
-#: D3 this is guidance, never a refusal.
-DEPENDENCY_LEAK_ADVISORY = (
-    "vaultspec-core is being provisioned in 'dependency' mode, a runtime "
+#: The one-line, warn-only advisory template shown when a run newly establishes
+#: the full-leak dependency placement. Per the install-parity ADR's D3 this is
+#: guidance, never a refusal.
+_DEPENDENCY_LEAK_ADVISORY_TEMPLATE = (
+    "{package} is being provisioned in 'dependency' mode, a runtime "
     "placement that ships it into built distributions. If it is "
     "development-only tooling, '--mode dev' (the default dev group, which does "
     "not leak downstream) or '--mode tool' (an ephemeral uvx launch) avoids "
     "that. Dependency mode remains fully supported; this is advisory only."
 )
+
+
+def dependency_leak_advisory(package: str = CORE_DISTRIBUTION_NAME) -> str:
+    """Render the dependency-leak advisory naming the electing package.
+
+    Companion packages (for example ``vaultspec-rag``) pass their own
+    distribution name so the advisory names the package actually being
+    provisioned rather than vaultspec-core.
+
+    Args:
+        package: Distribution name of the package newly establishing
+            dependency mode.
+
+    Returns:
+        The advisory text with *package* substituted.
+    """
+    return _DEPENDENCY_LEAK_ADVISORY_TEMPLATE.format(package=package)
+
+
+#: Backward-compatible core-named advisory. vaultspec-rag consumers floored on
+#: 0.1.38 reference this constant directly; prefer
+#: :func:`dependency_leak_advisory` for new call sites.
+DEPENDENCY_LEAK_ADVISORY = dependency_leak_advisory()
 
 
 @dataclass

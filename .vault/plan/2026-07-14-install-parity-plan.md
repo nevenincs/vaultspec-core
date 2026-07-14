@@ -93,7 +93,7 @@ Add mode-and-floor rows to rag's server doctor for the vaultspec-rag entry, upda
 - [ ] `W02.P07.S37` - Run rag's full test gate covering the new mode, renderer, and doctor tests; `src/vaultspec_rag/tests`.
 - [ ] `W02.P07.S38` - Review both CLIs' install --help output side by side and confirm the --mode flag vocabulary, help text, and doctor row shape are parity-symmetric between vaultspec-core and vaultspec-rag; `src/vaultspec_core/cli/root.py`.
 - [x] `W02.P07.S39` - resolve each managed MCP definition's render mode from its own declaring package so mixed-mode workspaces sync stably; `src/vaultspec_core/core/mcps.py`.
-- [ ] `W02.P07.S40` - parameterize the dependency-leak advisory by package so companion installs name the right distribution; `src/vaultspec_core/core/workspace_mode.py`.
+- [x] `W02.P07.S40` - parameterize the dependency-leak advisory by package so companion installs name the right distribution; `src/vaultspec_core/core/workspace_mode.py`.
 
 ## Description
 
