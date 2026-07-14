@@ -1025,3 +1025,22 @@ def collect_rename_integrity(target: Path) -> tuple[RenameIntegritySignal, int]:
     except Exception as exc:
         logger.warning("Rename integrity collector failed: %s", exc, exc_info=True)
         return RenameIntegritySignal.ERROR, 0
+
+
+def observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode | None:
+    """Public accessor for the deployed MCP entry's observed install mode.
+
+    Companion packages (vaultspec-rag's upgrade inference and mode-flip
+    detection) consume this observation; the private helper stays the
+    internal implementation.
+
+    Args:
+        target: Workspace root directory.
+        package: Distribution name whose server entry to read; ``None``
+            means ``vaultspec-core``.
+
+    Returns:
+        The :class:`~vaultspec_core.core.enums.InstallMode` the deployed
+        entry is shaped for, or ``None`` when unobservable.
+    """
+    return _observed_mcp_mode(target, package)

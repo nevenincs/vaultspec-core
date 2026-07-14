@@ -8,6 +8,7 @@ consumers can import directly from the package.
 from __future__ import annotations
 
 from ..resolver import ResolutionPlan, ResolutionStep, resolve
+from .collectors import observed_mcp_mode
 from .diagnosis import (
     PackageModeDiagnosis,
     ProviderDiagnosis,
@@ -52,5 +53,6 @@ __all__ = [
     "VersionFloorSignal",
     "WorkspaceDiagnosis",
     "diagnose",
+    "observed_mcp_mode",
     "resolve",
 ]
