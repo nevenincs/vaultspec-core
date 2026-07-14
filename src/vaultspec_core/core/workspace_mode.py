@@ -33,7 +33,18 @@ from .exceptions import VaultSpecError
 from .helpers import advisory_lock, atomic_write, parse_version_tuple
 
 WORKSPACE_FILENAME = "workspace.json"
-WORKSPACE_SCHEMA_VERSION = "1.0"
+
+#: Current declaration schema version. Schema 2.0 is the per-package ``packages``
+#: map that lets one committed ``workspace.json`` carry a mode (and optional
+#: version floor) for each provisioned distribution independently.
+WORKSPACE_SCHEMA_VERSION = "2.0"
+
+#: The legacy single-key schema (``install_mode`` plus an optional
+#: ``minimum_vaultspec_version`` at the top level) that ``install-mode`` shipped.
+#: Files in this shape are recognized on read and folded into the schema 2.0
+#: ``packages`` map keyed to :data:`_DISTRIBUTION_NAME`, then rewritten in the
+#: current shape on the next write.
+_LEGACY_SCHEMA_VERSION = "1.0"
 
 #: Distribution name detection keys on; canonicalized per PEP 503 so that
 #: ``vaultspec_core`` and ``vaultspec-core`` compare equal.
@@ -42,6 +53,30 @@ _DISTRIBUTION_NAME = "vaultspec-core"
 #: Split a PEP 508 requirement string at the first character that terminates
 #: the distribution name (version specifier, extras, marker, or whitespace).
 _REQUIREMENT_NAME_BOUNDARY = re.compile(r"[<>=!~;\[\s(]")
+
+
+@dataclass
+class PackageDeclaration:
+    """One provisioned distribution's entry in the schema 2.0 ``packages`` map.
+
+    Each provisioned package (``vaultspec-core``, ``vaultspec-rag``, ...) owns an
+    independent entry, so a workspace can declare, for example, core in
+    dependency mode and rag in tool mode without the two choices colliding on a
+    single shared key.
+
+    Attributes:
+        install_mode: The provisioning mode declared for this package.
+        minimum_version: Optional floor constraint for this package; when set, an
+            invocation whose running package version is below it is refused per
+            the ``install-mode`` version-skew handshake. ``None`` when the
+            package declares no floor. This is the per-package rename of the
+            legacy top-level ``minimum_vaultspec_version`` key: now that the floor
+            lives inside a named package entry it is package-relative, so the
+            distribution-qualified name is redundant.
+    """
+
+    install_mode: InstallMode
+    minimum_version: str | None = None
 
 
 @dataclass
