@@ -59,7 +59,7 @@ Update user-facing docs and the generated spec reference for --mode dev and per-
 - [x] `W01.P04.S21` - Document the --mode dev flag, the DEV-renders-as-DEPENDENCY nuance, and the v2 per-package workspace.json shape in the MCP and install documentation; `docs/MCP.md`.
 - [x] `W01.P04.S22` - Update the provisioning-mode section to describe the three-mode model and per-package declaration; `README.md`.
 - [x] `W01.P04.S23` - Regenerate the locally-resident CLI reference to reflect the dev mode token and updated --mode help text; `.vaultspec/reference/cli.md`.
-- [ ] `W01.P04.S25` - Update the framework overview's install-mode description to name the three-mode model; `docs/framework.md`.
+- [x] `W01.P04.S25` - Update the framework overview's install-mode description to name the three-mode model; `docs/framework.md`.
 - [ ] `W01.P04.S24` - Run the full unit gate and perform an ADR-conformance review confirming the schema v2 migration, DEV mode, and per-package renderers match the install-parity ADR before the wave is released; `src/vaultspec_core`.
 
 ## Wave `W02` - vaultspec-rag mode adoption and parity
