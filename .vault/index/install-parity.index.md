@@ -21,6 +21,7 @@ related:
   - '[[2026-07-14-install-parity-W01-P02-S13]]'
   - '[[2026-07-14-install-parity-W01-P03-S14]]'
   - '[[2026-07-14-install-parity-W01-P03-S15]]'
+  - '[[2026-07-14-install-parity-W01-P03-S16]]'
   - '[[2026-07-14-install-parity-W01-P03-S28]]'
   - '[[2026-07-14-install-parity-adr]]'
   - '[[2026-07-14-install-parity-plan]]'
@@ -54,6 +55,7 @@ Auto-generated index of all documents tagged with `#install-parity`.
 - `2026-07-14-install-parity-W01-P02-S13` - Add resolver tests asserting the dependency-leak advisory fires for a DEPENDENCY-mode package and stays silent for TOOL or DEV mode
 - `2026-07-14-install-parity-W01-P03-S14` - Add a package parameter to resolve_render_mode, reading only that package's own entry from the v2 map, with the legacy-absent DEPENDENCY bridge as the default package's fallback
 - `2026-07-14-install-parity-W01-P03-S15` - Apply the render_mode aliasing helper in render_mcp_definition_for_mode and key mcp_status and mcp_sync's default resolution to resolve_render_mode(target, package='vaultspec-core')
+- `2026-07-14-install-parity-W01-P03-S16` - Apply the render_mode aliasing helper in entry_prefix_for_mode and hook_defs_for_mode, and key \_scaffold_precommit's default resolution to resolve_render_mode(target, package='vaultspec-core')
 - `2026-07-14-install-parity-W01-P03-S28` - Generalize the MCP launch table from a single hardcoded vaultspec-core module entry to a package-and-module-parameterized render_launch_for_mode helper, keeping vaultspec-core's own launch as the default so companion packages can render through the same sentinel-substitution renderer
 
 ### plan

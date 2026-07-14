@@ -756,9 +756,9 @@ def _scaffold_precommit(
     into ``prek.toml`` manually.
     """
     if mode is None:
-        from .workspace_mode import resolve_render_mode
+        from .workspace_mode import CORE_DISTRIBUTION_NAME, resolve_render_mode
 
-        mode = resolve_render_mode(target)
+        mode = resolve_render_mode(target, package=CORE_DISTRIBUTION_NAME)
     canonical_hooks = canonical_precommit_hooks_for_mode(mode)
 
     if (target / "prek.toml").exists():
