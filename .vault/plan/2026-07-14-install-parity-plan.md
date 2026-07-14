@@ -77,12 +77,12 @@ Block the rest of the wave on a released vaultspec-core version that carries the
 
 Add the --mode tool|dependency|dev flag to rag's install CLI, thread it through core's resolve_install_mode with package=vaultspec-rag, persist via core's per-package writer into the shared workspace.json, tokenize rag's MCP builtin definition for core's renderer, and add upgrade-time mode inference for the rag package.
 
-- [ ] `W02.P06.S29` - Add a --mode tool|dependency|dev option to handle_install and forward it to install_run; `src/vaultspec_rag/cli/_install.py`.
-- [ ] `W02.P06.S30` - Add a mode parameter to install_run that resolves through core's resolve_install_mode with package='vaultspec-rag' and persists the result via core's write_package_declaration into the shared workspace.json; `src/vaultspec_rag/commands/_install.py`.
-- [ ] `W02.P06.S31` - Replace the static command and args with core's sentinel tokens, rendering through render_launch_for_mode with package='vaultspec-rag' and module='vaultspec_rag.server' for module-invocation exe-lock parity; `src/vaultspec_rag/builtins/mcps/vaultspec-rag.builtin.json`.
-- [ ] `W02.P06.S32` - Add upgrade-time mode inference for the vaultspec-rag package, mirroring core's \_infer_upgrade_mode detection evidence and precedence; `src/vaultspec_rag/commands/_install.py`.
-- [ ] `W02.P06.S33` - Leave the --local-only flag and its per-host local-only.json marker unchanged as an orthogonal storage-backend choice, and add a regression test asserting it is not folded into the shared mode declaration; `src/vaultspec_rag/config.py`.
-- [ ] `W02.P06.S34` - Add tests covering --mode tool, dependency, and dev for the rag package, the mixed core-dependency-rag-tool configuration, and the tokenized MCP definition's rendered launch shape; `src/vaultspec_rag/tests/test_install_provision.py`.
+- [x] `W02.P06.S29` - Add a --mode tool|dependency|dev option to handle_install and forward it to install_run; `src/vaultspec_rag/cli/_install.py`.
+- [x] `W02.P06.S30` - Add a mode parameter to install_run that resolves through core's resolve_install_mode with package='vaultspec-rag' and persists the result via core's write_package_declaration into the shared workspace.json; `src/vaultspec_rag/commands/_install.py`.
+- [x] `W02.P06.S31` - Replace the static command and args with core's sentinel tokens, rendering through render_launch_for_mode with package='vaultspec-rag' and module='vaultspec_rag.server' for module-invocation exe-lock parity; `src/vaultspec_rag/builtins/mcps/vaultspec-rag.builtin.json`.
+- [x] `W02.P06.S32` - Add upgrade-time mode inference for the vaultspec-rag package, mirroring core's \_infer_upgrade_mode detection evidence and precedence; `src/vaultspec_rag/commands/_install.py`.
+- [x] `W02.P06.S33` - Leave the --local-only flag and its per-host local-only.json marker unchanged as an orthogonal storage-backend choice, and add a regression test asserting it is not folded into the shared mode declaration; `src/vaultspec_rag/config.py`.
+- [x] `W02.P06.S34` - Add tests covering --mode tool, dependency, and dev for the rag package, the mixed core-dependency-rag-tool configuration, and the tokenized MCP definition's rendered launch shape; `src/vaultspec_rag/tests/test_install_provision.py`.
 
 ### Phase `W02.P07` - rag diagnosis, docs, and cross-repo parity review
 

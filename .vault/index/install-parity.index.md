@@ -34,6 +34,12 @@ related:
   - '[[2026-07-14-install-parity-W01-P04-S25]]'
   - '[[2026-07-14-install-parity-W02-P05-S26]]'
   - '[[2026-07-14-install-parity-W02-P05-S27]]'
+  - '[[2026-07-14-install-parity-W02-P06-S29]]'
+  - '[[2026-07-14-install-parity-W02-P06-S30]]'
+  - '[[2026-07-14-install-parity-W02-P06-S31]]'
+  - '[[2026-07-14-install-parity-W02-P06-S32]]'
+  - '[[2026-07-14-install-parity-W02-P06-S33]]'
+  - '[[2026-07-14-install-parity-W02-P06-S34]]'
   - '[[2026-07-14-install-parity-W02-P07-S39]]'
   - '[[2026-07-14-install-parity-W02-P07-S40]]'
   - '[[2026-07-14-install-parity-adr]]'
@@ -81,6 +87,12 @@ Auto-generated index of all documents tagged with `#install-parity`.
 - `2026-07-14-install-parity-W01-P04-S25` - Update the framework overview's install-mode description to name the three-mode model
 - `2026-07-14-install-parity-W02-P05-S26` - Verify the released vaultspec-core version on PyPI carries the DEV member and schema v2 API - this step blocks the remainder of the wave
 - `2026-07-14-install-parity-W02-P05-S27` - Bump the vaultspec-core dependency floor and refresh uv.lock to the released version carrying the DEV member and schema v2
+- `2026-07-14-install-parity-W02-P06-S29` - Add a --mode tool|dependency|dev option to handle_install and forward it to install_run
+- `2026-07-14-install-parity-W02-P06-S30` - Add a mode parameter to install_run that resolves through core's resolve_install_mode with package='vaultspec-rag' and persists the result via core's write_package_declaration into the shared workspace.json
+- `2026-07-14-install-parity-W02-P06-S31` - Replace the static command and args with core's sentinel tokens, rendering through render_launch_for_mode with package='vaultspec-rag' and module='vaultspec_rag.server' for module-invocation exe-lock parity
+- `2026-07-14-install-parity-W02-P06-S32` - Add upgrade-time mode inference for the vaultspec-rag package, mirroring core's \_infer_upgrade_mode detection evidence and precedence
+- `2026-07-14-install-parity-W02-P06-S33` - Leave the --local-only flag and its per-host local-only.json marker unchanged as an orthogonal storage-backend choice, and add a regression test asserting it is not folded into the shared mode declaration
+- `2026-07-14-install-parity-W02-P06-S34` - Add tests covering --mode tool, dependency, and dev for the rag package, the mixed core-dependency-rag-tool configuration, and the tokenized MCP definition's rendered launch shape
 - `2026-07-14-install-parity-W02-P07-S39` - resolve each managed MCP definition's render mode from its own declaring package so mixed-mode workspaces sync stably
 - `2026-07-14-install-parity-W02-P07-S40` - parameterize the dependency-leak advisory by package so companion installs name the right distribution
 
