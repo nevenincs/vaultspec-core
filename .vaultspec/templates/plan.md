@@ -103,7 +103,8 @@ related:
 
 <!-- Briefly describe the proposed work. Reference `{adr}`s,
 `{research}`, `{reference}`. Supporting documentation must be read prior to
-writing the plan document. -->
+writing the plan document. A plan may execute one ADR or a cluster; when
+several feed it, state here which Wave or Phase each ADR governs. -->
 
 ## Steps
 

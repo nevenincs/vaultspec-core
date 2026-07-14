@@ -1,6 +1,6 @@
 ---
 name: vaultspec-write
-description: Write an implementation plan of waves, phases, and steps. Use only after an ADR is approved.
+description: Write an implementation plan of waves, phases, and steps. Use only after the authorizing ADR - or the cluster of ADRs a roll-up plan executes - is approved.
 ---
 
 # Plan writing skill (vaultspec-write)
@@ -58,6 +58,16 @@ Full criteria, the row contract, identifier rules, and ordering rules are embedd
 markdown-comment hint blocks in `.vaultspec/templates/plan.md`. The skill defers to
 those canonical sources rather than restating them.
 
+## ADR cardinality
+
+A plan executes one ADR or a cluster of them; both are normal. Multi-component work - a
+frontend or backend spanning several components, elements, or libraries, each with its
+own decision record - rolls up into a single epic plan (typically `L3`/`L4`) as the
+tracking document. Every governing ADR is listed in `related:` (`--related` repeats at
+scaffold time), and when several feed the plan, the Description section states which
+Wave or Phase each ADR governs. The inverse is not sanctioned: one ADR spread across
+several concurrent plans fragments tracking - prefer one plan per decision cluster.
+
 ## Rules
 
 - **Ground the plan in real code first.** Map the implementation surface the plan will
@@ -83,11 +93,12 @@ those canonical sources rather than restating them.
 - **Persistence:**
 
   - Plans: scaffold via
-    `vaultspec-core vault add plan --feature {feature} --tier <L1..L4> --related <adr-stem>`;
-    the CLI owns the filename (`.vault/plan/yyyy-mm-dd-{feature}-plan.md`) and the
-    frontmatter; never hand-write either. Build the structure with the
-    `vaultspec-core vault plan` verbs above, then author the prose sections
-    (Description, Parallelization, Verification) as body edits.
+    `vaultspec-core vault add plan --feature {feature} --tier <L1..L4> --related <adr-stem> [--related <adr-stem> ...]`
+    (one `--related` per authorizing ADR); the CLI owns the filename
+    (`.vault/plan/yyyy-mm-dd-{feature}-plan.md`) and the frontmatter; never hand-write
+    either. Build the structure with the `vaultspec-core vault plan` verbs above, then
+    author the prose sections (Description, Parallelization, Verification) as body
+    edits.
 
   - Phase Summaries: tier-conditional `.vault/exec/yyyy-mm-dd-{feature}/...-summary.md`
     filenames (`yyyy-mm-dd-{feature}-{phase}-summary.md` at L2;
@@ -123,11 +134,11 @@ frontmatter.
   embedded LINK RULES in the plan template.
 
 - **Drafting**: If working with sub-agents, load the `vaultspec-writer` agent persona.
-  Instruct it to "Create an implementation plan for `{feature}` based on
-  `[[...-adr.md]]`. Use the template at `.vaultspec/templates/plan.md` and conform to
-  the embedded HIERARCHY AND TIERS, IDENTIFIERS AND ROW CONTRACT, and NO COMPRESSION
-  hint blocks. The plan's tier (`L1`/`L2`/`L3`/`L4`) is already set in frontmatter by
-  the `--tier` flag at scaffold time."
+  Instruct it to "Create an implementation plan for `{feature}` based on the authorizing
+  ADR(s) `[[...-adr.md]]`. Use the template at `.vaultspec/templates/plan.md` and
+  conform to the embedded HIERARCHY AND TIERS, IDENTIFIERS AND ROW CONTRACT, and NO
+  COMPRESSION hint blocks. The plan's tier (`L1`/`L2`/`L3`/`L4`) is already set in
+  frontmatter by the `--tier` flag at scaffold time."
 
 - **Review**: Present the saved Plan summary to the user before executing.
 

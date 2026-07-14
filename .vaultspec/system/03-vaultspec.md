@@ -31,13 +31,19 @@ All significant work must follow this pipeline:
 | 1a Research  | vaultspec-research      | .vault/research/...   | -                 |
 | 1b Reference | vaultspec-code-research | .vault/reference/...  | -                 |
 | 2 Specify    | vaultspec-adr           | .vault/adr/...        | Research artifact |
-| 3 Plan       | vaultspec-write         | .vault/plan/...       | ADR artifact      |
+| 3 Plan       | vaultspec-write         | .vault/plan/...       | ADR artifact(s)   |
 | 4 Execute    | vaultspec-execute       | .vault/exec/.../steps | Approved plan     |
 | 5 Verify     | vaultspec-code-review   | .vault/audit/...      | Completed step(s) |
 
 Phases 1a and 1b are parallel entry points: Research explores the problem space,
 Reference grounds the work in existing source code. A feature needs at least one of the
 two; complex features benefit from both.
+
+A plan executes one ADR or a cluster of ADRs: multi-component work - each component,
+element, or library carrying its own decision record - rolls up into a single epic plan
+(typically `L3`/`L4`) as the tracking document, every governing ADR listed in the plan's
+`related:` frontmatter. The inverse fragments tracking: do not spread one ADR across
+several concurrent plans.
 
 The pipeline scales with the work. Trivial, single-file fixes with no architectural
 weight may proceed directly with user approval; state explicitly that the pipeline is

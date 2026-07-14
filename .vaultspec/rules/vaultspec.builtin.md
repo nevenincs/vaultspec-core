@@ -72,6 +72,9 @@ hierarchy should reference those above them.
 - **Implementation Plans** (`.vault/plan/`)
 
   - *Depends on:* ADRs, research, audits, (previous or related feature plans)
+  - *Cardinality:* one plan executes one ADR or a cluster of ADRs (the epic roll-up);
+    every governing ADR is listed in `related:`. One ADR is never spread across several
+    concurrent plans.
 
 - **Execution Records**
   (`.vault/exec/{yyyy-mm-dd-feature}/{yyyy-mm-dd-feature-{phase}-{step}}.md`)
