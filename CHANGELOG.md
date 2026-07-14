@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.41](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.40...vaultspec-core-v0.1.41) (2026-07-14)
+
+
+### Features
+
+* **diagnosis:** public observed_mcp_mode accessor for companion packages ([c71b484](https://github.com/nevenincs/vaultspec-core/commit/c71b484bcb0595d8c060c2441cf7bce3e95e1552))
+* **diagnosis:** public observed_mcp_mode accessor for companion packages ([c55cc2a](https://github.com/nevenincs/vaultspec-core/commit/c55cc2a9891ca5c9c47d1aac1171f7ddf298471f))
+
 ## [0.1.40](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.39...vaultspec-core-v0.1.40) (2026-07-14)
 
 
