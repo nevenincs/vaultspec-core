@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.39](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.38...vaultspec-core-v0.1.39) (2026-07-14)
+
+
+### Bug Fixes
+
+* **core:** parameterize dependency-leak advisory by package (install-parity W02.P07.S40) ([bc66800](https://github.com/nevenincs/vaultspec-core/commit/bc6680085a2ba414f4dc3378fe95852b335d153a))
+* **core:** per-package MCP render mode + package-named leak advisory (install-parity W02.P07) ([b5249f3](https://github.com/nevenincs/vaultspec-core/commit/b5249f370f57c128818e437ae4d87742a611617c))
+* **core:** resolve MCP render mode per declaring package (install-parity W02.P07.S39) ([93f208f](https://github.com/nevenincs/vaultspec-core/commit/93f208f0a4bcb90a5d3f6cd315b682686d947b93))
+
 ## [0.1.38](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.37...vaultspec-core-v0.1.38) (2026-07-14)
 
 
