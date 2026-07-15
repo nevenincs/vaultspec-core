@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.44](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.43...vaultspec-core-v0.1.44) (2026-07-15)
+
+
+### Features
+
+* add provider-native MCP enrollment ([#208](https://github.com/nevenincs/vaultspec-core/issues/208)) ([a972e94](https://github.com/nevenincs/vaultspec-core/commit/a972e9480ff81b82f0cb72dc94fc9e3db0592dfd))
+
 ## [0.1.43](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.42...vaultspec-core-v0.1.43) (2026-07-14)
 
 
