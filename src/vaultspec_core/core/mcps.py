@@ -911,6 +911,23 @@ def _set_owned_names(
     }
 
 
+def _discard_owned_names(
+    state: dict[str, Any], target: McpTarget, names: set[str]
+) -> None:
+    key = _ownership_target_key(target)
+    record = state["targets"].get(key)
+    if not isinstance(record, dict):
+        return
+    managed = record.get("managed")
+    if not isinstance(managed, dict):
+        state["targets"].pop(key, None)
+        return
+    for name in names:
+        managed.pop(name, None)
+    if not managed:
+        state["targets"].pop(key, None)
+
+
 def _apply_server_merge(
     servers: dict[str, dict[str, Any]],
     managed: set[str],
@@ -1408,9 +1425,11 @@ def mcp_uninstall(
     provider: Tool | str = "all",
     scope: McpScope | str = McpScope.PROJECT,
     enrolled: Iterable[Tool] | None = None,
+    names: Iterable[str] | None = None,
 ) -> SyncResult:
     """Remove only externally recorded Vaultspec-owned entries."""
     result = SyncResult()
+    selected_names = frozenset(names) if names is not None else None
     try:
         resolved_scope = _coerce_scope(scope)
         targets = resolve_mcp_targets(
@@ -1434,8 +1453,10 @@ def mcp_uninstall(
         for target in targets:
             sub = SyncResult()
             managed = _owned_names(state, target)
-            if not managed or not target.path.exists():
-                _set_owned_names(state, target, {})
+            requested = managed if selected_names is None else managed & selected_names
+            if not requested or not target.path.exists():
+                if not dry_run:
+                    _discard_owned_names(state, target, requested)
                 result.per_tool[target.provider.value] = sub
                 continue
             succeeded = False
@@ -1446,7 +1467,7 @@ def mcp_uninstall(
                         if not isinstance(raw, dict):
                             raise VaultSpecError("JSON root is not an object.")
                         servers = _json_server_map(raw, target, target_dir)
-                        present = managed & set(servers)
+                        present = requested & set(servers)
                         sub.pruned += len(present)
                         sub.items.extend((name, "[DELETE]") for name in sorted(present))
                         if not dry_run:
@@ -1457,7 +1478,7 @@ def mcp_uninstall(
                     else:
                         content = target.path.read_text(encoding="utf-8")
                         block_servers = _toml_servers(_managed_toml_content(content))
-                        present = managed & set(block_servers)
+                        present = requested & set(block_servers)
                         sub.pruned += len(present)
                         sub.items.extend((name, "[DELETE]") for name in sorted(present))
                         if not dry_run:
@@ -1491,7 +1512,7 @@ def mcp_uninstall(
                         f"Cannot uninstall MCPs from {target.path}: {exc}"
                     )
             if not dry_run and succeeded:
-                _set_owned_names(state, target, {})
+                _discard_owned_names(state, target, requested)
             result.merge(sub)
             result.per_tool[target.provider.value] = sub
         if not dry_run:
