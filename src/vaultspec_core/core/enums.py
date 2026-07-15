@@ -196,6 +196,21 @@ class Tool(StrEnum):
     CODEX = "codex"
 
 
+class McpScope(StrEnum):
+    """Native host scope for an MCP server enrollment."""
+
+    PROJECT = "project"
+    LOCAL = "local"
+    USER = "user"
+
+
+class McpTargetFormat(StrEnum):
+    """Serialization format consumed by an MCP host target."""
+
+    JSON = "json"
+    TOML = "toml"
+
+
 class GeminiBuiltinTool(StrEnum):
     """Canonical Gemini CLI built-in tool identifiers.
 
@@ -234,6 +249,7 @@ class ProviderCapability(StrEnum):
     TEAMS = "teams"
     SCHEDULED_TASKS = "scheduled_tasks"
     WORKFLOWS = "workflows"
+    MCPS = "mcps"
 
 
 class Resource(StrEnum):
