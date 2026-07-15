@@ -9,9 +9,12 @@ sync), MCP definitions are JSON files merged into a single provider-agnostic
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
+import re
+import tomllib
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -27,6 +30,7 @@ from .enums import (
 )
 from .exceptions import ResourceExistsError, ResourceNotFoundError, VaultSpecError
 from .helpers import advisory_lock, atomic_write, ensure_dir
+from .tags import TagError, find_blocks, strip_block, upsert_block
 from .types import McpTarget, SyncResult
 
 logger = logging.getLogger(__name__)
@@ -336,8 +340,17 @@ def resolve_mcp_targets(
     selected for the current install before the provider manifest is written.
     Ordinary callers omit it and resolution uses the committed manifest.
     """
-    ctx = _t.get_context()
+    try:
+        ctx = _t.get_context()
+    except LookupError:
+        if target_dir is None:
+            raise VaultSpecError(
+                "No workspace context or explicit MCP target directory is available."
+            ) from None
+        ctx = _t.init_paths(target_dir)
     root = target_dir or ctx.target_dir
+    if ctx.target_dir.resolve() != root.resolve():
+        ctx = _t.init_paths(root)
     resolved_scope = _coerce_scope(scope)
     tools = _selected_mcp_tools(provider, enrolled=enrolled)
     targets: list[McpTarget] = []
@@ -543,22 +556,16 @@ def mcp_list() -> list[dict[str, str]]:
     return list(items.values())
 
 
-def mcp_status() -> dict[str, Any]:
-    """Return focused status for MCP definitions and the synced config file.
-
-    This is intentionally narrower than ``spec doctor``: it reports only
-    whether source definitions under ``.vaultspec/mcps/`` are represented
-    in the workspace ``.mcp.json`` and whether managed entries have drifted.
-
-    Drift is judged mode-aware: definitions are rendered for the workspace's
-    resolved render mode (via
-    :func:`~vaultspec_core.core.workspace_mode.resolve_render_mode`) before
-    they are compared against the synced ``.mcp.json`` entries, so a
-    correctly-provisioned workspace in either mode is not reported as drifted
-    against the mode-neutral token form.
-    """
+def mcp_status(
+    *,
+    provider: Tool | str = "all",
+    scope: McpScope | str = McpScope.PROJECT,
+    target_dir: Path | None = None,
+    enrolled: Iterable[Tool] | None = None,
+) -> dict[str, Any]:
+    """Return aggregate and per-provider native MCP enrollment status."""
     try:
-        target_dir = _t.get_context().target_dir
+        root = target_dir or _t.get_context().target_dir
     except LookupError:
         return {
             "status": "no_context",
@@ -570,103 +577,163 @@ def mcp_status() -> dict[str, Any]:
             "missing": [],
             "drifted": [],
             "stale_managed": [],
+            "external": [],
+            "providers": {},
             "warnings": ["No workspace context available for MCP status."],
         }
 
     from .workspace_mode import CORE_DISTRIBUTION_NAME, resolve_render_mode
 
-    render_mode = resolve_render_mode(target_dir, package=CORE_DISTRIBUTION_NAME)
+    try:
+        resolved_scope = _coerce_scope(scope)
+        targets = resolve_mcp_targets(
+            provider,
+            scope=resolved_scope,
+            target_dir=root,
+            enrolled=enrolled,
+        )
+    except VaultSpecError as exc:
+        return {
+            "status": "invalid_target",
+            "config_path": None,
+            "config_exists": False,
+            "definitions": [],
+            "configured": [],
+            "managed": [],
+            "missing": [],
+            "drifted": [],
+            "stale_managed": [],
+            "external": [],
+            "providers": {},
+            "warnings": [str(exc)],
+        }
+
+    render_mode = resolve_render_mode(root, package=CORE_DISTRIBUTION_NAME)
     parse_warnings: list[str] = []
     sources = collect_mcp_servers(
-        warnings=parse_warnings, mode=render_mode, target=target_dir
+        warnings=parse_warnings, mode=render_mode, target=root
     )
     definitions = sorted(sources)
 
-    mcp_json = target_dir / ".mcp.json"
-    configured: list[str] = []
-    managed: list[str] = []
-    missing = definitions.copy()
-    drifted: list[str] = []
-    stale_managed: list[str] = []
     warnings = list(parse_warnings)
-    status = "ok"
-
-    if not mcp_json.exists():
-        status = "missing_config" if definitions else "no_definitions"
-        warnings.append(".mcp.json is missing; run vaultspec-core sync.")
+    try:
+        state = _read_ownership(_ownership_path(root, resolved_scope))
+    except VaultSpecError as exc:
         return {
-            "status": status,
-            "config_path": str(mcp_json),
+            "status": "invalid_target",
+            "config_path": None,
             "config_exists": False,
             "definitions": definitions,
-            "configured": configured,
-            "managed": managed,
-            "missing": missing,
-            "drifted": drifted,
-            "stale_managed": stale_managed,
-            "warnings": warnings,
+            "configured": [],
+            "managed": [],
+            "missing": definitions,
+            "drifted": [],
+            "stale_managed": [],
+            "external": [],
+            "providers": {},
+            "warnings": [*warnings, str(exc)],
         }
 
-    try:
-        raw = json.loads(mcp_json.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as exc:
-        return {
-            "status": "invalid_config",
-            "config_path": str(mcp_json),
-            "config_exists": True,
-            "definitions": definitions,
+    providers: dict[str, dict[str, Any]] = {}
+    for target in targets:
+        normalization = SyncResult()
+        target_sources = _normalized_sources(sources, target, normalization)
+        servers: dict[str, dict[str, Any]] = {}
+        managed = _owned_names(state, target)
+        target_warnings = list(normalization.warnings)
+        invalid = False
+        if target.path.exists():
+            try:
+                if target.format is McpTargetFormat.JSON:
+                    raw = json.loads(target.path.read_text(encoding="utf-8"))
+                    if not isinstance(raw, dict):
+                        raise VaultSpecError("JSON root is not an object.")
+                    native = _json_server_map(raw, target, root)
+                    servers = {
+                        str(name): dict(config)
+                        for name, config in native.items()
+                        if isinstance(config, dict)
+                    }
+                    legacy = raw.get(_LEGACY_MANAGED_KEY, [])
+                    if isinstance(legacy, list):
+                        managed.update(name for name in legacy if isinstance(name, str))
+                else:
+                    content = target.path.read_text(encoding="utf-8")
+                    outside = _toml_servers(strip_block(content, _TOML_BLOCK_TYPE))
+                    block = _toml_servers(_managed_toml_content(content))
+                    servers = {**outside, **block}
+                    managed.update(block)
+            except (
+                json.JSONDecodeError,
+                OSError,
+                TagError,
+                tomllib.TOMLDecodeError,
+                VaultSpecError,
+            ) as exc:
+                invalid = True
+                target_warnings.append(f"Cannot parse {target.path}: {exc}")
+        managed.intersection_update(servers)
+        configured = sorted(servers)
+        missing = sorted(set(definitions) - set(servers))
+        drifted = sorted(
+            name
+            for name in managed & set(target_sources)
+            if servers[name] != target_sources[name][1]
+        )
+        stale = sorted(managed - set(definitions))
+        external = sorted(set(servers) - managed)
+        if invalid:
+            target_status = "invalid_config"
+        elif not target.path.exists():
+            target_status = "missing_config" if definitions else "no_definitions"
+        elif missing or drifted or stale:
+            target_status = "partial"
+        else:
+            target_status = "ok"
+        providers[target.provider.value] = {
+            "status": target_status,
+            "scope": target.scope.value,
+            "config_path": str(target.path),
+            "config_exists": target.path.exists(),
             "configured": configured,
-            "managed": managed,
+            "managed": sorted(managed),
             "missing": missing,
             "drifted": drifted,
-            "stale_managed": stale_managed,
-            "warnings": [*warnings, f"Cannot parse .mcp.json: {exc}"],
+            "stale_managed": stale,
+            "external": external,
+            "warnings": target_warnings,
         }
+        warnings.extend(target_warnings)
 
-    if not isinstance(raw, dict):
-        return {
-            "status": "invalid_config",
-            "config_path": str(mcp_json),
-            "config_exists": True,
-            "definitions": definitions,
-            "configured": configured,
-            "managed": managed,
-            "missing": missing,
-            "drifted": drifted,
-            "stale_managed": stale_managed,
-            "warnings": [*warnings, ".mcp.json is not a JSON object."],
-        }
+    def aggregate(key: str) -> list[str]:
+        return sorted({item for data in providers.values() for item in data[key]})
 
-    servers = raw.get("mcpServers", {})
-    if not isinstance(servers, dict):
-        status = "invalid_config"
-        warnings.append(".mcp.json field 'mcpServers' is not a JSON object.")
-        servers = {}
-
-    configured = sorted(str(name) for name in servers)
-    raw_managed = raw.get(_MANAGED_KEY, [])
-    if isinstance(raw_managed, list):
-        managed = sorted(str(name) for name in raw_managed if isinstance(name, str))
-
-    missing = [name for name in definitions if name not in servers]
-    for name, (_source_path, config) in sources.items():
-        if name in servers and name in managed and servers[name] != config:
-            drifted.append(name)
-    stale_managed = [name for name in managed if name not in definitions]
-
-    if status == "ok" and (missing or drifted or stale_managed or warnings):
+    statuses = {data["status"] for data in providers.values()}
+    if not statuses:
+        status = "no_providers"
+    elif statuses <= {"ok", "no_definitions"}:
+        status = "ok"
+    else:
         status = "partial"
-
+    if "invalid_config" in statuses:
+        status = "invalid_config"
     return {
         "status": status,
-        "config_path": str(mcp_json),
-        "config_exists": True,
+        "config_path": (
+            next(iter(providers.values()))["config_path"]
+            if len(providers) == 1
+            else None
+        ),
+        "config_exists": bool(providers)
+        and all(data["config_exists"] for data in providers.values()),
         "definitions": definitions,
-        "configured": configured,
-        "managed": managed,
-        "missing": missing,
-        "drifted": sorted(drifted),
-        "stale_managed": stale_managed,
+        "configured": aggregate("configured"),
+        "managed": aggregate("managed"),
+        "missing": aggregate("missing"),
+        "drifted": aggregate("drifted"),
+        "stale_managed": aggregate("stale_managed"),
+        "external": aggregate("external"),
+        "providers": providers,
         "warnings": warnings,
     }
 
@@ -752,94 +819,114 @@ def mcp_remove(name: str) -> Path:
     raise ResourceNotFoundError(f"MCP definition '{name}' not found.")
 
 
-_MANAGED_KEY = "_vaultspecManaged"
+_LEGACY_MANAGED_KEY = "_vaultspecManaged"
+_TOML_BLOCK_TYPE = "mcps"
+_STDIO_FIELDS = frozenset({"command", "args", "env"})
 
 
-def _apply_mcp_merge(
-    existing: dict[str, Any],
+def _normalized_sources(
+    sources: dict[str, tuple[Path, dict[str, Any]]],
+    target: McpTarget,
+    result: SyncResult,
+) -> dict[str, tuple[Path, dict[str, Any]]]:
+    """Validate canonical stdio definitions before a provider adapter sees them."""
+    normalized: dict[str, tuple[Path, dict[str, Any]]] = {}
+    for name, (path, config) in sources.items():
+        unsupported = sorted(set(config) - _STDIO_FIELDS)
+        command = config.get("command")
+        args = config.get("args", [])
+        env = config.get("env", {})
+        if unsupported:
+            result.warnings.append(
+                f"MCP server '{name}' has fields unsupported by "
+                f"{target.provider.value}: {unsupported}; skipping this target."
+            )
+            continue
+        if not isinstance(command, str):
+            result.warnings.append(
+                f"MCP server '{name}' has a non-string command; skipping "
+                f"{target.provider.value}."
+            )
+            continue
+        if not isinstance(args, list) or not all(
+            isinstance(item, str) for item in args
+        ):
+            result.warnings.append(
+                f"MCP server '{name}' has non-string args; skipping "
+                f"{target.provider.value}."
+            )
+            continue
+        if not isinstance(env, dict) or not all(
+            isinstance(key, str) and isinstance(value, str)
+            for key, value in env.items()
+        ):
+            result.warnings.append(
+                f"MCP server '{name}' has a non-string environment map; skipping "
+                f"{target.provider.value}."
+            )
+            continue
+        definition: dict[str, Any] = {"command": command}
+        if "args" in config:
+            definition["args"] = list(args)
+        if "env" in config:
+            definition["env"] = dict(env)
+        normalized[name] = (path, definition)
+    return normalized
+
+
+def _fingerprint(config: dict[str, Any]) -> str:
+    """Return the stable observed-content fingerprint stored in ownership state."""
+    encoded = json.dumps(config, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _owned_names(state: dict[str, Any], target: McpTarget) -> set[str]:
+    raw = state["targets"].get(_ownership_target_key(target), {})
+    managed = raw.get("managed", {}) if isinstance(raw, dict) else {}
+    if isinstance(managed, dict):
+        return {str(name) for name in managed}
+    return set()
+
+
+def _set_owned_names(
+    state: dict[str, Any], target: McpTarget, servers: dict[str, dict[str, Any]]
+) -> None:
+    key = _ownership_target_key(target)
+    if not servers:
+        state["targets"].pop(key, None)
+        return
+    state["targets"][key] = {
+        "provider": target.provider.value,
+        "scope": target.scope.value,
+        "path": str(target.path.resolve()),
+        "managed": {
+            name: _fingerprint(config) for name, config in sorted(servers.items())
+        },
+    }
+
+
+def _apply_server_merge(
+    servers: dict[str, dict[str, Any]],
+    managed: set[str],
+    external: set[str],
     sources: dict[str, tuple[Path, dict[str, Any]]],
     *,
     force: bool,
     prune: bool,
     result: SyncResult,
     label: str,
-    force_managed: frozenset[str] = frozenset(),
+    force_managed: frozenset[str],
 ) -> bool:
-    """Merge *sources* into the *existing* MCP config dict in place.
-
-    Shared merge engine for every MCP target file (the workspace
-    ``.mcp.json`` and each provider-native config such as Antigravity's
-    ``.agents/mcp_config.json``). Mutates *existing* (its ``mcpServers`` map
-    and the ``_vaultspecManaged`` ownership sidecar) and records actions and
-    warnings on *result*.
-
-    *force_managed* is a surgical, per-entry escalation of *force* scoped to
-    the named already-managed servers only. It exists for the ``install
-    --upgrade`` mode-flip case: when an upgrade flips the workspace's install
-    mode, the pre-commit and declaration renderers rewrite unconditionally but
-    an unforced MCP sync would skip a pre-existing managed ``vaultspec-core``
-    entry still carrying the old mode's launch shape, leaving the migration
-    non-atomic across the three renderers. Naming that entry in *force_managed*
-    updates it in the same run without escalating the whole sync to *force*.
-    Because it gates only the ``name in managed`` branch, a user-owned entry
-    that shares a name with a source is never adopted or overwritten by it, so
-    the foreign-entry discipline stays intact.
-
-    Args:
-        existing: Parsed target config; mutated in place.
-        sources: Collected MCP definitions keyed by server name.
-        force: Overwrite managed/user entries that differ from their source.
-        prune: Remove managed entries whose source file is gone from disk.
-        result: Accumulator for counters, items, and warnings.
-        label: Human label for the target (e.g. ``".mcp.json"``) used in
-            warning messages.
-        force_managed: Names of already-managed servers to overwrite when they
-            diverge from their source, even when *force* is ``False``. Ignored
-            for any name not currently in the managed set.
-
-    Returns:
-        ``True`` when *existing* was modified, else ``False``.
-    """
-    servers = existing.setdefault("mcpServers", {})
-    if not isinstance(servers, dict):
-        servers = {}
-        existing["mcpServers"] = servers
-
-    if _MANAGED_KEY in existing:
-        raw_managed = existing.get(_MANAGED_KEY, [])
-        if isinstance(raw_managed, list):
-            managed: set[str] = {str(n) for n in raw_managed if isinstance(n, str)}
-        else:
-            managed = set()
-    else:
-        # Legacy migration: workspaces created before ownership tracking
-        # shipped have no sidecar key. Treat any pre-existing entry whose
-        # name matches a current source as managed — preserving the legacy
-        # "differs, use --force" warning behaviour for already-installed
-        # entries. After this sync the sidecar is written and future syncs
-        # use strict ownership.
-        managed = set(servers.keys()) & set(sources.keys())
-        if managed:
-            msg = (
-                f"Legacy {label} migration: taking ownership of "
-                f"{len(managed)} pre-existing entries that match current "
-                f"sources ({sorted(managed)}). Future syncs will use strict "
-                f"ownership tracking."
-            )
-            logger.warning(msg)
-            result.warnings.append(msg)
-
+    """Apply ownership-safe desired state to one provider's normalized servers."""
     changed = False
     for name, (_path, config) in sources.items():
         if name not in servers:
-            # New entry — vaultspec creates it and takes ownership.
             servers[name] = config
             managed.add(name)
             result.added += 1
             result.items.append((name, "[ADD]"))
             changed = True
         elif name in managed:
-            # Previously managed by vaultspec — sync content.
             if servers[name] == config:
                 result.unchanged += 1
                 result.items.append((name, "[UNCHANGED]"))
@@ -852,42 +939,25 @@ def _apply_mcp_merge(
                 result.skipped += 1
                 result.items.append((name, "[SKIP]"))
                 result.warnings.append(
-                    f"MCP server '{name}' differs from definition "
-                    f"(use --force to overwrite)"
+                    f"MCP server '{name}' in {label} differs from its definition "
+                    "(use --force to overwrite)."
                 )
         elif force:
-            # User-added entry that shares a name with a current source.
-            # --force is the explicit adopt path (issue #120): overwrite it
-            # with the source definition and take ownership, so the entry
-            # converges without the user hand-editing the generated file
-            # the CLI tells them not to touch.
-            if servers[name] != config:
-                servers[name] = config
-                changed = True
+            servers[name] = config
+            external.discard(name)
             managed.add(name)
             result.updated += 1
             result.items.append((name, "[ADOPT]"))
             changed = True
         else:
-            # User-added entry that shares a name with a current
-            # source. Preserve it; never take ownership implicitly.
             result.skipped += 1
             result.items.append((name, "[SKIP]"))
             result.warnings.append(
-                f"MCP server '{name}' is user-managed and shares its name "
-                f"with a vaultspec source; skipping. Re-run with --force to "
-                f"adopt it into vaultspec management, or rename one to resolve."
+                f"MCP server '{name}' in {label} is externally managed; "
+                "use --force to adopt it explicitly."
             )
 
     if prune:
-        # Critical: prune is gated on the source file being *physically
-        # absent* from disk, not merely missing from the parsed sources
-        # dict. ``collect_mcp_servers`` omits files that exist but failed
-        # JSON parsing or read; treating those as deletions would let a
-        # transient typo silently destroy the corresponding entry under
-        # ``sync --force``. ``_existing_source_server_names`` walks the
-        # directory without opening files, so a parse failure leaves the
-        # entry intact until the source is fixed (or genuinely deleted).
         on_disk = _existing_source_server_names()
         for name in sorted(managed - on_disk):
             if name in servers:
@@ -897,90 +967,324 @@ def _apply_mcp_merge(
                 changed = True
             managed.discard(name)
 
-    # Reconcile managed set with what is actually in ``servers``
-    # (defensive cleanup against external mutations).
-    managed &= set(servers.keys())
-
-    # Persist managed set; remove the key entirely when empty so we never
-    # write a dangling sidecar.
-    prior_managed = existing.get(_MANAGED_KEY)
-    new_managed_value = sorted(managed) if managed else None
-    if new_managed_value is None:
-        if _MANAGED_KEY in existing:
-            del existing[_MANAGED_KEY]
-            changed = True
-    elif prior_managed != new_managed_value:
-        existing[_MANAGED_KEY] = new_managed_value
-        changed = True
-
+    managed.intersection_update(servers)
     return changed
 
 
-def _sync_mcp_target(
-    path: Path,
+def _json_server_map(
+    raw: dict[str, Any], target: McpTarget, root: Path
+) -> dict[str, Any]:
+    """Return the native JSON server map for a Claude/Antigravity target."""
+    container = raw
+    if target.provider is Tool.CLAUDE and target.scope is McpScope.LOCAL:
+        projects = raw.setdefault("projects", {})
+        if not isinstance(projects, dict):
+            raise VaultSpecError(
+                "Claude configuration field 'projects' is not an object."
+            )
+        project = projects.setdefault(str(root.resolve()), {})
+        if not isinstance(project, dict):
+            raise VaultSpecError("Claude local project configuration is not an object.")
+        container = project
+    servers = container.setdefault("mcpServers", {})
+    if not isinstance(servers, dict):
+        raise VaultSpecError(f"MCP server map in {target.path} is not an object.")
+    return servers
+
+
+def _drop_empty_json_server_map(
+    raw: dict[str, Any], target: McpTarget, root: Path
+) -> None:
+    """Remove empty native containers while retaining unrelated host settings."""
+    if target.provider is Tool.CLAUDE and target.scope is McpScope.LOCAL:
+        projects = raw.get("projects")
+        if not isinstance(projects, dict):
+            return
+        project_key = str(root.resolve())
+        project = projects.get(project_key)
+        if isinstance(project, dict) and not project.get("mcpServers"):
+            project.pop("mcpServers", None)
+            if not project:
+                projects.pop(project_key, None)
+        if not projects:
+            raw.pop("projects", None)
+        return
+    if not raw.get("mcpServers"):
+        raw.pop("mcpServers", None)
+
+
+def _write_json_target(
+    path: Path, raw: dict[str, Any], target: McpTarget, root: Path
+) -> None:
+    _drop_empty_json_server_map(raw, target, root)
+    if raw:
+        ensure_dir(path.parent)
+        atomic_write(path, json.dumps(raw, indent=2) + "\n")
+    elif path.exists():
+        path.unlink()
+
+
+def _sync_json_target(
+    target: McpTarget,
+    root: Path,
+    state: dict[str, Any],
     sources: dict[str, tuple[Path, dict[str, Any]]],
     *,
     dry_run: bool,
     force: bool,
     prune: bool,
     result: SyncResult,
-    label: str,
-    force_managed: frozenset[str] = frozenset(),
+    force_managed: frozenset[str],
 ) -> None:
-    """Merge *sources* into a single MCP config file at *path*.
-
-    Reads the existing file (if any), applies the shared merge via
-    :func:`_apply_mcp_merge`, and writes the result. When pruning empties
-    the file and no user-defined top-level keys remain, the file is removed
-    rather than left as an orphan ``{"mcpServers": {}}`` artefact.
-
-    *force_managed* is forwarded verbatim to :func:`_apply_mcp_merge`; see its
-    docstring for the narrowly-scoped mode-flip escalation it performs.
-    """
-    with advisory_lock(path):
-        existing: dict[str, Any] = {}
-        if path.exists():
+    """Reconcile a Claude or Antigravity JSON target without host-only keys."""
+    with advisory_lock(target.path):
+        raw: dict[str, Any] = {}
+        if target.path.exists():
             try:
-                raw = json.loads(path.read_text(encoding="utf-8"))
-                if isinstance(raw, dict):
-                    existing = raw
+                loaded = json.loads(target.path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError) as exc:
-                result.warnings.append(f"Cannot parse existing {label}: {exc}")
+                result.errors.append(f"Cannot parse {target.path}: {exc}")
+                result.errored += 1
+                return
+            if not isinstance(loaded, dict):
+                result.errors.append(f"MCP target {target.path} is not a JSON object.")
+                result.errored += 1
+                return
+            raw = loaded
 
-        changed = _apply_mcp_merge(
-            existing,
+        try:
+            untyped_servers = _json_server_map(raw, target, root)
+        except VaultSpecError as exc:
+            result.errors.append(str(exc))
+            result.errored += 1
+            return
+        servers = {
+            str(name): config
+            for name, config in untyped_servers.items()
+            if isinstance(config, dict)
+        }
+        if len(servers) != len(untyped_servers):
+            result.errors.append(
+                f"MCP target {target.path} contains a non-object server."
+            )
+            result.errored += 1
+            return
+
+        managed = _owned_names(state, target) & set(servers)
+        legacy = raw.pop(_LEGACY_MANAGED_KEY, None)
+        migrated = (
+            {name for name in legacy if isinstance(name, str) and name in servers}
+            if isinstance(legacy, list)
+            else set()
+        )
+        if migrated:
+            managed.update(migrated)
+            result.warnings.append(
+                f"Migrated affirmative legacy ownership for {sorted(migrated)} "
+                f"from {target.path}."
+            )
+        external = set(servers) - managed
+        changed = legacy is not None
+        changed |= _apply_server_merge(
+            servers,
+            managed,
+            external,
             sources,
             force=force,
             prune=prune,
             result=result,
-            label=label,
+            label=str(target.path),
             force_managed=force_managed,
         )
-
+        untyped_servers.clear()
+        untyped_servers.update(servers)
+        _set_owned_names(
+            state, target, {name: servers[name] for name in managed if name in servers}
+        )
         if changed and not dry_run:
-            servers = existing.get("mcpServers", {})
-            if not servers and len(existing) == 1:
-                if path.exists():
-                    path.unlink()
-            else:
-                ensure_dir(path.parent)
-                atomic_write(path, json.dumps(existing, indent=2) + "\n")
+            _write_json_target(target.path, raw, target, root)
 
 
-def _provider_mcp_targets() -> dict[str, Path]:
-    """Return installed providers that read a provider-native MCP config file.
+def _toml_value(value: Any) -> str:
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return repr(value)
+    if isinstance(value, list):
+        return "[" + ", ".join(_toml_value(item) for item in value) + "]"
+    if isinstance(value, dict):
+        pairs = (
+            f"{json.dumps(str(key))} = {_toml_value(item)}"
+            for key, item in sorted(value.items())
+        )
+        return "{ " + ", ".join(pairs) + " }"
+    raise VaultSpecError(
+        f"Codex MCP configuration contains unsupported value: {value!r}"
+    )
 
-    Maps tool name to its ``mcp_config_file`` path (e.g. Antigravity's
-    ``.agents/mcp_config.json``). Providers that read the shared workspace
-    ``.mcp.json`` are not included.
-    """
-    from .manifest import installed_tool_configs
 
-    targets: dict[str, Path] = {}
-    for tool, cfg in installed_tool_configs().items():
-        if cfg.mcp_config_file is not None:
-            targets[tool.value] = cfg.mcp_config_file
-    return targets
+def _render_codex_servers(servers: dict[str, dict[str, Any]]) -> str:
+    sections: list[str] = []
+    for name, config in sorted(servers.items()):
+        lines = [f"[mcp_servers.{json.dumps(name, ensure_ascii=False)}]"]
+        lines.extend(
+            f"{key} = {_toml_value(value)}" for key, value in sorted(config.items())
+        )
+        sections.append("\n".join(lines))
+    return "\n\n".join(sections)
+
+
+def _toml_servers(content: str) -> dict[str, dict[str, Any]]:
+    if not content.strip():
+        return {}
+    parsed = tomllib.loads(content)
+    raw = parsed.get("mcp_servers", {})
+    if not isinstance(raw, dict):
+        raise VaultSpecError("Codex 'mcp_servers' field is not a table.")
+    servers: dict[str, dict[str, Any]] = {}
+    for name, config in raw.items():
+        if not isinstance(config, dict):
+            raise VaultSpecError(f"Codex MCP server '{name}' is not a table.")
+        servers[str(name)] = dict(config)
+    return servers
+
+
+def _managed_toml_content(content: str) -> str:
+    for block in find_blocks(content):
+        if block.block_type == _TOML_BLOCK_TYPE:
+            lines = content.splitlines()
+            return "\n".join(lines[block.content_start - 1 : block.content_end])
+    return ""
+
+
+_TOML_TABLE_RE = re.compile(r"^\s*\[(?!\[)(?P<header>.+)]\s*(?:#.*)?$")
+
+
+def _toml_header_path(header: str) -> tuple[str, ...] | None:
+    """Parse one TOML table header into its semantic key path."""
+    try:
+        parsed = tomllib.loads(f"[{header}]\n_vaultspec_probe = true\n")
+    except tomllib.TOMLDecodeError:
+        return None
+    path: list[str] = []
+    current: Any = parsed
+    while isinstance(current, dict) and "_vaultspec_probe" not in current:
+        if len(current) != 1:
+            return None
+        key, current = next(iter(current.items()))
+        path.append(str(key))
+    return tuple(path) if isinstance(current, dict) else None
+
+
+def _strip_external_codex_server(content: str, name: str) -> str:
+    """Remove one external Codex server's table sections without reformatting."""
+    kept: list[str] = []
+    removing = False
+    for line in content.splitlines():
+        match = _TOML_TABLE_RE.match(line)
+        if match:
+            path = _toml_header_path(match.group("header"))
+            removing = bool(
+                path and len(path) >= 2 and path[0] == "mcp_servers" and path[1] == name
+            )
+        if not removing:
+            kept.append(line)
+    rendered = "\n".join(kept)
+    if rendered and content.endswith("\n"):
+        rendered += "\n"
+    return rendered
+
+
+def _sync_toml_target(
+    target: McpTarget,
+    state: dict[str, Any],
+    sources: dict[str, tuple[Path, dict[str, Any]]],
+    *,
+    dry_run: bool,
+    force: bool,
+    prune: bool,
+    result: SyncResult,
+    force_managed: frozenset[str],
+) -> None:
+    """Reconcile Codex tables inside one comment-bounded managed block."""
+    with advisory_lock(target.path):
+        content = ""
+        if target.path.exists():
+            try:
+                content = target.path.read_text(encoding="utf-8")
+            except OSError as exc:
+                result.errors.append(f"Cannot read {target.path}: {exc}")
+                result.errored += 1
+                return
+        try:
+            if content.strip():
+                tomllib.loads(content)
+            managed_content = _managed_toml_content(content)
+            outside_content = strip_block(content, _TOML_BLOCK_TYPE)
+            outside = _toml_servers(outside_content)
+            block_servers = _toml_servers(managed_content)
+        except (TagError, tomllib.TOMLDecodeError, VaultSpecError) as exc:
+            result.errors.append(f"Cannot parse {target.path}: {exc}")
+            result.errored += 1
+            return
+
+        if force:
+            for name in sorted(set(sources) & set(outside)):
+                stripped = _strip_external_codex_server(content, name)
+                try:
+                    remaining = _toml_servers(strip_block(stripped, _TOML_BLOCK_TYPE))
+                except (TagError, tomllib.TOMLDecodeError, VaultSpecError) as exc:
+                    result.errors.append(
+                        f"Cannot adopt Codex MCP server '{name}' in "
+                        f"{target.path}: {exc}"
+                    )
+                    result.errored += 1
+                    return
+                if name in remaining:
+                    result.errors.append(
+                        f"Cannot safely adopt Codex MCP server '{name}' in "
+                        f"{target.path}; its external declaration is not a "
+                        "removable table."
+                    )
+                    result.errored += 1
+                    return
+                content = stripped
+
+        recorded = _owned_names(state, target)
+        managed = (recorded | set(block_servers)) & set(block_servers)
+        servers = {**outside, **block_servers}
+        external = set(outside)
+        changed = _apply_server_merge(
+            servers,
+            managed,
+            external,
+            sources,
+            force=force,
+            prune=prune,
+            result=result,
+            label=str(target.path),
+            force_managed=force_managed,
+        )
+        new_managed = {
+            name: servers[name]
+            for name in managed
+            if name in servers and name not in external
+        }
+        _set_owned_names(state, target, new_managed)
+        if changed and not dry_run:
+            rendered = _render_codex_servers(new_managed)
+            updated = (
+                upsert_block(content, _TOML_BLOCK_TYPE, rendered, comment_prefix="# ")
+                if rendered
+                else strip_block(content, _TOML_BLOCK_TYPE)
+            )
+            ensure_dir(target.path.parent)
+            if updated:
+                atomic_write(target.path, updated)
+            elif target.path.exists():
+                target.path.unlink()
 
 
 def mcp_sync(
@@ -989,37 +1293,18 @@ def mcp_sync(
     prune: bool = False,
     mode: InstallMode | None = None,
     force_managed: frozenset[str] = frozenset(),
+    *,
+    provider: Tool | str = "all",
+    scope: McpScope | str = McpScope.PROJECT,
+    target_dir: Path | None = None,
+    enrolled: Iterable[Tool] | None = None,
 ) -> SyncResult:
-    """Sync MCP server definitions into every MCP config target.
+    """Reconcile canonical MCP definitions into selected native host targets.
 
-    Collects all definitions from the MCP source directory and merges them
-    into the shared workspace ``.mcp.json`` plus each installed provider's
-    native MCP config file (for example Antigravity's
-    ``.agents/mcp_config.json``, which uses the same ``{"mcpServers": {...}}``
-    schema). When ``prune`` is set, managed entries whose source files have
-    been deleted are removed from every target.
-
-    Ownership tracking is persisted in each file under the reserved top-level
-    key ``_vaultspecManaged`` (a sorted list of server names vaultspec
-    created). Entries that pre-existed without being added by ``mcp_sync``
-    never enter the managed set, so user-added servers are always preserved —
-    even if they share a name with a current source. This mirrors the
-    content-marker ownership pattern used by ``sync_files``.
-
-    The launch command *core's own* definition renders to is selected by
-    *mode*. When *mode* is ``None`` (every standalone ``sync``/``doctor``
-    caller) it is resolved from core's entry in the committed workspace
-    declaration via
-    :func:`~vaultspec_core.core.workspace_mode.resolve_render_mode`, whose
-    legacy-absent rule renders dependency mode so a workspace provisioned
-    before ``install-mode`` is never silently flipped to the ``uvx`` shape. The
-    fresh-``install`` path passes its resolved mode explicitly, because the
-    declaration is written only after this render runs. Every *companion*
-    definition (one that names its own declaring package) instead renders at
-    that package's own committed render mode, so a mixed-mode workspace syncs
-    each managed entry in its own shape rather than flattening every entry onto
-    core's mode; see :func:`collect_mcp_servers` and
-    :func:`_render_definition_for_sync`.
+    Project scope is the safe default. User and Claude-local stores are touched
+    only when the caller explicitly selects those scopes. Ownership is stored
+    outside host schemas, and Codex content is bounded by a comment-only TOML
+    block so unrelated settings and comments remain byte-stable.
 
     Args:
         dry_run: If ``True``, compute changes without writing.
@@ -1028,13 +1313,11 @@ def mcp_sync(
             been deleted. Mirrors ``rules_sync``/``agents_sync``.
         mode: Provisioning mode to render definitions for, or ``None`` to
             resolve it from the committed workspace declaration.
-        force_managed: Names of already-managed servers to overwrite when they
-            diverge from their source, even when *force* is ``False``. This is
-            the ``install --upgrade`` mode-flip seam: it lets the caller migrate
-            a specific managed entry (the ``vaultspec-core`` launch command) to
-            the newly-resolved mode's shape in the same run without escalating
-            the whole sync to *force*. Scoped to managed entries only, so
-            user-owned entries stay untouched.
+        force_managed: Already-owned entries eligible for surgical updates.
+        provider: One provider name/member, or ``"all"`` enrolled providers.
+        scope: Explicit native host scope; defaults to project.
+        target_dir: Workspace root override used by companion packages.
+        enrolled: Fresh-install provider selection before manifest persistence.
 
     Returns:
         :class:`~vaultspec_core.core.types.SyncResult` with sync statistics.
@@ -1043,113 +1326,171 @@ def mcp_sync(
     result = SyncResult()
 
     try:
-        target_dir = _t.get_context().target_dir
+        root = target_dir or _t.get_context().target_dir
     except LookupError:
         result.errors.append("No workspace context available for MCP sync.")
+        return result
+
+    try:
+        resolved_scope = _coerce_scope(scope)
+        targets = resolve_mcp_targets(
+            provider, scope=resolved_scope, target_dir=root, enrolled=enrolled
+        )
+    except VaultSpecError as exc:
+        result.errors.append(str(exc))
+        result.errored += 1
         return result
 
     if mode is None:
         from .workspace_mode import CORE_DISTRIBUTION_NAME, resolve_render_mode
 
-        mode = resolve_render_mode(target_dir, package=CORE_DISTRIBUTION_NAME)
+        mode = resolve_render_mode(root, package=CORE_DISTRIBUTION_NAME)
 
     parse_warnings: list[str] = []
-    sources = collect_mcp_servers(warnings=parse_warnings, mode=mode, target=target_dir)
+    sources = collect_mcp_servers(warnings=parse_warnings, mode=mode, target=root)
     result.warnings.extend(parse_warnings)
-
-    _sync_mcp_target(
-        target_dir / ".mcp.json",
-        sources,
-        dry_run=dry_run,
-        force=force,
-        prune=prune,
-        result=result,
-        label=".mcp.json",
-        force_managed=force_managed,
-    )
-
-    for tool_name, mcp_path in sorted(_provider_mcp_targets().items()):
-        sub = SyncResult()
-        rel = (
-            str(mcp_path.relative_to(target_dir))
-            if mcp_path.is_relative_to(target_dir)
-            else str(mcp_path)
-        )
-        _sync_mcp_target(
-            mcp_path,
-            sources,
-            dry_run=dry_run,
-            force=force,
-            prune=prune,
-            result=sub,
-            label=rel.replace("\\", "/"),
-            force_managed=force_managed,
-        )
-        result.merge(sub)
-        result.per_tool[tool_name] = sub
+    ownership_path = _ownership_path(root, resolved_scope)
+    with advisory_lock(ownership_path):
+        try:
+            state = _read_ownership(ownership_path)
+        except VaultSpecError as exc:
+            result.errors.append(str(exc))
+            result.errored += 1
+            return result
+        before_state = json.dumps(state, sort_keys=True)
+        for target in targets:
+            sub = SyncResult()
+            target_sources = _normalized_sources(sources, target, sub)
+            if target.format is McpTargetFormat.JSON:
+                _sync_json_target(
+                    target,
+                    root,
+                    state,
+                    target_sources,
+                    dry_run=dry_run,
+                    force=force,
+                    prune=prune,
+                    result=sub,
+                    force_managed=force_managed,
+                )
+            else:
+                _sync_toml_target(
+                    target,
+                    state,
+                    target_sources,
+                    dry_run=dry_run,
+                    force=force,
+                    prune=prune,
+                    result=sub,
+                    force_managed=force_managed,
+                )
+            result.merge(sub)
+            result.per_tool[target.provider.value] = sub
+        if not dry_run and json.dumps(state, sort_keys=True) != before_state:
+            if state["targets"]:
+                _write_ownership(ownership_path, state)
+            elif ownership_path.exists():
+                ownership_path.unlink()
 
     return result
 
 
-def mcp_uninstall(target_dir: Path, *, dry_run: bool = False) -> list[str]:
-    """Remove all registry-managed MCP entries from ``.mcp.json``.
-
-    Collects managed server names from the registry source directory and
-    removes each from ``.mcp.json``.  User-added entries are preserved.
-    If no servers remain, the file is deleted.
-
-    Args:
-        target_dir: Workspace root directory.
-        dry_run: When ``True``, returns names without modifying files.
-
-    Returns:
-        List of server names that were (or would be) removed.
-    """
-    sources = collect_mcp_servers()
-    managed_names = set(sources.keys())
-
-    # If no registry is available, fall back to removing known built-in names
-    if not managed_names:
-        managed_names = {"vaultspec-core"}
-
-    # Every MCP target: the shared .mcp.json plus each installed provider's
-    # native MCP config (e.g. Antigravity's .agents/mcp_config.json).
-    targets = [target_dir / ".mcp.json", *_provider_mcp_targets().values()]
-
-    removed: set[str] = set()
-    for mcp_path in targets:
-        if not mcp_path.exists():
-            continue
-        with advisory_lock(mcp_path):
-            try:
-                raw = json.loads(mcp_path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
+def mcp_uninstall(
+    target_dir: Path,
+    *,
+    dry_run: bool = False,
+    provider: Tool | str = "all",
+    scope: McpScope | str = McpScope.PROJECT,
+    enrolled: Iterable[Tool] | None = None,
+) -> SyncResult:
+    """Remove only externally recorded Vaultspec-owned entries."""
+    result = SyncResult()
+    try:
+        resolved_scope = _coerce_scope(scope)
+        targets = resolve_mcp_targets(
+            provider,
+            scope=resolved_scope,
+            target_dir=target_dir,
+            enrolled=enrolled,
+        )
+    except VaultSpecError as exc:
+        result.errors.append(str(exc))
+        result.errored += 1
+        return result
+    ownership_path = _ownership_path(target_dir, resolved_scope)
+    with advisory_lock(ownership_path):
+        try:
+            state = _read_ownership(ownership_path)
+        except VaultSpecError as exc:
+            result.errors.append(str(exc))
+            result.errored += 1
+            return result
+        for target in targets:
+            sub = SyncResult()
+            managed = _owned_names(state, target)
+            if not managed or not target.path.exists():
+                _set_owned_names(state, target, {})
+                result.per_tool[target.provider.value] = sub
                 continue
-            if not isinstance(raw, dict):
-                continue
-            servers = raw.get("mcpServers", {})
-            if not isinstance(servers, dict):
-                continue
-
-            file_removed: list[str] = []
-            for name in managed_names:
-                if name in servers:
-                    file_removed.append(name)
-                    if not dry_run:
-                        del servers[name]
-            if not file_removed:
-                continue
-            removed.update(file_removed)
-
-            if not dry_run:
-                managed = raw.get(_MANAGED_KEY)
-                if isinstance(managed, list):
-                    raw[_MANAGED_KEY] = [n for n in managed if n in servers]
-                    if not raw[_MANAGED_KEY]:
-                        del raw[_MANAGED_KEY]
-                if servers or (len(raw) > 1):
-                    atomic_write(mcp_path, json.dumps(raw, indent=2) + "\n")
-                else:
-                    mcp_path.unlink()
-
-    return sorted(removed)
+            succeeded = False
+            with advisory_lock(target.path):
+                try:
+                    if target.format is McpTargetFormat.JSON:
+                        raw = json.loads(target.path.read_text(encoding="utf-8"))
+                        if not isinstance(raw, dict):
+                            raise VaultSpecError("JSON root is not an object.")
+                        servers = _json_server_map(raw, target, target_dir)
+                        present = managed & set(servers)
+                        sub.pruned += len(present)
+                        sub.items.extend((name, "[DELETE]") for name in sorted(present))
+                        if not dry_run:
+                            for name in present:
+                                servers.pop(name, None)
+                            raw.pop(_LEGACY_MANAGED_KEY, None)
+                            _write_json_target(target.path, raw, target, target_dir)
+                    else:
+                        content = target.path.read_text(encoding="utf-8")
+                        block_servers = _toml_servers(_managed_toml_content(content))
+                        present = managed & set(block_servers)
+                        sub.pruned += len(present)
+                        sub.items.extend((name, "[DELETE]") for name in sorted(present))
+                        if not dry_run:
+                            for name in present:
+                                block_servers.pop(name, None)
+                            rendered = _render_codex_servers(block_servers)
+                            updated = (
+                                upsert_block(
+                                    content,
+                                    _TOML_BLOCK_TYPE,
+                                    rendered,
+                                    comment_prefix="# ",
+                                )
+                                if rendered
+                                else strip_block(content, _TOML_BLOCK_TYPE)
+                            )
+                            if updated:
+                                atomic_write(target.path, updated)
+                            else:
+                                target.path.unlink()
+                    succeeded = True
+                except (
+                    json.JSONDecodeError,
+                    OSError,
+                    TagError,
+                    tomllib.TOMLDecodeError,
+                    VaultSpecError,
+                ) as exc:
+                    sub.errored += 1
+                    sub.errors.append(
+                        f"Cannot uninstall MCPs from {target.path}: {exc}"
+                    )
+            if not dry_run and succeeded:
+                _set_owned_names(state, target, {})
+            result.merge(sub)
+            result.per_tool[target.provider.value] = sub
+        if not dry_run:
+            if state["targets"]:
+                _write_ownership(ownership_path, state)
+            elif ownership_path.exists():
+                ownership_path.unlink()
+    return result
