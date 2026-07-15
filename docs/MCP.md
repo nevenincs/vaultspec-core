@@ -18,20 +18,21 @@ workspace behaves the same either way.
 
 ## Setup
 
-Run `vaultspec-core install` to scaffold `.mcp.json` in the workspace root.
-Configuration is part of the core install, not tied to any provider; skip it with
-`install --skip mcp` if you manage the file yourself.
+Vaultspec keeps provider-neutral MCP definitions in `.vaultspec/mcps/*.json`.
+Installation and `vaultspec-core spec mcps sync` render those definitions into each
+selected provider's native configuration:
 
-```json
-{
-  "mcpServers": {
-    "vaultspec-core": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "vaultspec_core.mcp_server.app"]
-    }
-  }
-}
-```
+| Provider    | Project scope             | Broader scope                                                            |
+| ----------- | ------------------------- | ------------------------------------------------------------------------ |
+| Claude      | `.mcp.json`               | Local or user enrollment in `~/.claude.json`                             |
+| Codex       | `.codex/config.toml`      | User enrollment in `$CODEX_HOME/config.toml`; local scope is unsupported |
+| Antigravity | `.agents/mcp_config.json` | Broader scopes are unsupported                                           |
+
+Project scope is the safe default. Select user or local scope explicitly. Native host
+files contain only host-valid configuration; Vaultspec records project and local
+ownership in the workspace's `.vaultspec/mcp-ownership.json` and user ownership in
+`~/.vaultspec/mcp-ownership.json`, so unrelated host entries remain external. Use
+`install --skip mcp` if you manage enrollment yourself.
 
 The server resolves its workspace from the client's current working directory.
 Editor-integrated clients such as Claude Code and Cursor already set the working
@@ -46,36 +47,20 @@ Module invocation avoids the lock.
 
 ### Install modes
 
-`vaultspec-core install` writes one of two launch shapes for this entry, matching how
-the workspace runs the tooling. Three modes select between them. Tool mode is the
-default and launches the server with `uvx`, resolving vaultspec-core on demand without
-adding it to your project's dependency set:
+The canonical definition records the Vaultspec package and module. Vaultspec renders the
+launch command for the active install mode:
 
-```json
-{
-  "mcpServers": {
-    "vaultspec-core": {
-      "command": "uvx",
-      "args": ["--from", "vaultspec-core", "python", "-m", "vaultspec_core.mcp_server.app"]
-    }
-  }
-}
-```
+- Tool mode, the default, uses `uvx --from ...` without adding Vaultspec to the
+  project's dependencies. A companion may declare a dedicated tool requirement such as
+  `vaultspec-rag[mcp]`.
+- Dependency mode uses `uv run ...` against the project's environment and ships in built
+  distributions.
+- Development mode also uses `uv run ...`, but records a development-only placement that
+  does not ship in built distributions.
 
-Dependency mode is the `uv run` shape shown at the top of this section: it resolves
-vaultspec-core from your project's own environment. Install selects it automatically
-when your `pyproject.toml` already lists vaultspec-core, and you can pin any of the
-three modes with `install --mode tool`, `install --mode dependency`, or
-`install --mode dev`. Both shapes launch the server as a Python module for the same
-Windows-lock reason above, so neither one holds an executable open.
-
-Dev mode is for vaultspec-core placed in your project's default `dev` dependency group.
-It renders exactly like dependency mode - the same `uv run` shape - because `uv run`
-resolves the default dev group identically to a project dependency. The distinction is
-that dependency mode ships vaultspec-core in your project's built distributions, while
-dev mode does not. Choosing dev records that non-leaking placement so the doctor and a
-fresh clone can read it, rather than inferring a full runtime dependency from an
-identical launch command.
+Select a mode with `install --mode tool`, `install --mode dependency`, or
+`install --mode dev`. Vaultspec consumes the package, module, and optional tool
+requirement while rendering; that metadata never reaches native host configuration.
 
 The chosen mode is recorded per package in the workspace's committed `workspace.json`,
 which keys each provisioned package to its own mode and version floor. A workspace that
@@ -92,26 +77,18 @@ stable from then on.
 ### Point the server at a different workspace
 
 When the client's working directory isn't the workspace you want - for example in a
-standalone setup outside an editor - set `VAULTSPEC_TARGET_DIR` in the server's `env`
-block.
-
-```json
-{
-  "mcpServers": {
-    "vaultspec-core": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "vaultspec_core.mcp_server.app"],
-      "env": { "VAULTSPEC_TARGET_DIR": "/path/to/workspace" }
-    }
-  }
-}
-```
+standalone setup outside an editor - set `VAULTSPEC_TARGET_DIR` in the canonical MCP
+definition's `env` map, then run `vaultspec-core spec mcps sync`. The provider adapter
+renders normalized `command`, `args`, and `env` fields into each selected native target.
 
 `VAULTSPEC_TARGET_DIR` is the environment equivalent of the CLI's `--target` flag.
 
 ### Your first call
 
-Restart or connect the MCP client so it picks up `.mcp.json`.
+Claude reads project enrollment from `.mcp.json`. Codex reads `.codex/config.toml` for a
+trusted project. Antigravity uses `.agents/mcp_config.json`. Reload or reconnect the
+provider as required by that host. Vaultspec writes enrollment only: it does not start
+the server, grant trust, or bypass provider approval.
 
 Call the `status` tool with no arguments. It returns a rollup report:
 `tool_schema_version`, the workspace's features with document counts and lifecycle
@@ -134,18 +111,22 @@ This is the only `VAULTSPEC_` variable the MCP server reads directly. See
 
 ## Verification
 
-Run `vaultspec-core spec mcps status --json` to check MCP configuration health. It
-validates the source definitions in `.vaultspec/mcps/` against `.mcp.json` without
-starting or probing any server process. The command exits 0 only when `status` is
-`"ok"`; any other status, including `missing_config`, `no_definitions`,
-`invalid_config`, or `no_context`, exits 1.
+```console
+vaultspec-core spec mcps status
+vaultspec-core spec mcps status codex --scope project
+vaultspec-core spec mcps status --json
+```
+
+Status reports aggregate and per-provider configuration health. It identifies managed,
+missing, drifted, stale managed, and external entries, plus warnings. It does not start
+or probe an MCP process. The command exits 0 only when aggregate status is `"ok"`.
 
 If status isn't `"ok"`, inspect the `missing`, `drifted`, `stale_managed`, and
-`warnings` fields in the output, run `vaultspec-core sync` to reconcile the definitions,
-then re-run the status check.
+`warnings` fields, run `vaultspec-core spec mcps sync` to reconcile enrollment, then
+re-run the status check. Project scope is the default; user or local enrollment must be
+requested explicitly, and unsupported provider/scope combinations fail.
 
-Run `vaultspec-core spec doctor --json` for a broader workspace diagnosis; it reports a
-missing or incomplete `.mcp.json` as one signal among the workspace's overall health.
+Run `vaultspec-core spec doctor --json` for a broader workspace diagnosis.
 
 ## Tools
 
@@ -177,9 +158,12 @@ synchronizing generated surfaces (`vaultspec-core sync`,
 so a connected host still asks you to confirm each one; the CLI skips that round-trip.
 
 Other operations have no MCP path at all. Regenerating a feature index runs through
-`vaultspec-core vault feature index`. Managing the MCP configuration itself runs through
-`vaultspec-core spec mcps add`, `remove`, and `sync`. Removing vaultspec from a
-workspace runs through `vaultspec-core uninstall`.
+`vaultspec-core vault feature index`. For MCP configuration, `list`, `add`, and `remove`
+inspect or mutate canonical definitions; `status` inspects native enrollment and
+ownership health; `sync` reconciles definitions into selected targets; and `uninstall`
+removes Vaultspec-owned enrollment while preserving canonical definitions and external
+host entries. Removing Vaultspec from a workspace runs through
+`vaultspec-core uninstall`.
 
 ### Terms
 
@@ -767,9 +751,9 @@ denylisted verbs from its results, and `invoke` rejects them before spawning. Th
 denylist covers:
 
 - `uninstall` - tears down the framework
-- `spec mcps add`, `spec mcps remove`, `spec mcps sync` - MCP registry mutation, owned
-  by the `spec mcps` lifecycle (the read-only `spec mcps list` and `spec mcps status`
-  stay available)
+- `spec mcps add`, `spec mcps remove`, `spec mcps sync`, and `spec mcps uninstall` - MCP
+  definition or enrollment mutation, owned by the `spec mcps` lifecycle (the read-only
+  `spec mcps list` and `spec mcps status` stay available)
 - `vault feature index` - index documents stay uncreatable through the MCP surface
 
 ## Logging

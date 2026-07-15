@@ -42,7 +42,7 @@ Route install, upgrade, sync, status, prune, and uninstall through selected prov
 Verify migrations and real Codex and Claude recognition, then document the provider and scope contract for operators and companion packages.
 
 - [x] `P03.S07` - Add real-behavior reconciliation, migration, lifecycle, and mode-rendering tests; `tests/test_mcps.py and tests/test_commands.py`.
-- [ ] `P03.S08` - Add isolated Codex and Claude CLI acceptance and update MCP operator guidance; `tests/cli/test_mcp_hosts.py and docs/MCP.md`.
+- [x] `P03.S08` - Add isolated Codex and Claude CLI acceptance and update MCP operator guidance; `tests/cli/test_mcp_hosts.py and docs/MCP.md`.
 
 ## Parallelization
 

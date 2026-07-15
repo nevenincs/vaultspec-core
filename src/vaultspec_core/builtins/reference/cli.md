@@ -608,15 +608,24 @@ enabled hooks; it takes `--path PATH`. Valid events: `vault.document.created`,
 
 ### vaultspec-core spec mcps
 
-Signature: `vaultspec-core spec mcps [OPTIONS] COMMAND [ARGS]...`. Manage MCP server
-definitions and synced `.mcp.json` entries.
+Signature: `vaultspec-core spec mcps [OPTIONS] COMMAND [ARGS]...`. Manage canonical
+definitions in `.vaultspec/mcps/*.json` and reconcile them into provider-native
+enrollment. Providers are `all`, `claude`, `antigravity`, and `codex`; scopes are
+`project`, `local`, and `user`. Unsupported provider/scope combinations fail.
 
-| Subcommand | Signature | Description | | ---------- |
---------------------------------------- | ----------------------------- | | `list` | - |
-List MCP server definitions. | | `status` | `[--json]` | Validate against `.mcp.json`. |
-| `add` | `--name NAME [--config JSON] [--force]` | Add a custom MCP definition. | |
-`remove` | `NAME [--force]` | Remove an MCP definition. | | `sync` |
-`[--dry-run] [--force]` | Sync definitions to config. |
+| Subcommand  | Signature                                                                             | Description                                                         |
+| ----------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `list`      | -                                                                                     | List canonical MCP server definitions.                              |
+| `status`    | `[PROVIDER] [--scope SCOPE] [--json] [--target PATH]`                                 | Inspect configuration and ownership state; does not probe runtimes. |
+| `add`       | `--name NAME [--config JSON] [--force]`                                               | Add or replace a canonical definition.                              |
+| `remove`    | `NAME [--force]`                                                                      | Remove a canonical definition.                                      |
+| `sync`      | `[PROVIDER] [--scope SCOPE] [--dry-run] [--force] [--prune] [--json] [--target PATH]` | Reconcile canonical definitions into native enrollment.             |
+| `uninstall` | `[PROVIDER] [--scope SCOPE] [--dry-run] [--force] [--json] [--target PATH]`           | Remove only Vaultspec-owned native enrollment.                      |
+
+The default provider is `all` and the default scope is `project`. `sync --force` adopts
+or replaces a same-name external entry; `sync --prune` removes owned enrollment whose
+canonical source was deleted. `uninstall` preserves canonical definitions and external
+host entries.
 
 ## Migration commands
 

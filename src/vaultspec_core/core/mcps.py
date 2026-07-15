@@ -1009,7 +1009,7 @@ def _json_server_map(
             raise VaultSpecError(
                 "Claude configuration field 'projects' is not an object."
             )
-        project = projects.setdefault(str(root.resolve()), {})
+        project = projects.setdefault(root.resolve().as_posix(), {})
         if not isinstance(project, dict):
             raise VaultSpecError("Claude local project configuration is not an object.")
         container = project
@@ -1027,7 +1027,7 @@ def _drop_empty_json_server_map(
         projects = raw.get("projects")
         if not isinstance(projects, dict):
             return
-        project_key = str(root.resolve())
+        project_key = root.resolve().as_posix()
         project = projects.get(project_key)
         if isinstance(project, dict) and not project.get("mcpServers"):
             project.pop("mcpServers", None)

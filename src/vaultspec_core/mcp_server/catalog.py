@@ -71,6 +71,7 @@ DENYLIST: frozenset[tuple[str, ...]] = frozenset(
         ("spec", "mcps", "add"),
         ("spec", "mcps", "remove"),
         ("spec", "mcps", "sync"),
+        ("spec", "mcps", "uninstall"),
         ("vault", "feature", "index"),
     }
 )

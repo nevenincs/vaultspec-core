@@ -70,6 +70,7 @@ def test_denylisted_verbs_absent_from_catalog(vault_root):  # noqa: F811
     # Spot-check the specific classes the ADR names.
     assert catalog.is_denied(("uninstall",))
     assert catalog.is_denied(("spec", "mcps", "add"))
+    assert catalog.is_denied(("spec", "mcps", "uninstall"))
     assert catalog.is_denied(("vault", "feature", "index"))
     # Read-only MCP-registry inspection stays reachable.
     assert catalog.declares(("spec", "mcps", "list"))
