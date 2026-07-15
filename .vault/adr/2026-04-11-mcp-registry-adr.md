@@ -1,16 +1,17 @@
 ---
 tags:
-  - '#adr'
-  - '#mcp-registry'
+  - "#adr"
+  - "#mcp-registry"
 date: '2026-04-11'
-modified: '2026-06-13'
 related:
-  - '[[2026-04-11-mcp-registry-research]]'
-  - '[[2026-03-28-mcp-installation-patterns-research]]'
-  - '[[2026-02-22-mcp-consolidation-adr]]'
+  - "[[2026-04-11-mcp-registry-research]]"
+  - "[[2026-03-28-mcp-installation-patterns-research]]"
+  - "[[2026-02-22-mcp-consolidation-adr]]"
+superseded_by: '2026-07-15-provider-mcp-enrollment-adr'
+modified: '2026-07-15'
 ---
 
-# `mcp-registry` adr: built-in MCP definitions with install/sync/uninstall lifecycle | (**status:** `accepted`)
+# `mcp-registry` adr: built-in MCP definitions with install/sync/uninstall lifecycle | (**status:** `superseded`)
 
 ## Problem Statement
 
