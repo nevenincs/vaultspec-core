@@ -11,10 +11,11 @@ from vaultspec_core.config import reset_config
 from vaultspec_core.core.commands import (
     CANONICAL_ENTRY_PREFIX,
     CANONICAL_HOOK_IDS,
+    entry_prefix_for_mode,
     install_run,
     sync_provider,
 )
-from vaultspec_core.core.enums import PrecommitHook
+from vaultspec_core.core.enums import InstallMode, PrecommitHook
 from vaultspec_core.core.manifest import read_manifest_data, write_manifest_data
 
 
@@ -37,8 +38,14 @@ def test_init_run_scaffolds_antigravity_workspace_layout() -> None:
         assert not (tmp_path / ".agents" / "agents").exists()
         mcp_config = json.loads((tmp_path / ".mcp.json").read_text(encoding="utf-8"))
         server = mcp_config["mcpServers"]["vaultspec-core"]
-        assert server["command"] == "uv"
-        expected = ["run", "python", "-m", "vaultspec_core.mcp_server.app"]
+        assert server["command"] == "uvx"
+        expected = [
+            "--from",
+            "vaultspec-core",
+            "python",
+            "-m",
+            "vaultspec_core.mcp_server.app",
+        ]
         assert server["args"] == expected
     finally:
         reset_config()
@@ -76,9 +83,9 @@ def test_install_run_scaffolds_full_canonical_precommit_hooks() -> None:
 
         for hook in hooks:
             if hook["id"] in CANONICAL_HOOK_IDS:
-                assert hook["entry"].startswith(CANONICAL_ENTRY_PREFIX), (
-                    f"Hook {hook['id']} uses non-canonical entry: {hook['entry']}"
-                )
+                assert hook["entry"].startswith(
+                    entry_prefix_for_mode(InstallMode.TOOL)
+                ), f"Hook {hook['id']} uses non-canonical entry: {hook['entry']}"
 
     finally:
         reset_config()
@@ -520,7 +527,15 @@ def test_sync_all_result_count_matches_resource_labels() -> None:
 
         results = sync_provider("all")
 
-        resource_labels = ["rules", "skills", "agents", "system", "config", "mcps"]
+        resource_labels = [
+            "rules",
+            "skills",
+            "agents",
+            "system",
+            "config",
+            "mcps",
+            "hooks",
+        ]
         # One result per resource label, plus the trailing structural backfill.
         assert len(results) == len(resource_labels) + 1, (
             f"sync_provider('all') returned {len(results)} results; expected "

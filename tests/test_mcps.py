@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import tomllib
 from uuid import uuid4
 
 import pytest
@@ -24,14 +25,27 @@ def _make_workspace(tmp: object = None):
 def _init_context(path):
     """Bootstrap a WorkspaceContext pointing at the given path."""
     from vaultspec_core.config.workspace import resolve_workspace
+    from vaultspec_core.core.manifest import ManifestData, write_manifest_data
     from vaultspec_core.core.types import init_paths
 
     reset_config()
     # Create minimal .vaultspec structure for workspace resolution
     fw_dir = path / ".vaultspec"
     fw_dir.mkdir(parents=True, exist_ok=True)
+    write_manifest_data(
+        path,
+        ManifestData(installed={"claude"}),
+    )
     layout = resolve_workspace(target_override=path)
     return init_paths(layout)
+
+
+def _owned_names(path, target_key: str = "claude:project") -> set[str]:
+    """Read the real external MCP ownership record for one native target."""
+    ownership = json.loads(
+        (path / ".vaultspec" / "mcp-ownership.json").read_text(encoding="utf-8")
+    )
+    return set(ownership["targets"][target_key]["managed"])
 
 
 @pytest.mark.unit
@@ -369,7 +383,7 @@ class TestMcpAdd:
             from vaultspec_core.core.mcps import mcp_add
 
             with pytest.raises(VaultSpecError, match="dict"):
-                mcp_add("srv", config=[1, 2, 3])  # type: ignore[arg-type]
+                mcp_add("srv", config=[1, 2, 3])  # ty: ignore[invalid-argument-type]
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)
@@ -633,18 +647,17 @@ class TestMcpUninstall:
             (mcps_dir / "managed.builtin.json").write_text(
                 json.dumps({"command": "uv"}), encoding="utf-8"
             )
-            mcp_data = {
-                "mcpServers": {
-                    "managed": {"command": "uv"},
-                    "user": {"command": "custom"},
-                }
-            }
-            (path / ".mcp.json").write_text(json.dumps(mcp_data), encoding="utf-8")
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_uninstall
+            from vaultspec_core.core.mcps import mcp_sync, mcp_uninstall
+
+            mcp_sync()
+            mcp_data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+            mcp_data["mcpServers"]["user"] = {"command": "custom"}
+            (path / ".mcp.json").write_text(json.dumps(mcp_data), encoding="utf-8")
 
             removed = mcp_uninstall(path)
-            assert "managed" in removed
+            assert removed.pruned == 1
+            assert ("managed", "[DELETE]") in removed.items
 
             remaining = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert "managed" not in remaining["mcpServers"]
@@ -659,18 +672,17 @@ class TestMcpUninstall:
             (mcps_dir / "only.builtin.json").write_text(
                 json.dumps({"command": "uv"}), encoding="utf-8"
             )
-            mcp_data = {"mcpServers": {"only": {"command": "uv"}}}
-            (path / ".mcp.json").write_text(json.dumps(mcp_data), encoding="utf-8")
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_uninstall
+            from vaultspec_core.core.mcps import mcp_sync, mcp_uninstall
 
+            mcp_sync()
             mcp_uninstall(path)
             assert not (path / ".mcp.json").exists()
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)
 
-    def test_fallback_to_vaultspec_core_when_no_registry(self):
+    def test_unowned_entry_survives_without_registry_or_ownership(self):
         path = PROJECT_ROOT / ".pytest-tmp" / f"mcps-uninstall-{uuid4().hex}"
         path.mkdir(parents=True, exist_ok=True)
         try:
@@ -680,7 +692,9 @@ class TestMcpUninstall:
             from vaultspec_core.core.mcps import mcp_uninstall
 
             removed = mcp_uninstall(path)
-            assert "vaultspec-core" in removed
+            assert removed.pruned == 0
+            remaining = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+            assert "vaultspec-core" in remaining["mcpServers"]
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)
@@ -759,7 +773,8 @@ class TestMcpSyncPrune:
             assert result.added == 1
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert "ephemeral" in data["mcpServers"]
-            assert data["_vaultspecManaged"] == ["ephemeral"]
+            assert _owned_names(path) == {"ephemeral"}
+            assert "_vaultspecManaged" not in data
 
             # Delete the source file to simulate companion uninstall
             (mcps_dir / "ephemeral.builtin.json").unlink()
@@ -817,7 +832,7 @@ class TestMcpSyncPrune:
             # User entry survives the orphan prune
             assert "my-tool" in data["mcpServers"]
             assert "managed" not in data["mcpServers"]
-            # No managed key remains since the only managed entry was pruned
+            # Host schemas never carry Vaultspec ownership metadata.
             assert "_vaultspecManaged" not in data
         finally:
             reset_config()
@@ -831,9 +846,8 @@ class TestMcpSyncPrune:
         """
         path, mcps_dir = _make_workspace()
         try:
-            # User pre-registers an entry — note: file already has the
-            # _vaultspecManaged sidecar (empty), so legacy migration
-            # does NOT take ownership.
+            # User pre-registers an entry with an empty legacy host marker, so
+            # migration has no affirmative ownership evidence.
             existing = {
                 "mcpServers": {"shared": {"command": "user-binary"}},
                 "_vaultspecManaged": [],
@@ -852,26 +866,22 @@ class TestMcpSyncPrune:
             # Should NOT add (entry already there) and NOT enter managed
             assert result.added == 0
             assert result.skipped == 1
-            assert any("user-managed" in w for w in result.warnings), result.warnings
+            assert any("externally managed" in w for w in result.warnings), (
+                result.warnings
+            )
 
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             # User's entry preserved unchanged
             assert data["mcpServers"]["shared"]["command"] == "user-binary"
-            # Source name did NOT get added to managed set
-            assert "shared" not in data.get("_vaultspecManaged", [])
+            # Source name did NOT get added to external ownership state.
+            ownership_path = path / ".vaultspec" / "mcp-ownership.json"
+            assert not ownership_path.exists()
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)
 
-    def test_legacy_migration_emits_explicit_warning(self):
-        """Security: legacy migration silently transferring ownership
-        of pre-existing entries is auditable. The first sync against
-        a workspace without ``_vaultspecManaged`` MUST surface a
-        warning naming every entry it took ownership of, so an
-        operator can spot unexpected migrations (e.g. an attacker
-        having dropped a ``foo.json`` source file matching a user
-        entry name).
-        """
+    def test_name_intersection_without_legacy_evidence_remains_external(self):
+        """Names alone never transfer ownership during legacy migration."""
         path, mcps_dir = _make_workspace()
         try:
             existing = {
@@ -892,23 +902,26 @@ class TestMcpSyncPrune:
             from vaultspec_core.core.mcps import mcp_sync
 
             result = mcp_sync()
-            assert any(
-                "Legacy" in w and "alpha" in w and "beta" in w for w in result.warnings
-            ), f"expected legacy-migration warning, got: {result.warnings}"
+            assert result.skipped == 2
+            assert all("externally managed" in warning for warning in result.warnings)
+            assert not (path / ".vaultspec" / "mcp-ownership.json").exists()
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)
 
     def test_legacy_migration_treats_pre_existing_as_managed(self):
         """Workspaces created before ownership tracking shipped have
-        no `_vaultspecManaged` sidecar. The migration heuristic treats
-        any pre-existing entry whose name matches a current source as
-        managed (preserves the legacy 'differs, use --force' warning).
+        an affirmative `_vaultspecManaged` host marker. Migration accepts that
+        marker once, moves ownership into the external sidecar, and removes the
+        legacy field from host configuration.
         """
         path, mcps_dir = _make_workspace()
         try:
-            # Pre-existing .mcp.json without sidecar key (legacy)
-            existing = {"mcpServers": {"legacy": {"command": "old"}}}
+            # An affirmative legacy marker is accepted once as ownership evidence.
+            existing = {
+                "mcpServers": {"legacy": {"command": "old"}},
+                "_vaultspecManaged": ["legacy"],
+            }
             (path / ".mcp.json").write_text(json.dumps(existing), encoding="utf-8")
             (mcps_dir / "legacy.builtin.json").write_text(
                 json.dumps({"command": "new"}), encoding="utf-8"
@@ -923,8 +936,8 @@ class TestMcpSyncPrune:
 
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert data["mcpServers"]["legacy"]["command"] == "new"
-            # Sidecar now persisted with the migrated entry
-            assert data["_vaultspecManaged"] == ["legacy"]
+            assert "_vaultspecManaged" not in data
+            assert _owned_names(path) == {"legacy"}
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)
@@ -943,12 +956,14 @@ class TestMcpSyncPrune:
 
             mcp_sync()
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
-            assert data["_vaultspecManaged"] == ["alpha", "beta"]
+            assert "_vaultspecManaged" not in data
+            assert _owned_names(path) == {"alpha", "beta"}
 
             # Re-sync: managed set should remain identical
             mcp_sync()
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
-            assert data["_vaultspecManaged"] == ["alpha", "beta"]
+            assert "_vaultspecManaged" not in data
+            assert _owned_names(path) == {"alpha", "beta"}
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)
@@ -976,7 +991,7 @@ class TestMcpSyncPrune:
             mcp_sync()
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert "fragile" in data["mcpServers"]
-            assert "fragile" in data["_vaultspecManaged"]
+            assert _owned_names(path) == {"fragile"}
 
             # Corrupt the source: file still exists but is invalid JSON.
             (mcps_dir / "fragile.builtin.json").write_text(
@@ -995,7 +1010,7 @@ class TestMcpSyncPrune:
 
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert "fragile" in data["mcpServers"]
-            assert "fragile" in data["_vaultspecManaged"]
+            assert _owned_names(path) == {"fragile"}
 
             # Now genuinely delete the source — prune SHOULD remove it.
             (mcps_dir / "fragile.builtin.json").unlink()
@@ -1007,9 +1022,8 @@ class TestMcpSyncPrune:
             shutil.rmtree(path, ignore_errors=True)
 
     def test_prune_preserves_user_top_level_keys(self):
-        """Regression: when pruning empties ``mcpServers`` AND clears
-        the managed sidecar, the file must still survive if the user
-        added other top-level keys (e.g. ``inputs``, custom config).
+        """Regression: when pruning empties ``mcpServers`` and ownership, the
+        file must still survive if the user added other top-level keys.
         Only when the file holds nothing but an empty ``mcpServers``
         dict may it be unlinked.
         """
@@ -1021,8 +1035,7 @@ class TestMcpSyncPrune:
             _init_context(path)
             from vaultspec_core.core.mcps import mcp_sync
 
-            # First sync: install. After this the file has
-            # mcpServers + _vaultspecManaged.
+            # First sync creates host enrollment plus external ownership.
             mcp_sync()
 
             # User manually adds a custom top-level key (e.g. inputs).
@@ -1038,7 +1051,7 @@ class TestMcpSyncPrune:
             assert (path / ".mcp.json").exists()
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert data["inputs"] == [{"type": "promptString", "id": "api-key"}]
-            assert data["mcpServers"] == {}
+            assert data.get("mcpServers", {}) == {}
             assert "_vaultspecManaged" not in data
         finally:
             reset_config()
@@ -1079,7 +1092,8 @@ class TestMcpSyncPrune:
             sync_provider("all", force=False)
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert "companion" in data["mcpServers"]
-            assert "companion" in data["_vaultspecManaged"]
+            assert "companion" in _owned_names(path)
+            assert "_vaultspecManaged" not in data
 
             # Companion uninstall: delete source + sync
             (mcps_dir / "companion.builtin.json").unlink()
@@ -1087,7 +1101,7 @@ class TestMcpSyncPrune:
 
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert "companion" not in data["mcpServers"]
-            assert "companion" not in data.get("_vaultspecManaged", [])
+            assert "companion" not in _owned_names(path)
             # vaultspec-core's own MCP entry is preserved
             assert "vaultspec-core" in data["mcpServers"]
         finally:
@@ -1112,9 +1126,256 @@ class TestInstallSeedsMcps:
             mcp_json = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert "vaultspec-core" in mcp_json["mcpServers"]
             server = mcp_json["mcpServers"]["vaultspec-core"]
-            assert server["command"] == "uv"
-            expected_args = ["run", "python", "-m", "vaultspec_core.mcp_server.app"]
+            assert server["command"] == "uvx"
+            expected_args = [
+                "--from",
+                "vaultspec-core",
+                "python",
+                "-m",
+                "vaultspec_core.mcp_server.app",
+            ]
             assert server["args"] == expected_args
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+
+def _native_servers(path, provider: str) -> dict[str, dict[str, object]]:
+    """Read one real project-scope provider target through its native schema."""
+    if provider == "claude":
+        raw = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+        return raw["mcpServers"]
+    if provider == "antigravity":
+        raw = json.loads(
+            (path / ".agents" / "mcp_config.json").read_text(encoding="utf-8")
+        )
+        return raw["mcpServers"]
+    raw = tomllib.loads((path / ".codex" / "config.toml").read_text(encoding="utf-8"))
+    return raw["mcp_servers"]
+
+
+@pytest.mark.unit
+class TestProviderNativeMcpEnrollment:
+    def test_explicit_public_seam_writes_all_native_targets(self):
+        path, mcps_dir = _make_workspace()
+        try:
+            definition = {
+                "command": "@@VAULTSPEC_INSTALL_MODE_COMMAND@@",
+                "args": ["@@VAULTSPEC_INSTALL_MODE_ARGS@@"],
+                "_vaultspec_mode_package": "vaultspec-rag",
+                "_vaultspec_mode_module": "vaultspec_rag.mcp_server.app",
+                "_vaultspec_mode_tool_spec": "vaultspec-rag[mcp]",
+            }
+            (mcps_dir / "vaultspec-rag.builtin.json").write_text(
+                json.dumps(definition), encoding="utf-8"
+            )
+            reset_config()
+
+            from vaultspec_core.core.enums import InstallMode, Tool
+            from vaultspec_core.core.mcps import mcp_status, mcp_sync
+            from vaultspec_core.core.workspace_mode import (
+                PackageDeclaration,
+                write_package_declaration,
+            )
+
+            enrolled = {Tool.CLAUDE, Tool.ANTIGRAVITY, Tool.CODEX}
+            write_package_declaration(
+                path,
+                "vaultspec-rag",
+                PackageDeclaration(install_mode=InstallMode.TOOL),
+            )
+            result = mcp_sync(
+                target_dir=path,
+                enrolled=enrolled,
+                mode=InstallMode.TOOL,
+            )
+
+            assert result.added == 3
+            assert set(result.per_tool) == {"claude", "antigravity", "codex"}
+            for provider in result.per_tool:
+                server = _native_servers(path, provider)["vaultspec-rag"]
+                assert server["command"] == "uvx"
+                assert server["args"] == [
+                    "--from",
+                    "vaultspec-rag[mcp]",
+                    "python",
+                    "-m",
+                    "vaultspec_rag.mcp_server.app",
+                ]
+                assert all(not key.startswith("_vaultspec_") for key in server)
+
+            ownership = json.loads(
+                (path / ".vaultspec" / "mcp-ownership.json").read_text(encoding="utf-8")
+            )
+            assert set(ownership["targets"]) == {
+                "claude:project",
+                "antigravity:project",
+                "codex:project",
+            }
+            assert "_vaultspecManaged" not in json.loads(
+                (path / ".mcp.json").read_text(encoding="utf-8")
+            )
+
+            status = mcp_status(target_dir=path, enrolled=enrolled)
+            assert status["status"] == "ok"
+            assert all(
+                provider_status["status"] == "ok"
+                for provider_status in status["providers"].values()
+            )
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_dry_run_is_byte_stable_and_creates_no_locks(self):
+        path, mcps_dir = _make_workspace()
+        try:
+            (mcps_dir / "dry.builtin.json").write_text(
+                json.dumps({"command": "dry-server"}), encoding="utf-8"
+            )
+            before = {
+                file.relative_to(path): file.read_bytes()
+                for file in path.rglob("*")
+                if file.is_file()
+            }
+            reset_config()
+
+            from vaultspec_core.core.enums import InstallMode, Tool
+            from vaultspec_core.core.mcps import mcp_sync
+
+            result = mcp_sync(
+                target_dir=path,
+                enrolled={Tool.CLAUDE, Tool.ANTIGRAVITY, Tool.CODEX},
+                mode=InstallMode.TOOL,
+                dry_run=True,
+            )
+            after = {
+                file.relative_to(path): file.read_bytes()
+                for file in path.rglob("*")
+                if file.is_file()
+            }
+
+            assert result.added == 3
+            assert after == before
+            assert not list(path.rglob("*.lock"))
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_selective_uninstall_preserves_core_and_ownership_fingerprints(self):
+        path, mcps_dir = _make_workspace()
+        try:
+            for name in ("vaultspec-core", "vaultspec-rag"):
+                (mcps_dir / f"{name}.builtin.json").write_text(
+                    json.dumps({"command": name}), encoding="utf-8"
+                )
+            reset_config()
+
+            from vaultspec_core.core.enums import InstallMode, Tool
+            from vaultspec_core.core.mcps import mcp_sync, mcp_uninstall
+
+            enrolled = {Tool.CLAUDE, Tool.ANTIGRAVITY, Tool.CODEX}
+            mcp_sync(
+                target_dir=path,
+                enrolled=enrolled,
+                mode=InstallMode.TOOL,
+            )
+            ownership_path = path / ".vaultspec" / "mcp-ownership.json"
+            before = json.loads(ownership_path.read_text(encoding="utf-8"))
+            core_fingerprints = {
+                key: record["managed"]["vaultspec-core"]
+                for key, record in before["targets"].items()
+            }
+
+            result = mcp_uninstall(
+                path,
+                enrolled=enrolled,
+                names=frozenset({"vaultspec-rag"}),
+            )
+
+            assert result.pruned == 3
+            for provider in ("claude", "antigravity", "codex"):
+                servers = _native_servers(path, provider)
+                assert "vaultspec-core" in servers
+                assert "vaultspec-rag" not in servers
+            after = json.loads(ownership_path.read_text(encoding="utf-8"))
+            assert {
+                key: record["managed"]["vaultspec-core"]
+                for key, record in after["targets"].items()
+            } == core_fingerprints
+            assert all(
+                "vaultspec-rag" not in record["managed"]
+                for record in after["targets"].values()
+            )
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_codex_drift_is_independent_and_force_repairs_only_codex(self):
+        path, mcps_dir = _make_workspace()
+        try:
+            (mcps_dir / "server.builtin.json").write_text(
+                json.dumps({"command": "expected"}), encoding="utf-8"
+            )
+            reset_config()
+
+            from vaultspec_core.core.enums import InstallMode, Tool
+            from vaultspec_core.core.mcps import mcp_status, mcp_sync
+
+            enrolled = {Tool.CLAUDE, Tool.CODEX}
+            mcp_sync(
+                target_dir=path,
+                enrolled=enrolled,
+                mode=InstallMode.TOOL,
+            )
+            claude_before = (path / ".mcp.json").read_bytes()
+            codex_path = path / ".codex" / "config.toml"
+            codex_path.write_text(
+                codex_path.read_text(encoding="utf-8").replace(
+                    'command = "expected"', 'command = "drifted"'
+                ),
+                encoding="utf-8",
+            )
+
+            status = mcp_status(target_dir=path, enrolled=enrolled)
+            assert status["providers"]["claude"]["status"] == "ok"
+            assert status["providers"]["codex"]["drifted"] == ["server"]
+
+            repaired = mcp_sync(
+                target_dir=path,
+                enrolled=enrolled,
+                provider=Tool.CODEX,
+                mode=InstallMode.TOOL,
+                force=True,
+            )
+            assert repaired.updated == 1
+            assert _native_servers(path, "codex")["server"]["command"] == "expected"
+            assert (path / ".mcp.json").read_bytes() == claude_before
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_codex_local_scope_fails_without_writing(self):
+        path, mcps_dir = _make_workspace()
+        try:
+            (mcps_dir / "server.builtin.json").write_text(
+                json.dumps({"command": "expected"}), encoding="utf-8"
+            )
+            reset_config()
+
+            from vaultspec_core.core.enums import Tool
+            from vaultspec_core.core.mcps import mcp_sync
+
+            result = mcp_sync(
+                target_dir=path,
+                enrolled={Tool.CODEX},
+                provider=Tool.CODEX,
+                scope="local",
+            )
+
+            assert result.errored == 1
+            assert any("distinct local MCP scope" in error for error in result.errors)
+            assert not (path / ".codex" / "config.toml").exists()
+            assert not (path / ".vaultspec" / "mcp-ownership.json").exists()
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)
