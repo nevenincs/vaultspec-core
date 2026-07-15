@@ -16,6 +16,7 @@ import os
 import re
 import tomllib
 from collections.abc import Iterable
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -437,6 +438,11 @@ def _read_ownership(path: Path) -> dict[str, Any]:
 def _write_ownership(path: Path, state: dict[str, Any]) -> None:
     ensure_dir(path.parent)
     atomic_write(path, json.dumps(state, indent=2, sort_keys=True) + "\n")
+
+
+def _target_lock(path: Path, *, dry_run: bool) -> Any:
+    """Return a no-op context for previews and a real advisory lock for writes."""
+    return nullcontext() if dry_run else advisory_lock(path)
 
 
 def _existing_source_server_names() -> set[str]:
@@ -1037,7 +1043,7 @@ def _sync_json_target(
     force_managed: frozenset[str],
 ) -> None:
     """Reconcile a Claude or Antigravity JSON target without host-only keys."""
-    with advisory_lock(target.path):
+    with _target_lock(target.path, dry_run=dry_run):
         raw: dict[str, Any] = {}
         if target.path.exists():
             try:
@@ -1209,7 +1215,7 @@ def _sync_toml_target(
     force_managed: frozenset[str],
 ) -> None:
     """Reconcile Codex tables inside one comment-bounded managed block."""
-    with advisory_lock(target.path):
+    with _target_lock(target.path, dry_run=dry_run):
         content = ""
         if target.path.exists():
             try:
@@ -1350,7 +1356,7 @@ def mcp_sync(
     sources = collect_mcp_servers(warnings=parse_warnings, mode=mode, target=root)
     result.warnings.extend(parse_warnings)
     ownership_path = _ownership_path(root, resolved_scope)
-    with advisory_lock(ownership_path):
+    with _target_lock(ownership_path, dry_run=dry_run):
         try:
             state = _read_ownership(ownership_path)
         except VaultSpecError as exc:
@@ -1418,7 +1424,7 @@ def mcp_uninstall(
         result.errored += 1
         return result
     ownership_path = _ownership_path(target_dir, resolved_scope)
-    with advisory_lock(ownership_path):
+    with _target_lock(ownership_path, dry_run=dry_run):
         try:
             state = _read_ownership(ownership_path)
         except VaultSpecError as exc:
@@ -1433,7 +1439,7 @@ def mcp_uninstall(
                 result.per_tool[target.provider.value] = sub
                 continue
             succeeded = False
-            with advisory_lock(target.path):
+            with _target_lock(target.path, dry_run=dry_run):
                 try:
                     if target.format is McpTargetFormat.JSON:
                         raw = json.loads(target.path.read_text(encoding="utf-8"))

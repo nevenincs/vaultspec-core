@@ -13,6 +13,7 @@ import logging
 import shutil
 import subprocess
 from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -786,7 +787,7 @@ def _scaffold_precommit(
 
     config_file = target / ".pre-commit-config.yaml"
 
-    with advisory_lock(config_file):
+    with nullcontext() if dry_run else advisory_lock(config_file):
         if config_file.exists():
             try:
                 raw = config_file.read_text(encoding="utf-8")
@@ -986,11 +987,21 @@ def init_run(
         created.extend(_scaffold_provider(target, tool))
 
     if "mcp" not in skip:
-        from .mcps import mcp_sync
+        from .mcps import mcp_sync, resolve_mcp_targets
 
-        mcp_result = mcp_sync(mode=mode)
-        if mcp_result.items:
-            created.append((".mcp.json", "mcp"))
+        selected = tuple(tools)
+        mcp_result = mcp_sync(
+            mode=mode,
+            target_dir=target,
+            enrolled=selected,
+        )
+        for mcp_target in resolve_mcp_targets(
+            target_dir=target,
+            enrolled=selected,
+        ):
+            provider_result = mcp_result.per_tool.get(mcp_target.provider.value)
+            if provider_result and provider_result.items:
+                created.append((_rel(target, mcp_target.path), "mcp"))
     if "precommit" not in skip:
         created.extend(_scaffold_precommit(target, mode=mode))
 
@@ -1198,11 +1209,22 @@ def install_run(
         for tool in tools:
             manifest.extend(_scaffold_provider(path, tool, dry_run=True))
         if "mcp" not in skip:
-            from .mcps import mcp_sync
+            from .mcps import mcp_sync, resolve_mcp_targets
 
-            mcp_result = mcp_sync(dry_run=True, mode=resolved_mode)
-            if mcp_result.items:
-                manifest.append((".mcp.json", "mcp"))
+            selected = tuple(tools)
+            mcp_result = mcp_sync(
+                dry_run=True,
+                mode=resolved_mode,
+                target_dir=path,
+                enrolled=selected,
+            )
+            for mcp_target in resolve_mcp_targets(
+                target_dir=path,
+                enrolled=selected,
+            ):
+                provider_result = mcp_result.per_tool.get(mcp_target.provider.value)
+                if not skip_core or (provider_result and provider_result.items):
+                    manifest.append((_rel(path, mcp_target.path), "mcp"))
         if "precommit" not in skip:
             manifest.extend(_scaffold_precommit(path, dry_run=True, mode=resolved_mode))
 
@@ -1423,7 +1445,12 @@ def install_run(
 
     tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
     provider_names = [t.value for t in tools]
-    has_mcp = (path / ".mcp.json").exists()
+    from .mcps import resolve_mcp_targets
+
+    has_mcp = any(
+        target.path.exists()
+        for target in resolve_mcp_targets(target_dir=path, enrolled=tuple(tools))
+    )
 
     # Manage gitignore block
     recommended = get_recommended_entries(path)
@@ -1622,15 +1649,31 @@ def uninstall_run(
             path / "AGENTS.md",
         ]
 
-        # Surgical .mcp.json cleanup BEFORE directory removal so the
-        # registry in .vaultspec/mcps/ is still readable.
-        mcp_path = path / ".mcp.json"
+        # Reconcile native MCP targets before provider directories and
+        # ownership state are removed.
         if "mcp" not in skip:
-            from .mcps import mcp_uninstall
+            from .mcps import mcp_uninstall, resolve_mcp_targets
 
-            uninstalled = mcp_uninstall(path, dry_run=dry_run)
-            if uninstalled:
-                removed.append((_rel(path, mcp_path), "mcp"))
+            active_ctx = _t.get_context()
+            mcp_tools = tuple(
+                tool
+                for tool, config in active_ctx.tool_configs.items()
+                if ProviderCapability.MCPS in config.capabilities
+                and tool.value not in skip
+            )
+            uninstalled = mcp_uninstall(
+                path,
+                dry_run=dry_run,
+                enrolled=mcp_tools,
+            )
+            errors.extend(uninstalled.errors)
+            for target in resolve_mcp_targets(
+                target_dir=path,
+                enrolled=mcp_tools,
+            ):
+                target_result = uninstalled.per_tool.get(target.provider.value)
+                if target_result and target_result.items:
+                    removed.append((_rel(path, target.path), "mcp"))
 
         for d in managed_dirs:
             owners = _dir_owners.get(d.name, [])
@@ -1741,6 +1784,31 @@ def uninstall_run(
     else:
         # Per-provider uninstall with shared directory protection
         tools = _filter_tools(_PROVIDER_TO_TOOLS.get(effective_provider, []), skip)
+        if "mcp" not in skip:
+            from .mcps import mcp_uninstall, resolve_mcp_targets
+
+            active_ctx = _t.get_context()
+            mcp_tools = tuple(
+                tool
+                for tool in tools
+                if ProviderCapability.MCPS in active_ctx.tool_configs[tool].capabilities
+            )
+            if mcp_tools:
+                uninstalled = mcp_uninstall(
+                    path,
+                    dry_run=dry_run,
+                    provider=effective_provider,
+                    enrolled=mcp_tools,
+                )
+                errors.extend(uninstalled.errors)
+                for target in resolve_mcp_targets(
+                    provider=effective_provider,
+                    target_dir=path,
+                    enrolled=mcp_tools,
+                ):
+                    target_result = uninstalled.per_tool.get(target.provider.value)
+                    if target_result and target_result.items:
+                        removed.append((_rel(path, target.path), "mcp"))
         for tool in tools:
             dirs, files = _collect_provider_artifacts(path, tool)
 
@@ -1996,7 +2064,11 @@ def sync_provider(
                     ensure_dir(directory)
         return result
 
-    def _run_all_syncs(*, include_mcp: bool = True) -> list[_t.SyncResult]:
+    def _run_all_syncs(
+        *,
+        include_mcp: bool = True,
+        mcp_provider: Tool | str = "all",
+    ) -> list[_t.SyncResult]:
         results: list[_t.SyncResult] = []
         sync_passes: list[tuple[Callable[[], _t.SyncResult], str]] = [
             (lambda: rules_sync(prune=force, dry_run=dry_run), "rules"),
@@ -2006,9 +2078,23 @@ def sync_provider(
             (lambda: config_sync(dry_run=dry_run, force=force), "config"),
         ]
         if include_mcp and "mcp" not in skip:
+            active_ctx = _t.get_context()
+            installed = read_manifest(active_ctx.target_dir)
+            enrolled = tuple(
+                tool
+                for tool in active_ctx.tool_configs
+                if tool.value in installed and tool.value not in (skip or set())
+            )
             sync_passes.append(
                 (
-                    lambda: _mcp_sync(dry_run=dry_run, force=force, prune=force),
+                    lambda: _mcp_sync(
+                        dry_run=dry_run,
+                        force=force,
+                        prune=force,
+                        provider=mcp_provider,
+                        target_dir=active_ctx.target_dir,
+                        enrolled=enrolled,
+                    ),
                     "mcps",
                 )
             )
@@ -2183,7 +2269,14 @@ def sync_provider(
     ) -> list[_t.SyncResult]:
         _t.set_context(replace(ctx, tool_configs=provider_configs))
         logger.info("Syncing provider: %s ...", provider)
-        results = _run_all_syncs(include_mcp=False)
+        include_mcp = any(
+            ProviderCapability.MCPS in config.capabilities
+            for config in provider_configs.values()
+        )
+        results = _run_all_syncs(
+            include_mcp=include_mcp,
+            mcp_provider=provider,
+        )
         if not dry_run:
             logger.info("Done.")
         return results
