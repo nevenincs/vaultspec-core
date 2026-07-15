@@ -52,6 +52,36 @@ class TestInstallForce:
         if result.exit_code != 0:
             assert "already installed" not in result.output.lower()
 
+    def test_install_api_refuses_success_when_native_mcp_reconciliation_fails(
+        self, tmp_path
+    ):
+        """A native-store parse failure is a typed install failure, not success."""
+        from vaultspec_core.core.commands import install_run
+        from vaultspec_core.core.exceptions import VaultSpecError
+
+        (tmp_path / ".mcp.json").write_text("not valid json", encoding="utf-8")
+
+        with pytest.raises(
+            VaultSpecError,
+            match="MCP provider-native enrollment failed",
+        ):
+            install_run(tmp_path, provider="claude", force=True)
+
+    def test_install_cli_exits_nonzero_when_native_mcp_reconciliation_fails(
+        self, tmp_path, runner
+    ):
+        """The CLI exposes the native-store failure and exits non-zero."""
+        (tmp_path / ".mcp.json").write_text("not valid json", encoding="utf-8")
+
+        result = runner.invoke(
+            app,
+            ["-t", str(tmp_path), "install", "claude", "--force"],
+        )
+
+        assert result.exit_code == 1, result.output
+        assert "MCP provider-native enrollment failed" in result.output
+        assert "Cannot parse" in result.output
+
 
 class TestInstallJson:
     def test_install_json_stdout_is_parseable(self, tmp_path, runner):

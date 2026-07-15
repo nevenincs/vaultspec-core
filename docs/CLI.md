@@ -109,7 +109,7 @@ full options.
 
 ### Top-level commands
 
-- `vaultspec-core install` - Deploy the vaultspec framework to the target directory.
+- `vaultspec-core install` - Install Vaultspec resources for the selected providers.
 - `vaultspec-core uninstall` - Remove the vaultspec framework from the target directory.
 - `vaultspec-core sync` - Sync rules, skills, agents, configs, system prompts, and MCPs.
 - `vaultspec-core doctor` - Diagnose overall workspace and vault health.
@@ -322,12 +322,14 @@ full options.
 
 #### Mcps
 
-- `vaultspec-core spec mcps list` - List all registered MCP server definitions.
-- `vaultspec-core spec mcps status` - Report focused MCP definition and .mcp.json sync
-  status.
-- `vaultspec-core spec mcps add` - Add a new custom MCP server definition.
-- `vaultspec-core spec mcps remove` - Remove an MCP server definition.
-- `vaultspec-core spec mcps sync` - Sync only MCP definitions to .mcp.json.
+- `vaultspec-core spec mcps list` - List canonical MCP server definitions.
+- `vaultspec-core spec mcps status` - Inspect provider-native MCP enrollment status.
+- `vaultspec-core spec mcps add` - Add or replace a canonical MCP server definition.
+- `vaultspec-core spec mcps remove` - Remove a canonical MCP server definition.
+- `vaultspec-core spec mcps sync` - Reconcile canonical definitions into provider-native
+  enrollment.
+- `vaultspec-core spec mcps uninstall` - Remove Vaultspec-owned provider-native MCP
+  enrollment.
 
 #### Reference
 
@@ -1746,22 +1748,32 @@ ______________________________________________________________________
 vaultspec-core spec mcps [OPTIONS] COMMAND [ARGS]...
 ```
 
-Manage MCP server definitions and the synced `.mcp.json` entries deployed for provider
-clients. MCP sync updates `.mcp.json`; use top-level `vaultspec-core sync` for a
-complete refresh across all provider-facing outputs.
+Manage canonical MCP server definitions in `.vaultspec/mcps/*.json` and reconcile them
+into provider-native enrollment files. Provider targets are `all`, `claude`,
+`antigravity`, and `codex`; scopes are `project`, `local`, and `user`. Unsupported
+provider/scope combinations fail instead of writing to a substitute location. Use
+top-level `vaultspec-core sync` for a complete refresh across all provider-facing
+outputs.
 
 #### Subcommands
 
 - `list` - List all registered MCP server definitions.
-- `status` (`--json`) - Validate MCP definitions against `.mcp.json`.
+- `status [PROVIDER]` (`--scope SCOPE`, `--json`, `--target PATH`) - Inspect enrollment
+  and ownership state without starting or probing MCP servers.
 - `add --name NAME [--config JSON] [--force]` - Add a new custom MCP server definition.
 - `remove NAME [--force]` - Remove an MCP server definition (`--force` skips
   confirmation).
-- `sync` (`--dry-run`, `--force`) - Sync MCP definitions to `.mcp.json`.
+- `sync [PROVIDER]` (`--scope SCOPE`, `--dry-run`, `--force`, `--prune`, `--json`,
+  `--target PATH`) - Reconcile canonical definitions into provider-native enrollment.
+- `uninstall [PROVIDER]` (`--scope SCOPE`, `--dry-run`, `--force`, `--json`,
+  `--target PATH`) - Remove only Vaultspec-owned provider-native enrollment.
 
 `vaultspec-core spec mcps status` exits `0` only when MCP config status is `ok`,
 otherwise `1`. It checks config health only and does not start or probe MCP server
-processes.
+processes. The default provider is `all` and the default scope is `project`. `--force`
+on `sync` explicitly adopts or replaces same-name external enrollment; `--prune` removes
+owned enrollment whose canonical source was deleted. `uninstall` preserves canonical
+definitions and externally owned host entries.
 
 #### Examples
 
@@ -1781,6 +1793,18 @@ processes.
 
   ```bash
   vaultspec-core spec mcps sync
+  ```
+
+- **Inspect Codex project enrollment**:
+
+  ```bash
+  vaultspec-core spec mcps status codex --scope project
+  ```
+
+- **Preview removal of Vaultspec-owned Claude user enrollment**:
+
+  ```bash
+  vaultspec-core spec mcps uninstall claude --scope user --dry-run
   ```
 
 - **Register a new custom MCP server definition**:

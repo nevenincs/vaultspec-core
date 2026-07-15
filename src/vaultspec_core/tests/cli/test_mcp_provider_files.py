@@ -101,13 +101,18 @@ class TestAgyMcpConfig:
         assert _servers(agy) == _servers(root)
         assert "vaultspec-core" in _servers(agy)
 
-    def test_uses_mcpservers_schema_and_managed_sidecar(self, tmp_path: Path):
+    def test_uses_host_schema_and_external_ownership_sidecar(self, tmp_path: Path):
         WorkspaceFactory(tmp_path).install("all")
         raw = json.loads(
             (tmp_path / ".agents" / "mcp_config.json").read_text(encoding="utf-8")
         )
         assert "mcpServers" in raw
-        assert "vaultspec-core" in raw.get("_vaultspecManaged", [])
+        assert "_vaultspecManaged" not in raw
+        ownership = json.loads(
+            (tmp_path / ".vaultspec" / "mcp-ownership.json").read_text(encoding="utf-8")
+        )
+        managed = ownership["targets"]["antigravity:project"]["managed"]
+        assert "vaultspec-core" in managed
 
     def test_not_written_when_antigravity_not_installed(self, tmp_path: Path):
         WorkspaceFactory(tmp_path).install("claude")

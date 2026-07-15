@@ -18,7 +18,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .enums import DirName, FileName, ProviderCapability, Resource, Tool
+from .enums import (
+    DirName,
+    FileName,
+    McpScope,
+    McpTargetFormat,
+    ProviderCapability,
+    Resource,
+    Tool,
+)
 from .exceptions import VaultSpecError
 
 logger = logging.getLogger(__name__)
@@ -86,6 +94,22 @@ class ToolConfig:
     mcp_config_file: Path | None = None
     embed_rules: bool = False
     capabilities: frozenset[ProviderCapability] = frozenset()
+
+
+@dataclass(frozen=True)
+class McpTarget:
+    """One provider-native MCP configuration destination.
+
+    ``provider`` and ``scope`` identify the host contract, while ``path`` and
+    ``format`` select its concrete serializer.  Target resolution is kept
+    separate from reconciliation so callers and companion packages can inspect
+    the exact mutation boundary before requesting a write.
+    """
+
+    provider: Tool
+    scope: McpScope
+    path: Path
+    format: McpTargetFormat
 
 
 @dataclass
@@ -257,6 +281,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
                     _pc.HOOKS,
                     _pc.TEAMS,
                     _pc.SCHEDULED_TASKS,
+                    _pc.MCPS,
                 }
             ),
         ),
@@ -298,6 +323,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
                     _pc.ROOT_CONFIG,
                     _pc.WORKFLOWS,
                     _pc.HOOKS,
+                    _pc.MCPS,
                 }
             ),
         ),
@@ -320,6 +346,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
                     _pc.AGENTS,
                     _pc.ROOT_CONFIG,
                     _pc.HOOKS,
+                    _pc.MCPS,
                 }
             ),
         ),

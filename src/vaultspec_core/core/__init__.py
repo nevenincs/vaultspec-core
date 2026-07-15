@@ -17,6 +17,10 @@ from .agents import collect_agents as collect_agents
 from .agents import transform_agent as transform_agent
 from .config_gen import config_show as config_show
 from .config_gen import config_sync as config_sync
+from .enums import InstallMode as InstallMode
+from .enums import McpScope as McpScope
+from .enums import McpTargetFormat as McpTargetFormat
+from .enums import Tool as Tool
 from .exceptions import (
     EditorCancellationError as EditorCancellationError,
 )
@@ -72,6 +76,12 @@ from .mcps import mcp_list as mcp_list
 from .mcps import mcp_remove as mcp_remove
 from .mcps import mcp_status as mcp_status
 from .mcps import mcp_sync as mcp_sync
+from .mcps import mcp_uninstall as mcp_uninstall
+from .mcps import render_launch_for_mode as render_launch_for_mode
+from .mcps import (
+    render_mcp_definition_for_mode as render_mcp_definition_for_mode,
+)
+from .mcps import resolve_mcp_targets as resolve_mcp_targets
 from .resources import resource_edit as resource_edit
 from .resources import resource_remove as resource_remove
 from .resources import resource_rename as resource_rename
@@ -90,6 +100,7 @@ from .sync import sync_files as sync_files
 from .system import system_show as system_show
 from .system import system_sync as system_sync
 from .types import CONFIG_HEADER as CONFIG_HEADER
+from .types import McpTarget as McpTarget
 from .types import SyncResult as SyncResult
 from .types import ToolConfig as ToolConfig
 from .types import WorkspaceContext as WorkspaceContext

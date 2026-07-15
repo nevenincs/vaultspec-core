@@ -113,8 +113,9 @@ class TestSyncValidation:
 
         payload = json.loads(result.output)["data"]
         assert result.exit_code == 1, result.output
-        assert payload["status"] == "missing_config"
+        assert payload["status"] == "partial"
         assert payload["missing"] == ["vaultspec-core"]
+        assert payload["providers"]["claude"]["status"] == "missing_config"
 
     def test_mcp_status_json_reports_managed_config_drift(
         self, runner, synthetic_project
@@ -258,15 +259,16 @@ class TestSyncAuthority:
         assert "antigravity" not in output
         assert "codex" not in output
 
-    def test_provider_scoped_sync_does_not_repair_global_mcp_state(
+    def test_provider_scoped_sync_repairs_only_requested_native_mcp_state(
         self, runner, synthetic_project
     ):
-        """Provider-scoped sync must not mutate provider-agnostic MCP config."""
+        """Provider-scoped sync repairs its native target without touching peers."""
         mcp_path = synthetic_project / ".mcp.json"
+        codex_path = synthetic_project / ".codex" / "config.toml"
+        codex_before = codex_path.read_bytes()
         payload = json.loads(mcp_path.read_text(encoding="utf-8"))
         payload["mcpServers"]["vaultspec-core"]["args"] = ["run", "broken-server"]
         mcp_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-        before = mcp_path.read_text(encoding="utf-8")
 
         result = runner.invoke(
             app,
@@ -274,19 +276,12 @@ class TestSyncAuthority:
         )
 
         assert result.exit_code == 0, result.output
-        assert mcp_path.read_text(encoding="utf-8") == before
-
-        repair_result = runner.invoke(
-            app,
-            ["--target", str(synthetic_project), "sync", "--force"],
-        )
-
-        assert repair_result.exit_code == 0, repair_result.output
         repaired = json.loads(mcp_path.read_text(encoding="utf-8"))
         assert repaired["mcpServers"]["vaultspec-core"]["args"] != [
             "run",
             "broken-server",
         ]
+        assert codex_path.read_bytes() == codex_before
 
     def test_provider_scoped_sync_respects_skip_for_requested_provider(
         self, runner, synthetic_project
@@ -441,7 +436,15 @@ class TestSyncAuthority:
             "command": "node",
             "args": ["user-server.js"],
         }
-        assert repaired["_vaultspecManaged"] == ["vaultspec-core"]
+        assert "_vaultspecManaged" not in repaired
+        ownership = json.loads(
+            (synthetic_project / ".vaultspec" / "mcp-ownership.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        assert set(ownership["targets"]["claude:project"]["managed"]) == {
+            "vaultspec-core"
+        }
 
         after = runner.invoke(
             app,
@@ -456,10 +459,9 @@ class TestSyncAuthority:
     ):
         """--force adopts a name-colliding user .mcp.json entry (issue #120).
 
-        When .mcp.json carries an entry whose name matches a source but which is
-        absent from _vaultspecManaged, a plain sync preserves it and points at
-        --force; --force then overwrites it with the source definition and
-        records it as managed, with no hand-editing of the generated file.
+        When .mcp.json carries an entry whose name matches a source but is absent
+        from the external ownership sidecar, a plain sync preserves it and points
+        at --force. --force then overwrites and records it as managed.
         """
         mcp_path = synthetic_project / ".mcp.json"
         source_path = (
@@ -473,15 +475,14 @@ class TestSyncAuthority:
             resolve_render_mode(synthetic_project),
         )
 
-        # _vaultspecManaged present but empty: vaultspec-core collides with the
-        # source yet is unmanaged, the exact state the issue reports.
         payload = {
             "mcpServers": {
                 "vaultspec-core": {"command": "node", "args": ["user-authored.js"]}
-            },
-            "_vaultspecManaged": [],
+            }
         }
         mcp_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        ownership_path = synthetic_project / ".vaultspec" / "mcp-ownership.json"
+        ownership_path.unlink()
 
         plain = runner.invoke(
             app,
@@ -490,7 +491,8 @@ class TestSyncAuthority:
         assert "--force" in plain.output
         preserved = json.loads(mcp_path.read_text(encoding="utf-8"))
         assert preserved["mcpServers"]["vaultspec-core"]["args"] == ["user-authored.js"]
-        assert "vaultspec-core" not in preserved.get("_vaultspecManaged", [])
+        plain_ownership = json.loads(ownership_path.read_text(encoding="utf-8"))
+        assert "claude:project" not in plain_ownership["targets"]
 
         forced = runner.invoke(
             app,
@@ -499,4 +501,6 @@ class TestSyncAuthority:
         assert forced.exit_code == 0, forced.output
         adopted = json.loads(mcp_path.read_text(encoding="utf-8"))
         assert adopted["mcpServers"]["vaultspec-core"] == expected_config
-        assert "vaultspec-core" in adopted["_vaultspecManaged"]
+        assert "_vaultspecManaged" not in adopted
+        ownership = json.loads(ownership_path.read_text(encoding="utf-8"))
+        assert "vaultspec-core" in ownership["targets"]["claude:project"]["managed"]
