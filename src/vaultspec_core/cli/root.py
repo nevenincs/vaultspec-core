@@ -250,12 +250,12 @@ def cmd_install(
 ) -> None:
     """Install Vaultspec resources for the selected providers.
 
-    Scaffolds the workspace structure and syncs all managed resources. For
-    MCP-capable providers, installation reconciles canonical MCP definitions
-    into project-scope provider-native configuration. It does not start MCP
-    servers or grant provider trust.
+    Scaffolds the workspace structure and syncs all managed resources.
     Use --upgrade to update builtin rules without re-scaffolding.
     Use --skip to exclude components on retry (e.g. --skip core --skip claude).
+    For MCP-capable providers, installation reconciles canonical MCP definitions
+    into project-scope provider-native configuration. It does not start MCP
+    servers or grant provider trust.
     """
     from vaultspec_core.core.commands import install_run
     from vaultspec_core.core.exceptions import VaultSpecError

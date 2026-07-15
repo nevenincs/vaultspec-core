@@ -12,7 +12,7 @@ import contextvars
 import logging
 import shutil
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from contextlib import nullcontext
 from dataclasses import replace
 from pathlib import Path
@@ -919,6 +919,24 @@ def _filter_tools(tools: list[Tool], skip: set[str]) -> list[Tool]:
     return [t for t in tools if t.value not in skip]
 
 
+def _require_reconciliation_success(
+    results: _t.SyncResult | Iterable[_t.SyncResult],
+    *,
+    operation: str,
+) -> None:
+    """Refuse to report install success after a failed reconciliation pass."""
+    passes = (results,) if isinstance(results, _t.SyncResult) else tuple(results)
+    errors = [message for result in passes for message in result.errors]
+    unreported = sum(result.errored for result in passes) - len(errors)
+    if unreported > 0:
+        errors.append(f"{unreported} reconciliation error(s) had no detail message.")
+    if errors:
+        raise VaultSpecError(
+            f"{operation} failed.",
+            hint=" ".join(errors),
+        )
+
+
 def init_run(
     force: bool = False,
     provider: str = "all",
@@ -994,6 +1012,10 @@ def init_run(
             mode=mode,
             target_dir=target,
             enrolled=selected,
+        )
+        _require_reconciliation_success(
+            mcp_result,
+            operation="MCP provider-native enrollment",
         )
         for mcp_target in resolve_mcp_targets(
             target_dir=target,
@@ -1170,9 +1192,14 @@ def install_run(
             sync_target = provider if provider not in ("all", "core") else "all"
             try:
                 sync_results = sync_provider(sync_target, dry_run=True, skip=skip)
-            except (VaultSpecError, OSError) as exc:
-                logger.debug("Upgrade dry-run provider preview skipped: %s", exc)
-                sync_results = []
+            except OSError as exc:
+                raise VaultSpecError(
+                    "Provider reconciliation preview failed.", hint=str(exc)
+                ) from exc
+            _require_reconciliation_success(
+                sync_results,
+                operation="Provider reconciliation preview",
+            )
             seen_preview = {rel for rel, _ in items}
             for sync_result in sync_results:
                 for rel, action in sync_result.items:
@@ -1217,6 +1244,10 @@ def install_run(
                 mode=resolved_mode,
                 target_dir=path,
                 enrolled=selected,
+            )
+            _require_reconciliation_success(
+                mcp_result,
+                operation="MCP provider-native enrollment preview",
             )
             for mcp_target in resolve_mcp_targets(
                 target_dir=path,
@@ -1329,7 +1360,11 @@ def install_run(
         # content. The pre-collapse hardcoded `force=True` was an asymmetry
         # against the fresh-install path and silently overwrote user content
         # on every upgrade. See PR #116 review thread r3260188496.
-        sync_provider(sync_target, force=force, skip=skip - {"core"})
+        sync_results = sync_provider(sync_target, force=force, skip=skip - {"core"})
+        _require_reconciliation_success(
+            sync_results,
+            operation="Provider reconciliation during upgrade",
+        )
 
         if "precommit" not in skip:
             _scaffold_precommit(path, mode=resolved_mode)
@@ -1346,9 +1381,13 @@ def install_run(
         if mcp_mode_flipped and not force and "mcp" not in skip:
             from .mcps import mcp_sync
 
-            mcp_sync(
+            mcp_result = mcp_sync(
                 mode=resolved_mode,
                 force_managed=frozenset({"vaultspec-core"}),
+            )
+            _require_reconciliation_success(
+                mcp_result,
+                operation="MCP mode-migration reconciliation",
             )
 
         # Update manifest timestamps and version
