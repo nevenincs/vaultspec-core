@@ -1,10 +1,9 @@
-"""Manage MCP server definitions for the vaultspec framework.
+"""Manage canonical MCP definitions and provider-native enrollment.
 
-This module handles MCP server definition collection, custom definition
-scaffolding, and the merge pipeline that syncs definitions into ``.mcp.json``.
-Unlike rules/skills/agents (which use Markdown sources and per-tool directory
-sync), MCP definitions are JSON files merged into a single provider-agnostic
-``.mcp.json`` file.
+Definitions in ``.vaultspec/mcps/*.json`` describe provider-neutral stdio
+servers. This module renders those definitions for each MCP-capable provider,
+reconciles project or explicit broader-scope targets, and records ownership
+outside host configuration so unrelated entries remain untouched.
 """
 
 from __future__ import annotations
@@ -43,7 +42,7 @@ logger = logging.getLogger(__name__)
 #: unambiguously. The seeded ``.vaultspec/mcps/`` copy carries these same bytes
 #: (keeping the ``BuiltinVersionSignal`` snapshot hash stable); substitution
 #: happens only here, downstream, and only the substituted concrete command is
-#: ever written into a workspace ``.mcp.json``.
+#: ever written into provider-native host configuration.
 _MODE_COMMAND_TOKEN = "@@VAULTSPEC_INSTALL_MODE_COMMAND@@"
 _MODE_ARGS_TOKEN = "@@VAULTSPEC_INSTALL_MODE_ARGS@@"
 
@@ -53,8 +52,8 @@ _MODE_ARGS_TOKEN = "@@VAULTSPEC_INSTALL_MODE_ARGS@@"
 #: and module below, keeping that file byte-identical - and present on a
 #: companion package's builtin so core's single sentinel-substitution renderer
 #: produces *that* package's ``uv run``/``uvx`` launch without a second renderer.
-#: They are consumed and stripped during substitution, so they never reach the
-#: written ``.mcp.json``.
+#: They are consumed and stripped during substitution, so they never reach
+#: provider-native host configuration.
 _MODE_PACKAGE_KEY = "_vaultspec_mode_package"
 _MODE_MODULE_KEY = "_vaultspec_mode_module"
 _MODE_TOOL_SPEC_KEY = "_vaultspec_mode_tool_spec"
@@ -143,8 +142,9 @@ def render_mcp_definition_for_mode(
     rather than falling off a two-key table. The distribution and module the
     launch targets come from the definition's own
     :data:`_MODE_PACKAGE_KEY`/:data:`_MODE_MODULE_KEY` metadata, defaulting to
-    core's package and module when absent; those keys are stripped during
-    substitution so they never reach the written ``.mcp.json``.
+    core's package and module when absent. Those keys and the optional
+    :data:`_MODE_TOOL_SPEC_KEY` are stripped during substitution so launch
+    metadata never reaches provider-native host configuration.
 
     Args:
         definition: A parsed MCP server definition (``command``/``args`` map).
@@ -455,7 +455,7 @@ def _existing_source_server_names() -> set[str]:
     must only be considered for orphan removal when its source file
     is *definitively absent*, not when parsing happened to fail this
     run. Otherwise a single typo in a managed definition would
-    silently delete the corresponding ``.mcp.json`` entry on the next
+    silently delete the corresponding provider-native enrollment on the next
     ``sync --force``, which is destructive and hard to recover from.
     """
     mcps_dir = _get_mcps_src_dir()
@@ -490,7 +490,7 @@ def collect_mcp_servers(
     onto whichever single mode the caller resolved for core. See
     :func:`_render_definition_for_sync` for the resolution rule. The merge
     pipeline that feeds :func:`mcp_sync` therefore writes the correctly-shaped
-    form for every entry into every ``.mcp.json`` target. When *mode* is
+    form for every entry into each provider-native target. When *mode* is
     ``None`` the raw (token-carrying) definitions are returned unchanged - the
     correct behaviour for callers that only inspect server *names* (uninstall,
     source counts) rather than the launch command.
@@ -569,7 +569,11 @@ def mcp_status(
     target_dir: Path | None = None,
     enrolled: Iterable[Tool] | None = None,
 ) -> dict[str, Any]:
-    """Return aggregate and per-provider native MCP enrollment status."""
+    """Return aggregate and per-provider enrollment health.
+
+    Status reports configuration and ownership state only; it does not start or
+    probe an MCP server.
+    """
     try:
         root = target_dir or _t.get_context().target_dir
     except LookupError:
@@ -1427,7 +1431,11 @@ def mcp_uninstall(
     enrolled: Iterable[Tool] | None = None,
     names: Iterable[str] | None = None,
 ) -> SyncResult:
-    """Remove only externally recorded Vaultspec-owned entries."""
+    """Remove recorded Vaultspec-owned enrollment from selected native targets.
+
+    When *names* is provided, only those owned server names are removed.
+    External host entries and canonical MCP definitions remain unchanged.
+    """
     result = SyncResult()
     selected_names = frozenset(names) if names is not None else None
     try:

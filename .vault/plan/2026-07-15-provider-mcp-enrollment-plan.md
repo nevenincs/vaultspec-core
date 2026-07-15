@@ -35,7 +35,7 @@ Define normalized definitions, provider and scope targets, external ownership st
 Route install, upgrade, sync, status, prune, and uninstall through selected provider-native targets with project-safe defaults.
 
 - [x] `P02.S05` - Wire selected providers and project-default MCP scopes into install, upgrade, sync, and uninstall; `src/vaultspec_core/core/commands.py`.
-- [ ] `P02.S06` - Add provider-scope MCP controls and provider-native status output; `src/vaultspec_core/cli/spec_cmd.py and src/vaultspec_core/cli/root.py`.
+- [x] `P02.S06` - Add provider-scope MCP controls and provider-native status output; `src/vaultspec_core/cli/spec_cmd.py and src/vaultspec_core/cli/root.py`.
 
 ### Phase `P03` - prove native hosts and publish guidance
 

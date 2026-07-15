@@ -30,7 +30,9 @@ from vaultspec_core.cli._target import TargetOption, apply_target
 logger = logging.getLogger(__name__)
 
 COMPLETE_SYNC_COMMAND = "vaultspec-core sync"
-PROVIDER_OUTPUTS = "AGENTS.md, CLAUDE.md, GEMINI.md, .codex/config.toml, .mcp.json"
+PROVIDER_OUTPUTS = (
+    "AGENTS.md, CLAUDE.md, GEMINI.md, native MCP configs, and provider directories"
+)
 
 
 def _print_complete_sync_notice(*, resource: str, mcp: bool = False) -> None:
@@ -42,7 +44,7 @@ def _print_complete_sync_notice(*, resource: str, mcp: bool = False) -> None:
     """
     from vaultspec_core.console import get_console
 
-    scope = ".mcp.json only" if mcp else f"{resource} resource files only"
+    scope = "native MCP targets only" if mcp else f"{resource} resource files only"
     get_console().print(
         f"[dim]Scoped sync: {scope}. Run [bold]{COMPLETE_SYNC_COMMAND}[/bold] "
         f"for the full provider refresh.[/dim]"
@@ -50,7 +52,12 @@ def _print_complete_sync_notice(*, resource: str, mcp: bool = False) -> None:
 
 
 def _emit_sync_result(
-    result: "SyncResult", *, label: str, dry_run: bool, json_output: bool
+    result: "SyncResult",
+    *,
+    label: str,
+    dry_run: bool,
+    json_output: bool,
+    command: str | None = None,
 ) -> None:
     """Render a sync pass through the canonical outcome renderer.
 
@@ -62,12 +69,17 @@ def _emit_sync_result(
     """
     from vaultspec_core.cli.rendering import emit_outcomes, sync_outcomes
 
-    outcomes = sync_outcomes(result)
+    outcomes = []
+    if result.per_tool:
+        for provider, provider_result in result.per_tool.items():
+            outcomes.extend(sync_outcomes(provider_result, group=provider))
+    else:
+        outcomes = sync_outcomes(result)
     title = f"{label} sync" + (" (dry run)" if dry_run else "")
     extra = {"warnings": result.warnings} if result.warnings else None
     code = emit_outcomes(
         outcomes,
-        command=f"spec.{label.lower()}.sync",
+        command=command or f"spec.{label.lower()}.sync",
         title=title,
         json_output=json_output,
         extra_json=extra,
@@ -1621,7 +1633,7 @@ def cmd_hooks_run(
 # =============================================================================
 
 mcps_app = make_app(
-    help="Manage MCP server definitions and synced .mcp.json entries.",
+    help="Manage canonical MCP definitions and provider-native enrollment.",
     no_args_is_help=True,
 )
 spec_app.add_typer(mcps_app, name="mcps")
@@ -1632,7 +1644,7 @@ def cmd_mcps_list(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """List all registered MCP server definitions."""
+    """List canonical MCP server definitions."""
     apply_target(target)
     from vaultspec_core.core import mcp_list
 
@@ -1656,40 +1668,63 @@ def cmd_mcps_list(
 
 @mcps_app.command("status")
 def cmd_mcps_status(
+    provider: Annotated[
+        str,
+        typer.Argument(help="Provider target (all, claude, antigravity, codex)"),
+    ] = "all",
+    scope: Annotated[
+        str,
+        typer.Option(
+            "--scope",
+            help="Enrollment scope (project, local, user); default: project",
+        ),
+    ] = "project",
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Report focused MCP definition and .mcp.json sync status."""
+    """Inspect provider-native MCP enrollment status."""
     apply_target(target)
+    _apply_provider_filter(provider)
     from vaultspec_core.core import mcp_status
 
-    status = mcp_status()
+    status = mcp_status(provider=provider, scope=scope)
 
     if json_output:
         _emit_json("spec.mcps.status", "unchanged", status)
         raise typer.Exit(0 if status["status"] == "ok" else 1)
 
-    from vaultspec_core.cli.rendering import Field, render_record
+    from vaultspec_core.cli.rendering import Column, render_listing
     from vaultspec_core.console import get_console
 
-    status_str = str(status["status"])
-    status_style = (
-        "green" if status_str == "ok" else ("yellow" if status_str == "warn" else "red")
-    )
-    fields: list[Field] = [
-        Field("status", status_str, style=status_style),
-        Field("config", str(status["config_path"])),
-        Field("definitions", ", ".join(status["definitions"]) or "none"),
-        Field("configured", ", ".join(status["configured"]) or "none"),
-        Field("managed", ", ".join(status["managed"]) or "none"),
+    rows = [
+        {
+            "provider": name,
+            "scope": data["scope"],
+            "status": data["status"],
+            "config": data["config_path"],
+            "managed": ", ".join(data["managed"]) or "none",
+            "missing": ", ".join(data["missing"]) or "none",
+            "drifted": ", ".join(data["drifted"]) or "none",
+            "external": ", ".join(data["external"]) or "none",
+        }
+        for name, data in status["providers"].items()
     ]
-    if status["missing"]:
-        fields.append(Field("missing", ", ".join(status["missing"])))
-    if status["drifted"]:
-        fields.append(Field("drifted", ", ".join(status["drifted"])))
-    if status["stale_managed"]:
-        fields.append(Field("stale managed", ", ".join(status["stale_managed"])))
-    render_record(fields, title="mcps status")
+    render_listing(
+        rows,
+        [
+            Column("provider"),
+            Column("scope"),
+            Column("status"),
+            Column("config"),
+            Column("managed"),
+            Column("missing"),
+            Column("drifted"),
+            Column("external"),
+        ],
+        title="mcps status",
+        summary=f"{status['status']}: {len(rows)} provider target(s)",
+        empty="no enrolled MCP-capable providers",
+    )
 
     console = get_console()
     for warning in status["warnings"]:
@@ -1708,7 +1743,7 @@ def cmd_mcps_add(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Add a new custom MCP server definition."""
+    """Add or replace a canonical MCP server definition."""
     apply_target(target)
     import json as json_mod
 
@@ -1743,7 +1778,7 @@ def cmd_mcps_remove(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Remove an MCP server definition."""
+    """Remove a canonical MCP server definition."""
     apply_target(target)
     from vaultspec_core.core import mcp_remove
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -1768,28 +1803,95 @@ def cmd_mcps_remove(
 def cmd_mcps_sync(
     provider: Annotated[
         str,
-        typer.Argument(
-            help="Provider to sync (all, claude, gemini, antigravity, codex)"
-        ),
+        typer.Argument(help="Provider target (all, claude, antigravity, codex)"),
     ] = "all",
-    dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
+    scope: Annotated[
+        str,
+        typer.Option(
+            "--scope",
+            help="Enrollment scope (project, local, user); default: project",
+        ),
+    ] = "project",
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview without writing files")
+    ] = False,
     force: Annotated[
         bool,
-        typer.Option("--force", help="Overwrite modified entries"),
+        typer.Option("--force", help="Adopt or overwrite same-name enrollment"),
+    ] = False,
+    prune: Annotated[
+        bool,
+        typer.Option("--prune", help="Remove owned enrollment with deleted sources"),
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Sync only MCP definitions to .mcp.json."""
+    """Reconcile canonical definitions into provider-native enrollment."""
     apply_target(target)
     _apply_provider_filter(provider)
     from vaultspec_core.core import mcp_sync
 
-    result = mcp_sync(force=force, dry_run=dry_run)
+    result = mcp_sync(
+        provider=provider,
+        scope=scope,
+        force=force,
+        prune=prune,
+        dry_run=dry_run,
+    )
 
     if not json_output:
         _print_complete_sync_notice(resource="MCP", mcp=True)
     _emit_sync_result(result, label="MCPs", dry_run=dry_run, json_output=json_output)
+
+
+@mcps_app.command("uninstall")
+def cmd_mcps_uninstall(
+    provider: Annotated[
+        str,
+        typer.Argument(help="Provider target (all, claude, antigravity, codex)"),
+    ] = "all",
+    scope: Annotated[
+        str,
+        typer.Option(
+            "--scope",
+            help="Enrollment scope (project, local, user); default: project",
+        ),
+    ] = "project",
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview removals")
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Required to remove owned host entries"),
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Remove Vaultspec-owned provider-native MCP enrollment."""
+    apply_target(target)
+    _apply_provider_filter(provider)
+    if not force and not dry_run:
+        typer.echo(
+            "Error: MCP uninstall is destructive. Pass --force or use --dry-run.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    from vaultspec_core.core import get_context, mcp_uninstall
+
+    result = mcp_uninstall(
+        get_context().target_dir,
+        provider=provider,
+        scope=scope,
+        dry_run=dry_run,
+    )
+    _emit_sync_result(
+        result,
+        label="MCPs uninstall",
+        dry_run=dry_run,
+        json_output=json_output,
+        command="spec.mcps.uninstall",
+    )
 
 
 # =============================================================================

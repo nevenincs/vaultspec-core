@@ -109,7 +109,7 @@ full options.
 
 ### Top-level commands
 
-- `vaultspec-core install` - Deploy the vaultspec framework to the target directory.
+- `vaultspec-core install` - Install Vaultspec resources for the selected providers.
 - `vaultspec-core uninstall` - Remove the vaultspec framework from the target directory.
 - `vaultspec-core sync` - Sync rules, skills, agents, configs, system prompts, and MCPs.
 - `vaultspec-core doctor` - Diagnose overall workspace and vault health.
@@ -322,12 +322,14 @@ full options.
 
 #### Mcps
 
-- `vaultspec-core spec mcps list` - List all registered MCP server definitions.
-- `vaultspec-core spec mcps status` - Report focused MCP definition and .mcp.json sync
-  status.
-- `vaultspec-core spec mcps add` - Add a new custom MCP server definition.
-- `vaultspec-core spec mcps remove` - Remove an MCP server definition.
-- `vaultspec-core spec mcps sync` - Sync only MCP definitions to .mcp.json.
+- `vaultspec-core spec mcps list` - List canonical MCP server definitions.
+- `vaultspec-core spec mcps status` - Inspect provider-native MCP enrollment status.
+- `vaultspec-core spec mcps add` - Add or replace a canonical MCP server definition.
+- `vaultspec-core spec mcps remove` - Remove a canonical MCP server definition.
+- `vaultspec-core spec mcps sync` - Reconcile canonical definitions into provider-native
+  enrollment.
+- `vaultspec-core spec mcps uninstall` - Remove Vaultspec-owned provider-native MCP
+  enrollment.
 
 #### Reference
 

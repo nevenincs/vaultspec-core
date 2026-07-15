@@ -248,9 +248,12 @@ def cmd_install(
         typer.Option("--no-hints", help="Suppress next-step advisory hints"),
     ] = False,
 ) -> None:
-    """Deploy the vaultspec framework to the target directory.
+    """Install Vaultspec resources for the selected providers.
 
-    Scaffolds the workspace structure and syncs all managed resources.
+    Scaffolds the workspace structure and syncs all managed resources. For
+    MCP-capable providers, installation reconciles canonical MCP definitions
+    into project-scope provider-native configuration. It does not start MCP
+    servers or grant provider trust.
     Use --upgrade to update builtin rules without re-scaffolding.
     Use --skip to exclude components on retry (e.g. --skip core --skip claude).
     """
@@ -805,17 +808,18 @@ def _collect_sync_outcomes(
 ) -> list[OutcomeItem]:
     """Flatten sync-pass results into per-provider-grouped outcomes.
 
-    Each resource pass carries per-provider results in ``per_tool``;
-    global passes (e.g. mcps) carry only the aggregate and are grouped
-    under their resource label. Shared by the text and ``--json``
-    renderings of both ``sync`` and ``sync --dry-run`` so the surfaces
-    cannot drift apart.
+    Each resource pass carries per-provider results in ``per_tool`` when its
+    output is host-specific; global passes use their resource label. Shared by
+    the text and ``--json`` renderings of both ``sync`` and ``sync --dry-run``
+    so the surfaces cannot drift apart.
     """
     from vaultspec_core.cli.rendering import sync_outcomes
 
     labels = ["rules", "skills", "agents", "system", "config"]
     if provider == "all" and "mcp" not in skip:
         labels.append("mcps")
+    if "hooks" not in skip:
+        labels.append("hooks")
     outcomes: list[OutcomeItem] = []
     # Results beyond the known positional resource passes (e.g. the trailing
     # structural-backfill pass, issue #133) are grouped per inferred provider so
