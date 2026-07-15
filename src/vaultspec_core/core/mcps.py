@@ -11,14 +11,23 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
 from . import types as _t
-from .enums import InstallMode, render_mode
+from .enums import (
+    InstallMode,
+    McpScope,
+    McpTargetFormat,
+    ProviderCapability,
+    Tool,
+    render_mode,
+)
 from .exceptions import ResourceExistsError, ResourceNotFoundError, VaultSpecError
 from .helpers import advisory_lock, atomic_write, ensure_dir
-from .types import SyncResult
+from .types import McpTarget, SyncResult
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +52,7 @@ _MODE_ARGS_TOKEN = "@@VAULTSPEC_INSTALL_MODE_ARGS@@"
 #: written ``.mcp.json``.
 _MODE_PACKAGE_KEY = "_vaultspec_mode_package"
 _MODE_MODULE_KEY = "_vaultspec_mode_module"
+_MODE_TOOL_SPEC_KEY = "_vaultspec_mode_tool_spec"
 
 #: The distribution and module core's own MCP server launches through. Used as
 #: the substitution defaults when a definition omits the per-definition
@@ -52,7 +62,10 @@ _DEFAULT_MCP_MODULE = "vaultspec_core.mcp_server.app"
 
 
 def render_launch_for_mode(
-    mode: InstallMode, package: str, module: str
+    mode: InstallMode,
+    package: str,
+    module: str,
+    tool_spec: str | None = None,
 ) -> tuple[str, list[str]]:
     """Return the concrete ``(command, args)`` launch a package+module renders to.
 
@@ -76,15 +89,19 @@ def render_launch_for_mode(
 
     Args:
         mode: The provisioning mode whose launch to render.
-        package: Distribution name for the ``uvx --from`` tool-mode launch.
+        package: Distribution name used as the workspace-mode identity and as
+            the default ``uvx --from`` tool-mode requirement.
         module: Fully-qualified module the MCP server runs as ``python -m``.
+        tool_spec: Optional tool-mode distribution requirement, such as
+            ``"vaultspec-rag[mcp]"``. It affects only ``uvx --from``; package
+            remains the declaration and mode-resolution identity.
 
     Returns:
         The ``(command, args)`` pair for the rendered mode.
     """
     if render_mode(mode) is InstallMode.DEPENDENCY:
         return "uv", ["run", "python", "-m", module]
-    return "uvx", ["--from", package, "python", "-m", module]
+    return "uvx", ["--from", tool_spec or package, "python", "-m", module]
 
 
 #: Core's own concrete MCP-server launch per mode, derived from the generalized
@@ -134,13 +151,15 @@ def render_mcp_definition_for_mode(
         removed. The input is not mutated.
     """
     rendered = dict(definition)
+    package = str(rendered.pop(_MODE_PACKAGE_KEY, _DEFAULT_MCP_PACKAGE))
+    module = str(rendered.pop(_MODE_MODULE_KEY, _DEFAULT_MCP_MODULE))
+    raw_tool_spec = rendered.pop(_MODE_TOOL_SPEC_KEY, None)
+    tool_spec = str(raw_tool_spec) if raw_tool_spec is not None else None
     has_command_token = rendered.get("command") == _MODE_COMMAND_TOKEN
     has_args_token = rendered.get("args") == [_MODE_ARGS_TOKEN]
     if not (has_command_token or has_args_token):
         return rendered
-    package = str(rendered.pop(_MODE_PACKAGE_KEY, _DEFAULT_MCP_PACKAGE))
-    module = str(rendered.pop(_MODE_MODULE_KEY, _DEFAULT_MCP_MODULE))
-    command, args = render_launch_for_mode(mode, package, module)
+    command, args = render_launch_for_mode(mode, package, module, tool_spec)
     if has_command_token:
         rendered["command"] = command
     if has_args_token:
@@ -232,6 +251,179 @@ def _get_mcps_src_dir() -> Path | None:
         return _t.get_context().mcps_src_dir
     except LookupError:
         return None
+
+
+_OWNERSHIP_VERSION = 1
+_OWNERSHIP_FILENAME = "mcp-ownership.json"
+
+
+def _coerce_scope(scope: McpScope | str) -> McpScope:
+    try:
+        return scope if isinstance(scope, McpScope) else McpScope(scope)
+    except ValueError as exc:
+        choices = ", ".join(item.value for item in McpScope)
+        raise VaultSpecError(
+            f"Unsupported MCP scope: {scope}",
+            hint=f"Choose one of: {choices}.",
+        ) from exc
+
+
+def _selected_mcp_tools(
+    provider: Tool | str,
+    *,
+    enrolled: Iterable[Tool] | None,
+) -> tuple[Tool, ...]:
+    """Return selected MCP-capable providers in canonical tool order."""
+    ctx = _t.get_context()
+    if enrolled is None:
+        from .manifest import installed_tool_configs
+
+        available = installed_tool_configs()
+    else:
+        selected = set(enrolled)
+        available = {
+            tool: cfg for tool, cfg in ctx.tool_configs.items() if tool in selected
+        }
+
+    if provider == "all":
+        candidates = tuple(tool for tool in Tool if tool in available)
+    else:
+        try:
+            selected_tool = provider if isinstance(provider, Tool) else Tool(provider)
+        except ValueError as exc:
+            raise VaultSpecError(f"Unsupported MCP provider: {provider}") from exc
+        if selected_tool not in available:
+            raise VaultSpecError(
+                f"MCP provider '{selected_tool.value}' is not enrolled.",
+                hint="Install the provider or pass the freshly selected provider set.",
+            )
+        candidates = (selected_tool,)
+
+    supported: list[Tool] = []
+    for tool in candidates:
+        cfg = available[tool]
+        if ProviderCapability.MCPS in cfg.capabilities:
+            supported.append(tool)
+        elif provider != "all":
+            raise VaultSpecError(
+                f"Provider '{tool.value}' has no verified MCP target contract."
+            )
+    return tuple(supported)
+
+
+def _claude_user_config_path() -> Path:
+    """Return Claude Code's user/local MCP store."""
+    return Path.home() / ".claude.json"
+
+
+def _codex_user_config_path() -> Path:
+    """Return Codex's user MCP store, honoring ``CODEX_HOME``."""
+    configured = os.environ.get("CODEX_HOME")
+    home = Path(configured).expanduser() if configured else Path.home() / ".codex"
+    return home / "config.toml"
+
+
+def resolve_mcp_targets(
+    provider: Tool | str = "all",
+    *,
+    scope: McpScope | str = McpScope.PROJECT,
+    target_dir: Path | None = None,
+    enrolled: Iterable[Tool] | None = None,
+) -> tuple[McpTarget, ...]:
+    """Resolve selected providers to their native MCP configuration targets.
+
+    ``enrolled`` is the fresh-install seam: callers can supply the provider set
+    selected for the current install before the provider manifest is written.
+    Ordinary callers omit it and resolution uses the committed manifest.
+    """
+    ctx = _t.get_context()
+    root = target_dir or ctx.target_dir
+    resolved_scope = _coerce_scope(scope)
+    tools = _selected_mcp_tools(provider, enrolled=enrolled)
+    targets: list[McpTarget] = []
+
+    for tool in tools:
+        cfg = ctx.tool_configs[tool]
+        if tool is Tool.CLAUDE:
+            path = (
+                root / ".mcp.json"
+                if resolved_scope is McpScope.PROJECT
+                else _claude_user_config_path()
+            )
+            target_format = McpTargetFormat.JSON
+        elif tool is Tool.CODEX:
+            if resolved_scope is McpScope.LOCAL:
+                raise VaultSpecError(
+                    "Codex does not define a distinct local MCP scope.",
+                    hint="Use project scope or explicitly request user scope.",
+                )
+            path = (
+                root / ".codex" / "config.toml"
+                if resolved_scope is McpScope.PROJECT
+                else _codex_user_config_path()
+            )
+            target_format = McpTargetFormat.TOML
+        elif tool is Tool.ANTIGRAVITY:
+            if resolved_scope is not McpScope.PROJECT:
+                raise VaultSpecError(
+                    "Antigravity MCP enrollment currently supports project scope only."
+                )
+            if cfg.mcp_config_file is None:
+                raise VaultSpecError("Antigravity MCP target is not configured.")
+            path = cfg.mcp_config_file
+            target_format = McpTargetFormat.JSON
+        else:
+            raise VaultSpecError(
+                f"Provider '{tool.value}' has no native MCP target resolver."
+            )
+        targets.append(
+            McpTarget(
+                provider=tool,
+                scope=resolved_scope,
+                path=path,
+                format=target_format,
+            )
+        )
+    return tuple(targets)
+
+
+def _ownership_path(root: Path, scope: McpScope) -> Path:
+    if scope in {McpScope.PROJECT, McpScope.LOCAL}:
+        return root / ".vaultspec" / _OWNERSHIP_FILENAME
+    return Path.home() / ".vaultspec" / _OWNERSHIP_FILENAME
+
+
+def _ownership_target_key(target: McpTarget) -> str:
+    base = f"{target.provider.value}:{target.scope.value}"
+    if target.scope is McpScope.USER:
+        return f"{base}:{target.path.resolve()}"
+    return base
+
+
+def _read_ownership(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {"version": _OWNERSHIP_VERSION, "targets": {}}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        raise VaultSpecError(
+            f"Cannot read MCP ownership state at {path}: {exc}",
+            hint="Repair or remove the corrupt sidecar before reconciling MCPs.",
+        ) from exc
+    if not isinstance(raw, dict) or not isinstance(raw.get("targets"), dict):
+        raise VaultSpecError(
+            f"Invalid MCP ownership state at {path}.",
+            hint="Expected an object with a 'targets' object.",
+        )
+    version = raw.get("version")
+    if version != _OWNERSHIP_VERSION:
+        raise VaultSpecError(f"Unsupported MCP ownership version at {path}: {version}")
+    return raw
+
+
+def _write_ownership(path: Path, state: dict[str, Any]) -> None:
+    ensure_dir(path.parent)
+    atomic_write(path, json.dumps(state, indent=2, sort_keys=True) + "\n")
 
 
 def _existing_source_server_names() -> set[str]:

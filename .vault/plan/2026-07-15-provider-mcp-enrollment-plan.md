@@ -26,7 +26,7 @@ The accepted provider MCP enrollment ADR governs all three phases. Phase P01 rep
 Define normalized definitions, provider and scope targets, external ownership state, native renderers, and the stable companion reconcile boundary.
 
 - [x] `P01.S01` - Define typed MCP scope, target, ownership, and tool-spec contracts; `src/vaultspec_core/core/enums.py and src/vaultspec_core/core/types.py`.
-- [ ] `P01.S02` - Implement ownership state and provider-scope target resolution; `src/vaultspec_core/core/mcps.py`.
+- [x] `P01.S02` - Implement ownership state and provider-scope target resolution; `src/vaultspec_core/core/mcps.py`.
 - [ ] `P01.S03` - Implement Claude JSON and Codex TOML reconciliation, status, prune, and uninstall; `src/vaultspec_core/core/mcps.py`.
 - [ ] `P01.S04` - Export the stable package-aware companion reconcile API; `src/vaultspec_core/core/__init__.py and src/vaultspec_core/core/mcps.py`.
 
