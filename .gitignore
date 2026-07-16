@@ -197,5 +197,8 @@ statistic/out/
 /.pre-commit-config.yaml.lock
 # <<< vaultspec-managed <<<
 
+# Local MCP ownership state (absolute machine paths; pending managed-block coverage, see #215)
+.vaultspec/mcp-ownership.json
+
 # Local benchmark working data (raw campaign logs)
 campaign-data/
