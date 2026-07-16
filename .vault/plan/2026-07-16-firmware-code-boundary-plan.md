@@ -53,7 +53,7 @@ Sync the deployed mirror, run the validation gates, and register the mechanical-
 
 - [x] `P03.S07` - Propagate builtin edits to the deployed mirror with vaultspec-core sync and confirm spec doctor is clean; `.vaultspec/`.
 - [x] `P03.S08` - Run vault check all, prek hooks, and the unit test gate, fixing any drift the gates surface; `src/vaultspec_core`.
-- [ ] `P03.S09` - Register the read-only vault check source-boundary scanner as a GitHub follow-up issue citing the governing decision; `gh issue`.
+- [x] `P03.S09` - Register the read-only vault check source-boundary scanner as a GitHub follow-up issue citing the governing decision; `gh issue`.
 
 ## Parallelization
 
