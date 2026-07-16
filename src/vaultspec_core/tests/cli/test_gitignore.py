@@ -312,9 +312,9 @@ class TestReadOnlyGitignore:
                     gi.chmod(stat.S_IREAD)
 
             if can_write:
-                # OS did not enforce read-only; just verify no crash
                 ensure_gitignore_block(tmp_path, ENTRIES)
-                gi.write_bytes(b"node_modules/\n")
+                assert MARKER_BEGIN in _read_gi(tmp_path)
+                assert stat.S_IMODE(gi.stat().st_mode) & stat.S_IWRITE == 0
             else:
                 with pytest.raises(OSError):
                     ensure_gitignore_block(tmp_path, ENTRIES)

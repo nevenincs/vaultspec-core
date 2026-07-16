@@ -307,7 +307,8 @@ class TestReadOnlyGitattributes:
 
             if can_write:
                 ensure_gitattributes_block(tmp_path)
-                ga.write_bytes(b"*.jpg binary\n")
+                assert MARKER_BEGIN in _read_ga(tmp_path)
+                assert stat.S_IMODE(ga.stat().st_mode) & stat.S_IWRITE == 0
             else:
                 with pytest.raises(OSError):
                     ensure_gitattributes_block(tmp_path)
