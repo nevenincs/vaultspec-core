@@ -1,7 +1,6 @@
 """Regression tests for GH issue 80 install-layer hygiene defects.
 
-Covers the five problem domains ratified in
-``2026-04-21-flow-bugs-adr``:
+Covers the five install-layer problem domains ratified for this fix:
 
 * D1 - ``_untrack_managed_paths`` drops historically-tracked
   ``.vaultspec/providers.json`` from the git index on install.

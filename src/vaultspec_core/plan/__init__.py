@@ -1,10 +1,10 @@
 """Plan-document parser, model, and operations for ``vaultspec-core vault plan``.
 
-Implements the natural-language convention defined in
-``.vault/adr/2026-05-05-plan-hardening-adr.md`` (Wave 1) and the CLI
-surface defined in ``.vault/adr/2026-05-06-plan-hardening-adr.md``
-(Wave 2). The package is consumed by :mod:`vaultspec_core.cli.vault_cmd`
-to back the ``vaultspec-core vault plan`` command group.
+Implements the plan-hardening convention in two layers: the
+natural-language document-parsing contract and, layered on top, the CLI
+surface that mutates plans through owning verbs. The package is consumed
+by :mod:`vaultspec_core.cli.vault_cmd` to back the ``vaultspec-core vault
+plan`` command group.
 
 Public surface (re-exported here as it lands across Wave 2 Phases):
 
