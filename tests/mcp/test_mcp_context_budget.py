@@ -16,14 +16,26 @@ from vaultspec_core.core.types import init_paths
 from vaultspec_core.mcp_server.app import create_server
 from vaultspec_core.vaultcore.models import DocType
 
-# Budget: 2 tools ~ 2K chars.  Ceiling at 10K to catch bloat.
-MAX_TOOL_DEFINITION_CHARS = 10_000
+# Budget: the nine-tool surface serializes to ~21.5K chars today; the
+# ceiling catches definition bloat without pinning every wording tweak.
+MAX_TOOL_DEFINITION_CHARS = 26_000
 
-# Maximum number of tools.
-MAX_TOOL_COUNT = 5
+# Maximum number of tools: the tiered surface is seven hot tools plus the
+# discover/invoke gateway; growth beyond that needs a deliberate decision.
+MAX_TOOL_COUNT = 9
 
 # Exact expected tool surface.
-EXPECTED_TOOLS = {"find", "create"}
+EXPECTED_TOOLS = {
+    "check",
+    "create",
+    "discover",
+    "edit",
+    "find",
+    "invoke",
+    "plan_edit",
+    "plan_progress",
+    "status",
+}
 
 
 # ---------------------------------------------------------------------------
