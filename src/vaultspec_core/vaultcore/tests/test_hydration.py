@@ -395,3 +395,79 @@ class TestCreateVaultDocStemCollision:
         )
         assert path.exists()
         assert path.stem == "2026-03-20-unique-feat-adr"
+
+
+class TestCreateVaultDocTopicInfix:
+    """Topic-infix filenames for the narrative trio (audit, reference, research)."""
+
+    @pytest.fixture()
+    def vault_project(self, tmp_path):
+        from vaultspec_core.builtins import seed_builtins
+
+        rules_dir = tmp_path / ".vaultspec"
+        rules_dir.mkdir(parents=True)
+        seed_builtins(rules_dir, force=True)
+        for dt in DocType:
+            (tmp_path / ".vault" / dt.value).mkdir(parents=True, exist_ok=True)
+        return tmp_path
+
+    @pytest.mark.parametrize(
+        "doc_type",
+        [DocType.AUDIT, DocType.REFERENCE, DocType.RESEARCH],
+    )
+    def test_infixed_filename_for_admitting_types(self, vault_project, doc_type):
+        path = create_vault_doc(
+            vault_project,
+            doc_type,
+            "my-feat",
+            "2026-07-16",
+            topic="engine-wire",
+        )
+        assert path.name == f"2026-07-16-my-feat-engine-wire-{doc_type.value}.md"
+        assert path.exists()
+
+    def test_omitted_topic_keeps_plain_filename(self, vault_project):
+        path = create_vault_doc(
+            vault_project,
+            DocType.REFERENCE,
+            "my-feat",
+            "2026-07-16",
+        )
+        assert path.name == "2026-07-16-my-feat-reference.md"
+
+    @pytest.mark.parametrize("doc_type", [DocType.ADR, DocType.PLAN, DocType.EXEC])
+    def test_non_admitting_type_raises(self, vault_project, doc_type):
+        with pytest.raises(ValueError, match="topic infix is not supported"):
+            create_vault_doc(
+                vault_project,
+                doc_type,
+                "my-feat",
+                "2026-07-16",
+                topic="second",
+            )
+
+    def test_two_topics_coexist_and_duplicate_collides(self, vault_project):
+        first = create_vault_doc(
+            vault_project,
+            DocType.REFERENCE,
+            "my-feat",
+            "2026-07-16",
+            topic="engine-wire",
+        )
+        second = create_vault_doc(
+            vault_project,
+            DocType.REFERENCE,
+            "my-feat",
+            "2026-07-16",
+            topic="deletion-manifest",
+        )
+        assert first.exists() and second.exists()
+        assert first.name != second.name
+        with pytest.raises(ResourceExistsError, match="already exists"):
+            create_vault_doc(
+                vault_project,
+                DocType.REFERENCE,
+                "my-feat",
+                "2026-07-16",
+                topic="engine-wire",
+            )
