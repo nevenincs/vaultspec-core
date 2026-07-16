@@ -52,7 +52,7 @@ Echo the boundary on the code-writing executor trio, the review gate, and the ex
 Sync the deployed mirror, run the validation gates, and register the mechanical-checker follow-up.
 
 - [x] `P03.S07` - Propagate builtin edits to the deployed mirror with vaultspec-core sync and confirm spec doctor is clean; `.vaultspec/`.
-- [ ] `P03.S08` - Run vault check all, prek hooks, and the unit test gate, fixing any drift the gates surface; `src/vaultspec_core`.
+- [x] `P03.S08` - Run vault check all, prek hooks, and the unit test gate, fixing any drift the gates surface; `src/vaultspec_core`.
 - [ ] `P03.S09` - Register the read-only vault check source-boundary scanner as a GitHub follow-up issue citing the governing decision; `gh issue`.
 
 ## Parallelization
