@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.46](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.45...vaultspec-core-v0.1.46) (2026-07-16)
+
+
+### Miscellaneous
+
+* **firmware:** release code-stands-alone boundary firmware ([fe29ea0](https://github.com/nevenincs/vaultspec-core/commit/fe29ea076c823492ce257cc2d382f280a1817971))
+
 ## [0.1.45](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.44...vaultspec-core-v0.1.45) (2026-07-16)
 
 
