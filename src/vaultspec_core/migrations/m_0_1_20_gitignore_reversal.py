@@ -49,10 +49,15 @@ def _old_policy_vocabulary() -> frozenset[str]:
     from ..core.enums import DirName, FileName
 
     # Runtime by-products - emitted by both the old and the reversed policy.
+    # The set also covers entries later releases added to the reversed
+    # policy (mcp-ownership.json), so a re-run over an already-reversed
+    # block stays a no-op instead of reading its own output as operator
+    # edits.
     vocabulary = {
         ".vaultspec/_snapshots/",
         ".vaultspec/*.lock",
         ".vaultspec/providers.json",
+        ".vaultspec/mcp-ownership.json",
         ".vault/.obsidian/",
         ".vault/.trash/",
         ".vault/data/",
