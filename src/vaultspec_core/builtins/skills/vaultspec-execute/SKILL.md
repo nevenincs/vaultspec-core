@@ -99,7 +99,10 @@ Assume the persona of a delegator.
 
 - **Integrity**: Ensure the safety audit is never skipped.
 
-- **Traceability**: All changes must be mapped to their respective Step Records.
+- **Traceability**: All changes must be mapped to their respective Step Records. The
+  mapping lives in the Step Record, which lists the modified files - never as plan,
+  Step-id, or vault-document annotations in the code itself (the code-stands-alone
+  boundary; opt-in git commit trailers are the sanctioned linkage channel).
 
 - **L4 plans**: When executing an `L4` plan, the execute skill respects the
   project-management association declared in the plan's `## Epic intent` block prose.

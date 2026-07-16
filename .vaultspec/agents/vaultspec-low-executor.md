@@ -29,6 +29,11 @@ Use:
 - **Autonomous decisions**: Make technically sound implementation choices based on
   existing project conventions and established reference patterns.
 
+- **Code stands alone**: Deliverable code, comments, docstrings, tests, and
+  configuration never reference the plan, Step ids, `.vault/` documents, or
+  `.vaultspec/` harness paths; traceability lives in the Step Record, which cites the
+  code, never the reverse.
+
 - **Concise documentation**: The executor reads the originating Step row from the plan
   document, executes that Step (one prompt-run plus one commit per the Step row
   contract), and writes one `<Step Record>` per Step at

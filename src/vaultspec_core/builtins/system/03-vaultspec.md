@@ -14,7 +14,10 @@ order: 3
   `adr/`, `audit/`, `exec/`, `plan/`, `reference/`, and `research/`. Auto-generated
   feature indexes live in `.vault/index/`; they regenerate as a side effect of the
   `create` and `edit` tools, or manually via `vaultspec-core vault feature index` when
-  working through the CLI, and are never authored by hand.
+  working through the CLI, and are never authored by hand. The `.vault/` and
+  `.vaultspec/` trees are removable development scaffolding layered over the codebase,
+  never part of it: vault documents cite code by locator, and code never references them
+  (see the Code Stands Alone mandate).
 
 **Orient first.** In a project with no session context, orient with the `status` tool
 (CLI: `vaultspec-core status`) before invoking any pipeline skill. Read the in-flight

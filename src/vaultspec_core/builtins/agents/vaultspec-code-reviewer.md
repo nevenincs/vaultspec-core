@@ -63,6 +63,12 @@ macroscopic awareness of an architect.
 
 - **Drift Detection:** Flag any "extra" features or logic not requested in the Plan.
 
+- **Boundary Integrity:** Flag any reference to the project's own development records -
+  `.vault/` document stems, plan/ADR/audit identifiers, Step ids, wiki-links, or
+  `.vaultspec/` harness paths - in delivered source, tests, configuration, or
+  user-facing docs. Dev metadata embedded in the codebase is an architectural violation
+  (HIGH); opt-in git commit trailers are the only sanctioned linkage channel.
+
 ## Quality & Performance Domain
 
 - **Language Idioms**: Assess adherence to the project's established idioms and the
