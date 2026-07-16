@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import stat
 from typing import TYPE_CHECKING
 
@@ -111,6 +112,19 @@ class TestIdempotency:
         ensure_gitignore_block(tmp_path, ENTRIES)
         content_after_second = _gi(tmp_path).read_bytes()
         assert content_after_first == content_after_second
+
+
+class TestAtomicWriteNamespace:
+    def test_legacy_temp_regular_file_is_untouched(self, tmp_path):
+        gi = _gi(tmp_path)
+        gi.write_bytes(b"# operator rule\n")
+        legacy = gi.with_suffix(gi.suffix + f".{os.getpid()}.tmp")
+        legacy.write_bytes(b"operator bytes\n")
+
+        ensure_gitignore_block(tmp_path, ENTRIES)
+
+        assert MARKER_BEGIN in _read_gi(tmp_path)
+        assert legacy.read_bytes() == b"operator bytes\n"
 
 
 class TestOrphanedMarkers:

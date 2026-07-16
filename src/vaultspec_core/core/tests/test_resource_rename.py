@@ -3,15 +3,14 @@
 ``resource_rename`` is now driven through the shared ``RenameTransaction``
 engine.  These tests exercise the flat-resource and skill-directory rename
 paths, the ``ResourceExistsError`` / ``ResourceNotFoundError`` contract,
-byte-for-byte rollback on an induced mid-apply failure, and ``base_dir``
-containment.  No test doubles are used: every condition is induced through the
-real filesystem under a real temporary ``.vaultspec`` tree.
+legacy temporary-node preservation, and ``base_dir`` containment.  No test
+doubles are used: every condition is induced through the real filesystem under
+a real temporary ``.vaultspec`` tree.
 """
 
 from __future__ import annotations
 
 import os
-import shutil
 from typing import TYPE_CHECKING
 
 import pytest
@@ -192,58 +191,50 @@ class TestSkillRename:
             )
 
 
-class TestRollback:
-    def test_flat_rename_rolls_back_on_content_write_failure(
-        self, vaultspec: Path
-    ) -> None:
+class TestLegacyTempObstaclePreservation:
+    def test_flat_rename_preserves_legacy_temp_directory(self, vaultspec: Path) -> None:
         rules_dir = vaultspec / "rules" / "rules"
         _write_rule(rules_dir, "atomic-rule", body="Keep me intact.\n")
-        before = _snapshot_tree(rules_dir)
-
-        # Plant a directory exactly where ``atomic_write`` places its temp file
-        # for the post-rename content write, so the write fails AFTER the rename
-        # has already landed - forcing the reverse journal to undo real work.
-        # The temp-name formula mirrors ``core.helpers.atomic_write``.
+        # This was the predictable scratch name used before atomic writes moved
+        # to exclusively created unpredictable siblings.
         new_path = rules_dir / "renamed-rule.md"
         obstacle = new_path.with_suffix(new_path.suffix + f".{os.getpid()}.tmp")
         obstacle.mkdir()
+        (obstacle / "operator.txt").write_bytes(b"keep\n")
 
-        with pytest.raises((VaultSpecError, OSError)):
-            resource_rename(
-                "atomic-rule", "renamed-rule", base_dir=rules_dir, label="Rule"
-            )
+        result = resource_rename(
+            "atomic-rule", "renamed-rule", base_dir=rules_dir, label="Rule"
+        )
 
-        shutil.rmtree(obstacle)
-        assert _snapshot_tree(rules_dir) == before
+        assert result == new_path
+        assert new_path.is_file()
+        assert obstacle.is_dir()
+        assert (obstacle / "operator.txt").read_bytes() == b"keep\n"
 
-    def test_skill_rename_rolls_back_on_content_write_failure(
+    def test_skill_rename_preserves_legacy_temp_directory(
         self, vaultspec: Path
     ) -> None:
         skills_dir = vaultspec / "rules" / "skills"
         old_dir = _write_skill(skills_dir, "tx-skill", body="Skill stays whole.\n")
         (old_dir / "extra.md").write_text("extra resource\n", encoding="utf-8")
-        before = _snapshot_tree(skills_dir)
-
-        # The temp file rides the directory rename into the new skill dir, so the
-        # SKILL.md content write fails only after the directory rename has landed.
+        # The operator-owned sibling rides the intentional directory rename and
+        # remains unchanged while the renamed SKILL.md is rewritten.
         skill_md = old_dir / "SKILL.md"
         obstacle = skill_md.with_suffix(skill_md.suffix + f".{os.getpid()}.tmp")
         obstacle.mkdir()
+        (obstacle / "operator.txt").write_bytes(b"keep\n")
 
-        with pytest.raises((VaultSpecError, OSError)):
-            resource_rename(
-                "tx-skill",
-                "renamed-skill",
-                base_dir=skills_dir,
-                label="Skill",
-                is_dir=True,
-            )
+        result = resource_rename(
+            "tx-skill",
+            "renamed-skill",
+            base_dir=skills_dir,
+            label="Skill",
+            is_dir=True,
+        )
 
-        # The obstacle was undone back into the old skill dir by the rollback.
-        leftover = old_dir / f"SKILL.md.{os.getpid()}.tmp"
-        if leftover.exists():
-            shutil.rmtree(leftover)
-        assert _snapshot_tree(skills_dir) == before
+        preserved = result / f"SKILL.md.{os.getpid()}.tmp"
+        assert preserved.is_dir()
+        assert (preserved / "operator.txt").read_bytes() == b"keep\n"
 
 
 class TestContainment:

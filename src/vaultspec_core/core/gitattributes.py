@@ -8,11 +8,10 @@ template normalises text to LF and exempts Windows batch files.
 from __future__ import annotations
 
 import logging
-import os
-import shutil
 from pathlib import Path
 
 from .enums import ManagedState
+from .helpers import atomic_write_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -228,19 +227,4 @@ def _write(ga_path: Path, content: str, bom: bytes) -> None:
 
     Always writes in binary mode to preserve the caller-chosen line endings.
     """
-    payload = bom + content.encode("utf-8")
-    tmp = ga_path.with_suffix(ga_path.suffix + f".{os.getpid()}.tmp")
-    try:
-        tmp.write_bytes(payload)
-        try:
-            tmp.replace(ga_path)
-        except PermissionError:
-            if os.name != "nt":
-                raise
-            try:
-                shutil.copyfile(tmp, ga_path)
-            finally:
-                tmp.unlink(missing_ok=True)
-    except Exception:
-        tmp.unlink(missing_ok=True)
-        raise
+    atomic_write_bytes(ga_path, bom + content.encode("utf-8"))

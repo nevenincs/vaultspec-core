@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 import shutil
 import stat
 import subprocess
@@ -229,31 +230,101 @@ def _rmtree_robust(path: Path) -> None:
     shutil.rmtree(path, onerror=_on_error)
 
 
+def _open_atomic_temp(path: Path) -> tuple[int, Path, tuple[int, int]]:
+    """Exclusively create an unpredictable regular file beside *path*."""
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    for optional_flag in ("O_BINARY", "O_CLOEXEC", "O_NOFOLLOW"):
+        flags |= getattr(os, optional_flag, 0)
+
+    for _attempt in range(128):
+        candidate = path.with_name(f".vs-write-{secrets.token_hex(16)}.tmp")
+        try:
+            fd = os.open(candidate, flags, 0o666)
+        except FileExistsError:
+            continue
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode):
+            os.close(fd)
+            raise OSError(
+                f"Atomic write temporary path is not a regular file: {candidate}"
+            )
+        return fd, candidate, (opened.st_dev, opened.st_ino)
+    raise FileExistsError(
+        f"Could not allocate an atomic write temporary file for {path}"
+    )
+
+
+def _unlink_owned_temp(path: Path, identity: tuple[int, int]) -> None:
+    """Remove *path* only while it is still the temporary file we created."""
+    try:
+        current = path.lstat()
+    except FileNotFoundError:
+        return
+    if stat.S_ISREG(current.st_mode) and (current.st_dev, current.st_ino) == identity:
+        path.unlink()
+
+
+def _assert_owned_temp(path: Path, identity: tuple[int, int]) -> None:
+    """Fail unless *path* still names the temporary regular file we opened."""
+    try:
+        current = path.lstat()
+    except FileNotFoundError as exc:
+        raise OSError(f"Atomic write temporary file disappeared: {path}") from exc
+    if (
+        not stat.S_ISREG(current.st_mode)
+        or (
+            current.st_dev,
+            current.st_ino,
+        )
+        != identity
+    ):
+        raise OSError(f"Atomic write temporary file identity changed: {path}")
+
+
+def atomic_write_bytes(path: Path, content: bytes) -> None:
+    """Atomically replace *path* from an exclusively created sibling file."""
+    destination_mode: int | None = None
+    try:
+        destination = path.lstat()
+    except FileNotFoundError:
+        pass
+    else:
+        if stat.S_ISREG(destination.st_mode):
+            destination_mode = stat.S_IMODE(destination.st_mode)
+
+    fd, tmp, identity = _open_atomic_temp(path)
+    owns_tmp = True
+    try:
+        view = memoryview(content)
+        while view:
+            written = os.write(fd, view)
+            if written == 0:
+                raise OSError(f"Atomic write made no progress for {path}")
+            view = view[written:]
+        if destination_mode is not None and hasattr(os, "fchmod"):
+            os.fchmod(fd, destination_mode)
+        os.fsync(fd)
+        os.close(fd)
+        fd = -1
+        _assert_owned_temp(tmp, identity)
+        os.replace(tmp, path)
+        owns_tmp = False
+    finally:
+        if fd >= 0:
+            os.close(fd)
+        if owns_tmp:
+            _unlink_owned_temp(tmp, identity)
+
+
 def atomic_write(path: Path, content: str) -> None:
-    """Write content to file atomically via tmp + rename.
+    """Write UTF-8 content through :func:`atomic_write_bytes`.
 
     Args:
         path: Destination file path to write.
         content: Text content to write, encoded as UTF-8.
     """
-    tmp = path.with_suffix(path.suffix + f".{os.getpid()}.tmp")
     try:
-        tmp.write_bytes(content.encode("utf-8"))
-        try:
-            tmp.replace(path)
-        except PermissionError as exc:
-            if os.name != "nt":
-                raise
-            logger.warning(
-                "atomic_write falling back to copy+unlink for %s "
-                "after replace failed: %s",
-                path,
-                exc,
-            )
-            try:
-                shutil.copyfile(tmp, path)
-            finally:
-                tmp.unlink(missing_ok=True)
+        atomic_write_bytes(path, content.encode("utf-8"))
     except Exception as exc:
         logger.error("atomic_write failed for %s: %s", path, exc)
         raise
