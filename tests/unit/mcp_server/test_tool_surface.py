@@ -236,15 +236,23 @@ def test_registry_entry_launches_this_server_unchanged(vault_root):  # noqa: F81
     """The shipped MCP registry entry still launches this server module.
 
     The builtin registry definition (ADR Q8: installation is a no-op for
-    existing projects) must keep pointing at the module whose ``create_server``
-    this test drives, so a synced project picks up the nine-tool surface with
-    no registry migration.
+    existing projects) must keep resolving to the module whose
+    ``create_server`` this test drives, so a synced project picks up the
+    nine-tool surface with no registry migration. Since the install-mode
+    model, the seeded registry carries the mode-neutral launch tokens and
+    the concrete launch is rendered per install mode; every mode must still
+    target this server module.
     """
+    from vaultspec_core.core.enums import InstallMode
+    from vaultspec_core.core.mcps import render_mcp_definition_for_mode
+
     registry = vault_root / ".vaultspec" / "mcps" / "vaultspec-core.builtin.json"
     definition = json.loads(registry.read_text(encoding="utf-8"))
-    args = definition["args"]
-    assert "vaultspec_core.mcp_server.app" in args
-    assert args[-1] == "vaultspec_core.mcp_server.app"
+    assert definition["args"] == ["@@VAULTSPEC_INSTALL_MODE_ARGS@@"]
+
+    for mode in (InstallMode.TOOL, InstallMode.DEPENDENCY, InstallMode.DEV):
+        rendered = render_mcp_definition_for_mode(definition, mode)
+        assert rendered["args"][-1] == "vaultspec_core.mcp_server.app", mode
 
     # The module the registry launches exposes the exact bootstrap this test
     # exercised, so the launched process serves the same nine-tool surface.
