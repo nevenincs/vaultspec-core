@@ -37,7 +37,7 @@ Land the canonical boundary mandate and its always-on echoes in the system promp
 
 - [x] `P01.S01` - Add the canonical Code-stands-alone mandate bullet (removable scaffolding, one-way reference direction, trailer carve-out) beside the Comments mandate; `src/vaultspec_core/builtins/system/01-core.md`.
 - [x] `P01.S02` - Add the one-sentence removable-harness characterization with one-way reference direction where the .vault store is introduced; `src/vaultspec_core/builtins/system/03-vaultspec.md`.
-- [ ] `P01.S03` - Add the one-clause hierarchy statement that source code sits outside the documentation hierarchy and never references vault or harness contents; `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
+- [x] `P01.S03` - Add the one-clause hierarchy statement that source code sits outside the documentation hierarchy and never references vault or harness contents; `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
 
 ### Phase `P02` - Personas and skills
 

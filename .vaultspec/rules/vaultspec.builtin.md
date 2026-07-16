@@ -54,7 +54,10 @@ The following helper skills are available:
 ## Documentation Hierarchy
 
 The documentation trail follows a strict dependency graph. Artifacts lower in the
-hierarchy should reference those above them.
+hierarchy should reference those above them. Source code sits outside this hierarchy
+entirely: vault documents cite code by `path:line` locator, and tracked source-file
+content never references `.vault/` documents, identifiers, or harness contents (opt-in
+git commit trailers are the sanctioned linkage channel).
 
 - **Brainstorm** / **Research** / **Reference** (`.vault/research/`,
   `.vault/reference/`)
