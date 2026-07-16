@@ -175,3 +175,23 @@ async def test_create_topic_rejected_for_non_admitting_type(vault_root):
         )
         assert payload["status"] == "failed"
         assert "topic is only valid" in payload["items"][0]["error"]["message"]
+
+
+async def test_create_mixed_batch_topic_failure_beside_success(vault_root):
+    """A topic-rejected item fails per-item while its batch siblings apply."""
+    mcp = create_server()
+    async with create_connected_server_and_client_session(mcp) as client:
+        payload = await _create(
+            client,
+            [
+                {"feature": "mixed-feat", "type": "reference", "topic": "wire"},
+                {"feature": "mixed-feat", "type": "adr", "topic": "second"},
+                {"feature": "mixed-feat", "type": "research"},
+            ],
+        )
+        assert payload["status"] == "mixed"
+        items = payload["items"]
+        assert items[0]["status"] == "created"
+        assert items[1]["status"] == "failed"
+        assert "topic is only valid" in items[1]["error"]["message"]
+        assert items[2]["status"] == "created"

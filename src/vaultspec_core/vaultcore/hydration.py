@@ -417,11 +417,19 @@ def create_vault_doc(
         if plan_link not in effective_related:
             effective_related.insert(0, plan_link)
 
+    # A topic-infixed document scaffolded without an explicit title would
+    # otherwise leave the template's `{topic}`/`{title}` heading placeholder
+    # unhydrated and fail the placeholder check; the humanized topic is a
+    # valid concise-prose heading value, and an explicit title still wins.
+    effective_title = title
+    if effective_title is None and topic is not None:
+        effective_title = topic.replace("-", " ")
+
     hydrated = hydrate_template(
         content,
         feature,
         date_str,
-        title,
+        effective_title,
         related=effective_related,
         extra_tags=extra_tags,
         tier=tier,

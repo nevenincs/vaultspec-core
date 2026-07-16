@@ -118,6 +118,9 @@ class TestAddSubcommand:
         )
         assert result.exit_code == 0, f"Failed: {result.output}"
         assert expected_path.exists()
+        body = expected_path.read_text(encoding="utf-8")
+        assert "{topic}" not in body
+        assert "{title}" not in body
 
     def test_add_topic_rejected_for_non_admitting_type(self, runner, synthetic_project):
         result = runner.invoke(

@@ -426,6 +426,33 @@ class TestCreateVaultDocTopicInfix:
         assert path.name == f"2026-07-16-my-feat-engine-wire-{doc_type.value}.md"
         assert path.exists()
 
+    def test_topic_hydrates_heading_when_title_absent(self, vault_project):
+        path = create_vault_doc(
+            vault_project,
+            DocType.REFERENCE,
+            "my-feat",
+            "2026-07-16",
+            topic="engine-wire",
+        )
+        text = path.read_text(encoding="utf-8")
+        assert "{topic}" not in text
+        assert "{title}" not in text
+        assert "engine wire" in text
+
+    def test_explicit_title_wins_over_topic_in_heading(self, vault_project):
+        path = create_vault_doc(
+            vault_project,
+            DocType.REFERENCE,
+            "my-feat",
+            "2026-07-16",
+            title="wire shapes deep dive",
+            topic="engine-wire",
+        )
+        text = path.read_text(encoding="utf-8")
+        assert "wire shapes deep dive" in text
+        assert "{topic}" not in text
+        assert path.name == "2026-07-16-my-feat-engine-wire-reference.md"
+
     def test_omitted_topic_keeps_plain_filename(self, vault_project):
         path = create_vault_doc(
             vault_project,
