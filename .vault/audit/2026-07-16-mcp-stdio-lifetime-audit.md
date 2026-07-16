@@ -58,6 +58,22 @@ RESOLVED: raised to warning.
 Both branches asserted the same contract, reading as a behavioral split that
 does not exist. RESOLVED: collapsed to unconditional asserts.
 
+### linux-ty-windll | medium | kernel32 loader failed type resolution on the linux CI runner
+
+Local ty (Windows host) resolved `ctypes.WinDLL` fine, but the CI runner's
+platform assumption rejected it: the loader body carried no platform
+narrowing of its own, only its callers did. RESOLVED: the loader now
+narrows on `sys.platform` and raises off Windows; ty passes on both
+platform assumptions.
+
+### mcp-websocket-cve | medium | Locked mcp 1.28.0 tripped the dependency audit
+
+A fresh upstream advisory (WebSocket server transport missing Host/Origin
+validation, patched in `mcp@1.28.1`) began failing the audit gate; the
+vulnerable transport is unused here (stdio only) but the gate is version-
+based. RESOLVED: dependency floor raised to `mcp>=1.28.1` and the lock
+upgraded; audit reports clean.
+
 ### pid-reuse-window | low | Microsecond PID-reuse window between resolve and open
 
 If the client dies and its PID recycles between resolution and
