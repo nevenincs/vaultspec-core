@@ -9,8 +9,10 @@ invented feature names (``editor-demo``, ``grid-layout``,
 project's own development records. ``vaultspec-core`` commands run
 in-process by swapping a recording :class:`rich.console.Console` into the
 shared console singleton (:mod:`vaultspec_core.console`); ``vaultspec-rag``
-runs as a subprocess and is skipped with a warning when the semantic-search
-backend is unavailable or the demo vault has no index.
+runs as a subprocess against the global executable, which indexes the demo
+vault on the search service before searching it, and is skipped with a
+warning when the semantic-search backend is unavailable or the demo index
+does not populate.
 
 Output is genuine command output over the demo vault; rendering only trims
 length (a dim ellipsis marks truncation) and applies the brand terminal
@@ -29,9 +31,11 @@ import contextlib
 import io
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from rich.console import Console
@@ -330,11 +334,81 @@ def run_core(args: list[str], width: int) -> str:
     return rec.export_text(styles=True)
 
 
-def run_rag(args: list[str], cwd: str) -> str | None:
+def resolve_rag() -> str | None:
+    """Locate the ``vaultspec-rag`` executable, preferring a global install.
+
+    Under ``uv run`` the active virtualenv's script directory is prepended to
+    ``PATH`` and can shadow the global ``vaultspec-rag`` with a copy whose
+    optional search backend is not installed. Drop the venv script directory
+    from the lookup so the provisioned global CLI wins, and fall back to a
+    bare lookup when that finds nothing.
+    """
+    venv_bin = Path(sys.executable).parent
+    entries = [
+        entry
+        for entry in os.environ.get("PATH", "").split(os.pathsep)
+        if entry and Path(entry) != venv_bin
+    ]
+    return shutil.which("vaultspec-rag", path=os.pathsep.join(entries)) or shutil.which(
+        "vaultspec-rag"
+    )
+
+
+def index_demo_vault(exe: str, demo_root: str, timeout: float = 90.0) -> bool:
+    """Index the demo vault on the search service and wait for it to land.
+
+    The service indexes asynchronously, so the ``index`` call only queues a
+    job; poll ``status`` until the vault documents become queryable. Returns
+    ``True`` once they are, ``False`` when the backend is unavailable or the
+    index does not populate within *timeout* seconds.
+    """
+    try:
+        queued = subprocess.run(
+            [exe, "--target", demo_root, "index", "--type", "vault"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        print(f"warning: skipping vaultspec-rag render ({exc})", file=sys.stderr)
+        return False
+    if queued.returncode != 0:
+        detail = queued.stdout.strip() or queued.stderr.strip()
+        print(
+            f"warning: skipping vaultspec-rag render (index refused: {detail})",
+            file=sys.stderr,
+        )
+        return False
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        time.sleep(3)
+        try:
+            status = subprocess.run(
+                [exe, "--target", demo_root, "status"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired:
+            continue
+        for line in status.stdout.splitlines():
+            if "Vault documents" in line:
+                _, _, count = line.partition(":")
+                if count.strip().isdigit() and int(count.strip()) > 0:
+                    return True
+    print(
+        "warning: skipping vaultspec-rag render "
+        "(demo vault did not finish indexing in time)",
+        file=sys.stderr,
+    )
+    return False
+
+
+def run_rag(exe: str, args: list[str], cwd: str) -> str | None:
     """Run a ``vaultspec-rag`` command in *cwd*, or ``None`` when unavailable."""
     try:
         proc = subprocess.run(
-            ["vaultspec-rag", *args],
+            [exe, *args],
             capture_output=True,
             text=True,
             timeout=120,
@@ -428,10 +502,28 @@ def main() -> None:
             start_match="Vault Check",
         )
         rag_query = "how the parser tokenises markdown into blocks"
-        rag_out = run_rag(
-            ["search", rag_query, "--type", "vault", "--doc-type", "adr"],
-            cwd=str(demo_root),
-        )
+        rag_exe = resolve_rag()
+        rag_out: str | None = None
+        if rag_exe is None:
+            print(
+                "warning: skipping vaultspec-rag render (executable not found on PATH)",
+                file=sys.stderr,
+            )
+        elif index_demo_vault(rag_exe, str(demo_root)):
+            rag_out = run_rag(
+                rag_exe,
+                [
+                    "--target",
+                    str(demo_root),
+                    "search",
+                    rag_query,
+                    "--type",
+                    "vault",
+                    "--doc-type",
+                    "adr",
+                ],
+                cwd=str(demo_root),
+            )
         if rag_out:
             render_svg(
                 rag_out,
@@ -448,8 +540,6 @@ def main() -> None:
 
 def _rmtree(path: Path) -> None:
     """Best-effort recursive delete of the temporary demo vault."""
-    import shutil
-
     shutil.rmtree(path, ignore_errors=True)
 
 
