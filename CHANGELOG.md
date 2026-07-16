@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.45](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.44...vaultspec-core-v0.1.45) (2026-07-16)
+
+
+### Bug Fixes
+
+* **core:** harden atomic file replacement ([#210](https://github.com/nevenincs/vaultspec-core/issues/210)) ([083ff4f](https://github.com/nevenincs/vaultspec-core/commit/083ff4ff8c2531f1d2ff4ce3a5789020721080d8))
+
 ## [0.1.44](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.43...vaultspec-core-v0.1.44) (2026-07-15)
 
 
