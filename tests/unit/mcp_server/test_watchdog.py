@@ -140,19 +140,13 @@ def test_non_pipe_stdin_fails_open(tmp_path: Path) -> None:
 def test_in_process_contract_on_this_platform() -> None:
     """Direct calls honor the platform contract without side effects.
 
-    Under pytest stdin is not a client-owned pipe on any platform (POSIX
-    returns the hard ``None``; on Windows the capture stdin is not a pipe
-    or resolves to no external client), so arming must decline rather than
-    spawn a watchdog thread against a live process this test cannot
-    control.
+    The contract is identical on every platform: POSIX returns the hard
+    ``None``, and under pytest on Windows the captured stdin is not a
+    client-owned pipe, so arming must decline rather than spawn a watchdog
+    thread against a live process this test cannot control.
     """
-    if sys.platform == "win32":
-        # Pytest's stdin is a NUL/console handle, not a client pipe.
-        assert resolve_stdin_client_pid() is None
-        assert arm_client_watchdog() is False
-    else:
-        assert resolve_stdin_client_pid() is None
-        assert arm_client_watchdog() is False
+    assert resolve_stdin_client_pid() is None
+    assert arm_client_watchdog() is False
 
 
 def test_armed_worker_exits_when_dead_client_pid_signals() -> None:

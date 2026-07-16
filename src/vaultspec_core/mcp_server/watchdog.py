@@ -28,18 +28,31 @@ _WAIT_OBJECT_0 = 0x0000_0000
 
 
 def _kernel32():  # pragma: no cover - trivial loader, Windows-only
-    """Load ``kernel32`` with last-error capture and correct prototypes.
+    """Load ``kernel32`` with last-error capture and declared prototypes.
 
-    ``OpenProcess`` needs an explicit ``c_void_p`` restype: the ctypes
-    default of ``c_int`` truncates 64-bit handle values.
+    Every foreign function declares ``argtypes`` and ``restype``: undeclared
+    ctypes signatures marshal by default int inference and fail silently,
+    and ``OpenProcess`` in particular needs a pointer-sized restype or
+    64-bit handle values truncate.
 
     Returns:
         The configured :class:`ctypes.WinDLL` instance.
     """
     import ctypes
+    from ctypes import wintypes
 
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    kernel32.OpenProcess.restype = ctypes.c_void_p
+    kernel32.GetNamedPipeServerProcessId.argtypes = (
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.DWORD),
+    )
+    kernel32.GetNamedPipeServerProcessId.restype = wintypes.BOOL
+    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
     return kernel32
 
 
@@ -59,34 +72,38 @@ def resolve_stdin_client_pid() -> int | None:
     if sys.platform != "win32":
         return None
 
-    import ctypes
-    import msvcrt
-
+    # Fail open on anything unexpected (no stdin object, a Windows build
+    # missing the export, ...): arming failures must never prevent serving.
     try:
-        handle = msvcrt.get_osfhandle(sys.stdin.fileno())
-    except OSError:
-        logger.debug("watchdog: no stdin OS handle; not arming")
-        return None
+        import ctypes
+        import msvcrt
 
-    kernel32 = _kernel32()
-    server_pid = ctypes.c_ulong(0)
-    ok = kernel32.GetNamedPipeServerProcessId(
-        ctypes.c_void_p(handle), ctypes.byref(server_pid)
-    )
-    if not ok:
-        logger.debug(
-            "watchdog: stdin is not a pipe (error %d); not arming",
-            ctypes.get_last_error(),
-        )
-        return None
+        try:
+            handle = msvcrt.get_osfhandle(sys.stdin.fileno())
+        except OSError:
+            logger.debug("watchdog: no stdin OS handle; not arming")
+            return None
 
-    pid = int(server_pid.value)
-    if pid == 0 or pid == os.getpid():
-        logger.debug(
-            "watchdog: pipe creator is self or unresolved (%d); not arming", pid
-        )
+        kernel32 = _kernel32()
+        server_pid = ctypes.c_ulong(0)
+        ok = kernel32.GetNamedPipeServerProcessId(handle, ctypes.byref(server_pid))
+        if not ok:
+            logger.debug(
+                "watchdog: stdin is not a pipe (error %d); not arming",
+                ctypes.get_last_error(),
+            )
+            return None
+
+        pid = int(server_pid.value)
+        if pid == 0 or pid == os.getpid():
+            logger.debug(
+                "watchdog: pipe creator is self or unresolved (%d); not arming", pid
+            )
+            return None
+        return pid
+    except Exception:
+        logger.debug("watchdog: client resolution failed; not arming", exc_info=True)
         return None
-    return pid
 
 
 def arm_client_watchdog(client_pid: int | None = None) -> bool:
@@ -113,37 +130,40 @@ def arm_client_watchdog(client_pid: int | None = None) -> bool:
     if client_pid is None:
         return False
 
-    import ctypes
+    try:
+        import ctypes
 
-    kernel32 = _kernel32()
-    process_handle = kernel32.OpenProcess(
-        _SYNCHRONIZE, False, ctypes.c_ulong(client_pid)
-    )
-    if not process_handle:
-        logger.debug(
-            "watchdog: cannot open client process %d (error %d); not arming",
-            client_pid,
-            ctypes.get_last_error(),
-        )
+        kernel32 = _kernel32()
+        process_handle = kernel32.OpenProcess(_SYNCHRONIZE, False, client_pid)
+        if not process_handle:
+            logger.debug(
+                "watchdog: cannot open client process %d (error %d); not arming",
+                client_pid,
+                ctypes.get_last_error(),
+            )
+            return False
+
+        def _wait_for_client_exit() -> None:
+            result = kernel32.WaitForSingleObject(process_handle, _INFINITE)
+            if result == _WAIT_OBJECT_0:
+                logger.warning(
+                    "watchdog: client process %d exited; shutting down", client_pid
+                )
+                os._exit(0)
+            kernel32.CloseHandle(process_handle)
+            logger.debug(
+                "watchdog: wait on client %d ended without exit signal (result %d)",
+                client_pid,
+                result,
+            )
+
+        threading.Thread(
+            target=_wait_for_client_exit,
+            name="mcp-client-watchdog",
+            daemon=True,
+        ).start()
+        logger.debug("watchdog: armed on client process %d", client_pid)
+        return True
+    except Exception:
+        logger.debug("watchdog: arming failed; not arming", exc_info=True)
         return False
-
-    def _wait_for_client_exit() -> None:
-        result = kernel32.WaitForSingleObject(
-            ctypes.c_void_p(process_handle), _INFINITE
-        )
-        if result == _WAIT_OBJECT_0:
-            logger.info("watchdog: client process %d exited; shutting down", client_pid)
-            os._exit(0)
-        logger.debug(
-            "watchdog: wait on client process %d ended without exit signal (result %d)",
-            client_pid,
-            result,
-        )
-
-    threading.Thread(
-        target=_wait_for_client_exit,
-        name="mcp-client-watchdog",
-        daemon=True,
-    ).start()
-    logger.debug("watchdog: armed on client process %d", client_pid)
-    return True
