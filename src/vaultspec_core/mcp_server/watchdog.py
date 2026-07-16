@@ -37,7 +37,13 @@ def _kernel32():  # pragma: no cover - trivial loader, Windows-only
 
     Returns:
         The configured :class:`ctypes.WinDLL` instance.
+
+    Raises:
+        RuntimeError: When called off Windows; callers gate on the platform.
     """
+    if sys.platform != "win32":
+        raise RuntimeError("kernel32 is only loadable on Windows")
+
     import ctypes
     from ctypes import wintypes
 
