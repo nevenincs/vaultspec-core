@@ -93,6 +93,17 @@ class TestCheckCodeBoundary:
         assert check_code_boundary(tmp_path, feature="my-feat").is_clean
         assert check_code_boundary(tmp_path, feature="other-feat").warning_count == 1
 
+    def test_feature_filter_rejects_prefix_and_substring_collisions(self, tmp_path):
+        _write_vault_doc(tmp_path, "adr", "my-feat-two")
+        src = tmp_path / "module.py"
+        src.write_text(f"# {DATE}-my-feat-two-adr\n", encoding="utf-8")
+
+        # A feature that is a prefix of another must not adopt its documents,
+        # and a bare letter must not match every stem containing it.
+        assert check_code_boundary(tmp_path, feature="my-feat").is_clean
+        assert check_code_boundary(tmp_path, feature="a").is_clean
+        assert check_code_boundary(tmp_path, feature="my-feat-two").warning_count == 1
+
     def test_undecodable_and_oversized_files_are_skipped(self, tmp_path):
         _write_vault_doc(tmp_path, "adr", "my-feat")
         binary = tmp_path / "blob.bin"

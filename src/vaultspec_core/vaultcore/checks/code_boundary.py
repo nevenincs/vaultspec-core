@@ -32,17 +32,13 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["check_code_boundary"]
 
-# Directories never scanned: the vault and harness themselves, provider
-# directories (generated projections of the harness), VCS internals, and
-# common build/cache trees whose contents are derived, not authored.
-_EXCLUDED_DIR_NAMES = frozenset(
+# VCS internals and common build/cache trees whose contents are derived,
+# not authored. The vault, harness, and provider directories are excluded
+# too, sourced from the central enum and the config at call time (see
+# :func:`_excluded_dir_names`) so a future provider is excluded the day it
+# is added to the enum.
+_STATIC_EXCLUDED_DIR_NAMES = frozenset(
     {
-        ".vault",
-        ".vaultspec",
-        ".claude",
-        ".gemini",
-        ".agents",
-        ".codex",
         ".git",
         ".hg",
         ".svn",
@@ -61,6 +57,25 @@ _EXCLUDED_DIR_NAMES = frozenset(
     }
 )
 
+
+def _excluded_dir_names() -> frozenset[str]:
+    """Return the directory names the walk never descends into.
+
+    The vault (from config, honoring a non-default ``docs_dir``), the
+    harness, and every provider directory come from
+    :class:`~vaultspec_core.core.enums.DirName`; VCS and cache names are
+    static.
+    """
+    from ...config import get_config
+    from ...core.enums import DirName
+
+    top_level = {
+        d.value for d in DirName if d is not DirName.INDEX and d.value.startswith(".")
+    }
+    top_level.add(get_config().docs_dir)
+    return frozenset(top_level | _STATIC_EXCLUDED_DIR_NAMES)
+
+
 # Files larger than this are skipped: generated bundles and data blobs, not
 # authored source. The cap keeps the walk's worst case bounded.
 _MAX_FILE_BYTES = 1_000_000
@@ -71,9 +86,11 @@ def _collect_needles(root_dir: Path, feature: str | None) -> set[str]:
 
     Authored records contribute their filename stem (date-prefixed,
     high-precision); generated feature indexes contribute their
-    ``<feature>.index`` stem. With *feature* set, only documents carrying
-    that feature tag (by stem convention: the feature segment between the
-    date prefix and the type suffix) plus that feature's index are needled.
+    ``<feature>.index`` stem. With *feature* set, a document is needled only
+    when its parsed frontmatter carries exactly that feature tag - filename
+    heuristics cannot split ``{date}-{feature}[-{topic}]-{type}`` reliably
+    because features and topics are both hyphenated kebab-case - and an
+    unparseable document is conservatively skipped under the filter.
 
     Args:
         root_dir: Project root directory.
@@ -93,15 +110,28 @@ def _collect_needles(root_dir: Path, feature: str | None) -> set[str]:
         if path.is_symlink() or not path.is_file():
             continue
         stem = path.name[: -len(".md")]
-        if feature is not None and feature not in stem:
+        if feature is not None and not _doc_matches_feature(path, feature):
             continue
         needles.add(stem)
 
     return needles
 
 
+def _doc_matches_feature(path: Path, feature: str) -> bool:
+    """Return ``True`` when the document at *path* carries *feature*'s tag."""
+    from ..parser import parse_vault_metadata
+    from ._base import extract_feature_tags
+
+    try:
+        metadata, _body = parse_vault_metadata(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError):
+        return False
+    return feature in extract_feature_tags(metadata.tags)
+
+
 def _iter_source_files(root_dir: Path):
     """Yield candidate source files under *root_dir*, honoring exclusions."""
+    excluded = _excluded_dir_names()
     stack = [root_dir]
     while stack:
         current = stack.pop()
@@ -113,7 +143,7 @@ def _iter_source_files(root_dir: Path):
             if entry.is_symlink():
                 continue
             if entry.is_dir():
-                if entry.name in _EXCLUDED_DIR_NAMES:
+                if entry.name in excluded:
                     continue
                 stack.append(entry)
                 continue
