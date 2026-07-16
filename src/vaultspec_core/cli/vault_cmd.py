@@ -1796,6 +1796,37 @@ def cmd_check_adr_status(
     )
 
 
+@check_app.command("code-boundary")
+def cmd_check_code_boundary(
+    feature: Annotated[
+        str | None,
+        typer.Option(
+            "--feature",
+            "-f",
+            help="Restrict the scanned record stems to one feature's documents",
+        ),
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Scan source files for references to the project's own vault records.
+
+    Opt-in and advisory: findings are warnings, the exit code stays zero,
+    and nothing is mutated. Not part of `vault check all`.
+    """
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.checks import check_code_boundary
+
+    result = check_code_boundary(_get_ctx().target_dir, feature=feature)
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.code-boundary"
+    )
+
+
 @check_app.command("structure")
 def cmd_check_structure(
     fix: Annotated[

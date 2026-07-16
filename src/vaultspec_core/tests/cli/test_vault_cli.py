@@ -464,3 +464,46 @@ class TestNoCommand:
         assert "add" in result.output, (
             f"vault help did not list the 'add' subcommand: {result.output}"
         )
+
+
+class TestCheckCodeBoundary:
+    """The opt-in source-boundary scanner verb is advisory."""
+
+    def test_findings_are_warnings_and_exit_zero(
+        self, runner, tmp_path: Path, synthetic_project
+    ):
+        from vaultspec_core.core.types import init_paths
+
+        stem = "2026-07-16-my-feat-adr"
+        doc = tmp_path / ".vault" / "adr" / f"{stem}.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text(
+            "---\ntags:\n  - '#adr'\n  - '#my-feat'\n"
+            "date: '2026-07-16'\nmodified: '2026-07-16'\nrelated: []\n---\n",
+            encoding="utf-8",
+        )
+        (tmp_path / "module.py").write_text(f"# see {stem}\n", encoding="utf-8")
+        (tmp_path / ".vaultspec").mkdir()
+        init_paths(tmp_path)
+
+        result = runner.invoke(
+            app,
+            ["--target", str(tmp_path), "vault", "check", "code-boundary"],
+        )
+        assert result.exit_code == 0, f"Failed: {result.output}"
+        assert stem in result.output
+
+    def test_clean_tree_reports_clean(self, runner, tmp_path: Path, synthetic_project):
+        from vaultspec_core.core.types import init_paths
+
+        (tmp_path / ".vault" / "adr").mkdir(parents=True)
+        (tmp_path / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
+        (tmp_path / ".vaultspec").mkdir()
+        init_paths(tmp_path)
+
+        result = runner.invoke(
+            app,
+            ["--target", str(tmp_path), "vault", "check", "code-boundary"],
+        )
+        assert result.exit_code == 0
+        assert "clean" in result.output

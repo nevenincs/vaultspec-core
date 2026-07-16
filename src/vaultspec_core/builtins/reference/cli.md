@@ -106,6 +106,8 @@ hand-edit between the markers.
   plans must ref ADRs.
 - `vaultspec-core vault check adr-status` - Validate ADR status against the canonical
   taxonomy.
+- `vaultspec-core vault check code-boundary` - Scan source files for references to the
+  project's own vault records.
 - `vaultspec-core vault check structure` - Check vault directory structure and filename
   conventions.
 - `vaultspec-core vault check rename-integrity` - Check name/filename integrity for
