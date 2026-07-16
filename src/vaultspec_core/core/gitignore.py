@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import logging
-import os
-import shutil
 from pathlib import Path
 
 from .enums import ManagedState, Tool
-from .helpers import advisory_lock
+from .helpers import advisory_lock, atomic_write_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -358,19 +356,4 @@ def _write(gi_path: Path, content: str, bom: bytes) -> None:
     Using text-mode would double ``\\r`` on Windows when the content
     already contains ``\\r\\n``.
     """
-    payload = bom + content.encode("utf-8")
-    tmp = gi_path.with_suffix(gi_path.suffix + f".{os.getpid()}.tmp")
-    try:
-        tmp.write_bytes(payload)
-        try:
-            tmp.replace(gi_path)
-        except PermissionError:
-            if os.name != "nt":
-                raise
-            try:
-                shutil.copyfile(tmp, gi_path)
-            finally:
-                tmp.unlink(missing_ok=True)
-    except Exception:
-        tmp.unlink(missing_ok=True)
-        raise
+    atomic_write_bytes(gi_path, bom + content.encode("utf-8"))

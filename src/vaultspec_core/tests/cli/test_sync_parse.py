@@ -100,7 +100,7 @@ class TestAtomicWrite:
     def test_no_temp_file_left(self, synthetic_project):
         p = synthetic_project / "clean.md"
         atomic_write(p, "data")
-        assert not (synthetic_project / "clean.md.tmp").exists()
+        assert not list(synthetic_project.glob(".vs-write-*.tmp"))
 
 
 class TestInitPaths:

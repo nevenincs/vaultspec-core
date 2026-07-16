@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#provider-mcp-enrollment'
 date: '2026-07-15'
-modified: '2026-07-15'
+modified: '2026-07-16'
 tier: L2
 related:
   - '[[2026-07-15-provider-mcp-enrollment-adr]]'
@@ -43,6 +43,7 @@ Verify migrations and real Codex and Claude recognition, then document the provi
 
 - [x] `P03.S07` - Add real-behavior reconciliation, migration, lifecycle, and mode-rendering tests; `tests/test_mcps.py and tests/test_commands.py`.
 - [x] `P03.S08` - Add isolated Codex and Claude CLI acceptance and update MCP operator guidance; `tests/cli/test_mcp_hosts.py and docs/MCP.md`.
+- [x] `P03.S09` - Harden atomic provider configuration writes against pre-existing sibling nodes; `src/vaultspec_core/core/helpers.py, src/vaultspec_core/core/gitignore.py, src/vaultspec_core/core/gitattributes.py, src/vaultspec_core/core/tests/test_atomic_write.py, src/vaultspec_core/core/tests/test_resource_rename.py, src/vaultspec_core/tests/cli/test_gitignore.py, src/vaultspec_core/tests/cli/test_gitattributes.py, and src/vaultspec_core/tests/cli/test_sync_parse.py`.
 
 ## Parallelization
 
