@@ -36,8 +36,9 @@ now.
   actively removing its eager `pywin32` import
   (https://github.com/modelcontextprotocol/python-sdk/pull/2365), so the
   watchdog must use only the standard library.
-- The identical defect exists in vaultspec-rag's `vaultspec-search-mcp`; the
-  chosen mechanism should be a pattern that repo can adopt verbatim.
+- The identical defect exists in vaultspec-rag's `vaultspec-search-mcp`; that
+  repo decides its own mechanism in its own record, so this decision binds
+  only the shared backstop contract, not the sibling's implementation.
 
 ## Considered options
 
@@ -78,8 +79,10 @@ blocking on `WaitForSingleObject(INFINITE)`, and calls `os._exit(0)` when the
 handle signals. The server entrypoint arms the watchdog immediately before
 starting the stdio transport, on Windows only; every failure path logs to
 stderr at debug level and falls back to EOF-only behavior. Non-Windows
-platforms never touch the module's Win32 surface. vaultspec-rag adopts the
-same module shape in its own repo for `vaultspec-search-mcp`.
+platforms never touch the module's Win32 surface. vaultspec-rag closes the
+same defect for `vaultspec-search-mcp` under its own decision record, which
+settled on an ancestor-chain watchdog; the repos share the backstop contract
+(hard-exit daemon thread, fail-open, EOF path untouched), not the module.
 
 ## Rationale
 
@@ -105,4 +108,5 @@ new dependency.
 - Servers whose client is alive but leaked their pipe are reaped only at that
   client's exit; a host-side sweep remains the remedy for chains predating the
   fix.
-- The pattern is portable to vaultspec-rag, closing the sibling report there.
+- vaultspec-rag closes the sibling report under its own decision record; the
+  two repos converge on the backstop contract while differing in mechanism.

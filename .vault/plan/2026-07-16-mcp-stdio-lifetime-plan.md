@@ -12,12 +12,12 @@ related:
 
 # `mcp-stdio-lifetime` plan
 
-- [ ] `S01` - Open feature branch and draft PR referencing issue 220 with the plan summary as body; `repo workflow`.
-- [ ] `S02` - Implement stdin-pipe client-PID resolver via ctypes GetNamedPipeServerProcessId and arm_client_watchdog with SYNCHRONIZE wait thread and hard exit, fail-open on every error path, POSIX no-op; `src/vaultspec_core/mcp_server/watchdog.py`.
-- [ ] `S03` - Wire arm_client_watchdog into \_serve immediately before mcp.run with stderr debug logging of armed or skipped outcome; `src/vaultspec_core/mcp_server/app.py`.
-- [ ] `S04` - Add real-pipe resolver test, real-process watchdog exit test, and fail-open tests for console stdin and dead client PID; `tests/unit/mcp_server/test_watchdog.py`.
-- [ ] `S05` - Add end-to-end orphan test spawning the real MCP server through an intermediary client, killing the client while a sibling holds the pipe, asserting server exit; `tests/unit/mcp_server/test_watchdog.py`.
-- [ ] `S06` - Run prek, ty, and unit pytest gates, fix findings, finalize PR body and mark ready for review; `quality gates`.
+- [x] `S01` - Open feature branch and draft PR referencing issue 220 with the plan summary as body; `repo workflow`.
+- [x] `S02` - Implement stdin-pipe client-PID resolver via ctypes GetNamedPipeServerProcessId and arm_client_watchdog with SYNCHRONIZE wait thread and hard exit, fail-open on every error path, POSIX no-op; `src/vaultspec_core/mcp_server/watchdog.py`.
+- [x] `S03` - Wire arm_client_watchdog into \_serve immediately before mcp.run with stderr debug logging of armed or skipped outcome; `src/vaultspec_core/mcp_server/app.py`.
+- [x] `S04` - Add real-pipe resolver test, real-process watchdog exit test, and fail-open tests for console stdin and dead client PID; `tests/unit/mcp_server/test_watchdog.py`.
+- [x] `S05` - Add end-to-end orphan test spawning the real MCP server through an intermediary client, killing the client while a sibling holds the pipe, asserting server exit; `tests/unit/mcp_server/test_watchdog.py`.
+- [x] `S06` - Run prek, ty, and unit pytest gates, fix findings, finalize PR body and mark ready for review; `quality gates`.
 
 ## Description
 
