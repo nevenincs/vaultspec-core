@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import atexit
 import os
 import sys
 import tempfile
@@ -83,7 +84,10 @@ def install_windows_temp_compat() -> None:
                 keep=keep,
                 lock_timeout=pytest_tmpdir.LOCK_TIMEOUT,
                 mode=0o755,
+                register=self._exit_stack.callback,
             )
+            atexit.register(self._exit_stack.close)
+            self._exit_stack.callback(atexit.unregister, self._exit_stack.close)
 
         self._basetemp = basetemp
         self._trace("new basetemp", basetemp)
