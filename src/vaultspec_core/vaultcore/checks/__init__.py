@@ -24,6 +24,7 @@ from ._base import (
 from .adr_status import check_adr_status
 from .annotations import check_annotations
 from .body_links import check_body_links
+from .code_boundary import check_code_boundary
 from .dangling import check_dangling
 from .encoding import check_encoding
 from .feature_rename_integrity import check_feature_rename_integrity
@@ -50,6 +51,7 @@ __all__ = [
     "check_adr_status",
     "check_annotations",
     "check_body_links",
+    "check_code_boundary",
     "check_dangling",
     "check_encoding",
     "check_feature_rename_integrity",
