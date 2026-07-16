@@ -44,7 +44,7 @@ Land the canonical boundary mandate and its always-on echoes in the system promp
 Echo the boundary on the code-writing executor trio, the review gate, and the execute skill's Traceability line.
 
 - [x] `P02.S04` - Add the byte-identical boundary bullet to the core implementation mandate of all three executor personas; `src/vaultspec_core/builtins/agents/vaultspec-low-executor.md src/vaultspec_core/builtins/agents/vaultspec-standard-executor.md src/vaultspec_core/builtins/agents/vaultspec-high-executor.md`.
-- [ ] `P02.S05` - Add the Boundary integrity check to the Intent Domain, mapped to the existing HIGH severity class; `src/vaultspec_core/builtins/agents/vaultspec-code-reviewer.md`.
+- [x] `P02.S05` - Add the Boundary integrity check to the Intent Domain, mapped to the existing HIGH severity class; `src/vaultspec_core/builtins/agents/vaultspec-code-reviewer.md`.
 - [ ] `P02.S06` - Disambiguate the Traceability requirement in place: mapping lives in the Step Record, never as annotations in code; `src/vaultspec_core/builtins/skills/vaultspec-execute/SKILL.md`.
 
 ### Phase `P03` - Propagation and closeout
