@@ -40,6 +40,12 @@ _TEMPLATE_NAMES = {
     DocType.INDEX: "index.md",
 }
 
+# Document types that admit the narrative topic infix
+# (``{date}-{feature}-{topic}-{type}.md``). The adr and plan cardinality
+# rules forbid disambiguation-by-infix, and exec filenames are
+# machine-derived, so only the narrative trio is listed.
+_TOPIC_INFIX_TYPES = frozenset({DocType.AUDIT, DocType.REFERENCE, DocType.RESEARCH})
+
 # The exec document type has two templates: the Step-record template (above)
 # and the Phase-summary template, selected via the ``summary`` flag on
 # :func:`get_template_path` / :func:`create_vault_doc`.
@@ -322,6 +328,7 @@ def create_vault_doc(
     date_str: str,
     title: str | None = None,
     *,
+    topic: str | None = None,
     related: list[str] | None = None,
     extra_tags: list[str] | None = None,
     content_root: pathlib.Path | None = None,
@@ -345,6 +352,13 @@ def create_vault_doc(
         feature: Feature name in kebab-case (leading ``#`` stripped).
         date_str: ISO 8601 date string (e.g. ``2026-02-06``).
         title: Optional document title.
+        topic: Optional kebab-case narrative infix. Admitted only for the
+            narrative trio (``audit``, ``reference``, ``research``); the
+            filename resolves to ``{date}-{feature}-{topic}-{type}.md``.
+            Omitted, the filename keeps its ``{date}-{feature}-{type}.md``
+            form. Raises :class:`ValueError` for any other document type
+            (adr and plan cardinality rules forbid disambiguation-by-infix;
+            exec filenames are machine-derived).
         related: Pre-resolved ``[[wiki-link]]`` strings for the
             ``related:`` frontmatter field.
         extra_tags: Additional ``#tag`` strings to append to ``tags:``.
@@ -376,6 +390,12 @@ def create_vault_doc(
             *force* is ``False``.
     """
     from ..config import get_config
+
+    if topic is not None and doc_type not in _TOPIC_INFIX_TYPES:
+        raise ValueError(
+            f"topic infix is not supported for '{doc_type.value}' documents; "
+            "admitted types: audit, reference, research"
+        )
 
     template_path = get_template_path(
         root_dir, doc_type, content_root=content_root, summary=summary
@@ -430,6 +450,9 @@ def create_vault_doc(
             / doc_type.value
             / f"{plan_date or date_str}-{feature}"
         )
+    elif topic is not None:
+        filename = f"{date_str}-{feature}-{topic}-{doc_type.value}.md"
+        target_dir = root_dir / get_config().docs_dir / doc_type.value
     else:
         filename = f"{date_str}-{feature}-{doc_type.value}.md"
         target_dir = root_dir / get_config().docs_dir / doc_type.value
