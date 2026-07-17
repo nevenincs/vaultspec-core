@@ -23,8 +23,9 @@ Complete command-line interface (CLI) reference for `vaultspec-core`. See the
 - `vaultspec-core` - Workspace management, vault operations, resource sync.
 - `vaultspec-mcp` - Console script that launches the stdio Model Context Protocol (MCP)
   server.
-- `uv run python -m vaultspec_core.mcp_server.app` - Module invocation of the MCP server
-  (avoids binary locking on Windows). See [MCP reference](./MCP.md).
+- `uv run --no-sync python -m vaultspec_core.mcp_server.app` - Module invocation of the
+  MCP server (avoids binary locking on Windows; `--no-sync` keeps a client connect from
+  mutating the environment). See [MCP reference](./MCP.md).
 
 ## Global options
 
