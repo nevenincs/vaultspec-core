@@ -122,6 +122,9 @@ class WorkspaceDiagnosis:
             ``version_floor`` is ``BELOW``.
         version_floor_minimum: Declared floor string, populated only when
             ``version_floor`` is ``BELOW``.
+        stale_mcp_seeds: Server names of package-bundled MCP seed definitions
+            still in a static pre-mode shape; core cannot refresh these, only
+            the owning package's installer can.
         packages: Per-package install-mode and version-floor diagnosis, one
             :class:`PackageModeDiagnosis` per distribution declared in the shared
             workspace map, keyed by canonicalized distribution name. Empty when
@@ -136,6 +139,7 @@ class WorkspaceDiagnosis:
     gitattributes: GitattributesSignal = GitattributesSignal.NO_FILE
     mcp: ConfigSignal = ConfigSignal.MISSING
     precommit: PrecommitSignal = PrecommitSignal.NO_FILE
+    stale_mcp_seeds: list[str] = field(default_factory=list)
     migration_status: str = "up_to_date"
     pending_migrations: list[str] = field(default_factory=list)
     vault_content: VaultContentSignal = VaultContentSignal.NO_VAULT
@@ -183,6 +187,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         collect_precommit_state,
         collect_provider_dir_state,
         collect_rename_integrity,
+        collect_stale_seed_definitions,
         collect_vault_content_state,
         collect_version_floor_state,
     )
@@ -217,6 +222,12 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
     except Exception:
         logger.warning("Precommit state collector failed", exc_info=True)
         precommit = PrecommitSignal.NO_FILE
+
+    try:
+        stale_mcp_seeds = collect_stale_seed_definitions(target)
+    except Exception:
+        logger.warning("Stale MCP seed collector failed", exc_info=True)
+        stale_mcp_seeds = []
 
     try:
         vault_content, vault_annotation_count, vault_unreadable_count = (
@@ -305,6 +316,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         gitattributes=gitattributes,
         mcp=mcp,
         precommit=precommit,
+        stale_mcp_seeds=stale_mcp_seeds,
         vault_content=vault_content,
         vault_annotation_count=vault_annotation_count,
         vault_unreadable_count=vault_unreadable_count,
