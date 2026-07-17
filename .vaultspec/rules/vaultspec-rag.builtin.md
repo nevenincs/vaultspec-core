@@ -2,58 +2,63 @@
 name: vaultspec-rag
 ---
 
-# vaultspec-rag — semantic search
+# vaultspec-rag — semantic search for code and decisions
 
-Use semantic search for codebase discovery and implementation discovery. When you need
-to find where or how something is done and don't know the exact name, search by meaning
-instead of grepping keywords or guessing identifiers.
+Discover by MEANING when you do not know the exact name, instead of grepping keywords or
+guessing identifiers. vaultspec-rag does two jobs: find the CODE, and find the DECISIONS -
+the ADRs (architecture decision records) that govern it.
 
-## Write good queries
+Server mode is the default backend. If a search reports the service is down, start it with
+`uvx vaultspec-rag server start` (small or offline projects opt into the on-disk local
+backend with `--local-only`). The running service auto-reindexes on file changes.
+DO NOT manually reindex during normal work.
 
-The index is hybrid: dense embeddings match meaning, sparse vectors match exact terms,
-and a cross-encoder reranks the top hits. So:
+## Discover code by meaning
 
-- Describe the concept or behavior in a short natural-language phrase.
-- Include the concrete domain nouns the target code or docs would use - they drive the
-  exact-match half of the search.
-- One concept per query. Narrow with filters; don't paste bare keywords or a guessed
-  function name.
-
-```
-vaultspec-rag search "where file locks are acquired during indexing" --type code
-vaultspec-rag search "retry policy for failed webhook delivery" --type code --language python
-vaultspec-rag search "decision on gpu lock scope" --type vault --doc-type adr
-```
-
-Code filters: `--language --path --function-name --class-name --include-path GLOB`.
-Vault filters: `--doc-type --feature --date --tag`. Filters also work inline in the
-query: `type:adr lang:python func:main`.
-
-## Run the server
-
-If the server is not running, start it:
+`--type code` searches source by meaning. Phrase the query as a short behaviour plus the
+concrete domain nouns the target code would use: the behaviour drives semantic matching, the
+nouns drive exact matching, so a bare keyword or pure prose finds less than both together.
 
 ```
-vaultspec-rag server start
+uvx vaultspec-rag search "retry backoff around failed webhook delivery" --type code
 ```
 
-Server mode is the default backend: `server start` supervises the managed Qdrant
-server and loads the GPU models. The server is the only workable backend at codebase
-scale - local mode is orders of magnitude slower - so it is the assumed default, not an
-opt-in. Provision the binary and models once with `vaultspec-rag install` (it fetches
-torch, the models, and the Qdrant binary by default).
+## Discover architecture decisions
 
-Local mode is a first-class explicit opt-out for small projects, CI, or air-gapped
-hosts: `vaultspec-rag server start --local-only` (or `VAULTSPEC_RAG_LOCAL_ONLY=1`, or
-`vaultspec-rag install --local-only` which persists the choice). It uses the on-disk
-store and needs no server binary.
+When you need the WHY - the rationale, constraints, or decision behind code - search the
+vault's ADRs, not the source. `--type vault --doc-type adr` returns the governing records.
 
-Check dependency readiness any time with `vaultspec-rag server doctor` (`--json` for the
-machine-readable snapshot): it reports torch CUDA, model presence, and the Qdrant binary
-and supervised-server state.
+```
+uvx vaultspec-rag search "decision on gpu lock scope around the forward pass" --type vault --doc-type adr
+```
 
-The running service auto-reindexes on file changes - DO NOT manually reindex during
-normal work.
+`--doc-type` also accepts `audit`, `plan`, `reference`, `research`, and `exec` (comma-separate
+to union several).
 
-The same search is available through MCP as the `search_vault` and `search_codebase`
-tools.
+## Cut noise with filters
+
+Semantic search competes production code against its own noise - overlapping tests, parallel
+locale files, generated and vendored trees, worktree clones. Code search is production-biased
+by default: it hides duplicate/derivative domains (`generated`, `worktree`) and demotes
+`tests`, `docs`, `locale`, and `vendored` beneath production. When noise still crowds a page,
+narrow by DOMAIN rather than raising `--max-results`. The domains are `prod`, `tests`, `docs`,
+`locale`, `generated`, `vendored`, `worktree`.
+
+Steer with inline query tokens (comma-separated, repeatable):
+
+```
+uvx vaultspec-rag search "fixture setup helpers exclude:tests" --type code
+uvx vaultspec-rag search "auth token validation only:prod" --type code
+uvx vaultspec-rag search "translation table lookup include:locale" --type code
+```
+
+`exclude:` hides a domain, `only:` keeps just the named domains, and `include:` re-admits a
+domain the default profile hides or demotes. Compose with path and category filters:
+
+```
+uvx vaultspec-rag search "request handler" --type code --include-path "src/**" --exclude-path "**/legacy/**"
+uvx vaultspec-rag search "encode batch" --type code --prefer production
+```
+
+The full option set is `uvx vaultspec-rag search --help`. The same search is available through
+MCP as the `search_codebase` and `search_vault` tools.

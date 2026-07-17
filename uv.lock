@@ -2223,7 +2223,7 @@ dev = [
     { name = "torch", version = "2.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux' and sys_platform != 'win32'" },
     { name = "torch", version = "2.12.1+cu130", source = { registry = "https://download.pytorch.org/whl/cu130" }, marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "ty" },
-    { name = "vaultspec-rag" },
+    { name = "vaultspec-rag", extra = ["mcp"] },
 ]
 
 [package.metadata]
@@ -2273,16 +2273,15 @@ dev = [
     { name = "torch", marker = "sys_platform != 'linux' and sys_platform != 'win32'", specifier = ">=2.4" },
     { name = "torch", marker = "sys_platform == 'linux' or sys_platform == 'win32'", specifier = ">=2.4", index = "https://download.pytorch.org/whl/cu130" },
     { name = "ty", specifier = ">=0.0.15" },
-    { name = "vaultspec-rag", specifier = ">=0.2.19" },
+    { name = "vaultspec-rag", extras = ["mcp"], specifier = ">=0.3.0" },
 ]
 
 [[package]]
 name = "vaultspec-rag"
-version = "0.2.23"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
-    { name = "mcp" },
     { name = "packaging" },
     { name = "pathspec" },
     { name = "psutil" },
@@ -2301,9 +2300,14 @@ dependencies = [
     { name = "vaultspec-core" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bc/a3/0b3edbd25df1dcdaf78819f53dbf8a6c3d92e9e4ac79ca84cc65b62677c3/vaultspec_rag-0.2.23.tar.gz", hash = "sha256:fd9750dc333272447f1503334169d44ec6a2a5cb2891ec97ee5a08be1d0a7a3d", size = 2069720, upload-time = "2026-06-21T11:22:29.517Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/85/b7/8596a01b762bc1b3eb2c967a11fa0001fb02ff01a96e0b149ad0d69ed8a1/vaultspec_rag-0.3.0.tar.gz", hash = "sha256:570948fc9223dd98f017a38f7d6b1747d0fffc0390f504dd91534acc46876980", size = 2745331, upload-time = "2026-07-14T20:26:11.794Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e3/d9/9f8a9b6366917a21e9d44afb73ed6d438c08f40fd6ed53c9196a43d19f83/vaultspec_rag-0.2.23-py3-none-any.whl", hash = "sha256:b7b16a3368e53109f77f827f7f847a6a63db02c8c3d351dc53cfc4fe80660aad", size = 693969, upload-time = "2026-06-21T11:22:27.655Z" },
+    { url = "https://files.pythonhosted.org/packages/96/98/0479424eb325ed36c3e7231a8f7b58a3ee301fe85aa0b529cd8352314af4/vaultspec_rag-0.3.0-py3-none-any.whl", hash = "sha256:16dd6cf47fe47ea28fc955d5b07753f9993c026ed561d984a3a13491fa8e933f", size = 921648, upload-time = "2026-07-14T20:26:10.035Z" },
+]
+
+[package.optional-dependencies]
+mcp = [
+    { name = "mcp" },
 ]
 
 [[package]]

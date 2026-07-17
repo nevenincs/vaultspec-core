@@ -18,9 +18,9 @@ related:
 
 Restore this workspace to a working state (the incident left the venv without vaultspec-core) and open the feature branch and draft PR, so gates and dogfooding can run.
 
-- [ ] `P01.S01` - Open feature branch and draft PR referencing the venv-corruption incident and the ADR amendment; `repo workflow`.
-- [ ] `P01.S02` - Sweep orphaned MCP server processes holding venv DLLs and repair the venv with an explicit uv sync; `environment recovery`.
-- [ ] `P01.S03` - Refresh the stale exe-form vaultspec-rag seed via rag re-enrollment and verify both MCP servers complete an initialize handshake; `.vaultspec/mcps`.
+- [x] `P01.S01` - Open feature branch and draft PR referencing the venv-corruption incident and the ADR amendment; `repo workflow`.
+- [x] `P01.S02` - Sweep orphaned MCP server processes holding venv DLLs and repair the venv with an explicit uv sync; `environment recovery`.
+- [x] `P01.S03` - Refresh the stale exe-form vaultspec-rag seed via rag re-enrollment and verify both MCP servers complete an initialize handshake; `.vaultspec/mcps`.
 
 ### Phase `P02` - static launch render and legacy recognition
 
