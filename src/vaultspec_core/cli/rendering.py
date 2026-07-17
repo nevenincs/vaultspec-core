@@ -331,6 +331,7 @@ def emit_outcomes(
 _SYNC_ACTION_OUTCOME: dict[str, Outcome] = {
     "[ADD]": Outcome.CREATED,
     "[UPDATE]": Outcome.UPDATED,
+    "[REFRESH]": Outcome.UPDATED,
     "[UNCHANGED]": Outcome.UNCHANGED,
     "[DELETE]": Outcome.REMOVED,
     "[SKIP]": Outcome.SKIPPED,

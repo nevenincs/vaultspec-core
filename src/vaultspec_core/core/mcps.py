@@ -4,6 +4,14 @@ Definitions in ``.vaultspec/mcps/*.json`` describe provider-neutral stdio
 servers. This module renders those definitions for each MCP-capable provider,
 reconciles project or explicit broader-scope targets, and records ownership
 outside host configuration so unrelated entries remain untouched.
+
+A managed entry that drifted from its rendered definition converges
+automatically, without ``--force``, whenever its on-disk bytes still match
+the fingerprint recorded at the last write: the drift is provably one the
+entry never survived a hand edit through, so refreshing it cannot destroy
+user content. An entry whose bytes no longer match its recorded fingerprint,
+or whose ownership record predates fingerprinting, keeps the existing
+skip-and-warn behavior and still requires ``--force``.
 """
 
 from __future__ import annotations
@@ -901,6 +909,38 @@ def _owned_names(state: dict[str, Any], target: McpTarget) -> set[str]:
     return set()
 
 
+def _owned_fingerprints(state: dict[str, Any], target: McpTarget) -> dict[str, str]:
+    """Return the recorded name-to-fingerprint map for one target's managed entries.
+
+    A name present here with a matching current fingerprint proves the deployed
+    entry is byte-identical to what vaultspec last wrote, so it is safe to
+    refresh to the current canonical shape without ``--force``. A name absent
+    from this map (legacy name-only ownership record) cannot be verified and
+    keeps the existing skip-and-warn behavior.
+    """
+    raw = state["targets"].get(_ownership_target_key(target), {})
+    managed = raw.get("managed", {}) if isinstance(raw, dict) else {}
+    if isinstance(managed, dict):
+        return {
+            str(name): value
+            for name, value in managed.items()
+            if isinstance(value, str)
+        }
+    return {}
+
+
+def _launch_repr(config: dict[str, Any]) -> str:
+    """Return a human-readable one-line rendering of a server's launch command."""
+    command = str(config.get("command", ""))
+    args = config.get("args", [])
+    parts = (
+        [command, *(str(item) for item in args)]
+        if isinstance(args, list)
+        else [command]
+    )
+    return " ".join(part for part in parts if part)
+
+
 def _set_owned_names(
     state: dict[str, Any], target: McpTarget, servers: dict[str, dict[str, Any]]
 ) -> None:
@@ -946,6 +986,7 @@ def _apply_server_merge(
     result: SyncResult,
     label: str,
     force_managed: frozenset[str],
+    recorded_fingerprints: dict[str, str],
 ) -> bool:
     """Apply ownership-safe desired state to one provider's normalized servers."""
     changed = False
@@ -965,12 +1006,35 @@ def _apply_server_merge(
                 result.updated += 1
                 result.items.append((name, "[UPDATE]"))
                 changed = True
-            else:
+            elif recorded_fingerprints.get(name) == _fingerprint(servers[name]):
+                # Bytes still match what vaultspec last wrote, so the drift is
+                # provably ours to converge, not a hand edit: refresh in place.
+                old_launch = _launch_repr(servers[name])
+                new_launch = _launch_repr(config)
+                servers[name] = config
+                result.updated += 1
+                result.items.append((name, "[REFRESH]"))
+                changed = True
+                result.warnings.append(
+                    f"MCP server '{name}' launch refreshed to the current "
+                    f"standard: '{old_launch}' -> '{new_launch}' (managed "
+                    "entry was unchanged since vaultspec wrote it; "
+                    "hand-edited entries are never refreshed automatically)."
+                )
+            elif name in recorded_fingerprints:
                 result.skipped += 1
                 result.items.append((name, "[SKIP]"))
                 result.warnings.append(
                     f"MCP server '{name}' in {label} differs from its definition "
                     "(use --force to overwrite)."
+                )
+            else:
+                result.skipped += 1
+                result.items.append((name, "[SKIP]"))
+                result.warnings.append(
+                    f"MCP server '{name}' in {label} differs from its definition "
+                    "and has no recorded fingerprint to verify against; use "
+                    "--force to overwrite."
                 )
         elif force:
             servers[name] = config
@@ -1101,6 +1165,7 @@ def _sync_json_target(
             return
 
         managed = _owned_names(state, target) & set(servers)
+        recorded_fingerprints = _owned_fingerprints(state, target)
         legacy = raw.pop(_LEGACY_MANAGED_KEY, None)
         migrated = (
             {name for name in legacy if isinstance(name, str) and name in servers}
@@ -1125,6 +1190,7 @@ def _sync_json_target(
             result=result,
             label=str(target.path),
             force_managed=force_managed,
+            recorded_fingerprints=recorded_fingerprints,
         )
         untyped_servers.clear()
         untyped_servers.update(servers)
@@ -1283,6 +1349,7 @@ def _sync_toml_target(
                 content = stripped
 
         recorded = _owned_names(state, target)
+        recorded_fingerprints = _owned_fingerprints(state, target)
         managed = (recorded | set(block_servers)) & set(block_servers)
         servers = {**outside, **block_servers}
         external = set(outside)
@@ -1296,6 +1363,7 @@ def _sync_toml_target(
             result=result,
             label=str(target.path),
             force_managed=force_managed,
+            recorded_fingerprints=recorded_fingerprints,
         )
         new_managed = {
             name: servers[name]
