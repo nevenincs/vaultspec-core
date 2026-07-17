@@ -16,9 +16,9 @@ Two trailer keys are defined:
 - ``Vaultspec-Feature`` carries a feature tag in kebab-case, with an optional
   leading ``#`` (the frontmatter-stored form).
 
-The convention is advisory and never load-bearing (see the commit-linkage ADR
-``2026-06-13-commit-linkage-adr``): absence or malformation of a trailer must
-never block a commit or fail a core command. Everything here is a pure, offline
+The commit-linkage convention is advisory and never load-bearing by design:
+absence or malformation of a trailer must never block a commit or fail a core
+command. Everything here is a pure, offline
 string operation over the trailer values; no git history is read to validate a
 single message. The CLI verb that wraps :func:`validate_message` always exits
 zero so it is safe to install as an advisory ``commit-msg`` hook.

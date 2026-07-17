@@ -1,7 +1,7 @@
 """Plan-frontmatter parsing and validation.
 
-Implements the Frontmatter contract from the convention ADR
-(``2026-05-05-plan-hardening-adr.md``):
+Implements the plan-frontmatter contract from the plan-hardening
+convention:
 
 - ``tier``: mandatory unquoted scalar, one of ``L1``, ``L2``, ``L3``, ``L4``.
   Pre-existing plans without the field default to ``L2``; the field is

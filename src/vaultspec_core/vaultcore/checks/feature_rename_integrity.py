@@ -28,7 +28,8 @@ Scope - what this checker deliberately does NOT do:
 - It does NOT check authored-document (adr/audit/plan/reference/research)
   filename feature-segment against the ``#feature`` tag. Authored filenames in
   a real vault legitimately use a narrative topic segment distinct from the
-  feature tag (e.g. ``2026-02-16-environment-variable-adr.md`` tagged
+  feature tag (e.g. an ADR whose filename carries a narrative topic
+  segment such as an environment-variable slug while it is tagged
   ``#framework``), so ``filename-segment == tag`` is not an invariant. A
   genuinely rename-drifted authored doc is structurally indistinguishable from
   a legitimately narrative-named one without rename history, so flagging it
