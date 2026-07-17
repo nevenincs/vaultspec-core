@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.47](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.46...vaultspec-core-v0.1.47) (2026-07-17)
+
+
+### Features
+
+* **mcp:** watchdog parity - hybrid anchors, kill switch, telemetry, POSIX backstop ([#223](https://github.com/nevenincs/vaultspec-core/issues/223)) ([c66fb47](https://github.com/nevenincs/vaultspec-core/commit/c66fb4745586591cc5d973a539acd09679d1bb74)), closes [#220](https://github.com/nevenincs/vaultspec-core/issues/220)
+* **vault:** opt-in code-boundary source scanner (vault check code-boundary) ([#218](https://github.com/nevenincs/vaultspec-core/issues/218)) ([50a67fa](https://github.com/nevenincs/vaultspec-core/commit/50a67fa05ccfcb38d4acf809d1442b2a5703eed7))
+* **vault:** topic-infix scaffolding for audit, reference, and research (--topic) ([#217](https://github.com/nevenincs/vaultspec-core/issues/217)) ([55eb8a3](https://github.com/nevenincs/vaultspec-core/commit/55eb8a33bab681e684ebacd3094fc03316ad82a2))
+
+
+### Bug Fixes
+
+* **boundary:** triage code-stands-alone violations in source docstrings and README renders ([#219](https://github.com/nevenincs/vaultspec-core/issues/219)) ([2537f19](https://github.com/nevenincs/vaultspec-core/commit/2537f19f7de7d1c45bfac0389c9f20e7b6f4f3d8))
+* **mcp:** MCP launch is side-effect-free static execution (--no-sync) ([#224](https://github.com/nevenincs/vaultspec-core/issues/224)) ([822511b](https://github.com/nevenincs/vaultspec-core/commit/822511b1739dacfc6e48733a88aed1be48167246))
+* **mcp:** Windows client-PID watchdog - stdio server exits when its client dies ([#221](https://github.com/nevenincs/vaultspec-core/issues/221)) ([6461594](https://github.com/nevenincs/vaultspec-core/commit/64615940183ae6f6a9809de2ab261207055b314d)), closes [#220](https://github.com/nevenincs/vaultspec-core/issues/220)
+* **sync:** managed gitignore covers mcp-ownership.json; honest stale-file warnings ([#216](https://github.com/nevenincs/vaultspec-core/issues/216)) ([5081371](https://github.com/nevenincs/vaultspec-core/commit/50813711be8ecfa1f842a566c849d0fc6e664e75))
+
 ## [0.1.46](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.45...vaultspec-core-v0.1.46) (2026-07-16)
 
 
