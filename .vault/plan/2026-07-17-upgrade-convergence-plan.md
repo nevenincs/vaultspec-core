@@ -36,7 +36,7 @@ Register the versioned convergence migration riding the refresh path, and add th
 Reconcile every user-facing hint and document with the now-truthful convergence behavior, then run the full gate set through review to a ready PR.
 
 - [x] `P03.S08` - Reconcile doctor hints, sync summaries, and the MCP doc convergence passage with the automatic behavior, exceptions, and opt-outs; `docs/MCP.md`.
-- [ ] `P03.S09` - Run gates, dispatch code review, resolve findings, append audit entries, dogfood convergence on this workspace, finalize PR; `quality gates`.
+- [x] `P03.S09` - Run gates, dispatch code review, resolve findings, append audit entries, dogfood convergence on this workspace, finalize PR; `quality gates`.
 
 ## Description
 
