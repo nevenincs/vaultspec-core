@@ -86,10 +86,13 @@ def render_launch_for_mode(
     the dev-scoped bookkeeping member never grows a third launch branch.
 
     Dependency-rendered mode launches the module through the governed project's
-    own venv (``uv run python -m <module>``), byte-identical to the launch every
-    dependency-mode workspace has always synced. Tool mode launches the same
-    module through an ephemeral ``uvx --from <package>`` invocation so the
-    distribution never enters the governed project's dependency set.
+    own venv with the ``--no-sync`` guard (``uv run --no-sync python -m
+    <module>``): a static execution that resolves the existing venv and never
+    installs, syncs, or otherwise mutates it, failing honestly when the venv is
+    stale or broken instead of self-repairing at connect time. Tool mode
+    launches the same module through an ephemeral ``uvx --from <package>``
+    invocation so the distribution never enters the governed project's
+    dependency set.
 
     Args:
         mode: The provisioning mode whose launch to render.
@@ -104,15 +107,15 @@ def render_launch_for_mode(
         The ``(command, args)`` pair for the rendered mode.
     """
     if render_mode(mode) is InstallMode.DEPENDENCY:
-        return "uv", ["run", "python", "-m", module]
+        return "uv", ["run", "--no-sync", "python", "-m", module]
     return "uvx", ["--from", tool_spec or package, "python", "-m", module]
 
 
 #: Core's own concrete MCP-server launch per mode, derived from the generalized
 #: :func:`render_launch_for_mode` so this convenience table and the renderer can
-#: never drift. Dependency mode reproduces byte-for-byte the launch every
-#: dependency-mode workspace has always synced; tool mode launches the same
-#: module entry point through an ephemeral ``uvx`` invocation. Only the two
+#: never drift. Dependency mode is a static, ``--no-sync``-guarded execution
+#: that resolves the existing venv without mutating it; tool mode launches the
+#: same module entry point through an ephemeral ``uvx`` invocation. Only the two
 #: rendered shapes are keyed (``DEV`` collapses onto ``DEPENDENCY``), which is
 #: what the observed-shape matcher and the mode-flip tests read.
 _MODE_MCP_LAUNCH: dict[InstallMode, tuple[str, list[str]]] = {
