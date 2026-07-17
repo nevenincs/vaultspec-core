@@ -104,7 +104,7 @@ def create_server() -> FastMCP:
     return mcp
 
 
-def _serve(ctx_obj: dict | None = None) -> None:
+def _serve(ctx_obj: dict | None = None, parent_pid: int | None = None) -> None:
     """Resolve runtime context, initialise paths, and start the MCP stdio server.
 
     Configures logging to stderr (to protect JSON-RPC on stdout), resolves
@@ -114,6 +114,8 @@ def _serve(ctx_obj: dict | None = None) -> None:
     Args:
         ctx_obj: Optional Typer context object injected by the root CLI app.
             Must contain ``"layout"`` and ``"target"`` keys when present.
+        parent_pid: Optional explicit client PID the lifetime watchdog
+            watches ahead of discovery.
 
     Raises:
         typer.Exit: If ``root_dir`` cannot be resolved in standalone mode.
@@ -144,12 +146,13 @@ def _serve(ctx_obj: dict | None = None) -> None:
 
     mcp = create_server()
 
-    # Windows backstop for the stdio lifetime contract: stdin EOF can be
-    # defeated by inherited pipe handles, so anchor shutdown to the client
-    # process itself. Fails open to EOF-only behavior when it cannot arm.
+    # Backstop for the stdio lifetime contract: stdin EOF can be defeated by
+    # inherited pipe handles, so anchor shutdown to the client process itself
+    # (pipe creator primary, ancestor chain fallback, POSIX reparent poll).
+    # Fails open to EOF-only behavior when it cannot arm.
     from .watchdog import arm_client_watchdog
 
-    if arm_client_watchdog():
+    if arm_client_watchdog(parent_pid=parent_pid):
         logger.debug("Client watchdog armed")
     else:
         logger.debug("Client watchdog not armed; relying on stdin EOF")
@@ -161,14 +164,26 @@ def _serve(ctx_obj: dict | None = None) -> None:
 
 
 @app.callback(invoke_without_command=True)
-def main(ctx: typer.Context) -> None:
+def main(
+    ctx: typer.Context,
+    parent_pid: int | None = typer.Option(
+        None,
+        "--parent-pid",
+        help=(
+            "Explicit client PID for the stdio lifetime watchdog "
+            "(watched in addition to the discovered client)"
+        ),
+    ),
+) -> None:
     """Typer callback entrypoint for vaultspec-mcp.
 
     Args:
         ctx: Typer context carrying the optional ``obj`` dict injected by
             the root CLI app (contains ``"layout"`` and ``"target"`` keys).
+        parent_pid: Optional explicit client PID forwarded to the lifetime
+            watchdog.
     """
-    _serve(ctx.obj)
+    _serve(ctx.obj, parent_pid=parent_pid)
 
 
 def run() -> None:

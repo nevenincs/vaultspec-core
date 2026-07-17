@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#mcp-stdio-lifetime'
-date: '2026-07-16'
-modified: '2026-07-16'
+date: '2026-07-17'
+modified: '2026-07-17'
 related:
   - '[[2026-07-16-mcp-stdio-lifetime-S01]]'
   - '[[2026-07-16-mcp-stdio-lifetime-S02]]'
@@ -16,6 +16,7 @@ related:
   - '[[2026-07-16-mcp-stdio-lifetime-audit]]'
   - '[[2026-07-16-mcp-stdio-lifetime-plan]]'
   - '[[2026-07-16-mcp-stdio-lifetime-research]]'
+  - '[[2026-07-17-mcp-stdio-lifetime-plan]]'
 ---
 
 # `mcp-stdio-lifetime` feature index
@@ -44,6 +45,7 @@ Auto-generated index of all documents tagged with `#mcp-stdio-lifetime`.
 ### plan
 
 - `2026-07-16-mcp-stdio-lifetime-plan` - `mcp-stdio-lifetime` plan
+- `2026-07-17-mcp-stdio-lifetime-plan` - `mcp-stdio-lifetime` plan
 
 ### research
 
