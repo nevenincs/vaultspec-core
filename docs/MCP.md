@@ -64,10 +64,35 @@ touches the project's environment; dependency and development modes resolve the
 project's existing environment as-is - the `--no-sync` guard means a client connect
 never runs an implicit `uv sync`. If the environment is stale or broken, the connect
 fails with the underlying Python error instead of mutating shared state while other
-processes may hold it; repair it explicitly with `uv sync`, then reconnect. A launch
-rendered before this guard existed (a bare `uv run` shape) is reported by
-`vaultspec-core spec doctor` as drift; refresh it with
-`vaultspec-core spec mcps sync --force` or `vaultspec-core install --upgrade`.
+processes may hold it; repair it explicitly with `uv sync`, then reconnect.
+
+### Convergence on upgrade
+
+Launch entries that Vaultspec wrote converge to the current standard automatically. A
+managed entry whose bytes still match the fingerprint recorded when Vaultspec last wrote
+it is provably untouched, so `vaultspec-core sync`, `vaultspec-core spec mcps sync`, and
+`vaultspec-core install --upgrade` all refresh it in place - no `--force` required - and
+print exactly what changed: the entry name, the old launch command, the new launch
+command, and why. A registered migration applies the same refresh the first time any
+`vaultspec-core vault ...` command runs in a workspace provisioned by an earlier
+release, so a launch rendered before the `--no-sync` guard existed (a bare `uv run`
+shape) converges on the workspace's next contact with the CLI, whatever its provisioned
+version.
+
+Two kinds of entry never converge automatically. An entry you edited by hand (its bytes
+no longer match the recorded fingerprint) is skipped with a warning and requires an
+explicit `vaultspec-core spec mcps sync --force`, which overwrites your edit. An entry
+recorded by a release that predates fingerprinting cannot be verified as untouched and
+keeps the same `--force`-only behavior. External entries Vaultspec never wrote are never
+adopted or modified without `--force`. To opt out of enrollment management entirely,
+provision with `install --skip mcp`; a workspace without recorded enrollment is never
+touched by the convergence migration.
+
+`vaultspec-core spec doctor` additionally warns - without failing - about two states
+Vaultspec cannot converge itself: canonical hooks that cannot be refreshed because
+`prek.toml` is present (transplant the entries manually), and a package-bundled seed
+definition still in a static pre-mode shape (re-run that package's installer with
+`--upgrade`).
 
 Select a mode with `install --mode tool`, `install --mode dependency`, or
 `install --mode dev`. Vaultspec consumes the package, module, and optional tool
