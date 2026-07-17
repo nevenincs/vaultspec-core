@@ -36,7 +36,7 @@ Document the static-execution contract, hand the rag-side contract off as a rag 
 
 - [x] `P03.S07` - Document the static-execution launch contract and refresh rendered-launch examples in the MCP doc and the CLI reference builtins source; `docs/MCP.md`.
 - [x] `P03.S08` - File the rag-side contract issue covering the tool-spec key and stale-seed refresh, referencing the shared launch-hygiene contract; `repo workflow`.
-- [ ] `P03.S09` - Run gates, dispatch code review, resolve findings, append audit entries, dogfood the refreshed .mcp.json, finalize PR; `quality gates`.
+- [x] `P03.S09` - Run gates, dispatch code review, resolve findings, append audit entries, dogfood the refreshed .mcp.json, finalize PR; `quality gates`.
 
 ## Description
 
