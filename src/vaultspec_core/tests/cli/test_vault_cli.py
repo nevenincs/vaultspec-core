@@ -89,6 +89,74 @@ class TestAddSubcommand:
         assert result.exit_code == 0, f"Failed: {result.output}"
         assert expected_path.exists()
 
+    def test_add_topic_infix_generates_disambiguated_filename(
+        self, runner, synthetic_project
+    ):
+        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
+        expected_path = (
+            synthetic_project
+            / ".vault"
+            / "reference"
+            / f"{date_str}-topic-feat-engine-wire-reference.md"
+        )
+        if expected_path.exists():
+            expected_path.unlink()
+
+        result = runner.invoke(
+            app,
+            [
+                "--target",
+                str(synthetic_project),
+                "vault",
+                "add",
+                "reference",
+                "--feature",
+                "topic-feat",
+                "--topic",
+                "engine-wire",
+            ],
+        )
+        assert result.exit_code == 0, f"Failed: {result.output}"
+        assert expected_path.exists()
+        body = expected_path.read_text(encoding="utf-8")
+        assert "{topic}" not in body
+        assert "{title}" not in body
+
+    def test_add_topic_rejected_for_non_admitting_type(self, runner, synthetic_project):
+        result = runner.invoke(
+            app,
+            [
+                "--target",
+                str(synthetic_project),
+                "vault",
+                "add",
+                "adr",
+                "--feature",
+                "topic-feat",
+                "--topic",
+                "second",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "--topic is only valid" in result.output
+
+    def test_add_topic_rejects_non_kebab_value(self, runner, synthetic_project):
+        result = runner.invoke(
+            app,
+            [
+                "--target",
+                str(synthetic_project),
+                "vault",
+                "add",
+                "reference",
+                "--feature",
+                "topic-feat",
+                "--topic",
+                "Not Kebab!",
+            ],
+        )
+        assert result.exit_code == 1
+
     def test_add_strips_hash_from_feature(self, runner, synthetic_project):
         """Creating with #feature should strip the hash."""
         date_str = datetime.now(UTC).strftime("%Y-%m-%d")

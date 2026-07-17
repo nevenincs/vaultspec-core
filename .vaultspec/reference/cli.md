@@ -45,7 +45,7 @@ hand-edit between the markers.
 
 ### Top-level commands
 
-- `vaultspec-core install` - Deploy the vaultspec framework to the target directory.
+- `vaultspec-core install` - Install Vaultspec resources for the selected providers.
 - `vaultspec-core uninstall` - Remove the vaultspec framework from the target directory.
 - `vaultspec-core sync` - Sync rules, skills, agents, configs, system prompts, and MCPs.
 - `vaultspec-core doctor` - Diagnose overall workspace and vault health.
@@ -258,12 +258,14 @@ hand-edit between the markers.
 
 #### Mcps
 
-- `vaultspec-core spec mcps list` - List all registered MCP server definitions.
-- `vaultspec-core spec mcps status` - Report focused MCP definition and .mcp.json sync
-  status.
-- `vaultspec-core spec mcps add` - Add a new custom MCP server definition.
-- `vaultspec-core spec mcps remove` - Remove an MCP server definition.
-- `vaultspec-core spec mcps sync` - Sync only MCP definitions to .mcp.json.
+- `vaultspec-core spec mcps list` - List canonical MCP server definitions.
+- `vaultspec-core spec mcps status` - Inspect provider-native MCP enrollment status.
+- `vaultspec-core spec mcps add` - Add or replace a canonical MCP server definition.
+- `vaultspec-core spec mcps remove` - Remove a canonical MCP server definition.
+- `vaultspec-core spec mcps sync` - Reconcile canonical definitions into provider-native
+  enrollment.
+- `vaultspec-core spec mcps uninstall` - Remove Vaultspec-owned provider-native MCP
+  enrollment.
 
 #### Reference
 
@@ -351,15 +353,17 @@ Create a `.vault/` document from a template.
 | Option | Short | Default | Description | | --------------- | ----- | ------- |
 -------------------------------------------------------------------- | | `--feature TAG`
 | `-f` | None | Feature tag (kebab-case). | | `--date DATE` | - | today | Override date
-(ISO 8601). | | `--title TITLE` | - | None | Document title. | | `--related DOC` | `-r`
-| None | Related document(s). Repeatable. | | `--tags TAG` | - | None | Additional
-freeform tags. Repeatable. | | `--force` | - | off | Overwrite an existing document. | |
-`--dry-run` | - | off | Preview without writing. | | `--json` | - | off | Emit
-machine-readable output. | | `--no-hints` | - | off | Suppress next-step advisory hints.
-| | `--tier TIER` | - | `L1` | Plan tier (`L1`..`L4`). Ignored for non-plan document
-types. | | `--step ID` | - | None | Canonical ID or display path of the Step to scaffold
-(exec records). | | `--all-steps` | - | off | Scaffold execution records for all Steps
-in the parent plan. |
+(ISO 8601). | | `--title TITLE` | - | None | Document title. | | `--topic TOPIC` | - |
+None | Narrative filename infix (kebab-case) producing
+`{date}-{feature}-{topic}-{type}.md`; audit, reference, and research only. | |
+`--related DOC` | `-r` | None | Related document(s). Repeatable. | | `--tags TAG` | - |
+None | Additional freeform tags. Repeatable. | | `--force` | - | off | Overwrite an
+existing document. | | `--dry-run` | - | off | Preview without writing. | | `--json` | -
+| off | Emit machine-readable output. | | `--no-hints` | - | off | Suppress next-step
+advisory hints. | | `--tier TIER` | - | `L1` | Plan tier (`L1`..`L4`). Ignored for
+non-plan document types. | | `--step ID` | - | None | Canonical ID or display path of
+the Step to scaffold (exec records). | | `--all-steps` | - | off | Scaffold execution
+records for all Steps in the parent plan. |
 
 ### vaultspec-core status
 
@@ -606,15 +610,24 @@ enabled hooks; it takes `--path PATH`. Valid events: `vault.document.created`,
 
 ### vaultspec-core spec mcps
 
-Signature: `vaultspec-core spec mcps [OPTIONS] COMMAND [ARGS]...`. Manage MCP server
-definitions and synced `.mcp.json` entries.
+Signature: `vaultspec-core spec mcps [OPTIONS] COMMAND [ARGS]...`. Manage canonical
+definitions in `.vaultspec/mcps/*.json` and reconcile them into provider-native
+enrollment. Providers are `all`, `claude`, `antigravity`, and `codex`; scopes are
+`project`, `local`, and `user`. Unsupported provider/scope combinations fail.
 
-| Subcommand | Signature | Description | | ---------- |
---------------------------------------- | ----------------------------- | | `list` | - |
-List MCP server definitions. | | `status` | `[--json]` | Validate against `.mcp.json`. |
-| `add` | `--name NAME [--config JSON] [--force]` | Add a custom MCP definition. | |
-`remove` | `NAME [--force]` | Remove an MCP definition. | | `sync` |
-`[--dry-run] [--force]` | Sync definitions to config. |
+| Subcommand  | Signature                                                                             | Description                                                         |
+| ----------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `list`      | -                                                                                     | List canonical MCP server definitions.                              |
+| `status`    | `[PROVIDER] [--scope SCOPE] [--json] [--target PATH]`                                 | Inspect configuration and ownership state; does not probe runtimes. |
+| `add`       | `--name NAME [--config JSON] [--force]`                                               | Add or replace a canonical definition.                              |
+| `remove`    | `NAME [--force]`                                                                      | Remove a canonical definition.                                      |
+| `sync`      | `[PROVIDER] [--scope SCOPE] [--dry-run] [--force] [--prune] [--json] [--target PATH]` | Reconcile canonical definitions into native enrollment.             |
+| `uninstall` | `[PROVIDER] [--scope SCOPE] [--dry-run] [--force] [--json] [--target PATH]`           | Remove only Vaultspec-owned native enrollment.                      |
+
+The default provider is `all` and the default scope is `project`. `sync --force` adopts
+or replaces a same-name external entry; `sync --prune` removes owned enrollment whose
+canonical source was deleted. `uninstall` preserves canonical definitions and external
+host entries.
 
 ## Migration commands
 

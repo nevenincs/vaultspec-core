@@ -142,3 +142,56 @@ async def test_create_seed_content_appended(vault_root):
         adr = next((vault_root / ".vault" / "adr").glob("*-seed-feat-adr.md"))
         text = adr.read_text(encoding="utf-8")
         assert "A distinctive seeded paragraph." in text
+
+
+async def test_create_topic_infix_scaffolds_second_reference(vault_root):
+    """A topic-infixed spec scaffolds a second same-day reference document."""
+    mcp = create_server()
+    async with create_connected_server_and_client_session(mcp) as client:
+        payload = await _create(
+            client,
+            [
+                {"feature": "infix-feat", "type": "reference"},
+                {
+                    "feature": "infix-feat",
+                    "type": "reference",
+                    "topic": "engine-wire",
+                },
+            ],
+        )
+        assert payload["status"] == "ok"
+        ref_dir = vault_root / ".vault" / "reference"
+        assert any(ref_dir.glob("*-infix-feat-reference.md"))
+        assert any(ref_dir.glob("*-infix-feat-engine-wire-reference.md"))
+
+
+async def test_create_topic_rejected_for_non_admitting_type(vault_root):
+    """A topic on an adr spec is a per-item failure."""
+    mcp = create_server()
+    async with create_connected_server_and_client_session(mcp) as client:
+        payload = await _create(
+            client,
+            [{"feature": "infix-feat", "type": "adr", "topic": "second"}],
+        )
+        assert payload["status"] == "failed"
+        assert "topic is only valid" in payload["items"][0]["error"]["message"]
+
+
+async def test_create_mixed_batch_topic_failure_beside_success(vault_root):
+    """A topic-rejected item fails per-item while its batch siblings apply."""
+    mcp = create_server()
+    async with create_connected_server_and_client_session(mcp) as client:
+        payload = await _create(
+            client,
+            [
+                {"feature": "mixed-feat", "type": "reference", "topic": "wire"},
+                {"feature": "mixed-feat", "type": "adr", "topic": "second"},
+                {"feature": "mixed-feat", "type": "research"},
+            ],
+        )
+        assert payload["status"] == "mixed"
+        items = payload["items"]
+        assert items[0]["status"] == "created"
+        assert items[1]["status"] == "failed"
+        assert "topic is only valid" in items[1]["error"]["message"]
+        assert items[2]["status"] == "created"

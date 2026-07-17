@@ -90,6 +90,18 @@ def cmd_add(
         str | None, typer.Option("--date", help="Override date (YYYY-MM-DD)")
     ] = None,
     title: Annotated[str | None, typer.Option("--title", help="Document title")] = None,
+    topic: Annotated[
+        str | None,
+        typer.Option(
+            "--topic",
+            help=(
+                "Narrative filename infix (kebab-case) disambiguating a "
+                "second document of the same type for a feature; produces "
+                "{date}-{feature}-{topic}-{type}.md. Only valid for audit, "
+                "reference, and research documents."
+            ),
+        ),
+    ] = None,
     related: Annotated[
         list[str] | None,
         typer.Option(
@@ -234,6 +246,22 @@ def cmd_add(
             f"[red]Invalid tier '{tier}'. Allowed values: L1, L2, L3, L4.[/red]"
         )
         raise typer.Exit(code=1)
+
+    # Validate the topic infix: admitted only for the narrative trio, and
+    # held to the same kebab-case discipline as the feature tag.
+    topic_value: str | None = None
+    if topic is not None:
+        if dt not in (DocType.AUDIT, DocType.REFERENCE, DocType.RESEARCH):
+            console.print(
+                "[red]Error: --topic is only valid for 'audit', 'reference', "
+                "and 'research' documents.[/red]"
+            )
+            raise typer.Exit(code=1)
+        topic_result = normalize_feature_tag(topic, label="topic")
+        if not topic_result.ok or topic_result.value is None:
+            console.print(f"[red]{topic_result.error}[/red]")
+            raise typer.Exit(code=1)
+        topic_value = topic_result.value
 
     # Validate feature tag through the shared vaultcore normalizer (the one
     # validator the MCP surface also converges on).
@@ -509,6 +537,7 @@ def cmd_add(
                 feature=feat,
                 date_str=date_str,
                 title=title,
+                topic=topic_value,
                 related=resolved_related,
                 extra_tags=extra_tags,
                 force=force,

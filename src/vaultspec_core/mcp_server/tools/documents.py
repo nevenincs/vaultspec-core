@@ -130,6 +130,10 @@ class DocumentSpec(BaseModel):
             directory and feature tags.
         tier: The plan tier (``L1``-``L4``) for a ``plan`` document; defaults
             to ``L1``. Ignored for other document types.
+        topic: Optional kebab-case narrative filename infix disambiguating a
+            second document of the same type for a feature
+            (``{date}-{feature}-{topic}-{type}.md``). Only valid for
+            ``audit``, ``reference``, and ``research`` documents.
     """
 
     feature: str
@@ -140,6 +144,7 @@ class DocumentSpec(BaseModel):
     related: list[str] | None = None
     tags: list[str] | None = None
     tier: str | None = None
+    topic: str | None = None
 
 
 class EditOperation(BaseModel):
@@ -267,6 +272,18 @@ def _create_one(
         if tier not in ("L1", "L2", "L3", "L4"):
             return _failed(f"Invalid tier '{tier}'. Allowed values: L1, L2, L3, L4.")
 
+    topic: str | None = None
+    if spec.topic is not None:
+        if doc_type not in (DocType.AUDIT, DocType.REFERENCE, DocType.RESEARCH):
+            return _failed(
+                "topic is only valid for 'audit', 'reference', and "
+                "'research' documents."
+            )
+        topic_norm = normalize_feature_tag(spec.topic, label="topic")
+        if not topic_norm.ok or topic_norm.value is None:
+            return _failed(topic_norm.error or "invalid topic")
+        topic = topic_norm.value
+
     date_str = spec.date or today
     try:
         created = create_vault_doc(
@@ -275,6 +292,7 @@ def _create_one(
             feature,
             date_str,
             spec.title,
+            topic=topic,
             related=resolved_related,
             extra_tags=extra_tags,
             tier=tier,
