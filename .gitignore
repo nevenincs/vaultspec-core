@@ -202,3 +202,4 @@ statistic/out/
 
 # Local benchmark working data (raw campaign logs)
 campaign-data/
+.qdrant-initialized
