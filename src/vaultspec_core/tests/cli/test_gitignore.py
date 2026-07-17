@@ -385,6 +385,7 @@ class TestRecommendedEntries:
         assert ".vaultspec/_snapshots/" in entries
         assert ".vaultspec/*.lock" in entries
         assert ".vaultspec/providers.json" in entries
+        assert ".vaultspec/mcp-ownership.json" in entries
 
     def test_root_lock_sentinel_when_companion_exists(self, tmp_path):
         (tmp_path / ".vaultspec").mkdir()

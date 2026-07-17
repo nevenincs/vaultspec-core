@@ -12,6 +12,7 @@ Tests drive the real Typer app through ``CliRunner`` against genuine
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 import pytest
@@ -103,11 +104,14 @@ class TestStatusTargetForms:
         assert result.exit_code == 0, result.output
         assert "Tier: L2" in result.output
 
-    def test_relative_path_resolves(self, tmp_path: Path, monkeypatch) -> None:
+    def test_relative_path_resolves(self, tmp_path: Path) -> None:
         ids = _build_vault(tmp_path)
-        monkeypatch.chdir(tmp_path)
-
-        result = _run(tmp_path, "status", f".vault/plan/{ids['stem']}.md")
+        previous_cwd = os.getcwd()
+        os.chdir(tmp_path)
+        try:
+            result = _run(tmp_path, "status", f".vault/plan/{ids['stem']}.md")
+        finally:
+            os.chdir(previous_cwd)
 
         assert result.exit_code == 0, result.output
         assert "Tier: L2" in result.output

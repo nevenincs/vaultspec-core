@@ -207,29 +207,36 @@ def sync_files(
                 continue
 
             abs_path = str(item).replace("\\", "/")
-            if prune:
-                # Content-ownership guard: only prune .md files that
-                # vaultspec created (have a matching source or carry the
-                # AUTO-GENERATED marker).  User-authored files are skipped.
-                if not is_skill and item.is_file() and item.suffix == ".md":
-                    has_source = item.name in source_names
-                    if not has_source:
-                        try:
-                            head = item.read_text(encoding="utf-8")[:512]
-                        except OSError:
-                            head = ""
-                        is_managed = (
-                            CONFIG_HEADER in head
-                            or "<vaultspec " in head
-                            or "trigger:" in head
-                        )
-                        if not is_managed:
-                            result.warnings.append(
-                                f"Skipped pruning user file: {abs_path} "
-                                f"(not managed by vaultspec)"
-                            )
-                            continue
 
+            # Content-ownership guard: vaultspec only ever prunes .md files
+            # it created (a matching source or a managed-content marker).
+            # User-authored files are never pruned, so the ownership probe
+            # runs in both modes to keep the warning honest: an unmanaged
+            # file must not be advertised as removable via --force.
+            is_managed = True
+            if not is_skill and item.is_file() and item.suffix == ".md":
+                try:
+                    head = item.read_text(encoding="utf-8")[:512]
+                except OSError:
+                    head = ""
+                is_managed = (
+                    CONFIG_HEADER in head or "<vaultspec " in head or "trigger:" in head
+                )
+
+            if not is_managed:
+                if prune:
+                    result.warnings.append(
+                        f"Skipped pruning user file: {abs_path} "
+                        f"(not managed by vaultspec)"
+                    )
+                else:
+                    result.warnings.append(
+                        f"Stale {label} file: {abs_path} "
+                        f"(not managed by vaultspec; remove manually if unwanted)"
+                    )
+                continue
+
+            if prune:
                 result.items.append((abs_path, "[DELETE]"))
                 if not dry_run:
                     if is_skill:

@@ -144,6 +144,16 @@ def _serve(ctx_obj: dict | None = None) -> None:
 
     mcp = create_server()
 
+    # Windows backstop for the stdio lifetime contract: stdin EOF can be
+    # defeated by inherited pipe handles, so anchor shutdown to the client
+    # process itself. Fails open to EOF-only behavior when it cannot arm.
+    from .watchdog import arm_client_watchdog
+
+    if arm_client_watchdog():
+        logger.debug("Client watchdog armed")
+    else:
+        logger.debug("Client watchdog not armed; relying on stdin EOF")
+
     # FastMCP run() is synchronous, but we can call it here. On Windows the
     # default event loop has been the Proactor loop since Python 3.8, which the
     # MCP stdio transport requires, so no explicit policy override is needed.

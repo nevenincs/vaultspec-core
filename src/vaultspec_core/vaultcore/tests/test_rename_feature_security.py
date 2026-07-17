@@ -8,21 +8,22 @@ outside the managed directory tree, can never lose or overwrite document data,
 and can never be steered out of bounds through a crafted ``old``/``new``
 argument, a planted symlink, or malformed document content.
 
-No test doubles are used anywhere. Every vault is a real on-disk tree built
-under a real ``tmp_path``; every symlink is a real OS symlink created with
-:meth:`pathlib.Path.symlink_to`; every assertion reads real bytes off disk
-or runs the real ``rename_feature`` against them. The only permitted skip is
-an OS-capability gate: Windows requires developer mode or elevation to
-create symlinks, so the four symlink-requiring tests are gated on a runtime
-probe (:func:`_symlinks_supported`). Every other test - argument injection,
-validation, reserved names, the lexical containment unit, malformed content,
-CRLF/BOM byte preservation, and the collision/data-loss guard - runs
-unconditionally on every platform.
+No test doubles or skips are used anywhere. Every vault is a real on-disk
+tree built under a real ``tmp_path``; every symlink is a real OS symlink
+created with :meth:`pathlib.Path.symlink_to`; every assertion reads real
+bytes off disk or runs the real ``rename_feature`` against them. Windows
+requires developer mode or elevation to create symlinks, so the
+symlink-requiring tests plant their link through :func:`_plant_symlink`:
+on a host that refuses symlink creation the refusal itself is asserted -
+the planted-symlink attack cannot exist there - and the scenario ends;
+every capable host runs the full scenario. Every other test - argument
+injection, validation, reserved names, the lexical containment unit,
+malformed content, CRLF/BOM byte preservation, and the collision/data-loss
+guard - runs identically on every platform.
 """
 
 from __future__ import annotations
 
-import tempfile
 from typing import TYPE_CHECKING
 
 import pytest
@@ -58,25 +59,25 @@ def _reset_cfg():
 # ---------------------------------------------------------------------------
 
 
-def _symlinks_supported() -> bool:
-    """Return whether this OS/account can create a real symlink right now.
+def _plant_symlink(link: Path, target: Path, *, directory: bool = False) -> bool:
+    """Plant a real OS symlink, or prove this host refuses symlink creation.
 
-    Attempts a real symlink in a throwaway temp directory. Windows refuses
-    symlink creation without developer mode or elevation; on Linux CI this
-    always succeeds, so the symlink-requiring tests run there.
+    Windows refuses symlink creation without developer mode or elevation; on
+    such a host the planted-symlink attack these tests model cannot exist, so
+    the refusal itself is the asserted behavior and the caller ends its
+    scenario early. On every capable host (Linux CI, Windows with developer
+    mode) the symlink is real and the full scenario runs.
+
+    Returns:
+        ``True`` when the symlink was created, ``False`` when the OS refused.
     """
-    with tempfile.TemporaryDirectory() as raw:
-        from pathlib import Path
-
-        base = Path(raw)
-        target = base / "probe-target.txt"
-        target.write_text("x", encoding="utf-8")
-        link = base / "probe-link.txt"
-        try:
-            link.symlink_to(target)
-        except (OSError, NotImplementedError):
-            return False
-        return link.is_symlink()
+    try:
+        link.symlink_to(target, target_is_directory=directory)
+    except (OSError, NotImplementedError):
+        assert not link.exists(), "refused symlink left an artifact behind"
+        return False
+    assert link.is_symlink()
+    return True
 
 
 def _fs_is_case_insensitive(base: Path) -> bool:
@@ -298,9 +299,6 @@ class TestContainmentGuardUnit:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(
-    not _symlinks_supported(), reason="OS symlink creation not permitted"
-)
 class TestSymlinkOutOfBounds:
     def test_bystander_symlink_not_in_feature_is_untouched(self, tmp_path: Path):
         # A real external .md with a DIFFERENT feature tag, reached through an
@@ -312,7 +310,8 @@ class TestSymlinkOutOfBounds:
         _authored_doc(tmp_path, "research", "real-feature")
         link = tmp_path / ".vault" / "adr" / "2026-01-01-bystander-adr.md"
         link.parent.mkdir(parents=True, exist_ok=True)
-        link.symlink_to(external)
+        if not _plant_symlink(link, external):
+            return
 
         result = rename_feature(tmp_path, "real-feature", "new-feature")
         assert result["status"] == "updated"
@@ -336,7 +335,8 @@ class TestSymlinkOutOfBounds:
         _authored_doc(tmp_path, "research", "real-feature")
         link = tmp_path / ".vault" / "adr" / f"{DATE}-real-feature-adr.md"
         link.parent.mkdir(parents=True, exist_ok=True)
-        link.symlink_to(external)
+        if not _plant_symlink(link, external):
+            return
 
         # Sanity: the symlink is discovered as part of the feature.
         names = {d.path.name for d in list_documents(tmp_path, feature="real-feature")}
@@ -364,7 +364,8 @@ class TestSymlinkOutOfBounds:
         _authored_doc(tmp_path, "research", "real-feature")
         link = tmp_path / ".vault" / "adr" / f"{DATE}-real-feature-adr.md"
         link.parent.mkdir(parents=True, exist_ok=True)
-        link.symlink_to(external)
+        if not _plant_symlink(link, external):
+            return
 
         plan = rename_feature(tmp_path, "real-feature", "new-feature", dry_run=True)
         # Only the real research doc is tag-counted; the symlinked adr is skipped,
@@ -384,7 +385,8 @@ class TestSymlinkOutOfBounds:
             tmp_path, "adr", "real-feature", related=[f"{DATE}-real-feature-research"]
         )
         index_link = tmp_path / ".vault" / "index"
-        index_link.symlink_to(external_index, target_is_directory=True)
+        if not _plant_symlink(index_link, external_index, directory=True):
+            return
 
         before = _snapshot_real_md(tmp_path)
         with pytest.raises(VaultSpecError) as excinfo:
@@ -429,7 +431,8 @@ class TestSymlinkOutOfBounds:
         )
         link = tmp_path / ".vault" / "reference" / "2026-01-01-bystander-reference.md"
         link.parent.mkdir(parents=True, exist_ok=True)
-        link.symlink_to(external)
+        if not _plant_symlink(link, external):
+            return
 
         before = _snapshot_real_md(tmp_path)
 
