@@ -16,7 +16,7 @@ related:
 - [x] `S02` - Add a raw JSON-RPC serving probe and wire it into the leaked-pipe and parent-pid watchdog e2es so lifecycle asserts count only from a serving server; `tests/unit/mcp_server/test_watchdog.py`.
 - [x] `S03` - Upgrade the entrypoint tests: handshake through the stdout-purity queue, EOF exit proven from a serving session, zero-input EOF kept as the documented exception; `tests/mcp/test_mcp_entrypoint.py`.
 - [x] `S04` - Hand the rag half to that repo's board with the inventory and the floor spec; `repo workflow`.
-- [ ] `S05` - Run gates, dispatch code review, resolve findings, append audit entries, open stacked PR; `quality gates`.
+- [x] `S05` - Run gates, dispatch code review, resolve findings, append audit entries, open stacked PR; `quality gates`.
 
 ## Description
 

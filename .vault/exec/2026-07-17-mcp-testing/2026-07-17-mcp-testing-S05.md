@@ -22,7 +22,7 @@ related:
 
 ## Outcome
 
-Pending completion at record time; outcome recorded in the audit and PR.
+Gates green (MCP suites 83, unit gate 1773, ty both platforms); review PASS-with-notes with both actionable findings resolved (`59a0e04d`); audit written; stacked PR open.
 
 ## Notes
 
