@@ -47,6 +47,67 @@ _RESOLVER_SNIPPET = (
     "print(resolve_stdin_client_pid(), flush=True)"
 )
 
+#: The nine tools the served surface must advertise; a lifecycle test only
+#: counts once the spawned server has proven it serves exactly these.
+_EXPECTED_TOOLS = frozenset(
+    {
+        "status",
+        "find",
+        "create",
+        "edit",
+        "plan_progress",
+        "plan_edit",
+        "check",
+        "discover",
+        "invoke",
+    }
+)
+
+
+def _assert_server_serves(stdin_pipe, stdout_pipe) -> None:
+    """Prove a spawned server serves MCP before any lifecycle assertion.
+
+    Drives the real newline-delimited JSON-RPC exchange over the given
+    binary pipes: ``initialize`` must identify the server,
+    ``notifications/initialized`` completes the handshake, and
+    ``tools/list`` must return exactly the nine-tool surface. Liveness
+    alone is never the pass criterion for a running MCP service.
+    """
+
+    def send(obj: dict) -> None:
+        stdin_pipe.write((json.dumps(obj) + "\n").encode("utf-8"))
+        stdin_pipe.flush()
+
+    def recv(expect_id: int) -> dict:
+        for _ in range(20):
+            line = stdout_pipe.readline()
+            assert line, "server closed stdout during the handshake"
+            message = json.loads(line)
+            if message.get("id") == expect_id:
+                assert "result" in message, message
+                return message["result"]
+        raise AssertionError(f"no response with id {expect_id} within 20 messages")
+
+    send(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {},
+                "clientInfo": {"name": "watchdog-probe", "version": "0"},
+            },
+        }
+    )
+    init_result = recv(1)
+    assert init_result["serverInfo"]["name"] == "vaultspec-mcp", init_result
+    send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+    send({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
+    tools_result = recv(2)
+    names = {tool["name"] for tool in tools_result["tools"]}
+    assert names == _EXPECTED_TOOLS, names
+
 
 def _wait_for_pid_exit(pid: int, timeout: float) -> bool:
     """Wait until the process identified by *pid* exits (Windows only).
@@ -271,13 +332,13 @@ def test_real_server_exits_when_client_dies_despite_leaked_pipe(
     (tmp_path / ".vault").mkdir()
     client_code = textwrap.dedent(
         f"""
-        import os, subprocess, sys, time
+        import json, os, subprocess, sys, time
         r, w = os.pipe()
         os.set_inheritable(w, True)
         server = subprocess.Popen(
             [sys.executable, "-m", "vaultspec_core.mcp_server.app"],
             stdin=r,
-            stdout=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             cwd={str(tmp_path)!r},
         )
@@ -290,6 +351,36 @@ def test_real_server_exits_when_client_dies_despite_leaked_pipe(
         )
         print(server.pid, flush=True)
         print(sleeper.pid, flush=True)
+
+        def send(obj):
+            os.write(w, (json.dumps(obj) + "\\n").encode("utf-8"))
+
+        def recv(expect_id):
+            for _ in range(20):
+                line = server.stdout.readline()
+                if not line:
+                    return None
+                message = json.loads(line)
+                if message.get("id") == expect_id:
+                    return message.get("result")
+            return None
+
+        # Prove the server SERVES over this very pipe before the kill:
+        # initialize, complete the handshake, and list the tool surface.
+        send({{
+            "jsonrpc": "2.0", "id": 1, "method": "initialize",
+            "params": {{
+                "protocolVersion": "2025-03-26", "capabilities": {{}},
+                "clientInfo": {{"name": "leak-client", "version": "0"}},
+            }},
+        }})
+        init_result = recv(1)
+        send({{"jsonrpc": "2.0", "method": "notifications/initialized"}})
+        send({{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {{}}}})
+        tools_result = recv(2)
+        name = (init_result or {{}}).get("serverInfo", {{}}).get("name")
+        tools = sorted(t["name"] for t in (tools_result or {{}}).get("tools", []))
+        print(f"SERVING name={{name}} tools={{','.join(tools)}}", flush=True)
         time.sleep(3600)
         """
     )
@@ -303,13 +394,13 @@ def test_real_server_exits_when_client_dies_despite_leaked_pipe(
         server_pid = int(client.stdout.readline())
         sleeper_pid = int(client.stdout.readline())
 
-        # Give the server a moment to boot and arm before the client dies,
-        # and prove it actually booted: a server that crashed at startup
-        # would make the post-kill exit assertion pass vacuously.
-        time.sleep(5)
-        assert not _wait_for_pid_exit(server_pid, timeout=0.1), (
-            "server was already dead before its client was killed"
-        )
+        # Functional floor: the server must prove it serves MCP through
+        # this exact pipe before the lifecycle assertion means anything.
+        serving_line = client.stdout.readline().strip()
+        assert serving_line.startswith("SERVING name=vaultspec-mcp "), serving_line
+        served_tools = set(serving_line.split("tools=", 1)[1].split(","))
+        assert served_tools == _EXPECTED_TOOLS, served_tools
+
         client.kill()
         client.wait(timeout=60)
 
@@ -537,12 +628,15 @@ def test_real_server_parent_pid_flag_reaps_on_override_death(
             str(sleeper.pid),
         ],
         stdin=subprocess.PIPE,
-        stdout=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
         cwd=tmp_path,
     )
     try:
-        time.sleep(5)
+        # Functional floor: prove the server serves MCP over its own pipes
+        # (handshake identifies it; tools/list is the exact nine-tool
+        # surface) before the override-death lifecycle assertion counts.
+        _assert_server_serves(server.stdin, server.stdout)
         assert server.poll() is None, "server exited before the override died"
         sleeper.kill()
         sleeper.wait(timeout=60)

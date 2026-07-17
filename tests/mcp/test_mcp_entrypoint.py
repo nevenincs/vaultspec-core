@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import queue
 import subprocess
@@ -12,6 +13,17 @@ import pytest
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+_INITIALIZE_REQUEST = {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+        "protocolVersion": "2025-03-26",
+        "capabilities": {},
+        "clientInfo": {"name": "entrypoint-probe", "version": "0"},
+    },
+}
 
 
 def _build_minimal_workspace(root: Path) -> None:
@@ -91,6 +103,17 @@ def test_mcp_entrypoint_starts_and_keeps_stdout_clean(tmp_path: Path) -> None:
 
         time.sleep(0.2)
         assert stdout_queue.empty()
+
+        # Functional floor: liveness and clean stdout are not serving.
+        # Prove the process answers the protocol - the initialize response
+        # must be the FIRST stdout bytes and must identify this server.
+        assert proc.stdin is not None
+        proc.stdin.write((json.dumps(_INITIALIZE_REQUEST) + "\n").encode("utf-8"))
+        proc.stdin.flush()
+        response_line = stdout_queue.get(timeout=15)
+        response = json.loads(response_line)
+        assert response["id"] == 1, response
+        assert response["result"]["serverInfo"]["name"] == "vaultspec-mcp", response
     finally:
         proc.terminate()
         try:
@@ -101,13 +124,59 @@ def test_mcp_entrypoint_starts_and_keeps_stdout_clean(tmp_path: Path) -> None:
 
 
 @pytest.mark.integration
-def test_mcp_entrypoint_exits_cleanly_on_stdin_eof(tmp_path: Path) -> None:
-    """The stdio server must exit promptly on stdin EOF, not spin or hang.
+def test_mcp_entrypoint_exits_cleanly_on_stdin_eof_while_serving(
+    tmp_path: Path,
+) -> None:
+    """EOF from a serving session must exit promptly - the disconnect path.
 
-    Regression guard for the busy-signal concern (#137): with no input and an
-    immediate EOF (``stdin`` closed), the server must terminate on its own
-    within a short window. A busy-loop or hang on EOF - the failure mode the
-    concern describes - would block until the timeout and fail this test.
+    Regression guard for the busy-signal concern (#137), upgraded to the
+    functional floor: the server first proves it serves (the initialize
+    response identifies it), then its client closes stdin - the real
+    client-disconnect lifecycle. A busy-loop or hang on EOF would block
+    until the timeout and fail this test.
+    """
+    _build_minimal_workspace(tmp_path)
+
+    env = os.environ.copy()
+    env["VAULTSPEC_TARGET_DIR"] = str(tmp_path)
+
+    proc = subprocess.Popen(
+        [sys.executable, "-c", "from vaultspec_core.mcp_server.app import run; run()"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+    )
+    try:
+        assert proc.stdin is not None and proc.stdout is not None
+        proc.stdin.write((json.dumps(_INITIALIZE_REQUEST) + "\n").encode("utf-8"))
+        proc.stdin.flush()
+        response = json.loads(proc.stdout.readline())
+        assert response["result"]["serverInfo"]["name"] == "vaultspec-mcp", response
+
+        proc.stdin.close()
+        returncode = proc.wait(timeout=20)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=5)
+        pytest.fail(
+            "MCP stdio server did not exit on stdin EOF within 20s; "
+            "possible busy-loop or hang (#137)."
+        )
+    assert returncode == 0, proc.stderr.read().decode("utf-8", errors="replace")
+
+
+@pytest.mark.integration
+def test_mcp_entrypoint_exits_on_immediate_eof_before_any_request(
+    tmp_path: Path,
+) -> None:
+    """Zero-input EOF exits cleanly - the degenerate startup lifecycle.
+
+    EOF here precedes any request, so a serving assertion is impossible by
+    construction: this is the documented exception to the functional floor,
+    kept because a spawn-then-abandon client must not leave a wedged
+    process. The serving-session disconnect path is covered by the test
+    above.
     """
     _build_minimal_workspace(tmp_path)
 
@@ -126,8 +195,5 @@ def test_mcp_entrypoint_exits_cleanly_on_stdin_eof(tmp_path: Path) -> None:
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait(timeout=5)
-        pytest.fail(
-            "MCP stdio server did not exit on stdin EOF within 20s; "
-            "possible busy-loop or hang (#137)."
-        )
+        pytest.fail("MCP stdio server did not exit on immediate stdin EOF within 20s.")
     assert returncode == 0, proc.stderr.read().decode("utf-8", errors="replace")
