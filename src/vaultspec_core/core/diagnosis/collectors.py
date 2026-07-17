@@ -810,17 +810,45 @@ def _observed_precommit_mode(
     return None
 
 
+#: The pre-``--no-sync`` dependency-mode MCP launch shape. Deployed workspaces
+#: seeded before the guard was introduced still carry this exact byte sequence, so
+#: :func:`_observed_mcp_mode` recognizes it as a bounded, explicit legacy
+#: candidate rather than silently reporting ``None`` for every not-yet-refreshed
+#: dependency-mode workspace. It is derived from the current renderer's args
+#: with the ``--no-sync`` element removed, so it can never drift into a second
+#: hand-maintained launch copy: only this one historical shape is recognized,
+#: and the mismatch it produces against the current declaration surfaces as
+#: ordinary drift, remediated by ``spec mcps sync --force`` or
+#: ``install --upgrade`` through the existing force-managed seam.
+def _legacy_dependency_args(module: str) -> list[str]:
+    from ..enums import InstallMode
+    from ..mcps import render_launch_for_mode
+
+    _, current_args = render_launch_for_mode(InstallMode.DEPENDENCY, "", module)
+    return [arg for arg in current_args if arg != "--no-sync"]
+
+
 def _observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode | None:
     """Infer the install mode *package*'s deployed MCP launch command is shaped for.
 
     Reads ``.mcp.json`` and matches *package*'s server entry (the server name is
     the distribution name) against the concrete launch each mode renders
-    (dependency mode launches through ``uv run``, tool mode through ``uvx``). The
-    runnable module is recovered from the deployed ``args`` (the token after
-    ``-m``) and the two candidate shapes are reconstructed through the renderer's
-    own :func:`~vaultspec_core.core.mcps.render_launch_for_mode`, so this matches
-    against the single launch comparator rather than a second hardcoded copy and
-    works for any package's module without a per-package table.
+    (dependency mode launches through ``uv run --no-sync``, tool mode through
+    ``uvx``). The runnable module is recovered from the deployed ``args`` (the
+    token after ``-m``) and the two candidate shapes are reconstructed through
+    the renderer's own :func:`~vaultspec_core.core.mcps.render_launch_for_mode`,
+    so this matches against the single launch comparator rather than a second
+    hardcoded copy and works for any package's module without a per-package
+    table.
+
+    A deployed entry shaped like the pre-``--no-sync`` legacy dependency launch
+    (``uv run python -m <module>``, no guard) also matches
+    :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY`
+    (:data:`_legacy_dependency_args`), so mode inference and the mode-mismatch
+    signal do not regress to ``None`` on workspaces seeded before the guard was
+    introduced; the byte difference between the legacy and current shapes then
+    reports as ordinary drift with a fix hint pointing at
+    ``spec mcps sync --force`` or ``install --upgrade``.
 
     Args:
         target: Workspace root directory.
@@ -830,7 +858,7 @@ def _observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode 
     Returns:
         The matching :class:`~vaultspec_core.core.enums.InstallMode`, or ``None``
         when there is no config, no matching server entry, the module cannot be
-        recovered, or the entry matches neither rendered launch shape.
+        recovered, or the entry matches neither rendered nor legacy launch shape.
     """
     from ..enums import InstallMode
     from ..mcps import render_launch_for_mode
@@ -870,6 +898,10 @@ def _observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode 
         mode_command, mode_args = render_launch_for_mode(mode, pkg, module)
         if command == mode_command and args == mode_args:
             return mode
+
+    if command == "uv" and args == _legacy_dependency_args(module):
+        return InstallMode.DEPENDENCY
+
     return None
 
 

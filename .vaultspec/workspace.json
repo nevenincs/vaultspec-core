@@ -3,6 +3,9 @@
     "vaultspec-core": {
       "install_mode": "dependency",
       "minimum_version": "0.1.37"
+    },
+    "vaultspec-rag": {
+      "install_mode": "dev"
     }
   },
   "schema_version": "2.0"

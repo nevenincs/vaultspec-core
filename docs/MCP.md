@@ -53,10 +53,21 @@ launch command for the active install mode:
 - Tool mode, the default, uses `uvx --from ...` without adding Vaultspec to the
   project's dependencies. A companion may declare a dedicated tool requirement such as
   `vaultspec-rag[mcp]`.
-- Dependency mode uses `uv run ...` against the project's environment and ships in built
-  distributions.
-- Development mode also uses `uv run ...`, but records a development-only placement that
-  does not ship in built distributions.
+- Dependency mode uses `uv run --no-sync ...` against the project's environment and
+  ships in built distributions.
+- Development mode also uses `uv run --no-sync ...`, but records a development-only
+  placement that does not ship in built distributions.
+
+Every rendered launch is a static execution: connecting a client never installs,
+resolves, or repairs anything. Tool mode runs from `uvx`'s isolated cache and never
+touches the project's environment; dependency and development modes resolve the
+project's existing environment as-is - the `--no-sync` guard means a client connect
+never runs an implicit `uv sync`. If the environment is stale or broken, the connect
+fails with the underlying Python error instead of mutating shared state while other
+processes may hold it; repair it explicitly with `uv sync`, then reconnect. A launch
+rendered before this guard existed (a bare `uv run` shape) is reported by
+`vaultspec-core spec doctor` as drift; refresh it with
+`vaultspec-core spec mcps sync --force` or `vaultspec-core install --upgrade`.
 
 Select a mode with `install --mode tool`, `install --mode dependency`, or
 `install --mode dev`. Vaultspec consumes the package, module, and optional tool

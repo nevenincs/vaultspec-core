@@ -15,6 +15,7 @@ from vaultspec_core.core.commands import (
     entry_prefix_for_mode,
 )
 from vaultspec_core.core.diagnosis.collectors import (
+    _observed_mcp_mode,
     collect_builtin_version_state,
     collect_config_state,
     collect_content_integrity,
@@ -94,6 +95,15 @@ def _write_manifest(root: Path, installed: list[str]) -> None:
 def _write_gitignore(root: Path, content: str) -> None:
     gi = root / ".gitignore"
     gi.write_text(content, encoding="utf-8")
+
+
+def _write_mcp_server_entry(
+    root: Path, package: str, command: str, args: list[str]
+) -> None:
+    """Write a single ``.mcp.json`` server entry with an arbitrary launch shape."""
+    path = root / ".mcp.json"
+    payload = {"mcpServers": {package: {"command": command, "args": args}}}
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -624,6 +634,54 @@ class TestModeMismatchState:
 
 
 # ---------------------------------------------------------------------------
+# _observed_mcp_mode: current, legacy, and unguarded launch shapes
+# ---------------------------------------------------------------------------
+class TestObservedMcpMode:
+    _MODULE = "vaultspec_core.mcp_server.app"
+
+    def test_current_dependency_shape_is_dependency(self, tmp_path: Path) -> None:
+        """The current --no-sync-guarded dependency shape maps to DEPENDENCY."""
+        _write_mcp_server_entry(
+            tmp_path,
+            "vaultspec-core",
+            "uv",
+            ["run", "--no-sync", "python", "-m", self._MODULE],
+        )
+        assert _observed_mcp_mode(tmp_path, "vaultspec-core") == InstallMode.DEPENDENCY
+
+    def test_legacy_bare_shape_is_dependency(self, tmp_path: Path) -> None:
+        """The pre-amendment bare uv run shape (no --no-sync) still maps to
+        DEPENDENCY, so doctor coverage does not regress on not-yet-refreshed
+        workspaces."""
+        _write_mcp_server_entry(
+            tmp_path, "vaultspec-core", "uv", ["run", "python", "-m", self._MODULE]
+        )
+        assert _observed_mcp_mode(tmp_path, "vaultspec-core") == InstallMode.DEPENDENCY
+
+    def test_tool_shape_is_tool(self, tmp_path: Path) -> None:
+        _write_mcp_server_entry(
+            tmp_path,
+            "vaultspec-core",
+            "uvx",
+            ["--from", "vaultspec-core", "python", "-m", self._MODULE],
+        )
+        assert _observed_mcp_mode(tmp_path, "vaultspec-core") == InstallMode.TOOL
+
+    def test_arbitrary_unguarded_shape_is_none(self, tmp_path: Path) -> None:
+        """An un-guarded shape that is neither the current nor the legacy
+        candidate must not be swept up by the legacy recognition - it reports
+        None rather than loosening the matcher into accepting arbitrary
+        shapes."""
+        _write_mcp_server_entry(
+            tmp_path,
+            "vaultspec-core",
+            "uv",
+            ["run", "--isolated", "python", "-m", self._MODULE],
+        )
+        assert _observed_mcp_mode(tmp_path, "vaultspec-core") is None
+
+
+# ---------------------------------------------------------------------------
 # resolver mode-mismatch advisory and precommit completeness
 # ---------------------------------------------------------------------------
 class TestModeMismatchResolution:
@@ -990,7 +1048,7 @@ class TestRenderLaunchForMode:
     def test_dependency_shape(self) -> None:
         assert render_launch_for_mode(
             InstallMode.DEPENDENCY, "vaultspec-core", _CORE_MODULE
-        ) == ("uv", ["run", "python", "-m", _CORE_MODULE])
+        ) == ("uv", ["run", "--no-sync", "python", "-m", _CORE_MODULE])
 
     def test_tool_shape(self) -> None:
         assert render_launch_for_mode(
@@ -1015,7 +1073,7 @@ class TestRenderLaunchForMode:
         )
         assert render_launch_for_mode(
             InstallMode.DEV, "vaultspec-rag", "vaultspec_rag.server"
-        ) == ("uv", ["run", "python", "-m", "vaultspec_rag.server"])
+        ) == ("uv", ["run", "--no-sync", "python", "-m", "vaultspec_rag.server"])
 
 
 # ---------------------------------------------------------------------------
@@ -1042,7 +1100,7 @@ class TestRenderMcpDefinitionForMode:
             self._tokened(), InstallMode.DEPENDENCY
         )
         assert rendered["command"] == "uv"
-        assert rendered["args"] == ["run", "python", "-m", _CORE_MODULE]
+        assert rendered["args"] == ["run", "--no-sync", "python", "-m", _CORE_MODULE]
 
     def test_dev_renders_byte_identically_to_dependency(self) -> None:
         assert render_mcp_definition_for_mode(
@@ -1312,11 +1370,11 @@ class TestInstallModeDevEndToEnd:
         install = factory.run("install", "--mode", "dev")
         assert install.exit_code == 0, self._combined(install)
 
-        # Dependency-shaped MCP launch (uv run), not the uvx tool shape.
+        # Dependency-shaped MCP launch (uv run --no-sync), not the uvx tool shape.
         mcp = json.loads((tmp_path / ".mcp.json").read_text(encoding="utf-8"))
         core_server = mcp["mcpServers"]["vaultspec-core"]
         assert core_server["command"] == "uv"
-        assert core_server["args"] == ["run", "python", "-m", _CORE_MODULE]
+        assert core_server["args"] == ["run", "--no-sync", "python", "-m", _CORE_MODULE]
 
         # Dependency-shaped hook entries (uv run --no-sync).
         precommit = (tmp_path / ".pre-commit-config.yaml").read_text(encoding="utf-8")

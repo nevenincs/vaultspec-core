@@ -1,7 +1,6 @@
 {
-  "command": "uv",
-  "args": [
-    "run",
-    "vaultspec-search-mcp"
-  ]
+  "command": "@@VAULTSPEC_INSTALL_MODE_COMMAND@@",
+  "args": ["@@VAULTSPEC_INSTALL_MODE_ARGS@@"],
+  "_vaultspec_mode_package": "vaultspec-rag",
+  "_vaultspec_mode_module": "vaultspec_rag.server"
 }
