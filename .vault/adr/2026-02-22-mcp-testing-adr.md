@@ -3,10 +3,11 @@ tags:
   - '#adr'
   - '#mcp-testing'
 date: '2026-02-22'
-modified: '2026-06-13'
+modified: '2026-07-17'
 related:
   - '[[2026-02-22-mcp-testing-research]]'
   - '[[2026-02-22-mcp-consolidation-adr]]'
+  - '[[2026-07-17-mcp-testing-research]]'
 ---
 
 # `mcp-testing` adr: `add in-memory client session tests` | (**status:** `accepted`)
@@ -81,6 +82,26 @@ classes:
   single session.
 
 Fixture pattern per \[[2026-02-22-mcp-testing-research]\] section 7.
+
+## Functional assertion floor (2026-07-17 amendment)
+
+Per the operator's directive and the inventory in
+`2026-07-17-mcp-testing-research`, existence is not functionality: a test
+that spawns the real MCP server process may not pass on liveness alone.
+Every such test asserts, before or alongside any lifecycle claim, at least
+one measurable served capability:
+
+- the `initialize` handshake completes and identifies the server, and/or
+- `tools/list` returns the exact expected tool surface, and/or
+- one tool call returns a correct, structurally asserted payload.
+
+Lifecycle tests (orphan reaping, EOF exit, watchdog behavior) satisfy the
+floor by proving the server was serving when the lifecycle event fired -
+the client side of the test performs the JSON-RPC exchange itself when it
+owns the transport pipes. In-memory session tests already exceed the floor
+by construction. The same floor is the recommended contract for the
+companion vaultspec-rag server's spawned-shim tests, handed to that repo's
+board.
 
 ## Rationale
 
