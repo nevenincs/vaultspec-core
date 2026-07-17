@@ -810,9 +810,8 @@ def _observed_precommit_mode(
     return None
 
 
-#: The pre-``--no-sync`` dependency-mode MCP launch shape
-#: (``2026-07-17-mcp-static-launch-adr`` A1). Deployed workspaces seeded before
-#: that amendment still carry this exact byte sequence, so
+#: The pre-``--no-sync`` dependency-mode MCP launch shape. Deployed workspaces
+#: seeded before the guard was introduced still carry this exact byte sequence, so
 #: :func:`_observed_mcp_mode` recognizes it as a bounded, explicit legacy
 #: candidate rather than silently reporting ``None`` for every not-yet-refreshed
 #: dependency-mode workspace. It is derived from the current renderer's args
@@ -846,10 +845,10 @@ def _observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode 
     (``uv run python -m <module>``, no guard) also matches
     :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY`
     (:data:`_legacy_dependency_args`), so mode inference and the mode-mismatch
-    signal do not regress to ``None`` on workspaces seeded before
-    ``2026-07-17-mcp-static-launch-adr``; the byte difference between the
-    legacy and current shapes then reports as ordinary drift with a fix hint
-    pointing at ``spec mcps sync --force`` or ``install --upgrade``.
+    signal do not regress to ``None`` on workspaces seeded before the guard was
+    introduced; the byte difference between the legacy and current shapes then
+    reports as ordinary drift with a fix hint pointing at
+    ``spec mcps sync --force`` or ``install --upgrade``.
 
     Args:
         target: Workspace root directory.
