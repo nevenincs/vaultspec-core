@@ -29,7 +29,7 @@ Register the versioned convergence migration riding the refresh path, and add th
 
 - [x] `P02.S05` - Register the launch-shape convergence migration invoking mcp_sync per enrolled provider, idempotent against the refresh path; `src/vaultspec_core/migrations`.
 - [x] `P02.S06` - Add warn-only doctor advisories for unrefreshable prek.toml hooks and stale static companion seeds with remediation hints; `src/vaultspec_core/core/diagnosis`.
-- [ ] `P02.S07` - Cover migration idempotence on both modes and both advisories with real-workspace tests; `src/vaultspec_core/tests`.
+- [x] `P02.S07` - Cover migration idempotence on both modes and both advisories with real-workspace tests; `src/vaultspec_core/tests`.
 
 ### Phase `P03` - messaging, docs, and gates
 
