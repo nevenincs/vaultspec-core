@@ -27,7 +27,7 @@ Restore this workspace to a working state (the incident left the venv without va
 Amend the dependency-mode launch bytes with the no-sync guard through the single comparator and add the legacy-shape recognition that keeps doctor coverage honest on pre-refresh workspaces, with tests.
 
 - [x] `P02.S04` - Add the no-sync guard to the dependency-mode branch of render_launch_for_mode and align its docstring with the static-execution contract; `src/vaultspec_core/core/mcps.py`.
-- [ ] `P02.S05` - Recognize the legacy bare uv run module launch as DEPENDENCY in the observed-shape matcher with a drift hint pointing at sync --force or install --upgrade; `src/vaultspec_core/core/diagnosis/collectors.py`.
+- [x] `P02.S05` - Recognize the legacy bare uv run module launch as DEPENDENCY in the observed-shape matcher with a drift hint pointing at sync --force or install --upgrade; `src/vaultspec_core/core/diagnosis/collectors.py`.
 - [ ] `P02.S06` - Update every launch-shape assertion and add legacy-shape and no-sync render tests across the renderer, per-package sync, collector, and mode-flip suites; `src/vaultspec_core/tests/cli`.
 
 ### Phase `P03` - documentation, sibling handoff, and gates
