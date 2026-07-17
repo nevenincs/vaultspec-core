@@ -123,6 +123,64 @@ class TestSyncFiles:
         assert result.pruned == 1
         assert not (dest / "stale.md").exists()
 
+    def test_prune_skips_unmanaged_stale_file(self, synthetic_project):
+        dest = synthetic_project / "dest"
+        dest.mkdir()
+        (dest / "user.md").write_text("hand-authored notes", encoding="utf-8")
+        sources = self._make_sources(synthetic_project, ["a.md"])
+        result = sync_files(
+            sources=sources,
+            dest_dir=dest,
+            transform_fn=lambda _t, n, m, b: transform_rule(Tool.CLAUDE, n, m, b),
+            dest_path_fn=lambda d, n: d / n,
+            prune=True,
+            dry_run=False,
+            label="test",
+        )
+        assert result.pruned == 0
+        assert (dest / "user.md").exists()
+        assert any("Skipped pruning user file" in w for w in result.warnings)
+
+    def test_stale_managed_file_warns_force_removable(self, synthetic_project):
+        dest = synthetic_project / "dest"
+        dest.mkdir()
+        (dest / "stale.md").write_text(
+            "---\nname: stale\ntrigger: always_on\n---\n\nold stale content",
+            encoding="utf-8",
+        )
+        sources = self._make_sources(synthetic_project, ["a.md"])
+        result = sync_files(
+            sources=sources,
+            dest_dir=dest,
+            transform_fn=lambda _t, n, m, b: transform_rule(Tool.CLAUDE, n, m, b),
+            dest_path_fn=lambda d, n: d / n,
+            prune=False,
+            dry_run=False,
+            label="test",
+        )
+        assert (dest / "stale.md").exists()
+        assert any("use --force to remove" in w for w in result.warnings)
+
+    def test_stale_unmanaged_file_warns_manual_removal(self, synthetic_project):
+        # An unmanaged stale file must never be advertised as --force
+        # removable: --force skips it, so the warning says so honestly.
+        dest = synthetic_project / "dest"
+        dest.mkdir()
+        (dest / "user.md").write_text("hand-authored notes", encoding="utf-8")
+        sources = self._make_sources(synthetic_project, ["a.md"])
+        result = sync_files(
+            sources=sources,
+            dest_dir=dest,
+            transform_fn=lambda _t, n, m, b: transform_rule(Tool.CLAUDE, n, m, b),
+            dest_path_fn=lambda d, n: d / n,
+            prune=False,
+            dry_run=False,
+            label="test",
+        )
+        assert (dest / "user.md").exists()
+        assert not any("use --force to remove" in w for w in result.warnings)
+        assert any("remove manually if unwanted" in w for w in result.warnings)
+
 
 class TestSyncSkills:
     """Tests for skills_sync."""

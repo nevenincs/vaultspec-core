@@ -191,14 +191,12 @@ statistic/out/
 .vault/logs/
 .vaultspec/*.lock
 .vaultspec/_snapshots/
+.vaultspec/mcp-ownership.json
 .vaultspec/providers.json
 /.gitignore.lock
 /.mcp.json.lock
 /.pre-commit-config.yaml.lock
 # <<< vaultspec-managed <<<
-
-# Local MCP ownership state (absolute machine paths; pending managed-block coverage, see #215)
-.vaultspec/mcp-ownership.json
 
 # Local benchmark working data (raw campaign logs)
 campaign-data/

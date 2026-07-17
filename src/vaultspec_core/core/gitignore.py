@@ -38,15 +38,18 @@ def get_recommended_entries(target: Path) -> list[str]:
 
     try:
         # Internal state that must ALWAYS be ignored if the framework
-        # exists. The snapshot directory, advisory-lock sentinels, and the
-        # install manifest (providers.json) are per-machine state, never
-        # authored content. Everything else under .vaultspec/ (rules,
-        # skills, agents, system) is team-shared and is not listed here.
+        # exists. The snapshot directory, advisory-lock sentinels, the
+        # install manifest (providers.json), and the MCP ownership ledger
+        # (mcp-ownership.json, absolute machine paths) are per-machine
+        # state, never authored content. Everything else under .vaultspec/
+        # (rules, skills, agents, system) is team-shared and is not listed
+        # here.
         framework_installed = (target / ".vaultspec").is_dir()
         if framework_installed:
             entries.add(".vaultspec/_snapshots/")
             entries.add(".vaultspec/*.lock")
             entries.add(".vaultspec/providers.json")
+            entries.add(".vaultspec/mcp-ownership.json")
         if (target / ".vault").is_dir():
             entries.add(".vault/.obsidian/")
             entries.add(".vault/.trash/")
