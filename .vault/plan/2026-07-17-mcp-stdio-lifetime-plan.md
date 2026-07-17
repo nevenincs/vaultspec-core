@@ -38,7 +38,7 @@ Prove every new anchor and knob with real processes and pipes, updating the test
 Document the contract and knobs, register the env var, and run the full gate set through review to a ready PR.
 
 - [x] `P03.S10` - Document the watchdog contract and knobs in the MCP doc and register VAULTSPEC_STDIO_WATCHDOG in the CLI reference env table via the builtins source; `docs/MCP.md`.
-- [ ] `P03.S11` - Run gates, dispatch code review, resolve findings, append audit entries, finalize PR; `quality gates`.
+- [x] `P03.S11` - Run gates, dispatch code review, resolve findings, append audit entries, finalize PR; `quality gates`.
 
 ## Description
 
