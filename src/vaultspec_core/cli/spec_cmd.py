@@ -2298,6 +2298,7 @@ def _render_diagnosis_table(_console, diag: "WorkspaceDiagnosis") -> None:
             PrecommitSignal.COMPLETE: ("ok", "green"),
             PrecommitSignal.INCOMPLETE: ("warn", "yellow"),
             PrecommitSignal.NON_CANONICAL: ("warn", "yellow"),
+            PrecommitSignal.UNREFRESHABLE: ("warn", "yellow"),
             PrecommitSignal.NO_HOOKS: ("warn", "yellow"),
             PrecommitSignal.NO_FILE: ("info", "dim"),
         },
@@ -2306,6 +2307,11 @@ def _render_diagnosis_table(_console, diag: "WorkspaceDiagnosis") -> None:
         PrecommitSignal.COMPLETE: "all hooks present",
         PrecommitSignal.INCOMPLETE: "missing canonical hooks",
         PrecommitSignal.NON_CANONICAL: "non-canonical entry pattern",
+        PrecommitSignal.UNREFRESHABLE: (
+            "prek.toml present; stale hook entries cannot be refreshed "
+            "automatically - transplant the canonical entries into prek.toml "
+            "manually"
+        ),
         PrecommitSignal.NO_HOOKS: "no vaultspec hooks found",
         PrecommitSignal.NO_FILE: "no .pre-commit-config.yaml",
     }.get(diag.precommit, str(diag.precommit))
@@ -2316,6 +2322,21 @@ def _render_diagnosis_table(_console, diag: "WorkspaceDiagnosis") -> None:
             "detail": pc_detail,
         }
     )
+
+    # Stale package-bundled MCP seed advisory (warn-only): core cannot refresh
+    # these; only the owning package's installer can.
+    if diag.stale_mcp_seeds:
+        names = ", ".join(diag.stale_mcp_seeds)
+        rows.append(
+            {
+                "component": "mcp seeds",
+                "status": Cell("warn", style="yellow"),
+                "detail": (
+                    f"stale package seed definition(s): {names} - re-run that "
+                    "package's installer with --upgrade to refresh the seed"
+                ),
+            }
+        )
 
     # Rename integrity row
     ri_status, ri_style = _signal_status(

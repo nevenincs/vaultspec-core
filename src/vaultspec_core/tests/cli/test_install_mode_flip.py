@@ -136,6 +136,87 @@ class TestModeFlipForcesManagedEntry:
         assert after["mcpServers"]["my-custom-server"] == foreign_before
         assert after["mcpServers"]["vaultspec-core"]["command"] == _TOOL_COMMAND
 
+    def test_flip_upgrade_refreshes_every_declared_companion(
+        self, tmp_path: Path
+    ) -> None:
+        """The widened mode-flip seam forces every package declared in the
+        workspace map, not only ``vaultspec-core``: a companion's managed
+        entry, hand-altered so a plain sync alone would skip it, still
+        migrates atomically alongside core's own entry on a flip upgrade.
+        """
+        import json as _json
+
+        from vaultspec_core.core.mcps import (
+            _MODE_ARGS_TOKEN,
+            _MODE_COMMAND_TOKEN,
+            _MODE_MODULE_KEY,
+            _MODE_PACKAGE_KEY,
+            mcp_sync,
+        )
+        from vaultspec_core.core.workspace_mode import (
+            PackageDeclaration,
+            write_package_declaration,
+        )
+        from vaultspec_core.tests.cli.test_mcp_per_package_sync import _bind_context
+
+        rag_package = "vaultspec-rag"
+        rag_module = "vaultspec_rag.server"
+
+        _write_pyproject_with_vaultspec(tmp_path)
+        WorkspaceFactory(tmp_path).install("all", mode=InstallMode.DEPENDENCY)
+
+        # Declare a companion package in tool mode and drop its tokenized
+        # definition, mirroring a real mixed-mode workspace, then sync it in
+        # so both entries carry a fingerprint recorded for their current
+        # (pre-flip) shapes.
+        mcps_dir = tmp_path / ".vaultspec" / "mcps"
+        mcps_dir.mkdir(parents=True, exist_ok=True)
+        (mcps_dir / f"{rag_package}.builtin.json").write_text(
+            _json.dumps(
+                {
+                    "command": _MODE_COMMAND_TOKEN,
+                    "args": [_MODE_ARGS_TOKEN],
+                    _MODE_PACKAGE_KEY: rag_package,
+                    _MODE_MODULE_KEY: rag_module,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        write_package_declaration(
+            tmp_path, rag_package, PackageDeclaration(install_mode=InstallMode.TOOL)
+        )
+        _bind_context(tmp_path)
+        mcp_sync(provider="claude")
+
+        # Hand-alter both managed entries so their fingerprints no longer
+        # verify: a plain sync (and, before the widened seam, the old
+        # core-only force set) would skip both as apparent hand edits.
+        mcp = _read_mcp(tmp_path)
+        mcp["mcpServers"]["vaultspec-core"]["env"] = {"HAND_ALTERED": "1"}
+        mcp["mcpServers"][rag_package]["env"] = {"HAND_ALTERED": "1"}
+        (tmp_path / ".mcp.json").write_text(
+            _json.dumps(mcp, indent=2) + "\n", encoding="utf-8"
+        )
+
+        # Flip core's own declared mode; the upgrade observes the deployed
+        # (still dependency-shaped) entry disagreeing with this declaration.
+        write_package_declaration(
+            tmp_path,
+            "vaultspec-core",
+            PackageDeclaration(install_mode=InstallMode.TOOL),
+        )
+
+        WorkspaceFactory(tmp_path).install("all", upgrade=True)
+
+        after = _read_mcp(tmp_path)["mcpServers"]
+        assert after["vaultspec-core"]["command"] == _TOOL_COMMAND
+        assert after["vaultspec-core"]["args"] == list(_TOOL_ARGS)
+        assert "env" not in after["vaultspec-core"]
+        assert after[rag_package]["command"] == "uvx"
+        assert "env" not in after[rag_package]
+
     def test_non_flip_upgrade_takes_no_force_path(self, tmp_path: Path) -> None:
         """A non-flip upgrade never engages the force path: a divergent
         user-owned entry and the already-matching managed entry both survive an

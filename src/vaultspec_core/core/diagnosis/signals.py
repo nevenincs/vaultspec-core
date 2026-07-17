@@ -92,6 +92,7 @@ class PrecommitSignal(StrEnum):
     NO_HOOKS = "no_hooks"
     INCOMPLETE = "incomplete"
     NON_CANONICAL = "non_canonical"
+    UNREFRESHABLE = "unrefreshable"
     COMPLETE = "complete"
 
 

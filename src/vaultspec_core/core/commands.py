@@ -1370,20 +1370,23 @@ def install_run(
             _scaffold_precommit(path, mode=resolved_mode)
 
         # Close the mode-flip force-gate asymmetry: when the mode flipped, the
-        # force-gated MCP pass above skipped the stale managed vaultspec-core
-        # entry. Force just that one managed entry into the new mode's launch
-        # shape so all three renderers migrate atomically in this run. Scoped to
-        # the managed vaultspec-core entry only, so user-owned entries and the
-        # foreign-entry discipline are untouched. Skipped when --force already
-        # rewrote it, when the mode did not flip (preserving today's force-gated
-        # semantics for a same-mode divergent entry), or when mcp sync is
-        # skipped outright.
+        # force-gated MCP pass above skipped every stale managed entry declared
+        # in the workspace, not just core's own. Force every declared package's
+        # managed entry into the new mode's launch shape so all three renderers
+        # migrate atomically in this run; user-owned entries and the
+        # foreign-entry discipline remain untouched. Skipped when --force
+        # already rewrote it, when the mode did not flip (preserving today's
+        # force-gated semantics for a same-mode divergent entry, now handled by
+        # the fingerprint-verified refresh path in the sync above), or when
+        # mcp sync is skipped outright.
         if mcp_mode_flipped and not force and "mcp" not in skip:
             from .mcps import mcp_sync
+            from .workspace_mode import read_package_declarations
 
+            declared_packages = frozenset(read_package_declarations(path))
             mcp_result = mcp_sync(
                 mode=resolved_mode,
-                force_managed=frozenset({"vaultspec-core"}),
+                force_managed=declared_packages or frozenset({"vaultspec-core"}),
             )
             _require_reconciliation_success(
                 mcp_result,

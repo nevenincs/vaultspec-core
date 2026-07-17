@@ -71,6 +71,7 @@ pytestmark = [pytest.mark.unit]
                 "NO_HOOKS",
                 "INCOMPLETE",
                 "NON_CANONICAL",
+                "UNREFRESHABLE",
                 "COMPLETE",
             },
         ),

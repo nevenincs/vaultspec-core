@@ -201,3 +201,156 @@ class TestCoreOnlyWorkspaceZeroChurn:
         assert not any(action == "[SKIP]" for _name, action in result.items)
         servers = _read_servers(tmp_path)
         assert set(servers) == {_CORE_PACKAGE}
+
+
+def _write_probe_definition(root: Path, *, args: list[str]) -> None:
+    """Write a plain (mode-token-free) custom MCP definition named ``probe``."""
+    mcps_dir = root / ".vaultspec" / "mcps"
+    mcps_dir.mkdir(parents=True, exist_ok=True)
+    definition = {"command": "python", "args": args}
+    (mcps_dir / "probe.json").write_text(
+        json.dumps(definition, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def _claude_target(root: Path):
+    from vaultspec_core.core.enums import McpScope, Tool
+    from vaultspec_core.core.mcps import resolve_mcp_targets
+
+    targets = resolve_mcp_targets(Tool.CLAUDE, scope=McpScope.PROJECT, target_dir=root)
+    return targets[0]
+
+
+class TestFingerprintVerifiedRefresh:
+    """Exercises the fingerprint-verified refresh path (``[REFRESH]``) and its
+    two skip-and-warn companions: hand-edited drift and a legacy name-only
+    ownership record that predates fingerprinting. Every scenario is scoped
+    to the Claude project target (``.mcp.json``) via ``provider="claude"``
+    so assertions stay focused on one file.
+    """
+
+    def test_untouched_entry_refreshes_on_plain_sync(self, tmp_path: Path) -> None:
+        """An untouched managed entry whose bytes match its recorded
+        fingerprint converges to a changed standard on a plain sync, with a
+        [REFRESH] item and a narration naming both commands."""
+        _provision(tmp_path, InstallMode.DEPENDENCY)
+        _write_probe_definition(tmp_path, args=["-m", "probe", "--old"])
+        _bind_context(tmp_path)
+        mcp_sync(provider="claude")
+
+        # The standard changes: the source definition renders a new shape,
+        # while the deployed entry is still exactly what was last written.
+        _write_probe_definition(tmp_path, args=["-m", "probe", "--new"])
+
+        result = mcp_sync(provider="claude")
+
+        servers = _read_servers(tmp_path)
+        assert servers["probe"]["args"] == ["-m", "probe", "--new"]
+        assert ("probe", "[REFRESH]") in result.items
+        assert result.updated >= 1
+        refresh_warning = next(
+            w
+            for w in result.warnings
+            if w.startswith("MCP server 'probe' launch refreshed")
+        )
+        assert "python -m probe --old" in refresh_warning
+        assert "python -m probe --new" in refresh_warning
+
+    def test_hand_edited_entry_is_skipped_with_force_hint(self, tmp_path: Path) -> None:
+        """A managed entry whose bytes no longer match its recorded
+        fingerprint is a hand edit: it is skipped, the warning names
+        --force, and the file is byte-unchanged."""
+        _provision(tmp_path, InstallMode.DEPENDENCY)
+        _write_probe_definition(tmp_path, args=["-m", "probe", "--old"])
+        _bind_context(tmp_path)
+        mcp_sync(provider="claude")
+
+        mcp_path = tmp_path / ".mcp.json"
+        raw = json.loads(mcp_path.read_text(encoding="utf-8"))
+        raw["mcpServers"]["probe"]["env"] = {"HAND_ALTERED": "1"}
+        mcp_path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+        before = mcp_path.read_text(encoding="utf-8")
+
+        result = mcp_sync(provider="claude")
+
+        after = mcp_path.read_text(encoding="utf-8")
+        assert after == before
+        assert ("probe", "[SKIP]") in result.items
+        warning = next(w for w in result.warnings if "probe" in w)
+        assert "--force" in warning
+        assert "no recorded fingerprint" not in warning
+
+    def test_name_only_legacy_record_is_skipped_with_honest_hint(
+        self, tmp_path: Path
+    ) -> None:
+        """A managed name whose ownership record predates fingerprinting
+        cannot be verified: it is skipped and the warning honestly names
+        --force as the only remediation."""
+        _provision(tmp_path, InstallMode.DEPENDENCY)
+        _write_probe_definition(tmp_path, args=["-m", "probe", "--old"])
+        _bind_context(tmp_path)
+        mcp_sync(provider="claude")
+
+        from vaultspec_core.core.mcps import (
+            _ownership_path,
+            _ownership_target_key,
+            _read_ownership,
+            _write_ownership,
+        )
+
+        target = _claude_target(tmp_path)
+        path = _ownership_path(tmp_path, target.scope)
+        state = _read_ownership(path)
+        key = _ownership_target_key(target)
+        state["targets"][key]["managed"]["probe"] = None
+        _write_ownership(path, state)
+
+        # Change the standard so the entry now differs from its definition.
+        _write_probe_definition(tmp_path, args=["-m", "probe", "--new"])
+
+        result = mcp_sync(provider="claude")
+
+        servers = _read_servers(tmp_path)
+        assert servers["probe"]["args"] == ["-m", "probe", "--old"]
+        assert ("probe", "[SKIP]") in result.items
+        warning = next(w for w in result.warnings if "probe" in w)
+        assert "--force" in warning
+        assert "no recorded fingerprint" in warning
+
+    def test_external_entry_never_touched_without_force(self, tmp_path: Path) -> None:
+        """A pre-existing entry that vaultspec never wrote (no ownership
+        record), even one sharing its name with a declared definition, is
+        never adopted or refreshed by a plain sync."""
+        _provision(tmp_path, InstallMode.DEPENDENCY)
+        _write_probe_definition(tmp_path, args=["-m", "probe", "--new"])
+        _bind_context(tmp_path)
+
+        mcp_path = tmp_path / ".mcp.json"
+        raw = json.loads(mcp_path.read_text(encoding="utf-8"))
+        raw["mcpServers"]["probe"] = {"command": "node", "args": ["server.js"]}
+        mcp_path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+        before = json.loads(mcp_path.read_text(encoding="utf-8"))["mcpServers"]["probe"]
+
+        result = mcp_sync(provider="claude")
+
+        after = json.loads(mcp_path.read_text(encoding="utf-8"))["mcpServers"]["probe"]
+        assert after == before
+        assert ("probe", "[SKIP]") in result.items
+        warning = next(w for w in result.warnings if "probe" in w)
+        assert "externally managed" in warning
+        assert "--force" in warning
+
+    def test_refresh_then_resync_is_idempotent(self, tmp_path: Path) -> None:
+        """Running sync a second time after a refresh reports unchanged."""
+        _provision(tmp_path, InstallMode.DEPENDENCY)
+        _write_probe_definition(tmp_path, args=["-m", "probe", "--old"])
+        _bind_context(tmp_path)
+        mcp_sync(provider="claude")
+        _write_probe_definition(tmp_path, args=["-m", "probe", "--new"])
+        mcp_sync(provider="claude")
+
+        result = mcp_sync(provider="claude")
+
+        assert ("probe", "[UNCHANGED]") in result.items
+        assert result.updated == 0
+        assert result.added == 0

@@ -659,8 +659,13 @@ def collect_gitattributes_state(target: Path) -> GitattributesSignal:
 def collect_precommit_state(target: Path) -> PrecommitSignal:
     """Assess the state of vaultspec-core hooks in ``.pre-commit-config.yaml``.
 
-    Checks that all canonical hooks are present and use the canonical
-    entry pattern (``uv run --no-sync vaultspec-core ...``).
+    Checks that all canonical hooks are present and use the canonical entry
+    pattern (``uv run --no-sync vaultspec-core ...``). When ``prek.toml`` is
+    present the hook scaffold never runs, so a stale or incomplete YAML hook
+    set cannot be refreshed automatically; that state is reported as
+    :attr:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal.UNREFRESHABLE`
+    so the operator learns the remediation is a manual transplant into
+    ``prek.toml``, not another install run.
 
     Args:
         target: Workspace root directory.
@@ -669,6 +674,14 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
         :class:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal`
         reflecting the observed state.
     """
+    signal = _collect_precommit_yaml_state(target)
+    if signal is not PrecommitSignal.COMPLETE and (target / "prek.toml").exists():
+        return PrecommitSignal.UNREFRESHABLE
+    return signal
+
+
+def _collect_precommit_yaml_state(target: Path) -> PrecommitSignal:
+    """Assess ``.pre-commit-config.yaml`` hook state, ignoring ``prek.toml``."""
     import yaml
 
     from ..commands import CANONICAL_HOOK_IDS, canonical_hook_entries_for_mode
@@ -1076,3 +1089,43 @@ def observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode |
         entry is shaped for, or ``None`` when unobservable.
     """
     return _observed_mcp_mode(target, package)
+
+
+def collect_stale_seed_definitions(target: Path) -> list[str]:
+    """Return package-bundled MCP seed definitions still in a static shape.
+
+    A ``.builtin.json`` definition under ``.vaultspec/mcps/`` is seeded by its
+    owning package's installer and, since the mode-aware provisioning model,
+    always carries the mode-neutral launch tokens. A builtin seed whose
+    ``command`` is a concrete string instead of the token predates that model:
+    it bypasses the launch renderer entirely, so no core-side sync or upgrade
+    can converge it - only re-running the owning package's installer refreshes
+    the seed. The doctor surfaces these so the stale state is visible where
+    operators look, rather than only in installer logs.
+
+    Custom user definitions (plain ``.json``) are the user's own content and
+    are never reported here.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        Sorted server names of stale package-bundled seed definitions; empty
+        when every builtin seed is mode-neutral or none exist.
+    """
+    from ..mcps import _MODE_COMMAND_TOKEN, _server_name
+
+    mcps_dir = target / ".vaultspec" / "mcps"
+    if not mcps_dir.exists():
+        return []
+
+    stale: list[str] = []
+    for path in sorted(mcps_dir.glob("*.builtin.json")):
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Cannot read MCP seed definition %s: %s", path, exc)
+            continue
+        if isinstance(raw, dict) and raw.get("command") != _MODE_COMMAND_TOKEN:
+            stale.append(_server_name(path.name))
+    return sorted(stale)
