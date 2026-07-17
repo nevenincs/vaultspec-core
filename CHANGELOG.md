@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.48](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.47...vaultspec-core-v0.1.48) (2026-07-17)
+
+
+### Features
+
+* **install:** managed launch artifacts converge automatically on upgrade and sync ([#227](https://github.com/nevenincs/vaultspec-core/issues/227)) ([34fc142](https://github.com/nevenincs/vaultspec-core/commit/34fc14205d11fad927f3ca062fba0b9ff0cf955d))
+
 ## [0.1.47](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.46...vaultspec-core-v0.1.47) (2026-07-17)
 
 
