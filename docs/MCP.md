@@ -756,6 +756,32 @@ denylist covers:
   `spec mcps list` and `spec mcps status` stay available)
 - `vault feature index` - index documents stay uncreatable through the MCP surface
 
+## Server lifetime
+
+The server's lifetime is its client connection. It exits when stdin reaches EOF, and a
+lifetime watchdog backstops the cases where EOF never arrives - on Windows, a client
+that restarts or dies can leave the server's stdin pipe held open by inherited handles,
+which would otherwise leave orphaned server processes running indefinitely.
+
+The watchdog anchors shutdown to the client process itself. On Windows it identifies the
+process that created the server's stdin pipe and exits the moment that process
+terminates; when stdin is not a client-created pipe (a console launch, for example) it
+watches the server's ancestor process chain instead, ignoring short-lived launcher
+processes. On other platforms a coarse poll exits the server if it is ever orphaned.
+When the watchdog fires, one JSON event line (`"event": "stdio_watchdog_exit"`) is
+written to stderr before the server exits cleanly.
+
+Two knobs control it:
+
+- `VAULTSPEC_STDIO_WATCHDOG` - set to `0`, `false`, `off`, or `no` to disable the
+  watchdog entirely; the server then exits only on stdin EOF.
+- `--parent-pid <PID>` - names an explicit client process to watch in addition to the
+  detected one. Useful for hosts that spawn the server through wrappers the detection
+  cannot see through.
+
+A watchdog that cannot start never prevents the server from serving; every failure falls
+back to plain EOF-only behavior.
+
 ## Logging
 
 All server logs go to stderr. Stdout is reserved exclusively for the JSON-RPC protocol

@@ -663,4 +663,6 @@ name. | | `VAULTSPEC_CLAUDE_DIR` | str | `.claude` | Claude tool directory name.
 `VAULTSPEC_IO_BUFFER_SIZE` | int | `8192` | I/O read buffer size in bytes. | |
 `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int | `1000000` | Subprocess stdout capture limit. |
 | `VAULTSPEC_LOG_LEVEL` | str | `INFO` | Root log level for the CLI. | |
-`VAULTSPEC_EDITOR` | str | `zed -w` | Editor command for resource editing. |
+`VAULTSPEC_EDITOR` | str | `zed -w` | Editor command for resource editing. | |
+`VAULTSPEC_STDIO_WATCHDOG` | str | on | MCP server lifetime watchdog;
+`0`/`false`/`off`/`no` disables it (EOF-only exit). |

@@ -45,7 +45,7 @@ hand-edit between the markers.
 
 ### Top-level commands
 
-- `vaultspec-core install` - Deploy the vaultspec framework to the target directory.
+- `vaultspec-core install` - Install Vaultspec resources for the selected providers.
 - `vaultspec-core uninstall` - Remove the vaultspec framework from the target directory.
 - `vaultspec-core sync` - Sync rules, skills, agents, configs, system prompts, and MCPs.
 - `vaultspec-core doctor` - Diagnose overall workspace and vault health.
@@ -258,12 +258,14 @@ hand-edit between the markers.
 
 #### Mcps
 
-- `vaultspec-core spec mcps list` - List all registered MCP server definitions.
-- `vaultspec-core spec mcps status` - Report focused MCP definition and .mcp.json sync
-  status.
-- `vaultspec-core spec mcps add` - Add a new custom MCP server definition.
-- `vaultspec-core spec mcps remove` - Remove an MCP server definition.
-- `vaultspec-core spec mcps sync` - Sync only MCP definitions to .mcp.json.
+- `vaultspec-core spec mcps list` - List canonical MCP server definitions.
+- `vaultspec-core spec mcps status` - Inspect provider-native MCP enrollment status.
+- `vaultspec-core spec mcps add` - Add or replace a canonical MCP server definition.
+- `vaultspec-core spec mcps remove` - Remove a canonical MCP server definition.
+- `vaultspec-core spec mcps sync` - Reconcile canonical definitions into provider-native
+  enrollment.
+- `vaultspec-core spec mcps uninstall` - Remove Vaultspec-owned provider-native MCP
+  enrollment.
 
 #### Reference
 
@@ -606,15 +608,24 @@ enabled hooks; it takes `--path PATH`. Valid events: `vault.document.created`,
 
 ### vaultspec-core spec mcps
 
-Signature: `vaultspec-core spec mcps [OPTIONS] COMMAND [ARGS]...`. Manage MCP server
-definitions and synced `.mcp.json` entries.
+Signature: `vaultspec-core spec mcps [OPTIONS] COMMAND [ARGS]...`. Manage canonical
+definitions in `.vaultspec/mcps/*.json` and reconcile them into provider-native
+enrollment. Providers are `all`, `claude`, `antigravity`, and `codex`; scopes are
+`project`, `local`, and `user`. Unsupported provider/scope combinations fail.
 
-| Subcommand | Signature | Description | | ---------- |
---------------------------------------- | ----------------------------- | | `list` | - |
-List MCP server definitions. | | `status` | `[--json]` | Validate against `.mcp.json`. |
-| `add` | `--name NAME [--config JSON] [--force]` | Add a custom MCP definition. | |
-`remove` | `NAME [--force]` | Remove an MCP definition. | | `sync` |
-`[--dry-run] [--force]` | Sync definitions to config. |
+| Subcommand  | Signature                                                                             | Description                                                         |
+| ----------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `list`      | -                                                                                     | List canonical MCP server definitions.                              |
+| `status`    | `[PROVIDER] [--scope SCOPE] [--json] [--target PATH]`                                 | Inspect configuration and ownership state; does not probe runtimes. |
+| `add`       | `--name NAME [--config JSON] [--force]`                                               | Add or replace a canonical definition.                              |
+| `remove`    | `NAME [--force]`                                                                      | Remove a canonical definition.                                      |
+| `sync`      | `[PROVIDER] [--scope SCOPE] [--dry-run] [--force] [--prune] [--json] [--target PATH]` | Reconcile canonical definitions into native enrollment.             |
+| `uninstall` | `[PROVIDER] [--scope SCOPE] [--dry-run] [--force] [--json] [--target PATH]`           | Remove only Vaultspec-owned native enrollment.                      |
+
+The default provider is `all` and the default scope is `project`. `sync --force` adopts
+or replaces a same-name external entry; `sync --prune` removes owned enrollment whose
+canonical source was deleted. `uninstall` preserves canonical definitions and external
+host entries.
 
 ## Migration commands
 
@@ -652,4 +663,5 @@ name. | | `VAULTSPEC_CLAUDE_DIR` | str | `.claude` | Claude tool directory name.
 `VAULTSPEC_IO_BUFFER_SIZE` | int | `8192` | I/O read buffer size in bytes. | |
 `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int | `1000000` | Subprocess stdout capture limit. |
 | `VAULTSPEC_LOG_LEVEL` | str | `INFO` | Root log level for the CLI. | |
-`VAULTSPEC_EDITOR` | str | `zed -w` | Editor command for resource editing. |
+`VAULTSPEC_EDITOR` | str | `zed -w` | Editor command for resource editing. | |
+`VAULTSPEC_STDIO_WATCHDOG` | str | on | MCP server lifetime watchdog; `0`/`false`/`off`/`no` disables it (EOF-only exit). |
