@@ -81,6 +81,28 @@ If the client dies and its PID recycles between resolution and
 the decision's accepted residual; the window is microseconds at server
 spawn, when the client is by definition alive.
 
+### parity-dedup-handle-leak | medium | Deduped fallback ancestors leaked their opened handles
+
+In the 2026-07-17 parity revision, when an explicit parent override was
+also a discovered ancestor and the fallback engaged, the duplicate's
+freshly opened `SYNCHRONIZE` handle was dropped without `CloseHandle` -
+the sibling implementation dedups inside the walk and closes duplicates.
+RESOLVED: duplicates are now closed at the dedup site.
+
+### parity-thread-start-leak | low | Thread-start failure left opened handles behind
+
+An arming-thread start failure failed open correctly but unwound past the
+watched handle set without closing it. RESOLVED: the start is wrapped and
+every handle closes before the fail-open guard absorbs the error.
+
+### parity-kill-switch-test-nit | low | Kill-switch test asserted an environment-incidental resolver result
+
+The in-process kill-switch test asserted the resolver's `None` under
+the disabled env, which the switch does not govern; under a harness that
+pipes stdin into the test runner it could flake. RESOLVED: the assertion
+was dropped; the switch is proven by the disable predicate and the arming
+refusal.
+
 ## Recommendations
 
 - Ship after the resolved findings above; verdict PASS-with-notes, no
