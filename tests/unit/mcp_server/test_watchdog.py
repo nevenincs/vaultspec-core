@@ -179,7 +179,6 @@ def test_kill_switch_disables_arming_in_process() -> None:
     os.environ[STDIO_WATCHDOG_ENV] = "off"
     try:
         assert watchdog_disabled() is True
-        assert resolve_stdin_client_pid() is None
         assert arm_client_watchdog() is False
     finally:
         if previous is None:

@@ -473,7 +473,14 @@ def arm_client_watchdog(
             if not client_watched:
                 fallback = _open_ancestor_chain()
                 known = {w.pid for w in watched}
-                watched.extend(w for w in fallback if w.pid not in known)
+                for target in fallback:
+                    if target.pid in known:
+                        # Already watched (an explicit override on the
+                        # chain); drop the duplicate without leaking its
+                        # freshly opened handle.
+                        _kernel32.CloseHandle(target.handle)
+                    else:
+                        watched.append(target)
             if not watched:
                 logger.debug(
                     "watchdog: no watchable targets; "
@@ -486,7 +493,12 @@ def arm_client_watchdog(
                 name="mcp-client-watchdog",
                 daemon=True,
             )
-            thread.start()
+            try:
+                thread.start()
+            except Exception:
+                for target in watched:
+                    _kernel32.CloseHandle(target.handle)
+                raise
             logger.debug(
                 "watchdog: armed on %s",
                 ", ".join(f"{w.pid}({w.exe})" for w in watched),
