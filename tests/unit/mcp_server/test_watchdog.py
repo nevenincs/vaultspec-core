@@ -384,6 +384,7 @@ def test_real_server_exits_when_client_dies_despite_leaked_pipe(
         time.sleep(3600)
         """
     )
+    sleeper_pid = 0
     client = subprocess.Popen(
         [sys.executable, "-c", client_code],
         stdout=subprocess.PIPE,
@@ -404,18 +405,19 @@ def test_real_server_exits_when_client_dies_despite_leaked_pipe(
         client.kill()
         client.wait(timeout=60)
 
-        try:
-            assert _wait_for_pid_exit(server_pid, timeout=30), (
-                "server survived its client; watchdog did not fire"
-            )
-        finally:
+        assert _wait_for_pid_exit(server_pid, timeout=30), (
+            "server survived its client; watchdog did not fire"
+        )
+    finally:
+        if client.poll() is None:
+            client.kill()
+        # The sleeper is reaped on every exit path, including a failed
+        # serving assertion, so no failure mode leaks the 120s holder.
+        if sleeper_pid:
             subprocess.run(
                 ["taskkill", "/PID", str(sleeper_pid), "/F"],
                 capture_output=True,
             )
-    finally:
-        if client.poll() is None:
-            client.kill()
 
 
 def test_dead_parent_pid_override_emits_exit_event() -> None:

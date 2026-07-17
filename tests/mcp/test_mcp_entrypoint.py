@@ -140,11 +140,14 @@ def test_mcp_entrypoint_exits_cleanly_on_stdin_eof_while_serving(
     env = os.environ.copy()
     env["VAULTSPEC_TARGET_DIR"] = str(tmp_path)
 
+    # stderr is discarded rather than piped: the test blocks on stdout
+    # mid-handshake, and an undrained stderr pipe filling its buffer would
+    # deadlock the server's logging against this read.
     proc = subprocess.Popen(
         [sys.executable, "-c", "from vaultspec_core.mcp_server.app import run; run()"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
         env=env,
     )
     try:
@@ -163,7 +166,7 @@ def test_mcp_entrypoint_exits_cleanly_on_stdin_eof_while_serving(
             "MCP stdio server did not exit on stdin EOF within 20s; "
             "possible busy-loop or hang (#137)."
         )
-    assert returncode == 0, proc.stderr.read().decode("utf-8", errors="replace")
+    assert returncode == 0
 
 
 @pytest.mark.integration
