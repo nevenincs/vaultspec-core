@@ -14,6 +14,7 @@ related:
   - '[[2026-07-17-mcp-testing-S03]]'
   - '[[2026-07-17-mcp-testing-S04]]'
   - '[[2026-07-17-mcp-testing-S05]]'
+  - '[[2026-07-17-mcp-testing-audit]]'
   - '[[2026-07-17-mcp-testing-plan]]'
   - '[[2026-07-17-mcp-testing-research]]'
 ---
@@ -27,6 +28,10 @@ Auto-generated index of all documents tagged with `#mcp-testing`.
 ### adr
 
 - `2026-02-22-mcp-testing-adr` - `mcp-testing` adr: `add in-memory client session tests` | (**status:** `accepted`)
+
+### audit
+
+- `2026-07-17-mcp-testing-audit` - `mcp-testing` audit: `functional assertion floor review`
 
 ### exec
 
