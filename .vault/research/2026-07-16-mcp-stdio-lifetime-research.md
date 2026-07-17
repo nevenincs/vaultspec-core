@@ -78,6 +78,51 @@ vaultspec-rag's `vaultspec-search-mcp` stdio entrypoint shows identical
 behavior per issue 220; the same mechanism applies. Not investigated: HTTP/SSE
 transports (not used by either package's stdio registration).
 
+### Cross-repo parity delta (added 2026-07-17, post-merge)
+
+Both fixes are merged: core's client-PID watchdog
+(`src/vaultspec_core/mcp_server/watchdog.py`) and vaultspec-rag's
+ancestor-chain watchdog (rag `src/vaultspec_rag/server/_stdio_lifetime.py`,
+rag main `6ee6f8f`). Comparing the two, rag carries robustness features core
+lacks:
+
+- **Operator kill switch**: `VAULTSPEC_RAG_STDIO_WATCHDOG=0|false|off|no`
+  disables the watchdog; core has no disable path. Core's env convention is
+  bare `VAULTSPEC_*` (per the CLI reference env table), so the parity name
+  is `VAULTSPEC_STDIO_WATCHDOG`.
+- **Explicit client override**: rag accepts `--parent-pid` on the shim
+  entrypoint, watched ahead of discovery; core's `client_pid` parameter is
+  reachable only in code.
+- **Coverage when stdin is not a client pipe**: rag's ancestor-chain
+  discovery works for any launch shape; core fails open entirely when pipe
+  resolution declines (console-less or exotic launches get no backstop).
+  Rag's chain walk is PID-reuse safe (handles taken at startup plus
+  creation-time monotonicity) and prunes transient spawn helpers with a 10s
+  grace window; the trade-off is semantic bluntness - any ancestor's death
+  (including a terminal above the client) fires it.
+- **POSIX backstop**: rag runs a coarse reparent poll (15s) plus explicit
+  parent liveness; core is a strict POSIX no-op on the grounds that EOF
+  delivery is reliable there.
+- **Structured exit telemetry**: rag emits one JSON event line to stderr
+  (`stdio_watchdog_exit` with the dead ancestor pid/exe) before
+  `os._exit(0)`; core logs a plain warning line.
+- **Documentation**: rag documents the watchdog contract and its knobs in
+  its configuration and MCP docs; core's watchdog is undocumented.
+
+Where core is ahead: the pipe-creator anchor identifies the exact client
+regardless of wrapper depth (rag fires on above-client ancestor deaths too)
+and needs no grace heuristics on the primary path; the ctypes prototypes
+are fully declared on both sides.
+
+### Board sweep (2026-07-17)
+
+Open issues: core `#215`, `#213`, `#205` - all covered by open PRs 216-218
+awaiting review, none watchdog-scoped (`#215` is MCP-adjacent gitignore
+hygiene). vaultspec-rag has zero open issues (`rag#184` closed 2026-07-16).
+No board item requires handling inside this parity sweep; the rag-side
+parity recommendation (adopting a pipe-creator primary anchor) has no home
+yet and would need a new rag issue.
+
 ## Sources
 
 - https://github.com/nevenincs/vaultspec-core/issues/220
@@ -86,3 +131,6 @@ transports (not used by either package's stdio registration).
 - `pyproject.toml:20`
 - https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-getnamedpipeserverprocessid
 - Live process audit and EOF experiment, reporting host, 2026-07-17 (transient; not re-fetchable)
+- vaultspec-rag `src/vaultspec_rag/server/_stdio_lifetime.py` and `server/_main.py` at rag main `6ee6f8f`
+- https://github.com/nevenincs/vaultspec-rag/pull/228
+- `src/vaultspec_core/builtins/reference/cli.md:657` (env-var naming convention)
