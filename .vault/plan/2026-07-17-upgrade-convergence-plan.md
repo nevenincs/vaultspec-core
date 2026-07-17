@@ -18,7 +18,7 @@ related:
 
 Open the tracking PR and land the fingerprint-verified refresh path in the managed-entry merge with its narrated per-entry messaging, plus the widened companion seam.
 
-- [ ] `P01.S01` - Open feature branch and draft PR referencing the convergence mandate and the governing decision; `repo workflow`.
+- [x] `P01.S01` - Open feature branch and draft PR referencing the convergence mandate and the governing decision; `repo workflow`.
 - [ ] `P01.S02` - Add fingerprint-verified refresh to the managed-entry merge with old-to-new narrated warning lines and a refresh item label; `src/vaultspec_core/core/mcps.py`.
 - [ ] `P01.S03` - Widen the upgrade mode-flip force seam from core-only to every package declared in the workspace map; `src/vaultspec_core/core/commands.py`.
 - [ ] `P01.S04` - Cover untouched-entry refresh, hand-edited preservation, name-only legacy sidecar, and companion seam with real-workspace tests; `src/vaultspec_core/tests/cli`.
