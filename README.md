@@ -260,6 +260,16 @@ and code by meaning; and
 [vaultspec-dashboard](https://github.com/nevenincs/vaultspec-dashboard) is the visual
 workspace that aggregates those views.
 
+## Release pipeline
+
+Releases follow [release-please](https://github.com/googleapis/release-please): merging
+conventional commits (`feat:`, `fix:`, `feat!:`) to `main` keeps an open Release PR with
+the next version and changelog in sync. Merging that PR creates a GitHub Release and
+tag, which triggers `release-please.yml` to dispatch the `publish.yml` workflow for that
+tag. `publish.yml` builds the package, runs smoke tests against the built wheel and
+sdist, and publishes to PyPI over OIDC trusted publishing - no long-lived PyPI token is
+stored in the repo.
+
 ## Status, help, and license
 
 vaultspec-core is actively developed. The version badge shows the current release. File

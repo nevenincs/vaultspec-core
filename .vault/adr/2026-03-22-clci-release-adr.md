@@ -88,10 +88,14 @@ so a dedicated binary is cleaner than subcommand routing.
   Creates/updates the Release PR. When the Release PR merges,
   release-please creates a GitHub Release with a git tag.
 - `publish.yml` (replace existing) - triggers on
-  `on: release: types: [published]`. Builds, smoke tests, and publishes to
-  PyPI. Completely decoupled from release-please - it just reacts to the
-  GitHub Release event. This means CI has already passed on the Release PR
-  before it could be merged.
+  `workflow_dispatch` with a required `tag` input. `release-please.yml`
+  dispatches it explicitly via `gh api .../actions/workflows/publish.yml/dispatches`
+  once release-please reports `release_created`, using a job-level
+  `permissions: actions: write` grant to make the dispatch call. Builds,
+  smoke tests, and publishes to PyPI. Still decoupled from the release
+  itself - it is dispatched, not triggered by the GitHub Release event -
+  and only fires after release-please has created the tag, so CI has
+  already passed on the Release PR before it could be merged.
 
 **Version management (release-please):**
 
