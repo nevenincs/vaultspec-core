@@ -24,21 +24,18 @@
 <img src="docs/assets/demo.gif" alt="vaultspec pipeline demo - provisioning a project, scaffolding research, ADR, and plan, then checking and graphing the vault" width="880" />
 </p>
 
-Vaultspec guides agents through a `Research → Decide (ADRs) → Plan → Execute → Verify`
-pipeline, similar in spirit to spec-driven frameworks like Superpowers - with one
-difference: nothing is throwaway. All work leaves a papertrail in the project's
-`.vault`. Documents are bound together by feature tags and wiki-link references.
-Together, they represent the project's decision and execution history - a second brain
-your agents read before they write.
+Vaultspec guides agents through a `Research → Decide → Plan → Execute → Verify` pipeline
+(the Decide stage produces an Architecture Decision Record, or ADR, for each choice),
+similar in spirit to spec-driven frameworks like Superpowers, with one difference:
+nothing is throwaway. All work leaves a papertrail in the project's `.vault`. Documents
+are bound together by feature tags and wiki-link references, together representing the
+project's decision and execution history - a second brain your agents read before they
+write.
 
 We hold ourselves to it, too: vaultspec-core is developed with vaultspec. Its own
-`.vault` currently holds 900+ CLI-scaffolded documents across 100+ features, and every
-terminal render on this page is real output - the stills against that live vault, the
-demo above against a scratch project:
-
-<p align="center">
-<img src="docs/assets/term-status.svg" alt="vaultspec-core status - live output from this repository's own vault" width="880" />
-</p>
+`.vault` currently holds 900+ CLI-scaffolded documents across 100+ features. Every
+terminal render on this page is real output: the stills are captured against that live
+vault, and the pipeline demo above runs against a scratch project.
 
 ## What is included?
 
@@ -51,7 +48,11 @@ machinery that enforces it:
   taxonomy, wiki-link resolution, and plan structure are enforced, never hand-written.
 - **Structured plans** that scale with the work: four complexity tiers (`L1`-`L4`) with
   waves, phases, and steps under stable canonical identifiers.
-- **An MCP server** for Model Context Protocol clients.
+- **A Model Context Protocol (MCP) server** for MCP-capable clients.
+
+<p align="center">
+<img src="docs/assets/term-status.svg" alt="vaultspec-core status - live output from this repository's own vault" width="880" />
+</p>
 
 See the [framework manual](./docs/framework.md) for the full tour.
 
@@ -96,14 +97,14 @@ See the [CLI reference](./docs/CLI.md) for installation options.
 
 Install picks a mode for how the pre-commit hooks and the MCP server launch. Tool mode
 is the default and runs vaultspec-core through `uvx`, so it never enters your project's
-dependency set; dependency mode runs it through `uv run` and is selected automatically
-when your `pyproject.toml` lists vaultspec-core; dev mode is for placement in the
-default `dev` dependency group, rendering like dependency mode but not shipping in your
-built distributions. Pin any with `install --mode tool`, `install --mode dependency`, or
-`install --mode dev`. The choice is recorded per package in a committed
-`workspace.json`, so a workspace running vaultspec-core alongside a companion package
-can declare each in its own mode. An existing workspace has its mode inferred and
-recorded the next time you run `install --upgrade`.
+dependency set. Dependency mode runs it through `uv run` and is selected automatically
+when your `pyproject.toml` lists vaultspec-core. Dev mode also runs through `uv run`,
+but places vaultspec-core in the default `dev` dependency group instead, so it doesn't
+ship in your built distributions. Pin any with `install --mode tool`,
+`install --mode dependency`, or `install --mode dev`. The choice is recorded per package
+in a committed `workspace.json`, so a workspace running vaultspec-core alongside a
+companion package can declare each in its own mode. An existing workspace has its mode
+inferred and recorded the next time you run `install --upgrade`.
 
 ### 3. Sync
 
@@ -130,7 +131,7 @@ The pipeline breaks down into these steps:
 `[R] Research  →  [D] Decide (ADRs)  →  [P] Plan  →  [E] Execute  →  [V] Verify`.
 Research has a parallel entry point - Reference (`/vaultspec-code-research`) - that
 grounds the work in existing source code; a feature starts from either, or both. Each
-step ships with its skills, agents and CLI verbs.
+step ships with its skills, agents, and CLI verbs.
 
 To start using the framework describe the work you want done in natural language:
 
