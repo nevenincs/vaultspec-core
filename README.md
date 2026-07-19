@@ -4,8 +4,7 @@
 
 # vaultspec-core
 
-**The governed development harness for coding agents and the humans who review their
-work.**
+**The agent harness: the pipeline, the vault, and the CLI that drives them.**
 
 [![build](https://img.shields.io/github/actions/workflow/status/nevenincs/vaultspec-core/ci.yml?branch=main&style=for-the-badge&label=build&logo=githubactions&logoColor=white&labelColor=1b1a16)](https://github.com/nevenincs/vaultspec-core/actions/workflows/ci.yml)
 [![release](https://img.shields.io/pypi/v/vaultspec-core?style=for-the-badge&label=release&logo=pypi&logoColor=white&labelColor=1b1a16&color=8A72B5)](https://pypi.org/project/vaultspec-core/)
@@ -244,6 +243,15 @@ operations. The launch command in `.mcp.json` follows the install mode - `uvx` i
 mode, `uv run` in dependency mode. See the [MCP reference](./docs/MCP.md) for setup and
 the tool catalog.
 
+## The vaultspec family
+
+| Project                                                                 | Role                                                                      | Maturity |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------- | -------- |
+| vaultspec-core                                                          | The agent harness: the pipeline, the vault, and the CLI that drives them. | Beta     |
+| [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag)             | The semantic search component for vault and code.                         | Beta     |
+| [vaultspec-dashboard](https://github.com/nevenincs/vaultspec-dashboard) | The application that runs it all as a UI.                                 | Beta     |
+| [vaultspec-a2a](https://github.com/nevenincs/vaultspec-a2a)             | Headless agent-to-agent orchestration.                                    | Beta     |
+
 ## Learn more
 
 | Guide                                   | What it covers                                              |
@@ -251,14 +259,6 @@ the tool catalog.
 | [Framework manual](./docs/framework.md) | The development workflow, skills, agents, and customization |
 | [CLI reference](./docs/CLI.md)          | Every command, flag, and option for vaultspec-core          |
 | [MCP reference](./docs/MCP.md)          | The MCP server tools, setup, and configuration              |
-
-## The vaultspec family
-
-The family has three focused responsibilities: vaultspec-core governs the workflow and
-vault; [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) retrieves decisions
-and code by meaning; and
-[vaultspec-dashboard](https://github.com/nevenincs/vaultspec-dashboard) is the visual
-workspace that aggregates those views.
 
 ## Release pipeline
 
@@ -272,8 +272,8 @@ stored in the repo.
 
 ## Status, help, and license
 
-vaultspec-core is actively developed. The version badge shows the current release. File
-bugs and questions on the
+vaultspec-core is in Beta and actively developed. The version badge shows the current
+release. File bugs and questions on the
 [issue tracker](https://github.com/nevenincs/vaultspec-core/issues). Bug reports,
 feature ideas, and pull requests are welcome. vaultspec-core is released under the
 [MIT License](./LICENSE).
