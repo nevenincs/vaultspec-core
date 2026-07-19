@@ -18,7 +18,9 @@ concurrency:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    # Artifact builds run on the shared self-hosted fleet (hosted
+    # multiplatform runners are cost-prohibitive); lint/test CI stays hosted.
+    runs-on: [self-hosted, Linux, X64]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -52,7 +54,7 @@ jobs:
   smoke-test:
     name: Smoke Test
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -80,7 +82,9 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     needs: smoke-test
-    runs-on: ubuntu-latest
+    # OIDC trusted publishing works from self-hosted runners: the id-token
+    # comes from GitHub's OIDC provider, not from the runner host.
+    runs-on: [self-hosted, Linux, X64]
     environment:
       name: pypi
     permissions:
