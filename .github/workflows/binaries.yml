@@ -81,6 +81,13 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Check out main so the scoop-bump step can rewrite and commit the
+      # in-repo bucket manifest after the assets are attached.
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
       - name: Download binaries
         uses: actions/download-artifact@v8
         with:
@@ -109,3 +116,49 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag }}
         run: gh release upload "${TAG}" dist-bin/* --clobber
+
+      # Bump the committed scoop manifest to the released version, reading the
+      # Windows hashes straight from the SHA256SUMS just built (scoop's
+      # checkver/autoupdate stanzas only serve maintainer tooling; `scoop
+      # install` reads the committed url/hash). Mirrors the dashboard repo's
+      # scoop-bump idiom, including the backward-bump guard.
+      - name: Bump scoop manifest
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          MANIFEST="bucket/vaultspec-core.json"
+          VERSION="${TAG#vaultspec-core-v}"
+          CORE_ASSET="vaultspec-core-x86_64-pc-windows-msvc.exe"
+          MCP_ASSET="vaultspec-mcp-x86_64-pc-windows-msvc.exe"
+          H_CORE=$(awk -v a="$CORE_ASSET" '$2==a{print $1}' dist-bin/SHA256SUMS)
+          H_MCP=$(awk -v a="$MCP_ASSET" '$2==a{print $1}' dist-bin/SHA256SUMS)
+          test -n "$VERSION" && test -n "$H_CORE" && test -n "$H_MCP"
+          # Refuse to bump the manifest to a version older than what is already
+          # committed (guards against a stale re-run clobbering a newer bump).
+          CURRENT=$(jq -r '.version' "$MANIFEST")
+          if [ "$CURRENT" != "0.0.0" ] && [ "$CURRENT" != "$VERSION" ] && \
+             [ "$(printf '%s\n' "$CURRENT" "$VERSION" | sort -V | tail -1)" = "$CURRENT" ]; then
+            echo "manifest is at ${CURRENT}, refusing to bump backward to ${VERSION}"
+            exit 1
+          fi
+          BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          jq \
+            --arg v "$VERSION" \
+            --arg uc "${BASE}/${CORE_ASSET}" \
+            --arg um "${BASE}/${MCP_ASSET}" \
+            --arg hc "$H_CORE" \
+            --arg hm "$H_MCP" \
+            '.version = $v | .url = [$uc, $um] | .hash = [$hc, $hm]' \
+            "$MANIFEST" > "${MANIFEST}.tmp"
+          mv "${MANIFEST}.tmp" "$MANIFEST"
+          if git diff --quiet -- "$MANIFEST"; then
+            echo "manifest already at ${VERSION}; nothing to bump"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$MANIFEST"
+          git commit -m "chore(scoop): bump manifest to ${TAG}"
+          git push origin main
