@@ -45,6 +45,11 @@ script. On Windows, MCP clients lock the console-script executable in `.venv/Scr
 which blocks `uv sync` and other package operations while the client is connected.
 Module invocation avoids the lock.
 
+> The module path above is the canonical invocation for this reason. The `vaultspec-mcp`
+> console script itself remains core-owned; other packages in the Vaultspec family name
+> their own console scripts distinctly (for example, vaultspec-a2a's is
+> `vaultspec-a2a-mcp`) rather than colliding with it.
+
 ### Install modes
 
 The canonical definition records the Vaultspec package and module. Vaultspec renders the
