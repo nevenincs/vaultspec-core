@@ -20,7 +20,7 @@ from vaultspec_core.core.diagnosis.signals import (
     ResolutionAction,
 )
 from vaultspec_core.core.enums import CliAction, Tool
-from vaultspec_core.core.resolver import ResolutionPlan, resolve
+from vaultspec_core.core.resolver import ResolutionPlan, _resolve_precommit, resolve
 
 pytestmark = [pytest.mark.unit]
 
@@ -374,6 +374,28 @@ class TestGitignoreRules:
             s for s in plan.steps if s.action == ResolutionAction.REPAIR_GITIGNORE
         ]
         assert gitignore_steps == []
+
+
+# ---------------------------------------------------------------------------
+# Pre-commit rules
+# ---------------------------------------------------------------------------
+
+
+class TestPrecommitRules:
+    def test_repeated_sync_ignores_unrefreshable_prek_boundary(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level("WARNING", logger="vaultspec_core.core.resolver")
+
+        for _ in range(2):
+            _resolve_precommit(
+                ResolutionPlan(),
+                PrecommitSignal.UNREFRESHABLE,
+                CliAction.SYNC,
+                force=False,
+            )
+
+        assert "Unknown PrecommitSignal member" not in caplog.text
 
 
 # ---------------------------------------------------------------------------

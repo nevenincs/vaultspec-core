@@ -855,6 +855,12 @@ def _resolve_precommit(
             )
         return
 
+    if signal == PrecommitSignal.UNREFRESHABLE:
+        # ``prek.toml`` owns this boundary, so sync cannot repair the stale
+        # YAML hooks. The doctor surface already renders the actionable
+        # advisory; resolution must leave the workspace unchanged.
+        return
+
     logger.warning("Unknown PrecommitSignal member: %s (action=%s)", signal, action)
 
 
