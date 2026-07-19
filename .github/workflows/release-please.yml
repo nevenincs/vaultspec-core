@@ -66,3 +66,24 @@ jobs:
             -f "ref=${TAG}" \
             -f "inputs[tag]=${TAG}"
           echo "Dispatched publish.yml for ${TAG}" >> "$GITHUB_STEP_SUMMARY"
+
+      # Standalone binaries bootstrap by installing the package from PyPI on
+      # first run, so this is dispatched alongside publish.yml (not gated on it)
+      # - the release must reach PyPI before end users launch a binary, which
+      # the paired publish dispatch handles.
+      - name: Dispatch binaries build workflow
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: |
+          if [ -z "${TAG}" ]; then
+            echo "::error::release-please reported release_created=true but tag_name output is empty"
+            exit 1
+          fi
+          echo "Dispatching binaries.yml for tag: ${TAG}"
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/binaries.yml/dispatches" \
+            -f "ref=${TAG}" \
+            -f "inputs[tag]=${TAG}"
+          echo "Dispatched binaries.yml for ${TAG}" >> "$GITHUB_STEP_SUMMARY"

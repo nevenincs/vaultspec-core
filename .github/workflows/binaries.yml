@@ -1,0 +1,111 @@
+name: Binaries
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build binaries for (e.g. vaultspec-core-v0.1.48)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: binaries-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            runner: [self-hosted, Linux, X64]
+            target: x86_64-unknown-linux-gnu
+          - name: windows-x86_64
+            runner: [self-hosted, Windows, X64]
+            target: x86_64-pc-windows-msvc
+          - name: macos-aarch64
+            runner: [self-hosted, macOS, ARM64]
+            target: aarch64-apple-darwin
+          # No self-hosted macOS x86_64 host exists; PyApp cross-builds it on
+          # the Apple Silicon runner (the CPython distribution is selected from
+          # the cargo target triple, and clang links both arches natively).
+          - name: macos-x86_64
+            runner: [self-hosted, macOS, ARM64]
+            target: x86_64-apple-darwin
+    # Artifact builds run on the shared self-hosted fleet (hosted multiplatform
+    # runners are cost-prohibitive); see publish.yml for the same constraint.
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install Python
+        run: uv python install 3.13
+
+      - name: Build binaries
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          uv run --no-project --python 3.13 -- \
+            python scripts/build_pyapp.py --tag "${TAG}" --target "${TARGET}" --outdir dist-bin
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: binaries-${{ matrix.name }}
+          path: dist-bin/
+          if-no-files-found: error
+          retention-days: 5
+
+  release:
+    name: Attach to release
+    needs: build
+    runs-on: [self-hosted, Linux, X64]
+    permissions:
+      contents: write
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v8
+        with:
+          pattern: binaries-*
+          path: dist-bin/
+          merge-multiple: true
+
+      - name: Aggregate checksums
+        shell: bash
+        run: |
+          cd dist-bin
+          # Per-asset .sha256 files are produced by build_pyapp.py; fold them
+          # into one sha256sum-compatible manifest and drop the fragments.
+          cat ./*.sha256 > SHA256SUMS
+          rm -f ./*.sha256
+          {
+            echo "### Binary checksums"
+            echo '```'
+            cat SHA256SUMS
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: gh release upload "${TAG}" dist-bin/* --clobber
