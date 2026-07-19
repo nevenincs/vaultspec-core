@@ -161,4 +161,19 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add "$MANIFEST"
           git commit -m "chore(scoop): bump manifest to ${TAG}"
-          git push origin main
+          # This job runs after a long matrix build, so main may have advanced
+          # meanwhile. Rebase-and-retry (bounded) so an unrelated commit does not
+          # fail the push non-fast-forward; the backward-bump guard above still
+          # protects against clobbering a newer manifest.
+          attempt=1
+          max_attempts=3
+          until git push origin main; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::scoop manifest push failed after ${max_attempts} attempts"
+              exit 1
+            fi
+            echo "push rejected (attempt ${attempt}/${max_attempts}); rebasing onto origin/main"
+            git fetch origin main
+            git rebase origin/main
+            attempt=$((attempt + 1))
+          done
