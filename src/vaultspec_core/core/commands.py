@@ -64,6 +64,7 @@ from .manifest import (
     remove_provider,
     write_manifest_data,
 )
+from .prek_boundary import collect_prek_boundary
 
 if TYPE_CHECKING:
     from .workspace_mode import ResolvedMode
@@ -788,11 +789,14 @@ def _scaffold_precommit(
     caller passes its resolved mode explicitly, because the declaration is
     written only after scaffolding.
 
-    Skips scaffolding entirely when ``prek.toml`` is present at *target*:
-    prek treats ``.pre-commit-config.yaml`` as a duplicate configuration
-    source and emits a warning, and writing both would cause neither tool
-    to execute our hooks.  The operator is expected to transplant hooks
-    into ``prek.toml`` manually.
+    Skips scaffolding entirely when ``prek.toml`` is present at *target*
+    (assessed through
+    :func:`~vaultspec_core.core.prek_boundary.collect_prek_boundary`):
+    prek reads ``prek.toml`` exclusively and silently ignores a co-present
+    ``.pre-commit-config.yaml``, so writing the YAML would leave hooks prek
+    never runs. The operator transplants hooks into ``prek.toml`` with
+    ``spec precommit migrate``; the log messages distinguish a healthy
+    transplant (hooks already in ``prek.toml``) from stranded hooks.
     """
     if mode is None:
         from .workspace_mode import CORE_DISTRIBUTION_NAME, resolve_render_mode
@@ -800,20 +804,37 @@ def _scaffold_precommit(
         mode = resolve_render_mode(target, package=CORE_DISTRIBUTION_NAME)
     canonical_hooks = canonical_precommit_hooks_for_mode(mode)
 
-    if (target / "prek.toml").exists():
-        logger.info(
-            "prek.toml detected at %s; skipping .pre-commit-config.yaml scaffold. "
-            "Add vaultspec-core hooks to prek.toml manually.",
-            target,
-        )
-        if (target / ".pre-commit-config.yaml").exists():
-            logger.warning(
-                "Both prek.toml and .pre-commit-config.yaml are present at %s. "
-                "prek reads prek.toml exclusively; vaultspec will not refresh the "
-                "YAML hooks.  Remove .pre-commit-config.yaml or migrate its hooks "
-                "into prek.toml to avoid stale pre-commit config.",
+    boundary = collect_prek_boundary(target, mode=mode)
+    if boundary.owns_boundary:
+        if boundary.hooks_present:
+            logger.info(
+                "prek.toml at %s already carries the vaultspec-core hooks; "
+                "skipping .pre-commit-config.yaml scaffold.",
                 target,
             )
+            if (target / ".pre-commit-config.yaml").exists():
+                logger.info(
+                    "A superseded .pre-commit-config.yaml is still present at %s. "
+                    "prek reads prek.toml exclusively; remove the YAML config "
+                    "once nothing else consumes it.",
+                    target,
+                )
+        else:
+            logger.info(
+                "prek.toml detected at %s; skipping .pre-commit-config.yaml "
+                "scaffold. Run 'vaultspec-core spec precommit migrate' to "
+                "transplant the vaultspec-core hooks into prek.toml.",
+                target,
+            )
+            if (target / ".pre-commit-config.yaml").exists():
+                logger.warning(
+                    "Both prek.toml and .pre-commit-config.yaml are present at "
+                    "%s and prek.toml lacks the vaultspec-core hooks. prek "
+                    "reads prek.toml exclusively; vaultspec will not refresh "
+                    "the YAML hooks. Run 'vaultspec-core spec precommit "
+                    "migrate' to transplant them.",
+                    target,
+                )
         return []
 
     config_file = target / ".pre-commit-config.yaml"
@@ -1802,7 +1823,12 @@ def uninstall_run(
                 label = file_labels.get(f.name, "")
                 removed.append((str(f).replace("\\", "/"), label))
 
-        # Surgical .pre-commit-config.yaml cleanup: remove vaultspec-core hooks
+        # Surgical .pre-commit-config.yaml cleanup: remove vaultspec-core
+        # hooks. This deliberately runs even when prek.toml owns the hook
+        # boundary (collect_prek_boundary): install and sync refuse to write
+        # the YAML under prek, but uninstall stripping vaultspec hooks from a
+        # legacy YAML is residue removal - leave-no-trace semantics - not
+        # management of the file.
         precommit_path = path / ".pre-commit-config.yaml"
         if "precommit" not in skip:
             if precommit_path.exists() and not dry_run:

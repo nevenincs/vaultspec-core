@@ -345,6 +345,198 @@ class TestPrekShortCircuit:
         assert result == [(".pre-commit-config.yaml", "precommit")]
         assert (tmp_path / ".pre-commit-config.yaml").exists()
 
+    def test_healthy_prek_skips_without_warning(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A prek.toml already carrying the canonical hooks short-circuits
+        with a healthy info message, not the stranded-hooks warning."""
+        from vaultspec_core.core.enums import InstallMode
+        from vaultspec_core.core.prek_boundary import render_prek_hook_block
+
+        (tmp_path / "prek.toml").write_text(
+            render_prek_hook_block(InstallMode.DEPENDENCY), encoding="utf-8"
+        )
+
+        caplog.set_level("INFO", logger="vaultspec_core.core.commands")
+        result = _scaffold_precommit(tmp_path)
+
+        assert result == []
+        assert not (tmp_path / ".pre-commit-config.yaml").exists()
+        assert any("already carries" in rec.message for rec in caplog.records)
+        assert not any(rec.levelname == "WARNING" for rec in caplog.records)
+
+
+class TestPrekMigrationVerb:
+    """``spec precommit migrate`` transplants hooks into prek.toml."""
+
+    _OPERATOR_CONTENT = (
+        "# operator-authored config with a comment worth preserving\n"
+        "[[repos]]\n"
+        'repo = "builtin"\n'
+        'hooks = [{ id = "trailing-whitespace" }]\n'
+    )
+
+    def test_fresh_transplant_preserves_operator_content(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.prek_boundary import (
+            MARKER_BEGIN,
+            MARKER_END,
+            collect_prek_boundary,
+            migrate_hooks_to_prek,
+        )
+
+        config = tmp_path / "prek.toml"
+        config.write_text(self._OPERATOR_CONTENT, encoding="utf-8")
+
+        result = migrate_hooks_to_prek(tmp_path)
+
+        assert result.status == "migrated"
+        raw = config.read_text(encoding="utf-8")
+        assert raw.startswith(self._OPERATOR_CONTENT)
+        assert MARKER_BEGIN in raw
+        assert MARKER_END in raw
+        assert collect_prek_boundary(tmp_path).hooks_present
+
+    def test_second_run_is_byte_for_byte_noop(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
+
+        config = tmp_path / "prek.toml"
+        config.write_text(self._OPERATOR_CONTENT, encoding="utf-8")
+        migrate_hooks_to_prek(tmp_path)
+        before = config.read_bytes()
+
+        result = migrate_hooks_to_prek(tmp_path)
+
+        assert result.status == "unchanged"
+        assert config.read_bytes() == before
+
+    def test_dry_run_leaves_tree_untouched(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
+
+        config = tmp_path / "prek.toml"
+        config.write_text(self._OPERATOR_CONTENT, encoding="utf-8")
+        before = config.read_bytes()
+
+        result = migrate_hooks_to_prek(tmp_path, dry_run=True)
+
+        assert result.status == "migrated"
+        assert config.read_bytes() == before
+
+    def test_mode_shapes_rendered_entries(self, tmp_path: Path) -> None:
+        """Dependency mode renders uv-run entries, tool mode uvx entries."""
+        from vaultspec_core.core.enums import InstallMode
+        from vaultspec_core.core.prek_boundary import render_prek_hook_block
+
+        dep = render_prek_hook_block(InstallMode.DEPENDENCY)
+        tool = render_prek_hook_block(InstallMode.TOOL)
+
+        assert 'entry = "uv run --no-sync vaultspec-core' in dep
+        assert 'entry = "uvx --from vaultspec-core vaultspec-core' in tool
+
+    def test_stale_managed_block_is_replaced_in_place(self, tmp_path: Path) -> None:
+        """Markers already present: the block is substituted, operator
+        content on both sides survives byte-for-byte."""
+        from vaultspec_core.core.prek_boundary import (
+            MARKER_BEGIN,
+            MARKER_END,
+            collect_prek_boundary,
+            migrate_hooks_to_prek,
+        )
+
+        trailer = "# trailing operator note\n[settings]\nfail_fast = true\n"
+        config = tmp_path / "prek.toml"
+        config.write_text(
+            self._OPERATOR_CONTENT
+            + f"\n{MARKER_BEGIN}\n# stale contents\n{MARKER_END}\n"
+            + trailer,
+            encoding="utf-8",
+        )
+
+        result = migrate_hooks_to_prek(tmp_path)
+
+        assert result.status == "migrated"
+        raw = config.read_text(encoding="utf-8")
+        assert raw.startswith(self._OPERATOR_CONTENT)
+        assert raw.endswith(trailer)
+        assert "# stale contents" not in raw
+        assert raw.count(MARKER_BEGIN) == 1
+        assert collect_prek_boundary(tmp_path).hooks_present
+
+    def test_conflicting_hooks_outside_block_refuse(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.commands import CANONICAL_HOOK_IDS
+        from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
+
+        hook_id = sorted(CANONICAL_HOOK_IDS)[0]
+        config = tmp_path / "prek.toml"
+        config.write_text(
+            "[[repos]]\n"
+            'repo = "local"\n\n'
+            "[[repos.hooks]]\n"
+            f'id = "{hook_id}"\n'
+            'entry = "echo operator-authored"\n'
+            'language = "system"\n',
+            encoding="utf-8",
+        )
+        before = config.read_bytes()
+
+        result = migrate_hooks_to_prek(tmp_path)
+
+        assert result.status == "conflicting"
+        assert config.read_bytes() == before
+
+    def test_missing_prek_config_refuses(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
+
+        assert migrate_hooks_to_prek(tmp_path).status == "no_prek_config"
+
+    def test_unparseable_prek_config_refuses(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
+
+        (tmp_path / "prek.toml").write_text("[[repos\nnot toml", encoding="utf-8")
+
+        assert migrate_hooks_to_prek(tmp_path).status == "unparseable"
+
+    def test_rendered_block_parses_as_valid_toml(self, tmp_path: Path) -> None:
+        """The rendered file round-trips through tomllib with the full
+        canonical hook set intact."""
+        import tomllib
+
+        from vaultspec_core.core.commands import CANONICAL_HOOK_IDS
+        from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
+
+        config = tmp_path / "prek.toml"
+        config.write_text(self._OPERATOR_CONTENT, encoding="utf-8")
+        migrate_hooks_to_prek(tmp_path)
+
+        data = tomllib.loads(config.read_text(encoding="utf-8"))
+        local = [r for r in data["repos"] if r.get("repo") == "local"]
+        ids = {h["id"] for r in local for h in r.get("hooks", [])}
+        assert ids == CANONICAL_HOOK_IDS
+
+
+class TestUninstallUnderPrek:
+    """Uninstall keeps stripping vaultspec hooks from a legacy YAML even
+    when prek.toml owns the boundary: residue removal, not management."""
+
+    def test_uninstall_strips_yaml_hooks_despite_prek(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.commands import (
+            CANONICAL_HOOK_IDS,
+            uninstall_run,
+        )
+
+        _run_git(tmp_path, "init")
+        install_run(
+            path=tmp_path, provider="all", upgrade=False, dry_run=False, force=True
+        )
+        yaml_path = tmp_path / ".pre-commit-config.yaml"
+        assert yaml_path.exists()
+        (tmp_path / "prek.toml").write_text("", encoding="utf-8")
+
+        uninstall_run(path=tmp_path, provider="all", dry_run=False, force=True)
+
+        if yaml_path.exists():
+            raw = yaml_path.read_text(encoding="utf-8")
+            assert not any(f"id: {hid}" in raw for hid in CANONICAL_HOOK_IDS)
+
 
 class TestSpecCheckGateEntry:
     """Regression: the canonical ``spec-check`` entry is the error-gating form.

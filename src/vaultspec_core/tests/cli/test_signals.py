@@ -72,6 +72,7 @@ pytestmark = [pytest.mark.unit]
                 "INCOMPLETE",
                 "NON_CANONICAL",
                 "UNREFRESHABLE",
+                "ORPHANED",
                 "COMPLETE",
             },
         ),
