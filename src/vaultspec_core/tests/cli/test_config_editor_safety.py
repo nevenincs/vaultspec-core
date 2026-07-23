@@ -251,7 +251,17 @@ class TestEditorSubprocessSafety:
             )
             assert result.exit_code == 0
 
-            # Case 1: Resolution Failure (Nonexistent Editor Binary) -> code 2
+            # Case 1: Resolution Failure -> code 2. Every rung of the ladder must
+            # miss, including the terminal ``vi`` fallback which is present on
+            # many POSIX hosts. Point PATH exclusively at the fake-editor dir
+            # (which holds no ``vi``) so nothing resolves; resolution fails
+            # before any subprocess launches, so no external binary is needed.
+            # Windows keeps the system PATH prepended - ``vi`` is absent there
+            # and ``cmd.exe`` stays available for the later cases.
+            if sys.platform == "win32":
+                os.environ["PATH"] = str(bindir) + os.pathsep + (old_path or "")
+            else:
+                os.environ["PATH"] = str(bindir)
             result = runner.invoke(
                 app,
                 [
@@ -267,6 +277,11 @@ class TestEditorSubprocessSafety:
             )
             assert result.exit_code == 2
             assert "Error: Could not resolve a working text editor" in result.output
+
+            # Restore the fake-editor dir plus the system PATH so the exit-code
+            # cases below can launch their real editor subprocesses (and reach
+            # cmd.exe on Windows).
+            os.environ["PATH"] = str(bindir) + os.pathsep + (old_path or "")
 
             # Case 2: Subprocess Failure (editor exits non-zero, not 130) -> code 3
             result = runner.invoke(
