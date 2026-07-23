@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import tomllib
 from pathlib import Path
@@ -12,6 +13,27 @@ from .exceptions import EditorResolutionError, VaultSpecError
 from .helpers import atomic_write, ensure_dir
 
 KNOWN_KEYS = {"editor"}
+
+
+def _command_first_token_on_path(command: str) -> bool:
+    """Return whether *command*'s leading token resolves on ``PATH``.
+
+    Tokenizes *command* with platform-aware quoting rules, disabling POSIX
+    mode on Windows exactly as :mod:`vaultspec_core.hooks.engine` does, so a
+    Windows editor path containing backslashes (for example
+    ``C:\\tools\\ed.exe``) is not mangled by POSIX escape handling before the
+    :func:`shutil.which` lookup.
+
+    Args:
+        command: Editor command string, optionally including flags such as
+            ``"code --wait"``.
+
+    Returns:
+        ``True`` when the command has a first token that :func:`shutil.which`
+        can locate on the current ``PATH``, ``False`` otherwise.
+    """
+    parts = shlex.split(command, posix=(os.name != "nt"))
+    return bool(parts) and shutil.which(parts[0]) is not None
 
 
 def get_local_config_path(target_dir: Path | None = None) -> Path:
@@ -127,46 +149,31 @@ def resolve_editor(
 
     if editor_override:
         sources_tried.append(f"--editor flag ({editor_override!r})")
-        import shlex
-
-        parts = shlex.split(editor_override)
-        if parts and shutil.which(parts[0]):
+        if _command_first_token_on_path(editor_override):
             return editor_override
 
     local_editor = get_config_value("editor", target_dir)
     if local_editor:
         sources_tried.append(f"local config 'editor' ({local_editor!r})")
-        import shlex
-
-        parts = shlex.split(local_editor)
-        if parts and shutil.which(parts[0]):
+        if _command_first_token_on_path(local_editor):
             return local_editor
 
     vaultspec_editor = os.environ.get("VAULTSPEC_EDITOR")
     if vaultspec_editor:
         sources_tried.append(f"$VAULTSPEC_EDITOR env var ({vaultspec_editor!r})")
-        import shlex
-
-        parts = shlex.split(vaultspec_editor)
-        if parts and shutil.which(parts[0]):
+        if _command_first_token_on_path(vaultspec_editor):
             return vaultspec_editor
 
     visual_env = os.environ.get("VISUAL")
     if visual_env:
         sources_tried.append(f"$VISUAL env var ({visual_env!r})")
-        import shlex
-
-        parts = shlex.split(visual_env)
-        if parts and shutil.which(parts[0]):
+        if _command_first_token_on_path(visual_env):
             return visual_env
 
     editor_env = os.environ.get("EDITOR")
     if editor_env:
         sources_tried.append(f"$EDITOR env var ({editor_env!r})")
-        import shlex
-
-        parts = shlex.split(editor_env)
-        if parts and shutil.which(parts[0]):
+        if _command_first_token_on_path(editor_env):
             return editor_env
 
     sources_tried.append("fallback 'vi'")
