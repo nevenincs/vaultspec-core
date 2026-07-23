@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import shutil
+import sys
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -10,7 +12,36 @@ from vaultspec_core.cli import app
 from vaultspec_core.core.exceptions import EditorResolutionError
 from vaultspec_core.core.local_config import get_local_config_path, resolve_editor
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 pytestmark = [pytest.mark.integration]
+
+
+def _write_fake_editor(directory: Path, name: str, exit_code: int = 0) -> str:
+    """Create a real, resolvable fake-editor executable on disk.
+
+    Writes a genuine platform-appropriate launcher script that accepts (and
+    ignores) the file-path argument :func:`vaultspec_core.core.resources.resource_edit`
+    appends, then terminates with ``exit_code``. This exercises the real
+    subprocess and :func:`shutil.which` resolution paths with a real binary
+    rather than a Windows-only system editor, so the assertions hold on any
+    operating system.
+
+    :param directory: Directory to write the script into; prepend it to ``PATH``
+        so the returned name resolves via :func:`shutil.which`.
+    :param name: Bare editor name, used verbatim as the resolvable command.
+    :param exit_code: Process exit status the fake editor returns.
+    :returns: The bare editor name to pass to ``--editor`` or an editor env var.
+    """
+    if sys.platform == "win32":
+        script = directory / f"{name}.cmd"
+        script.write_text(f"@echo off\r\nexit /b {exit_code}\r\n", encoding="utf-8")
+    else:
+        script = directory / name
+        script.write_text(f"#!/bin/sh\nexit {exit_code}\n", encoding="utf-8")
+        script.chmod(0o755)
+    return name
 
 
 class TestConfigCli:
@@ -104,23 +135,27 @@ class TestEditorResolution:
     def test_resolution_ladder(self, tmp_path):
         import os
 
-        # We need real executables that exist on Windows PATH.
-        # notepad, cmd, powershell are standard on Windows.
-        notepad_exe = shutil.which("notepad")
-        cmd_exe = shutil.which("cmd")
-        powershell_exe = shutil.which("powershell")
-
-        assert notepad_exe, "notepad not found on PATH"
-        assert cmd_exe, "cmd not found on PATH"
-        assert powershell_exe, "powershell not found on PATH"
+        # Real, resolvable fake editors - one distinct binary per ladder rung -
+        # created on disk and reachable via a PATH prepend, so precedence is
+        # proven with genuine executables on any operating system.
+        bindir = tmp_path / "bin"
+        bindir.mkdir()
+        ed_editor = _write_fake_editor(bindir, "vsed-editor")
+        ed_visual = _write_fake_editor(bindir, "vsed-visual")
+        ed_vaultspec = _write_fake_editor(bindir, "vsed-vaultspec")
+        ed_config = _write_fake_editor(bindir, "vsed-config")
+        ed_flag = _write_fake_editor(bindir, "vsed-flag")
 
         # Save old values
+        old_path = os.environ.get("PATH")
         old_visual = os.environ.get("VISUAL")
         old_editor = os.environ.get("EDITOR")
         old_vaultspec_editor = os.environ.get("VAULTSPEC_EDITOR")
 
         try:
-            # Clear environment variables first to avoid pollution
+            # Prepend the fake-editor dir and clear editor env vars to avoid
+            # pollution from the ambient environment.
+            os.environ["PATH"] = str(bindir) + os.pathsep + (old_path or "")
             os.environ.pop("VISUAL", None)
             os.environ.pop("EDITOR", None)
             os.environ.pop("VAULTSPEC_EDITOR", None)
@@ -135,33 +170,37 @@ class TestEditorResolution:
                 assert "Could not resolve a working text editor" in str(excinfo.value)
 
             # 2. EDITOR env var should take precedence over vi
-            os.environ["EDITOR"] = "powershell"
-            assert resolve_editor(target_dir=tmp_path) == "powershell"
+            os.environ["EDITOR"] = ed_editor
+            assert resolve_editor(target_dir=tmp_path) == ed_editor
 
             # 3. VISUAL env var should take precedence over EDITOR
-            os.environ["VISUAL"] = "cmd"
-            assert resolve_editor(target_dir=tmp_path) == "cmd"
+            os.environ["VISUAL"] = ed_visual
+            assert resolve_editor(target_dir=tmp_path) == ed_visual
 
             # 4. VAULTSPEC_EDITOR env var should take precedence over VISUAL
-            os.environ["VAULTSPEC_EDITOR"] = "powershell"
-            assert resolve_editor(target_dir=tmp_path) == "powershell"
+            os.environ["VAULTSPEC_EDITOR"] = ed_vaultspec
+            assert resolve_editor(target_dir=tmp_path) == ed_vaultspec
 
             # 5. Local config should take precedence over VAULTSPEC_EDITOR
             from vaultspec_core.core.local_config import set_config_value
 
             # Write local config
             get_local_config_path(tmp_path)
-            set_config_value("editor", "notepad", target_dir=tmp_path)
-            assert resolve_editor(target_dir=tmp_path) == "notepad"
+            set_config_value("editor", ed_config, target_dir=tmp_path)
+            assert resolve_editor(target_dir=tmp_path) == ed_config
 
             # 6. Editor override flag should take precedence over local config
             assert (
-                resolve_editor(editor_override="powershell", target_dir=tmp_path)
-                == "powershell"
+                resolve_editor(editor_override=ed_flag, target_dir=tmp_path) == ed_flag
             )
 
         finally:
             # Restore environment variables
+            if old_path is None:
+                os.environ.pop("PATH", None)
+            else:
+                os.environ["PATH"] = old_path
+
             if old_visual is None:
                 os.environ.pop("VISUAL", None)
             else:
@@ -181,72 +220,89 @@ class TestEditorResolution:
 class TestEditorSubprocessSafety:
     """Verify exit codes 2, 3, 4 under different editor invocation failures."""
 
-    def test_editor_failures_exits(self, runner, synthetic_project):
-        # Add a test rule first so we have something to edit
-        result = runner.invoke(
-            app,
-            [
-                "--target",
-                str(synthetic_project),
-                "spec",
-                "rules",
-                "add",
-                "test-safety-rule",
-                "--body",
-                "Initial rule content",
-            ],
-        )
-        assert result.exit_code == 0
+    def test_editor_failures_exits(self, runner, synthetic_project, tmp_path):
+        import os
 
-        # Case 1: Resolution Failure (Nonexistent Editor Binary) -> Exits with code 2
-        result = runner.invoke(
-            app,
-            [
-                "--target",
-                str(synthetic_project),
-                "spec",
-                "rules",
-                "edit",
-                "test-safety-rule",
-                "--editor",
-                "nonexistent-editor-binary-xyz",
-            ],
-        )
-        assert result.exit_code == 2
-        assert "Error: Could not resolve a working text editor" in result.output
+        # Real fake editors that exit with the exact codes the ladder maps:
+        # a nonexistent binary (resolution fail -> 2), a script exiting 5
+        # (non-zero -> 3), and a script exiting 130 (cancellation -> 4).
+        bindir = tmp_path / "bin"
+        bindir.mkdir()
+        ed_fail5 = _write_fake_editor(bindir, "vsed-fail5", exit_code=5)
+        ed_cancel = _write_fake_editor(bindir, "vsed-cancel", exit_code=130)
 
-        # Case 2: Subprocess Failure (Editor exits with non-zero code other than 130)
-        # -> Exits with code 3
-        # We can use cmd.exe to exit with non-zero code on Windows, e.g. "cmd /c exit 5"
-        result = runner.invoke(
-            app,
-            [
-                "--target",
-                str(synthetic_project),
-                "spec",
-                "rules",
-                "edit",
-                "test-safety-rule",
-                "--editor",
-                "cmd /c exit 5",
-            ],
-        )
-        assert result.exit_code == 3
-        assert "Error: Editor exited with non-zero exit code 5." in result.output
+        old_path = os.environ.get("PATH")
+        try:
+            os.environ["PATH"] = str(bindir) + os.pathsep + (old_path or "")
 
-        # Case 3: User Cancellation (Editor exits with code 130) -> Exits with code 4
-        result = runner.invoke(
-            app,
-            [
-                "--target",
-                str(synthetic_project),
-                "spec",
-                "rules",
-                "edit",
-                "test-safety-rule",
-                "--editor",
-                "cmd /c exit 130",
-            ],
-        )
-        assert result.exit_code == 4
-        assert "Error: Editor edit cancelled by user." in result.output
+            # Add a test rule first so we have something to edit
+            result = runner.invoke(
+                app,
+                [
+                    "--target",
+                    str(synthetic_project),
+                    "spec",
+                    "rules",
+                    "add",
+                    "test-safety-rule",
+                    "--body",
+                    "Initial rule content",
+                ],
+            )
+            assert result.exit_code == 0
+
+            # Case 1: Resolution Failure (Nonexistent Editor Binary) -> code 2
+            result = runner.invoke(
+                app,
+                [
+                    "--target",
+                    str(synthetic_project),
+                    "spec",
+                    "rules",
+                    "edit",
+                    "test-safety-rule",
+                    "--editor",
+                    "nonexistent-editor-binary-xyz",
+                ],
+            )
+            assert result.exit_code == 2
+            assert "Error: Could not resolve a working text editor" in result.output
+
+            # Case 2: Subprocess Failure (editor exits non-zero, not 130) -> code 3
+            result = runner.invoke(
+                app,
+                [
+                    "--target",
+                    str(synthetic_project),
+                    "spec",
+                    "rules",
+                    "edit",
+                    "test-safety-rule",
+                    "--editor",
+                    ed_fail5,
+                ],
+            )
+            assert result.exit_code == 3
+            assert "Error: Editor exited with non-zero exit code 5." in result.output
+
+            # Case 3: User Cancellation (editor exits with code 130) -> code 4
+            result = runner.invoke(
+                app,
+                [
+                    "--target",
+                    str(synthetic_project),
+                    "spec",
+                    "rules",
+                    "edit",
+                    "test-safety-rule",
+                    "--editor",
+                    ed_cancel,
+                ],
+            )
+            assert result.exit_code == 4
+            assert "Error: Editor edit cancelled by user." in result.output
+        finally:
+            if old_path is None:
+                os.environ.pop("PATH", None)
+            else:
+                os.environ["PATH"] = old_path
