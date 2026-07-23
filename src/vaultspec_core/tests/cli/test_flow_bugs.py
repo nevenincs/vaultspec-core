@@ -346,6 +346,76 @@ class TestPrekShortCircuit:
         assert (tmp_path / ".pre-commit-config.yaml").exists()
 
 
+class TestSpecCheckGateEntry:
+    """Regression: the canonical ``spec-check`` entry is the error-gating form.
+
+    Warning-strict ``spec doctor`` deadlocks commits because provider-mirror
+    lag is a warning-level steady state. The canonical hook must carry
+    ``--gate-errors`` so ``sync`` renders the non-deadlocking form directly,
+    and a config already on that form must be a no-op (no clobber, no diff).
+    """
+
+    def _spec_check_entry(self, root: Path) -> str:
+        import yaml
+
+        data = yaml.safe_load(
+            (root / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+        )
+        local = next(r for r in data["repos"] if r.get("repo") == "local")
+        return next(h["entry"] for h in local["hooks"] if h["id"] == "spec-check")
+
+    def test_scaffold_emits_gate_errors_form(self, tmp_path: Path) -> None:
+        _scaffold_precommit(tmp_path)
+        assert self._spec_check_entry(tmp_path).endswith("spec doctor --gate-errors")
+
+    def test_bare_entry_is_upgraded_to_gate_form(self, tmp_path: Path) -> None:
+        import yaml
+
+        # A repo carrying the old warning-strict bare form.
+        (tmp_path / ".pre-commit-config.yaml").write_text(
+            yaml.dump(
+                {
+                    "repos": [
+                        {
+                            "repo": "local",
+                            "hooks": [
+                                {
+                                    "id": "spec-check",
+                                    "name": "Spec check",
+                                    "entry": "uv run --no-sync vaultspec-core "
+                                    "spec doctor",
+                                    "language": "system",
+                                    "types": ["markdown"],
+                                    "pass_filenames": False,
+                                }
+                            ],
+                        }
+                    ]
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+
+        changed = _scaffold_precommit(tmp_path)
+
+        assert changed == [(".pre-commit-config.yaml", "precommit")]
+        assert self._spec_check_entry(tmp_path).endswith("spec doctor --gate-errors")
+
+    def test_gate_form_entry_is_noop(self, tmp_path: Path) -> None:
+        # First scaffold renders the canonical gating form; a second pass over
+        # the identical config must make no change (no clobber loop).
+        _scaffold_precommit(tmp_path)
+        before = (tmp_path / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+
+        second = _scaffold_precommit(tmp_path)
+
+        assert second == []
+        assert (tmp_path / ".pre-commit-config.yaml").read_text(
+            encoding="utf-8"
+        ) == before
+
+
 # ---- Domain 2 + domain 1 end-to-end: install leaves a clean tree -------------
 
 
@@ -1210,7 +1280,7 @@ _HOOK_SUBCOMMANDS = {
     "vault-fix": "vault check all --fix",
     "vault-sanitize-annotations": "vault sanitize annotations",
     "check-provider-artifacts": "check-providers",
-    "spec-check": "spec doctor",
+    "spec-check": "spec doctor --gate-errors",
 }
 _DEPENDENCY_HOOK_PREFIX = "uv run --no-sync vaultspec-core"
 _TOOL_HOOK_PREFIX = "uvx --from vaultspec-core vaultspec-core"
