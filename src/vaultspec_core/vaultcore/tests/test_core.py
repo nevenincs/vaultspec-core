@@ -121,3 +121,34 @@ class TestParseVaultMetadataBOM:
         assert meta_bom.date == meta_plain.date == "2026-06-26"
         assert meta_bom.related == meta_plain.related == ["[[other-doc]]"]
         assert body_bom == body_plain
+
+
+class TestParseVaultMetadataStepId:
+    """``parse_vault_metadata`` surfaces the exec-record ``step_id`` stamp."""
+
+    def test_step_id_parsed_from_exec_frontmatter(self):
+        content = (
+            "---\ntags:\n  - '#exec'\n  - '#editor-demo'\n"
+            "date: '2026-02-04'\nmodified: '2026-02-04'\n"
+            "step_id: 'S03'\nrelated:\n  - '[[2026-02-04-editor-demo-plan]]'\n"
+            "---\n\n# Body\nProse.\n"
+        )
+        meta, _body = parse_vault_metadata(content)
+        assert meta.step_id == "S03"
+
+    def test_step_id_none_when_absent(self):
+        content = (
+            "---\ntags:\n  - '#adr'\n  - '#editor-demo'\n"
+            "date: '2026-02-04'\nmodified: '2026-02-04'\n"
+            "related: []\n---\n\n# Body\nProse.\n"
+        )
+        meta, _body = parse_vault_metadata(content)
+        assert meta.step_id is None
+
+    def test_step_id_none_when_empty_value(self):
+        content = (
+            "---\ntags:\n  - '#exec'\n  - '#editor-demo'\n"
+            "date: '2026-02-04'\nstep_id: ''\nrelated: []\n---\n\n# Body\n"
+        )
+        meta, _body = parse_vault_metadata(content)
+        assert meta.step_id is None

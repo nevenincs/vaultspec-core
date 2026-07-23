@@ -182,6 +182,8 @@ def parse_vault_metadata(content: str) -> tuple[DocumentMetadata, str]:
                 metadata.superseded_by = val.strip("\"'") or None
             elif key == "archived":
                 metadata.archived = val.strip("\"'") or None
+            elif key == "step_id":
+                metadata.step_id = val.strip("\"'") or None
             elif val.startswith("[") and val.endswith("]"):
                 # Simple inline list parsing: ["#a", "#b"]
                 items = [

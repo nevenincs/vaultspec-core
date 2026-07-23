@@ -83,6 +83,10 @@ hand-edit between the markers.
 - `vaultspec-core vault check all` - Run all vault health checks.
 - `vaultspec-core vault check body-links` - Find wiki-links and markdown path links in
   document body text.
+- `vaultspec-core vault check exec-mapping` - Check execution records map to a live Step
+  in their parent plan.
+- `vaultspec-core vault check body-sections` - Check document bodies carry the sections
+  their template mandates.
 - `vaultspec-core vault check annotations` - Find generated template annotations in
   vault documents.
 - `vaultspec-core vault check markdown` - Check and optionally fix markdown hygiene

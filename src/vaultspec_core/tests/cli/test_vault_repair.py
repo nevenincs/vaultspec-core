@@ -615,6 +615,8 @@ class TestVaultRepair:
             "placeholders",
             "orphans",
             "features",
+            "exec-mapping",
+            "body-sections",
             "feature-rename-integrity",
             "references",
             "schema",

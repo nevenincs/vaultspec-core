@@ -1178,12 +1178,15 @@ class VaultGraph:
             superseded_by = (
                 raw_superseded_by if isinstance(raw_superseded_by, str) else None
             )
+            raw_step_id = node.frontmatter.get("step_id")
+            step_id = raw_step_id if isinstance(raw_step_id, str) else None
             metadata = DocumentMetadata(
                 tags=sorted(node.tags),
                 date=node.date,
                 modified=node.modified,
                 related=related,
                 superseded_by=superseded_by,
+                step_id=step_id,
             )
             snapshot[node.path] = (metadata, node.body)
         return snapshot

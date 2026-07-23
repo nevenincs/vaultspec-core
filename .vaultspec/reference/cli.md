@@ -83,6 +83,10 @@ hand-edit between the markers.
 - `vaultspec-core vault check all` - Run all vault health checks.
 - `vaultspec-core vault check body-links` - Find wiki-links and markdown path links in
   document body text.
+- `vaultspec-core vault check exec-mapping` - Check execution records map to a live Step
+  in their parent plan.
+- `vaultspec-core vault check body-sections` - Check document bodies carry the sections
+  their template mandates.
 - `vaultspec-core vault check annotations` - Find generated template annotations in
   vault documents.
 - `vaultspec-core vault check markdown` - Check and optionally fix markdown hygiene
@@ -574,9 +578,12 @@ management.
 Run diagnostic collectors across the framework, providers, builtins, `.gitignore`, vault
 content, and configuration files.
 
-| Option | Short | Default | Description | | -------------- | ----- | ------- |
+| Option | Short | Default | Description | | ---------------- | ----- | ------- |
 --------------------------- | | `--target DIR` | `-t` | cwd | Diagnose another
-directory. | | `--json` | - | off | Emit the diagnosis as JSON. |
+directory. | | `--json` | - | off | Emit the diagnosis as JSON. | | `--gate-errors` | -
+| off | Fold the warning exit (1) to 0 so only errors (exit 2) fail; used by the
+`spec-check` pre-commit hook so expected provider-mirror lag does not deadlock commits.
+|
 
 ### vaultspec-core spec rules
 
@@ -648,10 +655,11 @@ order and bumps the manifest version.
 ------------------------------------------------------ | | `vaultspec-core vault check`
 | `0` clean, `1` errors found. | | `vaultspec-core vault plan check` | `0` clean, `1` at
 least one ERROR-severity finding. | | `vaultspec-core spec doctor` | `0` all ok, `1`
-warnings, `2` errors. | | `vaultspec-core spec mcps status` | `0` config status ok, `1`
-otherwise. | | `vaultspec-core migrations status` | `0` up to date or no manifest, `1`
-migrations pending. | | `vaultspec-core migrations run` | `0` success (including no-op),
-`1` a migration failed. |
+warnings, `2` errors (`--gate-errors` folds `1` to `0`). | |
+`vaultspec-core spec mcps status` | `0` config status ok, `1` otherwise. | |
+`vaultspec-core migrations status` | `0` up to date or no manifest, `1` migrations
+pending. | | `vaultspec-core migrations run` | `0` success (including no-op), `1` a
+migration failed. |
 
 ## Environment variables
 

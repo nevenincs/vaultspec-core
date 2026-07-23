@@ -288,6 +288,11 @@ class DocumentMetadata:
         derived_from: List of audit/finding references.
         promoted_to: List of rules promoted.
         archived: ISO date (``YYYY-MM-DD``) set on archived documents.
+        step_id: Canonical Step identifier (e.g. ``S01``) machine-filled on
+            execution records by ``vaultspec-core vault add exec``; ``None`` on
+            every other document type and on legacy exec records predating the
+            field. Consumed by the exec-mapping health check to back-map a
+            record to a live Step in its parent plan.
     """
 
     tags: list[str] = field(default_factory=list)
@@ -299,6 +304,7 @@ class DocumentMetadata:
     derived_from: list[str] = field(default_factory=list)
     promoted_to: list[str] = field(default_factory=list)
     archived: str | None = None
+    step_id: str | None = None
 
     def validate(self) -> list[str]:
         """Validate the metadata against the vault schema rules.
