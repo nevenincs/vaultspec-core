@@ -262,6 +262,11 @@ hand-edit between the markers.
   compliance status.
 - `vaultspec-core spec hooks run` - Trigger hooks for a specific event.
 
+#### Precommit
+
+- `vaultspec-core spec precommit migrate` - Transplant the canonical vaultspec hooks
+  into prek.toml.
+
 #### Mcps
 
 - `vaultspec-core spec mcps list` - List canonical MCP server definitions.

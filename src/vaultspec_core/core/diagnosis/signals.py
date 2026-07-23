@@ -102,6 +102,7 @@ class PrecommitSignal(StrEnum):
     INCOMPLETE = "incomplete"
     NON_CANONICAL = "non_canonical"
     UNREFRESHABLE = "unrefreshable"
+    ORPHANED = "orphaned"
     COMPLETE = "complete"
 
 

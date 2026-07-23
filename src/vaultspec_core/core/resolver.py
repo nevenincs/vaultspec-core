@@ -942,9 +942,16 @@ def _resolve_precommit(
         return
 
     if signal == PrecommitSignal.UNREFRESHABLE:
-        # ``prek.toml`` owns this boundary, so sync cannot repair the stale
-        # YAML hooks. The doctor surface already renders the actionable
-        # advisory; resolution must leave the workspace unchanged.
+        # ``prek.toml`` owns this boundary and lacks the canonical hooks,
+        # so sync cannot repair anything here. The doctor surface renders
+        # the actionable advisory (``spec precommit migrate``); resolution
+        # must leave the workspace unchanged.
+        return
+
+    if signal == PrecommitSignal.ORPHANED:
+        # Hooks live safely in ``prek.toml``; the leftover
+        # ``.pre-commit-config.yaml`` is superseded and operator-owned.
+        # Removal is operator-gated, never a sync-time repair.
         return
 
     logger.warning("Unknown PrecommitSignal member: %s (action=%s)", signal, action)

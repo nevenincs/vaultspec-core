@@ -1629,6 +1629,79 @@ def cmd_hooks_run(
 
 
 # =============================================================================
+# Pre-commit boundary (prek)
+# =============================================================================
+
+precommit_app = make_app(
+    help="Manage the pre-commit hook boundary for prek-owned workspaces.",
+    no_args_is_help=True,
+)
+spec_app.add_typer(precommit_app, name="precommit")
+
+
+@precommit_app.command("migrate")
+def cmd_precommit_migrate(
+    remove_yaml: Annotated[
+        bool,
+        typer.Option(
+            "--remove-yaml",
+            help=(
+                "Also delete the superseded .pre-commit-config.yaml once the "
+                "canonical hooks are verifiably present in prek.toml"
+            ),
+        ),
+    ] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview without writing")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Transplant the canonical vaultspec hooks into prek.toml.
+
+    When prek.toml owns the hook boundary, sync no longer scaffolds
+    .pre-commit-config.yaml and prek silently ignores it. This command
+    renders the canonical hook set into a vaultspec-managed block inside
+    prek.toml. Idempotent: re-running with the hooks already present is a
+    no-op. The superseded YAML config is never deleted unless
+    --remove-yaml is passed and the hooks are verified present.
+    """
+    apply_target(target)
+    from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
+    from vaultspec_core.core.types import get_context
+
+    ctx = get_context()
+    result = migrate_hooks_to_prek(
+        ctx.target_dir, dry_run=dry_run, remove_yaml=remove_yaml
+    )
+
+    ok = result.status in ("migrated", "unchanged")
+    if json_output:
+        _emit_json(
+            "spec.precommit.migrate",
+            result.status if ok else "failed",
+            {
+                "status": result.status,
+                "detail": result.detail,
+                "yaml_removed": result.yaml_removed,
+                "dry_run": dry_run,
+            },
+        )
+        raise typer.Exit(0 if ok else 1)
+
+    from vaultspec_core.console import get_console
+
+    console = get_console()
+    prefix = "[dim](dry-run)[/dim] " if dry_run else ""
+    if ok:
+        style = "green" if result.status == "migrated" else "dim"
+        console.print(f"{prefix}[{style}]{result.status}[/{style}]: {result.detail}")
+        raise typer.Exit(0)
+    console.print(f"{prefix}[red]{result.status}[/red]: {result.detail}")
+    raise typer.Exit(1)
+
+
+# =============================================================================
 # MCPs
 # =============================================================================
 
@@ -2317,6 +2390,7 @@ def _render_diagnosis_table(_console, diag: "WorkspaceDiagnosis") -> None:
             PrecommitSignal.INCOMPLETE: ("warn", "yellow"),
             PrecommitSignal.NON_CANONICAL: ("warn", "yellow"),
             PrecommitSignal.UNREFRESHABLE: ("warn", "yellow"),
+            PrecommitSignal.ORPHANED: ("info", "dim"),
             PrecommitSignal.NO_HOOKS: ("warn", "yellow"),
             PrecommitSignal.NO_FILE: ("info", "dim"),
         },
@@ -2326,9 +2400,14 @@ def _render_diagnosis_table(_console, diag: "WorkspaceDiagnosis") -> None:
         PrecommitSignal.INCOMPLETE: "missing canonical hooks",
         PrecommitSignal.NON_CANONICAL: "non-canonical entry pattern",
         PrecommitSignal.UNREFRESHABLE: (
-            "prek.toml present; stale hook entries cannot be refreshed "
-            "automatically - transplant the canonical entries into prek.toml "
-            "manually"
+            "prek.toml lacks the vaultspec hooks and sync cannot refresh "
+            "them - run 'vaultspec-core spec precommit migrate' to "
+            "transplant the canonical entries into prek.toml"
+        ),
+        PrecommitSignal.ORPHANED: (
+            "hooks live in prek.toml; the superseded .pre-commit-config.yaml "
+            "is ignored by prek and can be removed ('vaultspec-core spec "
+            "precommit migrate --remove-yaml')"
         ),
         PrecommitSignal.NO_HOOKS: "no vaultspec hooks found",
         PrecommitSignal.NO_FILE: "no .pre-commit-config.yaml",
@@ -2550,6 +2629,9 @@ def _doctor_exit_code(
         PrecommitSignal.INCOMPLETE,
         PrecommitSignal.NON_CANONICAL,
         PrecommitSignal.NO_HOOKS,
+        # Content-verified genuine stranding: prek.toml owns the boundary
+        # and lacks the canonical hooks, so nothing runs them anywhere.
+        PrecommitSignal.UNREFRESHABLE,
     ):
         has_warn = True
     if diag.builtin_version == BuiltinVersionSignal.DELETED:

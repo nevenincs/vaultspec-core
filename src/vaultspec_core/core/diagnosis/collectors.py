@@ -777,12 +777,26 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
     """Assess the state of vaultspec-core hooks in ``.pre-commit-config.yaml``.
 
     Checks that all canonical hooks are present and use the canonical entry
-    pattern (``uv run --no-sync vaultspec-core ...``). When ``prek.toml`` is
-    present the hook scaffold never runs, so a stale or incomplete YAML hook
-    set cannot be refreshed automatically; that state is reported as
-    :attr:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal.UNREFRESHABLE`
-    so the operator learns the remediation is a manual transplant into
-    ``prek.toml``, not another install run.
+    pattern (``uv run --no-sync vaultspec-core ...``). When ``prek.toml``
+    is present the hook scaffold never runs, so the boundary is assessed
+    through
+    :func:`~vaultspec_core.core.prek_boundary.collect_prek_boundary` and
+    the signal reflects ``prek.toml``'s contents rather than its mere
+    existence:
+
+    - canonical hooks present in ``prek.toml`` and no YAML config left
+      behind:
+      :attr:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal.COMPLETE`;
+    - canonical hooks present in ``prek.toml`` with a superseded
+      ``.pre-commit-config.yaml`` still on disk:
+      :attr:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal.ORPHANED`
+      (benign; prek silently ignores the YAML);
+    - canonical hooks absent from ``prek.toml`` (including an unparseable
+      ``prek.toml``):
+      :attr:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal.UNREFRESHABLE`
+      - the hooks are genuinely stranded, whatever the YAML says, because
+      prek never reads it and sync will not refresh it. The remediation is
+      ``spec precommit migrate``.
 
     Args:
         target: Workspace root directory.
@@ -791,10 +805,16 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
         :class:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal`
         reflecting the observed state.
     """
-    signal = _collect_precommit_yaml_state(target)
-    if signal is not PrecommitSignal.COMPLETE and (target / "prek.toml").exists():
-        return PrecommitSignal.UNREFRESHABLE
-    return signal
+    from ..prek_boundary import collect_prek_boundary
+
+    boundary = collect_prek_boundary(target)
+    if not boundary.owns_boundary:
+        return _collect_precommit_yaml_state(target)
+    if boundary.hooks_present:
+        if (target / ".pre-commit-config.yaml").exists():
+            return PrecommitSignal.ORPHANED
+        return PrecommitSignal.COMPLETE
+    return PrecommitSignal.UNREFRESHABLE
 
 
 def _collect_precommit_yaml_state(target: Path) -> PrecommitSignal:
