@@ -390,6 +390,7 @@ Deploy the vaultspec framework into the target directory.
   `dependency` (resolved through the project's own venv, ships in built distributions),
   or `dev` (the default dev dependency group; renders like dependency but does not ship
   in built distributions). Auto-detected from `pyproject.toml` when omitted.
+- `--no-hints` (default off) - Suppress next-step advisory hints.
 - `--json` (default off) - Emit machine-readable output.
 
 `core` installs `.vaultspec/` only, without any provider config.
@@ -1140,6 +1141,7 @@ Move all documents for a feature tag to the archive.
 #### Options
 
 - `--dry-run` (default off) - Preview planned changes.
+- `--no-hints` (default off) - Suppress next-step advisory hints.
 - `--json` (default off) - Emit machine-readable output.
 - `--target` (`-t`) - Target directory (defaults to current working directory).
 
@@ -1293,6 +1295,10 @@ Run health checks on `.vault/`. Exits with code `1` if errors are found.
 - `--fix` (default off) - Apply auto-fixes where supported.
 - `--feature TAG` (`-f`) - Limit to a specific feature.
 - `--verbose` (`-v`, default off) - Show INFO-level diagnostics.
+- `--json` (default off) - Emit machine-readable output.
+
+`vaultspec-core vault check all` additionally accepts `--no-hints` to suppress the
+next-step advisory hints it prints after a run.
 
 `rename-integrity` adds a second repair flag, because a name mismatch can be resolved
 from either side: `--fix` is filename-wins and rewrites the frontmatter name to match
@@ -2099,8 +2105,8 @@ vaultspec-core spec system [OPTIONS] COMMAND [ARGS]...
 
 #### Subcommands
 
-- `show` - Display system prompt parts and generation targets.
-- `sync` (`--dry-run`, `--force`) - Resource-scoped system prompt sync.
+- `show` (`--json`) - Display system prompt parts and generation targets.
+- `sync` (`--dry-run`, `--force`, `--json`) - Resource-scoped system prompt sync.
 
 #### Examples
 
@@ -2444,6 +2450,10 @@ vaultspec-core config get [OPTIONS] KEY
 
 Read a local configuration value.
 
+#### Options
+
+- `--json` (default off) - Emit machine-readable output.
+
 #### Examples
 
 - **Retrieve the local project-level editor setting**:
@@ -2459,6 +2469,10 @@ vaultspec-core config set [OPTIONS] KEY VALUE
 ```
 
 Write a local configuration value. Supported keys: `editor`.
+
+#### Options
+
+- `--json` (default off) - Emit machine-readable output.
 
 #### Examples
 
@@ -2476,6 +2490,10 @@ vaultspec-core config unset [OPTIONS] KEY
 
 Clear a local configuration entry.
 
+#### Options
+
+- `--json` (default off) - Emit machine-readable output.
+
 #### Examples
 
 - **Clear the local project-level editor configuration**:
@@ -2491,6 +2509,10 @@ vaultspec-core config list [OPTIONS]
 ```
 
 Enumerate all known configuration entries and current values.
+
+#### Options
+
+- `--json` (default off) - Emit machine-readable output.
 
 #### Examples
 
