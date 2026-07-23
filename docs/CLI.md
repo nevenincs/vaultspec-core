@@ -471,6 +471,41 @@ edits.
   vaultspec-core sync all
   ```
 
+______________________________________________________________________
+
+### doctor
+
+```bash
+vaultspec-core doctor [OPTIONS]
+```
+
+Diagnose overall workspace and vault health. This is the single health command: it runs
+the workspace diagnosis of `vaultspec-core spec doctor` and the full vault sweep of
+`vaultspec-core vault check all`, then reports both under one exit code. Reach for it
+when you want a yes-or-no answer about the whole project; reach for the two narrower
+commands when you already know which half you are investigating.
+
+#### Options
+
+- `--target DIR` (`-t`, default cwd) - Diagnose a directory other than the current one.
+- `--json` (default off) - Output as JSON.
+
+Exit codes: `0` = all ok, `1` = warnings, `2` = errors.
+
+#### Examples
+
+- **Check the health of the whole project, framework and vault together**:
+
+  ```bash
+  vaultspec-core doctor
+  ```
+
+- **Diagnose another checkout and capture the result for a script**:
+
+  ```bash
+  vaultspec-core doctor --target ../other-project --json
+  ```
+
 ## Vault commands
 
 Group command: `vaultspec-core vault [OPTIONS] COMMAND [ARGS]...`
@@ -494,6 +529,9 @@ Create a new `.vault/` document from a template.
 - `--date DATE` (default today) - Override date (ISO 8601, e.g., YYYY-MM-DD).
 - `--title TITLE` - Document title. For execution records, overrides the default
   heading.
+- `--topic TOPIC` - Kebab-case filename infix that distinguishes a second document of
+  the same type for one feature, producing `{date}-{feature}-{topic}-{type}.md`. Only
+  valid for `audit`, `reference`, and `research`.
 - `--related DOC` (`-r`) - Related document(s). Accepts path, filename, stem, or
   `[[wiki-link]]`. Repeatable.
 - `--tags TAG` - Additional tags beyond the required directory and feature tags.
@@ -507,6 +545,11 @@ Create a new `.vault/` document from a template.
   valid for `exec`.
 - `--all-steps` (default off) - Scaffold execution records for all steps in parent plan.
   Only valid for `exec`.
+- `--summary` (default off) - Scaffold a Phase summary instead of a step record. Only
+  valid for `exec`, and requires `--phase`.
+- `--phase PHASE` - Canonical Phase ID (for example `P01`) to summarize; used with
+  `--summary`.
+- `--no-hints` (default off) - Suppress next-step advisory hints.
 
 #### Step-Aware Execution Scaffolding (`DOC_TYPE=exec`)
 
@@ -605,6 +648,195 @@ vaultspec-core vault add exec --feature test-feature --all-steps
 ```bash
 vaultspec-core vault add exec --feature test-feature --step P01.S01
 ```
+
+______________________________________________________________________
+
+### vaultspec-core vault edit
+
+```bash
+vaultspec-core vault edit [OPTIONS] REF
+```
+
+Set body and/or frontmatter in one atomic write. This is the primary editing surface for
+a scaffolded document: the body channel (`--body-file` or `--body-stdin`) and the
+frontmatter flags are applied together in a single write with a single validation pass,
+so a document never lands on disk with new prose and stale metadata. At least one edit -
+a body channel or a frontmatter flag - must be supplied.
+
+Pass `--expected-blob-hash` with the hash you last read to make the write conditional:
+if anything changed the document in the meantime, the edit is refused instead of
+overwriting someone else's work. `vaultspec-core vault list --json` reports the current
+hash for each document.
+
+#### Arguments
+
+- `REF` - Document to edit. Accepts stem, filename, path, or `[[wiki-link]]`. Required.
+
+#### Options
+
+- `--body-file FILE` - Read the new body text from this file.
+- `--body-stdin` (default off) - Read the new body text from stdin.
+- `--date DATE` - Set the date field (`YYYY-MM-DD`).
+- `--tags TAG` - Set the tags list. Repeatable; replaces the whole list.
+- `--related DOC` (`-r`) - Set the related list. Repeatable; replaces the whole list.
+  Each input is resolved to `[[wiki-link]]` form.
+- `--expected-blob-hash HASH` - Refuse the write unless the on-disk blob OID matches.
+- `--check` / `--no-check` (default `--check`) - Run conformance checks before writing.
+- `--dry-run` (default off) - Preview without writing.
+- `--json` (default off) - Output as JSON.
+- `--target DIR` (`-t`, default cwd) - Target directory.
+
+#### Examples
+
+- **Replace a document's prose and relink it in one write**:
+
+  ```bash
+  vaultspec-core vault edit 2026-05-17-test-feature-research --body-file draft.md --related 2026-05-17-test-feature-adr
+  ```
+
+- **Pipe generated prose in and preview the result before committing to it**:
+
+  ```bash
+  cat draft.md | vaultspec-core vault edit 2026-05-17-test-feature-research --body-stdin --dry-run
+  ```
+
+______________________________________________________________________
+
+### vaultspec-core vault set-body
+
+```bash
+vaultspec-core vault set-body [OPTIONS] REF
+```
+
+Replace only the body prose of a document, keeping its frontmatter. The frontmatter
+block is preserved byte for byte; only the text after the closing `---` fence is
+replaced, and the `modified:` stamp is refreshed. With `--check` (the default) the
+proposed content is validated first and the write is refused if any diagnostic is an
+error.
+
+Use this when the metadata is already right and you only want to swap the prose; use
+`vaultspec-core vault edit` when the same change also touches frontmatter.
+
+#### Arguments
+
+- `REF` - Document to edit. Accepts stem, filename, path, or `[[wiki-link]]`. Required.
+
+#### Options
+
+- `--body-file FILE` - Read the new body text from this file.
+- `--body-stdin` (default off) - Read the new body text from stdin.
+- `--expected-blob-hash HASH` - Refuse the write unless the on-disk blob OID matches.
+- `--check` / `--no-check` (default `--check`) - Run conformance checks before writing.
+- `--dry-run` (default off) - Preview without writing.
+- `--json` (default off) - Output as JSON.
+- `--target DIR` (`-t`, default cwd) - Target directory.
+
+#### Examples
+
+- **Swap in a rewritten body from a file**:
+
+  ```bash
+  vaultspec-core vault set-body 2026-05-17-test-feature-research --body-file rewrite.md
+  ```
+
+- **Write only if the document has not changed since you read it**:
+
+  ```bash
+  vaultspec-core vault set-body 2026-05-17-test-feature-research --body-stdin --expected-blob-hash 4f2a1c9
+  ```
+
+______________________________________________________________________
+
+### vaultspec-core vault set-frontmatter
+
+```bash
+vaultspec-core vault set-frontmatter [OPTIONS] REF
+```
+
+Edit selected frontmatter fields, keeping the body byte for byte. Only the fields you
+pass are changed and every other key is preserved. The proposed metadata is validated
+before writing and the write is refused on any violation, so a malformed tag set or date
+never reaches disk. The `modified:` stamp is refreshed automatically.
+
+There is no `--title` flag: a document's title is its body heading, not a frontmatter
+field. Both `--tags` and `--related` replace the whole list rather than appending, so
+pass every value you want to keep. To add or drop a single edge instead, use
+`vaultspec-core vault link add` and `vaultspec-core vault link remove`.
+
+#### Arguments
+
+- `REF` - Document to edit. Accepts stem, filename, path, or `[[wiki-link]]`. Required.
+
+#### Options
+
+- `--date DATE` - Set the date field (`YYYY-MM-DD`).
+- `--tags TAG` - Set the tags list. Repeatable; replaces the whole list.
+- `--related DOC` (`-r`) - Set the related list. Repeatable; replaces the whole list.
+  Each input is resolved to `[[wiki-link]]` form.
+- `--expected-blob-hash HASH` - Refuse the write unless the on-disk blob OID matches.
+- `--dry-run` (default off) - Preview without writing.
+- `--json` (default off) - Output as JSON.
+- `--target DIR` (`-t`, default cwd) - Target directory.
+
+#### Examples
+
+- **Repoint a document's related list at its governing decision record**:
+
+  ```bash
+  vaultspec-core vault set-frontmatter 2026-05-17-test-feature-plan --related 2026-05-17-test-feature-adr
+  ```
+
+- **Correct a document's date without touching a word of its prose**:
+
+  ```bash
+  vaultspec-core vault set-frontmatter 2026-05-17-test-feature-plan --date 2026-05-18
+  ```
+
+______________________________________________________________________
+
+### vaultspec-core vault rename
+
+```bash
+vaultspec-core vault rename [OPTIONS] REF
+```
+
+Rename a document's file and re-point incoming references. The document is renamed to
+`<--to>.md` in the same directory, every other document's `related: [[old-stem]]` entry
+is rewritten to the new stem, and the `modified:` stamp is refreshed. Pre-checks for
+blob hash, stem grammar, and filename collision run before anything is written, and the
+renamed document's conformance diagnostics come back with the result.
+
+This renames one document. To rename a whole feature - its documents, its exec folder,
+its tags, and its index - use `vaultspec-core vault feature rename`.
+
+#### Arguments
+
+- `REF` - Document to rename. Accepts stem, filename, path, or `[[wiki-link]]`.
+  Required.
+
+#### Options
+
+- `--to STEM` - New identity-bearing stem (filename without `.md`). Required.
+- `--expected-blob-hash HASH` - Refuse the rename unless the on-disk blob OID matches.
+- `--check` / `--no-check` (default `--check`) - Report conformance checks on the
+  renamed document.
+- `--dry-run` (default off) - Preview without writing.
+- `--json` (default off) - Output as JSON.
+- `--target DIR` (`-t`, default cwd) - Target directory.
+
+#### Examples
+
+- **Give a document a clearer stem and fix every link that pointed at it**:
+
+  ```bash
+  vaultspec-core vault rename 2026-05-17-test-feature-research --to 2026-05-17-test-feature-intake-research
+  ```
+
+- **See which documents a rename would rewrite before running it**:
+
+  ```bash
+  vaultspec-core vault rename 2026-05-17-test-feature-research --to 2026-05-17-test-feature-intake-research --dry-run
+  ```
 
 ______________________________________________________________________
 
@@ -745,6 +977,8 @@ Outputs a hierarchical tree grouped by feature and type.
 - `--depth N` (default 1) - Ego-graph radius in hops; only used with --node.
 - `--derived/--no-derived` (default on) - Include the derived relatedness edge set in
   JSON.
+- `--ref REF` - Read the vault corpus from this git ref (branch, tag, or commit) through
+  the object database, without checking it out into the working tree.
 
 The `--json` payload (schema `vaultspec.vault.graph.v2`) carries typed weighted explicit
 edges (`kind`, `multiplicity`, `weight`), node-size hints (`pagerank`, `in_degree`), and
@@ -856,6 +1090,7 @@ List all feature tags in the vault.
 - `--date DATE` - Filter by date.
 - `--orphaned` (default off) - Show only features with no incoming links.
 - `--type TYPE` - Filter by document type.
+- `--stale-days N` - Show only features whose latest activity is older than N days.
 - `--json` (default off) - Emit machine-readable output.
 
 #### Examples
@@ -942,6 +1177,53 @@ Restore all archived documents for a feature tag.
 
 ______________________________________________________________________
 
+### vaultspec-core vault feature rename
+
+```bash
+vaultspec-core vault feature rename [OPTIONS] OLD_FEATURE NEW_FEATURE
+```
+
+Atomically rename a feature tag across every vault surface. The rename rewrites document
+filenames, the exec folder and the execution-record filenames inside it, the `#feature`
+frontmatter tag, `related:` wiki-links, and the regenerated feature index. Free-form
+body prose is never touched, so a sentence that happens to mention the old name stays as
+you wrote it.
+
+The apply phase keeps a reverse journal. If anything fails part way through, the changes
+made so far are rolled back to the pre-rename state, so the vault is never left half
+renamed. By default the command refuses when the target feature already exists;
+`--force` merges the source feature into it, and per-file path collisions still refuse.
+Preview first with `--dry-run` - this command touches many files at once.
+
+#### Arguments
+
+- `OLD_FEATURE` - Current feature tag to rename. Required.
+- `NEW_FEATURE` - New feature tag name. Required.
+
+#### Options
+
+- `--dry-run` (default off) - Preview planned changes without writing.
+- `--force` (default off) - Merge the source into an existing target feature.
+- `--json` (default off) - Output as JSON.
+- `--no-hints` (default off) - Suppress next-step advisory hints.
+- `--target DIR` (`-t`, default cwd) - Target directory.
+
+#### Examples
+
+- **Preview the full set of files a feature rename would rewrite**:
+
+  ```bash
+  vaultspec-core vault feature rename test-feature editor-demo --dry-run
+  ```
+
+- **Fold one feature's documents into another existing feature**:
+
+  ```bash
+  vaultspec-core vault feature rename test-feature editor-demo --force
+  ```
+
+______________________________________________________________________
+
 ### vaultspec-core vault adr supersede
 
 ```bash
@@ -1011,6 +1293,11 @@ Run health checks on `.vault/`. Exits with code `1` if errors are found.
 - `--fix` (default off) - Apply auto-fixes where supported.
 - `--feature TAG` (`-f`) - Limit to a specific feature.
 - `--verbose` (`-v`, default off) - Show INFO-level diagnostics.
+
+`rename-integrity` adds a second repair flag, because a name mismatch can be resolved
+from either side: `--fix` is filename-wins and rewrites the frontmatter name to match
+the file, while `--fix-frontmatter-wins` is the inverse and renames the file to match
+the frontmatter name. Pick the one whose side you trust.
 
 #### Subcommands
 
@@ -1307,6 +1594,18 @@ Canonical identifiers (`S##`, `P##`, `W##`) remain append-only and gap-no-reuse.
   vaultspec-core vault plan tier demote --target L1 --force .vault/plan/2026-05-17-test-feature-plan.md
   ```
 
+#### Shared mutation options
+
+Every mutating plan verb - the step, phase, wave, epic-intent, and tier commands -
+shares three flags:
+
+- `--dry-run` (default off) - Preview the rewritten plan without writing it.
+- `--json` (default off) - Output as JSON.
+- `--canonicalise` (default off) - Strip unrecognized prose blocks while re-serializing
+  the plan. Without it, prose the parser does not recognize is carried through
+  untouched; with it, the plan is rewritten to the canonical structure only. Preview
+  with `--dry-run` before using it on a plan that carries hand-written notes.
+
 #### Read commands
 
 - `status` - Report plan health, structure, and completion. `--json` emits a
@@ -1517,6 +1816,131 @@ should skip the dependency check.
   vaultspec-core vault plan trailer validate .git/COMMIT_EDITMSG
   ```
 
+______________________________________________________________________
+
+### vaultspec-core vault link list
+
+```bash
+vaultspec-core vault link list [OPTIONS] [SRC]
+```
+
+List `related:` edges in the vault document graph. Without `SRC` every edge in the graph
+is listed. Given a `SRC`, the listing is scoped to that document: its out-links, meaning
+the edges it declares, and its in-links, meaning the edges other documents point at it.
+That in-link view is the quick way to answer "what would break if I retired this
+document?".
+
+Use `--feature` to restrict the listing to edges whose source carries a given feature
+tag. For a whole-graph picture rather than an edge list, use
+`vaultspec-core vault graph`.
+
+#### Arguments
+
+- `SRC` (optional) - Scope the listing to edges from or to this document. Accepts stem,
+  filename, path, or `[[wiki-link]]`.
+
+#### Options
+
+- `--feature TAG` (`-f`) - Filter edges whose source has this feature tag.
+- `--json` (default off) - Output as JSON.
+- `--target DIR` (`-t`, default cwd) - Target directory.
+
+#### Examples
+
+- **See everything one document links to and everything that links back to it**:
+
+  ```bash
+  vaultspec-core vault link list 2026-05-17-test-feature-adr
+  ```
+
+- **List only the edges declared by one feature's documents**:
+
+  ```bash
+  vaultspec-core vault link list --feature test-feature
+  ```
+
+______________________________________________________________________
+
+### vaultspec-core vault link add
+
+```bash
+vaultspec-core vault link add [OPTIONS] SRC DST
+```
+
+Add a `related:` edge from `SRC` to `DST`. Both arguments are resolved to document stems
+and the edge is written into the source document's `related:` frontmatter as a
+`[[wiki-link]]`. Adding an edge that already exists is reported as unchanged, so the
+command is safe to re-run.
+
+By default a dangling edge - one whose target resolves to no real document - is refused;
+pass `--force` when you deliberately want to link ahead to a document you have not
+scaffolded yet. The command exits `0` when the edge was added or already existed, and
+`1` when either argument fails to resolve or a dangling edge is refused.
+
+#### Arguments
+
+- `SRC` - Source document to add the edge from. Accepts stem, filename, path, or
+  `[[wiki-link]]`. Required.
+- `DST` - Target document to link to. Accepts stem, filename, path, or `[[wiki-link]]`.
+  Required.
+
+#### Options
+
+- `--dry-run` (default off) - Preview the change without writing.
+- `--force` (default off) - Allow creating a dangling edge whose target is not a real
+  document.
+- `--json` (default off) - Output as JSON.
+- `--target DIR` (`-t`, default cwd) - Target directory.
+
+#### Examples
+
+- **Link a plan to the decision record it carries out**:
+
+  ```bash
+  vaultspec-core vault link add 2026-05-17-test-feature-plan 2026-05-17-test-feature-adr
+  ```
+
+- **Check what a link would write before writing it**:
+
+  ```bash
+  vaultspec-core vault link add 2026-05-17-test-feature-plan 2026-05-17-test-feature-adr --dry-run
+  ```
+
+______________________________________________________________________
+
+### vaultspec-core vault link remove
+
+```bash
+vaultspec-core vault link remove [OPTIONS] SRC DST
+```
+
+Remove a `related:` edge from `SRC` to `DST`. Only the source document is rewritten; the
+target is left untouched. Removing an edge that does not exist is reported as unchanged
+rather than as an error, so the command is safe to re-run and safe to script. It exits
+`0` on success or on a no-op, and `1` when either argument fails to resolve or the write
+fails.
+
+#### Arguments
+
+- `SRC` - Source document to remove the edge from. Accepts stem, filename, path, or
+  `[[wiki-link]]`. Required.
+- `DST` - Target document to unlink. Accepts stem, filename, path, or `[[wiki-link]]`.
+  Required.
+
+#### Options
+
+- `--dry-run` (default off) - Preview the change without writing.
+- `--json` (default off) - Output as JSON.
+- `--target DIR` (`-t`, default cwd) - Target directory.
+
+#### Examples
+
+- **Drop a stale link between two documents**:
+
+  ```bash
+  vaultspec-core vault link remove 2026-05-17-test-feature-plan 2026-05-17-old-adr-stem
+  ```
+
 ## Spec commands
 
 Group command: `vaultspec-core spec [OPTIONS] COMMAND [ARGS]...`
@@ -1541,6 +1965,9 @@ reported as warnings and are not modified.
 
 - `--target DIR` (`-t`, default cwd) - Diagnose a directory other than the current one.
 - `--json` (default off) - Emit the diagnosis as JSON.
+- `--gate-errors` (default off) - Exit `0` on warnings and fail (exit `2`) only on
+  errors. Intended for the pre-commit gate, where warning-level provider-mirror lag is
+  an expected steady state that must not block a commit.
 
 Exit codes: `0` = all ok, `1` = warnings, `2` = errors.
 
@@ -1569,6 +1996,9 @@ vaultspec-core spec agents [OPTIONS] COMMAND [ARGS]...
 
 - `list` - List all resources.
 - `add NAME [--body BODY] [--from-file FILE] [--force] [--dry-run]` - Create a resource.
+  `skills add` and `agents add` also accept `--description TEXT` for the resource's
+  frontmatter summary, and `skills add` additionally accepts `--template NAME` to
+  scaffold from a named template instead of an empty body.
 - `show NAME` - Print resource content to stdout.
 - `edit NAME [--editor EDITOR]` - Open in configured editor. Resolution order: --editor
   flag, local config, VISUAL, EDITOR, vi.
@@ -1582,7 +2012,8 @@ vaultspec-core spec agents [OPTIONS] COMMAND [ARGS]...
 
 `edit` accepts the `--editor` option to override the editor binary for this invocation.
 `add` accepts the unified `--body` flag for direct content or `--from-file` to read from
-a file.
+a file. Rules carry no description, so `rules add` has no `--description`; only skills
+support `--template`.
 
 `vaultspec-core spec <resource> sync` commands are narrow maintenance surfaces. They do
 not guarantee that provider-facing config stubs such as `AGENTS.md`, `CLAUDE.md`,

@@ -343,6 +343,12 @@ changes without writing. | | `--force` | off | Prune stale files; overwrite
 user-authored content. | | `--skip` | `[]` | Skip a component (repeatable). | | `--json`
 | off | Emit machine-readable output. |
 
+### vaultspec-core doctor
+
+Diagnose overall workspace and vault health: runs `vaultspec-core spec doctor` and
+`vaultspec-core vault check all` under one exit code. Options: `--target` / `-t`,
+`--json`. Exit codes: `0` = all ok, `1` = warnings, `2` = errors.
+
 ### Sync output vocabulary
 
 Sync-shaped results (`vaultspec-core install`, `vaultspec-core sync`,
@@ -374,7 +380,41 @@ existing document. | | `--dry-run` | - | off | Preview without writing. | | `--j
 advisory hints. | | `--tier TIER` | - | `L1` | Plan tier (`L1`..`L4`). Ignored for
 non-plan document types. | | `--step ID` | - | None | Canonical ID or display path of
 the Step to scaffold (exec records). | | `--all-steps` | - | off | Scaffold execution
-records for all Steps in the parent plan. |
+records for all Steps in the parent plan. | | `--summary` | - | off | Scaffold a Phase
+summary instead of a Step record (exec only; requires `--phase`). | | `--phase ID` | - |
+None | Canonical Phase ID to summarise; used with `--summary`. |
+
+### vaultspec-core vault edit
+
+Set body and/or frontmatter in one atomic write, with one validation pass. At least one
+edit must be supplied. Body channels: `--body-file PATH`, `--body-stdin`. Frontmatter
+flags: `--date DATE`, `--tags TAG` (repeatable, replaces the list), `--related DOC` /
+`-r` (repeatable, replaces the list). Also accepts `--expected-blob-hash OID` (refuse
+the write unless the on-disk blob matches), `--check` / `--no-check` (conformance checks
+before writing, default on), `--dry-run`, and `--json`.
+
+### vaultspec-core vault set-body
+
+Replace only the body prose, preserving the frontmatter block byte-for-byte and
+refreshing `modified:`. Options: `--body-file PATH`, `--body-stdin`,
+`--expected-blob-hash OID`, `--check` / `--no-check` (default on), `--dry-run`,
+`--json`.
+
+### vaultspec-core vault set-frontmatter
+
+Edit selected frontmatter fields, preserving the body byte-for-byte. Only the fields
+passed change; metadata is validated before writing and the write is refused on any
+violation. Options: `--date DATE`, `--tags TAG` (repeatable, replaces the list),
+`--related DOC` / `-r` (repeatable, replaces the list), `--expected-blob-hash OID`,
+`--dry-run`, `--json`. There is no `--title`: the title is the body H1.
+
+### vaultspec-core vault rename
+
+`vaultspec-core vault rename [OPTIONS] REF` - rename one document's file and re-point
+every incoming `related:` reference. Options: `--to STEM` (required, new
+identity-bearing stem), `--expected-blob-hash OID`, `--check` / `--no-check` (default
+on), `--dry-run`, `--json`. Use `vaultspec-core vault feature rename` to rename a whole
+feature.
 
 ### vaultspec-core status
 
@@ -452,6 +492,8 @@ Render ASCII topology. | | `--body` | - | off | Include document body in JSON ou
 | `--node STEM` | - | None | Scope JSON to a node's local (ego) neighbourhood. | |
 `--depth N` | - | 1 | Ego-graph radius in hops; only used with --node. | |
 `--derived/--no-derived` | - | on | Include the derived relatedness edge set in JSON. |
+| `--ref REF` | - | None | Read the corpus from this git ref via the object database,
+with no working-tree checkout. |
 
 The `--json` payload (schema `vaultspec.vault.graph.v2`) carries typed weighted explicit
 edges (`kind`, `multiplicity`, `weight`), node-size hints (`pagerank`, `in_degree`), and
@@ -491,7 +533,9 @@ List feature tags in the vault.
 | Option | Default | Description | | ------------- | ------- |
 ------------------------------------------ | | `--date DATE` | None | Filter by date. |
 | `--orphaned` | off | Show only features with no incoming links. | | `--type TYPE` |
-None | Filter by document type. | | `--json` | off | Emit machine-readable output. |
+None | Filter by document type. | | `--stale-days N` | None | Show only features whose
+latest activity is older than N days. | | `--json` | off | Emit machine-readable output.
+|
 
 ### vaultspec-core vault feature index
 
@@ -513,6 +557,40 @@ feature tag to the archive. Options: `--dry-run` (preview planned changes), `--j
 documents for a feature tag. Options: `--dry-run` (preview planned changes), `--json`.
 The `--no-hints` flag is not accepted here.
 
+### vaultspec-core vault feature rename
+
+`vaultspec-core vault feature rename [OPTIONS] OLD_FEATURE NEW_FEATURE` - atomically
+rename a feature tag across filenames, the exec folder and its records, the `#feature`
+tag, `related:` wiki-links, and the regenerated index. Body prose is never rewritten. A
+reverse journal rolls the vault back if the apply phase fails. Options: `--dry-run`,
+`--force` (merge into an existing target feature; per-file path collisions still
+refuse), `--json`, `--no-hints`.
+
+### vaultspec-core vault adr supersede
+
+`vaultspec-core vault adr supersede [OPTIONS] OLD_ADR` - mark an ADR superseded by a
+newer one. Options: `--by STEM` (the superseding ADR), `--dry-run`, `--json`.
+
+### vaultspec-core vault rule promote
+
+`vaultspec-core vault rule promote [OPTIONS]` - promote an audit finding to a
+project-level rule. Options: `--from STEM` (audit to promote from, required),
+`--as NAME` (kebab-case rule name, required), `--force`, `--dry-run`, `--json`.
+
+### vaultspec-core vault link
+
+`vaultspec-core vault link list [OPTIONS] [SRC]` lists `related:` edges; with `SRC` the
+listing is scoped to that node's out-links and in-links. Options: `--feature TAG` /
+`-f`, `--json`.
+
+`vaultspec-core vault link add [OPTIONS] SRC DST` adds an edge from `SRC` to `DST`.
+Refuses a dangling target unless `--force` is passed. Options: `--dry-run`, `--force`,
+`--json`. Exits `0` when added or already present, `1` on resolution failure or dangling
+refusal.
+
+`vaultspec-core vault link remove [OPTIONS] SRC DST` removes an edge. A missing edge is
+reported as unchanged, not an error. Options: `--dry-run`, `--json`.
+
 ### vaultspec-core vault check
 
 Signature: `vaultspec-core vault check [OPTIONS] COMMAND [ARGS]...`. Run health checks
@@ -525,11 +603,13 @@ Subcommands: `all`, `annotations`, `markdown`, `placeholders`, `body-links`, `da
 `frontmatter`, `modified-stamp`, `links`, `orphans`, `features`, `references`, `schema`,
 `structure`, `rename-integrity`. The `structure` subcommand does not support
 `--feature`. The `rename-integrity` subcommand checks name/filename integrity for rules,
-skills, and agents. The `modified-stamp` subcommand flags missing, unparseable, or stale
-`modified:` stamps; with `--fix` it normalizes parsed values to canonical `yyyy-mm-dd`
-form. The `markdown` subcommand checks markdown hygiene (trailing whitespace, blank-line
-runs, final newline) and repairs it with `--fix`. The `placeholders` subcommand finds
-unreplaced `{...}` template placeholders left in document body prose (detection only).
+skills, and agents; `--fix` is filename-wins (rewrite the frontmatter name) and
+`--fix-frontmatter-wins` is the inverse (rename the file). The `modified-stamp`
+subcommand flags missing, unparseable, or stale `modified:` stamps; with `--fix` it
+normalizes parsed values to canonical `yyyy-mm-dd` form. The `markdown` subcommand
+checks markdown hygiene (trailing whitespace, blank-line runs, final newline) and
+repairs it with `--fix`. The `placeholders` subcommand finds unreplaced `{...}` template
+placeholders left in document body prose (detection only).
 
 ### vaultspec-core vault plan
 
@@ -598,16 +678,19 @@ The `vaultspec-core spec rules`, `vaultspec-core spec skills`, and
 | Subcommand | Signature | Description | | ---------- |
 ---------------------------------- | --------------------------------- | | `list` | - |
 List all resources. | | `add` | `NAME [--force] [--dry-run]` | Create a resource. | |
-`show` | `NAME` | Print resource content to stdout. | | `edit` | `NAME` | Open in
-`VAULTSPEC_EDITOR`. | | `remove` | `NAME [--yes` / `-y` / `--force]` | Delete a resource
-(prompts). | | `rename` | `OLD_NAME NEW_NAME` | Rename a resource. | | `sync` |
+`show` | `NAME` | Print resource content to stdout. | | `edit` | `NAME [--editor CMD]` |
+Open in the resolved editor. | | `remove` | `NAME [--yes` / `-y` / `--force]` | Delete a
+resource (prompts). | | `rename` | `OLD_NAME NEW_NAME` | Rename a resource. | | `sync` |
 `[PROVIDER] [--dry-run] [--force]` | Resource-scoped sync. | | `restore` | `FILENAME` |
 Restore to snapshotted original. |
 
 Body-content flags on `add` vary by resource: `vaultspec-core spec rules add` takes
 `--body TEXT`; `vaultspec-core spec skills add` takes `--description TEXT` and
 `--template TEXT`; `vaultspec-core spec agents add` takes `--description TEXT`. All
-three also accept `--from-file PATH`.
+three also accept `--from-file PATH`. `edit` accepts `--editor CMD` to override the
+editor binary for one invocation; resolution order is `--editor`, project config,
+`$VISUAL`, `$EDITOR` / `VAULTSPEC_EDITOR`, `vi`. `status` accepts `--json` and reports
+the missing, drifted, and stale rows of a prune-enabled dry-run sync.
 
 ### vaultspec-core spec system
 
@@ -621,6 +704,26 @@ The `vaultspec-core spec hooks list` command lists hooks with name, status, even
 action count. The signature `vaultspec-core spec hooks run [OPTIONS] EVENT` triggers
 enabled hooks; it takes `--path PATH`. Valid events: `vault.document.created`,
 `config.synced`, `audit.completed`.
+
+The group shares the resource CRUD shape (`list`, `add`, `show`, `edit`, `rename`,
+`remove`, `restore`, `sync`, `status`) plus `run`. `vaultspec-core spec hooks add NAME`
+takes `--event EVENT` (default `vault.document.created`) and `--command CMD` alongside
+the shared `--body`, `--from-file`, `--force`, and `--dry-run` flags; `edit` takes
+`--editor CMD`.
+
+### vaultspec-core spec precommit
+
+Manage the project's pre-commit integration. `vaultspec-core spec precommit migrate`
+converts a legacy `.pre-commit-config.yaml` to `prek.toml`, and takes `--remove-yaml` to
+delete the superseded YAML once the canonical hooks are verifiably present in
+`prek.toml`, plus `--dry-run` and `--json`.
+
+### vaultspec-core spec reference
+
+`vaultspec-core spec reference generate` rewrites the generator-owned regions of this
+reference and of the source-tree handbook from the live command tree. It takes `--check`
+to render in memory and diff against the committed files, exiting non-zero on mismatch
+without writing, plus `--json`.
 
 ### vaultspec-core spec mcps
 
