@@ -1440,6 +1440,58 @@ def cmd_check_body_links(
     )
 
 
+@check_app.command("exec-mapping")
+def cmd_check_exec_mapping(
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Check execution records map to a live Step in their parent plan."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
+    from vaultspec_core.vaultcore.checks import check_exec_mapping
+
+    snapshot = VaultGraph(_get_ctx().target_dir).to_snapshot()
+    result = check_exec_mapping(
+        _get_ctx().target_dir, snapshot=snapshot, feature=feature
+    )
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.exec-mapping"
+    )
+
+
+@check_app.command("body-sections")
+def cmd_check_body_sections(
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Check document bodies carry the sections their template mandates."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
+    from vaultspec_core.vaultcore.checks import check_body_sections
+
+    snapshot = VaultGraph(_get_ctx().target_dir).to_snapshot()
+    result = check_body_sections(
+        _get_ctx().target_dir, snapshot=snapshot, feature=feature
+    )
+    _render_and_exit(
+        result, verbose, json_output=json_output, command="vault.check.body-sections"
+    )
+
+
 @check_app.command("annotations")
 def cmd_check_annotations(
     fix: Annotated[

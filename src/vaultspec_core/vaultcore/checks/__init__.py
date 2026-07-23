@@ -24,9 +24,11 @@ from ._base import (
 from .adr_status import check_adr_status
 from .annotations import check_annotations
 from .body_links import check_body_links
+from .body_sections import check_body_sections
 from .code_boundary import check_code_boundary
 from .dangling import check_dangling
 from .encoding import check_encoding
+from .exec_mapping import check_exec_mapping
 from .feature_rename_integrity import check_feature_rename_integrity
 from .features import check_features
 from .frontmatter import check_frontmatter
@@ -51,9 +53,11 @@ __all__ = [
     "check_adr_status",
     "check_annotations",
     "check_body_links",
+    "check_body_sections",
     "check_code_boundary",
     "check_dangling",
     "check_encoding",
+    "check_exec_mapping",
     "check_feature_rename_integrity",
     "check_features",
     "check_frontmatter",
@@ -81,8 +85,8 @@ def run_all_checks(
 
     Executes structure, frontmatter, modified-stamp, annotations, markdown,
     links, dangling, body-links, placeholders, orphans, features,
-    feature-rename-integrity, references, schema, adr-status,
-    rename-integrity, and encoding checks in order. Builds a single
+    exec-mapping, body-sections, feature-rename-integrity, references, schema,
+    adr-status, rename-integrity, and encoding checks in order. Builds a single
     :class:`~vaultspec_core.graph.VaultGraph` and shares it across
     graph-consuming checkers to avoid redundant I/O.
 
@@ -114,6 +118,8 @@ def run_all_checks(
             check_placeholders(root_dir, snapshot=snapshot, feature=feature),
             check_orphans(root_dir, graph=graph, feature=feature),
             check_features(root_dir, snapshot=snapshot, feature=feature),
+            check_exec_mapping(root_dir, snapshot=snapshot, feature=feature),
+            check_body_sections(root_dir, snapshot=snapshot, feature=feature),
             check_feature_rename_integrity(root_dir),
             check_references(root_dir, graph=graph, feature=feature, fix=False),
             check_schema(root_dir, graph=graph, feature=feature, fix=False),
@@ -185,6 +191,15 @@ def run_all_checks(
     results.append(check_orphans(root_dir, graph=graph, feature=feature))
     results.append(
         check_features(root_dir, snapshot=graph.to_snapshot(), feature=feature)
+    )
+    # Exec-mapping and body-sections are read-only (no dangling reference or
+    # missing section has an unambiguous auto-repair); they run identically in
+    # both modes, following the check_encoding precedent.
+    results.append(
+        check_exec_mapping(root_dir, snapshot=graph.to_snapshot(), feature=feature)
+    )
+    results.append(
+        check_body_sections(root_dir, snapshot=graph.to_snapshot(), feature=feature)
     )
     # Feature-rename-integrity is read-only (reconciling drift is a feature
     # rename, not a frontmatter rewrite); it runs identically in both modes.
