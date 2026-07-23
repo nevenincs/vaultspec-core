@@ -112,7 +112,7 @@ mode-neutral MCP definition substituted by core's generalized renderer, doctor
 mode-and-floor rows, and upgrade-time mode inference, all calling into core's
 workspace_mode module rather than a rag-owned implementation. Wave W02's records live
 in this vault even though its Steps' file scopes sit in the vaultspec-rag repository
-(Y:/code/vaultspec-rag-worktrees/main); the wave's first Phase is a release gate that
+(the local `vaultspec-rag-worktrees/main` checkout); the wave's first Phase is a release gate that
 blocks the remainder of the wave on a released vaultspec-core version carrying the DEV
 member and schema v2, since rag's own pyproject.toml floors on that core version as a
 direct dependency.

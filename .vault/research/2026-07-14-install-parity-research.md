@@ -112,7 +112,7 @@ tool-only - require a third persisted mode or stay a detection detail under two.
   `src/vaultspec_rag/commands/_torch_flow.py:206-267`,
   `src/vaultspec_rag/builtins/mcps/vaultspec-rag.builtin.json`,
   `src/vaultspec_rag/workspace.py`, `src/vaultspec_rag/cli/_service_doctor.py`,
-  rag `pyproject.toml:19-36,63-65` (all under `Y:/code/vaultspec-rag-worktrees/main`).
+  rag `pyproject.toml:19-36,63-65` (all under the local `vaultspec-rag-worktrees/main` checkout).
 - Core reference: `src/vaultspec_core/core/enums.py:299-343`,
   `core/workspace_mode.py:47-63,194-243`, `core/mcps.py:41-80`,
   `core/diagnosis/collectors.py:731-933`, `cli/root.py:231-241`.

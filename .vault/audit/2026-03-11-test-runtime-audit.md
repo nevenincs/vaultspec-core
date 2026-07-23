@@ -32,7 +32,7 @@ These were straightforward stale-test failures caused by runtime drift.
 
 - As a result, `tmp_path` setup for those suites still used the shared OS temp
   root and hit `.lock` permission failures under
-  `C:\Users\hello\AppData\Local\Temp\pytest-of-hello`.
+  `%TEMP%\pytest-of-<user>`.
 
 This was a harness-scoping defect, not a product defect.
 

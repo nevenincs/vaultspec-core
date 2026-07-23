@@ -11,7 +11,7 @@ related: []
 
 ## 1. Scope and intent
 
-This research grounds a dev-only, never-shipped analytics module at repo-root `statistic/` (sibling to `src/`, `tests/`, `docs/`, `scripts/`). It reads the two agent-CLI transcript corpora on this machine - Claude Code under `C:\Users\hello\.claude\projects\` and Codex under `C:\Users\hello\.codex\` - filters to vaultspec-core CLI invocations and vaultspec MCP tool calls, and produces statistics that empirically ground the upcoming MCP-server overhaul: which verbs are actually exercised, which declared capabilities are dead, where invocations miss, and what each command class costs in tokens and turns.
+This research grounds a dev-only, never-shipped analytics module at repo-root `statistic/` (sibling to `src/`, `tests/`, `docs/`, `scripts/`). It reads the two agent-CLI transcript corpora on this machine - Claude Code under `~/.claude/projects/` and Codex under `~/.codex/` - filters to vaultspec-core CLI invocations and vaultspec MCP tool calls, and produces statistics that empirically ground the upcoming MCP-server overhaul: which verbs are actually exercised, which declared capabilities are dead, where invocations miss, and what each command class costs in tokens and turns.
 
 The packaging exclusion is confirmed. `pyproject.toml` line 100 declares `[tool.hatch.build.targets.wheel] packages = ["src/vaultspec_core"]`, so any top-level `statistic/` directory is inherently outside the wheel. Nothing further is needed to keep it unshipped; the residual risk is purely its generated report outputs, which mine personal data and must be gitignored (Section 5).
 
@@ -19,7 +19,7 @@ The window is fixed: analyze only transcripts with activity timestamp `>= 2026-0
 
 ## 2. The two transcript schemas
 
-Both corpora were sampled from real, in-window files. Claude: `C:\Users\hello\.claude\projects\Y--code-vaultspec-core-worktrees-feature-mcp\abaaaa78-13f1-41f1-8f8b-58cb53624e82.jsonl` plus a recent 80-file scan across all 47 project dirs (~5052 files). Codex: `C:\Users\hello\.codex\sessions\2026\07\07\rollout-2026-07-07T09-34-45-...jsonl` plus `history.jsonl` and `session_index.jsonl`.
+Both corpora were sampled from real, in-window files. Claude: `~/.claude/projects/<project-slug>/abaaaa78-13f1-41f1-8f8b-58cb53624e82.jsonl` plus a recent 80-file scan across all 47 project dirs (~5052 files). Codex: `~/.codex/sessions/2026/07/07/rollout-2026-07-07T09-34-45-...jsonl` plus `history.jsonl` and `session_index.jsonl`.
 
 ### 2.1 Claude Code (`.claude/projects/<project-slug>/*.jsonl`)
 
@@ -138,4 +138,4 @@ Downstream use. The output feeds MCP tool-surface design: hotspots (a) and n-gra
 
 ## 7. Sources
 
-Files read for grounding: `.vaultspec/reference/cli.md`; `pyproject.toml`; `C:\Users\hello\.claude\projects\Y--code-vaultspec-core-worktrees-feature-mcp\abaaaa78-13f1-41f1-8f8b-58cb53624e82.jsonl` plus an 80-file recent-scan across all 47 `C:\Users\hello\.claude\projects\*` dirs and their `subagents/`; `C:\Users\hello\.codex\` root listing, `history.jsonl`, `session_index.jsonl`, and `sessions\2026\07\07\rollout-2026-07-07T09-34-45-...jsonl`.
+Files read for grounding: `.vaultspec/reference/cli.md`; `pyproject.toml`; `~/.claude/projects/<project-slug>/abaaaa78-13f1-41f1-8f8b-58cb53624e82.jsonl` plus an 80-file recent-scan across all 47 `~/.claude/projects/*` dirs and their `subagents/`; `~/.codex/` root listing, `history.jsonl`, `session_index.jsonl`, and `sessions/2026/07/07/rollout-2026-07-07T09-34-45-...jsonl`.

@@ -27,7 +27,7 @@ related:
 
 - `uv sync --extra dev` -- installed 16 dev packages, no errors
 - `uv run python -c "import vaultspec; print('OK')"` -- OK
-- Package installed as editable at `Y:\code\vaultspec-worktrees\main`
+- Package installed as editable at the local `vaultspec-worktrees\main` checkout
 - `src/vaultspec/` on `sys.path` via hatchling wheel build
 
 ### Step 15: `uv run pytest` -- FAIL

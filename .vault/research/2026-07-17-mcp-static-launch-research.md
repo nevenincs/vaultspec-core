@@ -99,7 +99,7 @@ banned (and the two lock-holding processes in the incident were exactly this
 venv's `vaultspec-search-mcp.exe`), and a non-tokenized definition bypasses
 the mode renderer entirely. The rag repository has already shipped the
 correct tokenized form
-(`Y:/code/vaultspec-rag-worktrees/main/src/vaultspec_rag/builtins/mcps/vaultspec-rag.builtin.json`:
+(`vaultspec-rag-worktrees/main/src/vaultspec_rag/builtins/mcps/vaultspec-rag.builtin.json`:
 mode tokens plus `_vaultspec_mode_package: vaultspec-rag`,
 `_vaultspec_mode_module: vaultspec_rag.server`), so the workspace copy is
 stale seeded state, refreshed only by a rag-side re-enrollment. Additionally
@@ -112,7 +112,7 @@ the very workspace that runs both.
 `vaultspec-rag` made `mcp` an optional extra: the base install must not drag
 `mcp` (or its Windows `pywin32` transitive), and the MCP server requires
 `vaultspec-rag[mcp]`
-(`Y:/code/vaultspec-rag-worktrees/main/pyproject.toml:91-95`, entry point
+(`vaultspec-rag-worktrees/main/pyproject.toml:91-95`, entry point
 `vaultspec-search-mcp = "vaultspec_rag.server:main"` at line 65). Core's
 renderer supports exactly this via `_vaultspec_mode_tool_spec`
 (`src/vaultspec_core/core/mcps.py:59,99-101`, docstring example
@@ -216,8 +216,8 @@ rendering in `src/vaultspec_core/core/mcps.py` and its consumers.
 - `src/vaultspec_core/core/commands.py:396` - hook prefix `uv run --no-sync vaultspec-core`
 - `src/vaultspec_core/core/diagnosis/collectors.py:813-873` - observed-shape matcher
 - `.vaultspec/mcps/vaultspec-rag.builtin.json` (workspace copy, stale exe-form)
-- `Y:/code/vaultspec-rag-worktrees/main/src/vaultspec_rag/builtins/mcps/vaultspec-rag.builtin.json` - rag shipped tokenized form
-- `Y:/code/vaultspec-rag-worktrees/main/pyproject.toml:65,91-95` - `vaultspec-rag[mcp]` optional extra, entry point
+- `vaultspec-rag-worktrees/main/src/vaultspec_rag/builtins/mcps/vaultspec-rag.builtin.json` - rag shipped tokenized form
+- `vaultspec-rag-worktrees/main/pyproject.toml:65,91-95` - `vaultspec-rag[mcp]` optional extra, entry point
 - `.vaultspec/workspace.json` - core-only per-package map, dependency mode, floor 0.1.37
 - Incident reproduction 2026-07-17, this workspace: `uv run` exit 2, pywin32 DLL lock, missing `vaultspec_core` in site-packages
 - https://docs.astral.sh/uv/reference/cli/#uv-run - `uv run` sync semantics, `--no-sync`/`--frozen`/`--locked`

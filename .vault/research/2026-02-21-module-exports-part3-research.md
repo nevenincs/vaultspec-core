@@ -473,7 +473,7 @@ ______________________________________________________________________
 
 ### 8A. Test import inventory
 
-**Top-level `tests/` directory** (`Y:\code\vaultspec-worktrees\main\tests\`):
+**Top-level `tests/` directory** (the local `vaultspec-worktrees\main\tests\`):
 Approximately **94** `from vaultspec.*` import statements across test files.
 
 **In-tree tests** (`src/vaultspec/*/tests/`):
