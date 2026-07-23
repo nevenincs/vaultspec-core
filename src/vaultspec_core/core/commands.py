@@ -655,7 +655,13 @@ _HOOK_SUBCOMMAND: dict[PrecommitHook, str] = {
     PrecommitHook.VAULT_FIX: "vault check all --fix",
     PrecommitHook.VAULT_SANITIZE_ANNOTATIONS: "vault sanitize annotations",
     PrecommitHook.CHECK_PROVIDER_ARTIFACTS: "check-providers",
-    PrecommitHook.SPEC_CHECK: "spec doctor",
+    # ``--gate-errors`` folds the doctor's warning exit (1) to 0 so the gate
+    # blocks only on errors. Warning-level provider-mirror lag is the expected
+    # steady state after any builtins change - check-provider-artifacts forbids
+    # committing the regenerated mirror - so a warning-strict gate would
+    # deadlock every commit. This is the canonical entry, not a hand-hardened
+    # local override, so sync renders it directly rather than clobbering it.
+    PrecommitHook.SPEC_CHECK: "spec doctor --gate-errors",
 }
 _HOOK_META: dict[PrecommitHook, dict[str, object]] = {
     PrecommitHook.VAULT_FIX: {"name": "Vault fix", "types": ["markdown"]},

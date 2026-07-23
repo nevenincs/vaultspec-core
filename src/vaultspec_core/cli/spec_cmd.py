@@ -1905,13 +1905,26 @@ def cmd_doctor(
     json_output: Annotated[
         bool, typer.Option("--json", help="Output diagnosis as JSON")
     ] = False,
+    gate_errors: Annotated[
+        bool,
+        typer.Option(
+            "--gate-errors",
+            help=(
+                "Exit 0 on warnings; fail (exit 2) only on errors. For the "
+                "pre-commit gate, where warning-level provider-mirror lag is an "
+                "expected steady state that must not block commits."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Diagnose workspace health and report issues.
 
     Runs all diagnostic collectors and reports the state of the framework,
     providers, builtins, gitignore, and configuration files.
 
-    Exit codes: 0 = all ok, 1 = warnings, 2 = errors.
+    Exit codes: 0 = all ok, 1 = warnings, 2 = errors. With ``--gate-errors``
+    the warning exit is folded to 0 so only errors (exit 2) fail; the report
+    is unchanged and still lists every warning.
     """
     import dataclasses
 
@@ -1951,8 +1964,9 @@ def cmd_doctor(
     if json_output:
         data = dataclasses.asdict(diag)
         exit_code = _doctor_exit_code(diag)
-        _emit_json("spec.doctor", "failed" if exit_code else "unchanged", data)
-        raise typer.Exit(code=exit_code)
+        gated = _gate(exit_code, gate_errors=gate_errors)
+        _emit_json("spec.doctor", "failed" if gated else "unchanged", data)
+        raise typer.Exit(code=gated)
 
     from vaultspec_core.console import get_console
 
@@ -1960,7 +1974,7 @@ def cmd_doctor(
     _render_diagnosis_table(console, diag)
 
     exit_code = _doctor_exit_code(diag)
-    raise typer.Exit(code=exit_code)
+    raise typer.Exit(code=_gate(exit_code, gate_errors=gate_errors))
 
 
 # =============================================================================
@@ -2615,6 +2629,28 @@ def _doctor_exit_code(
     if has_warn:
         return 1
     return 0
+
+
+def _gate(exit_code: int, *, gate_errors: bool) -> int:
+    """Fold the warning exit to 0 when *gate_errors* is set.
+
+    The doctor's native contract is 0/1/2 for ok/warnings/errors. The
+    pre-commit gate opts into error-only blocking with ``--gate-errors``:
+    warning-level provider-mirror lag is the expected steady state after any
+    builtins change (``check-provider-artifacts`` forbids committing the
+    regenerated mirror), so a warning-strict gate would deadlock every commit.
+    Errors (exit 2) still fail; a clean run (0) is unaffected.
+
+    Args:
+        exit_code: The native doctor exit code (0, 1, or 2).
+        gate_errors: When ``True``, map the warning code (1) to 0.
+
+    Returns:
+        The gated exit code.
+    """
+    if gate_errors and exit_code < 2:
+        return 0
+    return exit_code
 
 
 def _run_edit_command(

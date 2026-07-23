@@ -255,3 +255,49 @@ class TestTopLevelDoctorCommand:
         factory = WorkspaceFactory(tmp_path)
         result = factory.run("doctor")
         assert result.exit_code == 2
+
+
+class TestDoctorGateErrors:
+    """``spec doctor --gate-errors`` folds the warning exit to 0.
+
+    The ``spec-check`` pre-commit hook opts into this so warning-level
+    provider-mirror lag - the expected steady state after any builtins
+    change - never deadlocks commits, while real errors still fail the gate.
+    Each test drives the real CLI against an on-disk workspace built by the
+    factory; no doubles.
+    """
+
+    def test_warning_state_fails_without_flag(self, tmp_path: Path) -> None:
+        # Stale synced provider content is a warning (exit 1) - the bare hook
+        # form that deadlocks commits.
+        factory = WorkspaceFactory(tmp_path)
+        factory.install().outdated_vaultspec_rules("claude")
+        result = factory.run("spec", "doctor")
+        assert result.exit_code == 1, result.output
+
+    def test_gate_errors_folds_warning_to_zero(self, tmp_path: Path) -> None:
+        factory = WorkspaceFactory(tmp_path)
+        factory.install().outdated_vaultspec_rules("claude")
+        result = factory.run("spec", "doctor", "--gate-errors")
+        assert result.exit_code == 0, result.output
+
+    def test_gate_errors_still_fails_on_error(self, tmp_path: Path) -> None:
+        # A corrupted manifest is an error (exit 2); the gate must still fail.
+        factory = WorkspaceFactory(tmp_path)
+        factory.install().corrupt_manifest()
+        result = factory.run("spec", "doctor", "--gate-errors")
+        assert result.exit_code == 2, result.output
+
+    def test_gate_errors_clean_is_zero(self, tmp_path: Path) -> None:
+        factory = WorkspaceFactory(tmp_path)
+        factory.install()
+        result = factory.run("spec", "doctor", "--gate-errors")
+        assert result.exit_code == 0, result.output
+
+    def test_gate_errors_json_folds_warning(self, tmp_path: Path) -> None:
+        factory = WorkspaceFactory(tmp_path)
+        factory.install().outdated_vaultspec_rules("claude")
+        result = factory.run("spec", "doctor", "--gate-errors", "--json")
+        assert result.exit_code == 0, result.output
+        # The report still records the warning; only the exit code is folded.
+        assert json.loads(result.output)["data"]["providers"]

@@ -71,7 +71,7 @@ repos:
     pass_filenames: false
   - id: spec-check
     name: Vault Doctor (Check)
-    entry: uv run --no-sync vaultspec-core spec doctor
+    entry: uv run --no-sync vaultspec-core spec doctor --gate-errors
     language: system
     types:
     - markdown
