@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Self
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
-from vaultspec_core.core.enums import DirName, FileName, InstallMode
+from vaultspec_core.core.enums import DirName, FileName, InstallMode, Resource
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -262,6 +262,18 @@ class WorkspaceFactory:
         manifest.write_text("{{{BROKEN", encoding="utf-8")
         return self
 
+    def delete_manifest(self) -> Self:
+        """Delete ``providers.json``, leaving framework content in place.
+
+        Reproduces a fresh clone of a project that tracks its canonical
+        ``.vaultspec/`` tree and provider projections while correctly ignoring
+        the per-machine runtime manifest.
+        """
+        manifest = self.root / DirName.VAULTSPEC / "providers.json"
+        if manifest.exists():
+            manifest.unlink()
+        return self
+
     def empty_manifest(self) -> Self:
         """Write valid JSON with an empty installed set."""
         from vaultspec_core.core.manifest import ManifestData, write_manifest_data
@@ -492,7 +504,7 @@ class WorkspaceFactory:
 
     def delete_builtins(self) -> Self:
         """Delete all ``*.builtin.md`` files from the rules source tree."""
-        rules = self.root / DirName.VAULTSPEC / "rules" / "rules"
+        rules = self.root / DirName.VAULTSPEC / Resource.RULES
         if rules.exists():
             for f in rules.glob("*.builtin.md"):
                 f.unlink()

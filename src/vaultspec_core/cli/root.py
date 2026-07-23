@@ -293,6 +293,16 @@ def cmd_install(
 
     gitignore_was_pre_reversal = upgrade and not dry_run and block_is_pre_reversal(path)
 
+    # Pre-flight establishes the runtime manifest when this workspace is
+    # adoptable, which flips the framework signal to PRESENT. Capture the
+    # pre-adoption observation first so install_run can tell "just adopted" from
+    # "already installed" and stay on the additive path instead of demanding
+    # --force against content the clone legitimately tracks.
+    from vaultspec_core.core.diagnosis.collectors import collect_framework_presence
+    from vaultspec_core.core.diagnosis.signals import FrameworkSignal
+
+    adopting = collect_framework_presence(path) is FrameworkSignal.ADOPTABLE
+
     _run_preflight(
         path,
         action=CliAction.UPGRADE if upgrade else CliAction.INSTALL,
@@ -312,6 +322,7 @@ def cmd_install(
             force=force,
             skip=set(skip),
             mode=mode,
+            adopt=adopting,
         )
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc, json_output=json_output)

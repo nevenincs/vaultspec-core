@@ -34,7 +34,7 @@ pytestmark = [pytest.mark.unit]
     [
         (
             FrameworkSignal,
-            {"MISSING", "CORRUPTED", "PRESENT"},
+            {"MISSING", "CORRUPTED", "ADOPTABLE", "PRESENT"},
         ),
         (
             ProviderDirSignal,
@@ -119,6 +119,7 @@ pytestmark = [pytest.mark.unit]
                 "PRUNE",
                 "REPAIR_MANIFEST",
                 "ADOPT_DIRECTORY",
+                "ADOPT_FRAMEWORK",
                 "REPAIR_GITIGNORE",
                 "REPAIR_GITATTRIBUTES",
                 "REPAIR_PRECOMMIT",

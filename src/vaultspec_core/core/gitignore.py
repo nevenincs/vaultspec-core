@@ -18,6 +18,154 @@ MARKER_END = "# <<< vaultspec-managed <<<"
 # canonical source content lives bundled in `src/vaultspec_core/builtins/`.
 DEFAULT_ENTRIES = [".vaultspec/"]
 
+# Root-level files vaultspec locks via ``advisory_lock`` irrespective of which
+# providers are enrolled.  Provider-native configurations are NOT listed here;
+# they are derived from ``resolve_mcp_targets`` so that enrolling a new provider
+# cannot silently reintroduce an uncovered sentinel.
+_ROOT_LOCK_SUBJECTS: tuple[str, ...] = (
+    ".gitignore",
+    ".mcp.json",
+    ".pre-commit-config.yaml",
+)
+
+
+def _provider_lock_subjects(target: Path) -> tuple[Path, ...]:
+    """Return the provider-native MCP configuration paths for *target*.
+
+    Derived from :func:`~vaultspec_core.core.mcps.resolve_mcp_targets`, the same
+    source of truth the lock-taking code consumes, so the managed-ignore policy
+    tracks provider enrolment automatically.
+
+    Returns an empty tuple when the targets cannot be resolved: a misconfigured
+    or unenrolled provider must never break ``.gitignore`` generation.
+
+    Args:
+        target: Workspace root directory.
+    """
+    from . import types as _t
+
+    try:
+        ctx = _t.get_context()
+        # ``resolve_mcp_targets`` re-initialises the process-wide workspace
+        # context when asked for a different root.  Computing ignore entries is
+        # a read-only query, so consult it only for the ambient workspace and
+        # skip provider derivation otherwise rather than mutate global state.
+        if ctx.target_dir.resolve() != target.resolve():
+            return ()
+
+        from .mcps import resolve_mcp_targets
+
+        return tuple(t.path for t in resolve_mcp_targets(target_dir=target))
+    except Exception:
+        return ()
+
+
+def _lock_subjects(target: Path) -> tuple[Path, ...]:
+    """Return every file vaultspec takes an advisory lock on inside *target*."""
+    subjects = {target / name for name in _ROOT_LOCK_SUBJECTS}
+    subjects.update(_provider_lock_subjects(target))
+    # User-scope provider stores (``~/.codex/config.toml``) resolve outside the
+    # workspace and are not covered by a repository ``.gitignore``.
+    return tuple(sorted(s for s in subjects if _is_within(s, target)))
+
+
+def _is_within(path: Path, root: Path) -> bool:
+    """Return ``True`` when *path* is contained by *root*."""
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def _sentinel_for(subject: Path) -> Path:
+    """Return the advisory-lock sentinel ``advisory_lock`` derives for *subject*."""
+    return subject.with_name(subject.name + ".lock")
+
+
+def managed_lock_candidates(target: Path) -> tuple[str, ...]:
+    """Return every advisory-lock sentinel path Core can own inside *target*.
+
+    :func:`~vaultspec_core.core.helpers.advisory_lock` always derives a sibling
+    ``<path>.lock`` sentinel and never removes it, so every file vaultspec locks
+    leaves a per-machine artefact behind.  This is the single derivation both the
+    managed-ignore policy and the untracking ownership gate consume, so the two
+    can never drift apart.
+
+    Unlike :func:`managed_lock_paths` this reports the full ownership surface
+    regardless of whether the locked subject currently exists: a sentinel
+    committed before its subject was retired is still ours to disown.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        Sorted root-relative POSIX paths, e.g. ``".codex/config.toml.lock"``.
+    """
+    return tuple(
+        sorted(
+            _sentinel_for(subject).relative_to(target).as_posix()
+            for subject in _lock_subjects(target)
+        )
+    )
+
+
+def managed_lock_paths(target: Path) -> tuple[str, ...]:
+    """Return the sentinels Core owns whose locked subject exists on disk.
+
+    The ignore block lists only these, mirroring the long-standing rule that a
+    companion-less lock path is not emitted.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        Sorted root-relative POSIX paths, e.g. ``".codex/config.toml.lock"``.
+    """
+    return tuple(
+        sorted(
+            _sentinel_for(subject).relative_to(target).as_posix()
+            for subject in _lock_subjects(target)
+            if subject.is_file()
+        )
+    )
+
+
+def prune_orphaned_lock_sentinels(target: Path) -> list[str]:
+    """Delete Core-owned lock sentinels whose subject file no longer exists.
+
+    A sentinel outlives its subject when a managed file is retired - most
+    notably ``.pre-commit-config.yaml.lock`` after a checkout migrates to
+    ``prek.toml``.  Because :func:`managed_lock_paths` only covers sentinels with
+    a live subject, an orphan would otherwise remain permanently visible in
+    ``git status``.
+
+    Only empty sentinels are removed: ``advisory_lock`` never writes to the file,
+    so a non-empty ``.lock`` sibling belongs to someone else and is left alone.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        Root-relative POSIX paths of the sentinels actually removed.
+    """
+    removed: list[str] = []
+    for subject in _lock_subjects(target):
+        if subject.exists():
+            continue
+        sentinel = _sentinel_for(subject)
+        try:
+            if not sentinel.is_file() or sentinel.stat().st_size != 0:
+                continue
+            sentinel.unlink()
+        except OSError:
+            # The sentinel may be held by a concurrent process; leaving it in
+            # place is always safe.
+            continue
+        removed.append(sentinel.relative_to(target).as_posix())
+        logger.debug("Removed orphaned lock sentinel %s", sentinel)
+    return removed
+
 
 def get_recommended_entries(target: Path) -> list[str]:
     """Return the runtime-only gitignore entries for the managed block.
@@ -56,22 +204,17 @@ def get_recommended_entries(target: Path) -> list[str]:
             entries.add(".vault/data/")
             entries.add(".vault/logs/")
 
-        # Root-level advisory-lock sentinels produced by ``advisory_lock``
-        # when vaultspec locks each of these managed files during install
-        # or sync.  Listed explicitly rather than via a broad ``*.lock``
-        # glob because legitimately-tracked lockfiles (uv.lock, bun.lock,
-        # Cargo.lock, ...) must not be ignored.  Each entry is anchored
-        # with a leading slash so it matches only at the repo root.  Only
-        # emitted when vaultspec itself is installed, to avoid polluting
-        # the recommended set on bare workspaces.
+        # Advisory-lock sentinels produced by ``advisory_lock`` when vaultspec
+        # locks a managed file during install or sync.  Enumerated from
+        # :func:`managed_lock_paths` rather than via a broad ``*.lock`` glob
+        # because legitimately-tracked lockfiles (uv.lock, bun.lock,
+        # Cargo.lock, ...) must not be ignored.  Each entry is anchored with a
+        # leading slash so it matches only at its exact location.  Only emitted
+        # when vaultspec itself is installed, to avoid polluting the
+        # recommended set on bare workspaces.
         if framework_installed:
-            for managed_file in (
-                ".gitignore",
-                ".mcp.json",
-                ".pre-commit-config.yaml",
-            ):
-                if (target / managed_file).exists():
-                    entries.add(f"/{managed_file}.lock")
+            for lock_path in managed_lock_paths(target):
+                entries.add(f"/{lock_path}")
 
     except Exception:
         # Fallback for very early bootstrap or corruption

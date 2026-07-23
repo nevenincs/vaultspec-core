@@ -42,6 +42,8 @@ from .gitignore import (
     _find_markers,
     ensure_gitignore_block,
     get_recommended_entries,
+    managed_lock_candidates,
+    prune_orphaned_lock_sentinels,
 )
 from .helpers import (
     _rmtree_robust,
@@ -450,18 +452,13 @@ _UNTRACK_PREFIXES: tuple[str, ...] = (
     ".codex/",
 )
 
-# Advisory-lock sentinel basenames we create ourselves.  Matched against
-# the stripped candidate (no leading slash, no trailing slash) in the
-# ``.lock`` ownership gate so that unrelated lockfiles (``uv.lock``,
-# ``Cargo.lock``, ``bun.lock``, ``package-lock.json`` siblings, etc.)
-# can never be untracked even if they reach the helper by accident.
-_MANAGED_LOCK_SENTINELS: frozenset[str] = frozenset(
-    {
-        ".gitignore.lock",
-        ".mcp.json.lock",
-        ".pre-commit-config.yaml.lock",
-    }
-)
+# Advisory-lock sentinels we create ourselves are enumerated per workspace by
+# :func:`~vaultspec_core.core.gitignore.managed_lock_paths` - the same
+# derivation the managed-ignore policy consumes, so the ownership gate and the
+# ignore block can never drift apart.  The set is deliberately path-exact (not
+# basename-based) so that unrelated lockfiles (``uv.lock``, ``Cargo.lock``,
+# ``bun.lock``, ``package-lock.json`` siblings, etc.) and look-alikes in
+# subdirectories can never be untracked even if they reach the helper.
 
 
 def _untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
@@ -485,6 +482,8 @@ def _untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
     if not _is_git_repo(target):
         return []
 
+    owned_lock_sentinels = frozenset(managed_lock_candidates(target))
+
     candidates: list[str] = []
     for entry in entries:
         # Skip glob patterns; git rm --cached does not expand them on our behalf.
@@ -497,20 +496,16 @@ def _untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
         # Only act on paths we own.  Two ownership gates:
         #   1. under a prefix in :data:`_UNTRACK_PREFIXES` (currently only
         #      ``.vaultspec/``);
-        #   2. a managed lock sentinel whose basename is in
-        #      :data:`_MANAGED_LOCK_SENTINELS` **and** sits at the workspace
-        #      root (``stem == basename``) so that subdirectory matches like
-        #      ``docs/.gitignore.lock`` cannot hit the allowlist.
-        #
-        # The sentinel allowlist is explicit so that sibling lockfiles such
-        # as ``uv.lock`` or ``Cargo.lock`` can never be untracked even if
-        # a future caller passes them in.
+        #   2. a sentinel path enumerated by ``managed_lock_candidates`` for
+        #      this exact workspace.  The comparison is whole-path, so a
+        #      look-alike such as ``docs/.gitignore.lock`` cannot match the
+        #      root-level ``.gitignore.lock`` we own, and sibling lockfiles
+        #      such as ``uv.lock`` or ``Cargo.lock`` are never eligible.
         stem = candidate.rstrip("/")
-        basename = stem.rsplit("/", 1)[-1]
         owned = (
             any(stem == prefix.rstrip("/") for prefix in _UNTRACK_PREFIXES)
             or any(stem.startswith(prefix) for prefix in _UNTRACK_PREFIXES)
-            or (stem == basename and basename in _MANAGED_LOCK_SENTINELS)
+            or stem in owned_lock_sentinels
         )
         if not owned:
             continue
@@ -942,6 +937,7 @@ def init_run(
     provider: str = "all",
     skip: set[str] | None = None,
     mode: InstallMode | None = None,
+    adopt: bool = False,
 ) -> list[tuple[str, str]]:
     """Scaffold the .vaultspec/ and .vault/ directory structure.
 
@@ -954,6 +950,9 @@ def init_run(
             explicitly because the committed workspace declaration is written
             only after scaffolding; ``None`` lets the renderers fall back to
             the declaration (dependency mode for a legacy workspace).
+        adopt: Scaffold into an existing ``.vaultspec/`` instead of refusing.
+            Adoption keeps ``force`` at its caller-supplied value, so seeding
+            stays create-only and existing framework content is preserved.
 
     Returns:
         A deduplicated list of ``(relative_path, label)`` tuples for all
@@ -975,7 +974,7 @@ def init_run(
     created: list[tuple[str, str]] = []
 
     if not skip_core:
-        if fw_dir.exists() and not force:
+        if fw_dir.exists() and not force and not adopt:
             raise ResourceExistsError(
                 f"{fw_dir} already exists. Use --force to overwrite."
             )
@@ -1099,6 +1098,7 @@ def install_run(
     force: bool = False,
     skip: set[str] | None = None,
     mode: InstallMode | None = None,
+    adopt: bool = False,
 ) -> dict[str, Any]:
     """Deploy the vaultspec framework to a project directory.
 
@@ -1113,6 +1113,11 @@ def install_run(
             to let the workspace fall back to the default. The resolved mode is
             persisted once at provision time to the committed workspace
             declaration and echoed into the manifest.
+        adopt: Treat an existing but unmanifested ``.vaultspec/`` as adoptable
+            rather than as an already-installed workspace, so the install
+            proceeds additively instead of demanding ``--force``. The CLI passes
+            the framework signal it observed before pre-flight ran; when
+            ``False`` the state is re-detected here.
 
     Returns:
         A dict describing the result:
@@ -1148,6 +1153,18 @@ def install_run(
     )
 
     skip_core = "core" in skip
+
+    # Adoption: a workspace that tracks canonical framework content but carries
+    # no runtime manifest (gitignored and per-machine by design) is claimed by an
+    # ordinary run, never by --force. The caller passes the observation it made
+    # before pre-flight established the manifest; a direct API caller that ran no
+    # pre-flight is served by the self-detection below. Both routes land on the
+    # same additive install: seeding and scaffolding stay create-only, so nothing
+    # already on disk is overwritten.
+    from .diagnosis.collectors import collect_framework_presence
+    from .diagnosis.signals import FrameworkSignal
+
+    adopting = adopt or (collect_framework_presence(path) is FrameworkSignal.ADOPTABLE)
 
     if skip_core and not (path / ".vaultspec").exists():
         raise VaultSpecError(
@@ -1401,6 +1418,9 @@ def install_run(
             mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
         _stamp_manifest_version_no_downgrade(mdata)
 
+        for orphan in prune_orphaned_lock_sentinels(path):
+            logger.info("Removed orphaned lock sentinel %s", orphan)
+
         # Re-opt-in gitignore management on --upgrade --force
         if force:
             ensure_gitignore_block(
@@ -1436,14 +1456,20 @@ def install_run(
         }
 
     fw_dir = path / ".vaultspec"
-    if fw_dir.exists() and not force and not skip_core:
+    if fw_dir.exists() and not force and not skip_core and not adopting:
         raise ResourceExistsError(
             f"vaultspec is already installed at {path}. "
             "Use --upgrade to update, --force to override, or remove it "
             f"first with 'vaultspec-core uninstall {path}'."
         )
 
-    created = init_run(force=force, provider=provider, skip=skip, mode=resolved_mode)
+    created = init_run(
+        force=force,
+        provider=provider,
+        skip=skip,
+        mode=resolved_mode,
+        adopt=adopting,
+    )
 
     reset_config()
     layout = resolve_workspace(target_override=path)
@@ -1493,6 +1519,13 @@ def install_run(
         target.path.exists()
         for target in resolve_mcp_targets(target_dir=path, enrolled=tuple(tools))
     )
+
+    # Retire sentinels whose subject is gone (e.g. .pre-commit-config.yaml.lock
+    # after a checkout migrates to prek.toml) before the ignore entries are
+    # computed: managed_lock_paths only covers sentinels with a live subject, so
+    # an orphan left in place would stay permanently visible in git status.
+    for orphan in prune_orphaned_lock_sentinels(path):
+        logger.info("Removed orphaned lock sentinel %s", orphan)
 
     # Manage gitignore block
     recommended = get_recommended_entries(path)
@@ -2219,6 +2252,9 @@ def sync_provider(
                         )
                     else:
                         _scaffold_precommit(ctx.target_dir)
+
+            for orphan in prune_orphaned_lock_sentinels(ctx.target_dir):
+                logger.info("Removed orphaned lock sentinel %s", orphan)
 
             # Respect gitignore opt-out: check whether the user removed
             # the managed block BEFORE re-creating it.  If the block is

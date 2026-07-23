@@ -10,10 +10,19 @@ from enum import StrEnum
 
 
 class FrameworkSignal(StrEnum):
-    """Observed state of the vaultspec framework directory."""
+    """Observed state of the vaultspec framework directory.
+
+    ``ADOPTABLE`` separates a legitimately unmanifested workspace from a
+    genuinely broken one. ``.vaultspec/providers.json`` is gitignored and
+    per-machine by design, so a fresh clone of a project that tracks its
+    canonical framework content carries the content but no runtime manifest.
+    Folding that state into ``CORRUPTED`` forced adoption through ``--force``,
+    which overwrites the very content the clone was tracking.
+    """
 
     MISSING = "missing"
     CORRUPTED = "corrupted"
+    ADOPTABLE = "adoptable"
     PRESENT = "present"
 
 
@@ -159,6 +168,7 @@ class ResolutionAction(StrEnum):
     PRUNE = "prune"
     REPAIR_MANIFEST = "repair_manifest"
     ADOPT_DIRECTORY = "adopt_directory"
+    ADOPT_FRAMEWORK = "adopt_framework"
     REPAIR_GITIGNORE = "repair_gitignore"
     REPAIR_GITATTRIBUTES = "repair_gitattributes"
     REPAIR_PRECOMMIT = "repair_precommit"

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -161,15 +162,22 @@ def write_manifest_data(target: Path, data: ManifestData) -> None:
         target: Workspace root directory.
         data: :class:`ManifestData` instance to persist.
     """
-    serial = data.serial + 1
-
     path = _manifest_path(target)
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
+    atomic_write(path, json.dumps(_manifest_payload(data), indent=2) + "\n")
+
+
+def _manifest_payload(data: ManifestData) -> dict[str, Any]:
+    """Build the on-disk manifest mapping for *data*, bumping the serial.
+
+    Shared by :func:`write_manifest_data` and :func:`create_manifest_exclusive`
+    so the two write paths cannot drift into different on-disk shapes.
+    """
+    return {
         "version": MANIFEST_VERSION,
         "vaultspec_version": data.vaultspec_version,
         "installed_at": data.installed_at,
-        "serial": serial,
+        "serial": data.serial + 1,
         "installed": sorted(data.installed),
         "provider_state": data.provider_state,
         "gitignore_managed": data.gitignore_managed,
@@ -182,7 +190,58 @@ def write_manifest_data(target: Path, data: ManifestData) -> None:
         ),
         "resolved_floor_version": data.resolved_floor_version,
     }
-    atomic_write(path, json.dumps(payload, indent=2) + "\n")
+
+
+def create_manifest_exclusive(target: Path, data: ManifestData) -> bool:
+    """Create ``.vaultspec/providers.json`` only if it does not already exist.
+
+    The compare-and-swap counterpart to :func:`write_manifest_data`, used by the
+    adoption path where establishing manifest state must never overwrite an
+    existing file. The whole check-and-create runs under the same advisory lock
+    the read-modify-write helpers take, and the create itself uses ``O_EXCL`` so
+    that even a writer outside the lock cannot be clobbered: the kernel, not the
+    prior ``exists()`` probe, decides who wins.
+
+    Losing the race is a successful convergence, not an error. A concurrent
+    installer that established the manifest first has produced exactly the state
+    this call wanted, so the caller proceeds against it untouched.
+
+    Args:
+        target: Workspace root directory.
+        data: :class:`ManifestData` instance to persist. Its ``serial`` is
+            written as-is plus one, matching :func:`write_manifest_data`.
+
+    Returns:
+        ``True`` when this call created the manifest, ``False`` when a manifest
+        already existed and was left untouched.
+
+    Raises:
+        VaultSpecError: If the manifest cannot be created for a reason other
+            than already existing.
+    """
+    path = _manifest_path(target)
+    payload = _manifest_payload(data)
+
+    with _manifest_lock(path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            return False
+        except OSError as exc:
+            raise VaultSpecError(
+                f"Could not establish provider manifest at {path}: {exc}",
+                hint="Check filesystem permissions on the .vaultspec/ directory.",
+            ) from exc
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+                handle.write(json.dumps(payload, indent=2) + "\n")
+        except OSError as exc:
+            raise VaultSpecError(
+                f"Could not write provider manifest at {path}: {exc}",
+                hint="Check filesystem permissions on the .vaultspec/ directory.",
+            ) from exc
+    return True
 
 
 def read_manifest(target: Path) -> set[str]:

@@ -2114,12 +2114,16 @@ def _render_diagnosis_table(_console, diag: "WorkspaceDiagnosis") -> None:
             FrameworkSignal.PRESENT: ("ok", "green"),
             FrameworkSignal.MISSING: ("error", "red"),
             FrameworkSignal.CORRUPTED: ("error", "red"),
+            FrameworkSignal.ADOPTABLE: ("warn", "yellow"),
         },
     )
     fw_detail = {
         FrameworkSignal.PRESENT: ".vaultspec/ present",
         FrameworkSignal.MISSING: ".vaultspec/ not found",
         FrameworkSignal.CORRUPTED: ".vaultspec/ corrupted manifest",
+        FrameworkSignal.ADOPTABLE: (
+            ".vaultspec/ present, no runtime manifest - run install to adopt"
+        ),
     }.get(diag.framework, str(diag.framework))
     rows.append(
         {
@@ -2520,6 +2524,10 @@ def _doctor_exit_code(
         FrameworkSignal.CORRUPTED,
     ):
         has_error = True
+    # Adoptable is a coherent workspace awaiting its per-machine manifest, not a
+    # broken one: actionable, so a warning, but never an error.
+    if diag.framework == FrameworkSignal.ADOPTABLE:
+        has_warn = True
     if diag.gitignore == GitignoreSignal.CORRUPTED:
         has_error = True
     if diag.gitattributes == GitattributesSignal.CORRUPTED:
