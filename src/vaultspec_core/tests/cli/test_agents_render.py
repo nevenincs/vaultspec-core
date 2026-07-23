@@ -353,9 +353,11 @@ class TestSourceAgentCoverage:
 def _fetch_upstream_base_declarations() -> str:
     """Fetch `base-declarations.ts` from gemini-cli main.
 
-    Hard-fails on any network or HTTP error. The integration marker on
-    the calling test class is the opt-in gate; once selected, the test
-    must reach upstream and verify the constants.
+    Hard-fails on any network or HTTP error. The ``network`` marker on the
+    calling test class keeps it out of the gating suites (which run
+    ``not network``); it is an opt-in drift guard run explicitly with
+    ``-m network``, and once selected must reach upstream and verify the
+    constants.
     """
     req = urllib.request.Request(
         _UPSTREAM_BASE_DECLARATIONS_URL,
@@ -365,6 +367,7 @@ def _fetch_upstream_base_declarations() -> str:
         return resp.read().decode("utf-8")
 
 
+@pytest.mark.network
 @pytest.mark.integration
 class TestUpstreamGeminiToolPin:
     """Live drift guard against `google-gemini/gemini-cli` main.
