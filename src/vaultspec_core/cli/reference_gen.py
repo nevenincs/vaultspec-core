@@ -141,13 +141,19 @@ def _command_signature(
 
     The ``[OPTIONS]`` token is emitted unconditionally to match the Typer usage
     line shape; positional arguments follow in declaration order, each rendered
-    through Click's own ``make_metavar`` so optional arguments keep their
-    ``[BRACKETS]`` and required ones stay bare.
+    through the project's own metavar grammar
+    (:func:`vaultspec_core.cli._metavar.render_argument_metavar`) so optional
+    arguments keep their ``[BRACKETS]`` and required ones stay bare, and so a
+    generated signature is byte-identical to the live ``Usage:`` line.
     """
+    from typer.core import TyperArgument
+
+    from vaultspec_core.cli._metavar import render_argument_metavar
+
     parts = ["vaultspec-core", *path, "[OPTIONS]"]
     for param in command.get_params(ctx):
-        if param.param_type_name == "argument":
-            parts.append(param.make_metavar(ctx))
+        if isinstance(param, TyperArgument):
+            parts.append(render_argument_metavar(param, ctx))
     return " ".join(parts)
 
 

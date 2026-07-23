@@ -157,11 +157,12 @@ its own dependency set. Dependency mode runs them through `uv run` and is select
 the project's `pyproject.toml` lists vaultspec-core. Dev mode is for vaultspec-core
 placed in the default `dev` dependency group: it renders exactly like dependency mode
 but does not ship in the project's built distributions, so choosing it records that
-non-leaking placement as a distinct declared state. Pin any with `install --mode tool`,
-`install --mode dependency`, or `install --mode dev`. The chosen mode is committed
-alongside `.vaultspec/` in a per-package `workspace.json`, so it travels with the
-workspace and a project running vaultspec-core beside a companion package can declare
-each in its own mode; `install --upgrade` records a mode for a workspace provisioned
+non-leaking placement as a distinct declared state. Pin any with
+`vaultspec-core install --mode tool`, `vaultspec-core install --mode dependency`, or
+`vaultspec-core install --mode dev`. The chosen mode is committed alongside
+`.vaultspec/` in a per-package `workspace.json`, so it travels with the workspace and a
+project running vaultspec-core beside a companion package can declare each in its own
+mode; `vaultspec-core install --upgrade` records a mode for a workspace provisioned
 before modes existed by inferring it from the existing hook and dependency shape.
 
 **Maintain.** `vaultspec-core vault check all --fix` validates and repairs the vault,

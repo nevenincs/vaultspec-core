@@ -1462,12 +1462,14 @@ that do not are unaffected:
       name: Validate vaultspec commit-linkage trailers
       language: system
       stages: [commit-msg]
-      entry: uv run --no-sync vaultspec-core vault plan trailer validate
+      entry: uv run vaultspec-core vault plan trailer validate
 ```
 
 At the `commit-msg` stage, pre-commit passes the path to the commit-message file (for
 example `.git/COMMIT_EDITMSG`) as the hook's positional argument, which lines up with
-`validate`'s `MESSAGE_FILE` argument - no extra flag is needed.
+`validate`'s `MESSAGE_FILE` argument - no extra flag is needed. Add uv's `--no-sync`
+flag to the `uv run` wrapper when the environment is already resolved and the hook
+should skip the dependency check.
 
 ##### Examples
 
@@ -1760,16 +1762,20 @@ outputs.
 
 #### Subcommands
 
-- `list` - List all registered MCP server definitions.
-- `status [PROVIDER]` (`--scope SCOPE`, `--json`, `--target PATH`) - Inspect enrollment
-  and ownership state without starting or probing MCP servers.
-- `add --name NAME [--config JSON] [--force]` - Add a new custom MCP server definition.
-- `remove NAME [--force]` - Remove an MCP server definition (`--force` skips
-  confirmation).
-- `sync [PROVIDER]` (`--scope SCOPE`, `--dry-run`, `--force`, `--prune`, `--json`,
-  `--target PATH`) - Reconcile canonical definitions into provider-native enrollment.
-- `uninstall [PROVIDER]` (`--scope SCOPE`, `--dry-run`, `--force`, `--json`,
-  `--target PATH`) - Remove only Vaultspec-owned provider-native enrollment.
+- `vaultspec-core spec mcps list` - List all registered MCP server definitions.
+- `vaultspec-core spec mcps status [PROVIDER]` (`--scope SCOPE`, `--json`,
+  `--target PATH`) - Inspect enrollment and ownership state without starting or probing
+  MCP servers.
+- `vaultspec-core spec mcps add --name NAME [--config JSON] [--force]` - Add a new
+  custom MCP server definition.
+- `vaultspec-core spec mcps remove NAME [--force]` - Remove an MCP server definition
+  (`--force` skips confirmation).
+- `vaultspec-core spec mcps sync [PROVIDER]` (`--scope SCOPE`, `--dry-run`, `--force`,
+  `--prune`, `--json`, `--target PATH`) - Reconcile canonical definitions into
+  provider-native enrollment.
+- `vaultspec-core spec mcps uninstall [PROVIDER]` (`--scope SCOPE`, `--dry-run`,
+  `--force`, `--json`, `--target PATH`) - Remove only Vaultspec-owned provider-native
+  enrollment.
 
 `vaultspec-core spec mcps status` exits `0` only when MCP config status is `ok`,
 otherwise `1`. It checks config health only and does not start or probe MCP server

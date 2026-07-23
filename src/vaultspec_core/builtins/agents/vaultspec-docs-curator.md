@@ -80,9 +80,10 @@ You act on what is mechanically safe and propose what needs judgment.
 - **Act directly.** Status propagation via
   `vaultspec-core vault adr supersede OLD --by NEW` (preview with `--dry-run`), and
   status encoding and stamp normalization. Always use the CLI mutators
-  (`vault adr supersede`, `vault set-frontmatter`, `vault set-body`, `vault edit`,
-  `vault link`) rather than raw file edits, so the frontmatter contract and the
-  `modified` stamp stay canonical.
+  (`vaultspec-core vault adr supersede`, `vaultspec-core vault set-frontmatter`,
+  `vaultspec-core vault set-body`, `vaultspec-core vault edit`,
+  `vaultspec-core vault link`) rather than raw file edits, so the frontmatter contract
+  and the `modified` stamp stay canonical.
 - **Act directly (boundary conformance).** Replace an ADR's restated evidence with a
   stem citation, and strip decision language from research and audit bodies where an
   accepted ADR records the same decision, leaving a one-line pointer - per the

@@ -76,9 +76,9 @@ several concurrent plans fragments tracking - prefer one plan per decision clust
   locate the sites (read the epicenter or nearest existing analogue in full, then
   confirm exact symbols and insertion points with grep),
   `vaultspec-rag search "<intent>" --type vault --doc-type adr` to confirm the governing
-  decisions, and `vaultspec-core status`/`vault list` - first-class for orientation - to
-  map plans and records. Where `vaultspec-rag` is not installed, the `vaultspec-core`
-  discovery verbs and grep carry the same sequence.
+  decisions, and `vaultspec-core status` and `vaultspec-core vault list` - first-class
+  for orientation - to map plans and records. Where `vaultspec-rag` is not installed,
+  the `vaultspec-core` discovery verbs and grep carry the same sequence.
 
 - **Must reference research and ADRs**. Read these in full prior to writing the plan.
 

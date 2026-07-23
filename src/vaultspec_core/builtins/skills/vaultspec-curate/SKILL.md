@@ -100,8 +100,9 @@ The curator acts on what is mechanically safe and proposes what needs judgment.
 
 - **Act directly (mechanically safe).** Status propagation through
   `vaultspec-core vault adr supersede OLD --by NEW`; status-encoding and stamp
-  normalization. Prefer the CLI mutators (`vault adr supersede`, `vault set-body`,
-  `vault edit`, `vault link`) over raw file edits so the frontmatter contract and the
+  normalization. Prefer the CLI mutators (`vaultspec-core vault adr supersede`,
+  `vaultspec-core vault set-body`, `vaultspec-core vault edit`,
+  `vaultspec-core vault link`) over raw file edits so the frontmatter contract and the
   `modified` stamp stay canonical.
 - **Act directly (content-preserving boundary conformance).** Replacing an ADR's
   restated evidence with a stem citation, and stripping decision language from a

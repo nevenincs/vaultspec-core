@@ -626,10 +626,10 @@ enrollment. Providers are `all`, `claude`, `antigravity`, and `codex`; scopes ar
 | `sync`      | `[PROVIDER] [--scope SCOPE] [--dry-run] [--force] [--prune] [--json] [--target PATH]` | Reconcile canonical definitions into native enrollment.             |
 | `uninstall` | `[PROVIDER] [--scope SCOPE] [--dry-run] [--force] [--json] [--target PATH]`           | Remove only Vaultspec-owned native enrollment.                      |
 
-The default provider is `all` and the default scope is `project`. `sync --force` adopts
-or replaces a same-name external entry; `sync --prune` removes owned enrollment whose
-canonical source was deleted. `uninstall` preserves canonical definitions and external
-host entries.
+The default provider is `all` and the default scope is `project`.
+`vaultspec-core spec mcps sync --force` adopts or replaces a same-name external entry;
+`vaultspec-core spec mcps sync --prune` removes owned enrollment whose canonical source
+was deleted. `uninstall` preserves canonical definitions and external host entries.
 
 ## Migration commands
 
@@ -668,4 +668,5 @@ name. | | `VAULTSPEC_CLAUDE_DIR` | str | `.claude` | Claude tool directory name.
 `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int | `1000000` | Subprocess stdout capture limit. |
 | `VAULTSPEC_LOG_LEVEL` | str | `INFO` | Root log level for the CLI. | |
 `VAULTSPEC_EDITOR` | str | `zed -w` | Editor command for resource editing. | |
-`VAULTSPEC_STDIO_WATCHDOG` | str | on | MCP server lifetime watchdog; `0`/`false`/`off`/`no` disables it (EOF-only exit). |
+`VAULTSPEC_STDIO_WATCHDOG` | str | on | MCP server lifetime watchdog;
+`0`/`false`/`off`/`no` disables it (EOF-only exit). |
