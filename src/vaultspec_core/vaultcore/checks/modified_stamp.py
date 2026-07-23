@@ -23,16 +23,24 @@ Finding semantics (D3b):
   date) -> finding; the fix refreshes the stamp to the file's mtime date,
   surfacing hand edits the CLI mutators did not stamp.
 
-Clone-signature guard. File mtime does not survive ``git clone``: a fresh
-checkout rewrites every tracked file to one wall-clock instant, so every
-document would falsely read as "modified today" and the staleness branch
-would flag the entire vault. To avoid that noise, before emitting any
-staleness finding this checker computes the modal mtime date across all
-scanned documents; when 80 percent or more of the documents share a single
-mtime date the run is treated as carrying the fresh-clone signature, every
-staleness finding is suppressed for that run, and a single informational
-diagnostic explains why. The missing, non-canonical, and unparseable
-branches are unaffected by the guard - they read frontmatter, not mtime.
+Git-operation guard. File mtime does not survive git operations: a fresh
+checkout rewrites every tracked file to one wall-clock instant, and a
+pre-commit stash/restore cycle rewrites the reverted files to a second
+instant, so the affected documents would falsely read as "modified today"
+and the staleness branch would flag the whole vault. That last case is the
+sharp one: prek stashes unstaged changes before running hooks, and when the
+restore lands on a different calendar day from the working tree's checkout,
+the vault's mtimes collapse onto two dates rather than one - defeating a
+guard that only recognises a single dominant date. To avoid that noise,
+before emitting any staleness finding this checker tallies the mtime date of
+every scanned document; when the largest few mtime dates (a fresh clone is
+one such wall-clock instant, a stash/restore cycle is two;
+:data:`_GIT_SIGNATURE_MAX_INSTANTS`) together account for at least
+:data:`_GIT_SIGNATURE_RATIO` of the documents, the run is treated as
+carrying a git-operation signature, every staleness finding is suppressed
+for that run, and a single informational diagnostic explains why. The
+missing, non-canonical, and unparseable branches are unaffected by the
+guard - they read frontmatter, not mtime.
 """
 
 from __future__ import annotations
@@ -58,9 +66,17 @@ if TYPE_CHECKING:
 
 __all__ = ["check_modified_stamp"]
 
-#: Threshold at or above which a shared mtime date is read as the
-#: fresh-clone signature and staleness findings are suppressed.
-_CLONE_SIGNATURE_RATIO = 0.8
+#: Fraction of documents which, once concentrated on the largest few mtime
+#: dates, is read as a git-operation signature and suppresses staleness.
+_GIT_SIGNATURE_RATIO = 0.8
+
+#: Number of largest mtime-date buckets whose combined share is measured
+#: against :data:`_GIT_SIGNATURE_RATIO`. A fresh clone collapses every file
+#: onto one wall-clock instant; a pre-commit stash/restore cycle spanning a
+#: calendar day adds a second. Two buckets model both without treating a
+#: vault of genuinely diverse hand-edit dates (many small buckets) as an
+#: artifact, so localized staleness still surfaces.
+_GIT_SIGNATURE_MAX_INSTANTS = 2
 
 #: Leading ``yyyy-mm-dd`` prefix on a vault filename, the scaffold-time
 #: date anchor used when ``date:`` is absent or unparseable.
@@ -221,10 +237,12 @@ def check_modified_stamp(
     module docstring describes. The unparseable case is reported but
     never rewritten so a hand-entered value is never silently lost.
 
-    Staleness findings are guarded against the fresh-clone signature:
-    when at least :data:`_CLONE_SIGNATURE_RATIO` of the scanned documents
-    share one mtime date the staleness branch is skipped for the whole
-    run and a single informational diagnostic explains why.
+    Staleness findings are guarded against git-operation mtime rewrites:
+    when the largest few mtime dates (:data:`_GIT_SIGNATURE_MAX_INSTANTS`)
+    together cover at least :data:`_GIT_SIGNATURE_RATIO` of the scanned
+    documents the staleness branch is skipped for the whole run and a
+    single informational diagnostic explains why. This covers both a fresh
+    clone (one instant) and a pre-commit stash/restore cycle (two).
 
     Args:
         root_dir: Project root directory.
@@ -250,8 +268,9 @@ def check_modified_stamp(
                 continue
         docs.append((doc_path, metadata))
 
-    # Clone-signature detection: tally mtime dates across the documents in
-    # scope and suppress staleness findings when one date dominates.
+    # Git-operation detection: tally mtime dates across the documents in
+    # scope and suppress staleness findings when the largest few dates -
+    # the wall-clock instants git operations rewrite files to - dominate.
     mtime_dates: dict[datetime.date, int] = {}
     mtime_by_path: dict[Path, datetime.date | None] = {}
     for doc_path, _metadata in docs:
@@ -261,20 +280,24 @@ def check_modified_stamp(
             mtime_dates[md] = mtime_dates.get(md, 0) + 1
 
     total_with_mtime = sum(mtime_dates.values())
-    clone_signature = False
+    git_signature = False
+    concentrated = 0
     if total_with_mtime:
-        dominant = max(mtime_dates.values())
-        clone_signature = dominant / total_with_mtime >= _CLONE_SIGNATURE_RATIO
+        ranked = sorted(mtime_dates.values(), reverse=True)
+        concentrated = sum(ranked[:_GIT_SIGNATURE_MAX_INSTANTS])
+        git_signature = concentrated / total_with_mtime >= _GIT_SIGNATURE_RATIO
 
-    if clone_signature:
+    if git_signature:
+        instants = min(_GIT_SIGNATURE_MAX_INSTANTS, len(mtime_dates))
         result.diagnostics.append(
             CheckDiagnostic(
                 path=None,
                 message=(
                     "Skipping staleness checks: "
-                    f"{dominant} of {total_with_mtime} documents share one mtime "
-                    "date (fresh-clone signature; file mtime does not survive "
-                    "git clone, so staleness cannot be inferred this run)."
+                    f"{concentrated} of {total_with_mtime} documents cluster on "
+                    f"{instants} mtime date(s) (git-operation signature; file mtime "
+                    "does not survive clone, checkout, or a stash/restore cycle, so "
+                    "staleness cannot be inferred this run)."
                 ),
                 severity=Severity.INFO,
             )
@@ -355,8 +378,8 @@ def check_modified_stamp(
             )
             continue
 
-        # Staleness: only when the run does not carry the clone signature.
-        if clone_signature:
+        # Staleness: only when the run does not carry the git-operation signature.
+        if git_signature:
             continue
         mtime_date = mtime_by_path.get(doc_path)
         if mtime_date is not None and mtime_date > parsed:

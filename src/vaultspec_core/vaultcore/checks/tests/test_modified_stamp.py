@@ -11,8 +11,9 @@ against real on-disk documents (vault-orientation ADR decisions D3, D3b):
 - an unparseable stamp is flagged as an error and never rewritten;
 - a stale stamp (file mtime newer than the stamp) is flagged and
   refreshed under fix;
-- the fresh-clone signature suppresses staleness findings and emits a
-  single informational diagnostic.
+- the git-operation signature - a fresh clone (one mtime instant) or a
+  pre-commit stash/restore cycle (two) - suppresses staleness findings
+  and emits a single informational diagnostic.
 
 All fixtures are real files; mtimes are set with :func:`os.utime`. No
 mocks, patches, or skips.
@@ -308,7 +309,46 @@ class TestCloneSignatureGuard:
         ]
         assert len(infos) == 1
         assert infos[0].path is None
-        assert "fresh-clone signature" in infos[0].message
+        assert "git-operation signature" in infos[0].message
+
+    def test_stash_restore_two_date_clusters_suppresses_staleness(self, tmp_path: Path):
+        # Regression for the archive-under-prek cascade (issue #235). prek
+        # stashes unstaged changes before running the vault-fix hook; the
+        # restore rewrites the reverted documents to today's mtime while the
+        # rest keep the working tree's earlier checkout date. The vault's
+        # mtimes then collapse onto TWO calendar dates rather than one. A
+        # guard that only recognised a single dominant date let every
+        # document read as stale and the fix rewrote the whole vault. The
+        # two-instant guard must recognise the cluster and suppress.
+        _skeleton(tmp_path)
+        docs = [
+            _write_doc(
+                tmp_path,
+                f"2026-01-{(i % 28) + 1:02d}-doc-{i}-adr",
+                date_line=f"date: '2026-01-{(i % 28) + 1:02d}'",
+                modified_line=f"modified: '2026-01-{(i % 28) + 1:02d}'",
+            )
+            for i in range(20)
+        ]
+        # Baseline checkout instant for the untouched majority.
+        checkout = datetime.date(2026, 7, 20)
+        for doc in docs:
+            _set_mtime(doc, checkout)
+        # Stash restore bumps a minority (5/20 = 25%) to a second date. The
+        # dominant single date holds only 75 percent - under the old guard's
+        # threshold - but the top two dates together cover 100 percent.
+        restore = datetime.date(2026, 7, 23)
+        for doc in docs[:5]:
+            _set_mtime(doc, restore)
+
+        result = _check(tmp_path, fix=True)
+
+        stale_findings = [d for d in result.diagnostics if "Stale" in d.message]
+        assert stale_findings == []
+        assert result.fixed_count == 0
+        infos = [d for d in result.diagnostics if "Skipping staleness" in d.message]
+        assert len(infos) == 1
+        assert "git-operation signature" in infos[0].message
 
     def test_below_threshold_does_not_trip_guard(self, tmp_path: Path):
         _skeleton(tmp_path)
