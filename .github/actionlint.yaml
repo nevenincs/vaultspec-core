@@ -1,3 +1,4 @@
 self-hosted-runner:
   labels:
     - dev-runner
+    - build
