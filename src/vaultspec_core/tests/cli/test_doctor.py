@@ -272,6 +272,12 @@ class TestDoctorGateErrors:
         # form that deadlocks commits.
         factory = WorkspaceFactory(tmp_path)
         factory.install().outdated_vaultspec_rules("claude")
+        # Assert the setup actually produced the drift the exit code depends on,
+        # so a fixture that fails to stale anything fails loudly here instead of
+        # as a bare exit-code mismatch.
+        diagnosis = json.loads(factory.run("spec", "doctor", "--json").output)
+        content = diagnosis["data"]["providers"]["claude"]["content"]
+        assert "diverged" in content.values(), content
         result = factory.run("spec", "doctor")
         assert result.exit_code == 1, result.output
 
