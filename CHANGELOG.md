@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.50](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.49...vaultspec-core-v0.1.50) (2026-07-23)
+
+
+### Bug Fixes
+
+* **config:** resolve editor paths with platform-aware tokenization ([#255](https://github.com/nevenincs/vaultspec-core/issues/255)) ([a1ee996](https://github.com/nevenincs/vaultspec-core/commit/a1ee99643fd28102dc021ec775e1d2442e9dafc3))
+
 ## [0.1.49](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.48...vaultspec-core-v0.1.49) (2026-07-23)
 
 
