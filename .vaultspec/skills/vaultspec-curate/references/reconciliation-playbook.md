@@ -96,12 +96,14 @@ Classify every finding into one of these, because the action differs by class:
 ## Act: the action for each class
 
 - **Status drift, off-taxonomy, missing status.** Normalize toward the canonical
-  encoding. Prefer `vaultspec-core vault set-frontmatter` / `vault edit` for frontmatter
-  and the CLI mutators over raw edits so stamps and the contract stay canonical.
+  encoding. Prefer `vaultspec-core vault set-frontmatter` / `vaultspec-core vault edit`
+  for frontmatter and the CLI mutators over raw edits so stamps and the contract stay
+  canonical.
 - **Unpropagated supersession.** Re-run
   `vaultspec-core vault adr supersede OLD --by NEW` (use `--dry-run` first) so the
   frontmatter and body status converge. For legacy `## Status` ADRs the tool cannot
-  rewrite, correct the body status to match via `vault set-body` / `vault edit`.
+  rewrite, correct the body status to match via `vaultspec-core vault set-body` /
+  `vaultspec-core vault edit`.
 - **Contradiction, duplication.** Do not silently rewrite. Record the conflicting ADRs,
   the nature of the contradiction, and a recommended resolution in the audit for human
   approval. Apply the chosen resolution only once approved.
@@ -113,7 +115,8 @@ Classify every finding into one of these, because the action differs by class:
 - **Decision-vs-code drift.** Report as a finding in the audit. ADRs drive rollout, so
   never retrofit the ADR to the code automatically. If the human explicitly requests the
   ADR-from-codebase retrofit (legitimate for late-adopting projects), amend the ADR's
-  Implementation prose via `vault set-body` / `vault edit` and note it in the audit.
+  Implementation prose via `vaultspec-core vault set-body` / `vaultspec-core vault edit`
+  and note it in the audit.
 - **Orphaned or stranded.** Surface in the audit with the graph evidence.
 - **Restated grounding.** Confirm the fact exists in the grounding document; if the ADR
   is its only home, relocate it into the grounding body first. Then replace the ADR's

@@ -34,12 +34,14 @@ The nine MCP tools cover the hot path by capability: `status` (orientation), `fi
 
 Operations without a first-class hot tool fall into two honest bands:
 
-- **Gateway-only, CLI-first:** `sync`, `spec <resource> sync`, and the above-Step plan
-  verbs (`tier promote/demote`, `wave`, `phase`, `epic intent`). The `discover`/`invoke`
+- **Gateway-only, CLI-first:** `vaultspec-core sync`,
+  `vaultspec-core spec <resource> sync`, and the above-Step plan verbs
+  (`tier promote/demote`, `wave`, `phase`, `epic intent`). The `discover`/`invoke`
   gateway also reaches these, but `invoke`'s destructive annotation forces host
   confirmation on every call, so the CLI is the better default even when connected.
-- **CLI-only:** `vault feature index`, `spec mcps add/remove/sync`, and `uninstall` have
-  no MCP path at all; run them through the CLI.
+- **CLI-only:** `vaultspec-core vault feature index`,
+  `vaultspec-core spec mcps add/remove/sync`, and `vaultspec-core uninstall` have no MCP
+  path at all; run them through the CLI.
 
 For anything else, the `discover` tool and the bundled CLI reference
 (`.vaultspec/reference/cli.md`, locally resident) are the catalogs of every command,
@@ -53,10 +55,11 @@ every operation; the bundled CLI reference is the catalog.
 - Run `vaultspec-core <cmd>`, or `uv run --no-sync vaultspec-core <cmd>` in uv
   environments; `--target DIR`, `--dry-run`, `--json`, `--force`, and `<cmd> --help`
   cover targeting, previewing, and the full flag and exit-code reference.
-- Sync-shaped results (`install`, `sync`, `spec <resource> sync`, `migrations run`) read
-  with one vocabulary - `created`, `updated`, `unchanged`, `removed`, `restored`,
-  `skipped`, `failed`; `unchanged` is a successful no-op, `skipped` carries a reason,
-  only `failed` stops the pipeline.
+- Sync-shaped results (`vaultspec-core install`, `vaultspec-core sync`,
+  `vaultspec-core spec <resource> sync`, `vaultspec-core migrations run`) read with one
+  vocabulary - `created`, `updated`, `unchanged`, `removed`, `restored`, `skipped`,
+  `failed`; `unchanged` is a successful no-op, `skipped` carries a reason, only `failed`
+  stops the pipeline.
 
 ## Allowed manual edits
 

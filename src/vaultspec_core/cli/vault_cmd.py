@@ -1844,7 +1844,7 @@ def cmd_check_code_boundary(
     """Scan source files for references to the project's own vault records.
 
     Opt-in and advisory: findings are warnings, the exit code stays zero,
-    and nothing is mutated. Not part of `vault check all`.
+    and nothing is mutated. Not part of `vaultspec-core vault check all`.
     """
     apply_target(target)
     from vaultspec_core.core.types import get_context as _get_ctx

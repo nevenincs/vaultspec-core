@@ -32,7 +32,7 @@ Project scope is the safe default. Select user or local scope explicitly. Native
 files contain only host-valid configuration; Vaultspec records project and local
 ownership in the workspace's `.vaultspec/mcp-ownership.json` and user ownership in
 `~/.vaultspec/mcp-ownership.json`, so unrelated host entries remain external. Use
-`install --skip mcp` if you manage enrollment yourself.
+`vaultspec-core install --skip mcp` if you manage enrollment yourself.
 
 The server resolves its workspace from the client's current working directory.
 Editor-integrated clients such as Claude Code and Cursor already set the working
@@ -90,8 +90,8 @@ explicit `vaultspec-core spec mcps sync --force`, which overwrites your edit. An
 recorded by a release that predates fingerprinting cannot be verified as untouched and
 keeps the same `--force`-only behavior. External entries Vaultspec never wrote are never
 adopted or modified without `--force`. To opt out of enrollment management entirely,
-provision with `install --skip mcp`; a workspace without recorded enrollment is never
-touched by the convergence migration.
+provision with `vaultspec-core install --skip mcp`; a workspace without recorded
+enrollment is never touched by the convergence migration.
 
 `vaultspec-core spec doctor` additionally warns - without failing - about two states
 Vaultspec cannot converge itself: canonical hooks that cannot be refreshed because
@@ -99,9 +99,10 @@ Vaultspec cannot converge itself: canonical hooks that cannot be refreshed becau
 definition still in a static pre-mode shape (re-run that package's installer with
 `--upgrade`).
 
-Select a mode with `install --mode tool`, `install --mode dependency`, or
-`install --mode dev`. Vaultspec consumes the package, module, and optional tool
-requirement while rendering; that metadata never reaches native host configuration.
+Select a mode with `vaultspec-core install --mode tool`,
+`vaultspec-core install --mode dependency`, or `vaultspec-core install --mode dev`.
+Vaultspec consumes the package, module, and optional tool requirement while rendering;
+that metadata never reaches native host configuration.
 
 The chosen mode is recorded per package in the workspace's committed `workspace.json`,
 which keys each provisioned package to its own mode and version floor. A workspace that
@@ -663,7 +664,7 @@ returns the query echoed back, a count, and a list of ranked verb schemas.
 
 Each verb schema carries:
 
-- `verb` - the space-joined verb path, for example `vault list`
+- `verb` - the space-joined verb path, for example `"vault list"`
 - `description` - the verb's help text
 - `score` - a relevance score; results are ranked by relevance, highest first
 - `supports_json` - whether the verb accepts a `--json` flag
@@ -792,10 +793,13 @@ denylisted verbs from its results, and `invoke` rejects them before spawning. Th
 denylist covers:
 
 - `uninstall` - tears down the framework
-- `spec mcps add`, `spec mcps remove`, `spec mcps sync`, and `spec mcps uninstall` - MCP
-  definition or enrollment mutation, owned by the `spec mcps` lifecycle (the read-only
-  `spec mcps list` and `spec mcps status` stay available)
-- `vault feature index` - index documents stay uncreatable through the MCP surface
+- `vaultspec-core spec mcps add`, `vaultspec-core spec mcps remove`,
+  `vaultspec-core spec mcps sync`, and `vaultspec-core spec mcps uninstall` - MCP
+  definition or enrollment mutation, owned by the `vaultspec-core spec mcps` lifecycle
+  (the read-only `vaultspec-core spec mcps list` and `vaultspec-core spec mcps status`
+  stay available)
+- `vaultspec-core vault feature index` - index documents stay uncreatable through the
+  MCP surface
 
 ## Server lifetime
 

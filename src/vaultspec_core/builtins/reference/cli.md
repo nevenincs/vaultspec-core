@@ -626,10 +626,10 @@ enrollment. Providers are `all`, `claude`, `antigravity`, and `codex`; scopes ar
 | `sync`      | `[PROVIDER] [--scope SCOPE] [--dry-run] [--force] [--prune] [--json] [--target PATH]` | Reconcile canonical definitions into native enrollment.             |
 | `uninstall` | `[PROVIDER] [--scope SCOPE] [--dry-run] [--force] [--json] [--target PATH]`           | Remove only Vaultspec-owned native enrollment.                      |
 
-The default provider is `all` and the default scope is `project`. `sync --force` adopts
-or replaces a same-name external entry; `sync --prune` removes owned enrollment whose
-canonical source was deleted. `uninstall` preserves canonical definitions and external
-host entries.
+The default provider is `all` and the default scope is `project`.
+`vaultspec-core spec mcps sync --force` adopts or replaces a same-name external entry;
+`vaultspec-core spec mcps sync --prune` removes owned enrollment whose canonical source
+was deleted. `uninstall` preserves canonical definitions and external host entries.
 
 ## Migration commands
 

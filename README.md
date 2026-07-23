@@ -85,7 +85,7 @@ uv add vaultspec-core
 If you added it as a project dependency, bootstrap from inside your environment:
 
 ```bash
-uv run --no-sync vaultspec-core install
+uv run vaultspec-core install
 ```
 
 See the [CLI reference](./docs/CLI.md) for installation options.
@@ -100,11 +100,12 @@ is the default and runs vaultspec-core through `uvx`, so it never enters your pr
 dependency set. Dependency mode runs it through `uv run` and is selected automatically
 when your `pyproject.toml` lists vaultspec-core. Dev mode also runs through `uv run`,
 but places vaultspec-core in the default `dev` dependency group instead, so it doesn't
-ship in your built distributions. Pin any with `install --mode tool`,
-`install --mode dependency`, or `install --mode dev`. The choice is recorded per package
-in a committed `workspace.json`, so a workspace running vaultspec-core alongside a
-companion package can declare each in its own mode. An existing workspace has its mode
-inferred and recorded the next time you run `install --upgrade`.
+ship in your built distributions. Pin any with `vaultspec-core install --mode tool`,
+`vaultspec-core install --mode dependency`, or `vaultspec-core install --mode dev`. The
+choice is recorded per package in a committed `workspace.json`, so a workspace running
+vaultspec-core alongside a companion package can declare each in its own mode. An
+existing workspace has its mode inferred and recorded the next time you run
+`vaultspec-core install --upgrade`.
 
 ### 3. Sync
 
@@ -112,14 +113,14 @@ All development paper trails live in `.vault` as markdown files. Rules, agents, 
 skills are seeded from `.vaultspec` via:
 
 ```bash
-uv run --no-sync vaultspec-core sync
+uv run vaultspec-core sync
 ```
 
 > [!TIP]
 > Make sure to run
 >
 > ```bash
-> uv run --no-sync vaultspec-core install --upgrade
+> uv run vaultspec-core install --upgrade
 > ```
 >
 > after a library update as the shipped agents, skills and rules might change between
