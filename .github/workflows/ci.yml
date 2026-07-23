@@ -103,6 +103,39 @@ jobs:
       - name: Run tests
         run: just dev test python
 
+  broad-tests:
+    name: Broad Test Suite (informational)
+    # The required "Tests" gate above is marker-scoped to `unit`, which hides the
+    # much larger integration/behavioural suite. This job runs the full suite
+    # (excluding only the gemini/claude markers, which need external API
+    # credentials) so a green CI no longer implies "every test passed" when only
+    # the unit slice ran. It is non-blocking for now: promote it to a required
+    # check once it is proven consistently green on CI. See the PR for rationale.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install just
+        uses: taiki-e/install-action@just
+
+      - name: Install dependencies
+        run: just dev deps sync
+
+      - name: Run broad test suite
+        run: uv run pytest src/vaultspec_core -q -m "not gemini and not claude"
+
   windows-vault-repair:
     name: Windows Vault Repair Tests
     runs-on: windows-latest
