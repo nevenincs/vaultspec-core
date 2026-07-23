@@ -1015,29 +1015,46 @@ Run health checks on `.vault/`. Exits with code `1` if errors are found.
 #### Subcommands
 
 - `all` (`--fix`: partial, `--feature`: yes) - Run every check in sequence.
-- `annotations` (`--fix`: yes, `--feature`: yes) - Find generated template annotations.
-- `body-links` (`--fix`: no, `--feature`: yes) - Find wiki-links and markdown path links
-  in document body text.
-- `dangling` (`--fix`: yes, `--feature`: yes) - Find `related:` wiki-links that resolve
-  to no document.
-- `frontmatter` (`--fix`: yes, `--feature`: yes) - Validate frontmatter against vault
-  schema.
+- `structure` (`--fix`: yes, `--feature`: no) - Check vault directory structure and
+  filename conventions.
+- `frontmatter` (`--fix`: yes, `--feature`: yes) - Validate document frontmatter against
+  vault schema.
+- `modified-stamp` (`--fix`: yes, `--feature`: yes) - Validate and reconcile the
+  `modified:` recency stamp on every document.
+- `annotations` (`--fix`: yes, `--feature`: yes) - Find generated template annotations
+  in vault documents.
+- `markdown` (`--fix`: yes, `--feature`: yes) - Check and optionally fix markdown
+  hygiene (whitespace, blank runs, trailing newline).
 - `links` (`--fix`: yes, `--feature`: yes) - Check wiki-links follow Obsidian convention
   (no `.md` extension).
-- `orphans` (`--fix`: no, `--feature`: yes) - Find documents with no incoming
+- `dangling` (`--fix`: yes, `--feature`: yes) - Find `related:` frontmatter wiki-links
+  that resolve to no document.
+- `body-links` (`--fix`: no, `--feature`: yes) - Find wiki-links and markdown path links
+  in document body text.
+- `placeholders` (`--fix`: no, `--feature`: yes) - Find unreplaced `{...}` template
+  placeholders in document body prose.
+- `orphans` (`--fix`: yes, `--feature`: yes) - Find documents with no incoming
   wiki-links.
-- `features` (`--fix`: no, `--feature`: yes) - Check feature tag completeness (missing
-  doc types).
-- `modified-stamp` (`--fix`: yes, `--feature`: yes) - Flag missing, unparseable, or
-  stale `modified:` stamps; `--fix` normalizes to `yyyy-mm-dd`.
-- `references` (`--fix`: yes, `--feature`: yes) - Check cross-references within
-  features.
-- `schema` (`--fix`: yes, `--feature`: yes) - Enforce dependency rules (ADR refs
-  research, plan refs ADR).
-- `structure` (`--fix`: yes, `--feature`: no) - Check directory structure and filename
-  conventions.
+- `features` (`--fix`: yes, `--feature`: yes) - Check feature tag completeness - missing
+  doc types.
+- `exec-mapping` (`--fix`: no, `--feature`: yes) - Check execution records map to a live
+  Step in their parent plan.
+- `body-sections` (`--fix`: no, `--feature`: yes) - Check document bodies carry the
+  sections their template mandates.
+- `feature-rename-integrity` (`--fix`: no, `--feature`: yes) - Surface exec folders
+  whose feature disagrees with their records' tag.
+- `references` (`--fix`: yes, `--feature`: yes) - Check for missing cross-references
+  within features.
+- `schema` (`--fix`: yes, `--feature`: yes) - Enforce schema rules: ADRs must ref
+  research, plans must ref ADRs.
+- `adr-status` (`--fix`: yes, `--feature`: yes) - Validate ADR status against the
+  canonical taxonomy.
 - `rename-integrity` (`--fix`: yes, `--feature`: no) - Check name/filename integrity for
   rules, skills, and agents.
+- `encoding` (`--fix`: no, `--feature`: yes) - Surface `.vault/` documents that are not
+  valid UTF-8 (detection only).
+- `code-boundary` (`--fix`: no, `--feature`: yes) - Scan source files for references to
+  the project's own vault records (opt-in; findings are advisory).
 
 `yes` = fully supported, `partial` = only the sub-checks that accept `--fix` apply fixes
 (`all` dispatches to every check), `no` = flag rejected with error. `structure` does not
@@ -1755,6 +1772,45 @@ vaultspec-core spec hooks [OPTIONS] COMMAND [ARGS]...
   ```
 
 ______________________________________________________________________
+
+### vaultspec-core spec precommit
+
+```bash
+vaultspec-core spec precommit [OPTIONS] COMMAND [ARGS]...
+```
+
+#### Subcommands
+
+- `migrate` (`--remove-yaml`, `--dry-run`, `--json`) - Transplant the canonical
+  vaultspec hooks into `prek.toml`.
+
+When `prek.toml` owns the hook boundary, sync no longer scaffolds
+`.pre-commit-config.yaml` and prek silently ignores it. `migrate` renders the canonical
+hook set into a vaultspec-managed block inside `prek.toml`. It is idempotent -
+re-running with the hooks already present is a no-op - and the superseded YAML config is
+never deleted unless `--remove-yaml` is passed and the canonical hooks are verified
+present in `prek.toml`.
+
+#### Options
+
+- `--remove-yaml` (default off) - Also delete the superseded `.pre-commit-config.yaml`
+  once the canonical hooks are verifiably present in `prek.toml`.
+- `--dry-run` (default off) - Preview without writing.
+- `--json` (default off) - Emit the result as JSON.
+
+#### Examples
+
+- **Preview the transplant without writing**:
+
+  ```bash
+  vaultspec-core spec precommit migrate --dry-run
+  ```
+
+- **Transplant hooks, then remove the superseded YAML**:
+
+  ```bash
+  vaultspec-core spec precommit migrate --remove-yaml
+  ```
 
 ### vaultspec-core spec mcps
 
