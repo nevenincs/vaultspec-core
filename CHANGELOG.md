@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.1.49](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.48...vaultspec-core-v0.1.49) (2026-07-23)
+
+
+### Features
+
+* **prek:** content-aware hook boundary with assisted prek.toml migration ([43a9a56](https://github.com/nevenincs/vaultspec-core/commit/43a9a564694a6da5720d09ebafb22088e24f1b5b))
+* **release:** add PyApp build configuration for standalone binaries ([3f6c0d1](https://github.com/nevenincs/vaultspec-core/commit/3f6c0d1f5123246e445aa283cc3abc1ee6dcfec3))
+* **release:** add self-hosted binary-build workflow with release upload ([c5fe2fd](https://github.com/nevenincs/vaultspec-core/commit/c5fe2fd360d8722e53a02b12b727abff61e897cf))
+* **scoop:** add core bucket manifest with post-release bump ([3385421](https://github.com/nevenincs/vaultspec-core/commit/33854211c0716381be293330875d82d645ff3264))
+* **vault:** add exec-mapping and body-sections check validators ([e1418df](https://github.com/nevenincs/vaultspec-core/commit/e1418dfd6c3f30c08b1969d8f94d9e1263794e63)), closes [#233](https://github.com/nevenincs/vaultspec-core/issues/233) [#234](https://github.com/nevenincs/vaultspec-core/issues/234)
+
+
+### Bug Fixes
+
+* **cli:** own positional metavar grammar across the Typer 0.27 change ([7fc2f3b](https://github.com/nevenincs/vaultspec-core/commit/7fc2f3bd385161022e5d43dd64368297634ee202))
+* **install:** non-destructive adoption and provider-lock ignore coverage ([c653c14](https://github.com/nevenincs/vaultspec-core/commit/c653c14a7c25116070c0d33cf2affb60f4daac73)), closes [#229](https://github.com/nevenincs/vaultspec-core/issues/229) [#230](https://github.com/nevenincs/vaultspec-core/issues/230)
+* recognize unrefreshable prek sync state ([88e18e0](https://github.com/nevenincs/vaultspec-core/commit/88e18e0f9ce383e935adf3a0867af78082fd3fa3))
+* **scoop:** make manifest push resilient to an advanced main ([9783fad](https://github.com/nevenincs/vaultspec-core/commit/9783fadd095b2d7b07b0a22d16b35e2f6d6ccbba))
+* **sync:** idempotent .pre-commit-config.yaml assembly ([2aa4a88](https://github.com/nevenincs/vaultspec-core/commit/2aa4a88a0218829bb225ec6a6e4bb758cb2c297d)), closes [#241](https://github.com/nevenincs/vaultspec-core/issues/241)
+* **sync:** self-gating spec-check hook so warnings do not deadlock commits ([6e41e06](https://github.com/nevenincs/vaultspec-core/commit/6e41e066627753c6371674640d1b35200f896468)), closes [#236](https://github.com/nevenincs/vaultspec-core/issues/236)
+* **test:** make outdated_vaultspec_rules deterministic to unflake doctor warning gate ([b804438](https://github.com/nevenincs/vaultspec-core/commit/b804438bdc4e1a741fd5fd5b4a94b08bd15b3b8f)), closes [#243](https://github.com/nevenincs/vaultspec-core/issues/243)
+* **vault:** recognize the stash/restore two-date mtime signature ([aa55570](https://github.com/nevenincs/vaultspec-core/commit/aa55570a74fb61b148c7aa8b69bd7d1443e361f9)), closes [#235](https://github.com/nevenincs/vaultspec-core/issues/235)
+
 ## [0.1.48](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.47...vaultspec-core-v0.1.48) (2026-07-17)
 
 
