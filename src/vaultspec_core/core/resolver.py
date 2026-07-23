@@ -109,7 +109,13 @@ def resolve(
     fw_action = CliAction.INSTALL if action == CliAction.UPGRADE else action
     prov_action = CliAction.SYNC if action == CliAction.UPGRADE else action
 
-    _resolve_framework(plan, diagnosis.framework, fw_action, force=force)
+    _resolve_framework(
+        plan,
+        diagnosis.framework,
+        fw_action,
+        force=force,
+        divergent_projections=diagnosis.divergent_projections,
+    )
     _resolve_version_warning(plan, diagnosis)
     # Builtins live directly under .vaultspec/ - framework content. Under
     # `install --upgrade` they are re-seeded unconditionally, so the
@@ -212,9 +218,16 @@ def _resolve_framework(
     action: CliAction,
     *,
     force: bool,
+    divergent_projections: list[str] | None = None,
 ) -> None:
     """Apply framework-level resolution rules."""
     if signal == FrameworkSignal.PRESENT:
+        return
+
+    if signal == FrameworkSignal.ADOPTABLE:
+        _resolve_adoptable(
+            plan, action, force=force, divergent_projections=divergent_projections or []
+        )
         return
 
     if signal == FrameworkSignal.MISSING:
@@ -277,6 +290,79 @@ def _resolve_framework(
     # All FrameworkSignal values are handled above; this is unreachable
     # unless a new enum member is added without updating the resolver.
     logger.warning("Unknown FrameworkSignal member: %s (action=%s)", signal, action)
+
+
+#: Cap on the number of diverged paths spelled out in the adoption conflict.
+#: The list must be precise enough to act on without becoming an unreadable
+#: wall of text on a workspace that has drifted wholesale.
+_MAX_LISTED_DIVERGENCES = 20
+
+
+def _resolve_adoptable(
+    plan: ResolutionPlan,
+    action: CliAction,
+    *,
+    force: bool,
+    divergent_projections: list[str],
+) -> None:
+    """Apply resolution rules for a tracked-but-unmanifested framework.
+
+    Establishing the runtime manifest is a create-only operation: it writes one
+    file that did not exist and overwrites nothing, which the framework-wide
+    gating contract classifies as an additive path requiring no ``--force``.
+    That is what makes a fresh clone adoptable in one ordinary run.
+
+    The adopting run's provider sync is the mixed path. Its per-file writes are
+    not force-gated, so any projection whose on-disk content has diverged from
+    source would be rewritten. On a workspace vaultspec has never claimed
+    locally that content is the operator's, not ours, so the destructive
+    sub-path is gated independently: adoption refuses with the exact paths named
+    and ``--force`` as the explicit consent.
+    """
+    if action == CliAction.UNINSTALL:
+        # Uninstall needs to know what is installed before it removes anything.
+        # Adoption is additive, so it runs unconditionally here; uninstall's own
+        # gating continues to govern the removal itself.
+        plan.steps.append(
+            ResolutionStep(
+                action=ResolutionAction.ADOPT_FRAMEWORK,
+                target="manifest",
+                reason="Establishing runtime manifest before uninstall",
+            )
+        )
+        return
+
+    if divergent_projections and not force:
+        listed = divergent_projections[:_MAX_LISTED_DIVERGENCES]
+        remainder = len(divergent_projections) - len(listed)
+        detail = ", ".join(listed)
+        if remainder > 0:
+            detail += f", and {remainder} more"
+        plan.conflicts.append(
+            "Cannot adopt this workspace without overwriting locally divergent "
+            f"projected content: {detail}. Reconcile these files with their "
+            ".vaultspec/ sources, or re-run with --force to overwrite them."
+        )
+        return
+
+    plan.steps.append(
+        ResolutionStep(
+            action=ResolutionAction.ADOPT_FRAMEWORK,
+            target="manifest",
+            reason=(
+                "Framework content present without a runtime manifest; "
+                "establishing manifest state"
+            ),
+        )
+    )
+    if action == CliAction.SYNC:
+        plan.steps.append(
+            ResolutionStep(
+                action=ResolutionAction.SYNC,
+                target="all",
+                reason="Sync after adopting the framework",
+            )
+        )
 
 
 # ---------------------------------------------------------------------------

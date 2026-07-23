@@ -130,6 +130,11 @@ class WorkspaceDiagnosis:
             workspace map, keyed by canonicalized distribution name. Empty when
             no ``workspace.json`` declaration exists. Drives the doctor's
             per-package install-mode and version-floor rows.
+        divergent_projections: Workspace-relative paths of projected provider
+            files whose on-disk content differs from what the sync engine would
+            write. Populated only when ``framework`` is
+            :attr:`~vaultspec_core.core.diagnosis.signals.FrameworkSignal.ADOPTABLE`,
+            where it names the content an adopting run would destroy.
     """
 
     framework: FrameworkSignal
@@ -152,6 +157,7 @@ class WorkspaceDiagnosis:
     version_floor_running: str = ""
     version_floor_minimum: str = ""
     packages: dict[str, PackageModeDiagnosis] = field(default_factory=dict)
+    divergent_projections: list[str] = field(default_factory=list)
 
 
 def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
@@ -178,6 +184,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         collect_builtin_version_state,
         collect_config_state,
         collect_content_integrity,
+        collect_divergent_projections,
         collect_framework_presence,
         collect_gitattributes_state,
         collect_gitignore_state,
@@ -332,9 +339,10 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
     if framework == FrameworkSignal.MISSING:
         return diag
 
-    if framework == FrameworkSignal.CORRUPTED:
-        # Manifest may be broken but directories may still exist.
-        # Collect what we can without requiring a valid WorkspaceContext.
+    if framework in (FrameworkSignal.CORRUPTED, FrameworkSignal.ADOPTABLE):
+        # Manifest may be broken or intentionally absent but directories may
+        # still exist. Collect what we can without requiring a valid
+        # WorkspaceContext.
         manifest_map: dict[str, ManifestEntrySignal] = {}
         try:
             manifest_map = collect_manifest_coherence(target)
@@ -352,6 +360,16 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
                 dir_state=dir_state,
                 manifest_entry=entry,
             )
+
+        # Adoption is the one path that claims a workspace vaultspec has never
+        # written to locally, so it is the one path that must name what it would
+        # overwrite before it writes anything. A corrupt manifest is a different
+        # condition and keeps its existing repair semantics.
+        if framework == FrameworkSignal.ADOPTABLE:
+            try:
+                diag.divergent_projections = collect_divergent_projections(target)
+            except Exception:
+                logger.warning("Divergent projection collector failed", exc_info=True)
         return diag
 
     # Layer 2: framework is PRESENT - collect manifest and builtin state

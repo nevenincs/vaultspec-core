@@ -297,10 +297,10 @@ class TestUntrackManagedPaths:
             )
 
     def test_does_not_untrack_subdir_sentinel_match(self, tmp_path: Path) -> None:
-        """Sentinel basenames only match at the workspace root.
+        """Sentinel paths only match at their exact managed location.
 
         A user-authored ``docs/.gitignore.lock`` must not be swept up even
-        though its basename matches :data:`_MANAGED_LOCK_SENTINELS`.
+        though its basename matches the root-level sentinel Core owns.
         """
         _init_git_repo(tmp_path)
         docs = tmp_path / "docs"

@@ -20,6 +20,7 @@ from .gitignore import ensure_gitignore_block, get_recommended_entries
 from .manifest import (
     ManifestData,
     add_providers,
+    create_manifest_exclusive,
     read_manifest_data,
     write_manifest_data,
 )
@@ -36,6 +37,7 @@ PREFLIGHT_ACTIONS: frozenset[ResolutionAction] = frozenset(
         ResolutionAction.REPAIR_GITATTRIBUTES,
         ResolutionAction.REPAIR_PRECOMMIT,
         ResolutionAction.ADOPT_DIRECTORY,
+        ResolutionAction.ADOPT_FRAMEWORK,
         ResolutionAction.SCAFFOLD,
     }
 )
@@ -156,6 +158,7 @@ _HANDLERS: dict[ResolutionAction, str] = {
     ResolutionAction.REPAIR_PRECOMMIT: "_execute_repair_precommit",
     ResolutionAction.SCAFFOLD: "_execute_scaffold",
     ResolutionAction.ADOPT_DIRECTORY: "_execute_adopt_directory",
+    ResolutionAction.ADOPT_FRAMEWORK: "_execute_adopt_framework",
 }
 
 
@@ -172,6 +175,16 @@ def _dispatch(target: Path, step: ResolutionStep) -> None:
 # ---------------------------------------------------------------------------
 
 
+#: Provider directory names, shared by every handler that derives the installed
+#: set from what is actually on disk.
+_TOOL_DIRS: dict[Tool, str] = {
+    Tool.CLAUDE: DirName.CLAUDE.value,
+    Tool.GEMINI: DirName.GEMINI.value,
+    Tool.ANTIGRAVITY: DirName.ANTIGRAVITY.value,
+    Tool.CODEX: DirName.CODEX.value,
+}
+
+
 def _execute_repair_manifest(target: Path, _step: ResolutionStep) -> None:
     """Rebuild the manifest by scanning for provider directories on disk."""
     # Read existing data (may be corrupt - fall back to defaults)
@@ -180,20 +193,35 @@ def _execute_repair_manifest(target: Path, _step: ResolutionStep) -> None:
     except Exception:
         data = ManifestData()
 
-    _tool_dir_map: dict[Tool, str] = {
-        Tool.CLAUDE: DirName.CLAUDE.value,
-        Tool.GEMINI: DirName.GEMINI.value,
-        Tool.ANTIGRAVITY: DirName.ANTIGRAVITY.value,
-        Tool.CODEX: DirName.CODEX.value,
+    data.installed = {
+        tool.value
+        for tool, dir_name in _TOOL_DIRS.items()
+        if (target / dir_name).is_dir()
     }
-
-    detected: set[str] = set()
-    for tool, dir_name in _tool_dir_map.items():
-        if (target / dir_name).is_dir():
-            detected.add(tool.value)
-
-    data.installed = detected
     write_manifest_data(target, data)
+
+
+def _execute_adopt_framework(target: Path, _step: ResolutionStep) -> None:
+    """Establish the runtime manifest for a tracked, unmanifested workspace.
+
+    Writes ``.vaultspec/providers.json`` and nothing else, deriving the
+    installed set from the provider directories actually present on disk. The
+    write is a compare-and-swap create under the manifest's advisory lock, so it
+    can only ever add the file: a manifest that appeared between diagnosis and
+    execution is left exactly as its writer produced it, and this call converges
+    silently rather than clobbering it.
+    """
+    detected = {
+        tool.value
+        for tool, dir_name in _TOOL_DIRS.items()
+        if (target / dir_name).is_dir()
+    }
+    created = create_manifest_exclusive(target, ManifestData(installed=detected))
+    if not created:
+        logger.debug(
+            "Manifest already established at %s; adoption converged without a write",
+            target,
+        )
 
 
 def _execute_scaffold(target: Path, step: ResolutionStep) -> None:

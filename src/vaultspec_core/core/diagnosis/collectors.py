@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -92,8 +93,45 @@ def _validate_tool_dir() -> None:
     _tool_dir_validated = True
 
 
+@lru_cache(maxsize=1)
+def _framework_content_names() -> frozenset[str]:
+    """Return the top-level ``.vaultspec/`` entry names the package seeds.
+
+    Derived from the bundled builtin tree so the set of names that identify a
+    real framework directory has exactly one source of truth and cannot drift
+    into a second hand-maintained list as new resource categories ship.
+    """
+    from ...builtins import list_builtins
+
+    return frozenset(rel.split("/", 1)[0] for rel in list_builtins())
+
+
+def _carries_framework_content(fw_dir: Path) -> bool:
+    """Return whether *fw_dir* holds recognizable vaultspec framework content.
+
+    A directory that merely exists proves nothing; one that carries at least one
+    of the resource categories the package seeds is a real framework tree whose
+    runtime manifest is simply absent.
+    """
+    try:
+        present = {child.name for child in fw_dir.iterdir()}
+    except OSError as exc:
+        logger.warning("Cannot read framework directory %s: %s", fw_dir, exc)
+        return False
+    return bool(present & _framework_content_names())
+
+
 def collect_framework_presence(target: Path) -> FrameworkSignal:
     """Check whether the vaultspec framework directory is present and valid.
+
+    Distinguishes a legitimately unmanifested workspace from a corrupt one. The
+    runtime manifest is gitignored and per-machine by design, so its complete
+    absence alongside real framework content is the expected shape of a fresh
+    clone that tracks its canonical ``.vaultspec/`` tree - that is
+    :attr:`~vaultspec_core.core.diagnosis.signals.FrameworkSignal.ADOPTABLE`,
+    not corruption. A manifest that exists but cannot be parsed, or a framework
+    directory carrying no recognizable content at all, remains
+    :attr:`~vaultspec_core.core.diagnosis.signals.FrameworkSignal.CORRUPTED`.
 
     Args:
         target: Workspace root directory.
@@ -108,6 +146,8 @@ def collect_framework_presence(target: Path) -> FrameworkSignal:
 
     manifest_path = fw_dir / "providers.json"
     if not manifest_path.exists():
+        if _carries_framework_content(fw_dir):
+            return FrameworkSignal.ADOPTABLE
         return FrameworkSignal.CORRUPTED
 
     try:
@@ -611,6 +651,83 @@ def collect_content_integrity(tool_value: str) -> dict[str, ContentSignal]:
         result[name] = ContentSignal.STALE
 
     return result
+
+
+def collect_divergent_projections(target: Path) -> list[str]:
+    """Return projected provider files whose on-disk content differs from source.
+
+    Used by the adoption path to name, before anything is written, the files an
+    adopting run's provider sync would rewrite. The sync engine's per-file write
+    is not force-gated, so on a workspace vaultspec has never claimed locally
+    these are the only files adoption can silently destroy - live edits in a
+    checkout whose projections were tracked in version control.
+
+    The comparison is delegated to :func:`collect_content_integrity`, the same
+    comparator the doctor and the sync engine share, so adoption cannot grow a
+    second, divergent notion of what "diverged" means. It reads the manifest
+    nowhere, which is what makes it computable on an unmanifested workspace.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        Sorted workspace-relative paths (forward-slash separated) of diverged
+        projections; empty when every projection matches its source or when
+        tool configuration cannot be resolved.
+    """
+    from ..enums import Tool
+    from ..types import WorkspaceContext, get_context, set_context
+
+    # Resolving tool configs needs the workspace context, which this collector
+    # must not leave mutated: the diagnosis layer is specified as side-effect
+    # free. Snapshot whatever was active and restore it unconditionally.
+    previous: WorkspaceContext | None
+    try:
+        previous = get_context()
+    except LookupError:
+        previous = None
+
+    try:
+        try:
+            from ..commands import _ensure_tool_configs
+
+            _ensure_tool_configs(target)
+            ctx = get_context()
+        except Exception:
+            logger.debug(
+                "Could not bootstrap tool configs for adoption probe", exc_info=True
+            )
+            return []
+
+        diverged: set[str] = set()
+        for tool in Tool:
+            dir_name = _TOOL_DIR.get(tool.value)
+            if dir_name is None or not (target / dir_name).is_dir():
+                continue
+            cfg = ctx.tool_configs.get(tool)
+            if cfg is None or cfg.rules_dir is None:
+                continue
+            try:
+                content = collect_content_integrity(tool.value)
+            except Exception:
+                logger.debug(
+                    "Content integrity probe failed for %s", tool.value, exc_info=True
+                )
+                continue
+            for name, signal in content.items():
+                if signal is not ContentSignal.DIVERGED:
+                    continue
+                dest = cfg.rules_dir / name
+                try:
+                    rel = dest.relative_to(target)
+                except ValueError:
+                    rel = dest
+                diverged.add(str(rel).replace("\\", "/"))
+
+        return sorted(diverged)
+    finally:
+        if previous is not None:
+            set_context(previous)
 
 
 def collect_gitattributes_state(target: Path) -> GitattributesSignal:
