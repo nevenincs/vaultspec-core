@@ -82,11 +82,16 @@ jobs:
       contents: write
     steps:
       # Check out main so the scoop-bump step can rewrite and commit the
-      # in-repo bucket manifest after the assets are attached.
+      # in-repo bucket manifest after the assets are attached. The SSH deploy
+      # key authenticates the manifest push: main is protected by a ruleset
+      # that requires status checks, and a deploy-key push is a bypass actor,
+      # so the automated bump lands without a human-gated PR while every other
+      # push stays gated.
       - name: Checkout
         uses: actions/checkout@v6
         with:
           ref: main
+          ssh-key: ${{ secrets.SCOOP_DEPLOY_KEY }}
 
       - name: Download binaries
         uses: actions/download-artifact@v8
