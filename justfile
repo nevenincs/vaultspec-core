@@ -231,7 +231,7 @@ _dev-test-help:
   @echo "  all       Run all tests"
 
 _dev-test-python:
-  uv run pytest src/vaultspec_core -x -q --tb=short -m "unit and not gemini and not claude"
+  uv run pytest src/vaultspec_core -x -q --tb=short -m "unit and not gemini and not claude and not network"
 
 _dev-test-all:
   just _dev-test-python

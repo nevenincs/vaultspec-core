@@ -113,6 +113,7 @@ markers = [
   "api: API-level tests covering stable public analysis surfaces",
   "unit: fast tests with no external dependencies",
   "integration: requires CLI tools and network",
+  "network: requires live network access (upstream drift guards); excluded from gating suites",
   "gemini: requires Gemini CLI installed",
   "claude: requires Claude CLI installed",
   "timeout: timeout in seconds for individual tests",

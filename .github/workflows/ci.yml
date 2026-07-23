@@ -144,7 +144,7 @@ jobs:
 
       - name: Run broad test suite
         shell: bash
-        run: uv run pytest src/vaultspec_core -q -m "not gemini and not claude"
+        run: uv run pytest src/vaultspec_core -q -m "not gemini and not claude and not network"
 
   windows-vault-repair:
     name: Windows Vault Repair Tests
