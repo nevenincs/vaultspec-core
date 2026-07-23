@@ -9,6 +9,7 @@ to a dedicated nested Typer namespace.
 from __future__ import annotations
 
 import contextvars
+import io
 import logging
 import shutil
 import subprocess
@@ -18,7 +19,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import yaml
+from ruamel.yaml import YAML, YAMLError
 
 from . import types as _t
 from .enums import (
@@ -739,6 +740,35 @@ CANONICAL_HOOK_ENTRIES: dict[str, str] = canonical_hook_entries_for_mode(
 _ALL_MANAGED_HOOK_IDS: frozenset[str] = CANONICAL_HOOK_IDS
 
 
+def _precommit_yaml() -> YAML:
+    """Return a round-trip YAML handler for ``.pre-commit-config.yaml``.
+
+    Round-trip mode preserves the parts of an author-maintained config that a
+    plain ``safe_load`` + ``dump`` cycle would silently rewrite: explanatory
+    comments, the single-quoted literal form of ``exclude``/``files`` regexes,
+    and long ``entry`` scalars that a re-emitter would otherwise line-wrap.
+    Preserving them is what makes a full ``sync`` over a correctly-rendered
+    config a byte-for-byte no-op instead of a spurious diff.
+
+    The sequence indent is pinned to the non-indented block style
+    (``sequence=2, offset=0``) so a freshly scaffolded config matches the
+    historical layout, and ``width`` is raised so entry scalars are never
+    folded onto continuation lines.
+    """
+    handler = YAML()
+    handler.preserve_quotes = True
+    handler.width = 4096
+    handler.indent(mapping=2, sequence=2, offset=0)
+    return handler
+
+
+def _dump_precommit_yaml(handler: YAML, data: object) -> str:
+    """Serialise *data* to a string through the round-trip *handler*."""
+    buffer = io.StringIO()
+    handler.dump(data, buffer)
+    return buffer.getvalue()
+
+
 def _scaffold_precommit(
     target: Path, *, dry_run: bool = False, mode: InstallMode | None = None
 ) -> list[tuple[str, str]]:
@@ -787,15 +817,16 @@ def _scaffold_precommit(
         return []
 
     config_file = target / ".pre-commit-config.yaml"
+    handler = _precommit_yaml()
 
     with nullcontext() if dry_run else advisory_lock(config_file):
         if config_file.exists():
             try:
                 raw = config_file.read_text(encoding="utf-8")
-                data = yaml.safe_load(raw) or {}
+                data = handler.load(raw) or {}
                 if not isinstance(data, dict):
                     return []
-            except (yaml.YAMLError, OSError):
+            except (YAMLError, OSError):
                 return []
 
             repos = data.setdefault("repos", [])
@@ -846,15 +877,7 @@ def _scaffold_precommit(
                 )
 
             if not dry_run:
-                atomic_write(
-                    config_file,
-                    yaml.dump(
-                        data,
-                        sort_keys=False,
-                        default_flow_style=False,
-                        allow_unicode=True,
-                    ),
-                )
+                atomic_write(config_file, _dump_precommit_yaml(handler, data))
             return [(".pre-commit-config.yaml", "precommit")]
 
         if not dry_run:
@@ -866,15 +889,7 @@ def _scaffold_precommit(
                     }
                 ]
             }
-            atomic_write(
-                config_file,
-                yaml.dump(
-                    data,
-                    sort_keys=False,
-                    default_flow_style=False,
-                    allow_unicode=True,
-                ),
-            )
+            atomic_write(config_file, _dump_precommit_yaml(handler, data))
         return [(".pre-commit-config.yaml", "precommit")]
 
 
@@ -1791,45 +1806,42 @@ def uninstall_run(
         precommit_path = path / ".pre-commit-config.yaml"
         if "precommit" not in skip:
             if precommit_path.exists() and not dry_run:
+                handler = _precommit_yaml()
                 try:
                     raw = precommit_path.read_text(encoding="utf-8")
-                    data = yaml.safe_load(raw)
+                    data = handler.load(raw)
                     if isinstance(data, dict):
                         repos = data.get("repos", [])
                         if isinstance(repos, list):
                             changed = False
-                            new_repos = []
-                            for r in repos:
-                                if isinstance(r, dict) and r.get("repo") == "local":
-                                    hooks = r.get("hooks", [])
-                                    if isinstance(hooks, list):
-                                        new_hooks = [
-                                            h
-                                            for h in hooks
-                                            if isinstance(h, dict)
-                                            and h.get("id") not in _ALL_MANAGED_HOOK_IDS
-                                        ]
-                                        if len(new_hooks) != len(hooks):
-                                            r["hooks"] = new_hooks
-                                            changed = True
-                                        if new_hooks:
-                                            new_repos.append(r)
-                                    else:
-                                        new_repos.append(r)
-                                else:
-                                    new_repos.append(r)
+                            # Mutate the loaded structure in place so surviving
+                            # non-vaultspec hooks keep their comments and quoting.
+                            for r in list(repos):
+                                if not (
+                                    isinstance(r, dict) and r.get("repo") == "local"
+                                ):
+                                    continue
+                                hooks = r.get("hooks", [])
+                                if not isinstance(hooks, list):
+                                    continue
+                                managed_idx = [
+                                    i
+                                    for i, h in enumerate(hooks)
+                                    if isinstance(h, dict)
+                                    and h.get("id") in _ALL_MANAGED_HOOK_IDS
+                                ]
+                                for i in reversed(managed_idx):
+                                    del hooks[i]
+                                if managed_idx:
+                                    changed = True
+                                if not hooks:
+                                    repos.remove(r)
 
                             if changed:
-                                if new_repos:
-                                    data["repos"] = new_repos
+                                if repos:
                                     atomic_write(
                                         precommit_path,
-                                        yaml.dump(
-                                            data,
-                                            sort_keys=False,
-                                            default_flow_style=False,
-                                            allow_unicode=True,
-                                        ),
+                                        _dump_precommit_yaml(handler, data),
                                     )
                                 else:
                                     del data["repos"]
@@ -1838,12 +1850,7 @@ def uninstall_run(
                                     else:
                                         atomic_write(
                                             precommit_path,
-                                            yaml.dump(
-                                                data,
-                                                sort_keys=False,
-                                                default_flow_style=False,
-                                                allow_unicode=True,
-                                            ),
+                                            _dump_precommit_yaml(handler, data),
                                         )
                                 removed.append(
                                     (_rel(path, precommit_path), "precommit")
@@ -1852,7 +1859,7 @@ def uninstall_run(
                                 if mdata_u.precommit_managed:
                                     mdata_u.precommit_managed = False
                                     write_manifest_data(path, mdata_u)
-                except (yaml.YAMLError, OSError):
+                except (YAMLError, OSError):
                     pass
             elif precommit_path.exists() and dry_run:
                 try:

@@ -416,6 +416,92 @@ class TestSpecCheckGateEntry:
         ) == before
 
 
+class TestScaffoldPreservesAuthorContent:
+    """Regression (GH issue 241): reassembling the config must not rewrite the
+    author-maintained parts it is not editing.
+
+    ``sync`` reassembles ``.pre-commit-config.yaml`` whenever it upgrades a
+    managed hook entry. A plain ``safe_load`` + ``dump`` round-trip silently
+    stripped explanatory comments and unquoted the ``exclude`` regexes on
+    unrelated hooks, so a full sync over a correctly-authored config produced a
+    spurious diff and lost maintainer rationale. The assembly must preserve
+    comments and single-quoted regex literals, and reassembling twice must be
+    byte-identical.
+    """
+
+    _COMMENT = (
+        "  # Read-only checks only: keep every hook a pure gate so pre-commit's\n"
+        "  # stash cycle never rolls back fixes on a restore conflict.\n"
+    )
+
+    def _authored_config(self) -> str:
+        # A correctly-authored config: explanatory comment, single-quoted
+        # exclude regexes on non-vaultspec hooks, and a vaultspec spec-check
+        # hook still on the bare (pre-gate) entry so the reassembly path fires.
+        return (
+            "default_stages:\n"
+            "- pre-commit\n"
+            "repos:\n"
+            "- repo: local\n"
+            "  hooks:\n"
+            f"{self._COMMENT}"
+            "  - id: mdformat-check\n"
+            "    name: Check Markdown formatting (mdformat)\n"
+            "    entry: uv run --no-sync mdformat --check\n"
+            "    language: system\n"
+            "    pass_filenames: true\n"
+            "    types:\n"
+            "    - markdown\n"
+            "    exclude: '^CHANGELOG\\.md$'\n"
+            "  - id: pymarkdown\n"
+            "    name: Lint Markdown style (pymarkdown)\n"
+            "    entry: uv run --no-sync pymarkdown --config .pymarkdown.json scan\n"
+            "    language: system\n"
+            "    pass_filenames: true\n"
+            "    types:\n"
+            "    - markdown\n"
+            "    exclude: '^CHANGELOG\\.md$'\n"
+            "  - id: spec-check\n"
+            "    name: Spec check\n"
+            "    entry: uv run --no-sync vaultspec-core spec doctor\n"
+            "    language: system\n"
+            "    types:\n"
+            "    - markdown\n"
+            "    pass_filenames: false\n"
+        )
+
+    def test_reassembly_preserves_comments_and_quoting(self, factory) -> None:
+        config = factory.root / ".pre-commit-config.yaml"
+        config.write_text(self._authored_config(), encoding="utf-8")
+
+        # This pass edits the spec-check entry, so it reassembles the file.
+        changed = _scaffold_precommit(factory.root)
+        assert changed == [(".pre-commit-config.yaml", "precommit")]
+
+        rendered = config.read_text(encoding="utf-8")
+
+        # The managed edit landed.
+        assert "spec doctor --gate-errors" in rendered
+        # The explanatory comment survived reassembly.
+        assert "# Read-only checks only" in rendered
+        assert "stash cycle never rolls back fixes" in rendered
+        # Both exclude regexes keep their single-quoted literal form.
+        assert rendered.count("exclude: '^CHANGELOG\\.md$'") == 2
+
+    def test_reassembly_is_idempotent(self, factory) -> None:
+        config = factory.root / ".pre-commit-config.yaml"
+        config.write_text(self._authored_config(), encoding="utf-8")
+
+        _scaffold_precommit(factory.root)
+        first = config.read_text(encoding="utf-8")
+
+        # A second pass over the now-canonical config must be a no-op, and a
+        # forced re-render must reproduce the same bytes.
+        second_result = _scaffold_precommit(factory.root)
+        assert second_result == []
+        assert config.read_text(encoding="utf-8") == first
+
+
 # ---- Domain 2 + domain 1 end-to-end: install leaves a clean tree -------------
 
 
