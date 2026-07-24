@@ -18,9 +18,9 @@ import typer.main
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
-from vaultspec_core.tests.cli.test_cli_handbook_drift import (
-    _collect_group_paths,
-    _collect_leaf_command_paths,
+from vaultspec_core.tests.cli.reference_contract import (
+    collect_group_paths,
+    collect_leaf_command_paths,
 )
 
 pytestmark = [pytest.mark.integration]
@@ -111,8 +111,8 @@ def _is_bare_cli_reference(reference: str, top_level_commands: set[str]) -> bool
 
 
 def _registered_command_paths() -> set[tuple[str, ...]]:
-    paths = set(_collect_leaf_command_paths(app))
-    paths.update(_collect_group_paths(app))
+    paths = set(collect_leaf_command_paths(app))
+    paths.update(collect_group_paths(app))
     return paths
 
 
@@ -281,7 +281,7 @@ def test_docs_do_not_describe_command_groups_with_bare_executables() -> None:
 
 def test_markdown_command_references_match_live_cli_surface() -> None:
     command_paths = _registered_command_paths()
-    leaf_paths = set(_collect_leaf_command_paths(app))
+    leaf_paths = set(collect_leaf_command_paths(app))
 
     offenders: list[str] = []
     for path in sorted(_DOC_PATHS):
@@ -306,7 +306,7 @@ def test_markdown_command_references_match_live_cli_surface() -> None:
 
 def test_markdown_command_examples_use_live_cli_options() -> None:
     command_paths = _registered_command_paths()
-    leaf_paths = set(_collect_leaf_command_paths(app))
+    leaf_paths = set(collect_leaf_command_paths(app))
 
     offenders: list[str] = []
     for path in sorted(_DOC_PATHS):
@@ -369,7 +369,7 @@ def test_cli_handbook_documents_every_command() -> None:
 
     missing = [
         f"vaultspec-core {' '.join(command_path)}"
-        for command_path in _collect_leaf_command_paths(app)
+        for command_path in collect_leaf_command_paths(app)
         if f"`vaultspec-core {' '.join(command_path)}`" not in handbook
     ]
 
