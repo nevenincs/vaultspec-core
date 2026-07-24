@@ -2191,7 +2191,7 @@ wheels = [
 
 [[package]]
 name = "vaultspec-core"
-version = "0.1.50"
+version = "0.1.51"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
