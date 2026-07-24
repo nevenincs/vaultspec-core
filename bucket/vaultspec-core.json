@@ -7,13 +7,13 @@
     "The hash field is intentionally absent: the assets do not exist yet, so no",
     "real digest can be committed - autoupdate reads it from SHA256SUMS."
   ],
-  "version": "0.1.50",
+  "version": "0.1.51",
   "description": "Spec-driven development framework - vaultspec-core CLI and MCP server",
   "homepage": "https://github.com/nevenincs/vaultspec-core",
   "license": "MIT",
   "url": [
-    "https://github.com/nevenincs/vaultspec-core/releases/download/vaultspec-core-v0.1.50/vaultspec-core-x86_64-pc-windows-msvc.exe",
-    "https://github.com/nevenincs/vaultspec-core/releases/download/vaultspec-core-v0.1.50/vaultspec-mcp-x86_64-pc-windows-msvc.exe"
+    "https://github.com/nevenincs/vaultspec-core/releases/download/vaultspec-core-v0.1.51/vaultspec-core-x86_64-pc-windows-msvc.exe",
+    "https://github.com/nevenincs/vaultspec-core/releases/download/vaultspec-core-v0.1.51/vaultspec-mcp-x86_64-pc-windows-msvc.exe"
   ],
   "bin": [
     [
@@ -40,7 +40,7 @@
     }
   },
   "hash": [
-    "3fcbefcf382c042260b16813f74515d1e07f89de63706cde6e9df05d4a77250e",
-    "e5bd7401a08779d2f1c9c42caee02154265b508f1a320c16a4561ed9fe9f951c"
+    "",
+    ""
   ]
 }
