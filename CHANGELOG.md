@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.51](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.50...vaultspec-core-v0.1.51) (2026-07-24)
+
+
+### Tests
+
+* **cli:** guard that every indexed command has a prose section ([#264](https://github.com/nevenincs/vaultspec-core/issues/264)) ([5a72cee](https://github.com/nevenincs/vaultspec-core/commit/5a72ceeba8549ec33cc68201c5b9a7265beb2ea8))
+
 ## [0.1.50](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.49...vaultspec-core-v0.1.50) (2026-07-23)
 
 
