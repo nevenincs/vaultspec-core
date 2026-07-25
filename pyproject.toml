@@ -91,7 +91,7 @@ dev = [
   "ruff>=0.15.2",
   "torch>=2.4",
   "ty>=0.0.15",
-  "vaultspec-rag[mcp]>=0.3.0",
+  "vaultspec-rag[mcp]>=0.3.8",
 ]
 
 [tool.hatch.metadata]
