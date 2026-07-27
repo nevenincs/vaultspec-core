@@ -1,17 +1,18 @@
 ---
 tags:
-  - '#adr'
-  - '#reference-topic-infix'
+  - "#adr"
+  - "#reference-topic-infix"
 date: '2026-07-16'
-modified: '2026-07-16'
 related:
   - "[[2026-07-16-reference-topic-infix-research]]"
-  - '[[2026-06-09-firmware-wording-review-adr]]'
-  - '[[2026-06-27-rename-convergence-adr]]'
-  - '[[2026-07-09-mcp-tool-schema-adr]]'
+  - "[[2026-06-09-firmware-wording-review-adr]]"
+  - "[[2026-06-27-rename-convergence-adr]]"
+  - "[[2026-07-09-mcp-tool-schema-adr]]"
+superseded_by: '2026-07-27-adr-topic-infix-adr'
+modified: '2026-07-27'
 ---
 
-# `reference-topic-infix` adr: `topic-infix scaffolding for the narrative document trio` | (**status:** `accepted`)
+# `reference-topic-infix` adr: `topic-infix scaffolding for the narrative document trio` | (**status:** `superseded`)
 
 ## Problem Statement
 

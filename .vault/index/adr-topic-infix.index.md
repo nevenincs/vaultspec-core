@@ -1,0 +1,40 @@
+---
+generated: true
+tags:
+  - '#index'
+  - '#adr-topic-infix'
+date: '2026-07-27'
+modified: '2026-07-27'
+related:
+  - '[[2026-07-27-adr-topic-infix-P01-S01]]'
+  - '[[2026-07-27-adr-topic-infix-adr]]'
+  - '[[2026-07-27-adr-topic-infix-plan]]'
+  - '[[2026-07-27-adr-topic-infix-reference]]'
+  - '[[2026-07-27-adr-topic-infix-research]]'
+---
+
+# `adr-topic-infix` feature index
+
+Auto-generated index of all documents tagged with `#adr-topic-infix`.
+
+## Documents
+
+### adr
+
+- `2026-07-27-adr-topic-infix-adr` - `adr-topic-infix` adr: `topic-infixed ADR records` | (**status:** `accepted`)
+
+### exec
+
+- `2026-07-27-adr-topic-infix-P01-S01` - Extend the shared topic-infix admission set to ADR documents
+
+### plan
+
+- `2026-07-27-adr-topic-infix-plan` - `adr-topic-infix` plan
+
+### reference
+
+- `2026-07-27-adr-topic-infix-reference` - `adr-topic-infix` reference: `ADR topic-infix creation path`
+
+### research
+
+- `2026-07-27-adr-topic-infix-research` - `adr-topic-infix` research: `same-day ADR disambiguation`
