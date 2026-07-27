@@ -31,19 +31,27 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
-def scan_vault(root_dir: pathlib.Path) -> Iterator[pathlib.Path]:
+def scan_vault(
+    root_dir: pathlib.Path,
+    *,
+    run_migrations: bool = True,
+) -> Iterator[pathlib.Path]:
     """Yield all markdown files under the configured docs directory.
 
-    Skips hidden ``.obsidian`` subtrees. Runs the lazy migration
-    trigger before walking the tree: any registered schema migration
-    whose target version exceeds the manifest's ``vaultspec_version``
-    is applied first, so callers always observe the post-migration
-    layout. The trigger short-circuits via a per-process workspace
-    cache, so the manifest read happens once per workspace per CLI
-    invocation rather than once per scan.
+    Skips hidden ``.obsidian`` subtrees. By default, runs the lazy
+    migration trigger before walking the tree: any registered schema
+    migration whose target version exceeds the manifest's
+    ``vaultspec_version`` is applied first, so callers observe the
+    post-migration layout. The trigger short-circuits via a per-process
+    workspace cache, so the manifest read happens once per workspace per
+    CLI invocation rather than once per scan. Callers with an explicit
+    no-unrelated-mutation boundary may opt out.
 
     Args:
         root_dir: Project root that contains the docs directory.
+        run_migrations: Whether to run pending schema migrations before
+            scanning. Defaults to ``True`` to preserve lazy migration
+            behavior for existing callers.
 
     Yields:
         Absolute paths to each ``.md`` file found.
@@ -51,13 +59,14 @@ def scan_vault(root_dir: pathlib.Path) -> Iterator[pathlib.Path]:
     from ..config import get_config
     from ..migrations import run_pending_migrations
 
-    try:
-        run_pending_migrations(root_dir, use_cache=True)
-    except Exception:
-        # A migration failure must not silently corrupt the scan; log
-        # and propagate so the surrounding command surfaces it.
-        logger.exception("Pending migration failed for %s", root_dir)
-        raise
+    if run_migrations:
+        try:
+            run_pending_migrations(root_dir, use_cache=True)
+        except Exception:
+            # A migration failure must not silently corrupt the scan; log
+            # and propagate so the surrounding command surfaces it.
+            logger.exception("Pending migration failed for %s", root_dir)
+            raise
 
     docs_dir = root_dir / get_config().docs_dir
     if not docs_dir.exists():
