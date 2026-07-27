@@ -37,7 +37,7 @@ Lock the same-day ADR workflow with real tests and update the owned rule/referen
 
 - [x] `P02.S04` - Cover direct scaffolder creation and duplicate rejection for topic-infixed ADRs; `src/vaultspec_core/vaultcore/tests/test_hydration.py`.
 - [x] `P02.S05` - Cover CLI creation of two same-day topic-infixed ADRs; `tests/test_commands.py`.
-- [ ] `P02.S06` - Cover MCP creation of topic-infixed ADRs in a mixed batch; `tests/unit/mcp_server/test_create_tool.py`.
+- [x] `P02.S06` - Cover MCP creation of topic-infixed ADRs in a mixed batch; `tests/unit/mcp_server/test_create_tool.py`.
 - [ ] `P02.S07` - Revise the owned topic-infix rule and regenerate its published reference; `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`.
 
 ## Parallelization
