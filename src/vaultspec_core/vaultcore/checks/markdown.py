@@ -166,7 +166,10 @@ def check_markdown(
     result = CheckResult(check_name="markdown", supports_fix=True)
     wanted_feature = feature.lstrip("#") if feature else None
 
-    for doc_path in scan_vault(root_dir):
+    for doc_path in scan_vault(
+        root_dir,
+        run_migrations=not bool(wanted_feature),
+    ):
         try:
             raw_content = doc_path.read_bytes().decode("utf-8")
         except (OSError, UnicodeDecodeError):
