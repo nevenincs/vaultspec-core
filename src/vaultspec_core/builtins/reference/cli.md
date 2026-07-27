@@ -194,6 +194,15 @@ hand-edit between the markers.
 - `vaultspec-core vault link add` - Add a related: edge from *src* to *dst*.
 - `vaultspec-core vault link remove` - Remove a related: edge from *src* to *dst*.
 
+#### Exec
+
+- `vaultspec-core vault exec relink` - Relink one execution record to a live Step in its
+  existing parent plan.
+- `vaultspec-core vault exec retire` - Archive one record only when its current Step is
+  retired by its parent plan.
+- `vaultspec-core vault exec detach` - Remove a Step claim only when it resolves to
+  neither a live nor retired Step.
+
 ### Spec
 
 - `vaultspec-core spec doctor` - Diagnose workspace health and report issues.
