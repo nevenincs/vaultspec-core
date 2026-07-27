@@ -29,7 +29,7 @@ Converge the shared creator, CLI, and MCP on the accepted four-type admission se
 
 - [x] `P01.S01` - Extend the shared topic-infix admission set to ADR documents; `src/vaultspec_core/vaultcore/hydration.py`.
 - [x] `P01.S02` - Align CLI topic validation and help text with ADR admission; `src/vaultspec_core/cli/vault_cmd.py`.
-- [ ] `P01.S03` - Align MCP topic schema and validation with ADR admission; `src/vaultspec_core/mcp_server/tools/documents.py`.
+- [x] `P01.S03` - Align MCP topic schema and validation with ADR admission; `src/vaultspec_core/mcp_server/tools/documents.py`.
 
 ### Phase `P02` - prove behavior and synchronize the contract
 
