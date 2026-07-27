@@ -31,8 +31,35 @@ __all__ = [
     "VaultSnapshot",
     "extract_feature_tags",
     "is_generated_index",
+    "iter_document_texts",
     "render_check_result",
 ]
+
+
+def iter_document_texts(root_dir: Path, *, run_migrations: bool = True):
+    """Yield ``(path, text, has_crlf)`` for every readable vault document.
+
+    The standalone-read fallback for content-consuming checks invoked
+    without the ingress raw-text map (single-check CLI verbs, mutating
+    passes).  ``text`` keeps the source newlines; ``has_crlf`` reports the
+    CRLF convention.  Unreadable or non-UTF-8 files are skipped, mirroring
+    every other discovery path (``check_encoding`` surfaces them).
+
+    Args:
+        root_dir: Project root directory.
+        run_migrations: Forwarded to ``scan_vault``.
+
+    Yields:
+        ``(path, text, has_crlf)`` tuples in scan order.
+    """
+    from ..scanner import scan_vault
+
+    for doc_path in scan_vault(root_dir, run_migrations=run_migrations):
+        try:
+            raw_content = doc_path.read_bytes().decode("utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        yield doc_path, raw_content, "\r\n" in raw_content
 
 
 class Severity(StrEnum):
@@ -172,6 +199,13 @@ _SEVERITY_ICON = {
 }
 
 
+#: Maximum diagnostics rendered per check on the human surface.  The count
+#: summary above the listing always carries the full totals, the truncation
+#: is explicitly marked, and ``--json`` remains the uncapped machine
+#: contract, per the report-volume policy.
+DIAGNOSTIC_RENDER_CAP = 50
+
+
 def render_check_result(
     console: Console,
     result: CheckResult,
@@ -180,6 +214,10 @@ def render_check_result(
     summary_only: bool = False,
 ) -> None:
     """Render a CheckResult to a Rich console.
+
+    At most :data:`DIAGNOSTIC_RENDER_CAP` findings are printed per check; a
+    marked truncation line reports how many more exist and points at
+    ``--json`` for the full set.
 
     Args:
         console: Rich Console instance.
@@ -221,9 +259,15 @@ def render_check_result(
     # names); escape it so Rich does not treat [[...]] as console markup.
     from rich.markup import escape
 
+    rendered = 0
+    suppressed = 0
     for diag in result.diagnostics:
         if diag.severity == Severity.INFO and not verbose:
             continue
+        if rendered >= DIAGNOSTIC_RENDER_CAP:
+            suppressed += 1
+            continue
+        rendered += 1
         style = _SEVERITY_STYLE[diag.severity]
         icon = _SEVERITY_ICON[diag.severity]
         message = escape(diag.message)
@@ -235,3 +279,9 @@ def render_check_result(
             console.print(f"    [{style}]{icon}[/{style}] {message}")
         if diag.fix_description:
             console.print(f"      [dim]fix: {escape(diag.fix_description)}[/dim]")
+    if suppressed:
+        console.print(
+            f"    [dim]... {suppressed} more finding"
+            f"{'s' if suppressed != 1 else ''} not shown; "
+            "use --json for the full set[/dim]"
+        )

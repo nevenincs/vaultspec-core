@@ -25,6 +25,7 @@ from .scanner import get_doc_type, scan_vault
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from ..graph import VaultGraph
     from .rename_engine import RenameTransaction
 
 logger = logging.getLogger(__name__)
@@ -84,7 +85,7 @@ def _parse_feature_from_tags(tags: list[str], doc_type_tag: str | None) -> str |
     return None
 
 
-def _scan_all(root_dir: Path) -> list[VaultDocument]:
+def _scan_all(root_dir: Path, *, doc_type: str | None = None) -> list[VaultDocument]:
     """Scan the vault and parse every document into a :class:`VaultDocument`.
 
     Used internally by :func:`list_documents`, :func:`get_stats`,
@@ -92,19 +93,27 @@ def _scan_all(root_dir: Path) -> list[VaultDocument]:
 
     Args:
         root_dir: Project root directory.
+        doc_type: When set, keep only documents of this type.  The type is
+            pure path arithmetic (``get_doc_type``), so the filter is
+            applied before the file is read: a type-scoped listing reads
+            only its own subset of the corpus instead of parsing every
+            document and discarding the rest.
 
     Returns:
-        List of :class:`VaultDocument` instances for all readable vault files.
+        List of :class:`VaultDocument` instances for all readable vault
+        files that pass the filter.
     """
     docs = []
     for doc_path in scan_vault(root_dir):
+        dt = get_doc_type(doc_path, root_dir)
+        dt_str = dt.value if dt else "unknown"
+        if doc_type is not None and dt_str != doc_type:
+            continue
         try:
             content = doc_path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
         meta, _ = parse_frontmatter(content)
-        dt = get_doc_type(doc_path, root_dir)
-        dt_str = dt.value if dt else "unknown"
         tags = meta.get("tags", [])
         if isinstance(tags, str):
             tags = [tags]
@@ -149,22 +158,24 @@ def list_documents(
         Ordered list of :class:`VaultDocument` instances matching all
         supplied filters.
     """
-    docs = _scan_all(root_dir)
-
     if doc_type == "orphaned":
         from ..graph import VaultGraph
 
+        docs = _scan_all(root_dir)
         graph = VaultGraph(root_dir)
         orphan_names = set(graph.get_orphaned())
         docs = [d for d in docs if d.name in orphan_names]
     elif doc_type == "invalid":
         from ..graph import VaultGraph
 
+        docs = _scan_all(root_dir)
         graph = VaultGraph(root_dir)
         dangling_sources = {src for src, _ in graph.get_dangling_links()}
         docs = [d for d in docs if d.name in dangling_sources]
-    elif doc_type:
-        docs = [d for d in docs if d.doc_type == doc_type]
+    else:
+        # A concrete doc-type filter is path-derived and applied inside the
+        # scan, before any file is read.
+        docs = _scan_all(root_dir, doc_type=doc_type)
 
     if feature:
         feature = feature.lstrip("#")
@@ -182,6 +193,7 @@ def get_stats(
     feature: str | None = None,
     doc_type: str | None = None,
     date: str | None = None,
+    graph: VaultGraph | None = None,
 ) -> dict:
     """Compute vault statistics with optional filters.
 
@@ -190,6 +202,10 @@ def get_stats(
         feature: Restrict counts to a single feature (without ``#``).
         doc_type: Restrict counts to a single document type.
         date: Restrict to documents matching this date (``YYYY-MM-DD``).
+        graph: Optional pre-built :class:`~vaultspec_core.graph.VaultGraph`
+            to reuse for the orphan and dangling counts; callers that
+            already hold a graph (the orientation rollup) pass it so the
+            stats path never rebuilds a second one.
 
     Returns:
         Dict with keys: ``total_docs``, ``total_features``,
@@ -208,10 +224,11 @@ def get_stats(
             features.add(d.feature)
 
     # Orphan/invalid counts from graph (unfiltered)
-    from ..graph import VaultGraph
-
     try:
-        graph = VaultGraph(root_dir)
+        if graph is None:
+            from ..graph import VaultGraph as _VaultGraph
+
+            graph = _VaultGraph(root_dir)
         orphaned_count = len(graph.get_orphaned())
         dangling_link_count = len(graph.get_dangling_links())
     except (OSError, ValueError) as exc:

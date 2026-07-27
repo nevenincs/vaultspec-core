@@ -4,6 +4,7 @@ tags:
   - '#{feature}'
 date: '{yyyy-mm-dd}'
 modified: '{yyyy-mm-dd}'
+body_schema: 'body-v1'
 related:
   - '[[{yyyy-mm-dd-*}]]'
 ---

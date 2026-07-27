@@ -586,6 +586,26 @@ class TestVaultGraphPhantom:
         snapshot_stems = {p.stem for p in snapshot}
         assert not phantom_names & snapshot_stems
 
+    def test_to_snapshot_preserves_body_schema(self, tmp_path):
+        doc = tmp_path / ".vault" / "adr" / "2026-07-27-schema-provenance-adr.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text(
+            "---\n"
+            "tags:\n"
+            "  - '#adr'\n"
+            "  - '#schema-provenance'\n"
+            "date: '2026-07-27'\n"
+            "body_schema: 'body-v1'\n"
+            "related: []\n"
+            "---\n"
+            "# Schema provenance\n",
+            encoding="utf-8",
+        )
+
+        snapshot = VaultGraph(tmp_path).to_snapshot()
+
+        assert snapshot[doc][0].body_schema == "body-v1"
+
     def test_metrics_phantom_count(self, vault_root):
         graph = VaultGraph(vault_root)
         m = graph.metrics()

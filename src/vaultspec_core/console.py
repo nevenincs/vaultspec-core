@@ -6,6 +6,7 @@ terminals that use cp1252 or similar legacy codepages.
 
 from __future__ import annotations
 
+import contextlib
 import io
 import os
 import sys
@@ -82,6 +83,13 @@ def _console_kwargs(stdout=None, environ: dict[str, str] | None = None) -> dict:
     if not utf8:
         kwargs["file"] = _make_utf8_stdout(stdout)
         kwargs["legacy_windows"] = False
+    # One terminal-geometry query per run: pin the console width at
+    # construction so large render loops do not re-query the terminal size
+    # for every printed line. Only pinned when a real terminal answers;
+    # pipes and captured streams keep Rich's own fallback behaviour.
+    if "COLUMNS" not in env:
+        with contextlib.suppress(OSError, ValueError):
+            kwargs["width"] = os.get_terminal_size().columns
     return kwargs
 
 

@@ -51,6 +51,7 @@ def generate_feature_index(
         Path to the created or updated index file.
     """
     from ..config import get_config
+    from .body_schema import CURRENT_BODY_SCHEMA
 
     cfg = get_config()
     docs_dir = root_dir / cfg.docs_dir
@@ -97,6 +98,7 @@ def generate_feature_index(
         f"  - '#{feature}'\n"
         f"date: '{date}'\n"
         f"modified: '{date}'\n"
+        f"body_schema: '{CURRENT_BODY_SCHEMA}'\n"
         f"{related_block}\n"
         f"---\n"
         f"\n"

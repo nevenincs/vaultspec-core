@@ -119,6 +119,9 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
     if metadata.modified:
         lines.append(f"modified: '{metadata.modified}'")
 
+    if metadata.body_schema:
+        lines.append(f"body_schema: '{metadata.body_schema}'")
+
     if metadata.related:
         lines.append("related:")
         for link in metadata.related:
@@ -149,6 +152,7 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
         "tags",
         "date",
         "modified",
+        "body_schema",
         "related",
         "feature",
         "supersedes",

@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 import yaml
 
-from ..core.helpers import atomic_write
+from ..core.helpers import atomic_write_bytes
 from .models import refresh_modified_stamp
 
 if TYPE_CHECKING:
@@ -66,7 +66,8 @@ def _atomic_write_restore(path: Path, content: str) -> None:
     Args:
         path: Destination file path.
         content: UTF-8 text to write; must already have the correct line
-            endings applied before this call.
+            endings applied before this call. Low surrogate escapes preserve
+            legacy input bytes exactly.
 
     Raises:
         Exception: Re-raises any exception from the underlying write after
@@ -75,7 +76,7 @@ def _atomic_write_restore(path: Path, content: str) -> None:
     bak = path.with_suffix(path.suffix + ".bak")
     bak.write_bytes(path.read_bytes())
     try:
-        atomic_write(path, content)
+        atomic_write_bytes(path, content.encode("utf-8", errors="surrogateescape"))
     except Exception:
         if bak.exists():
             bak.replace(path)

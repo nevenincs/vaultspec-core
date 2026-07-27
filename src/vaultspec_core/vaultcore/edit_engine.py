@@ -629,7 +629,7 @@ def execute_edit(
             proposed_lf
             if source_newline == "\n"
             else proposed_lf.replace("\n", source_newline)
-        ).encode("utf-8")
+        ).encode("utf-8", errors="surrogateescape")
 
         changed = proposed_bytes != original_bytes
 
