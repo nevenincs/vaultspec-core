@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.1.52](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.51...vaultspec-core-v0.1.52) (2026-07-27)
+
+
+### Features
+
+* allow topic-infixed ADR records ([#271](https://github.com/nevenincs/vaultspec-core/issues/271)) ([7009f37](https://github.com/nevenincs/vaultspec-core/commit/7009f377297452745dbbfe9e455d18494751cea6))
+
+
+### Bug Fixes
+
+* **plan:** preserve sanitized link rules across mutations ([9343c0c](https://github.com/nevenincs/vaultspec-core/commit/9343c0c22763806ad17ec1ebc610ea6acf6a03d6))
+* **plan:** preserve sanitized link rules across mutations ([313e11f](https://github.com/nevenincs/vaultspec-core/commit/313e11fec07a2b0e9f1050e47b4290784916471f))
+* prevent scoped markdown repair migration spills ([f4159dc](https://github.com/nevenincs/vaultspec-core/commit/f4159dc1d10325973978bc56ac69f50791206158))
+* scope markdown repairs before migrations ([68be351](https://github.com/nevenincs/vaultspec-core/commit/68be351c42a1c53b041c3c786094e00c7d6c6394))
+
+
+### Performance
+
+* **vault:** scale large-corpus reads to the second domain ([#273](https://github.com/nevenincs/vaultspec-core/issues/273)) ([b2acc30](https://github.com/nevenincs/vaultspec-core/commit/b2acc30c2e1083fe871db02770a2b037773fb9d5))
+
 ## [0.1.51](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.50...vaultspec-core-v0.1.51) (2026-07-24)
 
 
