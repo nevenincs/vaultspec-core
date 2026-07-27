@@ -25,7 +25,11 @@ if TYPE_CHECKING:
     from vaultspec_core.core.types import SyncResult
 
 from vaultspec_core.cli._errors import handle_error as _handle_error
-from vaultspec_core.cli._target import TargetOption, apply_target
+from vaultspec_core.cli._target import (
+    TargetOption,
+    apply_target,
+    resolve_effective_target,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -2005,8 +2009,7 @@ def cmd_doctor(
         diagnose,
     )
 
-    effective = target or Path.cwd()
-    effective = effective.resolve()
+    effective = resolve_effective_target(target)
 
     if not effective.exists():
         typer.echo(

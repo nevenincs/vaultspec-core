@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import TYPE_CHECKING
 
 import pytest
+from typer.testing import CliRunner
 
+from vaultspec_core.cli import app
 from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from typer.testing import Result
 
 pytestmark = [pytest.mark.unit]
 
@@ -307,3 +312,169 @@ class TestDoctorGateErrors:
         assert result.exit_code == 0, result.output
         # The report still records the warning; only the exit code is folded.
         assert json.loads(result.output)["data"]["providers"]
+
+
+# ---- Target precedence -------------------------------------------------------
+
+#: Filename of the deliberately malformed document the vault-half tests plant.
+#: Its directory tag contradicts its directory, so every checker pass over the
+#: workspace holding it names it - and no pass over the other workspace can.
+PROBE_DOC = "2026-05-15-target-probe-research.md"
+
+
+def _workspace(root: Path, *, corrupt: bool = False) -> Path:
+    """Install a real workspace at *root*, optionally corrupting its manifest."""
+    root.mkdir(parents=True, exist_ok=True)
+    factory = WorkspaceFactory(root)
+    factory.install("core")
+    if corrupt:
+        factory.corrupt_manifest()
+    return root
+
+
+def _plant_probe_doc(root: Path) -> None:
+    """Write one vault document whose directory tag contradicts its directory."""
+    doc = root / ".vault" / "research" / PROBE_DOC
+    doc.parent.mkdir(parents=True, exist_ok=True)
+    doc.write_text(
+        "---\n"
+        "tags:\n"
+        "  - '#plan'\n"
+        "  - '#target-probe'\n"
+        "date: '2026-05-15'\n"
+        "modified: '2026-05-15'\n"
+        "related: []\n"
+        "---\n"
+        "\n"
+        "# `target-probe` research: probe\n",
+        encoding="utf-8",
+    )
+
+
+def _run_from(cwd: Path, *args: str) -> Result:
+    """Invoke the real CLI with *cwd* as the process working directory."""
+    from vaultspec_core.console import reset_console
+
+    reset_console()
+    runner = CliRunner(env={"NO_COLOR": "1"})
+    previous_cwd = os.getcwd()
+    os.chdir(cwd)
+    try:
+        return runner.invoke(app, list(args))
+    finally:
+        os.chdir(previous_cwd)
+
+
+class TestDoctorTargetPrecedence:
+    """``--target`` at either flag position selects the diagnosed directory.
+
+    The documented priority is subcommand ``--target`` > root-level ``-t`` >
+    current working directory. A CI invocation that puts the flag before the
+    verb must therefore diagnose the named directory, never the process
+    working directory: diagnosing the wrong tree reports someone else's
+    health and exits on someone else's findings, which reads as a pass.
+
+    Each test installs two real workspaces, runs the real CLI from inside
+    one of them, and asserts on the other's diagnosis.
+    """
+
+    def test_spec_doctor_honours_root_level_target_over_cwd(
+        self, tmp_path: Path
+    ) -> None:
+        healthy = _workspace(tmp_path / "healthy")
+        broken = _workspace(tmp_path / "broken", corrupt=True)
+
+        result = _run_from(healthy, "-t", str(broken), "spec", "doctor", "--json")
+
+        assert result.exit_code == 2, result.output
+        assert json.loads(result.output)["data"]["framework"] == "corrupted"
+
+    def test_spec_doctor_subcommand_target_overrides_root_level(
+        self, tmp_path: Path
+    ) -> None:
+        healthy = _workspace(tmp_path / "healthy")
+        broken = _workspace(tmp_path / "broken", corrupt=True)
+
+        result = _run_from(
+            broken,
+            "-t",
+            str(broken),
+            "spec",
+            "doctor",
+            "--target",
+            str(healthy),
+            "--json",
+        )
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["data"]["framework"] == "present"
+
+    def test_spec_doctor_falls_back_to_cwd_without_any_target(
+        self, tmp_path: Path
+    ) -> None:
+        _workspace(tmp_path / "healthy")
+        broken = _workspace(tmp_path / "broken", corrupt=True)
+
+        result = _run_from(broken, "spec", "doctor", "--json")
+
+        assert result.exit_code == 2, result.output
+        assert json.loads(result.output)["data"]["framework"] == "corrupted"
+
+    def test_doctor_honours_root_level_target_over_cwd(self, tmp_path: Path) -> None:
+        healthy = _workspace(tmp_path / "healthy")
+        broken = _workspace(tmp_path / "broken", corrupt=True)
+
+        result = _run_from(healthy, "-t", str(broken), "doctor", "--json")
+
+        assert result.exit_code == 2, result.output
+        data = json.loads(result.output)["data"]
+        assert data["spec"]["framework"] == "corrupted"
+
+    def test_doctor_subcommand_target_overrides_root_level(
+        self, tmp_path: Path
+    ) -> None:
+        healthy = _workspace(tmp_path / "healthy")
+        broken = _workspace(tmp_path / "broken", corrupt=True)
+
+        result = _run_from(
+            broken, "-t", str(broken), "doctor", "--target", str(healthy), "--json"
+        )
+
+        data = json.loads(result.output)["data"]
+        assert data["spec"]["framework"] == "present", result.output
+
+    def test_doctor_falls_back_to_cwd_without_any_target(self, tmp_path: Path) -> None:
+        _workspace(tmp_path / "healthy")
+        broken = _workspace(tmp_path / "broken", corrupt=True)
+
+        result = _run_from(broken, "doctor", "--json")
+
+        assert result.exit_code == 2, result.output
+        data = json.loads(result.output)["data"]
+        assert data["spec"]["framework"] == "corrupted"
+
+    def test_doctor_vault_checks_run_against_root_level_target(
+        self, tmp_path: Path
+    ) -> None:
+        clean = _workspace(tmp_path / "clean")
+        flawed = _workspace(tmp_path / "flawed")
+        _plant_probe_doc(flawed)
+
+        result = _run_from(clean, "-t", str(flawed), "doctor", "--json")
+
+        # The vault half runs over the target, so its findings name the
+        # document that exists only there.
+        assert PROBE_DOC in result.output, result.output
+
+    def test_doctor_vault_checks_ignore_cwd_when_target_given(
+        self, tmp_path: Path
+    ) -> None:
+        clean = _workspace(tmp_path / "clean")
+        flawed = _workspace(tmp_path / "flawed")
+        _plant_probe_doc(flawed)
+
+        result = _run_from(flawed, "-t", str(clean), "doctor", "--json")
+
+        # The working directory holds the flawed document; the target does
+        # not, so no finding may name it.
+        assert PROBE_DOC not in result.output, result.output

@@ -166,6 +166,30 @@ def apply_target(
         raise typer.Exit(code=1) from e
 
 
+def resolve_effective_target(target: Path | None) -> Path:
+    """Return the directory a subcommand should operate on.
+
+    Applies the same priority as :func:`apply_target`  - *target*
+    (subcommand ``--target``) > the root-level ``-t`` captured by
+    :func:`set_root_target` > the current working directory  - without
+    resolving or validating a workspace.
+
+    Commands that require a workspace read
+    :attr:`~vaultspec_core.core.types.WorkspaceContext.target_dir` after
+    calling :func:`apply_target`. This accessor serves the commands that
+    need the directory *independently* of that resolution: a diagnostic
+    verb must still name the directory it inspected when that directory
+    holds no workspace at all.
+
+    Args:
+        target: Subcommand-level ``--target`` value (may be ``None``).
+
+    Returns:
+        The resolved effective target directory.
+    """
+    return (target or _root_target or Path.cwd()).resolve()
+
+
 def _nearest_vaultspec_hint(start: Path) -> str:
     """Return a discovery hint pointing at the nearest vaultspec workspace.
 
