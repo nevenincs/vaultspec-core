@@ -232,3 +232,99 @@ def test_status_collect_missing_exec_records(tmp_path: Path) -> None:
     # Also assert JSON serialization of exec_missing_ids
     payload = status_to_json_dict(status)
     assert payload["exec_missing_ids"] == ["S01"]
+
+
+def _write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+class TestExecRecordIndexGraphParity:
+    """``ExecRecordIndex.build(graph=...)`` matches the no-graph scan path."""
+
+    def test_build_with_graph_matches_without(self, tmp_path: Path) -> None:
+        from vaultspec_core.config import reset_config
+        from vaultspec_core.graph import VaultGraph
+        from vaultspec_core.plan.status import ExecRecordIndex
+
+        reset_config()
+        try:
+            exec_dir = tmp_path / ".vault" / "exec" / "2026-05-17-test-feature"
+            _write(
+                exec_dir / "2026-05-17-test-feature-P01-S01.md",
+                "---\ntags:\n  - '#exec'\n  - '#test-feature'\n"
+                "step_id: 'S01'\n---\n\nBody.\n",
+            )
+            _write(
+                exec_dir / "2026-05-17-test-feature-P01-S02.md",
+                "---\ntags:\n  - '#exec'\n  - '#test-feature'\n"
+                "step_id: 'S02'\n---\n\nBody.\n",
+            )
+            # An exec record with no resolvable step_id lands in the
+            # unlinked bucket under both paths.
+            _write(
+                exec_dir / "2026-05-17-test-feature-orphan.md",
+                "---\ntags:\n  - '#exec'\n  - '#test-feature'\n---\n\nBody.\n",
+            )
+
+            without_graph = ExecRecordIndex.build(tmp_path)
+            graph = VaultGraph(tmp_path)
+            with_graph = ExecRecordIndex.build(tmp_path, graph=graph)
+
+            assert with_graph.by_step == without_graph.by_step
+            assert with_graph.unlinked_by_feature == without_graph.unlinked_by_feature
+            assert with_graph.by_step == {
+                ("test-feature", "S01"): "2026-05-17-test-feature-P01-S01",
+                ("test-feature", "S02"): "2026-05-17-test-feature-P01-S02",
+            }
+            assert with_graph.unlinked_by_feature == {
+                "test-feature": ["2026-05-17-test-feature-orphan"]
+            }
+        finally:
+            reset_config()
+
+
+class TestCollectAllStatusesGraphParity:
+    """``collect_all_statuses(graph=...)`` matches the no-graph scan path."""
+
+    def test_collect_all_statuses_with_graph_matches_without(
+        self, tmp_path: Path
+    ) -> None:
+        from vaultspec_core.config import reset_config
+        from vaultspec_core.graph import VaultGraph
+        from vaultspec_core.plan.status import collect_all_statuses
+
+        reset_config()
+        try:
+            _write(
+                tmp_path / ".vault" / "plan" / "2026-05-17-alpha-plan.md",
+                "---\ntags:\n  - '#plan'\n  - '#alpha'\ndate: '2026-05-17'\n"
+                "tier: L1\n---\n\n# `alpha` plan\n\n"
+                "- [x] `S01` - do the work; `src/a.py`.\n"
+                "- [ ] `S02` - do more; `src/b.py`.\n",
+            )
+            _write(
+                tmp_path
+                / ".vault"
+                / "exec"
+                / "2026-05-17-alpha"
+                / "2026-05-17-alpha-S01.md",
+                "---\ntags:\n  - '#exec'\n  - '#alpha'\nstep_id: 'S01'\n---\n\nBody.\n",
+            )
+
+            without_graph = collect_all_statuses(tmp_path)
+            graph = VaultGraph(tmp_path)
+            with_graph = collect_all_statuses(tmp_path, graph=graph)
+
+            assert len(with_graph) == len(without_graph) == 1
+            a, b = with_graph[0], without_graph[0]
+            assert a.document.name == b.document.name
+            assert a.document.feature == b.document.feature
+            assert a.document.date == b.document.date
+            assert a.error == b.error is None
+            assert a.status is not None and b.status is not None
+            assert a.status.step_count == b.status.step_count == 2
+            assert a.status.steps_completed == b.status.steps_completed == 1
+            assert a.status.exec_missing_ids == b.status.exec_missing_ids == []
+        finally:
+            reset_config()

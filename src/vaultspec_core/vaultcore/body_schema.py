@@ -69,9 +69,12 @@ class BodySchemaResolution:
     """Schema resolution result consumed by body-section validation.
 
     ``source`` deliberately distinguishes a current direct declaration from
-    records which need a later hash-attested baseline. P02 can add an
-    ``attested`` source without changing the validator-facing function
-    signature.
+    records which need a later hash-attested baseline. ``"missing"`` means no
+    schema was declared and no ledger entry exists: the document makes no
+    provenance claim, so a consumer should treat it as silence rather than a
+    finding. ``"attestation_required"`` and ``"unknown"`` mean a document or
+    the ledger made a claim the evidence contradicts, which a consumer should
+    still report.
     """
 
     required_sections: tuple[str, ...] | None

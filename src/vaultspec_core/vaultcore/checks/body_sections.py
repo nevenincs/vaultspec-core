@@ -2,9 +2,10 @@
 
 Required level-two (``## ``) headings come from the immutable body-schema
 registry, never from today's mutable templates. A document either names a
-known stamped schema or, once legacy attestation is available, resolves through
-the repository's path-and-body-hash baseline. A document with neither proof is
-reported as unattested; it must not quietly inherit the current template.
+known stamped schema or resolves through the repository's path-and-body-hash
+baseline. A document declaring neither is silent: absence of a claim is not a
+finding. A document (or the ledger) making a claim the evidence contradicts
+is reported; it must not quietly inherit the current template.
 
 For an attested schema, every required section must be present and carry real
 authored content. A required section that is absent, or that holds only a
@@ -18,9 +19,9 @@ Edge handling:
 - Execution records select ``exec-step.md`` or ``exec-summary.md`` by the
   ``-summary`` filename convention.
 - Generated feature indexes are out of scope (their body is machine-authored).
-- Missing, unknown, or otherwise un-attested provenance is a finding, not a
-  skip. The resolver keeps its future legacy-baseline logic behind one stable
-  interface.
+- No ``body_schema`` declared and no ledger entry makes no provenance claim,
+  so nothing is reported. A declared-but-unattested or ledger-contradicted
+  claim (``attestation_required``, ``unknown``) is a finding, not a skip.
 
 The checker is read-only: a section's position, ordering, and content are the
 author's, so no safe automatic repair exists. Each finding's ``fix_description``
@@ -134,6 +135,11 @@ def check_body_sections(
         )
         required = resolution.required_sections
         if required is None:
+            if resolution.source == "missing":
+                # No body_schema declared and no ledger entry: the document
+                # makes no provenance claim, so there is nothing to
+                # contradict. Silence, not a finding.
+                continue
             detail = (
                 resolution.diagnostic or "no attested body schema was resolved"
             ).rstrip(".")

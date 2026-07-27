@@ -504,7 +504,7 @@ def compute_rollup(
     # Parse every plan once (predecessor D6) and share the result across
     # the in-flight bucket, the recently-completed bucket, and the
     # per-feature plan tail, rather than scanning plans three times.
-    entries = collect_all_statuses(root_dir)
+    entries = collect_all_statuses(root_dir, graph=g)
     status_by_feature: dict[str, PlanStatus] = {}
     for entry in entries:
         feature = entry.document.feature
@@ -798,7 +798,7 @@ def compute_trace(
     from ..plan.status import ExecRecordIndex
 
     g = graph if graph is not None else VaultGraph(root_dir)
-    exec_index = ExecRecordIndex.build(root_dir)
+    exec_index = ExecRecordIndex.build(root_dir, graph=g)
 
     plan_stems = {
         name

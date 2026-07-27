@@ -558,3 +558,115 @@ class TestStemIndexParity:
             f"Keys only in fresh: {set(fresh_stem_index) - set(cached_stem_index)}\n"
             f"Keys only in cached: {set(cached_stem_index) - set(fresh_stem_index)}"
         )
+
+
+class TestEncodingIssuesSurviveCache:
+    """A cache hit must not lose the ingress read's decode failures.
+
+    A document that fails to decode never becomes a usable node, so it is
+    invisible in the serialised graph. Before these were persisted, a warm
+    build restored a corpus that appeared to have read cleanly, which made
+    the encoding check silently report nothing on every run after the first.
+    """
+
+    def _vault_with_undecodable_document(self, root: Path) -> Path:
+        research = root / ".vault" / "research"
+        research.mkdir(parents=True, exist_ok=True)
+        (research / "2026-05-15-ok-research.md").write_text(
+            "---\ntags:\n  - '#research'\n  - '#demo'\n"
+            "date: '2026-05-15'\nrelated: []\n---\n\n# ok\n",
+            encoding="utf-8",
+        )
+        broken = research / "2026-05-15-broken-research.md"
+        broken.write_bytes(b"---\ntags:\n\xff\xfe not utf-8\n---\n\n# broken\n")
+        return broken
+
+    def test_cached_build_reports_same_encoding_issues_as_cold(
+        self, tmp_path: Path
+    ) -> None:
+        root = tmp_path / "repo"
+        root.mkdir()
+        broken = self._vault_with_undecodable_document(root)
+
+        cold = VaultGraph(root, use_cache=False)
+        VaultGraph(root)  # prime the cache
+        warm = VaultGraph(root)
+
+        assert [i.path for i in cold.encoding_issues] == [broken]
+        assert [i.path for i in warm.encoding_issues] == [broken], (
+            "the warm build lost the ingress read's decode failure"
+        )
+        assert [i.kind for i in warm.encoding_issues] == ["decode"]
+
+    def test_encoding_check_agrees_across_cold_warm_and_standalone(
+        self, tmp_path: Path
+    ) -> None:
+        from ...vaultcore.checks.encoding import check_encoding
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault_with_undecodable_document(root)
+
+        cold_graph = VaultGraph(root, use_cache=False)
+        cold = len(check_encoding(root, graph=cold_graph).diagnostics)
+        VaultGraph(root)
+        warm = len(check_encoding(root, graph=VaultGraph(root)).diagnostics)
+        standalone = len(check_encoding(root).diagnostics)
+
+        assert cold == standalone == 1
+        assert warm == 1, "check_encoding went blind on a warm cache"
+
+
+class TestUnreadableDocumentsExcludedFromGraphDerivedQueries:
+    """The graph-backed query path must drop what the disk path drops.
+
+    ``_scan_all`` skips a document it cannot decode. The graph still creates
+    a node for such a file, with empty frontmatter and body, which is
+    indistinguishable from a genuinely empty document by its fields alone.
+    """
+
+    def _vault(self, root: Path) -> None:
+        for sub in ("research", "plan"):
+            (root / ".vault" / sub).mkdir(parents=True, exist_ok=True)
+        (root / ".vault" / "research" / "2026-05-15-ok-research.md").write_text(
+            "---\ntags:\n  - '#research'\n  - '#demo'\n"
+            "date: '2026-05-15'\nrelated: []\n---\n\n# ok\n",
+            encoding="utf-8",
+        )
+        (root / ".vault" / "research" / "2026-05-15-bad-research.md").write_bytes(
+            b"---\ntags:\n\xff\xfe bad\n---\n\n# broken\n"
+        )
+        (root / ".vault" / "plan" / "2026-05-15-ok-plan.md").write_text(
+            "---\ntags:\n  - '#plan'\n  - '#demo'\n"
+            "date: '2026-05-15'\nrelated: []\n---\n\n# p\n",
+            encoding="utf-8",
+        )
+        (root / ".vault" / "plan" / "2026-05-15-bad-plan.md").write_bytes(
+            b"---\ntags:\n\xff\xfe bad\n---\n\n# broken\n"
+        )
+
+    def test_get_stats_totals_match_list_documents(self, tmp_path: Path) -> None:
+        from ...vaultcore.query import get_stats, list_documents
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        assert get_stats(root)["total_docs"] == len(list_documents(root))
+
+    def test_collect_all_statuses_agrees_with_and_without_graph(
+        self, tmp_path: Path
+    ) -> None:
+        from ...plan.status import collect_all_statuses
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        without = collect_all_statuses(root)
+        with_graph = collect_all_statuses(root, graph=VaultGraph(root))
+
+        assert len(with_graph) == len(without)
+        assert [e.document.name for e in with_graph] == [
+            e.document.name for e in without
+        ]

@@ -1,10 +1,11 @@
 """Tests for the body-sections vault health checker.
 
 Exercises immutable, attested body-schema validation against real on-disk
-documents. A current schema stamp selects the registry contract, missing or
-unknown provenance is reported, mutable deployed templates cannot alter a
-document's requirements, and execution records select their step or summary
-contract. No mocks, patches, or skips.
+documents. A current schema stamp selects the registry contract, a declared
+or ledger-contradicted claim is reported while an undeclared document with no
+ledger entry is silent, mutable deployed templates cannot alter a document's
+requirements, and execution records select their step or summary contract.
+No mocks, patches, or skips.
 """
 
 from __future__ import annotations
@@ -256,7 +257,7 @@ class TestBodySections:
         result = _run(tmp_path)
         assert result.diagnostics == []
 
-    def test_missing_schema_provenance_is_flagged(self, tmp_path: Path) -> None:
+    def test_missing_schema_provenance_is_silent(self, tmp_path: Path) -> None:
         _skeleton(tmp_path)
         _write_doc(
             tmp_path,
@@ -266,11 +267,25 @@ class TestBodySections:
             body_schema=None,
         )
         result = _run(tmp_path)
+        assert result.diagnostics == []
+
+    def test_declared_legacy_schema_absent_from_ledger_is_flagged(
+        self, tmp_path: Path
+    ) -> None:
+        _skeleton(tmp_path)
+        _write_doc(
+            tmp_path,
+            "adr",
+            "2026-02-04-feat-adr",
+            _contents("adr"),
+            body_schema="legacy-adr-v1",
+        )
+        result = _run(tmp_path)
         assert len(result.diagnostics) == 1
         diagnostic = result.diagnostics[0]
         assert diagnostic.severity is Severity.WARNING
         assert "provenance is not attested" in diagnostic.message
-        assert "body_schema" in diagnostic.message
+        assert "legacy-adr-v1" in diagnostic.message
 
     def test_hash_attested_legacy_body_is_validated_by_its_contract(
         self, tmp_path: Path
@@ -306,6 +321,40 @@ class TestBodySections:
         result = _run(tmp_path)
 
         assert result.diagnostics == []
+
+    def test_ledger_hash_mismatch_is_flagged(self, tmp_path: Path) -> None:
+        _skeleton(tmp_path)
+        _write_doc(
+            tmp_path,
+            "adr",
+            "2026-02-04-feat-adr",
+            _contents("adr"),
+            body_schema=None,
+        )
+        ledger = body_schema_baseline_path(tmp_path)
+        ledger.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "entries": [
+                        {
+                            "path": ".vault/adr/2026-02-04-feat-adr.md",
+                            "body_sha256": "0" * 64,
+                            "body_schema": "legacy-adr-v3",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        result = _run(tmp_path)
+
+        assert len(result.diagnostics) == 1
+        diagnostic = result.diagnostics[0]
+        assert diagnostic.severity is Severity.WARNING
+        assert "provenance is not attested" in diagnostic.message
+        assert "SHA-256" in diagnostic.message
 
     def test_unknown_schema_provenance_is_flagged(self, tmp_path: Path) -> None:
         _skeleton(tmp_path)
