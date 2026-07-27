@@ -103,8 +103,9 @@ def serialise_plan(plan: Plan, canonicalise: bool = False) -> str:
     parts: list[str] = []
     parts.append(_render_frontmatter(plan))
     parts.append("")
-    parts.append(_render_link_rules_comment())
-    parts.append("")
+    if plan.has_link_rules:
+        parts.append(_render_link_rules_comment())
+        parts.append("")
     ledger = _render_retirement_ledger(plan)
     if ledger is not None:
         parts.append(ledger)

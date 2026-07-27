@@ -165,6 +165,9 @@ class Plan:
             demote; same persistence as ``retired_step_ids``.
         retired_wave_ids: Canonical Wave ids retired via remove or
             demote; same persistence as ``retired_step_ids``.
+        has_link_rules: Whether the source carried the generated ``LINK RULES``
+            guidance block. Structural mutations preserve its absence after an
+            explicit annotation sanitation pass.
     """
 
     frontmatter: PlanFrontmatter
@@ -177,6 +180,7 @@ class Plan:
     retired_phase_ids: set[str] = field(default_factory=set)
     retired_wave_ids: set[str] = field(default_factory=set)
     unknown_blocks: list[UnknownBlock] = field(default_factory=list)
+    has_link_rules: bool = True
 
 
 class PlanParseError(ValueError):
@@ -229,7 +233,7 @@ def parse_plan(source: str | Path) -> Plan:
 
     title = _extract_title(body)
     epic_intent = _extract_epic_intent(body)
-    waves, phases, steps, unknown_blocks = _walk_body(body)
+    waves, phases, steps, unknown_blocks, has_link_rules = _walk_body(body)
     retired_steps, retired_phases, retired_waves = _extract_retirement_ledger(body)
 
     return Plan(
@@ -243,6 +247,7 @@ def parse_plan(source: str | Path) -> Plan:
         retired_phase_ids=retired_phases,
         retired_wave_ids=retired_waves,
         unknown_blocks=unknown_blocks,
+        has_link_rules=has_link_rules,
     )
 
 
@@ -335,7 +340,7 @@ def _extract_epic_intent(body: str) -> EpicIntent | None:
 
 def _walk_body(
     body: str,
-) -> tuple[list[Wave], list[Phase], list[Step], list[UnknownBlock]]:
+) -> tuple[list[Wave], list[Phase], list[Step], list[UnknownBlock], bool]:
     """Walk the body and assemble container chains and unknown blocks."""
     waves: list[Wave] = []
     phases: list[Phase] = []
@@ -350,6 +355,7 @@ def _walk_body(
     buffered_unknown: list[str] = []
     in_epic_intent: bool = False
     in_link_rules_comment: bool = False
+    has_link_rules = False
 
     def _flush_intent() -> None:
         if intent_target is not None and intent_buffer:
@@ -377,6 +383,7 @@ def _walk_body(
 
         # 2. Link rules comment block
         if "<!-- LINK RULES:" in line:
+            has_link_rules = True
             in_link_rules_comment = True
         if in_link_rules_comment:
             if "-->" in line:
@@ -469,7 +476,7 @@ def _walk_body(
     _flush_intent()
     _flush_unknown("after_all")
 
-    return waves, phases, steps, unknown_blocks
+    return waves, phases, steps, unknown_blocks, has_link_rules
 
 
 def _build_step(match: re.Match[str], index: int, raw_line: str) -> Step:
