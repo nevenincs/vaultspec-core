@@ -642,6 +642,10 @@ class VaultGraph:
                 cache_mod.fingerprint_vault(scanned_files, self.root_dir),
                 self._to_cache_graph(),
                 self._dangling_links,
+                [
+                    (str(issue.path), issue.kind, issue.detail, issue.start)
+                    for issue in self._encoding_issues
+                ],
             )
 
     def _to_cache_graph(self) -> dict[str, Any]:
@@ -703,6 +707,15 @@ class VaultGraph:
         for bare_stem, keys in by_stem.items():
             self._stem_index[bare_stem] = sorted(keys)
         self._dangling_links = [(pair[0], pair[1]) for pair in payload.dangling_links]
+        # A document that failed to read or decode never becomes a usable node,
+        # so the cache carries these separately; restoring them keeps a warm
+        # run's encoding findings identical to a cold one's.
+        from pathlib import Path as _Path
+
+        self._encoding_issues = [
+            EncodingIssue(_Path(raw_path), kind, detail, start)
+            for raw_path, kind, detail, start in payload.encoding_issues
+        ]
         logger.info(
             "Graph loaded from cache: %d nodes, %d edges",
             self._digraph.number_of_nodes(),

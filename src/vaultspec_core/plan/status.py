@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from vaultspec_core.graph import VaultGraph
     from vaultspec_core.plan.frontmatter import Tier
     from vaultspec_core.plan.parser import Plan
     from vaultspec_core.vaultcore.query import VaultDocument
@@ -105,24 +106,66 @@ class ExecRecordIndex:
     unlinked_by_feature: dict[str, list[str]] = field(default_factory=dict)
 
     @classmethod
-    def build(cls, root_dir: Path) -> ExecRecordIndex:
+    def build(
+        cls, root_dir: Path, *, graph: VaultGraph | None = None
+    ) -> ExecRecordIndex:
         """Scan every execution record once into the shared index.
 
         Args:
             root_dir: Project root directory.
+            graph: Optional pre-built
+                :class:`~vaultspec_core.graph.VaultGraph`. When supplied
+                (the orientation rollup's already-built graph), the exec
+                records are read from the graph's already-parsed
+                frontmatter instead of a fresh ``list_documents`` scan
+                plus a per-record ``read_text``/``parse_frontmatter`` pass.
 
         Returns:
             A populated :class:`ExecRecordIndex`. Records whose feature
             tag or ``step_id:`` cannot be read are bucketed as unlinked
             under their best-known feature rather than aborting the scan.
         """
+        index = cls()
+
+        if graph is not None:
+            from vaultspec_core.vaultcore.models import DocType
+            from vaultspec_core.vaultcore.query import _feature_from_tags_or_meta
+
+            # Match the disk path, which skips records it cannot read or
+            # decode; the graph still nodes such a file with empty frontmatter.
+            unreadable = {issue.path for issue in graph.encoding_issues}
+
+            for node in graph.nodes.values():
+                if (
+                    node.phantom
+                    or node.path is None
+                    or node.path in unreadable
+                    or node.doc_type is not DocType.EXEC
+                ):
+                    continue
+                meta = node.frontmatter
+                tags = meta.get("tags", [])
+                if isinstance(tags, str):
+                    tags = [tags]
+                feature = _feature_from_tags_or_meta(tags, meta, DocType.EXEC.value)
+                step_id: str | None = None
+                raw_step_id = meta.get("step_id")
+                if raw_step_id:
+                    step_id = str(raw_step_id).strip()
+                name = node.path.stem
+
+                if feature and step_id:
+                    index.by_step[(feature, step_id)] = name
+                elif feature:
+                    index.unlinked_by_feature.setdefault(feature, []).append(name)
+            return index
+
         from vaultspec_core.vaultcore.parser import parse_frontmatter
         from vaultspec_core.vaultcore.query import list_documents
 
-        index = cls()
         for doc in list_documents(root_dir, doc_type="exec"):
             feature = doc.feature
-            step_id: str | None = None
+            step_id = None
             try:
                 content = doc.path.read_text(encoding="utf-8")
                 meta, _ = parse_frontmatter(content)
@@ -291,7 +334,9 @@ class PlanStatusEntry:
     error: str | None = None
 
 
-def collect_all_statuses(root_dir: Path) -> list[PlanStatusEntry]:
+def collect_all_statuses(
+    root_dir: Path, *, graph: VaultGraph | None = None
+) -> list[PlanStatusEntry]:
     """Collect status for every plan in the vault in one batched pass.
 
     Implements the batched status core (decision D6): the execution
@@ -303,6 +348,12 @@ def collect_all_statuses(root_dir: Path) -> list[PlanStatusEntry]:
 
     Args:
         root_dir: Project root directory.
+        graph: Optional pre-built
+            :class:`~vaultspec_core.graph.VaultGraph`. When supplied (the
+            orientation rollup's already-built graph), both the exec-record
+            index and the plan-document listing are derived from the
+            graph's already-parsed frontmatter instead of independently
+            rescanning the corpus.
 
     Returns:
         A list of :class:`PlanStatusEntry`, one per plan document, in the
@@ -310,11 +361,16 @@ def collect_all_statuses(root_dir: Path) -> list[PlanStatusEntry]:
         returns them.
     """
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.vaultcore.query import list_documents
+    from vaultspec_core.vaultcore.query import _docs_from_graph, list_documents
 
-    exec_index = ExecRecordIndex.build(root_dir)
+    exec_index = ExecRecordIndex.build(root_dir, graph=graph)
     entries: list[PlanStatusEntry] = []
-    for doc in list_documents(root_dir, doc_type="plan"):
+    docs = (
+        _docs_from_graph(graph, doc_type="plan")
+        if graph is not None
+        else list_documents(root_dir, doc_type="plan")
+    )
+    for doc in docs:
         try:
             content = doc.path.read_text(encoding="utf-8")
             plan = parse_plan(content)

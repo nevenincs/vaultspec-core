@@ -18,6 +18,7 @@ skips: every assertion reads structures computed from real files.
 from __future__ import annotations
 
 import datetime
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -28,6 +29,7 @@ from ..orientation import (
     compute_rollup,
     compute_trace,
 )
+from ..scanner import scan_vault
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -579,3 +581,101 @@ class TestTraceTargetResolution:
         assert summary_stem in plan.summaries
         assert summary_stem not in plan.unlinked_records
         assert stems["exec_orphan"] in plan.unlinked_records
+
+
+# ---------------------------------------------------------------------------
+# Scan budget: the rollup shares one corpus ingestion, not a rescan per
+# consumer (predecessor D7; the get_stats/collect_all_statuses gap closed
+# here threads the rollup's already-built graph through both).
+# ---------------------------------------------------------------------------
+
+
+def _count_corpus_reads(fn) -> int:
+    """Run *fn* under a real profiler, counting genuine ``.vault/*.md`` reads.
+
+    Mirrors the scale gate's ``sys.setprofile`` technique
+    (``tests/scale/test_scale_gate.py``): observes the real execution
+    rather than stubbing it, counting every ``read_text``/``read_bytes``
+    call whose ``self`` is a path ending in ``.md`` under a ``.vault``
+    directory. ``pathlib.Path.read_text`` delegates to a same-named
+    ``PathBase.read_text`` internally (CPython 3.13), so a delegating
+    inner frame whose immediate caller carries the same name is not
+    double-counted; only the outermost entry per logical read counts.
+    """
+    count = 0
+
+    def profiler(frame, event: str, arg: object) -> None:
+        nonlocal count
+        if event != "call":
+            return
+        name = frame.f_code.co_name
+        if name not in ("read_text", "read_bytes"):
+            return
+        caller = frame.f_back
+        if caller is not None and caller.f_code.co_name == name:
+            return
+        target = frame.f_locals.get("self")
+        parts = getattr(target, "parts", None)
+        if parts and ".vault" in parts and str(target).endswith(".md"):
+            count += 1
+
+    sys.setprofile(profiler)
+    try:
+        fn()
+    finally:
+        sys.setprofile(None)
+    return count
+
+
+class TestRollupScanBudget:
+    """A single ``compute_rollup`` call reads the corpus at most once, plus
+    one additional read per plan document for its full Step body (the one
+    read ``collect_all_statuses`` cannot avoid: ``parse_plan`` needs body
+    markup the graph does not retain in reparseable form)."""
+
+    def test_single_ingress_per_rollup_call(self, tmp_path: Path) -> None:
+        from ...testing.synthetic import build_synthetic_vault
+
+        build_synthetic_vault(tmp_path, n_docs=24, seed=11, edge_probability=0.3)
+        # Settle any pending migration before profiling so only the
+        # rollup's own reads are counted.
+        list(scan_vault(tmp_path))
+        scanned = list(scan_vault(tmp_path))
+        doc_count = len(scanned)
+        plan_count = sum(1 for p in scanned if p.parent.name == "plan")
+        assert doc_count > 0
+        assert plan_count > 0, "corpus must contain at least one plan document"
+
+        reads = _count_corpus_reads(lambda: compute_rollup(tmp_path))
+
+        # Before the fix this scan (get_stats + collect_all_statuses/
+        # ExecRecordIndex.build) re-read every document 2-3 separate times
+        # on top of the graph's own ingestion; now every document is read
+        # exactly once for the graph, and a plan document is read exactly
+        # one further time for its full body.
+        assert reads <= doc_count + plan_count, (
+            f"compute_rollup performed {reads} corpus reads for {doc_count} "
+            f"documents ({plan_count} plans); expected at most "
+            f"{doc_count + plan_count} (one graph-ingestion read per "
+            "document, plus one full-body read per plan)."
+        )
+
+    def test_repeated_rollup_calls_scale_linearly_not_multiplicatively(
+        self, tmp_path: Path
+    ) -> None:
+        """Two independent rollup calls must not each cost more than one
+        ingestion pass; guards against a future change reintroducing a
+        per-consumer rescan inside a single call."""
+        from ...testing.synthetic import build_synthetic_vault
+
+        build_synthetic_vault(tmp_path, n_docs=12, seed=13, edge_probability=0.3)
+        list(scan_vault(tmp_path))
+        scanned = list(scan_vault(tmp_path))
+        doc_count = len(scanned)
+        plan_count = sum(1 for p in scanned if p.parent.name == "plan")
+
+        reads = _count_corpus_reads(
+            lambda: (compute_rollup(tmp_path), compute_rollup(tmp_path))
+        )
+
+        assert reads <= 2 * (doc_count + plan_count)

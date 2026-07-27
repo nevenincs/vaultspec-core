@@ -85,7 +85,7 @@ __all__ = [
 #: Schema string stamped into every cache file.  Bump when the on-disk
 #: payload shape changes so an older cache is treated as a miss rather than
 #: misread.  Tied to the graph wire schema generation (``v3``).
-CACHE_SCHEMA = "vaultspec.vault.graph.cache.v3"
+CACHE_SCHEMA = "vaultspec.vault.graph.cache.v4"
 
 #: Manifest value type: ``(st_size, st_mtime_ns, sha256_hex)`` per file.
 Fingerprint = tuple[int, int, str]
@@ -105,12 +105,18 @@ class GraphCachePayload:
             ``edges="edges"``.
         dangling_links: The ``(source, target)`` dangling-link pairs
             recorded during the cached build, as two-element lists.
+        encoding_issues: The read and decode failures the cached build's
+            ingress read observed, as ``(path, kind, detail, start)`` rows.
+            Persisted because a document that fails to decode never enters
+            the serialised graph, so a cache hit would otherwise restore a
+            corpus that silently claims every file read cleanly.
     """
 
     schema: str
     manifest: dict[str, Fingerprint]
     graph: dict[str, Any]
     dangling_links: list[list[str]]
+    encoding_issues: list[tuple[str, str, str, int | None]]
 
 
 def cache_path(root_dir: Path) -> Path:
@@ -298,9 +304,10 @@ def load(path: Path) -> GraphCachePayload | None:
     raw_manifest = data.get("manifest")
     raw_graph = data.get("graph")
     raw_dangling = data.get("dangling_links")
+    raw_encoding = data.get("encoding_issues")
     if not isinstance(raw_manifest, dict) or not isinstance(raw_graph, dict):
         return None
-    if not isinstance(raw_dangling, list):
+    if not isinstance(raw_dangling, list) or not isinstance(raw_encoding, list):
         return None
 
     manifest: dict[str, Fingerprint] = {}
@@ -327,11 +334,28 @@ def load(path: Path) -> GraphCachePayload | None:
             return None
         dangling.append([pair[0], pair[1]])
 
+    encoding: list[tuple[str, str, str, int | None]] = []
+    for row in raw_encoding:
+        if (
+            not isinstance(row, list)
+            or len(row) != 4
+            or not isinstance(row[0], str)
+            or not isinstance(row[1], str)
+            or not isinstance(row[2], str)
+            or not (row[3] is None or isinstance(row[3], int))
+        ):
+            logger.debug(
+                "Graph cache encoding-issue row %r is malformed; ignoring", row
+            )
+            return None
+        encoding.append((row[0], row[1], row[2], row[3]))
+
     return GraphCachePayload(
         schema=CACHE_SCHEMA,
         manifest=manifest,
         graph=raw_graph,
         dangling_links=dangling,
+        encoding_issues=encoding,
     )
 
 
@@ -340,6 +364,7 @@ def save(
     manifest: dict[str, Fingerprint],
     graph: dict[str, Any],
     dangling_links: list[tuple[str, str]],
+    encoding_issues: list[tuple[str, str, str, int | None]] | None = None,
 ) -> None:
     """Atomically write a cache file for a freshly-built graph.
 
@@ -355,6 +380,10 @@ def save(
         graph: The networkx node-link ``dict`` of the canonical graph.
         dangling_links: The ``(source, target)`` dangling pairs recorded
             during the build.
+        encoding_issues: The ``(path, kind, detail, start)`` read and decode
+            failures the build's ingress read observed. A file that fails to
+            decode never becomes a usable node, so without this the cache
+            would restore a corpus that appears to have read cleanly.
     """
     from ..core.helpers import atomic_write
 
@@ -363,6 +392,7 @@ def save(
         "manifest": {key: list(value) for key, value in manifest.items()},
         "graph": graph,
         "dangling_links": [list(pair) for pair in dangling_links],
+        "encoding_issues": [list(row) for row in (encoding_issues or [])],
     }
     try:
         path.parent.mkdir(parents=True, exist_ok=True)

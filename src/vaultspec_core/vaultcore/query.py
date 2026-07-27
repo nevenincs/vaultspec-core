@@ -85,6 +85,32 @@ def _parse_feature_from_tags(tags: list[str], doc_type_tag: str | None) -> str |
     return None
 
 
+def _feature_from_tags_or_meta(
+    tags: list[str], meta: dict, doc_type_tag: str | None
+) -> str | None:
+    """Derive a document's feature tag, with the bare ``feature:`` fallback.
+
+    Primarily reads *tags* via :func:`_parse_feature_from_tags`, falling
+    back to a bare top-level ``feature:`` frontmatter key when no
+    tag-derived feature is found. Shared by :func:`_scan_all` and
+    :func:`_docs_from_graph` so both callers apply the identical fallback
+    chain against the same parsed frontmatter shape.
+
+    Args:
+        tags: Normalised tag list (already coerced from a scalar).
+        meta: Parsed frontmatter dict for the document.
+        doc_type_tag: Bare doc-type value to skip (e.g. ``"adr"``), or
+            ``None``.
+
+    Returns:
+        Feature name string without the leading ``#``, or ``None``.
+    """
+    feature = _parse_feature_from_tags(tags, doc_type_tag)
+    if not feature and "feature" in meta:
+        feature = str(meta["feature"]).lstrip("#").strip().lower() or None
+    return feature
+
+
 def _scan_all(root_dir: Path, *, doc_type: str | None = None) -> list[VaultDocument]:
     """Scan the vault and parse every document into a :class:`VaultDocument`.
 
@@ -117,10 +143,7 @@ def _scan_all(root_dir: Path, *, doc_type: str | None = None) -> list[VaultDocum
         tags = meta.get("tags", [])
         if isinstance(tags, str):
             tags = [tags]
-        feature = _parse_feature_from_tags(tags, dt_str)
-        # Fallback: if no feature from tags, check bare 'feature:' field
-        if not feature and "feature" in meta:
-            feature = str(meta["feature"]).lstrip("#").strip().lower() or None
+        feature = _feature_from_tags_or_meta(tags, meta, dt_str)
         date = meta.get("date") or _parse_date_from_filename(doc_path.name)
 
         docs.append(
@@ -136,12 +159,89 @@ def _scan_all(root_dir: Path, *, doc_type: str | None = None) -> list[VaultDocum
     return docs
 
 
+def _docs_from_graph(
+    graph: VaultGraph,
+    *,
+    doc_type: str | None = None,
+    feature: str | None = None,
+    date: str | None = None,
+) -> list[VaultDocument]:
+    """Derive :class:`VaultDocument` records from an already-built graph.
+
+    Reuses the frontmatter each node already parsed during the graph build
+    instead of re-reading and re-parsing every file from disk, while
+    reproducing :func:`_scan_all`'s exact field derivation (including the
+    bare ``feature:`` fallback and the filename-date fallback) so the
+    result is byte-for-byte identical to the uncached path. Phantom nodes
+    and ref-scoped nodes (``path is None``) are never part of ``_scan_all``'s
+    domain and are skipped; a stem-collision node's qualified ``name`` is
+    sidestepped by deriving the document name from ``node.path.stem``
+    instead.
+
+    Args:
+        graph: An already-built :class:`~vaultspec_core.graph.VaultGraph`
+            over the same ``root_dir`` the caller would otherwise rescan.
+        doc_type: Filter by type, matching :func:`list_documents`'
+            concrete-type semantics. The ``"orphaned"``/``"invalid"``
+            pseudo-types are not supported here; callers needing them must
+            use :func:`list_documents`.
+        feature: Filter by feature tag (without ``#`` prefix).
+        date: Filter by exact date string (``YYYY-MM-DD``).
+
+    Returns:
+        Ordered list of :class:`VaultDocument` instances matching all
+        supplied filters.
+    """
+    # ``_scan_all`` drops a document it cannot read or decode, so the graph
+    # path must drop it too. The graph still creates a node for such a file
+    # (with empty frontmatter and body), which is indistinguishable from a
+    # genuinely empty document by its fields alone; the ingress read records
+    # the failure separately, and that record is the only sound signal.
+    unreadable = {issue.path for issue in graph.encoding_issues}
+
+    docs: list[VaultDocument] = []
+    for node in graph.nodes.values():
+        if node.phantom or node.path is None or node.path in unreadable:
+            continue
+        dt_str = node.doc_type.value if node.doc_type else "unknown"
+        if doc_type is not None and dt_str != doc_type:
+            continue
+
+        meta = node.frontmatter
+        tags = meta.get("tags", [])
+        if isinstance(tags, str):
+            tags = [tags]
+        doc_feature = _feature_from_tags_or_meta(tags, meta, dt_str)
+        doc_date = meta.get("date") or _parse_date_from_filename(node.path.name)
+
+        docs.append(
+            VaultDocument(
+                path=node.path,
+                name=node.path.stem,
+                doc_type=dt_str,
+                feature=doc_feature,
+                date=str(doc_date) if doc_date else None,
+                tags=tags,
+            )
+        )
+
+    if feature:
+        feature = feature.lstrip("#")
+        docs = [d for d in docs if d.feature == feature]
+
+    if date:
+        docs = [d for d in docs if d.date == date]
+
+    return docs
+
+
 def list_documents(
     root_dir: Path,
     *,
     doc_type: str | None = None,
     feature: str | None = None,
     date: str | None = None,
+    graph: VaultGraph | None = None,
 ) -> list[VaultDocument]:
     """List vault documents with optional filters.
 
@@ -153,25 +253,42 @@ def list_documents(
             (contains dangling outgoing links).
         feature: Filter by feature tag (without ``#`` prefix).
         date: Filter by exact date string (``YYYY-MM-DD``).
+        graph: Optional pre-built :class:`~vaultspec_core.graph.VaultGraph`
+            to reuse. One is built when omitted, and the already-parsed
+            frontmatter it carries backs the listing instead of a second
+            read-and-parse of every document. A graph that cannot be built
+            degrades to the direct disk scan rather than failing.
 
     Returns:
         Ordered list of :class:`VaultDocument` instances matching all
         supplied filters.
     """
-    if doc_type == "orphaned":
-        from ..graph import VaultGraph
+    if graph is None:
+        try:
+            from ..graph import VaultGraph as _VaultGraph
 
-        docs = _scan_all(root_dir)
-        graph = VaultGraph(root_dir)
-        orphan_names = set(graph.get_orphaned())
-        docs = [d for d in docs if d.name in orphan_names]
-    elif doc_type == "invalid":
-        from ..graph import VaultGraph
+            graph = _VaultGraph(root_dir)
+        except (OSError, ValueError) as exc:
+            logger.warning("Failed to build vault graph for listing: %s", exc)
+            graph = None
 
-        docs = _scan_all(root_dir)
-        graph = VaultGraph(root_dir)
-        dangling_sources = {src for src, _ in graph.get_dangling_links()}
-        docs = [d for d in docs if d.name in dangling_sources]
+    if graph is not None:
+        # The pseudo-types are graph predicates over the same derived set, so
+        # they filter the graph-backed listing rather than triggering a second
+        # full scan alongside the graph they already needed.
+        docs = _docs_from_graph(
+            graph, doc_type=None if doc_type in ("orphaned", "invalid") else doc_type
+        )
+        if doc_type == "orphaned":
+            orphan_names = set(graph.get_orphaned())
+            docs = [d for d in docs if d.name in orphan_names]
+        elif doc_type == "invalid":
+            dangling_sources = {src for src, _ in graph.get_dangling_links()}
+            docs = [d for d in docs if d.name in dangling_sources]
+    elif doc_type in ("orphaned", "invalid"):
+        # Both pseudo-types are defined by graph edges; without a graph there
+        # is no sound answer, so report nothing rather than something wrong.
+        docs = []
     else:
         # A concrete doc-type filter is path-derived and applied inside the
         # scan, before any file is read.
@@ -203,9 +320,12 @@ def get_stats(
         doc_type: Restrict counts to a single document type.
         date: Restrict to documents matching this date (``YYYY-MM-DD``).
         graph: Optional pre-built :class:`~vaultspec_core.graph.VaultGraph`
-            to reuse for the orphan and dangling counts; callers that
-            already hold a graph (the orientation rollup) pass it so the
-            stats path never rebuilds a second one.
+            to reuse. When *doc_type* is not the ``"orphaned"``/``"invalid"``
+            pseudo-type, the graph's already-parsed frontmatter also backs
+            the document listing (via :func:`_docs_from_graph`) instead of
+            a fresh disk scan; callers that already hold a graph (the
+            orientation rollup) pass it so the stats path never rebuilds
+            or rescans the corpus a second time.
 
     Returns:
         Dict with keys: ``total_docs``, ``total_features``,
@@ -214,7 +334,22 @@ def get_stats(
         computed against the full unfiltered vault via
         :class:`~vaultspec_core.graph.VaultGraph`.
     """
-    docs = list_documents(root_dir, feature=feature, doc_type=doc_type, date=date)
+    if graph is None:
+        try:
+            from ..graph import VaultGraph as _VaultGraph
+
+            graph = _VaultGraph(root_dir)
+        except (OSError, ValueError) as exc:
+            logger.warning("Failed to build vault graph for stats: %s", exc)
+            graph = None
+
+    # The "orphaned"/"invalid" pseudo-types need list_documents' own
+    # graph-backed semantics; every concrete type (and the unfiltered case)
+    # reads from the already-built graph instead of rescanning the corpus.
+    if graph is not None and doc_type not in ("orphaned", "invalid"):
+        docs = _docs_from_graph(graph, feature=feature, doc_type=doc_type, date=date)
+    else:
+        docs = list_documents(root_dir, feature=feature, doc_type=doc_type, date=date)
 
     counts_by_type: dict[str, int] = {}
     features: set[str] = set()
@@ -223,18 +358,14 @@ def get_stats(
         if d.feature:
             features.add(d.feature)
 
-    # Orphan/invalid counts from graph (unfiltered)
-    try:
-        if graph is None:
-            from ..graph import VaultGraph as _VaultGraph
-
-            graph = _VaultGraph(root_dir)
-        orphaned_count = len(graph.get_orphaned())
-        dangling_link_count = len(graph.get_dangling_links())
-    except (OSError, ValueError) as exc:
-        logger.warning("Failed to build vault graph for stats: %s", exc)
-        orphaned_count = 0
-        dangling_link_count = 0
+    orphaned_count = 0
+    dangling_link_count = 0
+    if graph is not None:
+        try:
+            orphaned_count = len(graph.get_orphaned())
+            dangling_link_count = len(graph.get_dangling_links())
+        except (OSError, ValueError) as exc:
+            logger.warning("Failed to compute orphan/dangling counts: %s", exc)
 
     return {
         "total_docs": len(docs),
@@ -454,9 +585,7 @@ def unarchive_feature(root_dir: Path, feature: str, dry_run: bool = False) -> di
         if isinstance(tags, str):
             tags = [tags]
 
-        feature_val = _parse_feature_from_tags(tags, dt_str)
-        if not feature_val and "feature" in meta:
-            feature_val = str(meta["feature"]).lstrip("#").strip().lower() or None
+        feature_val = _feature_from_tags_or_meta(tags, meta, dt_str)
 
         if feature_val == feature.lower():
             archived_docs.append((doc_path, rel_path))
