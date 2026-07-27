@@ -26,17 +26,17 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-      - name: Update uv.lock on release branch
+      - name: Check out the release branch
         if: steps.release.outputs.pr && !steps.release.outputs.release_created
         uses: actions/checkout@v6
         with:
           ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
 
-      - name: Regenerate lockfile
+      - name: Set up uv for the release branch
         if: steps.release.outputs.pr && !steps.release.outputs.release_created
         uses: astral-sh/setup-uv@v7
 
-      - name: Push updated lockfile
+      - name: Regenerate and push uv.lock onto the release branch
         if: steps.release.outputs.pr && !steps.release.outputs.release_created
         run: |
           uv lock
@@ -49,6 +49,46 @@ jobs:
             git commit -m "chore: update uv.lock for release"
             git push
           fi
+
+      # The push above lands a few seconds after release-please makes the pull
+      # request mergeable, so a release merged inside that window ships the
+      # previous version's lockfile and leaves main failing every job at
+      # dependency install. Main is ruleset-protected and cannot be pushed to
+      # directly, so reconcile through a pull request instead of assuming the
+      # window was never hit.
+      - name: Check out main to verify the released lockfile
+        if: steps.release.outputs.release_created == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Set up uv for the lockfile verification
+        if: steps.release.outputs.release_created == 'true'
+        uses: astral-sh/setup-uv@v7
+
+      - name: Open a reconciling pull request when the lockfile drifted
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: |
+          if uv lock --locked; then
+            echo "uv.lock on main matches the released version"
+            exit 0
+          fi
+          echo "::warning::uv.lock on main did not match the released version; opening a reconciling pull request"
+          uv lock
+          BRANCH="chore/reconcile-uv-lock-${TAG}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+          git add uv.lock
+          git commit -m "chore(deps): reconcile uv.lock with ${TAG}"
+          git push --set-upstream origin "${BRANCH}"
+          gh pr create --base main --head "${BRANCH}" \
+            --title "chore(deps): reconcile uv.lock with ${TAG}" \
+            --body "The release for \`${TAG}\` was merged before the lockfile update reached its branch, so main carries the previous version's \`uv.lock\`. Every job installing with \`--locked\` fails until this merges."
+          echo "Opened a lockfile reconciliation pull request for ${TAG}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Dispatch PyPI publish workflow
         if: steps.release.outputs.release_created == 'true'

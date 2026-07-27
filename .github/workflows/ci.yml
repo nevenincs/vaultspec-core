@@ -19,6 +19,28 @@ env:
   FORCE_COLOR: "0"
 
 jobs:
+  # Every other job installs with --locked, so a lockfile that has drifted from
+  # pyproject.toml fails all of them at once, inside "Install dependencies",
+  # where the cause is easy to miss. This job isolates that one question and
+  # answers it in seconds, so the drift reads as itself rather than as a
+  # repository-wide outage.
+  lockfile:
+    name: Lockfile In Sync
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Verify uv.lock matches pyproject.toml
+        run: |
+          if ! uv lock --locked; then
+            echo "::error::uv.lock has drifted from pyproject.toml. Every job that installs with --locked will fail until this is fixed. Run 'uv lock' and commit the result."
+            exit 1
+          fi
+
   workflow-lint:
     name: Workflow Lint
     runs-on: ubuntu-latest
