@@ -28,6 +28,7 @@ from ._base import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
     from pathlib import Path
 
 __all__ = ["apply_markdown_hygiene", "check_markdown"]
@@ -141,6 +142,7 @@ def check_markdown(
     *,
     feature: str | None = None,
     fix: bool = False,
+    raw_texts: Mapping[Path, tuple[str, bool]] | None = None,
 ) -> CheckResult:
     """Check and optionally fix markdown hygiene across vault documents.
 
@@ -155,31 +157,36 @@ def check_markdown(
         feature: Restrict checks to documents with this feature tag
             (without ``#``).
         fix: When ``True``, rewrite affected documents in place.
+        raw_texts: The ingress read's per-document ``(text, crlf)`` map (see
+            :attr:`~vaultspec_core.graph.api.VaultGraph.raw_texts`).  When
+            supplied on a non-mutating pass, documents are validated from it
+            instead of re-reading the corpus - the single-ingress contract.
+            Ignored when ``fix`` is set: the mutating path reads and rewrites
+            the file it is about to change.
 
     Returns:
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
         check name ``"markdown"``.
     """
     from ..parser import parse_vault_metadata
-    from ..scanner import scan_vault
+    from ._base import iter_document_texts
 
     result = CheckResult(check_name="markdown", supports_fix=True)
     wanted_feature = feature.lstrip("#") if feature else None
 
-    for doc_path in scan_vault(
-        root_dir,
-        run_migrations=not bool(wanted_feature),
-    ):
-        try:
-            raw_content = doc_path.read_bytes().decode("utf-8")
-        except (OSError, UnicodeDecodeError):
-            continue
+    if raw_texts is not None and not fix:
+        sources: Iterable[tuple[Path, str, bool]] = (
+            (path, text, crlf) for path, (text, crlf) in raw_texts.items()
+        )
+    else:
+        sources = iter_document_texts(root_dir, run_migrations=not bool(wanted_feature))
 
+    for doc_path, raw_content, has_crlf in sources:
         metadata, _body = parse_vault_metadata(raw_content)
         if wanted_feature and wanted_feature not in extract_feature_tags(metadata.tags):
             continue
 
-        source_newline = "\r\n" if "\r\n" in raw_content else "\n"
+        source_newline = "\r\n" if has_crlf else "\n"
         content_lf = raw_content.replace("\r\n", "\n")
         cleaned_lf, stats = apply_markdown_hygiene(content_lf)
         if stats.total == 0:

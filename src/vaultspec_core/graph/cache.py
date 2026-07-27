@@ -7,8 +7,9 @@ link resolution, and the PageRank pass.  This module caches the *built*
 canonical graph beside a fingerprint manifest so that an unchanged corpus
 loads the serialised graph instead of re-parsing.
 
-The cache is an optimisation and must be **sound**: a stale cache is never
-trusted.  Soundness rests on three guards, in order of strength:
+The cache is an optimisation and must stay **sound** without its own
+validation costing more than the rebuild it avoids.  Soundness rests on
+three guards, applied per git's racily-clean rule:
 
 1. **File-set equality.**  The manifest fingerprints the complete set of
    scanned ``.md`` files.  A file added or removed since the cache was
@@ -16,23 +17,29 @@ trusted.  Soundness rests on three guards, in order of strength:
    surviving file changed.
 2. **Per-file size and mtime.**  Each file carries ``(st_size,
    st_mtime_ns)`` - the same primitive the repair pipeline uses in
-   :mod:`vaultspec_core.vaultcore.repair`.  This is the cheap fast-path
-   guard: almost every real edit changes the size or the modification time.
-3. **Per-file content hash.**  Each file also carries a SHA-256 of its
-   bytes.  ``st_mtime_ns`` resolution can theoretically miss a same-size
-   edit applied within a single timestamp tick, so the content hash closes
-   that window: validation requires the size, the mtime, *and* the hash to
-   match.  The hash is read-once per file during fingerprinting, which is
-   strictly cheaper than the parse-and-build the cache avoids, so it is
-   always computed rather than gated behind a flag.
+   :mod:`vaultspec_core.vaultcore.repair`.  A size or mtime divergence is
+   always a miss, and a match is *trusted* for any file whose mtime is
+   strictly older than the cache file's own mtime: such a file cannot have
+   been edited after the manifest recorded it without moving its mtime.
+3. **Per-file content hash, racily-clean files only.**  A file whose mtime
+   is not older than the cache write ("racy": edited within the same
+   timestamp tick the cache was written in, or under clock skew) cannot be
+   proven clean by stat alone, so exactly those files are re-hashed against
+   the manifest's stored SHA-256.  On nanosecond-resolution filesystems
+   (NTFS, ext4) the racy set is empty or near-empty; on coarse-resolution
+   filesystems it grows to cover the wider tick.  Passing ``deep=True``
+   hashes every file regardless - the explicit deep-verification path for
+   doctor-class diagnostics.
 
-:func:`validate` returns ``True`` only when the current file set and every
-per-file fingerprint match the manifest exactly.  Any divergence - a
-changed, added, or removed file, an absent cache, or a corrupt/unreadable
-cache file - is treated as a miss and forces a full rebuild.  The cache can
-therefore be safely always-on: it can never serve data that does not match
-the bytes currently on disk, and a corrupt cache degrades silently to a
-rebuild rather than crashing or serving garbage.
+:func:`validate` returns ``True`` only when the current file set matches
+the manifest and every per-file guard passes.  Any divergence - a changed,
+added, or removed file, an absent cache, or a corrupt/unreadable cache
+file - is treated as a miss and forces a full rebuild.  The accepted
+residual risk is a same-size edit that lands in the same mtime tick as a
+*document* write recorded in the manifest while the cache file itself
+carries a newer tick and the edit bypasses the mutating CLI verbs (which
+drop the cache file); that window is bounded by one filesystem timestamp
+tick and closable on demand with ``deep=True``.
 
 The serialised graph store is JSON (networkx node-link format) rather than
 pickle.  JSON is inspectable, diff-friendly, version-safe across Python
@@ -145,19 +152,29 @@ def _hash_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _manifest_key(path: Path, root_dir: Path) -> str:
+    """Return the stable vault-relative POSIX manifest key for *path*."""
+    try:
+        return path.relative_to(root_dir).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 def fingerprint_vault(
     scanned_files: Iterable[Path],
     root_dir: Path,
 ) -> dict[str, Fingerprint]:
     """Compute the fingerprint manifest for the documents the graph consumes.
 
-    Keyed on the exact file set passed in (the same iterable the graph
-    build walks via ``scan_vault``) so the manifest cannot drift from the
-    corpus the cached graph was built over.  Each file contributes its
-    ``(st_size, st_mtime_ns, sha256_hex)`` fingerprint.  Files that cannot
-    be stat-ed or read are skipped: a vanished file simply does not appear
-    in the manifest, which is itself a file-set divergence that
-    :func:`validate` detects on the next build.
+    Called on the *save* path only, after a rebuild: the warm-read path
+    validates against the stored manifest with :func:`validate` and never
+    recomputes full hashes.  Keyed on the exact file set passed in (the
+    same iterable the graph build walks via ``scan_vault``) so the manifest
+    cannot drift from the corpus the cached graph was built over.  Each
+    file contributes its ``(st_size, st_mtime_ns, sha256_hex)``
+    fingerprint.  Files that cannot be stat-ed or read are skipped: a
+    vanished file simply does not appear in the manifest, which is itself a
+    file-set divergence that :func:`validate` detects on the next build.
 
     Args:
         scanned_files: The document paths the graph build observed (e.g.
@@ -174,41 +191,73 @@ def fingerprint_vault(
         except OSError:
             continue
         try:
-            key = path.relative_to(root_dir).as_posix()
-        except ValueError:
-            key = path.as_posix()
-        try:
             content_hash = _hash_file(path)
         except OSError:
             continue
-        manifest[key] = (stat.st_size, stat.st_mtime_ns, content_hash)
+        manifest[_manifest_key(path, root_dir)] = (
+            stat.st_size,
+            stat.st_mtime_ns,
+            content_hash,
+        )
     return manifest
 
 
 def validate(
     manifest: dict[str, Fingerprint],
-    current: dict[str, Fingerprint],
+    scanned_files: Iterable[Path],
+    root_dir: Path,
+    *,
+    cache_mtime_ns: int | None,
+    deep: bool = False,
 ) -> bool:
-    """Return ``True`` only when *current* matches the cached *manifest* exactly.
+    """Return ``True`` only when the corpus on disk still matches *manifest*.
 
-    The match is total: the two mappings must have the same set of keys
-    (so an added or removed file invalidates) and identical fingerprint
-    tuples for every key (so a changed size, mtime, or content hash
-    invalidates).  Any divergence returns ``False``, forcing a full
-    rebuild.  This is the single decision point behind "stale never
-    trusted".
+    Applies the racily-clean rule (see the module docstring): the file set
+    must be identical, every file's ``(st_size, st_mtime_ns)`` must match
+    the manifest, and files whose mtime is not older than *cache_mtime_ns*
+    (the cache file's own mtime) are additionally content-hashed against
+    the manifest because stat alone cannot prove them clean.  Any
+    divergence returns ``False``, forcing a full rebuild.
 
     Args:
         manifest: The fingerprint manifest stored in the cache.
-        current: The freshly-computed fingerprint manifest for the vault
-            as it exists on disk now.
+        scanned_files: The document paths of the vault as it exists on
+            disk now (e.g. the output of ``scan_vault``).
+        root_dir: Project root, used to derive stable vault-relative keys.
+        cache_mtime_ns: The cache file's ``st_mtime_ns``, the racily-clean
+            reference point.  ``None`` (unknown) treats every file as racy,
+            degrading to full hash validation - sound, never unsound.
+        deep: When ``True``, content-hash every file regardless of mtime -
+            the explicit deep-verification path.
 
     Returns:
-        ``True`` when the manifests are equal, ``False`` otherwise.
+        ``True`` when every guard passes for every file, ``False``
+        otherwise.
     """
-    if manifest.keys() != current.keys():
-        return False
-    return all(manifest[key] == current[key] for key in manifest)
+    seen: set[str] = set()
+    for path in scanned_files:
+        try:
+            stat = path.stat()
+        except OSError:
+            # A vanished file is absent from the seen set; the final
+            # file-set equality check reports the divergence.
+            continue
+        key = _manifest_key(path, root_dir)
+        seen.add(key)
+        entry = manifest.get(key)
+        if entry is None:
+            return False
+        size, mtime_ns, content_hash = entry
+        if stat.st_size != size or stat.st_mtime_ns != mtime_ns:
+            return False
+        racy = cache_mtime_ns is None or stat.st_mtime_ns >= cache_mtime_ns
+        if deep or racy:
+            try:
+                if _hash_file(path) != content_hash:
+                    return False
+            except OSError:
+                return False
+    return seen == manifest.keys()
 
 
 def load(path: Path) -> GraphCachePayload | None:

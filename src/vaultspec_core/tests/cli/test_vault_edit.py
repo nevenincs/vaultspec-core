@@ -18,6 +18,8 @@ Coverage:
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -190,6 +192,39 @@ class TestSetBody:
         # the exact failure that an un-normalized stdin \r\n produces when the
         # write path re-applies a CRLF source newline.
         assert b"\r\r" not in on_disk
+
+    def test_stdin_channel_preserves_legacy_c1_byte(self, tmp_path):
+        """A real CLI process must retain a legacy byte during body replacement."""
+        root = _make_vault(tmp_path)
+        document = _doc(root)
+        original = document.read_bytes()
+        source_newline = b"\r\n" if b"\r\n" in original else b"\n"
+        expected_hash = git_blob_oid(original)
+        body = b"\n# Demo ADR\n\nLegacy byte: \x90\n"
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "vaultspec_core",
+                "--target",
+                str(root),
+                "vault",
+                "set-body",
+                "2026-01-01-alpha-adr",
+                "--body-stdin",
+                "--expected-blob-hash",
+                expected_hash,
+                "--json",
+            ],
+            input=body,
+            capture_output=True,
+            check=False,
+        )
+
+        assert result.returncode == 0, result.stderr.decode("utf-8", "replace")
+        assert json.loads(result.stdout)["status"] == "updated"
+        assert document.read_bytes().endswith(body.replace(b"\n", source_newline))
 
     def test_refuse_on_error_leaves_file_unchanged(self, runner, tmp_path):
         root = _make_vault(tmp_path)

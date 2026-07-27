@@ -102,30 +102,42 @@ def run_all_checks(
     from ...graph import VaultGraph
 
     if not fix:
+        # The single-ingress contract: the graph build (or, after a cache
+        # hit, ensure_raw_texts) reads each document exactly once, and the
+        # whole calculate phase below runs from the shared snapshot and
+        # raw-text map without another corpus read. check_rename_integrity
+        # is exempt by scope: it validates .vaultspec/ workspace resources,
+        # not the vault corpus.
         graph = VaultGraph(root_dir)
+        graph.ensure_raw_texts()
         snapshot = graph.to_snapshot()
+        raw_texts = graph.raw_texts
         return [
             check_structure(root_dir, snapshot=snapshot, fix=False),
             check_frontmatter(root_dir, snapshot=snapshot, feature=feature, fix=False),
             check_modified_stamp(
                 root_dir, snapshot=snapshot, feature=feature, fix=False
             ),
-            check_annotations(root_dir, feature=feature, fix=False),
-            check_markdown(root_dir, feature=feature, fix=False),
+            check_annotations(
+                root_dir, feature=feature, fix=False, raw_texts=raw_texts
+            ),
+            check_markdown(root_dir, feature=feature, fix=False, raw_texts=raw_texts),
             check_links(root_dir, snapshot=snapshot, feature=feature, fix=False),
             check_dangling(root_dir, graph=graph, feature=feature, fix=False),
             check_body_links(root_dir, snapshot=snapshot, feature=feature),
             check_placeholders(root_dir, snapshot=snapshot, feature=feature),
             check_orphans(root_dir, graph=graph, feature=feature),
             check_features(root_dir, snapshot=snapshot, feature=feature),
-            check_exec_mapping(root_dir, snapshot=snapshot, feature=feature),
+            check_exec_mapping(
+                root_dir, snapshot=snapshot, feature=feature, raw_texts=raw_texts
+            ),
             check_body_sections(root_dir, snapshot=snapshot, feature=feature),
-            check_feature_rename_integrity(root_dir),
+            check_feature_rename_integrity(root_dir, snapshot=snapshot),
             check_references(root_dir, graph=graph, feature=feature, fix=False),
             check_schema(root_dir, graph=graph, feature=feature, fix=False),
             check_adr_status(root_dir, snapshot=snapshot, feature=feature, fix=False),
             check_rename_integrity(root_dir, fix=False),
-            check_encoding(root_dir),
+            check_encoding(root_dir, graph=graph),
         ]
 
     # Mutating checks can rename files or rewrite frontmatter. Refresh graph

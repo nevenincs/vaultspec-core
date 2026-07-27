@@ -6,6 +6,7 @@ import pytest
 
 from vaultspec_core.core.exceptions import ResourceExistsError
 from vaultspec_core.vaultcore import hydrate_template
+from vaultspec_core.vaultcore.body_schema import CURRENT_BODY_SCHEMA
 from vaultspec_core.vaultcore.hydration import create_vault_doc, get_template_path
 from vaultspec_core.vaultcore.models import DocType
 
@@ -241,6 +242,60 @@ def test_create_vault_doc_plan_substitutes_tier(tmp_path):
     assert "tier: L3" in content
     assert "tier: L{#}" not in content
     assert "tier: {tier}" not in content
+
+
+def test_create_vault_doc_stamps_current_body_schema(tmp_path):
+    """A real bundled template produces a scaffold declaring its contract."""
+    from vaultspec_core.builtins import seed_builtins
+    from vaultspec_core.vaultcore import parse_vault_metadata
+
+    rules_dir = tmp_path / ".vaultspec"
+    rules_dir.mkdir(parents=True)
+    seed_builtins(rules_dir, force=True)
+    for dt in DocType:
+        (tmp_path / ".vault" / dt.value).mkdir(parents=True, exist_ok=True)
+
+    path = create_vault_doc(
+        tmp_path,
+        DocType.ADR,
+        "schema-stamp",
+        "2026-07-27",
+        title="Schema stamp",
+    )
+    metadata, _body = parse_vault_metadata(path.read_text(encoding="utf-8"))
+
+    assert metadata.body_schema == CURRENT_BODY_SCHEMA
+
+
+def test_create_vault_doc_replaces_stale_template_schema_stamp(tmp_path):
+    """A stale real template cannot make a newly scaffolded document legacy."""
+    from vaultspec_core.builtins import seed_builtins
+    from vaultspec_core.vaultcore import parse_vault_metadata
+
+    rules_dir = tmp_path / ".vaultspec"
+    rules_dir.mkdir(parents=True)
+    seed_builtins(rules_dir, force=True)
+    for dt in DocType:
+        (tmp_path / ".vault" / dt.value).mkdir(parents=True, exist_ok=True)
+
+    template = rules_dir / "templates" / "adr.md"
+    template.write_text(
+        template.read_text(encoding="utf-8").replace(
+            "body_schema: 'body-v1'", "body_schema: 'legacy-adr-v1'"
+        ),
+        encoding="utf-8",
+    )
+
+    path = create_vault_doc(
+        tmp_path,
+        DocType.ADR,
+        "schema-stamp",
+        "2026-07-27",
+        title="Schema stamp",
+    )
+    metadata, _body = parse_vault_metadata(path.read_text(encoding="utf-8"))
+
+    assert metadata.body_schema == CURRENT_BODY_SCHEMA
 
 
 def test_emit_time_validator_rejects_invalid_plan_tier(tmp_path):

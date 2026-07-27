@@ -527,7 +527,7 @@ def compute_rollup(
             real_nodes, limit=limit, since_days=since_days, reference=reference
         )
     )
-    totals = get_stats(root_dir)
+    totals = get_stats(root_dir, graph=g)
 
     return Rollup(
         active_features=active_features,

@@ -100,3 +100,21 @@ date: "2026-02-08"
     meta, _body = parse_vault_metadata(content)
     assert meta.tags == ["#plan", "#feat"]
     assert meta.date == "2026-02-08"
+
+
+def test_parse_vault_metadata_retains_optional_body_schema():
+    content = """---
+tags:
+  - '#research'
+  - '#schema-provenance'
+date: '2026-07-27'
+body_schema: 'body-v1'
+related: []
+---
+# Research
+"""
+
+    meta, _body = parse_vault_metadata(content)
+
+    assert meta.body_schema == "body-v1"
+    assert "# Research" in _body

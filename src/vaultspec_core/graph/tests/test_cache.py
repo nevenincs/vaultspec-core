@@ -1,13 +1,19 @@
 """Correctness tests proving the graph fingerprint cache is never stale.
 
 Every test runs against a real on-disk synthetic vault with no mocks,
-patches, or ``time.sleep`` hacks.  The contract under test is "stale never
-trusted": a cache may only be served when the corpus on disk is byte-for-byte
-the corpus the cache was built over.  The tests prove each invalidation
-trigger independently:
+patches, or ``time.sleep`` hacks.  The contract under test is the
+racily-clean rule: a cache is served only when the file set matches, every
+file's size and mtime match the manifest, and any file whose mtime is not
+older than the cache file's own mtime additionally matches its stored
+content hash.  The tests prove each trigger independently:
 
-- a content edit (changed size, and changed content hash even at equal size)
-  forces a rebuild that reflects the new bytes;
+- a content edit (changed size or mtime) forces a rebuild that reflects the
+  new bytes;
+- a same-size edit on a racy file (mtime not older than the cache write) is
+  caught by the hash guard;
+- the accepted residual window - a same-size edit whose mtime is restored
+  below the cache write tick - is served stale by design and caught by the
+  explicit ``deep=True`` verification path;
 - an added file appears in the next build;
 - a removed file disappears from the next build;
 - a corrupt or truncated cache file degrades silently to a full rebuild;
@@ -22,6 +28,7 @@ rather than pass quietly.
 from __future__ import annotations
 
 import json
+import os
 from typing import TYPE_CHECKING
 
 import pytest
@@ -67,11 +74,20 @@ def _word_count(graph: VaultGraph, name: str) -> int:
     return graph.nodes[name].word_count
 
 
-def _scanned_fingerprints(root: Path) -> dict[str, cache_mod.Fingerprint]:
-    """Fingerprint the current vault exactly as the graph build does."""
+def _validate_against_disk(root: Path, *, deep: bool = False) -> bool:
+    """Validate the on-disk cache against the corpus exactly as the build does."""
     from ...vaultcore import scan_vault
 
-    return cache_mod.fingerprint_vault(list(scan_vault(root)), root)
+    cache_file = cache_mod.cache_path(root)
+    payload = cache_mod.load(cache_file)
+    assert payload is not None
+    return cache_mod.validate(
+        payload.manifest,
+        list(scan_vault(root)),
+        root,
+        cache_mtime_ns=cache_file.stat().st_mtime_ns,
+        deep=deep,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -102,22 +118,20 @@ class TestContentChangeInvalidates:
         expected_words = original_words + len(added.split())
 
         # Sanity: validate must report the cache as stale now.
-        payload = cache_mod.load(cache_mod.cache_path(vault_root))
-        assert payload is not None
-        assert (
-            cache_mod.validate(payload.manifest, _scanned_fingerprints(vault_root))
-            is False
-        )
+        assert _validate_against_disk(vault_root) is False
 
         second = VaultGraph(vault_root)
         assert _word_count(second, target_name) == expected_words
         assert _word_count(second, target_name) != original_words
 
-    def test_same_size_edit_caught_by_content_hash(self, vault_root: Path) -> None:
-        # Build, then overwrite a real document with content of the SAME byte
-        # length but different bytes.  Size is unchanged; only the content
-        # hash differs.  This is the case the bare (size, mtime) guard could
-        # miss within one timestamp tick, and the hash must catch it.
+    def _same_size_title_flip(self, vault_root: Path) -> tuple[Path, str, str]:
+        """Build once and apply a same-size title edit with the mtime restored.
+
+        Overwrites a real document with content of the SAME byte length but
+        different bytes, then restores the file's original ``(atime, mtime)``
+        with ``os.utime`` so the stat guard cannot see the edit.  Returns the
+        edited path, the node name, and the flipped title text.
+        """
         first = VaultGraph(vault_root)
         target_name = next(
             name
@@ -126,13 +140,11 @@ class TestContentChangeInvalidates:
         )
         target_path = first.nodes[target_name].path
         assert target_path is not None
+        original_stat = target_path.stat()
         original_text = target_path.read_text(encoding="utf-8")
         original_title = first.nodes[target_name].title
         assert original_title is not None
 
-        # Flip a single character in the title heading, preserving length.
-        # The title starts with "# "; replace the first title letter so the
-        # parsed title text changes but the byte count does not.
         marker = f"# {original_title}"
         assert marker in original_text
         first_letter = original_title[0]
@@ -144,16 +156,43 @@ class TestContentChangeInvalidates:
         )
         assert len(mutated.encode("utf-8")) == len(original_text.encode("utf-8"))
         target_path.write_text(mutated, encoding="utf-8")
+        os.utime(
+            target_path,
+            ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns),
+        )
+        return target_path, target_name, f"{flipped}{original_title[1:]}"
 
-        current = _scanned_fingerprints(vault_root)
-        payload = cache_mod.load(cache_mod.cache_path(vault_root))
-        assert payload is not None
-        # The size+mtime alone could collide; the content hash differs, so
-        # validation must reject the cache.
-        assert cache_mod.validate(payload.manifest, current) is False
+    def test_same_size_racy_edit_caught_by_content_hash(self, vault_root: Path) -> None:
+        # A same-size, same-mtime edit on a RACY file (file mtime not older
+        # than the cache file's mtime) must be caught by the hash guard.
+        # Age the cache file below the document's restored mtime so the
+        # racily-clean rule classifies the document as racy.
+        target_path, target_name, flipped_title = self._same_size_title_flip(vault_root)
+        cache_file = cache_mod.cache_path(vault_root)
+        doc_mtime_ns = target_path.stat().st_mtime_ns
+        cache_stat = cache_file.stat()
+        os.utime(cache_file, ns=(cache_stat.st_atime_ns, doc_mtime_ns))
+
+        assert _validate_against_disk(vault_root) is False
 
         second = VaultGraph(vault_root)
-        assert second.nodes[target_name].title == f"{flipped}{original_title[1:]}"
+        assert second.nodes[target_name].title == flipped_title
+
+    def test_same_size_non_racy_edit_is_accepted_stale_until_deep(
+        self, vault_root: Path
+    ) -> None:
+        # The ADR-accepted residual window: a same-size edit whose mtime is
+        # restored below the cache write tick passes stat validation and is
+        # served stale by design.  The explicit deep verification path must
+        # still catch it.
+        self._same_size_title_flip(vault_root)
+        cache_file = cache_mod.cache_path(vault_root)
+        assert cache_file.stat().st_mtime_ns > max(
+            p.stat().st_mtime_ns for p in (vault_root / ".vault").rglob("*.md")
+        )
+
+        assert _validate_against_disk(vault_root) is True
+        assert _validate_against_disk(vault_root, deep=True) is False
 
 
 # ---------------------------------------------------------------------------
@@ -271,10 +310,8 @@ class TestCacheHitIsIdentical:
 
     def test_cache_hit_validates(self, vault_root: Path) -> None:
         VaultGraph(vault_root)
-        payload = cache_mod.load(cache_mod.cache_path(vault_root))
-        assert payload is not None
         # Unchanged corpus: validation must pass.
-        assert cache_mod.validate(payload.manifest, _scanned_fingerprints(vault_root))
+        assert _validate_against_disk(vault_root) is True
 
 
 # ---------------------------------------------------------------------------
@@ -332,83 +369,137 @@ class TestCliMutationRefreshesCache:
 
 
 # ---------------------------------------------------------------------------
-# (g) validate() content-hash guard - pure unit tests
+# (g) validate() racily-clean guards - real-file unit tests
 # ---------------------------------------------------------------------------
 
 
-class TestValidateHashGuard:
-    """Isolate the content-hash guard in :func:`~vaultspec_core.graph.cache.validate`.
+class TestValidateRacilyClean:
+    """Isolate each guard in :func:`~vaultspec_core.graph.cache.validate`.
 
-    These tests call ``validate`` directly with hand-built manifest dicts so
-    the hash guard is exercised independently of mtime or size changes, which
-    is the scenario the existing filesystem-level test
-    ``test_same_size_edit_caught_by_content_hash`` cannot isolate (a real
-    write also bumps mtime, so the size-or-mtime guard fires first).
+    Every case runs against real files under ``tmp_path`` with real stat
+    values; mtimes are steered with ``os.utime`` (a real filesystem
+    operation) so the racy and non-racy branches are each exercised
+    deliberately.
     """
 
-    def test_identical_fingerprints_validate(self) -> None:
-        # Same size, same mtime, same hash: valid.
-        manifest: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 5, "h1")}
-        current: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 5, "h1")}
-        assert cache_mod.validate(manifest, current) is True
+    def _corpus(
+        self, tmp_path: Path
+    ) -> tuple[list[Path], dict[str, cache_mod.Fingerprint]]:
+        a = tmp_path / "a.md"
+        b = tmp_path / "b.md"
+        a.write_text("alpha document body\n", encoding="utf-8")
+        b.write_text("beta document body\n", encoding="utf-8")
+        files = [a, b]
+        return files, cache_mod.fingerprint_vault(files, tmp_path)
 
-    def test_different_hash_invalidates(self) -> None:
-        # Identical size and mtime, different hash: must invalidate.
-        manifest: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 5, "h1")}
-        current: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 5, "h2")}
-        assert cache_mod.validate(manifest, current) is False
+    @staticmethod
+    def _max_mtime_ns(files: list[Path]) -> int:
+        return max(p.stat().st_mtime_ns for p in files)
 
-    def test_different_size_invalidates(self) -> None:
-        manifest: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 5, "h1")}
-        current: dict[str, cache_mod.Fingerprint] = {"a.md": (11, 5, "h1")}
-        assert cache_mod.validate(manifest, current) is False
+    def test_unchanged_corpus_validates_without_racy_files(
+        self, tmp_path: Path
+    ) -> None:
+        files, manifest = self._corpus(tmp_path)
+        newer = self._max_mtime_ns(files) + 1
+        assert (
+            cache_mod.validate(manifest, files, tmp_path, cache_mtime_ns=newer) is True
+        )
 
-    def test_different_mtime_invalidates(self) -> None:
-        manifest: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 5, "h1")}
-        current: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 6, "h1")}
-        assert cache_mod.validate(manifest, current) is False
+    def test_unknown_cache_mtime_degrades_to_full_hash_and_validates(
+        self, tmp_path: Path
+    ) -> None:
+        files, manifest = self._corpus(tmp_path)
+        assert (
+            cache_mod.validate(manifest, files, tmp_path, cache_mtime_ns=None) is True
+        )
 
-    def test_added_key_invalidates(self) -> None:
-        manifest: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 5, "h1")}
-        current: dict[str, cache_mod.Fingerprint] = {
-            "a.md": (10, 5, "h1"),
-            "b.md": (20, 7, "h2"),
-        }
-        assert cache_mod.validate(manifest, current) is False
+    def test_size_change_invalidates(self, tmp_path: Path) -> None:
+        files, manifest = self._corpus(tmp_path)
+        files[0].write_text("alpha document body grown\n", encoding="utf-8")
+        newer = self._max_mtime_ns(files) + 1
+        assert (
+            cache_mod.validate(manifest, files, tmp_path, cache_mtime_ns=newer) is False
+        )
 
-    def test_removed_key_invalidates(self) -> None:
-        manifest: dict[str, cache_mod.Fingerprint] = {
-            "a.md": (10, 5, "h1"),
-            "b.md": (20, 7, "h2"),
-        }
-        current: dict[str, cache_mod.Fingerprint] = {"a.md": (10, 5, "h1")}
-        assert cache_mod.validate(manifest, current) is False
+    def test_mtime_change_invalidates(self, tmp_path: Path) -> None:
+        # Bump by a full second: below-filesystem-resolution deltas (e.g.
+        # +1ns on NTFS's 100ns clock) are silently rounded away by utime.
+        files, manifest = self._corpus(tmp_path)
+        stat = files[0].stat()
+        os.utime(files[0], ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))
+        newer = self._max_mtime_ns(files) + 1
+        assert (
+            cache_mod.validate(manifest, files, tmp_path, cache_mtime_ns=newer) is False
+        )
 
-    def test_empty_manifests_validate(self) -> None:
-        assert cache_mod.validate({}, {}) is True
+    def test_racy_same_size_edit_caught_by_hash(self, tmp_path: Path) -> None:
+        # Same byte count, same restored mtime: only the hash differs.  With
+        # the cache reference at or below the file's mtime the file is racy
+        # and the hash guard must fire.
+        files, manifest = self._corpus(tmp_path)
+        stat = files[0].stat()
+        files[0].write_text("ALPHA document body\n", encoding="utf-8")
+        os.utime(files[0], ns=(stat.st_atime_ns, stat.st_mtime_ns))
+        assert (
+            cache_mod.validate(
+                manifest, files, tmp_path, cache_mtime_ns=stat.st_mtime_ns
+            )
+            is False
+        )
 
-    def test_multiple_keys_all_match(self) -> None:
-        manifest: dict[str, cache_mod.Fingerprint] = {
-            "a.md": (10, 5, "h1"),
-            "b.md": (20, 7, "h2"),
-        }
-        current: dict[str, cache_mod.Fingerprint] = {
-            "a.md": (10, 5, "h1"),
-            "b.md": (20, 7, "h2"),
-        }
-        assert cache_mod.validate(manifest, current) is True
+    def test_non_racy_same_size_edit_is_accepted_until_deep(
+        self, tmp_path: Path
+    ) -> None:
+        # The accepted residual window: with the cache reference newer than
+        # the file's restored mtime, stat validation trusts the file; the
+        # explicit deep path still catches the edit.
+        files, manifest = self._corpus(tmp_path)
+        stat = files[0].stat()
+        files[0].write_text("ALPHA document body\n", encoding="utf-8")
+        os.utime(files[0], ns=(stat.st_atime_ns, stat.st_mtime_ns))
+        newer = self._max_mtime_ns(files) + 1
+        assert (
+            cache_mod.validate(manifest, files, tmp_path, cache_mtime_ns=newer) is True
+        )
+        assert (
+            cache_mod.validate(
+                manifest, files, tmp_path, cache_mtime_ns=newer, deep=True
+            )
+            is False
+        )
 
-    def test_multiple_keys_one_hash_differs(self) -> None:
-        # One entry has same size+mtime but different hash: must invalidate.
-        manifest: dict[str, cache_mod.Fingerprint] = {
-            "a.md": (10, 5, "h1"),
-            "b.md": (20, 7, "h2"),
-        }
-        current: dict[str, cache_mod.Fingerprint] = {
-            "a.md": (10, 5, "h1"),
-            "b.md": (20, 7, "h2-changed"),
-        }
-        assert cache_mod.validate(manifest, current) is False
+    def test_added_file_invalidates(self, tmp_path: Path) -> None:
+        files, manifest = self._corpus(tmp_path)
+        extra = tmp_path / "c.md"
+        extra.write_text("gamma document body\n", encoding="utf-8")
+        newer = self._max_mtime_ns([*files, extra]) + 1
+        assert (
+            cache_mod.validate(
+                manifest, [*files, extra], tmp_path, cache_mtime_ns=newer
+            )
+            is False
+        )
+
+    def test_removed_file_invalidates(self, tmp_path: Path) -> None:
+        files, manifest = self._corpus(tmp_path)
+        newer = self._max_mtime_ns(files) + 1
+        assert (
+            cache_mod.validate(manifest, files[:1], tmp_path, cache_mtime_ns=newer)
+            is False
+        )
+
+    def test_vanished_file_invalidates(self, tmp_path: Path) -> None:
+        # The scanned list still names the file, but it is gone from disk:
+        # the file-set equality check must report the divergence.
+        files, manifest = self._corpus(tmp_path)
+        files[0].unlink()
+        newer = self._max_mtime_ns(files[1:]) + 1
+        assert (
+            cache_mod.validate(manifest, files, tmp_path, cache_mtime_ns=newer) is False
+        )
+
+    def test_empty_corpus_validates(self, tmp_path: Path) -> None:
+        assert cache_mod.validate({}, [], tmp_path, cache_mtime_ns=None) is True
 
 
 # ---------------------------------------------------------------------------

@@ -12,6 +12,11 @@ Re-exports from six internal modules: :mod:`.models`
 :mod:`vaultspec_core.graph`, and :mod:`vaultspec_core.mcp_server`.
 """
 
+from .body_schema import BODY_SCHEMA_REGISTRY as BODY_SCHEMA_REGISTRY
+from .body_schema import CURRENT_BODY_SCHEMA as CURRENT_BODY_SCHEMA
+from .body_schema import BodySchema as BodySchema
+from .body_schema import BodySchemaResolution as BodySchemaResolution
+from .body_schema import resolve_body_schema as resolve_body_schema
 from .hydration import create_vault_doc as create_vault_doc
 from .hydration import get_template_path as get_template_path
 from .hydration import hydrate_template as hydrate_template

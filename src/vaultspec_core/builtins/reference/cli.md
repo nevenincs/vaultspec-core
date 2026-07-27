@@ -207,6 +207,8 @@ hand-edit between the markers.
 
 - `vaultspec-core vault archive documents` - Archive exactly the documents named in a
   UTF-8 manifest.
+- `vaultspec-core vault archive restore` - Restore exactly the archived documents named
+  in a UTF-8 manifest.
 
 ### Spec
 
@@ -578,6 +580,16 @@ listed by `--manifest PATH`. The manifest is UTF-8, one repository-relative
 `.vault/*.md` path per line. The command validates the entire manifest before moving
 anything; `--dry-run` previews the destination paths and `--json` emits the standard
 envelope.
+
+### vaultspec-core vault archive restore
+
+`vaultspec-core vault archive restore [OPTIONS]` is the inverse: it restores exactly the
+archived documents listed by `--manifest PATH`, one repository-relative
+`.vault/_archive/*.md` path per line. The whole manifest is validated before anything
+moves. `--deduplicate-identical` drops an archived copy whose live counterpart is
+byte-identical instead of failing on the collision, while differing contents are still
+reported as conflicts; `--dry-run` previews the destination paths and `--json` emits the
+standard envelope.
 
 ### vaultspec-core vault exec
 

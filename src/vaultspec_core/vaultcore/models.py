@@ -293,6 +293,9 @@ class DocumentMetadata:
             every other document type and on legacy exec records predating the
             field. Consumed by the exec-mapping health check to back-map a
             record to a live Step in its parent plan.
+        body_schema: Immutable body-section contract identifier stamped on new
+            scaffolds. ``None`` remains valid for historical documents until
+            their hash-attested baseline is introduced.
     """
 
     tags: list[str] = field(default_factory=list)
@@ -305,6 +308,7 @@ class DocumentMetadata:
     promoted_to: list[str] = field(default_factory=list)
     archived: str | None = None
     step_id: str | None = None
+    body_schema: str | None = None
 
     def validate(self) -> list[str]:
         """Validate the metadata against the vault schema rules.

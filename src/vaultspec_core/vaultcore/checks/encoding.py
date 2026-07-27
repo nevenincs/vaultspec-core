@@ -27,22 +27,34 @@ from ._base import CheckDiagnostic, CheckResult, Severity
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from ...graph.api import VaultGraph
+
 logger = logging.getLogger(__name__)
 
 __all__ = ["check_encoding"]
 
+_DECODE_MESSAGE = (
+    "Document is not valid UTF-8 "
+    "(byte {start}: {reason}); it is silently "
+    "excluded from feature scans, indexes, and renames. "
+    "Convert it to UTF-8 (a UTF-8-BOM file is also accepted)."
+)
 
-def check_encoding(root_dir: Path) -> CheckResult:
+
+def check_encoding(root_dir: Path, *, graph: VaultGraph | None = None) -> CheckResult:
     """Report every ``.vault/`` document that is not valid UTF-8.
 
-    Walks ``<root>/<docs_dir>/**/*.md`` directly (mirroring ``scan_vault``'s
-    exclusions: ``.obsidian`` and ``_archive`` subtrees and symlinks are
-    skipped) rather than consulting the parsed snapshot, because a non-UTF-8
-    document never enters the snapshot in the first place. Each file is read as
-    raw bytes and decoded as UTF-8: a clean decode (including a UTF-8-BOM file,
-    which is valid UTF-8) passes, a :class:`UnicodeDecodeError` is reported as
-    an ``ERROR`` naming the file, and a read failure (:class:`OSError`) is a
-    ``WARNING``.
+    When *graph* is supplied (the combined ``run_all_checks`` pass), the
+    findings come from the read and decode failures the ingress read already
+    observed (:attr:`~vaultspec_core.graph.api.VaultGraph.encoding_issues`),
+    folding this check into the run's single read of the corpus. Standalone,
+    it walks ``<root>/<docs_dir>/**/*.md`` directly (mirroring
+    ``scan_vault``'s exclusions: ``.obsidian`` and ``_archive`` subtrees and
+    symlinks are skipped) rather than consulting the parsed snapshot, because
+    a non-UTF-8 document never enters the snapshot in the first place. Either
+    way, a clean decode (including a UTF-8-BOM file, which is valid UTF-8)
+    passes, a :class:`UnicodeDecodeError` is reported as an ``ERROR`` naming
+    the file, and a read failure (:class:`OSError`) is a ``WARNING``.
 
     Encoding is validated vault-wide and takes no ``feature`` filter: a
     non-UTF-8 document has no parseable frontmatter and therefore no feature
@@ -51,14 +63,44 @@ def check_encoding(root_dir: Path) -> CheckResult:
 
     Args:
         root_dir: Project root directory.
+        graph: A built :class:`~vaultspec_core.graph.api.VaultGraph` whose
+            ingress read (``ensure_raw_texts``) has run.
 
     Returns:
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with check
         name ``"encoding"``.
     """
-    from ...config import get_config
-
     result = CheckResult(check_name="encoding", supports_fix=False)
+
+    if graph is not None:
+        # No per-file stat parity probes here: the graph path must stay
+        # disk-free. The only divergence from the standalone walk is that a
+        # symlinked document observed by the scan is reported rather than
+        # skipped.
+        for issue in sorted(graph.encoding_issues, key=lambda i: i.path):
+            path = issue.path
+            rel_path = path.relative_to(root_dir) if path.is_absolute() else path
+            if issue.kind == "read":
+                result.diagnostics.append(
+                    CheckDiagnostic(
+                        path=rel_path,
+                        message=f"Could not read document bytes: {issue.detail}",
+                        severity=Severity.WARNING,
+                    )
+                )
+            else:
+                result.diagnostics.append(
+                    CheckDiagnostic(
+                        path=rel_path,
+                        message=_DECODE_MESSAGE.format(
+                            start=issue.start, reason=issue.detail
+                        ),
+                        severity=Severity.ERROR,
+                    )
+                )
+        return result
+
+    from ...config import get_config
 
     docs_dir = root_dir / get_config().docs_dir
     if not docs_dir.exists():
@@ -90,12 +132,7 @@ def check_encoding(root_dir: Path) -> CheckResult:
             result.diagnostics.append(
                 CheckDiagnostic(
                     path=rel_path,
-                    message=(
-                        "Document is not valid UTF-8 "
-                        f"(byte {exc.start}: {exc.reason}); it is silently "
-                        "excluded from feature scans, indexes, and renames. "
-                        "Convert it to UTF-8 (a UTF-8-BOM file is also accepted)."
-                    ),
+                    message=_DECODE_MESSAGE.format(start=exc.start, reason=exc.reason),
                     severity=Severity.ERROR,
                 )
             )

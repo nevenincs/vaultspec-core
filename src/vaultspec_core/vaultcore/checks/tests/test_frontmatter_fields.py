@@ -61,6 +61,7 @@ tags:
   - "#adr"
   - "#feat"
 date: 2026-05-17
+body_schema: 'body-v1'
 supersedes:
   - "2026-05-01-old-adr"
   - "2026-05-10-other-adr"
@@ -111,6 +112,7 @@ def test_fix_frontmatter_preserves_new_fields(tmp_path):
         """---
 feature: my-feature
 date: 2026-05-17
+body_schema: 'body-v1'
 supersedes:
   - "2026-05-01-old-adr"
 superseded_by: "2026-05-20-newer-adr"
@@ -134,6 +136,7 @@ archived: 2026-05-22
     new_content = doc.read_text(encoding="utf-8")
     meta, _ = parse_vault_metadata(new_content)
     assert meta.tags == ["#adr", "#my-feature"]
+    assert meta.body_schema == "body-v1"
     assert meta.supersedes == ["2026-05-01-old-adr"]
     assert meta.superseded_by == "2026-05-20-newer-adr"
     assert meta.derived_from == ["audit:2026-05-17-cli-simplification"]
@@ -146,6 +149,7 @@ archived: 2026-05-22
     assert new_content.count("derived_from:") == 1
     assert new_content.count("promoted_to:") == 1
     assert new_content.count("archived:") == 1
+    assert new_content.count("body_schema:") == 1
 
 
 def test_migration_0_1_21(tmp_path):

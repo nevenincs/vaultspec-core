@@ -1,14 +1,12 @@
-"""Validate a document body against the sections its template mandates.
+"""Validate a document body against its attested immutable section contract.
 
-The shipped templates in ``.vaultspec/templates/`` are the single source of
-truth for a document type's required sections: each template carries a fixed
-set of level-two (``## ``) headings that constitute the body contract. Nothing
-previously confirmed a document actually kept them - an ADR could ship without
-its ``Consequences`` section and pass every check.
+Required level-two (``## ``) headings come from the immutable body-schema
+registry, never from today's mutable templates. A document either names a
+known stamped schema or, once legacy attestation is available, resolves through
+the repository's path-and-body-hash baseline. A document with neither proof is
+reported as unattested; it must not quietly inherit the current template.
 
-This checker derives the required sections per document type by extracting the
-``## `` headings from that type's template (never a hardcoded list), then for
-each document verifies every required heading is present and carries real
+For an attested schema, every required section must be present and carry real
 authored content. A required section that is absent, or that holds only a
 scaffold hint-comment or an unreplaced ``{placeholder}``, is reported: a
 scaffolded-but-unauthored document cannot satisfy the contract. Author-added
@@ -20,8 +18,9 @@ Edge handling:
 - Execution records select ``exec-step.md`` or ``exec-summary.md`` by the
   ``-summary`` filename convention.
 - Generated feature indexes are out of scope (their body is machine-authored).
-- A document type with no template, or a template that cannot be read, degrades
-  to a skip (no finding) rather than a crash (No-Crash policy).
+- Missing, unknown, or otherwise un-attested provenance is a finding, not a
+  skip. The resolver keeps its future legacy-baseline logic behind one stable
+  interface.
 
 The checker is read-only: a section's position, ordering, and content are the
 author's, so no safe automatic repair exists. Each finding's ``fix_description``
@@ -62,16 +61,6 @@ _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 _PLACEHOLDER_ONLY_RE = re.compile(r"^(?:\s*\{[^{}]*\}\s*)+$")
 
 
-def _required_sections(template_text: str) -> list[str]:
-    """Return the ordered ``## `` section titles a template mandates.
-
-    HTML comment blocks (which embed example headings in the scaffold hints)
-    are stripped first so only the template's real headings are extracted.
-    """
-    stripped = _COMMENT_RE.sub("", template_text)
-    return [m.group("title") for m in _H2_RE.finditer(stripped)]
-
-
 def _section_contents(body: str) -> dict[str, str]:
     """Map each ``## `` heading title in *body* to its raw content.
 
@@ -106,7 +95,7 @@ def check_body_sections(
     snapshot: VaultSnapshot,
     feature: str | None = None,
 ) -> CheckResult:
-    """Validate every document body carries its template-mandated sections.
+    """Validate every document body carries its attested required sections.
 
     Args:
         root_dir: Project root directory.
@@ -119,14 +108,14 @@ def check_body_sections(
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with check
         name ``"body-sections"``. Does not support ``--fix``.
     """
-    from ..hydration import get_template_path
+    from ..body_schema import read_baseline, resolve_body_schema
     from ..scanner import get_doc_type
 
     result = CheckResult(check_name="body-sections", supports_fix=False)
 
-    # Cache required-section lists per (doc_type, summary) so each template is
-    # read and parsed once per run rather than once per document.
-    required_cache: dict[tuple[str, bool], list[str] | None] = {}
+    # The attestation ledger is a workspace-global fact: read once for the
+    # whole pass, never per document.
+    baseline = read_baseline(root_dir)
 
     for doc_path, (metadata, body) in sorted(snapshot.items()):
         doc_type = get_doc_type(doc_path, root_dir)
@@ -139,27 +128,29 @@ def check_body_sections(
             if feat not in extract_feature_tags(metadata.tags):
                 continue
 
-        is_summary = doc_path.stem.endswith("-summary")
-        cache_key = (doc_type.value, is_summary)
-        if cache_key not in required_cache:
-            template_path = get_template_path(root_dir, doc_type, summary=is_summary)
-            if template_path is None:
-                required_cache[cache_key] = None
-            else:
-                try:
-                    template_text = template_path.read_text(encoding="utf-8")
-                except (OSError, UnicodeDecodeError):
-                    required_cache[cache_key] = None
-                else:
-                    required_cache[cache_key] = _required_sections(template_text)
-
-        required = required_cache[cache_key]
-        if not required:
-            # No template mapping, unreadable template, or a template with no
-            # required sections: nothing to validate against, skip cleanly.
+        rel_path = doc_path.relative_to(root_dir)
+        resolution = resolve_body_schema(
+            root_dir, doc_path, metadata, body, baseline=baseline
+        )
+        required = resolution.required_sections
+        if required is None:
+            detail = (
+                resolution.diagnostic or "no attested body schema was resolved"
+            ).rstrip(".")
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=rel_path,
+                    message=f"Body schema provenance is not attested: {detail}.",
+                    severity=Severity.WARNING,
+                    fixable=False,
+                    fix_description=(
+                        "Declare a known immutable body_schema or restore the "
+                        "reviewed baseline attestation."
+                    ),
+                )
+            )
             continue
 
-        rel_path = doc_path.relative_to(root_dir)
         contents = _section_contents(body)
 
         for title in required:
@@ -169,7 +160,7 @@ def check_body_sections(
                         path=rel_path,
                         message=(
                             f"Missing required section '## {title}' mandated by "
-                            f"the {doc_type.value} template."
+                            f"attested body schema '{resolution.schema_id}'."
                         ),
                         severity=Severity.WARNING,
                         fixable=False,

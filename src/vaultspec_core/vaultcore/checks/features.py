@@ -35,35 +35,6 @@ def _count_index_related(snapshot: VaultSnapshot) -> dict[str, int]:
     return counts
 
 
-def _index_exists_for(
-    feat_name: str,
-    snapshot: VaultSnapshot,
-) -> bool:
-    """Return ``True`` when an index file for *feat_name* exists.
-
-    The check is filename-based and folder-agnostic so both legacy
-    root-level indexes and the canonical ``index/`` subfolder layout
-    satisfy the predicate. The migration auto-fix relocates legacy
-    files; until it runs they still count as existing for staleness
-    purposes.
-    """
-    return any(doc_path.name == f"{feat_name}.index.md" for doc_path in snapshot)
-
-
-def _count_feature_docs(
-    feat_name: str,
-    snapshot: VaultSnapshot,
-) -> int:
-    """Count non-index documents tagged with *feat_name*."""
-    count = 0
-    for doc_path, (metadata, _body) in snapshot.items():
-        if is_generated_index(doc_path):
-            continue
-        if feat_name in extract_feature_tags(metadata.tags):
-            count += 1
-    return count
-
-
 def check_features(
     root_dir: Path,
     *,
@@ -94,14 +65,22 @@ def check_features(
 
     result = CheckResult(check_name="features", supports_fix=False)
 
+    # One pass over the snapshot collects everything the per-feature loop
+    # needs: the doc-type sets, the per-feature document counts, and the
+    # index-file name set. No helper below re-scans the snapshot, so the
+    # check stays linear in corpus size instead of features x documents.
     by_feature: dict[str, set[str]] = {}
+    doc_counts: dict[str, int] = {}
+    index_names: set[str] = set()
     for doc_path, (metadata, _body) in snapshot.items():
         if is_generated_index(doc_path):
+            index_names.add(doc_path.name)
             continue
         feat_tags = extract_feature_tags(metadata.tags)
         dt = get_doc_type(doc_path, root_dir)
         dt_value = dt.value if dt else None
-        for ft in feat_tags:
+        for ft in set(feat_tags):
+            doc_counts[ft] = doc_counts.get(ft, 0) + 1
             if dt_value:
                 by_feature.setdefault(ft, set()).add(dt_value)
 
@@ -171,7 +150,9 @@ def check_features(
 
         # -- Index health checks --
 
-        if not _index_exists_for(feat_name, snapshot):
+        # Filename-based and folder-agnostic: both legacy root-level indexes
+        # and the canonical index/ subfolder layout satisfy the predicate.
+        if f"{feat_name}.index.md" not in index_names:
             result.diagnostics.append(
                 CheckDiagnostic(
                     path=None,
@@ -188,7 +169,7 @@ def check_features(
             )
         else:
             # Index exists - check staleness
-            actual_count = _count_feature_docs(feat_name, snapshot)
+            actual_count = doc_counts.get(feat_name, 0)
             index_count = index_related_counts.get(feat_name, 0)
             if index_count != actual_count:
                 result.diagnostics.append(

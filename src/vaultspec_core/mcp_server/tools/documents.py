@@ -601,10 +601,11 @@ def _edit_result_to_item(
 def _regenerate_indexes(root_dir: Path, features: set[str]) -> None:
     """Regenerate the feature index for every feature touched by a batch.
 
-    The graph is built with the cache bypassed so the freshly-written
-    documents are seen; index generation is the automatic side effect the
-    ADR folds into ``create``, absorbing the manual ``vault feature index``
-    call class.
+    The graph is built through the fingerprint cache: the freshly-written
+    documents change their files' size or mtime, so validation misses and
+    the rebuild sees them, while the refreshed cache warms the next read.
+    Index generation is the automatic side effect the ADR folds into
+    ``create``, absorbing the manual ``vault feature index`` call class.
 
     Args:
         root_dir: The project root.
@@ -613,7 +614,7 @@ def _regenerate_indexes(root_dir: Path, features: set[str]) -> None:
     from ...graph import VaultGraph
     from ...vaultcore.index import generate_feature_index
 
-    graph = VaultGraph(root_dir, use_cache=False)
+    graph = VaultGraph(root_dir)
     for feature in sorted(features):
         nodes = graph.get_feature_nodes(feature)
         if nodes:

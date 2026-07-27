@@ -424,10 +424,23 @@ class TestVaultRepair:
             for diag in result.diagnostics
             if diag.severity == "warning"
         ]
+        # The fixture is deliberately legacy-shaped: its documents predate the
+        # body_schema declaration, and provenance attestation requires a
+        # hash-attested baseline entry that the repair pipeline cannot
+        # synthesise. Those three warnings survive repair by design.
         assert postcheck_warnings == [
             "Feature 'state-mutation' has no feature index. Run "
             "vaultspec-core vault feature index to generate "
-            "index/state-mutation.index.md"
+            "index/state-mutation.index.md",
+            "Body schema provenance is not attested: "
+            "2026-05-15-state-mutation-adr.md does not declare a body_schema; "
+            "it requires a hash-attested legacy baseline entry.",
+            "Body schema provenance is not attested: "
+            "2026-05-15-state-mutation-plan.md does not declare a body_schema; "
+            "it requires a hash-attested legacy baseline entry.",
+            "Body schema provenance is not attested: "
+            "2026-05-15-state-mutation-research.md does not declare a "
+            "body_schema; it requires a hash-attested legacy baseline entry.",
         ]
 
     def test_repair_changed_files_tracks_cascaded_tmp_workspace_mutations(
@@ -445,7 +458,21 @@ class TestVaultRepair:
         )
 
         assert run.error_count == 0
-        assert run.warning_count == 0
+        # Repair generates the feature index, so the only surviving warnings
+        # are the body-schema provenance findings the fixture's legacy-shaped
+        # documents cannot clear without a hash-attested baseline entry.
+        residual_warnings = [
+            diag.message
+            for result in run.postcheck
+            for diag in result.diagnostics
+            if diag.severity == "warning"
+        ]
+        assert [
+            message
+            for message in residual_warnings
+            if not message.startswith("Body schema provenance is not attested:")
+        ] == []
+        assert len(residual_warnings) == 3
         assert ".vault/plan/2026-05-15-state-mutation-plan.md" in run.changed_files
         assert ".vault/adr/2026-05-15-state-mutation-adr.md" in run.changed_files
         assert (

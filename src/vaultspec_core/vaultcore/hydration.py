@@ -16,6 +16,7 @@ import re
 from typing import TYPE_CHECKING
 
 from ..core.exceptions import ResourceExistsError
+from .body_schema import CURRENT_BODY_SCHEMA
 from .models import DocType
 
 __all__ = ["get_template_path", "hydrate_template"]
@@ -189,6 +190,7 @@ def hydrate_template(
     # than relying on the template carrying the field, so scaffolds from
     # mirrors whose templates predate the schema row still get stamped.
     hydrated = _inject_modified(hydrated, date)
+    hydrated = _inject_body_schema(hydrated)
 
     # Inject resolved related links into frontmatter
     if related is not None:
@@ -257,6 +259,37 @@ def _inject_modified(content: str, date: str) -> str:
 
     insert_at = fence.start(1) + date_line.end()
     return content[:insert_at] + f"modified: '{date}'\n" + content[insert_at:]
+
+
+def _inject_body_schema(content: str) -> str:
+    """Ensure every newly hydrated document declares the current contract.
+
+    A stale deployed template may carry an older schema identifier, but a new
+    document cannot self-classify as historical. The scaffolder therefore
+    always writes :data:`CURRENT_BODY_SCHEMA` rather than preserving a template
+    token; legacy schemas are available only through hash attestation.
+    """
+    fence = re.match(r"^---\s*\n(.*?\n)---", content, re.DOTALL)
+    if not fence:
+        return content
+    frontmatter_block = fence.group(1)
+    schema_line = re.search(r"^body_schema:[^\n]*\n", frontmatter_block, re.MULTILINE)
+    if schema_line:
+        start = fence.start(1) + schema_line.start()
+        end = fence.start(1) + schema_line.end()
+        return (
+            content[:start] + f"body_schema: '{CURRENT_BODY_SCHEMA}'\n" + content[end:]
+        )
+
+    modified_line = re.search(r"^modified:[^\n]*\n", frontmatter_block, re.MULTILINE)
+    if not modified_line:
+        return content
+    insert_at = fence.start(1) + modified_line.end()
+    return (
+        content[:insert_at]
+        + f"body_schema: '{CURRENT_BODY_SCHEMA}'\n"
+        + content[insert_at:]
+    )
 
 
 def _inject_related(content: str, related: list[str]) -> str:

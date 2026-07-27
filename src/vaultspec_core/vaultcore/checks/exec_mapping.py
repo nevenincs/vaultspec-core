@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING
 from ._base import CheckDiagnostic, CheckResult, Severity, extract_feature_tags
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
     from ._base import VaultSnapshot
@@ -60,8 +61,16 @@ def check_exec_mapping(
     *,
     snapshot: VaultSnapshot,
     feature: str | None = None,
+    raw_texts: Mapping[Path, tuple[str, bool]] | None = None,
 ) -> CheckResult:
     """Validate every execution record maps to a live Step in its parent plan.
+
+    Per-plan work is memoized for the whole pass: each distinct parent plan
+    is parsed exactly once no matter how many records reference it, live-plan
+    existence is answered from the snapshot's own key set instead of a disk
+    probe per record, and archive probes are cached per stem. With
+    *raw_texts* supplied, plan parsing consumes the ingress read's text and
+    the calculate phase touches the corpus on disk not at all.
 
     Args:
         root_dir: Project root directory.
@@ -69,6 +78,9 @@ def check_exec_mapping(
             ``(metadata, body)`` tuples.
         feature: Restrict checks to documents carrying this feature tag
             (without ``#``).
+        raw_texts: The ingress read's per-document ``(text, crlf)`` map (see
+            :attr:`~vaultspec_core.graph.api.VaultGraph.raw_texts`); when
+            supplied, parent plans are parsed from it rather than from disk.
 
     Returns:
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with check
@@ -83,6 +95,46 @@ def check_exec_mapping(
     docs_dir = root_dir / get_config().docs_dir
     plan_dir = docs_dir / "plan"
     archive_plan_dir = docs_dir / "_archive" / "plan"
+
+    # Live plans are exactly the snapshot documents inside the plan
+    # directory: the snapshot's key set answers existence without a disk
+    # probe per record. Archive probes and per-plan parses are memoized so
+    # each distinct stem costs one lookup for the whole pass.
+    live_plan_names = {p.name for p in snapshot if p.parent == plan_dir}
+    archived_stem_cache: dict[str, bool] = {}
+    plan_ids_cache: dict[Path, tuple[set[str], set[str]] | Exception] = {}
+
+    def _is_archived(stem: str) -> bool:
+        cached = archived_stem_cache.get(stem)
+        if cached is None:
+            cached = (archive_plan_dir / f"{stem}.md").is_file()
+            archived_stem_cache[stem] = cached
+        return cached
+
+    def _step_ids(plan_path: Path) -> tuple[set[str], set[str]] | Exception:
+        cached = plan_ids_cache.get(plan_path)
+        if cached is None:
+            source: str | Path = plan_path
+            if raw_texts is not None:
+                entry = raw_texts.get(plan_path)
+                if entry is None:
+                    # The plan is in the corpus but its text never survived
+                    # ingress (read or decode failure). The single-ingress
+                    # contract forbids a disk fallback, so classify it as
+                    # unparseable - which a disk read of an unreadable file
+                    # would conclude anyway.
+                    cached = ValueError(
+                        "plan document could not be read during ingress"
+                    )
+                    plan_ids_cache[plan_path] = cached
+                    return cached
+                source = entry[0]
+            try:
+                cached = _plan_step_ids(source)
+            except Exception as exc:
+                cached = exc
+            plan_ids_cache[plan_path] = cached
+        return cached
 
     for doc_path, (metadata, _body) in sorted(snapshot.items()):
         if get_doc_type(doc_path, root_dir) is not DocType.EXEC:
@@ -109,11 +161,10 @@ def check_exec_mapping(
         live_plan_path: Path | None = None
         archived_stem: str | None = None
         for stem in candidate_stems:
-            candidate = plan_dir / f"{stem}.md"
-            if candidate.is_file():
-                live_plan_path = candidate
+            if f"{stem}.md" in live_plan_names:
+                live_plan_path = plan_dir / f"{stem}.md"
                 break
-            if (archive_plan_dir / f"{stem}.md").is_file():
+            if _is_archived(stem):
                 archived_stem = stem
 
         if live_plan_path is None:
@@ -140,9 +191,9 @@ def check_exec_mapping(
             )
             continue
 
-        try:
-            live_ids, retired_ids = _plan_step_ids(live_plan_path)
-        except Exception as exc:
+        ids_or_error = _step_ids(live_plan_path)
+        if isinstance(ids_or_error, Exception):
+            exc = ids_or_error
             logger.debug("Could not parse plan %s: %s", live_plan_path, exc)
             result.diagnostics.append(
                 CheckDiagnostic(
@@ -158,6 +209,7 @@ def check_exec_mapping(
             )
             continue
 
+        live_ids, retired_ids = ids_or_error
         if step_id in live_ids:
             continue
         if step_id in retired_ids:
@@ -197,10 +249,14 @@ def check_exec_mapping(
     return result
 
 
-def _plan_step_ids(plan_path: Path) -> tuple[set[str], set[str]]:
-    """Return the (live, retired) canonical Step id sets for *plan_path*."""
+def _plan_step_ids(source: str | Path) -> tuple[set[str], set[str]]:
+    """Return the (live, retired) canonical Step id sets for a plan.
+
+    *source* is either the plan's path (read from disk) or its full text
+    (the ingress read's copy); ``parse_plan`` accepts both.
+    """
     from ...plan.parser import parse_plan
 
-    plan = parse_plan(plan_path)
+    plan = parse_plan(source)
     live = {step.canonical_id for step in plan.steps}
     return live, set(plan.retired_step_ids)

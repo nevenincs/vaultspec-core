@@ -221,6 +221,47 @@ class GraphMetrics:
         return d
 
 
+@dataclass(frozen=True)
+class EncodingIssue:
+    """A document the ingress read could not read or decode.
+
+    Attributes:
+        path: Absolute path of the affected file.
+        kind: ``"read"`` for an :class:`OSError`, ``"decode"`` for a
+            :class:`UnicodeDecodeError`.
+        detail: The error string (``read``) or decode failure reason
+            (``decode``).
+        start: The failing byte offset for ``decode`` issues, else ``None``.
+    """
+
+    path: pathlib.Path
+    kind: str
+    detail: str
+    start: int | None
+
+
+@dataclass(frozen=True)
+class GraphCounts:
+    """Cheap descriptive counts of a vault graph.
+
+    The always-affordable half of the metrics surface: document, link, and
+    feature counts derived from the graph structure alone, with no
+    graph-theoretic algorithm behind them.  Render and orientation paths
+    consume this class; the expensive analysis in
+    :meth:`VaultGraph.metrics` (centrality, components, density) is opt-in
+    and never bought implicitly by a display path.
+
+    Attributes:
+        docs: Number of real (non-phantom) documents in scope.
+        links: Number of directed link edges in scope.
+        features: Number of distinct feature tags in scope.
+    """
+
+    docs: int
+    links: int
+    features: int
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -265,6 +306,31 @@ def _top_n(
     """Return the top *n* entries from *scores* by value descending."""
     ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
     return dict(ranked[:n])
+
+
+def _betweenness_centrality(g: nx.DiGraph) -> dict[str, float]:
+    """Compute betweenness centrality via the C-backed engine when available.
+
+    Betweenness is the one O(V*E) algorithm on the opt-in analysis surface;
+    ``rustworkx`` runs the same Brandes algorithm with the same
+    normalisation orders of magnitude faster than pure-Python networkx.
+    The networkx implementation remains the automatic fallback when the
+    binary wheel is unavailable, so no platform loses the surface.
+
+    Args:
+        g: The (sub)graph to analyse.
+
+    Returns:
+        Mapping of node name to normalised betweenness score, matching
+        ``nx.betweenness_centrality``'s semantics.
+    """
+    try:
+        import rustworkx as rx
+    except ImportError:  # pragma: no cover - wheel unavailable on platform
+        return nx.betweenness_centrality(g)
+    rgraph = rx.networkx_converter(g)
+    scores = rx.betweenness_centrality(rgraph, normalized=True, endpoints=False)
+    return {rgraph[index]: score for index, score in scores.items()}
 
 
 def _pagerank(
@@ -468,6 +534,8 @@ class VaultGraph:
         self._digraph: nx.DiGraph = nx.DiGraph()
         self._dangling_links: list[tuple[str, str]] = []
         self._stem_index: dict[str, list[str]] = {}
+        self._raw_texts: dict[pathlib.Path, tuple[str, bool]] = {}
+        self._encoding_issues: list[EncodingIssue] = []
         self._build_graph(use_cache=use_cache)
 
     @classmethod
@@ -507,6 +575,8 @@ class VaultGraph:
         graph._digraph = nx.DiGraph()
         graph._dangling_links = []
         graph._stem_index = {}
+        graph._raw_texts = {}
+        graph._encoding_issues = []
 
         docs_dir_name = pathlib.Path(get_config().docs_dir).name
         corpus = read_vault_at_ref(root_dir, ref, docs_dir_name)
@@ -518,18 +588,20 @@ class VaultGraph:
     def _build_graph(self, *, use_cache: bool = True) -> None:
         """Populate the graph, loading from the fingerprint cache when valid.
 
-        Scans the vault once into a file list and fingerprints it.  When
-        *use_cache* is set and a cache file exists whose manifest matches the
-        current fingerprints exactly (same file set, same per-file size, mtime,
-        and content hash), the serialised canonical graph is loaded and the
-        full parse is skipped.  On any divergence - a changed, added, or
-        removed file, an absent cache, or a corrupt cache - the graph is
-        rebuilt from the scanned files and the cache is rewritten.
+        Scans the vault once into a file list.  When *use_cache* is set and a
+        cache file exists whose manifest passes the racily-clean validation
+        (same file set, same per-file size and mtime, and a matching content
+        hash for any file whose mtime is not older than the cache file's own
+        mtime), the serialised canonical graph is loaded and the full parse is
+        skipped.  On any divergence - a changed, added, or removed file, an
+        absent cache, or a corrupt cache - the graph is rebuilt from the
+        scanned files and the cache (manifest hashes included) is rewritten.
 
-        The cache can never serve data that does not match the bytes on disk:
-        :func:`vaultspec_core.graph.cache.validate` requires a total
-        fingerprint match, and a corrupt cache degrades silently to a full
-        rebuild rather than crashing or serving stale data.
+        Validation is stat-first: full content hashing happens only on the
+        save path after a rebuild, never on the warm read, so the cache's own
+        upkeep stays cheap relative to the parse it avoids.  A corrupt cache
+        degrades silently to a full rebuild rather than crashing or serving
+        stale data.
 
         Args:
             use_cache: When ``True`` (default), attempt a cache load before
@@ -542,17 +614,24 @@ class VaultGraph:
         logger.info("Building vault graph from %s", self.root_dir)
 
         scanned_files = list(scan_vault(self.root_dir))
-        fingerprints = cache_mod.fingerprint_vault(scanned_files, self.root_dir)
         path = cache_mod.cache_path(self.root_dir)
 
         if use_cache:
             payload = cache_mod.load(path)
-            if payload is not None and cache_mod.validate(
-                payload.manifest, fingerprints
-            ):
-                logger.info("Graph cache hit at %s; skipping re-parse", path)
-                self._load_from_cache(payload)
-                return
+            if payload is not None:
+                try:
+                    cache_mtime_ns: int | None = path.stat().st_mtime_ns
+                except OSError:
+                    cache_mtime_ns = None
+                if cache_mod.validate(
+                    payload.manifest,
+                    scanned_files,
+                    self.root_dir,
+                    cache_mtime_ns=cache_mtime_ns,
+                ):
+                    logger.info("Graph cache hit at %s; skipping re-parse", path)
+                    self._load_from_cache(payload)
+                    return
             logger.info("Graph cache miss at %s; rebuilding", path)
 
         self._rebuild_from_files(scanned_files)
@@ -560,7 +639,7 @@ class VaultGraph:
         if use_cache:
             cache_mod.save(
                 path,
-                fingerprints,
+                cache_mod.fingerprint_vault(scanned_files, self.root_dir),
                 self._to_cache_graph(),
                 self._dangling_links,
             )
@@ -651,6 +730,8 @@ class VaultGraph:
         self.nodes = {}
         self._digraph = nx.DiGraph()
         self._dangling_links = []
+        self._raw_texts = {}
+        self._encoding_issues = []
 
         # Pass 1a: collect all DocNodes keyed by stem, detecting collisions
         by_stem: dict[str, list[DocNode]] = {}
@@ -662,19 +743,79 @@ class VaultGraph:
 
             node = DocNode(path=path, name=stem, doc_type=doc_type)
 
-            try:
-                content = path.read_text(encoding="utf-8")
+            content = self._ingest_document(path)
+            if content is not None:
                 self._populate_node_from_content(node, content)
-            except (OSError, UnicodeDecodeError) as e:
-                logger.warning(
-                    "Failed to read metadata from %s: %s",
-                    path,
-                    e,
-                )
 
             by_stem.setdefault(stem, []).append(node)
 
         self._assemble_from_by_stem(by_stem)
+
+    def _ingest_document(self, path: pathlib.Path) -> str | None:
+        """Read *path* once, recording its raw text and any encoding issue.
+
+        The single ingress read: the file's bytes are read exactly once,
+        decoded as UTF-8, and newline-normalised the way ``read_text``'s
+        universal-newline mode would (``\\r\\n`` and ``\\r`` become ``\\n``)
+        so the parse consumes identical input to the previous per-consumer
+        reads.  The normalised text and the source's CRLF convention are
+        retained in :attr:`raw_texts` for content-consuming checks, and a
+        read or decode failure is recorded in :attr:`encoding_issues`
+        instead of being silently dropped.
+
+        Returns:
+            The normalised document text, or ``None`` when the file could
+            not be read or decoded.
+        """
+        try:
+            raw_bytes = path.read_bytes()
+        except OSError as e:
+            self._encoding_issues.append(EncodingIssue(path, "read", str(e), None))
+            logger.warning("Failed to read metadata from %s: %s", path, e)
+            return None
+        try:
+            decoded = raw_bytes.decode("utf-8")
+        except UnicodeDecodeError as e:
+            self._encoding_issues.append(
+                EncodingIssue(path, "decode", e.reason, e.start)
+            )
+            logger.warning("Failed to read metadata from %s: %s", path, e)
+            return None
+        crlf = "\r\n" in decoded
+        content = decoded.replace("\r\n", "\n").replace("\r", "\n")
+        self._raw_texts[path] = (content, crlf)
+        return content
+
+    def ensure_raw_texts(self) -> None:
+        """Guarantee :attr:`raw_texts` is populated for a working-tree graph.
+
+        A cold build fills the raw-text map during its parse; a cache-hit
+        build parses nothing, so a caller that needs document text (the
+        check pipeline) invokes this to perform the run's single ingress
+        read pass.  A no-op when the map is already populated or when the
+        graph is ref-scoped (checks do not run against history).
+        """
+        if self._raw_texts or self.ref is not None:
+            return
+        from ..vaultcore.scanner import scan_vault
+
+        self._encoding_issues = []
+        for path in scan_vault(self.root_dir, run_migrations=False):
+            self._ingest_document(path)
+
+    @property
+    def raw_texts(self) -> dict[pathlib.Path, tuple[str, bool]]:
+        """Per-document ``(normalised text, source_had_crlf)`` in scan order.
+
+        Populated by a cold build or :meth:`ensure_raw_texts`; empty after a
+        bare cache hit or for a ref-scoped graph.
+        """
+        return self._raw_texts
+
+    @property
+    def encoding_issues(self) -> list[EncodingIssue]:
+        """Read and decode failures observed during the ingress read."""
+        return self._encoding_issues
 
     def _rebuild_from_corpus(
         self, corpus: list[tuple[str, str]], docs_dir_name: str
@@ -1180,6 +1321,8 @@ class VaultGraph:
             )
             raw_step_id = node.frontmatter.get("step_id")
             step_id = raw_step_id if isinstance(raw_step_id, str) else None
+            raw_body_schema = node.frontmatter.get("body_schema")
+            body_schema = raw_body_schema if isinstance(raw_body_schema, str) else None
             metadata = DocumentMetadata(
                 tags=sorted(node.tags),
                 date=node.date,
@@ -1187,11 +1330,49 @@ class VaultGraph:
                 related=related,
                 superseded_by=superseded_by,
                 step_id=step_id,
+                body_schema=body_schema,
             )
             snapshot[node.path] = (metadata, node.body)
         return snapshot
 
     # -- Metrics (networkx algorithms) ---------------------------------------
+
+    def counts(self, feature: str | None = None) -> GraphCounts:
+        """Return the cheap descriptive counts for the graph or a feature.
+
+        Produces exactly the ``total_nodes``, ``total_edges``, and
+        ``total_features`` values :meth:`metrics` reports, without running
+        any of the graph-theoretic analysis (centrality, components,
+        density) that method bundles.  This is the surface render and
+        orientation paths use; :meth:`metrics` is the explicit opt-in for
+        analysis.
+
+        Args:
+            feature: When set, count only this feature's subgraph.
+
+        Returns:
+            A :class:`GraphCounts` instance.
+        """
+        if feature:
+            g = self.subgraph(feature=feature)
+            nodes: dict[str, DocNode] = {
+                n.name: n for n in self.get_feature_nodes(feature)
+            }
+        else:
+            g = self._digraph
+            nodes = self.nodes
+        phantom_count = 0
+        features: set[str] = set()
+        for node in nodes.values():
+            if node.phantom:
+                phantom_count += 1
+            elif node.feature:
+                features.add(node.feature)
+        return GraphCounts(
+            docs=g.number_of_nodes() - phantom_count,
+            links=g.number_of_edges(),
+            features=len(features),
+        )
 
     def metrics(
         self,
@@ -1199,12 +1380,13 @@ class VaultGraph:
         *,
         _g: nx.DiGraph | None = None,
     ) -> GraphMetrics:
-        """Compute aggregate statistics via networkx algorithms.
+        """Compute aggregate statistics via graph-library algorithms.
 
         Delegates to ``nx.density``, ``nx.in_degree_centrality``,
-        ``nx.betweenness_centrality``, and
-        ``nx.number_weakly_connected_components`` instead of manual
-        computation.
+        ``nx.number_weakly_connected_components``, and betweenness
+        centrality through the C-backed engine seam
+        (:func:`_betweenness_centrality`, ``rustworkx`` with a networkx
+        fallback) instead of manual computation.
 
         Args:
             feature: Compute metrics only for this feature's subgraph.
@@ -1255,7 +1437,7 @@ class VaultGraph:
         btwn_cent: dict[str, float] = {}
         if n_nodes > 1:
             in_cent = _top_n(nx.in_degree_centrality(g))
-            btwn_cent = _top_n(nx.betweenness_centrality(g))
+            btwn_cent = _top_n(_betweenness_centrality(g))
 
         # --- feature / type counts (excludes phantoms) ---
         features: set[str] = set()
@@ -1389,6 +1571,12 @@ class VaultGraph:
 
         return lines
 
+    #: Maximum lines the tree render prints.  The title always carries the
+    #: full corpus counts, the truncation is explicitly marked, and the
+    #: ``--json`` envelope remains the uncapped machine contract, per the
+    #: report-volume policy.
+    TREE_RENDER_CAP = 1000
+
     def render_tree(
         self,
         feature: str | None = None,
@@ -1397,24 +1585,36 @@ class VaultGraph:
 
         Renders the vault grouped by feature and doc-type via the plain-text
         shape vocabulary.  This is complementary to :meth:`render_ascii` which
-        shows the actual graph topology.
+        shows the actual graph topology.  At most :attr:`TREE_RENDER_CAP`
+        lines are printed; a marked truncation line reports the remainder and
+        points at feature scoping or ``--json``.
 
         Args:
             feature: Optional feature name to scope the tree.
         """
+        from vaultspec_core.cli.rendering import TreeLine
         from vaultspec_core.cli.rendering import render_tree as _render_tree
 
         if feature:
-            m = self.metrics(feature=feature)
-            title = f"#{feature}  {m.total_nodes} docs, {m.total_edges} links"
+            c = self.counts(feature=feature)
+            title = f"#{feature}  {c.docs} docs, {c.links} links"
         else:
-            m = self.metrics()
-            title = (
-                f".vault  {m.total_nodes} docs, "
-                f"{m.total_edges} links, {m.total_features} features"
-            )
+            c = self.counts()
+            title = f".vault  {c.docs} docs, {c.links} links, {c.features} features"
 
-        _render_tree(self.render_tree_lines(feature=feature), title=title)
+        lines = self.render_tree_lines(feature=feature)
+        if len(lines) > self.TREE_RENDER_CAP:
+            remainder = len(lines) - self.TREE_RENDER_CAP
+            lines = [
+                *lines[: self.TREE_RENDER_CAP],
+                TreeLine(
+                    f"... {remainder} more lines truncated; scope with "
+                    "--feature <name> or use --json for the full graph",
+                    depth=0,
+                    style="dim",
+                ),
+            ]
+        _render_tree(lines, title=title)
 
     def _build_typed_node_lines(
         self,

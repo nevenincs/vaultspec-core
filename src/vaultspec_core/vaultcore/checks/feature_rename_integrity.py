@@ -57,6 +57,8 @@ from ._base import CheckDiagnostic, CheckResult, Severity, extract_feature_tags
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from ._base import VaultSnapshot
+
 logger = logging.getLogger(__name__)
 
 __all__ = ["check_feature_rename_integrity"]
@@ -68,27 +70,36 @@ __all__ = ["check_feature_rename_integrity"]
 _EXEC_FOLDER_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-(.+)$")
 
 
-def check_feature_rename_integrity(root_dir: Path) -> CheckResult:
+def check_feature_rename_integrity(
+    root_dir: Path,
+    *,
+    snapshot: VaultSnapshot | None = None,
+) -> CheckResult:
     """Report exec folders whose feature disagrees with their records' tag.
 
-    Walks ``<root>/<docs_dir>/exec/*`` directly (rather than the parsed
-    snapshot) so the folder name - which the snapshot does not retain - can be
-    compared against the ``#feature`` tag of each record inside it. For every
-    exec folder named ``{plan_date}-{feature}``, each contained record's
-    feature tag must equal that ``{feature}`` segment; a record carrying a
-    different feature tag is the post-rename drift signal and the folder is
-    reported once as an ``ERROR``.
+    When *snapshot* is supplied (the combined ``run_all_checks`` pass), the
+    folder-vs-tag comparison runs entirely from the snapshot: an exec
+    record's containing folder is its path's parent, and its feature tag is
+    already parsed - no corpus re-read. Standalone, it walks
+    ``<root>/<docs_dir>/exec/*`` directly. For every exec folder named
+    ``{plan_date}-{feature}``, each contained record's feature tag must equal
+    that ``{feature}`` segment; a record carrying a different feature tag is
+    the post-rename drift signal and the folder is reported once as an
+    ``ERROR``.
 
-    Records that are symlinks, unreadable, non-UTF-8 (surfaced by
-    ``check_encoding``), or tagged only ``#uncategorized`` / untagged are
-    skipped. Folders whose name lacks the ``{plan_date}-{feature}`` shape are
-    skipped as a grammar concern owned by ``check_structure``.
+    Records that are symlinks (disk path only), unreadable, non-UTF-8
+    (surfaced by ``check_encoding``), or tagged only ``#uncategorized`` /
+    untagged are skipped. Folders whose name lacks the
+    ``{plan_date}-{feature}`` shape are skipped as a grammar concern owned by
+    ``check_structure``.
 
     The check is vault-wide and takes no ``feature`` filter: drift is defined
     by the folder-vs-tag disagreement itself, not by any single feature scope.
 
     Args:
         root_dir: Project root directory.
+        snapshot: Pre-built snapshot mapping document paths to parsed
+            ``(metadata, body)`` tuples.
 
     Returns:
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with check
@@ -96,14 +107,94 @@ def check_feature_rename_integrity(root_dir: Path) -> CheckResult:
     """
     from ...config import get_config
     from ..models import DocType
-    from ..parser import parse_frontmatter
 
     result = CheckResult(check_name="feature-rename-integrity", supports_fix=False)
 
     exec_dir = root_dir / get_config().docs_dir / DocType.EXEC.value
-    if not exec_dir.exists():
-        return result
 
+    if snapshot is not None:
+        conflicts_by_folder = _conflicts_from_snapshot(snapshot, exec_dir)
+    else:
+        if not exec_dir.exists():
+            return result
+        conflicts_by_folder = _conflicts_from_disk(exec_dir)
+
+    for folder, folder_feature, conflicting in conflicts_by_folder:
+        rel_folder = folder.relative_to(root_dir) if folder.is_absolute() else folder
+        conflicting_tags = sorted(conflicting)
+        tag_display = ", ".join(f"#{t}" for t in conflicting_tags)
+        example = conflicting[conflicting_tags[0]]
+        result.diagnostics.append(
+            CheckDiagnostic(
+                path=rel_folder,
+                message=(
+                    f"Exec folder feature segment '{folder_feature}' disagrees "
+                    f"with the {tag_display} feature tag of the records it "
+                    f"contains (e.g. {example.name}). This is post-rename drift "
+                    "between the exec folder name and its records' feature tag."
+                ),
+                severity=Severity.ERROR,
+                fix_description=(
+                    "Reconcile the exec folder name and its records' #feature "
+                    f"tag so they agree (the records are tagged "
+                    f"'#{conflicting_tags[0]}' but live under a "
+                    f"'{folder_feature}' folder)."
+                ),
+            )
+        )
+
+    return result
+
+
+def _record_feature(tags: list[str]) -> str | None:
+    """Return a record's comparable feature tag, or ``None`` to skip it."""
+    feats = extract_feature_tags(tags)
+    feature = feats[0] if feats else None
+    if not feature or feature == "uncategorized":
+        return None
+    return feature
+
+
+def _conflicts_from_snapshot(
+    snapshot: VaultSnapshot,
+    exec_dir: Path,
+) -> list[tuple[Path, str, dict[str, Path]]]:
+    """Derive per-folder tag conflicts from the parsed snapshot.
+
+    Exec records are the snapshot documents whose parent directory sits
+    directly under *exec_dir*; the folder name the disk walk would read is
+    the path's parent name, so no filesystem access is needed.
+    """
+    by_folder: dict[Path, list[Path]] = {}
+    for doc_path in snapshot:
+        parent = doc_path.parent
+        if parent.parent == exec_dir:
+            by_folder.setdefault(parent, []).append(doc_path)
+
+    conflicts: list[tuple[Path, str, dict[str, Path]]] = []
+    for folder in sorted(by_folder):
+        match = _EXEC_FOLDER_RE.match(folder.name)
+        if match is None:
+            continue
+        folder_feature = match.group(1)
+        conflicting: dict[str, Path] = {}
+        for record in sorted(by_folder[folder]):
+            metadata, _body = snapshot[record]
+            feature = _record_feature(metadata.tags)
+            if feature is not None and feature != folder_feature:
+                conflicting.setdefault(feature, record)
+        if conflicting:
+            conflicts.append((folder, folder_feature, conflicting))
+    return conflicts
+
+
+def _conflicts_from_disk(
+    exec_dir: Path,
+) -> list[tuple[Path, str, dict[str, Path]]]:
+    """Derive per-folder tag conflicts by walking the exec tree directly."""
+    from ..parser import parse_frontmatter
+
+    conflicts: list[tuple[Path, str, dict[str, Path]]] = []
     for folder in sorted(exec_dir.iterdir()):
         if folder.is_symlink() or not folder.is_dir():
             continue
@@ -131,37 +222,9 @@ def check_feature_rename_integrity(root_dir: Path) -> CheckResult:
             tags = meta.get("tags", [])
             if isinstance(tags, str):
                 tags = [tags]
-            feats = extract_feature_tags(tags)
-            feature = feats[0] if feats else None
-            if not feature or feature == "uncategorized":
-                continue
-            if feature != folder_feature:
+            feature = _record_feature(tags)
+            if feature is not None and feature != folder_feature:
                 conflicting.setdefault(feature, record)
-
-        if not conflicting:
-            continue
-
-        rel_folder = folder.relative_to(root_dir) if folder.is_absolute() else folder
-        conflicting_tags = sorted(conflicting)
-        tag_display = ", ".join(f"#{t}" for t in conflicting_tags)
-        example = conflicting[conflicting_tags[0]]
-        result.diagnostics.append(
-            CheckDiagnostic(
-                path=rel_folder,
-                message=(
-                    f"Exec folder feature segment '{folder_feature}' disagrees "
-                    f"with the {tag_display} feature tag of the records it "
-                    f"contains (e.g. {example.name}). This is post-rename drift "
-                    "between the exec folder name and its records' feature tag."
-                ),
-                severity=Severity.ERROR,
-                fix_description=(
-                    "Reconcile the exec folder name and its records' #feature "
-                    f"tag so they agree (the records are tagged "
-                    f"'#{conflicting_tags[0]}' but live under a "
-                    f"'{folder_feature}' folder)."
-                ),
-            )
-        )
-
-    return result
+        if conflicting:
+            conflicts.append((folder, folder_feature, conflicting))
+    return conflicts

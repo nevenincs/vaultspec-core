@@ -10,7 +10,7 @@ resolution and :mod:`vaultspec_core.core.types` for global path initialization.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
+from pathlib import Path  # noqa: TC003 - Typer evaluates the root --target annotation.
 from typing import TYPE_CHECKING, Annotated
 
 import typer
@@ -21,6 +21,7 @@ from vaultspec_core.cli._target import (
     TargetOption,
     apply_target,
     apply_target_install,
+    resolve_effective_target,
 )
 from vaultspec_core.core.enums import CliAction, InstallMode
 
@@ -627,7 +628,7 @@ def cmd_sync(
         ctx = get_context()
         sync_target = ctx.target_dir
     except LookupError:
-        sync_target = target or Path.cwd()
+        sync_target = resolve_effective_target(target)
 
     _run_preflight(
         sync_target,
@@ -954,7 +955,6 @@ def cmd_doctor(
     import dataclasses
     import json
     import logging
-    from pathlib import Path
 
     import typer
 
@@ -964,8 +964,7 @@ def cmd_doctor(
     from vaultspec_core.core.diagnosis import diagnose
     from vaultspec_core.vaultcore.checks import render_check_result, run_all_checks
 
-    effective_dir = target or Path.cwd()
-    effective_dir = effective_dir.resolve()
+    effective_dir = resolve_effective_target(target)
 
     if not effective_dir.exists():
         typer.echo(f"Error: target directory does not exist: {effective_dir}", err=True)

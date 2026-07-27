@@ -272,6 +272,8 @@ full options.
 
 - `vaultspec-core vault archive documents` - Archive exactly the documents named in a
   UTF-8 manifest.
+- `vaultspec-core vault archive restore` - Restore exactly the archived documents named
+  in a UTF-8 manifest.
 
 ### Spec
 
@@ -1217,6 +1219,44 @@ destination before it moves anything, so a bad line cannot produce a partial arc
 
   ```bash
   vaultspec-core vault archive documents --manifest .vault/archive-manifest.txt --dry-run
+  ```
+
+______________________________________________________________________
+
+### vaultspec-core vault archive restore
+
+```bash
+vaultspec-core vault archive restore [OPTIONS]
+```
+
+Bring archived documents back into the live vault. Each manifest line must be a
+repository-relative `.vault/_archive/*.md` path. This is the inverse of
+`vaultspec-core vault archive documents`: every source and destination is validated
+before anything moves, so a bad line cannot produce a partial restore.
+
+#### Options
+
+- `--manifest PATH` - Required UTF-8 manifest of repository-relative archived Markdown
+  paths, one per line.
+- `--dry-run` (default off) - Validate and show the restore destinations without
+  writing.
+- `--deduplicate-identical` (default off) - When an archived document already has a live
+  counterpart with byte-identical content, drop the archived copy instead of failing on
+  the collision. Documents whose contents differ are still reported as conflicts.
+- `--json` (default off) - Emit the standard machine-readable result envelope.
+
+#### Examples
+
+- **Preview restoring a set of archived records**:
+
+  ```bash
+  vaultspec-core vault archive restore --manifest .vault/restore-manifest.txt --dry-run
+  ```
+
+- **Restore, clearing archived copies that already match the live document**:
+
+  ```bash
+  vaultspec-core vault archive restore --manifest .vault/restore-manifest.txt --deduplicate-identical
   ```
 
 ______________________________________________________________________
