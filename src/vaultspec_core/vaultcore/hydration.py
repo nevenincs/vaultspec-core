@@ -40,11 +40,12 @@ _TEMPLATE_NAMES = {
     DocType.INDEX: "index.md",
 }
 
-# Document types that admit the narrative topic infix
-# (``{date}-{feature}-{topic}-{type}.md``). The adr and plan cardinality
-# rules forbid disambiguation-by-infix, and exec filenames are
-# machine-derived, so only the narrative trio is listed.
-_TOPIC_INFIX_TYPES = frozenset({DocType.AUDIT, DocType.REFERENCE, DocType.RESEARCH})
+# Document types that admit the optional topic infix
+# (``{date}-{feature}-{topic}-{type}.md``). Plans retain one execution
+# cluster and exec filenames are machine-derived, so they remain excluded.
+_TOPIC_INFIX_TYPES = frozenset(
+    {DocType.ADR, DocType.AUDIT, DocType.REFERENCE, DocType.RESEARCH}
+)
 
 # The exec document type has two templates: the Step-record template (above)
 # and the Phase-summary template, selected via the ``summary`` flag on
@@ -394,7 +395,7 @@ def create_vault_doc(
     if topic is not None and doc_type not in _TOPIC_INFIX_TYPES:
         raise ValueError(
             f"topic infix is not supported for '{doc_type.value}' documents; "
-            "admitted types: audit, reference, research"
+            "admitted types: adr, audit, reference, research"
         )
 
     template_path = get_template_path(

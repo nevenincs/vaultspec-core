@@ -259,6 +259,20 @@ full options.
 - `vaultspec-core vault link add` - Add a related: edge from *src* to *dst*.
 - `vaultspec-core vault link remove` - Remove a related: edge from *src* to *dst*.
 
+#### Exec
+
+- `vaultspec-core vault exec relink` - Relink one execution record to a live Step in its
+  existing parent plan.
+- `vaultspec-core vault exec retire` - Archive one record only when its current Step is
+  retired by its parent plan.
+- `vaultspec-core vault exec detach` - Remove a Step claim only when it resolves to
+  neither a live nor retired Step.
+
+#### Archive
+
+- `vaultspec-core vault archive documents` - Archive exactly the documents named in a
+  UTF-8 manifest.
+
 ### Spec
 
 - `vaultspec-core spec doctor` - Diagnose workspace health and report issues.
@@ -1176,6 +1190,85 @@ Restore all archived documents for a feature tag.
   ```bash
   vaultspec-core vault feature unarchive test-feature
   ```
+
+______________________________________________________________________
+
+### vaultspec-core vault archive documents
+
+```bash
+vaultspec-core vault archive documents [OPTIONS]
+```
+
+Archive exactly the live vault documents listed in a UTF-8 manifest. Each line must be a
+repository-relative `.vault/*.md` path. The command validates every source and
+destination before it moves anything, so a bad line cannot produce a partial archive.
+
+#### Options
+
+- `--manifest PATH` - Required UTF-8 manifest of repository-relative vault Markdown
+  paths, one per line.
+- `--dry-run` (default off) - Validate and show the archive destinations without
+  writing.
+- `--json` (default off) - Emit the standard machine-readable result envelope.
+
+#### Examples
+
+- **Preview the archival of explicitly selected historical records**:
+
+  ```bash
+  vaultspec-core vault archive documents --manifest .vault/archive-manifest.txt --dry-run
+  ```
+
+______________________________________________________________________
+
+### vaultspec-core vault exec relink
+
+```bash
+vaultspec-core vault exec relink [OPTIONS]
+```
+
+Relink one execution record to a live Step in its existing parent plan. The record body
+is preserved; only the validated Step mapping can change.
+
+#### Options
+
+- `--record PATH` - Required live execution-record path.
+- `--step STEP` - Required live Step identifier or display path in the parent plan.
+- `--dry-run` (default off) - Preview the recovery without writing.
+- `--json` (default off) - Emit the standard machine-readable result envelope.
+
+______________________________________________________________________
+
+### vaultspec-core vault exec retire
+
+```bash
+vaultspec-core vault exec retire [OPTIONS]
+```
+
+Archive one execution record only when its current Step is retired by its parent plan.
+
+#### Options
+
+- `--record PATH` - Required live execution-record path.
+- `--dry-run` (default off) - Preview the recovery without writing.
+- `--json` (default off) - Emit the standard machine-readable result envelope.
+
+______________________________________________________________________
+
+### vaultspec-core vault exec detach
+
+```bash
+vaultspec-core vault exec detach [OPTIONS]
+```
+
+Remove one record's Step claim only when it resolves to neither a live nor a retired
+Step.
+
+#### Options
+
+- `--record PATH` - Required live execution-record path.
+- `--dry-run` (default off) - Preview the recovery without writing.
+- `--json` (default off) - Emit the standard machine-readable result envelope.
 
 ______________________________________________________________________
 

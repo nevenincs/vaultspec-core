@@ -130,7 +130,7 @@ class TestAddSubcommand:
                 str(synthetic_project),
                 "vault",
                 "add",
-                "adr",
+                "plan",
                 "--feature",
                 "topic-feat",
                 "--topic",

@@ -133,7 +133,7 @@ class DocumentSpec(BaseModel):
         topic: Optional kebab-case narrative filename infix disambiguating a
             second document of the same type for a feature
             (``{date}-{feature}-{topic}-{type}.md``). Only valid for
-            ``audit``, ``reference``, and ``research`` documents.
+            ``adr``, ``audit``, ``reference``, and ``research`` documents.
     """
 
     feature: str
@@ -274,9 +274,14 @@ def _create_one(
 
     topic: str | None = None
     if spec.topic is not None:
-        if doc_type not in (DocType.AUDIT, DocType.REFERENCE, DocType.RESEARCH):
+        if doc_type not in (
+            DocType.ADR,
+            DocType.AUDIT,
+            DocType.REFERENCE,
+            DocType.RESEARCH,
+        ):
             return _failed(
-                "topic is only valid for 'audit', 'reference', and "
+                "topic is only valid for 'adr', 'audit', 'reference', and "
                 "'research' documents."
             )
         topic_norm = normalize_feature_tag(spec.topic, label="topic")

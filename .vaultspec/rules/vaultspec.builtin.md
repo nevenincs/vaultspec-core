@@ -27,10 +27,10 @@ The workflow persists the following documents, bound by a single feature tag:
 - `.vault/exec/yyyy-mm-dd-<feature>/...-summary.md`: The `<Phase Summary>`.
 
 - `.vault/audit/yyyy-mm-dd-<feature>-audit.md`: The `<Audit>` report. A feature with
-  multiple audits, references, or research documents disambiguates each with an optional
-  narrative infix - `yyyy-mm-dd-<feature>-<topic>-<type>.md` - scaffolded through the
-  owning verb's `--topic` flag (`vaultspec-core vault add` for audit, reference, and
-  research only), never by hand-picking a filename.
+  multiple ADRs, audits, references, or research documents disambiguates each with an
+  optional topic infix - `yyyy-mm-dd-<feature>-<topic>-<type>.md` - scaffolded through
+  the owning verb's `--topic` flag (`vaultspec-core vault add` for adr, audit,
+  reference, and research only), never by hand-picking a filename.
 
 - `.vault/index/<feature>.index.md`: The auto-generated `<Feature Index>` linking every
   document for a feature. The index regenerates as a side effect of the `create` and
@@ -276,7 +276,7 @@ instead.
   - Top-level docs: `yyyy-mm-dd-{feature}-{type}.md` (e.g.,
     `2026-02-04-editor-demo-plan.md`)
 
-  - Narrative infix (audit, reference, research only):
+  - Optional topic infix (adr, audit, reference, research only):
     `yyyy-mm-dd-{feature}-{topic}-{type}.md` (e.g.,
     `2026-02-04-editor-demo-engine-wire-reference.md`), scaffolded with the owning
     verb's `--topic` flag
