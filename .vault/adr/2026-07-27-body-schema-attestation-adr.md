@@ -11,7 +11,7 @@ related:
   - '[[2026-07-27-body-schema-attestation-reference]]'
 ---
 
-# `body-schema-attestation` adr: `body-schema provenance warning default` | (**status:** `proposed`)
+# `body-schema-attestation` adr: `body-schema provenance warning default` | (**status:** `accepted`)
 
 ## Problem Statement
 
