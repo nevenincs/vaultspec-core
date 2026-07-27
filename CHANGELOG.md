@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.53](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.52...vaultspec-core-v0.1.53) (2026-07-27)
+
+
+### Bug Fixes
+
+* **vault:** body-schema attestation decision and single-ingress document listings ([#274](https://github.com/nevenincs/vaultspec-core/issues/274)) ([d57337d](https://github.com/nevenincs/vaultspec-core/commit/d57337dacbf2a0e8f584c8ef132ecaae63ecb9ef))
+
 ## [0.1.52](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.51...vaultspec-core-v0.1.52) (2026-07-27)
 
 
