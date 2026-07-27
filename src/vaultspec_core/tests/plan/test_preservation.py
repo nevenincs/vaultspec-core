@@ -15,6 +15,7 @@ from typer.testing import CliRunner
 from vaultspec_core.cli import app
 from vaultspec_core.plan.parser import parse_plan
 from vaultspec_core.plan.serialiser import serialise_plan
+from vaultspec_core.vaultcore.checks.annotations import check_annotations
 
 L1_SAMPLE = """---
 tags:
@@ -174,6 +175,17 @@ def test_serialise_plan_preserves_unknown_blocks() -> None:
     assert serialise_plan(re_parsed, canonicalise=False) == serialized_l1
 
 
+def test_serialise_plan_preserves_link_rules_when_source_contains_them() -> None:
+    """Keep creation-time link guidance when it is present in the source."""
+    annotated = L1_SAMPLE.replace(
+        "---\n\nGeneral preamble",
+        "---\n\n<!-- LINK RULES:\n     generated guidance. -->\n\nGeneral preamble",
+        1,
+    )
+
+    assert "<!-- LINK RULES:" in serialise_plan(parse_plan(annotated))
+
+
 def test_serialise_plan_canonicalise_strips_unknown_blocks() -> None:
     """Verify that serialise_plan with canonicalise=True strips unknown blocks."""
     plan_l1 = parse_plan(L1_SAMPLE)
@@ -270,6 +282,35 @@ def test_cli_standard_apply_preserves_and_reports_count(
     assert "General preamble" in content
     assert "Prose description" in content
     assert "- [x] `S01`" in content
+
+
+def test_cli_step_check_does_not_restore_sanitized_link_rules(
+    tmp_path, runner: CliRunner
+) -> None:
+    """A structural mutation must not undo the real annotation sanitizer."""
+    plan_path = tmp_path / ".vault" / "plan" / "2026-05-05-demo-plan.md"
+    plan_path.parent.mkdir(parents=True)
+    annotated = L1_SAMPLE.replace(
+        "---\n\nGeneral preamble",
+        "---\n\n<!-- LINK RULES:\n     generated guidance. -->\n\nGeneral preamble",
+        1,
+    )
+    plan_path.write_text(serialise_plan(parse_plan(annotated)), encoding="utf-8")
+
+    sanitation = check_annotations(tmp_path, fix=True)
+
+    assert sanitation.fixed_count == 1
+    assert "<!-- LINK RULES:" not in plan_path.read_text(encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["vault", "plan", "step", "check", str(plan_path), "S01"],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    content = plan_path.read_text(encoding="utf-8")
+    assert "- [x] `S01`" in content
+    assert "<!-- LINK RULES:" not in content
 
 
 def test_cli_step_add_preservation(tmp_path, runner: CliRunner) -> None:
