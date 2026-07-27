@@ -5,8 +5,10 @@ import shutil
 from uuid import uuid4
 
 import pytest
+from typer.testing import CliRunner
 
 from tests.constants import PROJECT_ROOT
+from vaultspec_core.cli import app
 from vaultspec_core.config import reset_config
 from vaultspec_core.core.commands import (
     CANONICAL_ENTRY_PREFIX,
@@ -442,6 +444,87 @@ def test_vault_add_dry_run_no_write() -> None:
         )
         assert not path.exists()
         assert path.name == "2026-04-11-dry-test-research.md"
+    finally:
+        reset_config()
+        shutil.rmtree(tmp_path, ignore_errors=True)
+
+
+@pytest.mark.unit
+def test_vault_add_creates_distinct_same_day_topic_infixed_adrs() -> None:
+    """The public CLI creates distinct ADR records for distinct topic infixes."""
+    tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"vault-add-adr-topic-{uuid4().hex}"
+    try:
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        reset_config()
+        install_run(
+            path=tmp_path,
+            provider="all",
+            upgrade=False,
+            dry_run=False,
+            force=False,
+        )
+
+        runner = CliRunner(env={"NO_COLOR": "1"})
+        first = runner.invoke(
+            app,
+            [
+                "vault",
+                "add",
+                "adr",
+                "--feature",
+                "same-day-decisions",
+                "--topic",
+                "circuit-accounting",
+                "--date",
+                "2026-07-27",
+                "--target",
+                str(tmp_path),
+            ],
+        )
+        second = runner.invoke(
+            app,
+            [
+                "vault",
+                "add",
+                "adr",
+                "--feature",
+                "same-day-decisions",
+                "--topic",
+                "sibling-adoption",
+                "--date",
+                "2026-07-27",
+                "--target",
+                str(tmp_path),
+            ],
+        )
+        duplicate = runner.invoke(
+            app,
+            [
+                "vault",
+                "add",
+                "adr",
+                "--feature",
+                "same-day-decisions",
+                "--topic",
+                "circuit-accounting",
+                "--date",
+                "2026-07-27",
+                "--target",
+                str(tmp_path),
+            ],
+        )
+
+        assert first.exit_code == 0, first.output
+        assert second.exit_code == 0, second.output
+        assert duplicate.exit_code == 1, duplicate.output
+        adr_dir = tmp_path / ".vault" / "adr"
+        assert (
+            adr_dir / "2026-07-27-same-day-decisions-circuit-accounting-adr.md"
+        ).is_file()
+        assert (
+            adr_dir / "2026-07-27-same-day-decisions-sibling-adoption-adr.md"
+        ).is_file()
+        assert "already exists" in duplicate.output
     finally:
         reset_config()
         shutil.rmtree(tmp_path, ignore_errors=True)
