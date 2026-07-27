@@ -12,6 +12,7 @@ related:
   - '[[2026-07-27-adr-topic-infix-P02-S04]]'
   - '[[2026-07-27-adr-topic-infix-P02-S05]]'
   - '[[2026-07-27-adr-topic-infix-P02-S06]]'
+  - '[[2026-07-27-adr-topic-infix-P02-S07]]'
   - '[[2026-07-27-adr-topic-infix-adr]]'
   - '[[2026-07-27-adr-topic-infix-plan]]'
   - '[[2026-07-27-adr-topic-infix-reference]]'
@@ -36,6 +37,7 @@ Auto-generated index of all documents tagged with `#adr-topic-infix`.
 - `2026-07-27-adr-topic-infix-P02-S04` - Cover direct scaffolder creation and duplicate rejection for topic-infixed ADRs
 - `2026-07-27-adr-topic-infix-P02-S05` - Cover CLI creation of two same-day topic-infixed ADRs
 - `2026-07-27-adr-topic-infix-P02-S06` - Cover MCP creation of topic-infixed ADRs in a mixed batch
+- `2026-07-27-adr-topic-infix-P02-S07` - Revise the owned topic-infix rule and regenerate its published reference
 
 ### plan
 

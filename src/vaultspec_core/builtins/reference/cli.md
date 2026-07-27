@@ -386,7 +386,7 @@ Create a `.vault/` document from a template.
 | `-f` | None | Feature tag (kebab-case). | | `--date DATE` | - | today | Override date
 (ISO 8601). | | `--title TITLE` | - | None | Document title. | | `--topic TOPIC` | - |
 None | Narrative filename infix (kebab-case) producing
-`{date}-{feature}-{topic}-{type}.md`; audit, reference, and research only. | |
+`{date}-{feature}-{topic}-{type}.md`; adr, audit, reference, and research only. | |
 `--related DOC` | `-r` | None | Related document(s). Repeatable. | | `--tags TAG` | - |
 None | Additional freeform tags. Repeatable. | | `--force` | - | off | Overwrite an
 existing document. | | `--dry-run` | - | off | Preview without writing. | | `--json` | -
