@@ -203,6 +203,11 @@ hand-edit between the markers.
 - `vaultspec-core vault exec detach` - Remove a Step claim only when it resolves to
   neither a live nor retired Step.
 
+#### Archive
+
+- `vaultspec-core vault archive documents` - Archive exactly the documents named in a
+  UTF-8 manifest.
+
 ### Spec
 
 - `vaultspec-core spec doctor` - Diagnose workspace health and report issues.
@@ -565,6 +570,22 @@ feature tag to the archive. Options: `--dry-run` (preview planned changes), `--j
 `vaultspec-core vault feature unarchive [OPTIONS] FEATURE_TAG` - restore all archived
 documents for a feature tag. Options: `--dry-run` (preview planned changes), `--json`.
 The `--no-hints` flag is not accepted here.
+
+### vaultspec-core vault archive documents
+
+`vaultspec-core vault archive documents [OPTIONS]` archives exactly the live documents
+listed by `--manifest PATH`. The manifest is UTF-8, one repository-relative
+`.vault/*.md` path per line. The command validates the entire manifest before moving
+anything; `--dry-run` previews the destination paths and `--json` emits the standard
+envelope.
+
+### vaultspec-core vault exec
+
+`vaultspec-core vault exec relink` takes `--record PATH` and `--step STEP` to repair one
+record's mapping to a live Step. `retire` takes `--record PATH` and archives it only
+when its parent plan retired the claimed Step. `detach` takes `--record PATH` and
+removes its Step claim only when the claim resolves to neither a live nor a retired
+Step. Every verb accepts `--dry-run` and `--json`.
 
 ### vaultspec-core vault feature rename
 
