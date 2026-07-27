@@ -398,7 +398,7 @@ class TestCreateVaultDocStemCollision:
 
 
 class TestCreateVaultDocTopicInfix:
-    """Topic-infix filenames for the narrative trio (audit, reference, research)."""
+    """Topic-infix filenames for ADR and narrative document records."""
 
     @pytest.fixture()
     def vault_project(self, tmp_path):
@@ -413,7 +413,7 @@ class TestCreateVaultDocTopicInfix:
 
     @pytest.mark.parametrize(
         "doc_type",
-        [DocType.AUDIT, DocType.REFERENCE, DocType.RESEARCH],
+        [DocType.ADR, DocType.AUDIT, DocType.REFERENCE, DocType.RESEARCH],
     )
     def test_infixed_filename_for_admitting_types(self, vault_project, doc_type):
         path = create_vault_doc(
@@ -462,7 +462,7 @@ class TestCreateVaultDocTopicInfix:
         )
         assert path.name == "2026-07-16-my-feat-reference.md"
 
-    @pytest.mark.parametrize("doc_type", [DocType.ADR, DocType.PLAN, DocType.EXEC])
+    @pytest.mark.parametrize("doc_type", [DocType.PLAN, DocType.EXEC])
     def test_non_admitting_type_raises(self, vault_project, doc_type):
         with pytest.raises(ValueError, match="topic infix is not supported"):
             create_vault_doc(
@@ -497,4 +497,30 @@ class TestCreateVaultDocTopicInfix:
                 "my-feat",
                 "2026-07-16",
                 topic="engine-wire",
+            )
+
+    def test_two_adr_topics_coexist_and_duplicate_collides(self, vault_project):
+        first = create_vault_doc(
+            vault_project,
+            DocType.ADR,
+            "my-feat",
+            "2026-07-16",
+            topic="circuit-accounting",
+        )
+        second = create_vault_doc(
+            vault_project,
+            DocType.ADR,
+            "my-feat",
+            "2026-07-16",
+            topic="sibling-adoption",
+        )
+        assert first.name == "2026-07-16-my-feat-circuit-accounting-adr.md"
+        assert second.name == "2026-07-16-my-feat-sibling-adoption-adr.md"
+        with pytest.raises(ResourceExistsError, match="already exists"):
+            create_vault_doc(
+                vault_project,
+                DocType.ADR,
+                "my-feat",
+                "2026-07-16",
+                topic="circuit-accounting",
             )
