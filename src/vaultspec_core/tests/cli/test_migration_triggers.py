@@ -308,6 +308,48 @@ class TestVaultCheckWarnsWithoutMutation:
         assert "Pending schema migration" in result.stdout
 
 
+class TestFeatureScopedMarkdownRepair:
+    def test_fix_does_not_migrate_unselected_documents(self, tmp_path: Path) -> None:
+        """A selected markdown repair must not trigger global schema convergence."""
+        factory = WorkspaceFactory(tmp_path).install("core")
+        research_dir = tmp_path / ".vault" / "research"
+        research_dir.mkdir(parents=True, exist_ok=True)
+        selected = research_dir / "2026-07-27-alpha-research.md"
+        selected_before = (
+            b"---\n"
+            b"tags:\n"
+            b"  - '#research'\n"
+            b"  - '#alpha'\n"
+            b"date: '2026-07-27'\n"
+            b"related: []\n"
+            b"---\n\n"
+            b"# alpha research   \n"
+        )
+        selected.write_bytes(selected_before)
+        unselected = research_dir / "2026-07-27-beta-research.md"
+        unselected.write_text(
+            "---\n"
+            "tags:\n"
+            "  - '#research'\n"
+            "  - '#beta'\n"
+            "date: '2026-07-27'\n"
+            "related: []\n"
+            "---\n\n"
+            "# beta research\n",
+            encoding="utf-8",
+        )
+        before = unselected.read_bytes()
+        _rewind_manifest(tmp_path, "0.1.28")
+
+        result = factory.run(
+            "vault", "check", "markdown", "--fix", "--feature", "alpha"
+        )
+
+        assert result.exit_code == 0, result.stdout
+        assert selected.read_bytes() != selected_before
+        assert unselected.read_bytes() == before
+
+
 class TestMigrationsCli:
     def test_status_lists_pending(self, tmp_path: Path):
         factory = WorkspaceFactory(tmp_path).install("core")
