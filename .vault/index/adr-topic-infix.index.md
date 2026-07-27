@@ -7,6 +7,7 @@ date: '2026-07-27'
 modified: '2026-07-27'
 related:
   - '[[2026-07-27-adr-topic-infix-P01-S01]]'
+  - '[[2026-07-27-adr-topic-infix-P01-S02]]'
   - '[[2026-07-27-adr-topic-infix-adr]]'
   - '[[2026-07-27-adr-topic-infix-plan]]'
   - '[[2026-07-27-adr-topic-infix-reference]]'
@@ -26,6 +27,7 @@ Auto-generated index of all documents tagged with `#adr-topic-infix`.
 ### exec
 
 - `2026-07-27-adr-topic-infix-P01-S01` - Extend the shared topic-infix admission set to ADR documents
+- `2026-07-27-adr-topic-infix-P01-S02` - Align CLI topic validation and help text with ADR admission
 
 ### plan
 

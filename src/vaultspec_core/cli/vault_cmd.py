@@ -105,7 +105,7 @@ def cmd_add(
             help=(
                 "Narrative filename infix (kebab-case) disambiguating a "
                 "second document of the same type for a feature; produces "
-                "{date}-{feature}-{topic}-{type}.md. Only valid for audit, "
+                "{date}-{feature}-{topic}-{type}.md. Only valid for adr, audit, "
                 "reference, and research documents."
             ),
         ),
@@ -255,13 +255,13 @@ def cmd_add(
         )
         raise typer.Exit(code=1)
 
-    # Validate the topic infix: admitted only for the narrative trio, and
-    # held to the same kebab-case discipline as the feature tag.
+    # Validate the topic infix for standalone decision and narrative records,
+    # holding it to the same kebab-case discipline as the feature tag.
     topic_value: str | None = None
     if topic is not None:
-        if dt not in (DocType.AUDIT, DocType.REFERENCE, DocType.RESEARCH):
+        if dt not in (DocType.ADR, DocType.AUDIT, DocType.REFERENCE, DocType.RESEARCH):
             console.print(
-                "[red]Error: --topic is only valid for 'audit', 'reference', "
+                "[red]Error: --topic is only valid for 'adr', 'audit', 'reference', "
                 "and 'research' documents.[/red]"
             )
             raise typer.Exit(code=1)
