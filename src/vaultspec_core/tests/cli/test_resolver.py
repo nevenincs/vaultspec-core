@@ -477,32 +477,30 @@ class TestPrecommitRules:
 
         assert plan.steps == []
 
-    def test_missing_config_is_scaffolded_on_sync_only(self) -> None:
-        sync_plan = ResolutionPlan()
-        _resolve_precommit(
-            sync_plan, PrecommitSignal.NO_FILE, CliAction.SYNC, force=False
-        )
-        assert [(s.action, s.target, s.reason) for s in sync_plan.steps] == [
-            (
-                ResolutionAction.REPAIR_PRECOMMIT,
-                ".pre-commit-config.yaml",
-                "Pre-commit config missing but management is enabled",
-            )
-        ]
+    @pytest.mark.parametrize(
+        "signal", [PrecommitSignal.NO_FILE, PrecommitSignal.NO_HOOKS]
+    )
+    @pytest.mark.parametrize(
+        "action", [CliAction.INSTALL, CliAction.SYNC, CliAction.UNINSTALL]
+    )
+    def test_absence_is_honoured_not_repaired(
+        self, signal: PrecommitSignal, action: CliAction
+    ) -> None:
+        """Total hook absence is an operator decision, never drift (#284).
 
-        install_plan = ResolutionPlan()
-        _resolve_precommit(
-            install_plan, PrecommitSignal.NO_FILE, CliAction.INSTALL, force=False
-        )
-        assert install_plan.steps == []
+        A resolution step here would execute in preflight, before the sync
+        body's reconcile pass can observe the removal and stand management
+        down - the exact resurrection loop issue #284 reports.
+        """
+        plan = ResolutionPlan()
+
+        _resolve_precommit(plan, signal, action, force=False)
+
+        assert plan.steps == []
 
     @pytest.mark.parametrize(
         ("signal", "reason"),
         [
-            (
-                PrecommitSignal.NO_HOOKS,
-                "No vaultspec-core hooks found in pre-commit config",
-            ),
             (
                 PrecommitSignal.INCOMPLETE,
                 "Missing canonical hooks in pre-commit config",

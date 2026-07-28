@@ -243,7 +243,10 @@ def cmd_sync(
         list[str] | None,
         typer.Option(
             "--skip",
-            help="Skip a component (core or provider name). Repeatable.",
+            help=(
+                "Skip a component: core, a provider name, mcp, or "
+                "precommit. Repeatable."
+            ),
         ),
     ] = None,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
@@ -260,7 +263,8 @@ def cmd_sync(
 
     Defaults to syncing all providers. Pass a provider name to sync only
     that provider (e.g. 'vaultspec-core sync claude').
-    Use --skip to exclude providers (e.g. --skip claude --skip codex).
+    Use --skip to exclude components (e.g. --skip claude --skip precommit);
+    valid targets are core, provider names, mcp, and precommit.
     """
     skip = list(skip or [])
     apply_target(target, split_source=True, json_output=json_output)
@@ -282,6 +286,7 @@ def cmd_sync(
         dry_run=dry_run,
         scope="sync",
         render=not json_output,
+        skip=set(skip),
     )
 
     from vaultspec_core.core.commands import sync_provider

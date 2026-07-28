@@ -30,6 +30,7 @@ def _run_preflight(
     dry_run: bool = False,
     scope: str = "framework",
     render: bool = True,
+    skip: set[str] | None = None,
 ) -> None:
     """Run diagnosis and resolution pre-flight.
 
@@ -37,6 +38,10 @@ def _run_preflight(
     repair, scaffold, adopt) and displays their outcomes. Non-preflight
     steps are shown as informational. Blocks on conflicts unless
     *dry_run* is ``True``.
+
+    *skip* carries the invoking command's ``--skip`` set into resolution,
+    so preflight never repairs a component the main command was told to
+    leave alone (#284).
 
     Raises :class:`typer.Exit` with code 1 if conflicts are present and
     *dry_run* is ``False``, or if any preflight execution step fails.
@@ -58,7 +63,7 @@ def _run_preflight(
     # raw traceback escape preflight. render is the human-console flag, so its
     # inverse selects the machine-readable json error envelope.
     try:
-        plan = resolve(diag, action, provider, force=force, dry_run=dry_run)
+        plan = resolve(diag, action, provider, force=force, dry_run=dry_run, skip=skip)
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc, json_output=not render)
         return  # unreachable: _handle_error raises typer.Exit
