@@ -22,6 +22,8 @@ from vaultspec_core.cli._target import (
 from vaultspec_core.cli.spec_cmd_shared import _emit_json
 
 if TYPE_CHECKING:
+    from rich.console import Console
+
     from vaultspec_core.core.diagnosis import ProviderDiagnosis, WorkspaceDiagnosis
 
 logger = logging.getLogger(__name__)
@@ -103,7 +105,7 @@ def cmd_doctor(
     raise typer.Exit(code=_gate(exit_code, gate_errors=gate_errors))
 
 
-def _render_diagnosis_table(_console, diag: "WorkspaceDiagnosis") -> None:
+def _render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> None:
     """Render the workspace diagnosis as a box-free listing.
 
     The ``_console`` argument is retained for call-site compatibility; the
@@ -125,7 +127,7 @@ def _render_diagnosis_table(_console, diag: "WorkspaceDiagnosis") -> None:
         VersionFloorSignal,
     )
 
-    rows: list[dict] = []
+    rows: list[dict[str, object]] = []
 
     # Framework row
     fw_status, fw_style = _signal_status(
@@ -156,7 +158,7 @@ def _render_diagnosis_table(_console, diag: "WorkspaceDiagnosis") -> None:
     # Provider rows
     for tool, prov in diag.providers.items():
         prov_status, prov_style = _provider_status(prov)
-        details = []
+        details: list[str] = []
         details.append(f"dir: {prov.dir_state.value}")
         if prov.manifest_entry not in (
             ManifestEntrySignal.COHERENT,
@@ -478,9 +480,9 @@ def _render_diagnosis_table(_console, diag: "WorkspaceDiagnosis") -> None:
     )
 
 
-def _signal_status(
-    signal: StrEnum,
-    mapping: dict,
+def _signal_status[SignalT: StrEnum](
+    signal: SignalT,
+    mapping: dict[SignalT, tuple[str, str]],
 ) -> tuple[str, str]:
     """Map a signal value to a (status_label, style) pair."""
     return mapping.get(signal, (f"unknown ({signal.value})", "dim"))
