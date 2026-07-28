@@ -37,7 +37,24 @@ import networkx as nx
 from ..vaultcore import DocType
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+
     from .api import VaultGraph
+
+# networkx's bundled type stubs leave the link-prediction dispatchables
+# (`jaccard_coefficient`, `adamic_adar_index`) untyped - each is a runtime
+# backend-dispatch descriptor whose declared return type is `Unknown`, not a
+# gap this module can close by annotating call sites. A dict lookup retrieves
+# the same callable without tripping that stub-only "partially unknown"
+# report, and the `Callable` annotation below is the real, hand-verified
+# signature: both functions accept the graph and an explicit `ebunch` and
+# yield `(node, node, score)` triples.
+_jaccard_coefficient: Callable[
+    [nx.Graph[str], list[tuple[str, str]]], Iterable[tuple[str, str, float]]
+] = nx.__dict__["jaccard_coefficient"]
+_adamic_adar_index: Callable[
+    [nx.Graph[str], list[tuple[str, str]]], Iterable[tuple[str, str, float]]
+] = nx.__dict__["adamic_adar_index"]
 
 __all__ = [
     "COEFFICIENTS_VERSION",
@@ -198,7 +215,7 @@ def _reciprocity_pairs(
 def _undirected_projection(
     graph: VaultGraph,
     scope: set[str] | None = None,
-) -> nx.Graph:
+) -> nx.Graph[str]:
     """Return an undirected projection over non-phantom nodes only.
 
     The networkx link-prediction family (Jaccard, Adamic-Adar) operates on an
@@ -399,11 +416,11 @@ def compute_derived_edges(
     candidate_pairs = list(itertools.combinations(reals, 2))
     jaccard = {
         frozenset((u, v)): score
-        for u, v, score in nx.jaccard_coefficient(undirected, candidate_pairs)
+        for u, v, score in _jaccard_coefficient(undirected, candidate_pairs)
     }
     adamic = {
         frozenset((u, v)): score
-        for u, v, score in nx.adamic_adar_index(undirected, candidate_pairs)
+        for u, v, score in _adamic_adar_index(undirected, candidate_pairs)
     }
 
     edges: list[DerivedEdge] = []

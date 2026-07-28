@@ -22,6 +22,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from mcp.server.fastmcp import Context
+from mcp.server.session import ServerSession
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
@@ -802,12 +803,12 @@ def _find_documents(
         *limit*.
     """
     from ...vaultcore.blob_hash import git_blob_oid
-    from ...vaultcore.query import list_documents
+    from ...vaultcore.query import VaultDocument, list_documents
 
     root_dir = _get_ctx().target_dir
     effective_types = types if types else _DEFAULT_TYPES
 
-    all_docs = []
+    all_docs: list[VaultDocument] = []
     for dt in effective_types:
         all_docs.extend(
             list_documents(root_dir, doc_type=dt, feature=feature, date=date)
@@ -852,16 +853,8 @@ def register_document_tools(mcp: FastMCP) -> None:
         mcp: The :class:`~mcp.server.fastmcp.FastMCP` instance to decorate.
     """
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            readOnlyHint=True,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
-    @_isolated_context
     async def find(
-        ctx: Context,
+        ctx: Context[ServerSession, Any, Any],
         feature: str | None = None,
         type: list[str] | None = None,
         date: str | None = None,
@@ -908,16 +901,17 @@ def register_document_tools(mcp: FastMCP) -> None:
         await ctx.debug(f"Found {len(rows)} documents.")
         return rows
 
-    @mcp.tool(
+    find = mcp.tool(
         annotations=ToolAnnotations(
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
+            readOnlyHint=True,
+            idempotentHint=True,
             openWorldHint=False,
         ),
-    )
-    @_isolated_context
-    async def create(ctx: Context, documents: list[DocumentSpec]) -> BatchResult:
+    )(_isolated_context(find))
+
+    async def create(
+        ctx: Context[ServerSession, Any, Any], documents: list[DocumentSpec]
+    ) -> BatchResult:
         """Scaffold one or more vault documents from templates.
 
         Each spec is normalized, its related references resolved, and its
@@ -956,16 +950,18 @@ def register_document_tools(mcp: FastMCP) -> None:
         await ctx.debug(f"create: {len(affected)} feature index(es) regenerated")
         return build_batch(items)
 
-    @mcp.tool(
+    create = mcp.tool(
         annotations=ToolAnnotations(
             readOnlyHint=False,
-            destructiveHint=True,
+            destructiveHint=False,
             idempotentHint=False,
             openWorldHint=False,
         ),
-    )
-    @_isolated_context
-    async def edit(ctx: Context, operations: list[EditOperation]) -> BatchResult:
+    )(_isolated_context(create))
+
+    async def edit(
+        ctx: Context[ServerSession, Any, Any], operations: list[EditOperation]
+    ) -> BatchResult:
         """Apply one or more body-prose edits to vault documents.
 
         Each operation composes a full body (``set_body`` replaces it;
@@ -990,3 +986,12 @@ def register_document_tools(mcp: FastMCP) -> None:
 
         items = [_edit_one(root_dir, idx, op) for idx, op in enumerate(operations)]
         return build_batch(items)
+
+    edit = mcp.tool(
+        annotations=ToolAnnotations(
+            readOnlyHint=False,
+            destructiveHint=True,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )(_isolated_context(edit))
