@@ -1,4 +1,4 @@
-"""Read and write the committed workspace mode declaration.
+"""Read and write the committed workspace declaration.
 
 Vaultspec-core is development-harness tooling, not a runtime dependency of the
 projects it governs, so the choice between tool mode and dependency mode is a
@@ -7,6 +7,14 @@ decision the whole team must share. This module owns the committed
 from the gitignored per-machine ``providers.json`` manifest: the declaration is
 the source of truth every contributor and a fresh clone read, while the
 manifest only echoes the locally resolved value for bookkeeping.
+
+The same file also carries the workspace's git-hook policy. Scaffolding a
+``.pre-commit-config.yaml`` installs a gate that rewrites the working tree to
+the staged state, which is unsafe in a checkout several workers share, so a
+project that runs its gates explicitly must be able to decline it once and have
+that survive every later sync. :class:`HooksDeclaration` is that declaration;
+it is workspace-scoped rather than per-package because a workspace has exactly
+one hook configuration no matter how many packages are provisioned into it.
 
 Reads are lenient about a missing file (there is simply no persisted choice
 yet) and strict about a present but broken one: corrupt JSON or an
@@ -35,10 +43,15 @@ from .helpers import advisory_lock, atomic_write, parse_version_tuple
 
 WORKSPACE_FILENAME = "workspace.json"
 
-#: Current declaration schema version. Schema 2.0 is the per-package ``packages``
-#: map that lets one committed ``workspace.json`` carry a mode (and optional
-#: version floor) for each provisioned distribution independently.
-WORKSPACE_SCHEMA_VERSION = "2.0"
+#: Current declaration schema version. Schema 2.0 introduced the per-package
+#: ``packages`` map that lets one committed ``workspace.json`` carry a mode (and
+#: optional version floor) for each provisioned distribution independently.
+#: Schema 2.1 adds the optional top-level ``hooks`` object; the bump is a minor
+#: one because the addition is purely additive - a 2.1 file parses identically
+#: under the 2.0 reader, which ignores top-level keys it does not know. The
+#: version is informational: no reader gates on it, and the key is written only
+#: when it departs from the default, so an unchanged workspace never gains it.
+WORKSPACE_SCHEMA_VERSION = "2.1"
 
 #: The legacy single-key schema (``install_mode`` plus an optional
 #: ``minimum_vaultspec_version`` at the top level) that ``install-mode`` shipped.
@@ -221,6 +234,27 @@ class PackageDeclaration:
 
 
 @dataclass
+class HooksDeclaration:
+    """The workspace's committed policy on vaultspec-managed git hooks.
+
+    Workspace-scoped rather than per-package: a checkout has exactly one hook
+    configuration, whatever mix of packages is provisioned into it.
+
+    Attributes:
+        pre_commit: Whether vaultspec-core may scaffold and reconcile its
+            managed hooks in ``.pre-commit-config.yaml``. Defaults to ``True``,
+            which is also what an absent declaration means, so an existing
+            workspace that has never expressed a preference keeps scaffolding
+            exactly as before. Setting it to ``False`` declines the file
+            permanently: every later ``install`` and ``sync`` leaves it alone,
+            and the managed ``.gitignore`` block starts ignoring it so a
+            resurrected copy can never be committed by accident.
+    """
+
+    pre_commit: bool = True
+
+
+@dataclass
 class WorkspaceDeclaration:
     """The committed shared declaration of a workspace's provisioning mode.
 
@@ -282,34 +316,24 @@ def _parse_package_entry(path: Path, name: object, entry: Any) -> PackageDeclara
     return PackageDeclaration(install_mode=mode, minimum_version=minimum)
 
 
-def _read_packages_map(target: Path) -> dict[str, PackageDeclaration] | None:
-    """Read every package entry from the committed ``workspace.json``.
+def _read_raw(target: Path) -> dict[str, Any] | None:
+    """Read and shape-validate the committed ``workspace.json`` document.
 
-    The single parse point behind the whole read surface. A missing file is
-    lenient (returns ``None``); a present but broken file is strict (raises).
-    Two on-disk shapes are recognized: the schema 2.0 ``packages`` map is parsed
-    entry by entry, and the legacy schema 1.0 single-key shape
-    (``install_mode`` plus optional ``minimum_vaultspec_version`` at the top
-    level) is folded into a one-entry map keyed to :data:`_DISTRIBUTION_NAME`,
-    renaming the top-level ``minimum_vaultspec_version`` floor to the
-    package-relative ``minimum_version``. The fold happens purely in memory; the
-    next write persists the file in schema 2.0 shape.
-
-    Package keys are canonicalized per PEP 503 so callers can look an entry up by
-    any spelling of a distribution name.
+    The single JSON parse point behind every reader in this module, so the
+    packages map and the hooks declaration cannot disagree about what counts as
+    a missing file versus a broken one. A missing file is lenient (returns
+    ``None``); a present but unreadable, unparseable, or non-object file is
+    strict and raises.
 
     Args:
         target: Workspace root directory.
 
     Returns:
-        A mapping of canonicalized distribution name to
-        :class:`PackageDeclaration`, or ``None`` when the file is absent.
+        The parsed top-level object, or ``None`` when the file is absent.
 
     Raises:
         VaultSpecError: If the file exists but contains invalid JSON, is
-            unreadable, is not an object, or names an ``install_mode`` outside
-            the canonical :class:`~vaultspec_core.core.enums.InstallMode`
-            vocabulary.
+            unreadable, or is not a JSON object.
     """
     path = _workspace_path(target)
     if not path.exists():
@@ -327,6 +351,90 @@ def _read_packages_map(target: Path) -> dict[str, PackageDeclaration] | None:
             f"Malformed workspace declaration at {path}: expected a JSON object.",
             hint="Fix the JSON by hand or re-run 'vaultspec-core install --mode'.",
         )
+    return raw
+
+
+def read_hooks_declaration(target: Path) -> HooksDeclaration:
+    """Read the workspace's committed git-hook policy.
+
+    Absence is not a decision to be repaired: a workspace with no declaration
+    file, no ``hooks`` object, or no ``pre_commit`` key has simply never
+    expressed a preference, and every such case returns the permissive default
+    so scaffolding behaves exactly as it did before the key existed. Only an
+    explicit ``false`` declines.
+
+    A present but broken ``hooks`` object is strict and raises, matching the
+    fail-loud contract the rest of the read surface honors: silently ignoring a
+    malformed opt-out would reinstall the very file the operator declined.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        The declared :class:`HooksDeclaration`, or the default when undeclared.
+
+    Raises:
+        VaultSpecError: If the file exists but is malformed, or its ``hooks``
+            value is not an object, or ``hooks.pre_commit`` is not a boolean.
+    """
+    raw = _read_raw(target)
+    if raw is None:
+        return HooksDeclaration()
+    hooks = raw.get("hooks")
+    if hooks is None:
+        return HooksDeclaration()
+    path = _workspace_path(target)
+    if not isinstance(hooks, dict):
+        raise VaultSpecError(
+            f"Malformed 'hooks' object in workspace declaration at {path}: "
+            "expected a JSON object.",
+            hint="Fix the JSON by hand or re-run "
+            "'vaultspec-core spec precommit enable'.",
+        )
+    pre_commit = hooks.get("pre_commit", True)
+    if not isinstance(pre_commit, bool):
+        raise VaultSpecError(
+            f"Invalid hooks.pre_commit in workspace declaration at {path}: "
+            f"{pre_commit!r}.",
+            hint="Set hooks.pre_commit to true or false, or re-run "
+            "'vaultspec-core spec precommit enable'.",
+        )
+    return HooksDeclaration(pre_commit=pre_commit)
+
+
+def _read_packages_map(target: Path) -> dict[str, PackageDeclaration] | None:
+    """Read every package entry from the committed ``workspace.json``.
+
+    The single parse point behind the whole read surface. A missing file is
+    lenient (returns ``None``); a present but broken file is strict (raises).
+    Two on-disk shapes are recognized: the schema 2.0 ``packages`` map is parsed
+    entry by entry, and the legacy schema 1.0 single-key shape
+    (``install_mode`` plus optional ``minimum_vaultspec_version`` at the top
+    level) is folded into a one-entry map keyed to :data:`_DISTRIBUTION_NAME`,
+    renaming the top-level ``minimum_vaultspec_version`` floor to the
+    package-relative ``minimum_version``. The fold happens purely in memory; the
+    next write persists the file in the current schema shape.
+
+    Package keys are canonicalized per PEP 503 so callers can look an entry up by
+    any spelling of a distribution name.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        A mapping of canonicalized distribution name to
+        :class:`PackageDeclaration`, or ``None`` when the file is absent.
+
+    Raises:
+        VaultSpecError: If the file exists but contains invalid JSON, is
+            unreadable, is not an object, or names an ``install_mode`` outside
+            the canonical :class:`~vaultspec_core.core.enums.InstallMode`
+            vocabulary.
+    """
+    raw = _read_raw(target)
+    if raw is None:
+        return None
+    path = _workspace_path(target)
 
     packages_raw = raw.get("packages")
     if packages_raw is not None:
@@ -458,16 +566,29 @@ def read_workspace_declaration(target: Path) -> WorkspaceDeclaration | None:
     )
 
 
-def _write_packages_map(target: Path, packages: dict[str, PackageDeclaration]) -> None:
-    """Serialize *packages* to ``.vaultspec/workspace.json`` in schema 2.0 shape.
+def _write_document(
+    target: Path, packages: dict[str, PackageDeclaration], hooks: HooksDeclaration
+) -> None:
+    """Serialize the whole declaration to ``.vaultspec/workspace.json``.
 
-    The single lock-free write primitive. Emits the ``{"schema_version": "2.0",
-    "packages": {...}}`` envelope canonically: ``json.dumps`` with
-    ``sort_keys=True`` orders the package names and every nested key
-    deterministically, two-space indent and a trailing newline keep the
-    committed file diff-clean. Each package entry carries its ``install_mode``
-    and, only when set, its ``minimum_version`` floor, so an unset floor never
-    writes a null. Callers that must not race a concurrent writer wrap this in
+    The single lock-free write primitive, and the only place the on-disk shape
+    is decided. Emits the ``{"schema_version": ..., "packages": {...}}``
+    envelope canonically: ``json.dumps`` with ``sort_keys=True`` orders the
+    package names and every nested key deterministically, two-space indent and a
+    trailing newline keep the committed file diff-clean. Each package entry
+    carries its ``install_mode`` and, only when set, its ``minimum_version``
+    floor, so an unset floor never writes a null.
+
+    The write is whole-document rather than key-wise, so every caller must
+    supply *both* halves of the declaration or silently drop the one it did not
+    name. That is why *hooks* is a required parameter rather than an optional
+    one defaulted to :class:`HooksDeclaration`: a mode write that forgot it
+    would erase a committed hook opt-out and reinstall the file the operator
+    declined, and a default would make that omission invisible. A default-valued
+    *hooks* writes no ``hooks`` key at all, so a workspace that has never
+    declined keeps a byte-identical file.
+
+    Callers that must not race a concurrent writer wrap this in
     :func:`~vaultspec_core.core.helpers.advisory_lock`; this primitive itself
     takes no lock so it can be composed inside a caller's own read-modify-write
     critical section without re-entering a non-reentrant lock.
@@ -475,6 +596,7 @@ def _write_packages_map(target: Path, packages: dict[str, PackageDeclaration]) -
     Args:
         target: Workspace root directory.
         packages: Mapping of distribution name to :class:`PackageDeclaration`.
+        hooks: The workspace's git-hook policy.
     """
     path = _workspace_path(target)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -484,11 +606,30 @@ def _write_packages_map(target: Path, packages: dict[str, PackageDeclaration]) -
         if decl.minimum_version is not None:
             entry["minimum_version"] = decl.minimum_version
         packages_payload[name] = entry
-    payload = {
+    payload: dict[str, Any] = {
         "schema_version": WORKSPACE_SCHEMA_VERSION,
         "packages": packages_payload,
     }
+    if hooks != HooksDeclaration():
+        payload["hooks"] = {"pre_commit": hooks.pre_commit}
     atomic_write(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+def write_hooks_declaration(target: Path, declaration: HooksDeclaration) -> None:
+    """Persist the workspace's git-hook policy to ``.vaultspec/workspace.json``.
+
+    Upserts the ``hooks`` object while leaving every package entry untouched.
+    The whole read-modify-write cycle runs under a single advisory lock so a
+    concurrent mode writer is serialized rather than clobbered, and a legacy
+    single-key file is migrated to the current shape on this write.
+
+    Args:
+        target: Workspace root directory.
+        declaration: The :class:`HooksDeclaration` to persist.
+    """
+    path = _workspace_path(target)
+    with advisory_lock(path):
+        _write_document(target, _read_packages_map(target) or {}, declaration)
 
 
 def write_package_declaration(
@@ -500,9 +641,14 @@ def write_package_declaration(
     only *package*'s entry and leaves every sibling package's entry untouched.
     The whole read-modify-write cycle runs under a single advisory lock, so two
     processes writing different packages' entries are serialized rather than
-    clobbering each other's map, and a legacy single-key file is migrated to
-    schema 2.0 shape on the first write. The entry is keyed by canonicalized
+    clobbering each other's map, and a legacy single-key file is migrated to the
+    current schema shape on the first write. The entry is keyed by canonicalized
     distribution name, matching :func:`read_package_declaration`.
+
+    The committed hook policy is read inside the same lock and written straight
+    back through, because the write primitive emits the whole document: an
+    install or sync that recorded a mode would otherwise erase a hook opt-out
+    and resurrect the file the operator declined.
 
     Args:
         target: Workspace root directory.
@@ -514,7 +660,7 @@ def write_package_declaration(
     with advisory_lock(path):
         packages = _read_packages_map(target) or {}
         packages[key] = declaration
-        _write_packages_map(target, packages)
+        _write_document(target, packages, read_hooks_declaration(target))
 
 
 def write_workspace_declaration(
@@ -527,8 +673,8 @@ def write_workspace_declaration(
     :class:`WorkspaceDeclaration` while leaving every companion package's entry
     untouched. The whole read-modify-write cycle runs under a single advisory
     lock so a concurrent writer of a sibling package's entry is serialized rather
-    than clobbered. The file is always rewritten in schema 2.0 shape, so a legacy
-    single-key file is migrated on the first write. The declaration's own
+    than clobbered. The file is always rewritten in the current schema shape, so a
+    legacy single-key file is migrated on the first write. The declaration's own
     ``schema_version`` field is ignored on write; the on-disk version is always
     :data:`WORKSPACE_SCHEMA_VERSION`.
 

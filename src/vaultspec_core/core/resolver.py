@@ -120,6 +120,16 @@ def resolve(
             pc_managed = _mdata.precommit_managed
         except Exception:
             pc_managed = True
+        # A committed opt-out outranks the per-machine manifest flag. Without
+        # this the doctor would keep planning a repair the scaffold declines to
+        # perform, leaving a workspace that made a deliberate choice
+        # permanently reporting a defect it must never fix.
+        try:
+            from .workspace_mode import read_hooks_declaration
+
+            pc_managed = pc_managed and read_hooks_declaration(target).pre_commit
+        except Exception:
+            logger.debug("Could not read the hook declaration", exc_info=True)
 
     # The canonical entry prefix the non-canonical precommit advisory names is
     # mode-dependent: a tool-mode workspace should be told to use the uvx form,

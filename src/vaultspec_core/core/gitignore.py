@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .enums import ManagedState, Tool
 from .helpers import advisory_lock, atomic_write_bytes
+from .workspace_mode import read_hooks_declaration
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +180,12 @@ def get_recommended_entries(target: Path) -> list[str]:
     advisory-lock sentinels, the install manifest, and the vault's local
     caches. Authored content is never added here.
 
+    The one entry that is not a runtime by-product is
+    ``/.pre-commit-config.yaml``, and it appears only when the workspace has
+    declared it does not want that file. A config the workspace declined is not
+    policy a teammate should inherit, so the sharing rule that keeps it out of
+    the block does not apply to it.
+
     Args:
         target: Workspace root directory.
     """
@@ -215,6 +222,19 @@ def get_recommended_entries(target: Path) -> list[str]:
         if framework_installed:
             for lock_path in managed_lock_paths(target):
                 entries.add(f"/{lock_path}")
+
+        # ``.pre-commit-config.yaml`` is team-shared while a workspace wants
+        # hooks, so it is deliberately absent from the block above even though
+        # its ``.lock`` sentinel is listed: the sentinel is per-machine runtime
+        # state and the config it locks is authoritative policy a teammate
+        # should inherit.  That reverses the moment the workspace declares it
+        # does not want the file.  A declined config is not policy anyone should
+        # inherit, and until it is ignored a sweep-style ``git add -A`` recommits
+        # the hooks the declaration just refused - which is how the file kept
+        # coming back before the opt-out existed.  Anchored with a leading slash
+        # so it matches only at the workspace root.
+        if framework_installed and not read_hooks_declaration(target).pre_commit:
+            entries.add("/.pre-commit-config.yaml")
 
     except Exception:
         # Fallback for very early bootstrap or corruption
