@@ -34,10 +34,10 @@ from vaultspec_core.vaultcore.edit_engine import (
     EditError,
     EditResult,
     _compose_new_text,
-    enforce_blob_hash,
-    resolve_document_path,
     _write_proposed,
+    enforce_blob_hash,
     execute_edit,
+    resolve_document_path,
 )
 from vaultspec_core.vaultcore.normalize import (
     NormalizeResult,

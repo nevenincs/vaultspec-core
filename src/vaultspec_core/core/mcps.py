@@ -86,17 +86,21 @@ from .mcps_ownership import (
 )
 from .mcps_ownership import (
     _ownership_path as _ownership_path,
-    ownership_path as ownership_path,
 )
 from .mcps_ownership import (
     _ownership_target_key as _ownership_target_key,
 )
 from .mcps_ownership import (
     _read_ownership as _read_ownership,
-    read_ownership as read_ownership,
 )
 from .mcps_ownership import (
     _write_ownership as _write_ownership,
+)
+from .mcps_ownership import (
+    ownership_path as ownership_path,
+)
+from .mcps_ownership import (
+    read_ownership as read_ownership,
 )
 from .mcps_sync import mcp_sync as mcp_sync
 from .mcps_targets import resolve_mcp_targets as resolve_mcp_targets

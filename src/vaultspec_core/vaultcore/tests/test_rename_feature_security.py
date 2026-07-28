@@ -36,7 +36,7 @@ from ..query import (
     list_documents,
     rename_feature,
 )
-from .test_rename_feature import _authored_doc, _snapshot_md
+from .test_rename_feature import authored_doc, snapshot_md
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -132,7 +132,7 @@ def _write(path: Path, text: str) -> Path:
 def _snapshot_real_md(root: Path) -> dict[Path, bytes]:
     """Snapshot bytes of every NON-symlink ``.md`` document under ``.vault``.
 
-    Unlike ``_snapshot_md`` (which follows symlinks via ``is_file()``), this
+    Unlike ``snapshot_md`` (which follows symlinks via ``is_file()``), this
     captures only legitimate regular vault files so symlink-targeted bytes
     never enter the comparison set; the symlink and its external target are
     asserted separately.
@@ -176,13 +176,13 @@ _MALFORMED_TARGETS = [
 class TestTargetArgumentInjection:
     @pytest.mark.parametrize("new", _MALFORMED_TARGETS)
     def test_malformed_target_refuses_and_no_mutation(self, tmp_path: Path, new: str):
-        _authored_doc(tmp_path, "research", "real-feature")
-        before = _snapshot_md(tmp_path)
+        authored_doc(tmp_path, "research", "real-feature")
+        before = snapshot_md(tmp_path)
 
         with pytest.raises(VaultSpecError):
             rename_feature(tmp_path, "real-feature", new)
 
-        after = _snapshot_md(tmp_path)
+        after = snapshot_md(tmp_path)
         assert set(after) == set(before), (
             f"injection target {new!r} added/removed a document"
         )
@@ -198,7 +198,7 @@ class TestTargetArgumentInjection:
         # asserting it raises would test for behaviour the spec intentionally
         # lacks. The real security property is that the accepted name still
         # produces only in-vault paths and loses no data.
-        _authored_doc(tmp_path, "research", "real-feature")
+        authored_doc(tmp_path, "research", "real-feature")
 
         result = rename_feature(tmp_path, "real-feature", "trailing-")
         assert result["status"] == "updated"
@@ -229,13 +229,13 @@ _MALFORMED_SOURCES = [
 class TestSourceArgumentInjection:
     @pytest.mark.parametrize("old", _MALFORMED_SOURCES)
     def test_malformed_source_refuses_and_no_mutation(self, tmp_path: Path, old: str):
-        _authored_doc(tmp_path, "research", "real-feature")
-        before = _snapshot_md(tmp_path)
+        authored_doc(tmp_path, "research", "real-feature")
+        before = snapshot_md(tmp_path)
 
         with pytest.raises(VaultSpecError):
             rename_feature(tmp_path, old, "new-feature")
 
-        after = _snapshot_md(tmp_path)
+        after = snapshot_md(tmp_path)
         assert set(after) == set(before)
         for path, original in before.items():
             assert after[path] == original, f"injection source {old!r} mutated {path}"
@@ -257,13 +257,13 @@ _RESERVED_TARGETS = [
 class TestReservedTargetNames:
     @pytest.mark.parametrize("new", _RESERVED_TARGETS)
     def test_reserved_target_refuses_and_no_mutation(self, tmp_path: Path, new: str):
-        _authored_doc(tmp_path, "research", "real-feature")
-        before = _snapshot_md(tmp_path)
+        authored_doc(tmp_path, "research", "real-feature")
+        before = snapshot_md(tmp_path)
 
         with pytest.raises(VaultSpecError):
             rename_feature(tmp_path, "real-feature", new)
 
-        after = _snapshot_md(tmp_path)
+        after = snapshot_md(tmp_path)
         assert set(after) == set(before)
         for path, original in before.items():
             assert after[path] == original, f"reserved target {new!r} mutated {path}"
@@ -308,7 +308,7 @@ class TestSymlinkOutOfBounds:
         _write(external, _doc_text("adr", "bystander-ext", body="# EXTERNAL-SECRET\n"))
         external_before = external.read_bytes()
 
-        _authored_doc(tmp_path, "research", "real-feature")
+        authored_doc(tmp_path, "research", "real-feature")
         link = tmp_path / ".vault" / "adr" / "2026-01-01-bystander-adr.md"
         link.parent.mkdir(parents=True, exist_ok=True)
         if not _plant_symlink(link, external):
@@ -333,7 +333,7 @@ class TestSymlinkOutOfBounds:
         _write(external, _doc_text("adr", "real-feature", body="# EXTERNAL-ADR\n"))
         external_before = external.read_bytes()
 
-        _authored_doc(tmp_path, "research", "real-feature")
+        authored_doc(tmp_path, "research", "real-feature")
         link = tmp_path / ".vault" / "adr" / f"{DATE}-real-feature-adr.md"
         link.parent.mkdir(parents=True, exist_ok=True)
         if not _plant_symlink(link, external):
@@ -362,7 +362,7 @@ class TestSymlinkOutOfBounds:
         # the apply path refuses the symlinked source outright.)
         external = tmp_path / "external" / "adr.md"
         _write(external, _doc_text("adr", "real-feature", body="# EXTERNAL\n"))
-        _authored_doc(tmp_path, "research", "real-feature")
+        authored_doc(tmp_path, "research", "real-feature")
         link = tmp_path / ".vault" / "adr" / f"{DATE}-real-feature-adr.md"
         link.parent.mkdir(parents=True, exist_ok=True)
         if not _plant_symlink(link, external):
@@ -381,8 +381,8 @@ class TestSymlinkOutOfBounds:
         external_index = tmp_path / "external_index"
         external_index.mkdir()
 
-        _authored_doc(tmp_path, "research", "real-feature")
-        _authored_doc(
+        authored_doc(tmp_path, "research", "real-feature")
+        authored_doc(
             tmp_path, "adr", "real-feature", related=[f"{DATE}-real-feature-research"]
         )
         index_link = tmp_path / ".vault" / "index"
@@ -419,11 +419,11 @@ class TestSymlinkOutOfBounds:
         _write(external, "EXTERNAL-UNRELATED-BYTES\n")
         external_before = external.read_bytes()
 
-        _authored_doc(tmp_path, "research", "widget-engine")
-        _authored_doc(
+        authored_doc(tmp_path, "research", "widget-engine")
+        authored_doc(
             tmp_path, "adr", "widget-engine", related=[f"{DATE}-widget-engine-research"]
         )
-        _authored_doc(
+        authored_doc(
             tmp_path,
             "plan",
             "widget-engine",
@@ -503,7 +503,7 @@ class TestMalformedContent:
         # A real rename of a sibling feature must leave an unclosed-frontmatter
         # document byte-identical: the scanner never routes it into scope and
         # the cascade's missing-fence guard refuses to write it.
-        _authored_doc(tmp_path, "research", "real-feature")
+        authored_doc(tmp_path, "research", "real-feature")
         malformed = tmp_path / ".vault" / "adr" / f"{DATE}-real-feature-adr.md"
         _write(malformed, self._UNCLOSED)
         before = malformed.read_bytes()
@@ -535,13 +535,13 @@ class TestMalformedContent:
         # rollback to a byte-identical vault.
         doc = tmp_path / ".vault" / "research" / f"{DATE}-widget-engine-research.md"
         _write(doc, self._MULTILINE_FLOW)
-        before = _snapshot_md(tmp_path)
+        before = snapshot_md(tmp_path)
 
         with pytest.raises(VaultSpecError, match="rolled back") as excinfo:
             rename_feature(tmp_path, "widget-engine", "gadget-engine")
         assert "inline tags" in str(excinfo.value.__cause__)
 
-        after = _snapshot_md(tmp_path)
+        after = snapshot_md(tmp_path)
         assert set(after) == set(before)
         for path, original in before.items():
             assert after[path] == original, f"failed rename mutated {path}"
@@ -550,7 +550,7 @@ class TestMalformedContent:
         # A document with invalid UTF-8 in its body is skipped by the scanner
         # (so it is out of scope) and must survive a sibling rename unchanged,
         # without the rename crashing.
-        _authored_doc(tmp_path, "adr", "real-feature")
+        authored_doc(tmp_path, "adr", "real-feature")
         non_utf8 = (
             tmp_path / ".vault" / "reference" / f"{DATE}-real-feature-reference.md"
         )
@@ -625,7 +625,7 @@ class TestMalformedContent:
         # A neighbour BOM+CRLF document whose related: link points into the
         # renamed feature is rewritten by the cascade with its BOM and CRLF
         # endings preserved byte-for-byte.
-        _authored_doc(tmp_path, "research", "widget-engine")
+        authored_doc(tmp_path, "research", "widget-engine")
         neighbour = tmp_path / ".vault" / "adr" / f"{DATE}-neighbour-adr.md"
         neighbour.parent.mkdir(parents=True, exist_ok=True)
         bom_crlf = (
@@ -674,7 +674,7 @@ class TestCollisionDataLoss:
         # ``gadget-engine-PERF-audit.md`` on a case-insensitive filesystem.
         self._audit(tmp_path, "widget-engine", "perf")
         self._audit(tmp_path, "gadget-engine", "PERF")
-        before = _snapshot_md(tmp_path)
+        before = snapshot_md(tmp_path)
 
         if _fs_is_case_insensitive(tmp_path):
             # The destinations collide case-insensitively: the rename must
@@ -689,7 +689,7 @@ class TestCollisionDataLoss:
                     force=True,
                     dry_run=True,
                 )
-            after = _snapshot_md(tmp_path)
+            after = snapshot_md(tmp_path)
             assert set(after) == set(before)
             for path, original in before.items():
                 assert after[path] == original, f"collision refusal mutated {path}"

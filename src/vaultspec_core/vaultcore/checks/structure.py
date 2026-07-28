@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from contextlib import AbstractContextManager
     from pathlib import Path
 
-__all__ = ["check_structure", "ensure_index_directory_tag"]
+__all__ = ["_fix_filename", "check_structure", "ensure_index_directory_tag"]
 
 logger = logging.getLogger(__name__)
 

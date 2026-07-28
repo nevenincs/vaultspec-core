@@ -10,6 +10,11 @@ from pathlib import Path
 _PYTEST_TEMP_ROOT = Path(tempfile.gettempdir()) / "vaultspec-pytest"
 
 
+def _replace_attr(target: object, name: str, value: object) -> None:
+    """Install a compatibility hook on a third-party module or class."""
+    setattr(target, name, value)
+
+
 def install_windows_temp_compat() -> None:
     """Avoid Windows 0o700 temp-dir ACL breakage on Python 3.13+."""
     if sys.platform != "win32" or sys.version_info < (3, 13):
@@ -105,8 +110,8 @@ def install_windows_temp_compat() -> None:
             self._trace("mktemp", p)
         return p
 
-    setattr(tempfile, "mkdtemp", _mkdtemp_755)
-    setattr(pytest_pathlib, "make_numbered_dir", _make_numbered_dir_755)
-    setattr(pytest_tmpdir, "make_numbered_dir", _make_numbered_dir_755)
-    setattr(pytest_tmpdir.TempPathFactory, "getbasetemp", _getbasetemp_755)
-    setattr(pytest_tmpdir.TempPathFactory, "mktemp", _mktemp_755)
+    _replace_attr(tempfile, "mkdtemp", _mkdtemp_755)
+    _replace_attr(pytest_pathlib, "make_numbered_dir", _make_numbered_dir_755)
+    _replace_attr(pytest_tmpdir, "make_numbered_dir", _make_numbered_dir_755)
+    _replace_attr(pytest_tmpdir.TempPathFactory, "getbasetemp", _getbasetemp_755)
+    _replace_attr(pytest_tmpdir.TempPathFactory, "mktemp", _mktemp_755)

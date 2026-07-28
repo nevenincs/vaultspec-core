@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import sys
 from collections import Counter
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -34,7 +35,6 @@ from ...vaultcore.scanner import scan_vault
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from pathlib import Path
     from types import FrameType
 
 pytestmark = [pytest.mark.benchmark]

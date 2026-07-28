@@ -17,7 +17,8 @@ import pytest
 
 from ...config import reset_config
 from ...testing.synthetic import build_synthetic_vault
-from ..api import VaultGraph, _betweenness_centrality
+from ..algorithms import _betweenness_centrality
+from ..api import VaultGraph
 
 if TYPE_CHECKING:
     from pathlib import Path

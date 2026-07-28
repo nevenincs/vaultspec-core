@@ -10,7 +10,8 @@ import pytest
 from vaultspec_core.config import reset_config
 
 from ...models import DocumentMetadata
-from ..structure import _fix_filename, _rename_document_path, check_structure
+from ...rename_ops import rename_document_path
+from ..structure import _fix_filename, check_structure
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -130,7 +131,7 @@ def test_case_only_rename_uses_short_temp_name_for_long_filenames(
     source.write_text("# Long case-only rename\n", encoding="utf-8")
 
     assert len(source.name) < 255
-    assert _rename_document_path(source, target) is True
+    assert rename_document_path(source, target) is True
     assert target.exists()
     assert source.name not in {path.name for path in docs.iterdir()}
     assert not list(docs.glob(".vs-*.tmp"))

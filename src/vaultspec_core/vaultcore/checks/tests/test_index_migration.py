@@ -19,7 +19,7 @@ import pytest
 from ....config import reset_config
 from ....graph import VaultGraph
 from .._base import Severity
-from ..structure import _ensure_index_directory_tag, check_structure
+from ..structure import check_structure, ensure_index_directory_tag
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -117,7 +117,7 @@ class TestEnsureIndexDirectoryTag:
             "---\n\n"
             "# body\n"
         )
-        after, changed = _ensure_index_directory_tag(before)
+        after, changed = ensure_index_directory_tag(before)
         assert changed is True
         assert "  - '#index'" in after
         assert "  - '#my-feat'" in after
@@ -137,7 +137,7 @@ class TestEnsureIndexDirectoryTag:
             "related: []\n"
             "---\n"
         )
-        after, changed = _ensure_index_directory_tag(content)
+        after, changed = ensure_index_directory_tag(content)
         assert changed is False
         assert after == content
 
@@ -152,7 +152,7 @@ class TestEnsureIndexDirectoryTag:
             "---\r\n\r\n"
             "# body\r\n"
         )
-        after, changed = _ensure_index_directory_tag(before)
+        after, changed = ensure_index_directory_tag(before)
         assert changed is True
         # The inserted line must end with CRLF, not LF, so the file does
         # not get mixed line endings.
@@ -179,7 +179,7 @@ class TestEnsureIndexDirectoryTag:
             "---\n\n"
             "# body\n"
         )
-        after, changed = _ensure_index_directory_tag(before)
+        after, changed = ensure_index_directory_tag(before)
         assert changed is True, (
             "#index-notes is a different tag; #index must still be inserted"
         )
@@ -196,7 +196,7 @@ class TestEnsureIndexDirectoryTag:
             "related: []\n"
             "---\n"
         )
-        after, changed = _ensure_index_directory_tag(before)
+        after, changed = ensure_index_directory_tag(before)
         assert changed is True
         # No CRLF pair should appear in an originally-LF file.
         assert "\r\n" not in after

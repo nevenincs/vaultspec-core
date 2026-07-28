@@ -19,7 +19,7 @@ from __future__ import annotations
 import networkx as nx
 import pytest
 
-from ...graph.api import _pagerank
+from ...graph.algorithms import _pagerank
 
 pytestmark = [pytest.mark.unit]
 

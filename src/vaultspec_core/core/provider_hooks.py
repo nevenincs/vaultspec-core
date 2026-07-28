@@ -47,6 +47,7 @@ __all__ = [
     "PROVIDER_EVENT_NAMES",
     "HookEvent",
     "HookSpec",
+    "_compose_flat_hooks",
     "load_provider_hook_specs",
     "provider_hooks_sync",
     "render_hooks_payload",

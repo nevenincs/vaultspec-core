@@ -1,0 +1,236 @@
+name: Model Drift
+
+# Hard-coded vendor model identifiers go stale on the vendors' release
+# schedule, not ours, and nothing in the normal CI gate notices: the pinned
+# identifier tests assert the values we wrote down, so they stay green while
+# the world moves on. This job is the outside observer that CI cannot be - it
+# re-checks the three registries against the vendors' current lineups and
+# opens a PR when they have diverged.
+#
+# ---------------------------------------------------------------------------
+# DORMANT BY DESIGN - this workflow is parked, not scheduled.
+#
+# It is manual-only (workflow_dispatch), so committing it costs nothing: no
+# timer fires, no API credit is spent, and no failure notifications arrive.
+# It sits here ready to be switched on, and runs only when someone presses
+# "Run workflow" in the Actions tab.
+#
+# To activate the weekly cadence, in this order:
+#
+#   1. Add an `ANTHROPIC_API_KEY` repository secret. Without it the agent
+#      step fails immediately - this is the only hard prerequisite, and the
+#      only thing that costs money.
+#   2. Point `github_token` below at a PAT (`DEV_RUNNER_PAT` already exists)
+#      instead of the default `GITHUB_TOKEN`. PRs opened by the default token
+#      do not trigger CI - the same rule that leaves release-please PRs
+#      unchecked - so a drift PR would otherwise arrive with no test results.
+#   3. Uncomment the `schedule:` block below.
+#
+# Step 1 alone is enough to trial it manually before committing to a cadence;
+# a manual run is the recommended way to validate the whole path once.
+# ---------------------------------------------------------------------------
+on:
+  # Uncomment to run every Monday morning. GitHub cron is UTC-only - there is
+  # no timezone field - so "0 7" fires at 07:00 UTC. Shift the hour to track a
+  # different local morning (e.g. "0 6" for 07:00 CET, "0 5" for 07:00 CEST).
+  #
+  # Two scheduler caveats worth knowing before trusting this as a heartbeat:
+  # scheduled runs are queued on a best-effort basis and can be delayed under
+  # load, and GitHub disables scheduled workflows in a repository after 60
+  # days with no commit activity.
+  #
+  # schedule:
+  #   - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+# Write scope is needed because the job's whole purpose is to push a branch
+# and open a PR. It never pushes to the default branch - see the prompt.
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: model-drift-${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  NO_COLOR: "1"
+  FORCE_COLOR: "0"
+
+jobs:
+  drift:
+    name: Weekly Model Drift Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install just
+        uses: taiki-e/install-action@just
+
+      - name: Install dependencies
+        run: just deps sync
+
+      # Deterministic and free. Printing the pinned values before the agent
+      # runs means the run log answers "what did we believe on this date?"
+      # even when the agent step later fails, times out, or is rate-limited.
+      - name: Report currently pinned identifiers
+        run: |
+          uv run --no-sync python - <<'PY'
+          from vaultspec_core.core.enums import (
+              ClaudeModels,
+              CodexModels,
+              GeminiModels,
+          )
+
+          for registry in (ClaudeModels, GeminiModels, CodexModels):
+              pinned = ", ".join(f"{m.name}={m.value}" for m in registry)
+              print(f"{registry.__name__}: {pinned}")
+          PY
+
+      - name: Review vendor releases and reconcile the registries
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          claude_args: "--model claude-opus-5"
+          prompt: |
+            You are auditing this repository's hard-coded AI model identifiers
+            against the vendors' current published lineups. Today's date is
+            available to you; treat any model knowledge you hold from training
+            as potentially stale and verify everything against vendor sources
+            via web search before acting.
+
+            ## The single source of truth
+
+            `src/vaultspec_core/core/enums.py` defines four tiered registries,
+            each with exactly three members - HIGH, MEDIUM, LOW:
+
+            - `ClaudeModels`  - Anthropic (Claude)
+            - `GeminiModels`  - Google (Gemini)
+            - `CodexModels`   - OpenAI (Codex CLI)
+            - `AntigravityModels` - reference-only; it MUST mirror
+              `GeminiModels` value-for-value, and is never emitted into any
+              provider artifact.
+
+            Every agent definition in this repository selects a model by
+            authoring `tier:` (HIGH / STANDARD / LOW), never by naming a model
+            string, so these registries are the only place a model identifier
+            is decided.
+
+            ## What to check
+
+            For each of Anthropic, Google, and OpenAI Codex, determine the
+            current identifiers for three tiers:
+
+            - HIGH   - the vendor's flagship / most capable model for hard
+                       reasoning and agentic coding
+            - MEDIUM - the balanced everyday workhorse
+            - LOW    - the fast, low-cost tier
+
+            Use the vendors' own documentation as the authority (Anthropic's
+            model overview, Google's Gemini API model list, OpenAI's Codex
+            model docs). Prefer primary vendor docs over blog posts,
+            aggregators, or third-party summaries.
+
+            ## Rules for deciding that something has drifted
+
+            1. Only move to a model that is generally available and is the
+               vendor's recommended choice for that tier. Do NOT chase a
+               preview/experimental release unless the vendor itself presents
+               it as the current best option for that tier - the existing
+               `gemini-3.1-pro-preview` HIGH pin is a deliberate example of a
+               preview that IS the flagship.
+            2. A tier legitimately stays put when the vendor has shipped no
+               successor. Do not invent a change to make the tiers look
+               uniform - Claude's LOW tier lagging its HIGH tier by a
+               generation is expected, not drift.
+            3. Never pin an identifier the vendor has retired, shut down, or
+               deprecated.
+            4. Use the exact identifier string the vendor's API accepts. Do not
+               append or invent date suffixes, and do not guess a string you
+               have not seen in vendor documentation.
+            5. If you cannot verify a vendor's current lineup with confidence,
+               leave that registry untouched and say so in the PR body. A
+               correct no-op is a good outcome; a plausible guess is not.
+
+            ## If nothing has drifted
+
+            Stop. Do not create a branch, a commit, a PR, or an issue. Print a
+            short summary of what you verified and which sources you used, and
+            end the run. A quiet week must stay quiet.
+
+            ## If something has drifted
+
+            Make exactly these changes, and nothing else:
+
+            1. `src/vaultspec_core/core/enums.py` - update the changed member
+               values, keep `AntigravityModels` mirroring `GeminiModels`, and
+               revise the affected class docstrings so they state what is
+               current, what it superseded, and the verification date.
+            2. `src/vaultspec_core/core/tests/test_enums_models.py` - update
+               the pinned assertions in `TestGroundTruthIdentifiers` and its
+               verification date. Add any newly retired identifier to the
+               `dead` set in `test_no_deprecated_identifiers_remain`. Only add
+               strings the vendor has actually retired or deprecated - a
+               previous-generation model that is still served does not belong
+               there.
+            3. `src/vaultspec_core/tests/cli/test_agents_render.py` - update
+               the tier-resolution fixtures that assert concrete model strings.
+
+            Do NOT touch anything else. In particular:
+
+            - Leave `.vault/` alone. It is a development-records corpus, and
+              its model mentions are historical records of what was observed.
+            - Leave the Codex transcript fixtures under `tests/statistic/`
+              alone. Those model strings are opaque parser sample data, not
+              configuration.
+            - Do not commit provider artifacts (`.claude/`, `.codex/`,
+              `.gemini/`, `.antigravity/`). They are gitignored generated
+              output, regenerated from these registries on demand.
+
+            ## Verify before opening the PR
+
+            Run both, and do not open a PR until they pass:
+
+                just test unit
+                just framework sync
+
+            `just framework sync` regenerates the provider artifacts from the
+            registries. It writes only gitignored files, so nothing from it
+            gets committed - it is here as a smoke test that the renderers
+            still accept the new identifiers. If either command fails, fix the
+            cause; if you cannot, open the PR as a draft and state plainly in
+            the body what failed and what you tried.
+
+            ## Opening the PR
+
+            Create a branch named `chore/model-drift-<YYYY-MM-DD>` from the
+            default branch, commit with a `chore(models):` subject following
+            this repository's Conventional Commits style, push, and open a PR
+            with `gh pr create`.
+
+            Never commit or push to the default branch directly.
+
+            The PR body must contain:
+
+            - A table of every changed identifier: registry, tier, old value,
+              new value.
+            - A one-line justification per change, each with the vendor
+              documentation URL you verified it against.
+            - Any registry you deliberately left unchanged, and why.
+            - The pass/fail result of the two verification commands.
+
+            Be conservative throughout. A missed week costs nothing - the job
+            runs again next Monday. A wrong identifier silently mis-routes
+            every agent dispatch in the repository until a human notices.

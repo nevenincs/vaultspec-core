@@ -27,11 +27,11 @@ from .gitignore import (
     prune_orphaned_lock_sentinels,
 )
 from .install_mode import (
+    _write_mode_declaration,
     fresh_install_schema_version,
     infer_upgrade_mode,
     persist_resolved_mode,
     stamp_manifest_version_no_downgrade,
-    _write_mode_declaration,
 )
 from .manifest import add_providers, read_manifest_data, write_manifest_data
 from .precommit import _scaffold_precommit
@@ -262,13 +262,13 @@ def _preview_upgrade_items(
     )
     seen_preview = {rel for rel, _ in items}
     for sync_result in sync_results:
-        for rel, action in sync_result.items:
+        for relative_path, action in sync_result.items:
             if action in ("[UNCHANGED]", "[SKIP]"):
                 continue
-            if rel in seen_preview:
+            if relative_path in seen_preview:
                 continue
-            seen_preview.add(rel)
-            items.append((rel, action))
+            seen_preview.add(relative_path)
+            items.append((relative_path, action))
     return items
 
 
@@ -311,8 +311,8 @@ def _preview_install_manifest(
 
     # Deduplicate preserving order (by relative path)
     seen: dict[str, str] = {}
-    for rel, label in manifest:
-        seen.setdefault(rel, label)
+    for relative_path, label in manifest:
+        seen.setdefault(relative_path, label)
     return list(seen.items())
 
 

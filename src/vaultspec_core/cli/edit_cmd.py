@@ -66,7 +66,7 @@ if TYPE_CHECKING:
     from vaultspec_core.vaultcore.checks._base import CheckResult
     from vaultspec_core.vaultcore.edit_engine import EditResult
 
-__all__ = ["register_edit_commands", "register_rename_command"]
+__all__ = ["_execute_rename", "register_edit_commands", "register_rename_command"]
 
 
 # ---------------------------------------------------------------------------

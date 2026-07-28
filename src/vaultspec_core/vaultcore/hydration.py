@@ -26,6 +26,7 @@ __all__ = [
     "ParentPlan",
     "TemplateFields",
     "WritePolicy",
+    "_assert_scaffolded_content_valid",
     "create_vault_doc",
     "get_template_path",
     "hydrate_template",

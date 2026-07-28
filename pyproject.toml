@@ -16,7 +16,6 @@ classifiers = [
 ]
 dependencies = [
   "PyYAML>=6.0.3",
-  "httpx>=0.28.1",
   "mcp>=2.0.0",
   "networkx>=3.6",
   "phart>=0.5.0",
@@ -41,7 +40,7 @@ keywords = [
 license = { file = "LICENSE" }
 name = "vaultspec-core"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.14"
 version = "0.1.53"
 
   [project.urls]
@@ -83,6 +82,11 @@ dev = [
   # measures. Configured from [tool.complexipy] below.
   "complexipy>=6.2",
   "deptry>=0.25.1",
+  # Sole consumer is `scripts/dependency_audit.py`, which posts the locked
+  # package set to the OSV querybatch API. Declared here rather than relied on
+  # transitively: `mcp@2.0.0` moved to `httpx2`, so nothing in the runtime tree
+  # pulls httpx any more.
+  "httpx>=0.28.1",
   "identify>=2.0.0",
   "mdformat>=1.0.0",
   "mdformat-frontmatter>=2.0.10",
@@ -253,6 +257,7 @@ typeCheckingMode = "strict"
   # exercise, so reportPrivateUsage is a trust-boundary false positive inside
   # the test tree (fixing it by making internals public would damage the
   # design). Every other strict rule stays ON for tests.
+
   [[tool.basedpyright.executionEnvironments]]
   reportPrivateUsage = false
   root = "src/vaultspec_core/config/tests"
@@ -454,29 +459,29 @@ known_first_party = ["vaultspec_core"]
   [tool.deptry.per_rule_ignores]
   # DEP002 is "declared but never imported".
   #
-  # httpx / sse-starlette / starlette / uvicorn are declared in
-  # [project.dependencies] but serve no first-party import, and the evidence
-  # says they are redundant rather than deliberate:
+  # sse-starlette / starlette / uvicorn are declared in [project.dependencies]
+  # but serve no first-party import, and the evidence says they are redundant
+  # rather than deliberate:
   #
   #   - The MCP server is STDIO-ONLY. `mcp_server/app.py` calls a bare
   #     `mcp.run()`, whose default transport is stdio, and the module's own
   #     comments name the stdio lifetime contract throughout. The HTTP and SSE
   #     transport stack is never constructed.
-  #   - `mcp@2.0.0` already requires sse-starlette, starlette, and uvicorn
-  #     itself, so removing those three declarations would not change a single
-  #     resolved environment. It no longer pulls `httpx` at all (2.0 moved to
-  #     `httpx2`), so that one declaration is now the only thing keeping httpx
-  #     in the runtime environment.
-  #   - The only first-party `import httpx` is in `scripts/dependency_audit.py`,
-  #     a dev script that is not shipped; that import argues for the dev group,
-  #     not for [project.dependencies].
+  #   - `mcp@2.0.0` already requires all three itself, so removing these
+  #     declarations would not change a single resolved environment.
   #
   # They are NOT removed here only because a direct declaration of a transitive
-  # package is also how one pins a security floor, and whether any of these four
+  # package is also how one pins a security floor, and whether any of the three
   # was pinned for an advisory is an intent question the code cannot answer.
   # Resolve that, then delete them from [project.dependencies] and drop these
-  # four names from the list below - do not leave the ignores standing as the
+  # three names from the list below - do not leave the ignores standing as the
   # permanent answer.
+  #
+  # `httpx` WAS a fourth name here and is now resolved: the mcp 2.0 bump moved
+  # the SDK to `httpx2`, so httpx stopped being a transitive of the runtime tree
+  # entirely and the declaration was pinning a floor on a package nothing
+  # installed or imported. Its only first-party import is the unshipped
+  # `scripts/dependency_audit.py`, so it moved to the `dev` dependency group.
   #
   # The remaining names are the legacy `[project.optional-dependencies] dev`
   # extra, which duplicates the PEP 735 `dev` dependency group below it. They
@@ -484,7 +489,6 @@ known_first_party = ["vaultspec_core"]
   # surfaces onto the dependency group is tracked separately; until then the
   # scanner reports every one of them.
   DEP002 = [
-    "httpx",
     "sse-starlette",
     "starlette",
     "uvicorn",

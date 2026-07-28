@@ -50,6 +50,7 @@ class _OwnershipState(TypedDict):
 __all__ = [
     "_OWNERSHIP_FILENAME",
     "_OWNERSHIP_VERSION",
+    "_OwnershipState",
     "_discard_owned_names",
     "_fingerprint",
     "_launch_repr",
@@ -57,13 +58,12 @@ __all__ = [
     "_owned_names",
     "_ownership_path",
     "_ownership_target_key",
-    "_OwnershipState",
     "_read_ownership",
-    "ownership_path",
-    "read_ownership",
     "_set_owned_names",
     "_target_lock",
     "_write_ownership",
+    "ownership_path",
+    "read_ownership",
 ]
 
 

@@ -70,7 +70,7 @@ def _frontmatter(
     )
 
 
-def _authored_doc(
+def authored_doc(
     root: Path,
     doc_type: str,
     feature: str,
@@ -132,7 +132,7 @@ def _build_index(root: Path, feature: str) -> Path:
     return generate_feature_index(root, feature, nodes=nodes)
 
 
-def _snapshot_md(root: Path) -> dict[Path, bytes]:
+def snapshot_md(root: Path) -> dict[Path, bytes]:
     """Snapshot the bytes of every ``.md`` document under ``.vault``.
 
     The auxiliary graph cache under ``.vault/data/`` is not a document and
@@ -149,39 +149,39 @@ def _snapshot_md(root: Path) -> dict[Path, bytes]:
 
 class TestValidationGuards:
     def test_empty_source_refuses(self, tmp_path: Path):
-        _authored_doc(tmp_path, "research", "real-feature")
+        authored_doc(tmp_path, "research", "real-feature")
         with pytest.raises(VaultSpecError, match="source feature tag is required"):
             rename_feature(tmp_path, "", "new-feature")
 
     def test_empty_target_refuses(self, tmp_path: Path):
-        _authored_doc(tmp_path, "research", "real-feature")
+        authored_doc(tmp_path, "research", "real-feature")
         with pytest.raises(VaultSpecError, match="target feature tag is required"):
             rename_feature(tmp_path, "real-feature", "  #  ")
 
     def test_identical_source_target_refuses(self, tmp_path: Path):
-        _authored_doc(tmp_path, "research", "same-feature")
+        authored_doc(tmp_path, "research", "same-feature")
         with pytest.raises(VaultSpecError, match="identical"):
             rename_feature(tmp_path, "same-feature", "same-feature")
 
     def test_non_kebab_target_refuses(self, tmp_path: Path):
-        _authored_doc(tmp_path, "research", "old-feature")
+        authored_doc(tmp_path, "research", "old-feature")
         with pytest.raises(VaultSpecError, match="not a valid feature tag"):
             rename_feature(tmp_path, "old-feature", "Bad_Name")
 
     def test_reserved_doctype_target_refuses(self, tmp_path: Path):
-        _authored_doc(tmp_path, "research", "old-feature")
+        authored_doc(tmp_path, "research", "old-feature")
         with pytest.raises(VaultSpecError, match="reserved document-type name"):
             rename_feature(tmp_path, "old-feature", "adr")
 
     def test_missing_source_refuses(self, tmp_path: Path):
         # A vault with a different feature; the source matches nothing.
-        _authored_doc(tmp_path, "research", "present-feature")
+        authored_doc(tmp_path, "research", "present-feature")
         with pytest.raises(VaultSpecError, match="matches zero documents"):
             rename_feature(tmp_path, "ghost-feature", "new-feature")
 
     def test_collision_without_force_refuses(self, tmp_path: Path):
-        _authored_doc(tmp_path, "research", "source-feature")
-        _authored_doc(tmp_path, "adr", "target-feature")
+        authored_doc(tmp_path, "research", "source-feature")
+        authored_doc(tmp_path, "adr", "target-feature")
         with pytest.raises(VaultSpecError, match="already has 1 document"):
             rename_feature(tmp_path, "source-feature", "target-feature")
 
@@ -193,11 +193,11 @@ class TestValidationGuards:
 
 class TestDryRun:
     def _build(self, root: Path) -> None:
-        _authored_doc(root, "research", "widget-engine")
-        _authored_doc(
+        authored_doc(root, "research", "widget-engine")
+        authored_doc(
             root, "adr", "widget-engine", related=[f"{DATE}-widget-engine-research"]
         )
-        _authored_doc(
+        authored_doc(
             root,
             "plan",
             "widget-engine",
@@ -249,11 +249,11 @@ class TestDryRun:
 
     def test_dry_run_mutates_nothing(self, tmp_path: Path):
         self._build(tmp_path)
-        before = _snapshot_md(tmp_path)
+        before = snapshot_md(tmp_path)
 
         rename_feature(tmp_path, "widget-engine", "gadget-engine", dry_run=True)
 
-        after = _snapshot_md(tmp_path)
+        after = snapshot_md(tmp_path)
         assert set(after) == set(before), "dry-run must not add or remove any document"
         for path, original in before.items():
             assert after[path] == original, f"dry-run mutated {path.name}"
@@ -270,20 +270,20 @@ class TestHappyPath:
     BODY_MENTION = "The widget-engine subsystem coordinates downstream work."
 
     def _build(self, root: Path) -> None:
-        _authored_doc(
+        authored_doc(
             root,
             "research",
             self.OLD,
             body=f"# research\n\n{self.BODY_MENTION}\n",
         )
-        _authored_doc(
+        authored_doc(
             root,
             "adr",
             self.OLD,
             related=[f"{DATE}-{self.OLD}-research"],
             body=f"# adr\n\n{self.BODY_MENTION}\n",
         )
-        _authored_doc(
+        authored_doc(
             root,
             "plan",
             self.OLD,
@@ -291,7 +291,7 @@ class TestHappyPath:
             extra_fm="tier: L2\n",
         )
         # Audit with a narrative topic infix.
-        _authored_doc(
+        authored_doc(
             root,
             "audit",
             self.OLD,
@@ -371,9 +371,7 @@ class TestExecRename:
     PLAN_DATE = "2026-05-01"
 
     def _build(self, root: Path) -> None:
-        _authored_doc(
-            root, "plan", self.OLD, date=self.PLAN_DATE, extra_fm="tier: L2\n"
-        )
+        authored_doc(root, "plan", self.OLD, date=self.PLAN_DATE, extra_fm="tier: L2\n")
         _exec_record(
             root,
             self.OLD,
@@ -433,9 +431,9 @@ class TestCrossFeatureLinks:
     OTHER = "neighbour-feature"
 
     def _build(self, root: Path) -> None:
-        _authored_doc(root, "research", self.OLD)
+        authored_doc(root, "research", self.OLD)
         # A document in a DIFFERENT feature that links into the renamed one.
-        _authored_doc(
+        authored_doc(
             root,
             "adr",
             self.OTHER,
@@ -487,7 +485,7 @@ class TestArchivedDocsUntouched:
         return path
 
     def test_archived_doc_bytes_unchanged_by_rename(self, tmp_path: Path):
-        _authored_doc(tmp_path, "adr", self.OLD)
+        authored_doc(tmp_path, "adr", self.OLD)
         archived = self._archived_doc(tmp_path)
         before = archived.read_bytes()
 
@@ -510,22 +508,22 @@ class TestRollback:
     NEW = "gadget-engine"
 
     def _build(self, root: Path) -> None:
-        _authored_doc(root, "research", self.OLD)
-        _authored_doc(root, "adr", self.OLD, related=[f"{DATE}-{self.OLD}-research"])
-        _authored_doc(
+        authored_doc(root, "research", self.OLD)
+        authored_doc(root, "adr", self.OLD, related=[f"{DATE}-{self.OLD}-research"])
+        authored_doc(
             root,
             "plan",
             self.OLD,
             related=[f"{DATE}-{self.OLD}-adr"],
             extra_fm="tier: L2\n",
         )
-        _authored_doc(
+        authored_doc(
             root, "audit", self.OLD, topic="perf", related=[f"{DATE}-{self.OLD}-plan"]
         )
 
     def test_reverse_journal_rollback_restores_state(self, tmp_path: Path):
         self._build(tmp_path)
-        before = _snapshot_md(tmp_path)
+        before = snapshot_md(tmp_path)
 
         # Discover the deterministic apply order via the dry-run plan, then
         # plant a real directory at the SECOND destination filename. The OS
@@ -542,7 +540,7 @@ class TestRollback:
         # Remove the planted obstacle before inspecting for strays.
         obstacle.rmdir()
 
-        after = _snapshot_md(tmp_path)
+        after = snapshot_md(tmp_path)
         assert set(after) == set(before), (
             "rollback must leave no stray or missing documents; "
             f"added={set(after) - set(before)} removed={set(before) - set(after)}"
@@ -559,8 +557,8 @@ class TestRollback:
 class TestForceMergeAndCollision:
     def test_force_merge_into_existing_feature(self, tmp_path: Path):
         # Source has a research doc; target already owns an adr.
-        _authored_doc(tmp_path, "research", "source-feature")
-        _authored_doc(tmp_path, "adr", "target-feature")
+        authored_doc(tmp_path, "research", "source-feature")
+        authored_doc(tmp_path, "adr", "target-feature")
 
         result = rename_feature(
             tmp_path, "source-feature", "target-feature", force=True
@@ -586,14 +584,14 @@ class TestForceMergeAndCollision:
     def test_per_file_collision_refused_and_no_mutation(self, tmp_path: Path):
         # Both features own an adr of the same date+type; after the segment
         # swap the source adr would land on the existing target adr.
-        _authored_doc(tmp_path, "adr", "source-feature")
-        _authored_doc(tmp_path, "adr", "target-feature")
-        before = _snapshot_md(tmp_path)
+        authored_doc(tmp_path, "adr", "source-feature")
+        authored_doc(tmp_path, "adr", "target-feature")
+        before = snapshot_md(tmp_path)
 
         with pytest.raises(VaultSpecError, match="collision"):
             rename_feature(tmp_path, "source-feature", "target-feature", force=True)
 
-        after = _snapshot_md(tmp_path)
+        after = snapshot_md(tmp_path)
         assert set(after) == set(before)
         for path, original in before.items():
             assert after[path] == original, f"collision refusal mutated {path.name}"
@@ -610,8 +608,8 @@ class TestFlowTagsAndIndex:
 
     def _build(self, root: Path) -> None:
         # research uses YAML flow-style tags: ['#widget-engine', '#research'].
-        _authored_doc(root, "research", self.OLD, flow_tags=True)
-        _authored_doc(root, "adr", self.OLD, related=[f"{DATE}-{self.OLD}-research"])
+        authored_doc(root, "research", self.OLD, flow_tags=True)
+        authored_doc(root, "adr", self.OLD, related=[f"{DATE}-{self.OLD}-research"])
         _build_index(root, self.OLD)
 
     def test_flow_style_tags_normalized_to_new(self, tmp_path: Path):

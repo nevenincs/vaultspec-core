@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from .._base import Severity
-from ..code_boundary import _MAX_FILE_BYTES, check_code_boundary
+from ..code_boundary import check_code_boundary
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -24,6 +24,10 @@ pytestmark = [pytest.mark.unit]
 
 DATE = "2026-07-16"
 STEM = f"{DATE}-my-feat-adr"
+
+# Mirrors the scanner's own oversized-file threshold (code_boundary._MAX_FILE_BYTES);
+# kept as a local constant so the test can exceed it without importing the private name.
+_OVERSIZED_FILE_BYTES = 1_000_000
 
 
 def _write_vault_doc(root: Path, doc_type: str, feature: str) -> Path:
@@ -112,7 +116,7 @@ class TestCheckCodeBoundary:
         binary.write_bytes(b"\xff\xfe" + STEM.encode("utf-16-le"))
         big = tmp_path / "bundle.js"
         big.write_text(
-            STEM + "x" * _MAX_FILE_BYTES,
+            STEM + "x" * _OVERSIZED_FILE_BYTES,
             encoding="utf-8",
         )
 

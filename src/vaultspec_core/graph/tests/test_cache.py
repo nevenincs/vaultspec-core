@@ -41,6 +41,7 @@ from ...config import reset_config
 from ...testing.synthetic import build_synthetic_vault
 from .. import cache as cache_mod
 from ..api import VaultGraph
+from .conftest import stem_index_of
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -644,6 +645,7 @@ class TestStemIndexParity:
 
         # Load from cache; verify _stem_index excludes every phantom key.
         cached = VaultGraph(vault_root)
+        cached_stem_index = stem_index_of(cached)
         for phantom_key in phantoms:
             bare_stem = (
                 phantom_key.split("/", 1)[1] if "/" in phantom_key else phantom_key
@@ -652,8 +654,8 @@ class TestStemIndexParity:
             # maps to the phantom key.  (It may still be present if a real
             # node shares the same bare stem, but that is not the phantom
             # contributing it.)
-            if bare_stem in cached._stem_index:
-                for mapped_key in cached._stem_index[bare_stem]:
+            if bare_stem in cached_stem_index:
+                for mapped_key in cached_stem_index[bare_stem]:
                     assert not cached.nodes[mapped_key].phantom, (
                         f"_stem_index[{bare_stem!r}] contains phantom key "
                         f"{mapped_key!r} after cache load."
@@ -661,12 +663,12 @@ class TestStemIndexParity:
 
     def test_stem_index_matches_fresh_build(self, vault_root: Path) -> None:
         fresh = VaultGraph(vault_root, use_cache=False)
-        fresh_stem_index = dict(fresh._stem_index)
+        fresh_stem_index = stem_index_of(fresh)
 
         # Prime cache and load from it.
         VaultGraph(vault_root)
         cached = VaultGraph(vault_root)
-        cached_stem_index = dict(cached._stem_index)
+        cached_stem_index = stem_index_of(cached)
 
         assert cached_stem_index == fresh_stem_index, (
             f"_stem_index mismatch between cached and fresh build.\n"
