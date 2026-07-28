@@ -277,8 +277,15 @@ def test_armed_worker_exits_when_dead_client_pid_signals() -> None:
 
     The test holds the victim's ``Popen`` handle so the kernel keeps the
     process object alive after exit: ``OpenProcess`` then succeeds and the
-    wait fires at once. On POSIX the override path declines and the worker
-    reports it stayed up.
+    wait fires at once.
+
+    POSIX has no equivalent contract. ``client_pid`` is a Windows-only anchor -
+    :func:`arm_client_watchdog` does not consult it on POSIX, where the backstop
+    is a coarse reparent poll against the *real* parent. So arming reports
+    success and the worker stays up, because its parent (this test process) is
+    very much alive. The assertion here used to expect a decline, which the
+    POSIX-backstop work stopped being true without updating the expectation; it
+    then failed on every Linux run.
     """
     victim = subprocess.Popen([sys.executable, "-c", "pass"], stdout=subprocess.DEVNULL)
     victim.wait(timeout=60)
@@ -308,7 +315,9 @@ def test_armed_worker_exits_when_dead_client_pid_signals() -> None:
         assert "still-alive" not in proc.stdout
         assert elapsed < 15, f"worker outlived a dead client by {elapsed:.1f}s"
     else:
-        assert "armed=False" in proc.stdout
+        # The reparent poll arms regardless of the ignored client_pid, and
+        # watches a live parent, so the worker must survive its full sleep.
+        assert "armed=True" in proc.stdout
         assert "still-alive" in proc.stdout
 
 

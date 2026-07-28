@@ -1,4 +1,13 @@
-"""Real Claude Code and Codex CLI acceptance for native MCP enrollment."""
+"""Real Claude Code and Codex CLI acceptance for native MCP enrollment.
+
+Every test here shells out to the genuine ``claude`` binary, so the module
+carries the ``claude`` marker the rest of the suite already uses for that
+requirement. ``EXCLUDED_MARKERS`` deselects it wherever the CLI is not
+provisioned - which is every hosted runner - so these stay release-acceptance
+tests run against a real host rather than a gate that fails on absence.
+Without the marker ``just test repo`` collected them everywhere and
+``_host_executable`` asserted, reporting a missing binary as a code defect.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +24,7 @@ from vaultspec_core.config import reset_config
 from vaultspec_core.core.commands import install_run
 from vaultspec_core.core.mcps import mcp_uninstall
 
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.claude]
 
 
 def _host_executable(name: str) -> str:
