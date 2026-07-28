@@ -262,7 +262,7 @@ def _register_check_commands_content(check_app: _typer.Typer) -> None:
         total_fixed = sum(r.fixed_count for r in results)
 
         console.print()
-        parts = []
+        parts: list[str] = []
         if total_errors:
             parts.append(
                 f"[red]{total_errors} error{'s' if total_errors != 1 else ''}[/red]"

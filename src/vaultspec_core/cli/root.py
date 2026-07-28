@@ -30,15 +30,26 @@ from vaultspec_core.cli.root_doctor import cmd_check_providers, cmd_doctor
 from vaultspec_core.cli.root_install import cmd_install, cmd_uninstall
 from vaultspec_core.cli.root_preflight import _run_preflight, logger
 from vaultspec_core.cli.root_sync import (
-    _collect_sync_outcomes,
-    _infer_label,
-    _reject_core_sync_target,
-    _render_sync_dry_run,
-    _render_sync_post_notices,
-    _resolve_active_sync_names,
-    _single_item_result,
+    collect_sync_outcomes,
     cmd_sync,
+    infer_label,
+    reject_core_sync_target,
+    render_sync_dry_run,
+    render_sync_post_notices,
+    resolve_active_sync_names,
+    single_item_result,
 )
+
+# Compatibility aliases for historical test and plugin imports. The helpers
+# themselves are public in ``root_sync`` because they form an intentional
+# cross-module seam.
+_collect_sync_outcomes = collect_sync_outcomes
+_infer_label = infer_label
+_reject_core_sync_target = reject_core_sync_target
+_render_sync_dry_run = render_sync_dry_run
+_render_sync_post_notices = render_sync_post_notices
+_resolve_active_sync_names = resolve_active_sync_names
+_single_item_result = single_item_result
 
 app.command("install")(cmd_install)
 app.command("uninstall")(cmd_uninstall)
@@ -81,14 +92,21 @@ if __name__ == "__main__":
 
 
 __all__ = [
+    "collect_sync_outcomes",
+    "infer_label",
     "_collect_sync_outcomes",
     "_infer_label",
     "_register_subcommands",
+    "reject_core_sync_target",
+    "render_sync_dry_run",
+    "render_sync_post_notices",
+    "resolve_active_sync_names",
+    "_run_preflight",
+    "single_item_result",
     "_reject_core_sync_target",
     "_render_sync_dry_run",
     "_render_sync_post_notices",
     "_resolve_active_sync_names",
-    "_run_preflight",
     "_single_item_result",
     "app",
     "cmd_check_providers",

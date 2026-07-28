@@ -17,7 +17,7 @@ classifiers = [
 dependencies = [
   "PyYAML>=6.0.3",
   "httpx>=0.28.1",
-  "mcp>=1.28.1",
+  "mcp>=2.0.0",
   "networkx>=3.6",
   "phart>=0.5.0",
   "pydantic>=2.12.5",
@@ -61,7 +61,6 @@ version = "0.1.53"
     "mdformat-frontmatter>=2.0.10",
     "mdformat-gfm>=1.0.0",
     "mdformat-gfm-alerts>=1.0.0",
-    "prek>=0.3.2",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
     "pytest-durations>=1.0.0",
@@ -89,7 +88,6 @@ dev = [
   "mdformat-frontmatter>=2.0.10",
   "mdformat-gfm>=1.0.0",
   "mdformat-gfm-alerts>=1.0.0",
-  "prek>=0.3.2",
   # Module length and the class-shape design limits ruff has no rule for
   # (C0302, R0902, R0904, R0916). Everything else pylint would report is
   # already covered by ruff and stays disabled.
@@ -221,7 +219,7 @@ target-version = "py313"
     "src/vaultspec_core/testing/synthetic.py" = ["TC003"]
     # Diagnosis dataclasses use Tool as runtime dict key and for JSON serialization.
     "src/vaultspec_core/core/diagnosis/diagnosis.py" = ["TC001"]
-    # FastMCP inspects tool annotations at runtime, so Context must be importable.
+    # MCPServer inspects tool annotations at runtime, so Context must be importable.
     "src/vaultspec_core/mcp_server/tools/documents.py" = ["TC002"]
     "src/vaultspec_core/mcp_server/tools/orientation.py" = ["TC002"]
     "src/vaultspec_core/mcp_server/tools/plan.py" = ["TC002"]
@@ -243,9 +241,9 @@ target-version = "py313"
 python-version = "3.13"
 root = [".", "src"]
 
-# Strict-mode type checking. Landed ADVISORY (`just lint type-strict` is not in
-# the `lint all` chain yet) and promoted to gating once the burndown reaches
-# zero. `ty` stays the fast pre-commit gate.
+# Strict-mode type checking. The burndown reached zero, so this is now a
+# gating check: `just lint type-strict` is in the `lint all` chain. `ty`
+# stays the fast pre-commit gate.
 [tool.basedpyright]
 include = ["src/vaultspec_core"]
 pythonVersion = "3.13"
@@ -257,7 +255,51 @@ typeCheckingMode = "strict"
   # design). Every other strict rule stays ON for tests.
   [[tool.basedpyright.executionEnvironments]]
   reportPrivateUsage = false
+  root = "src/vaultspec_core/config/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/core/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/graph/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/hooks/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/metrics/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/migrations/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/protocol/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/testing/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
   root = "src/vaultspec_core/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/vaultcore/checks/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/vaultcore/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/verification/tests"
 
 # Cognitive complexity - how much state a reader must hold to follow a
 # function, as distinct from the number of paths through it that `xenon`
@@ -420,8 +462,11 @@ known_first_party = ["vaultspec_core"]
   #     `mcp.run()`, whose default transport is stdio, and the module's own
   #     comments name the stdio lifetime contract throughout. The HTTP and SSE
   #     transport stack is never constructed.
-  #   - `mcp@1.28.1` already requires all four itself, so removing the direct
-  #     declarations would not change a single resolved environment.
+  #   - `mcp@2.0.0` already requires sse-starlette, starlette, and uvicorn
+  #     itself, so removing those three declarations would not change a single
+  #     resolved environment. It no longer pulls `httpx` at all (2.0 moved to
+  #     `httpx2`), so that one declaration is now the only thing keeping httpx
+  #     in the runtime environment.
   #   - The only first-party `import httpx` is in `scripts/dependency_audit.py`,
   #     a dev script that is not shipped; that import argues for the dev group,
   #     not for [project.dependencies].
@@ -448,7 +493,6 @@ known_first_party = ["vaultspec_core"]
     "mdformat-frontmatter",
     "mdformat-gfm",
     "mdformat-gfm-alerts",
-    "prek",
     "pytest",
     "pytest-asyncio",
     "pytest-durations",

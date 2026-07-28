@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Literal, TypeGuard
+from typing import TYPE_CHECKING, Literal, TypeGuard, cast
 
 from .models import DocType
 
@@ -326,7 +326,7 @@ def _parse_baseline(raw: object) -> tuple[Mapping[str, BaselineEntry], str | Non
 
     entries: dict[str, BaselineEntry] = {}
     previous_path: str | None = None
-    for index, raw_entry in enumerate(entries_raw):
+    for index, raw_entry in enumerate(cast("list[object]", entries_raw)):
         entry, entry_error = _parse_baseline_entry(index, raw_entry)
         if entry is None:
             return MappingProxyType({}), entry_error
@@ -377,7 +377,9 @@ def _baseline_order_error(
 
 def _is_json_object(value: object) -> TypeGuard[dict[str, object]]:
     """Narrow JSON-decoded objects without accepting non-string member names."""
-    return isinstance(value, dict) and all(isinstance(key, str) for key in value)
+    return isinstance(value, dict) and all(
+        isinstance(key, str) for key in cast("dict[object, object]", value)
+    )
 
 
 def _is_canonical_vault_path(value: str) -> bool:

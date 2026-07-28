@@ -81,9 +81,9 @@ def check_mcp_server_factory() -> None:
             "register_vault_tools when running in a bare environment."
         )
     cls_name = type(server).__name__
-    if cls_name != "FastMCP":
-        _fail(f"create_server() returned {cls_name}, expected FastMCP")
-    print("PASS: create_server() returns FastMCP")
+    if cls_name != "MCPServer":
+        _fail(f"create_server() returned {cls_name}, expected MCPServer")
+    print("PASS: create_server() returns MCPServer")
 
 
 def check_cli_version() -> None:

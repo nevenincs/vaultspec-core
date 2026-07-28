@@ -24,7 +24,7 @@ from vaultspec_core.cli import app
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from click.testing import Result
+    from typer.testing import CliRunner, Result
 
 pytestmark = [pytest.mark.unit]
 
@@ -84,7 +84,7 @@ def _make_vault(tmp_path: Path, *, install: bool = True) -> Path:
     return root
 
 
-def _run(runner, *args: str, target: Path) -> Result:
+def _run(runner: CliRunner, *args: str, target: Path) -> Result:
     return runner.invoke(app, ["--target", str(target), *args])
 
 
@@ -94,7 +94,7 @@ def _run(runner, *args: str, target: Path) -> Result:
 
 
 class TestLinkList:
-    def test_json_envelope_shape(self, runner, tmp_path):
+    def test_json_envelope_shape(self, runner: CliRunner, tmp_path: Path) -> None:
         root = _make_vault(tmp_path)
         result = _run(runner, "vault", "link", "list", "--json", target=root)
         assert result.exit_code == 0, result.output
@@ -107,7 +107,7 @@ class TestLinkList:
         assert isinstance(data["edges"], list)
         assert data["count"] == len(data["edges"])
 
-    def test_list_includes_known_edge(self, runner, tmp_path):
+    def test_list_includes_known_edge(self, runner: CliRunner, tmp_path: Path) -> None:
         root = _make_vault(tmp_path)
         result = _run(runner, "vault", "link", "list", "--json", target=root)
         assert result.exit_code == 0
@@ -115,7 +115,9 @@ class TestLinkList:
         src_edges = [e for e in edges if e["src"] == "2026-01-01-alpha-adr"]
         assert any(e["dst"] == "2026-01-01-beta-adr" for e in src_edges)
 
-    def test_src_scoped_list_shows_out_and_in(self, runner, tmp_path):
+    def test_src_scoped_list_shows_out_and_in(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -131,7 +133,7 @@ class TestLinkList:
         directions = {e["direction"] for e in edges}
         assert "out" in directions
 
-    def test_unknown_src_exits_1(self, runner, tmp_path):
+    def test_unknown_src_exits_1(self, runner: CliRunner, tmp_path: Path) -> None:
         root = _make_vault(tmp_path)
         result = _run(
             runner, "vault", "link", "list", "no-such-doc", "--json", target=root
@@ -140,7 +142,9 @@ class TestLinkList:
         envelope = json.loads(result.output)
         assert envelope["status"] == "failed"
 
-    def test_feature_filter_scopes_output(self, runner, tmp_path):
+    def test_feature_filter_scopes_output(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -165,7 +169,7 @@ class TestLinkList:
 
 
 class TestLinkAdd:
-    def test_add_creates_edge(self, runner, tmp_path):
+    def test_add_creates_edge(self, runner: CliRunner, tmp_path: Path) -> None:
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -189,7 +193,7 @@ class TestLinkAdd:
         )
         assert "[[2026-01-01-alpha-adr]]" in content
 
-    def test_dry_run_does_not_write(self, runner, tmp_path):
+    def test_dry_run_does_not_write(self, runner: CliRunner, tmp_path: Path) -> None:
         root = _make_vault(tmp_path)
         beta_path = root / ".vault" / "adr" / "2026-01-01-beta-adr.md"
         original_bytes = beta_path.read_bytes()
@@ -212,7 +216,9 @@ class TestLinkAdd:
         # File must be byte-identical
         assert beta_path.read_bytes() == original_bytes
 
-    def test_idempotent_add_returns_unchanged(self, runner, tmp_path):
+    def test_idempotent_add_returns_unchanged(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
         root = _make_vault(tmp_path)
         # alpha already links to beta
         result = _run(
@@ -229,7 +235,9 @@ class TestLinkAdd:
         envelope = json.loads(result.output)
         assert envelope["status"] == "unchanged"
 
-    def test_dangling_refusal_exits_1_without_force(self, runner, tmp_path):
+    def test_dangling_refusal_exits_1_without_force(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -246,7 +254,9 @@ class TestLinkAdd:
         assert envelope["status"] == "failed"
         assert "dangling" in envelope["data"]["message"].lower()
 
-    def test_dangling_with_force_succeeds(self, runner, tmp_path):
+    def test_dangling_with_force_succeeds(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -267,7 +277,7 @@ class TestLinkAdd:
         )
         assert "[[phantom-does-not-exist]]" in content
 
-    def test_unknown_src_exits_1(self, runner, tmp_path):
+    def test_unknown_src_exits_1(self, runner: CliRunner, tmp_path: Path) -> None:
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -290,7 +300,7 @@ class TestLinkAdd:
 
 
 class TestLinkRemove:
-    def test_remove_deletes_edge(self, runner, tmp_path):
+    def test_remove_deletes_edge(self, runner: CliRunner, tmp_path: Path) -> None:
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -311,7 +321,7 @@ class TestLinkRemove:
         )
         assert "[[2026-01-01-beta-adr]]" not in content
 
-    def test_dry_run_does_not_write(self, runner, tmp_path):
+    def test_dry_run_does_not_write(self, runner: CliRunner, tmp_path: Path) -> None:
         root = _make_vault(tmp_path)
         alpha_path = root / ".vault" / "adr" / "2026-01-01-alpha-adr.md"
         original_bytes = alpha_path.read_bytes()
@@ -334,7 +344,9 @@ class TestLinkRemove:
         # File must be byte-identical
         assert alpha_path.read_bytes() == original_bytes
 
-    def test_noop_remove_returns_unchanged(self, runner, tmp_path):
+    def test_noop_remove_returns_unchanged(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
         root = _make_vault(tmp_path)
         # beta does not link to alpha
         result = _run(
@@ -351,7 +363,7 @@ class TestLinkRemove:
         envelope = json.loads(result.output)
         assert envelope["status"] == "unchanged"
 
-    def test_unknown_src_exits_1(self, runner, tmp_path):
+    def test_unknown_src_exits_1(self, runner: CliRunner, tmp_path: Path) -> None:
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -367,7 +379,7 @@ class TestLinkRemove:
         envelope = json.loads(result.output)
         assert envelope["status"] == "failed"
 
-    def test_json_envelope_schema(self, runner, tmp_path):
+    def test_json_envelope_schema(self, runner: CliRunner, tmp_path: Path) -> None:
         root = _make_vault(tmp_path)
         result = _run(
             runner,

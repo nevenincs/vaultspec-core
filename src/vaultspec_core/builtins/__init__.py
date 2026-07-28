@@ -15,6 +15,13 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "_builtins_root",
+    "check_outdated",
+    "list_builtins",
+    "seed_builtins",
+]
+
 
 def _builtins_root() -> Path:
     """Return the filesystem path to the bundled builtins directory."""

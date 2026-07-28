@@ -15,14 +15,21 @@ import stat
 import subprocess
 import sys
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import yaml
 
 logger = logging.getLogger(__name__)
+
+# ``_rmtree_robust`` and ``_launch_editor`` are consumed by several sibling
+# modules (config generation, sync, uninstall, hooks/rules/skills scaffolding)
+# under the module's leading-underscore convention for shared-but-internal
+# helpers; the explicit re-export marks that cross-module contract for the
+# type checker.
+__all__ = ["_launch_editor", "_rmtree_robust"]
 
 
 _thread_locks: dict[str, threading.Lock] = {}
@@ -38,7 +45,7 @@ def _get_thread_lock(key: str) -> threading.Lock:
 
 
 @contextmanager
-def advisory_lock(path: Path) -> Iterator[None]:
+def advisory_lock(path: Path) -> Generator[None]:
     """Advisory file lock for serializing concurrent read-modify-write cycles.
 
     Serializes threads within the same process via a per-path
@@ -89,23 +96,21 @@ def advisory_lock(path: Path) -> Iterator[None]:
         tlock.release()
 
 
-def _yaml_load(text: str) -> dict[str, Any]:
-    """Parse a YAML string and return a dict, defaulting to empty dict on empty input.
-
-    Args:
-        text: A YAML-formatted string to parse.
-
-    Returns:
-        Parsed key-value mapping, or an empty dict if *text* is empty or null.
-    """
-    return yaml.safe_load(text) or {}
-
-
 class _LiteralStr(str):
     """Marker type for strings that should use YAML literal block scalar."""
 
 
-def _literal_representer(dumper: yaml.Dumper, data: _LiteralStr) -> yaml.ScalarNode:
+class _ScalarRepresenter(Protocol):
+    """The subset of PyYAML's untyped ``Dumper`` interface this module relies on."""
+
+    def represent_scalar(
+        self, tag: str, value: str, style: str | None = None
+    ) -> yaml.ScalarNode: ...
+
+
+def _literal_representer(
+    dumper: _ScalarRepresenter, data: _LiteralStr
+) -> yaml.ScalarNode:
     """Represent a _LiteralStr value using YAML literal block scalar style (``|``).
 
     Args:
@@ -216,18 +221,18 @@ def _rmtree_robust(path: Path) -> None:
         path.unlink()
         return
 
-    def _on_error(
+    def _on_exc(
         func: Callable[..., object],
         fpath: str,
-        exc_info: tuple[type, BaseException, object],
+        exc: BaseException,
     ) -> None:
         if os.name == "nt":
             os.chmod(fpath, stat.S_IWRITE)
             func(fpath)
         else:
-            raise exc_info[1]
+            raise exc
 
-    shutil.rmtree(path, onerror=_on_error)
+    shutil.rmtree(path, onexc=_on_exc)
 
 
 def _open_atomic_temp(path: Path) -> tuple[int, Path, tuple[int, int]]:

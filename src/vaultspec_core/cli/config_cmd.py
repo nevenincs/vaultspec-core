@@ -136,7 +136,7 @@ def cmd_config_list(
     effective_target = apply_target_install(target)
     try:
         config_data = read_local_config(effective_target)
-        entries = {}
+        entries: dict[str, object] = {}
         for key in sorted(KNOWN_KEYS):
             entries[key] = config_data.get(key)
 
@@ -157,7 +157,7 @@ def cmd_config_list(
                 summary_line,
             )
 
-            rows = []
+            rows: list[dict[str, object]] = []
             for key, val in entries.items():
                 if val is not None:
                     rows.append({"key": key, "value": str(val), "status": "set"})

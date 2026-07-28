@@ -10,10 +10,14 @@ preservation.
 from __future__ import annotations
 
 import datetime
+from typing import TYPE_CHECKING
 
 import pytest
 import yaml
 from yaml.constructor import SafeConstructor
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from ...protocol.providers import GeminiModels
 from .. import parse_frontmatter, parse_vault_metadata
@@ -174,7 +178,7 @@ class TestFrontmatterLoaderSafety:
         # arbitrary tags - so this holds whichever branch libyaml selected.
         assert issubclass(SafeLoader, SafeConstructor)
 
-    def test_object_tag_is_not_instantiated(self, tmp_path):
+    def test_object_tag_is_not_instantiated(self, tmp_path: Path) -> None:
         document = (
             "---\n"
             "tags:\n"
@@ -196,7 +200,9 @@ class TestFrontmatterLoaderSafety:
         assert meta["payload"] == "!!python/object/apply:datetime.date [2026, 7, 28]"
         assert "# Body" in body
 
-    def test_object_tag_does_not_invoke_the_named_callable(self, tmp_path):
+    def test_object_tag_does_not_invoke_the_named_callable(
+        self, tmp_path: Path
+    ) -> None:
         # ``apply`` tags call the named object, which is the arbitrary-execution
         # vector proper - not merely arbitrary construction.
         document = (
@@ -242,7 +248,9 @@ class TestFrontmatterLoaderSafety:
 class TestFrontmatterRoundTrip:
     """The shapes the vault schema actually emits must survive a real read."""
 
-    def test_canonical_vault_frontmatter_round_trips_from_disk(self, tmp_path):
+    def test_canonical_vault_frontmatter_round_trips_from_disk(
+        self, tmp_path: Path
+    ) -> None:
         document = (
             "---\n"
             "tags:\n"
@@ -291,7 +299,9 @@ class TestFrontmatterRoundTrip:
         ]
         assert vault_body == body
 
-    def test_inline_list_frontmatter_round_trips_from_disk(self, tmp_path):
+    def test_inline_list_frontmatter_round_trips_from_disk(
+        self, tmp_path: Path
+    ) -> None:
         document = (
             "---\n"
             "tags: ['#plan', '#editor-demo']\n"

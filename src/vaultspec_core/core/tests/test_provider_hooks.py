@@ -29,9 +29,22 @@ if TYPE_CHECKING:
 pytestmark = [pytest.mark.unit]
 
 
-def _spec(event: HookEvent, **kw) -> HookSpec:
+def _spec(
+    event: HookEvent,
+    *,
+    name: str = "h",
+    command: str = "echo x",
+    matcher: str = "",
+    timeout: int | None = None,
+    enabled: bool = True,
+) -> HookSpec:
     return HookSpec(
-        name=kw.pop("name", "h"), event=event, command=kw.pop("command", "echo x"), **kw
+        name=name,
+        event=event,
+        command=command,
+        matcher=matcher,
+        timeout=timeout,
+        enabled=enabled,
     )
 
 

@@ -239,7 +239,7 @@ def _node_label_plain(node: DocNode) -> str:
         parts.append(node.title)
     if node.date:
         parts.append(node.date)
-    meta = []
+    meta: list[str] = []
     if node.word_count:
         meta.append(f"{node.word_count}w")
     meta.append(f"{len(node.in_links)}in")

@@ -31,6 +31,8 @@ from vaultspec_core.core.workspace_mode import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
 pytestmark = [pytest.mark.unit]
 
 
@@ -54,7 +56,7 @@ def _write_pyproject(root: Path, *, dependencies: list[str] | None = None) -> No
 
 
 class TestRoundTrip:
-    def test_tool_mode_round_trips(self, factory):
+    def test_tool_mode_round_trips(self, factory: WorkspaceFactory) -> None:
         write_workspace_declaration(
             factory.root, WorkspaceDeclaration(install_mode=InstallMode.TOOL)
         )
@@ -65,7 +67,9 @@ class TestRoundTrip:
         assert result.minimum_vaultspec_version is None
         assert result.schema_version == WORKSPACE_SCHEMA_VERSION
 
-    def test_dependency_mode_with_floor_round_trips(self, factory):
+    def test_dependency_mode_with_floor_round_trips(
+        self, factory: WorkspaceFactory
+    ) -> None:
         write_workspace_declaration(
             factory.root,
             WorkspaceDeclaration(
@@ -79,7 +83,7 @@ class TestRoundTrip:
         assert result.install_mode is InstallMode.DEPENDENCY
         assert result.minimum_vaultspec_version == "0.1.37"
 
-    def test_floor_key_omitted_when_unset(self, factory):
+    def test_floor_key_omitted_when_unset(self, factory: WorkspaceFactory) -> None:
         write_workspace_declaration(
             factory.root, WorkspaceDeclaration(install_mode=InstallMode.TOOL)
         )
@@ -87,7 +91,7 @@ class TestRoundTrip:
         raw = json.loads(_declaration_path(factory.root).read_text(encoding="utf-8"))
         assert "minimum_vaultspec_version" not in raw
 
-    def test_write_is_canonical(self, factory):
+    def test_write_is_canonical(self, factory: WorkspaceFactory) -> None:
         write_workspace_declaration(
             factory.root,
             WorkspaceDeclaration(
@@ -106,7 +110,7 @@ class TestRoundTrip:
         assert core_entry["install_mode"] == "dependency"
         assert core_entry["minimum_version"] == "1.2.3"
 
-    def test_schema_version_forced_on_write(self, factory):
+    def test_schema_version_forced_on_write(self, factory: WorkspaceFactory) -> None:
         write_workspace_declaration(
             factory.root,
             WorkspaceDeclaration(install_mode=InstallMode.TOOL, schema_version="99.0"),
@@ -117,24 +121,24 @@ class TestRoundTrip:
 
 
 class TestMissingFile:
-    def test_missing_file_returns_none(self, factory):
+    def test_missing_file_returns_none(self, factory: WorkspaceFactory) -> None:
         assert read_workspace_declaration(factory.root) is None
 
 
 class TestCorruptDeclaration:
-    def test_corrupt_json_raises(self, factory):
+    def test_corrupt_json_raises(self, factory: WorkspaceFactory) -> None:
         _write_raw(factory.root, "{not valid json")
 
         with pytest.raises(VaultSpecError, match="Corrupt workspace declaration"):
             read_workspace_declaration(factory.root)
 
-    def test_non_object_payload_raises(self, factory):
+    def test_non_object_payload_raises(self, factory: WorkspaceFactory) -> None:
         _write_raw(factory.root, json.dumps(["tool"]))
 
         with pytest.raises(VaultSpecError, match="expected a JSON object"):
             read_workspace_declaration(factory.root)
 
-    def test_malformed_mode_value_raises(self, factory):
+    def test_malformed_mode_value_raises(self, factory: WorkspaceFactory) -> None:
         _write_raw(
             factory.root,
             json.dumps({"schema_version": "1.0", "install_mode": "hybrid"}),
@@ -143,7 +147,7 @@ class TestCorruptDeclaration:
         with pytest.raises(VaultSpecError, match="Invalid install_mode"):
             read_workspace_declaration(factory.root)
 
-    def test_missing_mode_key_raises(self, factory):
+    def test_missing_mode_key_raises(self, factory: WorkspaceFactory) -> None:
         _write_raw(factory.root, json.dumps({"schema_version": "1.0"}))
 
         with pytest.raises(VaultSpecError, match="Invalid install_mode"):
@@ -153,7 +157,9 @@ class TestCorruptDeclaration:
 class TestResolvePrecedence:
     """The Q5 precedence chain: explicit > persisted > detected > default."""
 
-    def test_explicit_overrides_persisted_and_detected(self, factory):
+    def test_explicit_overrides_persisted_and_detected(
+        self, factory: WorkspaceFactory
+    ) -> None:
         # Detection and the persisted declaration both point at dependency
         # mode; the explicit flag must still win and flip the result to tool.
         _write_pyproject(factory.root, dependencies=["vaultspec-core>=0.1"])
@@ -163,7 +169,7 @@ class TestResolvePrecedence:
 
         assert resolve_install_mode(factory.root, InstallMode.TOOL) is InstallMode.TOOL
 
-    def test_persisted_overrides_detected(self, factory):
+    def test_persisted_overrides_detected(self, factory: WorkspaceFactory) -> None:
         # Detection would read dependency evidence from pyproject, but the
         # persisted declaration names tool mode and outranks detection.
         _write_pyproject(factory.root, dependencies=["vaultspec-core>=0.1"])
@@ -173,7 +179,7 @@ class TestResolvePrecedence:
 
         assert resolve_install_mode(factory.root) is InstallMode.TOOL
 
-    def test_detected_overrides_default(self, factory):
+    def test_detected_overrides_default(self, factory: WorkspaceFactory) -> None:
         # No explicit flag and no persisted declaration, so dependency
         # evidence in pyproject outranks the tool-mode default.
         _write_pyproject(factory.root, dependencies=["vaultspec-core>=0.1"])
@@ -184,15 +190,19 @@ class TestResolvePrecedence:
 class TestDetectionSignals:
     """Detection inputs when no explicit flag or persisted declaration exists."""
 
-    def test_absence_of_pyproject_forces_tool(self, factory):
+    def test_absence_of_pyproject_forces_tool(self, factory: WorkspaceFactory) -> None:
         assert resolve_install_mode(factory.root) is InstallMode.TOOL
 
-    def test_vaultspec_in_project_dependencies_is_dependency_evidence(self, factory):
+    def test_vaultspec_in_project_dependencies_is_dependency_evidence(
+        self, factory: WorkspaceFactory
+    ) -> None:
         _write_pyproject(factory.root, dependencies=["vaultspec-core>=0.1.37"])
 
         assert resolve_install_mode(factory.root) is InstallMode.DEPENDENCY
 
-    def test_vaultspec_in_default_dev_group_is_dev_evidence(self, factory):
+    def test_vaultspec_in_default_dev_group_is_dev_evidence(
+        self, factory: WorkspaceFactory
+    ) -> None:
         # PEP 735 default dev group, underscore spelling, mixed with an
         # unrelated requirement: the probe recognizes the distribution as
         # dev-scoped, non-leaking placement and resolves to DEV, not DEPENDENCY.
@@ -205,7 +215,9 @@ class TestDetectionSignals:
 
         assert resolve_install_mode(factory.root) is InstallMode.DEV
 
-    def test_pyproject_without_vaultspec_defaults_to_tool(self, factory):
+    def test_pyproject_without_vaultspec_defaults_to_tool(
+        self, factory: WorkspaceFactory
+    ) -> None:
         # A pyproject that exists but does not list vaultspec-core is the
         # "absence of both signals" case and falls through to the default.
         _write_pyproject(factory.root, dependencies=["pytest", "rich"])
@@ -222,7 +234,9 @@ class TestResolveRefusal:
     the integration file is excluded from.
     """
 
-    def test_dependency_without_pyproject_raises_with_hint(self, factory):
+    def test_dependency_without_pyproject_raises_with_hint(
+        self, factory: WorkspaceFactory
+    ) -> None:
         with pytest.raises(VaultSpecError) as excinfo:
             resolve_install_mode(factory.root, InstallMode.DEPENDENCY)
 
@@ -231,8 +245,8 @@ class TestResolveRefusal:
         assert "pyproject.toml" in excinfo.value.hint
 
     def test_corrupt_declaration_raises_before_resolution_with_explicit_mode(
-        self, factory
-    ):
+        self, factory: WorkspaceFactory
+    ) -> None:
         # An explicit request outranks the persisted declaration, but the
         # declaration is still read and validated first, so a corrupt
         # workspace.json fails fast at resolution rather than later inside the
@@ -246,7 +260,9 @@ class TestResolveRefusal:
 class TestLegacyV1Fold:
     """A schema 1.0 single-key file folds into the schema 2.0 core entry."""
 
-    def test_v1_single_key_file_folds_to_core_entry(self, factory):
+    def test_v1_single_key_file_folds_to_core_entry(
+        self, factory: WorkspaceFactory
+    ) -> None:
         _write_raw(
             factory.root,
             json.dumps(
@@ -271,7 +287,7 @@ class TestLegacyV1Fold:
         assert core.install_mode is InstallMode.DEPENDENCY
         assert core.minimum_version == "0.1.37"
 
-    def test_v1_fold_without_floor(self, factory):
+    def test_v1_fold_without_floor(self, factory: WorkspaceFactory) -> None:
         _write_raw(
             factory.root,
             json.dumps({"install_mode": "tool", "schema_version": "1.0"}),
@@ -282,7 +298,9 @@ class TestLegacyV1Fold:
         assert core.install_mode is InstallMode.TOOL
         assert core.minimum_version is None
 
-    def test_next_write_migrates_legacy_file_to_v2_shape(self, factory):
+    def test_next_write_migrates_legacy_file_to_v2_shape(
+        self, factory: WorkspaceFactory
+    ) -> None:
         # A legacy v1 file gains a rag entry: the folded core entry is preserved
         # and the whole file is rewritten in schema 2.0 shape with no leftover
         # top-level single-key fields.
@@ -306,7 +324,7 @@ class TestLegacyV1Fold:
 class TestSchemaV2RoundTrip:
     """The schema 2.0 per-package map round-trips through the public helpers."""
 
-    def test_dev_mode_round_trips(self, factory):
+    def test_dev_mode_round_trips(self, factory: WorkspaceFactory) -> None:
         write_package_declaration(
             factory.root, "vaultspec-core", PackageDeclaration(InstallMode.DEV)
         )
@@ -318,7 +336,9 @@ class TestSchemaV2RoundTrip:
         raw = json.loads(_declaration_path(factory.root).read_text(encoding="utf-8"))
         assert raw["packages"]["vaultspec-core"]["install_mode"] == "dev"
 
-    def test_dev_mode_round_trips_through_facade(self, factory):
+    def test_dev_mode_round_trips_through_facade(
+        self, factory: WorkspaceFactory
+    ) -> None:
         write_workspace_declaration(
             factory.root, WorkspaceDeclaration(install_mode=InstallMode.DEV)
         )
@@ -327,7 +347,7 @@ class TestSchemaV2RoundTrip:
         assert result is not None
         assert result.install_mode is InstallMode.DEV
 
-    def test_per_package_floor_round_trips(self, factory):
+    def test_per_package_floor_round_trips(self, factory: WorkspaceFactory) -> None:
         write_package_declaration(
             factory.root,
             "vaultspec-rag",
@@ -341,7 +361,7 @@ class TestSchemaV2RoundTrip:
         raw = json.loads(_declaration_path(factory.root).read_text(encoding="utf-8"))
         assert raw["packages"]["vaultspec-rag"]["minimum_version"] == "2.0.0"
 
-    def test_floor_omitted_when_unset_in_entry(self, factory):
+    def test_floor_omitted_when_unset_in_entry(self, factory: WorkspaceFactory) -> None:
         write_package_declaration(
             factory.root, "vaultspec-core", PackageDeclaration(InstallMode.TOOL)
         )
@@ -349,7 +369,9 @@ class TestSchemaV2RoundTrip:
         raw = json.loads(_declaration_path(factory.root).read_text(encoding="utf-8"))
         assert "minimum_version" not in raw["packages"]["vaultspec-core"]
 
-    def test_missing_package_entry_returns_none(self, factory):
+    def test_missing_package_entry_returns_none(
+        self, factory: WorkspaceFactory
+    ) -> None:
         write_package_declaration(
             factory.root, "vaultspec-core", PackageDeclaration(InstallMode.TOOL)
         )
@@ -360,7 +382,9 @@ class TestSchemaV2RoundTrip:
 class TestMixedPackageConfig:
     """A workspace declaring two packages resolves each independently."""
 
-    def test_core_dependency_rag_tool_read_independently(self, factory):
+    def test_core_dependency_rag_tool_read_independently(
+        self, factory: WorkspaceFactory
+    ) -> None:
         write_package_declaration(
             factory.root,
             "vaultspec-core",
@@ -379,7 +403,9 @@ class TestMixedPackageConfig:
         assert rag.install_mode is InstallMode.TOOL
         assert rag.minimum_version is None
 
-    def test_single_package_write_preserves_sibling(self, factory):
+    def test_single_package_write_preserves_sibling(
+        self, factory: WorkspaceFactory
+    ) -> None:
         write_package_declaration(
             factory.root, "vaultspec-core", PackageDeclaration(InstallMode.TOOL)
         )
@@ -399,7 +425,7 @@ class TestMixedPackageConfig:
         assert rag.install_mode is InstallMode.DEPENDENCY
         assert rag.minimum_version == "2.0.0"
 
-    def test_facade_write_preserves_sibling(self, factory):
+    def test_facade_write_preserves_sibling(self, factory: WorkspaceFactory) -> None:
         write_package_declaration(
             factory.root, "vaultspec-rag", PackageDeclaration(InstallMode.TOOL)
         )
@@ -411,14 +437,18 @@ class TestMixedPackageConfig:
         assert rag is not None
         assert rag.install_mode is InstallMode.TOOL
 
-    def test_facade_returns_none_when_only_sibling_declared(self, factory):
+    def test_facade_returns_none_when_only_sibling_declared(
+        self, factory: WorkspaceFactory
+    ) -> None:
         write_package_declaration(
             factory.root, "vaultspec-rag", PackageDeclaration(InstallMode.TOOL)
         )
 
         assert read_workspace_declaration(factory.root) is None
 
-    def test_pep503_spelling_writes_canonical_key(self, factory):
+    def test_pep503_spelling_writes_canonical_key(
+        self, factory: WorkspaceFactory
+    ) -> None:
         write_package_declaration(
             factory.root, "vaultspec_rag", PackageDeclaration(InstallMode.TOOL)
         )
@@ -431,7 +461,9 @@ class TestMixedPackageConfig:
 class TestV2CorruptEntries:
     """Broken schema 2.0 entries fail loud rather than silently dropping."""
 
-    def test_invalid_mode_in_package_entry_raises(self, factory):
+    def test_invalid_mode_in_package_entry_raises(
+        self, factory: WorkspaceFactory
+    ) -> None:
         _write_raw(
             factory.root,
             json.dumps(
@@ -445,7 +477,7 @@ class TestV2CorruptEntries:
         with pytest.raises(VaultSpecError, match="Invalid install_mode for package"):
             read_workspace_declaration(factory.root)
 
-    def test_non_object_package_entry_raises(self, factory):
+    def test_non_object_package_entry_raises(self, factory: WorkspaceFactory) -> None:
         _write_raw(
             factory.root,
             json.dumps(
@@ -459,7 +491,7 @@ class TestV2CorruptEntries:
         with pytest.raises(VaultSpecError, match="Malformed package entry"):
             read_workspace_declaration(factory.root)
 
-    def test_non_object_packages_map_raises(self, factory):
+    def test_non_object_packages_map_raises(self, factory: WorkspaceFactory) -> None:
         _write_raw(
             factory.root,
             json.dumps({"schema_version": "2.0", "packages": ["vaultspec-core"]}),
@@ -487,7 +519,7 @@ class TestDetectionTaxonomy:
     and a named non-default group or absence is NONE.
     """
 
-    def test_project_dependency_is_runtime(self, factory):
+    def test_project_dependency_is_runtime(self, factory: WorkspaceFactory) -> None:
         path = _pyproject(factory.root, 'dependencies = ["vaultspec-core>=0.1"]\n')
 
         assert (
@@ -495,7 +527,7 @@ class TestDetectionTaxonomy:
             is DependencyEvidence.RUNTIME
         )
 
-    def test_optional_dependency_is_runtime(self, factory):
+    def test_optional_dependency_is_runtime(self, factory: WorkspaceFactory) -> None:
         # optional-dependencies ship in built metadata and install with their
         # extra, so they leak downstream and read as runtime, not dev.
         path = _pyproject(
@@ -508,7 +540,7 @@ class TestDetectionTaxonomy:
             is DependencyEvidence.RUNTIME
         )
 
-    def test_default_dev_group_is_dev(self, factory):
+    def test_default_dev_group_is_dev(self, factory: WorkspaceFactory) -> None:
         path = _pyproject(
             factory.root,
             '[dependency-groups]\ndev = ["vaultspec-core>=0.1"]\n',
@@ -516,7 +548,7 @@ class TestDetectionTaxonomy:
 
         assert detect_package_evidence(path, "vaultspec-core") is DependencyEvidence.DEV
 
-    def test_legacy_uv_dev_dependencies_is_dev(self, factory):
+    def test_legacy_uv_dev_dependencies_is_dev(self, factory: WorkspaceFactory) -> None:
         path = _pyproject(
             factory.root,
             '[tool.uv]\ndev-dependencies = ["vaultspec-core>=0.1"]\n',
@@ -524,7 +556,7 @@ class TestDetectionTaxonomy:
 
         assert detect_package_evidence(path, "vaultspec-core") is DependencyEvidence.DEV
 
-    def test_named_non_default_group_is_none(self, factory):
+    def test_named_non_default_group_is_none(self, factory: WorkspaceFactory) -> None:
         # A named group is out of detection's scope: it stays inert until
         # enabled with --group, so it is deliberately unclassified.
         path = _pyproject(
@@ -536,7 +568,7 @@ class TestDetectionTaxonomy:
             detect_package_evidence(path, "vaultspec-core") is DependencyEvidence.NONE
         )
 
-    def test_runtime_outranks_dev_when_in_both(self, factory):
+    def test_runtime_outranks_dev_when_in_both(self, factory: WorkspaceFactory) -> None:
         # Declared in both a runtime set and the dev group: a leaking placement
         # is never masked by a dev declaration.
         path = _pyproject(
@@ -550,7 +582,9 @@ class TestDetectionTaxonomy:
             is DependencyEvidence.RUNTIME
         )
 
-    def test_underscore_spelling_in_dev_group_matches(self, factory):
+    def test_underscore_spelling_in_dev_group_matches(
+        self, factory: WorkspaceFactory
+    ) -> None:
         path = _pyproject(
             factory.root,
             '[dependency-groups]\ndev = ["vaultspec_core==0.1.37"]\n',
@@ -558,20 +592,20 @@ class TestDetectionTaxonomy:
 
         assert detect_package_evidence(path, "vaultspec-core") is DependencyEvidence.DEV
 
-    def test_absent_package_is_none(self, factory):
+    def test_absent_package_is_none(self, factory: WorkspaceFactory) -> None:
         path = _pyproject(factory.root, 'dependencies = ["pytest", "rich"]\n')
 
         assert (
             detect_package_evidence(path, "vaultspec-core") is DependencyEvidence.NONE
         )
 
-    def test_missing_file_is_none(self, factory):
+    def test_missing_file_is_none(self, factory: WorkspaceFactory) -> None:
         assert (
             detect_package_evidence(factory.root / "pyproject.toml", "vaultspec-core")
             is DependencyEvidence.NONE
         )
 
-    def test_malformed_file_is_none(self, factory):
+    def test_malformed_file_is_none(self, factory: WorkspaceFactory) -> None:
         path = factory.root / "pyproject.toml"
         path.write_text("this is not valid toml = = =\n", encoding="utf-8")
 
@@ -579,7 +613,9 @@ class TestDetectionTaxonomy:
             detect_package_evidence(path, "vaultspec-core") is DependencyEvidence.NONE
         )
 
-    def test_package_parameter_classifies_companion_independently(self, factory):
+    def test_package_parameter_classifies_companion_independently(
+        self, factory: WorkspaceFactory
+    ) -> None:
         # core runtime, rag dev group: each distribution classifies on its own
         # placement, not the file as a whole.
         path = _pyproject(
@@ -598,12 +634,16 @@ class TestDetectionTaxonomy:
 class TestDevPrecedence:
     """DEV enters resolve_install_mode's precedence chain via detection."""
 
-    def test_detected_dev_group_resolves_to_dev(self, factory):
+    def test_detected_dev_group_resolves_to_dev(
+        self, factory: WorkspaceFactory
+    ) -> None:
         _pyproject(factory.root, '[dependency-groups]\ndev = ["vaultspec-core>=0.1"]\n')
 
         assert resolve_install_mode(factory.root) is InstallMode.DEV
 
-    def test_detected_optional_dependency_resolves_to_dependency(self, factory):
+    def test_detected_optional_dependency_resolves_to_dependency(
+        self, factory: WorkspaceFactory
+    ) -> None:
         _pyproject(
             factory.root,
             '[project.optional-dependencies]\nextra = ["vaultspec-core>=0.1"]\n',
@@ -611,14 +651,18 @@ class TestDevPrecedence:
 
         assert resolve_install_mode(factory.root) is InstallMode.DEPENDENCY
 
-    def test_detected_named_group_falls_through_to_tool(self, factory):
+    def test_detected_named_group_falls_through_to_tool(
+        self, factory: WorkspaceFactory
+    ) -> None:
         _pyproject(
             factory.root, '[dependency-groups]\nlint = ["vaultspec-core>=0.1"]\n'
         )
 
         assert resolve_install_mode(factory.root) is InstallMode.TOOL
 
-    def test_persisted_dev_outranks_runtime_detection(self, factory):
+    def test_persisted_dev_outranks_runtime_detection(
+        self, factory: WorkspaceFactory
+    ) -> None:
         # Detection would read runtime evidence, but the persisted DEV
         # declaration outranks detection.
         _pyproject(factory.root, 'dependencies = ["vaultspec-core>=0.1"]\n')
@@ -628,7 +672,9 @@ class TestDevPrecedence:
 
         assert resolve_install_mode(factory.root) is InstallMode.DEV
 
-    def test_explicit_dev_with_pyproject_is_permitted(self, factory):
+    def test_explicit_dev_with_pyproject_is_permitted(
+        self, factory: WorkspaceFactory
+    ) -> None:
         # A pyproject exists but does not yet list vaultspec-core; an explicit
         # --mode dev is still honored since the contributor may be about to add
         # the placement.
@@ -636,7 +682,9 @@ class TestDevPrecedence:
 
         assert resolve_install_mode(factory.root, InstallMode.DEV) is InstallMode.DEV
 
-    def test_explicit_dev_overrides_persisted_and_detected(self, factory):
+    def test_explicit_dev_overrides_persisted_and_detected(
+        self, factory: WorkspaceFactory
+    ) -> None:
         _pyproject(factory.root, 'dependencies = ["vaultspec-core>=0.1"]\n')
         write_package_declaration(
             factory.root, "vaultspec-core", PackageDeclaration(InstallMode.TOOL)
@@ -644,7 +692,9 @@ class TestDevPrecedence:
 
         assert resolve_install_mode(factory.root, InstallMode.DEV) is InstallMode.DEV
 
-    def test_package_parameter_resolves_companion_independently(self, factory):
+    def test_package_parameter_resolves_companion_independently(
+        self, factory: WorkspaceFactory
+    ) -> None:
         # rag persisted DEV, core persisted DEPENDENCY: resolving each package
         # reads only its own entry.
         write_package_declaration(
@@ -660,7 +710,7 @@ class TestDevPrecedence:
             is InstallMode.DEV
         )
 
-    def test_detection_uses_the_named_package(self, factory):
+    def test_detection_uses_the_named_package(self, factory: WorkspaceFactory) -> None:
         # Only rag is dev-declared; resolving rag detects DEV while core, absent
         # from the manifest, falls through to the tool default.
         _pyproject(factory.root, '[dependency-groups]\ndev = ["vaultspec-rag>=0.1"]\n')
@@ -677,7 +727,9 @@ class TestDevPrecedence:
 class TestDevRefusal:
     """The impossible-combo refusal extends to DEV, which also needs a manifest."""
 
-    def test_explicit_dev_without_pyproject_raises_with_dev_hint(self, factory):
+    def test_explicit_dev_without_pyproject_raises_with_dev_hint(
+        self, factory: WorkspaceFactory
+    ) -> None:
         with pytest.raises(VaultSpecError) as excinfo:
             resolve_install_mode(factory.root, InstallMode.DEV)
 
@@ -689,8 +741,8 @@ class TestDevRefusal:
         assert "--mode tool" in excinfo.value.hint
 
     def test_explicit_dependency_without_pyproject_raises_with_dependency_hint(
-        self, factory
-    ):
+        self, factory: WorkspaceFactory
+    ) -> None:
         with pytest.raises(VaultSpecError) as excinfo:
             resolve_install_mode(factory.root, InstallMode.DEPENDENCY)
 
@@ -703,7 +755,9 @@ class TestDevRefusal:
 class TestModeProvenance:
     """resolve_install_mode_with_provenance tags how each mode was resolved."""
 
-    def test_explicit_flag_is_explicit_provenance(self, factory):
+    def test_explicit_flag_is_explicit_provenance(
+        self, factory: WorkspaceFactory
+    ) -> None:
         _pyproject(factory.root, 'dependencies = ["vaultspec-core>=0.1"]\n')
 
         resolved = resolve_install_mode_with_provenance(
@@ -711,7 +765,9 @@ class TestModeProvenance:
         )
         assert resolved == ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.EXPLICIT)
 
-    def test_persisted_declaration_is_persisted_provenance(self, factory):
+    def test_persisted_declaration_is_persisted_provenance(
+        self, factory: WorkspaceFactory
+    ) -> None:
         _pyproject(factory.root, 'dependencies = ["vaultspec-core>=0.1"]\n')
         write_package_declaration(
             factory.root, "vaultspec-core", PackageDeclaration(InstallMode.DEPENDENCY)
@@ -720,23 +776,31 @@ class TestModeProvenance:
         resolved = resolve_install_mode_with_provenance(factory.root)
         assert resolved.provenance is ModeProvenance.PERSISTED
 
-    def test_detected_runtime_is_detected_provenance(self, factory):
+    def test_detected_runtime_is_detected_provenance(
+        self, factory: WorkspaceFactory
+    ) -> None:
         _pyproject(factory.root, 'dependencies = ["vaultspec-core>=0.1"]\n')
 
         resolved = resolve_install_mode_with_provenance(factory.root)
         assert resolved == ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.DETECTED)
 
-    def test_detected_dev_is_detected_provenance(self, factory):
+    def test_detected_dev_is_detected_provenance(
+        self, factory: WorkspaceFactory
+    ) -> None:
         _pyproject(factory.root, '[dependency-groups]\ndev = ["vaultspec-core>=0.1"]\n')
 
         resolved = resolve_install_mode_with_provenance(factory.root)
         assert resolved == ResolvedMode(InstallMode.DEV, ModeProvenance.DETECTED)
 
-    def test_no_pyproject_is_default_provenance(self, factory):
+    def test_no_pyproject_is_default_provenance(
+        self, factory: WorkspaceFactory
+    ) -> None:
         resolved = resolve_install_mode_with_provenance(factory.root)
         assert resolved == ResolvedMode(InstallMode.TOOL, ModeProvenance.DEFAULT)
 
-    def test_pyproject_without_evidence_is_default_provenance(self, factory):
+    def test_pyproject_without_evidence_is_default_provenance(
+        self, factory: WorkspaceFactory
+    ) -> None:
         _pyproject(factory.root, 'dependencies = ["pytest"]\n')
 
         resolved = resolve_install_mode_with_provenance(factory.root)
@@ -746,29 +810,29 @@ class TestModeProvenance:
 class TestNewlyEstablishesDependency:
     """The moment-of-choice predicate behind the dependency-leak advisory."""
 
-    def test_explicit_dependency_is_newly_established(self):
+    def test_explicit_dependency_is_newly_established(self) -> None:
         resolved = ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.EXPLICIT)
         assert newly_establishes_dependency(resolved)
 
-    def test_detected_dependency_is_newly_established(self):
+    def test_detected_dependency_is_newly_established(self) -> None:
         resolved = ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.DETECTED)
         assert newly_establishes_dependency(resolved)
 
-    def test_inferred_dependency_is_newly_established(self):
+    def test_inferred_dependency_is_newly_established(self) -> None:
         resolved = ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.INFERRED)
         assert newly_establishes_dependency(resolved)
 
-    def test_persisted_dependency_is_not_newly_established(self):
+    def test_persisted_dependency_is_not_newly_established(self) -> None:
         # The core of the review fix: a persisted dependency read must not nag.
         resolved = ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.PERSISTED)
         assert not newly_establishes_dependency(resolved)
 
-    def test_dev_mode_is_never_newly_established(self):
+    def test_dev_mode_is_never_newly_established(self) -> None:
         for provenance in ModeProvenance:
             resolved = ResolvedMode(InstallMode.DEV, provenance)
             assert not newly_establishes_dependency(resolved)
 
-    def test_tool_mode_is_never_newly_established(self):
+    def test_tool_mode_is_never_newly_established(self) -> None:
         for provenance in ModeProvenance:
             resolved = ResolvedMode(InstallMode.TOOL, provenance)
             assert not newly_establishes_dependency(resolved)
@@ -777,16 +841,16 @@ class TestNewlyEstablishesDependency:
 class TestDependencyLeakAdvisoryText:
     """The advisory names the package that actually elects dependency mode."""
 
-    def test_advisory_names_the_given_package(self):
+    def test_advisory_names_the_given_package(self) -> None:
         text = dependency_leak_advisory("vaultspec-rag")
         assert text.startswith("vaultspec-rag is being provisioned")
         assert "vaultspec-core" not in text
 
-    def test_advisory_defaults_to_core(self):
+    def test_advisory_defaults_to_core(self) -> None:
         assert dependency_leak_advisory().startswith(
             "vaultspec-core is being provisioned"
         )
 
-    def test_backcompat_constant_matches_core_rendering(self):
+    def test_backcompat_constant_matches_core_rendering(self) -> None:
         # vaultspec-rag consumers floored on 0.1.38 reference the constant.
         assert dependency_leak_advisory() == DEPENDENCY_LEAK_ADVISORY

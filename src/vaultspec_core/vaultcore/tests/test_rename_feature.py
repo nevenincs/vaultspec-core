@@ -26,6 +26,7 @@ from ..parser import parse_frontmatter
 from ..query import list_documents, rename_feature
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
     from pathlib import Path
 
 pytestmark = [pytest.mark.unit]
@@ -34,7 +35,7 @@ DATE = "2026-06-26"
 
 
 @pytest.fixture(autouse=True)
-def _reset_cfg():
+def reset_cfg() -> Generator[None]:
     """Reset the process-global config to defaults around every test."""
     reset_config()
     yield

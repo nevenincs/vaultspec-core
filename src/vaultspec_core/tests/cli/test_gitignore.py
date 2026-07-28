@@ -42,7 +42,7 @@ def _read_gi(root: Path) -> str:
 
 
 class TestBlockInsertion:
-    def test_insert_into_existing_gitignore(self, tmp_path):
+    def test_insert_into_existing_gitignore(self, tmp_path: Path) -> None:
         _write_gi(tmp_path, "node_modules/\n")
         changed = ensure_gitignore_block(tmp_path, ENTRIES)
 
@@ -53,11 +53,11 @@ class TestBlockInsertion:
         assert ".vaultspec/_snapshots/" in text
         assert text.startswith("node_modules/")
 
-    def test_no_gitignore_returns_false(self, tmp_path):
+    def test_no_gitignore_returns_false(self, tmp_path: Path) -> None:
         changed = ensure_gitignore_block(tmp_path, ENTRIES)
         assert changed is False
 
-    def test_empty_gitignore(self, tmp_path):
+    def test_empty_gitignore(self, tmp_path: Path) -> None:
         _write_gi(tmp_path, "")
         changed = ensure_gitignore_block(tmp_path, ENTRIES)
 
@@ -68,7 +68,7 @@ class TestBlockInsertion:
 
 
 class TestBlockUpdate:
-    def test_update_existing_block(self, tmp_path):
+    def test_update_existing_block(self, tmp_path: Path) -> None:
         _write_gi(tmp_path, "node_modules/\n")
         ensure_gitignore_block(tmp_path, ENTRIES)
         new_entries = [".vaultspec/_snapshots/", ".vaultspec/cache/"]
@@ -82,7 +82,7 @@ class TestBlockUpdate:
 
 
 class TestBlockRemoval:
-    def test_remove_existing_block(self, tmp_path):
+    def test_remove_existing_block(self, tmp_path: Path) -> None:
         _write_gi(tmp_path, "node_modules/\n")
         ensure_gitignore_block(tmp_path, ENTRIES)
         changed = ensure_gitignore_block(tmp_path, ENTRIES, state=ManagedState.ABSENT)
@@ -92,20 +92,20 @@ class TestBlockRemoval:
         assert MARKER_BEGIN not in text
         assert MARKER_END not in text
 
-    def test_remove_no_block_returns_false(self, tmp_path):
+    def test_remove_no_block_returns_false(self, tmp_path: Path) -> None:
         _write_gi(tmp_path, "node_modules/\n")
         changed = ensure_gitignore_block(tmp_path, ENTRIES, state=ManagedState.ABSENT)
         assert changed is False
 
 
 class TestIdempotency:
-    def test_same_entries_twice_returns_false(self, tmp_path):
+    def test_same_entries_twice_returns_false(self, tmp_path: Path) -> None:
         _write_gi(tmp_path, "node_modules/\n")
         ensure_gitignore_block(tmp_path, ENTRIES)
         changed = ensure_gitignore_block(tmp_path, ENTRIES)
         assert changed is False
 
-    def test_content_stable_after_two_calls(self, tmp_path):
+    def test_content_stable_after_two_calls(self, tmp_path: Path) -> None:
         _write_gi(tmp_path, "node_modules/\n")
         ensure_gitignore_block(tmp_path, ENTRIES)
         content_after_first = _gi(tmp_path).read_bytes()
@@ -115,7 +115,7 @@ class TestIdempotency:
 
 
 class TestAtomicWriteNamespace:
-    def test_legacy_temp_regular_file_is_untouched(self, tmp_path):
+    def test_legacy_temp_regular_file_is_untouched(self, tmp_path: Path) -> None:
         gi = _gi(tmp_path)
         gi.write_bytes(b"# operator rule\n")
         legacy = gi.with_suffix(gi.suffix + f".{os.getpid()}.tmp")
@@ -128,7 +128,7 @@ class TestAtomicWriteNamespace:
 
 
 class TestOrphanedMarkers:
-    def test_orphaned_begin_marker(self, tmp_path):
+    def test_orphaned_begin_marker(self, tmp_path: Path) -> None:
         content = f"node_modules/\n{MARKER_BEGIN}\n.vaultspec/_snapshots/\n"
         _write_gi(tmp_path, content)
         changed = ensure_gitignore_block(tmp_path, ENTRIES)
@@ -138,7 +138,7 @@ class TestOrphanedMarkers:
         assert text.count(MARKER_BEGIN) == 1
         assert text.count(MARKER_END) == 1
 
-    def test_orphaned_end_marker(self, tmp_path):
+    def test_orphaned_end_marker(self, tmp_path: Path) -> None:
         content = f"node_modules/\n{MARKER_END}\n"
         _write_gi(tmp_path, content)
         changed = ensure_gitignore_block(tmp_path, ENTRIES)
@@ -150,7 +150,7 @@ class TestOrphanedMarkers:
 
 
 class TestLineEndings:
-    def test_crlf_preserved(self, tmp_path):
+    def test_crlf_preserved(self, tmp_path: Path) -> None:
         raw = b"node_modules/\r\n.env\r\n"
         _gi(tmp_path).write_bytes(raw)
         ensure_gitignore_block(tmp_path, ENTRIES)
@@ -163,7 +163,7 @@ class TestLineEndings:
 
 
 class TestContentPreservation:
-    def test_user_content_above_and_below(self, tmp_path):
+    def test_user_content_above_and_below(self, tmp_path: Path) -> None:
         before_block = "# user content above\nnode_modules/\n"
         block = f"{MARKER_BEGIN}\n.old_entry/\n{MARKER_END}\n"
         after_block = "# user content below\n.env\n"
@@ -180,7 +180,7 @@ class TestContentPreservation:
 
 
 class TestTrailingBlanks:
-    def test_multiple_trailing_blanks_normalized(self, tmp_path):
+    def test_multiple_trailing_blanks_normalized(self, tmp_path: Path) -> None:
         _write_gi(tmp_path, "node_modules/\n\n\n\n")
         ensure_gitignore_block(tmp_path, ENTRIES)
 
@@ -199,7 +199,7 @@ class TestTrailingBlanks:
 
 
 class TestFileWithoutNewline:
-    def test_file_ending_without_newline(self, tmp_path):
+    def test_file_ending_without_newline(self, tmp_path: Path) -> None:
         _write_gi(tmp_path, "node_modules/")
         changed = ensure_gitignore_block(tmp_path, ENTRIES)
 
@@ -210,13 +210,15 @@ class TestFileWithoutNewline:
 
 
 class TestInvertedMarkers:
-    def test_find_markers_inverted_returns_both(self):
+    def test_find_markers_inverted_returns_both(self) -> None:
         lines = ["some content", MARKER_END, ".entry/", MARKER_BEGIN]
         begins, ends = _find_markers(lines)
         assert begins == [3]
         assert ends == [1]
 
-    def test_ensure_removes_both_markers_and_appends_fresh_block(self, tmp_path):
+    def test_ensure_removes_both_markers_and_appends_fresh_block(
+        self, tmp_path: Path
+    ) -> None:
         content = f"node_modules/\n{MARKER_END}\n.entry/\n{MARKER_BEGIN}\n"
         _write_gi(tmp_path, content)
         changed = ensure_gitignore_block(tmp_path, ENTRIES)
@@ -230,13 +232,13 @@ class TestInvertedMarkers:
 
 
 class TestDuplicateBeginMarkers:
-    def test_find_markers_duplicate_begin_returns_all(self):
+    def test_find_markers_duplicate_begin_returns_all(self) -> None:
         lines = [MARKER_BEGIN, ".entry/", MARKER_BEGIN, ".entry2/", MARKER_END]
         begins, ends = _find_markers(lines)
         assert begins == [0, 2]
         assert ends == [4]
 
-    def test_ensure_handles_duplicate_begin(self, tmp_path):
+    def test_ensure_handles_duplicate_begin(self, tmp_path: Path) -> None:
         content = f"{MARKER_BEGIN}\n.entry/\n{MARKER_BEGIN}\n.entry2/\n{MARKER_END}\n"
         _write_gi(tmp_path, content)
         changed = ensure_gitignore_block(tmp_path, ENTRIES)
@@ -249,13 +251,13 @@ class TestDuplicateBeginMarkers:
 
 
 class TestDuplicateEndMarkers:
-    def test_find_markers_duplicate_end_returns_all(self):
+    def test_find_markers_duplicate_end_returns_all(self) -> None:
         lines = [MARKER_BEGIN, ".entry/", MARKER_END, MARKER_END]
         begins, ends = _find_markers(lines)
         assert begins == [0]
         assert ends == [2, 3]
 
-    def test_ensure_handles_duplicate_end(self, tmp_path):
+    def test_ensure_handles_duplicate_end(self, tmp_path: Path) -> None:
         content = f"{MARKER_BEGIN}\n.entry/\n{MARKER_END}\n{MARKER_END}\n"
         _write_gi(tmp_path, content)
         changed = ensure_gitignore_block(tmp_path, ENTRIES)
@@ -268,7 +270,7 @@ class TestDuplicateEndMarkers:
 
 
 class TestEmptyEntriesList:
-    def test_empty_entries_writes_markers_only(self, tmp_path):
+    def test_empty_entries_writes_markers_only(self, tmp_path: Path) -> None:
         _write_gi(tmp_path, "node_modules/\n")
         changed = ensure_gitignore_block(tmp_path, [], state=ManagedState.PRESENT)
 
@@ -284,10 +286,11 @@ class TestEmptyEntriesList:
 
 
 class TestReadOnlyGitignore:
-    def test_read_only_raises_oserror(self, tmp_path):
+    def test_read_only_raises_oserror(self, tmp_path: Path) -> None:
         _write_gi(tmp_path, "node_modules/\n")
         gi = _gi(tmp_path)
         gi.chmod(stat.S_IREAD)
+        can_write = False
         try:
             # On Linux, root/CI can write read-only files; also, atomic
             # replace (rename) can succeed for 0444 files if the directory is
@@ -358,13 +361,13 @@ class TestProviderArtifactOwnership:
 class TestRecommendedEntries:
     """Verify .vault/ is not blanket-ignored; only generated subdirs are."""
 
-    def test_vault_dir_not_blanket_ignored(self, tmp_path):
+    def test_vault_dir_not_blanket_ignored(self, tmp_path: Path) -> None:
         (tmp_path / ".vaultspec").mkdir()
         (tmp_path / ".vault").mkdir()
         entries = get_recommended_entries(tmp_path)
         assert ".vault/" not in entries
 
-    def test_vault_generated_subdirs_ignored(self, tmp_path):
+    def test_vault_generated_subdirs_ignored(self, tmp_path: Path) -> None:
         (tmp_path / ".vaultspec").mkdir()
         (tmp_path / ".vault").mkdir()
         entries = get_recommended_entries(tmp_path)
@@ -373,7 +376,9 @@ class TestRecommendedEntries:
         assert ".vault/data/" in entries
         assert ".vault/logs/" in entries
 
-    def test_vaultspec_dir_not_blanket_ignored_but_runtime_ignored(self, tmp_path):
+    def test_vaultspec_dir_not_blanket_ignored_but_runtime_ignored(
+        self, tmp_path: Path
+    ) -> None:
         """`.vaultspec/` itself is team-shared and not blanket-ignored.
 
         Only genuine per-machine runtime by-products (snapshots, advisory locks,
@@ -387,7 +392,7 @@ class TestRecommendedEntries:
         assert ".vaultspec/providers.json" in entries
         assert ".vaultspec/mcp-ownership.json" in entries
 
-    def test_root_lock_sentinel_when_companion_exists(self, tmp_path):
+    def test_root_lock_sentinel_when_companion_exists(self, tmp_path: Path) -> None:
         (tmp_path / ".vaultspec").mkdir()
         (tmp_path / ".gitignore").write_text("", encoding="utf-8")
         (tmp_path / ".mcp.json").write_text("{}", encoding="utf-8")
@@ -399,7 +404,9 @@ class TestRecommendedEntries:
         assert "/.mcp.json.lock" in entries
         assert "/.pre-commit-config.yaml.lock" in entries
 
-    def test_root_lock_sentinel_skipped_when_companion_absent(self, tmp_path):
+    def test_root_lock_sentinel_skipped_when_companion_absent(
+        self, tmp_path: Path
+    ) -> None:
         (tmp_path / ".vaultspec").mkdir()
 
         entries = get_recommended_entries(tmp_path)

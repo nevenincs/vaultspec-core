@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -18,13 +18,17 @@ from ...vaultcore import DocType
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from typer.testing import CliRunner
+
+    from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
 pytestmark = [pytest.mark.unit]
 
 
 class TestGetVersion:
     """Verify version information is correctly retrieved."""
 
-    def test_reads_version_from_pyproject(self, synthetic_project):
+    def test_reads_version_from_pyproject(self, synthetic_project: Path):
         from importlib.metadata import version
 
         from vaultspec_core.cli_common import get_version
@@ -33,7 +37,7 @@ class TestGetVersion:
         expected = version("vaultspec-core")
         assert v == expected
 
-    def test_get_version_returns_string(self, synthetic_project):
+    def test_get_version_returns_string(self, synthetic_project: Path):
         from vaultspec_core.cli_common import get_version
 
         assert isinstance(get_version(), str)
@@ -42,7 +46,7 @@ class TestGetVersion:
 class TestHelpText:
     """Verify that --help output contains expected strings."""
 
-    def test_main_help(self, runner, synthetic_project):
+    def test_main_help(self, runner: CliRunner, synthetic_project: Path):
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "vault", "--help"]
         )
@@ -51,7 +55,7 @@ class TestHelpText:
         assert "check" in result.output
         assert "stats" in result.output
 
-    def test_add_help(self, runner, synthetic_project):
+    def test_add_help(self, runner: CliRunner, synthetic_project: Path):
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "vault", "add", "--help"]
         )
@@ -62,7 +66,9 @@ class TestHelpText:
 class TestAddSubcommand:
     """Verify 'vault add' behavior."""
 
-    def test_add_generates_correct_filename(self, runner, synthetic_project):
+    def test_add_generates_correct_filename(
+        self, runner: CliRunner, synthetic_project: Path
+    ):
         date_str = datetime.now(UTC).strftime("%Y-%m-%d")
 
         # Cleanup potential leftover from previous failed tests
@@ -90,7 +96,7 @@ class TestAddSubcommand:
         assert expected_path.exists()
 
     def test_add_topic_infix_generates_disambiguated_filename(
-        self, runner, synthetic_project
+        self, runner: CliRunner, synthetic_project: Path
     ):
         date_str = datetime.now(UTC).strftime("%Y-%m-%d")
         expected_path = (
@@ -122,7 +128,9 @@ class TestAddSubcommand:
         assert "{topic}" not in body
         assert "{title}" not in body
 
-    def test_add_topic_rejected_for_non_admitting_type(self, runner, synthetic_project):
+    def test_add_topic_rejected_for_non_admitting_type(
+        self, runner: CliRunner, synthetic_project: Path
+    ):
         result = runner.invoke(
             app,
             [
@@ -140,7 +148,9 @@ class TestAddSubcommand:
         assert result.exit_code == 1
         assert "--topic is only valid" in result.output
 
-    def test_add_topic_rejects_non_kebab_value(self, runner, synthetic_project):
+    def test_add_topic_rejects_non_kebab_value(
+        self, runner: CliRunner, synthetic_project: Path
+    ):
         result = runner.invoke(
             app,
             [
@@ -157,7 +167,9 @@ class TestAddSubcommand:
         )
         assert result.exit_code == 1
 
-    def test_add_strips_hash_from_feature(self, runner, synthetic_project):
+    def test_add_strips_hash_from_feature(
+        self, runner: CliRunner, synthetic_project: Path
+    ):
         """Creating with #feature should strip the hash."""
         date_str = datetime.now(UTC).strftime("%Y-%m-%d")
 
@@ -182,7 +194,7 @@ class TestAddSubcommand:
         assert expected_path.exists()
 
     def test_add_valid_doc_types_accepted(
-        self, runner, tmp_path: Path, synthetic_project
+        self, runner: CliRunner, tmp_path: Path, synthetic_project: Path
     ):
         """Test all user-creatable DocType choices are accepted.
 
@@ -236,7 +248,7 @@ class TestAddSubcommand:
             )
 
     def test_add_index_type_is_rejected(
-        self, runner, tmp_path: Path, synthetic_project
+        self, runner: CliRunner, tmp_path: Path, synthetic_project: Path
     ):
         """``vault add index`` must redirect users to ``vault feature index``.
 
@@ -275,7 +287,9 @@ class TestAddSubcommand:
         if index_dir.is_dir():
             assert not any(index_dir.iterdir())
 
-    def test_add_created_doc_passes_validation(self, runner, synthetic_project):
+    def test_add_created_doc_passes_validation(
+        self, runner: CliRunner, synthetic_project: Path
+    ):
         """Created documents must pass the project's own frontmatter validation."""
         from vaultspec_core.vaultcore.parser import parse_vault_metadata
 
@@ -313,7 +327,7 @@ class TestAddSubcommand:
         assert not errors, f"Created document fails validation: {errors}"
 
     def test_add_retains_template_annotations_until_explicit_fix(
-        self, runner, synthetic_project
+        self, runner: CliRunner, synthetic_project: Path
     ):
         """Hydration must not strip agent-facing template instructions."""
         date_str = datetime.now(UTC).strftime("%Y-%m-%d")
@@ -369,7 +383,9 @@ class TestAddSubcommand:
 class TestVaultJsonOutput:
     """JSON-mode commands must produce machine-readable stdout only."""
 
-    def test_add_dry_run_json_has_no_human_prefix(self, runner, synthetic_project):
+    def test_add_dry_run_json_has_no_human_prefix(
+        self, runner: CliRunner, synthetic_project: Path
+    ):
         result = runner.invoke(
             app,
             [
@@ -391,7 +407,7 @@ class TestVaultJsonOutput:
         assert payload["dry_run"] is True
         assert payload["type"] == "research"
 
-    def test_graph_empty_json_has_no_human_prefix(self, factory):
+    def test_graph_empty_json_has_no_human_prefix(self, factory: WorkspaceFactory):
         factory.install("core")
 
         result = factory.run("vault", "graph", "--json")
@@ -402,7 +418,9 @@ class TestVaultJsonOutput:
         assert payload["nodes"] == []
         assert payload.get("links", payload.get("edges", [])) == []
 
-    def test_feature_index_empty_json_has_no_human_prefix(self, factory):
+    def test_feature_index_empty_json_has_no_human_prefix(
+        self, factory: WorkspaceFactory
+    ):
         factory.install("core")
 
         result = factory.run("vault", "feature", "index", "--json")
@@ -416,15 +434,18 @@ class TestVaultJsonOutput:
 class TestVaultGraphScopingFlags:
     """vault graph --node/--depth ego scoping and --derived/--no-derived."""
 
-    def _graph_json(self, runner, project, *extra: str) -> dict:
+    def _graph_json(
+        self, runner: CliRunner, project: Path, *extra: str
+    ) -> dict[str, Any]:
         result = runner.invoke(
             app,
             ["--target", str(project), "vault", "graph", "--json", *extra],
         )
         assert result.exit_code == 0, result.output
-        return json.loads(result.output)
+        payload: dict[str, Any] = json.loads(result.output)
+        return payload
 
-    def _busiest_node(self, payload: dict) -> str:
+    def _busiest_node(self, payload: dict[str, Any]) -> str:
         """Return the node id with the most incoming plus outgoing links."""
         nodes = payload["data"]["nodes"]
         ranked = sorted(
@@ -435,7 +456,7 @@ class TestVaultGraphScopingFlags:
         return ranked[0]["id"]
 
     def test_full_graph_includes_derived_edges_by_default(
-        self, runner, synthetic_project
+        self, runner: CliRunner, synthetic_project: Path
     ):
         payload = self._graph_json(runner, synthetic_project)
         assert payload["schema"] == "vaultspec.vault.graph.v2"
@@ -446,14 +467,18 @@ class TestVaultGraphScopingFlags:
         assert isinstance(data["derived_edges"], list)
         assert len(data["derived_edges"]) > 0
 
-    def test_no_derived_empties_the_derived_array(self, runner, synthetic_project):
+    def test_no_derived_empties_the_derived_array(
+        self, runner: CliRunner, synthetic_project: Path
+    ):
         payload = self._graph_json(runner, synthetic_project, "--no-derived")
         assert payload["data"]["derived_edges"] == []
         # The canonical edges array is unaffected by the derived toggle.
         with_derived = self._graph_json(runner, synthetic_project)
         assert payload["data"]["edges"] == with_derived["data"]["edges"]
 
-    def test_node_scopes_to_ego_neighbourhood(self, runner, synthetic_project):
+    def test_node_scopes_to_ego_neighbourhood(
+        self, runner: CliRunner, synthetic_project: Path
+    ):
         full = self._graph_json(runner, synthetic_project)
         centre = self._busiest_node(full)
         ego = self._graph_json(runner, synthetic_project, "--node", centre)
@@ -464,7 +489,9 @@ class TestVaultGraphScopingFlags:
         assert ego_ids <= full_ids
         assert len(ego_ids) < len(full_ids)
 
-    def test_depth_zero_returns_only_the_centre(self, runner, synthetic_project):
+    def test_depth_zero_returns_only_the_centre(
+        self, runner: CliRunner, synthetic_project: Path
+    ):
         full = self._graph_json(runner, synthetic_project)
         centre = self._busiest_node(full)
         ego0 = self._graph_json(
@@ -473,7 +500,9 @@ class TestVaultGraphScopingFlags:
         ids = {n["id"] for n in ego0["data"]["nodes"]}
         assert ids == {centre}
 
-    def test_depth_grows_neighbourhood_monotonically(self, runner, synthetic_project):
+    def test_depth_grows_neighbourhood_monotonically(
+        self, runner: CliRunner, synthetic_project: Path
+    ):
         full = self._graph_json(runner, synthetic_project)
         centre = self._busiest_node(full)
         n0 = len(
@@ -489,7 +518,9 @@ class TestVaultGraphScopingFlags:
         assert n0 == 1
         assert n1 >= n0
 
-    def test_missing_node_fails_with_exit_one(self, runner, synthetic_project):
+    def test_missing_node_fails_with_exit_one(
+        self, runner: CliRunner, synthetic_project: Path
+    ):
         result = runner.invoke(
             app,
             [
@@ -507,7 +538,9 @@ class TestVaultGraphScopingFlags:
         assert payload["status"] == "failed"
         assert "this-node-does-not-exist" in payload["data"]["message"]
 
-    def test_ego_derived_edges_stay_within_scope(self, runner, synthetic_project):
+    def test_ego_derived_edges_stay_within_scope(
+        self, runner: CliRunner, synthetic_project: Path
+    ):
         full = self._graph_json(runner, synthetic_project)
         centre = self._busiest_node(full)
         ego = self._graph_json(
@@ -520,7 +553,7 @@ class TestVaultGraphScopingFlags:
 
 
 class TestNoCommand:
-    def test_no_command_prints_help(self, runner, synthetic_project):
+    def test_no_command_prints_help(self, runner: CliRunner, synthetic_project: Path):
         result = runner.invoke(app, ["--target", str(synthetic_project), "vault"])
         # vault_app uses no_args_is_help=True. The actual contract is that
         # help is rendered to output; the exit code is a Typer-version
@@ -538,7 +571,7 @@ class TestCheckCodeBoundary:
     """The opt-in source-boundary scanner verb is advisory."""
 
     def test_findings_are_warnings_and_exit_zero(
-        self, runner, tmp_path: Path, synthetic_project
+        self, runner: CliRunner, tmp_path: Path, synthetic_project: Path
     ):
         from vaultspec_core.core.types import init_paths
 
@@ -561,7 +594,9 @@ class TestCheckCodeBoundary:
         assert result.exit_code == 0, f"Failed: {result.output}"
         assert stem in result.output
 
-    def test_clean_tree_reports_clean(self, runner, tmp_path: Path, synthetic_project):
+    def test_clean_tree_reports_clean(
+        self, runner: CliRunner, tmp_path: Path, synthetic_project: Path
+    ):
         from vaultspec_core.core.types import init_paths
 
         (tmp_path / ".vault" / "adr").mkdir(parents=True)

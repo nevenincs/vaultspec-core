@@ -235,7 +235,7 @@ def render_check_result(
     warnings = result.warning_count
     infos = result.info_count
 
-    parts = []
+    parts: list[str] = []
     if errors:
         parts.append(f"[red]{errors} error{'s' if errors != 1 else ''}[/red]")
     if warnings:

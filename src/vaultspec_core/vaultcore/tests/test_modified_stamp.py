@@ -110,7 +110,7 @@ _BUILTIN_TEMPLATES = Path(vaultspec_core.__file__).parent / "builtins" / "templa
 
 
 @pytest.fixture(autouse=True)
-def _reset_cfg() -> Generator[None]:
+def reset_cfg() -> Generator[None]:
     reset_config()
     yield
     reset_config()
@@ -295,7 +295,9 @@ class TestScaffoldStamp:
         "doc_type",
         [DocType.ADR, DocType.AUDIT, DocType.PLAN, DocType.RESEARCH, DocType.REFERENCE],
     )
-    def test_scaffold_stamps_modified_equal_to_date(self, tmp_path, doc_type):
+    def test_scaffold_stamps_modified_equal_to_date(
+        self, tmp_path: Path, doc_type: DocType
+    ) -> None:
         content_root = self._content_root(tmp_path)
         path = create_vault_doc(
             tmp_path,
@@ -311,7 +313,7 @@ class TestScaffoldStamp:
         assert metadata.modified == "2026-06-12"
         assert metadata.validate() == []
 
-    def test_scaffold_exec_step_record_stamps_modified(self, tmp_path):
+    def test_scaffold_exec_step_record_stamps_modified(self, tmp_path: Path) -> None:
         content_root = self._content_root(tmp_path)
         path = create_vault_doc(
             tmp_path,
@@ -327,7 +329,7 @@ class TestScaffoldStamp:
         assert metadata.modified == "2026-06-12"
         assert metadata.validate() == []
 
-    def test_stamp_lands_in_frontmatter_after_date(self, tmp_path):
+    def test_stamp_lands_in_frontmatter_after_date(self, tmp_path: Path) -> None:
         content_root = self._content_root(tmp_path)
         path = create_vault_doc(
             tmp_path,

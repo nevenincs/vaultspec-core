@@ -32,7 +32,7 @@ class TestConsole:
         c2 = get_console()
         assert c1 is not c2
 
-    def test_console_can_print_unicode(self, capsys):
+    def test_console_can_print_unicode(self, capsys: pytest.CaptureFixture[str]):
         """Console must handle Unicode without UnicodeEncodeError."""
         console = get_console()
         # These are the exact characters that caused the cp1252 crash

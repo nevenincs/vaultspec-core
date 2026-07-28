@@ -21,8 +21,7 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any
 
-from mcp.server.fastmcp import Context
-from mcp.server.session import ServerSession
+from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
@@ -34,7 +33,7 @@ from ..results import BatchResult, ItemResult, build_batch, build_item
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server.mcpserver import MCPServer
 
 logger = logging.getLogger(__name__)
 
@@ -838,7 +837,7 @@ def _find_documents(
     return rows
 
 
-def register_document_tools(mcp: FastMCP) -> None:
+def register_document_tools(mcp: MCPServer[None]) -> None:
     """Register the ``find``, ``create``, and ``edit`` document tools on *mcp*.
 
     ``find`` is read-only and idempotent; ``create`` is non-read-only,
@@ -850,11 +849,19 @@ def register_document_tools(mcp: FastMCP) -> None:
     ``find`` declares its output through the :class:`FindEntry` list return.
 
     Args:
-        mcp: The :class:`~mcp.server.fastmcp.FastMCP` instance to decorate.
+        mcp: The :class:`~mcp.server.mcpserver.MCPServer` instance to decorate.
     """
 
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=True,
+            idempotent_hint=True,
+            open_world_hint=False,
+        ),
+    )
+    @_isolated_context
     async def find(
-        ctx: Context[ServerSession, Any, Any],
+        ctx: Context[Any, Any],
         feature: str | None = None,
         type: list[str] | None = None,
         date: str | None = None,
@@ -887,30 +894,37 @@ def register_document_tools(mcp: FastMCP) -> None:
         Returns:
             The result rows, one :class:`FindEntry` each.
         """
-        await ctx.info(
-            f"find: feature={feature!r} type={type!r} date={date!r} "
-            f"body={body} json={json} limit={limit}"
+        _ = ctx
+        logger.info(
+            "find: feature=%r type=%r date=%r body=%s json=%s limit=%s",
+            feature,
+            type,
+            date,
+            body,
+            json,
+            limit,
         )
 
         if not feature and not type and not date:
             rows = _find_features(limit, json)
-            await ctx.debug(f"Listed {len(rows)} features.")
+            logger.debug("Listed %d features.", len(rows))
             return rows
 
         rows = _find_documents(feature, type, date, body, limit)
-        await ctx.debug(f"Found {len(rows)} documents.")
+        logger.debug("Found %d documents.", len(rows))
         return rows
 
-    find = mcp.tool(
+    @mcp.tool(
         annotations=ToolAnnotations(
-            readOnlyHint=True,
-            idempotentHint=True,
-            openWorldHint=False,
+            read_only_hint=False,
+            destructive_hint=False,
+            idempotent_hint=False,
+            open_world_hint=False,
         ),
-    )(_isolated_context(find))
-
+    )
+    @_isolated_context
     async def create(
-        ctx: Context[ServerSession, Any, Any], documents: list[DocumentSpec]
+        ctx: Context[Any, Any], documents: list[DocumentSpec]
     ) -> BatchResult:
         """Scaffold one or more vault documents from templates.
 
@@ -931,10 +945,11 @@ def register_document_tools(mcp: FastMCP) -> None:
         if not documents:
             raise ValueError("create requires at least one document spec")
 
+        _ = ctx
         root_dir = _get_ctx().target_dir
         today = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d")
 
-        await ctx.info(f"create: {len(documents)} document(s)")
+        logger.info("create: %d document(s)", len(documents))
 
         items: list[ItemResult] = []
         affected: set[str] = set()
@@ -947,20 +962,20 @@ def register_document_tools(mcp: FastMCP) -> None:
         if affected:
             _regenerate_indexes(root_dir, affected)
 
-        await ctx.debug(f"create: {len(affected)} feature index(es) regenerated")
+        logger.debug("create: %d feature index(es) regenerated", len(affected))
         return build_batch(items)
 
-    create = mcp.tool(
+    @mcp.tool(
         annotations=ToolAnnotations(
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
+            read_only_hint=False,
+            destructive_hint=True,
+            idempotent_hint=False,
+            open_world_hint=False,
         ),
-    )(_isolated_context(create))
-
+    )
+    @_isolated_context
     async def edit(
-        ctx: Context[ServerSession, Any, Any], operations: list[EditOperation]
+        ctx: Context[Any, Any], operations: list[EditOperation]
     ) -> BatchResult:
         """Apply one or more body-prose edits to vault documents.
 
@@ -981,17 +996,11 @@ def register_document_tools(mcp: FastMCP) -> None:
         if not operations:
             raise ValueError("edit requires at least one operation")
 
+        _ = ctx
         root_dir = _get_ctx().target_dir
-        await ctx.info(f"edit: {len(operations)} operation(s)")
+        logger.info("edit: %d operation(s)", len(operations))
 
         items = [_edit_one(root_dir, idx, op) for idx, op in enumerate(operations)]
         return build_batch(items)
 
-    edit = mcp.tool(
-        annotations=ToolAnnotations(
-            readOnlyHint=False,
-            destructiveHint=True,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )(_isolated_context(edit))
+    _ = (find, create, edit)  # bound by the decorator; silence unused warnings

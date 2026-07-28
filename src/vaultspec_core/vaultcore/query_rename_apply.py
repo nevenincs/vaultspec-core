@@ -37,6 +37,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+#: Re-exported (with underscore intact) for :mod:`vaultspec_core.vaultcore.query`,
+#: the single public import surface for the feature rename engine.
+__all__ = ["_apply_rename_plan", "_refresh_rename_stamps", "_regenerate_feature_index"]
+
 
 class RenameLinkPair(TypedDict):
     """One ``old`` -> ``new`` rel-path or stem pair reported by a rename."""

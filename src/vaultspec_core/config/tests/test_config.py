@@ -48,7 +48,7 @@ class TestConfigParsing:
 class TestVaultSpecConfig:
     """Test the VaultSpecConfig dataclass and environment loading logic."""
 
-    def test_default_values(self, clean_config):
+    def test_default_values(self, clean_config: None) -> None:
         cfg = get_config()
         assert cfg.target_dir == Path.cwd()
         assert cfg.docs_dir == ".vault"
@@ -57,7 +57,7 @@ class TestVaultSpecConfig:
         assert cfg.io_buffer_size == 8192
         assert cfg.terminal_output_limit == 1_000_000
 
-    def test_storage_defaults(self, clean_config):
+    def test_storage_defaults(self, clean_config: None) -> None:
         cfg = get_config()
         assert cfg.docs_dir == ".vault"
         assert cfg.index_dir == "index"
@@ -142,7 +142,7 @@ class TestVaultSpecConfig:
         cfg3 = get_config()
         assert cfg3 is not cfg1
 
-    def test_validation_min_value(self, caplog):
+    def test_validation_min_value(self, caplog: pytest.LogCaptureFixture) -> None:
         # io_buffer_size has min_value=1
         old = os.environ.get("VAULTSPEC_IO_BUFFER_SIZE")
         os.environ["VAULTSPEC_IO_BUFFER_SIZE"] = "0"

@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 import typer.rich_utils
-from typer.testing import CliRunner
+from typer.testing import CliRunner, Result
 
 import vaultspec_core.core.types as _t
 from vaultspec_core.cli import app
@@ -21,23 +22,28 @@ from vaultspec_core.config.workspace import resolve_workspace
 from vaultspec_core.core.types import init_paths
 from vaultspec_core.testing import CorpusManifest, build_synthetic_vault
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
 # Disable Rich/Typer color output in tests.
 os.environ["NO_COLOR"] = "1"
 typer.rich_utils.COLOR_SYSTEM = None
 
 
-def setup_rules_dir(root):
+def setup_rules_dir(root: Path) -> None:
     """Setup rules source directory in the given root."""
     (root / ".vaultspec" / "rules").mkdir(parents=True, exist_ok=True)
 
 
 @pytest.fixture(scope="session")
-def runner():
+def runner() -> CliRunner:
     return CliRunner(env={"NO_COLOR": "1"})
 
 
 @pytest.fixture
-def synthetic_project(tmp_path) -> Path:
+def synthetic_project(tmp_path: Path) -> Path:
     """Build a synthetic vault and install vaultspec on top.
 
     Each test gets a fresh ``tmp_path / "project"`` containing a synthetic
@@ -64,7 +70,7 @@ def synthetic_project(tmp_path) -> Path:
 
 
 @pytest.fixture
-def synthetic_project_manifest(tmp_path) -> tuple[Path, CorpusManifest]:
+def synthetic_project_manifest(tmp_path: Path) -> tuple[Path, CorpusManifest]:
     """Like ``synthetic_project`` but also returns the ``CorpusManifest``.
 
     Use this fixture when a test needs to inspect generated docs, named
@@ -84,7 +90,7 @@ def synthetic_project_manifest(tmp_path) -> tuple[Path, CorpusManifest]:
     return dest, manifest
 
 
-def run_vaultspec(runner, *args, target=None):
+def run_vaultspec(runner: CliRunner, *args: str, target: Path | None = None) -> Result:
     """Invoke the CLI with optional --target."""
     args_list = list(args)
     if target and "--target" not in args_list and "-t" not in args_list:
@@ -92,7 +98,7 @@ def run_vaultspec(runner, *args, target=None):
     return runner.invoke(app, args_list)
 
 
-def run_vault(runner, *args, target=None):
+def run_vault(runner: CliRunner, *args: str, target: Path | None = None) -> Result:
     """Invoke the CLI with ``vault`` prefix and optional --target."""
     args_list = list(args)
     if target and "--target" not in args_list and "-t" not in args_list:
@@ -102,7 +108,7 @@ def run_vault(runner, *args, target=None):
     return runner.invoke(app, args_list)
 
 
-def run_spec(runner, *args, target=None):
+def run_spec(runner: CliRunner, *args: str, target: Path | None = None) -> Result:
     """Invoke the CLI with optional --target (spec commands)."""
     args_list = list(args)
     if target and "--target" not in args_list and "-t" not in args_list:
@@ -111,15 +117,15 @@ def run_spec(runner, *args, target=None):
 
 
 @pytest.fixture
-def factory(tmp_path):
+def factory(tmp_path: Path) -> WorkspaceFactory:
     """Return a :class:`WorkspaceFactory` for composing on-disk test states."""
     from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
     return WorkspaceFactory(tmp_path)
 
 
-@pytest.fixture(autouse=True)
-def _isolate_state():
+@pytest.fixture(autouse=True, name="_isolate_state")
+def isolate_state() -> Generator[None]:
     """Save and restore workspace context and console between tests.
 
     This prevents state leakage when one test's CLI invocation sets the

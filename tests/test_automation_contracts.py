@@ -41,7 +41,6 @@ def test_justfile_exposes_every_verb_at_the_root() -> None:
                 "audit",
                 "test",
                 "build",
-                "precommit",
                 "vault",
                 "framework",
                 "assets",
@@ -294,7 +293,9 @@ def test_bandit_excludes_every_nested_test_tree() -> None:
     audit = toolchain.find_verb("audit")
     assert audit is not None
     security = next(t for t in audit.targets if t.name == "security")
-    argv = security.steps[0].argv
+    step = security.steps[0]
+    assert isinstance(step, (toolchain.Cmd, toolchain.ToolOrDocker))
+    argv = step.argv
     assert "-x" in argv, "the bandit scan must carry an exclusion"
     assert argv[argv.index("-x") + 1] == "*/tests/*", (
         "the bandit exclusion must be a glob covering nested test trees"

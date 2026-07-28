@@ -12,13 +12,14 @@ from ..index import generate_feature_index
 from ..models import DocType
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
     from pathlib import Path
 
 pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture(autouse=True)
-def _reset_cfg():
+def reset_cfg() -> Generator[None]:
     reset_config()
     yield
     reset_config()
@@ -43,12 +44,12 @@ def _node(
     )
 
 
-def _gen(tmp_path, feat, nodes):
+def _gen(tmp_path: Path, feat: str, nodes: list[DocNode]) -> Path:
     return generate_feature_index(tmp_path, feat, nodes=nodes, date_str="2026-03-23")
 
 
 class TestGenerateFeatureIndex:
-    def test_creates_index_file(self, tmp_path):
+    def test_creates_index_file(self, tmp_path: Path) -> None:
         nodes = [
             _node(tmp_path, "d1", "research", "f", "2026-03-01", "R"),
             _node(tmp_path, "d2", "adr", "f", "2026-03-02", "A"),
@@ -57,7 +58,7 @@ class TestGenerateFeatureIndex:
         assert path.exists()
         assert path.name == "f.index.md"
 
-    def test_index_lives_in_index_subfolder(self, tmp_path):
+    def test_index_lives_in_index_subfolder(self, tmp_path: Path) -> None:
         nodes = [
             _node(tmp_path, "d1", "research", "f", "2026-03-01", "R"),
         ]
@@ -65,7 +66,7 @@ class TestGenerateFeatureIndex:
         assert path.parent == tmp_path / ".vault" / "index"
         assert path.parent.is_dir()
 
-    def test_index_has_correct_frontmatter(self, tmp_path):
+    def test_index_has_correct_frontmatter(self, tmp_path: Path) -> None:
         nodes = [
             _node(tmp_path, "d1", "research", "f", "2026-03-01", "R"),
         ]
@@ -75,7 +76,7 @@ class TestGenerateFeatureIndex:
         assert "'#f'" in content
         assert "2026-03-23" in content
 
-    def test_index_carries_index_directory_tag(self, tmp_path):
+    def test_index_carries_index_directory_tag(self, tmp_path: Path) -> None:
         nodes = [
             _node(tmp_path, "x", "adr", "my-feat", "2026-03-01", "X"),
         ]
@@ -86,7 +87,7 @@ class TestGenerateFeatureIndex:
         # Frontmatter contains exactly two #-prefixed tag lines: #index and #<feature>
         assert content.count("  - '#") == 2
 
-    def test_related_contains_all_feature_docs(self, tmp_path):
+    def test_related_contains_all_feature_docs(self, tmp_path: Path) -> None:
         nodes = [
             _node(tmp_path, "a", "research", "f", "2026-03-01", "A"),
             _node(tmp_path, "b", "adr", "f", "2026-03-02", "B"),
@@ -98,7 +99,7 @@ class TestGenerateFeatureIndex:
         assert "[[b]]" in content
         assert "[[c]]" in content
 
-    def test_body_groups_by_type(self, tmp_path):
+    def test_body_groups_by_type(self, tmp_path: Path) -> None:
         nodes = [
             _node(tmp_path, "a", "research", "f", "2026-03-01", "RA"),
             _node(tmp_path, "b", "adr", "f", "2026-03-02", "AB"),
@@ -110,7 +111,7 @@ class TestGenerateFeatureIndex:
         assert "`a`" in content
         assert "`b`" in content
 
-    def test_idempotent_update(self, tmp_path):
+    def test_idempotent_update(self, tmp_path: Path) -> None:
         nodes = [
             _node(tmp_path, "a", "research", "f", "2026-03-01", "A"),
         ]
@@ -123,7 +124,7 @@ class TestGenerateFeatureIndex:
         assert p1 == p2
         assert c1 == c2
 
-    def test_update_reflects_new_docs(self, tmp_path):
+    def test_update_reflects_new_docs(self, tmp_path: Path) -> None:
         v1 = [_node(tmp_path, "a", "research", "f", "2026-03-01", "A")]
         _gen(tmp_path, "f", v1)
 
@@ -136,7 +137,7 @@ class TestGenerateFeatureIndex:
         assert "[[b]]" in content
         assert "### adr" in content
 
-    def test_excludes_self_from_related(self, tmp_path):
+    def test_excludes_self_from_related(self, tmp_path: Path) -> None:
         nodes = [
             _node(tmp_path, "a", "research", "f", "2026-03-01", "A"),
             DocNode(

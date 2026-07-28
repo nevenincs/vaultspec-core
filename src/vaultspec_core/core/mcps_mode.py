@@ -11,6 +11,23 @@ from typing import Any
 
 from .enums import InstallMode, render_mode
 
+# ``_render_definition_for_sync`` is consumed by
+# :mod:`vaultspec_core.core.mcps_definitions` and :mod:`vaultspec_core.core.mcps`
+# under this module's leading-underscore convention for shared-but-internal
+# helpers; the explicit re-export marks that cross-module contract for the
+# type checker.
+__all__ = [
+    "_DEFAULT_MCP_MODULE",
+    "_DEFAULT_MCP_PACKAGE",
+    "_MODE_ARGS_TOKEN",
+    "_MODE_COMMAND_TOKEN",
+    "_MODE_MCP_LAUNCH",
+    "_MODE_MODULE_KEY",
+    "_MODE_PACKAGE_KEY",
+    "_MODE_TOOL_SPEC_KEY",
+    "_render_definition_for_sync",
+]
+
 #: Sentinel tokens carried by the mode-neutral builtin MCP definition
 #: (``builtins/mcps/vaultspec-core.builtin.json``). They are deliberately
 #: shaped so they cannot collide with any real command name or argument value,

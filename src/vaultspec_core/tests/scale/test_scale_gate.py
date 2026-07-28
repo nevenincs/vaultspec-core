@@ -33,7 +33,9 @@ from ...vaultcore.checks import run_all_checks
 from ...vaultcore.scanner import scan_vault
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
+    from types import FrameType
 
 pytestmark = [pytest.mark.benchmark]
 
@@ -45,17 +47,17 @@ _LARGE = 480
 _LINEAR_SLACK = 6.0
 
 
-def _profile_counts(fn) -> Counter[str]:
+def _profile_counts(fn: Callable[[], object]) -> Counter[str]:
     """Run *fn* under a profiler, counting the operations the gate budgets."""
     counts: Counter[str] = Counter()
 
-    def profiler(frame, event: str, arg: object) -> None:
+    def profiler(frame: FrameType, event: str, arg: object) -> None:
         if event != "call":
             return
         name = frame.f_code.co_name
         if name in ("read_bytes", "read_text"):
             target = frame.f_locals.get("self")
-            parts = getattr(target, "parts", None)
+            parts = target.parts if isinstance(target, Path) else None
             if parts and ".vault" in parts and str(target).endswith(".md"):
                 counts["corpus_reads"] += 1
         elif name in ("parse_plan", "extract_feature_tags"):

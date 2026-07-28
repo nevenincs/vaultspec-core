@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -52,7 +52,7 @@ def _write_doc(
     return path
 
 
-def _json_payload(output: str) -> dict:
+def _json_payload(output: str) -> dict[str, Any]:
     assert output.lstrip().startswith("{"), (
         "JSON-mode CLI output must not include human text before the payload:\n"
         f"{output}"

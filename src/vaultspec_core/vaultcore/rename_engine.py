@@ -33,6 +33,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+#: Re-exported (with underscore intact) for every CRUD surface that reaches
+#: into this module's containment guard: :mod:`vaultspec_core.core.hooks`,
+#: :mod:`vaultspec_core.core.resources`, :mod:`vaultspec_core.vaultcore.batch_archive`,
+#: :mod:`vaultspec_core.vaultcore.exec_recovery`, and
+#: :mod:`vaultspec_core.vaultcore.query_rename`.
+__all__ = ["_assert_within"]
+
 
 def _assert_within(managed_root: Path, path: Path) -> Path:
     """Return *path* iff its real location is inside *managed_root*, else raise.

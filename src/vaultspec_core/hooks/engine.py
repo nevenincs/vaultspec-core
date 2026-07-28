@@ -29,6 +29,8 @@ __all__ = [
     "Hook",
     "HookAction",
     "HookResult",
+    "_is_provider_hook_event",
+    "_parse_yaml",
     "fire_hooks",
     "load_hooks",
     "trigger",
@@ -194,14 +196,8 @@ def _parse_hook(path: Path, data: dict[str, Any]) -> Hook | None:
         logger.warning("Hook %s has unsupported event: %s", path.name, event)
         return None
 
-    actions: list[HookAction] = []
     raw_actions = data.get("actions", [])
-    if isinstance(raw_actions, list):
-        for raw in raw_actions:
-            if isinstance(raw, dict):
-                action = _parse_action(raw)
-                if action is not None:
-                    actions.append(action)
+    actions = _parse_actions(raw_actions) if isinstance(raw_actions, list) else []
 
     return Hook(
         name=path.stem,
@@ -212,7 +208,18 @@ def _parse_hook(path: Path, data: dict[str, Any]) -> Hook | None:
     )
 
 
-def _parse_action(raw: dict[str, Any]) -> HookAction | None:
+def _parse_actions(raw_actions: Any) -> list[HookAction]:
+    """Parse every valid action from an untyped YAML sequence."""
+    actions: list[HookAction] = []
+    for raw in raw_actions:
+        if isinstance(raw, dict):
+            action = _parse_action(raw)
+            if action is not None:
+                actions.append(action)
+    return actions
+
+
+def _parse_action(raw: Any) -> HookAction | None:
     """Parse a single action dict into a HookAction.
 
     Args:

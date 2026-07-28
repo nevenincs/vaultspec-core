@@ -93,7 +93,7 @@ def guard_plan_write(
         raise PlanWriteGuardError(msg) from exc
 
     newly_retired = _retired_ids(new_plan) - _retired_ids(old_plan)
-    expected = expected_retired if expected_retired is not None else set()
+    expected: set[str] = expected_retired if expected_retired is not None else set()
     unexpected = newly_retired - expected
     if unexpected:
         joined = ", ".join(sorted(unexpected))

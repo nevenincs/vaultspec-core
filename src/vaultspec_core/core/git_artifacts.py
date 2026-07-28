@@ -13,24 +13,32 @@ import subprocess
 from pathlib import Path
 
 from .gitattributes import has_valid_block as _ga_has_valid_block
-from .gitignore import _find_markers, managed_lock_candidates
+from .gitignore import managed_lock_candidates
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "PROVIDER_ARTIFACT_PATTERNS",
+    "_UNTRACK_PREFIXES",
+    "_is_git_repo",
+    "check_staged_provider_artifacts",
+]
 
-def _has_gitignore_block(gi_path: Path) -> bool:
+
+def has_gitignore_block(gi_path: Path) -> bool:
     """Report whether *gi_path* carries exactly one well-formed managed block."""
     if not gi_path.exists():
         return False
     try:
         content = gi_path.read_text(encoding="utf-8")
-        begins, ends = _find_markers(content.splitlines())
+        # ``.gitignore`` and ``.gitattributes`` share the same managed-block
+        # marker text, so the generic detector applies to both.
+        return _ga_has_valid_block(content.splitlines())
     except (OSError, UnicodeDecodeError):
         return False
-    return len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]
 
 
-def _has_gitattributes_block(ga_path: Path) -> bool:
+def has_gitattributes_block(ga_path: Path) -> bool:
     """Report whether *ga_path* carries a well-formed managed block."""
     if not ga_path.exists():
         return False
@@ -39,6 +47,12 @@ def _has_gitattributes_block(ga_path: Path) -> bool:
         return _ga_has_valid_block(content.splitlines())
     except (OSError, UnicodeDecodeError):
         return False
+
+
+#: Backward-compatible aliases for external callers still importing the
+#: previously private names.
+_has_gitignore_block = has_gitignore_block
+_has_gitattributes_block = has_gitattributes_block
 
 
 def _is_git_repo(target: Path) -> bool:
@@ -80,7 +94,7 @@ _UNTRACK_PREFIXES: tuple[str, ...] = (
 # subdirectories can never be untracked even if they reach the helper.
 
 
-def _untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
+def untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
     """Stop tracking managed paths that were committed before they became ignored.
 
     Iterates *entries* and retains only those under :data:`_UNTRACK_PREFIXES`
@@ -201,6 +215,11 @@ def _untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
     for path in actually_untracked:
         logger.info("Untracked previously-committed managed path: %s", path)
     return actually_untracked
+
+
+#: Backward-compatible alias for external callers still importing the
+#: previously private name.
+_untrack_managed_paths = untrack_managed_paths
 
 
 # Patterns that must never be committed.  Used by the

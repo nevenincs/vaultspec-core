@@ -26,11 +26,13 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
+    from vaultspec_core.core.types import SyncResult
+
 pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture(autouse=True)
-def _reset() -> Iterator[None]:
+def reset_config_fixture() -> Iterator[None]:
     reset_config()
     yield
     reset_config()
@@ -43,7 +45,7 @@ def _activate_context(root: Path) -> None:
     init_paths(resolve_workspace(target_override=root))
 
 
-def _all_item_paths(results: list) -> list[str]:
+def _all_item_paths(results: list[SyncResult]) -> list[str]:
     return [rel for result in results for rel, _action in result.items]
 
 

@@ -43,7 +43,9 @@ class TestEngineParity:
         # The dependency is declared; the fallback exists only for
         # platforms without the wheel, and this environment must exercise
         # the real engine.
-        import rustworkx  # noqa: F401
+        import rustworkx
+
+        assert rustworkx.__name__ == "rustworkx"
 
     def test_betweenness_matches_networkx(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root, use_cache=False)

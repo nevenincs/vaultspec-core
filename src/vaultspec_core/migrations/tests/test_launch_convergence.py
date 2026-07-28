@@ -11,7 +11,7 @@ second run after convergence does no work.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 import pytest
 
@@ -23,6 +23,10 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 pytestmark = [pytest.mark.unit]
+
+
+class _McpConfig(TypedDict):
+    mcpServers: dict[str, dict[str, object]]
 
 
 def _bind_context(root: Path) -> None:
@@ -61,9 +65,9 @@ def _write_probe(root: Path, *, args: list[str]) -> None:
     )
 
 
-def _servers(root: Path) -> dict[str, dict]:
-    raw = json.loads((root / ".mcp.json").read_text(encoding="utf-8"))
-    return raw["mcpServers"]
+def _servers(root: Path) -> dict[str, dict[str, object]]:
+    config: _McpConfig = json.loads((root / ".mcp.json").read_text(encoding="utf-8"))
+    return config["mcpServers"]
 
 
 @pytest.mark.parametrize("mode", [InstallMode.DEPENDENCY, InstallMode.TOOL])

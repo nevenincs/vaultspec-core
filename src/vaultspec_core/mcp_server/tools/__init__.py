@@ -1,7 +1,7 @@
 """First-class MCP tool handlers, grouped by domain.
 
 Each module registers a slice of the nine-tool surface onto a shared
-``FastMCP`` instance.  :mod:`documents` owns document discovery and mutation
+``MCPServer`` instance.  :mod:`documents` owns document discovery and mutation
 (``find`` / ``create`` / ``edit``), :mod:`orientation` owns read-only
 orientation and health checking (``status`` / ``check``), :mod:`plan` owns
 plan progress and step authoring (``plan_progress`` / ``plan_edit``), and

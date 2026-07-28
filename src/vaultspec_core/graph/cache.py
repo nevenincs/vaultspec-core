@@ -64,7 +64,7 @@ import hashlib
 import json
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -280,9 +280,12 @@ def _is_fingerprint_row(value: object) -> bool:
     Returns:
         ``True`` when the row can be read back as a fingerprint.
     """
-    if not isinstance(value, list) or len(value) != 3:
+    if not isinstance(value, list):
         return False
-    size, mtime_ns, content_hash = value
+    items = cast("list[Any]", value)
+    if len(items) != 3:
+        return False
+    size, mtime_ns, content_hash = items
     return (
         isinstance(size, int)
         and isinstance(mtime_ns, int)
@@ -304,9 +307,12 @@ def _is_encoding_issue_row(row: object) -> bool:
     Returns:
         ``True`` when the row can be read back as an encoding issue.
     """
-    if not isinstance(row, list) or len(row) != 4:
+    if not isinstance(row, list):
         return False
-    doc_path, kind, detail, start = row
+    items = cast("list[Any]", row)
+    if len(items) != 4:
+        return False
+    doc_path, kind, detail, start = items
     return (
         isinstance(doc_path, str)
         and isinstance(kind, str)
@@ -336,15 +342,16 @@ def _read_cache_json(path: Path) -> dict[str, Any] | None:
         return None
     if not isinstance(data, dict):
         return None
-    if data.get("schema") != CACHE_SCHEMA:
+    payload = cast("dict[str, Any]", data)
+    if payload.get("schema") != CACHE_SCHEMA:
         logger.debug(
             "Graph cache schema mismatch at %s (%r != %r); ignoring",
             path,
-            data.get("schema"),
+            payload.get("schema"),
             CACHE_SCHEMA,
         )
         return None
-    return data
+    return payload
 
 
 def _extract_cache_sections(
@@ -368,7 +375,11 @@ def _extract_cache_sections(
         return None
     if not isinstance(raw_dangling, list) or not isinstance(raw_encoding, list):
         return None
-    return raw_manifest, raw_graph, raw_dangling, raw_encoding
+    manifest = cast("dict[str, Any]", raw_manifest)
+    graph = cast("dict[str, Any]", raw_graph)
+    dangling = cast("list[Any]", raw_dangling)
+    encoding = cast("list[Any]", raw_encoding)
+    return manifest, graph, dangling, encoding
 
 
 def _parse_manifest(raw_manifest: dict[str, Any]) -> dict[str, Fingerprint] | None:
@@ -383,7 +394,7 @@ def _parse_manifest(raw_manifest: dict[str, Any]) -> dict[str, Fingerprint] | No
     """
     manifest: dict[str, Fingerprint] = {}
     for key, value in raw_manifest.items():
-        if not isinstance(key, str) or not _is_fingerprint_row(value):
+        if not _is_fingerprint_row(value):
             logger.debug("Graph cache manifest entry %r is malformed; ignoring", key)
             return None
         manifest[key] = (value[0], value[1], value[2])
@@ -402,13 +413,15 @@ def _parse_dangling(raw_dangling: list[Any]) -> list[list[str]] | None:
     """
     dangling: list[list[str]] = []
     for pair in raw_dangling:
-        if (
-            not isinstance(pair, list)
-            or len(pair) != 2
-            or not all(isinstance(item, str) for item in pair)
-        ):
+        if not isinstance(pair, list):
             return None
-        dangling.append([pair[0], pair[1]])
+        pair_items = cast("list[Any]", pair)
+        if len(pair_items) != 2:
+            return None
+        first, second = pair_items
+        if not isinstance(first, str) or not isinstance(second, str):
+            return None
+        dangling.append([first, second])
     return dangling
 
 

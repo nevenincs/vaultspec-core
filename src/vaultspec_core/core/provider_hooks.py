@@ -34,7 +34,7 @@ import logging
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from . import types as _t
 from .enums import DirName, ProviderCapability, Tool
@@ -240,11 +240,14 @@ def _command_from(data: dict[str, Any]) -> str:
         return command.strip()
     actions = data.get("actions")
     if isinstance(actions, list):
-        for action in actions:
-            if isinstance(action, dict) and action.get("type") == "shell":
-                cmd = action.get("command")
-                if isinstance(cmd, str) and cmd.strip():
-                    return cmd.strip()
+        action_items = cast("list[Any]", actions)
+        for action in action_items:
+            if isinstance(action, dict):
+                action_map = cast("dict[str, Any]", action)
+                if action_map.get("type") == "shell":
+                    cmd = action_map.get("command")
+                    if isinstance(cmd, str) and cmd.strip():
+                        return cmd.strip()
     return ""
 
 
@@ -278,15 +281,16 @@ def load_provider_hook_specs(
     files = sorted({*hooks_dir.glob("*.yaml"), *hooks_dir.glob("*.yml")})
     for path in files:
         try:
-            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
         except yaml.YAMLError as exc:
             msg = f"Failed to parse hook {path.name}: {exc}"
             logger.warning(msg)
             if warnings is not None:
                 warnings.append(msg)
             continue
-        if not isinstance(data, dict):
+        if not isinstance(loaded, dict):
             continue
+        data = cast("dict[str, Any]", loaded)
         event = data.get("event", "")
         if not isinstance(event, str) or event not in _CANONICAL_EVENTS:
             continue
@@ -343,7 +347,9 @@ def _read_json(path: Path) -> dict[str, Any]:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return {}
-    return raw if isinstance(raw, dict) else {}
+    if not isinstance(raw, dict):
+        return {}
+    return cast("dict[str, Any]", raw)
 
 
 def _compose_flat_hooks(
@@ -361,7 +367,9 @@ def _compose_flat_hooks(
     """
     out = dict(existing)
     raw_hooks = out.get("hooks")
-    hooks: dict[str, Any] = dict(raw_hooks) if isinstance(raw_hooks, dict) else {}
+    hooks: dict[str, Any] = (
+        dict(cast("dict[str, Any]", raw_hooks)) if isinstance(raw_hooks, dict) else {}
+    )
 
     for event, groups in prev_managed.items():
         if event in hooks and isinstance(hooks[event], list):

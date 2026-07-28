@@ -22,7 +22,7 @@ pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture(autouse=True)
-def _reset_cfg() -> Generator[None]:
+def reset_cfg() -> Generator[None]:
     reset_config()
     yield
     reset_config()
@@ -33,7 +33,7 @@ def _make_skeleton(root: Path) -> None:
         (root / ".vault" / sub).mkdir(parents=True, exist_ok=True)
 
 
-def test_parse_new_fields_inline_and_bulleted():
+def test_parse_new_fields_inline_and_bulleted() -> None:
     # Inline list format
     content_inline = """---
 tags: ["#adr", "#feat"]
@@ -85,7 +85,7 @@ archived: 2026-05-22
     assert meta_b.archived == "2026-05-22"
 
 
-def test_validate_archived_format():
+def test_validate_archived_format() -> None:
     # Valid archived date format
     meta = DocumentMetadata(
         tags=["#adr", "#feat"],
@@ -105,7 +105,7 @@ def test_validate_archived_format():
     assert "Invalid archived date format" in errors[0]
 
 
-def test_fix_frontmatter_preserves_new_fields(tmp_path):
+def test_fix_frontmatter_preserves_new_fields(tmp_path: Path) -> None:
     _make_skeleton(tmp_path)
     doc = tmp_path / ".vault" / "adr" / "2026-05-17-test-adr.md"
     doc.write_text(
@@ -152,7 +152,7 @@ archived: 2026-05-22
     assert new_content.count("body_schema:") == 1
 
 
-def test_fix_frontmatter_preserves_unknown_keys(tmp_path):
+def test_fix_frontmatter_preserves_unknown_keys(tmp_path: Path) -> None:
     _make_skeleton(tmp_path)
     doc = tmp_path / ".vault" / "adr" / "2026-05-17-unknown-adr.md"
     doc.write_text(
@@ -189,7 +189,7 @@ trailing_unknown: also kept
     assert meta.tags == ["#adr", "#my-feature"]
 
 
-def test_fix_frontmatter_noop_when_nothing_to_fix(tmp_path):
+def test_fix_frontmatter_noop_when_nothing_to_fix(tmp_path: Path) -> None:
     _make_skeleton(tmp_path)
     doc = tmp_path / ".vault" / "adr" / "2026-05-17-clean-adr.md"
     original = """---
@@ -206,7 +206,7 @@ date: 2026-05-17
     assert doc.read_text(encoding="utf-8") == original
 
 
-def test_fix_frontmatter_normalizes_date_suffix(tmp_path):
+def test_fix_frontmatter_normalizes_date_suffix(tmp_path: Path) -> None:
     _make_skeleton(tmp_path)
     doc = tmp_path / ".vault" / "adr" / "2026-05-17-date-adr.md"
     doc.write_text(
@@ -227,7 +227,7 @@ date: "2026-05-17 10:30"
     assert meta.date == "2026-05-17"
 
 
-def test_migration_0_1_21(tmp_path):
+def test_migration_0_1_21(tmp_path: Path) -> None:
     # Runs the additive migration which should return successfully
     res = migrate_0_1_21(tmp_path)
     assert res.name == "frontmatter_lifecycle"

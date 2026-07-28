@@ -1,6 +1,6 @@
 """Tests for the ``plan_progress`` and ``plan_edit`` MCP tools and the resolver.
 
-Drives the real FastMCP server over the in-memory session transport against
+Drives the real MCPServer over the in-memory client transport against
 a :class:`WorkspaceFactory`-installed vault on the real filesystem, with no
 mocks, stubs, or skips.  Covers checked/unchecked batch marking with the
 next-open-step readout, step add/insert/edit/remove with canonical-identifier
@@ -11,7 +11,7 @@ raised by the shared plan resolver.
 from __future__ import annotations
 
 import pytest
-from mcp.shared.memory import create_connected_server_and_client_session
+from mcp import Client
 
 from vaultspec_core.mcp_server.app import create_server
 from vaultspec_core.mcp_server.plan_resolver import PlanResolutionError, resolve_plan
@@ -56,7 +56,7 @@ def _plan_path(vault_root, feature: str):
 async def test_plan_edit_add_insert_edit_remove_preserves_ids(vault_root):
     """add/insert/edit/remove route through the core and never reuse an id."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create_plan(client, "editflow")
         added = await _plan_edit(
             client,
@@ -118,7 +118,7 @@ async def test_plan_edit_add_insert_edit_remove_preserves_ids(vault_root):
 async def test_plan_edit_failed_op_does_not_abort_batch(vault_root):
     """A bad op fails per-item while a good op in the same batch still applies."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create_plan(client, "partialedit")
         result = await _plan_edit(
             client,
@@ -137,7 +137,7 @@ async def test_plan_edit_failed_op_does_not_abort_batch(vault_root):
 async def test_plan_edit_unknown_operation_fails_the_item(vault_root):
     """An unrecognised verb fails its item and echoes the verb it was given."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create_plan(client, "unknownverb")
         result = await _plan_edit(
             client,
@@ -154,7 +154,7 @@ async def test_plan_edit_unknown_operation_fails_the_item(vault_root):
 async def test_plan_edit_missing_required_fields_fail_per_operation(vault_root):
     """Each verb reports its own missing-precondition message."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create_plan(client, "preconditions")
         result = await _plan_edit(
             client,
@@ -187,12 +187,12 @@ async def test_plan_edit_missing_required_fields_fail_per_operation(vault_root):
 async def test_plan_edit_empty_batch_is_protocol_error(vault_root):
     """An empty operation list is a whole-call protocol error."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create_plan(client, "emptyedit")
         result = await client.call_tool(
             "plan_edit", {"plan": "emptyedit", "operations": []}
         )
-        assert result.isError
+        assert result.is_error
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +203,7 @@ async def test_plan_edit_empty_batch_is_protocol_error(vault_root):
 async def test_plan_progress_check_uncheck_and_next_open_step(vault_root):
     """Marking a step advances completion and reports the next open step."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create_plan(client, "progressfeat")
         await _plan_edit(
             client,
@@ -240,7 +240,7 @@ async def test_plan_progress_check_uncheck_and_next_open_step(vault_root):
 async def test_plan_progress_unknown_step_fails_item(vault_root):
     """An unknown step id is a per-item failure, not a whole-call error."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create_plan(client, "unknownstep")
         await _plan_edit(
             client,
@@ -263,12 +263,12 @@ async def test_plan_progress_unknown_step_fails_item(vault_root):
 async def test_plan_progress_unresolvable_plan_is_protocol_error(vault_root):
     """An unresolvable plan address surfaces as a whole-call protocol error."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool(
             "plan_progress",
             {"plan": "no-such-plan", "steps": [{"step_id": "S01", "state": "checked"}]},
         )
-        assert result.isError
+        assert result.is_error
 
 
 # ---------------------------------------------------------------------------
@@ -279,7 +279,7 @@ async def test_plan_progress_unresolvable_plan_is_protocol_error(vault_root):
 async def test_resolver_ambiguous_feature_raises(vault_root):
     """A feature owning two plans is a structured ambiguity error, not a guess."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create_plan(client, "twoplans", date="2026-07-09")
         await _create_plan(client, "twoplans", date="2026-07-10")
 

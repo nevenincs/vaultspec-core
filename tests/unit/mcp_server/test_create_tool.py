@@ -1,6 +1,6 @@
 """Tests for the batch-native MCP ``create`` tool.
 
-Drives the real FastMCP server over the in-memory session transport against
+Drives the real MCPServer over the in-memory client transport against
 a :class:`WorkspaceFactory`-installed vault on the real filesystem.  Covers
 the intra-batch lifecycle dependency (an item validated against the vault
 state including earlier same-batch items), the partial-failure envelope (a
@@ -11,7 +11,7 @@ and the automatic feature-index regeneration side effect.
 from __future__ import annotations
 
 import pytest
-from mcp.shared.memory import create_connected_server_and_client_session
+from mcp import Client
 
 from vaultspec_core.mcp_server.app import create_server
 
@@ -33,7 +33,7 @@ async def test_create_batch_intra_batch_lifecycle_dependency(vault_root):
     same-batch items satisfy the later exec item without a second call.
     """
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         payload = await _create(
             client,
             [
@@ -64,7 +64,7 @@ async def test_create_exec_before_plan_fails_but_later_item_applies(vault_root):
     the item after it is still scaffolded.
     """
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         payload = await _create(
             client,
             [
@@ -88,7 +88,7 @@ async def test_create_exec_before_plan_fails_but_later_item_applies(vault_root):
 async def test_create_regenerates_feature_index(vault_root):
     """Creating documents regenerates the affected feature's index as a side effect."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         payload = await _create(
             client,
             [
@@ -106,7 +106,7 @@ async def test_create_regenerates_feature_index(vault_root):
 async def test_create_rejects_index_type_per_item(vault_root):
     """An ``index`` spec is a per-item failure, not a whole-call error."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         payload = await _create(
             client,
             [{"feature": "idx-reject", "type": "index"}],
@@ -119,7 +119,7 @@ async def test_create_rejects_index_type_per_item(vault_root):
 async def test_create_rejects_unknown_document_type_per_item(vault_root):
     """A type outside the taxonomy fails its item with the offending value."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         payload = await _create(
             client,
             [{"feature": "type-reject", "type": "brief"}],
@@ -133,7 +133,7 @@ async def test_create_rejects_unknown_document_type_per_item(vault_root):
 async def test_create_rejects_invalid_plan_tier(vault_root):
     """A tier outside ``L1``-``L4`` fails the item and writes nothing."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         payload = await _create(
             client,
             [{"feature": "tier-reject", "type": "plan", "tier": "L5"}],
@@ -148,7 +148,7 @@ async def test_create_rejects_invalid_plan_tier(vault_root):
 async def test_create_reports_unresolvable_related_with_failures(vault_root):
     """An unresolvable ``related`` entry fails the item and lists each failure."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         payload = await _create(
             client,
             [
@@ -168,15 +168,15 @@ async def test_create_reports_unresolvable_related_with_failures(vault_root):
 async def test_create_empty_batch_raises_protocol_error(vault_root):
     """An empty batch is a malformed whole-call input surfaced as ``isError``."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("create", {"documents": []})
-        assert result.isError
+        assert result.is_error
 
 
 async def test_create_seed_content_appended(vault_root):
     """Seed content is appended through the shared edit engine as a section."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         payload = await _create(
             client,
             [
@@ -196,7 +196,7 @@ async def test_create_seed_content_appended(vault_root):
 async def test_create_topic_infix_scaffolds_second_reference(vault_root):
     """A topic-infixed spec scaffolds a second same-day reference document."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         payload = await _create(
             client,
             [
@@ -217,7 +217,7 @@ async def test_create_topic_infix_scaffolds_second_reference(vault_root):
 async def test_create_topic_rejected_for_plan(vault_root):
     """A topic on a plan spec remains a per-item failure."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         payload = await _create(
             client,
             [{"feature": "infix-feat", "type": "plan", "topic": "second"}],
@@ -229,7 +229,7 @@ async def test_create_topic_rejected_for_plan(vault_root):
 async def test_create_mixed_batch_accepts_adr_topic_and_rejects_plan_topic(vault_root):
     """ADR topics create while plan topics fail without aborting the batch."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         payload = await _create(
             client,
             [

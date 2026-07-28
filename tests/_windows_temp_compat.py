@@ -4,6 +4,7 @@ import atexit
 import os
 import sys
 import tempfile
+import uuid
 from pathlib import Path
 
 _PYTEST_TEMP_ROOT = Path(tempfile.gettempdir()) / "vaultspec-pytest"
@@ -29,10 +30,9 @@ def install_windows_temp_compat() -> None:
         os.makedirs(base_dir, mode=0o755, exist_ok=True)
         file_prefix = prefix if prefix is not None else tempfile.template
         file_suffix = suffix or ""
-        names = tempfile._get_candidate_names()
         for _ in range(tempfile.TMP_MAX):
             candidate = os.path.join(
-                base_dir, f"{file_prefix}{next(names)}{file_suffix}"
+                base_dir, f"{file_prefix}{uuid.uuid4().hex}{file_suffix}"
             )
             try:
                 os.mkdir(candidate, 0o755)
@@ -41,7 +41,7 @@ def install_windows_temp_compat() -> None:
             return candidate
         raise FileExistsError("No usable temporary directory name found")
 
-    def _make_numbered_dir_755(root, prefix: str, mode: int = 0o700):
+    def _make_numbered_dir_755(root: Path, prefix: str, mode: int = 0o700) -> Path:
         return orig_make_numbered_dir(root=root, prefix=prefix, mode=0o755)
 
     def _getbasetemp_755(self):
@@ -105,8 +105,8 @@ def install_windows_temp_compat() -> None:
             self._trace("mktemp", p)
         return p
 
-    tempfile.mkdtemp = _mkdtemp_755
-    pytest_pathlib.make_numbered_dir = _make_numbered_dir_755
-    pytest_tmpdir.make_numbered_dir = _make_numbered_dir_755
-    pytest_tmpdir.TempPathFactory.getbasetemp = _getbasetemp_755
-    pytest_tmpdir.TempPathFactory.mktemp = _mktemp_755
+    setattr(tempfile, "mkdtemp", _mkdtemp_755)
+    setattr(pytest_pathlib, "make_numbered_dir", _make_numbered_dir_755)
+    setattr(pytest_tmpdir, "make_numbered_dir", _make_numbered_dir_755)
+    setattr(pytest_tmpdir.TempPathFactory, "getbasetemp", _getbasetemp_755)
+    setattr(pytest_tmpdir.TempPathFactory, "mktemp", _mktemp_755)

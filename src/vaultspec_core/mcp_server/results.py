@@ -12,8 +12,8 @@ agent that already reads ``created`` / ``updated`` / ``unchanged`` /
 ``failed`` from ``vaultspec-core ... --json`` reads the same words here, and
 the aggregate reducer matches the CLI's rule that a batch is ``mixed`` only
 when its items disagree.  The models are Pydantic ``BaseModel`` subclasses so
-FastMCP derives an ``outputSchema`` from the tool return type and returns
-``structuredContent`` to the host.
+MCPServer derives an ``output_schema`` from the tool return type and returns
+``structured_content`` to the host.
 """
 
 from __future__ import annotations

@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from .signals import (
     ConfigSignal,
@@ -25,6 +25,10 @@ if TYPE_CHECKING:
     from ..enums import Tool
 
 logger = logging.getLogger(__name__)
+
+#: Re-exported (with underscore intact) for
+#: :mod:`vaultspec_core.core.diagnosis.collectors_mode`.
+__all__ = ["_read_mcp_servers"]
 
 
 def _provider_config_file(tool: Tool) -> Path | None:
@@ -92,11 +96,12 @@ def _read_mcp_servers(mcp_path: Path) -> dict[str, object] | None:
     if not isinstance(raw, dict):
         return None
 
-    servers = raw.get("mcpServers")
+    raw_dict = cast("dict[str, object]", raw)
+    servers = raw_dict.get("mcpServers")
     if not isinstance(servers, dict):
         return None
 
-    return servers
+    return cast("dict[str, object]", servers)
 
 
 def _registry_mcp_signal(

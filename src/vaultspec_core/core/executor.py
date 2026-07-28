@@ -9,6 +9,7 @@ SYNC, PRUNE, and REMOVE are left for the main command to handle.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -151,22 +152,11 @@ def execute_plan(
 # Dispatch
 # ---------------------------------------------------------------------------
 
-_HANDLERS: dict[ResolutionAction, str] = {
-    ResolutionAction.REPAIR_MANIFEST: "_execute_repair_manifest",
-    ResolutionAction.REPAIR_GITIGNORE: "_execute_repair_gitignore",
-    ResolutionAction.REPAIR_GITATTRIBUTES: "_execute_repair_gitattributes",
-    ResolutionAction.REPAIR_PRECOMMIT: "_execute_repair_precommit",
-    ResolutionAction.SCAFFOLD: "_execute_scaffold",
-    ResolutionAction.ADOPT_DIRECTORY: "_execute_adopt_directory",
-    ResolutionAction.ADOPT_FRAMEWORK: "_execute_adopt_framework",
-}
-
 
 def _dispatch(target: Path, step: ResolutionStep) -> None:
-    handler_name = _HANDLERS.get(step.action)
-    if handler_name is None:
+    handler = _HANDLERS.get(step.action)
+    if handler is None:
         raise ValueError(f"No handler for action {step.action!r}")
-    handler = globals()[handler_name]
     handler(target, step)
 
 
@@ -226,7 +216,7 @@ def _execute_adopt_framework(target: Path, _step: ResolutionStep) -> None:
 
 def _execute_scaffold(target: Path, step: ResolutionStep) -> None:
     """Scaffold directories for a single provider."""
-    from .commands import _ensure_tool_configs, _scaffold_provider
+    from .commands import _ensure_tool_configs, scaffold_provider
 
     _ensure_tool_configs(target)
 
@@ -235,7 +225,7 @@ def _execute_scaffold(target: Path, step: ResolutionStep) -> None:
     except ValueError as exc:
         raise ValueError(f"Unknown provider {step.target!r} for scaffold") from exc
 
-    _scaffold_provider(target, tool)
+    scaffold_provider(target, tool)
 
 
 def _execute_adopt_directory(target: Path, step: ResolutionStep) -> None:
@@ -259,3 +249,17 @@ def _execute_repair_precommit(target: Path, _step: ResolutionStep) -> None:
     from .commands import _scaffold_precommit
 
     _scaffold_precommit(target)
+
+
+#: Maps each preflight action to the handler that executes it. Defined after
+#: the handlers themselves so :func:`_dispatch` holds direct references
+#: rather than looking functions up by name at call time.
+_HANDLERS: dict[ResolutionAction, Callable[[Path, ResolutionStep], None]] = {
+    ResolutionAction.REPAIR_MANIFEST: _execute_repair_manifest,
+    ResolutionAction.REPAIR_GITIGNORE: _execute_repair_gitignore,
+    ResolutionAction.REPAIR_GITATTRIBUTES: _execute_repair_gitattributes,
+    ResolutionAction.REPAIR_PRECOMMIT: _execute_repair_precommit,
+    ResolutionAction.SCAFFOLD: _execute_scaffold,
+    ResolutionAction.ADOPT_DIRECTORY: _execute_adopt_directory,
+    ResolutionAction.ADOPT_FRAMEWORK: _execute_adopt_framework,
+}

@@ -383,7 +383,7 @@ class TestMcpAdd:
             from vaultspec_core.core.mcps import mcp_add
 
             with pytest.raises(VaultSpecError, match="dict"):
-                mcp_add("srv", config=[1, 2, 3])  # ty: ignore[invalid-argument-type]
+                mcp_add("srv", config=[1, 2, 3])
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)

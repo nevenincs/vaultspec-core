@@ -17,7 +17,7 @@ dedup against) is left for the next ``sync`` to regenerate.
 
 See also:
     :mod:`vaultspec_core.migrations` for the registry driver.
-    :func:`vaultspec_core.core.agents._sanitize_legacy_codex_agents` for the
+    :func:`vaultspec_core.core.agents.sanitize_legacy_codex_agents` for the
     shared sanitiser the live sync path also calls.
 """
 
@@ -61,7 +61,7 @@ def migrate(workspace: Path) -> MigrationResult:
     """
     from ..core.agents import (
         _codex_managed_agent_names,
-        _sanitize_legacy_codex_agents,
+        sanitize_legacy_codex_agents,
     )
     from ..core.helpers import atomic_write
 
@@ -82,7 +82,7 @@ def migrate(workspace: Path) -> MigrationResult:
         raise MigrationError(f"{_NAME}: failed to read {config_path}: {exc}") from exc
 
     names = _codex_managed_agent_names(content)
-    sanitized = _sanitize_legacy_codex_agents(content, names)
+    sanitized = sanitize_legacy_codex_agents(content, names)
     if sanitized == content:
         return MigrationResult(
             name=_NAME,

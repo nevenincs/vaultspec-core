@@ -22,7 +22,7 @@ Subpackages:
         vault/spec-core events.
     :mod:`vaultspec_core.metrics`: Lightweight aggregate statistics over
         ``.vault/`` content (:class:`~vaultspec_core.metrics.VaultSummary`).
-    :mod:`vaultspec_core.mcp_server`: FastMCP server exposing vault and
+    :mod:`vaultspec_core.mcp_server`: MCPServer exposing vault and
         spec-core tool surfaces over JSON-RPC/stdio.
     :mod:`vaultspec_core.protocol`: Model-provider abstraction for prompt
         execution (Claude, Gemini).

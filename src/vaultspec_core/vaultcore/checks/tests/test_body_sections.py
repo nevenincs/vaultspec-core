@@ -62,7 +62,7 @@ _TYPE_META = {
 
 
 @pytest.fixture(autouse=True)
-def _reset_cfg() -> Generator[None]:
+def reset_cfg() -> Generator[None]:
     reset_config()
     yield
     reset_config()

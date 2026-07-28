@@ -35,28 +35,6 @@ ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 WIKI_LINK_RE = re.compile(r"^\[\[.+\]\]$")
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _parse_frontmatter(text: str) -> dict[str, object]:
-    """Extract key-value pairs from the YAML frontmatter block.
-
-    Minimal parser - only handles the fields we care about.
-    """
-    if not text.startswith("---"):
-        return {}
-    end = text.index("---", 3)
-    block = text[3:end]
-    result: dict[str, object] = {}
-    for line in block.splitlines():
-        if ":" in line and not line.startswith(" ") and not line.startswith("-"):
-            key, _, val = line.partition(":")
-            result[key.strip()] = val.strip()
-    return result
-
-
 def _read_tags(text: str) -> list[str]:
     """Extract the tag list from the YAML frontmatter."""
     in_tags = False
@@ -256,6 +234,8 @@ def test_dangling_broken_link_present_in_file(tmp_path: Path) -> None:
     detail = manifest.pathology_details["dangling"][0]
     source_path = detail["source_path"]
     target_stem = detail["target_stem"]
+    assert isinstance(source_path, Path)
+    assert isinstance(target_stem, str)
     text = source_path.read_text(encoding="utf-8")
     assert target_stem in text, (
         f"Broken target stem {target_stem!r} not found in {source_path}"
@@ -307,6 +287,7 @@ def test_phantom_only_links_doc_is_plan_type(tmp_path: Path) -> None:
         root, n_docs=12, seed=42, pathologies=["phantom_only_links"]
     )
     plan_doc = manifest.pathology_details["phantom_only_links"][0]["plan_doc"]
+    assert isinstance(plan_doc, GeneratedDoc)
     assert plan_doc.doc_type == "plan"
 
 
@@ -621,4 +602,5 @@ def test_cycle_detail_records_nodes(tmp_path: Path) -> None:
     assert len(details) >= 1
     assert "cycle_nodes" in details[0]
     nodes = details[0]["cycle_nodes"]
+    assert isinstance(nodes, list)
     assert len(nodes) == 3  # A -> B -> C -> A

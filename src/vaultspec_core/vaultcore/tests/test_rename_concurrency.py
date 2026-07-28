@@ -29,7 +29,7 @@ from ..models import DocumentMetadata
 from ..rename_engine import docs_lock_target
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Generator
     from pathlib import Path
 
     from ..checks._base import VaultSnapshot
@@ -46,7 +46,7 @@ _COMPLETION_SECONDS = 10.0
 
 
 @pytest.fixture(autouse=True)
-def _reset_cfg():
+def reset_cfg() -> Generator[None]:
     """Reset the process-global config to defaults around every test."""
     reset_config()
     yield

@@ -64,7 +64,7 @@ if TYPE_CHECKING:
 
     from ..models import DocumentMetadata
 
-__all__ = ["check_modified_stamp"]
+__all__ = ["_filename_date", "_write_stamp", "check_modified_stamp"]
 
 #: Fraction of documents which, once concentrated on the largest few mtime
 #: dates, is read as a git-operation signature and suppresses staleness.

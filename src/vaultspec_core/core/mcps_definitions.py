@@ -11,7 +11,7 @@ import logging
 import tomllib
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from . import types as _t
 from .enums import InstallMode, McpScope, McpTargetFormat, Tool
@@ -26,12 +26,22 @@ from .mcps_native import (
     _normalized_sources,
     _toml_servers,
 )
-from .mcps_ownership import _owned_names, _ownership_path, _read_ownership
+from .mcps_ownership import (
+    _owned_names,
+    _ownership_path,
+    _OwnershipState,
+    _read_ownership,
+)
 from .mcps_targets import _coerce_scope, resolve_mcp_targets
 from .tags import TagError, strip_block
 from .types import McpTarget, SyncResult
 
 logger = logging.getLogger(__name__)
+
+#: Re-exported (with underscore intact) for :mod:`vaultspec_core.core.mcps`
+#: and :mod:`vaultspec_core.core.mcps_sync`, which reach into these as the
+#: single public import surface for MCP definitions.
+__all__ = ["_get_mcps_src_dir", "_server_name"]
 
 
 def _server_name(filename: str) -> str:
@@ -129,12 +139,13 @@ def collect_mcp_servers(
                 if warnings is not None:
                     warnings.append(msg)
                 continue
+            payload = cast("dict[str, Any]", raw)
             name = _server_name(f.name)
             if not name:
                 continue
             if mode is not None:
-                raw = _render_definition_for_sync(raw, mode, target)
-            sources[name] = (f, raw)
+                payload = _render_definition_for_sync(payload, mode, target)
+            sources[name] = (f, payload)
         except (json.JSONDecodeError, OSError) as e:
             msg = f"Failed to read/parse MCP definition {f}: {e}"
             logger.error(msg)
@@ -228,15 +239,17 @@ def _read_target_native_state(
             raw = json.loads(target.path.read_text(encoding="utf-8"))
             if not isinstance(raw, dict):
                 raise VaultSpecError("JSON root is not an object.")
-            native = _json_server_map(raw, target, root)
+            payload = cast("dict[str, Any]", raw)
+            native = _json_server_map(payload, target, root)
             servers = {
-                str(name): dict(config)
+                str(name): dict(cast("dict[str, Any]", config))
                 for name, config in native.items()
                 if isinstance(config, dict)
             }
-            legacy = raw.get(_LEGACY_MANAGED_KEY, [])
+            legacy = payload.get(_LEGACY_MANAGED_KEY, [])
             if isinstance(legacy, list):
-                managed.update(name for name in legacy if isinstance(name, str))
+                legacy_items = cast("list[Any]", legacy)
+                managed.update(name for name in legacy_items if isinstance(name, str))
         else:
             content = target.path.read_text(encoding="utf-8")
             outside = _toml_servers(strip_block(content, _TOML_BLOCK_TYPE))
@@ -290,7 +303,7 @@ def _evaluate_provider_target(
     sources: dict[str, tuple[Path, dict[str, Any]]],
     definitions: list[str],
     root: Path,
-    state: dict[str, Any],
+    state: _OwnershipState,
 ) -> dict[str, Any]:
     """Assess one resolved MCP target's enrollment health.
 
@@ -450,15 +463,17 @@ def mcp_status(
 
 def mcp_add(
     name: str,
-    config: dict[str, Any] | None = None,
+    config: object | None = None,
     force: bool = False,
 ) -> Path:
     """Scaffold a new custom MCP server definition.
 
     Args:
         name: Server name.
-        config: Server configuration dict.  Uses an empty scaffold when
-            ``None``.
+        config: Server configuration dict, typically decoded from a JSON
+            string at the CLI boundary and so genuinely untyped until the
+            ``isinstance`` check below confirms its shape. Uses an empty
+            scaffold when ``None``.
         force: Whether to overwrite an existing definition.
 
     Returns:
@@ -488,7 +503,11 @@ def mcp_add(
             f"MCP definition '{file_name}' exists. Use --force to overwrite."
         )
 
-    server_config = config if config is not None else {"command": "", "args": []}
+    server_config: dict[str, Any] = (
+        cast("dict[str, Any]", config)
+        if config is not None
+        else {"command": "", "args": []}
+    )
     atomic_write(file_path, json.dumps(server_config, indent=2) + "\n")
     logger.info("Created MCP definition: %s", file_path)
     return file_path

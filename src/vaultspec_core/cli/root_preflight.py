@@ -20,6 +20,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# ``_run_preflight`` is consumed by :mod:`.root_install`, :mod:`.root_sync`,
+# and :mod:`.root` under this module's leading-underscore convention for a
+# shared-but-internal helper; the explicit re-export marks that cross-module
+# contract for the type checker.
+__all__ = ["_run_preflight"]
+
 
 def _run_preflight(
     target: Path,

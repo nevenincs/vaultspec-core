@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, TypedDict
 
 from .models import DocType
@@ -23,6 +24,17 @@ if TYPE_CHECKING:
     from ..graph import VaultGraph
 
 logger = logging.getLogger(__name__)
+
+#: Re-exported (with underscore intact) for :mod:`vaultspec_core.vaultcore.query`
+#: and :mod:`vaultspec_core.vaultcore.query_archive`, which reach into these as
+#: the single public import surface for document listing.
+__all__ = [
+    "_docs_from_graph",
+    "_feature_from_tags_or_meta",
+    "_parse_date_from_filename",
+    "_parse_feature_from_tags",
+    "_scan_all",
+]
 
 
 @dataclass
@@ -80,7 +92,7 @@ def _parse_feature_from_tags(tags: list[str], doc_type_tag: str | None) -> str |
 
 
 def _feature_from_tags_or_meta(
-    tags: list[str], meta: dict, doc_type_tag: str | None
+    tags: list[str], meta: Mapping[str, object], doc_type_tag: str | None
 ) -> str | None:
     """Derive a document's feature tag, with the bare ``feature:`` fallback.
 
@@ -123,7 +135,7 @@ def _scan_all(root_dir: Path, *, doc_type: str | None = None) -> list[VaultDocum
         List of :class:`VaultDocument` instances for all readable vault
         files that pass the filter.
     """
-    docs = []
+    docs: list[VaultDocument] = []
     for doc_path in scan_vault(root_dir):
         dt = get_doc_type(doc_path, root_dir)
         dt_str = dt.value if dt else "unknown"
@@ -298,6 +310,16 @@ def list_documents(
     return docs
 
 
+class VaultStats(TypedDict):
+    """Aggregate counts returned by :func:`get_stats`."""
+
+    total_docs: int
+    total_features: int
+    counts_by_type: dict[str, int]
+    orphaned_count: int
+    dangling_link_count: int
+
+
 def get_stats(
     root_dir: Path,
     *,
@@ -305,7 +327,7 @@ def get_stats(
     doc_type: str | None = None,
     date: str | None = None,
     graph: VaultGraph | None = None,
-) -> dict:
+) -> VaultStats:
     """Compute vault statistics with optional filters.
 
     Args:

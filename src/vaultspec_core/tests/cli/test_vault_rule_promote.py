@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -10,11 +11,16 @@ from vaultspec_core.cli import app
 from vaultspec_core.core.rules import rules_list
 from vaultspec_core.core.types import init_paths
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from typer.testing import CliRunner
+
 pytestmark = [pytest.mark.integration]
 
 
 @pytest.fixture
-def test_project(tmp_path):
+def test_project(tmp_path: Path) -> Path:
     """Setup a simplified project structure for rule promotion tests."""
     project_dir = tmp_path / "project"
     project_dir.mkdir()
@@ -31,7 +37,9 @@ def test_project(tmp_path):
     return project_dir
 
 
-def test_rule_promote_missing_audit_fails(runner, test_project):
+def test_rule_promote_missing_audit_fails(
+    runner: CliRunner, test_project: Path
+) -> None:
     result = runner.invoke(
         app,
         [
@@ -51,7 +59,9 @@ def test_rule_promote_missing_audit_fails(runner, test_project):
     assert "not found" in result.output
 
 
-def test_rule_promote_invalid_kebab_fails(runner, test_project):
+def test_rule_promote_invalid_kebab_fails(
+    runner: CliRunner, test_project: Path
+) -> None:
     # Setup audit file first
     audit_file = test_project / ".vault" / "audit" / "2026-05-17-test-audit.md"
     audit_file.write_text(
@@ -78,7 +88,9 @@ def test_rule_promote_invalid_kebab_fails(runner, test_project):
     assert "must be in kebab-case" in result.output
 
 
-def test_rule_promote_existing_rule_fails_unless_forced(runner, test_project):
+def test_rule_promote_existing_rule_fails_unless_forced(
+    runner: CliRunner, test_project: Path
+) -> None:
     # Setup audit file
     audit_file = test_project / ".vault" / "audit" / "2026-05-17-test-audit.md"
     audit_file.write_text(
@@ -131,7 +143,9 @@ def test_rule_promote_existing_rule_fails_unless_forced(runner, test_project):
     assert "Rule promoted successfully" in result.output
 
 
-def test_rule_promote_success_mutates_audit_and_creates_rule(runner, test_project):
+def test_rule_promote_success_mutates_audit_and_creates_rule(
+    runner: CliRunner, test_project: Path
+) -> None:
     # Setup audit file with \r\n line endings to check preservation
     audit_content = (
         "---\r\n"
@@ -181,7 +195,7 @@ def test_rule_promote_success_mutates_audit_and_creates_rule(runner, test_projec
     assert "custom_field: 'hello'" in mutated_audit  # preserved unknown field
 
 
-def test_rule_promote_dry_run(runner, test_project):
+def test_rule_promote_dry_run(runner: CliRunner, test_project: Path) -> None:
     audit_file = test_project / ".vault" / "audit" / "2026-05-17-test-audit.md"
     audit_file.write_text(
         "---\ntags:\n  - '#audit'\n  - '#test-feat'\n"
@@ -215,7 +229,7 @@ def test_rule_promote_dry_run(runner, test_project):
     assert "promoted_to:" not in audit_content
 
 
-def test_rule_promote_json_output(runner, test_project):
+def test_rule_promote_json_output(runner: CliRunner, test_project: Path) -> None:
     audit_file = test_project / ".vault" / "audit" / "2026-05-17-test-audit.md"
     audit_file.write_text(
         "---\ntags:\n  - '#audit'\n  - '#test-feat'\n"
@@ -245,7 +259,9 @@ def test_rule_promote_json_output(runner, test_project):
     assert "json-rule.md" in payload["data"]["path"]
 
 
-def test_nested_custom_rules_are_flattened(runner, test_project):
+def test_nested_custom_rules_are_flattened(
+    runner: CliRunner, test_project: Path
+) -> None:
     """A custom rule under the legacy project/ subdir is sanitized to flat.
 
     Nested rule folders are not supported; rules_list() (and sync) run the

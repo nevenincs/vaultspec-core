@@ -143,7 +143,7 @@ LINT = Verb(
     name="lint",
     summary="Run gating static analysis.",
     note=(
-        "'all' omits complexity, nesting, size, and type-strict - run those by name. "
+        "'all' omits complexity, nesting, and size - run those by name. "
         "Each is a real gate whose burndown is unfinished, so adding it to the chain "
         "would hide every dimension behind it."
     ),
@@ -250,9 +250,9 @@ LINT = Verb(
             # about it from CI. A local gate that omits what CI enforces
             # teaches people the wrong thing about what "green" means.
             #
-            # `type-strict` stays OUT deliberately: basedpyright still reports
-            # thousands of annotation-debt errors, so it runs advisory in CI
-            # and joins here when that burndown reaches zero.
+            # `type-strict` joined the same way: the burndown reached zero, so
+            # the dimension graduated into the chain under the same promotion
+            # rule the other dimensions followed.
             tuple(
                 Ref(name)
                 for name in (
@@ -265,6 +265,7 @@ LINT = Verb(
                     "complexity",
                     "nesting",
                     "size",
+                    "type-strict",
                 )
             ),
         ),
@@ -459,24 +460,6 @@ BUILD = Verb(
     ),
 )
 
-PRECOMMIT = Verb(
-    name="precommit",
-    summary="Manage the prek-owned git pre-commit hooks.",
-    targets=(
-        Target("install", "Install the git hooks.", (uv_run("prek", "install"),)),
-        Target(
-            "upgrade",
-            "Update the pinned hook revisions.",
-            (uv_run("prek", "auto-update"),),
-        ),
-        Target(
-            "run",
-            "Run every hook against all files.",
-            (uv_run("prek", "run", "--all-files"),),
-        ),
-    ),
-)
-
 VAULT = Verb(
     name="vault",
     summary="Operate on this repository's own .vault/ development corpus.",
@@ -643,7 +626,6 @@ VERBS: tuple[Verb, ...] = (
     AUDIT,
     TEST,
     BUILD,
-    PRECOMMIT,
     VAULT,
     FRAMEWORK,
     ASSETS,
@@ -659,7 +641,6 @@ DEFAULTS: dict[str, str] = {
     "audit": "all",
     "test": "all",
     "build": "python",
-    "precommit": "run",
     "vault": "check",
     "framework": "doctor",
     "assets": "all",

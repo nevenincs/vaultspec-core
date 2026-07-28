@@ -75,15 +75,20 @@ class PrekBoundaryState:
 
 def _local_hooks(data: dict[str, object]) -> list[dict[str, object]]:
     """Extract hook tables from every ``repo = "local"`` repos entry."""
-    repos = data.get("repos", [])
-    if not isinstance(repos, list):
+    raw_repos = data.get("repos", [])
+    if not isinstance(raw_repos, list):
         return []
+    repos = cast("list[object]", raw_repos)
     hooks: list[dict[str, object]] = []
-    for repo in repos:
-        if not (isinstance(repo, dict) and repo.get("repo") == "local"):
+    for raw_repo in repos:
+        if not isinstance(raw_repo, dict):
             continue
-        entries = repo.get("hooks", [])
-        if isinstance(entries, list):
+        repo = cast("dict[str, object]", raw_repo)
+        if repo.get("repo") != "local":
+            continue
+        raw_entries = repo.get("hooks", [])
+        if isinstance(raw_entries, list):
+            entries = cast("list[object]", raw_entries)
             hooks.extend(
                 cast("dict[str, object]", h) for h in entries if isinstance(h, dict)
             )
@@ -174,7 +179,8 @@ def _toml_value(value: object) -> str:
     if isinstance(value, str):
         return _toml_string(value)
     if isinstance(value, list):
-        return "[" + ", ".join(_toml_value(v) for v in value) + "]"
+        items = cast("list[object]", value)
+        return "[" + ", ".join(_toml_value(v) for v in items) + "]"
     raise TypeError(f"Unsupported TOML value type: {type(value).__name__}")
 
 

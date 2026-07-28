@@ -34,19 +34,19 @@ class TestAdrStatusFromToken:
             ("deprecated", AdrStatus.DEPRECATED),
         ],
     )
-    def test_resolves_canonical_tokens(self, token, expected):
+    def test_resolves_canonical_tokens(self, token: str, expected: AdrStatus) -> None:
         assert AdrStatus.from_token(token) is expected
 
     @pytest.mark.parametrize(
         "token",
         ["Accepted", "  accepted  ", "`accepted`", " `Accepted` "],
     )
-    def test_resolves_leniently(self, token):
+    def test_resolves_leniently(self, token: str) -> None:
         """Case, whitespace, and backtick quoting are tolerated."""
         assert AdrStatus.from_token(token) is AdrStatus.ACCEPTED
 
     @pytest.mark.parametrize("token", ["", "approved", "done", "wip", "  "])
-    def test_off_taxonomy_returns_none(self, token):
+    def test_off_taxonomy_returns_none(self, token: str) -> None:
         assert AdrStatus.from_token(token) is None
 
     def test_none_returns_none(self):

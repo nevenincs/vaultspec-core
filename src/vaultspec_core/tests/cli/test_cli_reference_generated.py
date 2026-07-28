@@ -24,6 +24,7 @@ from vaultspec_core.cli import app
 from vaultspec_core.cli.reference_gen import (
     MANAGED_FILES,
     MANAGED_REGIONS,
+    ManagedRegion,
     ReferenceMarkerError,
     begin_marker,
     bundled_reference_path,
@@ -362,7 +363,7 @@ def test_handbook_prose_outside_region_survives_regenerate(tmp_path: Path) -> No
     assert "- `vaultspec-core install`" in rewritten
 
 
-def region_tuple() -> tuple:
+def region_tuple() -> tuple[ManagedRegion, ...]:
     """Return the handbook's region set from the registry (the shared region)."""
     for managed in MANAGED_FILES:
         if managed.path_factory().name == "CLI.md":

@@ -44,7 +44,7 @@ def parse_csv_list(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
-def parse_int_or_none(value: str) -> int | None:
+def parse_int_or_none(value: str | None) -> int | None:
     """Parse *value* as an ``int``, returning ``None`` on failure.
 
     Args:
@@ -53,13 +53,15 @@ def parse_int_or_none(value: str) -> int | None:
     Returns:
         Parsed integer, or ``None`` if the string cannot be converted.
     """
+    if value is None:
+        return None
     try:
         return int(value)
     except (ValueError, TypeError):
         return None
 
 
-def parse_float_or_none(value: str) -> float | None:
+def parse_float_or_none(value: str | None) -> float | None:
     """Parse *value* as a ``float``, returning ``None`` on failure.
 
     Args:
@@ -68,6 +70,8 @@ def parse_float_or_none(value: str) -> float | None:
     Returns:
         Parsed float, or ``None`` if the string cannot be converted.
     """
+    if value is None:
+        return None
     try:
         return float(value)
     except (ValueError, TypeError):
@@ -189,13 +193,18 @@ class _OptionalFloat:
     """Sentinel type for registry entries that parse to ``float | None``."""
 
 
+def _parse_bool(raw: str) -> bool:
+    """Parse a boolean environment variable value."""
+    return raw.lower() in ("1", "true", "yes")
+
+
 # Maps a registry ``var_type`` to its ``(converter, skip_validation)`` pair.
 # ``skip_validation`` is ``True`` for types (``bool``, ``Path``, ``list``)
 # whose values bypass the options/range validation applied to the rest.
 # Types absent from this table (``str`` / ``Optional[str]``) need no
 # conversion and are handled by the ``_convert_raw_value`` fallback.
 _TYPE_CONVERTERS: dict[type, tuple[Any, bool]] = {
-    bool: (lambda raw: raw.lower() in ("1", "true", "yes"), True),
+    bool: (_parse_bool, True),
     int: (int, False),
     float: (float, False),
     Path: (Path, True),

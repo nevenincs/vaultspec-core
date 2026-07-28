@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -19,6 +20,9 @@ from ...hooks.engine import (
     _parse_hook,
     _triggering,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 pytestmark = [pytest.mark.unit]
 
@@ -61,7 +65,7 @@ class TestParseAction:
 class TestParseHook:
     """Test hook parsing from YAML dicts."""
 
-    def test_valid_hook(self, tmp_path):
+    def test_valid_hook(self, tmp_path: Path) -> None:
         path = tmp_path / "test.yaml"
         data = {
             "event": "config.synced",
@@ -76,16 +80,16 @@ class TestParseHook:
         assert len(hook.actions) == 1
         assert hook.enabled is True
 
-    def test_missing_event(self, tmp_path):
+    def test_missing_event(self, tmp_path: Path) -> None:
         path = tmp_path / "test.yaml"
         assert _parse_hook(path, {}) is None
 
-    def test_unsupported_event(self, tmp_path):
+    def test_unsupported_event(self, tmp_path: Path) -> None:
         path = tmp_path / "test.yaml"
         data = {"event": "unknown.event"}
         assert _parse_hook(path, data) is None
 
-    def test_disabled_hook(self, tmp_path):
+    def test_disabled_hook(self, tmp_path: Path) -> None:
         path = tmp_path / "test.yaml"
         data = {
             "event": "config.synced",
@@ -98,7 +102,7 @@ class TestParseHook:
         assert hook is not None
         assert hook.enabled is False
 
-    def test_multiple_actions(self, tmp_path):
+    def test_multiple_actions(self, tmp_path: Path) -> None:
         path = tmp_path / "test.yaml"
         data = {
             "event": "vault.document.created",
@@ -115,15 +119,15 @@ class TestParseHook:
 class TestLoadHooks:
     """Test loading hooks from a directory."""
 
-    def test_empty_dir(self, tmp_path):
+    def test_empty_dir(self, tmp_path: Path) -> None:
         hooks = load_hooks(tmp_path)
         assert hooks == []
 
-    def test_nonexistent_dir(self, tmp_path):
+    def test_nonexistent_dir(self, tmp_path: Path) -> None:
         hooks = load_hooks(tmp_path / "nonexistent")
         assert hooks == []
 
-    def test_loads_yaml(self, tmp_path):
+    def test_loads_yaml(self, tmp_path: Path) -> None:
         hook_file = tmp_path / "my-hook.yaml"
         hook_file.write_text(
             "event: config.synced\nactions:\n  - type: shell\n    command: echo done\n",
@@ -133,7 +137,7 @@ class TestLoadHooks:
         assert len(hooks) == 1
         assert hooks[0].name == "my-hook"
 
-    def test_loads_yml(self, tmp_path):
+    def test_loads_yml(self, tmp_path: Path) -> None:
         hook_file = tmp_path / "my-hook.yml"
         hook_file.write_text(
             "event: config.synced\nactions:\n  - type: shell\n    command: echo done\n",
@@ -142,7 +146,7 @@ class TestLoadHooks:
         hooks = load_hooks(tmp_path)
         assert len(hooks) == 1
 
-    def test_skips_invalid(self, tmp_path):
+    def test_skips_invalid(self, tmp_path: Path) -> None:
         # Valid hook
         (tmp_path / "good.yaml").write_text(
             "event: config.synced\nactions:\n  - type: shell\n    command: echo ok\n",
@@ -220,7 +224,7 @@ class TestTrigger:
         assert results[0].success is True
         assert "Python" in results[0].output
 
-    def test_context_interpolation(self, tmp_path):
+    def test_context_interpolation(self, tmp_path: Path) -> None:
         script = tmp_path / "print_arg.py"
         script.write_text("import sys\nprint(sys.argv[1])", encoding="utf-8")
         exe = sys.executable.replace("\\", "/")
@@ -243,7 +247,7 @@ class TestTrigger:
         assert len(results) == 1
         assert results[0].success is True
 
-    def test_failing_command(self, tmp_path):
+    def test_failing_command(self, tmp_path: Path) -> None:
         # Write the script to a file to avoid shell quoting issues on Windows.
         script = tmp_path / "fail.py"
         script.write_text("import sys; sys.exit(1)", encoding="utf-8")
@@ -267,7 +271,7 @@ class TestTrigger:
 class TestDeduplication:
     """Test that duplicate yaml/yml stems load only one hook."""
 
-    def test_yaml_takes_precedence_over_yml(self, tmp_path):
+    def test_yaml_takes_precedence_over_yml(self, tmp_path: Path) -> None:
         yaml_content = (
             "event: config.synced\nactions:\n  - type: shell\n    command: echo yaml\n"
         )
@@ -281,7 +285,7 @@ class TestDeduplication:
         assert hooks[0].source_path is not None
         assert hooks[0].source_path.suffix == ".yaml"
 
-    def test_unique_stems_load_all(self, tmp_path):
+    def test_unique_stems_load_all(self, tmp_path: Path) -> None:
         (tmp_path / "hook-a.yaml").write_text(
             "event: config.synced\nactions:\n  - type: shell\n    command: echo a\n",
             encoding="utf-8",
@@ -358,7 +362,7 @@ class TestFireHooksIntegration:
     load_hooks(tmp_path) + trigger() directly.
     """
 
-    def test_shell_hook_side_effect(self, tmp_path):
+    def test_shell_hook_side_effect(self, tmp_path: Path) -> None:
         marker = tmp_path / "hook-fired.txt"
         # Write a helper script to a file to avoid backslash escaping issues
         # with Windows paths embedded inside YAML command strings.
@@ -387,7 +391,7 @@ class TestFireHooksIntegration:
         assert results[0].success is True
         assert marker.exists(), "Shell hook should have created the marker file"
 
-    def test_no_hooks_returns_empty(self, tmp_path):
+    def test_no_hooks_returns_empty(self, tmp_path: Path) -> None:
         hooks = load_hooks(tmp_path)
         results = trigger(hooks, "vault.document.created")
         assert results == []

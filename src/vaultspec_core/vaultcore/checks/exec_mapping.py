@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["check_exec_mapping"]
+__all__ = ["_link_stem", "check_exec_mapping"]
 
 #: Strip the ``[[`` / ``]]`` wrapper (and any ``#anchor`` / ``|alias``) from a
 #: ``related:`` wiki-link, yielding the bare document stem.

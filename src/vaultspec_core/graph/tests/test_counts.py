@@ -25,6 +25,7 @@ from ..api import VaultGraph
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from types import FrameType
 
 pytestmark = [pytest.mark.unit]
 
@@ -68,7 +69,7 @@ class TestRenderPathBuysNoAnalysis:
         graph = VaultGraph(vault_root, use_cache=False)
         analysis_calls: list[str] = []
 
-        def profiler(frame, event: str, arg: object) -> None:
+        def profiler(frame: FrameType, event: str, arg: object) -> None:
             if event == "call" and frame.f_code.co_name in (
                 "betweenness_centrality",
                 "in_degree_centrality",

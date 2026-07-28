@@ -11,10 +11,9 @@ import logging
 import re
 import sys
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from . import types as _t
-from .config_gen import _toml_quote
 from .enums import (
     CapabilityLevel,
     ClaudeModels,
@@ -34,6 +33,16 @@ from .sync import sync_files
 from .types import SyncResult
 
 logger = logging.getLogger(__name__)
+
+# ``_codex_managed_agent_names`` is consumed by the ``m_0_1_24`` migration to
+# de-duplicate legacy Codex agent tables; the explicit re-export marks that
+# cross-module contract for the type checker.
+__all__ = ["_codex_managed_agent_names", "sanitize_legacy_codex_agents"]
+
+
+def _toml_quote(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 # Static mapping from the Claude tool vocabulary used in
@@ -65,7 +74,8 @@ def _coerce_tools(meta: dict[str, Any]) -> list[str]:
     raw = meta.get("tools")
     if not isinstance(raw, list):
         return []
-    return [item for item in raw if isinstance(item, str) and item]
+    items = cast("list[object]", raw)
+    return [item for item in items if isinstance(item, str) and item]
 
 
 def _render_passthrough_agent(
@@ -248,8 +258,7 @@ def transform_agent(
     Returns:
         Rendered file content with YAML frontmatter prepended.
     """
-    if isinstance(tool, str):
-        tool = Tool(tool)
+    tool = Tool(tool)
     renderer = _AGENT_RENDERERS.get(tool, _render_passthrough_agent)
     return renderer(name, meta, body, warnings=warnings)
 
@@ -304,7 +313,8 @@ def _coerce_codex_string(meta: dict[str, Any], key: str) -> str | None:
 def _coerce_string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+    items = cast("list[object]", value)
+    return [item.strip() for item in items if isinstance(item, str) and item.strip()]
 
 
 def _render_codex_agent(name: str, meta: dict[str, Any], body: str) -> str:
@@ -347,7 +357,7 @@ def _build_codex_agents_body(
     sources: dict[str, tuple[Path, dict[str, Any], str]],
 ) -> str:
     """Render Codex agent definitions as TOML content (body only)."""
-    rendered_agents = []
+    rendered_agents: list[str] = []
     for name, (_path, meta, body) in sorted(sources.items()):
         rendered_agents.append(_render_codex_agent(name, meta, body))
     if not rendered_agents:
@@ -514,7 +524,7 @@ def _codex_managed_agent_names(content: str) -> set[str]:
     return names
 
 
-def _sanitize_legacy_codex_agents(content: str, names: set[str]) -> str:
+def sanitize_legacy_codex_agents(content: str, names: set[str]) -> str:
     """Strip stale duplicate agent tables that collide with the managed block.
 
     Removes the legacy sentinel block wholesale, then removes any
@@ -571,7 +581,7 @@ def _sync_codex_agents(
     raw_existing = path.read_text(encoding="utf-8") if existed else ""
     body = _build_codex_agents_body(sources)
     managed_names = {Path(name).stem for name in sources}
-    existing = _sanitize_legacy_codex_agents(raw_existing, managed_names)
+    existing = sanitize_legacy_codex_agents(raw_existing, managed_names)
 
     abs_path = str(path).replace("\\", "/")
 

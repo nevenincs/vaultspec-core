@@ -15,7 +15,9 @@ pytestmark = [pytest.mark.integration]
 class TestCleanSync:
     """Sync against a cleanly installed workspace."""
 
-    def test_sync_on_clean_workspace_exits_zero(self, factory) -> None:
+    def test_sync_on_clean_workspace_exits_zero(
+        self, factory: WorkspaceFactory
+    ) -> None:
         factory.install()
         result = factory.run("sync")
         assert result.exit_code == 0, result.output

@@ -234,9 +234,11 @@ def cmd_tier_demote(
     current_t = plan.frontmatter.tier
     resolved_target = target_tier
     if resolved_target is None:
-        from vaultspec_core.plan.commands.tier_ops import _previous_tier
-
-        resolved_target = _previous_tier(current_t)
+        # tier_ops._previous_tier is module-private; the ordering is stable
+        # and small enough to mirror locally rather than reach into it.
+        tier_order = (Tier.L1, Tier.L2, Tier.L3, Tier.L4)
+        current_index = tier_order.index(current_t)
+        resolved_target = tier_order[current_index - 1] if current_index > 0 else None
 
     if resolved_target is not None:
         if current_t in (Tier.L4, Tier.L3) and resolved_target is Tier.L2:

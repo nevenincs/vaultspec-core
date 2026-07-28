@@ -19,8 +19,13 @@ if TYPE_CHECKING:
     from .manifest import ManifestData
     from .workspace_mode import ResolvedMode
 
+#: Re-exported (with underscore intact) for :mod:`vaultspec_core.core.commands`
+#: and :mod:`vaultspec_core.core.provision`, which reach into this as the
+#: single public import surface for mode resolution.
+__all__ = ["_write_mode_declaration"]
 
-def _stamp_manifest_version_no_downgrade(mdata: ManifestData) -> None:
+
+def stamp_manifest_version_no_downgrade(mdata: ManifestData) -> None:
     """Set ``mdata.vaultspec_version`` to the running package version.
 
     Never downgrade: a registered migration whose ``target_version``
@@ -33,7 +38,7 @@ def _stamp_manifest_version_no_downgrade(mdata: ManifestData) -> None:
         mdata.vaultspec_version = running
 
 
-def _fresh_install_schema_version() -> str:
+def fresh_install_schema_version() -> str:
     """Return the manifest version a freshly-installed workspace conforms to.
 
     A fresh install writes the current on-disk schema, so it must not
@@ -49,7 +54,7 @@ def _fresh_install_schema_version() -> str:
     return max(candidates, key=parse_version_tuple)
 
 
-def _persist_resolved_mode(path: Path, mdata: ManifestData, mode: InstallMode) -> None:
+def persist_resolved_mode(path: Path, mdata: ManifestData, mode: InstallMode) -> None:
     """Persist *mode* to the committed declaration and echo it into *mdata*.
 
     Writes the shared source of truth (``.vaultspec/workspace.json`` via
@@ -120,7 +125,7 @@ def _write_mode_declaration(path: Path, mode: InstallMode) -> str | None:
     return floor
 
 
-def _infer_upgrade_mode(target: Path, explicit: InstallMode | None) -> ResolvedMode:
+def infer_upgrade_mode(target: Path, explicit: InstallMode | None) -> ResolvedMode:
     """Infer the provisioning mode for an ``install --upgrade`` (ADR Q6).
 
     Precedence mirrors provision-time resolution at its top: an explicit
@@ -175,3 +180,11 @@ def _infer_upgrade_mode(target: Path, explicit: InstallMode | None) -> ResolvedM
     if detected is InstallMode.DEPENDENCY and observed is InstallMode.DEPENDENCY:
         return ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.INFERRED)
     return ResolvedMode(InstallMode.TOOL, ModeProvenance.INFERRED)
+
+
+#: Backward-compatible aliases for external callers still importing the
+#: previously private names.
+_stamp_manifest_version_no_downgrade = stamp_manifest_version_no_downgrade
+_fresh_install_schema_version = fresh_install_schema_version
+_persist_resolved_mode = persist_resolved_mode
+_infer_upgrade_mode = infer_upgrade_mode

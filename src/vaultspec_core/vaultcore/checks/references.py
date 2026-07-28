@@ -134,7 +134,7 @@ def check_references(
     result = CheckResult(check_name="references", supports_fix=True)
 
     # Group nodes by feature (skip phantoms - they have no real doc type)
-    by_feature: dict[str, dict[str, list]] = {}
+    by_feature: dict[str, dict[str, list[DocNode]]] = {}
     for _name, node in graph.nodes.items():
         if node.phantom:
             continue
@@ -168,7 +168,7 @@ def check_references(
         # Check if research docs are referenced
         for research_node in research_docs:
             if research_node.name not in plan_adr_links:
-                referencing_types = []
+                referencing_types: list[str] = []
                 if plan_docs:
                     referencing_types.append("plan")
                 if adr_docs:
@@ -180,7 +180,9 @@ def check_references(
                 if fix:
                     # Add to the first ADR or plan in this feature
                     target_doc = (adr_docs or plan_docs)[0]
-                    if _add_related_link(target_doc.path, research_node.name):
+                    if target_doc.path is not None and _add_related_link(
+                        target_doc.path, research_node.name
+                    ):
                         result.fixed_count += 1
                         result.diagnostics.append(
                             CheckDiagnostic(
@@ -196,7 +198,11 @@ def check_references(
 
                 result.diagnostics.append(
                     CheckDiagnostic(
-                        path=research_node.path.relative_to(root_dir),
+                        path=(
+                            research_node.path.relative_to(root_dir)
+                            if research_node.path is not None
+                            else None
+                        ),
                         message=(
                             f"Research doc not referenced by any "
                             f"{'/'.join(referencing_types)} in feature "
@@ -292,7 +298,10 @@ def _fix_missing_link(
     if not fix or not feat_name or node.path is None:
         return False
     by_type = feat_type_index.get(feat_name, {})
-    candidates = next((by_type[t] for t in candidate_types if by_type.get(t)), [])
+    no_candidates: list[DocNode] = []
+    candidates = next(
+        (by_type[t] for t in candidate_types if by_type.get(t)), no_candidates
+    )
     if not candidates or not _add_related_link(node.path, candidates[0].name):
         return False
     result.fixed_count += 1

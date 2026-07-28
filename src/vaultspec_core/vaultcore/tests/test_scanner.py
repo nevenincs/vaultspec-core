@@ -5,6 +5,9 @@ Covers :func:`~vaultspec_core.vaultcore.scanner.scan_vault` (file discovery,
 (directory-based classification) against a synthetic vault fixture.
 """
 
+from collections.abc import Generator
+from pathlib import Path
+
 import pytest
 
 from ...config import reset_config
@@ -15,14 +18,14 @@ pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture(autouse=True)
-def _reset_cfg():
+def reset_cfg() -> Generator[None]:
     reset_config()
     yield
     reset_config()
 
 
 @pytest.fixture
-def vault_project(tmp_path) -> CorpusManifest:
+def vault_project(tmp_path: Path) -> CorpusManifest:
     return build_synthetic_vault(
         tmp_path,
         n_docs=24,

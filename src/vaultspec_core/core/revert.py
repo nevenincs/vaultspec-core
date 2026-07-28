@@ -144,7 +144,9 @@ def get_snapshot_content(
         return None
 
 
-def revert_resource(vaultspec_dir: Path, category: str, filename: str) -> dict:
+def revert_resource(
+    vaultspec_dir: Path, category: str, filename: str
+) -> dict[str, object]:
     """Revert a resource to its snapshotted original.
 
     Args:
@@ -194,7 +196,7 @@ def revert_resource(vaultspec_dir: Path, category: str, filename: str) -> dict:
     }
 
 
-def list_modified_builtins(vaultspec_dir: Path) -> list[dict]:
+def list_modified_builtins(vaultspec_dir: Path) -> list[dict[str, object]]:
     """List builtin resources that differ from their install-time snapshots.
 
     Args:
@@ -207,7 +209,7 @@ def list_modified_builtins(vaultspec_dir: Path) -> list[dict]:
         exist.
     """
     snapshot_dir = vaultspec_dir / _SNAPSHOT_DIR
-    results = []
+    results: list[dict[str, object]] = []
 
     if not snapshot_dir.exists():
         return results

@@ -10,8 +10,12 @@ that leaks into layout - fails the build instead of slipping through review.
 from __future__ import annotations
 
 import os
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from vaultspec_core.cli.rendering import (
     Column,
@@ -34,7 +38,9 @@ def _box_glyphs(text: str) -> set[str]:
     return {ch for ch in text if "─" <= ch <= "╿"}
 
 
-def _render_at_width(width: int, render, capsys) -> str:
+def _render_at_width(
+    width: int, render: Callable[[], None], capsys: pytest.CaptureFixture[str]
+) -> str:
     """Render under a forced ``COLUMNS`` width and return captured stdout.
 
     Rich reads ``COLUMNS`` for width on a non-tty stream, so this is how an
@@ -69,7 +75,9 @@ _COLS = [Column("name"), Column("source")]
 class TestWidthDeterminism:
     """Identical bytes under a 30-column and a 200-column environment."""
 
-    def test_listing_is_width_independent(self, capsys):
+    def test_listing_is_width_independent(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         def render():
             render_listing(_ROWS, _COLS, title="Rules", summary="2 rules")
 
@@ -78,7 +86,9 @@ class TestWidthDeterminism:
         assert narrow == wide
         assert _LONG in narrow  # the long value rendered whole, not wrapped
 
-    def test_record_is_width_independent(self, capsys):
+    def test_record_is_width_independent(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         def render():
             render_record(
                 [Field("status", "drifted"), Field("detail", _LONG)], title="Status"
@@ -88,7 +98,9 @@ class TestWidthDeterminism:
             200, render, capsys
         )
 
-    def test_tree_is_width_independent(self, capsys):
+    def test_tree_is_width_independent(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         def render():
             render_tree(
                 [TreeLine("feature", 0), TreeLine(_LONG, 1, glyph="+")], title="Graph"
@@ -109,22 +121,26 @@ class TestNoBoxDrawing:
     def teardown_method(self):
         reset_console()
 
-    def test_listing_has_no_box_glyphs(self, capsys):
+    def test_listing_has_no_box_glyphs(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         render_listing(_ROWS, _COLS, title="Rules", summary="2 rules")
         assert _box_glyphs(capsys.readouterr().out) == set()
 
-    def test_record_has_no_box_glyphs(self, capsys):
+    def test_record_has_no_box_glyphs(self, capsys: pytest.CaptureFixture[str]) -> None:
         render_record([Field("status", "ok"), Field("count", "3")], title="Status")
         assert _box_glyphs(capsys.readouterr().out) == set()
 
-    def test_tree_has_no_box_glyphs(self, capsys):
+    def test_tree_has_no_box_glyphs(self, capsys: pytest.CaptureFixture[str]) -> None:
         render_tree(
             [TreeLine("a", 0), TreeLine("b", 1, glyph="+"), TreeLine("c", 2)],
             title="Graph",
         )
         assert _box_glyphs(capsys.readouterr().out) == set()
 
-    def test_dry_run_tree_has_no_box_glyphs(self, capsys):
+    def test_dry_run_tree_has_no_box_glyphs(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         items = [
             DryRunItem(path="a.md", status=DryRunStatus.NEW, label="claude"),
             DryRunItem(path="b.md", status=DryRunStatus.UPDATE, label="claude"),
@@ -133,7 +149,9 @@ class TestNoBoxDrawing:
         render_dry_run_tree(items, title="Preview")
         assert _box_glyphs(capsys.readouterr().out) == set()
 
-    def test_install_summary_has_no_box_glyphs(self, capsys):
+    def test_install_summary_has_no_box_glyphs(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         render_install_summary(
             {"rules": 1, "skills": 2, "agents": 9},
             path="/tmp/x",
@@ -142,7 +160,9 @@ class TestNoBoxDrawing:
         )
         assert _box_glyphs(capsys.readouterr().out) == set()
 
-    def test_uninstall_summary_has_no_box_glyphs(self, capsys):
+    def test_uninstall_summary_has_no_box_glyphs(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         render_uninstall_summary(
             [("/tmp/x/.claude", "claude (provider)")], path="/tmp/x"
         )
@@ -167,18 +187,22 @@ class TestEncodingInvariance:
     def teardown_method(self):
         reset_console()
 
-    def test_listing_structure_is_ascii(self, capsys):
+    def test_listing_structure_is_ascii(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         render_listing(_ROWS, _COLS, title="Rules", summary="2 rules")
         assert capsys.readouterr().out.isascii()
 
-    def test_record_structure_is_ascii(self, capsys):
+    def test_record_structure_is_ascii(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         render_record(
             [Field("status", "ok"), Field("detail", truncate("x" * 200, 50))],
             title="Status",
         )
         assert capsys.readouterr().out.isascii()
 
-    def test_tree_structure_is_ascii(self, capsys):
+    def test_tree_structure_is_ascii(self, capsys: pytest.CaptureFixture[str]) -> None:
         render_tree(
             [TreeLine("a", 0), TreeLine("b", 1, glyph="+"), TreeLine("c", 2)],
             title="Graph",
@@ -200,6 +224,7 @@ class TestEncodingInvariance:
 def _all_command_paths() -> list[tuple[str, ...]]:
     """Every group and leaf command path in the live app, root first."""
     import typer
+    from typer._click.core import Command as ClickCommand
     from typer._click.core import Context as ClickContext
     from typer.core import TyperGroup
 
@@ -208,11 +233,12 @@ def _all_command_paths() -> list[tuple[str, ...]]:
     root = typer.main.get_command(app)
     paths: list[tuple[str, ...]] = [()]
 
-    def walk(command, prefix: tuple[str, ...]) -> None:
+    def walk(command: ClickCommand, prefix: tuple[str, ...]) -> None:
         if isinstance(command, TyperGroup):
             ctx = ClickContext(command)
             for name in command.list_commands(ctx):
                 sub = command.get_command(ctx, name)
+                assert sub is not None, name
                 paths.append((*prefix, name))
                 walk(sub, (*prefix, name))
 
@@ -224,7 +250,7 @@ def _all_command_paths() -> list[tuple[str, ...]]:
 class TestPlainClickHelp:
     """Every command's --help is bog-standard plain Click, never a Rich panel."""
 
-    def test_no_help_screen_has_box_drawing(self):
+    def test_no_help_screen_has_box_drawing(self) -> None:
         from typer.testing import CliRunner
 
         from vaultspec_core.cli import app
@@ -237,7 +263,7 @@ class TestPlainClickHelp:
                 offenders.append(" ".join(path) or "(root)")
         assert not offenders, f"box-drawing in help for: {offenders}"
 
-    def test_group_help_uses_plain_section_headers(self):
+    def test_group_help_uses_plain_section_headers(self) -> None:
         from typer.testing import CliRunner
 
         from vaultspec_core.cli import app
@@ -248,7 +274,7 @@ class TestPlainClickHelp:
         assert "\nOptions:\n" in result.output
         assert "\nCommands:\n" in result.output
 
-    def test_help_word_wraps_prose_within_the_column_budget(self):
+    def test_help_word_wraps_prose_within_the_column_budget(self) -> None:
         # Click's plain help formatter word-wraps prose to the terminal width
         # (80 in the test runner) instead of emitting one long line or a Rich
         # panel. A real narrow terminal wraps tighter via COLUMNS; the runner
@@ -280,7 +306,9 @@ class TestHintUniformity:
     def teardown_method(self):
         reset_console()
 
-    def test_single_hint_uses_next_action_header(self, capsys):
+    def test_single_hint_uses_next_action_header(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         from vaultspec_core.cli.rendering import render_next_actions
 
         render_next_actions([("Define an ADR", "vaultspec-core vault add adr")])
@@ -292,7 +320,9 @@ class TestHintUniformity:
         assert "> " not in out
         assert "vaultspec-core vault add adr" in out
 
-    def test_multiple_hints_use_plural_header(self, capsys):
+    def test_multiple_hints_use_plural_header(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         from vaultspec_core.cli.rendering import render_next_actions
 
         render_next_actions(
@@ -301,7 +331,9 @@ class TestHintUniformity:
         out = capsys.readouterr().out
         assert "Next actions:" in out
 
-    def test_hint_footer_is_box_free_and_ascii(self, capsys):
+    def test_hint_footer_is_box_free_and_ascii(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         from vaultspec_core.cli.rendering import render_next_actions
 
         render_next_actions([("Re-sync", "vaultspec-core sync")])
@@ -309,7 +341,9 @@ class TestHintUniformity:
         assert _box_glyphs(out) == set()
         assert out.isascii()
 
-    def test_empty_hint_list_prints_nothing(self, capsys):
+    def test_empty_hint_list_prints_nothing(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         from vaultspec_core.cli.rendering import render_next_actions
 
         render_next_actions([])

@@ -1,6 +1,6 @@
-"""Bootstrap the FastMCP application for the vaultspec MCP server.
+"""Bootstrap the MCPServer application for the vaultspec MCP server.
 
-Constructs the ``FastMCP`` instance, registers the vault tool surface, and
+Constructs the ``MCPServer`` instance, registers the vault tool surface, and
 provides the runtime entry boundary for ``vaultspec-mcp``. Supports both
 root-CLI-injected context (via ``ctx.obj``) and standalone fallback
 configuration via :func:`~vaultspec_core.config.get_config`.
@@ -10,14 +10,14 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import typer
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncGenerator
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from vaultspec_core import __version__
 from vaultspec_core.cli._app import make_app
@@ -69,24 +69,24 @@ app = make_app(help="Run the Vaultspec MCP server.", no_args_is_help=False)
 
 
 @asynccontextmanager
-async def _lifespan(_app: FastMCP) -> AsyncIterator[None]:
+async def _lifespan(_app: MCPServer[None]) -> AsyncGenerator[None]:
     """Unified server lifespan."""
     yield None
 
 
-def create_server() -> FastMCP:
-    """Create and configure the FastMCP server instance.
+def create_server() -> MCPServer[None]:
+    """Create and configure the MCPServer instance.
 
-    Instantiates :class:`~mcp.server.fastmcp.FastMCP` and registers the vault
-    tool surface via the domain ``register_*_tools`` functions in
+    Instantiates :class:`~mcp.server.mcpserver.MCPServer` and registers the
+    vault tool surface via the domain ``register_*_tools`` functions in
     :mod:`vaultspec_core.mcp_server.tools`. Each tool handler runs in a copied
     :class:`contextvars.Context` so that per-request mutations do not leak
     between concurrent requests.
 
     Returns:
-        Configured :class:`~mcp.server.fastmcp.FastMCP` instance ready to serve.
+        Configured :class:`~mcp.server.mcpserver.MCPServer` ready to serve.
     """
-    mcp = FastMCP(
+    mcp = MCPServer(
         name="vaultspec-mcp",
         instructions=_build_instructions(),
         lifespan=_lifespan,
@@ -104,7 +104,9 @@ def create_server() -> FastMCP:
     return mcp
 
 
-def _serve(ctx_obj: dict | None = None, parent_pid: int | None = None) -> None:
+def _serve(
+    ctx_obj: dict[str, Any] | None = None, parent_pid: int | None = None
+) -> None:
     """Resolve runtime context, initialise paths, and start the MCP stdio server.
 
     Configures logging to stderr (to protect JSON-RPC on stdout), resolves
@@ -157,7 +159,7 @@ def _serve(ctx_obj: dict | None = None, parent_pid: int | None = None) -> None:
     else:
         logger.debug("Client watchdog not armed; relying on stdin EOF")
 
-    # FastMCP run() is synchronous, but we can call it here. On Windows the
+    # MCPServer run() is synchronous, but we can call it here. On Windows the
     # default event loop has been the Proactor loop since Python 3.8, which the
     # MCP stdio transport requires, so no explicit policy override is needed.
     mcp.run()

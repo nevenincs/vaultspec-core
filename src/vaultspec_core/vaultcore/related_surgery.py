@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import yaml
 
@@ -29,6 +29,8 @@ if TYPE_CHECKING:
 
 __all__ = [
     "append_related_entry",
+    "atomic_write_restore",
+    "read_preserve_newlines",
     "remove_related_entries",
 ]
 
@@ -37,7 +39,7 @@ __all__ = [
 _RELATED_ENTRY_RE = re.compile(r'^\s*-\s*["\']?\[\[(.+?)\]\]["\']?\s*$')
 
 
-def _read_preserve_newlines(path: Path) -> tuple[str, str]:
+def read_preserve_newlines(path: Path) -> tuple[str, str]:
     """Read a file and return ``(normalised_content, original_newline)``.
 
     Args:
@@ -56,7 +58,7 @@ def _read_preserve_newlines(path: Path) -> tuple[str, str]:
     return raw.replace("\r\n", "\n"), newline
 
 
-def _atomic_write_restore(path: Path, content: str) -> None:
+def atomic_write_restore(path: Path, content: str) -> None:
     """Write *content* to *path* atomically; restore from .bak on failure.
 
     A ``.bak`` copy of the original is written before the atomic write and
@@ -105,7 +107,7 @@ def remove_related_entries(path: Path, targets: list[str]) -> int:
         could not be read).
     """
     try:
-        content, source_newline = _read_preserve_newlines(path)
+        content, source_newline = read_preserve_newlines(path)
     except (OSError, UnicodeDecodeError):
         return 0
 
@@ -161,7 +163,7 @@ def remove_related_entries(path: Path, targets: list[str]) -> int:
     # Vault-orientation ADR (decision D3): a link mutation refreshes the
     # target document's modified stamp.
     new_content = refresh_modified_stamp(new_content, _dt.date.today())
-    _atomic_write_restore(path, new_content)
+    atomic_write_restore(path, new_content)
     return removed
 
 
@@ -207,7 +209,7 @@ def append_related_entry(path: Path, wiki_link: str) -> bool:
     if not stem:
         raise ValueError(f"Cannot parse stem from wiki_link: {wiki_link!r}")
 
-    content, source_newline = _read_preserve_newlines(path)
+    content, source_newline = read_preserve_newlines(path)
     lines = content.split("\n")
 
     in_frontmatter = False
@@ -305,7 +307,7 @@ def append_related_entry(path: Path, wiki_link: str) -> bool:
     # Vault-orientation ADR (decision D3): a link mutation refreshes the
     # target document's modified stamp.
     new_content = refresh_modified_stamp(new_content, _dt.date.today())
-    _atomic_write_restore(path, new_content)
+    atomic_write_restore(path, new_content)
     return True
 
 
@@ -337,12 +339,15 @@ def _parse_inline_related(inline_value: str) -> list[str]:
             f"Cannot parse inline related: value {inline_value!r}: {exc}"
         ) from exc
 
-    value = parsed.get("related") if isinstance(parsed, dict) else None
+    parsed_mapping = (
+        cast("dict[str, object]", parsed) if isinstance(parsed, dict) else None
+    )
+    value = parsed_mapping.get("related") if parsed_mapping is not None else None
     if not isinstance(value, list):
         raise ValueError(f"Inline related: value is not a sequence: {inline_value!r}")
 
     stems: list[str] = []
-    for item in value:
+    for item in cast("list[object]", value):
         if not isinstance(item, str):
             raise ValueError(f"Inline related: entry is not a string: {item!r}")
         stem = _extract_stem(item)

@@ -3,7 +3,7 @@
 Defines :func:`cmd_sync`, mounted by :mod:`vaultspec_core.cli.root` as the
 ``sync`` command on :data:`~vaultspec_core.cli.root_app.app`. Also hosts the
 sync-specific rendering and outcome-collection helpers
-(:func:`_collect_sync_outcomes` and friends), some of which are re-exported
+(:func:`collect_sync_outcomes` and friends), some of which are re-exported
 from :mod:`vaultspec_core.cli.root` for use by tests.
 """
 
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from vaultspec_core.core.types import SyncResult
 
 
-def _reject_core_sync_target(provider: str) -> None:
+def reject_core_sync_target(provider: str) -> None:
     """Refuse ``core`` as a sync target; it is not a provider output.
 
     Raises:
@@ -49,7 +49,7 @@ def _reject_core_sync_target(provider: str) -> None:
     raise typer.Exit(code=1)
 
 
-def _render_sync_dry_run(
+def render_sync_dry_run(
     results: list[SyncResult],
     provider: str,
     skip: list[str],
@@ -73,7 +73,7 @@ def _render_sync_dry_run(
 
         from vaultspec_core.cli.rendering import json_envelope, outcomes_as_json
 
-        outcomes = _collect_sync_outcomes(results, provider, skip)
+        outcomes = collect_sync_outcomes(results, provider, skip)
         inner = outcomes_as_json(outcomes)
         envelope = json_envelope(
             "sync", str(inner["status"]), {"items": inner["items"]}
@@ -96,7 +96,7 @@ def _render_sync_dry_run(
         DryRunItem(
             path=item_path,
             status=action_map.get(action, DryRunStatus.UPDATE),
-            label=_infer_label(item_path),
+            label=infer_label(item_path),
         )
         for r in results
         for item_path, action in r.items
@@ -113,7 +113,7 @@ def _render_sync_dry_run(
     raise typer.Exit(0)
 
 
-def _resolve_active_sync_names(
+def resolve_active_sync_names(
     active_configs: dict[Tool, Any], provider: str, skip: list[str]
 ) -> list[str]:
     """Return the enabled provider config names selected for this sync.
@@ -142,7 +142,7 @@ def _resolve_active_sync_names(
     ]
 
 
-def _render_sync_post_notices(
+def render_sync_post_notices(
     console: Console,
     sync_target: Path,
     results: list[SyncResult],
@@ -268,7 +268,7 @@ def cmd_sync(
     """
     skip = list(skip or [])
     apply_target(target, split_source=True, json_output=json_output)
-    _reject_core_sync_target(provider)
+    reject_core_sync_target(provider)
 
     from vaultspec_core.core.types import get_context
 
@@ -303,7 +303,7 @@ def cmd_sync(
     console = get_console()
 
     if dry_run:
-        _render_sync_dry_run(results, provider, skip, json_output, console)
+        render_sync_dry_run(results, provider, skip, json_output, console)
 
     # Non-dry-run: route every provider through the canonical outcome
     # renderer. Per the cli-sync-vocabulary ADR (audit findings
@@ -314,13 +314,13 @@ def cmd_sync(
     from vaultspec_core.core.manifest import installed_tool_configs
 
     active_configs = installed_tool_configs()
-    active_names = _resolve_active_sync_names(active_configs, provider, skip)
+    active_names = resolve_active_sync_names(active_configs, provider, skip)
 
     if not active_names and not json_output:
         console.print("[dim]No enabled providers to sync.[/dim]")
         raise typer.Exit(0)
 
-    outcomes = _collect_sync_outcomes(results, provider, skip)
+    outcomes = collect_sync_outcomes(results, provider, skip)
 
     all_warnings = [w for r in results for w in r.warnings]
     extra_json = {"warnings": all_warnings} if all_warnings else None
@@ -333,14 +333,14 @@ def cmd_sync(
     )
 
     if not json_output:
-        _render_sync_post_notices(
+        render_sync_post_notices(
             console, sync_target, results, all_warnings, code, active_names
         )
 
     raise typer.Exit(code)
 
 
-def _collect_sync_outcomes(
+def collect_sync_outcomes(
     results: list[SyncResult], provider: str, skip: list[str]
 ) -> list[OutcomeItem]:
     """Flatten sync-pass results into per-provider-grouped outcomes.
@@ -372,14 +372,14 @@ def _collect_sync_outcomes(
             for item_path, _action in r.items:
                 outcomes.extend(
                     sync_outcomes(
-                        _single_item_result(r, item_path),
-                        group=_infer_label(item_path),
+                        single_item_result(r, item_path),
+                        group=infer_label(item_path),
                     )
                 )
     return outcomes
 
 
-def _single_item_result(source: SyncResult, item_path: str) -> SyncResult:
+def single_item_result(source: SyncResult, item_path: str) -> SyncResult:
     """Return a one-item SyncResult mirroring ``item_path``'s action.
 
     Used to re-group structural-backfill items under their inferred provider
@@ -401,7 +401,7 @@ def _single_item_result(source: SyncResult, item_path: str) -> SyncResult:
     return single
 
 
-def _infer_label(item_path: str) -> str:
+def infer_label(item_path: str) -> str:
     """Infer a human-readable label from a sync output path."""
     p = item_path.replace("\\", "/")
 

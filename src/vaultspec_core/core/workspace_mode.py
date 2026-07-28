@@ -27,11 +27,15 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .enums import InstallMode
 from .exceptions import VaultSpecError
 from .helpers import advisory_lock, atomic_write, parse_version_tuple
+
+#: Re-exported (with underscore intact) for
+#: :mod:`vaultspec_core.core.diagnosis.collectors_precommit`.
+__all__ = ["_canonical_distribution_name"]
 
 WORKSPACE_FILENAME = "workspace.json"
 
@@ -269,6 +273,7 @@ def _parse_package_entry(path: Path, name: object, entry: Any) -> PackageDeclara
             f"{path}: expected a JSON object.",
             hint="Fix the JSON by hand or re-run 'vaultspec-core install --mode'.",
         )
+    entry = cast("dict[str, Any]", entry)
     mode = InstallMode.from_token(entry.get("install_mode"))
     if mode is None:
         raise VaultSpecError(
@@ -327,6 +332,7 @@ def _read_packages_map(target: Path) -> dict[str, PackageDeclaration] | None:
             f"Malformed workspace declaration at {path}: expected a JSON object.",
             hint="Fix the JSON by hand or re-run 'vaultspec-core install --mode'.",
         )
+    raw = cast("dict[str, Any]", raw)
 
     packages_raw = raw.get("packages")
     if packages_raw is not None:
@@ -336,6 +342,7 @@ def _read_packages_map(target: Path) -> dict[str, PackageDeclaration] | None:
                 "expected a JSON object.",
                 hint="Fix the JSON by hand or re-run 'vaultspec-core install --mode'.",
             )
+        packages_raw = cast("dict[str, Any]", packages_raw)
         return {
             _canonical_distribution_name(str(name)): _parse_package_entry(
                 path, name, entry
@@ -627,30 +634,35 @@ def detect_package_evidence(pyproject: Path, package: str) -> DependencyEvidence
     runtime_candidates: list[Any] = []
     project = data.get("project")
     if isinstance(project, dict):
+        project = cast("dict[str, Any]", project)
         deps = project.get("dependencies")
         if isinstance(deps, list):
-            runtime_candidates.extend(deps)
+            runtime_candidates.extend(cast("list[Any]", deps))
         optional = project.get("optional-dependencies")
         if isinstance(optional, dict):
+            optional = cast("dict[str, Any]", optional)
             for group in optional.values():
                 if isinstance(group, list):
-                    runtime_candidates.extend(group)
+                    runtime_candidates.extend(cast("list[Any]", group))
     if any(name == key for name in _requirement_names(runtime_candidates)):
         return DependencyEvidence.RUNTIME
 
     dev_candidates: list[Any] = []
     groups = data.get("dependency-groups")
     if isinstance(groups, dict):
+        groups = cast("dict[str, Any]", groups)
         dev_group = groups.get("dev")
         if isinstance(dev_group, list):
-            dev_candidates.extend(dev_group)
+            dev_candidates.extend(cast("list[Any]", dev_group))
     tool = data.get("tool")
     if isinstance(tool, dict):
+        tool = cast("dict[str, Any]", tool)
         uv = tool.get("uv")
         if isinstance(uv, dict):
+            uv = cast("dict[str, Any]", uv)
             dev = uv.get("dev-dependencies")
             if isinstance(dev, list):
-                dev_candidates.extend(dev)
+                dev_candidates.extend(cast("list[Any]", dev))
     if any(name == key for name in _requirement_names(dev_candidates)):
         return DependencyEvidence.DEV
 

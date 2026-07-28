@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
@@ -26,7 +26,7 @@ from ...core.types import get_context as _get_ctx
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server.mcpserver import MCPServer
 
     from ...vaultcore.checks import CheckResult
     from ...vaultcore.orientation import GroundingTrace, Rollup
@@ -376,7 +376,7 @@ def _checks_to_result(results: list[CheckResult], *, fix: bool) -> CheckResultMo
 # ---------------------------------------------------------------------------
 
 
-def register_orientation_tools(mcp: FastMCP) -> None:
+def register_orientation_tools(mcp: MCPServer[None]) -> None:
     """Register the ``status`` and ``check`` orientation tools on *mcp*.
 
     ``status`` is read-only and idempotent. ``check`` is annotated
@@ -386,18 +386,18 @@ def register_orientation_tools(mcp: FastMCP) -> None:
     return models.
 
     Args:
-        mcp: The :class:`~mcp.server.fastmcp.FastMCP` instance to decorate.
+        mcp: The :class:`~mcp.server.mcpserver.MCPServer` instance to decorate.
     """
 
     @mcp.tool(
         annotations=ToolAnnotations(
-            readOnlyHint=True,
-            idempotentHint=True,
-            openWorldHint=False,
+            read_only_hint=True,
+            idempotent_hint=True,
+            open_world_hint=False,
         ),
     )
     @_isolated_context
-    async def status(ctx: Context, target: str | None = None) -> StatusResult:
+    async def status(ctx: Context[Any, Any], target: str | None = None) -> StatusResult:
         """Orient in a vaultspec project, project-wide or targeted.
 
         With no ``target``, returns the project rollup: active features with
@@ -409,7 +409,8 @@ def register_orientation_tools(mcp: FastMCP) -> None:
         completion facts. Returns no blob hashes.
 
         Args:
-            ctx: The MCP request context.
+            ctx: The MCP request context (unused; logging routes through the
+                module logger instead of the deprecated client-facing channel).
             target: A feature tag or plan stem/path for the targeted trace,
                 or ``None`` for the project rollup.
 
@@ -419,6 +420,7 @@ def register_orientation_tools(mcp: FastMCP) -> None:
         Raises:
             ValueError: When a ``target`` resolves to no plan or feature.
         """
+        _ = ctx
         from ...vaultcore.orientation import (
             TargetResolutionError,
             compute_rollup,
@@ -427,10 +429,10 @@ def register_orientation_tools(mcp: FastMCP) -> None:
 
         root_dir = _get_ctx().target_dir
         if target is None:
-            await ctx.info("status: project rollup")
+            logger.info("status: project rollup")
             return _rollup_to_result(compute_rollup(root_dir))
 
-        await ctx.info(f"status: trace target={target!r}")
+        logger.info("status: trace target=%r", target)
         try:
             trace = compute_trace(root_dir, target)
         except TargetResolutionError as exc:
@@ -439,15 +441,15 @@ def register_orientation_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         annotations=ToolAnnotations(
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
+            read_only_hint=False,
+            destructive_hint=False,
+            idempotent_hint=True,
+            open_world_hint=False,
         ),
     )
     @_isolated_context
     async def check(
-        ctx: Context,
+        ctx: Context[Any, Any],
         feature: str | None = None,
         fix: bool = False,
     ) -> CheckResultModel:
@@ -460,7 +462,8 @@ def register_orientation_tools(mcp: FastMCP) -> None:
         re-running converges (idempotent).
 
         Args:
-            ctx: The MCP request context.
+            ctx: The MCP request context (unused; logging routes through the
+                module logger instead of the deprecated client-facing channel).
             feature: Restrict per-document checks to this feature tag
                 (without ``#``), or ``None`` for the whole vault.
             fix: When ``True``, apply the safe auto-corrections.
@@ -469,14 +472,19 @@ def register_orientation_tools(mcp: FastMCP) -> None:
             The :class:`CheckResultModel` with per-checker summaries and the
             flattened error- and warning-severity findings.
         """
+        _ = ctx
         from ...vaultcore.checks import run_all_checks
 
-        await ctx.info(f"check: feature={feature!r} fix={fix}")
+        logger.info("check: feature=%r fix=%s", feature, fix)
         root_dir = _get_ctx().target_dir
         results = run_all_checks(root_dir, feature=feature, fix=fix)
         report = _checks_to_result(results, fix=fix)
-        await ctx.debug(
-            f"check: {report.total_errors} error(s), "
-            f"{report.total_warnings} warning(s), {report.total_fixed} fixed"
+        logger.debug(
+            "check: %d error(s), %d warning(s), %d fixed",
+            report.total_errors,
+            report.total_warnings,
+            report.total_fixed,
         )
         return report
+
+    _ = (status, check)  # bound by the decorator; silence unused warnings

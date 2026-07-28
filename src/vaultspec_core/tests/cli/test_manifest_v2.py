@@ -21,6 +21,7 @@ from vaultspec_core.core.manifest import (
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from typing import Any
 
 pytestmark = [pytest.mark.unit]
 
@@ -29,20 +30,20 @@ def _manifest_path(root: Path) -> Path:
     return root / ".vaultspec" / "providers.json"
 
 
-def _write_raw(root: Path, payload: dict) -> None:
+def _write_raw(root: Path, payload: dict[str, Any]) -> None:
     path = _manifest_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
 class TestReadManifestData:
-    def test_missing_file_returns_default(self, tmp_path):
+    def test_missing_file_returns_default(self, tmp_path: Path) -> None:
         data = read_manifest_data(tmp_path)
         assert data.installed == set()
         assert data.version == "2.0"
         assert data.serial == 0
 
-    def test_malformed_json_returns_default(self, tmp_path):
+    def test_malformed_json_returns_default(self, tmp_path: Path) -> None:
         path = _manifest_path(tmp_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("{not valid json", encoding="utf-8")
@@ -51,7 +52,7 @@ class TestReadManifestData:
         assert data.installed == set()
         assert data.serial == 0
 
-    def test_v1_manifest_gets_defaults_for_new_fields(self, tmp_path):
+    def test_v1_manifest_gets_defaults_for_new_fields(self, tmp_path: Path) -> None:
         _write_raw(tmp_path, {"installed": ["claude", "gemini"]})
 
         data = read_manifest_data(tmp_path)
@@ -63,7 +64,7 @@ class TestReadManifestData:
         assert data.provider_state == {}
         assert data.gitignore_managed is False
 
-    def test_v2_manifest_all_fields(self, tmp_path):
+    def test_v2_manifest_all_fields(self, tmp_path: Path) -> None:
         payload = {
             "version": "2.0",
             "vaultspec_version": "0.1.4",
@@ -86,7 +87,7 @@ class TestReadManifestData:
 
 
 class TestWriteManifestData:
-    def test_creates_valid_json(self, tmp_path):
+    def test_creates_valid_json(self, tmp_path: Path) -> None:
         data = ManifestData(
             installed={"claude", "gemini"},
             vaultspec_version="0.1.4",
@@ -99,14 +100,14 @@ class TestWriteManifestData:
         assert sorted(raw["installed"]) == ["claude", "gemini"]
         assert raw["gitignore_managed"] is False
 
-    def test_auto_increments_serial(self, tmp_path):
+    def test_auto_increments_serial(self, tmp_path: Path) -> None:
         data = ManifestData(serial=3)
         write_manifest_data(tmp_path, data)
 
         raw = json.loads(_manifest_path(tmp_path).read_text(encoding="utf-8"))
         assert raw["serial"] == 4
 
-    def test_forces_current_version(self, tmp_path):
+    def test_forces_current_version(self, tmp_path: Path) -> None:
         data = ManifestData(version="1.0")
         write_manifest_data(tmp_path, data)
 
@@ -115,18 +116,18 @@ class TestWriteManifestData:
 
 
 class TestBackwardCompat:
-    def test_read_manifest_returns_set(self, tmp_path):
+    def test_read_manifest_returns_set(self, tmp_path: Path) -> None:
         _write_raw(tmp_path, {"installed": ["claude", "gemini"]})
         result = read_manifest(tmp_path)
         assert isinstance(result, set)
         assert result == {"claude", "gemini"}
 
-    def test_write_manifest_accepts_set(self, tmp_path):
+    def test_write_manifest_accepts_set(self, tmp_path: Path) -> None:
         write_manifest(tmp_path, {"claude"})
         result = read_manifest(tmp_path)
         assert result == {"claude"}
 
-    def test_write_manifest_preserves_v2_fields(self, tmp_path):
+    def test_write_manifest_preserves_v2_fields(self, tmp_path: Path) -> None:
         payload = {
             "version": "2.0",
             "vaultspec_version": "0.1.4",
@@ -149,12 +150,12 @@ class TestBackwardCompat:
 
 
 class TestAddProviders:
-    def test_adds_to_empty_manifest(self, tmp_path):
+    def test_adds_to_empty_manifest(self, tmp_path: Path) -> None:
         result = add_providers(tmp_path, ["claude"])
         assert result == {"claude"}
         assert read_manifest(tmp_path) == {"claude"}
 
-    def test_preserves_v2_fields(self, tmp_path):
+    def test_preserves_v2_fields(self, tmp_path: Path) -> None:
         payload = {
             "version": "2.0",
             "vaultspec_version": "0.1.4",
@@ -176,13 +177,13 @@ class TestAddProviders:
 
 
 class TestRemoveProvider:
-    def test_removes_existing(self, tmp_path):
+    def test_removes_existing(self, tmp_path: Path) -> None:
         _write_raw(tmp_path, {"installed": ["claude", "gemini"]})
         result = remove_provider(tmp_path, "claude")
         assert result == {"gemini"}
         assert read_manifest(tmp_path) == {"gemini"}
 
-    def test_preserves_v2_fields(self, tmp_path):
+    def test_preserves_v2_fields(self, tmp_path: Path) -> None:
         payload = {
             "version": "2.0",
             "vaultspec_version": "0.1.4",
@@ -201,12 +202,12 @@ class TestRemoveProvider:
         assert data.provider_state == {"claude": {"synced": "true"}}
         assert data.serial == 4
 
-    def test_remove_nonexistent_is_noop(self, tmp_path):
+    def test_remove_nonexistent_is_noop(self, tmp_path: Path) -> None:
         _write_raw(tmp_path, {"installed": ["claude"]})
         result = remove_provider(tmp_path, "gemini")
         assert result == {"claude"}
 
-    def test_remove_provider_cleans_provider_state(self, tmp_path):
+    def test_remove_provider_cleans_provider_state(self, tmp_path: Path) -> None:
         payload = {
             "version": "2.0",
             "serial": 1,
@@ -227,7 +228,7 @@ class TestRemoveProvider:
 
 
 class TestModeEcho:
-    def test_write_round_trips_mode_and_floor(self, tmp_path):
+    def test_write_round_trips_mode_and_floor(self, tmp_path: Path) -> None:
         data = ManifestData(
             installed={"claude"},
             resolved_mode=InstallMode.DEPENDENCY,
@@ -239,21 +240,21 @@ class TestModeEcho:
         assert result.resolved_mode is InstallMode.DEPENDENCY
         assert result.resolved_floor_version == "0.1.37"
 
-    def test_write_serializes_mode_as_string_value(self, tmp_path):
+    def test_write_serializes_mode_as_string_value(self, tmp_path: Path) -> None:
         write_manifest_data(tmp_path, ManifestData(resolved_mode=InstallMode.TOOL))
 
         raw = json.loads(_manifest_path(tmp_path).read_text(encoding="utf-8"))
         assert raw["resolved_mode"] == "tool"
         assert raw["resolved_floor_version"] is None
 
-    def test_unset_mode_serializes_as_null(self, tmp_path):
+    def test_unset_mode_serializes_as_null(self, tmp_path: Path) -> None:
         write_manifest_data(tmp_path, ManifestData())
 
         raw = json.loads(_manifest_path(tmp_path).read_text(encoding="utf-8"))
         assert raw["resolved_mode"] is None
         assert raw["resolved_floor_version"] is None
 
-    def test_legacy_manifest_without_echo_fields(self, tmp_path):
+    def test_legacy_manifest_without_echo_fields(self, tmp_path: Path) -> None:
         _write_raw(tmp_path, {"version": "2.0", "installed": ["claude"]})
 
         data = read_manifest_data(tmp_path)
@@ -261,7 +262,7 @@ class TestModeEcho:
         assert data.resolved_mode is None
         assert data.resolved_floor_version is None
 
-    def test_malformed_mode_token_reads_as_none(self, tmp_path):
+    def test_malformed_mode_token_reads_as_none(self, tmp_path: Path) -> None:
         _write_raw(
             tmp_path,
             {"version": "2.0", "installed": ["claude"], "resolved_mode": "hybrid"},
@@ -270,7 +271,7 @@ class TestModeEcho:
         data = read_manifest_data(tmp_path)
         assert data.resolved_mode is None
 
-    def test_echo_preserved_across_add_providers(self, tmp_path):
+    def test_echo_preserved_across_add_providers(self, tmp_path: Path) -> None:
         write_manifest_data(
             tmp_path,
             ManifestData(
@@ -289,7 +290,7 @@ class TestModeEcho:
 
 
 class TestMalformedSerial:
-    def test_malformed_serial_returns_default(self, tmp_path):
+    def test_malformed_serial_returns_default(self, tmp_path: Path) -> None:
         payload = {
             "version": "2.0",
             "installed": ["claude"],

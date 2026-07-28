@@ -57,7 +57,7 @@ class MarkdownStats:
 
     def describe(self) -> str:
         """Return a compact human-readable summary of the issues."""
-        parts = []
+        parts: list[str] = []
         if self.trailing_whitespace:
             suffix = "s" if self.trailing_whitespace != 1 else ""
             parts.append(f"{self.trailing_whitespace} trailing-whitespace line{suffix}")
@@ -96,27 +96,30 @@ def apply_markdown_hygiene(content: str) -> tuple[str, MarkdownStats]:
     # Tag each line with whether it sits strictly inside a fenced block. The
     # fence open/close markers themselves are treated as outside the fence
     # (they are never blank and their trailing whitespace is safe to strip).
-    rows: list[list] = []
+    rows: list[tuple[str, bool]] = []
     in_fence = False
     for line in lines:
         if _is_fence(line):
-            rows.append([line, False])
+            rows.append((line, False))
             in_fence = not in_fence
         else:
-            rows.append([line, in_fence])
+            rows.append((line, in_fence))
 
     # MD009: strip trailing whitespace outside fences.
-    for row in rows:
-        if not row[1]:
-            trimmed = row[0].rstrip(" \t")
-            if trimmed != row[0]:
+    stripped_rows: list[tuple[str, bool]] = []
+    for text, fenced in rows:
+        if not fenced:
+            trimmed = text.rstrip(" \t")
+            if trimmed != text:
                 stats.trailing_whitespace += 1
-                row[0] = trimmed
+            stripped_rows.append((trimmed, fenced))
+        else:
+            stripped_rows.append((text, fenced))
 
     # MD012: collapse consecutive blank lines outside fences.
     collapsed: list[str] = []
     prev_blank = False
-    for text, fenced in rows:
+    for text, fenced in stripped_rows:
         is_blank = (not fenced) and text == ""
         if is_blank and prev_blank:
             stats.blank_runs += 1

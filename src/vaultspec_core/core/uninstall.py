@@ -32,14 +32,31 @@ from .manifest import (
 from .precommit import _ALL_MANAGED_HOOK_IDS, _strip_managed_precommit_hooks
 from .provider_registry import (
     _PROVIDER_TO_TOOLS,
-    _filter_tools,
-    _rel,
-    _validate_provider,
-    _validate_skip,
+    filter_tools,
+    rel,
+    validate_provider,
+    validate_skip,
 )
 from .provision import _ensure_tool_configs
 
 logger = logging.getLogger(__name__)
+
+#: Re-exported (with underscore intact) for :mod:`vaultspec_core.core.commands`,
+#: which is the single public import surface for uninstall orchestration.
+__all__ = [
+    "_UNINSTALL_DIR_LABELS",
+    "_UNINSTALL_DIR_OWNERS",
+    "_UNINSTALL_FILE_LABELS",
+    "_UNINSTALL_FILE_OWNERS",
+    "_delete_managed_dir",
+    "_delete_managed_file",
+    "_reconcile_uninstall_git_blocks",
+    "_uninstall_everything",
+    "_uninstall_mcp_targets",
+    "_uninstall_precommit_hooks",
+    "_uninstall_provider_artifacts",
+    "uninstall_run",
+]
 
 # Map directory names → component owners (for skip filtering).
 # .agents/ is shared by antigravity, gemini, and codex (all place skills there
@@ -88,7 +105,7 @@ def _delete_managed_dir(
     try:
         _rmtree_robust(directory)
     except OSError as exc:
-        errors.append(f"Failed to remove {_rel(root, directory)}: {exc}")
+        errors.append(f"Failed to remove {rel(root, directory)}: {exc}")
         return False
     return True
 
@@ -107,7 +124,7 @@ def _delete_managed_file(
     try:
         file.unlink()
     except OSError as exc:
-        errors.append(f"Failed to remove {_rel(root, file)}: {exc}")
+        errors.append(f"Failed to remove {rel(root, file)}: {exc}")
         return False
     return True
 
@@ -142,7 +159,7 @@ def _uninstall_mcp_targets(
     ):
         target_result = uninstalled.per_tool.get(target.provider.value)
         if target_result and target_result.items:
-            removed.append((_rel(root, target.path), "mcp"))
+            removed.append((rel(root, target.path), "mcp"))
 
 
 def _uninstall_precommit_hooks(
@@ -167,12 +184,12 @@ def _uninstall_precommit_hooks(
         except OSError:
             return
         if any(f"id: {hid}" in raw for hid in _ALL_MANAGED_HOOK_IDS):
-            removed.append((_rel(root, precommit_path), "precommit"))
+            removed.append((rel(root, precommit_path), "precommit"))
         return
 
     if not _strip_managed_precommit_hooks(precommit_path):
         return
-    removed.append((_rel(root, precommit_path), "precommit"))
+    removed.append((rel(root, precommit_path), "precommit"))
     try:
         mdata = read_manifest_data(root)
         if mdata.precommit_managed:
@@ -267,7 +284,7 @@ def _uninstall_provider_artifacts(
     Directories and files another installed provider still owns are logged and
     left in place; the manifest is updated once every tool is off disk.
     """
-    tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
+    tools = filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
 
     if "mcp" not in skip:
         active_ctx = _t.get_context()
@@ -368,8 +385,8 @@ def uninstall_run(
     Raises:
         ProviderError: If *provider* is invalid or *force* not set.
     """
-    _validate_provider(provider)
-    skip = _validate_skip(skip)
+    validate_provider(provider)
+    skip = validate_skip(skip)
 
     # Safety gate: require --force for destructive operations
     if not force and not dry_run:

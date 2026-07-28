@@ -40,7 +40,7 @@ def _read_ga(root: Path) -> str:
 
 
 class TestFileCreation:
-    def test_creates_file_when_missing(self, tmp_path):
+    def test_creates_file_when_missing(self, tmp_path: Path) -> None:
         changed = ensure_gitattributes_block(tmp_path)
 
         assert changed is True
@@ -51,14 +51,14 @@ class TestFileCreation:
         for entry in DEFAULT_ENTRIES:
             assert entry in text
 
-    def test_absent_state_no_file_returns_false(self, tmp_path):
+    def test_absent_state_no_file_returns_false(self, tmp_path: Path) -> None:
         changed = ensure_gitattributes_block(tmp_path, state=ManagedState.ABSENT)
         assert changed is False
         assert not _ga(tmp_path).exists()
 
 
 class TestBlockInsertion:
-    def test_insert_into_existing_gitattributes(self, tmp_path):
+    def test_insert_into_existing_gitattributes(self, tmp_path: Path) -> None:
         _write_ga(tmp_path, "*.jpg binary\n")
         changed = ensure_gitattributes_block(tmp_path)
 
@@ -69,7 +69,7 @@ class TestBlockInsertion:
         assert "* text=auto eol=lf" in text
         assert text.startswith("*.jpg binary")
 
-    def test_empty_gitattributes(self, tmp_path):
+    def test_empty_gitattributes(self, tmp_path: Path) -> None:
         _write_ga(tmp_path, "")
         changed = ensure_gitattributes_block(tmp_path)
 
@@ -80,7 +80,7 @@ class TestBlockInsertion:
 
 
 class TestBlockUpdate:
-    def test_update_existing_block(self, tmp_path):
+    def test_update_existing_block(self, tmp_path: Path) -> None:
         _write_ga(tmp_path, "*.jpg binary\n")
         ensure_gitattributes_block(tmp_path)
         new_entries = ["* text=auto eol=lf", "*.ps1 text eol=crlf"]
@@ -94,7 +94,7 @@ class TestBlockUpdate:
 
 
 class TestBlockRemoval:
-    def test_remove_existing_block(self, tmp_path):
+    def test_remove_existing_block(self, tmp_path: Path) -> None:
         _write_ga(tmp_path, "*.jpg binary\n")
         ensure_gitattributes_block(tmp_path)
         changed = ensure_gitattributes_block(tmp_path, state=ManagedState.ABSENT)
@@ -104,20 +104,20 @@ class TestBlockRemoval:
         assert MARKER_BEGIN not in text
         assert MARKER_END not in text
 
-    def test_remove_no_block_returns_false(self, tmp_path):
+    def test_remove_no_block_returns_false(self, tmp_path: Path) -> None:
         _write_ga(tmp_path, "*.jpg binary\n")
         changed = ensure_gitattributes_block(tmp_path, state=ManagedState.ABSENT)
         assert changed is False
 
 
 class TestIdempotency:
-    def test_same_entries_twice_returns_false(self, tmp_path):
+    def test_same_entries_twice_returns_false(self, tmp_path: Path) -> None:
         _write_ga(tmp_path, "*.jpg binary\n")
         ensure_gitattributes_block(tmp_path)
         changed = ensure_gitattributes_block(tmp_path)
         assert changed is False
 
-    def test_content_stable_after_two_calls(self, tmp_path):
+    def test_content_stable_after_two_calls(self, tmp_path: Path) -> None:
         _write_ga(tmp_path, "*.jpg binary\n")
         ensure_gitattributes_block(tmp_path)
         content_after_first = _ga(tmp_path).read_bytes()
@@ -127,7 +127,7 @@ class TestIdempotency:
 
 
 class TestAtomicWriteNamespace:
-    def test_legacy_temp_regular_file_is_untouched(self, tmp_path):
+    def test_legacy_temp_regular_file_is_untouched(self, tmp_path: Path) -> None:
         ga = _ga(tmp_path)
         legacy = ga.with_suffix(ga.suffix + f".{os.getpid()}.tmp")
         legacy.write_bytes(b"operator bytes\n")
@@ -139,7 +139,7 @@ class TestAtomicWriteNamespace:
 
 
 class TestOrphanedMarkers:
-    def test_orphaned_begin_marker(self, tmp_path):
+    def test_orphaned_begin_marker(self, tmp_path: Path) -> None:
         content = f"*.jpg binary\n{MARKER_BEGIN}\n* text=auto eol=lf\n"
         _write_ga(tmp_path, content)
         changed = ensure_gitattributes_block(tmp_path)
@@ -149,7 +149,7 @@ class TestOrphanedMarkers:
         assert text.count(MARKER_BEGIN) == 1
         assert text.count(MARKER_END) == 1
 
-    def test_orphaned_end_marker(self, tmp_path):
+    def test_orphaned_end_marker(self, tmp_path: Path) -> None:
         content = f"*.jpg binary\n{MARKER_END}\n"
         _write_ga(tmp_path, content)
         changed = ensure_gitattributes_block(tmp_path)
@@ -161,7 +161,7 @@ class TestOrphanedMarkers:
 
 
 class TestLineEndings:
-    def test_crlf_preserved(self, tmp_path):
+    def test_crlf_preserved(self, tmp_path: Path) -> None:
         raw = b"*.jpg binary\r\n*.png binary\r\n"
         _ga(tmp_path).write_bytes(raw)
         ensure_gitattributes_block(tmp_path)
@@ -171,7 +171,7 @@ class TestLineEndings:
         lf_only = result.count(b"\n") - crlf_count
         assert crlf_count > lf_only
 
-    def test_created_file_uses_lf(self, tmp_path):
+    def test_created_file_uses_lf(self, tmp_path: Path) -> None:
         ensure_gitattributes_block(tmp_path)
         raw = _ga(tmp_path).read_bytes()
         assert b"\r\n" not in raw
@@ -179,7 +179,7 @@ class TestLineEndings:
 
 
 class TestContentPreservation:
-    def test_user_content_above_and_below(self, tmp_path):
+    def test_user_content_above_and_below(self, tmp_path: Path) -> None:
         before_block = "# user content above\n*.jpg binary\n"
         block = f"{MARKER_BEGIN}\n*.old entry\n{MARKER_END}\n"
         after_block = "# user content below\n*.png binary\n"
@@ -196,7 +196,7 @@ class TestContentPreservation:
 
 
 class TestTrailingBlanks:
-    def test_multiple_trailing_blanks_normalized(self, tmp_path):
+    def test_multiple_trailing_blanks_normalized(self, tmp_path: Path) -> None:
         _write_ga(tmp_path, "*.jpg binary\n\n\n\n")
         ensure_gitattributes_block(tmp_path)
 
@@ -214,7 +214,7 @@ class TestTrailingBlanks:
 
 
 class TestFileWithoutNewline:
-    def test_file_ending_without_newline(self, tmp_path):
+    def test_file_ending_without_newline(self, tmp_path: Path) -> None:
         _write_ga(tmp_path, "*.jpg binary")
         changed = ensure_gitattributes_block(tmp_path)
 
@@ -225,13 +225,15 @@ class TestFileWithoutNewline:
 
 
 class TestInvertedMarkers:
-    def test_find_markers_inverted_returns_both(self):
+    def test_find_markers_inverted_returns_both(self) -> None:
         lines = ["some content", MARKER_END, "*.entry", MARKER_BEGIN]
         begins, ends = _find_markers(lines)
         assert begins == [3]
         assert ends == [1]
 
-    def test_ensure_removes_both_markers_and_appends_fresh_block(self, tmp_path):
+    def test_ensure_removes_both_markers_and_appends_fresh_block(
+        self, tmp_path: Path
+    ) -> None:
         content = f"*.jpg binary\n{MARKER_END}\n*.entry\n{MARKER_BEGIN}\n"
         _write_ga(tmp_path, content)
         changed = ensure_gitattributes_block(tmp_path)
@@ -244,7 +246,7 @@ class TestInvertedMarkers:
 
 
 class TestDuplicateBeginMarkers:
-    def test_ensure_handles_duplicate_begin(self, tmp_path):
+    def test_ensure_handles_duplicate_begin(self, tmp_path: Path) -> None:
         content = f"{MARKER_BEGIN}\n*.entry\n{MARKER_BEGIN}\n*.entry2\n{MARKER_END}\n"
         _write_ga(tmp_path, content)
         changed = ensure_gitattributes_block(tmp_path)
@@ -256,7 +258,7 @@ class TestDuplicateBeginMarkers:
 
 
 class TestDuplicateEndMarkers:
-    def test_ensure_handles_duplicate_end(self, tmp_path):
+    def test_ensure_handles_duplicate_end(self, tmp_path: Path) -> None:
         content = f"{MARKER_BEGIN}\n*.entry\n{MARKER_END}\n{MARKER_END}\n"
         _write_ga(tmp_path, content)
         changed = ensure_gitattributes_block(tmp_path)
@@ -268,7 +270,7 @@ class TestDuplicateEndMarkers:
 
 
 class TestEmptyEntriesList:
-    def test_empty_entries_writes_markers_only(self, tmp_path):
+    def test_empty_entries_writes_markers_only(self, tmp_path: Path) -> None:
         _write_ga(tmp_path, "*.jpg binary\n")
         changed = ensure_gitattributes_block(tmp_path, [], state=ManagedState.PRESENT)
 
@@ -283,10 +285,11 @@ class TestEmptyEntriesList:
 
 
 class TestReadOnlyGitattributes:
-    def test_read_only_raises_oserror(self, tmp_path):
+    def test_read_only_raises_oserror(self, tmp_path: Path) -> None:
         _write_ga(tmp_path, "*.jpg binary\n")
         ga = _ga(tmp_path)
         ga.chmod(stat.S_IREAD)
+        can_write = False
         try:
             try:
                 probe = tmp_path / "probe.tmp"
@@ -322,7 +325,7 @@ class TestReadOnlyGitattributes:
 
 
 class TestInstallCreatesGitattributes:
-    def test_install_creates_gitattributes_with_block(self, tmp_path):
+    def test_install_creates_gitattributes_with_block(self, tmp_path: Path) -> None:
         from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
         factory = WorkspaceFactory(tmp_path)
@@ -333,7 +336,7 @@ class TestInstallCreatesGitattributes:
         assert "* text=auto eol=lf" in text
         assert "*.bat text eol=crlf" in text
 
-    def test_install_sets_manifest_flag(self, tmp_path):
+    def test_install_sets_manifest_flag(self, tmp_path: Path) -> None:
         from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
         factory = WorkspaceFactory(tmp_path)
@@ -342,7 +345,7 @@ class TestInstallCreatesGitattributes:
         mdata = factory.read_manifest()
         assert mdata.gitattributes_managed is True
 
-    def test_install_preserves_existing_content(self, tmp_path):
+    def test_install_preserves_existing_content(self, tmp_path: Path) -> None:
         from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
         (tmp_path / ".gitattributes").write_text("*.jpg binary\n", encoding="utf-8")
@@ -355,7 +358,7 @@ class TestInstallCreatesGitattributes:
 
 
 class TestSyncRespectsGitattributesOptOut:
-    def test_sync_repairs_block(self, tmp_path):
+    def test_sync_repairs_block(self, tmp_path: Path) -> None:
         from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
         factory = WorkspaceFactory(tmp_path)
@@ -372,7 +375,7 @@ class TestSyncRespectsGitattributesOptOut:
         repaired = ga.read_text(encoding="utf-8")
         assert "* text=auto eol=lf" in repaired
 
-    def test_sync_honours_opt_out(self, tmp_path):
+    def test_sync_honours_opt_out(self, tmp_path: Path) -> None:
         from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
         factory = WorkspaceFactory(tmp_path)
@@ -386,7 +389,7 @@ class TestSyncRespectsGitattributesOptOut:
 
 
 class TestUninstallRemovesGitattributes:
-    def test_full_uninstall_removes_block(self, tmp_path):
+    def test_full_uninstall_removes_block(self, tmp_path: Path) -> None:
         from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
         factory = WorkspaceFactory(tmp_path)

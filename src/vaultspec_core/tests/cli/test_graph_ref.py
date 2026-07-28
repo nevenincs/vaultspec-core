@@ -50,7 +50,7 @@ def _doc(directory_tag: str, feature: str, title: str, body: str) -> str:
 
 
 @pytest.fixture
-def vault_repo(tmp_path) -> tuple[Path, str, str]:
+def vault_repo(tmp_path: Path) -> tuple[Path, str, str]:
     """A git repo whose ``.vault/`` corpus changes between two commits.
 
     Returns ``(repo, sha1, sha2)`` where ``sha1`` has two linked documents and
@@ -102,7 +102,9 @@ def vault_repo(tmp_path) -> tuple[Path, str, str]:
 # ---- read_vault_at_ref ------------------------------------------------------
 
 
-def test_read_vault_at_ref_returns_corpus_at_each_ref(vault_repo) -> None:
+def test_read_vault_at_ref_returns_corpus_at_each_ref(
+    vault_repo: tuple[Path, str, str],
+) -> None:
     repo, sha1, sha2 = vault_repo
 
     at_c1 = dict(read_vault_at_ref(repo, sha1, ".vault"))
@@ -118,20 +120,24 @@ def test_read_vault_at_ref_returns_corpus_at_each_ref(vault_repo) -> None:
     assert "Revised findings" in at_c2[".vault/research/2026-06-13-alpha-research.md"]
 
 
-def test_read_vault_at_ref_accepts_branch_name(vault_repo) -> None:
+def test_read_vault_at_ref_accepts_branch_name(
+    vault_repo: tuple[Path, str, str],
+) -> None:
     repo, _sha1, _sha2 = vault_repo
     branch = _git(repo, "rev-parse", "--abbrev-ref", "HEAD")
     corpus = read_vault_at_ref(repo, branch, ".vault")
     assert len(corpus) == 3
 
 
-def test_read_vault_at_ref_unresolvable_ref_raises(vault_repo) -> None:
+def test_read_vault_at_ref_unresolvable_ref_raises(
+    vault_repo: tuple[Path, str, str],
+) -> None:
     repo, _sha1, _sha2 = vault_repo
     with pytest.raises(RefScanError, match="does not resolve"):
         read_vault_at_ref(repo, "no-such-ref", ".vault")
 
 
-def test_read_vault_at_ref_non_git_raises(tmp_path) -> None:
+def test_read_vault_at_ref_non_git_raises(tmp_path: Path) -> None:
     not_a_repo = tmp_path / "plain"
     not_a_repo.mkdir()
     with pytest.raises(RefScanError, match="not a git repository"):
@@ -141,7 +147,9 @@ def test_read_vault_at_ref_non_git_raises(tmp_path) -> None:
 # ---- VaultGraph.from_ref ----------------------------------------------------
 
 
-def test_from_ref_matches_working_tree_build(vault_repo) -> None:
+def test_from_ref_matches_working_tree_build(
+    vault_repo: tuple[Path, str, str],
+) -> None:
     """A ref build at HEAD is structurally identical to a working-tree build."""
     repo, _sha1, sha2 = vault_repo
 
@@ -155,7 +163,7 @@ def test_from_ref_matches_working_tree_build(vault_repo) -> None:
     assert ref_graph.ref == sha2
 
 
-def test_from_ref_reflects_historical_ref(vault_repo) -> None:
+def test_from_ref_reflects_historical_ref(vault_repo: tuple[Path, str, str]) -> None:
     repo, sha1, _sha2 = vault_repo
     graph = VaultGraph.from_ref(repo, sha1)
     # The plan added at c2 is absent at c1.
@@ -168,13 +176,17 @@ def test_from_ref_reflects_historical_ref(vault_repo) -> None:
     ) in graph.digraph.edges()
 
 
-def test_from_ref_does_not_write_working_tree_cache(vault_repo) -> None:
+def test_from_ref_does_not_write_working_tree_cache(
+    vault_repo: tuple[Path, str, str],
+) -> None:
     repo, _sha1, sha2 = vault_repo
     VaultGraph.from_ref(repo, sha2)
     assert not cache_path(repo).exists()
 
 
-def test_from_ref_node_path_is_virtual_tree_path(vault_repo) -> None:
+def test_from_ref_node_path_is_virtual_tree_path(
+    vault_repo: tuple[Path, str, str],
+) -> None:
     repo, _sha1, sha2 = vault_repo
     data = VaultGraph.from_ref(repo, sha2).to_dict()
     assert data["ref"] == sha2
@@ -182,7 +194,9 @@ def test_from_ref_node_path_is_virtual_tree_path(vault_repo) -> None:
     assert paths["2026-06-13-alpha-adr"] == ".vault/adr/2026-06-13-alpha-adr.md"
 
 
-def test_working_tree_node_path_is_vault_relative(vault_repo) -> None:
+def test_working_tree_node_path_is_vault_relative(
+    vault_repo: tuple[Path, str, str],
+) -> None:
     """A working-tree build emits the same vault-relative path as a ref build.
 
     Consumer-symmetry follow-up: no absolute OS path leaks into the envelope,
@@ -204,7 +218,7 @@ def test_working_tree_node_path_is_vault_relative(vault_repo) -> None:
     assert paths == ref_paths
 
 
-def test_from_ref_bad_ref_raises(vault_repo) -> None:
+def test_from_ref_bad_ref_raises(vault_repo: tuple[Path, str, str]) -> None:
     repo, _sha1, _sha2 = vault_repo
     with pytest.raises(RefScanError):
         VaultGraph.from_ref(repo, "nope")

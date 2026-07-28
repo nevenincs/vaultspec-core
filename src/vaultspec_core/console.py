@@ -10,6 +10,7 @@ import contextlib
 import io
 import os
 import sys
+from typing import Any, TextIO
 
 from rich.console import Console
 
@@ -18,7 +19,7 @@ __all__ = ["configure_stdio", "get_console", "reset_console"]
 _console: Console | None = None
 
 
-def _is_utf8_capable(stdout=None) -> bool:
+def _is_utf8_capable(stdout: TextIO | None = None) -> bool:
     """Check if stdout can handle UTF-8 output."""
     stream = sys.stdout if stdout is None else stdout
     encoding = getattr(stream, "encoding", None) or ""
@@ -58,7 +59,7 @@ def configure_stdio() -> None:
             continue
 
 
-def _make_utf8_stdout(stdout=None) -> io.TextIOWrapper:
+def _make_utf8_stdout(stdout: TextIO | None = None) -> io.TextIOWrapper:
     """Wrap stdout's underlying byte buffer with a UTF-8 text wrapper.
 
     This avoids UnicodeEncodeError when Rich writes Unicode characters
@@ -70,11 +71,13 @@ def _make_utf8_stdout(stdout=None) -> io.TextIOWrapper:
     )
 
 
-def _console_kwargs(stdout=None, environ: dict[str, str] | None = None) -> dict:
+def _console_kwargs(
+    stdout: TextIO | None = None, environ: dict[str, str] | None = None
+) -> dict[str, Any]:
     """Build Rich Console kwargs from real stream and environment inputs."""
     env = os.environ if environ is None else environ
     utf8 = _is_utf8_capable(stdout)
-    kwargs: dict = {
+    kwargs: dict[str, Any] = {
         "highlight": False,
         "soft_wrap": True,
         "no_color": "NO_COLOR" in env,

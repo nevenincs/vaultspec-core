@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 import pytest
 
 from vaultspec_core.cli import app
 from vaultspec_core.core.types import init_paths
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from typer.testing import CliRunner
 
 pytestmark = [pytest.mark.integration]
 
@@ -29,7 +35,7 @@ _NEW_ADR_CONTENT_20 = (
 
 
 @pytest.fixture
-def test_project(tmp_path):
+def test_project(tmp_path: Path) -> Path:
     """Setup a simplified project structure for adr supersede tests."""
     project_dir = tmp_path / "project"
     project_dir.mkdir()
@@ -46,7 +52,7 @@ def test_project(tmp_path):
     return project_dir
 
 
-def test_adr_supersede_missing_old_fails(runner, test_project):
+def test_adr_supersede_missing_old_fails(runner: CliRunner, test_project: Path) -> None:
     # Setup new ADR file only
     new_adr = test_project / ".vault" / "adr" / "2026-05-17-new-adr.md"
     new_adr.write_text(_NEW_ADR_CONTENT_17, encoding="utf-8")
@@ -69,7 +75,7 @@ def test_adr_supersede_missing_old_fails(runner, test_project):
     assert "not found" in result.output
 
 
-def test_adr_supersede_missing_new_fails(runner, test_project):
+def test_adr_supersede_missing_new_fails(runner: CliRunner, test_project: Path) -> None:
     # Setup old ADR file only
     old_adr = test_project / ".vault" / "adr" / "2026-05-17-old-adr.md"
     old_adr.write_text(_OLD_ADR_CONTENT, encoding="utf-8")
@@ -92,7 +98,9 @@ def test_adr_supersede_missing_new_fails(runner, test_project):
     assert "not found" in result.output
 
 
-def test_adr_supersede_missing_by_option_fails(runner, test_project):
+def test_adr_supersede_missing_by_option_fails(
+    runner: CliRunner, test_project: Path
+) -> None:
     result = runner.invoke(
         app,
         [
@@ -108,7 +116,9 @@ def test_adr_supersede_missing_by_option_fails(runner, test_project):
     assert "--by option is required" in result.output
 
 
-def test_adr_supersede_success_mutates_both_files(runner, test_project):
+def test_adr_supersede_success_mutates_both_files(
+    runner: CliRunner, test_project: Path
+) -> None:
     # Setup old ADR with \r\n line endings and custom field
     old_content = (
         "---\r\n"
@@ -174,7 +184,7 @@ def test_adr_supersede_success_mutates_both_files(runner, test_project):
     assert "other_field: 'world'" in mutated_new  # preserved unknown field
 
 
-def test_adr_supersede_dry_run(runner, test_project):
+def test_adr_supersede_dry_run(runner: CliRunner, test_project: Path) -> None:
     old_adr = test_project / ".vault" / "adr" / "2026-05-17-old-adr.md"
     old_adr.write_text(_OLD_ADR_CONTENT, encoding="utf-8")
     new_adr = test_project / ".vault" / "adr" / "2026-05-20-new-adr.md"
@@ -206,7 +216,7 @@ def test_adr_supersede_dry_run(runner, test_project):
     assert "supersedes:" not in new_content
 
 
-def test_adr_supersede_json_output(runner, test_project):
+def test_adr_supersede_json_output(runner: CliRunner, test_project: Path) -> None:
     old_adr = test_project / ".vault" / "adr" / "2026-05-17-old-adr.md"
     old_adr.write_text(_OLD_ADR_CONTENT, encoding="utf-8")
     new_adr = test_project / ".vault" / "adr" / "2026-05-20-new-adr.md"

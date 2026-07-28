@@ -9,6 +9,8 @@ Covers:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 from typer.testing import CliRunner
 
@@ -16,6 +18,9 @@ from vaultspec_core.cli import app
 from vaultspec_core.plan.parser import parse_plan
 from vaultspec_core.plan.serialiser import serialise_plan
 from vaultspec_core.vaultcore.checks.annotations import check_annotations
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 L1_SAMPLE = """---
 tags:
@@ -196,7 +201,7 @@ def test_serialise_plan_canonicalise_strips_unknown_blocks() -> None:
     assert "Final closing remarks" not in serialized_l1
 
 
-def test_cli_dry_run_does_not_modify_file(tmp_path, runner: CliRunner) -> None:
+def test_cli_dry_run_does_not_modify_file(tmp_path: Path, runner: CliRunner) -> None:
     """Verify that --dry-run outputs a unified diff and does not modify the file."""
     plan_path = tmp_path / "test-plan.md"
     plan_path.write_text(L1_SAMPLE, encoding="utf-8")
@@ -225,7 +230,9 @@ def test_cli_dry_run_does_not_modify_file(tmp_path, runner: CliRunner) -> None:
     assert plan_path.read_text(encoding="utf-8") == L1_SAMPLE
 
 
-def test_cli_canonicalise_strips_and_reports_zero(tmp_path, runner: CliRunner) -> None:
+def test_cli_canonicalise_strips_and_reports_zero(
+    tmp_path: Path, runner: CliRunner
+) -> None:
     """Verify that --canonicalise strips unknown blocks and reports 0 preserved."""
     plan_path = tmp_path / "test-plan.md"
     plan_path.write_text(L1_SAMPLE, encoding="utf-8")
@@ -256,7 +263,7 @@ def test_cli_canonicalise_strips_and_reports_zero(tmp_path, runner: CliRunner) -
 
 
 def test_cli_standard_apply_preserves_and_reports_count(
-    tmp_path, runner: CliRunner
+    tmp_path: Path, runner: CliRunner
 ) -> None:
     """Verify that standard apply preserves unknown blocks and reports count."""
     plan_path = tmp_path / "test-plan.md"
@@ -285,7 +292,7 @@ def test_cli_standard_apply_preserves_and_reports_count(
 
 
 def test_cli_step_check_does_not_restore_sanitized_link_rules(
-    tmp_path, runner: CliRunner
+    tmp_path: Path, runner: CliRunner
 ) -> None:
     """A structural mutation must not undo the real annotation sanitizer."""
     plan_path = tmp_path / ".vault" / "plan" / "2026-05-05-demo-plan.md"
@@ -313,7 +320,7 @@ def test_cli_step_check_does_not_restore_sanitized_link_rules(
     assert "<!-- LINK RULES:" not in content
 
 
-def test_cli_step_add_preservation(tmp_path, runner: CliRunner) -> None:
+def test_cli_step_add_preservation(tmp_path: Path, runner: CliRunner) -> None:
     """Verify step add maintains unknown blocks and prints proper message."""
     plan_path = tmp_path / "test-plan.md"
     plan_path.write_text(L1_SAMPLE, encoding="utf-8")
@@ -343,7 +350,9 @@ def test_cli_step_add_preservation(tmp_path, runner: CliRunner) -> None:
     assert "new step action" in content
 
 
-def test_cli_epic_intent_edit_l4_preservation(tmp_path, runner: CliRunner) -> None:
+def test_cli_epic_intent_edit_l4_preservation(
+    tmp_path: Path, runner: CliRunner
+) -> None:
     """Verify epic intent edit maintains unknown blocks in L4 plans."""
     l4_sample = """---
 tags:

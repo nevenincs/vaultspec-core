@@ -10,21 +10,26 @@ to exercise the actual byte-level I/O that the helpers promise.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 import yaml
 
 from ..related_surgery import append_related_entry, remove_related_entries
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 pytestmark = [pytest.mark.unit]
 
 
-def _write_crlf(path, text: str) -> None:
+def _write_crlf(path: Path, text: str) -> None:
     """Write *text* with CRLF line endings."""
     crlf_text = text.replace("\n", "\r\n")
     path.write_bytes(crlf_text.encode("utf-8"))
 
 
-def _write_lf(path, text: str) -> None:
+def _write_lf(path: Path, text: str) -> None:
     """Write *text* with LF line endings."""
     path.write_bytes(text.encode("utf-8"))
 
@@ -75,7 +80,7 @@ def _frontmatter_key_block(raw: bytes, key: str) -> bytes:
 class TestRemoveRelatedEntriesCRLF:
     """CRLF preservation: bytes outside the related: block are unchanged."""
 
-    def test_crlf_preserved_on_removal(self, tmp_path):
+    def test_crlf_preserved_on_removal(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         content = (
             "---\n"
@@ -108,7 +113,7 @@ class TestRemoveRelatedEntriesCRLF:
         assert b"[[gone]]" not in raw_after
         _ = raw_before  # reference prevents unused-var warning
 
-    def test_crlf_all_removed_leaves_empty_list(self, tmp_path):
+    def test_crlf_all_removed_leaves_empty_list(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         content = (
             '---\nrelated:\n  - "[[gone-one]]"\n  - "[[gone-two]]"\n---\n\nBody.\n'
@@ -130,7 +135,7 @@ class TestRemoveRelatedEntriesCRLF:
 class TestRemoveRelatedEntriesLF:
     """Verify LF files are not corrupted (no CRLF injected)."""
 
-    def test_lf_preserved_on_removal(self, tmp_path):
+    def test_lf_preserved_on_removal(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         content = '---\nrelated:\n  - "[[gone]]"\n  - "[[kept]]"\n---\n\nBody.\n'
         _write_lf(doc, content)
@@ -143,7 +148,7 @@ class TestRemoveRelatedEntriesLF:
         assert b"\r\n" not in raw_after
         assert b"[[kept]]" in raw_after
 
-    def test_returns_zero_when_no_match(self, tmp_path):
+    def test_returns_zero_when_no_match(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         content = "---\nrelated:\n  - '[[real]]'\n---\nBody.\n"
         _write_lf(doc, content)
@@ -155,12 +160,12 @@ class TestRemoveRelatedEntriesLF:
         # File must be byte-identical - no write happened
         assert doc.read_bytes() == original_bytes
 
-    def test_returns_zero_on_unreadable_file(self, tmp_path):
+    def test_returns_zero_on_unreadable_file(self, tmp_path: Path) -> None:
         doc = tmp_path / "missing.md"
         removed = remove_related_entries(doc, ["anything"])
         assert removed == 0
 
-    def test_case_insensitive_match(self, tmp_path):
+    def test_case_insensitive_match(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         content = "---\nrelated:\n  - '[[Some-Doc]]'\n---\nBody.\n"
         _write_lf(doc, content)
@@ -174,7 +179,7 @@ class TestRemoveRelatedEntriesLF:
 class TestRemoveAtomicWrite:
     """Verify the write is atomic: a successful write leaves no .bak file."""
 
-    def test_no_bak_file_after_success(self, tmp_path):
+    def test_no_bak_file_after_success(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         content = "---\nrelated:\n  - '[[gone]]'\n---\nBody.\n"
         _write_lf(doc, content)
@@ -193,7 +198,7 @@ class TestRemoveAtomicWrite:
 class TestAppendRelatedEntryCRLF:
     """CRLF preservation: new entry uses CRLF; existing bytes unchanged."""
 
-    def test_crlf_preserved_on_append(self, tmp_path):
+    def test_crlf_preserved_on_append(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         content = "---\nrelated:\n  - '[[existing]]'\n---\nBody.\n"
         _write_crlf(doc, content)
@@ -213,7 +218,7 @@ class TestAppendRelatedEntryCRLF:
         # Body preserved
         assert "Body." in decoded
 
-    def test_crlf_empty_related_list_append(self, tmp_path):
+    def test_crlf_empty_related_list_append(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         content = "---\nrelated: []\n---\nBody.\n"
         _write_crlf(doc, content)
@@ -230,7 +235,7 @@ class TestAppendRelatedEntryCRLF:
 class TestAppendRelatedEntryLF:
     """Core logic on LF files."""
 
-    def test_append_to_existing_block(self, tmp_path):
+    def test_append_to_existing_block(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         _write_lf(
             doc,
@@ -244,7 +249,7 @@ class TestAppendRelatedEntryLF:
         assert "[[first]]" in content
         assert "[[second]]" in content
 
-    def test_append_lands_at_end_of_block_list(self, tmp_path):
+    def test_append_lands_at_end_of_block_list(self, tmp_path: Path) -> None:
         """A new entry must be appended LAST, not prepended (review H1)."""
         doc = tmp_path / "doc.md"
         _write_lf(
@@ -259,7 +264,7 @@ class TestAppendRelatedEntryLF:
         # Order must be preserved with the new entry LAST: [[x]], [[z]], [[y]]
         assert parsed["related"] == ["[[x]]", "[[z]]", "[[y]]"]
 
-    def test_append_matches_existing_block_indent(self, tmp_path):
+    def test_append_matches_existing_block_indent(self, tmp_path: Path) -> None:
         """A new entry must reuse the block's indentation, not a fixed 2 spaces.
 
         Appending a hardcoded 2-space item beneath a 4-space block produces a
@@ -280,7 +285,7 @@ class TestAppendRelatedEntryLF:
         parsed = yaml.safe_load(text.split("---\n")[1])
         assert parsed["related"] == ["[[a]]", "[[b]]"]
 
-    def test_append_aliased_stem_dedupes(self, tmp_path):
+    def test_append_aliased_stem_dedupes(self, tmp_path: Path) -> None:
         """A plain `[[foo]]` append must dedupe an aliased `[[foo|Foo]]` entry.
 
         The idempotency guard compares the bare stem, so an aliased existing
@@ -296,7 +301,7 @@ class TestAppendRelatedEntryLF:
         # No duplicate written - file is byte-identical.
         assert doc.read_bytes() == original_bytes
 
-    def test_idempotent_same_stem(self, tmp_path):
+    def test_idempotent_same_stem(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         _write_lf(doc, "---\nrelated:\n  - '[[alpha]]'\n---\nBody.\n")
         original_bytes = doc.read_bytes()
@@ -307,7 +312,7 @@ class TestAppendRelatedEntryLF:
         # File must be byte-identical
         assert doc.read_bytes() == original_bytes
 
-    def test_idempotent_case_insensitive(self, tmp_path):
+    def test_idempotent_case_insensitive(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         _write_lf(doc, "---\nrelated:\n  - '[[My-Doc]]'\n---\nBody.\n")
 
@@ -315,7 +320,7 @@ class TestAppendRelatedEntryLF:
 
         assert appended is False
 
-    def test_creates_related_key_when_absent(self, tmp_path):
+    def test_creates_related_key_when_absent(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         _write_lf(doc, "---\ntags:\n  - '#exec'\n---\nBody.\n")
 
@@ -330,14 +335,14 @@ class TestAppendRelatedEntryLF:
         dash_count = sum(1 for ln in lines if ln.strip() == "---")
         assert dash_count >= 2
 
-    def test_raises_on_empty_wiki_link(self, tmp_path):
+    def test_raises_on_empty_wiki_link(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         _write_lf(doc, "---\nrelated: []\n---\nBody.\n")
 
         with pytest.raises(ValueError):
             append_related_entry(doc, "[[]]")
 
-    def test_no_bak_after_success(self, tmp_path):
+    def test_no_bak_after_success(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         _write_lf(doc, "---\nrelated: []\n---\nBody.\n")
 
@@ -367,7 +372,7 @@ class TestAppendInlineFlowSequence:
         idx = text.index("---", text.index("---") + 3)
         return text[idx:].encode("utf-8")
 
-    def test_single_entry_flow_normalised(self, tmp_path):
+    def test_single_entry_flow_normalised(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         _write_lf(doc, "---\nrelated: ['[[a]]']\n---\nBody paragraph.\n")
         body_before = self._body_after_fence(doc.read_bytes())
@@ -383,7 +388,7 @@ class TestAppendInlineFlowSequence:
         # (d) body bytes byte-identical
         assert self._body_after_fence(doc.read_bytes()) == body_before
 
-    def test_double_quoted_multi_entry_flow_normalised(self, tmp_path):
+    def test_double_quoted_multi_entry_flow_normalised(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         _write_lf(doc, '---\nrelated: ["[[a]]", "[[b]]"]\n---\nBody paragraph.\n')
         body_before = self._body_after_fence(doc.read_bytes())
@@ -396,7 +401,7 @@ class TestAppendInlineFlowSequence:
         assert parsed["related"] == ["[[a]]", "[[b]]", "[[c]]"]
         assert self._body_after_fence(doc.read_bytes()) == body_before
 
-    def test_flow_idempotent_existing_stem(self, tmp_path):
+    def test_flow_idempotent_existing_stem(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         _write_lf(doc, "---\nrelated: ['[[a]]']\n---\nBody.\n")
         original = doc.read_bytes()
@@ -414,7 +419,7 @@ class TestAppendInlineFlowSequence:
 
 
 class TestRoundTrip:
-    def test_remove_then_add_restores(self, tmp_path):
+    def test_remove_then_add_restores(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
         _write_lf(
             doc,
@@ -431,7 +436,7 @@ class TestRoundTrip:
         assert "[[alpha]]" in final
         assert "[[beta]]" in final
 
-    def test_crlf_round_trip_unchanged_outside_block(self, tmp_path):
+    def test_crlf_round_trip_unchanged_outside_block(self, tmp_path: Path) -> None:
         """Bytes outside the related: block must be bit-perfect after a round-trip."""
         doc = tmp_path / "doc.md"
         content = (

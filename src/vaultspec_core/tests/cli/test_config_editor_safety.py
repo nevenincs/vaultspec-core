@@ -15,6 +15,8 @@ from vaultspec_core.core.local_config import get_local_config_path, resolve_edit
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from typer.testing import CliRunner
+
 pytestmark = [pytest.mark.integration]
 
 
@@ -53,7 +55,7 @@ def _write_probe_editor(directory: Path, name: str, exit_code: int = 0) -> str:
 class TestConfigCli:
     """Verify config get, set, unset, list command operations."""
 
-    def test_config_crud(self, runner, tmp_path):
+    def test_config_crud(self, runner: CliRunner, tmp_path: Path) -> None:
         # Establish target directory
         target_dir = tmp_path / "project"
         target_dir.mkdir()
@@ -138,7 +140,7 @@ class TestEditorResolution:
     Order: flag -> config -> VISUAL -> EDITOR -> vi.
     """
 
-    def test_resolution_ladder(self, tmp_path):
+    def test_resolution_ladder(self, tmp_path: Path) -> None:
         import os
 
         # Real, resolvable probe editors - one distinct binary per ladder rung -
@@ -226,7 +228,9 @@ class TestEditorResolution:
 class TestEditorSubprocessSafety:
     """Verify exit codes 2, 3, 4 under different editor invocation failures."""
 
-    def test_editor_failures_exits(self, runner, synthetic_project, tmp_path):
+    def test_editor_failures_exits(
+        self, runner: CliRunner, synthetic_project: Path, tmp_path: Path
+    ) -> None:
         import os
 
         # Real probe editors that exit with the exact codes the ladder maps:

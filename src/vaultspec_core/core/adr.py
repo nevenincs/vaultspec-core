@@ -7,9 +7,9 @@ import logging
 import re
 from pathlib import Path
 
+from ..config import get_config
 from ..vaultcore import (
     DocumentMetadata,
-    VaultConstants,
     parse_vault_metadata,
     refresh_modified_stamp,
 )
@@ -192,7 +192,7 @@ def adr_supersede(
         A tuple of (old_adr_path, new_adr_path).
     """
     target_dir = _t.get_context().target_dir
-    docs_dir = VaultConstants._get_docs_dir()
+    docs_dir = get_config().docs_dir
 
     old_stem = old_adr[:-3] if old_adr.endswith(".md") else old_adr
     new_stem = by_new_adr[:-3] if by_new_adr.endswith(".md") else by_new_adr

@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from ...graph import DocNode, GraphMetrics, VaultGraph
+from ...testing.synthetic import CorpusManifest, GeneratedDoc
 from ...vaultcore import DocType
 
 pytestmark = [pytest.mark.unit]
@@ -22,7 +23,7 @@ pytestmark = [pytest.mark.unit]
 
 
 class TestDocNode:
-    def test_defaults(self):
+    def test_defaults(self) -> None:
         node = DocNode(path=Path("test.md"), name="test")
         assert node.doc_type is None
         assert node.tags == set()
@@ -35,7 +36,7 @@ class TestDocNode:
         assert node.word_count == 0
         assert node.frontmatter == {}
 
-    def test_to_nx_attrs_serialises_sets_as_sorted_lists(self):
+    def test_to_nx_attrs_serialises_sets_as_sorted_lists(self) -> None:
         node = DocNode(
             path=Path("/a/b.md"),
             name="b",
@@ -49,7 +50,7 @@ class TestDocNode:
         assert d["in_links"] == ["d"]
         assert d["path"] == str(Path("/a/b.md"))
 
-    def test_to_nx_attrs_includes_all_fields(self):
+    def test_to_nx_attrs_includes_all_fields(self) -> None:
         node = DocNode(
             path=Path("x.md"),
             name="x",
@@ -81,7 +82,7 @@ class TestDocNode:
 
 
 class TestGraphMetrics:
-    def test_defaults(self):
+    def test_defaults(self) -> None:
         m = GraphMetrics()
         assert m.total_nodes == 0
         assert m.density == 0.0
@@ -89,7 +90,7 @@ class TestGraphMetrics:
         assert m.in_degree_centrality == {}
         assert m.betweenness_centrality == {}
 
-    def test_to_dict_restructures_degree_tuples(self):
+    def test_to_dict_restructures_degree_tuples(self) -> None:
         m = GraphMetrics(
             max_in_degree=("hub", 5),
             max_out_degree=("spoke", 3),
@@ -108,11 +109,11 @@ class TestGraphMetrics:
 
 
 class TestVaultGraphBuilding:
-    def test_builds_many_nodes(self, vault_root):
+    def test_builds_many_nodes(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         assert len(graph.nodes) > 80
 
-    def test_no_nodes_lost_to_stem_collisions(self, vault_root):
+    def test_no_nodes_lost_to_stem_collisions(self, vault_root: Path) -> None:
         """All files produce a node  - collisions use type/stem keys."""
         from ...vaultcore import scan_vault
 
@@ -121,7 +122,7 @@ class TestVaultGraphBuilding:
         real_count = sum(1 for n in graph.nodes.values() if not n.phantom)
         assert real_count == file_count
 
-    def test_colliding_stems_get_qualified_keys(self, vault_root):
+    def test_colliding_stems_get_qualified_keys(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         qualified = [k for k in graph.nodes if "/" in k]
         assert len(qualified) > 0
@@ -132,7 +133,7 @@ class TestVaultGraphBuilding:
             assert len(parts[0]) > 0
             assert len(parts[1]) > 0
 
-    def test_stem_index_maps_collisions(self, vault_root):
+    def test_stem_index_maps_collisions(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         collisions = {
             stem: keys for stem, keys in graph._stem_index.items() if len(keys) > 1
@@ -142,7 +143,7 @@ class TestVaultGraphBuilding:
             assert all(k.endswith(stem) for k in keys)
             assert all(k in graph.nodes for k in keys)
 
-    def test_wiki_links_to_colliding_stems_fan_out(self, vault_root):
+    def test_wiki_links_to_colliding_stems_fan_out(self, vault_root: Path) -> None:
         """Stem collisions exist in the synthetic corpus fixture."""
         graph = VaultGraph(vault_root)
         collisions = {
@@ -154,7 +155,9 @@ class TestVaultGraphBuilding:
             for key in keys:
                 assert key in graph.nodes, f"Collision key {key!r} missing from nodes"
 
-    def test_wiki_links_to_colliding_stems_fan_out_guaranteed(self, tmp_path):
+    def test_wiki_links_to_colliding_stems_fan_out_guaranteed(
+        self, tmp_path: Path
+    ) -> None:
         """A wiki-link to a colliding stem fans out to all qualified variants.
 
         Constructs a minimal vault where two docs share the same stem in
@@ -203,22 +206,22 @@ class TestVaultGraphBuilding:
         assert graph._digraph.has_edge("linker-doc", adr_key)
         assert graph._digraph.has_edge("linker-doc", plan_key)
 
-    def test_networkx_digraph_has_same_node_count(self, vault_root):
+    def test_networkx_digraph_has_same_node_count(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         assert graph._digraph.number_of_nodes() == len(graph.nodes)
 
-    def test_networkx_digraph_has_edges(self, vault_root):
+    def test_networkx_digraph_has_edges(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         assert graph._digraph.number_of_edges() > 0
 
-    def test_digraph_property_exposes_nx_graph(self, vault_root):
+    def test_digraph_property_exposes_nx_graph(self, vault_root: Path) -> None:
         import networkx as nx
 
         graph = VaultGraph(vault_root)
         assert isinstance(graph.digraph, nx.DiGraph)
         assert graph.digraph is graph._digraph
 
-    def test_nx_node_attrs_are_json_friendly(self, vault_root):
+    def test_nx_node_attrs_are_json_friendly(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         name = "2026-02-05-editor-demo-architecture-adr"
         attrs = graph.digraph.nodes[name]
@@ -226,40 +229,40 @@ class TestVaultGraphBuilding:
         assert isinstance(attrs["path"], str)
         assert attrs["doc_type"] == "adr"
 
-    def test_node_has_doc_type(self, vault_root):
+    def test_node_has_doc_type(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         node = graph.nodes["2026-02-05-editor-demo-architecture-adr"]
         assert node.doc_type == DocType.ADR
 
-    def test_node_has_feature(self, vault_root):
+    def test_node_has_feature(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         node = graph.nodes["2026-02-05-editor-demo-architecture-adr"]
         assert node.feature == "editor-demo"
 
-    def test_node_has_date(self, vault_root):
+    def test_node_has_date(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         node = graph.nodes["2026-02-05-editor-demo-architecture-adr"]
         assert node.date is not None
         assert node.date.startswith("2026")
 
-    def test_node_has_body_and_word_count(self, vault_root):
+    def test_node_has_body_and_word_count(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         node = graph.nodes["2026-02-05-editor-demo-architecture-adr"]
         assert len(node.body) > 0
         assert node.word_count > 0
 
-    def test_node_has_frontmatter_dict(self, vault_root):
+    def test_node_has_frontmatter_dict(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         node = graph.nodes["2026-02-05-editor-demo-architecture-adr"]
         assert isinstance(node.frontmatter, dict)
         assert "tags" in node.frontmatter
 
-    def test_out_links_populated(self, vault_root):
+    def test_out_links_populated(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         node = graph.nodes["2026-02-05-editor-demo-architecture-adr"]
         assert len(node.out_links) > 0
 
-    def test_in_links_populated(self, vault_root):
+    def test_in_links_populated(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         node = graph.nodes.get("2026-02-05-editor-demo-research")
         assert node is not None
@@ -272,44 +275,44 @@ class TestVaultGraphBuilding:
 
 
 class TestVaultGraphQueries:
-    def test_get_orphaned(self, vault_root):
+    def test_get_orphaned(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         orphans = graph.get_orphaned()
         assert isinstance(orphans, list)
         assert orphans == sorted(orphans)
 
-    def test_get_dangling_links(self, vault_root):
+    def test_get_dangling_links(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         dangling = graph.get_dangling_links()
         assert isinstance(dangling, list)
 
-    def test_get_feature_rankings(self, vault_root):
+    def test_get_feature_rankings(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         rankings = graph.get_feature_rankings()
         assert isinstance(rankings, list)
         feature_names = [name for name, _score in rankings]
         assert "editor-demo" in feature_names
 
-    def test_get_feature_nodes(self, vault_root):
+    def test_get_feature_nodes(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         nodes = graph.get_feature_nodes("editor-demo")
         assert len(nodes) > 0
         for node in nodes:
             assert "#editor-demo" in node.tags
 
-    def test_get_feature_nodes_sorted_by_date(self, vault_root):
+    def test_get_feature_nodes_sorted_by_date(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         nodes = graph.get_feature_nodes("editor-demo")
         dates = [n.date for n in nodes if n.date]
         assert dates == sorted(dates)
 
-    def test_get_features(self, vault_root):
+    def test_get_features(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         features = graph.get_features()
         assert "editor-demo" in features
         assert features == sorted(features)
 
-    def test_subgraph_returns_nx_digraph(self, vault_root):
+    def test_subgraph_returns_nx_digraph(self, vault_root: Path) -> None:
         import networkx as nx
 
         graph = VaultGraph(vault_root)
@@ -318,7 +321,7 @@ class TestVaultGraphQueries:
         assert sg.number_of_nodes() > 0
         assert sg.number_of_nodes() < len(graph.nodes)
 
-    def test_subgraph_none_returns_full(self, vault_root):
+    def test_subgraph_none_returns_full(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         sg = graph.subgraph(feature=None)
         assert sg is graph._digraph
@@ -330,7 +333,7 @@ class TestVaultGraphQueries:
 
 
 class TestVaultGraphMetrics:
-    def test_global_metrics(self, vault_root):
+    def test_global_metrics(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         m = graph.metrics()
         assert m.total_nodes > 80
@@ -342,7 +345,7 @@ class TestVaultGraphMetrics:
         assert m.connected_components >= 1
         assert len(m.nodes_by_type) > 0
 
-    def test_centrality_populated(self, vault_root):
+    def test_centrality_populated(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         m = graph.metrics()
         assert len(m.in_degree_centrality) > 0
@@ -353,7 +356,7 @@ class TestVaultGraphMetrics:
         for v in m.betweenness_centrality.values():
             assert 0.0 <= v <= 1.0
 
-    def test_feature_scoped_metrics(self, vault_root):
+    def test_feature_scoped_metrics(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         m = graph.metrics(feature="editor-demo")
         assert m.total_nodes > 0
@@ -362,7 +365,7 @@ class TestVaultGraphMetrics:
             "editor-demo": m.total_nodes,
         }
 
-    def test_feature_scoped_centrality_populated(self, vault_root):
+    def test_feature_scoped_centrality_populated(self, vault_root: Path) -> None:
         """metrics(feature=...) populates centrality dicts for the subgraph.
 
         The synthetic corpus fixture has enough editor-demo nodes that
@@ -389,7 +392,9 @@ class TestVaultGraphMetrics:
         for v in m.betweenness_centrality.values():
             assert 0.0 <= v <= 1.0, f"betweenness_centrality value {v} out of range"
 
-    def test_feature_scoped_centrality_keys_are_node_names(self, vault_root):
+    def test_feature_scoped_centrality_keys_are_node_names(
+        self, vault_root: Path
+    ) -> None:
         """Centrality dict keys are node names belonging to the feature subgraph."""
         graph = VaultGraph(vault_root)
         m = graph.metrics(feature="editor-demo")
@@ -401,7 +406,7 @@ class TestVaultGraphMetrics:
                 f"centrality key {key!r} not in editor-demo feature nodes"
             )
 
-    def test_metrics_to_dict(self, vault_root):
+    def test_metrics_to_dict(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         m = graph.metrics()
         d = m.to_dict()
@@ -418,13 +423,13 @@ class TestVaultGraphMetrics:
 
 
 class TestVaultGraphASCII:
-    def test_render_ascii_returns_string(self, vault_root):
+    def test_render_ascii_returns_string(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         result = graph.render_ascii()
         assert isinstance(result, str)
         assert len(result) > 0
 
-    def test_render_ascii_feature_scoped(self, vault_root):
+    def test_render_ascii_feature_scoped(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         result = graph.render_ascii(feature="editor-demo")
         assert isinstance(result, str)
@@ -437,7 +442,7 @@ class TestVaultGraphASCII:
 
 
 class TestVaultGraphRendering:
-    def test_render_tree_full_vault(self, vault_root):
+    def test_render_tree_full_vault(self, vault_root: Path) -> None:
         from vaultspec_core.cli.rendering import TreeLine
 
         graph = VaultGraph(vault_root)
@@ -446,7 +451,7 @@ class TestVaultGraphRendering:
         assert all(isinstance(line, TreeLine) for line in lines)
         assert len(lines) > 0
 
-    def test_render_tree_feature_scoped(self, vault_root):
+    def test_render_tree_feature_scoped(self, vault_root: Path) -> None:
         from vaultspec_core.cli.rendering import TreeLine
 
         graph = VaultGraph(vault_root)
@@ -461,7 +466,7 @@ class TestVaultGraphRendering:
 
 
 class TestVaultGraphJSON:
-    def test_to_dict_uses_node_link_format(self, vault_root):
+    def test_to_dict_uses_node_link_format(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         d = graph.to_dict()
         # networkx node_link_data keys
@@ -474,45 +479,45 @@ class TestVaultGraphJSON:
         assert "root" in d
         assert d["directed"] is True
 
-    def test_to_dict_nodes_have_id(self, vault_root):
+    def test_to_dict_nodes_have_id(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         d = graph.to_dict()
         for node_dict in d["nodes"]:
             assert "id" in node_dict
 
-    def test_to_dict_body_excluded_by_default(self, vault_root):
+    def test_to_dict_body_excluded_by_default(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         d = graph.to_dict()
         for node_dict in d["nodes"]:
             assert "body" not in node_dict
 
-    def test_to_dict_with_body(self, vault_root):
+    def test_to_dict_with_body(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         d = graph.to_dict(include_body=True)
         has_body = any("body" in n for n in d["nodes"])
         assert has_body
 
-    def test_to_dict_feature_scoped(self, vault_root):
+    def test_to_dict_feature_scoped(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         d = graph.to_dict(feature="editor-demo")
         assert d["feature"] == "editor-demo"
         for node_dict in d["nodes"]:
             assert "#editor-demo" in node_dict.get("tags", [])
 
-    def test_to_json_is_valid_json(self, vault_root):
+    def test_to_json_is_valid_json(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         s = graph.to_json()
         parsed = json.loads(s)
         assert "nodes" in parsed
         assert "metrics" in parsed
 
-    def test_to_json_feature_scoped(self, vault_root):
+    def test_to_json_feature_scoped(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         s = graph.to_json(feature="editor-demo")
         parsed = json.loads(s)
         assert parsed["feature"] == "editor-demo"
 
-    def test_edges_have_source_and_target(self, vault_root):
+    def test_edges_have_source_and_target(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         d = graph.to_dict()
         for edge in d["edges"]:
@@ -526,17 +531,17 @@ class TestVaultGraphJSON:
 
 
 class TestDocNodePhantom:
-    def test_defaults_include_phantom_false(self):
+    def test_defaults_include_phantom_false(self) -> None:
         node = DocNode(path=Path("test.md"), name="test")
         assert node.phantom is False
 
-    def test_to_nx_attrs_includes_phantom_field(self):
+    def test_to_nx_attrs_includes_phantom_field(self) -> None:
         node = DocNode(path=Path("x.md"), name="x")
         d = node.to_nx_attrs()
         assert "phantom" in d
         assert d["phantom"] is False
 
-    def test_to_nx_attrs_phantom_true(self):
+    def test_to_nx_attrs_phantom_true(self) -> None:
         node = DocNode(path=None, name="ghost", phantom=True)
         d = node.to_nx_attrs()
         assert d["phantom"] is True
@@ -548,7 +553,7 @@ class TestDocNodePhantom:
 
 
 class TestVaultGraphPhantom:
-    def test_builds_many_nodes_includes_phantoms(self, vault_root):
+    def test_builds_many_nodes_includes_phantoms(self, vault_root: Path) -> None:
         """Total node count includes both real and phantom nodes."""
         graph = VaultGraph(vault_root)
         real = sum(1 for n in graph.nodes.values() if not n.phantom)
@@ -556,7 +561,9 @@ class TestVaultGraphPhantom:
         assert len(graph.nodes) == real + phantoms
         assert phantoms > 0
 
-    def test_phantom_nodes_created_for_unresolved_targets(self, vault_root):
+    def test_phantom_nodes_created_for_unresolved_targets(
+        self, vault_root: Path
+    ) -> None:
         graph = VaultGraph(vault_root)
         phantoms = [n for n in graph.nodes.values() if n.phantom]
         assert len(phantoms) > 0
@@ -565,7 +572,7 @@ class TestVaultGraphPhantom:
             assert node.name in graph.nodes
             assert node.name in graph._digraph
 
-    def test_phantom_nodes_have_incoming_edges(self, vault_root):
+    def test_phantom_nodes_have_incoming_edges(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         phantoms = [n for n in graph.nodes.values() if n.phantom]
         for node in phantoms:
@@ -573,20 +580,20 @@ class TestVaultGraphPhantom:
             for source in node.in_links:
                 assert graph._digraph.has_edge(source, node.name)
 
-    def test_get_orphaned_excludes_phantoms(self, vault_root):
+    def test_get_orphaned_excludes_phantoms(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         orphans = graph.get_orphaned()
         for name in orphans:
             assert not graph.nodes[name].phantom
 
-    def test_to_snapshot_excludes_phantoms(self, vault_root):
+    def test_to_snapshot_excludes_phantoms(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         snapshot = graph.to_snapshot()
         phantom_names = {n.name for n in graph.nodes.values() if n.phantom}
         snapshot_stems = {p.stem for p in snapshot}
         assert not phantom_names & snapshot_stems
 
-    def test_to_snapshot_preserves_body_schema(self, tmp_path):
+    def test_to_snapshot_preserves_body_schema(self, tmp_path: Path) -> None:
         doc = tmp_path / ".vault" / "adr" / "2026-07-27-schema-provenance-adr.md"
         doc.parent.mkdir(parents=True)
         doc.write_text(
@@ -606,27 +613,27 @@ class TestVaultGraphPhantom:
 
         assert snapshot[doc][0].body_schema == "body-v1"
 
-    def test_metrics_phantom_count(self, vault_root):
+    def test_metrics_phantom_count(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         m = graph.metrics()
         actual_phantoms = sum(1 for n in graph.nodes.values() if n.phantom)
         assert m.phantom_count == actual_phantoms
         assert m.phantom_count > 0
 
-    def test_metrics_dangling_link_count(self, vault_root):
+    def test_metrics_dangling_link_count(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         m = graph.metrics()
         edge_count_to_phantoms = sum(
             1
-            for src, tgt in graph._dangling_links
+            for _src, tgt in graph._dangling_links
             if tgt in graph.nodes and graph.nodes[tgt].phantom
         )
         assert m.dangling_link_count == edge_count_to_phantoms
         assert m.dangling_link_count > 0
 
     def test_check_schema_ignores_phantom_adr_references(
-        self, vault_root, graph_manifest
-    ):
+        self, vault_root: Path, graph_manifest: CorpusManifest
+    ) -> None:
         """A plan linking only to phantom targets still reports 'no ADR reference'."""
         from ...vaultcore.checks.references import check_schema
 
@@ -635,6 +642,7 @@ class TestVaultGraphPhantom:
         # Resolve the phantom-only-links plan via the manifest so the test is
         # not coupled to a specific hardcoded filename.
         plan_doc = graph_manifest.pathology_details["phantom_only_links"][0]["plan_doc"]
+        assert isinstance(plan_doc, GeneratedDoc)
         plan_name = plan_doc.path.stem
         node = graph.nodes[plan_name]
         assert node.doc_type == DocType.PLAN
@@ -648,13 +656,15 @@ class TestVaultGraphPhantom:
         ]
         assert any("no references to ADR" in d.message for d in plan_diags)
 
-    def test_tree_rendering_shows_not_created_for_phantoms(self, vault_root):
+    def test_tree_rendering_shows_not_created_for_phantoms(
+        self, vault_root: Path
+    ) -> None:
         graph = VaultGraph(vault_root)
         lines = graph.render_tree_lines()
         texts = [line.text for line in lines]
         assert any("(not created)" in t for t in texts)
 
-    def test_json_output_includes_phantom_flag(self, vault_root):
+    def test_json_output_includes_phantom_flag(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         d = graph.to_dict()
         phantom_dicts = [n for n in d["nodes"] if n.get("phantom") is True]
@@ -668,7 +678,7 @@ class TestVaultGraphPhantom:
 # ---------------------------------------------------------------------------
 
 
-def _make_vault_with_archive(tmp_path):
+def _make_vault_with_archive(tmp_path: Path) -> tuple[Path, Path, Path]:
     """Build a minimal two-document vault where one doc is archived.
 
     Layout::
@@ -719,7 +729,7 @@ class TestVaultGraphArchiveResolution:
     traversal is exercised end-to-end.
     """
 
-    def test_archived_link_does_not_appear_in_dangling(self, tmp_path):
+    def test_archived_link_does_not_appear_in_dangling(self, tmp_path: Path) -> None:
         """A link to an archived doc must not be counted as dangling."""
         root, _src, _arch = _make_vault_with_archive(tmp_path)
         graph = VaultGraph(root)
@@ -729,7 +739,7 @@ class TestVaultGraphArchiveResolution:
         assert "archived-doc" not in dangling_targets
         assert "adr/archived-doc" not in dangling_targets
 
-    def test_archived_target_produces_phantom_node(self, tmp_path):
+    def test_archived_target_produces_phantom_node(self, tmp_path: Path) -> None:
         """The graph creates a phantom node for the archived target."""
         root, _src, _arch = _make_vault_with_archive(tmp_path)
         graph = VaultGraph(root)
@@ -738,28 +748,30 @@ class TestVaultGraphArchiveResolution:
         assert resolved_key in graph.nodes
         assert graph.nodes[resolved_key].phantom is True
 
-    def test_source_out_links_contains_resolved_archive_key(self, tmp_path):
+    def test_source_out_links_contains_resolved_archive_key(
+        self, tmp_path: Path
+    ) -> None:
         """source-doc.out_links resolves to the qualified archive key."""
         root, _src, _arch = _make_vault_with_archive(tmp_path)
         graph = VaultGraph(root)
         src_node = graph.nodes["source-doc"]
         assert "adr/archived-doc" in src_node.out_links
 
-    def test_is_archived_true_for_archived_stem(self, tmp_path):
+    def test_is_archived_true_for_archived_stem(self, tmp_path: Path) -> None:
         """_is_archived returns True when the stem resolves under _archive/."""
         root, _src, _arch = _make_vault_with_archive(tmp_path)
         graph = VaultGraph(root)
         # Bare stem - rglob branch
         assert graph._is_archived("archived-doc") is True
 
-    def test_is_archived_true_for_qualified_key(self, tmp_path):
+    def test_is_archived_true_for_qualified_key(self, tmp_path: Path) -> None:
         """_is_archived returns True for a qualified type/stem key."""
         root, _src, _arch = _make_vault_with_archive(tmp_path)
         graph = VaultGraph(root)
         # Qualified key with slash - direct path branch
         assert graph._is_archived("adr/archived-doc") is True
 
-    def test_is_archived_false_when_no_archive_dir(self, tmp_path):
+    def test_is_archived_false_when_no_archive_dir(self, tmp_path: Path) -> None:
         """_is_archived returns False when there is no _archive/ directory."""
         # Build vault without any _archive dir
         vault_dir = tmp_path / ".vault" / "adr"
@@ -772,13 +784,13 @@ class TestVaultGraphArchiveResolution:
         graph = VaultGraph(tmp_path)
         assert graph._is_archived("any-stem") is False
 
-    def test_is_archived_false_for_nonexistent_stem(self, tmp_path):
+    def test_is_archived_false_for_nonexistent_stem(self, tmp_path: Path) -> None:
         """_is_archived returns False for a stem that is not in _archive/."""
         root, _src, _arch = _make_vault_with_archive(tmp_path)
         graph = VaultGraph(root)
         assert graph._is_archived("completely-nonexistent-stem") is False
 
-    def test_resolve_link_archive_bare_stem(self, tmp_path):
+    def test_resolve_link_archive_bare_stem(self, tmp_path: Path) -> None:
         """_resolve_link resolves a bare archived stem to its qualified key."""
         root, _src, _arch = _make_vault_with_archive(tmp_path)
         graph = VaultGraph(root)
@@ -787,14 +799,14 @@ class TestVaultGraphArchiveResolution:
         resolved = graph._resolve_link("adr/archived-doc")
         assert resolved == ["adr/archived-doc"]
 
-    def test_archived_link_edge_exists_in_digraph(self, tmp_path):
+    def test_archived_link_edge_exists_in_digraph(self, tmp_path: Path) -> None:
         """A directed edge from source to the archived phantom node exists."""
         root, _src, _arch = _make_vault_with_archive(tmp_path)
         graph = VaultGraph(root)
         assert graph._digraph.has_edge("source-doc", "adr/archived-doc")
 
 
-def _make_weighted_vault(tmp_path):
+def _make_weighted_vault(tmp_path: Path) -> Path:
     """Build a minimal vault with crafted edge multiplicity and provenance.
 
     Document ``doc-a`` cites ``doc-b`` three times in its body and references
@@ -835,39 +847,41 @@ def _make_weighted_vault(tmp_path):
 class TestExplicitEdgeAttributes:
     """Exact-value assertions for edge kind, multiplicity, and weight."""
 
-    def test_body_only_edge_kind_and_multiplicity(self, tmp_path):
+    def test_body_only_edge_kind_and_multiplicity(self, tmp_path: Path) -> None:
         """A body-only triple citation yields kind body, multiplicity 3."""
         graph = VaultGraph(_make_weighted_vault(tmp_path))
         data = graph.digraph.edges["doc-a", "doc-b"]
         assert data["kind"] == "body"
         assert data["multiplicity"] == 3
 
-    def test_both_sources_edge_kind_and_multiplicity(self, tmp_path):
+    def test_both_sources_edge_kind_and_multiplicity(self, tmp_path: Path) -> None:
         """A target reached by body and related is kind both, multiplicity 2."""
         graph = VaultGraph(_make_weighted_vault(tmp_path))
         data = graph.digraph.edges["doc-a", "doc-c"]
         assert data["kind"] == "both"
         assert data["multiplicity"] == 2
 
-    def test_weight_is_multiplicity_over_graph_maximum(self, tmp_path):
+    def test_weight_is_multiplicity_over_graph_maximum(self, tmp_path: Path) -> None:
         """Weights are exact rationals: 3/3 = 1.0 and 2/3."""
         graph = VaultGraph(_make_weighted_vault(tmp_path))
         assert graph.digraph.edges["doc-a", "doc-b"]["weight"] == 1.0
         assert graph.digraph.edges["doc-a", "doc-c"]["weight"] == 2 / 3
 
-    def test_strongest_edge_normalises_to_one(self, tmp_path):
+    def test_strongest_edge_normalises_to_one(self, tmp_path: Path) -> None:
         """Exactly one edge - the maximum-multiplicity one - has weight 1.0."""
         graph = VaultGraph(_make_weighted_vault(tmp_path))
         weights = [d["weight"] for _, _, d in graph.digraph.edges(data=True)]
         assert weights.count(1.0) == 1
         assert max(weights) == 1.0
 
-    def test_only_two_edges_built(self, tmp_path):
+    def test_only_two_edges_built(self, tmp_path: Path) -> None:
         """The crafted vault produces exactly the two intended edges."""
         graph = VaultGraph(_make_weighted_vault(tmp_path))
         assert graph.digraph.number_of_edges() == 2
 
-    def test_synthetic_corpus_related_edges_are_unit_weight(self, vault_root):
+    def test_synthetic_corpus_related_edges_are_unit_weight(
+        self, vault_root: Path
+    ) -> None:
         """The synthetic corpus emits only related, multiplicity-1 edges.
 
         The synthetic generator wires documents solely through ``related:``

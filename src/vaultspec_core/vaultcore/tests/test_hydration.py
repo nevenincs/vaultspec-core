@@ -1,6 +1,7 @@
 """Tests for vault document template hydration."""
 
 import logging
+from pathlib import Path
 
 import pytest
 
@@ -18,7 +19,7 @@ from vaultspec_core.vaultcore.models import DocType
 pytestmark = [pytest.mark.unit]
 
 
-def _make_templates_dir(content_root):
+def _make_templates_dir(content_root: Path) -> Path:
     """Create the ``rules/templates`` tree under a content root and return it."""
     templates_dir = content_root / "templates"
     templates_dir.mkdir(parents=True, exist_ok=True)
@@ -34,7 +35,7 @@ class TestTemplatePathLegacyFallback:
     Guards REVIEW-005 in the firmware-wording-review audit.
     """
 
-    def test_reference_resolves_to_current_filename(self, tmp_path):
+    def test_reference_resolves_to_current_filename(self, tmp_path: Path) -> None:
         """When ``reference.md`` exists it is preferred over the legacy name."""
         content_root = tmp_path / ".vaultspec"
         templates_dir = _make_templates_dir(content_root)
@@ -48,7 +49,9 @@ class TestTemplatePathLegacyFallback:
         )
         assert resolved == current
 
-    def test_reference_falls_back_to_legacy_filename(self, tmp_path, caplog):
+    def test_reference_falls_back_to_legacy_filename(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """A stale mirror with only ``ref-audit.md`` resolves to it with a warning."""
         content_root = tmp_path / ".vaultspec"
         templates_dir = _make_templates_dir(content_root)
@@ -65,7 +68,7 @@ class TestTemplatePathLegacyFallback:
         assert resolved == legacy
         assert "vaultspec-core install --upgrade" in caplog.text
 
-    def test_reference_missing_both_names_returns_none(self, tmp_path):
+    def test_reference_missing_both_names_returns_none(self, tmp_path: Path) -> None:
         """When neither filename is present the resolver returns ``None``."""
         content_root = tmp_path / ".vaultspec"
         _make_templates_dir(content_root)
@@ -75,7 +78,9 @@ class TestTemplatePathLegacyFallback:
         )
         assert resolved is None
 
-    def test_create_vault_doc_reference_uses_legacy_template(self, tmp_path):
+    def test_create_vault_doc_reference_uses_legacy_template(
+        self, tmp_path: Path
+    ) -> None:
         """create_vault_doc scaffolds a REFERENCE doc from the legacy template.
 
         End-to-end proof that the fallback flows through document creation:
@@ -108,7 +113,9 @@ class TestTemplatePathLegacyFallback:
         assert "#stale-feat" in content
         assert "{feature}" not in content
 
-    def test_create_vault_doc_missing_template_names_remedy(self, tmp_path):
+    def test_create_vault_doc_missing_template_names_remedy(
+        self, tmp_path: Path
+    ) -> None:
         """A mirror missing both filenames raises an error naming the remedy."""
         content_root = tmp_path / ".vaultspec"
         _make_templates_dir(content_root)
@@ -124,7 +131,7 @@ class TestTemplatePathLegacyFallback:
         assert "vaultspec-core install --upgrade" in str(excinfo.value)
 
 
-def test_hydrate_template_basic():
+def test_hydrate_template_basic() -> None:
     """Verify that placeholders in a template are correctly replaced."""
     template = """---
 tags: ["#adr", "#{feature}"]
@@ -142,7 +149,7 @@ date: {yyyy-mm-dd}
     assert "# My Title" in result
 
 
-def test_hydrate_template_placeholders():
+def test_hydrate_template_placeholders() -> None:
     """Verify supported placeholders and the topic alias are hydrated."""
     template = "{feature} {yyyy-mm-dd} {title} {topic}"
     result = hydrate_template(
@@ -151,7 +158,9 @@ def test_hydrate_template_placeholders():
     assert result == "feat 2026-02-01 Plan Title Plan Title"
 
 
-def test_hydrate_template_leaves_missing_title_and_warns(caplog):
+def test_hydrate_template_leaves_missing_title_and_warns(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """Verify unresolved placeholders remain when optional title is omitted."""
     template = "{feature} {title}"
     with caplog.at_level(logging.WARNING):
@@ -161,7 +170,9 @@ def test_hydrate_template_leaves_missing_title_and_warns(caplog):
     assert "Potential unhydrated placeholder found in template: {title}" in caplog.text
 
 
-def test_hydrate_template_skips_placeholders_inside_html_comments(caplog):
+def test_hydrate_template_skips_placeholders_inside_html_comments(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """Tokens inside HTML guidance comments do not raise unhydrated warnings.
 
     The framework templates carry human-facing guidance like
@@ -182,28 +193,30 @@ def test_hydrate_template_skips_placeholders_inside_html_comments(caplog):
     assert "Potential unhydrated placeholder" not in caplog.text
 
 
-def test_hydrate_template_substitutes_tier_when_passed():
+def test_hydrate_template_substitutes_tier_when_passed() -> None:
     """Verify the {tier} placeholder is hydrated when tier is supplied."""
     template = "tier: {tier}"
     result = hydrate_template(template, "feat", "2026-05-18", TemplateFields(tier="L3"))
     assert result == "tier: L3"
 
 
-def test_hydrate_template_substitutes_quoted_tier_placeholder():
+def test_hydrate_template_substitutes_quoted_tier_placeholder() -> None:
     """The quoted template placeholder hydrates to an unquoted scalar."""
     template = "tier: '{tier}'"
     result = hydrate_template(template, "feat", "2026-06-10", TemplateFields(tier="L3"))
     assert result == "tier: L3"
 
 
-def test_hydrate_template_substitutes_mdformat_normalized_tier():
+def test_hydrate_template_substitutes_mdformat_normalized_tier() -> None:
     """Verify mdformat-normalized plan templates still hydrate tier."""
     template = "tier: {tier: null}"
     result = hydrate_template(template, "feat", "2026-05-18", TemplateFields(tier="L3"))
     assert result == "tier: L3"
 
 
-def test_hydrate_template_leaves_tier_unhydrated_when_none(caplog):
+def test_hydrate_template_leaves_tier_unhydrated_when_none(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """Verify {tier} stays as-is when tier is not provided, with warning."""
     template = "tier: {tier}"
     with caplog.at_level(logging.WARNING):
@@ -212,7 +225,9 @@ def test_hydrate_template_leaves_tier_unhydrated_when_none(caplog):
     assert "Potential unhydrated placeholder found in template: {tier}" in caplog.text
 
 
-def test_hydrate_template_warns_on_mdformat_normalized_tier(caplog):
+def test_hydrate_template_warns_on_mdformat_normalized_tier(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """Verify mdformat-normalized tier placeholders still emit diagnostics."""
     template = "tier: {tier: null}"
     with caplog.at_level(logging.WARNING):
@@ -224,7 +239,7 @@ def test_hydrate_template_warns_on_mdformat_normalized_tier(caplog):
     )
 
 
-def test_create_vault_doc_plan_substitutes_tier(tmp_path):
+def test_create_vault_doc_plan_substitutes_tier(tmp_path: Path) -> None:
     """End-to-end: vault add plan with tier writes the supplied tier value."""
     from vaultspec_core.builtins import seed_builtins
 
@@ -246,7 +261,7 @@ def test_create_vault_doc_plan_substitutes_tier(tmp_path):
     assert "tier: {tier}" not in content
 
 
-def test_create_vault_doc_stamps_current_body_schema(tmp_path):
+def test_create_vault_doc_stamps_current_body_schema(tmp_path: Path) -> None:
     """A real bundled template produces a scaffold declaring its contract."""
     from vaultspec_core.builtins import seed_builtins
     from vaultspec_core.vaultcore import parse_vault_metadata
@@ -267,7 +282,9 @@ def test_create_vault_doc_stamps_current_body_schema(tmp_path):
     assert metadata.body_schema == CURRENT_BODY_SCHEMA
 
 
-def test_create_vault_doc_replaces_stale_template_schema_stamp(tmp_path):
+def test_create_vault_doc_replaces_stale_template_schema_stamp(
+    tmp_path: Path,
+) -> None:
     """A stale real template cannot make a newly scaffolded document legacy."""
     from vaultspec_core.builtins import seed_builtins
     from vaultspec_core.vaultcore import parse_vault_metadata
@@ -296,7 +313,7 @@ def test_create_vault_doc_replaces_stale_template_schema_stamp(tmp_path):
     assert metadata.body_schema == CURRENT_BODY_SCHEMA
 
 
-def test_emit_time_validator_rejects_invalid_plan_tier(tmp_path):
+def test_emit_time_validator_rejects_invalid_plan_tier(tmp_path: Path) -> None:
     """A plan template that hydrates to an invalid tier value must refuse to write.
 
     Exercises the scaffolder-integrity invariant: scaffolders never write
@@ -330,7 +347,7 @@ def test_emit_time_validator_rejects_invalid_plan_tier(tmp_path):
         _assert_scaffolded_content_valid(invalid_plan, DocType.PLAN)
 
 
-def test_emit_time_validator_accepts_valid_plan(tmp_path):
+def test_emit_time_validator_accepts_valid_plan(tmp_path: Path) -> None:
     """A well-formed plan passes the emit-time validator without raising."""
     from vaultspec_core.vaultcore.hydration import _assert_scaffolded_content_valid
 
@@ -349,7 +366,7 @@ def test_emit_time_validator_accepts_valid_plan(tmp_path):
     _assert_scaffolded_content_valid(valid_plan, DocType.PLAN)
 
 
-def test_create_vault_doc_plan_default_tier_l1(tmp_path):
+def test_create_vault_doc_plan_default_tier_l1(tmp_path: Path) -> None:
     """Plan scaffolded without explicit tier still hydrates cleanly when L1 passed."""
     from vaultspec_core.builtins import seed_builtins
 
@@ -373,7 +390,7 @@ class TestCreateVaultDocStemCollision:
     """Ensure vault add rejects files whose stem collides with an existing doc."""
 
     @pytest.fixture()
-    def vault_project(self, tmp_path):
+    def vault_project(self, tmp_path: Path) -> Path:
         """Scaffold a minimal vault with one existing doc and real templates.
 
         Uses seed_builtins to copy real templates - never shadows them.
@@ -396,7 +413,7 @@ class TestCreateVaultDocStemCollision:
         )
         return tmp_path
 
-    def test_exact_path_collision_rejected(self, vault_project):
+    def test_exact_path_collision_rejected(self, vault_project: Path) -> None:
         """Re-creating the same file raises ResourceExistsError."""
         with pytest.raises(ResourceExistsError, match="already exists"):
             create_vault_doc(
@@ -405,7 +422,7 @@ class TestCreateVaultDocStemCollision:
                 TemplateFields(title="Duplicate"),
             )
 
-    def test_cross_type_stem_collision_rejected(self, vault_project):
+    def test_cross_type_stem_collision_rejected(self, vault_project: Path) -> None:
         """A different type dir but same stem is rejected."""
         # Manually place a file in research/ with the same stem as
         # the ADR we're about to create
@@ -430,7 +447,7 @@ class TestCreateVaultDocStemCollision:
                 TemplateFields(title="Collision"),
             )
 
-    def test_unique_stem_succeeds(self, vault_project):
+    def test_unique_stem_succeeds(self, vault_project: Path) -> None:
         """A truly unique stem creates the file without error."""
         path = create_vault_doc(
             vault_project,
@@ -445,7 +462,7 @@ class TestCreateVaultDocTopicInfix:
     """Topic-infix filenames for ADR and narrative document records."""
 
     @pytest.fixture()
-    def vault_project(self, tmp_path):
+    def vault_project(self, tmp_path: Path) -> Path:
         from vaultspec_core.builtins import seed_builtins
 
         rules_dir = tmp_path / ".vaultspec"
@@ -459,7 +476,9 @@ class TestCreateVaultDocTopicInfix:
         "doc_type",
         [DocType.ADR, DocType.AUDIT, DocType.REFERENCE, DocType.RESEARCH],
     )
-    def test_infixed_filename_for_admitting_types(self, vault_project, doc_type):
+    def test_infixed_filename_for_admitting_types(
+        self, vault_project: Path, doc_type: DocType
+    ) -> None:
         path = create_vault_doc(
             vault_project,
             DocumentIdentity(doc_type, "my-feat", "2026-07-16", topic="engine-wire"),
@@ -467,7 +486,9 @@ class TestCreateVaultDocTopicInfix:
         assert path.name == f"2026-07-16-my-feat-engine-wire-{doc_type.value}.md"
         assert path.exists()
 
-    def test_topic_hydrates_heading_when_title_absent(self, vault_project):
+    def test_topic_hydrates_heading_when_title_absent(
+        self, vault_project: Path
+    ) -> None:
         path = create_vault_doc(
             vault_project,
             DocumentIdentity(
@@ -479,7 +500,9 @@ class TestCreateVaultDocTopicInfix:
         assert "{title}" not in text
         assert "engine wire" in text
 
-    def test_explicit_title_wins_over_topic_in_heading(self, vault_project):
+    def test_explicit_title_wins_over_topic_in_heading(
+        self, vault_project: Path
+    ) -> None:
         path = create_vault_doc(
             vault_project,
             DocumentIdentity(
@@ -492,7 +515,7 @@ class TestCreateVaultDocTopicInfix:
         assert "{topic}" not in text
         assert path.name == "2026-07-16-my-feat-engine-wire-reference.md"
 
-    def test_omitted_topic_keeps_plain_filename(self, vault_project):
+    def test_omitted_topic_keeps_plain_filename(self, vault_project: Path) -> None:
         path = create_vault_doc(
             vault_project,
             DocumentIdentity(DocType.REFERENCE, "my-feat", "2026-07-16"),
@@ -500,14 +523,18 @@ class TestCreateVaultDocTopicInfix:
         assert path.name == "2026-07-16-my-feat-reference.md"
 
     @pytest.mark.parametrize("doc_type", [DocType.PLAN, DocType.EXEC])
-    def test_non_admitting_type_raises(self, vault_project, doc_type):
+    def test_non_admitting_type_raises(
+        self, vault_project: Path, doc_type: DocType
+    ) -> None:
         with pytest.raises(ValueError, match="topic infix is not supported"):
             create_vault_doc(
                 vault_project,
                 DocumentIdentity(doc_type, "my-feat", "2026-07-16", topic="second"),
             )
 
-    def test_two_topics_coexist_and_duplicate_collides(self, vault_project):
+    def test_two_topics_coexist_and_duplicate_collides(
+        self, vault_project: Path
+    ) -> None:
         first = create_vault_doc(
             vault_project,
             DocumentIdentity(
@@ -530,7 +557,9 @@ class TestCreateVaultDocTopicInfix:
                 ),
             )
 
-    def test_two_adr_topics_coexist_and_duplicate_collides(self, vault_project):
+    def test_two_adr_topics_coexist_and_duplicate_collides(
+        self, vault_project: Path
+    ) -> None:
         first = create_vault_doc(
             vault_project,
             DocumentIdentity(

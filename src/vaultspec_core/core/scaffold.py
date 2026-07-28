@@ -13,10 +13,10 @@ from pathlib import Path
 from . import types as _t
 from .enums import ProviderCapability, Tool
 from .helpers import atomic_write, ensure_dir
-from .provider_registry import _rel
+from .provider_registry import rel
 
 
-def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, str]]:
+def scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, str]]:
     """Scaffold the ``.vaultspec/`` and ``.vault/`` directory structures.
 
     Args:
@@ -36,13 +36,16 @@ def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, st
     # intermediate rules/ wrapper), so the framework root must exist first.
     if not dry_run:
         ensure_dir(fw_dir)
-    created.append((_rel(target, fw_dir), "core (.vaultspec)"))
+    created.append((rel(target, fw_dir), "core (.vaultspec)"))
 
     # Dynamically discover resource categories from the builtins package
     # so that new categories (e.g. hooks) are scaffolded automatically.
-    from vaultspec_core.builtins import _builtins_root
+    # Resolved directly through importlib.resources (the same public API
+    # the builtins package's own root helper wraps) so this module never
+    # reaches into that package's private surface.
+    from importlib import resources
 
-    builtins_root = _builtins_root()
+    builtins_root = Path(str(resources.files("vaultspec_core.builtins")))
     subdirs = sorted(
         d.name
         for d in builtins_root.iterdir()
@@ -52,7 +55,7 @@ def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, st
         d = fw_dir / subdir
         if not dry_run:
             ensure_dir(d)
-        created.append((_rel(target, d), "core (.vaultspec)"))
+        created.append((rel(target, d), "core (.vaultspec)"))
 
     from vaultspec_core.vaultcore.models import DocType
 
@@ -60,7 +63,7 @@ def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, st
         d = vault_dir / subdir
         if not dry_run:
             ensure_dir(d)
-        created.append((_rel(target, d), "vault (.vault)"))
+        created.append((rel(target, d), "vault (.vault)"))
 
     return created
 
@@ -102,8 +105,8 @@ def _dir_or_file_rels(
     """
     names = _provider_dir_preview_names(src_dir, is_skill=is_skill) if dry_run else []
     if not names:
-        return [_rel(target, dest_dir)]
-    return [_rel(target, dest_dir / name) for name in names]
+        return [rel(target, dest_dir)]
+    return [rel(target, dest_dir / name) for name in names]
 
 
 def _ensure_dir_unless_dry_run(path: Path, *, dry_run: bool) -> None:
@@ -143,7 +146,7 @@ def _ensure_native_config_file(path: Path, *, dry_run: bool) -> None:
         atomic_write(path, "")
 
 
-def _scaffold_provider(
+def scaffold_provider(
     target: Path, tool: Tool, *, dry_run: bool = False
 ) -> list[tuple[str, str]]:
     """Scaffold directories for a single provider.
@@ -169,42 +172,48 @@ def _scaffold_provider(
     label = tool.value
     seen_rels: set[str] = set()
 
-    def _add(rel: str, sublabel: str) -> None:
-        if rel not in seen_rels:
-            seen_rels.add(rel)
-            created.append((rel, f"{label} ({sublabel})"))
+    def _add(rel_path: str, sublabel: str) -> None:
+        if rel_path not in seen_rels:
+            seen_rels.add(rel_path)
+            created.append((rel_path, f"{label} ({sublabel})"))
 
     if ProviderCapability.RULES in caps and cfg.rules_dir:
-        for rel in _scaffold_provider_subdir(
+        for rel_path in _scaffold_provider_subdir(
             target, cfg.rules_dir, ctx.rules_src_dir, dry_run=dry_run
         ):
-            _add(rel, "rules")
+            _add(rel_path, "rules")
 
     if ProviderCapability.SKILLS in caps and cfg.skills_dir:
-        for rel in _scaffold_provider_subdir(
+        for rel_path in _scaffold_provider_subdir(
             target, cfg.skills_dir, ctx.skills_src_dir, dry_run=dry_run, is_skill=True
         ):
-            _add(rel, "skills")
+            _add(rel_path, "skills")
 
     if ProviderCapability.AGENTS in caps and cfg.agents_dir:
-        for rel in _scaffold_provider_subdir(
+        for rel_path in _scaffold_provider_subdir(
             target, cfg.agents_dir, ctx.agents_src_dir, dry_run=dry_run
         ):
-            _add(rel, "agents")
+            _add(rel_path, "agents")
 
     if ProviderCapability.WORKFLOWS in caps and cfg.workflows_dir:
         _ensure_dir_unless_dry_run(cfg.workflows_dir, dry_run=dry_run)
-        _add(_rel(target, cfg.workflows_dir), "workflows")
+        _add(rel(target, cfg.workflows_dir), "workflows")
 
     if cfg.config_file:
         _ensure_plain_config_file(cfg.config_file, dry_run=dry_run)
-        _add(_rel(target, cfg.config_file), "config")
+        _add(rel(target, cfg.config_file), "config")
 
     if cfg.rule_ref_config_file:
-        _add(_rel(target, cfg.rule_ref_config_file), "config")
+        _add(rel(target, cfg.rule_ref_config_file), "config")
 
     if cfg.native_config_file:
         _ensure_native_config_file(cfg.native_config_file, dry_run=dry_run)
-        _add(_rel(target, cfg.native_config_file), "config")
+        _add(rel(target, cfg.native_config_file), "config")
 
     return created
+
+
+#: Backward-compatible aliases for external callers still importing the
+#: previously private names.
+_scaffold_core = scaffold_core
+_scaffold_provider = scaffold_provider

@@ -288,12 +288,12 @@ class TestMalformedPayloadRowsRejected:
     Every case writes a real cache file and reads it back through ``load``.
     """
 
-    def _write(self, tmp_path: Path, payload: dict) -> Path:
+    def _write(self, tmp_path: Path, payload: dict[str, object]) -> Path:
         cache_file = tmp_path / "graph.json"
         cache_file.write_text(json.dumps(payload), encoding="utf-8")
         return cache_file
 
-    def _payload(self) -> dict:
+    def _payload(self) -> dict[str, object]:
         """Return a minimal payload that satisfies every documented shape."""
         return {
             "schema": cache_mod.CACHE_SCHEMA,

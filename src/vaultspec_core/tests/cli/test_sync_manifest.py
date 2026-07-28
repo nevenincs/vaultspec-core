@@ -5,7 +5,9 @@ provider manifest is present or absent, verifying that only installed providers
 receive synced files.
 """
 
+from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -19,14 +21,14 @@ pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture
-def sync_workspace(tmp_path):
+def sync_workspace(tmp_path: Path) -> Generator[Path]:
     """Set up a minimal workspace with .vaultspec for sync testing."""
     # Create minimal vaultspec directory
     vaultspec = tmp_path / ".vaultspec"
     vaultspec.mkdir()
 
     # Build tool configs pointing to tmp_path
-    tool_configs = {}
+    tool_configs: dict[Tool, ToolConfig] = {}
     for tool in Tool:
         rules_dir = tmp_path / f".{tool.value}" / "rules"
         tool_configs[tool] = ToolConfig(
@@ -58,22 +60,18 @@ def sync_workspace(tmp_path):
     _t._workspace_ctx.reset(token)
 
 
-def _noop_transform(_tool, name, meta, body):
+def _noop_transform(_tool: Tool, name: str, meta: dict[str, Any], body: str) -> str:
     return body
-
-
-def _default_dest_path(dest_dir, name):
-    return dest_dir / name
 
 
 class TestManifestAwareSync:
     """Verify that sync targets respect the provider manifest."""
 
-    def test_sync_respects_manifest(self, sync_workspace):
+    def test_sync_respects_manifest(self, sync_workspace: Path) -> None:
         """When manifest exists with only claude, only claude gets synced."""
         write_manifest(sync_workspace, {"claude"})
 
-        sources: dict[str, tuple[Path, dict, str]] = {
+        sources: dict[str, tuple[Path, dict[str, Any], str]] = {
             "test.md": (Path(), {}, "Test content.\n"),
         }
         sync_to_all_tools(sources, "rules_dir", _noop_transform, "Rules")
@@ -85,9 +83,9 @@ class TestManifestAwareSync:
         assert not (sync_workspace / ".antigravity" / "rules" / "test.md").exists()
         assert not (sync_workspace / ".codex" / "rules" / "test.md").exists()
 
-    def test_sync_skips_all_when_no_manifest(self, sync_workspace):
+    def test_sync_skips_all_when_no_manifest(self, sync_workspace: Path) -> None:
         """When no manifest exists, sync skips all tools (not installed)."""
-        sources: dict[str, tuple[Path, dict, str]] = {
+        sources: dict[str, tuple[Path, dict[str, Any], str]] = {
             "test.md": (Path(), {}, "Test content.\n"),
         }
         sync_to_all_tools(sources, "rules_dir", _noop_transform, "Rules")
@@ -98,11 +96,11 @@ class TestManifestAwareSync:
                 sync_workspace / f".{tool.value}" / "rules" / "test.md"
             ).exists()
 
-    def test_sync_multiple_providers(self, sync_workspace):
+    def test_sync_multiple_providers(self, sync_workspace: Path) -> None:
         """When manifest has multiple providers, all get synced."""
         write_manifest(sync_workspace, {"claude", "gemini"})
 
-        sources: dict[str, tuple[Path, dict, str]] = {
+        sources: dict[str, tuple[Path, dict[str, Any], str]] = {
             "test.md": (Path(), {}, "Test content.\n"),
         }
         sync_to_all_tools(sources, "rules_dir", _noop_transform, "Rules")

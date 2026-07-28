@@ -7,6 +7,7 @@ loading, and the shared abstract provider API.
 from __future__ import annotations
 
 import inspect
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -23,6 +24,9 @@ from ..providers import (
     resolve_includes,
 )
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 pytestmark = [pytest.mark.unit]
 
 _ALL_PROVIDERS = (
@@ -36,18 +40,18 @@ _ALL_PROVIDERS = (
 class TestSharedResolveIncludes:
     """Tests for :func:`~vaultspec_core.protocol.providers.base.resolve_includes`."""
 
-    def test_basic(self, tmp_path):
+    def test_basic(self, tmp_path: Path) -> None:
         (tmp_path / "included.md").write_text("Included content", encoding="utf-8")
         result = resolve_includes("Before\n@included.md\nAfter", tmp_path, tmp_path)
         assert "Included content" in result
         assert "Before" in result
         assert "After" in result
 
-    def test_missing_file(self, tmp_path):
+    def test_missing_file(self, tmp_path: Path) -> None:
         result = resolve_includes("@nonexistent.md", tmp_path, tmp_path)
         assert "ERROR: Missing include" in result
 
-    def test_url_passthrough(self, tmp_path):
+    def test_url_passthrough(self, tmp_path: Path) -> None:
         result = resolve_includes("@https://example.com/file.md", tmp_path, tmp_path)
         assert "@https://example.com/file.md" in result
 
@@ -56,13 +60,13 @@ class TestGeminiProvider:
     """Tests for :class:`~vaultspec_core.protocol.providers.gemini.GeminiProvider`."""
 
     @pytest.fixture
-    def provider(self):
+    def provider(self) -> GeminiProvider:
         return GeminiProvider()
 
-    def test_name(self, provider):
+    def test_name(self, provider: GeminiProvider) -> None:
         assert provider.name == "gemini"
 
-    def test_system_prompt_ordering(self, provider):
+    def test_system_prompt_ordering(self, provider: GeminiProvider) -> None:
         """Prompt ordering: system instructions -> persona -> rules."""
         prompt = provider.construct_system_prompt(
             "I am a persona",
@@ -79,10 +83,10 @@ class TestClaudeProvider:
     """Tests for :class:`~vaultspec_core.protocol.providers.claude.ClaudeProvider`."""
 
     @pytest.fixture
-    def provider(self):
+    def provider(self) -> ClaudeProvider:
         return ClaudeProvider()
 
-    def test_name(self, provider):
+    def test_name(self, provider: ClaudeProvider) -> None:
         assert provider.name == "claude"
 
 
@@ -90,29 +94,37 @@ class TestCodexProvider:
     """Tests for :class:`~vaultspec_core.protocol.providers.codex.CodexProvider`."""
 
     @pytest.fixture
-    def provider(self):
+    def provider(self) -> CodexProvider:
         return CodexProvider()
 
-    def test_name(self, provider):
+    def test_name(self, provider: CodexProvider) -> None:
         assert provider.name == "codex"
 
-    def test_models_registry(self, provider):
+    def test_models_registry(self, provider: CodexProvider) -> None:
         assert provider.models is CodexModels
 
-    def test_load_system_prompt_reads_root_agents_md(self, provider, tmp_path):
+    def test_load_system_prompt_reads_root_agents_md(
+        self, provider: CodexProvider, tmp_path: Path
+    ) -> None:
         (tmp_path / "AGENTS.md").write_text("Codex instructions.", encoding="utf-8")
         assert "Codex instructions." in provider.load_system_prompt(tmp_path)
 
-    def test_load_system_prompt_missing_file(self, provider, tmp_path):
+    def test_load_system_prompt_missing_file(
+        self, provider: CodexProvider, tmp_path: Path
+    ) -> None:
         assert provider.load_system_prompt(tmp_path) == ""
 
-    def test_load_rules_reads_codex_rules(self, provider, tmp_path):
+    def test_load_rules_reads_codex_rules(
+        self, provider: CodexProvider, tmp_path: Path
+    ) -> None:
         rules_dir = tmp_path / ".codex" / "rules"
         rules_dir.mkdir(parents=True)
         (rules_dir / "a.md").write_text("Rule A", encoding="utf-8")
         assert "Rule A" in provider.load_rules(tmp_path)
 
-    def test_load_rules_missing_dir(self, provider, tmp_path):
+    def test_load_rules_missing_dir(
+        self, provider: CodexProvider, tmp_path: Path
+    ) -> None:
         assert provider.load_rules(tmp_path) == ""
 
 
@@ -120,26 +132,34 @@ class TestAntigravityProvider:
     """Tests for the Antigravity provider (reference-only model registry)."""
 
     @pytest.fixture
-    def provider(self):
+    def provider(self) -> AntigravityProvider:
         return AntigravityProvider()
 
-    def test_name(self, provider):
+    def test_name(self, provider: AntigravityProvider) -> None:
         assert provider.name == "antigravity"
 
-    def test_models_registry_is_reference_only(self, provider):
+    def test_models_registry_is_reference_only(
+        self, provider: AntigravityProvider
+    ) -> None:
         assert provider.models is AntigravityModels
 
-    def test_no_dedicated_system_prompt(self, provider, tmp_path):
+    def test_no_dedicated_system_prompt(
+        self, provider: AntigravityProvider, tmp_path: Path
+    ) -> None:
         # Antigravity has no system file; model is runtime-selected.
         assert provider.load_system_prompt(tmp_path) == ""
 
-    def test_load_rules_reads_shared_agents_rules(self, provider, tmp_path):
+    def test_load_rules_reads_shared_agents_rules(
+        self, provider: AntigravityProvider, tmp_path: Path
+    ) -> None:
         rules_dir = tmp_path / ".agents" / "rules"
         rules_dir.mkdir(parents=True)
         (rules_dir / "a.md").write_text("Shared rule", encoding="utf-8")
         assert "Shared rule" in provider.load_rules(tmp_path)
 
-    def test_load_rules_missing_dir(self, provider, tmp_path):
+    def test_load_rules_missing_dir(
+        self, provider: AntigravityProvider, tmp_path: Path
+    ) -> None:
         assert provider.load_rules(tmp_path) == ""
 
 
@@ -192,10 +212,12 @@ class TestClaudeSystemPrompt:
     """Verify Claude provider system prompt methods."""
 
     @pytest.fixture
-    def provider(self):
+    def provider(self) -> ClaudeProvider:
         return ClaudeProvider()
 
-    def test_load_system_prompt_reads_claude_md(self, provider, tmp_path):
+    def test_load_system_prompt_reads_claude_md(
+        self, provider: ClaudeProvider, tmp_path: Path
+    ) -> None:
         """load_system_prompt reads .claude/CLAUDE.md."""
         claude_dir = tmp_path / ".claude"
         claude_dir.mkdir()
@@ -206,11 +228,13 @@ class TestClaudeSystemPrompt:
         result = provider.load_system_prompt(tmp_path)
         assert "System instructions here." in result
 
-    def test_load_system_prompt_missing_file(self, provider, tmp_path):
+    def test_load_system_prompt_missing_file(
+        self, provider: ClaudeProvider, tmp_path: Path
+    ) -> None:
         """load_system_prompt returns '' when file is missing."""
         assert provider.load_system_prompt(tmp_path) == ""
 
-    def test_construct_system_prompt_ordering(self, provider):
+    def test_construct_system_prompt_ordering(self, provider: ClaudeProvider) -> None:
         """Prompt ordering: system instructions -> persona -> rules."""
         prompt = provider.construct_system_prompt(
             "I am a persona",
@@ -222,7 +246,9 @@ class TestClaudeSystemPrompt:
         rules_pos = prompt.index("SYSTEM RULES & CONTEXT")
         assert instr_pos < persona_pos < rules_pos
 
-    def test_construct_system_prompt_no_instructions(self, provider):
+    def test_construct_system_prompt_no_instructions(
+        self, provider: ClaudeProvider
+    ) -> None:
         """Without system_instructions, no SYSTEM INSTRUCTIONS section."""
         prompt = provider.construct_system_prompt("persona", "rules", "")
         assert "SYSTEM INSTRUCTIONS" not in prompt

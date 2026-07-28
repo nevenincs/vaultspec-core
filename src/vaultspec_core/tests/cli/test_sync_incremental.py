@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from ...core import agents_sync, config_sync, rules_sync, skills_sync, system_sync
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 pytestmark = [pytest.mark.unit]
 
 
 class TestIncrementalRules:
-    def test_add_modify_remove_loop(self, synthetic_project):
+    def test_add_modify_remove_loop(self, synthetic_project: Path) -> None:
         """Standard rule lifecycle."""
         rule_src = synthetic_project / ".vaultspec" / "rules" / "rule1.md"
         rule_src.write_text("---\nname: rule1\n---\n\nOriginal body", encoding="utf-8")
@@ -33,7 +38,7 @@ class TestIncrementalRules:
         rules_sync(prune=True)
         assert not dest.exists()
 
-    def test_idempotent_resync(self, synthetic_project):
+    def test_idempotent_resync(self, synthetic_project: Path) -> None:
         """Syncing with no changes doesn't update files."""
         rule_src = synthetic_project / ".vaultspec" / "rules" / "stable.md"
         rule_src.write_text("---\nname: stable\n---\n\nBody", encoding="utf-8")
@@ -45,7 +50,7 @@ class TestIncrementalRules:
         mtime2 = dest.stat().st_mtime
         assert mtime1 == mtime2
 
-    def test_cross_destination_consistency(self, synthetic_project):
+    def test_cross_destination_consistency(self, synthetic_project: Path) -> None:
         """Rules are synced to all available tool destinations."""
         (synthetic_project / ".vaultspec" / "rules" / "shared.md").write_text(
             "---\nname: shared\n---\n\nShared rule", encoding="utf-8"
@@ -55,7 +60,7 @@ class TestIncrementalRules:
             p = synthetic_project / tool_dir / "rules" / "shared.md"
             assert p.exists(), f"Missing in {tool_dir}"
 
-    def test_five_pass_churn(self, synthetic_project):
+    def test_five_pass_churn(self, synthetic_project: Path) -> None:
         """Simulate rapid changes across multiple sync passes."""
         rules_dir = synthetic_project / ".vaultspec" / "rules"
         dest = synthetic_project / ".claude" / "rules" / "churn.md"
@@ -69,7 +74,7 @@ class TestIncrementalRules:
 
 
 class TestIncrementalSkills:
-    def test_skill_lifecycle(self, synthetic_project):
+    def test_skill_lifecycle(self, synthetic_project: Path) -> None:
         """Skill directory and SKILL.md lifecycle."""
         skill_dir = synthetic_project / ".vaultspec" / "skills" / "vaultspec-test"
         skill_dir.mkdir(parents=True)
@@ -98,7 +103,7 @@ class TestIncrementalSkills:
 
 
 class TestIncrementalSystem:
-    def test_system_add_modify_cycle(self, synthetic_project):
+    def test_system_add_modify_cycle(self, synthetic_project: Path) -> None:
         """System prompt assembly lifecycle."""
         base_src = synthetic_project / ".vaultspec" / "system" / "base.md"
         base_src.write_text("---\n---\n\n# Base v1", encoding="utf-8")
@@ -114,7 +119,7 @@ class TestIncrementalSystem:
         system_sync(force=True)
         assert "# Base v2" in gemini_sys.read_text(encoding="utf-8")
 
-    def test_system_idempotent(self, synthetic_project):
+    def test_system_idempotent(self, synthetic_project: Path) -> None:
         """Syncing system twice with no changes produces identical output."""
         (synthetic_project / ".vaultspec" / "system" / "base.md").write_text(
             "---\n---\n\n# Stable base", encoding="utf-8"
@@ -133,7 +138,7 @@ class TestIncrementalSystem:
 
 
 class TestIncrementalConfig:
-    def test_rule_ref_change_propagates(self, synthetic_project):
+    def test_rule_ref_change_propagates(self, synthetic_project: Path) -> None:
         # Config body now generates @rules/... references from synced rule files.
         rules_dest = synthetic_project / ".claude" / "rules"
         (rules_dest / "alpha.md").write_text("rule alpha", encoding="utf-8")
@@ -149,7 +154,7 @@ class TestIncrementalConfig:
         assert "alpha.md" in content
         assert "beta.md" in content
 
-    def test_rule_removal_updates_config(self, synthetic_project):
+    def test_rule_removal_updates_config(self, synthetic_project: Path) -> None:
         # Config body reflects which rule files exist in the destination.
         rules_dest = synthetic_project / ".claude" / "rules"
         (rules_dest / "keep.md").write_text("keep rule", encoding="utf-8")
@@ -167,14 +172,18 @@ class TestIncrementalConfig:
         assert "keep.md" in content_v2
         assert "drop.md" not in content_v2
 
-    def test_codex_config_file_exists_after_install(self, synthetic_project):
+    def test_codex_config_file_exists_after_install(
+        self, synthetic_project: Path
+    ) -> None:
         # AGENTS.md is created during scaffold (like CLAUDE.md / GEMINI.md).
         # config_sync with no rule refs should not destroy it.
         config_sync(force=True)
         codex_cfg = synthetic_project / "AGENTS.md"
         assert codex_cfg.exists()
 
-    def test_codex_native_config_tracks_frontmatter_changes(self, synthetic_project):
+    def test_codex_native_config_tracks_frontmatter_changes(
+        self, synthetic_project: Path
+    ) -> None:
         sys_dir = synthetic_project / ".vaultspec" / "system"
         (sys_dir / "codex-settings.md").write_text(
             "---\n"
@@ -196,7 +205,9 @@ class TestIncrementalConfig:
         content = codex_cfg.read_text(encoding="utf-8")
         assert 'approval_policy = "never"' in content
 
-    def test_codex_reasoning_settings_track_changes(self, synthetic_project):
+    def test_codex_reasoning_settings_track_changes(
+        self, synthetic_project: Path
+    ) -> None:
         sys_dir = synthetic_project / ".vaultspec" / "system"
         (sys_dir / "codex-reasoning.md").write_text(
             "---\n"
@@ -227,7 +238,7 @@ class TestIncrementalConfig:
 
 
 class TestMixedOperations:
-    def test_full_mixed_lifecycle(self, synthetic_project):
+    def test_full_mixed_lifecycle(self, synthetic_project: Path) -> None:
         """Add rules+skills, sync, modify+remove some, resync."""
         rules_dir = synthetic_project / ".vaultspec" / "rules"
         skills_dir = synthetic_project / ".vaultspec" / "skills"
@@ -281,7 +292,9 @@ class TestMixedOperations:
 
 
 class TestIncrementalAgents:
-    def test_codex_agent_block_tracks_add_modify_remove(self, synthetic_project):
+    def test_codex_agent_block_tracks_add_modify_remove(
+        self, synthetic_project: Path
+    ) -> None:
         agents_dir = synthetic_project / ".vaultspec" / "agents"
         agents_dir.mkdir(parents=True, exist_ok=True)
         agent_path = agents_dir / "vaultspec-worker.md"
@@ -307,7 +320,9 @@ class TestIncrementalAgents:
             encoding="utf-8"
         )
 
-    def test_prune_obsolete_codex_agents_directory(self, synthetic_project):
+    def test_prune_obsolete_codex_agents_directory(
+        self, synthetic_project: Path
+    ) -> None:
         obsolete_dir = synthetic_project / ".codex" / "agents"
         obsolete_dir.mkdir(parents=True, exist_ok=True)
         legacy_file = obsolete_dir / "vaultspec-adr-researcher.toml"
@@ -321,7 +336,9 @@ class TestIncrementalAgents:
         assert not legacy_file.exists()
         assert not obsolete_dir.exists()
 
-    def test_strip_unmanaged_duplicate_agent_keys(self, synthetic_project):
+    def test_strip_unmanaged_duplicate_agent_keys(
+        self, synthetic_project: Path
+    ) -> None:
         codex_cfg = synthetic_project / ".codex" / "config.toml"
         initial_toml = """[agents]
 vaultspec-worker = "legacy-value"

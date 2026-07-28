@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from typer.testing import Result
+
+    from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
 from vaultspec_core.core.commands import (
     canonical_hook_entries_for_mode,
@@ -793,13 +797,13 @@ class TestModeMismatchResolution:
 # ---------------------------------------------------------------------------
 class TestDoctorModeAndFloorRows:
     @staticmethod
-    def _run_doctor(root: Path):
+    def _run_doctor(root: Path) -> Result:
         from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
         return WorkspaceFactory(root).run("doctor")
 
     @staticmethod
-    def _combined(result) -> str:
+    def _combined(result: Result) -> str:
         return (result.stdout or "") + "\n" + (result.stderr or "")
 
     def test_doctor_renders_mode_mismatch_row(self, tmp_path: Path) -> None:
@@ -1139,7 +1143,7 @@ class TestRenderLaunchForMode:
 # ---------------------------------------------------------------------------
 class TestRenderMcpDefinitionForMode:
     @staticmethod
-    def _tokened(**extra: str) -> dict:
+    def _tokened(**extra: str) -> dict[str, Any]:
         return {"command": _MODE_COMMAND_TOKEN, "args": [_MODE_ARGS_TOKEN], **extra}
 
     def test_core_tool_mode(self) -> None:
@@ -1403,13 +1407,13 @@ class TestDiagnosePackagesMap:
 # ---------------------------------------------------------------------------
 class TestInstallModeDevEndToEnd:
     @staticmethod
-    def _factory(root: Path):
+    def _factory(root: Path) -> WorkspaceFactory:
         from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
         return WorkspaceFactory(root)
 
     @staticmethod
-    def _combined(result) -> str:
+    def _combined(result: Result) -> str:
         return (result.stdout or "") + "\n" + (result.stderr or "")
 
     def test_install_mode_dev_renders_dependency_and_doctor_is_clean(

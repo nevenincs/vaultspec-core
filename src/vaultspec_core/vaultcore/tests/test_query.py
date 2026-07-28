@@ -1,8 +1,12 @@
 """Tests for vault query engine."""
 
+from collections.abc import Generator
+from pathlib import Path
+
 import pytest
 
 from ...config import reset_config
+from ...graph import VaultGraph
 from ...testing.synthetic import CorpusManifest, build_synthetic_vault
 from ..query import (
     VaultDocument,
@@ -16,14 +20,14 @@ pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture(autouse=True)
-def _reset_cfg():
+def reset_cfg() -> Generator[None]:
     reset_config()
     yield
     reset_config()
 
 
 @pytest.fixture
-def vault_project(tmp_path) -> CorpusManifest:
+def vault_project(tmp_path: Path) -> CorpusManifest:
     return build_synthetic_vault(
         tmp_path,
         n_docs=24,
@@ -33,17 +37,17 @@ def vault_project(tmp_path) -> CorpusManifest:
 
 
 class TestListDocuments:
-    def test_list_all(self, vault_project: CorpusManifest):
+    def test_list_all(self, vault_project: CorpusManifest) -> None:
         docs = list_documents(vault_project.root)
         assert len(docs) > 0
         assert all(isinstance(d, VaultDocument) for d in docs)
 
-    def test_filter_by_type(self, vault_project: CorpusManifest):
+    def test_filter_by_type(self, vault_project: CorpusManifest) -> None:
         docs = list_documents(vault_project.root, doc_type="adr")
         assert len(docs) > 0
         assert all(d.doc_type == "adr" for d in docs)
 
-    def test_filter_by_feature(self, vault_project: CorpusManifest):
+    def test_filter_by_feature(self, vault_project: CorpusManifest) -> None:
         docs = list_documents(vault_project.root)
         features = {d.feature for d in docs if d.feature}
         assert features, "Synthetic vault must produce docs with features"
@@ -52,7 +56,7 @@ class TestListDocuments:
         assert len(filtered) > 0
         assert all(d.feature == feature for d in filtered)
 
-    def test_filter_by_date(self, vault_project: CorpusManifest):
+    def test_filter_by_date(self, vault_project: CorpusManifest) -> None:
         docs = list_documents(vault_project.root)
         dates = {d.date for d in docs if d.date}
         assert dates, "Synthetic vault must produce docs with dates"
@@ -61,15 +65,15 @@ class TestListDocuments:
         assert len(filtered) > 0
         assert all(d.date == date for d in filtered)
 
-    def test_list_orphaned(self, vault_project: CorpusManifest):
+    def test_list_orphaned(self, vault_project: CorpusManifest) -> None:
         docs = list_documents(vault_project.root, doc_type="orphaned")
         assert isinstance(docs, list)
 
-    def test_list_invalid(self, vault_project: CorpusManifest):
+    def test_list_invalid(self, vault_project: CorpusManifest) -> None:
         docs = list_documents(vault_project.root, doc_type="invalid")
         assert isinstance(docs, list)
 
-    def test_document_has_all_fields(self, vault_project: CorpusManifest):
+    def test_document_has_all_fields(self, vault_project: CorpusManifest) -> None:
         docs = list_documents(vault_project.root)
         assert docs, "Synthetic vault must produce at least one document"
         d = docs[0]
@@ -82,13 +86,13 @@ class TestListDocuments:
 
 
 class TestGetStats:
-    def test_basic_stats(self, vault_project: CorpusManifest):
+    def test_basic_stats(self, vault_project: CorpusManifest) -> None:
         stats = get_stats(vault_project.root)
         assert "total_docs" in stats
         assert "total_features" in stats
         assert "counts_by_type" in stats
 
-    def test_stats_with_feature_filter(self, vault_project: CorpusManifest):
+    def test_stats_with_feature_filter(self, vault_project: CorpusManifest) -> None:
         docs = list_documents(vault_project.root)
         features = {d.feature for d in docs if d.feature}
         assert features, "Synthetic vault must produce docs with features"
@@ -96,17 +100,17 @@ class TestGetStats:
         stats = get_stats(vault_project.root, feature=feature)
         assert "total_docs" in stats
 
-    def test_stats_includes_orphan_count(self, vault_project: CorpusManifest):
+    def test_stats_includes_orphan_count(self, vault_project: CorpusManifest) -> None:
         stats = get_stats(vault_project.root)
         assert "orphaned_count" in stats
 
-    def test_stats_includes_dangling_count(self, vault_project: CorpusManifest):
+    def test_stats_includes_dangling_count(self, vault_project: CorpusManifest) -> None:
         stats = get_stats(vault_project.root)
         assert "dangling_link_count" in stats
 
 
 class TestListFeatureDetails:
-    def test_returns_feature_info(self, vault_project: CorpusManifest):
+    def test_returns_feature_info(self, vault_project: CorpusManifest) -> None:
         features = list_feature_details(vault_project.root)
         assert isinstance(features, list)
         if features:
@@ -117,7 +121,7 @@ class TestListFeatureDetails:
 
 
 class TestArchiveFeature:
-    def test_archive_moves_docs(self, tmp_path):
+    def test_archive_moves_docs(self, tmp_path: Path) -> None:
         """Archiving moves all docs for a feature into .vault/_archive/."""
         from ..query import archive_feature
 
@@ -138,7 +142,7 @@ class TestArchiveFeature:
         # File should be under _archive/adr/
         assert (archive_dir / "adr" / doc.name).exists()
 
-    def test_archive_nonexistent_feature(self, tmp_path):
+    def test_archive_nonexistent_feature(self, tmp_path: Path) -> None:
         """Archiving a feature with no docs raises VaultSpecError."""
         from ...core.exceptions import VaultSpecError
         from ..query import archive_feature
@@ -151,7 +155,7 @@ class TestArchiveFeature:
             archive_feature(tmp_path, "nonexistent-feature-xyz")
 
     @pytest.mark.parametrize("empty_tag", ["", "   ", "#", " # "])
-    def test_archive_empty_tag_refuses(self, tmp_path, empty_tag):
+    def test_archive_empty_tag_refuses(self, tmp_path: Path, empty_tag: str) -> None:
         """An empty/whitespace feature tag must be rejected, never treated
         as a wildcard that archives every document in the vault."""
         from ...core.exceptions import VaultSpecError
@@ -162,7 +166,7 @@ class TestArchiveFeature:
         with pytest.raises(VaultSpecError, match="feature tag is required"):
             archive_feature(tmp_path, empty_tag)
 
-    def test_archive_preserves_subdir_structure(self, tmp_path):
+    def test_archive_preserves_subdir_structure(self, tmp_path: Path) -> None:
         """Archived docs maintain their type subdirectory."""
         from ..query import archive_feature
 
@@ -189,12 +193,12 @@ class TestDocsFromGraph:
     ``list_documents``/``_scan_all`` disk-scanning path it replaces inside
     ``get_stats``/``collect_all_statuses``."""
 
-    def _graph(self, root):
-        from ...graph import VaultGraph
-
+    def _graph(self, root: Path) -> VaultGraph:
         return VaultGraph(root)
 
-    def test_matches_list_documents_unfiltered(self, vault_project: CorpusManifest):
+    def test_matches_list_documents_unfiltered(
+        self, vault_project: CorpusManifest
+    ) -> None:
         via_scan = list_documents(vault_project.root)
         via_graph = _docs_from_graph(self._graph(vault_project.root))
 
@@ -214,7 +218,7 @@ class TestDocsFromGraph:
 
     def test_matches_list_documents_with_doc_type_filter(
         self, vault_project: CorpusManifest
-    ):
+    ) -> None:
         via_scan = list_documents(vault_project.root, doc_type="adr")
         via_graph = _docs_from_graph(self._graph(vault_project.root), doc_type="adr")
 
@@ -224,7 +228,7 @@ class TestDocsFromGraph:
 
     def test_matches_list_documents_with_feature_filter(
         self, vault_project: CorpusManifest
-    ):
+    ) -> None:
         docs = list_documents(vault_project.root)
         feature = next(d.feature for d in docs if d.feature)
 
@@ -237,7 +241,7 @@ class TestDocsFromGraph:
 
     def test_matches_list_documents_with_date_filter(
         self, vault_project: CorpusManifest
-    ):
+    ) -> None:
         docs = list_documents(vault_project.root)
         date = next(d.date for d in docs if d.date)
 
@@ -248,7 +252,7 @@ class TestDocsFromGraph:
         assert via_graph
         assert all(d.date == date for d in via_graph)
 
-    def test_skips_phantom_nodes_from_dangling_links(self, tmp_path):
+    def test_skips_phantom_nodes_from_dangling_links(self, tmp_path: Path) -> None:
         """A dangling wiki-link creates a phantom node (``path=None``); the
         adapter must never crash on it or count it as a real document."""
         adr_dir = tmp_path / ".vault" / "adr"
@@ -268,7 +272,7 @@ class TestDocsFromGraph:
         assert len(docs) == 1
         assert docs[0].name == "2026-04-01-broken-link-adr"
 
-    def test_stem_collision_name_uses_bare_stem(self, tmp_path):
+    def test_stem_collision_name_uses_bare_stem(self, tmp_path: Path) -> None:
         """A stem collision re-keys the graph node's ``name`` as
         ``doctype/stem``; the adapter must derive the document ``name``
         from ``node.path.stem`` instead, matching ``VaultDocument.name``."""
@@ -294,7 +298,7 @@ class TestDocsFromGraph:
         )
         assert len(docs) == 2
 
-    def test_bare_feature_field_fallback(self, tmp_path):
+    def test_bare_feature_field_fallback(self, tmp_path: Path) -> None:
         """A document with no non-directory tag but a bare top-level
         ``feature:`` key must resolve the same feature via both paths."""
         adr_dir = tmp_path / ".vault" / "adr"
@@ -313,7 +317,7 @@ class TestDocsFromGraph:
         assert via_scan[0].feature == "legacy-widget"
         assert via_graph[0].feature == "legacy-widget"
 
-    def test_filename_date_fallback(self, tmp_path):
+    def test_filename_date_fallback(self, tmp_path: Path) -> None:
         """A document with no frontmatter ``date:`` key still resolves its
         date from the dated filename prefix, identically via both paths."""
         adr_dir = tmp_path / ".vault" / "adr"
@@ -336,7 +340,7 @@ class TestGetStatsGraphPath:
     """``get_stats`` now reads the graph by default; its totals must still
     match an independent ``list_documents``-based computation."""
 
-    def test_totals_match_list_documents(self, vault_project: CorpusManifest):
+    def test_totals_match_list_documents(self, vault_project: CorpusManifest) -> None:
         docs = list_documents(vault_project.root)
         stats = get_stats(vault_project.root)
 
@@ -351,7 +355,9 @@ class TestGetStatsGraphPath:
         assert stats["counts_by_type"] == counts
         assert stats["total_features"] == len(features)
 
-    def test_explicit_graph_matches_implicit_build(self, vault_project: CorpusManifest):
+    def test_explicit_graph_matches_implicit_build(
+        self, vault_project: CorpusManifest
+    ) -> None:
         from ...graph import VaultGraph
 
         graph = VaultGraph(vault_project.root)
@@ -361,7 +367,7 @@ class TestGetStatsGraphPath:
 
     def test_orphaned_pseudo_type_still_works_with_graph_present(
         self, vault_project: CorpusManifest
-    ):
+    ) -> None:
         from ...graph import VaultGraph
 
         graph = VaultGraph(vault_project.root)
@@ -379,7 +385,9 @@ class TestListDocumentsGraphParity:
     """
 
     @staticmethod
-    def _key(docs: list[VaultDocument]) -> list[tuple]:
+    def _key(
+        docs: list[VaultDocument],
+    ) -> list[tuple[str, str, str | None, str | None]]:
         return sorted((d.name, d.doc_type, d.feature, d.date) for d in docs)
 
     @pytest.mark.parametrize(

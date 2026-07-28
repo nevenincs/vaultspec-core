@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 import shutil
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from typer.testing import CliRunner
 
@@ -471,6 +471,7 @@ class WorkspaceFactory:
     def add_user_mcp_servers(self) -> Self:
         """Merge a user MCP server entry into ``.mcp.json``."""
         mcp = self.root / ".mcp.json"
+        raw: dict[str, Any]
         if mcp.exists():
             raw = json.loads(mcp.read_text(encoding="utf-8"))
         else:
@@ -485,7 +486,9 @@ class WorkspaceFactory:
     def create_user_only_mcp(self) -> Self:
         """Create ``.mcp.json`` with only user-defined servers."""
         mcp = self.root / ".mcp.json"
-        raw = {"mcpServers": {"my-server": {"command": "node", "args": []}}}
+        raw: dict[str, Any] = {
+            "mcpServers": {"my-server": {"command": "node", "args": []}}
+        }
         mcp.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
         return self
 

@@ -60,12 +60,12 @@ def _unwrap(result: Any) -> Any:
     """Return a ``call_tool`` result's structured payload, error-checked.
 
     Asserts the call did not surface a protocol error, then returns the
-    structured content, unwrapping FastMCP's ``{"result": ...}`` envelope when
+    structured content, unwrapping MCPServer's ``{"result": ...}`` envelope when
     present (mirroring the in-memory suite's ``data_of`` helper).
     """
     error_texts = [c.text for c in result.content if hasattr(c, "text")]
-    assert not result.isError, f"tool returned error: {error_texts}"
-    sc = result.structuredContent
+    assert not result.is_error, f"tool returned error: {error_texts}"
+    sc = result.structured_content
     if isinstance(sc, dict) and list(sc.keys()) == ["result"]:
         return sc["result"]
     return sc
@@ -92,13 +92,13 @@ async def _drive_session(project: Path) -> None:
         ClientSession(read, write) as session,
     ):
         init_result = await session.initialize()
-        assert init_result.serverInfo.name == "vaultspec-mcp"
+        assert init_result.server_info.name == "vaultspec-mcp"
 
         listed = await session.list_tools()
         names = {tool.name for tool in listed.tools}
         assert names == _EXPECTED_TOOLS, names
         for tool in listed.tools:
-            assert tool.outputSchema is not None, (
+            assert tool.output_schema is not None, (
                 f"{tool.name} advertises no outputSchema over the wire"
             )
 
@@ -120,7 +120,7 @@ async def _drive_session(project: Path) -> None:
 
         # invoke of a denylisted verb is rejected as a protocol error.
         denied = await session.call_tool("invoke", {"verb": "uninstall"})
-        assert denied.isError
+        assert denied.is_error
         denied_text = " ".join(
             str(c.text) for c in denied.content if hasattr(c, "text")
         ).lower()
