@@ -80,6 +80,7 @@ _TYPE_PARAGRAPHS: dict[str, str] = {
     ),
 }
 
+
 @dataclass
 class GeneratedDoc:
     """A single generated vault document.
