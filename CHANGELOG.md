@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.1.54](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.53...vaultspec-core-v0.1.54) (2026-07-28)
+
+
+### Features
+
+* **dev:** platform-agnostic development harness and quality-gate parity ([#279](https://github.com/nevenincs/vaultspec-core/issues/279)) ([2945621](https://github.com/nevenincs/vaultspec-core/commit/2945621988dcc2e6ea6f30b869a5c7bc3b4d2c63))
+* let a workspace decline managed pre-commit scaffolding ([e38faca](https://github.com/nevenincs/vaultspec-core/commit/e38faca47b44ed5a9b69edc085bf4a9584b898d5))
+* let a workspace decline managed pre-commit scaffolding ([#285](https://github.com/nevenincs/vaultspec-core/issues/285)) ([c58cc21](https://github.com/nevenincs/vaultspec-core/commit/c58cc21423e97abdbbc790cf127a489912dc58e1))
+* **packaging:** ship the py.typed marker so consumers can read the inline types ([ce252de](https://github.com/nevenincs/vaultspec-core/commit/ce252de59fa60d1c0adcd0365fb1686bbaafe628)), closes [#278](https://github.com/nevenincs/vaultspec-core/issues/278)
+* **packaging:** ship the py.typed marker so consumers can read the inline types ([f825fd9](https://github.com/nevenincs/vaultspec-core/commit/f825fd9c4e7cdf9f23987f83eecfc3eb37ff4b0d)), closes [#278](https://github.com/nevenincs/vaultspec-core/issues/278)
+
+
+### Bug Fixes
+
+* **ci:** pin the interpreter and bound requires-python ([#283](https://github.com/nevenincs/vaultspec-core/issues/283)) ([b32ce86](https://github.com/nevenincs/vaultspec-core/commit/b32ce8650fec413202545ce0d62469d1c9925da2))
+* **ci:** pin the interpreter and bound requires-python ([#283](https://github.com/nevenincs/vaultspec-core/issues/283)) ([6dbdcaa](https://github.com/nevenincs/vaultspec-core/commit/6dbdcaa12b9e2703c4e671704fa04ec66dcc480b))
+* **sync:** honour pre-commit hook removal instead of resurrecting it ([#286](https://github.com/nevenincs/vaultspec-core/issues/286)) ([9dd9956](https://github.com/nevenincs/vaultspec-core/commit/9dd9956167e202814db573cdf3a6d336d862b8a4)), closes [#284](https://github.com/nevenincs/vaultspec-core/issues/284)
+* **types:** annotate _target.py plan-document helpers (round 1 part 2/2) ([ccd4b28](https://github.com/nevenincs/vaultspec-core/commit/ccd4b28c27d82e159d3812515b2937d3ced073bf))
+* **types:** annotate _target.py plan-document helpers (round 1 part 2/2) ([823a8fa](https://github.com/nevenincs/vaultspec-core/commit/823a8fab8179fa3234b18d2e982bb7e6cb52a3c2))
+* **types:** annotate precommit.py's YAML-driven dict/list cascades ([6931b4a](https://github.com/nevenincs/vaultspec-core/commit/6931b4af1bb213a602201400a518d731a6bef843))
+* **types:** annotate precommit.py's YAML-driven dict/list cascades ([8b9e548](https://github.com/nevenincs/vaultspec-core/commit/8b9e548071fcb76bb2cc185f144ef5785437efe0))
+* **types:** annotate spec_cmd_doctor signal-mapping and rows collections ([b3442ad](https://github.com/nevenincs/vaultspec-core/commit/b3442addc6d60d5048b417bcf70df4c852dc3699))
+* **types:** annotate spec_cmd_doctor signal-mapping and rows collections ([8e31293](https://github.com/nevenincs/vaultspec-core/commit/8e312931a4f49502f92c92fe3347fab21c2b3189))
+* **types:** annotate spec_cmd_shared helpers and export the sibling-module surface ([834eec8](https://github.com/nevenincs/vaultspec-core/commit/834eec85fc705e132c8a3725c2afd24d73330099))
+* **types:** annotate spec_cmd_shared helpers and export the sibling-module surface ([ffa0161](https://github.com/nevenincs/vaultspec-core/commit/ffa01614a3a3116fb4ed57687fe173ae3c142ce3))
+* **types:** annotate vault_cmd._validate_created_doc doc_path parameter ([89ded03](https://github.com/nevenincs/vaultspec-core/commit/89ded035adb423ebd3fb3527757113ad75c1b6fc))
+* **types:** annotate vault_cmd._validate_created_doc doc_path parameter ([0d2b512](https://github.com/nevenincs/vaultspec-core/commit/0d2b51243a11e67b3d5bc56a11b4c9d6a92eb64e))
+* **types:** basedpyright strict burndown round 1 (part 1/2) ([aed414f](https://github.com/nevenincs/vaultspec-core/commit/aed414f7fbf1009fd58e525425dc314069035658))
+* **types:** basedpyright strict burndown round 1 (part 1/2) ([43d8f74](https://github.com/nevenincs/vaultspec-core/commit/43d8f74f2714ab7c64b0989e63511b914e395728))
+* **types:** keep the new precommit-standdown fixture off the strict gate ([6dd9d3d](https://github.com/nevenincs/vaultspec-core/commit/6dd9d3d20317e196dfb12af5d31ccf72d4c26081))
+
 ## [0.1.53](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.52...vaultspec-core-v0.1.53) (2026-07-27)
 
 
