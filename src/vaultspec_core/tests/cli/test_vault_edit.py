@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -30,7 +30,7 @@ from vaultspec_core.vaultcore.blob_hash import git_blob_oid
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from click.testing import Result
+    from typer.testing import CliRunner, Result
 
 pytestmark = [pytest.mark.unit]
 
@@ -82,12 +82,14 @@ def _doc(root: Path) -> Path:
     return root / ".vault" / "adr" / "2026-01-01-alpha-adr.md"
 
 
-def _run(runner, *args: str, target: Path, stdin: str | None = None) -> Result:
+def _run(
+    runner: CliRunner, *args: str, target: Path, stdin: str | None = None
+) -> Result:
     """Invoke the CLI with ``--target`` and optional stdin."""
     return runner.invoke(app, ["--target", str(target), *args], input=stdin)
 
 
-def _envelope(result: Result) -> dict:
+def _envelope(result: Result) -> dict[str, Any]:
     """Parse the JSON envelope from a CLI result, asserting it is present."""
     return json.loads(result.output)
 
@@ -124,7 +126,9 @@ class TestBlobHashParity:
 
 
 class TestSetBody:
-    def test_success_returns_updated_and_post_hash(self, runner, tmp_path):
+    def test_success_returns_updated_and_post_hash(
+        self, runner: CliRunner, tmp_path: Path
+    ):
         root = _make_vault(tmp_path)
         body_file = tmp_path / "newbody.md"
         body_file.write_text("\n# Demo ADR\n\nReplaced body.\n", encoding="utf-8")
@@ -151,7 +155,7 @@ class TestSetBody:
         # Frontmatter survived byte-for-byte (still carries the original tags).
         assert b"#test-feat" in on_disk
 
-    def test_stdin_channel(self, runner, tmp_path):
+    def test_stdin_channel(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -167,7 +171,7 @@ class TestSetBody:
         assert _envelope(result)["status"] == "updated"
         assert b"From stdin." in _doc(root).read_bytes()
 
-    def test_stdin_channel_normalizes_crlf(self, runner, tmp_path):
+    def test_stdin_channel_normalizes_crlf(self, runner: CliRunner, tmp_path: Path):
         # The engine write channel always uses --body-stdin; a CRLF draft must be
         # normalized to LF identically to --body-file, never persisted as \r\n
         # (which on an LF document is stray-CR corruption, and on a CRLF file
@@ -193,7 +197,7 @@ class TestSetBody:
         # write path re-applies a CRLF source newline.
         assert b"\r\r" not in on_disk
 
-    def test_stdin_channel_preserves_legacy_c1_byte(self, tmp_path):
+    def test_stdin_channel_preserves_legacy_c1_byte(self, tmp_path: Path):
         """A real CLI process must retain a legacy byte during body replacement."""
         root = _make_vault(tmp_path)
         document = _doc(root)
@@ -226,7 +230,9 @@ class TestSetBody:
         assert json.loads(result.stdout)["status"] == "updated"
         assert document.read_bytes().endswith(body.replace(b"\n", source_newline))
 
-    def test_refuse_on_error_leaves_file_unchanged(self, runner, tmp_path):
+    def test_refuse_on_error_leaves_file_unchanged(
+        self, runner: CliRunner, tmp_path: Path
+    ):
         root = _make_vault(tmp_path)
         # Corrupt the fixture's frontmatter so the proposed content is invalid
         # (a single tag fails the >=2-tag rule). The body replacement is fine,
@@ -265,7 +271,9 @@ class TestSetBody:
         # The file is untouched.
         assert _doc(root).read_bytes() == before
 
-    def test_no_check_allows_warning_but_still_blocks_error(self, runner, tmp_path):
+    def test_no_check_allows_warning_but_still_blocks_error(
+        self, runner: CliRunner, tmp_path: Path
+    ):
         # --no-check skips the snapshot checkers, but the frontmatter model
         # validator still runs and an ERROR still refuses the write.
         root = _make_vault(tmp_path)
@@ -299,7 +307,7 @@ class TestSetBody:
         assert _envelope(result)["data"]["refused"] is True
         assert _doc(root).read_bytes() == before
 
-    def test_blob_hash_conflict_refuses(self, runner, tmp_path):
+    def test_blob_hash_conflict_refuses(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         before = _doc(root).read_bytes()
         body_file = tmp_path / "b.md"
@@ -326,7 +334,7 @@ class TestSetBody:
         # No write occurred.
         assert _doc(root).read_bytes() == before
 
-    def test_blob_hash_match_allows_write(self, runner, tmp_path):
+    def test_blob_hash_match_allows_write(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         current = git_blob_oid(_doc(root).read_bytes())
         body_file = tmp_path / "b.md"
@@ -348,7 +356,7 @@ class TestSetBody:
         assert _envelope(result)["status"] == "updated"
         assert b"Matched." in _doc(root).read_bytes()
 
-    def test_dry_run_writes_nothing(self, runner, tmp_path):
+    def test_dry_run_writes_nothing(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         before = _doc(root).read_bytes()
         body_file = tmp_path / "b.md"
@@ -384,7 +392,7 @@ class TestSetBody:
         )
         assert env["data"]["blob_hash"] == _envelope(result2)["data"]["blob_hash"]
 
-    def test_unresolvable_ref_fails(self, runner, tmp_path):
+    def test_unresolvable_ref_fails(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         body_file = tmp_path / "b.md"
         body_file.write_text("body\n", encoding="utf-8")
@@ -408,7 +416,7 @@ class TestSetBody:
 
 
 class TestSetFrontmatter:
-    def test_set_date_validates_then_writes(self, runner, tmp_path):
+    def test_set_date_validates_then_writes(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -427,7 +435,7 @@ class TestSetFrontmatter:
         # The body survived the frontmatter edit byte-for-byte.
         assert "Original body." in text
 
-    def test_set_related_resolves_and_writes(self, runner, tmp_path):
+    def test_set_related_resolves_and_writes(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -443,7 +451,7 @@ class TestSetFrontmatter:
         text = _doc(root).read_text(encoding="utf-8")
         assert "[[2026-01-01-beta-adr]]" in text
 
-    def test_refuse_on_bad_tags(self, runner, tmp_path):
+    def test_refuse_on_bad_tags(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         before = _doc(root).read_bytes()
         # A single tag fails the >=2-tag and one-feature-tag rules.
@@ -463,7 +471,7 @@ class TestSetFrontmatter:
         assert env["data"]["errors"]
         assert _doc(root).read_bytes() == before
 
-    def test_nothing_to_edit_fails(self, runner, tmp_path):
+    def test_nothing_to_edit_fails(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -476,7 +484,7 @@ class TestSetFrontmatter:
         assert result.exit_code == 1, result.output
         assert _envelope(result)["status"] == "failed"
 
-    def test_dry_run_writes_nothing(self, runner, tmp_path):
+    def test_dry_run_writes_nothing(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         before = _doc(root).read_bytes()
         result = _run(
@@ -501,7 +509,7 @@ class TestSetFrontmatter:
 
 
 class TestEdit:
-    def test_combined_atomic_write(self, runner, tmp_path):
+    def test_combined_atomic_write(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         body_file = tmp_path / "b.md"
         body_file.write_text("\n# Demo ADR\n\nCombined body.\n", encoding="utf-8")
@@ -532,7 +540,7 @@ class TestEdit:
         assert "[[2026-01-01-beta-adr]]" in text
         assert env["data"]["blob_hash"] == git_blob_oid(_doc(root).read_bytes())
 
-    def test_frontmatter_only_edit(self, runner, tmp_path):
+    def test_frontmatter_only_edit(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -550,7 +558,7 @@ class TestEdit:
         assert "date: '2026-05-05'" in text
         assert "Original body." in text
 
-    def test_nothing_to_edit_fails(self, runner, tmp_path):
+    def test_nothing_to_edit_fails(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -563,7 +571,7 @@ class TestEdit:
         assert result.exit_code == 1, result.output
         assert _envelope(result)["status"] == "failed"
 
-    def test_dry_run_writes_nothing(self, runner, tmp_path):
+    def test_dry_run_writes_nothing(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         before = _doc(root).read_bytes()
         body_file = tmp_path / "b.md"
@@ -585,7 +593,7 @@ class TestEdit:
         assert _envelope(result)["data"]["dry_run"] is True
         assert _doc(root).read_bytes() == before
 
-    def test_conflict_refuses_combined(self, runner, tmp_path):
+    def test_conflict_refuses_combined(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         before = _doc(root).read_bytes()
         result = _run(

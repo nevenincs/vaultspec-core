@@ -10,7 +10,7 @@ ownership, and preserves user-added entries.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -42,9 +42,15 @@ _TOOL_LAUNCH = {
 }
 
 
-def _servers(path: Path) -> dict:
+def _servers(path: Path) -> dict[str, object]:
     raw = json.loads(path.read_text(encoding="utf-8"))
-    return raw.get("mcpServers", {})
+    if not isinstance(raw, dict):
+        return {}
+    raw = cast("dict[str, object]", raw)
+    servers = raw.get("mcpServers", {})
+    if not isinstance(servers, dict):
+        return {}
+    return cast("dict[str, object]", servers)
 
 
 def _write_dependency_pyproject(root: Path) -> None:
@@ -60,22 +66,24 @@ def _write_dependency_pyproject(root: Path) -> None:
 
 
 class TestMcpModeRendering:
-    def test_dependency_mode_renders_uv_run_launch(self, tmp_path: Path):
+    def test_dependency_mode_renders_uv_run_launch(self, tmp_path: Path) -> None:
         _write_dependency_pyproject(tmp_path)
         WorkspaceFactory(tmp_path).install("all", mode=InstallMode.DEPENDENCY)
         assert _servers(tmp_path / ".mcp.json")["vaultspec-core"] == _DEPENDENCY_LAUNCH
 
-    def test_tool_mode_renders_uvx_launch(self, tmp_path: Path):
+    def test_tool_mode_renders_uvx_launch(self, tmp_path: Path) -> None:
         WorkspaceFactory(tmp_path).install("all", mode=InstallMode.TOOL)
         assert _servers(tmp_path / ".mcp.json")["vaultspec-core"] == _TOOL_LAUNCH
 
-    def test_provider_native_config_matches_mode(self, tmp_path: Path):
+    def test_provider_native_config_matches_mode(self, tmp_path: Path) -> None:
         """The provider-native MCP config renders the same mode as .mcp.json."""
         WorkspaceFactory(tmp_path).install("all", mode=InstallMode.TOOL)
         agy = tmp_path / ".agents" / "mcp_config.json"
         assert _servers(agy)["vaultspec-core"] == _TOOL_LAUNCH
 
-    def test_absent_declaration_renders_dependency_on_sync(self, tmp_path: Path):
+    def test_absent_declaration_renders_dependency_on_sync(
+        self, tmp_path: Path
+    ) -> None:
         """The Q6 migration bridge: a workspace whose declaration is absent
         (provisioned before install-mode) must render the dependency launch on
         sync, never silently flip to the uvx tool form.
@@ -92,7 +100,9 @@ class TestMcpModeRendering:
 
 
 class TestAgyMcpConfig:
-    def test_install_writes_agents_mcp_config_mirroring_root(self, tmp_path: Path):
+    def test_install_writes_agents_mcp_config_mirroring_root(
+        self, tmp_path: Path
+    ) -> None:
         WorkspaceFactory(tmp_path).install("all")
         agy = tmp_path / ".agents" / "mcp_config.json"
         root = tmp_path / ".mcp.json"
@@ -101,7 +111,9 @@ class TestAgyMcpConfig:
         assert _servers(agy) == _servers(root)
         assert "vaultspec-core" in _servers(agy)
 
-    def test_uses_host_schema_and_external_ownership_sidecar(self, tmp_path: Path):
+    def test_uses_host_schema_and_external_ownership_sidecar(
+        self, tmp_path: Path
+    ) -> None:
         WorkspaceFactory(tmp_path).install("all")
         raw = json.loads(
             (tmp_path / ".agents" / "mcp_config.json").read_text(encoding="utf-8")
@@ -114,11 +126,11 @@ class TestAgyMcpConfig:
         managed = ownership["targets"]["antigravity:project"]["managed"]
         assert "vaultspec-core" in managed
 
-    def test_not_written_when_antigravity_not_installed(self, tmp_path: Path):
+    def test_not_written_when_antigravity_not_installed(self, tmp_path: Path) -> None:
         WorkspaceFactory(tmp_path).install("claude")
         assert not (tmp_path / ".agents" / "mcp_config.json").exists()
 
-    def test_uninstall_removes_managed_entry(self, tmp_path: Path):
+    def test_uninstall_removes_managed_entry(self, tmp_path: Path) -> None:
         factory = WorkspaceFactory(tmp_path).install("all")
         agy = tmp_path / ".agents" / "mcp_config.json"
         assert "vaultspec-core" in _servers(agy)
@@ -126,7 +138,7 @@ class TestAgyMcpConfig:
         if agy.exists():
             assert "vaultspec-core" not in _servers(agy)
 
-    def test_sync_preserves_user_added_agy_server(self, tmp_path: Path):
+    def test_sync_preserves_user_added_agy_server(self, tmp_path: Path) -> None:
         factory = WorkspaceFactory(tmp_path).install("all")
         agy = tmp_path / ".agents" / "mcp_config.json"
         raw = json.loads(agy.read_text(encoding="utf-8"))

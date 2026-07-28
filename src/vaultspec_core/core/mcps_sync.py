@@ -11,7 +11,7 @@ import logging
 import tomllib
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from . import types as _t
 from .enums import InstallMode, McpScope, McpTargetFormat, Tool
@@ -35,6 +35,7 @@ from .mcps_ownership import (
     _owned_fingerprints,
     _owned_names,
     _ownership_path,
+    _OwnershipState,
     _read_ownership,
     _set_owned_names,
     _target_lock,
@@ -164,7 +165,7 @@ def _apply_server_merge(
 def _sync_json_target(
     target: McpTarget,
     root: Path,
-    state: dict[str, Any],
+    state: _OwnershipState,
     sources: dict[str, tuple[Path, dict[str, Any]]],
     *,
     dry_run: bool,
@@ -187,7 +188,7 @@ def _sync_json_target(
                 result.errors.append(f"MCP target {target.path} is not a JSON object.")
                 result.errored += 1
                 return
-            raw = loaded
+            raw = cast("dict[str, Any]", loaded)
 
         try:
             untyped_servers = _json_server_map(raw, target, root)
@@ -195,8 +196,8 @@ def _sync_json_target(
             result.errors.append(str(exc))
             result.errored += 1
             return
-        servers = {
-            str(name): config
+        servers: dict[str, dict[str, Any]] = {
+            str(name): cast("dict[str, Any]", config)
             for name, config in untyped_servers.items()
             if isinstance(config, dict)
         }
@@ -210,11 +211,14 @@ def _sync_json_target(
         managed = _owned_names(state, target) & set(servers)
         recorded_fingerprints = _owned_fingerprints(state, target)
         legacy = raw.pop(_LEGACY_MANAGED_KEY, None)
-        migrated = (
-            {name for name in legacy if isinstance(name, str) and name in servers}
-            if isinstance(legacy, list)
-            else set()
-        )
+        migrated: set[str] = set()
+        if isinstance(legacy, list):
+            legacy_items = cast("list[Any]", legacy)
+            migrated = {
+                name
+                for name in legacy_items
+                if isinstance(name, str) and name in servers
+            }
         if migrated:
             managed.update(migrated)
             result.warnings.append(
@@ -246,7 +250,7 @@ def _sync_json_target(
 
 def _sync_toml_target(
     target: McpTarget,
-    state: dict[str, Any],
+    state: _OwnershipState,
     sources: dict[str, tuple[Path, dict[str, Any]]],
     *,
     dry_run: bool,

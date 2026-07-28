@@ -18,6 +18,10 @@ from . import types as _t
 from .exceptions import ResourceExistsError, ResourceNotFoundError
 from .types import SyncResult
 
+__all__ = [
+    "_resolve_hook_path",
+]
+
 logger = logging.getLogger(__name__)
 
 
@@ -313,13 +317,14 @@ def hooks_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
     return result
 
 
-def _action_warnings(name: str, actions: Any) -> list[str]:
+def _action_warnings(name: str, actions: object) -> list[str]:
     """Return compliance warnings for one hook definition's ``actions`` list."""
     if not isinstance(actions, list) or not actions:
         return [f"Hook '{name}' has no defined actions."]
 
+    action_list = cast("list[object]", actions)
     warnings: list[str] = []
-    for idx, act in enumerate(actions):
+    for idx, act in enumerate(action_list):
         if not isinstance(act, dict):
             warnings.append(
                 f"Hook '{name}': action at index {idx} is not a dictionary."

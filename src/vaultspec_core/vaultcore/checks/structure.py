@@ -16,7 +16,6 @@ from contextlib import nullcontext
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from ..rename_ops import _FRONTMATTER_LINE_BUDGET as _FRONTMATTER_LINE_BUDGET
 from ..rename_ops import rename_document_path as _rename_document_path
 from ..rename_ops import rewrite_incoming_refs as _rewrite_incoming_refs
 from ._base import (
@@ -31,7 +30,7 @@ if TYPE_CHECKING:
     from contextlib import AbstractContextManager
     from pathlib import Path
 
-__all__ = ["check_structure"]
+__all__ = ["check_structure", "ensure_index_directory_tag"]
 
 logger = logging.getLogger(__name__)
 
@@ -190,7 +189,7 @@ _INDEX_TAG = "#index"
 _TAG_ENTRY_RE = re.compile(r"""^\s*-\s*['"]?(#[\w-]+)['"]?\s*$""")
 
 
-def _ensure_index_directory_tag(content: str) -> tuple[str, bool]:
+def ensure_index_directory_tag(content: str) -> tuple[str, bool]:
     """Insert ``#index`` into the YAML ``tags:`` block if missing.
 
     Args:
@@ -264,6 +263,12 @@ def _ensure_index_directory_tag(content: str) -> tuple[str, bool]:
     new_line = f"{tag_indent}- '{_INDEX_TAG}'{newline}"
     new_lines = [*lines[:insert_idx], new_line, *lines[insert_idx:]]
     return "".join(new_lines), True
+
+
+#: Back-compat alias for the pre-existing callers (the index-subfolder
+#: migration and its tests) that import this helper under its original
+#: underscore-prefixed name.
+_ensure_index_directory_tag = ensure_index_directory_tag
 
 
 def _detect_legacy_root_indexes(

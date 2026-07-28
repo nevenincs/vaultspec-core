@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path  # noqa: TC003 - Typer inspects this command annotation.
-from typing import Annotated
+from typing import Annotated, cast
 
 import typer
 
@@ -92,6 +92,7 @@ def cmd_archive_documents(
     console = get_console()
     paths = payload["paths"]
     assert isinstance(paths, list)
+    paths = cast("list[str]", paths)
     if dry_run:
         console.print(
             "[yellow]Dry-run:[/yellow] would archive "
@@ -173,6 +174,7 @@ def cmd_restore_documents(
     console = get_console()
     paths = payload["paths"]
     assert isinstance(paths, list)
+    paths = cast("list[str]", paths)
     if dry_run:
         console.print(
             "[yellow]Dry-run:[/yellow] would restore "

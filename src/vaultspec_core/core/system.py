@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from . import types as _t
-from .config_gen import _is_cli_managed
+from .config_gen import is_cli_managed
 from .helpers import build_file
 from .skills import collect_skills
 from .sync import apply_file_sync
@@ -144,7 +144,7 @@ def system_show() -> dict[str, Any]:
         - ``"targets"``: list of dicts with ``"tool"``, ``"path"``, ``"managed"``.
     """
     parts = collect_system_parts()
-    parts_list = []
+    parts_list: list[dict[str, Any]] = []
     for name, (_path, meta, body) in sorted(parts.items()):
         tool_filter = meta.get("tool", "-")
         line_count = len(body.strip().splitlines()) if body.strip() else 0
@@ -153,13 +153,13 @@ def system_show() -> dict[str, Any]:
         )
 
     ctx = _t.get_context()
-    targets_list = []
+    targets_list: list[dict[str, Any]] = []
     for tool_type, cfg in ctx.tool_configs.items():
         system_file = cfg.system_file
         if system_file is None:
             continue
         rel = str(system_file.relative_to(ctx.target_dir))
-        managed = "CLI-managed" if _is_cli_managed(system_file) else "custom"
+        managed = "CLI-managed" if is_cli_managed(system_file) else "custom"
         targets_list.append({"tool": tool_type.value, "path": rel, "managed": managed})
 
     return {"parts": parts_list, "targets": targets_list}
@@ -200,7 +200,7 @@ def system_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
 
                 if (
                     system_file.exists()
-                    and not _is_cli_managed(system_file)
+                    and not is_cli_managed(system_file)
                     and not force
                 ):
                     logger.warning(

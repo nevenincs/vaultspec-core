@@ -20,15 +20,28 @@ Validates canonical identifiers against the convention ADR's
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from vaultspec_core.plan.checks._base import Finding, Severity
 from vaultspec_core.plan.identifiers import extract_inventory
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from vaultspec_core.plan.parser import Plan
 
 __all__ = ["check_identifiers"]
+
+
+class _HasLineNumber(Protocol):
+    """Structural type for the container rows ``_detect_duplicates`` indexes.
+
+    :class:`~vaultspec_core.plan.parser.Step`, :class:`Phase`, and
+    :class:`Wave` all carry a ``line_number`` field but share no common
+    base class; this protocol lets one helper accept any of them.
+    """
+
+    line_number: int
 
 
 _RE_UNDERPADDED_HEADING_ID = re.compile(
@@ -254,7 +267,7 @@ def _detect_duplicates(
     identifiers: list[str],
     *,
     kind: str,
-    line_lookup: list,
+    line_lookup: Sequence[_HasLineNumber],
 ) -> list[Finding]:
     """Yield one Finding per duplicate canonical identifier."""
     counts: dict[str, list[int]] = {}

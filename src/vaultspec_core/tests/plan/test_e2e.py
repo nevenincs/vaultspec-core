@@ -10,12 +10,16 @@ that the round-trip preserves canonical identifiers.
 from __future__ import annotations
 
 import random
+from typing import TYPE_CHECKING
 
 import pytest
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
 from vaultspec_core.tests.plan._factories import make_clean_plan
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @pytest.fixture()
@@ -24,7 +28,7 @@ def runner() -> CliRunner:
     return CliRunner(env={"NO_COLOR": "1"})
 
 
-def test_status_command_reports_clean_plan(tmp_path, runner: CliRunner) -> None:
+def test_status_command_reports_clean_plan(tmp_path: Path, runner: CliRunner) -> None:
     """``vault plan status`` exits cleanly and reports the declared tier."""
     rng = random.Random(0)
     spec = make_clean_plan("L2", rng=rng, phases=2, steps=3)
@@ -38,7 +42,7 @@ def test_status_command_reports_clean_plan(tmp_path, runner: CliRunner) -> None:
     assert "Steps" in result.stdout
 
 
-def test_status_json_output_is_valid_json(tmp_path, runner: CliRunner) -> None:
+def test_status_json_output_is_valid_json(tmp_path: Path, runner: CliRunner) -> None:
     """``vault plan status --json`` emits a parseable payload."""
     import json
 
@@ -58,7 +62,7 @@ def test_status_json_output_is_valid_json(tmp_path, runner: CliRunner) -> None:
     assert payload["wave_count"] == 1
 
 
-def test_check_command_clean_plan_exits_zero(tmp_path, runner: CliRunner) -> None:
+def test_check_command_clean_plan_exits_zero(tmp_path: Path, runner: CliRunner) -> None:
     """``vault plan check`` on a clean plan exits with status 0."""
     rng = random.Random(2)
     spec = make_clean_plan("L1", rng=rng, steps=2)
@@ -70,7 +74,7 @@ def test_check_command_clean_plan_exits_zero(tmp_path, runner: CliRunner) -> Non
     assert result.exit_code == 0
 
 
-def test_check_text_output_surfaces_fix_hint(tmp_path, runner: CliRunner) -> None:
+def test_check_text_output_surfaces_fix_hint(tmp_path: Path, runner: CliRunner) -> None:
     """`vault plan check` text output must surface a finding's fix hint,
     labelled autofix/manual - it used to be reachable only via --json."""
     body = (
@@ -99,7 +103,9 @@ def test_check_text_output_surfaces_fix_hint(tmp_path, runner: CliRunner) -> Non
     assert "fix (autofix):" in result.output
 
 
-def test_step_check_toggles_persistence_to_disk(tmp_path, runner: CliRunner) -> None:
+def test_step_check_toggles_persistence_to_disk(
+    tmp_path: Path, runner: CliRunner
+) -> None:
     """``vault plan step check`` mutates the file on disk; round-trip preserves ids."""
     from vaultspec_core.plan.parser import parse_plan
 
@@ -120,7 +126,9 @@ def test_step_check_toggles_persistence_to_disk(tmp_path, runner: CliRunner) -> 
     assert untouched.checked is False
 
 
-def test_query_open_filter_lists_uncompleted_steps(tmp_path, runner: CliRunner) -> None:
+def test_query_open_filter_lists_uncompleted_steps(
+    tmp_path: Path, runner: CliRunner
+) -> None:
     """``vault plan query --open`` lists every open Step in the plan."""
     rng = random.Random(4)
     spec = make_clean_plan("L1", rng=rng, steps=4)
@@ -134,7 +142,7 @@ def test_query_open_filter_lists_uncompleted_steps(tmp_path, runner: CliRunner) 
     assert "Matched 3 of 4" in result.stdout
 
 
-def test_query_json_emits_parseable_payload(tmp_path, runner: CliRunner) -> None:
+def test_query_json_emits_parseable_payload(tmp_path: Path, runner: CliRunner) -> None:
     """``vault plan query --json`` is machine-readable, matching the
     ``--json`` coverage its sibling ``vault plan status`` already has."""
     import json
@@ -157,7 +165,7 @@ def test_query_json_emits_parseable_payload(tmp_path, runner: CliRunner) -> None
     assert all(s["checked"] is False for s in payload["steps"])
 
 
-def test_tier_show_reports_canonical_tier(tmp_path, runner: CliRunner) -> None:
+def test_tier_show_reports_canonical_tier(tmp_path: Path, runner: CliRunner) -> None:
     """``vault plan tier show`` prints the declared tier."""
     rng = random.Random(5)
     spec = make_clean_plan("L4", rng=rng, waves=1, phases=1, steps=1)
@@ -190,7 +198,7 @@ def test_help_lists_plan_subcommands(runner: CliRunner) -> None:
         assert verb in output, f"help text missing {verb!r}: {output}"
 
 
-def test_step_add_appends_new_canonical_id(tmp_path, runner: CliRunner) -> None:
+def test_step_add_appends_new_canonical_id(tmp_path: Path, runner: CliRunner) -> None:
     """``vault plan step add`` allocates the next-available S## and persists it."""
     from vaultspec_core.plan.parser import parse_plan
 
@@ -220,7 +228,7 @@ def test_step_add_appends_new_canonical_id(tmp_path, runner: CliRunner) -> None:
     assert plan.steps[-1].action == "draft the connector module"
 
 
-def test_step_remove_retires_id_through_cli(tmp_path, runner: CliRunner) -> None:
+def test_step_remove_retires_id_through_cli(tmp_path: Path, runner: CliRunner) -> None:
     """``vault plan step remove`` retires the id; round-trip preserves retirement."""
     from vaultspec_core.plan.identifiers import next_available_step
     from vaultspec_core.plan.parser import parse_plan
@@ -241,7 +249,9 @@ def test_step_remove_retires_id_through_cli(tmp_path, runner: CliRunner) -> None
     assert next_available_step(plan) == "S05"
 
 
-def test_step_remove_unknown_id_emits_clean_error(tmp_path, runner: CliRunner) -> None:
+def test_step_remove_unknown_id_emits_clean_error(
+    tmp_path: Path, runner: CliRunner
+) -> None:
     """A typed handler error renders as ``error: ...`` plus exit 1, not a traceback.
 
     Regression for the H-NEW-2 finding: every mutating wrapper now applies the
@@ -264,7 +274,9 @@ def test_step_remove_unknown_id_emits_clean_error(tmp_path, runner: CliRunner) -
     assert "Traceback" not in combined
 
 
-def test_tier_promote_rejects_missing_phase_flags(tmp_path, runner: CliRunner) -> None:
+def test_tier_promote_rejects_missing_phase_flags(
+    tmp_path: Path, runner: CliRunner
+) -> None:
     """L1 -> L2 promotion without --phase-title / --phase-intent must refuse.
 
     The CLI does not silently substitute ``TODO: Phase title`` placeholders
@@ -284,7 +296,7 @@ def test_tier_promote_rejects_missing_phase_flags(tmp_path, runner: CliRunner) -
     assert "TODO: Phase title" not in plan_path.read_text(encoding="utf-8")
 
 
-def test_tier_promote_advances_one_step(tmp_path, runner: CliRunner) -> None:
+def test_tier_promote_advances_one_step(tmp_path: Path, runner: CliRunner) -> None:
     """``vault plan tier promote`` advances the tier and synthesises a Phase wrapper."""
     from vaultspec_core.plan.parser import parse_plan
 
@@ -316,7 +328,7 @@ def test_tier_promote_advances_one_step(tmp_path, runner: CliRunner) -> None:
 
 
 def test_cli_repairs_manually_duplicated_step_with_display_path(
-    tmp_path,
+    tmp_path: Path,
     runner: CliRunner,
 ) -> None:
     """Manual duplicate Step ids are repairable through display-path targeting."""
@@ -378,7 +390,7 @@ def test_cli_repairs_manually_duplicated_step_with_display_path(
 
 
 def test_cli_stable_insertion_uses_alpha_suffixes_for_waves_and_phases(
-    tmp_path,
+    tmp_path: Path,
     runner: CliRunner,
 ) -> None:
     """Wave and Phase insertions use lowercase alpha suffixes, never Step suffixes."""
@@ -474,7 +486,7 @@ def test_cli_stable_insertion_uses_alpha_suffixes_for_waves_and_phases(
     assert "S03" in reparsed.retired_step_ids
 
 
-def test_unexpected_retirement_check_direct(tmp_path) -> None:
+def test_unexpected_retirement_check_direct(tmp_path: Path) -> None:
     """Verify that unexpected retirement check raises PlanCommandError.
 
     Tests calling _save_plan_or_dry_run directly.
@@ -521,7 +533,7 @@ related: []
     assert "S01" in str(exc_info.value)
 
 
-def test_resolve_vault_root_from_plan_path_under_docs_dir(tmp_path) -> None:
+def test_resolve_vault_root_from_plan_path_under_docs_dir(tmp_path: Path) -> None:
     """``_resolve_vault_root`` derives the root from a plan under ``.vault/plan/``.
 
     Regression for issue #157: the mutation verbs never initialise the
@@ -537,7 +549,7 @@ def test_resolve_vault_root_from_plan_path_under_docs_dir(tmp_path) -> None:
     assert _resolve_vault_root(plan_path) == tmp_path.resolve()
 
 
-def test_step_check_in_empty_context_exits_zero(tmp_path) -> None:
+def test_step_check_in_empty_context_exits_zero(tmp_path: Path) -> None:
     """A mutation verb run with no workspace context must still exit 0.
 
     Regression for issue #157: every ``vault plan`` mutation verb performed
@@ -571,7 +583,9 @@ def test_step_check_in_empty_context_exits_zero(tmp_path) -> None:
     assert target.checked is True
 
 
-def test_invalidate_graph_cache_for_plan_drops_cache_without_context(tmp_path) -> None:
+def test_invalidate_graph_cache_for_plan_drops_cache_without_context(
+    tmp_path: Path,
+) -> None:
     """The post-save hook drops the right cache file even with no context."""
     import contextvars
 
@@ -582,7 +596,7 @@ def test_invalidate_graph_cache_for_plan_drops_cache_without_context(tmp_path) -
     plan_path.parent.mkdir(parents=True, exist_ok=True)
     plan_path.write_text("# cache plan\n", encoding="utf-8")
 
-    def _seed_and_invalidate():
+    def _seed_and_invalidate() -> Path:
         cache_file = cache_path(tmp_path)
         cache_file.parent.mkdir(parents=True, exist_ok=True)
         cache_file.write_text("{}", encoding="utf-8")

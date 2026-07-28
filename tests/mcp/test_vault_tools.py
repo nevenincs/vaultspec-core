@@ -1,4 +1,4 @@
-"""Tests for the MCP ``find`` vault tool using a real FastMCP server.
+"""Tests for the MCP ``find`` vault tool using a real MCPServer.
 
 The batch ``create`` and ``edit`` tools are covered by
 ``tests/unit/mcp_server/test_create_tool.py`` and ``test_edit_tool.py``.
@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from mcp.shared.memory import create_connected_server_and_client_session
+from mcp import Client
 
 from vaultspec_core.config import reset_config
 from vaultspec_core.core.types import init_paths
@@ -33,9 +33,9 @@ def _vault_doc(doc_type: str, feature: str, date: str, heading: str = "") -> str
 def _data(result) -> Any:
     """Extract Python object from a CallToolResult."""
     error_texts = [c.text for c in result.content if hasattr(c, "text")]
-    assert not result.isError, f"Tool returned error: {error_texts}"
-    if result.structuredContent is not None:
-        sc = result.structuredContent
+    assert not result.is_error, f"Tool returned error: {error_texts}"
+    if result.structured_content is not None:
+        sc = result.structured_content
         if isinstance(sc, dict) and list(sc.keys()) == ["result"]:
             return sc["result"]
         return sc
@@ -79,7 +79,7 @@ async def test_find_lists_features_when_no_args(vault_root):
         _vault_doc("plan", "feat-a", "2026-03-06", "# Plan A")
     )
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("find", {})
         features = _data(result)
         assert isinstance(features, list)
@@ -99,7 +99,7 @@ async def test_find_json_returns_enriched_metadata(vault_root):
         _vault_doc("plan", "rich-feat", "2026-03-06", "# Plan")
     )
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("find", {"json": True})
         features = _data(result)
         feat = next((f for f in features if f["name"] == "rich-feat"), None)
@@ -115,7 +115,7 @@ async def test_find_by_feature(vault_root):
         _vault_doc("adr", "my-feat", "2026-03-06", "# ADR")
     )
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("find", {"feature": "my-feat"})
         docs = _data(result)
         assert len(docs) >= 1
@@ -131,7 +131,7 @@ async def test_find_by_type(vault_root):
         _vault_doc("plan", "typed-feat", "2026-03-06")
     )
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("find", {"type": ["plan"]})
         docs = _data(result)
         assert all(d["type"] == "plan" for d in docs)
@@ -146,7 +146,7 @@ async def test_find_excludes_exec_by_default(vault_root):
         _vault_doc("exec", "exc-feat", "2026-03-06")
     )
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("find", {"feature": "exc-feat"})
         docs = _data(result)
         types = {d["type"] for d in docs}
@@ -160,7 +160,7 @@ async def test_find_includes_exec_when_explicit(vault_root):
         _vault_doc("exec", "exp-feat", "2026-03-06")
     )
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("find", {"type": ["exec"]})
         docs = _data(result)
         assert len(docs) >= 1
@@ -174,7 +174,7 @@ async def test_find_with_body(vault_root):
         + "\nSome body content.\n"
     )
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("find", {"feature": "body-feat", "body": True})
         docs = _data(result)
         assert len(docs) >= 1
@@ -192,7 +192,7 @@ async def test_find_respects_limit(vault_root):
         _vault_doc("adr", "lim-b", "2026-03-06")
     )
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("find", {"type": ["adr"], "limit": 1})
         docs = _data(result)
         assert len(docs) == 1

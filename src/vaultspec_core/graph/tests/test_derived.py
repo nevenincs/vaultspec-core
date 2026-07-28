@@ -52,11 +52,11 @@ class TestReciprocitySignal:
         _write(vault / "plan" / "recip-y.md", ["#plan", "#feat-y"], '  - "[[recip-x]]"')
         return VaultGraph(tmp_path)
 
-    def test_reciprocity_score_is_one(self, tmp_path):
+    def test_reciprocity_score_is_one(self, tmp_path: Path) -> None:
         edge = _edge_map(self._graph(tmp_path))[("recip-x", "recip-y")]
         assert edge.signals["reciprocity"] == 1.0
 
-    def test_reciprocity_is_the_only_signal(self, tmp_path):
+    def test_reciprocity_is_the_only_signal(self, tmp_path: Path) -> None:
         edge = _edge_map(self._graph(tmp_path))[("recip-x", "recip-y")]
         # Two mutually-linked nodes are each other's only neighbour, so they
         # have no common neighbour: the undirected Jaccard is 0 and no
@@ -64,7 +64,7 @@ class TestReciprocitySignal:
         # reciprocity is the sole relatedness signal.
         assert set(edge.signals) == {"reciprocity"}
 
-    def test_reciprocity_weight_is_exact(self, tmp_path):
+    def test_reciprocity_weight_is_exact(self, tmp_path: Path) -> None:
         edge = _edge_map(self._graph(tmp_path))[("recip-x", "recip-y")]
         assert edge.weight == COEFF_RECIPROCITY * 1.0
         assert edge.kind == "reciprocity"
@@ -73,7 +73,7 @@ class TestReciprocitySignal:
 class TestSharedFeatureSignal:
     """Two documents in the same feature fire shared-feature."""
 
-    def test_shared_feature_score_is_one(self, tmp_path):
+    def test_shared_feature_score_is_one(self, tmp_path: Path) -> None:
         vault = tmp_path / ".vault"
         (vault / "adr").mkdir(parents=True)
         (vault / "plan").mkdir()
@@ -99,11 +99,11 @@ class TestSharedTagSignal:
         _write(vault / "plan" / "st-b.md", ["#plan", "#feat-shared", "#topic-x"])
         return VaultGraph(tmp_path)
 
-    def test_shared_tag_counts_the_shared_semantic_tag(self, tmp_path):
+    def test_shared_tag_counts_the_shared_semantic_tag(self, tmp_path: Path) -> None:
         edge = _edge_map(self._graph(tmp_path))[("st-a", "st-b")]
         assert edge.signals["shared_tag"] == 1.0
 
-    def test_shared_feature_and_tag_compose_exactly(self, tmp_path):
+    def test_shared_feature_and_tag_compose_exactly(self, tmp_path: Path) -> None:
         edge = _edge_map(self._graph(tmp_path))[("st-a", "st-b")]
         # The pair shares the feature and one extra semantic tag.
         assert edge.signals["shared_feature"] == 1.0
@@ -135,23 +135,25 @@ class TestLinkPredictionAndCoCitation:
         _write(vault / "plan" / "doc-b.md", ["#plan", "#feat-h"])
         return VaultGraph(tmp_path)
 
-    def test_jaccard_is_one_for_single_shared_neighbour(self, tmp_path):
+    def test_jaccard_is_one_for_single_shared_neighbour(self, tmp_path: Path) -> None:
         edge = _edge_map(self._graph(tmp_path))[("doc-a", "doc-b")]
         # Each cited doc has exactly the hub as its sole neighbour, so the
         # Jaccard coefficient is |{hub}| / |{hub}| = 1.0.
         assert edge.signals["jaccard"] == 1.0
 
-    def test_adamic_adar_is_inverse_log_of_hub_degree(self, tmp_path):
+    def test_adamic_adar_is_inverse_log_of_hub_degree(self, tmp_path: Path) -> None:
         edge = _edge_map(self._graph(tmp_path))[("doc-a", "doc-b")]
         # The single common neighbour (hub) has undirected degree 2, so
         # Adamic-Adar = 1 / ln(2).
         assert edge.signals["adamic_adar"] == 1.0 / math.log(2)
 
-    def test_co_citation_counts_the_single_shared_predecessor(self, tmp_path):
+    def test_co_citation_counts_the_single_shared_predecessor(
+        self, tmp_path: Path
+    ) -> None:
         edge = _edge_map(self._graph(tmp_path))[("doc-a", "doc-b")]
         assert edge.signals["co_citation"] == 1.0
 
-    def test_composed_weight_is_exact_linear_combination(self, tmp_path):
+    def test_composed_weight_is_exact_linear_combination(self, tmp_path: Path) -> None:
         edge = _edge_map(self._graph(tmp_path))[("doc-a", "doc-b")]
         expected = (
             COEFF_SHARED_FEATURE * 1.0
@@ -161,7 +163,7 @@ class TestLinkPredictionAndCoCitation:
         )
         assert edge.weight == expected
 
-    def test_no_self_or_hub_pair_signals_inflate(self, tmp_path):
+    def test_no_self_or_hub_pair_signals_inflate(self, tmp_path: Path) -> None:
         edge = _edge_map(self._graph(tmp_path))[("doc-a", "doc-b")]
         # Exactly the four expected signals fire; reciprocity and shared_tag
         # do not (no mutual edge, no extra shared tag).
@@ -190,23 +192,23 @@ class TestDerivedEdgeDeterminismAndOrdering:
         _write(vault / "plan" / "doc-b.md", ["#plan", "#feat-h"])
         return VaultGraph(tmp_path)
 
-    def test_repeated_computation_is_identical(self, tmp_path):
+    def test_repeated_computation_is_identical(self, tmp_path: Path) -> None:
         graph = self._graph(tmp_path)
         first = [(e.source, e.target, e.weight) for e in compute_derived_edges(graph)]
         second = [(e.source, e.target, e.weight) for e in compute_derived_edges(graph)]
         assert first == second
 
-    def test_edges_sorted_by_descending_weight(self, tmp_path):
+    def test_edges_sorted_by_descending_weight(self, tmp_path: Path) -> None:
         edges = compute_derived_edges(self._graph(tmp_path))
         weights = [e.weight for e in edges]
         assert weights == sorted(weights, reverse=True)
 
-    def test_endpoints_are_sorted_within_each_edge(self, tmp_path):
+    def test_endpoints_are_sorted_within_each_edge(self, tmp_path: Path) -> None:
         edges = compute_derived_edges(self._graph(tmp_path))
         for edge in edges:
             assert edge.source < edge.target
 
-    def test_to_dict_round_trips_fields(self, tmp_path):
+    def test_to_dict_round_trips_fields(self, tmp_path: Path) -> None:
         edge = _edge_map(self._graph(tmp_path))[("doc-a", "doc-b")]
         d = edge.to_dict()
         assert d["source"] == "doc-a"
@@ -243,7 +245,7 @@ class TestScopedComputation:
         _write(vault / "plan" / "doc-d.md", ["#plan", "#feat-h"])
         return VaultGraph(tmp_path)
 
-    def test_scope_emits_only_in_scope_pairs(self, tmp_path):
+    def test_scope_emits_only_in_scope_pairs(self, tmp_path: Path) -> None:
         graph = self._graph(tmp_path)
         scope = {"doc-a", "doc-b"}
         scoped = compute_derived_edges(graph, scope)
@@ -254,7 +256,7 @@ class TestScopedComputation:
             assert edge.source in scope
             assert edge.target in scope
 
-    def test_scope_does_not_enumerate_full_pair_set(self, tmp_path):
+    def test_scope_does_not_enumerate_full_pair_set(self, tmp_path: Path) -> None:
         graph = self._graph(tmp_path)
         # The full computation enumerates every real pair: C(5, 2) = 10 pairs
         # over {hub, doc-a, doc-b, doc-c, doc-d}, all sharing the feature, so
@@ -264,7 +266,9 @@ class TestScopedComputation:
         scoped = compute_derived_edges(graph, {"doc-a", "doc-b"})
         assert len(scoped) == 1
 
-    def test_scope_invariant_signals_match_full_for_the_pair(self, tmp_path):
+    def test_scope_invariant_signals_match_full_for_the_pair(
+        self, tmp_path: Path
+    ) -> None:
         graph = self._graph(tmp_path)
         full = _edge_map(graph)[("doc-a", "doc-b")]
         scoped = {
@@ -278,7 +282,9 @@ class TestScopedComputation:
         assert scoped.signals["co_citation"] == full.signals["co_citation"]
         assert scoped.signals["co_citation"] == 1.0
 
-    def test_projection_relative_signals_differ_under_scope(self, tmp_path):
+    def test_projection_relative_signals_differ_under_scope(
+        self, tmp_path: Path
+    ) -> None:
         graph = self._graph(tmp_path)
         full = _edge_map(graph)[("doc-a", "doc-b")]
         scoped = {
@@ -296,7 +302,7 @@ class TestScopedComputation:
         assert "jaccard" not in scoped.signals
         assert "adamic_adar" not in scoped.signals
 
-    def test_none_scope_is_whole_graph(self, tmp_path):
+    def test_none_scope_is_whole_graph(self, tmp_path: Path) -> None:
         graph = self._graph(tmp_path)
         explicit = [
             (e.source, e.target, e.weight) for e in compute_derived_edges(graph, None)
@@ -325,7 +331,9 @@ class TestScopedToDictExport:
         _write(vault / "adr" / "doc-c.md", ["#adr", "#feat-other"])
         return VaultGraph(tmp_path)
 
-    def test_ego_export_only_carries_in_neighbourhood_derived_edges(self, tmp_path):
+    def test_ego_export_only_carries_in_neighbourhood_derived_edges(
+        self, tmp_path: Path
+    ) -> None:
         graph = self._graph(tmp_path)
         # Ego around doc-a at depth 1 reaches the hub and, through it, doc-b and
         # doc-c.  Every derived edge in the payload must have both endpoints in
@@ -336,7 +344,9 @@ class TestScopedToDictExport:
             assert edge["source"] in exported
             assert edge["target"] in exported
 
-    def test_full_export_derived_count_matches_unscoped_compute(self, tmp_path):
+    def test_full_export_derived_count_matches_unscoped_compute(
+        self, tmp_path: Path
+    ) -> None:
         graph = self._graph(tmp_path)
         data = graph.to_dict()
         assert len(data["derived_edges"]) == len(compute_derived_edges(graph))
@@ -345,7 +355,7 @@ class TestScopedToDictExport:
 class TestDerivedEdgesNeverEnterCanonicalGraph:
     """The canonical DiGraph holds no synthetic relatedness edges."""
 
-    def test_canonical_graph_has_no_derived_edge(self, tmp_path):
+    def test_canonical_graph_has_no_derived_edge(self, tmp_path: Path) -> None:
         vault = tmp_path / ".vault"
         (vault / "research").mkdir(parents=True)
         (vault / "adr").mkdir()

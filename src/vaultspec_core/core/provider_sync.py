@@ -21,7 +21,7 @@ from .exceptions import (
     ProviderNotInstalledError,
     WorkspaceNotInitializedError,
 )
-from .git_artifacts import _has_gitattributes_block, _has_gitignore_block
+from .git_artifacts import has_gitattributes_block, has_gitignore_block
 from .gitattributes import ensure_gitattributes_block
 from .gitignore import (
     ensure_gitignore_block,
@@ -29,12 +29,27 @@ from .gitignore import (
     prune_orphaned_lock_sentinels,
 )
 from .helpers import ensure_dir
-from .install_mode import _stamp_manifest_version_no_downgrade
+from .install_mode import stamp_manifest_version_no_downgrade
 from .manifest import read_manifest, read_manifest_data, write_manifest_data
 from .precommit import _scaffold_precommit
-from .provider_registry import SYNC_PROVIDERS, _rel, _validate_skip
+from .provider_registry import SYNC_PROVIDERS, rel, validate_skip
 
 logger = logging.getLogger(__name__)
+
+#: Re-exported (with underscore intact) for :mod:`vaultspec_core.core.commands`,
+#: which is the single public import surface for sync orchestration.
+__all__ = [
+    "_SYNC_PROVIDER_TOOLS",
+    "_backfill_structures",
+    "_empty_sync_results",
+    "_mcp_sync_pass",
+    "_reconcile_gitattributes_opt_out",
+    "_reconcile_gitignore_opt_out",
+    "_reconcile_precommit_management",
+    "_run_all_syncs",
+    "_stamp_last_synced",
+    "_sync_all_providers",
+]
 
 # Single-provider sync targets mapped to the tool they narrow the context to.
 _SYNC_PROVIDER_TOOLS: dict[str, Tool] = {
@@ -86,7 +101,7 @@ def _backfill_structures(*, skip: set[str], dry_run: bool) -> _t.SyncResult:
         for directory in structural:
             if directory.exists():
                 continue
-            result.items.append((_rel(target, directory).replace("\\", "/"), "[ADD]"))
+            result.items.append((rel(target, directory).replace("\\", "/"), "[ADD]"))
             result.added += 1
             if not dry_run:
                 ensure_dir(directory)
@@ -206,7 +221,7 @@ def _reconcile_gitignore_opt_out(target_dir: Path) -> None:
     mdata = read_manifest_data(target_dir)
     if not mdata.gitignore_managed:
         return
-    if _has_gitignore_block(target_dir / ".gitignore"):
+    if has_gitignore_block(target_dir / ".gitignore"):
         ensure_gitignore_block(target_dir, get_recommended_entries(target_dir))
         return
     mdata.gitignore_managed = False
@@ -218,7 +233,7 @@ def _reconcile_gitattributes_opt_out(target_dir: Path) -> None:
     mdata = read_manifest_data(target_dir)
     if not mdata.gitattributes_managed:
         return
-    if _has_gitattributes_block(target_dir / ".gitattributes"):
+    if has_gitattributes_block(target_dir / ".gitattributes"):
         ensure_gitattributes_block(target_dir)
         return
     mdata.gitattributes_managed = False
@@ -236,7 +251,7 @@ def _stamp_last_synced(target_dir: Path, candidates: Iterable[str]) -> None:
             continue
         mdata.provider_state.setdefault(name, {})
         mdata.provider_state[name]["last_synced"] = now
-    _stamp_manifest_version_no_downgrade(mdata)
+    stamp_manifest_version_no_downgrade(mdata)
     write_manifest_data(target_dir, mdata)
 
 
@@ -334,7 +349,7 @@ def sync_provider(
             f"Valid: {', '.join(sorted(SYNC_PROVIDERS))}"
         )
 
-    skip = _validate_skip(skip, allow_core=False)
+    skip = validate_skip(skip, allow_core=False)
 
     ctx = _t.get_context()
 

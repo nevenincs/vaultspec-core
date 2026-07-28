@@ -379,7 +379,7 @@ def render_dry_run_tree(items: Sequence[DryRunItem], *, title: str = "Preview") 
 
     # Summary line
     by_status = count_by_status(list(items))
-    parts = []
+    parts: list[str] = []
     for status in DryRunStatus:
         count = by_status.get(status, 0)
         if count:

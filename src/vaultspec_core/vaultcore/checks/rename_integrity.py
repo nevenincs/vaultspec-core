@@ -7,7 +7,7 @@ frontmatter 'name' keys.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ...core.helpers import atomic_write, build_file
 from ...core.resources import resource_rename
@@ -214,7 +214,7 @@ def _read_resource_metadata(
     file_path: Path,
     root_dir: Path,
     result: CheckResult,
-) -> tuple[dict, str] | None:
+) -> tuple[dict[str, Any], str] | None:
     """Read and parse a resource file's frontmatter, recording errors on failure."""
     from ..parser import parse_frontmatter
 
@@ -257,7 +257,7 @@ def _describe_fix(
 
 def _apply_filename_wins_fix(
     file_path: Path,
-    meta: dict,
+    meta: dict[str, Any],
     body: str,
     expected_name: str,
     label: str,

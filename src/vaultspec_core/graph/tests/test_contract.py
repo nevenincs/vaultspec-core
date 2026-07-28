@@ -7,7 +7,8 @@ without a corresponding schema version bump.
 """
 
 import json
-from typing import Any
+from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -102,7 +103,7 @@ class TestGraphEnvelopeV2Contract:
     and should be rejected until the schema version is bumped.
     """
 
-    def test_schema_string(self, vault_root):
+    def test_schema_string(self, vault_root: Path) -> None:
         """Envelope schema must be exactly vaultspec.vault.graph.v2."""
         graph = VaultGraph(vault_root)
         envelope = json_envelope(
@@ -113,7 +114,7 @@ class TestGraphEnvelopeV2Contract:
         )
         assert envelope["schema"] == "vaultspec.vault.graph.v2"
 
-    def test_envelope_top_level_keys(self, vault_root):
+    def test_envelope_top_level_keys(self, vault_root: Path) -> None:
         """Envelope has exactly schema, status, and data."""
         graph = VaultGraph(vault_root)
         envelope = json_envelope(
@@ -124,7 +125,7 @@ class TestGraphEnvelopeV2Contract:
         )
         assert frozenset(envelope.keys()) == _EXPECTED_ENVELOPE_KEYS
 
-    def test_status_key_present(self, vault_root):
+    def test_status_key_present(self, vault_root: Path) -> None:
         """Status field is present and non-empty."""
         graph = VaultGraph(vault_root)
         envelope = json_envelope(
@@ -135,7 +136,7 @@ class TestGraphEnvelopeV2Contract:
         )
         assert envelope["status"] == "unchanged"
 
-    def test_data_keys(self, vault_root):
+    def test_data_keys(self, vault_root: Path) -> None:
         """data payload has exactly the expected top-level keys."""
         graph = VaultGraph(vault_root)
         envelope = json_envelope(
@@ -146,9 +147,10 @@ class TestGraphEnvelopeV2Contract:
         )
         data = envelope["data"]
         assert isinstance(data, dict)
+        data = cast("dict[str, object]", data)
         assert frozenset(data.keys()) == _EXPECTED_DATA_KEYS
 
-    def _data(self, vault_root: Any, feature: str | None = None) -> dict[str, Any]:
+    def _data(self, vault_root: Path, feature: str | None = None) -> dict[str, Any]:
         """Build the envelope and return its data payload as a typed dict."""
         graph = VaultGraph(vault_root)
         envelope = json_envelope(
@@ -159,10 +161,10 @@ class TestGraphEnvelopeV2Contract:
         )
         return dict(envelope)
 
-    def test_every_node_has_required_fields(self, vault_root):
+    def test_every_node_has_required_fields(self, vault_root: Path) -> None:
         """Every node dict carries exactly the expected field set."""
         envelope = self._data(vault_root)
-        nodes: list[dict[str, Any]] = envelope["data"]["nodes"]  # type: ignore[index]
+        nodes: list[dict[str, Any]] = envelope["data"]["nodes"]
         assert len(nodes) > 0, "No nodes in graph - corpus generation failed"
         for node in nodes:
             missing = _EXPECTED_NODE_FIELDS - frozenset(node.keys())
@@ -170,10 +172,10 @@ class TestGraphEnvelopeV2Contract:
             assert not missing, f"Node {node.get('id')!r} missing fields: {missing}"
             assert not extra, f"Node {node.get('id')!r} unexpected fields: {extra}"
 
-    def test_every_edge_has_required_fields(self, vault_root):
+    def test_every_edge_has_required_fields(self, vault_root: Path) -> None:
         """Every edge dict carries exactly source and target."""
         envelope = self._data(vault_root)
-        edges: list[dict[str, Any]] = envelope["data"]["edges"]  # type: ignore[index]
+        edges: list[dict[str, Any]] = envelope["data"]["edges"]
         assert len(edges) > 0, "No edges in graph - corpus generation failed"
         for edge in edges:
             missing = _EXPECTED_EDGE_FIELDS - frozenset(edge.keys())
@@ -181,17 +183,17 @@ class TestGraphEnvelopeV2Contract:
             assert not missing, f"Edge {edge!r} missing fields: {missing}"
             assert not extra, f"Edge {edge!r} unexpected fields: {extra}"
 
-    def test_metrics_keys(self, vault_root):
+    def test_metrics_keys(self, vault_root: Path) -> None:
         """metrics dict carries exactly the expected key set."""
         envelope = self._data(vault_root)
-        metrics: dict[str, Any] = envelope["data"]["metrics"]  # type: ignore[index]
+        metrics: dict[str, Any] = envelope["data"]["metrics"]
         assert isinstance(metrics, dict)
         missing = _EXPECTED_METRICS_KEYS - frozenset(metrics.keys())
         extra = frozenset(metrics.keys()) - _EXPECTED_METRICS_KEYS
         assert not missing, f"metrics missing keys: {missing}"
         assert not extra, f"metrics unexpected keys: {extra}"
 
-    def test_envelope_is_json_serialisable(self, vault_root):
+    def test_envelope_is_json_serialisable(self, vault_root: Path) -> None:
         """Entire envelope round-trips through json.dumps / json.loads."""
         graph = VaultGraph(vault_root)
         envelope = json_envelope(
@@ -204,28 +206,29 @@ class TestGraphEnvelopeV2Contract:
         parsed = json.loads(serialised)
         assert parsed["schema"] == "vaultspec.vault.graph.v2"
 
-    def test_directed_graph_flag(self, vault_root):
+    def test_directed_graph_flag(self, vault_root: Path) -> None:
         """data.directed must be True - the graph is directed."""
         envelope = self._data(vault_root)
-        data: dict[str, Any] = envelope["data"]  # type: ignore[index]
+        data: dict[str, Any] = envelope["data"]
         assert data["directed"] is True
 
-    def test_metrics_max_degree_shape(self, vault_root):
+    def test_metrics_max_degree_shape(self, vault_root: Path) -> None:
         """max_in_degree and max_out_degree are {node, count} dicts."""
         envelope = self._data(vault_root)
-        metrics: dict[str, Any] = envelope["data"]["metrics"]  # type: ignore[index]
+        metrics: dict[str, Any] = envelope["data"]["metrics"]
         for field_name in ("max_in_degree", "max_out_degree"):
             value = metrics[field_name]
             assert isinstance(value, dict), f"{field_name} must be a dict"
+            value = cast("dict[str, object]", value)
             assert frozenset(value.keys()) == frozenset({"node", "count"}), (
                 f"{field_name} must have exactly 'node' and 'count' keys"
             )
 
-    def test_feature_scoped_envelope_shape(self, vault_root):
+    def test_feature_scoped_envelope_shape(self, vault_root: Path) -> None:
         """Feature-scoped to_dict also produces the full v2 shape."""
         envelope = self._data(vault_root, feature="editor-demo")
         assert envelope["schema"] == "vaultspec.vault.graph.v2"
-        data: dict[str, Any] = envelope["data"]  # type: ignore[index]
+        data: dict[str, Any] = envelope["data"]
         assert data["feature"] == "editor-demo"
         # Nodes in a feature-scoped graph are all tagged with the feature
         nodes: list[dict[str, Any]] = data["nodes"]

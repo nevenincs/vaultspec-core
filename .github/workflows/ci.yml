@@ -121,13 +121,10 @@ jobs:
         if: always()
         run: just lint size
 
-      # ADVISORY, not gating: strict typing reports annotation debt spread
-      # across nearly every module. `continue-on-error` keeps the burndown
-      # visible in the job log without blocking merges, and this step becomes a
-      # real gate - by deleting that key - once the count reaches zero.
-      - name: Strict types (advisory)
+      # Strict typing's burndown reached zero, so this step is a real gate:
+      # a regression fails the job like every other lint dimension here.
+      - name: Strict types
         if: always()
-        continue-on-error: true
         run: just lint type-strict
 
   code-health:

@@ -76,7 +76,7 @@ def migrate(workspace: Path) -> MigrationResult:
             version.
     """
     from ..config import get_config
-    from ..vaultcore.checks.structure import _ensure_index_directory_tag
+    from ..vaultcore.checks.structure import ensure_index_directory_tag
 
     cfg = get_config()
     docs_dir = workspace / cfg.docs_dir
@@ -134,7 +134,7 @@ def migrate(workspace: Path) -> MigrationResult:
                 f"index_subfolder: failed to read {legacy}: {exc}"
             ) from exc
 
-        new_content, changed = _ensure_index_directory_tag(content)
+        new_content, changed = ensure_index_directory_tag(content)
         try:
             if changed:
                 atomic_write(target, new_content)

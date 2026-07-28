@@ -199,4 +199,6 @@ def test_mcp_entrypoint_exits_on_immediate_eof_before_any_request(
         proc.kill()
         proc.wait(timeout=5)
         pytest.fail("MCP stdio server did not exit on immediate stdin EOF within 20s.")
-    assert returncode == 0, proc.stderr.read().decode("utf-8", errors="replace")
+    stderr = proc.stderr
+    assert stderr is not None
+    assert returncode == 0, stderr.read().decode("utf-8", errors="replace")

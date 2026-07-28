@@ -4,6 +4,8 @@ Covers ``VaultSummary``, aggregate totals, document-type coverage, feature
 counts, and empty-vault edge cases over vaultcore-backed fixtures.
 """
 
+from pathlib import Path
+
 import pytest
 
 from ...vaultcore import DocType
@@ -32,11 +34,11 @@ class TestGetVaultMetrics:
     Runs against the real fixture vault.
     """
 
-    def test_counts_documents(self, vault_root):
+    def test_counts_documents(self, vault_root: Path) -> None:
         result = get_vault_metrics(vault_root)
         assert result.total_docs > 80
 
-    def test_has_all_doc_types(self, vault_root):
+    def test_has_all_doc_types(self, vault_root: Path) -> None:
         result = get_vault_metrics(vault_root)
         for dt in (
             DocType.ADR,
@@ -48,14 +50,14 @@ class TestGetVaultMetrics:
         ):
             assert result.counts_by_type.get(dt, 0) > 0, f"Missing count for {dt.value}"
 
-    def test_counts_features(self, vault_root):
+    def test_counts_features(self, vault_root: Path) -> None:
         result = get_vault_metrics(vault_root)
         assert result.total_features > 5
 
 
 @pytest.mark.unit
 class TestVaultSummaryEdgeCases:
-    def test_empty_vault_zero_counts(self, tmp_path):
+    def test_empty_vault_zero_counts(self, tmp_path: Path) -> None:
         """Metrics on empty vault return zero counts."""
         vault_dir = tmp_path / ".vault"
         vault_dir.mkdir()
@@ -65,7 +67,7 @@ class TestVaultSummaryEdgeCases:
         assert summary.total_docs == 0
         assert summary.total_features == 0
 
-    def test_single_doc_type_only(self, tmp_path):
+    def test_single_doc_type_only(self, tmp_path: Path) -> None:
         """Vault with only ADRs still returns valid metrics."""
         vault_dir = tmp_path / ".vault" / "adr"
         vault_dir.mkdir(parents=True)
@@ -76,7 +78,7 @@ class TestVaultSummaryEdgeCases:
         summary = get_vault_metrics(tmp_path)
         assert summary.total_docs >= 1
 
-    def test_features_deduplicated(self, vault_root):
+    def test_features_deduplicated(self, vault_root: Path) -> None:
         """Same feature across multiple docs counted once."""
         from ...vaultcore.scanner import list_features
 

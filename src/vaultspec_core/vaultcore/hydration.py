@@ -448,7 +448,7 @@ def _inject_extra_tags(content: str, extra_tags: list[str]) -> str:
     #     - "#adr"
     #     - "#feature"
     # We want to insert after the last - "..." line in the tags block
-    tag_lines = []
+    tag_lines: list[str] = []
     for tag in extra_tags:
         normalized = tag if tag.startswith("#") else f"#{tag}"
         tag_lines.append(f'  - "{normalized}"')

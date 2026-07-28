@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from typing import TYPE_CHECKING
 
 import pytest
 from typer.testing import CliRunner
@@ -18,16 +19,21 @@ from vaultspec_core.cli import app
 from vaultspec_core.core.gitignore import MARKER_BEGIN, MARKER_END
 from vaultspec_core.core.manifest import read_manifest_data
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 pytestmark = [pytest.mark.integration]
 
 
 @pytest.fixture
-def runner():
+def runner() -> CliRunner:
     return CliRunner(env={"NO_COLOR": "1"})
 
 
 class TestCorruptedManifestFullRepair:
-    def test_sync_force_repairs_corrupted_manifest_and_syncs(self, tmp_path, runner):
+    def test_sync_force_repairs_corrupted_manifest_and_syncs(
+        self, tmp_path: Path, runner: CliRunner
+    ):
         """Install, corrupt manifest, sync --force, verify repair."""
         # 1. Clean install
         (tmp_path / ".gitignore").write_text("# user\n", encoding="utf-8")
@@ -52,7 +58,9 @@ class TestCorruptedManifestFullRepair:
 
 
 class TestOrphanedProviderRecovery:
-    def test_orphaned_provider_rescaffolded_on_sync(self, tmp_path, runner):
+    def test_orphaned_provider_rescaffolded_on_sync(
+        self, tmp_path: Path, runner: CliRunner
+    ):
         """Delete provider dir (orphan in manifest), sync, verify."""
         # 1. Clean install
         (tmp_path / ".gitignore").write_text("# user\n", encoding="utf-8")
@@ -81,7 +89,9 @@ class TestOrphanedProviderRecovery:
 
 
 class TestUntrackedDirectoryAdoption:
-    def test_pre_existing_claude_dir_adopted_on_install(self, tmp_path, runner):
+    def test_pre_existing_claude_dir_adopted_on_install(
+        self, tmp_path: Path, runner: CliRunner
+    ):
         """Create .claude/ before install, verify it's adopted into manifest."""
         # 1. Create .claude/ with some user content BEFORE install
         (tmp_path / ".claude" / "rules").mkdir(parents=True)
@@ -103,7 +113,9 @@ class TestUntrackedDirectoryAdoption:
 
 
 class TestGitignoreCorruptionRepair:
-    def test_corrupted_gitignore_block_repaired_on_sync(self, tmp_path, runner):
+    def test_corrupted_gitignore_block_repaired_on_sync(
+        self, tmp_path: Path, runner: CliRunner
+    ):
         """Corrupt the gitignore block (orphaned marker), sync, verify repair."""
         # 1. Clean install
         (tmp_path / ".gitignore").write_text("# user\n", encoding="utf-8")
@@ -127,7 +139,9 @@ class TestGitignoreCorruptionRepair:
 
 
 class TestFullLifecycleRecovery:
-    def test_install_corrupt_doctor_repair_doctor(self, tmp_path, runner):
+    def test_install_corrupt_doctor_repair_doctor(
+        self, tmp_path: Path, runner: CliRunner
+    ):
         """Complete lifecycle proving the system can diagnose, repair, and verify."""
         # 1. Install
         (tmp_path / ".gitignore").write_text("# user\n", encoding="utf-8")
@@ -185,7 +199,7 @@ class TestFullLifecycleRecovery:
 
 
 class TestMultipleCorruptions:
-    def test_multiple_corruptions_all_repaired(self, tmp_path, runner):
+    def test_multiple_corruptions_all_repaired(self, tmp_path: Path, runner: CliRunner):
         """Corrupt manifest + gitignore + delete dir, sync repairs all."""
         # 1. Install
         (tmp_path / ".gitignore").write_text("# user\n", encoding="utf-8")
@@ -224,7 +238,9 @@ class TestMultipleCorruptions:
 
 
 class TestInstallUninstallReinstall:
-    def test_full_install_uninstall_reinstall_cycle(self, tmp_path, runner):
+    def test_full_install_uninstall_reinstall_cycle(
+        self, tmp_path: Path, runner: CliRunner
+    ):
         """Prove the full lifecycle leaves a clean workspace."""
         (tmp_path / ".gitignore").write_text("# user\n", encoding="utf-8")
 

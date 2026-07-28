@@ -30,9 +30,9 @@ import json
 import logging
 import subprocess
 import sys
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
@@ -43,7 +43,7 @@ from ..isolation import isolated_context as _isolated_context
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server.mcpserver import MCPServer
 
 logger = logging.getLogger(__name__)
 
@@ -342,7 +342,7 @@ def _render_flags(flag_lookup: Any, arguments: dict[str, Any]) -> list[str]:
             msg = f"unknown flag {flag_name!r} for this verb"
             raise ValueError(msg)
         if declared.takes_value:
-            values = value if isinstance(value, list) else [value]
+            values = cast("list[object]", value) if isinstance(value, list) else [value]
             for item in values:
                 rendered.append(flag_name)
                 rendered.append(str(item))
@@ -361,7 +361,7 @@ def _parse_verb(verb: str) -> tuple[str, ...]:
 # ---------------------------------------------------------------------------
 
 
-def register_gateway_tools(mcp: FastMCP) -> None:
+def register_gateway_tools(mcp: MCPServer[None]) -> None:
     """Register the ``discover`` and ``invoke`` gateway tools on *mcp*.
 
     ``discover`` is read-only and idempotent: a search never mutates the vault.
@@ -371,18 +371,20 @@ def register_gateway_tools(mcp: FastMCP) -> None:
     structured output through their typed return models.
 
     Args:
-        mcp: The :class:`~mcp.server.fastmcp.FastMCP` instance to decorate.
+        mcp: The :class:`~mcp.server.mcpserver.MCPServer` instance to decorate.
     """
 
     @mcp.tool(
         annotations=ToolAnnotations(
-            readOnlyHint=True,
-            idempotentHint=True,
-            openWorldHint=False,
+            read_only_hint=True,
+            idempotent_hint=True,
+            open_world_hint=False,
         ),
     )
     @_isolated_context
-    async def discover(ctx: Context, query: str, limit: int = 10) -> DiscoverResult:
+    async def discover(
+        ctx: Context[Any, Any], query: str, limit: int = 10
+    ) -> DiscoverResult:
         """Search the long-tail verb catalog and return ranked schemas.
 
         Ranks every cataloged verb against ``query`` across its path and
@@ -392,14 +394,16 @@ def register_gateway_tools(mcp: FastMCP) -> None:
         addressable by ``invoke`` - the static denylist is already applied.
 
         Args:
-            ctx: The MCP request context.
+            ctx: The MCP request context (unused; logging routes through the
+                module logger instead of the deprecated client-facing channel).
             query: The free-text search string (verb words, an intent phrase).
             limit: The maximum number of ranked verbs to return.
 
         Returns:
             The :class:`DiscoverResult` with ranked verbs and their schemas.
         """
-        await ctx.info(f"discover: query={query!r} limit={limit}")
+        _ = ctx
+        logger.info("discover: query=%r limit=%d", query, limit)
         catalog = _load_catalog(_reference_path())
         ranked = catalog.search(query, limit=limit)
         verbs = [
@@ -431,15 +435,15 @@ def register_gateway_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         annotations=ToolAnnotations(
-            readOnlyHint=False,
-            destructiveHint=True,
-            idempotentHint=False,
-            openWorldHint=False,
+            read_only_hint=False,
+            destructive_hint=True,
+            idempotent_hint=False,
+            open_world_hint=False,
         ),
     )
     @_isolated_context
     async def invoke(
-        ctx: Context,
+        ctx: Context[Any, Any],
         verb: str,
         arguments: dict[str, Any] | None = None,
         positionals: list[str] | None = None,
@@ -455,7 +459,8 @@ def register_gateway_tools(mcp: FastMCP) -> None:
         a structured error payload while remaining a successful call.
 
         Args:
-            ctx: The MCP request context.
+            ctx: The MCP request context (unused; logging routes through the
+                module logger instead of the deprecated client-facing channel).
             verb: The space-joined verb path, e.g. ``"vault list"``.
             arguments: The verb's flags as a mapping (``feature`` -> value);
                 value-taking flags may pass a list to repeat, boolean flags
@@ -478,6 +483,7 @@ def register_gateway_tools(mcp: FastMCP) -> None:
                 verb's declared arguments - surfaced as a protocol error before
                 any process is spawned.
         """
+        _ = ctx
         verb_path = _parse_verb(verb)
         catalog = _load_catalog(_reference_path())
 
@@ -500,9 +506,11 @@ def register_gateway_tools(mcp: FastMCP) -> None:
             ordered_positionals,
             root_dir,
         )
-        await ctx.info(
-            f"invoke: verb={verb!r} json={entry.supports_json} "
-            f"positionals={len(ordered_positionals)}"
+        logger.info(
+            "invoke: verb=%r json=%s positionals=%d",
+            verb,
+            entry.supports_json,
+            len(ordered_positionals),
         )
 
         command = ["vaultspec-core", *argv[argv.index("--target") :]]
@@ -518,7 +526,7 @@ def register_gateway_tools(mcp: FastMCP) -> None:
                 check=False,
             )
         except subprocess.TimeoutExpired:
-            await ctx.warning(f"invoke: verb={verb!r} timed out after {timeout}s")
+            logger.warning("invoke: verb=%r timed out after %ss", verb, timeout)
             return InvokeResult(
                 verb=entry.verb,
                 ok=False,

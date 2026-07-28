@@ -20,6 +20,8 @@ import typer
 from vaultspec_core.cli._target import TargetOption, apply_target
 
 if TYPE_CHECKING:
+    from typing import Any
+
     import typer as _typer
     from rich.console import Console
 
@@ -206,7 +208,7 @@ def _plan_cells(plan: PlanInFlight) -> list[str]:
     return cells
 
 
-def _rollup_payload(rollup: Rollup) -> dict:
+def _rollup_payload(rollup: Rollup) -> dict[str, Any]:
     """Shape a :class:`Rollup` into the JSON envelope's data mapping."""
     import dataclasses
 
@@ -335,7 +337,7 @@ def _emit_status_rollup(
     _emit_status_hints(_STATUS_ROLLUP_HINTS, json_output=False, no_hints=no_hints)
 
 
-def _plan_trace_payload(plan: PlanTrace) -> dict:
+def _plan_trace_payload(plan: PlanTrace) -> dict[str, Any]:
     """Shape a :class:`PlanTrace` into the JSON envelope's data mapping."""
     import dataclasses
 

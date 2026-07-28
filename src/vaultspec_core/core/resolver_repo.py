@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _resolve_gitignore(
+def resolve_gitignore(
     plan: ResolutionPlan,
     signal: GitignoreSignal,
     action: CliAction,
@@ -78,18 +78,13 @@ def _resolve_gitignore(
         # Uninstall doesn't need entries that aren't there.
         return
 
-    if signal == GitignoreSignal.PARTIAL and action == CliAction.UNINSTALL:
-        # Partial entries during uninstall: the managed block will be
-        # removed by the uninstall command.
-        return
-
 
 # ---------------------------------------------------------------------------
 # Gitattributes rules
 # ---------------------------------------------------------------------------
 
 
-def _resolve_gitattributes(
+def resolve_gitattributes(
     plan: ResolutionPlan,
     signal: GitattributesSignal,
     action: CliAction,
@@ -138,9 +133,6 @@ def _resolve_gitattributes(
     ):
         return
 
-    if signal == GitattributesSignal.PARTIAL and action == CliAction.UNINSTALL:
-        return
-
     # All GitattributesSignal values are handled above.
     logger.warning("Unknown GitattributesSignal member: %s (action=%s)", signal, action)
 
@@ -176,7 +168,7 @@ _PRECOMMIT_INERT_SIGNALS = (
 )
 
 
-def _resolve_precommit(
+def resolve_precommit(
     plan: ResolutionPlan,
     signal: PrecommitSignal,
     action: CliAction,
@@ -216,3 +208,11 @@ def _resolve_precommit(
         return
 
     logger.warning("Unknown PrecommitSignal member: %s (action=%s)", signal, action)
+
+
+# Backward-compatible private aliases: ``core/resolver.py`` and its tests
+# (outside this round's scope) still import these by their original
+# underscore names. New callers should prefer the public names above.
+_resolve_gitignore = resolve_gitignore
+_resolve_gitattributes = resolve_gitattributes
+_resolve_precommit = resolve_precommit

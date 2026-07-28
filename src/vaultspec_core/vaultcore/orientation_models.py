@@ -17,7 +17,7 @@ from __future__ import annotations
 import datetime as _dt
 import re
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .models import parse_lenient_date
 
@@ -257,7 +257,7 @@ class Rollup:
     recently_completed: list[PlanInFlight]
     recent_documents: dict[str, list[RecentDocument]]
     exec_activity: list[ExecActivity]
-    totals: dict
+    totals: dict[str, Any]
     limit: int
     since_days: int | None
 

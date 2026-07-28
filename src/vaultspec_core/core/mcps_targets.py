@@ -15,6 +15,10 @@ from .enums import McpScope, McpTargetFormat, ProviderCapability, Tool
 from .exceptions import VaultSpecError
 from .types import McpTarget
 
+#: Re-exported (with underscore intact) for the sibling ``mcps_*`` modules
+#: that reach into this as the single public import surface for scope coercion.
+__all__ = ["_coerce_scope"]
+
 
 def _coerce_scope(scope: McpScope | str) -> McpScope:
     try:

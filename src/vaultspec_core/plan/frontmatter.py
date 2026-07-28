@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from vaultspec_core.vaultcore.parser import parse_frontmatter
 
@@ -30,6 +30,7 @@ __all__ = [
     "PlanFrontmatter",
     "PlanFrontmatterError",
     "Tier",
+    "is_directory_tag",
     "parse_plan_frontmatter",
 ]
 
@@ -151,7 +152,8 @@ def _coerce_string_list(value: object, *, field_name: str) -> list[str]:
             f"{field_name} must be a YAML list, got {type(value).__name__}",
         )
     coerced: list[str] = []
-    for entry in value:
+    items = cast("list[object]", value)
+    for entry in items:
         if not isinstance(entry, str):
             raise PlanFrontmatterError(
                 f"{field_name} entries must be strings, got {type(entry).__name__}",
@@ -182,7 +184,7 @@ def _require_tag(tags: list[str], required: str) -> None:
 def _require_feature_tag(tags: list[str]) -> None:
     """Raise :class:`PlanFrontmatterError` when no ``#<feature>`` tag exists."""
     for tag in tags:
-        if tag.startswith("#") and tag != "#plan" and not _is_directory_tag(tag):
+        if tag.startswith("#") and tag != "#plan" and not is_directory_tag(tag):
             return
     raise PlanFrontmatterError(
         "tags must include a feature tag (e.g., '#editor-demo')",
@@ -194,6 +196,6 @@ _DIRECTORY_TAGS = frozenset(
 )
 
 
-def _is_directory_tag(tag: str) -> bool:
+def is_directory_tag(tag: str) -> bool:
     """Return ``True`` if ``tag`` is one of the canonical directory tags."""
     return tag in _DIRECTORY_TAGS

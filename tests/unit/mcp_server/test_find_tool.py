@@ -5,13 +5,13 @@ single *global* cap applied to the type-ordered concatenation of results, not
 a per-type quota. The regression guarded is a silent drift where ``limit``
 starts meaning "per type" or the type ordering stops being honored. No mocks,
 stubs, or skips: real documents are scaffolded through the ``create`` tool and
-searched through the ``find`` tool on the real FastMCP server.
+searched through the ``find`` tool on the real MCPServer.
 """
 
 from __future__ import annotations
 
 import pytest
-from mcp.shared.memory import create_connected_server_and_client_session
+from mcp import Client
 
 from vaultspec_core.mcp_server.app import create_server
 
@@ -34,7 +34,7 @@ async def test_find_limit_is_global_and_type_ordered(vault_root):
     ``limit=3`` returns both ``research`` rows plus one ``reference`` row.
     """
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         created = await _create(
             client,
             [

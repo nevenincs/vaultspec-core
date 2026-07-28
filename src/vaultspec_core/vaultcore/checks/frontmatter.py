@@ -101,7 +101,7 @@ def _normalized_date(date_val: str | None) -> tuple[str | None, bool]:
 
 def _existing_tag_lines(yaml_block: str) -> list[str]:
     """Return the verbatim ``tags:`` lines already present in *yaml_block*."""
-    lines = []
+    lines: list[str] = []
     for line in yaml_block.split("\n"):
         stripped = line.strip()
         if stripped.startswith("tags") or (
@@ -113,7 +113,7 @@ def _existing_tag_lines(yaml_block: str) -> list[str]:
 
 def _unknown_key_lines(yaml_block: str) -> list[str]:
     """Return the verbatim lines of every key outside :data:`_KNOWN_KEYS`."""
-    lines = []
+    lines: list[str] = []
     in_unknown_key = False
     for line in yaml_block.split("\n"):
         stripped = line.strip()
@@ -199,7 +199,7 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
     yaml_block = match.group(1)
     body = match.group(2)
     leading_whitespace = content[: len(content) - len(content.lstrip())]
-    fixes_applied = []
+    fixes_applied: list[str] = []
 
     # Parse current state
     from ..parser import parse_vault_metadata

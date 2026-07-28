@@ -38,7 +38,7 @@ def _write_vault_doc(root: Path, doc_type: str, feature: str) -> Path:
 
 
 class TestCheckCodeBoundary:
-    def test_stem_hit_in_source_file_is_warning(self, tmp_path):
+    def test_stem_hit_in_source_file_is_warning(self, tmp_path: Path) -> None:
         _write_vault_doc(tmp_path, "adr", "my-feat")
         src = tmp_path / "src" / "module.py"
         src.parent.mkdir(parents=True)
@@ -53,7 +53,7 @@ class TestCheckCodeBoundary:
         assert STEM in diag.message
         assert diag.path is not None and diag.path.name == "module.py"
 
-    def test_wiki_link_form_is_reported(self, tmp_path):
+    def test_wiki_link_form_is_reported(self, tmp_path: Path) -> None:
         _write_vault_doc(tmp_path, "adr", "my-feat")
         doc = tmp_path / "docs" / "guide.md"
         doc.parent.mkdir(parents=True)
@@ -64,7 +64,7 @@ class TestCheckCodeBoundary:
         assert result.warning_count == 1
         assert STEM in result.diagnostics[0].message
 
-    def test_literal_vault_path_alone_is_not_a_finding(self, tmp_path):
+    def test_literal_vault_path_alone_is_not_a_finding(self, tmp_path: Path) -> None:
         _write_vault_doc(tmp_path, "adr", "my-feat")
         src = tmp_path / "workspace.py"
         src.write_text('VAULT_DIR = root / ".vault"\n', encoding="utf-8")
@@ -73,7 +73,7 @@ class TestCheckCodeBoundary:
 
         assert result.is_clean
 
-    def test_vault_harness_and_provider_dirs_are_excluded(self, tmp_path):
+    def test_vault_harness_and_provider_dirs_are_excluded(self, tmp_path: Path) -> None:
         _write_vault_doc(tmp_path, "adr", "my-feat")
         for dirname in (".vault", ".vaultspec", ".claude", ".gemini", ".agents"):
             f = tmp_path / dirname / "notes.md"
@@ -84,7 +84,7 @@ class TestCheckCodeBoundary:
 
         assert result.is_clean
 
-    def test_feature_filter_narrows_needles(self, tmp_path):
+    def test_feature_filter_narrows_needles(self, tmp_path: Path) -> None:
         _write_vault_doc(tmp_path, "adr", "my-feat")
         _write_vault_doc(tmp_path, "adr", "other-feat")
         src = tmp_path / "module.py"
@@ -93,7 +93,9 @@ class TestCheckCodeBoundary:
         assert check_code_boundary(tmp_path, feature="my-feat").is_clean
         assert check_code_boundary(tmp_path, feature="other-feat").warning_count == 1
 
-    def test_feature_filter_rejects_prefix_and_substring_collisions(self, tmp_path):
+    def test_feature_filter_rejects_prefix_and_substring_collisions(
+        self, tmp_path: Path
+    ) -> None:
         _write_vault_doc(tmp_path, "adr", "my-feat-two")
         src = tmp_path / "module.py"
         src.write_text(f"# {DATE}-my-feat-two-adr\n", encoding="utf-8")
@@ -104,7 +106,7 @@ class TestCheckCodeBoundary:
         assert check_code_boundary(tmp_path, feature="a").is_clean
         assert check_code_boundary(tmp_path, feature="my-feat-two").warning_count == 1
 
-    def test_undecodable_and_oversized_files_are_skipped(self, tmp_path):
+    def test_undecodable_and_oversized_files_are_skipped(self, tmp_path: Path) -> None:
         _write_vault_doc(tmp_path, "adr", "my-feat")
         binary = tmp_path / "blob.bin"
         binary.write_bytes(b"\xff\xfe" + STEM.encode("utf-16-le"))
@@ -118,7 +120,7 @@ class TestCheckCodeBoundary:
 
         assert result.is_clean
 
-    def test_index_stem_is_a_needle(self, tmp_path):
+    def test_index_stem_is_a_needle(self, tmp_path: Path) -> None:
         index = tmp_path / ".vault" / "index" / "my-feat.index.md"
         index.parent.mkdir(parents=True)
         index.write_text(
@@ -133,6 +135,6 @@ class TestCheckCodeBoundary:
 
         assert result.warning_count == 1
 
-    def test_no_vault_means_clean(self, tmp_path):
+    def test_no_vault_means_clean(self, tmp_path: Path) -> None:
         (tmp_path / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
         assert check_code_boundary(tmp_path).is_clean

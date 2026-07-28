@@ -74,7 +74,7 @@ def write_local_config(data: dict[str, Any], target_dir: Path | None = None) -> 
             )
 
     # Serialize to simple TOML format
-    lines = []
+    lines: list[str] = []
     for k, v in sorted(data.items()):
         if isinstance(v, str):
             escaped = v.replace("\\", "\\\\").replace('"', '\\"')
@@ -145,7 +145,7 @@ def resolve_editor(
       4. EDITOR env var
       5. "vi" fallback
     """
-    sources_tried = []
+    sources_tried: list[str] = []
 
     if editor_override:
         sources_tried.append(f"--editor flag ({editor_override!r})")

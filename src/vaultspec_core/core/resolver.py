@@ -18,21 +18,21 @@ from typing import TYPE_CHECKING
 
 from .enums import CliAction
 from .resolver_diagnostics import (
-    _resolve_builtin_version,
-    _resolve_mode_mismatch,
-    _resolve_version_warning,
+    resolve_builtin_version,
+    resolve_mode_mismatch,
+    resolve_version_warning,
 )
 from .resolver_framework import _resolve_framework
 from .resolver_providers import (
-    _resolve_config,
-    _resolve_content,
-    _resolve_manifest_entry,
-    _resolve_provider_dir,
+    resolve_config,
+    resolve_content,
+    resolve_manifest_entry,
+    resolve_provider_dir,
 )
 from .resolver_repo import (
-    _resolve_gitattributes,
-    _resolve_gitignore,
-    _resolve_precommit,
+    resolve_gitattributes,
+    resolve_gitignore,
+    resolve_precommit,
 )
 from .resolver_types import ResolutionPlan, ResolutionStep
 
@@ -93,15 +93,15 @@ def resolve(
         force=force,
         divergent_projections=diagnosis.divergent_projections,
     )
-    _resolve_version_warning(plan, diagnosis)
+    resolve_version_warning(plan, diagnosis)
     # Builtins live directly under .vaultspec/ - framework content. Under
     # `install --upgrade` they are re-seeded unconditionally, so the
     # builtin-version signal must resolve with framework semantics; using
     # prov_action (SYNC) would wrongly tell the operator to pass --force
     # to re-seed something the upgrade is already about to re-seed.
-    _resolve_builtin_version(plan, diagnosis.builtin_version, fw_action, force=force)
-    _resolve_gitignore(plan, diagnosis.gitignore, prov_action, force=force)
-    _resolve_gitattributes(plan, diagnosis.gitattributes, prov_action, force=force)
+    resolve_builtin_version(plan, diagnosis.builtin_version, fw_action, force=force)
+    resolve_gitignore(plan, diagnosis.gitignore, prov_action, force=force)
+    resolve_gitattributes(plan, diagnosis.gitattributes, prov_action, force=force)
 
     # Determine precommit management state from manifest
     pc_managed = True
@@ -137,7 +137,7 @@ def resolve(
                 "Could not resolve render mode for precommit advisory", exc_info=True
             )
 
-    _resolve_precommit(
+    resolve_precommit(
         plan,
         diagnosis.precommit,
         prov_action,
@@ -145,35 +145,35 @@ def resolve(
         precommit_managed=pc_managed,
         expected_entry_prefix=expected_entry_prefix,
     )
-    _resolve_mode_mismatch(plan, diagnosis.mode_mismatch)
+    resolve_mode_mismatch(plan, diagnosis.mode_mismatch)
 
     # Per-provider rules
     for tool, prov_diag in diagnosis.providers.items():
         if provider != "all" and tool.value != provider:
             continue
         name = tool.value
-        _resolve_manifest_entry(
+        resolve_manifest_entry(
             plan,
             prov_diag.manifest_entry,
             name,
             prov_action,
             force=force,
         )
-        _resolve_provider_dir(
+        resolve_provider_dir(
             plan,
             prov_diag.dir_state,
             name,
             prov_action,
             force=force,
         )
-        _resolve_content(
+        resolve_content(
             plan,
             prov_diag.content,
             name,
             prov_action,
             force=force,
         )
-        _resolve_config(
+        resolve_config(
             plan,
             prov_diag.config,
             name,

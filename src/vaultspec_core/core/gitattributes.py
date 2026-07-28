@@ -15,6 +15,10 @@ from .helpers import atomic_write_bytes
 
 logger = logging.getLogger(__name__)
 
+#: Re-exported (with underscore intact) for
+#: :mod:`vaultspec_core.core.diagnosis.collectors_config`.
+__all__ = ["_find_markers"]
+
 MARKER_BEGIN = "# >>> vaultspec-managed (do not edit this block) >>>"
 MARKER_END = "# <<< vaultspec-managed <<<"
 

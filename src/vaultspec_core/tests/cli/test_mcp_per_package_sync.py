@@ -11,7 +11,7 @@ test doubles.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -86,13 +86,13 @@ def _add_companion_definition(root: Path) -> None:
     )
 
 
-def _read_servers(root: Path) -> dict[str, dict]:
+def _read_servers(root: Path) -> dict[str, dict[str, Any]]:
     """Return the ``mcpServers`` map from the workspace ``.mcp.json``."""
     raw = json.loads((root / ".mcp.json").read_text(encoding="utf-8"))
     return raw["mcpServers"]
 
 
-def _expected_entry(mode: InstallMode, package: str, module: str) -> dict:
+def _expected_entry(mode: InstallMode, package: str, module: str) -> dict[str, Any]:
     """The launch a package+module renders to at *mode*, derived from the spec."""
     command, args = render_launch_for_mode(mode, package, module)
     return {"command": command, "args": args}
@@ -302,7 +302,9 @@ class TestFingerprintVerifiedRefresh:
         path = _ownership_path(tmp_path, target.scope)
         state = _read_ownership(path)
         key = _ownership_target_key(target)
-        state["targets"][key]["managed"]["probe"] = None
+        managed = state["targets"][key].get("managed", {})
+        managed["probe"] = None
+        state["targets"][key]["managed"] = managed
         _write_ownership(path, state)
 
         # Change the standard so the entry now differs from its definition.

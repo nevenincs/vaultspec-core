@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from .signals import PrecommitSignal
 
@@ -19,6 +19,13 @@ if TYPE_CHECKING:
     from ..enums import InstallMode
 
 logger = logging.getLogger(__name__)
+
+# ``_observed_precommit_mode`` is consumed by :mod:`.collectors_mode` (the
+# mode-mismatch collector) and re-exported by :mod:`.collectors` under this
+# module's leading-underscore convention for shared-but-internal helpers;
+# the explicit re-export marks that cross-module contract for the type
+# checker.
+__all__ = ["_collect_precommit_yaml_state", "_observed_precommit_mode"]
 
 
 def collect_precommit_state(target: Path) -> PrecommitSignal:
@@ -83,7 +90,7 @@ def _local_precommit_hooks(config_path: Path) -> list[dict[str, object]] | None:
         return None
 
     try:
-        data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        data: object = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     except (yaml.YAMLError, OSError) as exc:
         logger.warning("Cannot read .pre-commit-config.yaml %s: %s", config_path, exc)
         return None
@@ -91,16 +98,22 @@ def _local_precommit_hooks(config_path: Path) -> list[dict[str, object]] | None:
     if not isinstance(data, dict):
         return []
 
-    repos = data.get("repos", [])
+    repos = cast("dict[str, object]", data).get("repos", [])
     if not isinstance(repos, list):
         return []
 
     local_hooks: list[dict[str, object]] = []
-    for repo in repos:
-        if isinstance(repo, dict) and repo.get("repo") == "local":
-            hooks = repo.get("hooks", [])
-            if isinstance(hooks, list):
-                local_hooks.extend(h for h in hooks if isinstance(h, dict))
+    for repo in cast("list[object]", repos):
+        if isinstance(repo, dict):
+            repo_map = cast("dict[str, object]", repo)
+            if repo_map.get("repo") == "local":
+                hooks = repo_map.get("hooks", [])
+                if isinstance(hooks, list):
+                    local_hooks.extend(
+                        cast("dict[str, object]", h)
+                        for h in cast("list[object]", hooks)
+                        if isinstance(h, dict)
+                    )
     return local_hooks
 
 
@@ -120,9 +133,9 @@ def _collect_precommit_yaml_state(target: Path) -> PrecommitSignal:
     if local_hooks is None:
         return PrecommitSignal.NO_FILE
 
-    found_ids = {
+    found_ids = frozenset(
         str(h.get("id")) for h in local_hooks if h.get("id") in CANONICAL_HOOK_IDS
-    }
+    )
 
     if not found_ids:
         return PrecommitSignal.NO_HOOKS

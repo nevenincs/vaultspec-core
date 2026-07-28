@@ -287,8 +287,10 @@ def sync_to_all_tools(
     """
     if dest_path_fn is None:
 
-        def dest_path_fn(dest_dir: Path, name: str) -> Path:
+        def _default_dest_path_fn(dest_dir: Path, name: str) -> Path:
             return dest_dir / name
+
+        dest_path_fn = _default_dest_path_fn
 
     from .manifest import installed_tool_configs
 

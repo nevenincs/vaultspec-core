@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from vaultspec_core.cli import app
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from typer.testing import CliRunner
 
 pytestmark = [pytest.mark.unit]
 
@@ -12,19 +19,19 @@ pytestmark = [pytest.mark.unit]
 class TestMainHelp:
     """Verify that help output is printed for --help, -h, and no-args."""
 
-    def test_help_flag(self, runner, synthetic_project):
+    def test_help_flag(self, runner: CliRunner, synthetic_project: Path) -> None:
         """--help exits 0."""
         result = runner.invoke(app, ["--target", str(synthetic_project), "--help"])
         assert result.exit_code == 0
         assert "vaultspec-core" in result.output
 
-    def test_help_no_args(self, runner, synthetic_project):
+    def test_help_no_args(self, runner: CliRunner, synthetic_project: Path) -> None:
         """No arguments exits 0 and prints help text."""
         result = runner.invoke(app, ["--target", str(synthetic_project)])
         assert result.exit_code == 0
         assert "vaultspec-core" in result.output
 
-    def test_help_h_flag(self, runner, synthetic_project):
+    def test_help_h_flag(self, runner: CliRunner, synthetic_project: Path) -> None:
         """-h is rejected because the CLI only exposes --help."""
         result = runner.invoke(app, ["--target", str(synthetic_project), "-h"])
         assert result.exit_code != 0
@@ -34,7 +41,7 @@ class TestMainHelp:
 class TestMainVersion:
     """Verify --version and -V print the version string."""
 
-    def test_version_long(self, runner, synthetic_project):
+    def test_version_long(self, runner: CliRunner, synthetic_project: Path) -> None:
         """--version exits 0 and output contains the version string."""
         from vaultspec_core.cli_common import get_version
 
@@ -43,7 +50,7 @@ class TestMainVersion:
         assert result.exit_code == 0
         assert expected_version in result.output
 
-    def test_version_short(self, runner, synthetic_project):
+    def test_version_short(self, runner: CliRunner, synthetic_project: Path) -> None:
         """-V exits 0 and prints the same version."""
         from vaultspec_core.cli_common import get_version
 
@@ -56,7 +63,9 @@ class TestMainVersion:
 class TestNamespaceRouting:
     """Verify that namespace commands route to the correct sub-CLI."""
 
-    def test_vault_namespace_help(self, runner, synthetic_project):
+    def test_vault_namespace_help(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """``vaultspec-core vault --help`` exits 0 and shows subcommands."""
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "vault", "--help"]
@@ -65,7 +74,9 @@ class TestNamespaceRouting:
         assert "add" in result.output
         assert "check" in result.output
 
-    def test_spec_namespace_help(self, runner, synthetic_project):
+    def test_spec_namespace_help(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """``vaultspec-core spec --help`` exits 0 and shows subcommands."""
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "spec", "--help"]
@@ -78,7 +89,7 @@ class TestNamespaceRouting:
 class TestSpecCliFallthrough:
     """Verify commands under the spec group are routed correctly."""
 
-    def test_rules_help(self, runner, synthetic_project):
+    def test_rules_help(self, runner: CliRunner, synthetic_project: Path) -> None:
         """``vaultspec-core spec rules --help`` exits 0 and shows rules subcommands."""
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "spec", "rules", "--help"]
@@ -86,14 +97,16 @@ class TestSpecCliFallthrough:
         assert result.exit_code == 0
         assert "list" in result.output
 
-    def test_skills_help(self, runner, synthetic_project):
+    def test_skills_help(self, runner: CliRunner, synthetic_project: Path) -> None:
         """``vaultspec-core spec skills --help`` exits 0."""
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "spec", "skills", "--help"]
         )
         assert result.exit_code == 0
 
-    def test_vault_check_all_runs(self, runner, synthetic_project):
+    def test_vault_check_all_runs(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """``vaultspec-core vault check all`` exits 0 and shows check results."""
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "vault", "check", "all"]
@@ -113,12 +126,16 @@ class TestSpecCliFallthrough:
             f"synthetic corpus warnings did not surface fix hints: {result.output}"
         )
 
-    def test_unknown_command_fails(self, runner, synthetic_project):
+    def test_unknown_command_fails(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """``vaultspec nonexistent`` fails."""
         result = runner.invoke(app, ["--target", str(synthetic_project), "nonexistent"])
         assert result.exit_code != 0
 
-    def test_root_mcp_subcommand_is_unknown(self, runner, synthetic_project):
+    def test_root_mcp_subcommand_is_unknown(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """``vaultspec-core mcp`` is rejected because MCP ships separately."""
         result = runner.invoke(app, ["--target", str(synthetic_project), "mcp"])
         assert result.exit_code != 0

@@ -1,6 +1,6 @@
 """Tests for the discover/invoke gateway against the real installed binary.
 
-Drives the gateway tools over the in-memory FastMCP session on a
+Drives the gateway tools over the in-memory MCPServer client on a
 :class:`WorkspaceFactory`-installed vault, with ``invoke`` spawning the real
 ``vaultspec-core`` module entry (``sys.executable -m vaultspec_core``) as an
 argv-list subprocess - no mocks, stubs, or skips. Covers a read-only verb
@@ -14,8 +14,8 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from mcp.server.fastmcp import FastMCP
-from mcp.shared.memory import create_connected_server_and_client_session
+from mcp import Client
+from mcp.server.mcpserver import MCPServer
 
 from vaultspec_core.mcp_server.tools.gateway import register_gateway_tools
 
@@ -24,14 +24,14 @@ from .conftest import data_of, vault_root  # noqa: F401 - re-exported fixture
 pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 
 
-def _gateway_server() -> FastMCP:
-    """Build a FastMCP server exposing only the two gateway tools.
+def _gateway_server() -> MCPServer[None]:
+    """Build an MCPServer exposing only the two gateway tools.
 
     Registering onto a local instance exercises the gateway handlers in
     isolation end-to-end through the same session transport; the full
     nine-tool ``create_server`` wiring is covered by the surface test.
     """
-    mcp = FastMCP(name="vaultspec-mcp-gateway-test")
+    mcp = MCPServer(name="vaultspec-mcp-gateway-test")
     register_gateway_tools(mcp)
     return mcp
 
@@ -45,7 +45,7 @@ def _error_text(result: Any) -> str:
 async def test_invoke_readonly_verb_returns_parsed_json(vault_root):  # noqa: F811
     """A ``--json``-supporting read-only verb returns parsed structured data."""
     mcp = _gateway_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("invoke", {"verb": "vault list"})
         payload = data_of(result)
         assert payload["ok"] is True
@@ -60,9 +60,9 @@ async def test_invoke_readonly_verb_returns_parsed_json(vault_root):  # noqa: F8
 async def test_invoke_unknown_verb_rejected_before_spawn(vault_root):  # noqa: F811
     """An undeclared verb raises a protocol error and never spawns a process."""
     mcp = _gateway_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("invoke", {"verb": "totally bogus verb"})
-        assert result.isError
+        assert result.is_error
         text = _error_text(result)
         assert "unknown verb" in text
 
@@ -70,10 +70,10 @@ async def test_invoke_unknown_verb_rejected_before_spawn(vault_root):  # noqa: F
 async def test_invoke_denied_verb_rejected_before_spawn(vault_root):  # noqa: F811
     """Denylisted verbs are rejected before any spawn at the invoke boundary."""
     mcp = _gateway_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         for verb in ("uninstall", "vault feature index", "spec mcps add"):
             result = await client.call_tool("invoke", {"verb": verb})
-            assert result.isError, verb
+            assert result.is_error, verb
             text = _error_text(result)
             assert "denylist" in text or "out of scope" in text, verb
 
@@ -81,7 +81,7 @@ async def test_invoke_denied_verb_rejected_before_spawn(vault_root):  # noqa: F8
 async def test_invoke_nonzero_exit_folds_stderr(vault_root):  # noqa: F811
     """A verb that runs and exits non-zero folds stderr into the error payload."""
     mcp = _gateway_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         # ``vault plan status`` requires a positional PATH; omitting it makes the
         # real binary exit non-zero with a usage error on stderr.
         result = await client.call_tool("invoke", {"verb": "vault plan status"})
@@ -96,11 +96,11 @@ async def test_invoke_nonzero_exit_folds_stderr(vault_root):  # noqa: F811
 async def test_invoke_reserved_flag_rejected(vault_root):  # noqa: F811
     """A caller cannot shadow the server-managed ``--json`` / ``--target``."""
     mcp = _gateway_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool(
             "invoke", {"verb": "vault list", "arguments": {"json": True}}
         )
-        assert result.isError
+        assert result.is_error
         text = _error_text(result)
         assert "reserved" in text
 
@@ -108,11 +108,11 @@ async def test_invoke_reserved_flag_rejected(vault_root):  # noqa: F811
 async def test_invoke_unknown_flag_rejected(vault_root):  # noqa: F811
     """An argument naming an undeclared flag is rejected before spawn."""
     mcp = _gateway_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool(
             "invoke", {"verb": "vault list", "arguments": {"nonesuch": "x"}}
         )
-        assert result.isError
+        assert result.is_error
         text = _error_text(result)
         assert "unknown flag" in text
 
@@ -120,7 +120,7 @@ async def test_invoke_unknown_flag_rejected(vault_root):  # noqa: F811
 async def test_invoke_value_flag_passed_through(vault_root):  # noqa: F811
     """A declared value flag reaches the binary as a discrete argv item."""
     mcp = _gateway_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool(
             "invoke",
             {"verb": "vault list", "arguments": {"feature": "no-such-feature"}},
@@ -140,7 +140,7 @@ async def test_invoke_positional_verb_runs_end_to_end(vault_root):  # noqa: F811
     scaffold the document and exit clean.
     """
     mcp = _gateway_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool(
             "invoke",
             {
@@ -171,13 +171,13 @@ async def test_invoke_positional_verb_runs_end_to_end(vault_root):  # noqa: F811
 async def test_invoke_rejects_positional_for_argless_verb(vault_root):  # noqa: F811
     """A positional supplied to a verb that declares none is rejected pre-spawn."""
     mcp = _gateway_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         # ``vault stats`` declares no positional arguments; a stray operand
         # is refused by catalog validation before any process spawns.
         result = await client.call_tool(
             "invoke", {"verb": "vault stats", "positionals": ["stray"]}
         )
-        assert result.isError
+        assert result.is_error
         text = _error_text(result)
         assert "no positional" in text
 
@@ -191,7 +191,7 @@ async def test_invoke_rejects_dash_leading_positional(vault_root):  # noqa: F811
     reserved or unknown flag ride in through the operand slot.
     """
     mcp = _gateway_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         for smuggled in ("--json", "-x", "--target"):
             result = await client.call_tool(
                 "invoke",
@@ -201,7 +201,7 @@ async def test_invoke_rejects_dash_leading_positional(vault_root):  # noqa: F811
                     "arguments": {"feature": "dash-probe"},
                 },
             )
-            assert result.isError, smuggled
+            assert result.is_error, smuggled
             text = _error_text(result)
             assert "begins with '-'" in text or "must not look like options" in text, (
                 smuggled,
@@ -215,7 +215,7 @@ async def test_invoke_rejects_dash_leading_positional(vault_root):  # noqa: F811
 async def test_discover_returns_ranked_schemas(vault_root):  # noqa: F811
     """``discover`` ranks a known verb first and returns its parameter schema."""
     mcp = _gateway_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("discover", {"query": "list vault documents"})
         payload = data_of(result)
         assert payload["count"] >= 1
@@ -233,7 +233,7 @@ async def test_discover_returns_ranked_schemas(vault_root):  # noqa: F811
 async def test_discover_excludes_denylisted_verbs(vault_root):  # noqa: F811
     """A denied verb never appears in discover results."""
     mcp = _gateway_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool(
             "discover", {"query": "feature index generate", "limit": 50}
         )

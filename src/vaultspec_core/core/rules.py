@@ -52,20 +52,24 @@ def collect_rules(
     # Rule sources are flat after sanitization; reduce any residual nested key
     # (e.g. a basename collision the flattener could not resolve) to its
     # basename so the collected name is always the flat rule name.
-    sources = {}
+    sources: dict[str, tuple[Path, dict[str, Any], str]] = {}
     for k, v in raw_sources.items():
         sources[k.replace("\\", "/").rsplit("/", 1)[-1]] = v
     return sources
 
 
-def transform_rule(tool: Tool, name: str, _meta: dict[str, Any], body: str) -> str:
+def transform_rule(
+    tool: Tool | str, name: str, _meta: dict[str, Any], body: str
+) -> str:
     """Transform a rule definition for a specific tool destination.
 
     Adds a YAML frontmatter block with ``trigger: always_on`` and a ``name``
     key derived from the filename stem.
 
     Args:
-        tool: Target :class:`~vaultspec_core.core.enums.Tool`.
+        tool: Target :class:`~vaultspec_core.core.enums.Tool`, or its ``.value``
+            string (the ``transform_fn`` callback contract this satisfies
+            passes an untyped first argument; accept either shape).
         name: Source filename (stem used as rule name).
         _meta: Original frontmatter dict (unused; overridden by generated meta).
         body: Markdown body of the rule source file.
@@ -73,8 +77,10 @@ def transform_rule(tool: Tool, name: str, _meta: dict[str, Any], body: str) -> s
     Returns:
         Rendered file content with generated YAML frontmatter prepended.
     """
-    if isinstance(tool, str):
-        tool = Tool(tool)
+    # ``Tool`` is a ``StrEnum``, so a caller-supplied ``Tool`` member already
+    # satisfies ``isinstance(tool, str)`` - normalising unconditionally is
+    # equivalent to the old guarded form and covers a raw ``.value`` string.
+    tool = Tool(tool)
 
     fm: dict[str, Any] = {}
     fm["name"] = Path(name).stem
@@ -342,8 +348,8 @@ def rule_promote(
     import datetime as _dt
     import re
 
+    from ..config import get_config
     from ..vaultcore import (
-        VaultConstants,
         parse_vault_metadata,
         refresh_modified_stamp,
     )
@@ -352,7 +358,7 @@ def rule_promote(
     # 1. Locate the originating audit document
     target_dir = _t.get_context().target_dir
     audit_stem = from_audit[:-3] if from_audit.endswith(".md") else from_audit
-    docs_dir = VaultConstants._get_docs_dir()
+    docs_dir = get_config().docs_dir
     audit_file = target_dir / docs_dir / "audit" / f"{audit_stem}.md"
     if not audit_file.exists():
         raise ResourceNotFoundError(

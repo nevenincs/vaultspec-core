@@ -1,24 +1,30 @@
 """Tests for install command behavior."""
 
+from __future__ import annotations
+
 import json
+from typing import TYPE_CHECKING
 
 import pytest
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture
-def runner():
+def runner() -> CliRunner:
     return CliRunner()
 
 
 class TestProviderRegistry:
     """The provider vocabulary derives from one source (the Tool enum)."""
 
-    def test_provider_sets_derive_from_tool_enum(self):
+    def test_provider_sets_derive_from_tool_enum(self) -> None:
         from vaultspec_core.core.commands import (
             _PROVIDER_TO_TOOLS,
             SYNC_PROVIDERS,
@@ -38,13 +44,17 @@ class TestProviderRegistry:
 
 
 class TestInstallForce:
-    def test_install_without_force_fails_if_exists(self, tmp_path, runner):
+    def test_install_without_force_fails_if_exists(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         """Without --force, install must fail if .vaultspec/ exists."""
         (tmp_path / ".vaultspec").mkdir()
         result = runner.invoke(app, ["-t", str(tmp_path), "install"])
         assert result.exit_code != 0
 
-    def test_install_force_proceeds_if_exists(self, tmp_path, runner):
+    def test_install_force_proceeds_if_exists(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         """--force allows reinstall over existing .vaultspec/."""
         (tmp_path / ".vaultspec").mkdir()
         result = runner.invoke(app, ["-t", str(tmp_path), "install", "--force"])
@@ -53,8 +63,8 @@ class TestInstallForce:
             assert "already installed" not in result.output.lower()
 
     def test_install_api_refuses_success_when_native_mcp_reconciliation_fails(
-        self, tmp_path
-    ):
+        self, tmp_path: Path
+    ) -> None:
         """A native-store parse failure is a typed install failure, not success."""
         from vaultspec_core.core.commands import install_run
         from vaultspec_core.core.exceptions import VaultSpecError
@@ -68,8 +78,8 @@ class TestInstallForce:
             install_run(tmp_path, provider="claude", force=True)
 
     def test_install_cli_exits_nonzero_when_native_mcp_reconciliation_fails(
-        self, tmp_path, runner
-    ):
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         """The CLI exposes the native-store failure and exits non-zero."""
         (tmp_path / ".mcp.json").write_text("not valid json", encoding="utf-8")
 
@@ -84,7 +94,9 @@ class TestInstallForce:
 
 
 class TestInstallJson:
-    def test_install_json_stdout_is_parseable(self, tmp_path, runner):
+    def test_install_json_stdout_is_parseable(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         """JSON mode must not prepend preflight warnings to stdout."""
         result = runner.invoke(app, ["-t", str(tmp_path), "install", "--json"])
 
@@ -95,19 +107,23 @@ class TestInstallJson:
 
 
 class TestInstallDryRun:
-    def test_dry_run_does_not_use_would_wording(self, tmp_path, runner):
+    def test_dry_run_does_not_use_would_wording(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         """--dry-run must NOT use 'Would create:' wording."""
         result = runner.invoke(app, ["-t", str(tmp_path), "install", "--dry-run"])
         assert result.exit_code == 0
         assert "would create" not in result.output.lower()
 
-    def test_dry_run_produces_output(self, tmp_path, runner):
+    def test_dry_run_produces_output(self, tmp_path: Path, runner: CliRunner) -> None:
         """--dry-run must produce tree output."""
         result = runner.invoke(app, ["-t", str(tmp_path), "install", "--dry-run"])
         assert result.exit_code == 0
         assert len(result.output.strip()) > 0
 
-    def test_dry_run_lists_individual_provider_files(self, synthetic_project, runner):
+    def test_dry_run_lists_individual_provider_files(
+        self, synthetic_project: Path, runner: CliRunner
+    ) -> None:
         """On an installed workspace, the preview lists provider files, not just dirs.
 
         Regression for the sparse install --dry-run output: provider work was
@@ -123,7 +139,7 @@ class TestInstallDryRun:
         assert "vaultspec-cli.builtin.md" in result.output
 
 
-def _write_pyproject_with_vaultspec(root, *, section: str) -> None:
+def _write_pyproject_with_vaultspec(root: Path, *, section: str) -> None:
     """Write a pyproject.toml declaring vaultspec-core in *section*.
 
     *section* is one of ``"runtime"`` (``[project.dependencies]``) or ``"dev"``
@@ -158,7 +174,9 @@ class TestDependencyLeakAdvisory:
     silent when the mode is merely read from an existing persisted declaration.
     """
 
-    def test_explicit_dependency_install_warns(self, tmp_path, runner):
+    def test_explicit_dependency_install_warns(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         _write_pyproject_with_vaultspec(tmp_path, section="runtime")
         result = runner.invoke(
             app, ["-t", str(tmp_path), "install", "--mode", "dependency"]
@@ -166,7 +184,9 @@ class TestDependencyLeakAdvisory:
         assert result.exit_code == 0, result.output
         assert _advisory_present(result.output)
 
-    def test_detected_dependency_install_warns(self, tmp_path, runner):
+    def test_detected_dependency_install_warns(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         # No --mode flag: detection resolves dependency mode from the runtime
         # dependency listing, which is still a fresh election.
         _write_pyproject_with_vaultspec(tmp_path, section="runtime")
@@ -174,7 +194,9 @@ class TestDependencyLeakAdvisory:
         assert result.exit_code == 0, result.output
         assert _advisory_present(result.output)
 
-    def test_persisted_dependency_reinstall_is_silent(self, tmp_path, runner):
+    def test_persisted_dependency_reinstall_is_silent(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         # First install elects dependency mode and persists it.
         _write_pyproject_with_vaultspec(tmp_path, section="runtime")
         first = runner.invoke(
@@ -189,12 +211,16 @@ class TestDependencyLeakAdvisory:
         assert second.exit_code == 0, second.output
         assert not _advisory_present(second.output)
 
-    def test_tool_mode_install_is_silent(self, tmp_path, runner):
+    def test_tool_mode_install_is_silent(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         result = runner.invoke(app, ["-t", str(tmp_path), "install", "--mode", "tool"])
         assert result.exit_code == 0, result.output
         assert not _advisory_present(result.output)
 
-    def test_dependency_dry_run_persisted_is_silent(self, tmp_path, runner):
+    def test_dependency_dry_run_persisted_is_silent(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         # install --dry-run on a workspace already declaring dependency mode must
         # not print the advisory (the review's explicit verify criterion).
         _write_pyproject_with_vaultspec(tmp_path, section="runtime")
@@ -209,7 +235,9 @@ class TestDependencyLeakAdvisory:
 
 
 class TestInstallPathSafety:
-    def test_deep_nonexistent_path_rejected(self, tmp_path, runner):
+    def test_deep_nonexistent_path_rejected(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         """Installing to a deeply nested non-existent path must fail."""
         target = tmp_path / "a" / "b" / "c" / "project"
         result = runner.invoke(app, ["-t", str(target), "install"])
@@ -218,7 +246,9 @@ class TestInstallPathSafety:
         # Must NOT have created any directories
         assert not (tmp_path / "a").exists()
 
-    def test_single_level_nonexistent_path_creates_dir(self, tmp_path, runner):
+    def test_single_level_nonexistent_path_creates_dir(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         """Installing to a single-level non-existent path should create it."""
         target = tmp_path / "my-project"
         result = runner.invoke(app, ["-t", str(target), "install"])
@@ -226,7 +256,9 @@ class TestInstallPathSafety:
         assert target.exists()
         assert (target / ".vaultspec").exists()
 
-    def test_dry_run_nonexistent_path_no_side_effects(self, tmp_path, runner):
+    def test_dry_run_nonexistent_path_no_side_effects(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         """Dry-run on a non-existent path must not create the directory."""
         target = tmp_path / "phantom"
         runner.invoke(app, ["-t", str(target), "install", "--dry-run"])
@@ -237,21 +269,25 @@ class TestInstallPathSafety:
 class TestSharingPolicy:
     """install and upgrade state the team-shared gitignore policy."""
 
-    def test_install_prints_sharing_policy(self, tmp_path, runner):
+    def test_install_prints_sharing_policy(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         """A fresh install states the spec-layer sharing policy plainly."""
         result = runner.invoke(app, ["-t", str(tmp_path), "install"])
         assert result.exit_code == 0, result.output
         assert "Sharing policy" in result.output
 
-    def test_dry_run_install_omits_sharing_policy(self, tmp_path, runner):
+    def test_dry_run_install_omits_sharing_policy(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         """A dry-run previews changes; it does not state the policy."""
         result = runner.invoke(app, ["-t", str(tmp_path), "install", "--dry-run"])
         assert result.exit_code == 0
         assert "Sharing policy" not in result.output
 
     def test_upgrade_off_pre_reversal_block_prints_sharing_policy(
-        self, tmp_path, runner
-    ):
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         """Upgrading a workspace still on the pre-reversal policy states it."""
         from vaultspec_core.core.gitignore import MARKER_BEGIN, MARKER_END
 
@@ -268,7 +304,9 @@ class TestSharingPolicy:
         assert result.exit_code == 0, result.output
         assert "Sharing policy" in result.output
 
-    def test_upgrade_of_current_workspace_omits_sharing_policy(self, tmp_path, runner):
+    def test_upgrade_of_current_workspace_omits_sharing_policy(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
         """Re-upgrading an already-team-shared workspace stays quiet."""
         runner.invoke(app, ["-t", str(tmp_path), "install"])
 

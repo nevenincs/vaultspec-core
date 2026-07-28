@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _resolve_manifest_entry(
+def resolve_manifest_entry(
     plan: ResolutionPlan,
     signal: ManifestEntrySignal,
     tool_name: str,
@@ -123,7 +123,7 @@ def _resolve_manifest_entry(
 # ---------------------------------------------------------------------------
 
 
-def _resolve_provider_dir(
+def resolve_provider_dir(
     plan: ResolutionPlan,
     signal: ProviderDirSignal,
     tool_name: str,
@@ -185,7 +185,7 @@ def _resolve_provider_dir(
 # ---------------------------------------------------------------------------
 
 
-def _resolve_content(
+def resolve_content(
     plan: ResolutionPlan,
     content: dict[str, ContentSignal],
     tool_name: str,
@@ -262,7 +262,7 @@ _ROOT_CONFIG_LABELS = {
 }
 
 
-def _resolve_config(
+def resolve_config(
     plan: ResolutionPlan,
     signal: ConfigSignal,
     tool_name: str,
@@ -318,3 +318,11 @@ def _resolve_config(
     # Config resolution only applies to "sync" action; other actions handled
     # by the main command directly.  All ConfigSignal values covered above.
     logger.warning("Unknown ConfigSignal member: %s (action=%s)", signal, action)
+
+
+#: Backward-compatible aliases for external callers still importing the
+#: previously private names.
+_resolve_manifest_entry = resolve_manifest_entry
+_resolve_provider_dir = resolve_provider_dir
+_resolve_content = resolve_content
+_resolve_config = resolve_config

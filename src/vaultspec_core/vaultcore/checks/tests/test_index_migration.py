@@ -22,20 +22,21 @@ from .._base import Severity
 from ..structure import _ensure_index_directory_tag, check_structure
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
     from pathlib import Path
 
 pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture(autouse=True)
-def _reset_cfg():
+def reset_cfg() -> Generator[None]:
     reset_config()
     yield
     reset_config()
 
 
 @pytest.fixture(autouse=True)
-def _reset_migration_cache():
+def reset_migration_cache() -> Generator[None]:
     """Clear the per-process registry cache so each test starts clean.
 
     ``scan_vault`` short-circuits the migration check after the first
@@ -105,7 +106,7 @@ def _vault_with_minimal_skeleton(vault_root: Path) -> None:
 
 
 class TestEnsureIndexDirectoryTag:
-    def test_inserts_index_tag_into_tags_block(self):
+    def test_inserts_index_tag_into_tags_block(self) -> None:
         before = (
             "---\n"
             "generated: true\n"
@@ -125,7 +126,7 @@ class TestEnsureIndexDirectoryTag:
         closing_fence_idx = after.index("\n---\n", after.index("---\n") + 4)
         assert after.index("'#index'") < closing_fence_idx
 
-    def test_idempotent_when_index_tag_present(self):
+    def test_idempotent_when_index_tag_present(self) -> None:
         content = (
             "---\n"
             "generated: true\n"
@@ -140,7 +141,7 @@ class TestEnsureIndexDirectoryTag:
         assert changed is False
         assert after == content
 
-    def test_preserves_crlf_newline_convention(self):
+    def test_preserves_crlf_newline_convention(self) -> None:
         before = (
             "---\r\n"
             "generated: true\r\n"
@@ -161,7 +162,7 @@ class TestEnsureIndexDirectoryTag:
         without_crlf = after.replace("\r\n", "")
         assert "\n" not in without_crlf
 
-    def test_does_not_treat_index_substring_as_already_present(self):
+    def test_does_not_treat_index_substring_as_already_present(self) -> None:
         # A tag like ``#index-notes`` contains the literal string
         # ``#index`` but is a different tag. A naive substring check
         # would set ``has_index_tag = True`` and skip the mandatory
@@ -185,7 +186,7 @@ class TestEnsureIndexDirectoryTag:
         assert "  - '#index'\n" in after
         assert "  - '#index-notes'\n" in after
 
-    def test_preserves_lf_newline_convention(self):
+    def test_preserves_lf_newline_convention(self) -> None:
         before = (
             "---\n"
             "generated: true\n"
@@ -205,7 +206,7 @@ class TestEnsureIndexDirectoryTag:
 class TestCheckStructureWarnsLegacyIndex:
     """Detection-only branch: the checker must not mutate the workspace."""
 
-    def test_warns_on_legacy_root_index(self, tmp_path):
+    def test_warns_on_legacy_root_index(self, tmp_path: Path) -> None:
         _vault_with_minimal_skeleton(tmp_path)
         legacy = _write_legacy_index(tmp_path, "alpha")
 
@@ -226,7 +227,7 @@ class TestCheckStructureWarnsLegacyIndex:
         )
         assert legacy.exists(), "structure check must never mutate"
 
-    def test_warns_in_fix_mode_too(self, tmp_path):
+    def test_warns_in_fix_mode_too(self, tmp_path: Path) -> None:
         # --fix is for ongoing-hygiene fixes only. Legacy indexes
         # always surface as warnings; mutation is the registry's job.
         _vault_with_minimal_skeleton(tmp_path)
@@ -245,7 +246,9 @@ class TestCheckStructureWarnsLegacyIndex:
             "--fix must not relocate the legacy file; migration moved to the registry"
         )
 
-    def test_canonical_index_under_subfolder_is_not_flagged(self, tmp_path):
+    def test_canonical_index_under_subfolder_is_not_flagged(
+        self, tmp_path: Path
+    ) -> None:
         _vault_with_minimal_skeleton(tmp_path)
         canonical_dir = tmp_path / ".vault" / "index"
         canonical_dir.mkdir(parents=True, exist_ok=True)
@@ -269,7 +272,7 @@ class TestCheckStructureWarnsLegacyIndex:
             "canonical subfolder index must not trigger pending-migration diagnostics"
         )
 
-    def test_no_duplicate_diagnostic(self, tmp_path):
+    def test_no_duplicate_diagnostic(self, tmp_path: Path) -> None:
         # A root-level legacy index must surface exactly one
         # actionable per-file warning. The aggregate
         # validate_vault_structure ``Legacy feature index`` message
@@ -296,7 +299,7 @@ class TestCheckStructureWarnsLegacyIndex:
             "not the pathless aggregate"
         )
 
-    def test_warns_on_misplaced_index_in_typed_subdir(self, tmp_path):
+    def test_warns_on_misplaced_index_in_typed_subdir(self, tmp_path: Path) -> None:
         # An index file misplaced into a typed subdirectory (e.g.
         # ``adr/<feature>.index.md``) was previously a blind spot
         # before #91. The detection must flag it as a pending

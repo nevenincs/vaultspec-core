@@ -10,6 +10,12 @@ from .helpers import advisory_lock, atomic_write_bytes
 
 logger = logging.getLogger(__name__)
 
+# ``_collect_provider_artifacts`` is consumed by
+# :mod:`vaultspec_core.core.uninstall` under this module's leading-underscore
+# convention for shared-but-internal helpers; the explicit re-export marks
+# that cross-module contract for the type checker.
+__all__ = ["_collect_provider_artifacts", "_find_markers"]
+
 MARKER_BEGIN = "# >>> vaultspec-managed (do not edit this block) >>>"
 MARKER_END = "# <<< vaultspec-managed <<<"
 

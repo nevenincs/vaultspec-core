@@ -83,7 +83,7 @@ class GeminiProvider(ExecutionProvider):
         if not rules_dir.exists():
             return ""
 
-        all_rules = []
+        all_rules: list[str] = []
         for rule_file in sorted(rules_dir.glob("*.md")):
             content = rule_file.read_text(encoding="utf-8")
             resolved = resolve_includes(content, rules_dir, root_dir)

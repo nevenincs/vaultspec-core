@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from vaultspec_core.core.diagnosis.diagnosis import (
@@ -25,6 +27,9 @@ from vaultspec_core.core.diagnosis.signals import (
     VersionFloorSignal,
 )
 from vaultspec_core.core.enums import CliAction, PrecommitHook, Tool
+
+if TYPE_CHECKING:
+    from enum import Enum
 
 pytestmark = [pytest.mark.unit]
 
@@ -130,7 +135,7 @@ pytestmark = [pytest.mark.unit]
         ),
     ],
 )
-def test_enum_members(enum_cls, expected_members):
+def test_enum_members(enum_cls: type[Enum], expected_members: set[str]) -> None:
     assert set(enum_cls.__members__) == expected_members
 
 
@@ -144,7 +149,7 @@ def test_enum_members(enum_cls, expected_members):
         (RenameIntegritySignal, "CLEAN", "clean"),
     ],
 )
-def test_enum_string_values(enum_cls, member, value):
+def test_enum_string_values(enum_cls: type[Enum], member: str, value: str) -> None:
     assert enum_cls[member] == value
     assert enum_cls[member].value == value
 

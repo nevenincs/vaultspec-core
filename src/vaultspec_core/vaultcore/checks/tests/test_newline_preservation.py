@@ -25,7 +25,7 @@ pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture(autouse=True)
-def _reset_cfg() -> Generator[None]:
+def reset_cfg() -> Generator[None]:
     reset_config()
     yield
     reset_config()
@@ -37,7 +37,7 @@ def _make_skeleton(root: Path) -> None:
 
 
 class TestFrontmatterFixPreservesNewlines:
-    def test_crlf_file_remains_crlf_after_fix(self, tmp_path):
+    def test_crlf_file_remains_crlf_after_fix(self, tmp_path: Path) -> None:
         _make_skeleton(tmp_path)
         doc = tmp_path / ".vault" / "adr" / "2026-04-30-x-adr.md"
         # Bare ``feature:`` field is what triggers the frontmatter fixer
@@ -54,7 +54,7 @@ class TestFrontmatterFixPreservesNewlines:
         assert b"\n" not in without_crlf
         assert b"\r\n" in raw
 
-    def test_lf_file_remains_lf_after_fix(self, tmp_path):
+    def test_lf_file_remains_lf_after_fix(self, tmp_path: Path) -> None:
         _make_skeleton(tmp_path)
         doc = tmp_path / ".vault" / "adr" / "2026-04-30-y-adr.md"
         doc.write_bytes(b"---\nfeature: beta\ndate: 2026-04-30\n---\n\n# body\n")
@@ -67,7 +67,9 @@ class TestFrontmatterFixPreservesNewlines:
 
 
 class TestAddToRelatedPreservesNewlines:
-    def test_crlf_file_remains_crlf_when_appending_related(self, tmp_path):
+    def test_crlf_file_remains_crlf_when_appending_related(
+        self, tmp_path: Path
+    ) -> None:
         _make_skeleton(tmp_path)
         doc = tmp_path / ".vault" / "plan" / "2026-04-30-z-plan.md"
         doc.write_bytes(
@@ -90,7 +92,9 @@ class TestAddToRelatedPreservesNewlines:
         assert b"\r\n  - '[[added-target]]'" in raw
         assert b'\r\n  - "[[added-target]]"' not in raw
 
-    def test_empty_related_field_expands_with_single_quoted_link(self, tmp_path):
+    def test_empty_related_field_expands_with_single_quoted_link(
+        self, tmp_path: Path
+    ) -> None:
         _make_skeleton(tmp_path)
         doc = tmp_path / ".vault" / "plan" / "2026-04-30-empty-plan.md"
         doc.write_text(

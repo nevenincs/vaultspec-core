@@ -1,11 +1,12 @@
 """Tests for the dangling wiki-link checker."""
 
 import shutil
+from pathlib import Path
 
 import pytest
 
 from ....graph import VaultGraph
-from ....testing import build_synthetic_vault
+from ....testing import CorpusManifest, build_synthetic_vault
 from ....vaultcore.related_surgery import (
     remove_related_entries as _remove_related_entries,
 )
@@ -16,7 +17,7 @@ pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture
-def dangling_vault(tmp_path):
+def dangling_vault(tmp_path: Path) -> CorpusManifest:
     """Synthetic vault with the dangling pathology, exposing the manifest."""
     manifest = build_synthetic_vault(
         tmp_path,
@@ -28,7 +29,7 @@ def dangling_vault(tmp_path):
 
 
 class TestCheckDangling:
-    def test_reports_error_for_each_dangling_link(self, vault_root):
+    def test_reports_error_for_each_dangling_link(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         result = check_dangling(vault_root, graph=graph)
         assert not result.is_clean
@@ -39,7 +40,9 @@ class TestCheckDangling:
         dangling_links = graph.get_dangling_links()
         assert len(result.diagnostics) == len(dangling_links)
 
-    def test_fix_removes_related_entry(self, dangling_vault, tmp_path):
+    def test_fix_removes_related_entry(
+        self, dangling_vault: CorpusManifest, tmp_path: Path
+    ) -> None:
         """Copy the synthetic vault, run fix, verify related entry removed."""
         manifest = dangling_vault
         tmp_vault = tmp_path / "vault-copy"
@@ -57,6 +60,7 @@ class TestCheckDangling:
         broken_stem = detail["target_stem"]
         # The source path is relative to the original root; reconstruct in copy.
         original_source = detail["source_path"]
+        assert isinstance(original_source, Path)
         relative = original_source.relative_to(manifest.root)
         doc_path = tmp_vault / relative
         content = doc_path.read_text(encoding="utf-8")
@@ -64,7 +68,7 @@ class TestCheckDangling:
 
 
 class TestRemoveRelatedEntries:
-    def test_all_dangling_leaves_valid_empty_list(self, tmp_path):
+    def test_all_dangling_leaves_valid_empty_list(self, tmp_path: Path) -> None:
         """Removing every related: entry must leave `related: []`, not a
         bare key that parses as null and corrupts the document."""
         doc = tmp_path / "doc.md"
@@ -89,7 +93,7 @@ class TestRemoveRelatedEntries:
         # must not survive.
         assert "related:\n---" not in content
 
-    def test_surviving_entry_keeps_block_form(self, tmp_path):
+    def test_surviving_entry_keeps_block_form(self, tmp_path: Path) -> None:
         """A related: block that still has a live entry stays a block."""
         doc = tmp_path / "doc.md"
         doc.write_text(

@@ -123,43 +123,50 @@ class _TieredModelRegistry(StrEnum):
 class ClaudeModels(_TieredModelRegistry):
     """Single source of truth for Claude model identifiers.
 
-    Verified against Anthropic's published model lineup (mid-2026): Opus 4.8
-    is the current flagship, with Sonnet 4.6 and Haiku 4.5 as the mid and fast
-    tiers respectively.
+    Verified against Anthropic's published model lineup (2026-07-28): Opus 5
+    is the current flagship and Sonnet 5 the mid tier, both superseding the
+    Claude 4 series (``claude-opus-4-8``, ``claude-sonnet-4-6``). Haiku 4.5
+    remains the current fast tier - the Claude 5 family ships no Haiku.
     """
 
-    HIGH = "claude-opus-4-8"
-    MEDIUM = "claude-sonnet-4-6"
+    HIGH = "claude-opus-5"
+    MEDIUM = "claude-sonnet-5"
     LOW = "claude-haiku-4-5"
 
 
 class GeminiModels(_TieredModelRegistry):
     """Single source of truth for Gemini model identifiers.
 
-    Verified against Google's published Gemini API model list (mid-2026). The
-    prior ``gemini-3-pro-preview`` was shut down 2026-03-09, ``-3-flash-preview``
-    was superseded, and ``gemini-2.5-flash`` is deprecated (shutdown
-    2026-10-16); all three are replaced by the identifiers below.
+    Verified against Google's published Gemini API model list (2026-07-28).
+    ``gemini-3.6-flash`` is the current stable mid tier and
+    ``gemini-3.5-flash-lite`` the current lite tier, superseding
+    ``gemini-3.5-flash`` and ``gemini-3.1-flash-lite`` respectively.
+    ``gemini-3.1-pro-preview`` remains the flagship for the hardest reasoning
+    work; the earlier ``gemini-3-pro-preview`` and ``-3-flash-preview`` are
+    shut down, and ``gemini-2.5-flash`` is deprecated (shutdown 2026-10-16).
     """
 
     HIGH = "gemini-3.1-pro-preview"
-    MEDIUM = "gemini-3.5-flash"
-    LOW = "gemini-3.1-flash-lite"
+    MEDIUM = "gemini-3.6-flash"
+    LOW = "gemini-3.5-flash-lite"
 
 
 class CodexModels(_TieredModelRegistry):
     """Single source of truth for OpenAI Codex model identifiers.
 
-    Verified against OpenAI's published Codex model list (mid-2026). ``gpt-5.5``
-    is the recommended flagship default; the older ``gpt-5-codex`` family is
-    deprecated (API shutdown 2026-07-23) in favour of ``gpt-5.5``. Reasoning
-    depth is controlled separately via the Codex ``model_reasoning_effort``
-    setting rather than a distinct per-tier model identifier.
+    Verified against OpenAI's published Codex model list (2026-07-28). The
+    GPT-5.6 generation replaced the single-flagship-plus-effort-knob shape of
+    ``gpt-5.5`` with a tiered family, each variant occupying its own
+    cost-performance envelope: ``sol`` for the hardest coding work, ``terra``
+    for everyday tasks, ``luna`` for fast, low-cost runs. Reasoning depth is
+    still tuned independently via the Codex ``model_reasoning_effort`` setting.
+    The ``gpt-5.5``/``gpt-5.4`` line remains selectable but is previous
+    generation; ``gpt-5-codex`` is deprecated (API shutdown 2026-07-23).
     """
 
-    HIGH = "gpt-5.5"
-    MEDIUM = "gpt-5.4"
-    LOW = "gpt-5.4-mini"
+    HIGH = "gpt-5.6-sol"
+    MEDIUM = "gpt-5.6-terra"
+    LOW = "gpt-5.6-luna"
 
 
 class AntigravityModels(_TieredModelRegistry):
@@ -175,8 +182,8 @@ class AntigravityModels(_TieredModelRegistry):
     """
 
     HIGH = "gemini-3.1-pro-preview"
-    MEDIUM = "gemini-3.5-flash"
-    LOW = "gemini-3.1-flash-lite"
+    MEDIUM = "gemini-3.6-flash"
+    LOW = "gemini-3.5-flash-lite"
 
 
 ModelRegistry = (

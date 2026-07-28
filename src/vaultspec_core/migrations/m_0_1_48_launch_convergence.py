@@ -66,10 +66,10 @@ def migrate(workspace: Path) -> MigrationResult:
         file never wedges the migration registry.
     """
     from ..core.enums import McpScope
-    from ..core.mcps import _ownership_path, _read_ownership, mcp_sync
+    from ..core.mcps import mcp_sync, ownership_path, read_ownership
 
-    ownership_path = _ownership_path(workspace, McpScope.PROJECT)
-    if not ownership_path.exists():
+    ownership_file = ownership_path(workspace, McpScope.PROJECT)
+    if not ownership_file.exists():
         return MigrationResult(
             name=_NAME,
             target_version=_TARGET_VERSION,
@@ -78,9 +78,9 @@ def migrate(workspace: Path) -> MigrationResult:
         )
 
     try:
-        state = _read_ownership(ownership_path)
+        state = read_ownership(ownership_file)
     except Exception as exc:  # report, never wedge the registry
-        logger.warning("Cannot read MCP ownership state at %s: %s", ownership_path, exc)
+        logger.warning("Cannot read MCP ownership state at %s: %s", ownership_file, exc)
         return MigrationResult(
             name=_NAME,
             target_version=_TARGET_VERSION,
@@ -88,15 +88,14 @@ def migrate(workspace: Path) -> MigrationResult:
             counts={"refreshed": 0, "skipped": 0, "providers": 0},
         )
 
-    providers = sorted(
-        {
-            str(record.get("provider"))
-            for record in state.get("targets", {}).values()
-            if isinstance(record, dict)
-            and record.get("scope") == McpScope.PROJECT.value
-            and record.get("provider")
-        }
-    )
+    providers_seen: set[str] = set()
+    for record in state["targets"].values():
+        if record.get("scope") != McpScope.PROJECT.value:
+            continue
+        provider_value = record.get("provider")
+        if provider_value:
+            providers_seen.add(str(provider_value))
+    providers = sorted(providers_seen)
     if not providers:
         return MigrationResult(
             name=_NAME,

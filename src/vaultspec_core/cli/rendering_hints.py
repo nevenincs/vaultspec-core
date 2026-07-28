@@ -62,7 +62,7 @@ _NEXT_STEP_HINTS: dict[tuple[str, str], tuple[str, str]] = {
 }
 
 
-class SafeDict(dict):
+class SafeDict(dict[str, str]):
     """A dictionary that retains unknown string placeholders for formatting."""
 
     def __missing__(self, key: str) -> str:

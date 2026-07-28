@@ -4,7 +4,7 @@ Builds a real installed vault through the :class:`WorkspaceFactory` unified
 fixture over a stdlib ``tempfile`` root (the repo ``tmp_path`` compat shim is
 deliberately sidestepped), initialises the global path context, and exposes
 a helper to unwrap a ``CallToolResult`` into its structured payload.  No
-mocks, stubs, or skips: every test drives the real FastMCP server over the
+mocks, stubs, or skips: every test drives the real MCPServer over the
 in-memory session transport against the real filesystem.
 """
 
@@ -48,7 +48,7 @@ def data_of(result: Any) -> Any:
     """Unwrap a ``CallToolResult`` into its structured payload.
 
     Asserts the call did not surface a protocol error, then returns the
-    structured content (unwrapping FastMCP's ``{"result": ...}`` envelope
+    structured content (unwrapping MCPServer's ``{"result": ...}`` envelope
     when present).
 
     Args:
@@ -58,8 +58,8 @@ def data_of(result: Any) -> Any:
         The structured Python payload the tool returned.
     """
     error_texts = [c.text for c in result.content if hasattr(c, "text")]
-    assert not result.isError, f"Tool returned error: {error_texts}"
-    sc = result.structuredContent
+    assert not result.is_error, f"Tool returned error: {error_texts}"
+    sc = result.structured_content
     if isinstance(sc, dict) and list(sc.keys()) == ["result"]:
         return sc["result"]
     return sc

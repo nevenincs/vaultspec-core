@@ -24,7 +24,7 @@ from vaultspec_core.plan.identifiers import (
 from vaultspec_core.plan.parser import Phase
 
 if TYPE_CHECKING:
-    from vaultspec_core.plan.parser import Plan
+    from vaultspec_core.plan.parser import Plan, Wave
 
 __all__ = [
     "AddPhaseError",
@@ -451,7 +451,7 @@ def _resolve_wave_for_add(plan: Plan, *, wave_id: str | None):
     raise AddPhaseError(msg)
 
 
-def _locate_phase(plan: Plan, anchor_id: str):
+def _locate_phase(plan: Plan, anchor_id: str) -> tuple[Wave | None, int]:
     """Return (parent Wave or None, index within parent) for ``anchor_id``."""
     if plan.frontmatter.tier is Tier.L2:
         for index, phase in enumerate(plan.phases):
@@ -469,7 +469,7 @@ def _locate_phase(plan: Plan, anchor_id: str):
 
 def _phase_suffix_base(
     plan: Plan,
-    anchor_wave,
+    anchor_wave: Wave | None,
     anchor_index: int,
     anchor_id: str,
     *,

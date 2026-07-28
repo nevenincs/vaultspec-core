@@ -16,6 +16,12 @@ from .resolver_types import ResolutionPlan, ResolutionStep
 
 logger = logging.getLogger(__name__)
 
+# ``_resolve_framework`` is consumed by :mod:`vaultspec_core.core.resolver`
+# under this module's leading-underscore convention for shared-but-internal
+# helpers; the explicit re-export marks that cross-module contract for the
+# type checker.
+__all__ = ["_resolve_framework"]
+
 #: The actions the framework rules act on. An action outside this set falls
 #: through to the unhandled-signal warning, whatever the signal.
 _FRAMEWORK_ACTIONS = (CliAction.INSTALL, CliAction.SYNC, CliAction.UNINSTALL)

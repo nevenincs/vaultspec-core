@@ -35,8 +35,6 @@ from vaultspec_core.plan.parser import (
     parse_plan,
 )
 from vaultspec_core.tests.plan._factories import (
-    PlanSpec,
-    StepSpec,
     corrupt_checkbox,
     corrupt_drop_period,
     corrupt_lowercase_id,
@@ -441,13 +439,3 @@ def test_factory_render_contains_every_step_canonical_id(
 
     for step in spec.steps:
         assert f"`{step.display_path}`" in text
-
-
-def _step_canonical_count(spec: PlanSpec) -> int:
-    """Count canonical Step identifiers in the spec for assertion reuse."""
-    return len({s.canonical_id for s in spec.steps})
-
-
-def _step_action_summary(step: StepSpec) -> str:
-    """Render a Step's action + scope for diagnostic messages in failures."""
-    return f"{step.action}; `{step.scope}`"

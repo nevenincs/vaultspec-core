@@ -121,7 +121,7 @@ def rename_document_path(src: Path, dst: Path) -> bool:
 
     if src.name.lower() == dst.name.lower() and src.name != dst.name:
         try:
-            exact_names = {path.name for path in src.parent.iterdir()}
+            exact_names: set[str] = {path.name for path in src.parent.iterdir()}
         except OSError:
             exact_names = set()
         if dst.name in exact_names:

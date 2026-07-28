@@ -14,9 +14,9 @@ import re
 import shutil
 import subprocess
 import tomllib
-import urllib.error
 import urllib.request
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -106,15 +106,15 @@ class TestRenderClaudeAgent:
 
     def test_explicit_model_wins_over_tier(self):
         # An explicit model overrides the tier-derived default.
-        meta = {"model": "claude-opus-4-8", "tier": "LOW"}
+        meta = {"model": "claude-opus-5", "tier": "LOW"}
         out = _render_claude_agent("x.md", meta, "body")
-        assert _fm(out)["model"] == "claude-opus-4-8"
+        assert _fm(out)["model"] == "claude-opus-5"
 
     @pytest.mark.parametrize(
         ("tier", "expected"),
         [
-            ("HIGH", "claude-opus-4-8"),
-            ("STANDARD", "claude-sonnet-4-6"),
+            ("HIGH", "claude-opus-5"),
+            ("STANDARD", "claude-sonnet-5"),
             ("LOW", "claude-haiku-4-5"),
         ],
     )
@@ -221,17 +221,19 @@ class TestCodexModelResolution:
         return tomllib.loads(rendered)["agents"]["worker"].get("model")
 
     def test_explicit_codex_model_wins_over_tier(self):
-        assert self._model({"codex_model": "gpt-5.5", "tier": "LOW"}) == "gpt-5.5"
+        assert (
+            self._model({"codex_model": "gpt-5.6-sol", "tier": "LOW"}) == "gpt-5.6-sol"
+        )
 
     def test_generic_openai_model_is_reused(self):
-        assert self._model({"model": "gpt-5.4-mini"}) == "gpt-5.4-mini"
+        assert self._model({"model": "gpt-5.6-luna"}) == "gpt-5.6-luna"
 
     @pytest.mark.parametrize(
         ("tier", "expected"),
         [
-            ("HIGH", "gpt-5.5"),
-            ("STANDARD", "gpt-5.4"),
-            ("LOW", "gpt-5.4-mini"),
+            ("HIGH", "gpt-5.6-sol"),
+            ("STANDARD", "gpt-5.6-terra"),
+            ("LOW", "gpt-5.6-luna"),
         ],
     )
     def test_tier_resolves_to_current_model(self, tier: str, expected: str):
@@ -240,7 +242,7 @@ class TestCodexModelResolution:
     def test_non_openai_generic_model_without_tier_yields_no_model(self):
         # A Claude identifier in the generic field is not an OpenAI model and
         # there is no tier to fall back on, so no model key is emitted.
-        assert self._model({"model": "claude-opus-4-8"}) is None
+        assert self._model({"model": "claude-opus-5"}) is None
 
     def test_no_model_without_tier_or_model(self):
         assert self._model({}) is None
@@ -329,6 +331,7 @@ class TestSourceAgentCoverage:
 
         rendered_tools = rendered_meta.get("tools", [])
         assert isinstance(rendered_tools, list)
+        rendered_tools = cast("list[str]", rendered_tools)
         for tool_name in rendered_tools:
             assert tool_name in _GEMINI_TOOL_SET, (
                 f"{agent_path.name}: rendered tool {tool_name!r} is not "

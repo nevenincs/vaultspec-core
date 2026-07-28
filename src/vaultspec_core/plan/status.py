@@ -207,10 +207,10 @@ def _plan_feature(plan: Plan) -> str | None:
     Returns:
         Feature name string, or ``None`` when the plan carries none.
     """
-    from vaultspec_core.plan.frontmatter import _DIRECTORY_TAGS
+    from vaultspec_core.plan.frontmatter import is_directory_tag
 
     for tag in plan.frontmatter.tags:
-        if tag != "#plan" and tag not in _DIRECTORY_TAGS:
+        if tag != "#plan" and not is_directory_tag(tag):
             return tag.lstrip("#")
     return None
 

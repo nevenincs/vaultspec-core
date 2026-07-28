@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path, PurePosixPath
+from typing import cast
 
 from . import types as _t
 from .enums import Tool
@@ -24,7 +25,7 @@ _RULES_HEADER = "## Vaultspec Rules"
 _RULES_PREAMBLE = "You MUST respect these rules at all times:"
 
 
-def _is_cli_managed(path_or_content: str | Path) -> bool:
+def is_cli_managed(path_or_content: str | Path) -> bool:
     """Return ``True`` if a file or string contains a vaultspec managed block.
 
     Detects both old-style ``AUTO-GENERATED`` headers and new-style
@@ -54,6 +55,11 @@ def _is_cli_managed(path_or_content: str | Path) -> bool:
     return "<vaultspec " in content or _t.CONFIG_HEADER in content
 
 
+#: Backward-compatible alias for external callers still importing the
+#: previously private name.
+_is_cli_managed = is_cli_managed
+
+
 def _collect_rule_refs(cfg: ToolConfig) -> list[str]:
     """Scan the rule-reference directory for markdown rule files.
 
@@ -75,7 +81,7 @@ def _collect_rule_refs(cfg: ToolConfig) -> list[str]:
         return []
 
     config_dir = cfg.config_file.parent
-    refs = []
+    refs: list[str] = []
     for rule_file in sorted(rule_ref_dir.glob("*.md")):
         try:
             rel = rule_file.relative_to(config_dir)
@@ -171,8 +177,11 @@ def _render_codex_config_lines(meta: dict[str, object]) -> list[str]:
     for source_key, target_key in list_keys.items():
         value = meta.get(source_key)
         if isinstance(value, list):
+            raw_items = cast("list[object]", value)
             items = [
-                item.strip() for item in value if isinstance(item, str) and item.strip()
+                item.strip()
+                for item in raw_items
+                if isinstance(item, str) and item.strip()
             ]
             if items:
                 rendered_items = ", ".join(_toml_quote(item) for item in items)
@@ -303,7 +312,7 @@ def _sync_managed_md(
     is_new = not path.exists()
     existing = "" if is_new else path.read_text(encoding="utf-8")
     managed = not is_new and (
-        has_block(existing, block_type) or _is_cli_managed(existing) or force
+        has_block(existing, block_type) or is_cli_managed(existing) or force
     )
 
     if not managed:

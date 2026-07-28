@@ -53,11 +53,11 @@ from vaultspec_core.vaultcore.edit_engine import (
     EditError as _EditError,
 )
 from vaultspec_core.vaultcore.edit_engine import (
-    _enforce_blob_hash,
-    _invalidate_cache,
-    _resolve_doc_path,
-    _validate_proposed,
+    enforce_blob_hash,
     execute_edit,
+    invalidate_graph_cache,
+    resolve_document_path,
+    validate_proposed,
 )
 
 if TYPE_CHECKING:
@@ -256,11 +256,11 @@ def _emit(
             )
         errors = data.get("errors")
         if isinstance(errors, list):
-            for err in errors:
+            for err in cast("list[object]", errors):
                 console.print(f"  [red]{err}[/red]")
         checks = data.get("checks")
         if isinstance(checks, list):
-            for raw in checks:
+            for raw in cast("list[object]", checks):
                 diag = cast("dict[str, object]", raw)
                 if diag.get("severity") == "error":
                     console.print(f"  [red]{diag.get('message')}[/red]")
@@ -378,8 +378,8 @@ def _refresh_doc_stamps(paths: list[Path]) -> None:
     """
     from vaultspec_core.vaultcore.models import refresh_modified_stamp
     from vaultspec_core.vaultcore.related_surgery import (
-        _atomic_write_restore,
-        _read_preserve_newlines,
+        atomic_write_restore,
+        read_preserve_newlines,
     )
 
     today = _dt.date.today()
@@ -389,7 +389,7 @@ def _refresh_doc_stamps(paths: list[Path]) -> None:
             continue
         seen.add(path)
         try:
-            text_lf, newline = _read_preserve_newlines(path)
+            text_lf, newline = read_preserve_newlines(path)
         except (OSError, UnicodeDecodeError):
             continue
         stamped = refresh_modified_stamp(text_lf, today)
@@ -397,7 +397,7 @@ def _refresh_doc_stamps(paths: list[Path]) -> None:
             continue
         out = stamped if newline == "\n" else stamped.replace("\n", newline)
         try:
-            _atomic_write_restore(path, out)
+            atomic_write_restore(path, out)
         except OSError as exc:
             import logging
 
@@ -441,7 +441,7 @@ def _execute_rename(
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.blob_hash import git_blob_oid
     from vaultspec_core.vaultcore.checks._base import CheckResult
-    from vaultspec_core.vaultcore.related_surgery import _read_preserve_newlines
+    from vaultspec_core.vaultcore.related_surgery import read_preserve_newlines
     from vaultspec_core.vaultcore.rename_engine import (
         RenameTransaction,
         docs_lock_target,
@@ -454,11 +454,11 @@ def _execute_rename(
     docs_dir = root_dir / get_config().docs_dir
 
     try:
-        old_path = _resolve_doc_path(ref, root_dir)
+        old_path = resolve_document_path(ref, root_dir)
         old_stem = old_path.stem
 
         # Cursory pre-checks, before any mutation.
-        _enforce_blob_hash(old_path, expected_blob_hash)
+        enforce_blob_hash(old_path, expected_blob_hash)
         _validate_target_stem(new_stem)
 
         if new_stem == old_stem:
@@ -549,12 +549,12 @@ def _execute_rename(
         # the former per-document tally.
         rewritten = cascade.fixed_count
 
-        checks: list[dict] = []
+        checks: list[dict[str, object]] = []
         if run_checks:
-            content_lf, _ = _read_preserve_newlines(new_path)
-            checks = _validate_proposed(new_path, root_dir, content_lf)
+            content_lf, _ = read_preserve_newlines(new_path)
+            checks = validate_proposed(new_path, root_dir, content_lf)
 
-        _invalidate_cache(root_dir)
+        invalidate_graph_cache(root_dir)
         new_blob = git_blob_oid(new_path.read_bytes())
         _emit(
             command,

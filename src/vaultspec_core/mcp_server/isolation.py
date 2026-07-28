@@ -30,9 +30,9 @@ if TYPE_CHECKING:
 __all__ = ["isolated_context"]
 
 
-def isolated_context(
-    fn: Callable[..., Coroutine[Any, Any, Any]],
-) -> Callable[..., Coroutine[Any, Any, Any]]:
+def isolated_context[**P, R](
+    fn: Callable[P, Coroutine[Any, Any, R]],
+) -> Callable[P, Coroutine[Any, Any, R]]:
     """Wrap an async tool handler so its body runs in a copied context.
 
     Each invocation snapshots all :mod:`contextvars` state via
@@ -47,18 +47,24 @@ def isolated_context(
         fn: The async tool handler to wrap.
 
     Returns:
-        The wrapped handler whose body executes in an isolated context copy.
+        The wrapped handler whose body executes in an isolated context copy,
+        carrying the wrapped handler's own parameter and return types so a
+        decorated handler stays assignable to its original signature.
     """
 
     @functools.wraps(fn)
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         ctx_copy = contextvars.copy_context()
         coro = fn(*args, **kwargs)
+
+        def _spawn() -> asyncio.Task[R]:
+            return asyncio.ensure_future(coro)
+
         # Creating the task inside the copied context makes the task adopt it,
         # so the coroutine *body* runs isolated. Awaiting a coroutine built via
         # ``ctx_copy.run(fn, ...)`` would instead run the body in the ambient
         # context, defeating per-request isolation.
-        task = ctx_copy.run(asyncio.ensure_future, coro)
+        task = ctx_copy.run(_spawn)
         return await task
 
     return wrapper

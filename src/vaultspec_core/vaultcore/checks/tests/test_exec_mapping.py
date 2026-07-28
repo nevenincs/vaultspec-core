@@ -29,7 +29,7 @@ _PLAN_STEM = "2026-02-04-feat-plan"
 
 
 @pytest.fixture(autouse=True)
-def _reset_cfg() -> Generator[None]:
+def reset_cfg() -> Generator[None]:
     reset_config()
     yield
     reset_config()

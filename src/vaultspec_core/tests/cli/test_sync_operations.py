@@ -5,7 +5,7 @@ Covers: sync_files, rules_sync, skills_sync, system_sync, config_sync.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -30,15 +30,17 @@ pytestmark = [pytest.mark.unit]
 class TestSyncFiles:
     """Tests for the generic sync_files utility."""
 
-    def _make_sources(self, root: Path, names: list[str]):
-        sources = {}
+    def _make_sources(
+        self, root: Path, names: list[str]
+    ) -> dict[str, tuple[Path, dict[str, Any], str]]:
+        sources: dict[str, tuple[Path, dict[str, Any], str]] = {}
         for name in names:
             p = root / name
             p.write_text(f"body {name}", encoding="utf-8")
             sources[name] = (p, {}, f"body {name}")
         return sources
 
-    def test_adds_new_files(self, synthetic_project):
+    def test_adds_new_files(self, synthetic_project: Path) -> None:
         dest = synthetic_project / "dest"
         dest.mkdir()
         sources = self._make_sources(synthetic_project, ["a.md", "b.md"])
@@ -55,7 +57,7 @@ class TestSyncFiles:
         assert (dest / "a.md").exists()
         assert (dest / "b.md").exists()
 
-    def test_updates_existing_files(self, synthetic_project):
+    def test_updates_existing_files(self, synthetic_project: Path) -> None:
         dest = synthetic_project / "dest"
         dest.mkdir()
         (dest / "a.md").write_text("old", encoding="utf-8")
@@ -72,7 +74,7 @@ class TestSyncFiles:
         assert result.updated == 1
         assert (dest / "a.md").read_text(encoding="utf-8") != "old"
 
-    def test_unchanged_files_are_not_rewritten(self, synthetic_project):
+    def test_unchanged_files_are_not_rewritten(self, synthetic_project: Path) -> None:
         dest = synthetic_project / "dest"
         dest.mkdir()
         sources = self._make_sources(synthetic_project, ["a.md"])
@@ -103,7 +105,7 @@ class TestSyncFiles:
         assert result.added == 0
         assert result.updated == 0
 
-    def test_prune_removes_stale(self, synthetic_project):
+    def test_prune_removes_stale(self, synthetic_project: Path) -> None:
         dest = synthetic_project / "dest"
         dest.mkdir()
         (dest / "stale.md").write_text(
@@ -123,7 +125,7 @@ class TestSyncFiles:
         assert result.pruned == 1
         assert not (dest / "stale.md").exists()
 
-    def test_prune_skips_unmanaged_stale_file(self, synthetic_project):
+    def test_prune_skips_unmanaged_stale_file(self, synthetic_project: Path) -> None:
         dest = synthetic_project / "dest"
         dest.mkdir()
         (dest / "user.md").write_text("hand-authored notes", encoding="utf-8")
@@ -141,7 +143,9 @@ class TestSyncFiles:
         assert (dest / "user.md").exists()
         assert any("Skipped pruning user file" in w for w in result.warnings)
 
-    def test_stale_managed_file_warns_force_removable(self, synthetic_project):
+    def test_stale_managed_file_warns_force_removable(
+        self, synthetic_project: Path
+    ) -> None:
         dest = synthetic_project / "dest"
         dest.mkdir()
         (dest / "stale.md").write_text(
@@ -161,7 +165,9 @@ class TestSyncFiles:
         assert (dest / "stale.md").exists()
         assert any("use --force to remove" in w for w in result.warnings)
 
-    def test_stale_unmanaged_file_warns_manual_removal(self, synthetic_project):
+    def test_stale_unmanaged_file_warns_manual_removal(
+        self, synthetic_project: Path
+    ) -> None:
         # An unmanaged stale file must never be advertised as --force
         # removable: --force skips it, so the warning says so honestly.
         dest = synthetic_project / "dest"
@@ -185,7 +191,7 @@ class TestSyncFiles:
 class TestSyncSkills:
     """Tests for skills_sync."""
 
-    def _make_skill_sources(self, root: Path, names: list[str]):
+    def _make_skill_sources(self, root: Path, names: list[str]) -> None:
         skills_dir = root / ".vaultspec" / "skills"
         skills_dir.mkdir(parents=True, exist_ok=True)
         for name in names:
@@ -194,7 +200,7 @@ class TestSyncSkills:
             content = f"---\ndescription: {name}\n---\n\nbody"
             (d / "SKILL.md").write_text(content, encoding="utf-8")
 
-    def test_creates_skill_dirs(self, synthetic_project):
+    def test_creates_skill_dirs(self, synthetic_project: Path) -> None:
         self._make_skill_sources(synthetic_project, ["vaultspec-deploy"])
         skills_sync()
         dest_md = (
@@ -206,7 +212,7 @@ class TestSyncSkills:
         )
         assert shared_dest.exists()
 
-    def test_prune_respects_protected(self, synthetic_project):
+    def test_prune_respects_protected(self, synthetic_project: Path) -> None:
         # Directories without a SKILL.md (e.g. user tooling) shouldn't be pruned.
         # Directories with a SKILL.md that are no longer in sources ARE pruned.
         skills_dir = synthetic_project / ".claude" / "skills"
@@ -231,7 +237,7 @@ class TestSyncSkills:
 
 
 class TestSyncAgents:
-    def test_codex_writes_managed_agents_block(self, synthetic_project):
+    def test_codex_writes_managed_agents_block(self, synthetic_project: Path) -> None:
         agents_dir = synthetic_project / ".vaultspec" / "agents"
         agents_dir.mkdir(parents=True, exist_ok=True)
         (agents_dir / "vaultspec-worker.md").write_text(
@@ -256,7 +262,9 @@ class TestSyncAgents:
         assert 'approval_policy = "on-request"' in content
         assert "Implement carefully." in content
 
-    def test_codex_omits_non_codex_generic_model_metadata(self, synthetic_project):
+    def test_codex_omits_non_codex_generic_model_metadata(
+        self, synthetic_project: Path
+    ) -> None:
         agents_dir = synthetic_project / ".vaultspec" / "agents"
         agents_dir.mkdir(parents=True, exist_ok=True)
         (agents_dir / "gemini-test.md").write_text(
@@ -278,8 +286,8 @@ class TestSyncAgents:
         assert 'model = "gemini-2.5-flash"' not in content
 
     def test_codex_preserves_user_toml_while_updating_managed_block(
-        self, synthetic_project
-    ):
+        self, synthetic_project: Path
+    ) -> None:
         agents_dir = synthetic_project / ".vaultspec" / "agents"
         agents_dir.mkdir(parents=True, exist_ok=True)
         agent_path = agents_dir / "vaultspec-worker.md"
@@ -310,7 +318,9 @@ class TestSyncAgents:
             if line.strip().startswith("[agents.")
         ]
 
-    def test_codex_removes_legacy_sentinel_agents_block(self, synthetic_project):
+    def test_codex_removes_legacy_sentinel_agents_block(
+        self, synthetic_project: Path
+    ) -> None:
         # Regression for #140: a pre-tag-system sentinel block must not collide
         # with the freshly-upserted managed block (duplicate TOML keys).
         agents_dir = synthetic_project / ".vaultspec" / "agents"
@@ -338,7 +348,9 @@ class TestSyncAgents:
         assert len(headers) == len(set(headers)), f"duplicate tables: {headers}"
         assert headers.count('[agents."vaultspec-worker"]') == 1
 
-    def test_codex_removes_raw_duplicate_agent_tables(self, synthetic_project):
+    def test_codex_removes_raw_duplicate_agent_tables(
+        self, synthetic_project: Path
+    ) -> None:
         # Regression for #140: raw unwrapped legacy tables (no sentinel) that
         # duplicate a managed name are stripped, even when a prompt body holds
         # a line that looks like a TOML table header.
@@ -366,7 +378,7 @@ class TestSyncAgents:
         # The stale rewrite is reported as work done, not skipped unchanged.
         assert result.per_tool[Tool.CODEX.value].updated == 1
 
-    def test_codex_agents_sync_is_idempotent(self, synthetic_project):
+    def test_codex_agents_sync_is_idempotent(self, synthetic_project: Path) -> None:
         agents_dir = synthetic_project / ".vaultspec" / "agents"
         agents_dir.mkdir(parents=True, exist_ok=True)
         (agents_dir / "vaultspec-worker.md").write_text(
@@ -386,7 +398,7 @@ class TestSyncAgents:
 class TestSyncSkillsCodex:
     """Verify skills sync lands in .agents/skills/ for Codex destination."""
 
-    def _make_skill_sources(self, root: Path, names: list[str]):
+    def _make_skill_sources(self, root: Path, names: list[str]) -> None:
         skills_dir = root / ".vaultspec" / "skills"
         skills_dir.mkdir(parents=True, exist_ok=True)
         for name in names:
@@ -395,7 +407,9 @@ class TestSyncSkillsCodex:
             content = f"---\ndescription: {name}\n---\n\n# {name}"
             (d / "SKILL.md").write_text(content, encoding="utf-8")
 
-    def test_codex_skills_land_in_shared_agents_skills(self, synthetic_project):
+    def test_codex_skills_land_in_shared_agents_skills(
+        self, synthetic_project: Path
+    ) -> None:
         """Skills sync writes to .agents/skills/ which is shared by Codex."""
         self._make_skill_sources(synthetic_project, ["vaultspec-deploy"])
         skills_sync()
@@ -406,7 +420,9 @@ class TestSyncSkillsCodex:
         content = shared_dest.read_text(encoding="utf-8")
         assert "vaultspec-deploy" in content
 
-    def test_codex_skills_have_correct_frontmatter(self, synthetic_project):
+    def test_codex_skills_have_correct_frontmatter(
+        self, synthetic_project: Path
+    ) -> None:
         """Skills synced to .agents/skills/ have name and description frontmatter."""
         from vaultspec_core.vaultcore import parse_frontmatter
 
@@ -422,7 +438,7 @@ class TestSyncSkillsCodex:
 
 
 class TestSystemSync:
-    def test_generates_from_parts(self, synthetic_project):
+    def test_generates_from_parts(self, synthetic_project: Path) -> None:
         (synthetic_project / ".vaultspec" / "system" / "base.md").write_text(
             "---\n---\n\n# Base system prompt", encoding="utf-8"
         )
@@ -431,7 +447,7 @@ class TestSystemSync:
         system_file = synthetic_project / ".gemini" / "SYSTEM.md"
         assert system_file.exists()
 
-    def test_force_overwrites_custom(self, synthetic_project):
+    def test_force_overwrites_custom(self, synthetic_project: Path) -> None:
         (synthetic_project / ".vaultspec" / "system" / "base.md").write_text(
             "---\n---\n\n# Base", encoding="utf-8"
         )
@@ -446,7 +462,9 @@ class TestSystemSync:
 
 
 class TestSystemSyncBehavioralRules:
-    def test_generates_behavioral_rule_for_claude(self, synthetic_project):
+    def test_generates_behavioral_rule_for_claude(
+        self, synthetic_project: Path
+    ) -> None:
         """system_sync generates vaultspec-system.builtin.md for Claude."""
         (synthetic_project / ".vaultspec" / "system" / "base.md").write_text(
             "---\n---\n\n# Core mandates", encoding="utf-8"
@@ -457,7 +475,7 @@ class TestSystemSyncBehavioralRules:
         )
         assert rule_file.exists()
 
-    def test_system_sync_produces_both_outputs(self, synthetic_project):
+    def test_system_sync_produces_both_outputs(self, synthetic_project: Path) -> None:
         """system_sync generates SYSTEM.md for Gemini AND rule for Claude."""
         (synthetic_project / ".vaultspec" / "system" / "base.md").write_text(
             "---\n---\n\n# Base prompt", encoding="utf-8"
@@ -470,8 +488,8 @@ class TestSystemSyncBehavioralRules:
         assert dest_rule.exists()
 
     def test_system_sync_skips_antigravity_and_codex_rule_fallback(
-        self, synthetic_project
-    ):
+        self, synthetic_project: Path
+    ) -> None:
         (synthetic_project / ".vaultspec" / "system" / "base.md").write_text(
             "---\n---\n\n# Base prompt", encoding="utf-8"
         )
@@ -482,7 +500,7 @@ class TestSystemSyncBehavioralRules:
 
 
 class TestConfigSync:
-    def test_generates_from_rule_refs(self, synthetic_project):
+    def test_generates_from_rule_refs(self, synthetic_project: Path) -> None:
         # Config body now only generates rule references from synced rule files
         rules_dir = synthetic_project / ".claude" / "rules"
         rules_dir.mkdir(parents=True, exist_ok=True)
@@ -493,7 +511,9 @@ class TestConfigSync:
         content = config_file.read_text(encoding="utf-8")
         assert "@.claude/rules/my-rule.md" in content
 
-    def test_preserves_user_content_and_adds_managed_block(self, synthetic_project):
+    def test_preserves_user_content_and_adds_managed_block(
+        self, synthetic_project: Path
+    ) -> None:
         # Create rule files so config body has content to generate
         rules_dir = synthetic_project / ".claude" / "rules"
         rules_dir.mkdir(parents=True, exist_ok=True)
@@ -507,7 +527,9 @@ class TestConfigSync:
         assert "<vaultspec" in content
         assert "@.claude/rules/my-rule.md" in content
 
-    def test_generates_root_configs_for_antigravity_and_codex(self, synthetic_project):
+    def test_generates_root_configs_for_antigravity_and_codex(
+        self, synthetic_project: Path
+    ) -> None:
         # Create rule files in shared .agents/rules/ for antigravity/codex config
         (synthetic_project / ".agents" / "rules").mkdir(parents=True, exist_ok=True)
         (synthetic_project / ".agents" / "rules" / "antigravity-rule.md").write_text(
@@ -524,7 +546,9 @@ class TestConfigSync:
         assert "Antigravity-specific embedded rule text." in content
         assert "@.agents/rules/antigravity-rule.md" not in content
 
-    def test_codex_writes_managed_top_level_config_block(self, synthetic_project):
+    def test_codex_writes_managed_top_level_config_block(
+        self, synthetic_project: Path
+    ) -> None:
         (synthetic_project / ".vaultspec" / "system" / "codex-cfg.md").write_text(
             "---\n"
             "pipeline: config\n"
@@ -547,8 +571,8 @@ class TestConfigSync:
         assert 'project_doc_fallback_filenames = ["AGENTS.md", "CLAUDE.md"]' in content
 
     def test_codex_preserves_agents_block_while_updating_top_level_config(
-        self, synthetic_project
-    ):
+        self, synthetic_project: Path
+    ) -> None:
         agents_dir = synthetic_project / ".vaultspec" / "agents"
         agents_dir.mkdir(parents=True, exist_ok=True)
         (agents_dir / "vaultspec-worker.md").write_text(
@@ -574,7 +598,9 @@ class TestConfigSync:
         assert 'sandbox_mode = "workspace-write"' in content
         assert '[agents."vaultspec-worker"]' in content
 
-    def test_codex_writes_reasoning_and_service_tier_settings(self, synthetic_project):
+    def test_codex_writes_reasoning_and_service_tier_settings(
+        self, synthetic_project: Path
+    ) -> None:
         (synthetic_project / ".vaultspec" / "system" / "codex-cfg.md").write_text(
             "---\n"
             "pipeline: config\n"
@@ -600,7 +626,7 @@ class TestConfigSync:
 
 
 class TestEndToEnd:
-    def test_full_sync_cycle(self, synthetic_project):
+    def test_full_sync_cycle(self, synthetic_project: Path) -> None:
         """Create sources -> sync -> verify destinations."""
         # Set up source files
         (synthetic_project / ".vaultspec" / "rules" / "no-swear.md").write_text(
@@ -621,7 +647,7 @@ class TestEndToEnd:
         assert (synthetic_project / "CLAUDE.md").exists()
         assert (synthetic_project / ".gemini" / "SYSTEM.md").exists()
 
-    def test_modify_resync_cycle(self, synthetic_project):
+    def test_modify_resync_cycle(self, synthetic_project: Path) -> None:
         rule_src = synthetic_project / ".vaultspec" / "rules" / "rule1.md"
         rule_src.write_text("---\nname: rule1\n---\n\nOriginal body.", encoding="utf-8")
         rules_sync()
@@ -632,7 +658,7 @@ class TestEndToEnd:
         rules_sync()
         assert "MODIFIED" in dest.read_text(encoding="utf-8")
 
-    def test_prune_cycle(self, synthetic_project):
+    def test_prune_cycle(self, synthetic_project: Path) -> None:
         rule_src = synthetic_project / ".vaultspec" / "rules" / "ephemeral.md"
         rule_src.write_text("---\nname: ephemeral\n---\n\nGone soon.", encoding="utf-8")
         rules_sync()
@@ -643,7 +669,9 @@ class TestEndToEnd:
         rules_sync(prune=True)
         assert not dest.exists()
 
-    def test_managed_block_coexists_with_user_content(self, synthetic_project):
+    def test_managed_block_coexists_with_user_content(
+        self, synthetic_project: Path
+    ) -> None:
         # Create rule files so config body has content to generate
         rules_dir = synthetic_project / ".claude" / "rules"
         rules_dir.mkdir(parents=True, exist_ok=True)
@@ -665,7 +693,9 @@ class TestEndToEnd:
 class TestEndToEndAllDestinations:
     """Validate on-disk outputs for all destinations side by side."""
 
-    def test_full_workspace_sync_all_destinations(self, synthetic_project):
+    def test_full_workspace_sync_all_destinations(
+        self, synthetic_project: Path
+    ) -> None:
         """Full sync produces the correct file tree for every destination."""
         # Set up sources
         (synthetic_project / ".vaultspec" / "rules" / "no-swear.md").write_text(
@@ -759,7 +789,7 @@ class TestEndToEndAllDestinations:
         assert not (synthetic_project / ".codex" / "CODEX.md").exists()
         assert not (synthetic_project / ".codex" / "SYSTEM.md").exists()
 
-    def test_dry_run_writes_nothing(self, synthetic_project):
+    def test_dry_run_writes_nothing(self, synthetic_project: Path) -> None:
         """dry_run=True must not create any destination files or directories."""
         (synthetic_project / ".vaultspec" / "rules" / "dry-rule.md").write_text(
             "---\nname: dry-rule\n---\n\nDry run test.", encoding="utf-8"
@@ -807,7 +837,7 @@ class TestEndToEndAllDestinations:
 class TestDryRunReturnsItems:
     """Verify that dry-run populates SyncResult.items for rendering."""
 
-    def test_rules_sync_dry_run_returns_items(self, synthetic_project):
+    def test_rules_sync_dry_run_returns_items(self, synthetic_project: Path) -> None:
         (synthetic_project / ".vaultspec" / "rules" / "my-rule.md").write_text(
             "---\nname: my-rule\n---\n\nRule body.", encoding="utf-8"
         )
@@ -816,7 +846,7 @@ class TestDryRunReturnsItems:
         paths = [p for p, _action in result.items]
         assert any("my-rule" in p for p in paths)
 
-    def test_dry_run_items_have_correct_actions(self, synthetic_project):
+    def test_dry_run_items_have_correct_actions(self, synthetic_project: Path) -> None:
         (synthetic_project / ".vaultspec" / "rules" / "new-rule.md").write_text(
             "---\nname: new-rule\n---\n\nNew.", encoding="utf-8"
         )
@@ -828,14 +858,14 @@ class TestDryRunReturnsItems:
         # spurious add or update.
         assert all(a in {"[ADD]", "[UNCHANGED]"} for _p, a in result.items)
 
-    def test_system_sync_dry_run_returns_items(self, synthetic_project):
+    def test_system_sync_dry_run_returns_items(self, synthetic_project: Path) -> None:
         (synthetic_project / ".vaultspec" / "system" / "base.md").write_text(
             "---\n---\n\n# Base prompt", encoding="utf-8"
         )
         result = system_sync(dry_run=True)
         assert result.items, "system dry-run must populate items list"
 
-    def test_system_sync_real_run_returns_items(self, synthetic_project):
+    def test_system_sync_real_run_returns_items(self, synthetic_project: Path) -> None:
         """Regression: a non-dry-run system sync must record per-file items.
 
         system_sync once appended to result.items only under dry_run, so

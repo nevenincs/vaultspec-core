@@ -21,7 +21,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, TypedDict, cast
 
 from .models import DocType
 from .query_listing import VaultDocument, list_documents
@@ -33,6 +33,28 @@ if TYPE_CHECKING:
     from .query_archive import FeatureCrossLink
 
 logger = logging.getLogger(__name__)
+
+# These helpers are consumed by :mod:`.query` (compatibility re-export) and
+# :mod:`.query_rename_apply` (the transactional apply half of the rename
+# pipeline) under this module's leading-underscore convention for
+# shared-but-internal helpers; the explicit re-export marks that cross-module
+# contract for the type checker.
+__all__ = [
+    "_RenamePlan",
+    "_analyze_cross_feature_links",
+    "_assert_within_docs",
+    "_compute_rename_plan",
+    "_count_related_refs",
+    "_match_exec_folder_date",
+    "_parse_inline_tags",
+    "_predict_rewrites",
+    "_rel",
+    "_rewrite_feature_tag_block",
+    "_same_file",
+    "_swap_authored_filename",
+    "_swap_exec_filename",
+    "_validate_feature_rename",
+]
 
 
 class RenameCollision(TypedDict):
@@ -304,17 +326,21 @@ def _parse_inline_tags(after: str) -> list[str]:
     from ..core.exceptions import VaultSpecError
 
     try:
-        parsed = yaml.safe_load(f"tags: {after}")
+        parsed: object = yaml.safe_load(f"tags: {after}")
     except yaml.YAMLError as exc:
         raise VaultSpecError(
             f"Cannot parse inline tags value {after!r}: {exc}"
         ) from exc
 
-    value = parsed.get("tags") if isinstance(parsed, dict) else None
+    value = (
+        cast("dict[str, object]", parsed).get("tags")
+        if isinstance(parsed, dict)
+        else None
+    )
     if isinstance(value, str):
         return [value]
     if isinstance(value, list):
-        return [str(t) for t in value]
+        return [str(t) for t in cast("list[object]", value)]
     raise VaultSpecError(f"Inline tags value is not a sequence: {after!r}")
 
 

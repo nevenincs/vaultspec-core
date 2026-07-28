@@ -29,7 +29,12 @@ from vaultspec_core.migrations import reset_workspace_cache
 from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
     from pathlib import Path
+
+    from typer.testing import Result
+
+    from vaultspec_core.core.workspace_mode import WorkspaceDeclaration
 
 pytestmark = [pytest.mark.unit]
 
@@ -56,7 +61,7 @@ def _bind_context(workspace: Path) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _reset_caches():
+def reset_caches() -> Generator[None]:
     reset_config()
     reset_workspace_cache()
     yield
@@ -412,7 +417,7 @@ class TestUpgradeModeInference:
             encoding="utf-8",
         )
 
-    def _read_declaration(self, root: Path):
+    def _read_declaration(self, root: Path) -> WorkspaceDeclaration | None:
         from vaultspec_core.core.workspace_mode import read_workspace_declaration
 
         return read_workspace_declaration(root)
@@ -505,7 +510,9 @@ class TestUpgradeModeInference:
         factory.install("all", upgrade=True)
         decl_path = tmp_path / ".vaultspec" / "workspace.json"
         first = decl_path.read_bytes()
-        assert self._read_declaration(tmp_path).install_mode is InstallMode.DEPENDENCY
+        first_decl = self._read_declaration(tmp_path)
+        assert first_decl is not None
+        assert first_decl.install_mode is InstallMode.DEPENDENCY
 
         # The second upgrade re-derives the now-persisted mode and rewrites the
         # deterministic declaration to byte-identical content: idempotent at the
@@ -514,7 +521,9 @@ class TestUpgradeModeInference:
         second = decl_path.read_bytes()
 
         assert second == first
-        assert self._read_declaration(tmp_path).install_mode is InstallMode.DEPENDENCY
+        second_decl = self._read_declaration(tmp_path)
+        assert second_decl is not None
+        assert second_decl.install_mode is InstallMode.DEPENDENCY
 
 
 class TestFloorConstraint:
@@ -621,7 +630,7 @@ class TestFloorConstraintCli:
         )
 
     @staticmethod
-    def _combined(result) -> str:
+    def _combined(result: Result) -> str:
         return (result.stdout or "") + "\n" + (result.stderr or "")
 
     def test_sync_below_floor_exits_clean(self, tmp_path: Path) -> None:

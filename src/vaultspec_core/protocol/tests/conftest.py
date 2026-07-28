@@ -4,13 +4,15 @@ Provides a temporary workspace root and a sample execution fixture in markdown
 for provider-layer parsing and prompt assembly scenarios.
 """
 
+from pathlib import Path
+
 import pytest
 
 from ..providers import GeminiModels
 
 
 @pytest.fixture
-def test_root_dir(tmp_path):
+def test_root_dir(tmp_path: Path) -> Path:
     """A temporary directory acting as the project root."""
     (tmp_path / ".vaultspec" / "rules").mkdir(parents=True)
     (tmp_path / ".vault" / "adr").mkdir(parents=True)

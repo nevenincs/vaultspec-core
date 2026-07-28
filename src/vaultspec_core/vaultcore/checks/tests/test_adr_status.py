@@ -1,11 +1,13 @@
 """Tests for the adr-status canonical-taxonomy checker."""
 
+from pathlib import Path
+
 import pytest
 
 from ....core.enums import AdrStatus
 from ....graph import VaultGraph
 from ...models import DocumentMetadata
-from .._base import Severity
+from .._base import Severity, VaultSnapshot
 from ..adr_status import check_adr_status
 
 pytestmark = [pytest.mark.unit]
@@ -16,7 +18,14 @@ def _adr_body(status_line: str) -> str:
     return f"{status_line}\n\n## Problem Statement\n\nBody.\n"
 
 
-def _snapshot(root, name, body, *, tags=None, superseded_by=None):
+def _snapshot(
+    root: Path,
+    name: str,
+    body: str,
+    *,
+    tags: list[str] | None = None,
+    superseded_by: str | None = None,
+) -> tuple[Path, VaultSnapshot]:
     """Build a one-document snapshot for an ADR under ``.vault/adr/``."""
     path = root / ".vault" / "adr" / f"{name}.md"
     meta = DocumentMetadata(
@@ -27,7 +36,7 @@ def _snapshot(root, name, body, *, tags=None, superseded_by=None):
 
 
 class TestCanonicalStatus:
-    def test_canonical_quoted_status_is_clean(self, tmp_path):
+    def test_canonical_quoted_status_is_clean(self, tmp_path: Path) -> None:
         _, snap = _snapshot(
             tmp_path,
             "2026-01-01-demo-adr",
@@ -36,7 +45,7 @@ class TestCanonicalStatus:
         result = check_adr_status(tmp_path, snapshot=snap)
         assert result.is_clean
 
-    def test_title_with_pipe_is_parsed(self, tmp_path):
+    def test_title_with_pipe_is_parsed(self, tmp_path: Path) -> None:
         """A pipe inside the title must not defeat the status match."""
         _, snap = _snapshot(
             tmp_path,
@@ -46,7 +55,7 @@ class TestCanonicalStatus:
         result = check_adr_status(tmp_path, snapshot=snap)
         assert result.is_clean
 
-    def test_every_canonical_value_is_clean(self, tmp_path):
+    def test_every_canonical_value_is_clean(self, tmp_path: Path) -> None:
         for value in (s.value for s in AdrStatus):
             _, snap = _snapshot(
                 tmp_path,
@@ -61,7 +70,7 @@ class TestCanonicalStatus:
 
 
 class TestDivergences:
-    def test_off_taxonomy_token_warns(self, tmp_path):
+    def test_off_taxonomy_token_warns(self, tmp_path: Path) -> None:
         _, snap = _snapshot(
             tmp_path,
             "2026-01-01-demo-adr",
@@ -72,7 +81,7 @@ class TestDivergences:
         assert result.diagnostics[0].severity is Severity.WARNING
         assert "outside the canonical set" in result.diagnostics[0].message
 
-    def test_missing_status_warns(self, tmp_path):
+    def test_missing_status_warns(self, tmp_path: Path) -> None:
         _, snap = _snapshot(
             tmp_path,
             "2026-01-01-demo-adr",
@@ -81,7 +90,7 @@ class TestDivergences:
         result = check_adr_status(tmp_path, snapshot=snap)
         assert any("no parseable status" in d.message for d in result.diagnostics)
 
-    def test_legacy_status_section_warns(self, tmp_path):
+    def test_legacy_status_section_warns(self, tmp_path: Path) -> None:
         body = "# ADR: Demo\n\n## Status\n\nAccepted\n\n## Context\n\nText.\n"
         _, snap = _snapshot(tmp_path, "2026-01-01-demo-adr", body)
         result = check_adr_status(tmp_path, snapshot=snap)
@@ -89,7 +98,7 @@ class TestDivergences:
             "legacy '## Status' section" in d.message for d in result.diagnostics
         )
 
-    def test_unpropagated_supersession_warns(self, tmp_path):
+    def test_unpropagated_supersession_warns(self, tmp_path: Path) -> None:
         _, snap = _snapshot(
             tmp_path,
             "2026-01-01-demo-adr",
@@ -102,7 +111,7 @@ class TestDivergences:
             for d in result.diagnostics
         )
 
-    def test_superseded_with_frontmatter_is_clean(self, tmp_path):
+    def test_superseded_with_frontmatter_is_clean(self, tmp_path: Path) -> None:
         _, snap = _snapshot(
             tmp_path,
             "2026-01-01-demo-adr",
@@ -114,7 +123,7 @@ class TestDivergences:
 
 
 class TestQuotingFix:
-    def test_bare_token_warns_fixable(self, tmp_path):
+    def test_bare_token_warns_fixable(self, tmp_path: Path) -> None:
         _, snap = _snapshot(
             tmp_path,
             "2026-01-01-demo-adr",
@@ -126,7 +135,7 @@ class TestQuotingFix:
         assert diag.severity is Severity.WARNING
         assert diag.fixable is True
 
-    def test_fix_quotes_bare_token_on_disk(self, tmp_path):
+    def test_fix_quotes_bare_token_on_disk(self, tmp_path: Path) -> None:
         adr_dir = tmp_path / ".vault" / "adr"
         adr_dir.mkdir(parents=True)
         path = adr_dir / "2026-01-01-demo-adr.md"
@@ -136,7 +145,7 @@ class TestQuotingFix:
             encoding="utf-8",
         )
         meta = DocumentMetadata(tags=["#adr", "#demo"])
-        snapshot = {path: (meta, body)}
+        snapshot: VaultSnapshot = {path: (meta, body)}
 
         result = check_adr_status(tmp_path, snapshot=snapshot, fix=True)
 
@@ -144,7 +153,7 @@ class TestQuotingFix:
         content = path.read_text(encoding="utf-8")
         assert "(**status:** `accepted`)" in content
 
-    def test_fix_preserves_crlf(self, tmp_path):
+    def test_fix_preserves_crlf(self, tmp_path: Path) -> None:
         adr_dir = tmp_path / ".vault" / "adr"
         adr_dir.mkdir(parents=True)
         path = adr_dir / "2026-01-01-demo-adr.md"
@@ -152,7 +161,7 @@ class TestQuotingFix:
         text = "---\ntags:\n  - '#adr'\n  - '#demo'\n---\n\n" + body
         path.write_bytes(text.replace("\n", "\r\n").encode("utf-8"))
         meta = DocumentMetadata(tags=["#adr", "#demo"])
-        snapshot = {path: (meta, body)}
+        snapshot: VaultSnapshot = {path: (meta, body)}
 
         result = check_adr_status(tmp_path, snapshot=snapshot, fix=True)
 
@@ -165,14 +174,14 @@ class TestQuotingFix:
 
 
 class TestScoping:
-    def test_non_adr_paths_ignored(self, tmp_path):
+    def test_non_adr_paths_ignored(self, tmp_path: Path) -> None:
         path = tmp_path / ".vault" / "plan" / "2026-01-01-demo-plan.md"
         meta = DocumentMetadata(tags=["#plan", "#demo"])
         body = _adr_body("# `demo` plan")
         result = check_adr_status(tmp_path, snapshot={path: (meta, body)})
         assert result.is_clean
 
-    def test_feature_filter_excludes_other_features(self, tmp_path):
+    def test_feature_filter_excludes_other_features(self, tmp_path: Path) -> None:
         _, snap = _snapshot(
             tmp_path,
             "2026-01-01-other-adr",
@@ -191,7 +200,9 @@ class TestGraphPath:
     hand-built-snapshot tests still pass.
     """
 
-    def test_supersession_divergence_detected_through_graph(self, tmp_path):
+    def test_supersession_divergence_detected_through_graph(
+        self, tmp_path: Path
+    ) -> None:
         adr_dir = tmp_path / ".vault" / "adr"
         adr_dir.mkdir(parents=True)
         (adr_dir / "2026-01-01-demo-adr.md").write_text(

@@ -2,7 +2,7 @@
 
 Builds the production server through ``create_server`` on a
 :class:`WorkspaceFactory`-installed vault and drives it over the in-memory
-FastMCP session - no mocks, stubs, or skips. Asserts that exactly the nine
+MCPServer client - no mocks, stubs, or skips. Asserts that exactly the nine
 expected tools are registered with the ADR Q6 annotation matrix and an
 ``outputSchema`` each, exercises a representative call on every tool end-to-end
 (including a gateway ``invoke`` of the real ``vault list`` verb), confirms a
@@ -16,7 +16,7 @@ import json
 from pathlib import Path
 
 import pytest
-from mcp.shared.memory import create_connected_server_and_client_session
+from mcp import Client
 
 from vaultspec_core import __version__
 from vaultspec_core.mcp_server.app import create_server
@@ -41,47 +41,55 @@ _EXPECTED_TOOLS = frozenset(
 )
 
 #: The ADR Q6 annotation matrix: each tool mapped to the hints it must declare.
-#: Read-only tools (status/find/discover) leave ``destructiveHint`` unset
+#: Read-only tools (status/find/discover) leave ``destructive_hint`` unset
 #: (``None``), matching how their :class:`ToolAnnotations` are constructed.
 _ANNOTATIONS = {
-    "status": {"readOnlyHint": True, "idempotentHint": True, "openWorldHint": False},
-    "find": {"readOnlyHint": True, "idempotentHint": True, "openWorldHint": False},
-    "discover": {"readOnlyHint": True, "idempotentHint": True, "openWorldHint": False},
+    "status": {
+        "read_only_hint": True,
+        "idempotent_hint": True,
+        "open_world_hint": False,
+    },
+    "find": {"read_only_hint": True, "idempotent_hint": True, "open_world_hint": False},
+    "discover": {
+        "read_only_hint": True,
+        "idempotent_hint": True,
+        "open_world_hint": False,
+    },
     "create": {
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": False,
+        "read_only_hint": False,
+        "destructive_hint": False,
+        "idempotent_hint": False,
+        "open_world_hint": False,
     },
     "edit": {
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": False,
-        "openWorldHint": False,
+        "read_only_hint": False,
+        "destructive_hint": True,
+        "idempotent_hint": False,
+        "open_world_hint": False,
     },
     "plan_progress": {
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False,
+        "read_only_hint": False,
+        "destructive_hint": False,
+        "idempotent_hint": True,
+        "open_world_hint": False,
     },
     "plan_edit": {
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": False,
-        "openWorldHint": False,
+        "read_only_hint": False,
+        "destructive_hint": True,
+        "idempotent_hint": False,
+        "open_world_hint": False,
     },
     "check": {
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False,
+        "read_only_hint": False,
+        "destructive_hint": False,
+        "idempotent_hint": True,
+        "open_world_hint": False,
     },
     "invoke": {
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": False,
-        "openWorldHint": False,
+        "read_only_hint": False,
+        "destructive_hint": True,
+        "idempotent_hint": False,
+        "open_world_hint": False,
     },
 }
 
@@ -96,7 +104,7 @@ async def test_surface_registers_exactly_nine_tools_with_schemas(vault_root):  #
     by_name = {t.name: t for t in tools}
     for name, expected in _ANNOTATIONS.items():
         tool = by_name[name]
-        assert tool.outputSchema is not None, f"{name} declares no outputSchema"
+        assert tool.output_schema is not None, f"{name} declares no outputSchema"
         annotations = tool.annotations
         assert annotations is not None, f"{name} declares no annotations"
         for hint, value in expected.items():
@@ -116,7 +124,7 @@ async def test_surface_instructions_name_the_tools_and_version(vault_root):  # n
 async def test_surface_representative_call_per_tool(vault_root):  # noqa: F811
     """Every tool answers a representative call end-to-end on the real server."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         # create: scaffold a full research/adr/plan lifecycle in one batch so
         # intra-batch dependency validation is exercised for real.
         created = data_of(
@@ -225,11 +233,11 @@ async def test_surface_representative_call_per_tool(vault_root):  # noqa: F811
 async def test_surface_whole_call_failure_is_iserror(vault_root):  # noqa: F811
     """A whole-call failure raises to protocol ``isError``, not a success dict."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         empty_create = await client.call_tool("create", {"documents": []})
-        assert empty_create.isError
+        assert empty_create.is_error
         unknown_verb = await client.call_tool("invoke", {"verb": "totally bogus"})
-        assert unknown_verb.isError
+        assert unknown_verb.is_error
 
 
 def test_registry_entry_launches_this_server_unchanged(vault_root):  # noqa: F811

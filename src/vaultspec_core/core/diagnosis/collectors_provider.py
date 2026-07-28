@@ -23,6 +23,10 @@ from .signals import (
 
 logger = logging.getLogger(__name__)
 
+#: Re-exported (with underscore intact) for
+#: :mod:`vaultspec_core.core.diagnosis.collectors_content`.
+__all__ = ["_TOOL_DIR"]
+
 # Tool -> primary directory name mapping.  Kept here rather than imported from
 # enums to avoid pulling the full enum module at import time; the mapping is
 # stable and mirrors :class:`~vaultspec_core.core.enums.DirName`.
@@ -306,11 +310,11 @@ def collect_provider_dir_state(target: Path, tool_value: str) -> ProviderDirSign
     for child in children:
         child_resolved = child.resolve()
         # Known subdirectory
-        if any(child_resolved == kp.resolve() for kp in known_paths if kp is not None):
+        if any(child_resolved == kp.resolve() for kp in known_paths):
             continue
         # Known config file at provider level
         if child.is_file() and any(
-            child_resolved == kp.resolve() for kp in known_paths if kp is not None
+            child_resolved == kp.resolve() for kp in known_paths
         ):
             continue
         # Subdirectories of expected dirs are fine

@@ -10,6 +10,7 @@ import json
 import tomllib
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any, cast
 
 from .enums import McpScope, McpTargetFormat, Tool
 from .exceptions import VaultSpecError
@@ -48,7 +49,8 @@ def _uninstall_json_target(
     raw = json.loads(target.path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise VaultSpecError("JSON root is not an object.")
-    servers = _json_server_map(raw, target, root)
+    payload = cast("dict[str, Any]", raw)
+    servers = _json_server_map(payload, target, root)
     present = requested & set(servers)
     result.pruned += len(present)
     result.items.extend((name, "[DELETE]") for name in sorted(present))
@@ -56,8 +58,8 @@ def _uninstall_json_target(
         return
     for name in present:
         servers.pop(name, None)
-    raw.pop(_LEGACY_MANAGED_KEY, None)
-    _write_json_target(target.path, raw, target, root)
+    payload.pop(_LEGACY_MANAGED_KEY, None)
+    _write_json_target(target.path, payload, target, root)
 
 
 def _uninstall_toml_target(

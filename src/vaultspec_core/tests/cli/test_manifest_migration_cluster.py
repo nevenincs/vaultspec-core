@@ -34,7 +34,7 @@ pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture(autouse=True)
-def _reset() -> Iterator[None]:
+def reset_workspace_state() -> Iterator[None]:
     reset_config()
     reset_workspace_cache()
     yield
@@ -68,16 +68,14 @@ class TestVersionAdvisoryGating:
     def _warn_for_manifest_version(self, root: Path, version: str) -> bool:
         from vaultspec_core.core.diagnosis.diagnosis import WorkspaceDiagnosis
         from vaultspec_core.core.diagnosis.signals import FrameworkSignal
-        from vaultspec_core.core.resolver import (
-            ResolutionPlan,
-            _resolve_version_warning,
-        )
+        from vaultspec_core.core.resolver import ResolutionPlan
+        from vaultspec_core.core.resolver_diagnostics import resolve_version_warning
 
         data = read_manifest_data(root)
         data.vaultspec_version = version
         write_manifest_data(root, data)
         plan = ResolutionPlan()
-        _resolve_version_warning(
+        resolve_version_warning(
             plan, WorkspaceDiagnosis(framework=FrameworkSignal.PRESENT)
         )
         return any("Consider upgrading" in w for w in plan.warnings)

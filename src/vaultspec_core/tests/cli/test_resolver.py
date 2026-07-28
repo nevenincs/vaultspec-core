@@ -20,7 +20,8 @@ from vaultspec_core.core.diagnosis.signals import (
     ResolutionAction,
 )
 from vaultspec_core.core.enums import CliAction, Tool
-from vaultspec_core.core.resolver import ResolutionPlan, _resolve_precommit, resolve
+from vaultspec_core.core.resolver import ResolutionPlan, resolve
+from vaultspec_core.core.resolver import resolve_precommit as _resolve_precommit
 
 pytestmark = [pytest.mark.unit]
 

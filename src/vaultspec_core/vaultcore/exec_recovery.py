@@ -27,7 +27,7 @@ from .rename_engine import _assert_within, docs_lock_target
 from .rename_ops import split_keepends
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator
     from pathlib import Path
 
 __all__ = [
@@ -255,7 +255,7 @@ def _unchanged(operation: str, context: ExecRecoveryContext) -> ExecRecoveryResu
 @contextmanager
 def _recovery_context(
     root_dir: Path, record_path: Path, *, dry_run: bool
-) -> Iterator[ExecRecoveryContext]:
+) -> Generator[ExecRecoveryContext]:
     """Serialize recovery from parent resolution through the final mutation."""
     docs_dir = (root_dir.resolve() / get_config().docs_dir).resolve()
     if not dry_run:

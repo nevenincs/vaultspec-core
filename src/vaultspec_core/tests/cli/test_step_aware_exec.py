@@ -15,6 +15,8 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from typer.testing import CliRunner
+
 from vaultspec_core.cli import app
 
 pytestmark = [pytest.mark.integration]
@@ -61,7 +63,9 @@ def setup_test_plan(project_dir: Path) -> Path:
     return plan_file
 
 
-def test_step_aware_mutual_exclusion(runner, synthetic_project):
+def test_step_aware_mutual_exclusion(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
     """Passing both options, or options with wrong types, must fail."""
     # Both options supplied on exec
     result = runner.invoke(
@@ -106,7 +110,9 @@ def test_step_aware_mutual_exclusion(runner, synthetic_project):
     )
 
 
-def test_step_aware_legacy_fallback_warning(runner, synthetic_project):
+def test_step_aware_legacy_fallback_warning(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
     """Omitting flags displays warning and falls back to flat scaffolding."""
     setup_test_plan(synthetic_project)
 
@@ -136,7 +142,9 @@ def test_step_aware_legacy_fallback_warning(runner, synthetic_project):
     assert "Legacy Record" in content or "test-feature" in content
 
 
-def test_step_aware_individual_scaffolding(runner, synthetic_project):
+def test_step_aware_individual_scaffolding(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
     """Individual step scaffolding custom routes and hydrates placeholders."""
     setup_test_plan(synthetic_project)
 
@@ -185,7 +193,9 @@ def test_step_aware_individual_scaffolding(runner, synthetic_project):
     assert "## Notes" in content
 
 
-def test_scaffolded_step_record_passes_structure_check(runner, synthetic_project):
+def test_scaffolded_step_record_passes_structure_check(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
     """A scaffolded Step Record must satisfy `vault check structure` (issue #123).
 
     The scaffolder emits the canonical `<date>-<feature>-P01-S01.md` Step Record
@@ -226,7 +236,9 @@ def test_scaffolded_step_record_passes_structure_check(runner, synthetic_project
     assert VaultConstants.validate_filename(scaffolded.name, DocType.EXEC) == []
 
 
-def test_step_aware_bulk_scaffolding(runner, synthetic_project):
+def test_step_aware_bulk_scaffolding(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
     """Bulk scaffolding creates all records idempotently and obeys --force."""
     setup_test_plan(synthetic_project)
 
@@ -296,7 +308,9 @@ def test_step_aware_bulk_scaffolding(runner, synthetic_project):
     assert "updated" in result3.output
 
 
-def test_step_aware_bulk_scaffolding_dry_run(runner, synthetic_project):
+def test_step_aware_bulk_scaffolding_dry_run(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
     """A bulk dry run previews every record without writing one to disk."""
     setup_test_plan(synthetic_project)
     base_dir = synthetic_project / ".vault" / "exec" / "2026-05-17-test-feature"
@@ -361,7 +375,9 @@ def test_step_aware_bulk_scaffolding_dry_run(runner, synthetic_project):
     assert existing.read_text(encoding="utf-8") == "sentinel\n"
 
 
-def test_step_aware_bulk_scaffolding_json(runner, synthetic_project):
+def test_step_aware_bulk_scaffolding_json(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
     """Bulk scaffolding with --json outputs the outcome in envelope schema."""
     setup_test_plan(synthetic_project)
 
@@ -389,7 +405,7 @@ def test_step_aware_bulk_scaffolding_json(runner, synthetic_project):
     assert data["data"]["items"][0]["outcome"] == "created"
 
 
-def test_step_aware_status_hinting(runner, synthetic_project):
+def test_step_aware_status_hinting(runner: CliRunner, synthetic_project: Path) -> None:
     """Plan status reports exec-missing warning and disappears when resolved."""
     setup_test_plan(synthetic_project)
 
@@ -465,7 +481,7 @@ def test_step_aware_status_hinting(runner, synthetic_project):
     assert "S02" in result2.output
 
 
-def test_summary_requires_phase(runner, synthetic_project):
+def test_summary_requires_phase(runner: CliRunner, synthetic_project: Path) -> None:
     """``--summary`` without ``--phase`` is a clean error (issue #158)."""
     setup_test_plan(synthetic_project)
     result = runner.invoke(
@@ -485,7 +501,9 @@ def test_summary_requires_phase(runner, synthetic_project):
     assert "--summary requires --phase" in result.output
 
 
-def test_summary_rejected_on_non_exec_type(runner, synthetic_project):
+def test_summary_rejected_on_non_exec_type(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
     """``--summary`` is only valid for exec documents (issue #158)."""
     result = runner.invoke(
         app,
@@ -506,7 +524,9 @@ def test_summary_rejected_on_non_exec_type(runner, synthetic_project):
     assert "only" in result.output and "exec" in result.output
 
 
-def test_summary_mutually_exclusive_with_step(runner, synthetic_project):
+def test_summary_mutually_exclusive_with_step(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
     """``--summary`` cannot combine with ``--step`` (issue #158)."""
     setup_test_plan(synthetic_project)
     result = runner.invoke(
@@ -530,7 +550,7 @@ def test_summary_mutually_exclusive_with_step(runner, synthetic_project):
     assert "--summary cannot be combined with --step" in result.output
 
 
-def test_phase_requires_summary(runner, synthetic_project):
+def test_phase_requires_summary(runner: CliRunner, synthetic_project: Path) -> None:
     """``--phase`` without ``--summary`` is a clean error (issue #158)."""
     setup_test_plan(synthetic_project)
     result = runner.invoke(
@@ -551,7 +571,9 @@ def test_phase_requires_summary(runner, synthetic_project):
     assert "--phase is only valid together with --summary" in result.output
 
 
-def test_summary_unknown_phase_errors_cleanly(runner, synthetic_project):
+def test_summary_unknown_phase_errors_cleanly(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
     """A non-existent Phase id reports a clean error, not a traceback (#158)."""
     setup_test_plan(synthetic_project)
     result = runner.invoke(
@@ -606,7 +628,9 @@ def _setup_test_plan_with_phase(project_dir: Path) -> Path:
     return plan_file
 
 
-def test_summary_scaffolds_phase_summary(runner, synthetic_project):
+def test_summary_scaffolds_phase_summary(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
     """``--summary --phase`` scaffolds the canonical Phase-summary record (#158)."""
     _setup_test_plan_with_phase(synthetic_project)
     result = runner.invoke(

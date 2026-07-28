@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, cast
 
 from .collectors_config import _read_mcp_servers
 from .collectors_precommit import _observed_precommit_mode
@@ -22,6 +22,14 @@ if TYPE_CHECKING:
     from ..enums import InstallMode
 
 logger = logging.getLogger(__name__)
+
+_MODE_NEUTRAL_COMMAND_TOKEN = "@@VAULTSPEC_INSTALL_MODE_COMMAND@@"
+
+
+def _builtin_server_name(filename: str) -> str:
+    """Return the server name represented by a bundled definition filename."""
+    suffix = ".builtin.json"
+    return filename.removesuffix(suffix)
 
 
 #: The pre-``--no-sync`` dependency-mode MCP launch shape. Deployed workspaces
@@ -42,7 +50,7 @@ def _legacy_dependency_args(module: str) -> list[str]:
     return [arg for arg in current_args if arg != "--no-sync"]
 
 
-def _launch_module(args: list[Any]) -> str | None:
+def _launch_module(args: list[object]) -> str | None:
     """Return the runnable module a deployed launch argv names after ``-m``.
 
     Args:
@@ -105,10 +113,13 @@ def _observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode 
     entry = servers.get(pkg)
     if not isinstance(entry, dict):
         return None
+    entry_map = cast("dict[str, object]", entry)
 
-    command = entry.get("command")
-    args = entry.get("args")
-    module = _launch_module(args) if isinstance(args, list) else None
+    command = entry_map.get("command")
+    args = entry_map.get("args")
+    module = (
+        _launch_module(cast("list[object]", args)) if isinstance(args, list) else None
+    )
     if module is None:
         return None
 
@@ -284,8 +295,6 @@ def collect_stale_seed_definitions(target: Path) -> list[str]:
         Sorted server names of stale package-bundled seed definitions; empty
         when every builtin seed is mode-neutral or none exist.
     """
-    from ..mcps import _MODE_COMMAND_TOKEN, _server_name
-
     mcps_dir = target / ".vaultspec" / "mcps"
     if not mcps_dir.exists():
         return []
@@ -293,10 +302,14 @@ def collect_stale_seed_definitions(target: Path) -> list[str]:
     stale: list[str] = []
     for path in sorted(mcps_dir.glob("*.builtin.json")):
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
+            raw: object = json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as exc:
             logger.warning("Cannot read MCP seed definition %s: %s", path, exc)
             continue
-        if isinstance(raw, dict) and raw.get("command") != _MODE_COMMAND_TOKEN:
-            stale.append(_server_name(path.name))
+        if (
+            isinstance(raw, dict)
+            and cast("dict[str, object]", raw).get("command")
+            != _MODE_NEUTRAL_COMMAND_TOKEN
+        ):
+            stale.append(_builtin_server_name(path.name))
     return sorted(stale)

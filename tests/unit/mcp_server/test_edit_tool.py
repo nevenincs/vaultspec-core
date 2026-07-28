@@ -1,6 +1,6 @@
 """Tests for the batch-native MCP ``edit`` tool.
 
-Drives the real FastMCP server over the in-memory session transport against
+Drives the real MCPServer over the in-memory client transport against
 a :class:`WorkspaceFactory`-installed vault on the real filesystem.  Covers
 the blob-hash conflict path (a stale hash fails the item as ``conflict``
 without writing), ``section_not_found`` for a missing heading, intra-batch
@@ -11,7 +11,7 @@ post-write hash chaining from one op into the next.
 from __future__ import annotations
 
 import pytest
-from mcp.shared.memory import create_connected_server_and_client_session
+from mcp import Client
 
 from vaultspec_core.mcp_server.app import create_server
 from vaultspec_core.vaultcore.blob_hash import git_blob_oid
@@ -39,7 +39,7 @@ async def _edit(client, operations):
 async def test_edit_set_body_returns_post_write_hash(vault_root):
     """A ``set_body`` edit updates the file and returns the post-write blob hash."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create_adr(client, "sb-feat")
         adr = next((vault_root / ".vault" / "adr").glob("*-sb-feat-adr.md"))
         payload = await _edit(
@@ -62,7 +62,7 @@ async def test_edit_set_body_returns_post_write_hash(vault_root):
 async def test_edit_blob_hash_conflict(vault_root):
     """A stale ``expected_blob_hash`` fails the item as a conflict without writing."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create_adr(client, "conflict-feat")
         adr = next((vault_root / ".vault" / "adr").glob("*-conflict-feat-adr.md"))
         original = adr.read_bytes()
@@ -89,7 +89,7 @@ async def test_edit_blob_hash_conflict(vault_root):
 async def test_edit_section_not_found(vault_root):
     """Addressing a heading that does not exist fails the item, not the call."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create_adr(client, "miss-feat")
         adr = next((vault_root / ".vault" / "adr").glob("*-miss-feat-adr.md"))
         payload = await _edit(
@@ -117,7 +117,7 @@ async def test_edit_intra_batch_same_document_hash_on_first_op_only(vault_root):
     and the second item's post-write hash reflects the accumulated edits.
     """
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create_adr(client, "seq-feat")
         adr = next((vault_root / ".vault" / "adr").glob("*-seq-feat-adr.md"))
         current_hash = git_blob_oid(adr.read_bytes())
@@ -152,7 +152,7 @@ async def test_edit_intra_batch_same_document_hash_on_first_op_only(vault_root):
 async def test_edit_post_write_hash_chains_across_documents(vault_root):
     """The returned hash of one op is a valid guard for a later op on that doc."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create_adr(client, "chain-feat")
         adr = next((vault_root / ".vault" / "adr").glob("*-chain-feat-adr.md"))
         first = await _edit(
@@ -188,15 +188,15 @@ async def test_edit_post_write_hash_chains_across_documents(vault_root):
 async def test_edit_empty_batch_raises_protocol_error(vault_root):
     """An empty operation list is a malformed whole-call input surfaced as isError."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("edit", {"operations": []})
-        assert result.isError
+        assert result.is_error
 
 
 async def test_edit_unresolvable_target_fails_item(vault_root):
     """An unresolvable target is a per-item failure, not a whole-call error."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         payload = await _edit(
             client,
             [

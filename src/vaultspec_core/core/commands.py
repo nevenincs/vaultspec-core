@@ -20,23 +20,21 @@ import logging
 from typing import Any
 
 from . import types as _t
-from .git_artifacts import (  # noqa: F401
+from .git_artifacts import (
     _UNTRACK_PREFIXES,
     PROVIDER_ARTIFACT_PATTERNS,
-    _has_gitattributes_block,
-    _has_gitignore_block,
     _is_git_repo,
-    _untrack_managed_paths,
     check_staged_provider_artifacts,
+    untrack_managed_paths,
 )
-from .install_mode import (  # noqa: F401
-    _fresh_install_schema_version,
-    _infer_upgrade_mode,
-    _persist_resolved_mode,
-    _stamp_manifest_version_no_downgrade,
+from .install_mode import (
     _write_mode_declaration,
+    fresh_install_schema_version,
+    infer_upgrade_mode,
+    persist_resolved_mode,
+    stamp_manifest_version_no_downgrade,
 )
-from .precommit import (  # noqa: F401
+from .precommit import (
     _ALL_MANAGED_HOOK_IDS,
     _HOOK_META,
     _HOOK_SUBCOMMAND,
@@ -55,17 +53,17 @@ from .precommit import (  # noqa: F401
     entry_prefix_for_mode,
     hook_defs_for_mode,
 )
-from .provider_registry import (  # noqa: F401
+from .provider_registry import (
     _PROVIDER_TO_TOOLS,
     SYNC_PROVIDERS,
     VALID_PROVIDERS,
-    _filter_tools,
-    _rel,
-    _require_reconciliation_success,
-    _validate_provider,
-    _validate_skip,
+    filter_tools,
+    rel,
+    require_reconciliation_success,
+    validate_provider,
+    validate_skip,
 )
-from .provider_sync import (  # noqa: F401
+from .provider_sync import (
     _SYNC_PROVIDER_TOOLS,
     _backfill_structures,
     _empty_sync_results,
@@ -78,7 +76,7 @@ from .provider_sync import (  # noqa: F401
     _sync_all_providers,
     sync_provider,
 )
-from .provision import (  # noqa: F401
+from .provision import (
     _detect_precommit_managed,
     _ensure_tool_configs,
     _finalize_upgrade_manifest,
@@ -91,8 +89,8 @@ from .provision import (  # noqa: F401
     init_run,
     install_run,
 )
-from .scaffold import _scaffold_core, _scaffold_provider  # noqa: F401
-from .uninstall import (  # noqa: F401
+from .scaffold import scaffold_core, scaffold_provider
+from .uninstall import (
     _UNINSTALL_DIR_LABELS,
     _UNINSTALL_DIR_OWNERS,
     _UNINSTALL_FILE_LABELS,
@@ -108,6 +106,80 @@ from .uninstall import (  # noqa: F401
 )
 
 logger = logging.getLogger(__name__)
+
+__all__ = [
+    "CANONICAL_ENTRY_PREFIX",
+    "CANONICAL_HOOK_ENTRIES",
+    "CANONICAL_HOOK_IDS",
+    "CANONICAL_PRECOMMIT_HOOKS",
+    "PROVIDER_ARTIFACT_PATTERNS",
+    "SYNC_PROVIDERS",
+    "VALID_PROVIDERS",
+    "_ALL_MANAGED_HOOK_IDS",
+    "_HOOK_META",
+    "_HOOK_SUBCOMMAND",
+    "_MODE_ENTRY_PREFIX",
+    "_PROVIDER_TO_TOOLS",
+    "_SYNC_PROVIDER_TOOLS",
+    "_UNINSTALL_DIR_LABELS",
+    "_UNINSTALL_DIR_OWNERS",
+    "_UNINSTALL_FILE_LABELS",
+    "_UNINSTALL_FILE_OWNERS",
+    "_UNTRACK_PREFIXES",
+    "_backfill_structures",
+    "_delete_managed_dir",
+    "_delete_managed_file",
+    "_detect_precommit_managed",
+    "_drop_managed_hook_entries",
+    "_dump_precommit_yaml",
+    "_empty_sync_results",
+    "_ensure_tool_configs",
+    "_finalize_upgrade_manifest",
+    "_is_git_repo",
+    "_mcp_sync_pass",
+    "_migrate_mcp_launch_shape",
+    "_precommit_yaml",
+    "_preview_install_manifest",
+    "_preview_mcp_targets",
+    "_preview_upgrade_items",
+    "_reconcile_gitattributes_opt_out",
+    "_reconcile_gitignore_opt_out",
+    "_reconcile_precommit_management",
+    "_reconcile_uninstall_git_blocks",
+    "_reseed_builtins",
+    "_run_all_syncs",
+    "_run_upgrade",
+    "_scaffold_precommit",
+    "_stamp_last_synced",
+    "_strip_managed_precommit_hooks",
+    "_sync_all_providers",
+    "_uninstall_everything",
+    "_uninstall_mcp_targets",
+    "_uninstall_precommit_hooks",
+    "_uninstall_provider_artifacts",
+    "_write_mode_declaration",
+    "canonical_hook_entries_for_mode",
+    "canonical_precommit_hooks_for_mode",
+    "check_staged_provider_artifacts",
+    "entry_prefix_for_mode",
+    "filter_tools",
+    "fresh_install_schema_version",
+    "hook_defs_for_mode",
+    "infer_upgrade_mode",
+    "init_run",
+    "install_run",
+    "persist_resolved_mode",
+    "rel",
+    "require_reconciliation_success",
+    "scaffold_core",
+    "scaffold_provider",
+    "stamp_manifest_version_no_downgrade",
+    "sync_provider",
+    "uninstall_run",
+    "untrack_managed_paths",
+    "validate_provider",
+    "validate_skip",
+]
 
 
 def hooks_list_data() -> dict[str, Any]:

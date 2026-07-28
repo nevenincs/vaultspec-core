@@ -4,6 +4,9 @@ Resets configuration state and provides a synthetic vault corpus for
 relationship analysis.
 """
 
+from collections.abc import Generator
+from pathlib import Path
+
 import pytest
 
 from ...config import reset_config
@@ -11,14 +14,14 @@ from ...testing.synthetic import CorpusManifest, build_synthetic_vault
 
 
 @pytest.fixture(autouse=True)
-def _reset_cfg():
+def reset_cfg() -> Generator[None]:
     reset_config()
     yield
     reset_config()
 
 
 @pytest.fixture(scope="session")
-def graph_manifest(tmp_path_factory) -> CorpusManifest:
+def graph_manifest(tmp_path_factory: pytest.TempPathFactory) -> CorpusManifest:
     """Session-scoped synthetic vault for graph tests.
 
     Built with four feature names so literal feature assertions pass,
@@ -49,6 +52,6 @@ def graph_manifest(tmp_path_factory) -> CorpusManifest:
 
 
 @pytest.fixture(scope="session")
-def vault_root(graph_manifest: CorpusManifest):
+def vault_root(graph_manifest: CorpusManifest) -> Path:
     """Return the synthetic vault project root for graph testing."""
     return graph_manifest.root

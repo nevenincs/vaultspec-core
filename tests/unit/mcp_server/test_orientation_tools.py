@@ -1,6 +1,6 @@
 """Tests for the find-extend and the ``status`` and ``check`` MCP tools.
 
-Drives the real FastMCP server over the in-memory session transport against
+Drives the real MCPServer over the in-memory client transport against
 a :class:`WorkspaceFactory`-installed vault on the real filesystem, with no
 mocks, stubs, or skips.  Covers the find-extend contract (per-document
 ``blob_hash`` and ``resource_uri``, orientation-sourced lifecycle status),
@@ -11,7 +11,7 @@ clean and with findings (with and without ``fix``).
 from __future__ import annotations
 
 import pytest
-from mcp.shared.memory import create_connected_server_and_client_session
+from mcp import Client
 
 from vaultspec_core.mcp_server.app import create_server
 from vaultspec_core.vaultcore.blob_hash import git_blob_oid
@@ -34,7 +34,7 @@ async def _create(client, documents):
 async def test_find_document_mode_returns_blob_hash_and_resource_uri(vault_root):
     """Document-search rows carry the current blob hash and a resource link."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create(client, [{"feature": "findext-feat", "type": "adr"}])
         result = await client.call_tool("find", {"feature": "findext-feat"})
         docs = data_of(result)
@@ -50,7 +50,7 @@ async def test_find_document_mode_returns_blob_hash_and_resource_uri(vault_root)
 async def test_find_feature_status_sourced_from_orientation(vault_root):
     """A feature with an ADR and a plan reads back as ``Planned`` via orientation."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create(
             client,
             [
@@ -75,7 +75,7 @@ async def test_find_feature_status_sourced_from_orientation(vault_root):
 async def test_status_rollup_lists_features_and_version(vault_root):
     """The unparameterized status returns a rollup with the tool-schema version."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create(client, [{"feature": "rollupfeat", "type": "adr"}])
         result = await client.call_tool("status", {})
         payload = data_of(result)
@@ -90,7 +90,7 @@ async def test_status_rollup_lists_features_and_version(vault_root):
 async def test_status_trace_targets_a_feature(vault_root):
     """A feature target returns a grounding trace over its plan."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         await _create(
             client,
             [
@@ -109,9 +109,9 @@ async def test_status_trace_targets_a_feature(vault_root):
 async def test_status_unresolvable_target_is_protocol_error(vault_root):
     """An unresolvable trace target surfaces as a whole-call protocol error."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("status", {"target": "no-such-feature-or-plan"})
-        assert result.isError
+        assert result.is_error
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +122,7 @@ async def test_status_unresolvable_target_is_protocol_error(vault_root):
 async def test_check_clean_vault_reports_ok(vault_root):
     """A freshly-installed vault checks clean."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("check", {})
         payload = data_of(result)
         assert payload["status"] == "ok"
@@ -143,7 +143,7 @@ async def test_check_reports_findings_for_broken_document(vault_root):
         encoding="utf-8",
     )
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("check", {})
         payload = data_of(result)
         assert payload["status"] == "failed"
@@ -157,7 +157,7 @@ async def test_check_reports_findings_for_broken_document(vault_root):
 async def test_check_fix_flag_is_reported(vault_root):
     """The ``fix`` flag runs the repairing pass and is echoed in the result."""
     mcp = create_server()
-    async with create_connected_server_and_client_session(mcp) as client:
+    async with Client(mcp) as client:
         result = await client.call_tool("check", {"fix": True})
         payload = data_of(result)
         assert payload["fixed"] is True

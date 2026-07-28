@@ -26,6 +26,16 @@ if TYPE_CHECKING:
 
     from vaultspec_core.core.diagnosis import ProviderDiagnosis, WorkspaceDiagnosis
 
+__all__ = [
+    "_doctor_exit_code",
+    "_gate",
+    "_provider_status",
+    "_render_diagnosis_table",
+    "_signal_status",
+    "cmd_doctor",
+    "logger",
+]
+
 logger = logging.getLogger(__name__)
 
 

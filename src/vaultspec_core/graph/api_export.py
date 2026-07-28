@@ -18,12 +18,31 @@ import json
 import pathlib
 from typing import TYPE_CHECKING, Any
 
+from networkx.readwrite import json_graph
+
 from .derived import compute_derived_edges
 
 if TYPE_CHECKING:
+    import networkx as nx
+
     from .api import VaultGraph
 
 __all__ = ["relativise_node_path", "to_dict", "to_json"]
+
+# networkx's own stubs leave ``node_link_data`` without a return-type
+# annotation, so calling it directly always reports as "partially unknown"
+# regardless of how precisely the input graph is typed. This thin re-binding
+# declares the signature actually used below (verified against the runtime
+# behaviour) for type-checking only; the ``else`` branch binds the exact same
+# callable at runtime, so behaviour is unchanged. Mirrors the identical
+# pattern in :mod:`vaultspec_core.graph.api`.
+if TYPE_CHECKING:
+
+    def _node_link_data(
+        g: nx.DiGraph[str], *, edges: str = "edges"
+    ) -> dict[str, Any]: ...
+else:
+    _node_link_data = json_graph.node_link_data
 
 
 def relativise_node_path(root_dir: pathlib.Path, raw_path: Any) -> str | None:
@@ -92,8 +111,6 @@ def to_dict(
         ``metrics`` keys. ``ref`` names the git ref for a ref-scoped build
         (issue #160) and is ``None`` for a working-tree build.
     """
-    from .api import _node_link_data
-
     if node is not None:
         g = graph.ego_subgraph(node, depth=depth)
     else:

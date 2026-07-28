@@ -18,6 +18,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+#: Re-exported (with underscore intact) for :mod:`vaultspec_core.vaultcore.query`,
+#: the single public import surface for the feature archive/rename engine.
+__all__ = ["_cleanup_empty_dirs"]
+
 
 class FeatureCrossLink(TypedDict):
     """One incoming cross-feature link surfaced during archive/rename."""
@@ -161,7 +165,7 @@ def unarchive_feature(
             f"Feature tag '{feature}' matches zero archived documents."
         )
 
-    archived_docs = []
+    archived_docs: list[tuple[Path, Path]] = []
     for doc_path in archive_dir.rglob("*.md"):
         if ".obsidian" in doc_path.parts:
             continue

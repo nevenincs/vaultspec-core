@@ -2,7 +2,7 @@
 
 Covers the five install-layer problem domains ratified for this fix:
 
-* D1 - ``_untrack_managed_paths`` drops historically-tracked
+* D1 - ``untrack_managed_paths`` drops historically-tracked
   ``.vaultspec/providers.json`` from the git index on install.
 * D2 - lock sentinels are absent from ``git status --porcelain`` after
   install because the managed block now ignores them.
@@ -24,13 +24,15 @@ import pytest
 
 from vaultspec_core.core.commands import (
     _scaffold_precommit,
-    _untrack_managed_paths,
     check_staged_provider_artifacts,
     install_run,
+    untrack_managed_paths,
 )
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
 pytestmark = [pytest.mark.integration]
 
@@ -116,7 +118,7 @@ class TestCheckProvidersIgnoresDeletions:
 
 
 class TestUntrackManagedPaths:
-    """``_untrack_managed_paths`` drops tracked files from the index."""
+    """``untrack_managed_paths`` drops tracked files from the index."""
 
     def test_untracks_providers_json_when_tracked(self, tmp_path: Path) -> None:
         _init_git_repo(tmp_path)
@@ -134,7 +136,7 @@ class TestUntrackManagedPaths:
             == 0
         )
 
-        untracked = _untrack_managed_paths(tmp_path, [".vaultspec/"])
+        untracked = untrack_managed_paths(tmp_path, [".vaultspec/"])
 
         assert untracked == [".vaultspec/providers.json"]
         assert (
@@ -151,7 +153,7 @@ class TestUntrackManagedPaths:
         _run_git(tmp_path, "add", ".mcp.json")
         _run_git(tmp_path, "commit", "-q", "-m", "track mcp")
 
-        untracked = _untrack_managed_paths(tmp_path, [".mcp.json"])
+        untracked = untrack_managed_paths(tmp_path, [".mcp.json"])
 
         assert untracked == []
         assert (
@@ -166,7 +168,7 @@ class TestUntrackManagedPaths:
         _run_git(tmp_path, "add", ".mcp.json.lock")
         _run_git(tmp_path, "commit", "-q", "-m", "accidentally committed sentinel")
 
-        untracked = _untrack_managed_paths(tmp_path, ["/.mcp.json.lock"])
+        untracked = untrack_managed_paths(tmp_path, ["/.mcp.json.lock"])
 
         assert untracked == [".mcp.json.lock"]
         assert (
@@ -177,7 +179,7 @@ class TestUntrackManagedPaths:
         )
 
     def test_no_git_repo_is_noop(self, tmp_path: Path) -> None:
-        untracked = _untrack_managed_paths(tmp_path, [".vaultspec/"])
+        untracked = untrack_managed_paths(tmp_path, [".vaultspec/"])
         assert untracked == []
 
     def test_does_not_untrack_uv_lock(self, tmp_path: Path) -> None:
@@ -187,7 +189,7 @@ class TestUntrackManagedPaths:
         _run_git(tmp_path, "add", "uv.lock")
         _run_git(tmp_path, "commit", "-q", "-m", "track uv.lock")
 
-        untracked = _untrack_managed_paths(tmp_path, ["uv.lock"])
+        untracked = untrack_managed_paths(tmp_path, ["uv.lock"])
 
         assert untracked == []
         assert (
@@ -201,7 +203,7 @@ class TestUntrackManagedPaths:
         _run_git(tmp_path, "add", "custom.lock")
         _run_git(tmp_path, "commit", "-q", "-m", "track custom.lock")
 
-        untracked = _untrack_managed_paths(tmp_path, ["/custom.lock"])
+        untracked = untrack_managed_paths(tmp_path, ["/custom.lock"])
 
         assert untracked == []
         assert (
@@ -230,7 +232,7 @@ class TestUntrackManagedPaths:
         _run_git(tmp_path, "add", *paths)
         _run_git(tmp_path, "commit", "-q", "-m", "seed many legacy files")
 
-        untracked = _untrack_managed_paths(tmp_path, [".vaultspec/"])
+        untracked = untrack_managed_paths(tmp_path, [".vaultspec/"])
 
         assert sorted(untracked) == sorted(paths), (
             f"Expected all {len(paths)} files untracked; got {len(untracked)}"
@@ -253,7 +255,7 @@ class TestUntrackManagedPaths:
         _run_git(tmp_path, "add", ".claude/settings.json")
         _run_git(tmp_path, "commit", "-q", "-m", "legacy tracked claude settings")
 
-        untracked = _untrack_managed_paths(tmp_path, [".claude/"])
+        untracked = untrack_managed_paths(tmp_path, [".claude/"])
 
         assert untracked == [".claude/settings.json"]
         assert (
@@ -282,7 +284,7 @@ class TestUntrackManagedPaths:
         _run_git(tmp_path, "add", *seeded)
         _run_git(tmp_path, "commit", "-q", "-m", "seed 150 tracked files")
 
-        untracked = _untrack_managed_paths(tmp_path, [".vaultspec/"])
+        untracked = untrack_managed_paths(tmp_path, [".vaultspec/"])
 
         # Happy path: all 150 files untracked in exactly two chunks.
         # The critical invariant the regression is about is that
@@ -310,7 +312,7 @@ class TestUntrackManagedPaths:
         _run_git(tmp_path, "add", "docs/.gitignore.lock")
         _run_git(tmp_path, "commit", "-q", "-m", "track subdir sentinel")
 
-        untracked = _untrack_managed_paths(tmp_path, ["docs/.gitignore.lock"])
+        untracked = untrack_managed_paths(tmp_path, ["docs/.gitignore.lock"])
 
         assert untracked == []
         assert (
@@ -662,7 +664,9 @@ class TestScaffoldPreservesAuthorContent:
             "    pass_filenames: false\n"
         )
 
-    def test_reassembly_preserves_comments_and_quoting(self, factory) -> None:
+    def test_reassembly_preserves_comments_and_quoting(
+        self, factory: WorkspaceFactory
+    ) -> None:
         config = factory.root / ".pre-commit-config.yaml"
         config.write_text(self._authored_config(), encoding="utf-8")
 
@@ -680,7 +684,7 @@ class TestScaffoldPreservesAuthorContent:
         # Both exclude regexes keep their single-quoted literal form.
         assert rendered.count("exclude: '^CHANGELOG\\.md$'") == 2
 
-    def test_reassembly_is_idempotent(self, factory) -> None:
+    def test_reassembly_is_idempotent(self, factory: WorkspaceFactory) -> None:
         config = factory.root / ".pre-commit-config.yaml"
         config.write_text(self._authored_config(), encoding="utf-8")
 
@@ -1074,10 +1078,8 @@ class TestStructureRenameUpdatesRefs:
             CheckResult,
             Severity,
         )
-        from vaultspec_core.vaultcore.checks.structure import (
-            _FRONTMATTER_LINE_BUDGET,
-            _rewrite_incoming_refs,
-        )
+        from vaultspec_core.vaultcore.checks.structure import _rewrite_incoming_refs
+        from vaultspec_core.vaultcore.rename_ops import _FRONTMATTER_LINE_BUDGET
 
         vault = tmp_path / ".vault"
         adr_dir = vault / "adr"

@@ -22,6 +22,8 @@ from vaultspec_core.core.manifest import read_manifest_data, write_manifest_data
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
 pytestmark = [pytest.mark.integration]
 
 
@@ -269,7 +271,9 @@ class TestDoctorDegradedWorkspaces:
 class TestInstallModeConflictRefusal:
     """install refuses an impossible mode request instead of silent fallback."""
 
-    def test_dependency_mode_without_pyproject_refuses(self, factory):
+    def test_dependency_mode_without_pyproject_refuses(
+        self, factory: WorkspaceFactory
+    ) -> None:
         # A repo with no pyproject.toml has nothing to resolve a dependency
         # against, so an explicit dependency-mode request is a hard refusal
         # rather than a silent fallback to tool mode.

@@ -9,9 +9,13 @@ always exits zero (the trailer is enrichment, never a prerequisite).
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 import pytest
 from typer.testing import CliRunner
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from vaultspec_core.cli import app
 from vaultspec_core.plan.trailer import (
@@ -182,7 +186,7 @@ def test_cli_emit_invalid_step_is_usage_error(runner: CliRunner) -> None:
 # ---- CLI: validate (always exits zero) --------------------------------------
 
 
-def test_cli_validate_clean_exits_zero(runner: CliRunner, tmp_path) -> None:
+def test_cli_validate_clean_exits_zero(runner: CliRunner, tmp_path: Path) -> None:
     msg = tmp_path / "COMMIT_EDITMSG"
     msg.write_text("feat: x\n\nVaultspec-Step: P02.S06\n", encoding="utf-8")
     result = runner.invoke(app, ["vault", "plan", "trailer", "validate", str(msg)])
@@ -190,7 +194,7 @@ def test_cli_validate_clean_exits_zero(runner: CliRunner, tmp_path) -> None:
 
 
 def test_cli_validate_malformed_reports_but_exits_zero(
-    runner: CliRunner, tmp_path
+    runner: CliRunner, tmp_path: Path
 ) -> None:
     msg = tmp_path / "COMMIT_EDITMSG"
     msg.write_text("feat: x\n\nVaultspec-Step: garbage\n", encoding="utf-8")
@@ -200,20 +204,22 @@ def test_cli_validate_malformed_reports_but_exits_zero(
     assert "garbage" in result.output
 
 
-def test_cli_validate_trailerless_exits_zero(runner: CliRunner, tmp_path) -> None:
+def test_cli_validate_trailerless_exits_zero(runner: CliRunner, tmp_path: Path) -> None:
     msg = tmp_path / "COMMIT_EDITMSG"
     msg.write_text("chore: no trailers here\n", encoding="utf-8")
     result = runner.invoke(app, ["vault", "plan", "trailer", "validate", str(msg)])
     assert result.exit_code == 0, result.output
 
 
-def test_cli_validate_missing_file_exits_zero(runner: CliRunner, tmp_path) -> None:
+def test_cli_validate_missing_file_exits_zero(
+    runner: CliRunner, tmp_path: Path
+) -> None:
     missing = tmp_path / "does-not-exist"
     result = runner.invoke(app, ["vault", "plan", "trailer", "validate", str(missing)])
     assert result.exit_code == 0, result.output
 
 
-def test_cli_validate_json_envelope(runner: CliRunner, tmp_path) -> None:
+def test_cli_validate_json_envelope(runner: CliRunner, tmp_path: Path) -> None:
     msg = tmp_path / "COMMIT_EDITMSG"
     msg.write_text("feat: x\n\nVaultspec-Feature: Bad Tag\n", encoding="utf-8")
     result = runner.invoke(

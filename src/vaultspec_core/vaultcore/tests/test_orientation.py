@@ -32,13 +32,15 @@ from ..orientation import (
 from ..scanner import scan_vault
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
     from pathlib import Path
+    from types import FrameType
 
 pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture(autouse=True)
-def _reset_cfg():
+def reset_cfg() -> Generator[None]:
     reset_config()
     yield
     reset_config()
@@ -590,7 +592,7 @@ class TestTraceTargetResolution:
 # ---------------------------------------------------------------------------
 
 
-def _count_corpus_reads(fn) -> int:
+def _count_corpus_reads(fn: Callable[[], object]) -> int:
     """Run *fn* under a real profiler, counting genuine ``.vault/*.md`` reads.
 
     Mirrors the scale gate's ``sys.setprofile`` technique
@@ -604,7 +606,7 @@ def _count_corpus_reads(fn) -> int:
     """
     count = 0
 
-    def profiler(frame, event: str, arg: object) -> None:
+    def profiler(frame: FrameType, event: str, arg: object) -> None:
         nonlocal count
         if event != "call":
             return

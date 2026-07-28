@@ -7,14 +7,19 @@ which must not mangle a Windows editor path (backslash separators) before the
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from vaultspec_core.core.local_config import _command_first_token_on_path
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 pytestmark = [pytest.mark.unit]
 
 
-def test_native_absolute_path_resolves(tmp_path):
+def test_native_absolute_path_resolves(tmp_path: Path) -> None:
     """A real editor referenced by its native absolute path resolves.
 
     On Windows the absolute path uses backslash separators; tokenizing it with
@@ -29,11 +34,11 @@ def test_native_absolute_path_resolves(tmp_path):
     assert _command_first_token_on_path(str(editor)) is True
 
 
-def test_missing_command_is_rejected():
+def test_missing_command_is_rejected() -> None:
     """A command whose first token is not on ``PATH`` is rejected."""
     assert _command_first_token_on_path("vaultspec-not-a-real-editor-xyz") is False
 
 
-def test_blank_command_is_rejected():
+def test_blank_command_is_rejected() -> None:
     """A whitespace-only command yields no token and is rejected."""
     assert _command_first_token_on_path("   ") is False

@@ -34,8 +34,8 @@ from vaultspec_core.vaultcore.edit_engine import (
     EditError,
     EditResult,
     _compose_new_text,
-    _enforce_blob_hash,
-    _resolve_doc_path,
+    enforce_blob_hash,
+    resolve_document_path,
     _write_proposed,
     execute_edit,
 )
@@ -114,12 +114,12 @@ def _doc(root: Path) -> Path:
 
 class TestResolve:
     def test_stem_resolves_to_backing_file(self, vault_root):
-        resolved = _resolve_doc_path("2026-01-01-alpha-adr", vault_root)
+        resolved = resolve_document_path("2026-01-01-alpha-adr", vault_root)
         assert resolved == _doc(vault_root)
 
     def test_unknown_ref_raises_typed_error(self, vault_root):
         with pytest.raises(EditError) as excinfo:
-            _resolve_doc_path("no-such-document", vault_root)
+            resolve_document_path("no-such-document", vault_root)
         assert excinfo.value.data["path"] == "no-such-document"
 
 
@@ -133,7 +133,7 @@ class TestBlobHashConflict:
         doc = _doc(vault_root)
         stale = "deadbeef" * 5
         with pytest.raises(EditError) as excinfo:
-            _enforce_blob_hash(doc, stale)
+            enforce_blob_hash(doc, stale)
         data = excinfo.value.data
         assert data["conflict"] is True
         assert data["expected"] == stale
@@ -143,7 +143,7 @@ class TestBlobHashConflict:
         doc = _doc(vault_root)
         current = git_blob_oid(doc.read_bytes())
         # No exception is the assertion: a matching guard permits the write.
-        assert _enforce_blob_hash(doc, current) is None
+        assert enforce_blob_hash(doc, current) is None
 
     def test_execute_edit_folds_conflict_into_failed_result(self, vault_root):
         before = _doc(vault_root).read_bytes()

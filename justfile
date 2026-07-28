@@ -75,7 +75,6 @@ default:
 bootstrap:
     uv sync --locked --group dev
     {{dev}} framework install
-    {{dev}} precommit install
 
 # ===========================================================================
 #  Toolchain verbs
@@ -104,10 +103,6 @@ test target='all':
 # Build the Python distribution artifacts.
 build target='python':
     {{dev}} build {{target}}
-
-# Manage the prek-owned git pre-commit hooks.
-precommit target='run':
-    {{dev}} precommit {{target}}
 
 # ===========================================================================
 #  This checkout's own vaultspec records and harness

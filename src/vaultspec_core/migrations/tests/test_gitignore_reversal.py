@@ -24,7 +24,7 @@ pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture(autouse=True)
-def _reset_cfg():
+def reset_cfg():
     reset_config()
     yield
     reset_config()

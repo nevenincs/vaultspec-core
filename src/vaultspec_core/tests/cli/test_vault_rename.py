@@ -17,7 +17,7 @@ Coverage:
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -27,7 +27,7 @@ from vaultspec_core.vaultcore.blob_hash import git_blob_oid
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from click.testing import Result
+    from typer.testing import CliRunner, Result
 
 pytestmark = [pytest.mark.unit]
 
@@ -90,16 +90,18 @@ def _gamma(root: Path) -> Path:
     return root / ".vault" / "adr" / "2026-01-01-gamma-adr.md"
 
 
-def _run(runner, *args: str, target: Path, stdin: str | None = None) -> Result:
+def _run(
+    runner: CliRunner, *args: str, target: Path, stdin: str | None = None
+) -> Result:
     return runner.invoke(app, ["--target", str(target), *args], input=stdin)
 
 
-def _env(result: Result) -> dict:
+def _env(result: Result) -> dict[str, Any]:
     return json.loads(result.output)
 
 
 class TestVaultRename:
-    def test_moves_file_and_rekeys(self, runner, tmp_path):
+    def test_moves_file_and_rekeys(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -118,7 +120,7 @@ class TestVaultRename:
         assert _gamma(root).exists()
         assert not _alpha(root).exists()
 
-    def test_rewrites_incoming_related(self, runner, tmp_path):
+    def test_rewrites_incoming_related(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -140,7 +142,9 @@ class TestVaultRename:
         assert "[[2026-01-01-gamma-adr]]" in beta_text
         assert "[[2026-01-01-alpha-adr]]" not in beta_text
 
-    def test_incoming_rewritten_counts_links_not_docs_on_dedup(self, runner, tmp_path):
+    def test_incoming_rewritten_counts_links_not_docs_on_dedup(
+        self, runner: CliRunner, tmp_path: Path
+    ):
         """A dedup-drop is reported but NOT counted - the per-link contract.
 
         When a referencing doc already lists the rename target ahead of the old
@@ -183,7 +187,9 @@ class TestVaultRename:
         assert beta_text.count("[[2026-01-01-gamma-adr]]") == 1
         assert "[[2026-01-01-alpha-adr]]" not in beta_text
 
-    def test_collision_refuses_and_leaves_source(self, runner, tmp_path):
+    def test_collision_refuses_and_leaves_source(
+        self, runner: CliRunner, tmp_path: Path
+    ):
         root = _make_vault(tmp_path)
         before = _alpha(root).read_text(encoding="utf-8")
         result = _run(
@@ -202,7 +208,7 @@ class TestVaultRename:
         assert env["data"].get("collision") is True
         assert _alpha(root).read_text(encoding="utf-8") == before
 
-    def test_invalid_target_stem_refuses(self, runner, tmp_path):
+    def test_invalid_target_stem_refuses(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -218,7 +224,7 @@ class TestVaultRename:
         assert _env(result)["status"] == "failed"
         assert _alpha(root).exists()
 
-    def test_stale_blob_hash_refuses(self, runner, tmp_path):
+    def test_stale_blob_hash_refuses(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -237,7 +243,7 @@ class TestVaultRename:
         assert _alpha(root).exists()
         assert not _gamma(root).exists()
 
-    def test_matching_blob_hash_allows(self, runner, tmp_path):
+    def test_matching_blob_hash_allows(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         good = git_blob_oid(_alpha(root).read_bytes())
         result = _run(
@@ -255,7 +261,7 @@ class TestVaultRename:
         assert result.exit_code == 0, result.output
         assert _gamma(root).exists()
 
-    def test_dry_run_writes_nothing(self, runner, tmp_path):
+    def test_dry_run_writes_nothing(self, runner: CliRunner, tmp_path: Path):
         root = _make_vault(tmp_path)
         result = _run(
             runner,
@@ -273,7 +279,9 @@ class TestVaultRename:
         assert _alpha(root).exists()
         assert not _gamma(root).exists()
 
-    def test_directory_at_destination_refuses_without_dangling(self, runner, tmp_path):
+    def test_directory_at_destination_refuses_without_dangling(
+        self, runner: CliRunner, tmp_path: Path
+    ):
         """A blocked rename never rewrites incoming links (window closed).
 
         Plant a directory exactly where the target file would land. The
@@ -307,7 +315,7 @@ class TestVaultRename:
         assert _beta(root).read_bytes() == beta_before
         assert "[[2026-01-01-alpha-adr]]" in _beta(root).read_text(encoding="utf-8")
 
-    def test_midapply_failure_rolls_back_byte_for_byte(self, tmp_path):
+    def test_midapply_failure_rolls_back_byte_for_byte(self, tmp_path: Path):
         """A mid-apply failure restores the vault and leaves no dangling link.
 
         Drives the exact transactional composition ``vault rename`` uses -
@@ -354,7 +362,9 @@ class TestVaultRename:
         assert "[[2026-01-01-alpha-adr]]" in beta_text
         assert "[[2026-01-01-gamma-adr]]" not in beta_text
 
-    def test_archived_doc_bytes_unchanged_by_rename(self, runner, tmp_path):
+    def test_archived_doc_bytes_unchanged_by_rename(
+        self, runner: CliRunner, tmp_path: Path
+    ):
         """An archived doc referencing the renamed stem is never mutated.
 
         A document under ``.vault/_archive/`` is out of rename scope: the

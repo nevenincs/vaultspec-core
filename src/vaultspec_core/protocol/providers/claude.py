@@ -82,7 +82,7 @@ class ClaudeProvider(ExecutionProvider):
         if not rules_dir.exists():
             return ""
 
-        all_rules = []
+        all_rules: list[str] = []
         for rule_file in sorted(rules_dir.glob("*.md")):
             all_rules.append(rule_file.read_text(encoding="utf-8"))
 

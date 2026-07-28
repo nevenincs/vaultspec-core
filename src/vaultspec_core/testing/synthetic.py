@@ -19,10 +19,9 @@ from __future__ import annotations
 
 import random
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 __all__ = [
     "PATHOLOGY_NAMES",
@@ -81,7 +80,6 @@ _TYPE_PARAGRAPHS: dict[str, str] = {
     ),
 }
 
-
 @dataclass
 class GeneratedDoc:
     """A single generated vault document.
@@ -103,6 +101,10 @@ class GeneratedDoc:
     date: str
     path: Path
     related_ids: list[str] = field(default_factory=list)
+
+
+type PathologyDetailValue = str | int | Path | GeneratedDoc | list[str]
+type PathologyDetail = dict[str, PathologyDetailValue]
 
 
 @dataclass
@@ -128,7 +130,7 @@ class CorpusManifest:
     needles: dict[str, str]
     graph_edges: list[tuple[str, str]]
     pathologies: dict[str, list[GeneratedDoc]] = field(default_factory=dict)
-    pathology_details: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    pathology_details: dict[str, list[PathologyDetail]] = field(default_factory=dict)
     named_docs: dict[str, GeneratedDoc] = field(default_factory=dict)
 
 
@@ -216,7 +218,7 @@ def _apply_dangling(
     shape required by the ``check_dangling`` fix path.
     """
     affected: list[GeneratedDoc] = []
-    details: list[dict[str, Any]] = []
+    details: list[PathologyDetail] = []
 
     # Pick one exec-type doc to inject dangling link into; prefer exec subdir.
     exec_docs = [d for d in docs if d.doc_type == "exec"]
@@ -719,10 +721,11 @@ def _apply_unreferenced_research(
     manifest.pathology_details["unreferenced_research"] = [{"stem": stem}]
 
 
-_PATHOLOGY_HANDLERS: dict[
-    str,
-    Any,
-] = {  # type-checked at runtime via PATHOLOGY_NAMES export
+type PathologyHandler = Callable[
+    [Path, list[GeneratedDoc], random.Random, CorpusManifest], None
+]
+
+_PATHOLOGY_HANDLERS: dict[str, PathologyHandler] = {
     "dangling": _apply_dangling,
     "orphan": _apply_orphan,
     "missing_frontmatter": _apply_missing_frontmatter,

@@ -17,6 +17,10 @@ from . import types as _t
 from .enums import Tool
 from .exceptions import ProviderError, VaultSpecError
 
+#: Re-exported (with underscore intact) for the sibling command modules that
+#: reach into this as the single public import surface for provider vocabulary.
+__all__ = ["_PROVIDER_TO_TOOLS"]
+
 # Map provider argument names to Tool enum members. The per-tool entries derive
 # from the Tool enum so adding a provider is a single-site change; "all" selects
 # every tool and "core" selects none (framework-only). VALID_PROVIDERS and
@@ -33,11 +37,11 @@ VALID_PROVIDERS = set(_PROVIDER_TO_TOOLS)
 SYNC_PROVIDERS = VALID_PROVIDERS - {"core"}
 
 
-def _rel(target: Path, p: Path) -> str:
+def rel(target: Path, p: Path) -> str:
     return str(p.relative_to(target)).replace("\\", "/")
 
 
-def _validate_provider(provider: str) -> None:
+def validate_provider(provider: str) -> None:
     """Validate that *provider* is a known provider name.
 
     Raises:
@@ -50,7 +54,7 @@ def _validate_provider(provider: str) -> None:
         )
 
 
-def _validate_skip(skip: set[str] | None, *, allow_core: bool = True) -> set[str]:
+def validate_skip(skip: set[str] | None, *, allow_core: bool = True) -> set[str]:
     """Validate and normalise a *skip* set.
 
     Raises:
@@ -72,14 +76,14 @@ def _validate_skip(skip: set[str] | None, *, allow_core: bool = True) -> set[str
     return skip
 
 
-def _filter_tools(tools: list[Tool], skip: set[str]) -> list[Tool]:
+def filter_tools(tools: list[Tool], skip: set[str]) -> list[Tool]:
     """Remove tools whose provider name is in *skip*."""
     if not skip:
         return tools
     return [t for t in tools if t.value not in skip]
 
 
-def _require_reconciliation_success(
+def require_reconciliation_success(
     results: _t.SyncResult | Iterable[_t.SyncResult],
     *,
     operation: str,
@@ -95,3 +99,15 @@ def _require_reconciliation_success(
             f"{operation} failed.",
             hint=" ".join(errors),
         )
+
+
+# Backward-compatible private aliases: several ``core`` modules outside this
+# round's scope still import these helpers by their original underscore
+# names (e.g. ``core/commands.py``'s re-export surface, ``core/provision.py``,
+# ``core/scaffold.py``, ``core/uninstall.py``). Keep them resolvable without
+# touching those call sites; new callers should prefer the public names.
+_rel = rel
+_validate_provider = validate_provider
+_validate_skip = validate_skip
+_filter_tools = filter_tools
+_require_reconciliation_success = require_reconciliation_success

@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_builtin_version(
+def resolve_builtin_version(
     plan: ResolutionPlan,
     signal: BuiltinVersionSignal,
     action: CliAction,
@@ -46,6 +46,10 @@ def _resolve_builtin_version(
         return
 
     if signal == BuiltinVersionSignal.DELETED:
+        if action in (CliAction.INSTALL, CliAction.UNINSTALL):
+            # Deleted during install: vaultspec-core install --upgrade re-seeds.
+            # Deleted during uninstall: nothing left to remove.
+            return
         plan.warnings.append(
             "Builtin resources have been deleted from .vaultspec/. "
             "Run 'vaultspec-core install --upgrade' to restore."
@@ -95,14 +99,6 @@ def _resolve_builtin_version(
         # Modified builtins during uninstall: they'll be removed anyway.
         return
 
-    if signal == BuiltinVersionSignal.DELETED and action in (
-        CliAction.INSTALL,
-        CliAction.UNINSTALL,
-    ):
-        # Deleted during install: vaultspec-core install --upgrade re-seeds.
-        # Deleted during uninstall: nothing left to remove.
-        return
-
     # All BuiltinVersionSignal values are handled above.
     logger.warning(
         "Unknown BuiltinVersionSignal member: %s (action=%s)", signal, action
@@ -114,7 +110,7 @@ def _resolve_builtin_version(
 # ---------------------------------------------------------------------------
 
 
-def _resolve_mode_mismatch(
+def resolve_mode_mismatch(
     plan: ResolutionPlan,
     signal: ModeMismatchSignal,
 ) -> None:
@@ -191,7 +187,7 @@ def _enforce_version_floor(target: Path, running_version: str) -> None:
     )
 
 
-def _resolve_version_warning(
+def resolve_version_warning(
     plan: ResolutionPlan,
     diagnosis: WorkspaceDiagnosis,
 ) -> None:
@@ -266,3 +262,10 @@ def _resolve_version_warning(
             )
     except Exception:
         logger.debug("Version comparison failed", exc_info=True)
+
+
+#: Backward-compatible aliases for external callers still importing the
+#: previously private names.
+_resolve_builtin_version = resolve_builtin_version
+_resolve_mode_mismatch = resolve_mode_mismatch
+_resolve_version_warning = resolve_version_warning

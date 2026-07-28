@@ -1,7 +1,7 @@
 """Test that the MCP tool surface stays within a context budget.
 
 Prevents tool definition bloat from consuming agent working context.
-A FastMCP server's tool definitions are serialized into every LLM
+An MCPServer's tool definitions are serialized into every LLM
 request  - keeping them compact is a hard requirement.
 """
 
@@ -44,7 +44,7 @@ EXPECTED_TOOLS = {
 
 
 def _serialize_tool_definition(tool) -> str:
-    """Serialize a single FastMCP Tool object to a JSON string."""
+    """Serialize a single MCPServer Tool object to a JSON string."""
     tool_def = {
         "name": tool.name,
         "description": tool.description or "",

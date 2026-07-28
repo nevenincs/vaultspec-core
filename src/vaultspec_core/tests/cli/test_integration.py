@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from typer.testing import CliRunner
+
 import pytest
 
 from vaultspec_core.cli import app
@@ -17,7 +19,7 @@ pytestmark = [pytest.mark.unit]
 class TestPathsEnvBridge:
     """Verify that path overrides (target) propagate correctly."""
 
-    def test_target_override(self, synthetic_project: Path, runner) -> None:
+    def test_target_override(self, synthetic_project: Path, runner: CliRunner) -> None:
         """--target flag correctly overrides the workspace root."""
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "vault", "check", "all"]
@@ -37,7 +39,7 @@ class TestPathsEnvBridge:
 class TestValidationEdgeCases:
     """Verify error handling for invalid path configurations."""
 
-    def test_target_dir_must_exist(self, tmp_path: Path, runner) -> None:
+    def test_target_dir_must_exist(self, tmp_path: Path, runner: CliRunner) -> None:
         """Providing a nonexistent --target should exit with an error."""
         nonexistent = tmp_path / "ghost"
         result = runner.invoke(

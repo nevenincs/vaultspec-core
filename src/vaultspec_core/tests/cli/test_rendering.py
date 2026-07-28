@@ -49,7 +49,7 @@ def _has_box_drawing(text: str) -> bool:
 
 @pytest.mark.unit
 class TestOutcomeEnum:
-    def test_seven_word_taxonomy_plus_mixed(self):
+    def test_seven_word_taxonomy_plus_mixed(self) -> None:
         assert {o.value for o in Outcome} == {
             "created",
             "updated",
@@ -61,40 +61,41 @@ class TestOutcomeEnum:
             "mixed",
         }
 
-    def test_every_outcome_has_a_style(self):
+    def test_every_outcome_has_a_style(self) -> None:
         for outcome in Outcome:
             glyph, colour = OUTCOME_STYLE[outcome]
             assert glyph
             assert colour
 
-    def test_str_of_member_is_the_lowercase_word(self):
+    def test_str_of_member_is_the_lowercase_word(self) -> None:
         assert str(Outcome.CREATED) == "created"
 
 
 @pytest.mark.unit
 class TestOutcomeItem:
-    def test_item_is_frozen(self):
+    def test_item_is_frozen(self) -> None:
         item = OutcomeItem(name="rule-a", outcome=Outcome.CREATED)
+        field = "name"
         with pytest.raises(dataclasses.FrozenInstanceError):
-            item.name = "rule-b"  # ty: ignore[invalid-assignment]
+            setattr(item, field, "rule-b")
 
-    def test_detail_defaults_to_empty(self):
+    def test_detail_defaults_to_empty(self) -> None:
         assert OutcomeItem(name="x", outcome=Outcome.SKIPPED).detail == ""
 
 
 @pytest.mark.unit
 class TestAggregateOutcome:
-    def test_empty_set_aggregates_to_unchanged(self):
+    def test_empty_set_aggregates_to_unchanged(self) -> None:
         assert aggregate_outcome([]) == Outcome.UNCHANGED
 
-    def test_unanimous_outcome_is_returned(self):
+    def test_unanimous_outcome_is_returned(self) -> None:
         items = [
             OutcomeItem(name="a", outcome=Outcome.CREATED),
             OutcomeItem(name="b", outcome=Outcome.CREATED),
         ]
         assert aggregate_outcome(items) == Outcome.CREATED
 
-    def test_divergent_outcomes_aggregate_to_mixed(self):
+    def test_divergent_outcomes_aggregate_to_mixed(self) -> None:
         items = [
             OutcomeItem(name="a", outcome=Outcome.CREATED),
             OutcomeItem(name="b", outcome=Outcome.UPDATED),
@@ -104,7 +105,7 @@ class TestAggregateOutcome:
 
 @pytest.mark.unit
 class TestCountOutcomes:
-    def test_counts_per_outcome(self):
+    def test_counts_per_outcome(self) -> None:
         items = [
             OutcomeItem(name="a", outcome=Outcome.CREATED),
             OutcomeItem(name="b", outcome=Outcome.CREATED),
@@ -116,20 +117,20 @@ class TestCountOutcomes:
 
 @pytest.mark.unit
 class TestOutcomesAsJson:
-    def test_status_is_the_aggregate_word(self):
+    def test_status_is_the_aggregate_word(self) -> None:
         items = [OutcomeItem(name="a", outcome=Outcome.UPDATED)]
         payload = outcomes_as_json(items)
         assert payload["status"] == "updated"
 
-    def test_empty_invocation_reports_unchanged(self):
+    def test_empty_invocation_reports_unchanged(self) -> None:
         assert outcomes_as_json([])["status"] == "unchanged"
 
-    def test_item_records_carry_name_and_outcome(self):
+    def test_item_records_carry_name_and_outcome(self) -> None:
         items = [OutcomeItem(name="rule-a", outcome=Outcome.CREATED)]
         records = cast("list[dict[str, str]]", outcomes_as_json(items)["items"])
         assert records[0] == {"name": "rule-a", "outcome": "created"}
 
-    def test_detail_is_omitted_when_blank_and_present_otherwise(self):
+    def test_detail_is_omitted_when_blank_and_present_otherwise(self) -> None:
         items = [
             OutcomeItem(name="a", outcome=Outcome.SKIPPED, detail="excluded by policy"),
             OutcomeItem(name="b", outcome=Outcome.CREATED),
@@ -138,7 +139,7 @@ class TestOutcomesAsJson:
         assert records[0]["detail"] == "excluded by policy"
         assert "detail" not in records[1]
 
-    def test_group_is_recorded_when_present_and_omitted_when_blank(self):
+    def test_group_is_recorded_when_present_and_omitted_when_blank(self) -> None:
         items = [
             OutcomeItem(name="a", outcome=Outcome.CREATED, group="claude"),
             OutcomeItem(name="b", outcome=Outcome.CREATED),
@@ -150,13 +151,15 @@ class TestOutcomesAsJson:
 
 @pytest.mark.unit
 class TestRenderOutcomes:
-    def setup_method(self):
+    def setup_method(self) -> None:
         reset_console()
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         reset_console()
 
-    def test_text_surface_shares_one_taxonomy_with_json(self, capsys):
+    def test_text_surface_shares_one_taxonomy_with_json(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         items = [
             OutcomeItem(name="rule-a", outcome=Outcome.CREATED),
             OutcomeItem(name="rule-b", outcome=Outcome.SKIPPED, detail="exists"),
@@ -171,11 +174,15 @@ class TestRenderOutcomes:
         assert "1 skipped" in out
         assert "exists" in out
 
-    def test_empty_invocation_renders_without_error(self, capsys):
+    def test_empty_invocation_renders_without_error(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         render_outcomes([])
         assert "Result" in capsys.readouterr().out
 
-    def test_unchanged_items_are_counted_but_not_listed(self, capsys):
+    def test_unchanged_items_are_counted_but_not_listed(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         items = [
             OutcomeItem(name="changed.md", outcome=Outcome.CREATED),
             OutcomeItem(name="quiet-one.md", outcome=Outcome.UNCHANGED),
@@ -191,7 +198,9 @@ class TestRenderOutcomes:
         assert "2 unchanged" in out
         assert "1 created" in out
 
-    def test_grouped_items_render_under_sub_headings(self, capsys):
+    def test_grouped_items_render_under_sub_headings(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         items = [
             OutcomeItem(name="rule.md", outcome=Outcome.CREATED, group="claude"),
             OutcomeItem(name="quiet.md", outcome=Outcome.UNCHANGED, group="gemini"),
@@ -209,7 +218,7 @@ class TestRenderOutcomes:
 
 @pytest.mark.unit
 class TestSyncOutcomes:
-    def test_action_log_maps_to_canonical_outcomes(self):
+    def test_action_log_maps_to_canonical_outcomes(self) -> None:
         result = SyncResult()
         result.items = [
             ("a.md", "[ADD]"),
@@ -226,7 +235,7 @@ class TestSyncOutcomes:
             Outcome.SKIPPED,
         ]
 
-    def test_errors_become_failed_items_with_detail(self):
+    def test_errors_become_failed_items_with_detail(self) -> None:
         result = SyncResult()
         result.errors = ["broken.md: transform exploded"]
         item = sync_outcomes(result)[0]
@@ -234,11 +243,11 @@ class TestSyncOutcomes:
         assert item.name == "broken.md"
         assert item.detail == "transform exploded"
 
-    def test_empty_result_aggregates_to_unchanged(self):
+    def test_empty_result_aggregates_to_unchanged(self) -> None:
         payload = outcomes_as_json(sync_outcomes(SyncResult()))
         assert payload["status"] == "unchanged"
 
-    def test_group_label_propagates_to_every_item(self):
+    def test_group_label_propagates_to_every_item(self) -> None:
         result = SyncResult()
         result.items = [("a.md", "[ADD]")]
         result.errors = ["bad.md: transform exploded"]
@@ -249,7 +258,7 @@ class TestSyncOutcomes:
 
 @pytest.mark.unit
 class TestJsonEnvelope:
-    def test_wraps_payload_with_schema_and_status(self):
+    def test_wraps_payload_with_schema_and_status(self) -> None:
         env = json_envelope("sync", "updated", {"items": [1, 2]})
         assert env == {
             "schema": "vaultspec.sync.v1",
@@ -257,11 +266,11 @@ class TestJsonEnvelope:
             "data": {"items": [1, 2]},
         }
 
-    def test_dotted_command_forms_namespaced_schema(self):
+    def test_dotted_command_forms_namespaced_schema(self) -> None:
         env = json_envelope("spec.rules.sync", "unchanged", {})
         assert env["schema"] == "vaultspec.spec.rules.sync.v1"
 
-    def test_hints_included_only_when_supplied(self):
+    def test_hints_included_only_when_supplied(self) -> None:
         without = json_envelope("sync", "unchanged", {})
         assert "hints" not in without
         with_hint = json_envelope(
@@ -272,13 +281,15 @@ class TestJsonEnvelope:
 
 @pytest.mark.unit
 class TestEmitOutcomes:
-    def setup_method(self):
+    def setup_method(self) -> None:
         reset_console()
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         reset_console()
 
-    def test_failed_outcome_forces_exit_code_one(self, capsys):
+    def test_failed_outcome_forces_exit_code_one(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         items = [OutcomeItem(name="broken.md", outcome=Outcome.FAILED, detail="boom")]
         code = emit_outcomes(items, command="sync", title="Sync", json_output=False)
         # A failed outcome is the one outcome that stops a pipeline.
@@ -287,7 +298,7 @@ class TestEmitOutcomes:
         assert "broken.md" in out
         assert "boom" in out
 
-    def test_no_failure_exits_zero(self, capsys):
+    def test_no_failure_exits_zero(self, capsys: pytest.CaptureFixture[str]) -> None:
         items = [
             OutcomeItem(name="a", outcome=Outcome.CREATED),
             OutcomeItem(name="b", outcome=Outcome.SKIPPED),
@@ -297,11 +308,15 @@ class TestEmitOutcomes:
         )
         capsys.readouterr()
 
-    def test_empty_invocation_exits_zero(self, capsys):
+    def test_empty_invocation_exits_zero(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         assert emit_outcomes([], command="sync", title="Sync", json_output=False) == 0
         capsys.readouterr()
 
-    def test_json_envelope_wraps_payload_with_extra_keys(self, capsys):
+    def test_json_envelope_wraps_payload_with_extra_keys(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         items = [OutcomeItem(name="a", outcome=Outcome.CREATED)]
         code = emit_outcomes(
             items,
@@ -318,7 +333,9 @@ class TestEmitOutcomes:
         assert payload["data"]["items"][0]["name"] == "a"
         assert payload["data"]["warnings"] == ["heads up"]
 
-    def test_json_path_still_reports_failure_in_exit_code(self, capsys):
+    def test_json_path_still_reports_failure_in_exit_code(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         items = [OutcomeItem(name="x", outcome=Outcome.FAILED)]
         code = emit_outcomes(items, command="sync", title="Sync", json_output=True)
         assert code == 1
@@ -327,52 +344,54 @@ class TestEmitOutcomes:
 
 @pytest.mark.unit
 class TestTruncate:
-    def test_value_within_budget_is_unchanged(self):
+    def test_value_within_budget_is_unchanged(self) -> None:
         assert truncate("short", 10) == "short"
 
-    def test_value_over_budget_is_marked(self):
+    def test_value_over_budget_is_marked(self) -> None:
         out = truncate("a very long description indeed", 12)
         assert len(out) == 12
         assert out.endswith("...")
         assert out == "a very lo..."
 
-    def test_budget_smaller_than_marker_degrades_gracefully(self):
+    def test_budget_smaller_than_marker_degrades_gracefully(self) -> None:
         assert truncate("anything", 2) == ".."
 
-    def test_truncation_is_width_independent(self):
+    def test_truncation_is_width_independent(self) -> None:
         # Same input + same budget => same bytes, regardless of any console.
         assert truncate("x" * 100, 20) == truncate("x" * 100, 20)
 
 
 @pytest.mark.unit
 class TestSummaryLine:
-    def test_count_and_noun(self):
+    def test_count_and_noun(self) -> None:
         assert summary_line(3, "rules") == "3 rules"
 
-    def test_breakdown_is_parenthesized(self):
+    def test_breakdown_is_parenthesized(self) -> None:
         assert (
             summary_line(3, "rules", [(2, "project"), (1, "builtin")])
             == "3 rules (2 project, 1 builtin)"
         )
 
-    def test_zero_count_breakdown_entries_are_dropped(self):
+    def test_zero_count_breakdown_entries_are_dropped(self) -> None:
         assert summary_line(2, "rules", [(2, "project"), (0, "builtin")]) == (
             "2 rules (2 project)"
         )
 
-    def test_caller_owns_singular_noun(self):
+    def test_caller_owns_singular_noun(self) -> None:
         assert summary_line(1, "rule") == "1 rule"
 
 
 @pytest.mark.unit
 class TestRecord:
-    def setup_method(self):
+    def setup_method(self) -> None:
         reset_console()
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         reset_console()
 
-    def test_fields_render_as_key_value_lines(self, capsys):
+    def test_fields_render_as_key_value_lines(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         fields = [Field("status", "drifted"), Field("missing", "0")]
         render_record(fields, title="Rules status")
         out = capsys.readouterr().out
@@ -381,12 +400,14 @@ class TestRecord:
         assert "missing: 0" in out
         assert not _has_box_drawing(out)
 
-    def test_json_keys_equal_field_keys(self):
+    def test_json_keys_equal_field_keys(self) -> None:
         fields = [Field("status", "ok"), Field("drifted", "none", style="yellow")]
         # Decorative style never reaches the machine surface.
         assert record_as_json(fields) == {"status": "ok", "drifted": "none"}
 
-    def test_emit_record_json_envelope_shares_field_payload(self, capsys):
+    def test_emit_record_json_envelope_shares_field_payload(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         fields = [Field("status", "ok")]
         emit_record(
             fields, command="spec.rules.status", title="Rules", json_output=True
@@ -395,7 +416,9 @@ class TestRecord:
         assert payload["schema"] == "vaultspec.spec.rules.status.v1"
         assert payload["data"]["status"] == "ok"
 
-    def test_markup_in_values_does_not_break_rendering(self, capsys):
+    def test_markup_in_values_does_not_break_rendering(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         render_record([Field("expr", "list[int]")], title="T")
         # A '[' in the value must survive as literal text, not a markup tag.
         assert "list[int]" in capsys.readouterr().out
@@ -403,15 +426,17 @@ class TestRecord:
 
 @pytest.mark.unit
 class TestListing:
-    def setup_method(self):
+    def setup_method(self) -> None:
         reset_console()
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         reset_console()
 
     COLUMNS: ClassVar = [Column("name"), Column("source")]
 
-    def test_rows_render_single_space_separated(self, capsys):
+    def test_rows_render_single_space_separated(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         rows = [
             {"name": "vaultspec-system", "source": "builtin"},
             {"name": "live-test", "source": "project"},
@@ -428,13 +453,17 @@ class TestListing:
         assert "2 rules (1 project, 1 builtin)" in out
         assert not _has_box_drawing(out)
 
-    def test_empty_listing_collapses_to_one_line(self, capsys):
+    def test_empty_listing_collapses_to_one_line(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         render_listing([], self.COLUMNS, title="Rules", empty="no rules")
         out = capsys.readouterr().out
         assert "no rules" in out
         assert not _has_box_drawing(out)
 
-    def test_text_and_json_consume_one_column_order(self, capsys):
+    def test_text_and_json_consume_one_column_order(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         rows = [{"name": "a", "source": "builtin"}]
         render_listing(rows, self.COLUMNS, title="Rules")
         text = capsys.readouterr().out
@@ -443,13 +472,15 @@ class TestListing:
         assert payload == [{"name": "a", "source": "builtin"}]
         assert "a builtin" in text
 
-    def test_styled_cell_drops_style_in_json(self):
+    def test_styled_cell_drops_style_in_json(self) -> None:
         rows = [{"name": "a", "source": Cell("builtin", style="dim")}]
         assert listing_as_json(rows, self.COLUMNS) == [
             {"name": "a", "source": "builtin"}
         ]
 
-    def test_emit_listing_json_envelope_wraps_items(self, capsys):
+    def test_emit_listing_json_envelope_wraps_items(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         rows = [{"name": "a", "source": "builtin"}]
         emit_listing(
             rows,
@@ -465,13 +496,15 @@ class TestListing:
 
 @pytest.mark.unit
 class TestRenderTree:
-    def setup_method(self):
+    def setup_method(self) -> None:
         reset_console()
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         reset_console()
 
-    def test_depth_renders_as_indentation_not_connectors(self, capsys):
+    def test_depth_renders_as_indentation_not_connectors(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         lines = [
             TreeLine("feature-a", depth=0),
             TreeLine("plan.md", depth=1, glyph="+"),
@@ -484,7 +517,9 @@ class TestRenderTree:
         # Hierarchy is indentation only - never box-drawing connectors.
         assert not _has_box_drawing(out)
 
-    def test_deeper_nodes_indent_further(self, capsys):
+    def test_deeper_nodes_indent_further(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         render_tree([TreeLine("root", depth=0), TreeLine("child", depth=2)], title="T")
         lines = capsys.readouterr().out.splitlines()
         root_line = next(line for line in lines if "root" in line)

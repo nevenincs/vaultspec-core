@@ -16,9 +16,9 @@ from . import types as _t
 from .enums import InstallMode, ManagedState, Tool
 from .exceptions import VaultSpecError, WorkspaceNotInitializedError
 from .git_artifacts import (
-    _has_gitattributes_block,
-    _has_gitignore_block,
-    _untrack_managed_paths,
+    has_gitattributes_block,
+    has_gitignore_block,
+    untrack_managed_paths,
 )
 from .gitattributes import ensure_gitattributes_block
 from .gitignore import (
@@ -27,26 +27,43 @@ from .gitignore import (
     prune_orphaned_lock_sentinels,
 )
 from .install_mode import (
-    _fresh_install_schema_version,
-    _infer_upgrade_mode,
-    _persist_resolved_mode,
-    _stamp_manifest_version_no_downgrade,
+    fresh_install_schema_version,
+    infer_upgrade_mode,
+    persist_resolved_mode,
+    stamp_manifest_version_no_downgrade,
     _write_mode_declaration,
 )
 from .manifest import add_providers, read_manifest_data, write_manifest_data
 from .precommit import _scaffold_precommit
 from .provider_registry import (
     _PROVIDER_TO_TOOLS,
-    _filter_tools,
-    _rel,
-    _require_reconciliation_success,
-    _validate_provider,
-    _validate_skip,
+    filter_tools,
+    rel,
+    require_reconciliation_success,
+    validate_provider,
+    validate_skip,
 )
 from .provider_sync import sync_provider
-from .scaffold import _scaffold_core, _scaffold_provider
+from .scaffold import scaffold_core, scaffold_provider
 
 logger = logging.getLogger(__name__)
+
+#: Re-exported (with underscore intact) for :mod:`vaultspec_core.core.commands`
+#: and :mod:`vaultspec_core.core.uninstall`, which reach into these as the
+#: single public import surface for provisioning.
+__all__ = [
+    "_detect_precommit_managed",
+    "_ensure_tool_configs",
+    "_finalize_upgrade_manifest",
+    "_migrate_mcp_launch_shape",
+    "_preview_install_manifest",
+    "_preview_mcp_targets",
+    "_preview_upgrade_items",
+    "_reseed_builtins",
+    "_run_upgrade",
+    "init_run",
+    "install_run",
+]
 
 
 def init_run(
@@ -96,14 +113,14 @@ def init_run(
                 f"{fw_dir} already exists. Use --force to overwrite."
             )
 
-        created = _scaffold_core(target)
+        created = scaffold_core(target)
 
         # Seed builtin content directly into .vaultspec/
         from vaultspec_core.builtins import seed_builtins
 
         seeded = seed_builtins(fw_dir, force=force)
-        for rel, _action in seeded:
-            created.append((f".vaultspec/{rel}", "builtin"))
+        for relative_path, _action in seeded:
+            created.append((f".vaultspec/{relative_path}", "builtin"))
 
         # Snapshot builtins for revert support
         from .revert import snapshot_builtins
@@ -116,9 +133,9 @@ def init_run(
     init_paths(layout)
 
     # Scaffold provider directories
-    tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
+    tools = filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
     for tool in tools:
-        created.extend(_scaffold_provider(target, tool))
+        created.extend(scaffold_provider(target, tool))
 
     if "mcp" not in skip:
         from .mcps import mcp_sync, resolve_mcp_targets
@@ -129,7 +146,7 @@ def init_run(
             target_dir=target,
             enrolled=selected,
         )
-        _require_reconciliation_success(
+        require_reconciliation_success(
             mcp_result,
             operation="MCP provider-native enrollment",
         )
@@ -139,7 +156,7 @@ def init_run(
         ):
             provider_result = mcp_result.per_tool.get(mcp_target.provider.value)
             if provider_result and provider_result.items:
-                created.append((_rel(target, mcp_target.path), "mcp"))
+                created.append((rel(target, mcp_target.path), "mcp"))
     if "precommit" not in skip:
         created.extend(_scaffold_precommit(target, mode=mode))
 
@@ -150,8 +167,8 @@ def init_run(
 
     # Deduplicate by relative path, preserving order
     seen: dict[str, str] = {}
-    for rel, label in created:
-        seen.setdefault(rel, label)
+    for relative_path, label in created:
+        seen.setdefault(relative_path, label)
 
     return list(seen.items())
 
@@ -239,7 +256,7 @@ def _preview_upgrade_items(
         raise VaultSpecError(
             "Provider reconciliation preview failed.", hint=str(exc)
         ) from exc
-    _require_reconciliation_success(
+    require_reconciliation_success(
         sync_results,
         operation="Provider reconciliation preview",
     )
@@ -272,7 +289,7 @@ def _preview_install_manifest(
 
     manifest: list[tuple[str, str]] = []
     if not skip_core:
-        manifest = _scaffold_core(path, dry_run=True)
+        manifest = scaffold_core(path, dry_run=True)
 
         # Include builtin files that would be seeded
         from vaultspec_core.builtins import list_builtins
@@ -280,9 +297,9 @@ def _preview_install_manifest(
         for builtin_rel in list_builtins():
             manifest.append((f".vaultspec/{builtin_rel}", "builtin"))
 
-    tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
+    tools = filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
     for tool in tools:
-        manifest.extend(_scaffold_provider(path, tool, dry_run=True))
+        manifest.extend(scaffold_provider(path, tool, dry_run=True))
     if "mcp" not in skip:
         manifest.extend(
             _preview_mcp_targets(
@@ -319,7 +336,7 @@ def _preview_mcp_targets(
         target_dir=path,
         enrolled=selected,
     )
-    _require_reconciliation_success(
+    require_reconciliation_success(
         mcp_result,
         operation="MCP provider-native enrollment preview",
     )
@@ -327,7 +344,7 @@ def _preview_mcp_targets(
     for mcp_target in resolve_mcp_targets(target_dir=path, enrolled=selected):
         provider_result = mcp_result.per_tool.get(mcp_target.provider.value)
         if not skip_core or (provider_result and provider_result.items):
-            entries.append((_rel(path, mcp_target.path), "mcp"))
+            entries.append((rel(path, mcp_target.path), "mcp"))
     return entries
 
 
@@ -374,7 +391,7 @@ def _migrate_mcp_launch_shape(path: Path, resolved_mode: InstallMode) -> None:
         mode=resolved_mode,
         force_managed=declared_packages or frozenset({"vaultspec-core"}),
     )
-    _require_reconciliation_success(
+    require_reconciliation_success(
         mcp_result,
         operation="MCP mode-migration reconciliation",
     )
@@ -389,7 +406,7 @@ def _finalize_upgrade_manifest(
     mdata = read_manifest_data(path)
     if not mdata.installed_at:
         mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
-    _stamp_manifest_version_no_downgrade(mdata)
+    stamp_manifest_version_no_downgrade(mdata)
 
     for orphan in prune_orphaned_lock_sentinels(path):
         logger.info("Removed orphaned lock sentinel %s", orphan)
@@ -405,14 +422,14 @@ def _finalize_upgrade_manifest(
 
     mdata.precommit_managed = _detect_precommit_managed(path)
 
-    _persist_resolved_mode(path, mdata, resolved_mode)
+    persist_resolved_mode(path, mdata, resolved_mode)
     write_manifest_data(path, mdata)
 
     # Reconcile git index with the managed gitignore block so that
     # historically-committed state files (e.g. .vaultspec/providers.json
     # from a pre-managed-block install) stop showing up as dirty on
     # every subsequent run.
-    _untrack_managed_paths(path, get_recommended_entries(path))
+    untrack_managed_paths(path, get_recommended_entries(path))
 
 
 def _run_upgrade(
@@ -453,7 +470,7 @@ def _run_upgrade(
     # deployed hook shape folded in - so the leak advisory is recomputed from
     # the inferred provenance too: a persisted dependency declaration stays
     # silent, a freshly inferred one warns.
-    inferred = _infer_upgrade_mode(path, mode)
+    inferred = infer_upgrade_mode(path, mode)
     resolved_mode = inferred.mode
     leak_warnings = (
         [dependency_leak_advisory()] if newly_establishes_dependency(inferred) else []
@@ -482,7 +499,7 @@ def _run_upgrade(
     # artifacts contradicting the tool-mode declaration written moments
     # later. Writing it here threads the inferred mode into this same run's
     # rendering, mirroring the fresh-install ordering. The manifest echo and
-    # floor reconciliation still run once, later, via _persist_resolved_mode.
+    # floor reconciliation still run once, later, via persist_resolved_mode.
     _write_mode_declaration(path, resolved_mode)
 
     # Detect a mode flip before the sync below re-renders any artifact.
@@ -511,7 +528,7 @@ def _run_upgrade(
     # against the fresh-install path and silently overwrote user content
     # on every upgrade. See PR #116 review thread r3260188496.
     sync_results = sync_provider(sync_target, force=force, skip=skip - {"core"})
-    _require_reconciliation_success(
+    require_reconciliation_success(
         sync_results,
         operation="Provider reconciliation during upgrade",
     )
@@ -581,8 +598,8 @@ def install_run(
 
     from .exceptions import ResourceExistsError
 
-    _validate_provider(provider)
-    skip = _validate_skip(skip)
+    validate_provider(provider)
+    skip = validate_skip(skip)
 
     # Bootstrap a minimal context so downstream code can read target_dir
     _t.set_context(
@@ -696,7 +713,7 @@ def install_run(
     # the sync pass instead of the legacy-absent dependency bridge, which would
     # otherwise clobber the tool-mode artifacts init_run just wrote. The manifest
     # echo and floor reconciliation still happen once, later, via
-    # _persist_resolved_mode after the manifest is read.
+    # persist_resolved_mode after the manifest is read.
     _write_mode_declaration(path, resolved_mode)
 
     post_errors: list[str] = []
@@ -726,7 +743,7 @@ def install_run(
         "mcps": len(collect_mcp_servers()),
     }
 
-    tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
+    tools = filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
     provider_names = [t.value for t in tools]
     from .mcps import resolve_mcp_targets
 
@@ -760,23 +777,23 @@ def install_run(
     mdata = read_manifest_data(path, strict=True)
 
     # Robust detection: if it's there, it's managed.
-    mdata.gitignore_managed = _has_gitignore_block(path / ".gitignore")
-    mdata.gitattributes_managed = _has_gitattributes_block(path / ".gitattributes")
+    mdata.gitignore_managed = has_gitignore_block(path / ".gitignore")
+    mdata.gitattributes_managed = has_gitattributes_block(path / ".gitattributes")
     mdata.precommit_managed = _detect_precommit_managed(path)
 
-    mdata.vaultspec_version = _fresh_install_schema_version()
+    mdata.vaultspec_version = fresh_install_schema_version()
     mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
     for name in provider_names:
         mdata.provider_state.setdefault(name, {})
         mdata.provider_state[name]["installed_at"] = mdata.installed_at
-    _persist_resolved_mode(path, mdata, resolved_mode)
+    persist_resolved_mode(path, mdata, resolved_mode)
     write_manifest_data(path, mdata)
 
     # Reconcile git index with the managed gitignore block so that
     # historically-committed state files (e.g. .vaultspec/providers.json
     # from a pre-managed-block install) stop showing up as dirty on
     # every subsequent run.
-    _untrack_managed_paths(path, recommended)
+    untrack_managed_paths(path, recommended)
 
     result: dict[str, Any] = {
         "action": "install",

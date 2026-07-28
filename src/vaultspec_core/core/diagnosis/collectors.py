@@ -32,7 +32,6 @@ from .collectors_content import (
     collect_rename_integrity,
 )
 from .collectors_mode import (
-    _observed_mcp_mode,
     collect_mode_mismatch_state,
     collect_stale_seed_definitions,
     collect_version_floor_state,
@@ -49,6 +48,10 @@ from .collectors_provider import (
     collect_manifest_coherence,
     collect_provider_dir_state,
 )
+
+#: Backward-compatible alias for external callers still importing the
+#: previously private name; identical to the public :func:`observed_mcp_mode`.
+_observed_mcp_mode = observed_mcp_mode
 
 __all__ = [
     "_collect_precommit_yaml_state",

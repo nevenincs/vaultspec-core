@@ -1,8 +1,11 @@
 """Tests for sync command behavior."""
 
+from __future__ import annotations
+
 import json
 import os
 import re
+from typing import TYPE_CHECKING
 
 import pytest
 from typer.testing import CliRunner
@@ -12,18 +15,21 @@ from vaultspec_core.core.manifest import read_manifest_data, write_manifest_data
 from vaultspec_core.core.mcps import render_mcp_definition_for_mode
 from vaultspec_core.core.workspace_mode import resolve_render_mode
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 pytestmark = [pytest.mark.unit]
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 @pytest.fixture
-def runner():
+def runner() -> CliRunner:
     return CliRunner()
 
 
 class TestSyncCoreError:
-    def test_sync_core_fails(self, runner, synthetic_project):
+    def test_sync_core_fails(self, runner: CliRunner, synthetic_project: Path) -> None:
         """sync core must fail with clear error."""
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "sync", "core"]
@@ -31,7 +37,9 @@ class TestSyncCoreError:
         assert result.exit_code != 0
         assert "core" in result.output.lower()
 
-    def test_sync_core_error_mentions_source(self, runner, synthetic_project):
+    def test_sync_core_error_mentions_source(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """Error should explain that core is the sync source."""
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "sync", "core"]
@@ -42,7 +50,9 @@ class TestSyncCoreError:
 
 
 class TestSyncValidation:
-    def test_sync_unknown_provider_fails(self, runner, synthetic_project):
+    def test_sync_unknown_provider_fails(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """Unknown provider name must fail."""
         result = runner.invoke(
             app, ["--target", str(synthetic_project), "sync", "nonexistent"]
@@ -50,8 +60,8 @@ class TestSyncValidation:
         assert result.exit_code != 0
 
     def test_sync_unknown_provider_json_emits_error_envelope(
-        self, runner, synthetic_project
-    ):
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """Under --json a failure must be a parseable error envelope,
         not a plain-text line a JSON consumer cannot read."""
         result = runner.invoke(
@@ -63,7 +73,7 @@ class TestSyncValidation:
         assert payload["status"] == "failed"
         assert "nonexistent" in payload["data"]["message"]
 
-    def test_sync_help_shows_providers(self, runner):
+    def test_sync_help_shows_providers(self, runner: CliRunner) -> None:
         """--help should list available providers."""
         result = runner.invoke(app, ["sync", "--help"])
         assert result.exit_code == 0
@@ -71,13 +81,17 @@ class TestSyncValidation:
         assert "gemini" in result.output
         assert "codex" in result.output
 
-    def test_sync_help_declares_mcp_as_complete_sync_scope(self, runner):
+    def test_sync_help_declares_mcp_as_complete_sync_scope(
+        self, runner: CliRunner
+    ) -> None:
         """Top-level sync help should describe every authoritative sync pass."""
         result = runner.invoke(app, ["sync", "--help"])
         assert result.exit_code == 0
         assert "MCP" in result.output or "mcp" in result.output
 
-    def test_sync_skip_core_is_rejected(self, runner, synthetic_project):
+    def test_sync_skip_core_is_rejected(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """`core` is an install/uninstall component, not a sync skip target."""
         result = runner.invoke(
             app,
@@ -88,7 +102,9 @@ class TestSyncValidation:
         assert "core" in result.output
         assert "Invalid --skip" in result.output
 
-    def test_mcp_status_json_reports_configured_entry(self, runner, synthetic_project):
+    def test_mcp_status_json_reports_configured_entry(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """MCP status should answer the narrow config-health question directly."""
         result = runner.invoke(
             app,
@@ -102,7 +118,9 @@ class TestSyncValidation:
         assert payload["definitions"] == ["vaultspec-core"]
         assert payload["configured"] == ["vaultspec-core"]
 
-    def test_mcp_status_json_reports_missing_config(self, runner, synthetic_project):
+    def test_mcp_status_json_reports_missing_config(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """A missing .mcp.json should be visible without running global doctor."""
         (synthetic_project / ".mcp.json").unlink()
 
@@ -118,8 +136,8 @@ class TestSyncValidation:
         assert payload["providers"]["claude"]["status"] == "missing_config"
 
     def test_mcp_status_json_reports_managed_config_drift(
-        self, runner, synthetic_project
-    ):
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """Managed MCP entry drift should be visible before running repair sync."""
         mcp_path = synthetic_project / ".mcp.json"
         payload = json.loads(mcp_path.read_text(encoding="utf-8"))
@@ -138,7 +156,9 @@ class TestSyncValidation:
 
 
 class TestSyncAuthority:
-    def test_rules_add_points_to_top_level_sync(self, runner, synthetic_project):
+    def test_rules_add_points_to_top_level_sync(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """Adding a rule should not imply provider outputs were refreshed."""
         result = runner.invoke(
             app,
@@ -158,7 +178,9 @@ class TestSyncAuthority:
         assert "Provider-facing outputs were not updated" in result.output
         assert "vaultspec-core sync" in result.output
 
-    def test_rules_add_json_stays_machine_readable(self, runner, synthetic_project):
+    def test_rules_add_json_stays_machine_readable(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """JSON mode should not include human remediation guidance."""
         result = runner.invoke(
             app,
@@ -218,8 +240,12 @@ class TestSyncAuthority:
         ],
     )
     def test_non_rule_source_mutations_point_to_top_level_sync(
-        self, runner, synthetic_project, args, expected
-    ):
+        self,
+        runner: CliRunner,
+        synthetic_project: Path,
+        args: list[str],
+        expected: str,
+    ) -> None:
         """All source-side spec mutations should give the same sync cue."""
         result = runner.invoke(app, ["--target", str(synthetic_project), *args])
 
@@ -229,8 +255,8 @@ class TestSyncAuthority:
         assert "vaultspec-core sync" in result.output
 
     def test_narrow_rules_sync_warns_about_resource_scope(
-        self, runner, synthetic_project
-    ):
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """Resource sync output should identify top-level sync as authoritative."""
         result = runner.invoke(
             app,
@@ -242,8 +268,8 @@ class TestSyncAuthority:
         assert "full provider refresh" in result.output
 
     def test_provider_scoped_sync_renders_only_requested_provider(
-        self, runner, synthetic_project
-    ):
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """`sync claude` output should not imply every provider was refreshed."""
         result = runner.invoke(
             app,
@@ -260,8 +286,8 @@ class TestSyncAuthority:
         assert "codex" not in output
 
     def test_provider_scoped_sync_repairs_only_requested_native_mcp_state(
-        self, runner, synthetic_project
-    ):
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """Provider-scoped sync repairs its native target without touching peers."""
         mcp_path = synthetic_project / ".mcp.json"
         codex_path = synthetic_project / ".codex" / "config.toml"
@@ -284,8 +310,8 @@ class TestSyncAuthority:
         assert codex_path.read_bytes() == codex_before
 
     def test_provider_scoped_sync_respects_skip_for_requested_provider(
-        self, runner, synthetic_project
-    ):
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """`sync claude --skip claude` must not refresh Claude outputs."""
         claude_rule = next((synthetic_project / ".claude" / "rules").glob("*.md"))
         before = claude_rule.read_text(encoding="utf-8")
@@ -307,8 +333,8 @@ class TestSyncAuthority:
         assert mcp_path.read_text(encoding="utf-8") == mcp_before
 
     def test_sync_all_skip_does_not_stamp_skipped_provider(
-        self, runner, synthetic_project
-    ):
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """Skipped providers must not get fresh last_synced state."""
         mdata = read_manifest_data(synthetic_project)
         mdata.provider_state.setdefault("claude", {})["last_synced"] = "old-claude"
@@ -326,8 +352,8 @@ class TestSyncAuthority:
         assert after.provider_state["gemini"]["last_synced"] != "old-gemini"
 
     def test_sync_all_deleted_gitignore_disables_management(
-        self, runner, synthetic_project
-    ):
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """Deleting managed .gitignore should opt out without crashing sync."""
         mdata = read_manifest_data(synthetic_project)
         mdata.gitignore_managed = True
@@ -342,8 +368,8 @@ class TestSyncAuthority:
         assert read_manifest_data(synthetic_project).gitignore_managed is False
 
     def test_rule_add_then_top_level_sync_updates_provider_outputs(
-        self, runner, synthetic_project
-    ):
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """Top-level sync must refresh provider stubs after a rule source change."""
         rule_name = "operator-sync-regression"
         old_cwd = os.getcwd()
@@ -387,8 +413,8 @@ class TestSyncAuthority:
             )
 
     def test_top_level_sync_force_repairs_only_managed_mcp_state(
-        self, runner, synthetic_project
-    ):
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """Forced sync repairs managed MCP drift without deleting user servers."""
         mcp_path = synthetic_project / ".mcp.json"
         source_path = (
@@ -455,8 +481,8 @@ class TestSyncAuthority:
         assert after_status["status"] == "ok"
 
     def test_force_adopts_name_colliding_user_mcp_entry(
-        self, runner, synthetic_project
-    ):
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
         """--force adopts a name-colliding user .mcp.json entry (issue #120).
 
         When .mcp.json carries an entry whose name matches a source but is absent

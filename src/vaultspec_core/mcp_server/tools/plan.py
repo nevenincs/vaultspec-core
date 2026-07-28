@@ -19,7 +19,7 @@ import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel
 
@@ -30,13 +30,21 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
     from pathlib import Path
 
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server.mcpserver import MCPServer
 
     from ...plan.parser import Plan
 
 logger = logging.getLogger(__name__)
 
 __all__ = ["register_plan_tools"]
+
+# This server's lifespan (see mcp_server/app.py's ``_lifespan``) yields no
+# lifespan context, so every tool's ``Context`` is parameterized ``None`` for
+# that slot; the request type varies per transport, so ``Any``. Defined at
+# module scope (not under ``TYPE_CHECKING``) because MCPServer's context-parameter
+# detection resolves the ``from __future__ import annotations`` string
+# annotations at runtime via this module's globals.
+_PlanToolContext = Context[None, Any]
 
 
 # ---------------------------------------------------------------------------
@@ -267,7 +275,7 @@ def _reduce(statuses: list[str], success: set[str]) -> str:
 # ---------------------------------------------------------------------------
 
 
-def register_plan_tools(mcp: FastMCP) -> None:
+def register_plan_tools(mcp: MCPServer[None]) -> None:
     """Register the ``plan_progress`` and ``plan_edit`` plan tools on *mcp*.
 
     ``plan_progress`` is idempotent (explicit ``checked`` / ``unchecked``
@@ -277,20 +285,20 @@ def register_plan_tools(mcp: FastMCP) -> None:
     mutation through the plan step-ops core.
 
     Args:
-        mcp: The :class:`~mcp.server.fastmcp.FastMCP` instance to decorate.
+        mcp: The :class:`~mcp.server.mcpserver.MCPServer` instance to decorate.
     """
 
     @mcp.tool(
         annotations=ToolAnnotations(
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
+            read_only_hint=False,
+            destructive_hint=False,
+            idempotent_hint=True,
+            open_world_hint=False,
         ),
     )
     @_isolated_context
     async def plan_progress(
-        ctx: Context,
+        ctx: _PlanToolContext,
         plan: str,
         steps: list[StepStateChange],
     ) -> PlanProgressResult:
@@ -304,7 +312,8 @@ def register_plan_tools(mcp: FastMCP) -> None:
         updated completion counts and next open step are returned.
 
         Args:
-            ctx: The MCP request context.
+            ctx: The MCP request context (unused; logging routes through the
+                module logger instead of the deprecated client-facing channel).
             plan: A feature tag or plan stem/path addressing one plan.
             steps: The batch of step-state changes.
 
@@ -316,6 +325,7 @@ def register_plan_tools(mcp: FastMCP) -> None:
             ValueError: When ``steps`` is empty, a state is invalid, or the
                 plan address does not resolve to a unique plan.
         """
+        _ = ctx
         from ...plan.commands.step_ops import (
             AmbiguousStepError,
             StepNotFoundError,
@@ -334,7 +344,7 @@ def register_plan_tools(mcp: FastMCP) -> None:
         except PlanResolutionError as exc:
             raise ValueError(str(exc)) from exc
 
-        await ctx.info(f"plan_progress: {resolved.stem} {len(steps)} change(s)")
+        logger.info("plan_progress: %s %d change(s)", resolved.stem, len(steps))
 
         parsed, original_text = _load_plan(resolved.path)
         items: list[StepChangeResult] = []
@@ -397,15 +407,15 @@ def register_plan_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         annotations=ToolAnnotations(
-            readOnlyHint=False,
-            destructiveHint=True,
-            idempotentHint=False,
-            openWorldHint=False,
+            read_only_hint=False,
+            destructive_hint=True,
+            idempotent_hint=False,
+            open_world_hint=False,
         ),
     )
     @_isolated_context
     async def plan_edit(
-        ctx: Context,
+        ctx: _PlanToolContext,
         plan: str,
         operations: list[PlanEditOperation],
     ) -> PlanEditResult:
@@ -419,7 +429,8 @@ def register_plan_tools(mcp: FastMCP) -> None:
         operations are not first-class here - they live behind the gateway.
 
         Args:
-            ctx: The MCP request context.
+            ctx: The MCP request context (unused; logging routes through the
+                module logger instead of the deprecated client-facing channel).
             plan: A feature tag or plan stem/path addressing one plan.
             operations: The batch of step-authoring operations.
 
@@ -431,6 +442,7 @@ def register_plan_tools(mcp: FastMCP) -> None:
             ValueError: When ``operations`` is empty or the plan address does
                 not resolve to a unique plan.
         """
+        _ = ctx
         from ..plan_resolver import PlanResolutionError, resolve_plan
 
         if not operations:
@@ -442,7 +454,7 @@ def register_plan_tools(mcp: FastMCP) -> None:
         except PlanResolutionError as exc:
             raise ValueError(str(exc)) from exc
 
-        await ctx.info(f"plan_edit: {resolved.stem} {len(operations)} op(s)")
+        logger.info("plan_edit: %s %d op(s)", resolved.stem, len(operations))
 
         parsed, original_text = _load_plan(resolved.path)
         items: list[PlanEditItemResult] = []
@@ -476,6 +488,8 @@ def register_plan_tools(mcp: FastMCP) -> None:
             steps_completed=completed,
             next_open_step=next_open,
         )
+
+    _ = (plan_progress, plan_edit)  # bound by the decorator; silence unused warnings
 
 
 def _apply_plan_edit(plan: Plan, op: PlanEditOperation) -> PlanEditItemResult:

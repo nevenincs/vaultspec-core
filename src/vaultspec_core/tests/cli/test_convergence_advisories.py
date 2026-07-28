@@ -27,6 +27,10 @@ from vaultspec_core.core.mcps import _MODE_COMMAND_TOKEN
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from typer.testing import CliRunner
+
+    from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
 pytestmark = [pytest.mark.unit]
 
 
@@ -163,7 +167,9 @@ class TestPrekContentAwareSignal:
 class TestDoctorPrekAdvisoryText:
     """The doctor row names the actual remediation for each prek state."""
 
-    def test_unrefreshable_advisory_names_migrate_verb(self, runner, factory) -> None:
+    def test_unrefreshable_advisory_names_migrate_verb(
+        self, runner: CliRunner, factory: WorkspaceFactory
+    ) -> None:
         from vaultspec_core.tests.cli.conftest import run_spec
 
         factory.install()
@@ -173,7 +179,9 @@ class TestDoctorPrekAdvisoryText:
 
         assert "spec precommit migrate" in result.output
 
-    def test_orphaned_advisory_names_superseded_yaml(self, runner, factory) -> None:
+    def test_orphaned_advisory_names_superseded_yaml(
+        self, runner: CliRunner, factory: WorkspaceFactory
+    ) -> None:
         from vaultspec_core.tests.cli.conftest import run_spec
 
         factory.install()

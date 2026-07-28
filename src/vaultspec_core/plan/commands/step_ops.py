@@ -24,7 +24,7 @@ from vaultspec_core.plan.identifiers import next_available_step
 from vaultspec_core.plan.parser import Step
 
 if TYPE_CHECKING:
-    from vaultspec_core.plan.parser import Plan
+    from vaultspec_core.plan.parser import Phase, Plan
 
 __all__ = [
     "AddStepError",
@@ -508,7 +508,7 @@ def _matching_steps(plan: Plan, step_id: str) -> list[Step]:
     return [step for step in plan.steps if step.canonical_id == step_id]
 
 
-def _wave_id_of(plan: Plan, phase) -> str | None:
+def _wave_id_of(plan: Plan, phase: Phase) -> str | None:
     """Return the Wave canonical id that owns ``phase``, or ``None`` at L2."""
     if plan.frontmatter.tier is Tier.L2:
         return None

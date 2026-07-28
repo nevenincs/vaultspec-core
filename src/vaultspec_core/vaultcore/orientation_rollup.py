@@ -16,11 +16,10 @@ module, at call sites outside the package.
 from __future__ import annotations
 
 import datetime as _dt
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from .models import DocType
 from .orientation_models import (
-    _NO_DATE,
     ActiveFeature,
     ExecActivity,
     PlanInFlight,
@@ -37,6 +36,11 @@ if TYPE_CHECKING:
     from ..plan.status import PlanStatus, PlanStatusEntry
 
 __all__ = ["compute_rollup"]
+
+# Identical to `orientation_models._NO_DATE`: `datetime.date.min` is a class
+# attribute, so both names resolve to the same object and `is` comparisons
+# against values returned by `recency_date` stay valid.
+_NO_DATE = _dt.date.min
 
 
 def compute_rollup(
@@ -112,7 +116,7 @@ def compute_rollup(
             real_nodes, limit=limit, since_days=since_days, reference=reference
         )
     )
-    totals = get_stats(root_dir, graph=g)
+    totals = cast("dict[str, object]", get_stats(root_dir, graph=g))
 
     return Rollup(
         active_features=active_features,

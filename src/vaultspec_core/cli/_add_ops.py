@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, NoReturn
 import typer
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Mapping, Sequence
+    from collections.abc import Generator, Mapping, Sequence
     from pathlib import Path
 
     from rich.console import Console
@@ -306,7 +306,7 @@ def resolve_phase_display_path(console: Console, plan: Plan, phase: str) -> str:
 
 
 @contextmanager
-def suppress_logging(*, active: bool) -> Iterator[None]:
+def suppress_logging(*, active: bool) -> Generator[None]:
     """Silence library logging while a machine-readable payload is emitted."""
     import logging
 

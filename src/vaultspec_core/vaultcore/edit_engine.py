@@ -45,7 +45,11 @@ if TYPE_CHECKING:
 __all__ = [
     "EditError",
     "EditResult",
+    "enforce_blob_hash",
     "execute_edit",
+    "invalidate_graph_cache",
+    "resolve_document_path",
+    "validate_proposed",
 ]
 
 
@@ -110,7 +114,7 @@ class EditResult:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_doc_path(ref: str, root_dir: Path) -> Path:
+def resolve_document_path(ref: str, root_dir: Path) -> Path:
     """Resolve a stem, filename, or path reference to an on-disk document.
 
     Mirrors how ``vault add --related`` / ``vault link`` resolve a
@@ -180,7 +184,7 @@ def _split_document(text: str) -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 
 
-def _validate_proposed(
+def validate_proposed(
     doc_path: Path, root_dir: Path, new_text: str
 ) -> list[dict[str, object]]:
     """Validate proposed full document text without writing it.
@@ -246,7 +250,7 @@ def _has_error(diagnostics: list[dict[str, object]]) -> bool:
     """Return ``True`` when any diagnostic is ERROR severity.
 
     Args:
-        diagnostics: Rendered diagnostics from :func:`_validate_proposed`.
+        diagnostics: Rendered diagnostics from :func:`validate_proposed`.
 
     Returns:
         ``True`` if at least one diagnostic blocks the write.
@@ -258,7 +262,7 @@ def _warnings_of(diagnostics: list[dict[str, object]]) -> list[str]:
     """Return the messages of WARNING-severity diagnostics.
 
     Args:
-        diagnostics: Rendered diagnostics from :func:`_validate_proposed`.
+        diagnostics: Rendered diagnostics from :func:`validate_proposed`.
 
     Returns:
         The advisory messages that did not block the write.
@@ -289,7 +293,7 @@ def _frontmatter_validate(proposed_lf: str) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def _enforce_blob_hash(doc_path: Path, expected: str | None) -> None:
+def enforce_blob_hash(doc_path: Path, expected: str | None) -> None:
     """Enforce optimistic-concurrency against the pre-write on-disk bytes.
 
     Args:
@@ -477,10 +481,10 @@ def _compose_new_text(
         EditError: When the document cannot be read.
     """
     from vaultspec_core.vaultcore.models import refresh_modified_stamp
-    from vaultspec_core.vaultcore.related_surgery import _read_preserve_newlines
+    from vaultspec_core.vaultcore.related_surgery import read_preserve_newlines
 
     try:
-        content, source_newline = _read_preserve_newlines(doc_path)
+        content, source_newline = read_preserve_newlines(doc_path)
     except (OSError, UnicodeDecodeError) as exc:
         raise EditError(f"Cannot read document '{doc_path}': {exc}", {}) from exc
 
@@ -507,17 +511,17 @@ def _write_proposed(doc_path: Path, proposed_lf: str, source_newline: str) -> No
         proposed_lf: The proposed text (LF-normalised).
         source_newline: The newline convention to restore on write.
     """
-    from vaultspec_core.vaultcore.related_surgery import _atomic_write_restore
+    from vaultspec_core.vaultcore.related_surgery import atomic_write_restore
 
     out = (
         proposed_lf
         if source_newline == "\n"
         else proposed_lf.replace("\n", source_newline)
     )
-    _atomic_write_restore(doc_path, out)
+    atomic_write_restore(doc_path, out)
 
 
-def _invalidate_cache(root_dir: Path) -> None:
+def invalidate_graph_cache(root_dir: Path) -> None:
     """Drop the graph cache after a mutating write.
 
     Byte-for-byte equivalent to
@@ -589,11 +593,11 @@ def execute_edit(
     from vaultspec_core.vaultcore.blob_hash import git_blob_oid
 
     try:
-        doc_path = _resolve_doc_path(ref, root_dir)
+        doc_path = resolve_document_path(ref, root_dir)
 
         # Concurrency guard is enforced against the *current* on-disk bytes,
         # before any mutation or even composition is trusted.
-        _enforce_blob_hash(doc_path, expected_blob_hash)
+        enforce_blob_hash(doc_path, expected_blob_hash)
 
         proposed_lf, source_newline = _compose_new_text(
             doc_path,
@@ -608,7 +612,7 @@ def execute_edit(
 
         checks: list[dict[str, object]] = []
         if run_checks:
-            checks = _validate_proposed(doc_path, root_dir, proposed_lf)
+            checks = validate_proposed(doc_path, root_dir, proposed_lf)
 
         if frontmatter_errors or _has_error(checks):
             error: dict[str, object] = {
@@ -648,7 +652,7 @@ def execute_edit(
 
         if changed:
             _write_proposed(doc_path, proposed_lf, source_newline)
-            _invalidate_cache(root_dir)
+            invalidate_graph_cache(root_dir)
 
         post_hash = git_blob_oid(doc_path.read_bytes())
         return EditResult(

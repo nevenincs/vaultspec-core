@@ -16,7 +16,7 @@ Every test drives a real ``install_run`` over a real filesystem through
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -43,12 +43,12 @@ def _write_pyproject_with_vaultspec(root: Path) -> None:
     )
 
 
-def _read_mcp(root: Path) -> dict:
+def _read_mcp(root: Path) -> dict[str, Any]:
     """Read the parsed ``.mcp.json`` for *root*."""
     return json.loads((root / ".mcp.json").read_text(encoding="utf-8"))
 
 
-def _vaultspec_entry(root: Path) -> dict:
+def _vaultspec_entry(root: Path) -> dict[str, Any]:
     """Return the ``vaultspec-core`` server entry from ``.mcp.json``."""
     return _read_mcp(root)["mcpServers"]["vaultspec-core"]
 

@@ -1,5 +1,7 @@
 """Tests for builtin resource revert mechanism."""
 
+from pathlib import Path
+
 import pytest
 
 from vaultspec_core.core.revert import (
@@ -14,7 +16,7 @@ pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture
-def vaultspec_dir(tmp_path):
+def vaultspec_dir(tmp_path: Path) -> Path:
     """Create a minimal .vaultspec structure with builtin files."""
     vs = tmp_path / ".vaultspec"
     rules_dir = vs / "rules"
@@ -53,7 +55,7 @@ class TestIsBuiltin:
 
 
 class TestSnapshotBuiltins:
-    def test_snapshots_all_builtins(self, vaultspec_dir):
+    def test_snapshots_all_builtins(self, vaultspec_dir: Path) -> None:
         count = snapshot_builtins(vaultspec_dir)
         assert count == 2  # governance.builtin.md + code-review.builtin.md
 
@@ -65,14 +67,14 @@ class TestSnapshotBuiltins:
         # Custom rule should NOT be snapshotted
         assert not (snap / "rules" / "my-rule.md").exists()
 
-    def test_snapshot_preserves_content(self, vaultspec_dir):
+    def test_snapshot_preserves_content(self, vaultspec_dir: Path) -> None:
         snapshot_builtins(vaultspec_dir)
         snap_content = (
             vaultspec_dir / "_snapshots" / "rules" / "governance.builtin.md"
         ).read_text(encoding="utf-8")
         assert "Original content." in snap_content
 
-    def test_snapshot_overwrites_existing(self, vaultspec_dir):
+    def test_snapshot_overwrites_existing(self, vaultspec_dir: Path) -> None:
         snapshot_builtins(vaultspec_dir)
         # Modify the source
         (vaultspec_dir / "rules" / "governance.builtin.md").write_text(
@@ -85,26 +87,26 @@ class TestSnapshotBuiltins:
         ).read_text(encoding="utf-8")
         assert snap_content == "Modified."
 
-    def test_no_rules_dir_returns_zero(self, tmp_path):
+    def test_no_rules_dir_returns_zero(self, tmp_path: Path) -> None:
         vs = tmp_path / ".vaultspec"
         vs.mkdir()
         assert snapshot_builtins(vs) == 0
 
 
 class TestGetSnapshotContent:
-    def test_returns_content(self, vaultspec_dir):
+    def test_returns_content(self, vaultspec_dir: Path) -> None:
         snapshot_builtins(vaultspec_dir)
         content = get_snapshot_content(vaultspec_dir, "rules", "governance.builtin.md")
         assert content is not None
         assert "Original content." in content
 
-    def test_returns_none_when_missing(self, vaultspec_dir):
+    def test_returns_none_when_missing(self, vaultspec_dir: Path) -> None:
         content = get_snapshot_content(vaultspec_dir, "rules", "nonexistent.builtin.md")
         assert content is None
 
 
 class TestRevertResource:
-    def test_reverts_modified_builtin(self, vaultspec_dir):
+    def test_reverts_modified_builtin(self, vaultspec_dir: Path) -> None:
         snapshot_builtins(vaultspec_dir)
         # Modify the file
         target = vaultspec_dir / "rules" / "governance.builtin.md"
@@ -117,20 +119,24 @@ class TestRevertResource:
         restored = target.read_text(encoding="utf-8")
         assert "Original content." in restored
 
-    def test_revert_custom_fails(self, vaultspec_dir):
+    def test_revert_custom_fails(self, vaultspec_dir: Path) -> None:
         result = revert_resource(vaultspec_dir, "rules", "my-rule.md")
         assert result["reverted"] is False
-        assert "not a builtin" in result["reason"].lower()
+        reason = result["reason"]
+        assert isinstance(reason, str)
+        assert "not a builtin" in reason.lower()
 
-    def test_revert_without_snapshot_fails(self, vaultspec_dir):
+    def test_revert_without_snapshot_fails(self, vaultspec_dir: Path) -> None:
         # No snapshot taken
         result = revert_resource(vaultspec_dir, "rules", "governance.builtin.md")
         assert result["reverted"] is False
-        assert "no snapshot" in result["reason"].lower()
+        reason = result["reason"]
+        assert isinstance(reason, str)
+        assert "no snapshot" in reason.lower()
 
 
 class TestListModifiedBuiltins:
-    def test_detects_modified(self, vaultspec_dir):
+    def test_detects_modified(self, vaultspec_dir: Path) -> None:
         snapshot_builtins(vaultspec_dir)
         # Modify one
         (vaultspec_dir / "rules" / "governance.builtin.md").write_text(
@@ -142,7 +148,7 @@ class TestListModifiedBuiltins:
         assert statuses["governance.builtin.md"] == "modified"
         assert statuses["code-review.builtin.md"] == "ok"
 
-    def test_detects_missing(self, vaultspec_dir):
+    def test_detects_missing(self, vaultspec_dir: Path) -> None:
         snapshot_builtins(vaultspec_dir)
         # Delete one
         (vaultspec_dir / "rules" / "governance.builtin.md").unlink()
@@ -151,5 +157,5 @@ class TestListModifiedBuiltins:
         statuses = {m["filename"]: m["status"] for m in modified}
         assert statuses["governance.builtin.md"] == "missing"
 
-    def test_no_snapshots_returns_empty(self, vaultspec_dir):
+    def test_no_snapshots_returns_empty(self, vaultspec_dir: Path) -> None:
         assert list_modified_builtins(vaultspec_dir) == []

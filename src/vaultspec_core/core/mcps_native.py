@@ -11,7 +11,7 @@ import json
 import re
 import tomllib
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from .enums import McpScope, Tool
 from .exceptions import VaultSpecError
@@ -24,6 +24,18 @@ if TYPE_CHECKING:
 _LEGACY_MANAGED_KEY = "_vaultspecManaged"
 _TOML_BLOCK_TYPE = "mcps"
 _STDIO_FIELDS = frozenset({"command", "args", "env"})
+
+__all__ = [
+    "_LEGACY_MANAGED_KEY",
+    "_TOML_BLOCK_TYPE",
+    "_json_server_map",
+    "_managed_toml_content",
+    "_normalized_sources",
+    "_render_codex_servers",
+    "_strip_external_codex_server",
+    "_toml_servers",
+    "_write_json_target",
+]
 
 
 def _normalized_sources(
@@ -50,15 +62,27 @@ def _normalized_sources(
                 f"{target.provider.value}."
             )
             continue
-        if not isinstance(args, list) or not all(
-            isinstance(item, str) for item in args
-        ):
+        if not isinstance(args, list):
             result.warnings.append(
                 f"MCP server '{name}' has non-string args; skipping "
                 f"{target.provider.value}."
             )
             continue
-        if not isinstance(env, dict) or not all(
+        args = cast("list[Any]", args)
+        if not all(isinstance(item, str) for item in args):
+            result.warnings.append(
+                f"MCP server '{name}' has non-string args; skipping "
+                f"{target.provider.value}."
+            )
+            continue
+        if not isinstance(env, dict):
+            result.warnings.append(
+                f"MCP server '{name}' has a non-string environment map; skipping "
+                f"{target.provider.value}."
+            )
+            continue
+        env = cast("dict[Any, Any]", env)
+        if not all(
             isinstance(key, str) and isinstance(value, str)
             for key, value in env.items()
         ):
@@ -87,14 +111,15 @@ def _json_server_map(
             raise VaultSpecError(
                 "Claude configuration field 'projects' is not an object."
             )
+        projects = cast("dict[str, Any]", projects)
         project = projects.setdefault(root.resolve().as_posix(), {})
         if not isinstance(project, dict):
             raise VaultSpecError("Claude local project configuration is not an object.")
-        container = project
+        container = cast("dict[str, Any]", project)
     servers = container.setdefault("mcpServers", {})
     if not isinstance(servers, dict):
         raise VaultSpecError(f"MCP server map in {target.path} is not an object.")
-    return servers
+    return cast("dict[str, Any]", servers)
 
 
 def _drop_empty_json_server_map(
@@ -105,12 +130,15 @@ def _drop_empty_json_server_map(
         projects = raw.get("projects")
         if not isinstance(projects, dict):
             return
+        projects = cast("dict[str, Any]", projects)
         project_key = root.resolve().as_posix()
         project = projects.get(project_key)
-        if isinstance(project, dict) and not project.get("mcpServers"):
-            project.pop("mcpServers", None)
-            if not project:
-                projects.pop(project_key, None)
+        if isinstance(project, dict):
+            project = cast("dict[str, Any]", project)
+            if not project.get("mcpServers"):
+                project.pop("mcpServers", None)
+                if not project:
+                    projects.pop(project_key, None)
         if not projects:
             raw.pop("projects", None)
         return
@@ -137,11 +165,13 @@ def _toml_value(value: Any) -> str:
     if isinstance(value, int | float) and not isinstance(value, bool):
         return repr(value)
     if isinstance(value, list):
-        return "[" + ", ".join(_toml_value(item) for item in value) + "]"
+        items = cast("list[Any]", value)
+        return "[" + ", ".join(_toml_value(item) for item in items) + "]"
     if isinstance(value, dict):
+        mapping = cast("dict[Any, Any]", value)
         pairs = (
             f"{json.dumps(str(key))} = {_toml_value(item)}"
-            for key, item in sorted(value.items())
+            for key, item in sorted(mapping.items())
         )
         return "{ " + ", ".join(pairs) + " }"
     raise VaultSpecError(
@@ -167,11 +197,12 @@ def _toml_servers(content: str) -> dict[str, dict[str, Any]]:
     raw = parsed.get("mcp_servers", {})
     if not isinstance(raw, dict):
         raise VaultSpecError("Codex 'mcp_servers' field is not a table.")
+    raw = cast("dict[str, Any]", raw)
     servers: dict[str, dict[str, Any]] = {}
     for name, config in raw.items():
         if not isinstance(config, dict):
             raise VaultSpecError(f"Codex MCP server '{name}' is not a table.")
-        servers[str(name)] = dict(config)
+        servers[str(name)] = dict(cast("dict[str, Any]", config))
     return servers
 
 
@@ -195,6 +226,7 @@ def _toml_header_path(header: str) -> tuple[str, ...] | None:
     path: list[str] = []
     current: Any = parsed
     while isinstance(current, dict) and "_vaultspec_probe" not in current:
+        current = cast("dict[Any, Any]", current)
         if len(current) != 1:
             return None
         key, current = next(iter(current.items()))

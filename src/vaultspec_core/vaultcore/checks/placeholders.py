@@ -182,7 +182,7 @@ def _strip_non_prose(body: str) -> str:
     """
     stripped = _strip_code_fences(body)
     stripped = _HTML_COMMENT_RE.sub("", stripped)
-    out_lines = []
+    out_lines: list[str] = []
     for line in stripped.split("\n"):
         if _HEADING_RE.match(line):
             out_lines.append(line)

@@ -48,6 +48,8 @@ class _OwnershipState(TypedDict):
 
 
 __all__ = [
+    "_OWNERSHIP_FILENAME",
+    "_OWNERSHIP_VERSION",
     "_discard_owned_names",
     "_fingerprint",
     "_launch_repr",
@@ -55,7 +57,10 @@ __all__ = [
     "_owned_names",
     "_ownership_path",
     "_ownership_target_key",
+    "_OwnershipState",
     "_read_ownership",
+    "ownership_path",
+    "read_ownership",
     "_set_owned_names",
     "_target_lock",
     "_write_ownership",
@@ -100,6 +105,16 @@ def _read_ownership(path: Path) -> _OwnershipState:
     if version != _OWNERSHIP_VERSION:
         raise VaultSpecError(f"Unsupported MCP ownership version at {path}: {version}")
     return cast("_OwnershipState", raw)
+
+
+def ownership_path(root: Path, scope: McpScope) -> Path:
+    """Return the ownership sidecar path for *scope*."""
+    return _ownership_path(root, scope)
+
+
+def read_ownership(path: Path) -> _OwnershipState:
+    """Read and validate the MCP ownership sidecar at *path*."""
+    return _read_ownership(path)
 
 
 def _write_ownership(path: Path, state: _OwnershipState) -> None:
