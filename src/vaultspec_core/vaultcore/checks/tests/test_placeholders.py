@@ -225,17 +225,21 @@ def test_allowlist_covers_all_builtin_template_placeholders():
     (or the date / enum rules) must learn it, or this check would silently
     miss that residue in authored documents.
     """
+    import re
     from pathlib import Path
 
     import vaultspec_core
 
-    from ..placeholders import _PLACEHOLDER_RE
+    # Mirrors the checker's own token pattern (placeholders._PLACEHOLDER_RE); kept
+    # as a local regex so the test can scan raw template text without importing
+    # the private name.
+    placeholder_re = re.compile(r"(?<![${])\{[a-z0-9_*|-]*[a-z][a-z0-9_*|-]*\}(?!\})")
 
     templates_dir = Path(vaultspec_core.__file__).parent / "builtins" / "templates"
     tokens: set[str] = set()
     for template in templates_dir.glob("*.md"):
         text = template.read_text(encoding="utf-8")
-        tokens.update(match.group(0) for match in _PLACEHOLDER_RE.finditer(text))
+        tokens.update(match.group(0) for match in placeholder_re.finditer(text))
 
     assert tokens, "expected to find placeholder tokens in builtin templates"
     unknown = {t for t in tokens if not is_template_placeholder(t)}

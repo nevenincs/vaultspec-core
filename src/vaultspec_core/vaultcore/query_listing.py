@@ -11,7 +11,6 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from collections.abc import Mapping
 from typing import TYPE_CHECKING, TypedDict
 
 from .models import DocType
@@ -19,6 +18,7 @@ from .parser import parse_frontmatter
 from .scanner import get_doc_type, scan_vault
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
     from ..graph import VaultGraph

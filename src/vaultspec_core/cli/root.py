@@ -30,8 +30,8 @@ from vaultspec_core.cli.root_doctor import cmd_check_providers, cmd_doctor
 from vaultspec_core.cli.root_install import cmd_install, cmd_uninstall
 from vaultspec_core.cli.root_preflight import _run_preflight, logger
 from vaultspec_core.cli.root_sync import (
-    collect_sync_outcomes,
     cmd_sync,
+    collect_sync_outcomes,
     infer_label,
     reject_core_sync_target,
     render_sync_dry_run,
@@ -92,21 +92,14 @@ if __name__ == "__main__":
 
 
 __all__ = [
-    "collect_sync_outcomes",
-    "infer_label",
     "_collect_sync_outcomes",
     "_infer_label",
     "_register_subcommands",
-    "reject_core_sync_target",
-    "render_sync_dry_run",
-    "render_sync_post_notices",
-    "resolve_active_sync_names",
-    "_run_preflight",
-    "single_item_result",
     "_reject_core_sync_target",
     "_render_sync_dry_run",
     "_render_sync_post_notices",
     "_resolve_active_sync_names",
+    "_run_preflight",
     "_single_item_result",
     "app",
     "cmd_check_providers",
@@ -114,7 +107,14 @@ __all__ = [
     "cmd_install",
     "cmd_sync",
     "cmd_uninstall",
+    "collect_sync_outcomes",
+    "infer_label",
     "logger",
     "main",
+    "reject_core_sync_target",
+    "render_sync_dry_run",
+    "render_sync_post_notices",
+    "resolve_active_sync_names",
     "run",
+    "single_item_result",
 ]

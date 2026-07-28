@@ -41,6 +41,35 @@ jobs:
             exit 1
           fi
 
+  # `.python-version` is the single interpreter pin: every job resolves its
+  # Python from that file, and `requires-python` bounds the same range. Nothing
+  # enforces that the interpreter actually installed matches it, though - a
+  # setup action that silently falls back to a different minor would leave the
+  # declared pin and the tested interpreter disagreeing, which is exactly the
+  # drift that invalidated venvs across this estate when a host OS upgrade
+  # moved the system interpreter. This job compares the two directly.
+  interpreter-pin:
+    name: Interpreter Matches Pin
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+
+      - name: Verify the interpreter matches .python-version
+        run: |
+          pinned="$(tr -d '[:space:]' < .python-version)"
+          actual="$(python -c 'import sys; print("{}.{}".format(*sys.version_info[:2]))')"
+          if [ "$pinned" != "$actual" ]; then
+            echo "::error::Interpreter mismatch: .python-version pins ${pinned} but the resolved interpreter is ${actual}. Every job in this workflow runs on ${actual}, so the declared pin is not what is being tested."
+            exit 1
+          fi
+          echo "Interpreter matches the pin: ${actual}"
+
   workflow-lint:
     name: Workflow Lint
     runs-on: ubuntu-latest
@@ -61,7 +90,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version-file: .python-version
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -137,7 +166,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version-file: .python-version
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -169,7 +198,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version-file: .python-version
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -218,7 +247,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version-file: .python-version
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -248,7 +277,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version-file: .python-version
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -274,7 +303,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version-file: .python-version
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -310,7 +339,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version-file: .python-version
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7

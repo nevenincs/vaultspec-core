@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from ...graph import DocNode, VaultGraph
 
-__all__ = ["check_references", "check_schema"]
+__all__ = ["_add_related_link", "check_references", "check_schema"]
 
 logger = logging.getLogger(__name__)
 

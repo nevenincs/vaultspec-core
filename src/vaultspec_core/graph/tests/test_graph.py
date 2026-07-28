@@ -13,6 +13,7 @@ import pytest
 from ...graph import DocNode, GraphMetrics, VaultGraph
 from ...testing.synthetic import CorpusManifest, GeneratedDoc
 from ...vaultcore import DocType
+from .conftest import stem_index_of
 
 pytestmark = [pytest.mark.unit]
 
@@ -136,7 +137,7 @@ class TestVaultGraphBuilding:
     def test_stem_index_maps_collisions(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
         collisions = {
-            stem: keys for stem, keys in graph._stem_index.items() if len(keys) > 1
+            stem: keys for stem, keys in stem_index_of(graph).items() if len(keys) > 1
         }
         assert len(collisions) > 0
         for stem, keys in collisions.items():
@@ -147,7 +148,7 @@ class TestVaultGraphBuilding:
         """Stem collisions exist in the synthetic corpus fixture."""
         graph = VaultGraph(vault_root)
         collisions = {
-            stem: keys for stem, keys in graph._stem_index.items() if len(keys) > 1
+            stem: keys for stem, keys in stem_index_of(graph).items() if len(keys) > 1
         }
         assert collisions, "Test vault must have stem collisions"
         for stem, keys in collisions.items():
@@ -193,7 +194,7 @@ class TestVaultGraphBuilding:
         graph = VaultGraph(tmp_path)
 
         # The stem must be a collision (mapped to two qualified keys)
-        assert len(graph._stem_index.get("shared-stem", [])) == 2
+        assert len(stem_index_of(graph).get("shared-stem", [])) == 2
         adr_key = "adr/shared-stem"
         plan_key = "plan/shared-stem"
         assert adr_key in graph.nodes
@@ -203,16 +204,16 @@ class TestVaultGraphBuilding:
         linker = graph.nodes["linker-doc"]
         assert adr_key in linker.out_links, f"linker-doc missing edge to {adr_key!r}"
         assert plan_key in linker.out_links, f"linker-doc missing edge to {plan_key!r}"
-        assert graph._digraph.has_edge("linker-doc", adr_key)
-        assert graph._digraph.has_edge("linker-doc", plan_key)
+        assert graph.digraph.has_edge("linker-doc", adr_key)
+        assert graph.digraph.has_edge("linker-doc", plan_key)
 
     def test_networkx_digraph_has_same_node_count(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
-        assert graph._digraph.number_of_nodes() == len(graph.nodes)
+        assert graph.digraph.number_of_nodes() == len(graph.nodes)
 
     def test_networkx_digraph_has_edges(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
-        assert graph._digraph.number_of_edges() > 0
+        assert graph.digraph.number_of_edges() > 0
 
     def test_digraph_property_exposes_nx_graph(self, vault_root: Path) -> None:
         import networkx as nx
@@ -570,7 +571,7 @@ class TestVaultGraphPhantom:
         for node in phantoms:
             assert node.phantom is True
             assert node.name in graph.nodes
-            assert node.name in graph._digraph
+            assert node.name in graph.digraph
 
     def test_phantom_nodes_have_incoming_edges(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
@@ -578,7 +579,7 @@ class TestVaultGraphPhantom:
         for node in phantoms:
             assert len(node.in_links) > 0
             for source in node.in_links:
-                assert graph._digraph.has_edge(source, node.name)
+                assert graph.digraph.has_edge(source, node.name)
 
     def test_get_orphaned_excludes_phantoms(self, vault_root: Path) -> None:
         graph = VaultGraph(vault_root)
@@ -803,7 +804,7 @@ class TestVaultGraphArchiveResolution:
         """A directed edge from source to the archived phantom node exists."""
         root, _src, _arch = _make_vault_with_archive(tmp_path)
         graph = VaultGraph(root)
-        assert graph._digraph.has_edge("source-doc", "adr/archived-doc")
+        assert graph.digraph.has_edge("source-doc", "adr/archived-doc")
 
 
 def _make_weighted_vault(tmp_path: Path) -> Path:
