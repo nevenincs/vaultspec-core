@@ -44,7 +44,7 @@ repos:
 
 
 @pytest.fixture(autouse=True)
-def _reset() -> Iterator[None]:
+def reset() -> Iterator[None]:
     reset_config()
     yield
     reset_config()
