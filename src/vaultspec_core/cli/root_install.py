@@ -47,7 +47,10 @@ def cmd_install(
         list[str] | None,
         typer.Option(
             "--skip",
-            help="Skip a component (core or provider name). Repeatable.",
+            help=(
+                "Skip a component: core, a provider name, mcp, or "
+                "precommit. Repeatable."
+            ),
         ),
     ] = None,
     mode: Annotated[
@@ -74,7 +77,8 @@ def cmd_install(
 
     Scaffolds the workspace structure and syncs all managed resources.
     Use --upgrade to update builtin rules without re-scaffolding.
-    Use --skip to exclude components on retry (e.g. --skip core --skip claude).
+    Use --skip to exclude components on retry (e.g. --skip core --skip claude);
+    valid targets are core, provider names, mcp, and precommit.
     For MCP-capable providers, installation reconciles canonical MCP definitions
     into project-scope provider-native configuration. It does not start MCP
     servers or grant provider trust.
@@ -133,6 +137,7 @@ def cmd_install(
         dry_run=dry_run,
         scope="framework",
         render=not json_output,
+        skip=set(skip),
     )
 
     try:
@@ -331,6 +336,7 @@ def cmd_uninstall(
         dry_run=dry_run,
         scope="framework",
         render=not json_output,
+        skip=set(skip),
     )
 
     try:

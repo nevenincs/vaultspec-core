@@ -152,10 +152,13 @@ def _resolve_gitattributes(
 
 #: Repair reason per pre-commit signal, for the signals install and sync can
 #: repair in place. ``{entry_prefix}`` is filled with the mode-appropriate
-#: canonical hook entry prefix. NO_FILE is absent: scaffolding an entirely
-#: missing config is a sync-only repair with its own reason.
+#: canonical hook entry prefix. NO_FILE and NO_HOOKS are absent: total
+#: absence - no config at all, or a config the operator stripped of every
+#: vaultspec hook - is a decision, not drift (#284). Repairing it here would
+#: run in preflight, before the sync body's reconcile pass can observe the
+#: removal and stand management down; install and upgrade re-enroll
+#: explicitly through the provisioning scaffold instead.
 _PRECOMMIT_REPAIR_REASONS: dict[PrecommitSignal, str] = {
-    PrecommitSignal.NO_HOOKS: "No vaultspec-core hooks found in pre-commit config",
     PrecommitSignal.INCOMPLETE: "Missing canonical hooks in pre-commit config",
     PrecommitSignal.NON_CANONICAL: (
         "Hook entries use non-canonical pattern; should use '{entry_prefix}'"
@@ -192,15 +195,12 @@ def _resolve_precommit(
     if signal in _PRECOMMIT_INERT_SIGNALS:
         return
 
-    if signal == PrecommitSignal.NO_FILE:
-        if action == CliAction.SYNC:
-            plan.steps.append(
-                ResolutionStep(
-                    action=ResolutionAction.REPAIR_PRECOMMIT,
-                    target=".pre-commit-config.yaml",
-                    reason="Pre-commit config missing but management is enabled",
-                )
-            )
+    if signal in (PrecommitSignal.NO_FILE, PrecommitSignal.NO_HOOKS):
+        # Absence is honoured as an operator decision, never repaired as
+        # drift (#284): the sync body's reconcile pass observes the removal
+        # and durably stands management down, which a preflight re-scaffold
+        # here would forever preempt. Install/upgrade re-enroll through the
+        # provisioning scaffold, not through a resolution step.
         return
 
     reason = _PRECOMMIT_REPAIR_REASONS.get(signal)

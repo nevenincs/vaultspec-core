@@ -53,6 +53,7 @@ def resolve(
     force: bool = False,
     dry_run: bool = False,
     target: Path | None = None,
+    skip: set[str] | None = None,
 ) -> ResolutionPlan:
     """Build a resolution plan from diagnosed workspace state.
 
@@ -71,12 +72,17 @@ def resolve(
         target: Workspace root directory. Used to read manifest flags.
             Falls back to :func:`~vaultspec_core.core.types.get_context`
             if not provided.
+        skip: Component names the invoking command was asked to skip
+            (``--skip``). A skipped component contributes no resolution
+            steps, so preflight cannot repair what the main command was
+            told to leave alone (#284).
 
     Returns:
         A :class:`ResolutionPlan` with steps, warnings, and conflicts.
     """
     _ = dry_run  # reserved for executor phase
     action = CliAction(action)
+    skip = skip or set()
     plan = ResolutionPlan()
 
     if action == CliAction.DOCTOR:
@@ -137,14 +143,15 @@ def resolve(
                 "Could not resolve render mode for precommit advisory", exc_info=True
             )
 
-    _resolve_precommit(
-        plan,
-        diagnosis.precommit,
-        prov_action,
-        force=force,
-        precommit_managed=pc_managed,
-        expected_entry_prefix=expected_entry_prefix,
-    )
+    if "precommit" not in skip:
+        _resolve_precommit(
+            plan,
+            diagnosis.precommit,
+            prov_action,
+            force=force,
+            precommit_managed=pc_managed,
+            expected_entry_prefix=expected_entry_prefix,
+        )
     _resolve_mode_mismatch(plan, diagnosis.mode_mismatch)
 
     # Per-provider rules
