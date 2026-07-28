@@ -22,7 +22,6 @@ Exports:
 
 from __future__ import annotations
 
-import json
 import logging
 from collections import Counter
 from typing import TYPE_CHECKING, Any, cast
@@ -40,7 +39,7 @@ from ..vaultcore import (
     scan_vault,
 )
 from ..vaultcore.models import DocumentMetadata
-from . import rendering
+from . import api_export, rendering
 from .algorithms import (
     PAGERANK_ALPHA,
     _betweenness_centrality,
@@ -51,7 +50,6 @@ from .algorithms import (
     _pagerank,
     _top_n,
 )
-from .derived import compute_derived_edges
 from .models import DocNode, EncodingIssue, GraphCounts, GraphMetrics
 
 if TYPE_CHECKING:
@@ -1199,28 +1197,13 @@ class VaultGraph:
     def _relativise_node_path(self, raw_path: Any) -> str | None:
         """Return *raw_path* as a vault-relative POSIX path, or ``None``.
 
-        A working-tree node carries an absolute filesystem path; this rewrites
-        it to the same vault-relative virtual form a ref-scoped node already
-        uses (e.g. ``.vault/adr/foo.md``), so the serialised ``path`` field is
-        consistent across build modes and never leaks an absolute OS path. A
-        ``None`` path (phantom) stays ``None``; a path already relative or not
-        under the root is returned unchanged (as POSIX).
-
         Args:
             raw_path: The ``path`` value off a serialised node dict.
 
         Returns:
             The vault-relative POSIX path string, or ``None``.
         """
-        import pathlib
-
-        if not raw_path:
-            return None
-        candidate = pathlib.PurePath(str(raw_path))
-        root = pathlib.PurePath(str(self.root_dir))
-        if candidate.is_absolute() and candidate.is_relative_to(root):
-            return candidate.relative_to(root).as_posix()
-        return candidate.as_posix()
+        return api_export.relativise_node_path(self.root_dir, raw_path)
 
     def to_dict(
         self,
@@ -1262,66 +1245,14 @@ class VaultGraph:
             ref-scoped build (issue #160) and is ``None`` for a working-tree
             build.
         """
-        if node is not None:
-            g = self.ego_subgraph(node, depth=depth)
-        else:
-            g = self.subgraph(feature=feature)
-
-        # networkx native serialisation - pass edges="edges" explicitly so
-        # the wire key is deterministic regardless of networkx version.
-        # networkx changed the default from "links" (<=3.5) to "edges" (>=3.6).
-        data = _node_link_data(g, edges="edges")
-
-        # Strip body from nodes unless requested
-        if not include_body:
-            for node_dict in data.get("nodes", []):
-                node_dict.pop("body", None)
-
-        # Inject body when requested (body is not on the nx node)
-        if include_body:
-            for node_dict in data.get("nodes", []):
-                nid = node_dict.get("id", "")
-                doc = self.nodes.get(nid)
-                if doc:
-                    node_dict["body"] = doc.body
-
-        # Normalise every node ``path`` to a vault-relative POSIX path so the
-        # wire format never leaks an absolute OS path and is identical across
-        # build modes (issue #160 consumer symmetry): a ref-scoped node already
-        # carries its virtual tree path (e.g. ``.vault/adr/foo.md``), and a
-        # working-tree node's absolute filesystem path is relativised to the
-        # same shape here. Phantoms (``path is None``) and any path already
-        # outside the root are left untouched.
-        for node_dict in data.get("nodes", []):
-            node_dict["path"] = self._relativise_node_path(node_dict.get("path"))
-
-        # Derived (implicit) relatedness edges.  Computed on demand and kept
-        # in a SEPARATE array so checkers and the canonical edges list stay
-        # free of synthetic edges.  When the export is scoped (ego or feature),
-        # the derived computation is scoped to the exported node set too, so an
-        # ego query pays only its local pair cost instead of the whole-graph
-        # O(n^2) pass that is then filtered away.  An unscoped (full-graph)
-        # export passes scope=None and computes over every pair.
-        derived: list[dict[str, Any]] = []
-        if include_derived:
-            scope = None if (node is None and feature is None) else set(g.nodes())
-            derived = [edge.to_dict() for edge in compute_derived_edges(self, scope)]
-        data["derived_edges"] = derived
-
-        # Enrich with vault-specific metadata.
-        # Pass the already-computed subgraph so betweenness_centrality runs
-        # exactly once per to_dict call instead of recomputing via a second
-        # subgraph() traversal inside metrics().
-        m = self.metrics(feature=feature, _g=g)
-        data["root"] = str(self.root_dir)
-        # Ref-scoped builds (issue #160) name the snapshot here; a working-tree
-        # build carries ``ref: null`` so the v2 envelope stays self-describing
-        # without changing any node or edge shape.
-        data["ref"] = self.ref
-        data["feature"] = feature
-        data["metrics"] = m.to_dict()
-
-        return data
+        return api_export.to_dict(
+            self,
+            feature=feature,
+            include_body=include_body,
+            node=node,
+            depth=depth,
+            include_derived=include_derived,
+        )
 
     def to_json(
         self,
@@ -1339,11 +1270,9 @@ class VaultGraph:
         Returns:
             JSON string.
         """
-        return json.dumps(
-            self.to_dict(
-                feature=feature,
-                include_body=include_body,
-            ),
+        return api_export.to_json(
+            self,
+            feature=feature,
+            include_body=include_body,
             indent=indent,
-            default=str,
         )
