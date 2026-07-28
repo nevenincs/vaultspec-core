@@ -26,7 +26,14 @@ from vaultspec_core.vaultcore import (
     parse_lenient_date,
     parse_vault_metadata,
 )
-from vaultspec_core.vaultcore.hydration import create_vault_doc, hydrate_template
+from vaultspec_core.vaultcore.hydration import (
+    DocumentIdentity,
+    ExecBinding,
+    ParentPlan,
+    TemplateFields,
+    create_vault_doc,
+    hydrate_template,
+)
 from vaultspec_core.vaultcore.models import refresh_modified_stamp
 
 if TYPE_CHECKING:
@@ -292,12 +299,12 @@ class TestScaffoldStamp:
         content_root = self._content_root(tmp_path)
         path = create_vault_doc(
             tmp_path,
-            doc_type,
-            "stamp-feat",
-            "2026-06-12",
-            title="stamp probe",
+            DocumentIdentity(doc_type, "stamp-feat", "2026-06-12"),
+            TemplateFields(
+                title="stamp probe",
+                tier="L1" if doc_type is DocType.PLAN else None,
+            ),
             content_root=content_root,
-            tier="L1" if doc_type is DocType.PLAN else None,
         )
         metadata, _ = parse_vault_metadata(path.read_text(encoding="utf-8"))
         assert metadata.date == "2026-06-12"
@@ -308,13 +315,13 @@ class TestScaffoldStamp:
         content_root = self._content_root(tmp_path)
         path = create_vault_doc(
             tmp_path,
-            DocType.EXEC,
-            "stamp-feat",
-            "2026-06-12",
+            DocumentIdentity(DocType.EXEC, "stamp-feat", "2026-06-12"),
+            exec_binding=ExecBinding(
+                plan=ParentPlan(stem="2026-06-12-stamp-feat-plan"),
+                step_id="S01",
+                step_display_path="W01.P01.S01",
+            ),
             content_root=content_root,
-            step_id="S01",
-            step_display_path="W01.P01.S01",
-            plan_stem="2026-06-12-stamp-feat-plan",
         )
         metadata, _ = parse_vault_metadata(path.read_text(encoding="utf-8"))
         assert metadata.modified == "2026-06-12"
@@ -324,10 +331,8 @@ class TestScaffoldStamp:
         content_root = self._content_root(tmp_path)
         path = create_vault_doc(
             tmp_path,
-            DocType.RESEARCH,
-            "stamp-feat",
-            "2026-06-12",
-            title="placement probe",
+            DocumentIdentity(DocType.RESEARCH, "stamp-feat", "2026-06-12"),
+            TemplateFields(title="placement probe"),
             content_root=content_root,
         )
         content = path.read_text(encoding="utf-8")
@@ -348,7 +353,9 @@ class TestScaffoldStamp:
             "---\n"
             "# {feature} research: {topic}\n"
         )
-        hydrated = hydrate_template(template, "stamp-feat", "2026-06-12", "probe")
+        hydrated = hydrate_template(
+            template, "stamp-feat", "2026-06-12", TemplateFields(title="probe")
+        )
         assert hydrated.count("modified:") == 1
         metadata, _ = parse_vault_metadata(hydrated)
         assert metadata.modified == "2026-06-12"

@@ -18,8 +18,8 @@ if TYPE_CHECKING:
 pytestmark = [pytest.mark.integration]
 
 
-def _write_fake_editor(directory: Path, name: str, exit_code: int = 0) -> str:
-    """Create a real, resolvable fake-editor executable on disk.
+def _write_probe_editor(directory: Path, name: str, exit_code: int = 0) -> str:
+    """Create a real, resolvable editor executable on disk.
 
     Writes a genuine platform-appropriate launcher script that accepts (and
     ignores) the file-path argument :func:`vaultspec_core.core.resources.resource_edit`
@@ -28,10 +28,16 @@ def _write_fake_editor(directory: Path, name: str, exit_code: int = 0) -> str:
     rather than a Windows-only system editor, so the assertions hold on any
     operating system.
 
+    Named a *probe* rather than a fake because that is what it is: a real
+    executable on a real ``PATH``, not a test double. The suite-quality guard in
+    ``tests/test_test_suite_quality.py`` rejects ``fake``/``stub`` in a test
+    symbol's name, and a name that misdescribes a real binary as a double both
+    trips that guard and misleads the next reader.
+
     :param directory: Directory to write the script into; prepend it to ``PATH``
         so the returned name resolves via :func:`shutil.which`.
     :param name: Bare editor name, used verbatim as the resolvable command.
-    :param exit_code: Process exit status the fake editor returns.
+    :param exit_code: Process exit status the probe editor returns.
     :returns: The bare editor name to pass to ``--editor`` or an editor env var.
     """
     if sys.platform == "win32":
@@ -135,16 +141,16 @@ class TestEditorResolution:
     def test_resolution_ladder(self, tmp_path):
         import os
 
-        # Real, resolvable fake editors - one distinct binary per ladder rung -
+        # Real, resolvable probe editors - one distinct binary per ladder rung -
         # created on disk and reachable via a PATH prepend, so precedence is
         # proven with genuine executables on any operating system.
         bindir = tmp_path / "bin"
         bindir.mkdir()
-        ed_editor = _write_fake_editor(bindir, "vsed-editor")
-        ed_visual = _write_fake_editor(bindir, "vsed-visual")
-        ed_vaultspec = _write_fake_editor(bindir, "vsed-vaultspec")
-        ed_config = _write_fake_editor(bindir, "vsed-config")
-        ed_flag = _write_fake_editor(bindir, "vsed-flag")
+        ed_editor = _write_probe_editor(bindir, "vsed-editor")
+        ed_visual = _write_probe_editor(bindir, "vsed-visual")
+        ed_vaultspec = _write_probe_editor(bindir, "vsed-vaultspec")
+        ed_config = _write_probe_editor(bindir, "vsed-config")
+        ed_flag = _write_probe_editor(bindir, "vsed-flag")
 
         # Save old values
         old_path = os.environ.get("PATH")
@@ -153,7 +159,7 @@ class TestEditorResolution:
         old_vaultspec_editor = os.environ.get("VAULTSPEC_EDITOR")
 
         try:
-            # Prepend the fake-editor dir and clear editor env vars to avoid
+            # Prepend the probe-editor dir and clear editor env vars to avoid
             # pollution from the ambient environment.
             os.environ["PATH"] = str(bindir) + os.pathsep + (old_path or "")
             os.environ.pop("VISUAL", None)
@@ -223,13 +229,13 @@ class TestEditorSubprocessSafety:
     def test_editor_failures_exits(self, runner, synthetic_project, tmp_path):
         import os
 
-        # Real fake editors that exit with the exact codes the ladder maps:
+        # Real probe editors that exit with the exact codes the ladder maps:
         # a nonexistent binary (resolution fail -> 2), a script exiting 5
         # (non-zero -> 3), and a script exiting 130 (cancellation -> 4).
         bindir = tmp_path / "bin"
         bindir.mkdir()
-        ed_fail5 = _write_fake_editor(bindir, "vsed-fail5", exit_code=5)
-        ed_cancel = _write_fake_editor(bindir, "vsed-cancel", exit_code=130)
+        ed_fail5 = _write_probe_editor(bindir, "vsed-fail5", exit_code=5)
+        ed_cancel = _write_probe_editor(bindir, "vsed-cancel", exit_code=130)
 
         old_path = os.environ.get("PATH")
         try:
@@ -253,7 +259,7 @@ class TestEditorSubprocessSafety:
 
             # Case 1: Resolution Failure -> code 2. Every rung of the ladder must
             # miss, including the terminal ``vi`` fallback which is present on
-            # many POSIX hosts. Point PATH exclusively at the fake-editor dir
+            # many POSIX hosts. Point PATH exclusively at the probe-editor dir
             # (which holds no ``vi``) so nothing resolves; resolution fails
             # before any subprocess launches, so no external binary is needed.
             # Windows keeps the system PATH prepended - ``vi`` is absent there
@@ -278,7 +284,7 @@ class TestEditorSubprocessSafety:
             assert result.exit_code == 2
             assert "Error: Could not resolve a working text editor" in result.output
 
-            # Restore the fake-editor dir plus the system PATH so the exit-code
+            # Restore the probe-editor dir plus the system PATH so the exit-code
             # cases below can launch their real editor subprocesses (and reach
             # cmd.exe on Windows).
             os.environ["PATH"] = str(bindir) + os.pathsep + (old_path or "")

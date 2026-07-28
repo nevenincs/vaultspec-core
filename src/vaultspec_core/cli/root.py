@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path  # noqa: TC003 - Typer evaluates the root --target annotation.
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 
@@ -26,7 +26,10 @@ from vaultspec_core.cli._target import (
 from vaultspec_core.core.enums import CliAction, InstallMode
 
 if TYPE_CHECKING:
+    from rich.console import Console
+
     from vaultspec_core.cli.rendering import OutcomeItem
+    from vaultspec_core.core.enums import Tool
     from vaultspec_core.core.types import SyncResult
 
 logger = logging.getLogger(__name__)
@@ -570,6 +573,198 @@ def cmd_uninstall(
         console.print("Nothing to remove  - vaultspec is not installed at this path.")
 
 
+def _reject_core_sync_target(provider: str) -> None:
+    """Refuse ``core`` as a sync target; it is not a provider output.
+
+    Raises:
+        typer.Exit: Code 1, when ``provider`` is ``"core"``.
+    """
+    if provider != "core":
+        return
+    typer.echo(
+        "Error: 'core' is not a valid sync target. "
+        "The sync source is .vaultspec/ (core) itself.\n"
+        "  Hint: use 'vaultspec-core sync all' to sync all providers, "
+        "or 'vaultspec-core install --upgrade' to update the framework.",
+        err=True,
+    )
+    raise typer.Exit(code=1)
+
+
+def _render_sync_dry_run(
+    results: list[SyncResult],
+    provider: str,
+    skip: list[str],
+    json_output: bool,
+    console: Console,
+) -> None:
+    """Render a sync ``--dry-run`` preview and exit.
+
+    Args:
+        results: Per-provider sync results collected in preview mode.
+        provider: The provider argument as passed to ``cmd_sync``.
+        skip: Components excluded from the sync, as passed to ``cmd_sync``.
+        json_output: Whether to emit the machine-readable JSON envelope.
+        console: The Rich console to render human-readable output to.
+
+    Raises:
+        typer.Exit: Always; a dry run never falls through to a live sync.
+    """
+    if json_output:
+        import json
+
+        from vaultspec_core.cli.rendering import json_envelope, outcomes_as_json
+
+        outcomes = _collect_sync_outcomes(results, provider, skip)
+        inner = outcomes_as_json(outcomes)
+        envelope = json_envelope(
+            "sync", str(inner["status"]), {"items": inner["items"]}
+        )
+        typer.echo(json.dumps(envelope, indent=2))
+        raise typer.Exit(0)
+
+    from vaultspec_core.cli.rendering import render_dry_run_tree
+    from vaultspec_core.core.dry_run import DryRunItem, DryRunStatus
+    from vaultspec_core.core.types import get_context
+
+    action_map = {
+        "[ADD]": DryRunStatus.NEW,
+        "[UPDATE]": DryRunStatus.UPDATE,
+        "[UNCHANGED]": DryRunStatus.EXISTS,
+        "[SKIP]": DryRunStatus.EXISTS,
+        "[DELETE]": DryRunStatus.DELETE,
+    }
+    all_items = [
+        DryRunItem(
+            path=item_path,
+            status=action_map.get(action, DryRunStatus.UPDATE),
+            label=_infer_label(item_path),
+        )
+        for r in results
+        for item_path, action in r.items
+    ]
+    if not all_items:
+        console.print("[dim]Sync preview: no changes[/dim]")
+        raise typer.Exit(0)
+
+    target_dir = get_context().target_dir
+    title = f"Sync preview -> {target_dir}"
+    if provider != "all":
+        title = f"Sync preview ({provider}) -> {target_dir}"
+    render_dry_run_tree(all_items, title=title)
+    raise typer.Exit(0)
+
+
+def _resolve_active_sync_names(
+    active_configs: dict[Tool, Any], provider: str, skip: list[str]
+) -> list[str]:
+    """Return the enabled provider config names selected for this sync.
+
+    Args:
+        active_configs: Mapping of provider tool to its installed config, as
+            returned by :func:`~vaultspec_core.core.manifest.installed_tool_configs`.
+        provider: The provider argument as passed to ``cmd_sync``.
+        skip: Components excluded from the sync, as passed to ``cmd_sync``.
+
+    Returns:
+        The config names selected by ``provider`` and not excluded by ``skip``.
+    """
+    if provider == "all":
+        return [
+            cfg.name
+            for tool, cfg in active_configs.items()
+            if tool.value not in skip and cfg.name not in skip
+        ]
+    return [
+        cfg.name
+        for tool, cfg in active_configs.items()
+        if (tool.value == provider or cfg.name == provider)
+        and tool.value not in skip
+        and cfg.name not in skip
+    ]
+
+
+def _render_sync_post_notices(
+    console: Console,
+    sync_target: Path,
+    results: list[SyncResult],
+    all_warnings: list[str],
+    code: int,
+    active_names: list[str],
+) -> None:
+    """Render the advisory notices shown after a non-JSON, non-dry-run sync.
+
+    Covers three independent notices: builtins newer than ``.vaultspec/``,
+    provider-content warnings that ``--force`` would resolve, and a
+    zero-files-produced warning for an otherwise clean run.
+
+    Args:
+        console: The Rich console to render to.
+        sync_target: The resolved sync target directory.
+        results: Per-provider sync results from the live sync pass.
+        all_warnings: Warnings collected across ``results``.
+        code: The exit code ``emit_outcomes`` computed for the sync.
+        active_names: The provider config names selected for this sync.
+    """
+    from vaultspec_core.builtins import check_outdated
+
+    vaultspec_dir = sync_target / ".vaultspec"
+    outdated = check_outdated(vaultspec_dir) if vaultspec_dir.is_dir() else []
+    if outdated:
+        console.print()
+        console.print(
+            f"[bold yellow]Upgrade available:[/bold yellow] "
+            f"{len(outdated)} builtin(s) in the installed "
+            f"vaultspec-core package are newer than .vaultspec/:"
+        )
+        for path in outdated:
+            console.print(f"  [yellow]-[/yellow] {path}")
+        from vaultspec_core.cli.rendering import hints_suppressed, render_next_actions
+
+        if not hints_suppressed():
+            render_next_actions(
+                [
+                    (
+                        "Update builtins to the packaged version",
+                        "vaultspec-core install --upgrade",
+                    ),
+                    ("Re-sync after upgrading", "vaultspec-core sync"),
+                ]
+            )
+
+    if all_warnings:
+        console.print()
+        console.print(
+            f"[bold yellow]Warning:[/bold yellow] "
+            f"{len(all_warnings)} item(s) differ from .vaultspec/ source. "
+            f"Use [bold]--force[/bold] to resolve:"
+        )
+        for warning in all_warnings:
+            console.print(f"  [yellow]-[/yellow] {warning}")
+
+    # Warn only when a clean run genuinely found nothing to project.
+    total_changes = sum(r.added + r.updated for r in results)
+    total_skipped = sum(r.skipped for r in results)
+    total_unchanged = sum(r.unchanged for r in results)
+    ran_clean = code == 0 and not all_warnings
+    projected_nothing = (
+        total_changes == 0 and total_skipped == 0 and total_unchanged == 0
+    )
+    if not (ran_clean and active_names and projected_nothing):
+        return
+
+    console.print(
+        "\n[bold yellow]Warning:[/bold yellow] Sync produced 0 files. "
+        "The .vaultspec/ source directories may be empty."
+    )
+    from vaultspec_core.cli.rendering import hints_suppressed, render_next_actions
+
+    if not hints_suppressed():
+        render_next_actions(
+            [("Re-seed builtin content", "vaultspec-core install --upgrade")]
+        )
+
+
 @app.command("sync")
 def cmd_sync(
     provider: Annotated[
@@ -612,15 +807,7 @@ def cmd_sync(
     """
     skip = list(skip or [])
     apply_target(target, split_source=True, json_output=json_output)
-    if provider == "core":
-        typer.echo(
-            "Error: 'core' is not a valid sync target. "
-            "The sync source is .vaultspec/ (core) itself.\n"
-            "  Hint: use 'vaultspec-core sync all' to sync all providers, "
-            "or 'vaultspec-core install --upgrade' to update the framework.",
-            err=True,
-        )
-        raise typer.Exit(code=1)
+    _reject_core_sync_target(provider)
 
     from vaultspec_core.core.types import get_context
 
@@ -654,56 +841,7 @@ def cmd_sync(
     console = get_console()
 
     if dry_run:
-        if json_output:
-            import json
-
-            from vaultspec_core.cli.rendering import (
-                json_envelope,
-                outcomes_as_json,
-            )
-
-            outcomes = _collect_sync_outcomes(results, provider, skip)
-            inner = outcomes_as_json(outcomes)
-            envelope = json_envelope(
-                "sync", str(inner["status"]), {"items": inner["items"]}
-            )
-            typer.echo(json.dumps(envelope, indent=2))
-            raise typer.Exit(0)
-
-        from vaultspec_core.cli.rendering import render_dry_run_tree
-        from vaultspec_core.core.dry_run import (
-            DryRunItem,
-            DryRunStatus,
-        )
-        from vaultspec_core.core.types import get_context
-
-        action_map = {
-            "[ADD]": DryRunStatus.NEW,
-            "[UPDATE]": DryRunStatus.UPDATE,
-            "[UNCHANGED]": DryRunStatus.EXISTS,
-            "[SKIP]": DryRunStatus.EXISTS,
-            "[DELETE]": DryRunStatus.DELETE,
-        }
-        all_items = []
-        for r in results:
-            for item_path, action in r.items:
-                status = action_map.get(action, DryRunStatus.UPDATE)
-                all_items.append(
-                    DryRunItem(
-                        path=item_path,
-                        status=status,
-                        label=_infer_label(item_path),
-                    )
-                )
-        if all_items:
-            _target_dir = get_context().target_dir
-            title = f"Sync preview -> {_target_dir}"
-            if provider != "all":
-                title = f"Sync preview ({provider}) -> {_target_dir}"
-            render_dry_run_tree(all_items, title=title)
-        else:
-            console.print("[dim]Sync preview: no changes[/dim]")
-        raise typer.Exit(0)
+        _render_sync_dry_run(results, provider, skip, json_output, console)
 
     # Non-dry-run: route every provider through the canonical outcome
     # renderer. Per the cli-sync-vocabulary ADR (audit findings
@@ -714,20 +852,7 @@ def cmd_sync(
     from vaultspec_core.core.manifest import installed_tool_configs
 
     active_configs = installed_tool_configs()
-    if provider == "all":
-        active_names = [
-            cfg.name
-            for tool, cfg in active_configs.items()
-            if tool.value not in skip and cfg.name not in skip
-        ]
-    else:
-        active_names = [
-            cfg.name
-            for tool, cfg in active_configs.items()
-            if (tool.value == provider or cfg.name == provider)
-            and tool.value not in skip
-            and cfg.name not in skip
-        ]
+    active_names = _resolve_active_sync_names(active_configs, provider, skip)
 
     if not active_names and not json_output:
         console.print("[dim]No enabled providers to sync.[/dim]")
@@ -746,71 +871,9 @@ def cmd_sync(
     )
 
     if not json_output:
-        from vaultspec_core.builtins import check_outdated
-
-        vaultspec_dir = sync_target / ".vaultspec"
-        outdated = check_outdated(vaultspec_dir) if vaultspec_dir.is_dir() else []
-        if outdated:
-            console.print()
-            console.print(
-                f"[bold yellow]Upgrade available:[/bold yellow] "
-                f"{len(outdated)} builtin(s) in the installed "
-                f"vaultspec-core package are newer than .vaultspec/:"
-            )
-            for path in outdated:
-                console.print(f"  [yellow]-[/yellow] {path}")
-            from vaultspec_core.cli.rendering import (
-                hints_suppressed,
-                render_next_actions,
-            )
-
-            if not hints_suppressed():
-                render_next_actions(
-                    [
-                        (
-                            "Update builtins to the packaged version",
-                            "vaultspec-core install --upgrade",
-                        ),
-                        ("Re-sync after upgrading", "vaultspec-core sync"),
-                    ]
-                )
-
-        if all_warnings:
-            console.print()
-            console.print(
-                f"[bold yellow]Warning:[/bold yellow] "
-                f"{len(all_warnings)} item(s) differ from .vaultspec/ source. "
-                f"Use [bold]--force[/bold] to resolve:"
-            )
-            for warning in all_warnings:
-                console.print(f"  [yellow]-[/yellow] {warning}")
-
-        # Warn only when a clean run genuinely found nothing to project:
-        # no changes, no skips, and no files already in place.
-        total_changes = sum(r.added + r.updated for r in results)
-        total_skipped = sum(r.skipped for r in results)
-        total_unchanged = sum(r.unchanged for r in results)
-        if (
-            code == 0
-            and active_names
-            and total_changes == 0
-            and total_skipped == 0
-            and total_unchanged == 0
-            and not all_warnings
-        ):
-            console.print(
-                "\n[bold yellow]Warning:[/bold yellow] Sync produced 0 files. "
-                "The .vaultspec/ source directories may be empty."
-            )
-            from vaultspec_core.cli.rendering import (
-                hints_suppressed,
-                render_next_actions,
-            )
-
-            if not hints_suppressed():
-                render_next_actions(
-                    [("Re-seed builtin content", "vaultspec-core install --upgrade")]
-                )
+        _render_sync_post_notices(
+            console, sync_target, results, all_warnings, code, active_names
+        )
 
     raise typer.Exit(code)
 

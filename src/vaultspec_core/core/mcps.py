@@ -1493,6 +1493,59 @@ def mcp_sync(
     return result
 
 
+def _uninstall_json_target(
+    target: McpTarget,
+    root: Path,
+    requested: set[str],
+    *,
+    dry_run: bool,
+    result: SyncResult,
+) -> None:
+    """Drop *requested* owned servers from a Claude or Antigravity JSON target."""
+    raw = json.loads(target.path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise VaultSpecError("JSON root is not an object.")
+    servers = _json_server_map(raw, target, root)
+    present = requested & set(servers)
+    result.pruned += len(present)
+    result.items.extend((name, "[DELETE]") for name in sorted(present))
+    if dry_run:
+        return
+    for name in present:
+        servers.pop(name, None)
+    raw.pop(_LEGACY_MANAGED_KEY, None)
+    _write_json_target(target.path, raw, target, root)
+
+
+def _uninstall_toml_target(
+    target: McpTarget,
+    requested: set[str],
+    *,
+    dry_run: bool,
+    result: SyncResult,
+) -> None:
+    """Drop *requested* owned servers from a Codex TOML target."""
+    content = target.path.read_text(encoding="utf-8")
+    block_servers = _toml_servers(_managed_toml_content(content))
+    present = requested & set(block_servers)
+    result.pruned += len(present)
+    result.items.extend((name, "[DELETE]") for name in sorted(present))
+    if dry_run:
+        return
+    for name in present:
+        block_servers.pop(name, None)
+    rendered = _render_codex_servers(block_servers)
+    updated = (
+        upsert_block(content, _TOML_BLOCK_TYPE, rendered, comment_prefix="# ")
+        if rendered
+        else strip_block(content, _TOML_BLOCK_TYPE)
+    )
+    if updated:
+        atomic_write(target.path, updated)
+    else:
+        target.path.unlink()
+
+
 def mcp_uninstall(
     target_dir: Path,
     *,
@@ -1542,42 +1595,20 @@ def mcp_uninstall(
             with _target_lock(target.path, dry_run=dry_run):
                 try:
                     if target.format is McpTargetFormat.JSON:
-                        raw = json.loads(target.path.read_text(encoding="utf-8"))
-                        if not isinstance(raw, dict):
-                            raise VaultSpecError("JSON root is not an object.")
-                        servers = _json_server_map(raw, target, target_dir)
-                        present = requested & set(servers)
-                        sub.pruned += len(present)
-                        sub.items.extend((name, "[DELETE]") for name in sorted(present))
-                        if not dry_run:
-                            for name in present:
-                                servers.pop(name, None)
-                            raw.pop(_LEGACY_MANAGED_KEY, None)
-                            _write_json_target(target.path, raw, target, target_dir)
+                        _uninstall_json_target(
+                            target,
+                            target_dir,
+                            requested,
+                            dry_run=dry_run,
+                            result=sub,
+                        )
                     else:
-                        content = target.path.read_text(encoding="utf-8")
-                        block_servers = _toml_servers(_managed_toml_content(content))
-                        present = requested & set(block_servers)
-                        sub.pruned += len(present)
-                        sub.items.extend((name, "[DELETE]") for name in sorted(present))
-                        if not dry_run:
-                            for name in present:
-                                block_servers.pop(name, None)
-                            rendered = _render_codex_servers(block_servers)
-                            updated = (
-                                upsert_block(
-                                    content,
-                                    _TOML_BLOCK_TYPE,
-                                    rendered,
-                                    comment_prefix="# ",
-                                )
-                                if rendered
-                                else strip_block(content, _TOML_BLOCK_TYPE)
-                            )
-                            if updated:
-                                atomic_write(target.path, updated)
-                            else:
-                                target.path.unlink()
+                        _uninstall_toml_target(
+                            target,
+                            requested,
+                            dry_run=dry_run,
+                            result=sub,
+                        )
                     succeeded = True
                 except (
                     json.JSONDecodeError,

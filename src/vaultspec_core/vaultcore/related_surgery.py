@@ -238,22 +238,26 @@ def append_related_entry(path: Path, wiki_link: str) -> bool:
                 inline_value = stripped if stripped not in ("", "[]") else None
                 continue
 
-            if in_related:
-                if line and line[0] not in (" ", "\t"):
-                    # New top-level key; block ended
-                    in_related = False
-                else:
-                    m = _RELATED_ENTRY_RE.match(line)
-                    if m:
-                        # Idempotency check on the bare stem: an aliased
-                        # existing entry (`[[foo|Foo]]`) must dedupe against a
-                        # plain `[[foo]]` append, so compare only the stem
-                        # left of any `|` alias pipe.
-                        existing_stem = m.group(1).split("|", 1)[0].strip()
-                        if existing_stem.lower() == stem.lower():
-                            return False
-                        last_related_item_idx = i
-                        last_related_indent = line[: len(line) - len(line.lstrip())]
+            if not in_related:
+                continue
+
+            if line and line[0] not in (" ", "\t"):
+                # New top-level key; block ended
+                in_related = False
+                continue
+
+            m = _RELATED_ENTRY_RE.match(line)
+            if not m:
+                continue
+
+            # Idempotency check on the bare stem: an aliased existing entry
+            # (`[[foo|Foo]]`) must dedupe against a plain `[[foo]]` append, so
+            # compare only the stem left of any `|` alias pipe.
+            existing_stem = m.group(1).split("|", 1)[0].strip()
+            if existing_stem.lower() == stem.lower():
+                return False
+            last_related_item_idx = i
+            last_related_indent = line[: len(line) - len(line.lstrip())]
 
     # Match the existing block's indentation so the appended item cannot
     # introduce a mixed-indent block sequence - invalid under strict YAML yet

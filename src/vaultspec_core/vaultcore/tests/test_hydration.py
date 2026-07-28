@@ -7,7 +7,12 @@ import pytest
 from vaultspec_core.core.exceptions import ResourceExistsError
 from vaultspec_core.vaultcore import hydrate_template
 from vaultspec_core.vaultcore.body_schema import CURRENT_BODY_SCHEMA
-from vaultspec_core.vaultcore.hydration import create_vault_doc, get_template_path
+from vaultspec_core.vaultcore.hydration import (
+    DocumentIdentity,
+    TemplateFields,
+    create_vault_doc,
+    get_template_path,
+)
 from vaultspec_core.vaultcore.models import DocType
 
 pytestmark = [pytest.mark.unit]
@@ -94,10 +99,8 @@ class TestTemplatePathLegacyFallback:
 
         path = create_vault_doc(
             tmp_path,
-            DocType.REFERENCE,
-            "stale-feat",
-            "2026-06-10",
-            title="legacy fallback",
+            DocumentIdentity(DocType.REFERENCE, "stale-feat", "2026-06-10"),
+            TemplateFields(title="legacy fallback"),
             content_root=content_root,
         )
         assert path.exists()
@@ -114,10 +117,8 @@ class TestTemplatePathLegacyFallback:
         with pytest.raises(FileNotFoundError) as excinfo:
             create_vault_doc(
                 tmp_path,
-                DocType.REFERENCE,
-                "no-template-feat",
-                "2026-06-10",
-                title="missing",
+                DocumentIdentity(DocType.REFERENCE, "no-template-feat", "2026-06-10"),
+                TemplateFields(title="missing"),
                 content_root=content_root,
             )
         assert "vaultspec-core install --upgrade" in str(excinfo.value)
@@ -132,7 +133,9 @@ date: {yyyy-mm-dd}
 
 # {title}
 """
-    result = hydrate_template(template, "my-feature", "2026-03-01", title="My Title")
+    result = hydrate_template(
+        template, "my-feature", "2026-03-01", TemplateFields(title="My Title")
+    )
 
     assert 'tags: ["#adr", "#my-feature"]' in result
     assert "date: 2026-03-01" in result
@@ -142,7 +145,9 @@ date: {yyyy-mm-dd}
 def test_hydrate_template_placeholders():
     """Verify supported placeholders and the topic alias are hydrated."""
     template = "{feature} {yyyy-mm-dd} {title} {topic}"
-    result = hydrate_template(template, "feat", "2026-02-01", title="Plan Title")
+    result = hydrate_template(
+        template, "feat", "2026-02-01", TemplateFields(title="Plan Title")
+    )
     assert result == "feat 2026-02-01 Plan Title Plan Title"
 
 
@@ -180,21 +185,21 @@ def test_hydrate_template_skips_placeholders_inside_html_comments(caplog):
 def test_hydrate_template_substitutes_tier_when_passed():
     """Verify the {tier} placeholder is hydrated when tier is supplied."""
     template = "tier: {tier}"
-    result = hydrate_template(template, "feat", "2026-05-18", tier="L3")
+    result = hydrate_template(template, "feat", "2026-05-18", TemplateFields(tier="L3"))
     assert result == "tier: L3"
 
 
 def test_hydrate_template_substitutes_quoted_tier_placeholder():
     """The quoted template placeholder hydrates to an unquoted scalar."""
     template = "tier: '{tier}'"
-    result = hydrate_template(template, "feat", "2026-06-10", tier="L3")
+    result = hydrate_template(template, "feat", "2026-06-10", TemplateFields(tier="L3"))
     assert result == "tier: L3"
 
 
 def test_hydrate_template_substitutes_mdformat_normalized_tier():
     """Verify mdformat-normalized plan templates still hydrate tier."""
     template = "tier: {tier: null}"
-    result = hydrate_template(template, "feat", "2026-05-18", tier="L3")
+    result = hydrate_template(template, "feat", "2026-05-18", TemplateFields(tier="L3"))
     assert result == "tier: L3"
 
 
@@ -231,11 +236,8 @@ def test_create_vault_doc_plan_substitutes_tier(tmp_path):
 
     path = create_vault_doc(
         tmp_path,
-        DocType.PLAN,
-        "tier-test",
-        "2026-05-18",
-        title="Tier test",
-        tier="L3",
+        DocumentIdentity(DocType.PLAN, "tier-test", "2026-05-18"),
+        TemplateFields(title="Tier test", tier="L3"),
     )
     assert path.exists()
     content = path.read_text(encoding="utf-8")
@@ -257,10 +259,8 @@ def test_create_vault_doc_stamps_current_body_schema(tmp_path):
 
     path = create_vault_doc(
         tmp_path,
-        DocType.ADR,
-        "schema-stamp",
-        "2026-07-27",
-        title="Schema stamp",
+        DocumentIdentity(DocType.ADR, "schema-stamp", "2026-07-27"),
+        TemplateFields(title="Schema stamp"),
     )
     metadata, _body = parse_vault_metadata(path.read_text(encoding="utf-8"))
 
@@ -288,10 +288,8 @@ def test_create_vault_doc_replaces_stale_template_schema_stamp(tmp_path):
 
     path = create_vault_doc(
         tmp_path,
-        DocType.ADR,
-        "schema-stamp",
-        "2026-07-27",
-        title="Schema stamp",
+        DocumentIdentity(DocType.ADR, "schema-stamp", "2026-07-27"),
+        TemplateFields(title="Schema stamp"),
     )
     metadata, _body = parse_vault_metadata(path.read_text(encoding="utf-8"))
 
@@ -363,11 +361,8 @@ def test_create_vault_doc_plan_default_tier_l1(tmp_path):
 
     path = create_vault_doc(
         tmp_path,
-        DocType.PLAN,
-        "tier-default",
-        "2026-05-18",
-        title="Default tier",
-        tier="L1",
+        DocumentIdentity(DocType.PLAN, "tier-default", "2026-05-18"),
+        TemplateFields(title="Default tier", tier="L1"),
     )
     assert path.exists()
     content = path.read_text(encoding="utf-8")
@@ -406,10 +401,8 @@ class TestCreateVaultDocStemCollision:
         with pytest.raises(ResourceExistsError, match="already exists"):
             create_vault_doc(
                 vault_project,
-                DocType.ADR,
-                "my-feat",
-                "2026-03-17",
-                title="Duplicate",
+                DocumentIdentity(DocType.ADR, "my-feat", "2026-03-17"),
+                TemplateFields(title="Duplicate"),
             )
 
     def test_cross_type_stem_collision_rejected(self, vault_project):
@@ -433,20 +426,16 @@ class TestCreateVaultDocStemCollision:
         with pytest.raises(ResourceExistsError, match=r"stem.*already exists"):
             create_vault_doc(
                 vault_project,
-                DocType.ADR,
-                "collide",
-                "2026-03-20",
-                title="Collision",
+                DocumentIdentity(DocType.ADR, "collide", "2026-03-20"),
+                TemplateFields(title="Collision"),
             )
 
     def test_unique_stem_succeeds(self, vault_project):
         """A truly unique stem creates the file without error."""
         path = create_vault_doc(
             vault_project,
-            DocType.ADR,
-            "unique-feat",
-            "2026-03-20",
-            title="Unique",
+            DocumentIdentity(DocType.ADR, "unique-feat", "2026-03-20"),
+            TemplateFields(title="Unique"),
         )
         assert path.exists()
         assert path.stem == "2026-03-20-unique-feat-adr"
@@ -473,10 +462,7 @@ class TestCreateVaultDocTopicInfix:
     def test_infixed_filename_for_admitting_types(self, vault_project, doc_type):
         path = create_vault_doc(
             vault_project,
-            doc_type,
-            "my-feat",
-            "2026-07-16",
-            topic="engine-wire",
+            DocumentIdentity(doc_type, "my-feat", "2026-07-16", topic="engine-wire"),
         )
         assert path.name == f"2026-07-16-my-feat-engine-wire-{doc_type.value}.md"
         assert path.exists()
@@ -484,10 +470,9 @@ class TestCreateVaultDocTopicInfix:
     def test_topic_hydrates_heading_when_title_absent(self, vault_project):
         path = create_vault_doc(
             vault_project,
-            DocType.REFERENCE,
-            "my-feat",
-            "2026-07-16",
-            topic="engine-wire",
+            DocumentIdentity(
+                DocType.REFERENCE, "my-feat", "2026-07-16", topic="engine-wire"
+            ),
         )
         text = path.read_text(encoding="utf-8")
         assert "{topic}" not in text
@@ -497,11 +482,10 @@ class TestCreateVaultDocTopicInfix:
     def test_explicit_title_wins_over_topic_in_heading(self, vault_project):
         path = create_vault_doc(
             vault_project,
-            DocType.REFERENCE,
-            "my-feat",
-            "2026-07-16",
-            title="wire shapes deep dive",
-            topic="engine-wire",
+            DocumentIdentity(
+                DocType.REFERENCE, "my-feat", "2026-07-16", topic="engine-wire"
+            ),
+            TemplateFields(title="wire shapes deep dive"),
         )
         text = path.read_text(encoding="utf-8")
         assert "wire shapes deep dive" in text
@@ -511,9 +495,7 @@ class TestCreateVaultDocTopicInfix:
     def test_omitted_topic_keeps_plain_filename(self, vault_project):
         path = create_vault_doc(
             vault_project,
-            DocType.REFERENCE,
-            "my-feat",
-            "2026-07-16",
+            DocumentIdentity(DocType.REFERENCE, "my-feat", "2026-07-16"),
         )
         assert path.name == "2026-07-16-my-feat-reference.md"
 
@@ -522,60 +504,51 @@ class TestCreateVaultDocTopicInfix:
         with pytest.raises(ValueError, match="topic infix is not supported"):
             create_vault_doc(
                 vault_project,
-                doc_type,
-                "my-feat",
-                "2026-07-16",
-                topic="second",
+                DocumentIdentity(doc_type, "my-feat", "2026-07-16", topic="second"),
             )
 
     def test_two_topics_coexist_and_duplicate_collides(self, vault_project):
         first = create_vault_doc(
             vault_project,
-            DocType.REFERENCE,
-            "my-feat",
-            "2026-07-16",
-            topic="engine-wire",
+            DocumentIdentity(
+                DocType.REFERENCE, "my-feat", "2026-07-16", topic="engine-wire"
+            ),
         )
         second = create_vault_doc(
             vault_project,
-            DocType.REFERENCE,
-            "my-feat",
-            "2026-07-16",
-            topic="deletion-manifest",
+            DocumentIdentity(
+                DocType.REFERENCE, "my-feat", "2026-07-16", topic="deletion-manifest"
+            ),
         )
         assert first.exists() and second.exists()
         assert first.name != second.name
         with pytest.raises(ResourceExistsError, match="already exists"):
             create_vault_doc(
                 vault_project,
-                DocType.REFERENCE,
-                "my-feat",
-                "2026-07-16",
-                topic="engine-wire",
+                DocumentIdentity(
+                    DocType.REFERENCE, "my-feat", "2026-07-16", topic="engine-wire"
+                ),
             )
 
     def test_two_adr_topics_coexist_and_duplicate_collides(self, vault_project):
         first = create_vault_doc(
             vault_project,
-            DocType.ADR,
-            "my-feat",
-            "2026-07-16",
-            topic="circuit-accounting",
+            DocumentIdentity(
+                DocType.ADR, "my-feat", "2026-07-16", topic="circuit-accounting"
+            ),
         )
         second = create_vault_doc(
             vault_project,
-            DocType.ADR,
-            "my-feat",
-            "2026-07-16",
-            topic="sibling-adoption",
+            DocumentIdentity(
+                DocType.ADR, "my-feat", "2026-07-16", topic="sibling-adoption"
+            ),
         )
         assert first.name == "2026-07-16-my-feat-circuit-accounting-adr.md"
         assert second.name == "2026-07-16-my-feat-sibling-adoption-adr.md"
         with pytest.raises(ResourceExistsError, match="already exists"):
             create_vault_doc(
                 vault_project,
-                DocType.ADR,
-                "my-feat",
-                "2026-07-16",
-                topic="circuit-accounting",
+                DocumentIdentity(
+                    DocType.ADR, "my-feat", "2026-07-16", topic="circuit-accounting"
+                ),
             )

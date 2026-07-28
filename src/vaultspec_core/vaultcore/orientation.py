@@ -89,16 +89,28 @@ def feature_lifecycle_status(feature: ActiveFeature, doc_types: set[str]) -> str
     if "exec" in doc_types:
         return "In Progress"
     if feature.has_plan:
-        if feature.plan_step_count > 0 and feature.plan_completion_percent >= 100.0:
-            return "Completed"
-        if feature.plan_steps_completed > 0:
-            return "In Progress"
-        return "Planned"
-    if "adr" in doc_types:
-        return "Specified"
-    if "research" in doc_types:
-        return "Researching"
+        return _plan_lifecycle_status(feature)
+    for doc_type, status in _PRE_PLAN_STATUS:
+        if doc_type in doc_types:
+            return status
     return "Unknown"
+
+
+def _plan_lifecycle_status(feature: ActiveFeature) -> str:
+    """Derive the lifecycle status of a feature that already has a plan."""
+    if feature.plan_step_count > 0 and feature.plan_completion_percent >= 100.0:
+        return "Completed"
+    if feature.plan_steps_completed > 0:
+        return "In Progress"
+    return "Planned"
+
+
+#: The pre-plan lifecycle phases in precedence order: the first
+#: document type present names the feature's status.
+_PRE_PLAN_STATUS: tuple[tuple[str, str], ...] = (
+    ("adr", "Specified"),
+    ("research", "Researching"),
+)
 
 
 #: ``yyyy-mm-dd`` prefix on a vault filename stem, the third recency

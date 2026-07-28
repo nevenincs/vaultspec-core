@@ -7,13 +7,169 @@ import logging
 import re
 from pathlib import Path
 
-from ..vaultcore import VaultConstants, parse_vault_metadata, refresh_modified_stamp
+from ..vaultcore import (
+    DocumentMetadata,
+    VaultConstants,
+    parse_vault_metadata,
+    refresh_modified_stamp,
+)
 from . import types as _t
 from .enums import AdrStatus
 from .exceptions import ResourceNotFoundError, VaultSpecError
 from .helpers import atomic_write
 
 logger = logging.getLogger(__name__)
+
+#: Frontmatter keys ``adr_supersede`` understands and rebuilds explicitly; any other
+#: key in an ADR's frontmatter block is preserved verbatim, in place, by
+#: :func:`_preserve_unknown_frontmatter_keys`.
+_KNOWN_ADR_FRONTMATTER_KEYS = frozenset(
+    {
+        "tags",
+        "date",
+        "related",
+        "feature",
+        "supersedes",
+        "superseded_by",
+        "derived_from",
+        "promoted_to",
+        "archived",
+    }
+)
+
+_ADR_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", re.DOTALL)
+_ADR_STATUS_HEADING_RE = re.compile(
+    r"^(#\s+.*\|\s+\(\*\*status:\*\*\s+`?)([^`)]+)(`?\)\s*)$"
+)
+
+
+def _preserve_unknown_frontmatter_keys(yaml_block: str) -> list[str]:
+    """Return the raw lines of frontmatter keys not covered by known ADR fields.
+
+    Args:
+        yaml_block: The original YAML frontmatter block (without the ``---``
+            fences).
+
+    Returns:
+        The lines belonging to unrecognized top-level keys, verbatim, so the
+        frontmatter rebuild in :func:`_rewrite_adr_frontmatter` can append them
+        unchanged.
+    """
+    preserved: list[str] = []
+    in_unknown_key = False
+    for line in yaml_block.split("\n"):
+        stripped = line.strip()
+        if ":" in stripped and not stripped.startswith("-"):
+            key = stripped.split(":", 1)[0].strip()
+            in_unknown_key = key not in _KNOWN_ADR_FRONTMATTER_KEYS
+            if in_unknown_key:
+                preserved.append(line)
+            continue
+        if stripped.startswith("-"):
+            if in_unknown_key:
+                preserved.append(line)
+            continue
+        if in_unknown_key and stripped:
+            preserved.append(line)
+        in_unknown_key = False
+    return preserved
+
+
+def _rebuild_frontmatter_lines(meta: DocumentMetadata, yaml_block: str) -> list[str]:
+    """Rebuild an ADR's frontmatter lines from its known metadata fields.
+
+    Args:
+        meta: The parsed (and possibly mutated) document metadata.
+        yaml_block: The original YAML frontmatter block, used to recover any
+            keys not modeled by :class:`DocumentMetadata`.
+
+    Returns:
+        The rebuilt frontmatter lines, opening ``---`` fence included and
+        closing fence omitted (the caller appends body content before closing
+        the block).
+    """
+    fm_lines = ["---"]
+    if meta.tags:
+        fm_lines.append("tags:")
+        for tag in meta.tags:
+            fm_lines.append(f'  - "{tag}"')
+    if meta.date:
+        fm_lines.append(f"date: '{meta.date}'")
+    if meta.related:
+        fm_lines.append("related:")
+        for link in meta.related:
+            fm_lines.append(f'  - "{link}"')
+    if meta.supersedes:
+        fm_lines.append("supersedes:")
+        for stem in meta.supersedes:
+            fm_lines.append(f"  - '{stem}'")
+    if meta.superseded_by:
+        fm_lines.append(f"superseded_by: '{meta.superseded_by}'")
+    if meta.derived_from:
+        fm_lines.append("derived_from:")
+        for stem in meta.derived_from:
+            fm_lines.append(f"  - '{stem}'")
+    if meta.promoted_to:
+        fm_lines.append("promoted_to:")
+        for rule in meta.promoted_to:
+            fm_lines.append(f"  - '{rule}'")
+    if meta.archived:
+        fm_lines.append(f"archived: '{meta.archived}'")
+
+    fm_lines.extend(_preserve_unknown_frontmatter_keys(yaml_block))
+    return fm_lines
+
+
+def _rewrite_adr_frontmatter(
+    normalized: str, meta: DocumentMetadata, source_file: Path
+) -> str:
+    """Rebuild an ADR document's frontmatter block, preserving body and unknown keys.
+
+    Args:
+        normalized: The document text, normalized to ``\\n`` line endings.
+        meta: The parsed (and possibly mutated) document metadata to render.
+        source_file: The document's path, used only for the parse-error message.
+
+    Returns:
+        The rebuilt document text (still ``\\n``-normalized).
+
+    Raises:
+        VaultSpecError: If ``normalized`` has no parseable frontmatter block.
+    """
+    match = _ADR_FRONTMATTER_RE.match(normalized.lstrip())
+    if not match:
+        raise VaultSpecError(f"Could not parse frontmatter of ADR '{source_file}'.")
+    yaml_block, body_content = match.group(1), match.group(2)
+    leading = normalized[: len(normalized) - len(normalized.lstrip())]
+
+    fm_lines = _rebuild_frontmatter_lines(meta, yaml_block)
+    fm_lines.append("---")
+    if body_content:
+        fm_lines.append(body_content)
+
+    return leading + "\n".join(fm_lines)
+
+
+def _supersede_status_heading(normalized: str) -> str:
+    """Rewrite the first ADR H1 status token to ``superseded``.
+
+    Args:
+        normalized: The document text, normalized to ``\\n`` line endings.
+
+    Returns:
+        The document text with its status token rewritten, or unchanged if no
+        H1 heading matches the expected ``|  (**status:** \\`...\\`)`` shape.
+    """
+    lines_list = normalized.split("\n")
+    for i, line in enumerate(lines_list):
+        if not line.startswith("# "):
+            continue
+        match = _ADR_STATUS_HEADING_RE.match(line)
+        if not match:
+            continue
+        lines_list[i] = f"{match.group(1)}{AdrStatus.SUPERSEDED.value}{match.group(3)}"
+        break
+    return "\n".join(lines_list)
 
 
 def adr_supersede(
@@ -63,95 +219,10 @@ def adr_supersede(
     old_meta, _ = parse_vault_metadata(old_normalized)
     old_meta.superseded_by = new_stem
 
-    # Rewrite H1 status line: replace accepted/proposed/etc with superseded
-    # Pattern: # `tag` adr: `Title` | (**status:** `accepted`) or similar
-    # Using the regex: r"^(#\s+.*\|\s+\(\*\*status:\*\*\s+`?)([^`)]+)(`?\)\s*)$"
-    lines_list = old_normalized.split("\n")
-    for i, line in enumerate(lines_list):
-        if line.startswith("# "):
-            match = re.match(
-                r"^(#\s+.*\|\s+\(\*\*status:\*\*\s+`?)([^`)]+)(`?\)\s*)$", line
-            )
-            if match:
-                lines_list[i] = (
-                    f"{match.group(1)}{AdrStatus.SUPERSEDED.value}{match.group(3)}"
-                )
-                break
-
-    old_normalized_body = "\n".join(lines_list)
-    match = re.match(
-        r"^---\s*\n(.*?)\n---\s*\n?(.*)$", old_normalized_body.lstrip(), re.DOTALL
+    old_normalized_body = _supersede_status_heading(old_normalized)
+    final_old_content = _rewrite_adr_frontmatter(
+        old_normalized_body, old_meta, old_file
     )
-    if not match:
-        raise VaultSpecError(f"Could not parse frontmatter of old ADR '{old_file}'.")
-    old_yaml_block = match.group(1)
-    old_body_content = match.group(2)
-    old_leading = old_normalized_body[
-        : len(old_normalized_body) - len(old_normalized_body.lstrip())
-    ]
-
-    # Rebuild frontmatter keys
-    old_fm_lines = ["---"]
-    if old_meta.tags:
-        old_fm_lines.append("tags:")
-        for tag in old_meta.tags:
-            old_fm_lines.append(f'  - "{tag}"')
-    if old_meta.date:
-        old_fm_lines.append(f"date: '{old_meta.date}'")
-    if old_meta.related:
-        old_fm_lines.append("related:")
-        for link in old_meta.related:
-            old_fm_lines.append(f'  - "{link}"')
-    if old_meta.supersedes:
-        old_fm_lines.append("supersedes:")
-        for stem in old_meta.supersedes:
-            old_fm_lines.append(f"  - '{stem}'")
-    if old_meta.superseded_by:
-        old_fm_lines.append(f"superseded_by: '{old_meta.superseded_by}'")
-    if old_meta.derived_from:
-        old_fm_lines.append("derived_from:")
-        for stem in old_meta.derived_from:
-            old_fm_lines.append(f"  - '{stem}'")
-    if old_meta.promoted_to:
-        old_fm_lines.append("promoted_to:")
-        for rule in old_meta.promoted_to:
-            old_fm_lines.append(f"  - '{rule}'")
-    if old_meta.archived:
-        old_fm_lines.append(f"archived: '{old_meta.archived}'")
-
-    # Preserve unknown keys
-    known_keys = {
-        "tags",
-        "date",
-        "related",
-        "feature",
-        "supersedes",
-        "superseded_by",
-        "derived_from",
-        "promoted_to",
-        "archived",
-    }
-    in_unknown_key = False
-    for line in old_yaml_block.split("\n"):
-        stripped = line.strip()
-        if ":" in stripped and not stripped.startswith("-"):
-            key = stripped.split(":", 1)[0].strip()
-            in_unknown_key = key not in known_keys
-            if in_unknown_key:
-                old_fm_lines.append(line)
-        elif stripped.startswith("-"):
-            if in_unknown_key:
-                old_fm_lines.append(line)
-        else:
-            if in_unknown_key and stripped:
-                old_fm_lines.append(line)
-            in_unknown_key = False
-
-    old_fm_lines.append("---")
-    if old_body_content:
-        old_fm_lines.append(old_body_content)
-
-    final_old_content = old_leading + "\n".join(old_fm_lines)
     if old_newline == "\r\n":
         final_old_content = final_old_content.replace("\n", "\r\n")
 
@@ -165,65 +236,7 @@ def adr_supersede(
     if old_stem not in new_meta.supersedes:
         new_meta.supersedes.append(old_stem)
 
-    match = re.match(
-        r"^---\s*\n(.*?)\n---\s*\n?(.*)$", new_normalized.lstrip(), re.DOTALL
-    )
-    if not match:
-        raise VaultSpecError(f"Could not parse frontmatter of new ADR '{new_file}'.")
-    new_yaml_block = match.group(1)
-    new_body_content = match.group(2)
-    new_leading = new_normalized[: len(new_normalized) - len(new_normalized.lstrip())]
-
-    new_fm_lines = ["---"]
-    if new_meta.tags:
-        new_fm_lines.append("tags:")
-        for tag in new_meta.tags:
-            new_fm_lines.append(f'  - "{tag}"')
-    if new_meta.date:
-        new_fm_lines.append(f"date: '{new_meta.date}'")
-    if new_meta.related:
-        new_fm_lines.append("related:")
-        for link in new_meta.related:
-            new_fm_lines.append(f'  - "{link}"')
-    if new_meta.supersedes:
-        new_fm_lines.append("supersedes:")
-        for stem in new_meta.supersedes:
-            new_fm_lines.append(f"  - '{stem}'")
-    if new_meta.superseded_by:
-        new_fm_lines.append(f"superseded_by: '{new_meta.superseded_by}'")
-    if new_meta.derived_from:
-        new_fm_lines.append("derived_from:")
-        for stem in new_meta.derived_from:
-            new_fm_lines.append(f"  - '{stem}'")
-    if new_meta.promoted_to:
-        new_fm_lines.append("promoted_to:")
-        for rule in new_meta.promoted_to:
-            new_fm_lines.append(f"  - '{rule}'")
-    if new_meta.archived:
-        new_fm_lines.append(f"archived: '{new_meta.archived}'")
-
-    # Preserve unknown keys
-    in_unknown_key = False
-    for line in new_yaml_block.split("\n"):
-        stripped = line.strip()
-        if ":" in stripped and not stripped.startswith("-"):
-            key = stripped.split(":", 1)[0].strip()
-            in_unknown_key = key not in known_keys
-            if in_unknown_key:
-                new_fm_lines.append(line)
-        elif stripped.startswith("-"):
-            if in_unknown_key:
-                new_fm_lines.append(line)
-        else:
-            if in_unknown_key and stripped:
-                new_fm_lines.append(line)
-            in_unknown_key = False
-
-    new_fm_lines.append("---")
-    if new_body_content:
-        new_fm_lines.append(new_body_content)
-
-    final_new_content = new_leading + "\n".join(new_fm_lines)
+    final_new_content = _rewrite_adr_frontmatter(new_normalized, new_meta, new_file)
     if new_newline == "\r\n":
         final_new_content = final_new_content.replace("\n", "\r\n")
 

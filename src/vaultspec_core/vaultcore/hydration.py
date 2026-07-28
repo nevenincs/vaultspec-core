@@ -13,13 +13,23 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from ..core.exceptions import ResourceExistsError
 from .body_schema import CURRENT_BODY_SCHEMA
 from .models import DocType
 
-__all__ = ["get_template_path", "hydrate_template"]
+__all__ = [
+    "DocumentIdentity",
+    "ExecBinding",
+    "ParentPlan",
+    "TemplateFields",
+    "WritePolicy",
+    "create_vault_doc",
+    "get_template_path",
+    "hydrate_template",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -71,57 +81,155 @@ if TYPE_CHECKING:
     import pathlib
 
 
+@dataclass(frozen=True, slots=True)
+class DocumentIdentity:
+    """The values that name a vault document on disk.
+
+    Together these decide the target directory, the filename, and the
+    feature tag the scaffolded frontmatter carries.
+
+    Attributes:
+        doc_type: The type of vault document to create.
+        feature: Feature name in kebab-case (leading ``#`` stripped).
+        date: ISO 8601 date string (e.g. ``2026-02-06``).
+        topic: Optional kebab-case narrative infix. Admitted only for the
+            narrative trio (``audit``, ``reference``, ``research``) and
+            ``adr``; the filename resolves to
+            ``{date}-{feature}-{topic}-{type}.md``. Omitted, the filename
+            keeps its ``{date}-{feature}-{type}.md`` form.
+    """
+
+    doc_type: DocType
+    feature: str
+    date: str
+    topic: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TemplateFields:
+    """Author-supplied values a template's placeholders resolve to.
+
+    Attributes:
+        title: Optional title that maps to the ``{title}`` and ``{topic}``
+            placeholders.
+        related: Pre-resolved ``[[wiki-link]]`` strings to inject into the
+            ``related:`` frontmatter field.
+        extra_tags: Additional ``#tag`` strings to append to the ``tags:``
+            frontmatter field (beyond the directory and feature tags).
+        tier: Optional plan tier value (``L1``..``L4``) substituted into the
+            ``{tier}`` placeholder for plan templates.
+    """
+
+    title: str | None = None
+    related: list[str] | None = None
+    extra_tags: list[str] | None = None
+    tier: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ParentPlan:
+    """The plan document an execution record hangs off.
+
+    Attributes:
+        date: The parent plan's date, used for the execution folder and
+            filename prefix. Falling back to the record's own date when
+            omitted.
+        stem: The parent plan's filename stem, used for the ``{plan_stem}``
+            placeholder and the leading ``related:`` wiki-link.
+    """
+
+    date: str | None = None
+    stem: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ExecBinding:
+    """The plan row a scaffolded execution record documents.
+
+    Every field is inert for non-execution document types, whose templates
+    carry none of the corresponding placeholders.
+
+    Attributes:
+        plan: Identity of the parent plan.
+        step_id: The Step's canonical identifier (e.g. ``S01``).
+        step_display_path: The Step's display path (e.g. ``W01.P01.S01``),
+            which supplies the filename's identifier segment.
+        step_scope: The Step's declared file or area scope.
+        step_action: The Step's verbatim action text.
+        summary: When ``True``, the record summarises a Phase rather than
+            documenting a Step, and is scaffolded from the
+            ``exec-summary.md`` template.
+        phase_display_path: Display path of the summarised Phase (e.g.
+            ``P01`` or ``W01.P01``); fills the ``{phase}`` placeholder and
+            the summary filename's identifier segment.
+    """
+
+    plan: ParentPlan = ParentPlan()
+    step_id: str | None = None
+    step_display_path: str | None = None
+    step_scope: str | None = None
+    step_action: str | None = None
+    summary: bool = False
+    phase_display_path: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class WritePolicy:
+    """How the scaffolder treats the target path.
+
+    Attributes:
+        force: If ``True``, overwrite an existing document.
+        dry_run: If ``True``, resolve the target path without writing.
+    """
+
+    force: bool = False
+    dry_run: bool = False
+
+
 def hydrate_template(
     template_content: str,
     feature: str,
     date: str,
-    title: str | None = None,
-    *,
-    related: list[str] | None = None,
-    extra_tags: list[str] | None = None,
-    tier: str | None = None,
-    step_id: str | None = None,
-    step_scope: str | None = None,
-    step_action: str | None = None,
-    plan_stem: str | None = None,
-    phase: str | None = None,
+    fields: TemplateFields | None = None,
+    exec_binding: ExecBinding | None = None,
 ) -> str:
     """Replace placeholders in a template string with actual values.
 
     Supports both ``{key}`` and ``<key>`` placeholder styles.  Logs a
     warning for any placeholder that remains unresolved after substitution.
 
-    When *related* is provided, the template's placeholder ``related:``
-    entries are replaced with the resolved wiki-link list. When
-    *extra_tags* is provided, those tags are appended to the ``tags:``
-    block in frontmatter. When *tier* is provided, the template's
-    ``{tier}`` placeholder is substituted; otherwise the placeholder
-    is left as-is for the caller to fill.
+    When ``fields.related`` is provided, the template's placeholder
+    ``related:`` entries are replaced with the resolved wiki-link list. When
+    ``fields.extra_tags`` is provided, those tags are appended to the
+    ``tags:`` block in frontmatter. When ``fields.tier`` is provided, the
+    template's ``{tier}`` placeholder is substituted; otherwise the
+    placeholder is left as-is for the caller to fill.
 
     Args:
         template_content: Raw template text containing placeholder tokens.
         feature: Feature name in kebab-case (e.g. ``editor-demo``).
         date: ISO 8601 date string (e.g. ``2026-02-06``).
-        title: Optional title that maps to the ``{title}`` and ``{topic}``
-            placeholders.
-        related: Pre-resolved ``[[wiki-link]]`` strings to inject into
-            the ``related:`` frontmatter field.
-        extra_tags: Additional ``#tag`` strings to append to the ``tags:``
-            frontmatter field (beyond the directory and feature tags).
-        tier: Optional plan tier value (``L1``..``L4``) substituted into
-            the ``{tier}`` placeholder for plan templates.
-        step_id: Optional step canonical identifier (e.g. ``S01``).
-        step_scope: Optional file or area scope of the step.
-        step_action: Optional verbatim action of the step.
-        plan_stem: Optional parent plan stem used in wiki-links.
-        phase: Optional Phase identifier (display path, e.g. ``P01`` or
-            ``W01.P01``) substituted into the ``{phase}`` placeholder of the
-            exec-summary template. Takes precedence over the ``{phase}``
-            alias derived from *title*.
+        fields: Author-supplied placeholder values. Defaults to an empty
+            :class:`TemplateFields`, leaving every optional placeholder
+            for the caller to fill.
+        exec_binding: The plan row an execution record documents. Defaults
+            to an empty :class:`ExecBinding`, which leaves the step-aware
+            placeholders on their generic fallbacks.
 
     Returns:
         The fully-hydrated document string.
     """
+    if fields is None:
+        fields = TemplateFields()
+    if exec_binding is None:
+        exec_binding = ExecBinding()
+
+    title = fields.title
+    tier = fields.tier
+    # The exec-summary template's `{phase}` placeholder only applies to a
+    # summary record; a Step record leaves the title-derived alias in place.
+    phase = exec_binding.phase_display_path if exec_binding.summary else None
+
     hydrated = template_content
 
     # Normalize placeholders map
@@ -159,9 +267,12 @@ def hydrate_template(
                 hydrated = hydrated.replace(pattern, value)
 
     # Hydrate step-aware placeholders
+    step_id = exec_binding.step_id
+    plan_stem = exec_binding.plan.stem
     val_step_id = step_id if step_id is not None else "{S##}"
     val_plan_stem = plan_stem if plan_stem is not None else "{yyyy-mm-dd-*-plan}"
 
+    step_action = exec_binding.step_action
     if title is not None:
         val_heading = title
     elif step_action is not None:
@@ -170,6 +281,7 @@ def hydrate_template(
         val_heading = f"{feature} <display-path>"
 
     val_scope_block = ""
+    step_scope = exec_binding.step_scope
     if step_scope:
         scopes = [
             s.strip().strip("`") for s in re.split(r"[,;]+", step_scope) if s.strip()
@@ -193,12 +305,12 @@ def hydrate_template(
     hydrated = _inject_body_schema(hydrated)
 
     # Inject resolved related links into frontmatter
-    if related is not None:
-        hydrated = _inject_related(hydrated, related)
+    if fields.related is not None:
+        hydrated = _inject_related(hydrated, fields.related)
 
     # Inject extra tags into frontmatter
-    if extra_tags:
-        hydrated = _inject_extra_tags(hydrated, extra_tags)
+    if fields.extra_tags:
+        hydrated = _inject_extra_tags(hydrated, fields.extra_tags)
 
     # Check for remaining placeholders that might have been missed.
     # Pattern matches {key} or <key> where key is alphanumeric with hyphens.
@@ -357,73 +469,55 @@ def _inject_extra_tags(content: str, extra_tags: list[str]) -> str:
 
 def create_vault_doc(
     root_dir: pathlib.Path,
-    doc_type: DocType,
-    feature: str,
-    date_str: str,
-    title: str | None = None,
+    identity: DocumentIdentity,
+    fields: TemplateFields | None = None,
     *,
-    topic: str | None = None,
-    related: list[str] | None = None,
-    extra_tags: list[str] | None = None,
+    exec_binding: ExecBinding | None = None,
+    write: WritePolicy | None = None,
     content_root: pathlib.Path | None = None,
-    force: bool = False,
-    dry_run: bool = False,
-    tier: str | None = None,
-    step_id: str | None = None,
-    step_display_path: str | None = None,
-    step_scope: str | None = None,
-    step_action: str | None = None,
-    plan_date: str | None = None,
-    plan_stem: str | None = None,
-    summary: bool = False,
-    phase_display_path: str | None = None,
 ) -> pathlib.Path:
     """Scaffold a new vault document from the appropriate template.
 
     Args:
         root_dir: Project root (output_root from workspace layout).
-        doc_type: The type of vault document to create.
-        feature: Feature name in kebab-case (leading ``#`` stripped).
-        date_str: ISO 8601 date string (e.g. ``2026-02-06``).
-        title: Optional document title.
-        topic: Optional kebab-case narrative infix. Admitted only for the
-            narrative trio (``audit``, ``reference``, ``research``); the
-            filename resolves to ``{date}-{feature}-{topic}-{type}.md``.
-            Omitted, the filename keeps its ``{date}-{feature}-{type}.md``
-            form. Raises :class:`ValueError` for any other document type
-            (adr and plan cardinality rules forbid disambiguation-by-infix;
-            exec filenames are machine-derived).
-        related: Pre-resolved ``[[wiki-link]]`` strings for the
-            ``related:`` frontmatter field.
-        extra_tags: Additional ``#tag`` strings to append to ``tags:``.
+        identity: Type, feature, date, and optional narrative infix of the
+            document to create. A ``topic`` on a type outside the admitting
+            set raises :class:`ValueError` (adr and plan cardinality rules
+            forbid disambiguation-by-infix; exec filenames are
+            machine-derived).
+        fields: Author-supplied placeholder values. Defaults to an empty
+            :class:`TemplateFields`.
+        exec_binding: The plan row an execution record documents. Defaults
+            to an empty :class:`ExecBinding`, which scaffolds the flat
+            (non-step-aware) shape.
+        write: Overwrite and dry-run policy. Defaults to a
+            :class:`WritePolicy` that refuses to overwrite and does write.
         content_root: Explicit content root for template lookup.
-        force: If ``True``, overwrite an existing document.
-        dry_run: If ``True``, return the target path without writing.
-        tier: Plan tier value (``L1``..``L4``) substituted into the plan
-            template's ``{tier}`` placeholder. Ignored for non-plan
-            doc types whose templates do not carry the placeholder.
-        step_id: Optional step canonical identifier (e.g. ``S01``).
-        step_display_path: Optional display path of the step.
-        step_scope: Optional file or area scope of the step.
-        step_action: Optional verbatim action of the step.
-        plan_date: Optional parent plan date.
-        plan_stem: Optional parent plan stem used in wiki-links.
-        summary: When ``True`` and *doc_type* is :attr:`DocType.EXEC`,
-            scaffold a Phase-summary record from the ``exec-summary.md``
-            template instead of a Step record. Requires *phase_display_path*.
-        phase_display_path: Display path of the summarised Phase (e.g.
-            ``P01`` or ``W01.P01``); fills the ``{phase}`` placeholder and the
-            summary filename's identifier segment.
 
     Returns:
         Path to the newly created (or would-be-created) document.
 
     Raises:
-        FileNotFoundError: If no template exists for the given ``doc_type``.
-        ResourceExistsError: If the target file already exists and
-            *force* is ``False``.
+        FileNotFoundError: If no template exists for the identity's type.
+        ResourceExistsError: If the target file already exists and the
+            write policy does not force an overwrite.
     """
     from ..config import get_config
+
+    if fields is None:
+        fields = TemplateFields()
+    if exec_binding is None:
+        exec_binding = ExecBinding()
+    if write is None:
+        write = WritePolicy()
+
+    doc_type = identity.doc_type
+    feature = identity.feature
+    date_str = identity.date
+    topic = identity.topic
+    summary = exec_binding.summary
+    plan_date = exec_binding.plan.date
+    plan_stem = exec_binding.plan.stem
 
     if topic is not None and doc_type not in _TOPIC_INFIX_TYPES:
         raise ValueError(
@@ -445,7 +539,7 @@ def create_vault_doc(
 
     # Default to empty related list so created documents pass validation
     # instead of keeping template placeholder entries like [[{yyyy-mm-dd-*}]]
-    effective_related = list(related) if related is not None else []
+    effective_related = list(fields.related) if fields.related is not None else []
     if plan_stem:
         plan_link = f"[[{plan_stem}]]"
         if plan_link not in effective_related:
@@ -455,7 +549,7 @@ def create_vault_doc(
     # otherwise leave the template's `{topic}`/`{title}` heading placeholder
     # unhydrated and fail the placeholder check; the humanized topic is a
     # valid concise-prose heading value, and an explicit title still wins.
-    effective_title = title
+    effective_title = fields.title
     if effective_title is None and topic is not None:
         effective_title = topic.replace("-", " ")
 
@@ -463,19 +557,12 @@ def create_vault_doc(
         content,
         feature,
         date_str,
-        effective_title,
-        related=effective_related,
-        extra_tags=extra_tags,
-        tier=tier,
-        step_id=step_id,
-        step_scope=step_scope,
-        step_action=step_action,
-        plan_stem=plan_stem,
-        phase=phase_display_path if summary else None,
+        replace(fields, title=effective_title, related=effective_related),
+        exec_binding,
     )
 
     if doc_type is DocType.EXEC and summary:
-        suffix = (phase_display_path or "P01").replace(".", "-")
+        suffix = (exec_binding.phase_display_path or "P01").replace(".", "-")
         filename = f"{plan_date or date_str}-{feature}-{suffix}-summary.md"
         target_dir = (
             root_dir
@@ -483,8 +570,9 @@ def create_vault_doc(
             / doc_type.value
             / f"{plan_date or date_str}-{feature}"
         )
-    elif doc_type is DocType.EXEC and step_id is not None:
-        suffix = step_display_path.replace(".", "-") if step_display_path else "S01"
+    elif doc_type is DocType.EXEC and exec_binding.step_id is not None:
+        display_path = exec_binding.step_display_path
+        suffix = display_path.replace(".", "-") if display_path else "S01"
         filename = f"{plan_date or date_str}-{feature}-{suffix}.md"
         target_dir = (
             root_dir
@@ -501,7 +589,7 @@ def create_vault_doc(
 
     target_path = target_dir / filename
 
-    if not force:
+    if not write.force:
         if target_path.exists():
             raise ResourceExistsError(
                 f"File already exists at {target_path}",
@@ -529,7 +617,7 @@ def create_vault_doc(
     # cli-scaffolder-integrity ADR.
     _assert_scaffolded_content_valid(hydrated, doc_type)
 
-    if dry_run:
+    if write.dry_run:
         return target_path
 
     from ..core.helpers import atomic_write

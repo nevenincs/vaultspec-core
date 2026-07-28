@@ -15,7 +15,9 @@ from vaultspec_core.core.commands import (
     entry_prefix_for_mode,
 )
 from vaultspec_core.core.diagnosis.collectors import (
+    _collect_precommit_yaml_state,
     _observed_mcp_mode,
+    _observed_precommit_mode,
     collect_builtin_version_state,
     collect_config_state,
     collect_content_integrity,
@@ -679,6 +681,62 @@ class TestObservedMcpMode:
             ["run", "--isolated", "python", "-m", self._MODULE],
         )
         assert _observed_mcp_mode(tmp_path, "vaultspec-core") is None
+
+
+# ---------------------------------------------------------------------------
+# .pre-commit-config.yaml shapes the hook readers must tolerate
+# ---------------------------------------------------------------------------
+class TestPrecommitYamlState:
+    """Malformed and shape-surprising configs classify without crashing."""
+
+    def test_absent_config_is_no_file(self, tmp_path: Path) -> None:
+        assert _collect_precommit_yaml_state(tmp_path) == PrecommitSignal.NO_FILE
+
+    def test_unparseable_config_is_no_file(self, tmp_path: Path) -> None:
+        (tmp_path / ".pre-commit-config.yaml").write_text(
+            "repos: [unclosed\n", encoding="utf-8"
+        )
+        assert _collect_precommit_yaml_state(tmp_path) == PrecommitSignal.NO_FILE
+
+    def test_non_mapping_document_is_no_hooks(self, tmp_path: Path) -> None:
+        """A parseable but non-mapping document declares no hooks, not no file."""
+        (tmp_path / ".pre-commit-config.yaml").write_text(
+            "- first\n- second\n", encoding="utf-8"
+        )
+        assert _collect_precommit_yaml_state(tmp_path) == PrecommitSignal.NO_HOOKS
+
+    def test_non_list_repos_key_is_no_hooks(self, tmp_path: Path) -> None:
+        (tmp_path / ".pre-commit-config.yaml").write_text(
+            "repos: not-a-list\n", encoding="utf-8"
+        )
+        assert _collect_precommit_yaml_state(tmp_path) == PrecommitSignal.NO_HOOKS
+
+    def test_remote_only_repos_is_no_hooks(self, tmp_path: Path) -> None:
+        (tmp_path / ".pre-commit-config.yaml").write_text(
+            "repos:\n"
+            "  - repo: https://example.invalid/hooks\n"
+            "    rev: v1.0.0\n"
+            "    hooks:\n"
+            "      - id: something-else\n",
+            encoding="utf-8",
+        )
+        assert _collect_precommit_yaml_state(tmp_path) == PrecommitSignal.NO_HOOKS
+
+    def test_mode_inference_tolerates_a_non_list_repos_key(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / ".pre-commit-config.yaml").write_text(
+            "repos: not-a-list\n", encoding="utf-8"
+        )
+        assert _observed_precommit_mode(tmp_path) is None
+
+    def test_mode_inference_tolerates_an_unparseable_config(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / ".pre-commit-config.yaml").write_text(
+            "repos: [unclosed\n", encoding="utf-8"
+        )
+        assert _observed_precommit_mode(tmp_path) is None
 
 
 # ---------------------------------------------------------------------------

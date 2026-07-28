@@ -116,6 +116,55 @@ async def test_create_rejects_index_type_per_item(vault_root):
         assert "auto-generated" in payload["items"][0]["error"]["message"]
 
 
+async def test_create_rejects_unknown_document_type_per_item(vault_root):
+    """A type outside the taxonomy fails its item with the offending value."""
+    mcp = create_server()
+    async with create_connected_server_and_client_session(mcp) as client:
+        payload = await _create(
+            client,
+            [{"feature": "type-reject", "type": "brief"}],
+        )
+        assert payload["status"] == "failed"
+        item = payload["items"][0]
+        assert item["target"] == "brief:type-reject"
+        assert item["error"]["message"] == "Invalid document type: brief"
+
+
+async def test_create_rejects_invalid_plan_tier(vault_root):
+    """A tier outside ``L1``-``L4`` fails the item and writes nothing."""
+    mcp = create_server()
+    async with create_connected_server_and_client_session(mcp) as client:
+        payload = await _create(
+            client,
+            [{"feature": "tier-reject", "type": "plan", "tier": "L5"}],
+        )
+        assert payload["status"] == "failed"
+        assert payload["items"][0]["error"]["message"] == (
+            "Invalid tier 'L5'. Allowed values: L1, L2, L3, L4."
+        )
+        assert not any((vault_root / ".vault" / "plan").glob("*-tier-reject-plan.md"))
+
+
+async def test_create_reports_unresolvable_related_with_failures(vault_root):
+    """An unresolvable ``related`` entry fails the item and lists each failure."""
+    mcp = create_server()
+    async with create_connected_server_and_client_session(mcp) as client:
+        payload = await _create(
+            client,
+            [
+                {
+                    "feature": "related-reject",
+                    "type": "research",
+                    "related": ["[[no-such-document]]"],
+                }
+            ],
+        )
+        assert payload["status"] == "failed"
+        error = payload["items"][0]["error"]
+        assert error["message"].startswith("Cannot resolve related document(s): ")
+        assert error["failures"] == ["[[no-such-document]]"]
+
+
 async def test_create_empty_batch_raises_protocol_error(vault_root):
     """An empty batch is a malformed whole-call input surfaced as ``isError``."""
     mcp = create_server()

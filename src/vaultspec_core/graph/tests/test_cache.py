@@ -17,6 +17,8 @@ content hash.  The tests prove each trigger independently:
 - an added file appears in the next build;
 - a removed file disappears from the next build;
 - a corrupt or truncated cache file degrades silently to a full rebuild;
+- a cache file whose manifest or encoding-issue rows are structurally
+  malformed is rejected whole rather than partly trusted;
 - a cache hit reconstructs a graph behaviourally identical to a fresh build;
 - a real CLI mutation refreshes the cache so the next build is not stale.
 
@@ -274,6 +276,119 @@ class TestCorruptCacheRebuilds:
 
         rebuilt = VaultGraph(vault_root)
         assert rebuilt.digraph.number_of_nodes() == expected_nodes
+
+
+class TestMalformedPayloadRowsRejected:
+    """A structurally valid JSON cache with a bad row is still a miss.
+
+    ``load`` is the only gate between cache bytes and the restored corpus,
+    so a row that cannot be read back as its declared type must reject the
+    whole payload. Accepting the file and dropping the row would restore a
+    corpus that quietly differs from the one the cache was built over.
+    Every case writes a real cache file and reads it back through ``load``.
+    """
+
+    def _write(self, tmp_path: Path, payload: dict) -> Path:
+        cache_file = tmp_path / "graph.json"
+        cache_file.write_text(json.dumps(payload), encoding="utf-8")
+        return cache_file
+
+    def _payload(self) -> dict:
+        """Return a minimal payload that satisfies every documented shape."""
+        return {
+            "schema": cache_mod.CACHE_SCHEMA,
+            "manifest": {".vault/research/a.md": [128, 1700000000123456789, "ab12"]},
+            "graph": {"nodes": [], "edges": []},
+            "dangling_links": [["a", "b"]],
+            "encoding_issues": [
+                [".vault/research/a.md", "decode", "invalid start byte", 41],
+                [".vault/research/b.md", "read", "permission denied", None],
+            ],
+        }
+
+    def test_well_formed_payload_round_trips(self, tmp_path: Path) -> None:
+        loaded = cache_mod.load(self._write(tmp_path, self._payload()))
+
+        assert loaded is not None
+        assert loaded.manifest == {
+            ".vault/research/a.md": (128, 1700000000123456789, "ab12")
+        }
+        assert loaded.dangling_links == [["a", "b"]]
+        assert loaded.encoding_issues == [
+            (".vault/research/a.md", "decode", "invalid start byte", 41),
+            (".vault/research/b.md", "read", "permission denied", None),
+        ]
+
+    @pytest.mark.parametrize(
+        "row",
+        [
+            [128, 1700000000123456789],
+            [128, 1700000000123456789, "ab12", "extra"],
+            [128, 1700000000.5, "ab12"],
+            ["128", 1700000000123456789, "ab12"],
+            [128, 1700000000123456789, None],
+            {"size": 128},
+            "128",
+        ],
+        ids=[
+            "too-short",
+            "too-long",
+            "float-mtime",
+            "string-size",
+            "null-hash",
+            "object-not-list",
+            "scalar-not-list",
+        ],
+    )
+    def test_malformed_manifest_row_rejects_payload(
+        self, tmp_path: Path, row: object
+    ) -> None:
+        payload = self._payload()
+        payload["manifest"] = {".vault/research/a.md": row}
+
+        assert cache_mod.load(self._write(tmp_path, payload)) is None
+
+    @pytest.mark.parametrize(
+        "row",
+        [
+            [".vault/research/a.md", "decode", "invalid start byte"],
+            [".vault/research/a.md", "decode", "invalid start byte", 41, "extra"],
+            [None, "decode", "invalid start byte", 41],
+            [".vault/research/a.md", 7, "invalid start byte", 41],
+            [".vault/research/a.md", "decode", None, 41],
+            [".vault/research/a.md", "decode", "invalid start byte", 41.5],
+            [".vault/research/a.md", "decode", "invalid start byte", "41"],
+            "decode",
+        ],
+        ids=[
+            "too-short",
+            "too-long",
+            "null-path",
+            "int-kind",
+            "null-detail",
+            "float-start",
+            "string-start",
+            "scalar-not-list",
+        ],
+    )
+    def test_malformed_encoding_row_rejects_payload(
+        self, tmp_path: Path, row: object
+    ) -> None:
+        payload = self._payload()
+        payload["encoding_issues"] = [row]
+
+        assert cache_mod.load(self._write(tmp_path, payload)) is None
+
+    def test_null_start_is_accepted_on_every_encoding_row(self, tmp_path: Path) -> None:
+        payload = self._payload()
+        payload["encoding_issues"] = [[".vault/research/a.md", "read", "gone", None]]
+
+        loaded = cache_mod.load(self._write(tmp_path, payload))
+
+        assert loaded is not None
+        assert loaded.encoding_issues == [
+            (".vault/research/a.md", "read", "gone", None)
+        ]
 
 
 # ---------------------------------------------------------------------------

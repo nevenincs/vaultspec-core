@@ -21,59 +21,72 @@ def _recipe_exists(justfile_text: str, name: str) -> bool:
     return re.search(pattern, justfile_text) is not None
 
 
-def test_justfile_contains_required_recipes() -> None:
+def test_justfile_exposes_every_verb_at_the_root() -> None:
+    """Every entry point is a root verb; there is no nested dispatch namespace.
+
+    The harness was previously reached through `just dev <verb>` with a
+    parallel `just prod` mirror of the shipped CLI.  Both are gone: the
+    justfile is a development-only file, so a `dev` namespace inside it named
+    nothing, and mirroring a finished product's CLI only adds a layer that
+    drifts.  This pins the collapse so neither reappears.
+    """
     justfile = _read("justfile")
-    required = {
-        "prod",
-        "dev",
-        "ci",
-        "_dev-deps",
-        "_dev-lint",
-        "_dev-fix",
-        "_dev-audit",
-        "_dev-test",
-        "_dev-build",
-        "_dev-precommit",
-    }
-    missing = [name for name in sorted(required) if not _recipe_exists(justfile, name)]
+    missing = [
+        name
+        for name in sorted(
+            {
+                "deps",
+                "lint",
+                "fix",
+                "audit",
+                "test",
+                "build",
+                "precommit",
+                "vault",
+                "framework",
+                "assets",
+                "health",
+                "ci",
+            }
+        )
+        if not _recipe_exists(justfile, name)
+    ]
     assert not missing, f"Missing required just recipes: {missing}"
 
+    assert not _recipe_exists(justfile, "prod"), (
+        "`just prod` mirrored the shipped vaultspec-core CLI and was removed; "
+        "invoke the product directly with `uv run --no-sync vaultspec-core`."
+    )
+    assert not re.search(r"(?m)^_dev-", justfile), (
+        "The `_dev-*` internal recipe namespace was collapsed to root verbs."
+    )
 
-def test_justfile_exposes_approved_targets() -> None:
+
+def test_justfile_delegates_every_verb_to_the_dev_package() -> None:
+    """No recipe may carry shell logic; `dev/toolchain.py` is the only source.
+
+    The justfile previously branched on `os()` and embedded PowerShell
+    `switch` bodies, which meant every target existed twice and could drift
+    between platforms.  Each recipe is now a single delegation, so the
+    declarative toolchain is the one place a target is defined.
+    """
     justfile = _read("justfile")
-    # Top-level namespace recipes
-    assert "prod *args='':" in justfile
-    assert "dev target='--help' *args='':" in justfile
-    assert "ci *args='':" in justfile
-    # Internal dev recipes with default targets
-    assert "_dev-deps target='--help':" in justfile
-    assert "_dev-lint target='--help':" in justfile
-    assert "_dev-fix target='--help':" in justfile
-    assert "_dev-audit target='--help':" in justfile
-    assert "_dev-test target='--help':" in justfile
-    assert "_dev-build target='--help':" in justfile
-    assert "_dev-precommit target='--help':" in justfile
-    # Dev dispatch covers all verbs
-    for verb in (
-        "deps",
-        "lint",
-        "fix",
-        "audit",
-        "test",
-        "build",
-        "precommit",
-    ):
-        assert verb in justfile
-    # Lint sub-targets
-    for target in ("python", "type", "links", "toml", "markdown", "workflow"):
-        assert target in justfile
-    # Build/test sub-targets
-    for target in ("python", "all"):
-        assert target in justfile
+    for verb in ("deps", "lint", "fix", "audit", "test", "build", "health"):
+        assert re.search(
+            rf"(?m)^{verb} target='[a-z-]+':\n\s+\{{\{{dev\}}\}} {verb} ", justfile
+        ), f"Recipe `{verb}` must delegate to the dev package in one line"
+    for shell_ism in ('if os() == "windows"', "switch (", "Get-Command", "elseif"):
+        assert shell_ism not in justfile, (
+            f"Shell branching {shell_ism!r} belongs in dev/toolchain.py, "
+            "not the justfile"
+        )
 
 
 def test_dependency_audit_uses_uv_native_scanner() -> None:
-    justfile = _read("justfile")
+    # The invocation moved out of the justfile into the declarative toolchain
+    # when every recipe collapsed to a single delegation; the contract is
+    # unchanged, so it is asserted against its new home.
+    toolchain = _read("dev/toolchain.py")
     audit_script = _read("scripts/dependency_audit.py")
     # The supply-chain gate's justfile recipe delegates to the cross-platform
     # audit wrapper, which runs uv's native auditor against the frozen
@@ -81,7 +94,7 @@ def test_dependency_audit_uses_uv_native_scanner() -> None:
     # dependency groups, so no group-selection flag is pinned: --all-groups
     # was accepted by uv 0.10.x but rejected by 0.11.x, and breaking CI on a
     # uv minor bump is exactly the brittleness this audit is meant to prevent.
-    assert "scripts/dependency_audit.py" in justfile
+    assert "scripts/dependency_audit.py" in toolchain
     assert "uv audit" in audit_script
     assert "--preview-features" in audit_script
     assert "--frozen" in audit_script
@@ -92,7 +105,7 @@ def test_dependency_audit_uses_uv_native_scanner() -> None:
     # may appear in the recipe or the wrapper. When uv's preview decoder
     # aborts on a malformed OSV record, the wrapper independently repeats the
     # bulk OSV query rather than falling back to a second tool.
-    for surface in (justfile, audit_script):
+    for surface in (toolchain, audit_script):
         assert "pip-audit" not in surface
         assert "pip-tools" not in surface
 
@@ -197,40 +210,95 @@ def test_pre_commit_runs_vault_annotation_sanitizer() -> None:
     assert "vault sanitize annotations" in raw
 
 
-def test_lint_all_runs_every_validation_surface() -> None:
-    justfile = _read("justfile")
-    assert "just _dev-lint-python" in justfile
-    assert "just _dev-lint-type" in justfile
-    assert "just _dev-lint-links" in justfile
-    assert "just _dev-lint-toml" in justfile
-    assert "just _dev-lint-markdown" in justfile
-    assert "just _dev-lint-workflow" in justfile
-    assert "uv run ruff format --check src tests" in justfile
+def _toolchain_targets(verb_name: str) -> set[str]:
+    """Return the target names the dev toolchain declares for one verb."""
+    from dev import toolchain
+
+    verb = toolchain.find_verb(verb_name)
+    assert verb is not None, f"dev/toolchain.py declares no `{verb_name}` verb"
+    return {target.name for target in verb.targets}
 
 
-def test_test_all_runs_python() -> None:
-    justfile = _read("justfile")
-    assert "just _dev-test-python" in justfile
-    assert "just _dev-build-python" in justfile
+def test_lint_covers_every_validation_surface() -> None:
+    """The gating dimensions must all be reachable by name."""
+    required = {
+        "python",
+        "type",
+        "toml",
+        "links",
+        "markdown",
+        "workflow",
+        "complexity",
+        "nesting",
+        "size",
+        "type-strict",
+        "all",
+    }
+    missing = sorted(required - _toolchain_targets("lint"))
+    assert not missing, f"lint verb is missing targets: {missing}"
 
 
-def test_fix_surface_covers_all_autofixable_targets() -> None:
-    justfile = _read("justfile")
-    assert "_dev-fix target='--help':" in justfile
-    assert "uv run ruff format src tests" in justfile
-    assert "uv run ruff check --fix src tests" in justfile
-    assert "taplo fmt" in justfile
-    assert "pymarkdown" in justfile
-    assert ".pymarkdown.json" in justfile
-    assert "vault check all --fix" in justfile
-    assert "vault sanitize annotations" in justfile
+def test_audit_covers_every_advisory_dimension() -> None:
+    """Advisory dimensions are named individually so each can graduate to lint."""
+    required = {"deps", "security", "dead-code", "dependencies", "complexity", "all"}
+    missing = sorted(required - _toolchain_targets("audit"))
+    assert not missing, f"audit verb is missing targets: {missing}"
 
 
-def test_markdown_lint_uses_pymarkdown() -> None:
-    justfile = _read("justfile")
-    assert "pymarkdown" in justfile
-    assert "--config .pymarkdown.json" in justfile
-    assert "README.md" in justfile
+def test_only_the_dependency_audit_gates() -> None:
+    """`deps` is a verdict and gates; every other audit dimension is a lead.
+
+    A check whose documented contract and actual exit code disagree is worse
+    than no check, so the advisory flag is asserted rather than assumed.
+    """
+    from dev import toolchain
+
+    audit = toolchain.find_verb("audit")
+    assert audit is not None
+    by_name = {target.name: target for target in audit.targets}
+    assert not by_name["deps"].advisory, "the dependency audit must gate"
+    for name in ("security", "dead-code", "dependencies", "complexity"):
+        assert by_name[name].advisory, f"audit target `{name}` must be advisory"
+
+
+def test_health_report_is_measurement_only() -> None:
+    """Every health target exits 0; it ranks offenders rather than gating."""
+    from dev import toolchain
+
+    health = toolchain.find_verb("health")
+    assert health is not None
+    assert {"report", "fast", "census"} <= {t.name for t in health.targets}
+    for target in health.targets:
+        assert target.advisory, (
+            f"health target `{target.name}` must be advisory - the report is the "
+            "measurement instrument, and the gates live in pyproject.toml"
+        )
+
+
+def test_fix_surface_covers_every_autofixable_target() -> None:
+    required = {"python", "toml", "markdown", "vault", "all"}
+    missing = sorted(required - _toolchain_targets("fix"))
+    assert not missing, f"fix verb is missing targets: {missing}"
+
+
+def test_bandit_excludes_every_nested_test_tree() -> None:
+    """The security scan must not measure test code at any nesting depth.
+
+    A path-shaped exclusion (`<pkg>/tests`) only covers the top-level test
+    package and silently admitted `<pkg>/hooks/tests/` and its siblings, which
+    is where the scan's only MEDIUM findings came from. The glob covers every
+    depth.
+    """
+    from dev import toolchain
+
+    audit = toolchain.find_verb("audit")
+    assert audit is not None
+    security = next(t for t in audit.targets if t.name == "security")
+    argv = security.steps[0].argv
+    assert "-x" in argv, "the bandit scan must carry an exclusion"
+    assert argv[argv.index("-x") + 1] == "*/tests/*", (
+        "the bandit exclusion must be a glob covering nested test trees"
+    )
 
 
 def test_ci_workflow_calls_just_for_quality_gates() -> None:
@@ -248,24 +316,21 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
 
     expected_runs = {
         "lint-and-type": {
-            "just dev deps sync",
-            "just dev lint python",
-            "just dev lint type",
-            "just dev lint toml",
-            "just dev lint links",
-            "just dev lint markdown",
+            "just deps sync",
+            "just lint python",
+            "just lint type",
+            "just lint toml",
+            "just lint links",
+            "just lint markdown",
         },
-        "tests": {"just dev deps sync", "just dev test python"},
-        "windows-vault-repair": {
-            "just dev deps sync",
-            (
-                "uv run pytest src/vaultspec_core/tests/cli/test_vault_repair.py "
-                "src/vaultspec_core/vaultcore/checks/tests/"
-                "test_structure_case_rename.py -q"
-            ),
+        "tests": {"just deps sync", "just test unit"},
+        "windows-vault-repair": {"just deps sync", "just test vault-repair"},
+        "vault-audit": {
+            "just deps sync",
+            "just framework install",
+            "just vault check",
         },
-        "vault-audit": {"just dev deps sync", "just prod vault check all"},
-        "dependency-audit": {"just dev deps sync", "just dev audit deps"},
+        "dependency-audit": {"just deps sync", "just audit deps"},
     }
 
     for job_name, expected in expected_runs.items():
@@ -293,14 +358,57 @@ def test_ci_workflow_installs_native_lint_tools() -> None:
     assert "actions/setup-node@v4" not in used_actions
 
 
-def test_prod_delegates_to_cli() -> None:
-    justfile = _read("justfile")
-    # prod recipe passes all args through to uv run vaultspec-core
-    assert "prod *args='':" in justfile
-    assert '"uv run vaultspec-core " + args' in justfile
-    # install/uninstall available via prod namespace (documented in comments)
-    assert "just prod install" in justfile
-    assert "uv run vaultspec-core" in justfile
+def test_quality_gate_thresholds_are_declared_not_reimplemented() -> None:
+    """Every ratcheted threshold lives in pyproject.toml, not in the harness.
+
+    The harness composes the gates by invoking their tools; the moment it
+    carries a threshold of its own, the reported number and the enforced
+    number can drift apart. This pins each baseline-calibrated dimension to
+    its declaration site.
+    """
+    pyproject = _read("pyproject.toml")
+    for table in (
+        "[tool.complexipy]",
+        "[tool.pylint.format]",
+        "[tool.pylint.design]",
+        "[tool.ruff.lint.mccabe]",
+        "[tool.ruff.lint.pylint]",
+        "[tool.vulture]",
+        "[tool.bandit]",
+        "[tool.deptry]",
+        "[tool.basedpyright]",
+    ):
+        assert table in pyproject, f"missing gate declaration {table}"
+
+    toolchain = _read("dev/toolchain.py")
+    for threshold_flag in (
+        "--max-complexity-allowed",
+        "--max-module-lines",
+        "--max-attributes",
+        "--min-confidence",
+    ):
+        assert threshold_flag not in toolchain, (
+            f"{threshold_flag} must be declared in pyproject.toml, not passed "
+            "on the command line where it can drift from the gate"
+        )
+
+
+def test_test_tree_exclusion_patterns_match_windows_paths() -> None:
+    """Ignore patterns must be TOML literal strings, not basic strings.
+
+    As a basic string, `".*[\\\\/]tests[\\\\/].*"` decodes to the regex
+    `.*[\\/]tests[\\/].*`, whose character class contains only a forward slash
+    - the backslash reads as an escape of `/` rather than a class member. The
+    pattern then never matches a Windows path and the test tree silently
+    enters the gate it was meant to leave. Both sibling repositories carry
+    this defect; the literal-string form is the fix.
+    """
+    pyproject = _read("pyproject.toml")
+    assert "ignore-paths = ['.*[\\\\/]tests[\\\\/].*']" in pyproject
+    assert "extend_exclude = ['.*[\\\\/]tests[\\\\/].*']" in pyproject
+    assert '".*[\\\\/]tests[\\\\/].*"' not in pyproject, (
+        "a basic-string ignore pattern never matches a Windows path"
+    )
 
 
 def test_provider_capability_enum_covers_all_tools(tmp_path: Path) -> None:

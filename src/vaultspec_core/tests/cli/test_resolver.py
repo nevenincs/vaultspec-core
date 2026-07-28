@@ -126,6 +126,27 @@ class TestFrameworkRules:
         assert ResolutionAction.REPAIR_MANIFEST in actions
         assert ResolutionAction.SYNC in actions
 
+    def test_corrupted_uninstall_no_force_conflicts(self):
+        diag = _make_diagnosis(framework=FrameworkSignal.CORRUPTED)
+        plan = resolve(diag, CliAction.UNINSTALL, force=False)
+        assert plan.blocked
+        assert plan.conflicts == [
+            "Manifest is corrupted. Use --force to proceed with uninstall."
+        ]
+        assert plan.steps == []
+
+    def test_corrupted_uninstall_force_repairs(self):
+        diag = _make_diagnosis(framework=FrameworkSignal.CORRUPTED)
+        plan = resolve(diag, CliAction.UNINSTALL, force=True)
+        assert not plan.blocked
+        assert [(s.action, s.target, s.reason) for s in plan.steps] == [
+            (
+                ResolutionAction.REPAIR_MANIFEST,
+                "manifest",
+                "Corrupted manifest - repairing before uninstall",
+            )
+        ]
+
 
 # ---------------------------------------------------------------------------
 # Manifest entry rules
@@ -208,6 +229,41 @@ class TestProviderDirRules:
         plan = resolve(diag, CliAction.SYNC, provider="claude")
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.SYNC in actions
+
+    @pytest.mark.parametrize(
+        "signal", [ProviderDirSignal.EMPTY, ProviderDirSignal.PARTIAL]
+    )
+    @pytest.mark.parametrize("action", [CliAction.INSTALL, CliAction.UNINSTALL])
+    def test_syncable_states_outside_sync_are_recognized_no_ops(
+        self,
+        signal: ProviderDirSignal,
+        action: CliAction,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Install scaffolds and uninstall removes, so neither needs a step.
+
+        The absence of the unhandled-signal warning is the assertion that
+        matters: these combinations are deliberately inert, not unclassified.
+        """
+        caplog.set_level("WARNING", logger="vaultspec_core.core.resolver")
+        prov = _make_provider(dir_state=signal)
+        diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
+
+        plan = resolve(diag, action, provider="claude")
+
+        assert [s for s in plan.steps if s.target == "claude"] == []
+        assert "Unknown ProviderDirSignal member" not in caplog.text
+
+    def test_mixed_uninstall_is_not_reclassified_as_unknown(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level("WARNING", logger="vaultspec_core.core.resolver")
+        prov = _make_provider(dir_state=ProviderDirSignal.MIXED)
+        diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
+
+        resolve(diag, CliAction.UNINSTALL, provider="claude", force=True)
+
+        assert "Unknown ProviderDirSignal member" not in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -396,6 +452,99 @@ class TestPrecommitRules:
             )
 
         assert "Unknown PrecommitSignal member" not in caplog.text
+
+    def test_orphaned_prek_boundary_is_inert(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level("WARNING", logger="vaultspec_core.core.resolver")
+        plan = ResolutionPlan()
+
+        _resolve_precommit(plan, PrecommitSignal.ORPHANED, CliAction.SYNC, force=False)
+
+        assert plan.steps == []
+        assert "Unknown PrecommitSignal member" not in caplog.text
+
+    def test_unmanaged_workspace_gets_no_repair(self) -> None:
+        plan = ResolutionPlan()
+
+        _resolve_precommit(
+            plan,
+            PrecommitSignal.NO_HOOKS,
+            CliAction.SYNC,
+            force=False,
+            precommit_managed=False,
+        )
+
+        assert plan.steps == []
+
+    def test_missing_config_is_scaffolded_on_sync_only(self) -> None:
+        sync_plan = ResolutionPlan()
+        _resolve_precommit(
+            sync_plan, PrecommitSignal.NO_FILE, CliAction.SYNC, force=False
+        )
+        assert [(s.action, s.target, s.reason) for s in sync_plan.steps] == [
+            (
+                ResolutionAction.REPAIR_PRECOMMIT,
+                ".pre-commit-config.yaml",
+                "Pre-commit config missing but management is enabled",
+            )
+        ]
+
+        install_plan = ResolutionPlan()
+        _resolve_precommit(
+            install_plan, PrecommitSignal.NO_FILE, CliAction.INSTALL, force=False
+        )
+        assert install_plan.steps == []
+
+    @pytest.mark.parametrize(
+        ("signal", "reason"),
+        [
+            (
+                PrecommitSignal.NO_HOOKS,
+                "No vaultspec-core hooks found in pre-commit config",
+            ),
+            (
+                PrecommitSignal.INCOMPLETE,
+                "Missing canonical hooks in pre-commit config",
+            ),
+        ],
+    )
+    @pytest.mark.parametrize("action", [CliAction.INSTALL, CliAction.SYNC])
+    def test_repairable_signal_carries_its_own_reason(
+        self, signal: PrecommitSignal, reason: str, action: CliAction
+    ) -> None:
+        plan = ResolutionPlan()
+
+        _resolve_precommit(plan, signal, action, force=False)
+
+        assert [(s.action, s.target, s.reason) for s in plan.steps] == [
+            (ResolutionAction.REPAIR_PRECOMMIT, ".pre-commit-config.yaml", reason)
+        ]
+
+    def test_non_canonical_reason_names_the_mode_entry_prefix(self) -> None:
+        plan = ResolutionPlan()
+
+        _resolve_precommit(
+            plan,
+            PrecommitSignal.NON_CANONICAL,
+            CliAction.SYNC,
+            force=False,
+            expected_entry_prefix="uvx --from vaultspec-core vaultspec-core",
+        )
+
+        assert [s.reason for s in plan.steps] == [
+            "Hook entries use non-canonical pattern; should use "
+            "'uvx --from vaultspec-core vaultspec-core'"
+        ]
+
+    def test_repairable_signal_is_inert_on_uninstall(self) -> None:
+        plan = ResolutionPlan()
+
+        _resolve_precommit(
+            plan, PrecommitSignal.NON_CANONICAL, CliAction.UNINSTALL, force=False
+        )
+
+        assert plan.steps == []
 
 
 # ---------------------------------------------------------------------------
