@@ -8,6 +8,7 @@ just this shared surface without pulling in the doctor and reference
 command modules too.
 """
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -17,6 +18,20 @@ if TYPE_CHECKING:
     from vaultspec_core.core.types import SyncResult
 
 from vaultspec_core.cli._errors import handle_error as _handle_error
+
+__all__ = [
+    "COMPLETE_SYNC_COMMAND",
+    "PROVIDER_OUTPUTS",
+    "_apply_provider_filter",
+    "_emit_json",
+    "_emit_sync_result",
+    "_print_complete_sync_notice",
+    "_print_source_mutation_notice",
+    "_resource_path",
+    "_restore_resource_command",
+    "_run_edit_command",
+    "_spec_status_command",
+]
 
 COMPLETE_SYNC_COMMAND = "vaultspec-core sync"
 PROVIDER_OUTPUTS = (
@@ -56,9 +71,9 @@ def _emit_sync_result(
     Always raises :class:`typer.Exit` - code 1 when the pass recorded a
     failure, else 0.
     """
-    from vaultspec_core.cli.rendering import emit_outcomes, sync_outcomes
+    from vaultspec_core.cli.rendering import OutcomeItem, emit_outcomes, sync_outcomes
 
-    outcomes = []
+    outcomes: list[OutcomeItem] = []
     if result.per_tool:
         for provider, provider_result in result.per_tool.items():
             outcomes.extend(sync_outcomes(provider_result, group=provider))
@@ -147,7 +162,7 @@ def _resource_path(base_dir: Path, name: str, *, suffix: str = ".md") -> Path:
     return base_dir / filename
 
 
-def _emit_json(command: str, status: str, data: dict) -> None:
+def _emit_json(command: str, status: str, data: Mapping[str, object]) -> None:
     """Print a command payload as the canonical ``--json`` envelope.
 
     Per the ``cli-json-consistency`` ADR every ``--json`` output shares
@@ -198,7 +213,11 @@ def _restore_resource_command(
 
 
 def _spec_status_command(result: "SyncResult", label: str, json_output: bool) -> None:
-    missing, drifted, stale, up_to_date, skipped = [], [], [], [], []
+    missing: list[str] = []
+    drifted: list[str] = []
+    stale: list[str] = []
+    up_to_date: list[str] = []
+    skipped: list[str] = []
     for path, action in result.items:
         if action == "[ADD]":
             missing.append(path)
