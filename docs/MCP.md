@@ -815,7 +815,16 @@ terminates; when stdin is not a client-created pipe (a console launch, for examp
 watches the server's ancestor process chain instead, ignoring short-lived launcher
 processes. On other platforms a coarse poll exits the server if it is ever orphaned.
 When the watchdog fires, one JSON event line (`"event": "stdio_watchdog_exit"`) is
-written to stderr before the server exits cleanly.
+written to stderr before the server exits cleanly. Its `reason` field says why:
+`watched_process_exit` when the client died, `unanchored_orphan` when the server reaped
+itself as described below.
+
+On Windows the watchdog can also lose track of the client entirely - every launcher in
+the chain exits before it looks, and stdin is not a pipe it can trace. Rather than give
+up for the rest of the run, it keeps looking on an interval and re-anchors as soon as a
+live ancestor appears. Only if repeated checks agree that no live process is left to
+serve does it write a `"stdio_watchdog_disarmed"` event and then exit as an orphan. This
+is what stops unreachable servers accumulating in the background for hours.
 
 Two knobs control it:
 
@@ -825,8 +834,9 @@ Two knobs control it:
   detected one. Useful for hosts that spawn the server through wrappers the detection
   cannot see through.
 
-A watchdog that cannot start never prevents the server from serving; every failure falls
-back to plain EOF-only behavior.
+A watchdog that cannot start never prevents the server from serving, and an ambiguous
+reading is never treated as a dead client: a server is only ever reaped on evidence, not
+on the absence of it.
 
 ## Logging
 
