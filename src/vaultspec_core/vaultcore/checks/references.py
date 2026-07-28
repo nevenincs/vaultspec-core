@@ -20,7 +20,7 @@ from ._base import CheckDiagnostic, CheckResult, Severity
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from ...graph import VaultGraph
+    from ...graph import DocNode, VaultGraph
 
 __all__ = ["check_references", "check_schema"]
 
@@ -214,6 +214,181 @@ def check_references(
     return result
 
 
+def _build_feature_type_index(graph: VaultGraph) -> dict[str, dict[str, list[DocNode]]]:
+    """Index real nodes by feature tag and document type for fix lookups."""
+    from ..models import DocType
+
+    feat_type_index: dict[str, dict[str, list[DocNode]]] = {}
+    for node in graph.nodes.values():
+        if node.phantom or not node.doc_type:
+            continue
+        for tag in node.tags:
+            if not DocType.from_tag(tag):
+                feat = tag.lstrip("#")
+                feat_type_index.setdefault(feat, {}).setdefault(
+                    node.doc_type.value, []
+                ).append(node)
+    return feat_type_index
+
+
+def _is_filtered_out(
+    node: DocNode, feature: str | None, doc_type_filter: str | None
+) -> bool:
+    """Return True when *node* falls outside the requested type/feature filter.
+
+    An untyped node cannot satisfy a type filter, so it is filtered out. The
+    caller already skips those, but stating it here keeps the helper correct
+    on its own terms rather than relying on narrowing it cannot see.
+    """
+    if doc_type_filter and (
+        node.doc_type is None or node.doc_type.value != doc_type_filter
+    ):
+        return True
+    if not feature:
+        return False
+    # Feature filter (normalize: always compare stripped values)
+    feat = feature.lstrip("#")
+    return feat not in {t.lstrip("#") for t in node.tags}
+
+
+def _linked_doc_types(graph: VaultGraph, node: DocNode) -> set[str]:
+    """Classify outgoing link targets by doc type (skip phantoms)."""
+    linked_types: set[str] = set()
+    for target_name in node.out_links:
+        target = graph.nodes.get(target_name)
+        if target and not target.phantom and target.doc_type:
+            linked_types.add(target.doc_type.value)
+    return linked_types
+
+
+def _primary_feature_name(node: DocNode) -> str | None:
+    """Return the node's first feature tag without its ``#``, if any."""
+    from ..models import DocType
+
+    feat_tags = [t for t in node.tags if not DocType.from_tag(t)]
+    return feat_tags[0].lstrip("#") if feat_tags else None
+
+
+def _fix_missing_link(
+    node: DocNode,
+    rel_path: Path,
+    feat_name: str | None,
+    feat_type_index: dict[str, dict[str, list[DocNode]]],
+    candidate_types: tuple[str, ...],
+    result: CheckResult,
+    *,
+    fix: bool,
+) -> bool:
+    """Add the first same-feature document of *candidate_types* to ``related:``.
+
+    Returns ``True`` when a link was added and the INFO diagnostic recorded,
+    ``False`` when fixing is disabled or no candidate could be linked.
+
+    A node with no working-tree path (a phantom, or a ref-scoped node whose
+    blob lives only in git) has no file to rewrite, so it is never fixable.
+    The caller already skips those; the guard is restated here so the helper
+    holds on its own terms rather than on narrowing it cannot see.
+    """
+    if not fix or not feat_name or node.path is None:
+        return False
+    by_type = feat_type_index.get(feat_name, {})
+    candidates = next((by_type[t] for t in candidate_types if by_type.get(t)), [])
+    if not candidates or not _add_related_link(node.path, candidates[0].name):
+        return False
+    result.fixed_count += 1
+    result.diagnostics.append(
+        CheckDiagnostic(
+            path=rel_path,
+            message=(f"Fixed: added [[{candidates[0].name}]] to related field"),
+            severity=Severity.INFO,
+        )
+    )
+    return True
+
+
+def _check_adr_grounding(
+    node: DocNode,
+    rel_path: Path,
+    feat_name: str | None,
+    linked_types: set[str],
+    feat_type_index: dict[str, dict[str, list[DocNode]]],
+    result: CheckResult,
+    *,
+    fix: bool,
+) -> None:
+    """Require an ADR to reference research, reference, or audit grounding."""
+    # The documentation hierarchy sanctions research, reference, and audit
+    # documents as ADR grounding; any one of them satisfies the check.
+    grounding_types = ("research", "reference", "audit")
+    if linked_types & set(grounding_types):
+        return
+
+    if _fix_missing_link(
+        node, rel_path, feat_name, feat_type_index, grounding_types, result, fix=fix
+    ):
+        return
+
+    msg = "ADR has no grounding references (research, reference, or audit documents)"
+    if feat_name:
+        msg += f" (feature: {feat_name})"
+    result.diagnostics.append(
+        CheckDiagnostic(
+            path=rel_path,
+            message=msg,
+            severity=Severity.ERROR,
+            fixable=True,
+            fix_description=(
+                "Add a research document reference in the "
+                "related field or document body"
+            ),
+        )
+    )
+
+
+def _check_plan_grounding(
+    node: DocNode,
+    rel_path: Path,
+    feat_name: str | None,
+    linked_types: set[str],
+    feat_type_index: dict[str, dict[str, list[DocNode]]],
+    result: CheckResult,
+    *,
+    fix: bool,
+) -> None:
+    """Require a plan to reference an ADR, and nudge it toward research."""
+    if "adr" not in linked_types and not _fix_missing_link(
+        node, rel_path, feat_name, feat_type_index, ("adr",), result, fix=fix
+    ):
+        result.diagnostics.append(
+            CheckDiagnostic(
+                path=rel_path,
+                message="Plan has no references to ADR documents",
+                severity=Severity.ERROR,
+                fixable=True,
+                fix_description=(
+                    "Add an ADR document reference in the "
+                    "related field or document body"
+                ),
+            )
+        )
+
+    # Plans should reference research (soft)
+    if "research" not in linked_types and not _fix_missing_link(
+        node, rel_path, feat_name, feat_type_index, ("research",), result, fix=fix
+    ):
+        result.diagnostics.append(
+            CheckDiagnostic(
+                path=rel_path,
+                message="Plan has no references to research documents",
+                severity=Severity.WARNING,
+                fix_description=(
+                    "Consider adding research document references "
+                    "for supporting evidence"
+                ),
+            )
+        )
+
+
 def check_schema(
     root_dir: Path,
     *,
@@ -252,174 +427,38 @@ def check_schema(
     result = CheckResult(check_name="schema", supports_fix=True)
 
     # Pre-build feature->type->nodes index for fix lookups (skip phantoms)
-    feat_type_index: dict[str, dict[str, list]] = {}
-    for _name, _node in graph.nodes.items():
-        if _node.phantom or not _node.doc_type:
-            continue
-        for _tag in _node.tags:
-            if not DocType.from_tag(_tag):
-                _feat = _tag.lstrip("#")
-                feat_type_index.setdefault(_feat, {}).setdefault(
-                    _node.doc_type.value, []
-                ).append(_node)
+    feat_type_index = _build_feature_type_index(graph)
 
     for _name, node in sorted(graph.nodes.items()):
         if not node.doc_type or node.path is None:
             continue
 
-        # Apply filters
-        if doc_type_filter and node.doc_type.value != doc_type_filter:
+        if _is_filtered_out(node, feature, doc_type_filter):
             continue
-        # Feature filter (normalize: always compare stripped values)
-        if feature:
-            feat = feature.lstrip("#")
-            node_features = {t.lstrip("#") for t in node.tags}
-            if feat not in node_features:
-                continue
 
-        # Classify outgoing link targets by doc type (skip phantoms)
-        linked_types: set[str] = set()
-        for target_name in node.out_links:
-            target = graph.nodes.get(target_name)
-            if target and not target.phantom and target.doc_type:
-                linked_types.add(target.doc_type.value)
-
+        linked_types = _linked_doc_types(graph, node)
         rel_path = node.path.relative_to(root_dir)
-        feat_tags = [t for t in node.tags if not DocType.from_tag(t)]
-        feat_name = feat_tags[0].lstrip("#") if feat_tags else None
+        feat_name = _primary_feature_name(node)
 
         if node.doc_type == DocType.ADR:
-            # The documentation hierarchy sanctions research, reference, and
-            # audit documents as ADR grounding; any one of them satisfies the
-            # check.
-            grounding_types = {"research", "reference", "audit"}
-            if not (linked_types & grounding_types):
-                msg = (
-                    "ADR has no grounding references "
-                    "(research, reference, or audit documents)"
-                )
-                if feat_name:
-                    msg += f" (feature: {feat_name})"
-
-                if fix and feat_name:
-                    by_type = feat_type_index.get(feat_name, {})
-                    candidates = next(
-                        (
-                            by_type[t]
-                            for t in ("research", "reference", "audit")
-                            if by_type.get(t)
-                        ),
-                        [],
-                    )
-                    if candidates and _add_related_link(node.path, candidates[0].name):
-                        result.fixed_count += 1
-                        result.diagnostics.append(
-                            CheckDiagnostic(
-                                path=rel_path,
-                                message=(
-                                    f"Fixed: added [[{candidates[0].name}]] "
-                                    f"to related field"
-                                ),
-                                severity=Severity.INFO,
-                            )
-                        )
-                        continue
-
-                result.diagnostics.append(
-                    CheckDiagnostic(
-                        path=rel_path,
-                        message=msg,
-                        severity=Severity.ERROR,
-                        fixable=True,
-                        fix_description=(
-                            "Add a research document reference in the "
-                            "related field or document body"
-                        ),
-                    )
-                )
-
+            _check_adr_grounding(
+                node,
+                rel_path,
+                feat_name,
+                linked_types,
+                feat_type_index,
+                result,
+                fix=fix,
+            )
         elif node.doc_type == DocType.PLAN:
-            if "adr" not in linked_types:
-                if fix and feat_name:
-                    candidates = feat_type_index.get(feat_name, {}).get("adr", [])
-                    if candidates and _add_related_link(node.path, candidates[0].name):
-                        result.fixed_count += 1
-                        result.diagnostics.append(
-                            CheckDiagnostic(
-                                path=rel_path,
-                                message=(
-                                    f"Fixed: added [[{candidates[0].name}]] "
-                                    f"to related field"
-                                ),
-                                severity=Severity.INFO,
-                            )
-                        )
-                    else:
-                        result.diagnostics.append(
-                            CheckDiagnostic(
-                                path=rel_path,
-                                message="Plan has no references to ADR documents",
-                                severity=Severity.ERROR,
-                                fixable=True,
-                                fix_description=(
-                                    "Add an ADR document reference in the "
-                                    "related field or document body"
-                                ),
-                            )
-                        )
-                else:
-                    result.diagnostics.append(
-                        CheckDiagnostic(
-                            path=rel_path,
-                            message="Plan has no references to ADR documents",
-                            severity=Severity.ERROR,
-                            fixable=True,
-                            fix_description=(
-                                "Add an ADR document reference in the "
-                                "related field or document body"
-                            ),
-                        )
-                    )
-
-            # Plans should reference research (soft)
-            if "research" not in linked_types:
-                if fix and feat_name:
-                    candidates = feat_type_index.get(feat_name, {}).get("research", [])
-                    if candidates and _add_related_link(node.path, candidates[0].name):
-                        result.fixed_count += 1
-                        result.diagnostics.append(
-                            CheckDiagnostic(
-                                path=rel_path,
-                                message=(
-                                    f"Fixed: added [[{candidates[0].name}]] "
-                                    f"to related field"
-                                ),
-                                severity=Severity.INFO,
-                            )
-                        )
-                    else:
-                        result.diagnostics.append(
-                            CheckDiagnostic(
-                                path=rel_path,
-                                message="Plan has no references to research documents",
-                                severity=Severity.WARNING,
-                                fix_description=(
-                                    "Consider adding research document references "
-                                    "for supporting evidence"
-                                ),
-                            )
-                        )
-                else:
-                    result.diagnostics.append(
-                        CheckDiagnostic(
-                            path=rel_path,
-                            message="Plan has no references to research documents",
-                            severity=Severity.WARNING,
-                            fix_description=(
-                                "Consider adding research document references "
-                                "for supporting evidence"
-                            ),
-                        )
-                    )
+            _check_plan_grounding(
+                node,
+                rel_path,
+                feat_name,
+                linked_types,
+                feat_type_index,
+                result,
+                fix=fix,
+            )
 
     return result

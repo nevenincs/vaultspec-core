@@ -199,41 +199,27 @@ def _create_one(
     Returns:
         A two-tuple ``(item_result, affected_feature_or_None)``.
     """
-    from ...vaultcore.hydration import create_vault_doc
     from ...vaultcore.normalize import normalize_feature_tag
-    from ...vaultcore.resolve import (
-        RelatedResolutionError,
-        resolve_related_inputs,
-        validate_feature_dependencies,
-    )
+    from ...vaultcore.resolve import RelatedResolutionError, resolve_related_inputs
 
     type_str = spec.type or "research"
     target = f"{type_str}:{spec.feature}"
 
-    def _failed(message: str, **extra: Any) -> tuple[ItemResult, None]:
-        return (
-            build_item(
-                index,
-                status="failed",
-                target=target,
-                error={"message": message, **extra},
-            ),
-            None,
-        )
-
     norm = normalize_feature_tag(spec.feature)
     if not norm.ok or norm.value is None:
-        return _failed(norm.error or "invalid feature")
+        return _create_failure(index, target, norm.error or "invalid feature")
     feature = norm.value
 
     try:
         doc_type = DocType(type_str)
     except ValueError:
-        return _failed(f"Invalid document type: {type_str}")
+        return _create_failure(index, target, f"Invalid document type: {type_str}")
     if doc_type is DocType.INDEX:
-        return _failed(
+        return _create_failure(
+            index,
+            target,
             "'index' documents are auto-generated. "
-            "Use 'vaultspec-core vault feature index', not create."
+            "Use 'vaultspec-core vault feature index', not create.",
         )
 
     extra_tags: list[str] | None = None
@@ -242,7 +228,7 @@ def _create_one(
         for tag in spec.tags:
             tag_norm = normalize_feature_tag(tag, label="tag")
             if not tag_norm.ok or tag_norm.value is None:
-                return _failed(tag_norm.error or "invalid tag")
+                return _create_failure(index, target, tag_norm.error or "invalid tag")
             extra_tags.append(f"#{tag_norm.value}")
 
     resolved_related: list[str] | None = None
@@ -250,62 +236,110 @@ def _create_one(
         try:
             resolved_related = resolve_related_inputs(spec.related, root_dir)
         except RelatedResolutionError as exc:
-            return _failed(
+            return _create_failure(
+                index,
+                target,
                 "Cannot resolve related document(s): " + "; ".join(exc.failures),
                 failures=exc.failures,
             )
 
-    # Lifecycle-dependency validation runs against the on-disk vault, which
-    # already includes any earlier same-batch items - they were written
-    # sequentially before this one - so an intra-batch dependency (create the
-    # ADR then the plan in one call) is satisfied without special tracking.
-    warnings: list[str] = []
-    for diag in validate_feature_dependencies(root_dir, doc_type, feature):
-        if diag.startswith("ERROR:"):
-            return _failed(diag)
-        if diag.startswith("WARNING:"):
-            warnings.append(diag)
+    return _scaffold_one(
+        root_dir,
+        index,
+        target,
+        today,
+        spec,
+        doc_type,
+        feature,
+        extra_tags=extra_tags,
+        resolved_related=resolved_related,
+    )
+
+
+def _create_failure(
+    index: int, target: str, message: str, **extra: Any
+) -> tuple[ItemResult, None]:
+    """Fold one failed ``create`` item into its result envelope."""
+    return (
+        build_item(
+            index,
+            status="failed",
+            target=target,
+            error={"message": message, **extra},
+        ),
+        None,
+    )
+
+
+def _scaffold_one(
+    root_dir: Path,
+    index: int,
+    target: str,
+    today: str,
+    spec: DocumentSpec,
+    doc_type: DocType,
+    feature: str,
+    *,
+    extra_tags: list[str] | None,
+    resolved_related: list[str] | None,
+) -> tuple[ItemResult, str | None]:
+    """Validate the type-dependent spec fields and write the document.
+
+    Args:
+        root_dir: The project root whose ``.vault/`` receives the document.
+        index: The item's zero-based batch position.
+        target: The item's ``type:feature`` address.
+        today: The default ISO date used when the spec omits one.
+        spec: The document specification.
+        doc_type: The spec's resolved document type.
+        feature: The spec's normalized feature name.
+        extra_tags: The spec's normalized extra tags, if any.
+        resolved_related: The spec's resolved ``[[wiki-link]]`` related
+            entries, if any.
+
+    Returns:
+        A two-tuple ``(item_result, affected_feature_or_None)``.
+    """
+    from ...vaultcore.hydration import (
+        DocumentIdentity,
+        TemplateFields,
+        create_vault_doc,
+    )
+
+    warnings, dependency_error = _dependency_diagnostics(root_dir, doc_type, feature)
+    if dependency_error is not None:
+        return _create_failure(index, target, dependency_error)
 
     tier: str | None = None
     if doc_type is DocType.PLAN:
         tier = spec.tier or "L1"
         if tier not in ("L1", "L2", "L3", "L4"):
-            return _failed(f"Invalid tier '{tier}'. Allowed values: L1, L2, L3, L4.")
-
-    topic: str | None = None
-    if spec.topic is not None:
-        if doc_type not in (
-            DocType.ADR,
-            DocType.AUDIT,
-            DocType.REFERENCE,
-            DocType.RESEARCH,
-        ):
-            return _failed(
-                "topic is only valid for 'adr', 'audit', 'reference', and "
-                "'research' documents."
+            return _create_failure(
+                index, target, f"Invalid tier '{tier}'. Allowed values: L1, L2, L3, L4."
             )
-        topic_norm = normalize_feature_tag(spec.topic, label="topic")
-        if not topic_norm.ok or topic_norm.value is None:
-            return _failed(topic_norm.error or "invalid topic")
-        topic = topic_norm.value
+
+    topic, topic_error = _resolve_topic(spec, doc_type)
+    if topic_error is not None:
+        return _create_failure(index, target, topic_error)
 
     date_str = spec.date or today
     try:
         created = create_vault_doc(
             root_dir,
-            doc_type,
-            feature,
-            date_str,
-            spec.title,
-            topic=topic,
-            related=resolved_related,
-            extra_tags=extra_tags,
-            tier=tier,
+            DocumentIdentity(
+                doc_type=doc_type, feature=feature, date=date_str, topic=topic
+            ),
+            TemplateFields(
+                title=spec.title,
+                related=resolved_related,
+                extra_tags=extra_tags,
+                tier=tier,
+            ),
         )
     except FileNotFoundError as exc:
-        return _failed(f"Template unavailable: {exc}")
+        return _create_failure(index, target, f"Template unavailable: {exc}")
     except Exception as exc:  # ResourceExistsError, scaffold-validation, write
-        return _failed(str(exc))
+        return _create_failure(index, target, str(exc))
 
     seed_warnings = _apply_seed_content(root_dir, created, spec.content)
     warnings.extend(seed_warnings)
@@ -321,6 +355,51 @@ def _create_one(
         warnings=warnings,
     )
     return item, feature
+
+
+def _dependency_diagnostics(
+    root_dir: Path, doc_type: DocType, feature: str
+) -> tuple[list[str], str | None]:
+    """Split lifecycle-dependency diagnostics into warnings and a blocker.
+
+    Validation runs against the on-disk vault, which already includes any
+    earlier same-batch items - they were written sequentially before this one
+    - so an intra-batch dependency (create the ADR then the plan in one call)
+    is satisfied without special tracking.
+    """
+    from ...vaultcore.resolve import validate_feature_dependencies
+
+    warnings: list[str] = []
+    for diag in validate_feature_dependencies(root_dir, doc_type, feature):
+        if diag.startswith("ERROR:"):
+            return warnings, diag
+        if diag.startswith("WARNING:"):
+            warnings.append(diag)
+    return warnings, None
+
+
+def _resolve_topic(
+    spec: DocumentSpec, doc_type: DocType
+) -> tuple[str | None, str | None]:
+    """Normalize the optional narrative topic infix for the types allowing it."""
+    from ...vaultcore.normalize import normalize_feature_tag
+
+    if spec.topic is None:
+        return None, None
+    if doc_type not in (
+        DocType.ADR,
+        DocType.AUDIT,
+        DocType.REFERENCE,
+        DocType.RESEARCH,
+    ):
+        return None, (
+            "topic is only valid for 'adr', 'audit', 'reference', and "
+            "'research' documents."
+        )
+    topic_norm = normalize_feature_tag(spec.topic, label="topic")
+    if not topic_norm.ok or topic_norm.value is None:
+        return None, topic_norm.error or "invalid topic"
+    return topic_norm.value, None
 
 
 def _apply_seed_content(

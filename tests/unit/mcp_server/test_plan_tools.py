@@ -134,6 +134,56 @@ async def test_plan_edit_failed_op_does_not_abort_batch(vault_root):
         assert result["items"][1]["error"] is not None
 
 
+async def test_plan_edit_unknown_operation_fails_the_item(vault_root):
+    """An unrecognised verb fails its item and echoes the verb it was given."""
+    mcp = create_server()
+    async with create_connected_server_and_client_session(mcp) as client:
+        await _create_plan(client, "unknownverb")
+        result = await _plan_edit(
+            client,
+            "unknownverb",
+            [{"operation": "retire", "step_id": "S01"}],
+        )
+        assert result["status"] == "failed"
+        item = result["items"][0]
+        assert item["operation"] == "retire"
+        assert item["error"]["message"] == "Unknown plan_edit operation: 'retire'"
+        assert result["total_steps"] == 0
+
+
+async def test_plan_edit_missing_required_fields_fail_per_operation(vault_root):
+    """Each verb reports its own missing-precondition message."""
+    mcp = create_server()
+    async with create_connected_server_and_client_session(mcp) as client:
+        await _create_plan(client, "preconditions")
+        result = await _plan_edit(
+            client,
+            "preconditions",
+            [
+                {"operation": "add", "action": "No scope"},
+                {"operation": "insert", "scope": "src/x.py"},
+                {"operation": "edit", "action": "No step id"},
+                {"operation": "remove"},
+            ],
+        )
+        assert result["status"] == "failed"
+        messages = [item["error"]["message"] for item in result["items"]]
+        assert messages == [
+            "'add' requires 'action' and 'scope'",
+            "'insert' requires 'action' and 'scope'",
+            "'edit' requires 'step_id'",
+            "'remove' requires 'step_id'",
+        ]
+        assert [item["operation"] for item in result["items"]] == [
+            "add",
+            "insert",
+            "edit",
+            "remove",
+        ]
+        plan = parse_plan(_plan_path(vault_root, "preconditions").read_text("utf-8"))
+        assert plan.steps == []
+
+
 async def test_plan_edit_empty_batch_is_protocol_error(vault_root):
     """An empty operation list is a whole-call protocol error."""
     mcp = create_server()

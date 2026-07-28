@@ -1,277 +1,178 @@
+# ===========================================================================
+#  vaultspec-core development harness
+#
+#  Every entry point is a top-level verb; behaviour within a verb is selected
+#  by a `target` argument - `just lint type`, `just test broad`, `just fix
+#  markdown`. Run `just` for the annotated recipe list, and `just <verb> help`
+#  (or any unrecognised target) for that verb's targets with descriptions.
+#
+#  PLATFORM AGNOSTIC BY CONSTRUCTION. Every recipe body below is a single
+#  command with no shell branching, no pipes, no conditionals, and no `sh`
+#  versus PowerShell dialect. All of the logic - target dispatch, step
+#  chaining, tool-or-Docker fallback, advisory-versus-gating exit codes - lives
+#  in the `dev/` Python package, which imports only the standard library and
+#  therefore behaves identically on every platform. There is no shell script
+#  backing this file. To change what a target runs, edit `dev/toolchain.py`,
+#  which is the single declarative source of truth for the whole toolchain.
+#
+#  The verbs split by CONSEQUENCE, not by tool:
+#
+#    lint   GATES.    Read-only, and a finding fails the build.
+#    fix    MUTATES.  Everything automatically repairable, in one pass.
+#    audit  Only `deps` gates. Every other target is advisory and exits 0
+#           even with findings, because each yields a lead to confirm.
+#    test   GATES.    `just test help` states what each lane proves.
+#
+#  NO TOOL IS MIRRORED HERE. `vaultspec-core` and `vaultspec-rag` are finished
+#  products with their own CLIs and their own MCP servers; wrapping either one
+#  only adds a layer that can drift out of step with it. Invoke them directly
+#  (`uv run --no-sync vaultspec-core ...`, `uv run --no-sync vaultspec-rag ...`
+#  or the MCP tools). That applies to rag's whole surface - the search service,
+#  its lifecycle, and its indexes are rag's to manage, not this harness's.
+#
+#  What this file does expose is the operations the repository performs on
+#  ITSELF - its own `.vault/` corpus and its own `.vaultspec/` harness - as the
+#  `vault` and `framework` verbs, because those are development actions on this
+#  checkout rather than product usage.
+# ===========================================================================
+
 set positional-arguments := false
-set shell := ["sh", "-cu"]
-set windows-shell := ["pwsh.exe", "-NoProfile", "-c"]
+set quiet := true
 
+# just defaults to `sh -cu` on every platform, which on Windows means a Git Bash
+# `sh.exe` that is only on PATH for some Git for Windows install options. This
+# names the one interpreter every Windows machine is guaranteed to have. It is a
+# shell DECLARATION, not platform-specific logic: because each recipe body below
+# is a single command with no shell syntax, `cmd` and `sh` execute all of them
+# identically, and there is no second dialect of anything to maintain.
+set windows-shell := ["cmd.exe", "/c"]
 
+# Every recipe that merely *uses* the environment goes through `uv run
+# --no-sync`. Skipping the sync keeps `uv run` from re-resolving and rebuilding
+# the project into `.venv`, which fails on Windows whenever a resident process
+# - an MCP server, an editor, another agent's session - holds one of the
+# console-script executables open. The recipes whose purpose IS to change the
+# environment call `uv` directly, inside `dev/`.
+dev := "uv run --no-sync python -m dev"
 
+# List available recipes.
 default:
-  @echo "Available commands:"
-  @echo "  prod [args...]    Run the vaultspec-core Python CLI (pure 1:1 mirror)"
-  @echo "  dev <target>      Development toolchain (deps, lint, fix, audit, test, build, etc.)"
-  @echo "  ci                Full CI pipeline: lint → audit → vault check → test"
-  @echo ""
-  @echo "Run 'just <command> --help' for more details."
+    @just --list
 
 # ===========================================================================
-#  prod  - pure 1:1 mirror of the vaultspec-core Python CLI
+#  Bootstrap
 # ===========================================================================
 
-prod *args='':
-  @{{ if args == "--help" { "just _prod-help" } else if args == "-h" { "just _prod-help" } else if args == "help" { "just _prod-help" } else { "uv run vaultspec-core " + args } }}
+# The literal `uv sync` on the first line is deliberate: it is the only step
+# that must work before a virtual environment exists, so it cannot route
+# through `{{dev}}`. `framework install` then runs with --force because a fresh
+# checkout carries the tracked `.vaultspec/` config but not the gitignored
+# install manifest (`.vaultspec/providers.json`), and the diagnosis engine
+# reads that combination as CORRUPTED; --force rebuilds the manifest from the
+# tracked config the way a consumer recovering a lost manifest would.
 
-_prod-help:
-  @echo "Usage: just prod [args...]"
-  @echo ""
-  @echo "Runs the vaultspec-core Python CLI (pure 1:1 mirror)."
-  @echo "Examples:"
-  @echo "  just prod install . claude --force"
-  @echo "  just prod sync claude --dry-run"
-  @echo "  just prod vault check all --fix"
-  @echo "  just prod vault check all -v"
-  @echo "  just prod vault graph --metrics"
-  @echo "  just prod vault add adr -f my-feature"
-  @echo "  just prod spec rules list"
+# Provision a fresh clone or worktree: dependencies, framework, and git hooks.
+bootstrap:
+    uv sync --locked --group dev
+    {{dev}} framework install
+    {{dev}} precommit install
 
 # ===========================================================================
-#  dev  - development toolchain (linters, formatters, tests, builds)
+#  Toolchain verbs
 # ===========================================================================
 
-dev target='--help' *args='':
-  @{{ if target == "--help" { "just _dev-help" } else if target == "-h" { "just _dev-help" } else if target == "help" { "just _dev-help" } else { "just _dev-" + target + " " + args } }}
+# Manage project dependencies and the lockfile.
+deps target='sync':
+    {{dev}} deps {{target}}
 
-_dev-help:
-  @echo "Usage: just dev <target> [args...]"
-  @echo ""
-  @echo "Targets:"
-  @echo "  deps      dependency management (sync, upgrade, lock)"
-  @echo "  lint      read-only static analysis (ruff, ty, taplo, markdownlint, ...)"
-  @echo "  fix       auto-fix everything fixable (python, toml, markdown, vault)"
-  @echo "  audit     supply-chain / security checks (uv audit)"
-  @echo "  test      pytest"
-  @echo "  build     uv build"
-  @echo "  precommit pre-commit hook management (install, upgrade, run)"
+# Run gating static analysis: style, types, config, links, and markdown.
+lint target='all':
+    {{dev}} lint {{target}}
+
+# Apply every available formatter and automatic fix.
+fix target='all':
+    {{dev}} fix {{target}}
+
+# Audit dependencies and code quality; only 'deps' gates.
+audit target='all':
+    {{dev}} audit {{target}}
+
+# Run the project test suites.
+test target='all':
+    {{dev}} test {{target}}
+
+# Build the Python distribution artifacts.
+build target='python':
+    {{dev}} build {{target}}
+
+# Manage the prek-owned git pre-commit hooks.
+precommit target='run':
+    {{dev}} precommit {{target}}
 
 # ===========================================================================
-#  ci  - full pipeline: lint → audit → vault check → test
+#  This checkout's own vaultspec records and harness
 # ===========================================================================
 
-ci *args='':
-  @{{ if args == "--help" { "just _ci-help" } else if args == "-h" { "just _ci-help" } else if args == "help" { "just _ci-help" } else { "just _ci-run" } }}
+# Operate on this repository's own .vault/ development corpus.
+vault target='check':
+    {{dev}} vault {{target}}
 
-_ci-help:
-  @echo "Usage: just ci"
-  @echo ""
-  @echo "Runs the full CI pipeline: lint → audit → vault check → test"
+# Operate on this repository's own .vaultspec/ framework harness.
+framework target='doctor':
+    {{dev}} framework {{target}}
 
-_ci-run:
-  just dev lint all
-  just dev audit deps
-  just prod vault check all
-  just dev test all
+# ===========================================================================
+#  Assets and analytics
+# ===========================================================================
 
-# ---------------------------------------------------------------------------
-#  Internal recipes (prefixed with _ to hide from --list)
-# ---------------------------------------------------------------------------
+# Regenerate the committed README terminal renders and demo GIF.
+assets target='all':
+    {{dev}} assets {{target}}
 
-_dev-deps target='--help':
-  @{{ if target == "--help" { "just _dev-deps-help" } else if target == "-h" { "just _dev-deps-help" } else if target == "help" { "just _dev-deps-help" } else { "just _dev-deps-" + target } }}
+# MEASUREMENT ONLY - always exits 0. Composes the gates rather than
+# re-implementing any threshold, so the report and the gate cannot disagree.
+# `just health census` regenerates the distributions each baseline ratchet in
+# pyproject.toml is calibrated from; run it before lowering a threshold.
 
-_dev-deps-help:
-  @echo "Usage: just dev deps <target>"
-  @echo ""
-  @echo "Targets:"
-  @echo "  sync          Sync dependencies"
-  @echo "  upgrade       Upgrade all dependencies"
-  @echo "  lock          Lock dependencies"
-  @echo "  lock-upgrade  Upgrade and lock dependencies"
+# Rank the worst offenders across every code-health dimension.
+health target='report':
+    {{dev}} health {{target}}
 
-_dev-deps-sync:
-  uv sync --locked --group dev
+# Dev-only and unshipped: it reads the operator's own ~/.claude and ~/.codex
+# transcripts and writes into the gitignored statistic/out/. Every
+# machine-varying input is a flag with a home-derived default, so the bare
+# invocation is the normal one. Pass --help for the flag list.
 
-_dev-deps-upgrade:
-  uv sync --upgrade --all-groups
+# Report CLI usage analytics from the local agent transcript corpora.
+analytics *args='':
+    uv run --no-sync python -m statistic {{args}}
 
-_dev-deps-lock:
-  uv lock
+# ===========================================================================
+#  Release artifacts
+# ===========================================================================
 
-_dev-deps-lock-upgrade:
-  uv lock --upgrade
+# Parameterised rather than a fixed `build` target, and a release-workflow
+# action rather than a routine local build. The binaries resolve
+# `vaultspec-core==<tag>` from PyPI on first launch, so the tag must already be
+# published for the result to bootstrap. `tag` is the release tag (e.g.
+# vaultspec-core-v0.1.53); `rust_target` is a cargo triple (e.g.
+# x86_64-pc-windows-msvc).
 
-# ---------------------------------------------------------------------------
+# `--no-project` matches .github/workflows/binaries.yml exactly: the binary
+# build runs against a bare interpreter with no project environment, so a local
+# reproduction and the release workflow invoke the script identically.
 
-_dev-lint target='--help':
-  @{{ if target == "--help" { "just _dev-lint-help" } else if target == "-h" { "just _dev-lint-help" } else if target == "help" { "just _dev-lint-help" } else { "just _dev-lint-" + target } }}
+# Build the standalone PyApp binaries for one release tag and Rust target.
+binaries tag rust_target outdir='dist-bin':
+    uv run --no-project --python 3.13 -- python scripts/build_pyapp.py --tag {{tag}} --target {{rust_target}} --outdir {{outdir}}
 
-_dev-lint-help:
-  @echo "Usage: just dev lint <target>"
-  @echo ""
-  @echo "Targets:"
-  @echo "  python    Run Ruff on Python source"
-  @echo "  type      Run Ty (type checker) on Python source"
-  @echo "  links     Run Lychee link checker"
-  @echo "  toml      Run Taplo TOML linter"
-  @echo "  markdown  Run Markdown linting and formatting checks"
-  @echo "  workflow  Run Actionlint on GitHub workflows"
-  @echo "  all       Run all linters"
+# ===========================================================================
+#  Aggregate pipeline
+# ===========================================================================
 
-_dev-lint-python:
-  uv run ruff check src tests
-  uv run ruff format --check src tests
+# `test broad` rather than `test unit` on purpose - see `just test help`. This
+# mirrors what CI proves, so a green run here means what a green CI run means.
 
-_dev-lint-type:
-  uv run python -m ty check src/vaultspec_core
-
-_dev-lint-links:
-  @{{ if os() == "windows" { \
-    "if (Get-Command lychee -ErrorAction SilentlyContinue) { lychee --config lychee.toml README.md docs .vault src/vaultspec_core/builtins } elseif (Get-Command docker -ErrorAction SilentlyContinue) { docker run --rm -v '${PWD}:/repo' -w /repo lycheeverse/lychee:latest --config /repo/lychee.toml README.md docs .vault src/vaultspec_core/builtins } else { Write-Error 'lychee not found and docker is unavailable'; exit 127 }" \
-  } else { \
-    "if command -v lychee >/dev/null 2>&1; then lychee --config lychee.toml README.md docs .vault src/vaultspec_core/builtins; elif command -v docker >/dev/null 2>&1; then docker run --rm -v \"$PWD:/repo\" -w /repo lycheeverse/lychee:latest --config /repo/lychee.toml README.md docs .vault src/vaultspec_core/builtins; else echo 'lychee not found and docker is unavailable' >&2; exit 127; fi" \
-  } }}
-
-_dev-lint-toml:
-  @{{ if os() == "windows" { \
-    "if (Get-Command taplo -ErrorAction SilentlyContinue) { taplo lint *.toml } elseif (Get-Command docker -ErrorAction SilentlyContinue) { docker run --rm -v '${PWD}:/repo' -w /repo tamasfe/taplo:0.9 lint *.toml } else { Write-Error 'taplo not found and docker is unavailable'; exit 127 }" \
-  } else { \
-    "if command -v taplo >/dev/null 2>&1; then taplo lint *.toml; elif command -v docker >/dev/null 2>&1; then docker run --rm -v \"$PWD:/repo\" -w /repo tamasfe/taplo:0.9 lint *.toml; else echo 'taplo not found and docker is unavailable' >&2; exit 127; fi" \
-  } }}
-
-_dev-lint-markdown:
-  uv run mdformat --check README.md docs/ .vault/ src/vaultspec_core/builtins/
-  uv run mdformat --wrap 88 --check README.md docs/framework.md docs/MCP.md docs/CLI.md src/vaultspec_core/builtins
-  uv run pymarkdown --config .pymarkdown.json scan -r README.md docs/ .vault/ src/vaultspec_core/builtins/
-
-_dev-lint-workflow:
-  @{{ if os() == "windows" { \
-    "if (Get-Command actionlint -ErrorAction SilentlyContinue) { actionlint } elseif (Get-Command docker -ErrorAction SilentlyContinue) { docker run --rm -v '${PWD}:/repo' -w /repo rhysd/actionlint:latest } else { Write-Error 'actionlint not found and docker is unavailable'; exit 127 }" \
-  } else { \
-    "if command -v actionlint >/dev/null 2>&1; then actionlint; elif command -v docker >/dev/null 2>&1; then docker run --rm -v \"$PWD:/repo\" -w /repo rhysd/actionlint:latest; else echo 'actionlint not found and docker is unavailable' >&2; exit 127; fi" \
-  } }}
-
-_dev-lint-all:
-  just _dev-lint-python
-  just _dev-lint-type
-  just _dev-lint-links
-  just _dev-lint-toml
-  just _dev-lint-markdown
-  just _dev-lint-workflow
-
-# ---------------------------------------------------------------------------
-
-_dev-fix target='--help':
-  @{{ if target == "--help" { "just _dev-fix-help" } else if target == "-h" { "just _dev-fix-help" } else if target == "help" { "just _dev-fix-help" } else { "just _dev-fix-" + target } }}
-
-_dev-fix-help:
-  @echo "Usage: just dev fix <target>"
-  @echo ""
-  @echo "Targets:"
-  @echo "  python    Auto-fix and format Python source"
-  @echo "  toml      Auto-format TOML files"
-  @echo "  markdown  Auto-format Markdown files"
-  @echo "  vault     Auto-fix vault issues"
-  @echo "  all       Run all fixers"
-
-_dev-fix-python:
-  uv run ruff format src tests
-  uv run ruff check --fix src tests
-
-_dev-fix-toml:
-  @{{ if os() == "windows" { \
-    "if (Get-Command taplo -ErrorAction SilentlyContinue) { taplo fmt *.toml } elseif (Get-Command docker -ErrorAction SilentlyContinue) { docker run --rm -v '${PWD}:/repo' -w /repo tamasfe/taplo:0.9 fmt *.toml } else { Write-Error 'taplo not found and docker is unavailable'; exit 127 }" \
-  } else { \
-    "if command -v taplo >/dev/null 2>&1; then taplo fmt *.toml; elif command -v docker >/dev/null 2>&1; then docker run --rm -v \"$PWD:/repo\" -w /repo tamasfe/taplo:0.9 fmt *.toml; else echo 'taplo not found and docker is unavailable' >&2; exit 127; fi" \
-  } }}
-
-_dev-fix-markdown:
-  uv run mdformat README.md docs/ .vault/ src/vaultspec_core/builtins/
-  uv run mdformat --wrap 88 README.md docs/framework.md docs/MCP.md docs/CLI.md src/vaultspec_core/builtins
-  uv run pymarkdown --config .pymarkdown.json fix -r README.md docs/ .vault/ src/vaultspec_core/builtins/
-
-_dev-fix-vault:
-  uv run vaultspec-core vault check all --fix
-  uv run vaultspec-core vault sanitize annotations
-
-_dev-fix-all:
-  just _dev-fix-python
-  just _dev-fix-toml
-  just _dev-fix-markdown
-  just _dev-fix-vault
-
-# ---------------------------------------------------------------------------
-
-_dev-audit target='--help':
-  @{{ if target == "--help" { "just _dev-audit-help" } else if target == "-h" { "just _dev-audit-help" } else if target == "help" { "just _dev-audit-help" } else { "just _dev-audit-" + target } }}
-
-_dev-audit-help:
-  @echo "Usage: just dev audit <target>"
-  @echo ""
-  @echo "Targets:"
-  @echo "  deps      Run uv audit on locked dependencies"
-
-# The supply-chain gate runs `uv audit` -- uv's native, preview-feature OSV
-# scanner -- and never shells out to pip. The cross-platform wrapper lives in
-# scripts/dependency_audit.py; it fails the gate on real findings (uv audit
-# itself exits 0 even when advisories are present) and, when uv's preview
-# decoder aborts on a malformed upstream OSV record, independently repeats the
-# bulk OSV query to confirm the only affected advisories are ones already
-# triaged. See that script's module docstring for the full rationale,
-# including the disputed, unfixable pyjwt advisory PYSEC-2025-183.
-_dev-audit-deps:
-  uv run python scripts/dependency_audit.py
-
-# ---------------------------------------------------------------------------
-
-_dev-test target='--help':
-  @{{ if target == "--help" { "just _dev-test-help" } else if target == "-h" { "just _dev-test-help" } else if target == "help" { "just _dev-test-help" } else { "just _dev-test-" + target } }}
-
-_dev-test-help:
-  @echo "Usage: just dev test <target>"
-  @echo ""
-  @echo "Targets:"
-  @echo "  python    Run pytest on Python source"
-  @echo "  all       Run all tests"
-
-_dev-test-python:
-  uv run pytest src/vaultspec_core -x -q --tb=short -m "unit and not gemini and not claude and not network"
-
-_dev-test-all:
-  just _dev-test-python
-
-# ---------------------------------------------------------------------------
-
-_dev-build target='--help':
-  @{{ if target == "--help" { "just _dev-build-help" } else if target == "-h" { "just _dev-build-help" } else if target == "help" { "just _dev-build-help" } else { "just _dev-build-" + target } }}
-
-_dev-build-help:
-  @echo "Usage: just dev build <target>"
-  @echo ""
-  @echo "Targets:"
-  @echo "  python    Build Python package"
-  @echo "  all       Run all builds"
-
-_dev-build-python:
-  uv build
-
-_dev-build-all:
-  just _dev-build-python
-
-# ---------------------------------------------------------------------------
-
-_dev-precommit target='--help':
-  @{{ if target == "--help" { "just _dev-precommit-help" } else if target == "-h" { "just _dev-precommit-help" } else if target == "help" { "just _dev-precommit-help" } else { "just _dev-precommit-" + target } }}
-
-_dev-precommit-help:
-  @echo "Usage: just dev precommit <target>"
-  @echo ""
-  @echo "Targets:"
-  @echo "  install   Install pre-commit hooks"
-  @echo "  upgrade   Upgrade pre-commit hooks"
-  @echo "  run       Run pre-commit hooks on all files"
-
-_dev-precommit-install:
-  uv run prek install
-
-_dev-precommit-upgrade:
-  uv run prek auto-update
-
-_dev-precommit-run:
-  uv run prek run --all-files
+# Run the full local gate: lint, dependency audit, vault checks, broad tests.
+ci:
+    {{dev}} ci all

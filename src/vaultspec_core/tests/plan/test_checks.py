@@ -8,6 +8,7 @@ import pytest
 
 from vaultspec_core.plan.checks import Severity, collect_all, has_errors
 from vaultspec_core.plan.checks.frontmatter_check import check_frontmatter
+from vaultspec_core.plan.checks.heading_level_check import check_heading_levels
 from vaultspec_core.plan.checks.hierarchy_check import check_hierarchy
 from vaultspec_core.plan.checks.identifiers_check import check_identifiers
 from vaultspec_core.plan.checks.row_contract_check import check_row_contract
@@ -413,3 +414,55 @@ def test_collect_all_runs_every_rule_without_raising(tier: str) -> None:
 
     assert all(isinstance(f.code, str) for f in findings)
     assert all(isinstance(f.severity, Severity) for f in findings)
+
+
+# ---- Container heading level (PLAN070) --------------------------------------
+
+
+def test_heading_level_check_flags_demoted_phase() -> None:
+    """A Phase demoted to `##` is reported rather than silently dropped.
+
+    The parser recognises a Phase only at `###`. A demoted heading matches
+    nothing, so the container vanishes from the parsed model while its Step
+    rows survive and re-parent to the previous container. This asserts the
+    loss is real and that the rule catches it.
+    """
+    rng = random.Random(0)
+    spec = make_clean_plan("L3", rng=rng, waves=1, phases=2, steps=2)
+    text = spec.render()
+
+    canonical_phases = len(parse_plan(text).phases)
+    demoted = text.replace("### Phase `", "## Phase `", 1)
+    demoted_plan = parse_plan(demoted)
+
+    # The loss this rule exists to surface is real.
+    assert len(demoted_plan.phases) == canonical_phases - 1
+
+    findings = check_heading_levels(demoted)
+    assert [f.code for f in findings] == ["PLAN070"]
+    assert findings[0].severity is Severity.ERROR
+    assert "heading level 2" in findings[0].message
+
+    # And the harness surfaces it as an error, not just the rule in isolation.
+    assert has_errors(collect_all(demoted_plan, demoted))
+
+
+def test_heading_level_check_flags_promoted_wave() -> None:
+    """A Wave promoted to `#` is reported; the parser expects `##`."""
+    rng = random.Random(1)
+    spec = make_clean_plan("L3", rng=rng, waves=1, phases=1, steps=1)
+    text = spec.render()
+
+    promoted = text.replace("## Wave `", "# Wave `", 1)
+    findings = check_heading_levels(promoted)
+
+    assert [f.code for f in findings] == ["PLAN070"]
+    assert "Wave" in findings[0].message
+
+
+def test_heading_level_check_silent_on_canonical_levels() -> None:
+    """Correctly levelled containers produce no findings, at every tier."""
+    for tier in ("L1", "L2", "L3", "L4"):
+        rng = random.Random(2)
+        spec = make_clean_plan(tier, rng=rng, waves=2, phases=2, steps=2)
+        assert check_heading_levels(spec.render()) == []

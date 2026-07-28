@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from vaultspec_core.cli import app
-from vaultspec_core.cli.vault_cmd import _render_repair_run
+from vaultspec_core.cli._repair_render import render_repair_run
 from vaultspec_core.config import reset_config
 from vaultspec_core.vaultcore.checks import run_all_checks
 from vaultspec_core.vaultcore.repair import (
@@ -686,7 +686,7 @@ class TestVaultRepair:
             }
         )
 
-        _render_repair_run(run)
+        render_repair_run(run)
         captured = capsys.readouterr()
         output = captured.out
 
@@ -711,7 +711,7 @@ class TestVaultRepair:
             for index in range(3)
         ]
 
-        _render_repair_run(run)
+        render_repair_run(run)
         captured = capsys.readouterr()
         output = captured.out
 

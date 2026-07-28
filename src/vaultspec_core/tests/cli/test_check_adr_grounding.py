@@ -136,3 +136,72 @@ class TestAdrGroundingFix:
             tmp_path / ".vault" / "adr" / "2026-07-14-grounding-feat-adr.md"
         ).read_text(encoding="utf-8")
         assert "[[2026-07-14-grounding-feat-audit]]" in adr
+
+
+class TestPlanSchemaRules:
+    """A plan must reference an ADR and should reference research."""
+
+    def test_unlinked_plan_reports_both_rules(self, tmp_path: Path):
+        _write_doc(tmp_path, "plan", "2026-07-14-grounding-feat-plan")
+
+        result = check_schema(tmp_path, graph=VaultGraph(tmp_path))
+
+        plan_diags = [d for d in result.diagnostics if "Plan has no" in d.message]
+        assert [d.message for d in plan_diags] == [
+            "Plan has no references to ADR documents",
+            "Plan has no references to research documents",
+        ]
+        assert [d.severity.value for d in plan_diags] == ["error", "warning"]
+        assert [d.fixable for d in plan_diags] == [True, False]
+
+    def test_fix_links_adr_and_research(self, tmp_path: Path):
+        _write_doc(tmp_path, "research", "2026-07-14-grounding-feat-research")
+        _write_doc(
+            tmp_path,
+            "adr",
+            "2026-07-14-grounding-feat-adr",
+            related=["2026-07-14-grounding-feat-research"],
+        )
+        _write_doc(tmp_path, "plan", "2026-07-14-grounding-feat-plan")
+
+        result = check_schema(tmp_path, graph=VaultGraph(tmp_path), fix=True)
+
+        assert result.fixed_count == 2
+        plan = (
+            tmp_path / ".vault" / "plan" / "2026-07-14-grounding-feat-plan.md"
+        ).read_text(encoding="utf-8")
+        assert "[[2026-07-14-grounding-feat-adr]]" in plan
+        assert "[[2026-07-14-grounding-feat-research]]" in plan
+        assert not [d for d in result.diagnostics if "Plan has no" in d.message]
+
+    def test_fix_without_candidates_still_reports(self, tmp_path: Path):
+        _write_doc(tmp_path, "plan", "2026-07-14-grounding-feat-plan")
+
+        result = check_schema(tmp_path, graph=VaultGraph(tmp_path), fix=True)
+
+        assert result.fixed_count == 0
+        messages = [d.message for d in result.diagnostics if "Plan has no" in d.message]
+        assert messages == [
+            "Plan has no references to ADR documents",
+            "Plan has no references to research documents",
+        ]
+
+    def test_doc_type_filter_skips_plans(self, tmp_path: Path):
+        _write_doc(tmp_path, "plan", "2026-07-14-grounding-feat-plan")
+        _write_doc(tmp_path, "adr", "2026-07-14-grounding-feat-adr")
+
+        result = check_schema(
+            tmp_path, graph=VaultGraph(tmp_path), doc_type_filter="adr"
+        )
+
+        assert not [d for d in result.diagnostics if "Plan has no" in d.message]
+        assert _adr_diagnostics(tmp_path)
+
+    def test_feature_filter_skips_other_features(self, tmp_path: Path):
+        _write_doc(tmp_path, "plan", "2026-07-14-grounding-feat-plan")
+
+        result = check_schema(
+            tmp_path, graph=VaultGraph(tmp_path), feature="other-feature"
+        )
+
+        assert result.diagnostics == []

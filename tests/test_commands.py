@@ -384,7 +384,11 @@ def test_resolver_skips_repair_when_not_managed() -> None:
 def test_vault_add_force_overwrites_existing() -> None:
     """vault add --force must overwrite an existing document."""
     from vaultspec_core.core.exceptions import ResourceExistsError
-    from vaultspec_core.vaultcore.hydration import create_vault_doc
+    from vaultspec_core.vaultcore.hydration import (
+        DocumentIdentity,
+        WritePolicy,
+        create_vault_doc,
+    )
     from vaultspec_core.vaultcore.models import DocType
 
     tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"vault-add-force-{uuid4().hex}"
@@ -400,15 +404,14 @@ def test_vault_add_force_overwrites_existing() -> None:
             force=False,
         )
 
-        path1 = create_vault_doc(tmp_path, DocType.ADR, "test-feat", "2026-04-11")
+        identity = DocumentIdentity(DocType.ADR, "test-feat", "2026-04-11")
+        path1 = create_vault_doc(tmp_path, identity)
         assert path1.exists()
 
         with pytest.raises(ResourceExistsError, match="already exists"):
-            create_vault_doc(tmp_path, DocType.ADR, "test-feat", "2026-04-11")
+            create_vault_doc(tmp_path, identity)
 
-        path2 = create_vault_doc(
-            tmp_path, DocType.ADR, "test-feat", "2026-04-11", force=True
-        )
+        path2 = create_vault_doc(tmp_path, identity, write=WritePolicy(force=True))
         assert path2 == path1
         assert path2.exists()
     finally:
@@ -419,7 +422,11 @@ def test_vault_add_force_overwrites_existing() -> None:
 @pytest.mark.unit
 def test_vault_add_dry_run_no_write() -> None:
     """vault add --dry-run must return path without creating file."""
-    from vaultspec_core.vaultcore.hydration import create_vault_doc
+    from vaultspec_core.vaultcore.hydration import (
+        DocumentIdentity,
+        WritePolicy,
+        create_vault_doc,
+    )
     from vaultspec_core.vaultcore.models import DocType
 
     tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"vault-add-dry-{uuid4().hex}"
@@ -437,10 +444,8 @@ def test_vault_add_dry_run_no_write() -> None:
 
         path = create_vault_doc(
             tmp_path,
-            DocType.RESEARCH,
-            "dry-test",
-            "2026-04-11",
-            dry_run=True,
+            DocumentIdentity(DocType.RESEARCH, "dry-test", "2026-04-11"),
+            write=WritePolicy(dry_run=True),
         )
         assert not path.exists()
         assert path.name == "2026-04-11-dry-test-research.md"
@@ -534,7 +539,7 @@ def test_vault_add_creates_distinct_same_day_topic_infixed_adrs() -> None:
 def test_resource_exists_error_includes_hint() -> None:
     """ResourceExistsError from create_vault_doc must include a hint."""
     from vaultspec_core.core.exceptions import ResourceExistsError
-    from vaultspec_core.vaultcore.hydration import create_vault_doc
+    from vaultspec_core.vaultcore.hydration import DocumentIdentity, create_vault_doc
     from vaultspec_core.vaultcore.models import DocType
 
     tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"hint-test-{uuid4().hex}"
@@ -550,10 +555,11 @@ def test_resource_exists_error_includes_hint() -> None:
             force=False,
         )
 
-        create_vault_doc(tmp_path, DocType.ADR, "hint-feat", "2026-04-11")
+        identity = DocumentIdentity(DocType.ADR, "hint-feat", "2026-04-11")
+        create_vault_doc(tmp_path, identity)
 
         with pytest.raises(ResourceExistsError) as exc_info:
-            create_vault_doc(tmp_path, DocType.ADR, "hint-feat", "2026-04-11")
+            create_vault_doc(tmp_path, identity)
         assert exc_info.value.hint
         assert "--force" in exc_info.value.hint
     finally:

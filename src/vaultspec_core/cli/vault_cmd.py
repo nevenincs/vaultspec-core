@@ -22,7 +22,6 @@ if TYPE_CHECKING:
 
     from vaultspec_core.graph.api import VaultGraph
     from vaultspec_core.vaultcore.checks._base import CheckResult
-    from vaultspec_core.vaultcore.repair import RepairRun
 
 
 vault_app = make_app(
@@ -185,423 +184,128 @@ def cmd_add(
     apply_target(target)
     from datetime import UTC, datetime
 
+    from vaultspec_core.cli import _add_ops
     from vaultspec_core.console import get_console
     from vaultspec_core.core.types import get_context as _get_ctx
-    from vaultspec_core.vaultcore.hydration import create_vault_doc
-    from vaultspec_core.vaultcore.models import DocType
-    from vaultspec_core.vaultcore.normalize import normalize_feature_tag
-    from vaultspec_core.vaultcore.resolve import (
-        RelatedResolutionError,
-        resolve_related_inputs,
-        validate_feature_dependencies,
+    from vaultspec_core.vaultcore.hydration import (
+        DocumentIdentity,
+        ExecBinding,
+        ParentPlan,
+        TemplateFields,
+        WritePolicy,
+        create_vault_doc,
     )
+    from vaultspec_core.vaultcore.models import DocType
 
     console = get_console()
+    root_dir = _get_ctx().target_dir
 
-    # Resolve doc type enum
-    try:
-        dt = DocType(doc_type)
-    except ValueError:
-        valid = ", ".join(d.value for d in DocType if d is not DocType.INDEX)
-        console.print(
-            f"[red]Unknown document type '{doc_type}'. Valid types: {valid}[/red]"
-        )
-        raise typer.Exit(code=1) from None
-    if dt is DocType.INDEX:
-        console.print(
-            "[red]'index' documents are auto-generated. "
-            "Use 'vaultspec-core vault feature index' instead of "
-            "'vaultspec-core vault add index'.[/red]"
-        )
-        raise typer.Exit(code=1)
-
-    # Validate step-aware flags
-    if (step is not None or all_steps or summary) and dt is not DocType.EXEC:
-        console.print(
-            "[red]Error: --step, --all-steps, and --summary options are only "
-            "valid when creating 'exec' documents.[/red]"
-        )
-        raise typer.Exit(code=1)
-
-    if step is not None and all_steps:
-        console.print(
-            "[red]Error: --step and --all-steps options are mutually exclusive.[/red]"
-        )
-        raise typer.Exit(code=1)
-
-    if summary and (step is not None or all_steps):
-        console.print(
-            "[red]Error: --summary cannot be combined with --step or --all-steps.[/red]"
-        )
-        raise typer.Exit(code=1)
-
-    if summary and phase is None:
-        console.print(
-            "[red]Error: --summary requires --phase <P##> naming the Phase "
-            "to summarise.[/red]"
-        )
-        raise typer.Exit(code=1)
-
-    if phase is not None and not summary:
-        console.print(
-            "[red]Error: --phase is only valid together with --summary.[/red]"
-        )
-        raise typer.Exit(code=1)
-
-    # Validate tier for plan documents
-    if dt is DocType.PLAN and tier not in {"L1", "L2", "L3", "L4"}:
-        console.print(
-            f"[red]Invalid tier '{tier}'. Allowed values: L1, L2, L3, L4.[/red]"
-        )
-        raise typer.Exit(code=1)
-
-    # Validate the topic infix for standalone decision and narrative records,
-    # holding it to the same kebab-case discipline as the feature tag.
-    topic_value: str | None = None
-    if topic is not None:
-        if dt not in (DocType.ADR, DocType.AUDIT, DocType.REFERENCE, DocType.RESEARCH):
-            console.print(
-                "[red]Error: --topic is only valid for 'adr', 'audit', 'reference', "
-                "and 'research' documents.[/red]"
-            )
-            raise typer.Exit(code=1)
-        topic_result = normalize_feature_tag(topic, label="topic")
-        if not topic_result.ok or topic_result.value is None:
-            console.print(f"[red]{topic_result.error}[/red]")
-            raise typer.Exit(code=1)
-        topic_value = topic_result.value
-
-    # Validate feature tag through the shared vaultcore normalizer (the one
-    # validator the MCP surface also converges on).
-    feature_result = normalize_feature_tag(feature)
-    if not feature_result.ok or feature_result.value is None:
-        console.print(f"[red]{feature_result.error}[/red]")
-        raise typer.Exit(code=1)
-    feat = feature_result.value
+    dt = _add_ops.resolve_doc_type(console, doc_type)
+    _add_ops.validate_step_flags(
+        console, dt, step=step, all_steps=all_steps, summary=summary, phase=phase
+    )
+    _add_ops.validate_tier(console, dt, tier)
+    topic_value = _add_ops.normalize_topic(console, dt, topic)
+    feat = _add_ops.normalize_feature(console, feature)
+    extra_tags = _add_ops.normalize_extra_tags(console, tags)
+    resolved_related = _add_ops.resolve_related(console, related, root_dir)
+    _add_ops.report_dependency_diagnostics(
+        console, root_dir, dt, feat, json_output=json_output
+    )
 
     # Default date to today (UTC for deterministic vault doc dates)
     date_str = date or datetime.now(UTC).strftime("%Y-%m-%d")
 
-    # Validate extra tags format through the same shared normalizer.
-    extra_tags: list[str] | None = None
-    if tags:
-        extra_tags = []
-        for tag in tags:
-            tag_result = normalize_feature_tag(tag, label="tag")
-            if not tag_result.ok:
-                console.print(f"[red]{tag_result.error}[/red]")
-                raise typer.Exit(code=1)
-            extra_tags.append(f"#{tag_result.value}")
-
-    # Resolve related paths to wiki-links
-    resolved_related: list[str] | None = None
-    if related:
-        try:
-            resolved_related = resolve_related_inputs(related, _get_ctx().target_dir)
-        except RelatedResolutionError as exc:
-            for failure in exc.failures:
-                console.print(
-                    f"[red]Cannot resolve related document: '{failure}'[/red]"
-                )
-            console.print(
-                "[dim]Accepted formats: absolute path, relative path, "
-                "filename, stem, or [[wiki-link]][/dim]"
-            )
-            raise typer.Exit(code=1) from None
-
-    # Validate feature dependencies (lifecycle rules)
-    dep_diagnostics = validate_feature_dependencies(_get_ctx().target_dir, dt, feat)
-    dep_errors = [d for d in dep_diagnostics if d.startswith("ERROR:")]
-
-    if json_output:
-        for diag in dep_diagnostics:
-            if not diag.startswith("ERROR:"):
-                typer.echo(diag, err=True)
-        if dep_errors:
-            import json
-
-            from vaultspec_core.cli.rendering import json_envelope
-
-            typer.echo(
-                json.dumps(
-                    json_envelope(
-                        "vault.add", "failed", {"message": " ".join(dep_errors)}
-                    ),
-                    indent=2,
-                )
-            )
-            raise typer.Exit(code=1)
-    else:
-        for diag in dep_diagnostics:
-            style = "red" if diag.startswith("ERROR:") else "yellow"
-            console.print(f"[{style}]{diag}[/{style}]")
-        if dep_errors:
-            raise typer.Exit(code=1)
-
-    # Handle parent plan resolution if step-aware route is active
-    plan_date_arg = None
-    plan_stem_arg = None
-    step_id_arg = None
-    step_display_path_arg = None
-    step_scope_arg = None
-    step_action_arg = None
-    phase_display_arg = None
+    identity = DocumentIdentity(
+        doc_type=dt, feature=feat, date=date_str, topic=topic_value
+    )
+    fields = TemplateFields(
+        title=title,
+        related=resolved_related,
+        extra_tags=extra_tags,
+        tier=tier if dt is DocType.PLAN else None,
+    )
+    write = WritePolicy(force=force, dry_run=dry_run)
+    exec_binding = ExecBinding(summary=summary)
 
     if dt is DocType.EXEC and (step is not None or all_steps or summary):
-        from vaultspec_core.vaultcore.query import list_documents
-
-        parent_plan_doc = None
-        if resolved_related:
-            for rel in resolved_related:
-                stem = rel.lstrip("[").rstrip("]")
-                plan_docs = list_documents(_get_ctx().target_dir, doc_type="plan")
-                for doc in plan_docs:
-                    if doc.path.stem == stem:
-                        parent_plan_doc = doc
-                        break
-                if parent_plan_doc:
-                    break
-
-        if parent_plan_doc is None:
-            plan_docs = list_documents(
-                _get_ctx().target_dir, doc_type="plan", feature=feat
-            )
-            if len(plan_docs) == 1:
-                parent_plan_doc = plan_docs[0]
-            elif len(plan_docs) > 1:
-                names = ", ".join(d.path.name for d in plan_docs)
-                console.print(
-                    f"[red]Multiple plans found for feature '{feat}': {names}. "
-                    "Specify the parent plan using --related.[/red]"
-                )
-                raise typer.Exit(code=1)
-            else:
-                console.print(
-                    f"[red]No plan found for feature '{feat}'. "
-                    "Create a plan document before adding execution records.[/red]"
-                )
-                raise typer.Exit(code=1)
-
         from vaultspec_core.plan.parser import parse_plan
 
+        parent_plan_doc = _add_ops.resolve_parent_plan(
+            console, root_dir, feat, resolved_related
+        )
         parsed_plan = parse_plan(parent_plan_doc.path)
         plan_stem_arg = parent_plan_doc.path.stem
-        plan_date_arg = parent_plan_doc.date or plan_stem_arg[:10]
+        parent_plan = ParentPlan(
+            date=parent_plan_doc.date or plan_stem_arg[:10], stem=plan_stem_arg
+        )
 
+        if all_steps:
+            raise typer.Exit(
+                code=_add_ops.scaffold_all_steps(
+                    parsed_plan.steps,
+                    root_dir=root_dir,
+                    identity=identity,
+                    fields=fields,
+                    plan=parent_plan,
+                    write=write,
+                    json_output=json_output,
+                )
+            )
         if step is not None:
-            from vaultspec_core.plan.commands.step_ops import (
-                AmbiguousStepError,
-                StepNotFoundError,
-                find_step,
+            target_step = _add_ops.resolve_step_row(console, parsed_plan, step)
+            exec_binding = ExecBinding(
+                plan=parent_plan,
+                step_id=target_step.canonical_id,
+                step_display_path=target_step.display_path,
+                step_scope=target_step.scope,
+                step_action=target_step.action,
+                summary=summary,
             )
-
-            try:
-                target_step = find_step(parsed_plan, step)
-            except StepNotFoundError as exc:
-                console.print(f"[red]Error: {exc}[/red]")
-                raise typer.Exit(code=1) from None
-            except AmbiguousStepError as exc:
-                console.print(f"[red]Error: {exc}[/red]")
-                raise typer.Exit(code=1) from None
-
-            step_id_arg = target_step.canonical_id
-            step_display_path_arg = target_step.display_path
-            step_scope_arg = target_step.scope
-            step_action_arg = target_step.action
-
-        elif summary:
-            from vaultspec_core.plan.commands.phase_ops import (
-                PhaseNotFoundError,
-                find_phase,
-            )
-
+        else:
             # The "--summary requires --phase" validation above guarantees a
             # non-None phase id by the time this branch runs.
             assert phase is not None
-            try:
-                target_phase = find_phase(parsed_plan, phase)
-            except PhaseNotFoundError as exc:
-                console.print(f"[red]Error: {exc}[/red]")
-                raise typer.Exit(code=1) from None
-
-            phase_display_arg = target_phase.display_path
-
-        elif all_steps:
-            # Bulk scaffolding loop
-            import logging
-
-            from vaultspec_core.cli.rendering import Outcome, OutcomeItem, emit_outcomes
-
-            items = []
-            root_dir = _get_ctx().target_dir
-
-            previous_logging_disable = logging.root.manager.disable
-            if json_output:
-                logging.disable(logging.CRITICAL)
-
-            try:
-                for s in parsed_plan.steps:
-                    target_path = create_vault_doc(
-                        root_dir=root_dir,
-                        doc_type=dt,
-                        feature=feat,
-                        date_str=date_str,
-                        title=title,
-                        related=resolved_related,
-                        extra_tags=extra_tags,
-                        force=True,
-                        dry_run=True,
-                        step_id=s.canonical_id,
-                        step_display_path=s.display_path,
-                        step_scope=s.scope,
-                        step_action=s.action,
-                        plan_date=plan_date_arg,
-                        plan_stem=plan_stem_arg,
-                    )
-
-                    rel_name = str(target_path.relative_to(root_dir))
-
-                    if target_path.exists():
-                        if not force:
-                            items.append(
-                                OutcomeItem(
-                                    name=rel_name,
-                                    outcome=Outcome.SKIPPED,
-                                    detail="skipped; exists",
-                                )
-                            )
-                            continue
-                        else:
-                            outcome_type = Outcome.UPDATED
-                            detail_msg = (
-                                "overwritten" if not dry_run else "would overwrite"
-                            )
-                    else:
-                        outcome_type = Outcome.CREATED
-                        detail_msg = "created" if not dry_run else "would create"
-
-                    if not dry_run:
-                        create_vault_doc(
-                            root_dir=root_dir,
-                            doc_type=dt,
-                            feature=feat,
-                            date_str=date_str,
-                            title=title,
-                            related=resolved_related,
-                            extra_tags=extra_tags,
-                            force=force,
-                            dry_run=False,
-                            step_id=s.canonical_id,
-                            step_display_path=s.display_path,
-                            step_scope=s.scope,
-                            step_action=s.action,
-                            plan_date=plan_date_arg,
-                            plan_stem=plan_stem_arg,
-                        )
-
-                    items.append(
-                        OutcomeItem(
-                            name=rel_name,
-                            outcome=outcome_type,
-                            detail=detail_msg,
-                        )
-                    )
-            finally:
-                if json_output:
-                    logging.disable(previous_logging_disable)
-
-            if not dry_run and items:
-                from vaultspec_core.cli._cache_hook import invalidate_graph_cache
-
-                invalidate_graph_cache(root_dir)
-
-            exit_code = emit_outcomes(
-                items,
-                command="vault.add",
-                title="Scaffold Execution Steps",
-                json_output=json_output,
+            exec_binding = ExecBinding(
+                plan=parent_plan,
+                summary=summary,
+                phase_display_path=_add_ops.resolve_phase_display_path(
+                    console, parsed_plan, phase
+                ),
             )
-            raise typer.Exit(code=exit_code)
 
-    elif dt is DocType.EXEC:
-        if not json_output:
-            console.print(
-                "[yellow]Deprecation Warning: Scaffolding a flat execution "
-                "record without --step or --all-steps is deprecated and will "
-                "be removed in a future release.[/yellow]"
-            )
+    elif dt is DocType.EXEC and not json_output:
+        console.print(
+            "[yellow]Deprecation Warning: Scaffolding a flat execution "
+            "record without --step or --all-steps is deprecated and will "
+            "be removed in a future release.[/yellow]"
+        )
 
     # Single-document scaffolding path (legacy route or --step route)
-    import logging
-
-    previous_logging_disable = logging.root.manager.disable
-    if json_output:
-        logging.disable(logging.CRITICAL)
-    try:
+    with _add_ops.suppress_logging(active=json_output):
         try:
             path = create_vault_doc(
-                root_dir=_get_ctx().target_dir,
-                doc_type=dt,
-                feature=feat,
-                date_str=date_str,
-                title=title,
-                topic=topic_value,
-                related=resolved_related,
-                extra_tags=extra_tags,
-                force=force,
-                dry_run=dry_run,
-                tier=tier if dt is DocType.PLAN else None,
-                step_id=step_id_arg,
-                step_display_path=step_display_path_arg,
-                step_scope=step_scope_arg,
-                step_action=step_action_arg,
-                plan_date=plan_date_arg,
-                plan_stem=plan_stem_arg,
-                summary=summary,
-                phase_display_path=phase_display_arg,
+                root_dir,
+                identity,
+                fields,
+                exec_binding=exec_binding,
+                write=write,
             )
-        except FileNotFoundError as exc:
-            _handle_error(exc, json_output=json_output)
-            return
         except Exception as exc:
             _handle_error(exc, json_output=json_output)
             return
-    finally:
-        if json_output:
-            logging.disable(previous_logging_disable)
-
-    # Only invalidate when the doc was actually written (not a dry-run preview).
-    # Exceptions above cause early return, so reaching here means create_vault_doc
-    # completed successfully; dry_run=False implies a real write occurred.
-    if not dry_run:
-        from vaultspec_core.cli._cache_hook import invalidate_graph_cache
-
-        invalidate_graph_cache(_get_ctx().target_dir)
 
     if dry_run:
-        if json_output:
-            import json
-
-            from vaultspec_core.cli.rendering import json_envelope
-
-            typer.echo(
-                json.dumps(
-                    json_envelope(
-                        "vault.add",
-                        "created",
-                        {
-                            "path": str(path),
-                            "type": doc_type,
-                            "name": path.stem,
-                            "dry_run": True,
-                        },
-                    ),
-                    indent=2,
-                )
-            )
-        else:
-            console.print(f"[dim]Would create:[/dim] {path}")
+        _add_ops.emit_add_result(
+            console, path, doc_type, json_output=json_output, dry_run=True
+        )
         raise typer.Exit(0)
+
+    # Reaching here means create_vault_doc wrote the document: exceptions above
+    # cause an early return and a dry-run preview already exited.
+    from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+
+    invalidate_graph_cache(root_dir)
 
     # Post-creation self-validation
     _validate_created_doc(console, path)
@@ -625,24 +329,11 @@ def cmd_add(
         no_hints=no_hints,
     )
 
+    _add_ops.emit_add_result(
+        console, path, doc_type, json_output=json_output, hints=hint_dict
+    )
     if json_output:
-        import json
-
-        from vaultspec_core.cli.rendering import json_envelope
-
-        typer.echo(
-            json.dumps(
-                json_envelope(
-                    "vault.add",
-                    "created",
-                    {"path": str(path), "type": doc_type, "name": path.stem},
-                    hints=hint_dict,
-                ),
-                indent=2,
-            )
-        )
         raise typer.Exit(0)
-    console.print(f"[green]Created:[/green] {path}")
 
 
 def _validate_created_doc(console: Console, doc_path) -> None:
@@ -1173,6 +864,7 @@ def cmd_repair(
     if json_output:
         import json
 
+        from vaultspec_core.cli._repair_render import repair_payload
         from vaultspec_core.cli.rendering import json_envelope
 
         if run.error_count:
@@ -1183,159 +875,18 @@ def cmd_repair(
             repair_status = "unchanged"
         typer.echo(
             json.dumps(
-                json_envelope("vault.repair", repair_status, _repair_payload(run)),
+                json_envelope("vault.repair", repair_status, repair_payload(run)),
                 indent=2,
                 default=str,
             )
         )
         raise typer.Exit(code=1 if run.error_count else 0)
 
-    _render_repair_run(run, verbose=verbose)
+    from vaultspec_core.cli._repair_render import render_repair_run
+
+    render_repair_run(run, verbose=verbose)
     if run.error_count:
         raise typer.Exit(code=1)
-
-
-def _repair_payload(run: RepairRun) -> dict:
-    """Convert a :class:`RepairRun` to a JSON-serializable mapping."""
-    return {
-        "dry_run": run.dry_run,
-        "feature": run.feature,
-        "include_index": run.include_index,
-        "partial_failure": run.partial_failure,
-        "phases": run.phases,
-        "journal": run.journal,
-        "changed_files": run.changed_files,
-        "generated_indexes": run.generated_indexes,
-        "planned_fixes": run.planned_fixes,
-        "unresolved": run.unresolved,
-        "root_causes": run.root_causes,
-        "error_count": run.error_count,
-        "warning_count": run.warning_count,
-        "fixed_count": run.fixed_count,
-    }
-
-
-def _render_repair_run(run: RepairRun, *, verbose: bool = False) -> None:
-    """Render a repair run for human operators."""
-    from vaultspec_core.console import get_console
-
-    console = get_console()
-    title = "Vault Repair Preview" if run.dry_run else "Vault Repair"
-    if run.feature:
-        title += f" - #{run.feature}"
-    console.print(f"[bold]{title}[/bold]")
-    if run.partial_failure:
-        console.print("[red]  partial repair: at least one phase failed[/red]")
-
-    for phase in run.phases:
-        name = phase.get("phase", "unknown")
-        if name == "preflight":
-            status = phase.get("migration_status", "unknown")
-            pending = phase.get("pending_migrations", [])
-            platform = phase.get("platform", {})
-            case_probe = platform.get("case_sensitive_probe", "unknown")
-            console.print(f"  [bold]preflight[/bold]: migrations {status}")
-            console.print(f"    filesystem case probe: {case_probe}")
-            if pending:
-                console.print(f"    pending migrations: {', '.join(pending)}")
-            for migration in phase.get("applied_migrations", []):
-                console.print(f"    applied migration: {migration['summary']}")
-            if phase.get("message"):
-                console.print(f"    [yellow]{phase['message']}[/yellow]")
-        elif name in {"check", "fix", "postcheck"}:
-            errors = phase.get("error_count", 0)
-            warnings = phase.get("warning_count", 0)
-            fixed = phase.get("fixed_count", 0)
-            summary = f"{errors} errors, {warnings} warnings"
-            if fixed:
-                summary += f", {fixed} fixed"
-            if phase.get("dry_run"):
-                summary += ", preview only"
-            console.print(f"  [bold]{name}[/bold]: {summary}")
-            if verbose:
-                _render_phase_diagnostics(console, phase)
-        elif name == "index":
-            if phase.get("skipped"):
-                console.print(f"  [bold]index[/bold]: skipped ({phase.get('reason')})")
-            elif phase.get("dry_run"):
-                planned = phase.get("planned", [])
-                console.print(f"  [bold]index[/bold]: {len(planned)} planned")
-                if verbose:
-                    for path in planned:
-                        console.print(f"    {path}")
-            else:
-                generated = phase.get("generated", [])
-                console.print(f"  [bold]index[/bold]: {len(generated)} refreshed")
-                if verbose:
-                    for path in generated:
-                        console.print(f"    {path}")
-        elif name == "summary":
-            changed = phase.get("changed_files", [])
-            unresolved = phase.get("unresolved_count", 0)
-            console.print(f"  [bold]summary[/bold]: {len(changed)} changed files")
-            console.print(f"    unresolved diagnostics: {unresolved}")
-            if phase.get("partial_failure"):
-                console.print("    [red]partial failure: true[/red]")
-            if phase.get("journal_count"):
-                console.print(f"    journal entries: {phase['journal_count']}")
-
-    if run.planned_fixes and run.dry_run:
-        console.print()
-        console.print(
-            f"[bold]Planned mechanical fixes[/bold] ({len(run.planned_fixes)})"
-        )
-        for item in run.planned_fixes[:20]:
-            path = f"{item['path']}: " if item.get("path") else ""
-            console.print(f"  - {path}{item['fix_description'] or item['message']}")
-        if len(run.planned_fixes) > 20:
-            console.print(f"  ... {len(run.planned_fixes) - 20} more")
-
-    if run.root_causes:
-        console.print()
-        console.print("[bold]Root-cause groups[/bold]")
-        for group in run.root_causes:
-            console.print(f"  - {group['root_cause']}: {group['count']}")
-
-    if run.changed_files:
-        console.print()
-        console.print("[bold]Changed files[/bold]")
-        for path in run.changed_files[:30]:
-            console.print(f"  - {path}")
-        if len(run.changed_files) > 30:
-            console.print(f"  ... {len(run.changed_files) - 30} more")
-
-    if run.unresolved:
-        console.print()
-        console.print("[bold]Unresolved work[/bold]")
-        severity_rank = {"error": 0, "warning": 1, "info": 2}
-        display_items = [
-            item for item in run.unresolved if verbose or item.get("severity") != "info"
-        ]
-        hidden_info = len(run.unresolved) - len(display_items)
-        display_items.sort(
-            key=lambda item: severity_rank.get(str(item.get("severity")), 3)
-        )
-        for item in display_items[:20]:
-            path = f"{item['path']}: " if item.get("path") else ""
-            console.print(f"  - [{item['severity']}] {path}{item['message']}")
-        if hidden_info:
-            console.print(
-                f"  ... {hidden_info} INFO diagnostics hidden; "
-                "rerun with --verbose to show them."
-            )
-        if len(display_items) > 20:
-            console.print(f"  ... {len(display_items) - 20} more non-INFO diagnostics")
-
-
-def _render_phase_diagnostics(console, phase: dict) -> None:
-    for check in phase.get("checks", []):
-        diagnostics = check.get("diagnostics", [])
-        if not diagnostics:
-            continue
-        console.print(f"    {check['check_name']}:")
-        for diag in diagnostics[:10]:
-            path = f"{diag['path']}: " if diag.get("path") else ""
-            console.print(f"      - [{diag['severity']}] {path}{diag['message']}")
 
 
 @check_app.command("all")

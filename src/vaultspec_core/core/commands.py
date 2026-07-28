@@ -770,6 +770,70 @@ def _dump_precommit_yaml(handler: YAML, data: object) -> str:
     return buffer.getvalue()
 
 
+def _drop_managed_hook_entries(repos: list[Any]) -> bool:
+    """Delete vaultspec-managed hooks from the ``repos`` sequence in place.
+
+    Mutates the loaded structure so surviving non-vaultspec hooks keep their
+    comments and quoting, and drops any local repo left without hooks.
+
+    Returns:
+        ``True`` when a managed hook was deleted.
+    """
+    changed = False
+    for r in list(repos):
+        if not (isinstance(r, dict) and r.get("repo") == "local"):
+            continue
+        hooks = r.get("hooks", [])
+        if not isinstance(hooks, list):
+            continue
+        managed_idx = [
+            i
+            for i, h in enumerate(hooks)
+            if isinstance(h, dict) and h.get("id") in _ALL_MANAGED_HOOK_IDS
+        ]
+        for i in reversed(managed_idx):
+            del hooks[i]
+        if managed_idx:
+            changed = True
+        if not hooks:
+            repos.remove(r)
+    return changed
+
+
+def _strip_managed_precommit_hooks(config_file: Path) -> bool:
+    """Remove vaultspec-managed hooks from an existing ``.pre-commit-config.yaml``.
+
+    The file is rewritten in place, or deleted when nothing but the managed
+    hooks remained.  Read, parse, and write failures are absorbed: uninstall
+    residue removal is best-effort and never fails the run.
+
+    Returns:
+        ``True`` when the config was rewritten or deleted.
+    """
+    handler = _precommit_yaml()
+    try:
+        data = handler.load(config_file.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return False
+        repos = data.get("repos", [])
+        if not isinstance(repos, list):
+            return False
+        if not _drop_managed_hook_entries(repos):
+            return False
+
+        if repos:
+            atomic_write(config_file, _dump_precommit_yaml(handler, data))
+            return True
+        del data["repos"]
+        if data:
+            atomic_write(config_file, _dump_precommit_yaml(handler, data))
+        else:
+            config_file.unlink()
+    except (YAMLError, OSError):
+        return False
+    return True
+
+
 def _scaffold_precommit(
     target: Path, *, dry_run: bool = False, mode: InstallMode | None = None
 ) -> list[tuple[str, str]]:
@@ -872,20 +936,20 @@ def _scaffold_precommit(
 
                 for canonical in canonical_hooks:
                     hook_id = str(canonical["id"])
-                    if hook_id in existing_by_id:
-                        existing = existing_by_id[hook_id]
-                        if existing.get("entry") != canonical["entry"]:
-                            existing["entry"] = canonical["entry"]
-                            logger.info(
-                                "Updated pre-commit hook '%s' entry"
-                                " to canonical pattern",
-                                hook_id,
-                            )
-                            changed = True
-                    else:
+                    existing = existing_by_id.get(hook_id)
+                    if existing is None:
                         existing_hooks.append(dict(canonical))
                         logger.info("Added pre-commit hook '%s'", str(canonical["id"]))
                         changed = True
+                        continue
+                    if existing.get("entry") == canonical["entry"]:
+                        continue
+                    existing["entry"] = canonical["entry"]
+                    logger.info(
+                        "Updated pre-commit hook '%s' entry to canonical pattern",
+                        hook_id,
+                    )
+                    changed = True
 
                 if not changed:
                     return []
@@ -1132,6 +1196,335 @@ def _ensure_tool_configs(path: Path) -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _preview_upgrade_items(
+    path: Path, provider: str, skip: set[str], *, skip_core: bool
+) -> list[tuple[str, str]]:
+    """Enumerate what ``install --upgrade --dry-run`` would change.
+
+    The real upgrade re-seeds builtins AND runs the provider sync, which
+    backfills new provider files and structural directories. Preview that
+    provider-side work too so the dry-run enumerates what the real run
+    changes rather than only the builtin seed (issue #134). Only the
+    changed entries are surfaced to keep the preview signal-dense; an
+    unchanged provider tree contributes nothing.
+
+    Raises:
+        VaultSpecError: If the provider reconciliation preview fails.
+    """
+    _ensure_tool_configs(path)
+    items: list[tuple[str, str]] = []
+    if not skip_core:
+        from vaultspec_core.builtins import seed_builtins
+
+        items = seed_builtins(path / ".vaultspec", force=True, dry_run=True)
+
+    if not path.joinpath(".vaultspec").exists():
+        return items
+
+    sync_target = provider if provider not in ("all", "core") else "all"
+    try:
+        sync_results = sync_provider(sync_target, dry_run=True, skip=skip)
+    except OSError as exc:
+        raise VaultSpecError(
+            "Provider reconciliation preview failed.", hint=str(exc)
+        ) from exc
+    _require_reconciliation_success(
+        sync_results,
+        operation="Provider reconciliation preview",
+    )
+    seen_preview = {rel for rel, _ in items}
+    for sync_result in sync_results:
+        for rel, action in sync_result.items:
+            if action in ("[UNCHANGED]", "[SKIP]"):
+                continue
+            if rel in seen_preview:
+                continue
+            seen_preview.add(rel)
+            items.append((rel, action))
+    return items
+
+
+def _preview_install_manifest(
+    path: Path,
+    provider: str,
+    skip: set[str],
+    *,
+    skip_core: bool,
+    resolved_mode: InstallMode,
+) -> list[tuple[str, str]]:
+    """Enumerate the files a fresh ``install --dry-run`` would create.
+
+    Raises:
+        VaultSpecError: If the MCP enrollment preview fails.
+    """
+    _ensure_tool_configs(path)
+
+    manifest: list[tuple[str, str]] = []
+    if not skip_core:
+        manifest = _scaffold_core(path, dry_run=True)
+
+        # Include builtin files that would be seeded
+        from vaultspec_core.builtins import list_builtins
+
+        for builtin_rel in list_builtins():
+            manifest.append((f".vaultspec/{builtin_rel}", "builtin"))
+
+    tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
+    for tool in tools:
+        manifest.extend(_scaffold_provider(path, tool, dry_run=True))
+    if "mcp" not in skip:
+        manifest.extend(
+            _preview_mcp_targets(
+                path, tuple(tools), skip_core=skip_core, resolved_mode=resolved_mode
+            )
+        )
+    if "precommit" not in skip:
+        manifest.extend(_scaffold_precommit(path, dry_run=True, mode=resolved_mode))
+
+    # Deduplicate preserving order (by relative path)
+    seen: dict[str, str] = {}
+    for rel, label in manifest:
+        seen.setdefault(rel, label)
+    return list(seen.items())
+
+
+def _preview_mcp_targets(
+    path: Path,
+    selected: tuple[Tool, ...],
+    *,
+    skip_core: bool,
+    resolved_mode: InstallMode,
+) -> list[tuple[str, str]]:
+    """Enumerate the native MCP targets a fresh install would enroll.
+
+    Raises:
+        VaultSpecError: If the MCP enrollment preview fails.
+    """
+    from .mcps import mcp_sync, resolve_mcp_targets
+
+    mcp_result = mcp_sync(
+        dry_run=True,
+        mode=resolved_mode,
+        target_dir=path,
+        enrolled=selected,
+    )
+    _require_reconciliation_success(
+        mcp_result,
+        operation="MCP provider-native enrollment preview",
+    )
+    entries: list[tuple[str, str]] = []
+    for mcp_target in resolve_mcp_targets(target_dir=path, enrolled=selected):
+        provider_result = mcp_result.per_tool.get(mcp_target.provider.value)
+        if not skip_core or (provider_result and provider_result.items):
+            entries.append((_rel(path, mcp_target.path), "mcp"))
+    return entries
+
+
+def _detect_precommit_managed(path: Path) -> bool:
+    """Report whether *path* still carries vaultspec-managed pre-commit hooks."""
+    from .diagnosis.collectors import collect_precommit_state
+    from .diagnosis.signals import PrecommitSignal
+
+    return collect_precommit_state(path) not in (
+        PrecommitSignal.NO_FILE,
+        PrecommitSignal.NO_HOOKS,
+    )
+
+
+def _reseed_builtins(path: Path) -> list[tuple[str, str]]:
+    """Re-seed the builtin corpus and re-snapshot it for revert support."""
+    from vaultspec_core.builtins import seed_builtins
+
+    from .revert import snapshot_builtins
+
+    fw_dir = path / ".vaultspec"
+    seeded = seed_builtins(fw_dir, force=True)
+    snapshot_builtins(fw_dir)
+    return seeded
+
+
+def _migrate_mcp_launch_shape(path: Path, resolved_mode: InstallMode) -> None:
+    """Force every declared package's managed MCP entry into *resolved_mode*.
+
+    Closes the mode-flip force-gate asymmetry: when the mode flipped, the
+    force-gated MCP pass skipped every stale managed entry declared in the
+    workspace, not just core's own. Forcing them here migrates all three
+    renderers atomically in this run; user-owned entries and the foreign-entry
+    discipline remain untouched.
+
+    Raises:
+        VaultSpecError: If the reconciliation reports a failure.
+    """
+    from .mcps import mcp_sync
+    from .workspace_mode import read_package_declarations
+
+    declared_packages = frozenset(read_package_declarations(path))
+    mcp_result = mcp_sync(
+        mode=resolved_mode,
+        force_managed=declared_packages or frozenset({"vaultspec-core"}),
+    )
+    _require_reconciliation_success(
+        mcp_result,
+        operation="MCP mode-migration reconciliation",
+    )
+
+
+def _finalize_upgrade_manifest(
+    path: Path, *, force: bool, resolved_mode: InstallMode
+) -> None:
+    """Stamp manifest state and reconcile the git index after an upgrade."""
+    import datetime
+
+    mdata = read_manifest_data(path)
+    if not mdata.installed_at:
+        mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
+    _stamp_manifest_version_no_downgrade(mdata)
+
+    for orphan in prune_orphaned_lock_sentinels(path):
+        logger.info("Removed orphaned lock sentinel %s", orphan)
+
+    # Re-opt-in gitignore management on --upgrade --force
+    if force:
+        ensure_gitignore_block(
+            path,
+            get_recommended_entries(path),
+            state=ManagedState.PRESENT,
+        )
+        mdata.gitignore_managed = True
+
+    mdata.precommit_managed = _detect_precommit_managed(path)
+
+    _persist_resolved_mode(path, mdata, resolved_mode)
+    write_manifest_data(path, mdata)
+
+    # Reconcile git index with the managed gitignore block so that
+    # historically-committed state files (e.g. .vaultspec/providers.json
+    # from a pre-managed-block install) stop showing up as dirty on
+    # every subsequent run.
+    _untrack_managed_paths(path, get_recommended_entries(path))
+
+
+def _run_upgrade(
+    path: Path,
+    provider: str,
+    skip: set[str],
+    *,
+    skip_core: bool,
+    mode: InstallMode | None,
+    force: bool,
+) -> dict[str, Any]:
+    """Re-seed builtins, migrate schema, and reconcile providers in place.
+
+    Raises:
+        WorkspaceNotInitializedError: If *path* is not an initialized workspace.
+        VaultSpecError: If provider or MCP reconciliation reports a failure.
+    """
+    from vaultspec_core.config.workspace import WorkspaceError, resolve_workspace
+    from vaultspec_core.core.types import init_paths
+
+    from .workspace_mode import dependency_leak_advisory, newly_establishes_dependency
+
+    try:
+        layout = resolve_workspace(target_override=path)
+        init_paths(layout)
+    except WorkspaceError as e:
+        raise WorkspaceNotInitializedError(
+            f"Cannot upgrade: {e}",
+            hint=f"Run 'vaultspec-core install {path}' first.",
+        ) from e
+
+    # Q6 migration: refine the provision-time resolution with this
+    # workspace's deployed state. A legacy workspace carries no persisted
+    # mode, so infer it from the observed hook shape and the pyproject
+    # dependency listing; a workspace that already declares a mode keeps it,
+    # which is what makes a repeated upgrade idempotent. This supersedes the
+    # value resolve_install_mode computed at entry, since only here is the
+    # deployed hook shape folded in - so the leak advisory is recomputed from
+    # the inferred provenance too: a persisted dependency declaration stays
+    # silent, a freshly inferred one warns.
+    inferred = _infer_upgrade_mode(path, mode)
+    resolved_mode = inferred.mode
+    leak_warnings = (
+        [dependency_leak_advisory()] if newly_establishes_dependency(inferred) else []
+    )
+
+    seeded: list[tuple[str, str]] = [] if skip_core else _reseed_builtins(path)
+
+    # Run pending schema migrations BEFORE the sync. ``sync_provider``
+    # ends with ``mdata.vaultspec_version = package_version()``, which
+    # would otherwise mask any migration whose ``target_version``
+    # equals the running release: ``run_pending_migrations`` would
+    # read the just-bumped version and find nothing pending. Running
+    # the driver first preserves the pre-upgrade manifest version so
+    # the registry sees the real "needs migration" state, applies
+    # the pending entries, and then ``sync_provider`` re-bumps to
+    # the running version on its way out.
+    from ..migrations import run_pending_migrations
+
+    run_pending_migrations(path)
+
+    # Persist the inferred declaration BEFORE the provider sync and the hook
+    # scaffold re-render their artifacts. Both renderers resolve their mode
+    # from the committed declaration (via resolve_render_mode); on a legacy
+    # workspace with no declaration that fallback renders dependency mode, so
+    # an inference that landed tool mode would otherwise leave uv-run-shaped
+    # artifacts contradicting the tool-mode declaration written moments
+    # later. Writing it here threads the inferred mode into this same run's
+    # rendering, mirroring the fresh-install ordering. The manifest echo and
+    # floor reconciliation still run once, later, via _persist_resolved_mode.
+    _write_mode_declaration(path, resolved_mode)
+
+    # Detect a mode flip before the sync below re-renders any artifact.
+    # The pre-commit and declaration renderers rewrite unconditionally, but
+    # the MCP sync runs force-gated: a pre-existing MANAGED vaultspec-core
+    # entry still carrying the old mode's launch shape is skipped unless
+    # --force, which would leave the migration non-atomic across the three
+    # renderers until a later forced re-sync (mode-flip-force-asymmetry
+    # audit finding). Captured here against the still-old .mcp.json, this
+    # flags whether the deployed MCP launch shape disagrees with the mode
+    # this upgrade resolved to; the targeted force below closes the gap.
+    from .diagnosis.collectors import _observed_mcp_mode
+
+    observed_mcp_mode = _observed_mcp_mode(path)
+    mcp_mode_flipped = (
+        observed_mcp_mode is not None and observed_mcp_mode != resolved_mode
+    )
+
+    sync_target = provider if provider not in ("all", "core") else "all"
+    # `sync_provider` rejects `core` in its skip set (`allow_core=False`).
+    # `install_run` accepts `core` because it skips the framework scaffold;
+    # filter it out before forwarding to the sync pass.
+    # Forward `force`: `--upgrade` and `--force` are separate flags;
+    # `install --upgrade` (without `--force`) must preserve user-authored
+    # content. The pre-collapse hardcoded `force=True` was an asymmetry
+    # against the fresh-install path and silently overwrote user content
+    # on every upgrade. See PR #116 review thread r3260188496.
+    sync_results = sync_provider(sync_target, force=force, skip=skip - {"core"})
+    _require_reconciliation_success(
+        sync_results,
+        operation="Provider reconciliation during upgrade",
+    )
+
+    if "precommit" not in skip:
+        _scaffold_precommit(path, mode=resolved_mode)
+
+    # Skipped when --force already rewrote it, when the mode did not flip
+    # (preserving today's force-gated semantics for a same-mode divergent entry,
+    # now handled by the fingerprint-verified refresh path in the sync above), or
+    # when mcp sync is skipped outright.
+    if mcp_mode_flipped and not force and "mcp" not in skip:
+        _migrate_mcp_launch_shape(path, resolved_mode)
+
+    _finalize_upgrade_manifest(path, force=force, resolved_mode=resolved_mode)
+
+    return {
+        "action": "upgrade",
+        "items": seeded,
+        "path": path,
+        "warnings": leak_warnings,
+    }
+
+
 def install_run(
     path: Path,
     provider: str = "all",
@@ -1172,7 +1565,7 @@ def install_run(
         ResourceExistsError: If already installed and *force*/*upgrade* not set.
     """
     from vaultspec_core.config import reset_config
-    from vaultspec_core.config.workspace import WorkspaceError, resolve_workspace
+    from vaultspec_core.config.workspace import resolve_workspace
     from vaultspec_core.core.types import init_paths
 
     from .exceptions import ResourceExistsError
@@ -1234,268 +1627,37 @@ def install_run(
     )
 
     if upgrade and dry_run:
-        _ensure_tool_configs(path)
-        items: list[tuple[str, str]] = []
-        if not skip_core:
-            from vaultspec_core.builtins import seed_builtins
-
-            items = seed_builtins(path / ".vaultspec", force=True, dry_run=True)
-
-        # The real upgrade re-seeds builtins AND runs the provider sync, which
-        # backfills new provider files and structural directories. Preview that
-        # provider-side work too so the dry-run enumerates what the real run
-        # changes rather than only the builtin seed (issue #134). Only the
-        # changed entries are surfaced to keep the preview signal-dense; an
-        # unchanged provider tree contributes nothing.
-        if path.joinpath(".vaultspec").exists():
-            sync_target = provider if provider not in ("all", "core") else "all"
-            try:
-                sync_results = sync_provider(sync_target, dry_run=True, skip=skip)
-            except OSError as exc:
-                raise VaultSpecError(
-                    "Provider reconciliation preview failed.", hint=str(exc)
-                ) from exc
-            _require_reconciliation_success(
-                sync_results,
-                operation="Provider reconciliation preview",
-            )
-            seen_preview = {rel for rel, _ in items}
-            for sync_result in sync_results:
-                for rel, action in sync_result.items:
-                    if action in ("[UNCHANGED]", "[SKIP]"):
-                        continue
-                    if rel in seen_preview:
-                        continue
-                    seen_preview.add(rel)
-                    items.append((rel, action))
-
         return {
             "action": "upgrade",
-            "items": items,
+            "items": _preview_upgrade_items(path, provider, skip, skip_core=skip_core),
             "path": path,
             "dry_run": True,
             "warnings": leak_warnings,
         }
 
     if dry_run:
-        _ensure_tool_configs(path)
-
-        manifest: list[tuple[str, str]] = []
-
-        if not skip_core:
-            manifest = _scaffold_core(path, dry_run=True)
-
-            # Include builtin files that would be seeded
-            from vaultspec_core.builtins import list_builtins
-
-            for builtin_rel in list_builtins():
-                manifest.append((f".vaultspec/{builtin_rel}", "builtin"))
-
-        tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
-        for tool in tools:
-            manifest.extend(_scaffold_provider(path, tool, dry_run=True))
-        if "mcp" not in skip:
-            from .mcps import mcp_sync, resolve_mcp_targets
-
-            selected = tuple(tools)
-            mcp_result = mcp_sync(
-                dry_run=True,
-                mode=resolved_mode,
-                target_dir=path,
-                enrolled=selected,
-            )
-            _require_reconciliation_success(
-                mcp_result,
-                operation="MCP provider-native enrollment preview",
-            )
-            for mcp_target in resolve_mcp_targets(
-                target_dir=path,
-                enrolled=selected,
-            ):
-                provider_result = mcp_result.per_tool.get(mcp_target.provider.value)
-                if not skip_core or (provider_result and provider_result.items):
-                    manifest.append((_rel(path, mcp_target.path), "mcp"))
-        if "precommit" not in skip:
-            manifest.extend(_scaffold_precommit(path, dry_run=True, mode=resolved_mode))
-
-        # Deduplicate preserving order (by relative path)
-        seen: dict[str, str] = {}
-        for rel, label in manifest:
-            seen.setdefault(rel, label)
-
         return {
             "action": "dry_run",
-            "items": list(seen.items()),
+            "items": _preview_install_manifest(
+                path,
+                provider,
+                skip,
+                skip_core=skip_core,
+                resolved_mode=resolved_mode,
+            ),
             "path": path,
             "warnings": leak_warnings,
         }
 
     if upgrade:
-        try:
-            layout = resolve_workspace(target_override=path)
-            init_paths(layout)
-        except WorkspaceError as e:
-            raise WorkspaceNotInitializedError(
-                f"Cannot upgrade: {e}",
-                hint=f"Run 'vaultspec-core install {path}' first.",
-            ) from e
-
-        # Q6 migration: refine the provision-time resolution with this
-        # workspace's deployed state. A legacy workspace carries no persisted
-        # mode, so infer it from the observed hook shape and the pyproject
-        # dependency listing; a workspace that already declares a mode keeps it,
-        # which is what makes a repeated upgrade idempotent. This supersedes the
-        # value resolve_install_mode computed at entry, since only here is the
-        # deployed hook shape folded in - so the leak advisory is recomputed from
-        # the inferred provenance too: a persisted dependency declaration stays
-        # silent, a freshly inferred one warns.
-        inferred = _infer_upgrade_mode(path, mode)
-        resolved_mode = inferred.mode
-        leak_warnings = (
-            [dependency_leak_advisory()]
-            if newly_establishes_dependency(inferred)
-            else []
+        return _run_upgrade(
+            path,
+            provider,
+            skip,
+            skip_core=skip_core,
+            mode=mode,
+            force=force,
         )
-
-        seeded: list[tuple[str, str]] = []
-        if not skip_core:
-            # Re-seed builtins (force=True overwrites existing)
-            from vaultspec_core.builtins import seed_builtins
-
-            fw_dir = path / ".vaultspec"
-            seeded = seed_builtins(fw_dir, force=True)
-
-            # Re-snapshot builtins for revert support
-            from .revert import snapshot_builtins
-
-            snapshot_builtins(fw_dir)
-
-        # Run pending schema migrations BEFORE the sync. ``sync_provider``
-        # ends with ``mdata.vaultspec_version = package_version()``, which
-        # would otherwise mask any migration whose ``target_version``
-        # equals the running release: ``run_pending_migrations`` would
-        # read the just-bumped version and find nothing pending. Running
-        # the driver first preserves the pre-upgrade manifest version so
-        # the registry sees the real "needs migration" state, applies
-        # the pending entries, and then ``sync_provider`` re-bumps to
-        # the running version on its way out.
-        from ..migrations import run_pending_migrations
-
-        run_pending_migrations(path)
-
-        # Persist the inferred declaration BEFORE the provider sync and the hook
-        # scaffold re-render their artifacts. Both renderers resolve their mode
-        # from the committed declaration (via resolve_render_mode); on a legacy
-        # workspace with no declaration that fallback renders dependency mode, so
-        # an inference that landed tool mode would otherwise leave uv-run-shaped
-        # artifacts contradicting the tool-mode declaration written moments
-        # later. Writing it here threads the inferred mode into this same run's
-        # rendering, mirroring the fresh-install ordering. The manifest echo and
-        # floor reconciliation still run once, later, via _persist_resolved_mode.
-        _write_mode_declaration(path, resolved_mode)
-
-        # Detect a mode flip before the sync below re-renders any artifact.
-        # The pre-commit and declaration renderers rewrite unconditionally, but
-        # the MCP sync runs force-gated: a pre-existing MANAGED vaultspec-core
-        # entry still carrying the old mode's launch shape is skipped unless
-        # --force, which would leave the migration non-atomic across the three
-        # renderers until a later forced re-sync (mode-flip-force-asymmetry
-        # audit finding). Captured here against the still-old .mcp.json, this
-        # flags whether the deployed MCP launch shape disagrees with the mode
-        # this upgrade resolved to; the targeted force below closes the gap.
-        from .diagnosis.collectors import _observed_mcp_mode
-
-        observed_mcp_mode = _observed_mcp_mode(path)
-        mcp_mode_flipped = (
-            observed_mcp_mode is not None and observed_mcp_mode != resolved_mode
-        )
-
-        sync_target = provider if provider not in ("all", "core") else "all"
-        # `sync_provider` rejects `core` in its skip set (`allow_core=False`).
-        # `install_run` accepts `core` because it skips the framework scaffold;
-        # filter it out before forwarding to the sync pass.
-        # Forward `force`: `--upgrade` and `--force` are separate flags;
-        # `install --upgrade` (without `--force`) must preserve user-authored
-        # content. The pre-collapse hardcoded `force=True` was an asymmetry
-        # against the fresh-install path and silently overwrote user content
-        # on every upgrade. See PR #116 review thread r3260188496.
-        sync_results = sync_provider(sync_target, force=force, skip=skip - {"core"})
-        _require_reconciliation_success(
-            sync_results,
-            operation="Provider reconciliation during upgrade",
-        )
-
-        if "precommit" not in skip:
-            _scaffold_precommit(path, mode=resolved_mode)
-
-        # Close the mode-flip force-gate asymmetry: when the mode flipped, the
-        # force-gated MCP pass above skipped every stale managed entry declared
-        # in the workspace, not just core's own. Force every declared package's
-        # managed entry into the new mode's launch shape so all three renderers
-        # migrate atomically in this run; user-owned entries and the
-        # foreign-entry discipline remain untouched. Skipped when --force
-        # already rewrote it, when the mode did not flip (preserving today's
-        # force-gated semantics for a same-mode divergent entry, now handled by
-        # the fingerprint-verified refresh path in the sync above), or when
-        # mcp sync is skipped outright.
-        if mcp_mode_flipped and not force and "mcp" not in skip:
-            from .mcps import mcp_sync
-            from .workspace_mode import read_package_declarations
-
-            declared_packages = frozenset(read_package_declarations(path))
-            mcp_result = mcp_sync(
-                mode=resolved_mode,
-                force_managed=declared_packages or frozenset({"vaultspec-core"}),
-            )
-            _require_reconciliation_success(
-                mcp_result,
-                operation="MCP mode-migration reconciliation",
-            )
-
-        # Update manifest timestamps and version
-        import datetime
-
-        mdata = read_manifest_data(path)
-        if not mdata.installed_at:
-            mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
-        _stamp_manifest_version_no_downgrade(mdata)
-
-        for orphan in prune_orphaned_lock_sentinels(path):
-            logger.info("Removed orphaned lock sentinel %s", orphan)
-
-        # Re-opt-in gitignore management on --upgrade --force
-        if force:
-            ensure_gitignore_block(
-                path,
-                get_recommended_entries(path),
-                state=ManagedState.PRESENT,
-            )
-            mdata.gitignore_managed = True
-
-        from .diagnosis.collectors import collect_precommit_state
-        from .diagnosis.signals import PrecommitSignal
-
-        pc_signal = collect_precommit_state(path)
-        mdata.precommit_managed = pc_signal not in (
-            PrecommitSignal.NO_FILE,
-            PrecommitSignal.NO_HOOKS,
-        )
-
-        _persist_resolved_mode(path, mdata, resolved_mode)
-        write_manifest_data(path, mdata)
-
-        # Reconcile git index with the managed gitignore block so that
-        # historically-committed state files (e.g. .vaultspec/providers.json
-        # from a pre-managed-block install) stop showing up as dirty on
-        # every subsequent run.
-        _untrack_managed_paths(path, get_recommended_entries(path))
-
-        return {
-            "action": "upgrade",
-            "items": seeded,
-            "path": path,
-            "warnings": leak_warnings,
-        }
 
     fw_dir = path / ".vaultspec"
     if fw_dir.exists() and not force and not skip_core and not adopting:
@@ -1584,40 +1746,12 @@ def install_run(
     # Populate v2.0 manifest fields
     import datetime
 
-    gi_path = path / ".gitignore"
-    ga_path = path / ".gitattributes"
     mdata = read_manifest_data(path, strict=True)
 
     # Robust detection: if it's there, it's managed.
-    block_present = False
-    if gi_path.exists():
-        try:
-            content = gi_path.read_text(encoding="utf-8")
-            begins, ends = _find_markers(content.splitlines())
-            block_present = len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]
-
-        except (OSError, UnicodeDecodeError):
-            pass
-
-    ga_block_present = False
-    if ga_path.exists():
-        try:
-            content = ga_path.read_text(encoding="utf-8")
-            ga_block_present = _ga_has_valid_block(content.splitlines())
-        except (OSError, UnicodeDecodeError):
-            pass
-
-    mdata.gitignore_managed = block_present
-    mdata.gitattributes_managed = ga_block_present
-
-    from .diagnosis.collectors import collect_precommit_state
-    from .diagnosis.signals import PrecommitSignal
-
-    pc_signal = collect_precommit_state(path)
-    mdata.precommit_managed = pc_signal not in (
-        PrecommitSignal.NO_FILE,
-        PrecommitSignal.NO_HOOKS,
-    )
+    mdata.gitignore_managed = _has_gitignore_block(path / ".gitignore")
+    mdata.gitattributes_managed = _has_gitattributes_block(path / ".gitattributes")
+    mdata.precommit_managed = _detect_precommit_managed(path)
 
     mdata.vaultspec_version = _fresh_install_schema_version()
     mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
@@ -1645,6 +1779,305 @@ def install_run(
     if post_errors:
         result["errors"] = post_errors
     return result
+
+
+# Map directory names → component owners (for skip filtering).
+# .agents/ is shared by antigravity, gemini, and codex (all place skills there
+# via init_paths), so it must be preserved when any of its owners is skipped.
+_UNINSTALL_DIR_OWNERS: dict[str, list[str]] = {
+    ".vaultspec": ["core"],
+    ".vault": ["vault"],
+    ".claude": ["claude"],
+    ".gemini": ["gemini"],
+    ".agents": ["antigravity", "gemini", "codex"],
+    ".codex": ["codex"],
+}
+_UNINSTALL_DIR_LABELS: dict[str, str] = {
+    ".vaultspec": "core",
+    ".vault": "vault",
+    ".claude": "claude",
+    ".gemini": "gemini",
+    ".agents": "antigravity",
+    ".codex": "codex",
+}
+_UNINSTALL_FILE_LABELS: dict[str, str] = {
+    "CLAUDE.md": "claude (config)",
+    "GEMINI.md": "gemini (config)",
+    "AGENTS.md": "codex (config)",
+    ".mcp.json": "mcp",
+}
+# Map file names → owning component for skip checks
+_UNINSTALL_FILE_OWNERS: dict[str, str] = {
+    "CLAUDE.md": "claude",
+    "GEMINI.md": "gemini",
+    "AGENTS.md": "codex",
+}
+
+
+def _delete_managed_dir(
+    root: Path, directory: Path, *, dry_run: bool, errors: list[str]
+) -> bool:
+    """Delete *directory*, or preview the deletion under *dry_run*.
+
+    Returns:
+        ``True`` when the removal succeeded (or was previewed) and the caller
+        should record it, ``False`` when it failed and was reported in *errors*.
+    """
+    if dry_run:
+        return True
+    try:
+        _rmtree_robust(directory)
+    except OSError as exc:
+        errors.append(f"Failed to remove {_rel(root, directory)}: {exc}")
+        return False
+    return True
+
+
+def _delete_managed_file(
+    root: Path, file: Path, *, dry_run: bool, errors: list[str]
+) -> bool:
+    """Delete *file*, or preview the deletion under *dry_run*.
+
+    Returns:
+        ``True`` when the removal succeeded (or was previewed) and the caller
+        should record it, ``False`` when it failed and was reported in *errors*.
+    """
+    if dry_run:
+        return True
+    try:
+        file.unlink()
+    except OSError as exc:
+        errors.append(f"Failed to remove {_rel(root, file)}: {exc}")
+        return False
+    return True
+
+
+def _uninstall_mcp_targets(
+    root: Path,
+    *,
+    enrolled: tuple[Tool, ...],
+    provider: Tool | str = "all",
+    dry_run: bool,
+    removed: list[tuple[str, str]],
+    errors: list[str],
+) -> None:
+    """Retire vaultspec's native MCP enrollment from the *enrolled* hosts.
+
+    Appends every reconciled target to *removed* and any host-level failure to
+    *errors*.
+    """
+    from .mcps import mcp_uninstall, resolve_mcp_targets
+
+    uninstalled = mcp_uninstall(
+        root,
+        dry_run=dry_run,
+        provider=provider,
+        enrolled=enrolled,
+    )
+    errors.extend(uninstalled.errors)
+    for target in resolve_mcp_targets(
+        provider=provider,
+        target_dir=root,
+        enrolled=enrolled,
+    ):
+        target_result = uninstalled.per_tool.get(target.provider.value)
+        if target_result and target_result.items:
+            removed.append((_rel(root, target.path), "mcp"))
+
+
+def _uninstall_precommit_hooks(
+    root: Path, *, dry_run: bool, removed: list[tuple[str, str]]
+) -> None:
+    """Strip vaultspec-managed hooks from a legacy ``.pre-commit-config.yaml``.
+
+    This deliberately runs even when ``prek.toml`` owns the hook boundary
+    (:func:`collect_prek_boundary`): install and sync refuse to write the YAML
+    under prek, but uninstall stripping vaultspec hooks from a legacy YAML is
+    residue removal - leave-no-trace semantics - not management of the file.
+    """
+    precommit_path = root / ".pre-commit-config.yaml"
+    if not precommit_path.exists():
+        return
+
+    if dry_run:
+        try:
+            raw = precommit_path.read_text(encoding="utf-8")
+        except OSError:
+            return
+        if any(f"id: {hid}" in raw for hid in _ALL_MANAGED_HOOK_IDS):
+            removed.append((_rel(root, precommit_path), "precommit"))
+        return
+
+    if not _strip_managed_precommit_hooks(precommit_path):
+        return
+    removed.append((_rel(root, precommit_path), "precommit"))
+    try:
+        mdata = read_manifest_data(root)
+        if mdata.precommit_managed:
+            mdata.precommit_managed = False
+            write_manifest_data(root, mdata)
+    except (YAMLError, OSError):
+        pass
+
+
+def _uninstall_everything(
+    root: Path,
+    *,
+    skip: set[str],
+    keep_vault: bool,
+    dry_run: bool,
+    removed: list[tuple[str, str]],
+    errors: list[str],
+) -> None:
+    """Remove every managed directory, config file, and hook block under *root*.
+
+    Honours *skip* per component and appends what was removed to *removed*.
+    """
+    # .vaultspec is deleted LAST so the manifest survives partial failures.
+    managed_dirs = [
+        root / ".claude",
+        root / ".gemini",
+        root / ".agents",
+        root / ".codex",
+    ]
+    if not keep_vault:
+        managed_dirs.append(root / ".vault")
+    managed_dirs.append(root / ".vaultspec")
+
+    # Reconcile native MCP targets before provider directories and
+    # ownership state are removed.
+    if "mcp" not in skip:
+        active_ctx = _t.get_context()
+        _uninstall_mcp_targets(
+            root,
+            enrolled=tuple(
+                tool
+                for tool, config in active_ctx.tool_configs.items()
+                if ProviderCapability.MCPS in config.capabilities
+                and tool.value not in skip
+            ),
+            dry_run=dry_run,
+            removed=removed,
+            errors=errors,
+        )
+
+    for directory in managed_dirs:
+        skipped = [
+            owner
+            for owner in _UNINSTALL_DIR_OWNERS.get(directory.name, [])
+            if owner in skip
+        ]
+        if skipped:
+            logger.info("Skipping %s (--skip %s)", directory.name, ", ".join(skipped))
+            continue
+        if not directory.exists():
+            continue
+        if _delete_managed_dir(root, directory, dry_run=dry_run, errors=errors):
+            label = _UNINSTALL_DIR_LABELS.get(directory.name, "")
+            removed.append((str(directory).replace("\\", "/") + "/", label))
+
+    for file in (root / "CLAUDE.md", root / "GEMINI.md", root / "AGENTS.md"):
+        owner = _UNINSTALL_FILE_OWNERS.get(file.name, "")
+        if owner in skip:
+            logger.info("Skipping %s (--skip %s)", file.name, owner)
+            continue
+        if not file.exists():
+            continue
+        if _delete_managed_file(root, file, dry_run=dry_run, errors=errors):
+            label = _UNINSTALL_FILE_LABELS.get(file.name, "")
+            removed.append((str(file).replace("\\", "/"), label))
+
+    if "precommit" not in skip:
+        _uninstall_precommit_hooks(root, dry_run=dry_run, removed=removed)
+
+
+def _uninstall_provider_artifacts(
+    root: Path,
+    provider: str,
+    *,
+    skip: set[str],
+    dry_run: bool,
+    removed: list[tuple[str, str]],
+    errors: list[str],
+) -> None:
+    """Remove one provider's artifacts, preserving directories still shared.
+
+    Directories and files another installed provider still owns are logged and
+    left in place; the manifest is updated once every tool is off disk.
+    """
+    tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
+
+    if "mcp" not in skip:
+        active_ctx = _t.get_context()
+        mcp_tools = tuple(
+            tool
+            for tool in tools
+            if ProviderCapability.MCPS in active_ctx.tool_configs[tool].capabilities
+        )
+        if mcp_tools:
+            _uninstall_mcp_targets(
+                root,
+                enrolled=mcp_tools,
+                provider=provider,
+                dry_run=dry_run,
+                removed=removed,
+                errors=errors,
+            )
+
+    for tool in tools:
+        dirs, files = _collect_provider_artifacts(root, tool)
+
+        for directory in dirs:
+            if not directory.exists():
+                continue
+            sharing = providers_sharing_dir(root, directory, exclude=provider)
+            if sharing:
+                logger.info(
+                    "Preserving %s (still used by: %s)",
+                    directory.relative_to(root),
+                    ", ".join(sorted(sharing)),
+                )
+                continue
+            if _delete_managed_dir(root, directory, dry_run=dry_run, errors=errors):
+                removed.append((str(directory).replace("\\", "/") + "/", tool.value))
+
+        for file in files:
+            if not file.exists():
+                continue
+            sharing = providers_sharing_file(root, file, exclude=provider)
+            if sharing:
+                logger.info(
+                    "Preserving %s (still used by: %s)",
+                    file.relative_to(root),
+                    ", ".join(sorted(sharing)),
+                )
+                continue
+            if _delete_managed_file(root, file, dry_run=dry_run, errors=errors):
+                removed.append((str(file).replace("\\", "/"), f"{tool.value} (config)"))
+
+    # Update manifest once after all tools are removed from disk
+    if not dry_run:
+        for tool in tools:
+            remove_provider(root, tool.value)
+
+
+def _reconcile_uninstall_git_blocks(
+    root: Path, *, keep_vault: bool, was_gitignore_managed: bool
+) -> None:
+    """Re-sync the managed gitignore and gitattributes blocks after removal."""
+    try:
+        mdata_after = read_manifest_data(root)
+    except Exception:
+        mdata_after = ManifestData()
+
+    recommended = get_recommended_entries(root)
+    # If no providers remain and we are not keeping the vault, remove the block.
+    # Otherwise, we sync it if it was managed before.
+    if not mdata_after.installed and not keep_vault:
+        ensure_gitignore_block(root, [], state=ManagedState.ABSENT)
+        ensure_gitattributes_block(root, state=ManagedState.ABSENT)
+    elif recommended and was_gitignore_managed:
+        ensure_gitignore_block(root, recommended, state=ManagedState.PRESENT)
 
 
 def uninstall_run(
@@ -1702,40 +2135,6 @@ def uninstall_run(
     effective_provider = "all" if provider == "core" else provider
 
     removed: list[tuple[str, str]] = []  # (path, label)
-
-    # Map directory names → component owners (for skip filtering).
-    # .agents/ is shared by antigravity, gemini, and codex (all place
-    # skills there via init_paths), so it must be preserved when any of
-    # its owners is skipped.
-    _dir_owners: dict[str, list[str]] = {
-        ".vaultspec": ["core"],
-        ".vault": ["vault"],
-        ".claude": ["claude"],
-        ".gemini": ["gemini"],
-        ".agents": ["antigravity", "gemini", "codex"],
-        ".codex": ["codex"],
-    }
-    dir_labels: dict[str, str] = {
-        ".vaultspec": "core",
-        ".vault": "vault",
-        ".claude": "claude",
-        ".gemini": "gemini",
-        ".agents": "antigravity",
-        ".codex": "codex",
-    }
-    file_labels: dict[str, str] = {
-        "CLAUDE.md": "claude (config)",
-        "GEMINI.md": "gemini (config)",
-        "AGENTS.md": "codex (config)",
-        ".mcp.json": "mcp",
-    }
-    # Map file names → owning component for skip checks
-    _file_owner: dict[str, str] = {
-        "CLAUDE.md": "claude",
-        "GEMINI.md": "gemini",
-        "AGENTS.md": "codex",
-    }
-
     errors: list[str] = []
 
     # Capture manifest state before potential destruction
@@ -1746,245 +2145,31 @@ def uninstall_run(
         mdata_before = ManifestData()
 
     if effective_provider == "all":
-        from .helpers import atomic_write
-
-        # Remove everything (respecting skip).
-        # .vaultspec is deleted LAST so the manifest survives partial failures.
-        managed_dirs = [
-            path / ".claude",
-            path / ".gemini",
-            path / ".agents",
-            path / ".codex",
-        ]
-        if not keep_vault:
-            managed_dirs.append(path / ".vault")
-        managed_dirs.append(path / ".vaultspec")
-
-        managed_files = [
-            path / "CLAUDE.md",
-            path / "GEMINI.md",
-            path / "AGENTS.md",
-        ]
-
-        # Reconcile native MCP targets before provider directories and
-        # ownership state are removed.
-        if "mcp" not in skip:
-            from .mcps import mcp_uninstall, resolve_mcp_targets
-
-            active_ctx = _t.get_context()
-            mcp_tools = tuple(
-                tool
-                for tool, config in active_ctx.tool_configs.items()
-                if ProviderCapability.MCPS in config.capabilities
-                and tool.value not in skip
-            )
-            uninstalled = mcp_uninstall(
-                path,
-                dry_run=dry_run,
-                enrolled=mcp_tools,
-            )
-            errors.extend(uninstalled.errors)
-            for target in resolve_mcp_targets(
-                target_dir=path,
-                enrolled=mcp_tools,
-            ):
-                target_result = uninstalled.per_tool.get(target.provider.value)
-                if target_result and target_result.items:
-                    removed.append((_rel(path, target.path), "mcp"))
-
-        for d in managed_dirs:
-            owners = _dir_owners.get(d.name, [])
-            if owners and any(o in skip for o in owners):
-                skipped = [o for o in owners if o in skip]
-                logger.info("Skipping %s (--skip %s)", d.name, ", ".join(skipped))
-                continue
-            owner = dir_labels.get(d.name, "")
-            if d.exists():
-                if not dry_run:
-                    try:
-                        _rmtree_robust(d)
-                    except OSError as exc:
-                        errors.append(f"Failed to remove {_rel(path, d)}: {exc}")
-                        continue
-                removed.append((str(d).replace("\\", "/") + "/", owner))
-
-        for f in managed_files:
-            owner = _file_owner.get(f.name, "")
-            if owner in skip:
-                logger.info("Skipping %s (--skip %s)", f.name, owner)
-                continue
-            if f.exists():
-                if not dry_run:
-                    try:
-                        f.unlink()
-                    except OSError as exc:
-                        errors.append(f"Failed to remove {_rel(path, f)}: {exc}")
-                        continue
-                label = file_labels.get(f.name, "")
-                removed.append((str(f).replace("\\", "/"), label))
-
-        # Surgical .pre-commit-config.yaml cleanup: remove vaultspec-core
-        # hooks. This deliberately runs even when prek.toml owns the hook
-        # boundary (collect_prek_boundary): install and sync refuse to write
-        # the YAML under prek, but uninstall stripping vaultspec hooks from a
-        # legacy YAML is residue removal - leave-no-trace semantics - not
-        # management of the file.
-        precommit_path = path / ".pre-commit-config.yaml"
-        if "precommit" not in skip:
-            if precommit_path.exists() and not dry_run:
-                handler = _precommit_yaml()
-                try:
-                    raw = precommit_path.read_text(encoding="utf-8")
-                    data = handler.load(raw)
-                    if isinstance(data, dict):
-                        repos = data.get("repos", [])
-                        if isinstance(repos, list):
-                            changed = False
-                            # Mutate the loaded structure in place so surviving
-                            # non-vaultspec hooks keep their comments and quoting.
-                            for r in list(repos):
-                                if not (
-                                    isinstance(r, dict) and r.get("repo") == "local"
-                                ):
-                                    continue
-                                hooks = r.get("hooks", [])
-                                if not isinstance(hooks, list):
-                                    continue
-                                managed_idx = [
-                                    i
-                                    for i, h in enumerate(hooks)
-                                    if isinstance(h, dict)
-                                    and h.get("id") in _ALL_MANAGED_HOOK_IDS
-                                ]
-                                for i in reversed(managed_idx):
-                                    del hooks[i]
-                                if managed_idx:
-                                    changed = True
-                                if not hooks:
-                                    repos.remove(r)
-
-                            if changed:
-                                if repos:
-                                    atomic_write(
-                                        precommit_path,
-                                        _dump_precommit_yaml(handler, data),
-                                    )
-                                else:
-                                    del data["repos"]
-                                    if not data:
-                                        precommit_path.unlink()
-                                    else:
-                                        atomic_write(
-                                            precommit_path,
-                                            _dump_precommit_yaml(handler, data),
-                                        )
-                                removed.append(
-                                    (_rel(path, precommit_path), "precommit")
-                                )
-                                mdata_u = read_manifest_data(path)
-                                if mdata_u.precommit_managed:
-                                    mdata_u.precommit_managed = False
-                                    write_manifest_data(path, mdata_u)
-                except (YAMLError, OSError):
-                    pass
-            elif precommit_path.exists() and dry_run:
-                try:
-                    raw = precommit_path.read_text(encoding="utf-8")
-                    if any(f"id: {hid}" in raw for hid in _ALL_MANAGED_HOOK_IDS):
-                        removed.append((_rel(path, precommit_path), "precommit"))
-                except OSError:
-                    pass
-
+        _uninstall_everything(
+            path,
+            skip=skip,
+            keep_vault=keep_vault,
+            dry_run=dry_run,
+            removed=removed,
+            errors=errors,
+        )
     else:
-        # Per-provider uninstall with shared directory protection
-        tools = _filter_tools(_PROVIDER_TO_TOOLS.get(effective_provider, []), skip)
-        if "mcp" not in skip:
-            from .mcps import mcp_uninstall, resolve_mcp_targets
-
-            active_ctx = _t.get_context()
-            mcp_tools = tuple(
-                tool
-                for tool in tools
-                if ProviderCapability.MCPS in active_ctx.tool_configs[tool].capabilities
-            )
-            if mcp_tools:
-                uninstalled = mcp_uninstall(
-                    path,
-                    dry_run=dry_run,
-                    provider=effective_provider,
-                    enrolled=mcp_tools,
-                )
-                errors.extend(uninstalled.errors)
-                for target in resolve_mcp_targets(
-                    provider=effective_provider,
-                    target_dir=path,
-                    enrolled=mcp_tools,
-                ):
-                    target_result = uninstalled.per_tool.get(target.provider.value)
-                    if target_result and target_result.items:
-                        removed.append((_rel(path, target.path), "mcp"))
-        for tool in tools:
-            dirs, files = _collect_provider_artifacts(path, tool)
-
-            for d in dirs:
-                if not d.exists():
-                    continue
-                sharing = providers_sharing_dir(path, d, exclude=effective_provider)
-                if sharing:
-                    logger.info(
-                        "Preserving %s (still used by: %s)",
-                        d.relative_to(path),
-                        ", ".join(sorted(sharing)),
-                    )
-                    continue
-
-                if not dry_run:
-                    try:
-                        _rmtree_robust(d)
-                    except OSError as exc:
-                        errors.append(f"Failed to remove {_rel(path, d)}: {exc}")
-                        continue
-                removed.append((str(d).replace("\\", "/") + "/", tool.value))
-
-            for f in files:
-                if not f.exists():
-                    continue
-                sharing = providers_sharing_file(path, f, exclude=effective_provider)
-                if sharing:
-                    logger.info(
-                        "Preserving %s (still used by: %s)",
-                        f.relative_to(path),
-                        ", ".join(sorted(sharing)),
-                    )
-                    continue
-                if not dry_run:
-                    try:
-                        f.unlink()
-                    except OSError as exc:
-                        errors.append(f"Failed to remove {_rel(path, f)}: {exc}")
-                        continue
-                removed.append((str(f).replace("\\", "/"), f"{tool.value} (config)"))
-
-        # Update manifest once after all tools are removed from disk
-        if not dry_run:
-            for tool in tools:
-                remove_provider(path, tool.value)
+        _uninstall_provider_artifacts(
+            path,
+            effective_provider,
+            skip=skip,
+            dry_run=dry_run,
+            removed=removed,
+            errors=errors,
+        )
 
     # Re-sync gitignore and gitattributes blocks
     if not dry_run:
-        try:
-            mdata_after = read_manifest_data(path)
-        except Exception:
-            mdata_after = ManifestData()
-
-        recommended = get_recommended_entries(path)
-        # If no providers remain and we are not keeping the vault, remove the block.
-        # Otherwise, we sync it if it was managed before.
-        if not mdata_after.installed and not keep_vault:
-            ensure_gitignore_block(path, [], state=ManagedState.ABSENT)
-            ensure_gitattributes_block(path, state=ManagedState.ABSENT)
-        elif recommended and mdata_before.gitignore_managed:
-            ensure_gitignore_block(path, recommended, state=ManagedState.PRESENT)
+        _reconcile_uninstall_git_blocks(
+            path,
+            keep_vault=keep_vault,
+            was_gitignore_managed=mdata_before.gitignore_managed,
+        )
 
     action = "dry_run" if dry_run else "uninstall"
     result: dict[str, Any] = {
@@ -2082,6 +2267,289 @@ def hooks_run(event: str, path: str | None = None) -> list[dict[str, Any]]:
 # Valid sync provider targets exposed to the CLI.
 SYNC_PROVIDERS = VALID_PROVIDERS - {"core"}
 
+# Single-provider sync targets mapped to the tool they narrow the context to.
+_SYNC_PROVIDER_TOOLS: dict[str, Tool] = {
+    "claude": Tool.CLAUDE,
+    "gemini": Tool.GEMINI,
+    "antigravity": Tool.ANTIGRAVITY,
+    "codex": Tool.CODEX,
+}
+
+
+def _empty_sync_results() -> list[_t.SyncResult]:
+    """Return the positional no-op result set for a fully skipped sync."""
+    return [_t.SyncResult() for _ in range(5)]
+
+
+def _has_gitignore_block(gi_path: Path) -> bool:
+    """Report whether *gi_path* carries exactly one well-formed managed block."""
+    if not gi_path.exists():
+        return False
+    try:
+        content = gi_path.read_text(encoding="utf-8")
+        begins, ends = _find_markers(content.splitlines())
+    except (OSError, UnicodeDecodeError):
+        return False
+    return len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]
+
+
+def _has_gitattributes_block(ga_path: Path) -> bool:
+    """Report whether *ga_path* carries a well-formed managed block."""
+    if not ga_path.exists():
+        return False
+    try:
+        content = ga_path.read_text(encoding="utf-8")
+        return _ga_has_valid_block(content.splitlines())
+    except (OSError, UnicodeDecodeError):
+        return False
+
+
+def _backfill_structures(*, skip: set[str], dry_run: bool) -> _t.SyncResult:
+    """Create missing structural provider directories during sync (#133).
+
+    Content files are backfilled by the per-resource sync passes (their
+    ``apply_file_sync`` adds any missing destination), but a content-less
+    structural directory such as a provider's ``workflows/`` is only ever
+    created by ``install``/``_scaffold_provider``. After an upgrade that
+    introduces such a directory, ``sync`` left the provider ``partial``
+    while reporting success ("will be addressed by sync") - a no-op. This
+    backfill makes that promise real: it creates only directories that are
+    missing, never overwriting existing content, so it is safe at every
+    ``--force`` level and previews correctly under ``--dry-run``.
+    """
+    result = _t.SyncResult()
+    active_ctx = _t.get_context()
+    target = active_ctx.target_dir
+    installed = read_manifest_data(target).installed
+    for tool, cfg in active_ctx.tool_configs.items():
+        # Only backfill providers the operator actually enrolled; never
+        # materialise a provider directory a core-only or partial install
+        # deliberately omitted.
+        if tool.value in skip or tool.value not in installed:
+            continue
+        caps = cfg.capabilities
+        structural: list[Path] = []
+        if ProviderCapability.RULES in caps and cfg.rules_dir:
+            structural.append(cfg.rules_dir)
+        if ProviderCapability.SKILLS in caps and cfg.skills_dir:
+            structural.append(cfg.skills_dir)
+        if ProviderCapability.AGENTS in caps and cfg.agents_dir:
+            structural.append(cfg.agents_dir)
+        if ProviderCapability.WORKFLOWS in caps and cfg.workflows_dir:
+            structural.append(cfg.workflows_dir)
+        for directory in structural:
+            if directory.exists():
+                continue
+            result.items.append((_rel(target, directory).replace("\\", "/"), "[ADD]"))
+            result.added += 1
+            if not dry_run:
+                ensure_dir(directory)
+    return result
+
+
+def _mcp_sync_pass(
+    *,
+    skip: set[str],
+    dry_run: bool,
+    force: bool,
+    mcp_provider: Tool | str,
+) -> tuple[Callable[[], _t.SyncResult], str]:
+    """Build the MCP reconciliation pass for :func:`_run_all_syncs`."""
+    from .mcps import mcp_sync as _mcp_sync
+
+    active_ctx = _t.get_context()
+    installed = read_manifest(active_ctx.target_dir)
+    enrolled = tuple(
+        tool
+        for tool in active_ctx.tool_configs
+        if tool.value in installed and tool.value not in skip
+    )
+    return (
+        lambda: _mcp_sync(
+            dry_run=dry_run,
+            force=force,
+            prune=force,
+            provider=mcp_provider,
+            target_dir=active_ctx.target_dir,
+            enrolled=enrolled,
+        ),
+        "mcps",
+    )
+
+
+def _run_all_syncs(
+    *,
+    skip: set[str],
+    dry_run: bool,
+    force: bool,
+    include_mcp: bool = True,
+    mcp_provider: Tool | str = "all",
+) -> list[_t.SyncResult]:
+    """Run every resource sync pass, isolating each pass's failure.
+
+    A pass that raises is reported as an error-carrying :class:`SyncResult` in
+    its positional slot so the remaining passes still run.
+    """
+    from .agents import agents_sync
+    from .config_gen import config_sync
+    from .rules import rules_sync
+    from .skills import skills_sync
+    from .system import system_sync
+
+    results: list[_t.SyncResult] = []
+    sync_passes: list[tuple[Callable[[], _t.SyncResult], str]] = [
+        (lambda: rules_sync(prune=force, dry_run=dry_run), "rules"),
+        (lambda: skills_sync(prune=force, dry_run=dry_run), "skills"),
+        (lambda: agents_sync(prune=force, dry_run=dry_run), "agents"),
+        (lambda: system_sync(dry_run=dry_run, force=force), "system"),
+        (lambda: config_sync(dry_run=dry_run, force=force), "config"),
+    ]
+    if include_mcp and "mcp" not in skip:
+        sync_passes.append(
+            _mcp_sync_pass(
+                skip=skip,
+                dry_run=dry_run,
+                force=force,
+                mcp_provider=mcp_provider,
+            )
+        )
+    if "hooks" not in skip:
+        from .provider_hooks import provider_hooks_sync
+
+        sync_passes.append((lambda: provider_hooks_sync(dry_run=dry_run), "hooks"))
+    for sync_fn, label in sync_passes:
+        try:
+            results.append(sync_fn())
+        except Exception as exc:
+            logger.error("Sync pass '%s' failed: %s", label, exc)
+            error_result = _t.SyncResult()
+            error_result.errors.append(f"{label} sync failed: {exc}")
+            results.append(error_result)
+    # Structural backfill runs last and is appended after the positional
+    # resource passes; renderers treat any result beyond the known pass
+    # labels as structural (issue #133).
+    results.append(_backfill_structures(skip=skip, dry_run=dry_run))
+    return results
+
+
+def _reconcile_precommit_management(target_dir: Path) -> None:
+    """Re-scaffold managed pre-commit hooks, or stand down if the user removed them."""
+    mdata = read_manifest_data(target_dir)
+    if not mdata.precommit_managed:
+        return
+
+    from .diagnosis.collectors import collect_precommit_state
+    from .diagnosis.signals import PrecommitSignal
+
+    signal = collect_precommit_state(target_dir)
+    if signal in (PrecommitSignal.NO_HOOKS, PrecommitSignal.NO_FILE):
+        mdata.precommit_managed = False
+        write_manifest_data(target_dir, mdata)
+        logger.info("Pre-commit hooks removed by user, disabling management")
+        return
+    _scaffold_precommit(target_dir)
+
+
+def _reconcile_gitignore_opt_out(target_dir: Path) -> None:
+    """Re-sync the managed ``.gitignore`` block, honouring a user opt-out.
+
+    Checks whether the user removed the managed block BEFORE re-creating it.
+    If the block is gone but the manifest still says ``managed=True``, the user
+    opted out -- honour that by flipping the flag.
+    """
+    mdata = read_manifest_data(target_dir)
+    if not mdata.gitignore_managed:
+        return
+    if _has_gitignore_block(target_dir / ".gitignore"):
+        ensure_gitignore_block(target_dir, get_recommended_entries(target_dir))
+        return
+    mdata.gitignore_managed = False
+    write_manifest_data(target_dir, mdata)
+
+
+def _reconcile_gitattributes_opt_out(target_dir: Path) -> None:
+    """Re-sync the managed ``.gitattributes`` block (same pattern as gitignore)."""
+    mdata = read_manifest_data(target_dir)
+    if not mdata.gitattributes_managed:
+        return
+    if _has_gitattributes_block(target_dir / ".gitattributes"):
+        ensure_gitattributes_block(target_dir)
+        return
+    mdata.gitattributes_managed = False
+    write_manifest_data(target_dir, mdata)
+
+
+def _stamp_last_synced(target_dir: Path, candidates: Iterable[str]) -> None:
+    """Record a ``last_synced`` timestamp for every installed name in *candidates*."""
+    import datetime
+
+    now = datetime.datetime.now(tz=datetime.UTC).isoformat()
+    mdata = read_manifest_data(target_dir)
+    for name in candidates:
+        if name not in mdata.installed:
+            continue
+        mdata.provider_state.setdefault(name, {})
+        mdata.provider_state[name]["last_synced"] = now
+    _stamp_manifest_version_no_downgrade(mdata)
+    write_manifest_data(target_dir, mdata)
+
+
+def _sync_all_providers(
+    ctx: _t.WorkspaceContext,
+    *,
+    skip: set[str],
+    dry_run: bool,
+    force: bool,
+) -> list[_t.SyncResult]:
+    """Sync every enrolled provider, then reconcile workspace-level state."""
+
+    def _sync_all_with_configs(
+        narrowed_configs: dict[Tool, _t.ToolConfig] | None,
+    ) -> list[_t.SyncResult]:
+        if narrowed_configs is not None:
+            _t.set_context(replace(ctx, tool_configs=narrowed_configs))
+        logger.info("Syncing all resources...")
+        results = _run_all_syncs(skip=skip, dry_run=dry_run, force=force)
+        if not dry_run:
+            from vaultspec_core.hooks import fire_hooks
+
+            fire_hooks(
+                "config.synced",
+                {"root": str(ctx.target_dir), "event": "config.synced"},
+            )
+            logger.info("Done.")
+        return results
+
+    # When skipping providers, narrow tool_configs in a copied context
+    skipped_tools = {Tool(name) for name in skip if name in {t.value for t in Tool}}
+    narrowed_configs: dict[Tool, _t.ToolConfig] | None = None
+    if skipped_tools:
+        narrowed_configs = {
+            k: v for k, v in ctx.tool_configs.items() if k not in skipped_tools
+        }
+
+    copied = contextvars.copy_context()
+    results = copied.run(_sync_all_with_configs, narrowed_configs)
+
+    if dry_run:
+        return results
+
+    if "precommit" not in skip:
+        _reconcile_precommit_management(ctx.target_dir)
+
+    for orphan in prune_orphaned_lock_sentinels(ctx.target_dir):
+        logger.info("Removed orphaned lock sentinel %s", orphan)
+
+    _reconcile_gitignore_opt_out(ctx.target_dir)
+    _reconcile_gitattributes_opt_out(ctx.target_dir)
+
+    # Update last_synced timestamps for installed providers only
+    _stamp_last_synced(
+        ctx.target_dir,
+        [tool.value for tool in ctx.tool_configs if tool.value not in skip],
+    )
+    return results
+
 
 def sync_provider(
     provider: str,
@@ -2122,243 +2590,23 @@ def sync_provider(
 
     skip = _validate_skip(skip, allow_core=False)
 
-    from .agents import agents_sync
-    from .config_gen import config_sync
-    from .mcps import mcp_sync as _mcp_sync
-    from .rules import rules_sync
-    from .skills import skills_sync
-    from .system import system_sync
-
     ctx = _t.get_context()
 
-    def _empty_sync_results() -> list[_t.SyncResult]:
-        return [_t.SyncResult() for _ in range(5)]
-
-    def _backfill_structures() -> _t.SyncResult:
-        """Create missing structural provider directories during sync (#133).
-
-        Content files are backfilled by the per-resource sync passes (their
-        ``apply_file_sync`` adds any missing destination), but a content-less
-        structural directory such as a provider's ``workflows/`` is only ever
-        created by ``install``/``_scaffold_provider``. After an upgrade that
-        introduces such a directory, ``sync`` left the provider ``partial``
-        while reporting success ("will be addressed by sync") - a no-op. This
-        backfill makes that promise real: it creates only directories that are
-        missing, never overwriting existing content, so it is safe at every
-        ``--force`` level and previews correctly under ``--dry-run``.
-        """
-        result = _t.SyncResult()
-        active_ctx = _t.get_context()
-        target = active_ctx.target_dir
-        installed = read_manifest_data(target).installed
-        for tool, cfg in active_ctx.tool_configs.items():
-            # Only backfill providers the operator actually enrolled; never
-            # materialise a provider directory a core-only or partial install
-            # deliberately omitted.
-            if tool.value in skip or tool.value not in installed:
-                continue
-            caps = cfg.capabilities
-            structural: list[Path] = []
-            if ProviderCapability.RULES in caps and cfg.rules_dir:
-                structural.append(cfg.rules_dir)
-            if ProviderCapability.SKILLS in caps and cfg.skills_dir:
-                structural.append(cfg.skills_dir)
-            if ProviderCapability.AGENTS in caps and cfg.agents_dir:
-                structural.append(cfg.agents_dir)
-            if ProviderCapability.WORKFLOWS in caps and cfg.workflows_dir:
-                structural.append(cfg.workflows_dir)
-            for directory in structural:
-                if directory.exists():
-                    continue
-                result.items.append(
-                    (_rel(target, directory).replace("\\", "/"), "[ADD]")
-                )
-                result.added += 1
-                if not dry_run:
-                    ensure_dir(directory)
-        return result
-
-    def _run_all_syncs(
-        *,
-        include_mcp: bool = True,
-        mcp_provider: Tool | str = "all",
-    ) -> list[_t.SyncResult]:
-        results: list[_t.SyncResult] = []
-        sync_passes: list[tuple[Callable[[], _t.SyncResult], str]] = [
-            (lambda: rules_sync(prune=force, dry_run=dry_run), "rules"),
-            (lambda: skills_sync(prune=force, dry_run=dry_run), "skills"),
-            (lambda: agents_sync(prune=force, dry_run=dry_run), "agents"),
-            (lambda: system_sync(dry_run=dry_run, force=force), "system"),
-            (lambda: config_sync(dry_run=dry_run, force=force), "config"),
-        ]
-        if include_mcp and "mcp" not in skip:
-            active_ctx = _t.get_context()
-            installed = read_manifest(active_ctx.target_dir)
-            enrolled = tuple(
-                tool
-                for tool in active_ctx.tool_configs
-                if tool.value in installed and tool.value not in (skip or set())
-            )
-            sync_passes.append(
-                (
-                    lambda: _mcp_sync(
-                        dry_run=dry_run,
-                        force=force,
-                        prune=force,
-                        provider=mcp_provider,
-                        target_dir=active_ctx.target_dir,
-                        enrolled=enrolled,
-                    ),
-                    "mcps",
-                )
-            )
-        if "hooks" not in skip:
-            from .provider_hooks import provider_hooks_sync
-
-            sync_passes.append((lambda: provider_hooks_sync(dry_run=dry_run), "hooks"))
-        for sync_fn, label in sync_passes:
-            try:
-                results.append(sync_fn())
-            except Exception as exc:
-                logger.error("Sync pass '%s' failed: %s", label, exc)
-                error_result = _t.SyncResult()
-                error_result.errors.append(f"{label} sync failed: {exc}")
-                results.append(error_result)
-        # Structural backfill runs last and is appended after the positional
-        # resource passes; renderers treat any result beyond the known pass
-        # labels as structural (issue #133).
-        results.append(_backfill_structures())
-        return results
-
     # Guard: refuse to sync if vaultspec isn't installed at the target
-    vaultspec_dir = ctx.target_dir / ".vaultspec"
-    if not vaultspec_dir.exists():
+    if not (ctx.target_dir / ".vaultspec").exists():
         raise WorkspaceNotInitializedError(
             f"No .vaultspec/ found at {ctx.target_dir}.",
             hint=f"Run 'vaultspec-core install {ctx.target_dir}' first.",
         )
 
     if provider == "all":
-        # When skipping providers, narrow tool_configs in a copied context
-        skipped_tools = {Tool(name) for name in skip if name in {t.value for t in Tool}}
-
-        def _sync_all_with_configs(
-            narrowed_configs: dict[Tool, _t.ToolConfig] | None,
-        ) -> list[_t.SyncResult]:
-            if narrowed_configs is not None:
-                _t.set_context(replace(ctx, tool_configs=narrowed_configs))
-            logger.info("Syncing all resources...")
-            results = _run_all_syncs()
-            if not dry_run:
-                from vaultspec_core.hooks import fire_hooks
-
-                fire_hooks(
-                    "config.synced",
-                    {"root": str(ctx.target_dir), "event": "config.synced"},
-                )
-                logger.info("Done.")
-            return results
-
-        narrowed_configs: dict[Tool, _t.ToolConfig] | None = None
-        if skipped_tools:
-            narrowed_configs = {
-                k: v for k, v in ctx.tool_configs.items() if k not in skipped_tools
-            }
-
-        copied = contextvars.copy_context()
-        results = copied.run(_sync_all_with_configs, narrowed_configs)
-
-        if not dry_run:
-            import datetime
-
-            from .gitignore import ensure_gitignore_block
-
-            if "precommit" not in skip:
-                pc_mdata = read_manifest_data(ctx.target_dir)
-                if pc_mdata.precommit_managed:
-                    from .diagnosis.collectors import collect_precommit_state
-                    from .diagnosis.signals import PrecommitSignal
-
-                    pc_signal = collect_precommit_state(ctx.target_dir)
-                    if pc_signal in (
-                        PrecommitSignal.NO_HOOKS,
-                        PrecommitSignal.NO_FILE,
-                    ):
-                        pc_mdata.precommit_managed = False
-                        write_manifest_data(ctx.target_dir, pc_mdata)
-                        logger.info(
-                            "Pre-commit hooks removed by user, disabling management"
-                        )
-                    else:
-                        _scaffold_precommit(ctx.target_dir)
-
-            for orphan in prune_orphaned_lock_sentinels(ctx.target_dir):
-                logger.info("Removed orphaned lock sentinel %s", orphan)
-
-            # Respect gitignore opt-out: check whether the user removed
-            # the managed block BEFORE re-creating it.  If the block is
-            # gone but the manifest still says managed=True, the user
-            # opted out -- honour that by flipping the flag.
-            mdata = read_manifest_data(ctx.target_dir)
-            if mdata.gitignore_managed:
-                gi_path = ctx.target_dir / ".gitignore"
-                block_present = False
-                if gi_path.exists():
-                    try:
-                        content = gi_path.read_text(encoding="utf-8")
-                        begins, ends = _find_markers(content.splitlines())
-                        block_present = (
-                            len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]
-                        )
-                    except (OSError, UnicodeDecodeError):
-                        block_present = False
-
-                if block_present:
-                    ensure_gitignore_block(
-                        ctx.target_dir,
-                        get_recommended_entries(ctx.target_dir),
-                    )
-                else:
-                    mdata.gitignore_managed = False
-                    write_manifest_data(ctx.target_dir, mdata)
-
-            # Respect gitattributes opt-out (same pattern as gitignore).
-            mdata = read_manifest_data(ctx.target_dir)
-            if mdata.gitattributes_managed:
-                ga_path = ctx.target_dir / ".gitattributes"
-                ga_block_present = False
-                if ga_path.exists():
-                    try:
-                        content = ga_path.read_text(encoding="utf-8")
-                        ga_block_present = _ga_has_valid_block(content.splitlines())
-                    except (OSError, UnicodeDecodeError):
-                        pass
-
-                if ga_block_present:
-                    ensure_gitattributes_block(ctx.target_dir)
-                else:
-                    mdata.gitattributes_managed = False
-                    write_manifest_data(ctx.target_dir, mdata)
-
-            # Update last_synced timestamps for installed providers only
-            now = datetime.datetime.now(tz=datetime.UTC).isoformat()
-            mdata = read_manifest_data(ctx.target_dir)
-            for tool_type in ctx.tool_configs:
-                name = tool_type.value
-                if name in skip or name not in mdata.installed:
-                    continue
-                mdata.provider_state.setdefault(name, {})
-                mdata.provider_state[name]["last_synced"] = now
-            _stamp_manifest_version_no_downgrade(mdata)
-            write_manifest_data(ctx.target_dir, mdata)
-
-        return results
-
-    provider_skipped = provider in skip
+        return _sync_all_providers(ctx, skip=skip, dry_run=dry_run, force=force)
 
     # Validate provider is installed unless the provider was explicitly skipped.
     installed = read_manifest(ctx.target_dir)
-    if not provider_skipped and installed and provider not in installed:
+    if provider in skip:
+        return _empty_sync_results()
+    if installed and provider not in installed:
         raise ProviderNotInstalledError(
             f"Provider '{provider}' is not installed.",
             hint=(
@@ -2368,18 +2616,8 @@ def sync_provider(
         )
 
     # Per-provider sync: filter tool_configs to only the requested tool.
-    requested: set[Tool] = set()
-    if not provider_skipped:
-        if provider == "claude":
-            requested = {Tool.CLAUDE}
-        elif provider == "gemini":
-            requested = {Tool.GEMINI}
-        elif provider == "antigravity":
-            requested = {Tool.ANTIGRAVITY}
-        elif provider == "codex":
-            requested = {Tool.CODEX}
-    else:
-        return _empty_sync_results()
+    tool = _SYNC_PROVIDER_TOOLS.get(provider)
+    requested: set[Tool] = {tool} if tool is not None else set()
 
     def _sync_single_provider(
         provider_configs: dict[Tool, _t.ToolConfig],
@@ -2391,6 +2629,9 @@ def sync_provider(
             for config in provider_configs.values()
         )
         results = _run_all_syncs(
+            skip=skip,
+            dry_run=dry_run,
+            force=force,
             include_mcp=include_mcp,
             mcp_provider=provider,
         )
@@ -2403,17 +2644,6 @@ def sync_provider(
     results = copied.run(_sync_single_provider, narrowed)
 
     if not dry_run:
-        import datetime
-
-        now = datetime.datetime.now(tz=datetime.UTC).isoformat()
-        mdata = read_manifest_data(ctx.target_dir)
-        for tool_type in requested:
-            name = tool_type.value
-            if name not in mdata.installed:
-                continue
-            mdata.provider_state.setdefault(name, {})
-            mdata.provider_state[name]["last_synced"] = now
-        _stamp_manifest_version_no_downgrade(mdata)
-        write_manifest_data(ctx.target_dir, mdata)
+        _stamp_last_synced(ctx.target_dir, [tool_type.value for tool_type in requested])
 
     return results

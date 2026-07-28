@@ -12,7 +12,7 @@ import shutil
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from . import types as _t
 from .exceptions import ResourceExistsError, ResourceNotFoundError
@@ -313,6 +313,32 @@ def hooks_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
     return result
 
 
+def _action_warnings(name: str, actions: Any) -> list[str]:
+    """Return compliance warnings for one hook definition's ``actions`` list."""
+    if not isinstance(actions, list) or not actions:
+        return [f"Hook '{name}' has no defined actions."]
+
+    warnings: list[str] = []
+    for idx, act in enumerate(actions):
+        if not isinstance(act, dict):
+            warnings.append(
+                f"Hook '{name}': action at index {idx} is not a dictionary."
+            )
+            continue
+        act_dict = cast("dict[str, Any]", act)
+        if act_dict.get("type") != "shell":
+            warnings.append(
+                f"Hook '{name}': action at index {idx} "
+                f"has unknown type '{act_dict.get('type')}'."
+            )
+        elif not act_dict.get("command"):
+            warnings.append(
+                f"Hook '{name}': shell action at index {idx} "
+                "is missing 'command' field."
+            )
+    return warnings
+
+
 def hooks_status() -> dict[str, Any]:
     """Perform deep compliancy verification of YAML hook definitions."""
     from vaultspec_core.hooks import SUPPORTED_EVENTS
@@ -353,30 +379,7 @@ def hooks_status() -> dict[str, Any]:
                         f"Hook '{path.name}' has unsupported event '{event}'."
                     )
 
-                actions = data.get("actions", [])
-                if not isinstance(actions, list) or not actions:
-                    warnings.append(f"Hook '{path.name}' has no defined actions.")
-                else:
-                    for idx, act in enumerate(actions):
-                        if not isinstance(act, dict):
-                            warnings.append(
-                                f"Hook '{path.name}': action at index {idx} "
-                                "is not a dictionary."
-                            )
-                        else:
-                            from typing import cast
-
-                            act_dict = cast("dict[str, Any]", act)
-                            if act_dict.get("type") != "shell":
-                                warnings.append(
-                                    f"Hook '{path.name}': action at index {idx} "
-                                    f"has unknown type '{act_dict.get('type')}'."
-                                )
-                            elif not act_dict.get("command"):
-                                warnings.append(
-                                    f"Hook '{path.name}': shell action at index "
-                                    f"{idx} is missing 'command' field."
-                                )
+                warnings.extend(_action_warnings(path.name, data.get("actions", [])))
 
             except Exception as e:
                 # A hook that fails to parse cannot be classified; list it and

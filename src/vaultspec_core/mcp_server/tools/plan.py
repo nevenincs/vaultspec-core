@@ -27,6 +27,7 @@ from ...core.types import get_context as _get_ctx
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
     from pathlib import Path
 
     from mcp.server.fastmcp import FastMCP
@@ -492,50 +493,82 @@ def _apply_plan_edit(plan: Plan, op: PlanEditOperation) -> PlanEditItemResult:
         The per-operation :class:`PlanEditItemResult`.
     """
     from ...plan.commands._errors import PlanCommandError
-    from ...plan.commands.step_ops import add_step, edit_step, insert_step, remove_step
 
-    def _fail(message: str) -> PlanEditItemResult:
-        return PlanEditItemResult(
-            operation=op.operation, status="failed", error={"message": message}
-        )
-
+    handler = _PLAN_EDIT_HANDLERS.get(op.operation)
+    if handler is None:
+        return _plan_edit_failure(op, f"Unknown plan_edit operation: {op.operation!r}")
     try:
-        if op.operation == "add":
-            if op.action is None or op.scope is None:
-                return _fail("'add' requires 'action' and 'scope'")
-            step = add_step(
-                plan, action=op.action, scope=op.scope, phase_id=op.phase_id
-            )
-            return PlanEditItemResult(
-                operation="add", status="created", step_id=step.canonical_id
-            )
-        if op.operation == "insert":
-            if op.action is None or op.scope is None:
-                return _fail("'insert' requires 'action' and 'scope'")
-            step = insert_step(
-                plan,
-                action=op.action,
-                scope=op.scope,
-                before=op.before,
-                after=op.after,
-            )
-            return PlanEditItemResult(
-                operation="insert", status="created", step_id=step.canonical_id
-            )
-        if op.operation == "edit":
-            if op.step_id is None:
-                return _fail("'edit' requires 'step_id'")
-            step = edit_step(plan, op.step_id, action=op.action, scope=op.scope)
-            return PlanEditItemResult(
-                operation="edit", status="updated", step_id=step.canonical_id
-            )
-        if op.operation == "remove":
-            if op.step_id is None:
-                return _fail("'remove' requires 'step_id'")
-            retired = remove_step(plan, op.step_id)
-            return PlanEditItemResult(
-                operation="remove", status="removed", step_id=retired
-            )
-        return _fail(f"Unknown plan_edit operation: {op.operation!r}")
+        return handler(plan, op)
     except PlanCommandError as exc:
-        return _fail(str(exc))
+        return _plan_edit_failure(op, str(exc))
+
+
+def _plan_edit_failure(op: PlanEditOperation, message: str) -> PlanEditItemResult:
+    """Fold one failed ``plan_edit`` operation into its item result."""
+    return PlanEditItemResult(
+        operation=op.operation, status="failed", error={"message": message}
+    )
+
+
+def _plan_edit_add(plan: Plan, op: PlanEditOperation) -> PlanEditItemResult:
+    """Append a step to a phase or the document tail."""
+    from ...plan.commands.step_ops import add_step
+
+    if op.action is None or op.scope is None:
+        return _plan_edit_failure(op, "'add' requires 'action' and 'scope'")
+    step = add_step(plan, action=op.action, scope=op.scope, phase_id=op.phase_id)
+    return PlanEditItemResult(
+        operation="add", status="created", step_id=step.canonical_id
+    )
+
+
+def _plan_edit_insert(plan: Plan, op: PlanEditOperation) -> PlanEditItemResult:
+    """Place a step before or after an anchor step."""
+    from ...plan.commands.step_ops import insert_step
+
+    if op.action is None or op.scope is None:
+        return _plan_edit_failure(op, "'insert' requires 'action' and 'scope'")
+    step = insert_step(
+        plan,
+        action=op.action,
+        scope=op.scope,
+        before=op.before,
+        after=op.after,
+    )
+    return PlanEditItemResult(
+        operation="insert", status="created", step_id=step.canonical_id
+    )
+
+
+def _plan_edit_edit(plan: Plan, op: PlanEditOperation) -> PlanEditItemResult:
+    """Change a step's action and/or scope."""
+    from ...plan.commands.step_ops import edit_step
+
+    if op.step_id is None:
+        return _plan_edit_failure(op, "'edit' requires 'step_id'")
+    step = edit_step(plan, op.step_id, action=op.action, scope=op.scope)
+    return PlanEditItemResult(
+        operation="edit", status="updated", step_id=step.canonical_id
+    )
+
+
+def _plan_edit_remove(plan: Plan, op: PlanEditOperation) -> PlanEditItemResult:
+    """Retire a step, freeing nothing: its canonical id is never reused."""
+    from ...plan.commands.step_ops import remove_step
+
+    if op.step_id is None:
+        return _plan_edit_failure(op, "'remove' requires 'step_id'")
+    retired = remove_step(plan, op.step_id)
+    return PlanEditItemResult(operation="remove", status="removed", step_id=retired)
+
+
+#: The ``plan_edit`` operation verbs and the handler owning each; an
+#: unlisted verb fails the item rather than the batch.
+_PLAN_EDIT_HANDLERS: Mapping[
+    str, Callable[[Plan, PlanEditOperation], PlanEditItemResult]
+] = {
+    "add": _plan_edit_add,
+    "insert": _plan_edit_insert,
+    "edit": _plan_edit_edit,
+    "remove": _plan_edit_remove,
+}

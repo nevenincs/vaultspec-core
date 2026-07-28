@@ -152,6 +152,81 @@ archived: 2026-05-22
     assert new_content.count("body_schema:") == 1
 
 
+def test_fix_frontmatter_preserves_unknown_keys(tmp_path):
+    _make_skeleton(tmp_path)
+    doc = tmp_path / ".vault" / "adr" / "2026-05-17-unknown-adr.md"
+    doc.write_text(
+        """---
+tags:
+  - adr
+  - my-feature
+date: 2026-05-17
+custom_scalar: kept
+custom_list:
+  - one
+  - two
+
+trailing_unknown: also kept
+---
+# Content
+""",
+        encoding="utf-8",
+    )
+
+    desc = _fix_frontmatter(doc, tmp_path)
+    assert desc == "normalized tag # prefixes"
+
+    new_content = doc.read_text(encoding="utf-8")
+    assert "custom_scalar: kept" in new_content
+    assert "custom_list:" in new_content
+    assert "  - one" in new_content
+    assert "  - two" in new_content
+    assert "trailing_unknown: also kept" in new_content
+    assert new_content.count("date:") == 1
+    assert new_content.count("tags:") == 1
+
+    meta, _ = parse_vault_metadata(new_content)
+    assert meta.tags == ["#adr", "#my-feature"]
+
+
+def test_fix_frontmatter_noop_when_nothing_to_fix(tmp_path):
+    _make_skeleton(tmp_path)
+    doc = tmp_path / ".vault" / "adr" / "2026-05-17-clean-adr.md"
+    original = """---
+tags:
+  - "#adr"
+  - "#my-feature"
+date: 2026-05-17
+---
+# Content
+"""
+    doc.write_text(original, encoding="utf-8")
+
+    assert _fix_frontmatter(doc, tmp_path) is None
+    assert doc.read_text(encoding="utf-8") == original
+
+
+def test_fix_frontmatter_normalizes_date_suffix(tmp_path):
+    _make_skeleton(tmp_path)
+    doc = tmp_path / ".vault" / "adr" / "2026-05-17-date-adr.md"
+    doc.write_text(
+        """---
+tags:
+  - "#adr"
+  - "#my-feature"
+date: "2026-05-17 10:30"
+---
+# Content
+""",
+        encoding="utf-8",
+    )
+
+    assert _fix_frontmatter(doc, tmp_path) == "normalized date format"
+
+    meta, _ = parse_vault_metadata(doc.read_text(encoding="utf-8"))
+    assert meta.date == "2026-05-17"
+
+
 def test_migration_0_1_21(tmp_path):
     # Runs the additive migration which should return successfully
     res = migrate_0_1_21(tmp_path)

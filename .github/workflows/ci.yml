@@ -82,22 +82,85 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        run: just dev deps sync
+        run: just deps sync
 
       - name: Ruff
-        run: just dev lint python
+        run: just lint python
 
       - name: Ty
-        run: just dev lint type
+        run: just lint type
 
       - name: Taplo
-        run: just dev lint toml
+        run: just lint toml
 
       - name: Lychee
-        run: just dev lint links
+        run: just lint links
 
       - name: pymarkdown
-        run: just dev lint markdown
+        run: just lint markdown
+
+      # Baseline-ratcheted gates. Each threshold sits at this tree's worst
+      # current offender (see the census comments in pyproject.toml), so these
+      # are green today and fail only on a NEW record-breaking offender. They
+      # run after the cheap checks because they are the slow ones.
+      #
+      # `if: always()` on every gate below is deliberate. These steps
+      # previously did not exist, and the failure mode they guard against is
+      # real: a gate placed behind a red step never runs at all, so a
+      # regression it would have caught reaches the default branch unseen. Each
+      # gate must report its own verdict independently of its neighbours.
+      - name: Cognitive complexity
+        if: always()
+        run: just lint complexity
+
+      - name: Nesting depth
+        if: always()
+        run: just lint nesting
+
+      - name: Module and class size
+        if: always()
+        run: just lint size
+
+      # ADVISORY, not gating: strict typing reports annotation debt spread
+      # across nearly every module. `continue-on-error` keeps the burndown
+      # visible in the job log without blocking merges, and this step becomes a
+      # real gate - by deleting that key - once the count reaches zero.
+      - name: Strict types (advisory)
+        if: always()
+        continue-on-error: true
+        run: just lint type-strict
+
+  code-health:
+    name: Code Health (advisory)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install just
+        uses: taiki-e/install-action@just
+
+      - name: Install dependencies
+        run: just deps sync
+
+      # Measurement only - every target exits 0. This is the instrument the
+      # earlier health audits lacked: it ranks the worst offenders per
+      # dimension so the ratchet has a target list rather than an intention.
+      - name: Advisory audit dimensions
+        run: just audit all
+
+      - name: Code-health report
+        run: just health fast
 
   tests:
     name: Tests
@@ -120,10 +183,20 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        run: just dev deps sync
+        run: just deps sync
 
       - name: Run tests
-        run: just dev test python
+        run: just test unit
+
+      - name: Run development harness guards
+        run: just test harness
+
+      # The repository-root tests/ tree holds the automation contracts and the
+      # test-suite-quality guards. No CI lane named it until now, and the
+      # doubles guard inside it had been failing unobserved as a result. A
+      # guard nothing runs is not a guard.
+      - name: Run repository automation and suite-quality guards
+        run: just test repo
 
   broad-tests:
     name: broad (${{ matrix.os }})
@@ -162,11 +235,11 @@ jobs:
         # bash is available on windows-latest via Git Bash; using it on both
         # OSes keeps the just invocation and argument quoting identical.
         shell: bash
-        run: just dev deps sync
+        run: just deps sync
 
       - name: Run broad test suite
         shell: bash
-        run: uv run pytest src/vaultspec_core -q -m "not gemini and not claude and not network"
+        run: just test broad
 
   windows-vault-repair:
     name: Windows Vault Repair Tests
@@ -189,10 +262,10 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        run: just dev deps sync
+        run: just deps sync
 
       - name: Run vault repair regression tests
-        run: uv run pytest src/vaultspec_core/tests/cli/test_vault_repair.py src/vaultspec_core/vaultcore/checks/tests/test_structure_case_rename.py -q
+        run: just test vault-repair
 
   vault-audit:
     name: Vault Audit
@@ -215,7 +288,7 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        run: just dev deps sync
+        run: just deps sync
 
       - name: Bootstrap framework
         # The source repo tracks .vaultspec/ framework config, but the install
@@ -225,10 +298,10 @@ jobs:
         # --force to repair/create the manifest from the tracked config and
         # scaffold provider outputs, the way a consumer recovering a missing
         # manifest would.
-        run: just prod install --force
+        run: just framework install
 
       - name: Verify vault structure and links
-        run: just prod vault check all
+        run: just vault check
 
   dependency-audit:
     name: Dependency Audit (uv audit)
@@ -251,7 +324,7 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        run: just dev deps sync
+        run: just deps sync
 
       - name: Python dependency vulnerability audit
-        run: just dev audit deps
+        run: just audit deps

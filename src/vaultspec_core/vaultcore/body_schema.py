@@ -327,34 +327,52 @@ def _parse_baseline(raw: object) -> tuple[Mapping[str, BaselineEntry], str | Non
     entries: dict[str, BaselineEntry] = {}
     previous_path: str | None = None
     for index, raw_entry in enumerate(entries_raw):
-        if not _is_json_object(raw_entry) or set(raw_entry) != {
-            "path",
-            "body_sha256",
-            "body_schema",
-        }:
-            return MappingProxyType({}), f"entry {index} has an invalid shape"
-        path = raw_entry["path"]
-        digest = raw_entry["body_sha256"]
-        schema_id = raw_entry["body_schema"]
-        if not isinstance(path, str) or not _is_canonical_vault_path(path):
-            return MappingProxyType({}), f"entry {index} has an unsafe path"
-        if not isinstance(digest, str) or _SHA256_RE.fullmatch(digest) is None:
-            return MappingProxyType({}), f"entry {index} has an invalid body_sha256"
-        if (
-            not isinstance(schema_id, str)
-            or schema_id not in BODY_SCHEMA_REGISTRY
-            or schema_id == CURRENT_BODY_SCHEMA
-        ):
-            return MappingProxyType(
-                {}
-            ), f"entry {index} names an invalid legacy body_schema"
-        if path in entries:
-            return MappingProxyType({}), f"ledger contains duplicate path {path!r}"
-        if previous_path is not None and path <= previous_path:
-            return MappingProxyType({}), "ledger entries must be sorted by path"
-        entries[path] = BaselineEntry(path, digest, schema_id)
-        previous_path = path
+        entry, entry_error = _parse_baseline_entry(index, raw_entry)
+        if entry is None:
+            return MappingProxyType({}), entry_error
+        order_error = _baseline_order_error(entry.path, entries, previous_path)
+        if order_error is not None:
+            return MappingProxyType({}), order_error
+        entries[entry.path] = entry
+        previous_path = entry.path
     return MappingProxyType(entries), None
+
+
+def _parse_baseline_entry(
+    index: int, raw_entry: object
+) -> tuple[BaselineEntry | None, str | None]:
+    """Validate one ledger entry's shape and values in isolation."""
+    if not _is_json_object(raw_entry) or set(raw_entry) != {
+        "path",
+        "body_sha256",
+        "body_schema",
+    }:
+        return None, f"entry {index} has an invalid shape"
+    path = raw_entry["path"]
+    digest = raw_entry["body_sha256"]
+    schema_id = raw_entry["body_schema"]
+    if not isinstance(path, str) or not _is_canonical_vault_path(path):
+        return None, f"entry {index} has an unsafe path"
+    if not isinstance(digest, str) or _SHA256_RE.fullmatch(digest) is None:
+        return None, f"entry {index} has an invalid body_sha256"
+    if (
+        not isinstance(schema_id, str)
+        or schema_id not in BODY_SCHEMA_REGISTRY
+        or schema_id == CURRENT_BODY_SCHEMA
+    ):
+        return None, f"entry {index} names an invalid legacy body_schema"
+    return BaselineEntry(path, digest, schema_id), None
+
+
+def _baseline_order_error(
+    path: str, entries: Mapping[str, BaselineEntry], previous_path: str | None
+) -> str | None:
+    """Reject a ledger path that repeats or breaks the sorted-path order."""
+    if path in entries:
+        return f"ledger contains duplicate path {path!r}"
+    if previous_path is not None and path <= previous_path:
+        return "ledger entries must be sorted by path"
+    return None
 
 
 def _is_json_object(value: object) -> TypeGuard[dict[str, object]]:
@@ -444,6 +462,17 @@ def resolve_body_schema(
             source="missing" if schema_id is None else "attestation_required",
             diagnostic=(f"{doc_path.name} {descriptor}; it {requirement}."),
         )
+    return _resolve_attested(doc_path, metadata, body, schema_id, entry)
+
+
+def _resolve_attested(
+    doc_path: Path,
+    metadata: DocumentMetadata,
+    body: str,
+    schema_id: str | None,
+    entry: BaselineEntry,
+) -> BodySchemaResolution:
+    """Resolve a document against the ledger entry attesting its legacy body."""
     if schema_id is not None and schema_id != entry.body_schema:
         return BodySchemaResolution(
             required_sections=None,

@@ -212,6 +212,11 @@ def resolve(
 # ---------------------------------------------------------------------------
 
 
+#: The actions the framework rules act on. An action outside this set falls
+#: through to the unhandled-signal warning, whatever the signal.
+_FRAMEWORK_ACTIONS = (CliAction.INSTALL, CliAction.SYNC, CliAction.UNINSTALL)
+
+
 def _resolve_framework(
     plan: ResolutionPlan,
     signal: FrameworkSignal,
@@ -230,66 +235,73 @@ def _resolve_framework(
         )
         return
 
-    if signal == FrameworkSignal.MISSING:
-        if action == CliAction.INSTALL:
-            # Proceed normally - install will scaffold
-            return
-        if action == CliAction.SYNC:
-            plan.conflicts.append(
-                "Framework not installed. Run 'vaultspec-core install' first."
-            )
-            return
-        if action == CliAction.UNINSTALL:
-            plan.warnings.append("Nothing to remove - framework is not installed.")
-            return
+    if signal == FrameworkSignal.MISSING and action in _FRAMEWORK_ACTIONS:
+        _resolve_framework_missing(plan, action)
+        return
 
-    if signal == FrameworkSignal.CORRUPTED:
-        if action == CliAction.INSTALL:
-            if force:
-                plan.steps.append(
-                    ResolutionStep(
-                        action=ResolutionAction.REPAIR_MANIFEST,
-                        target="manifest",
-                        reason="Manifest corrupted, repairing before install",
-                    )
-                )
-            else:
-                plan.conflicts.append("Manifest is corrupted. Use --force to repair.")
-            return
-        if action == CliAction.SYNC:
-            plan.steps.append(
-                ResolutionStep(
-                    action=ResolutionAction.REPAIR_MANIFEST,
-                    target="manifest",
-                    reason="Manifest corrupted, repairing before sync",
-                )
-            )
-            plan.steps.append(
-                ResolutionStep(
-                    action=ResolutionAction.SYNC,
-                    target="all",
-                    reason="Sync after manifest repair",
-                )
-            )
-            return
-        if action == CliAction.UNINSTALL:
-            if force:
-                plan.steps.append(
-                    ResolutionStep(
-                        action=ResolutionAction.REPAIR_MANIFEST,
-                        target="manifest",
-                        reason="Corrupted manifest - repairing before uninstall",
-                    )
-                )
-            else:
-                plan.conflicts.append(
-                    "Manifest is corrupted. Use --force to proceed with uninstall."
-                )
-            return
+    if signal == FrameworkSignal.CORRUPTED and action in _FRAMEWORK_ACTIONS:
+        _resolve_framework_corrupted(plan, action, force=force)
+        return
 
     # All FrameworkSignal values are handled above; this is unreachable
     # unless a new enum member is added without updating the resolver.
     logger.warning("Unknown FrameworkSignal member: %s (action=%s)", signal, action)
+
+
+def _resolve_framework_missing(plan: ResolutionPlan, action: CliAction) -> None:
+    """Apply resolution rules for a workspace with no framework installed."""
+    if action == CliAction.SYNC:
+        plan.conflicts.append(
+            "Framework not installed. Run 'vaultspec-core install' first."
+        )
+    elif action == CliAction.UNINSTALL:
+        plan.warnings.append("Nothing to remove - framework is not installed.")
+    # Install proceeds normally - it will scaffold.
+
+
+def _resolve_framework_corrupted(
+    plan: ResolutionPlan,
+    action: CliAction,
+    *,
+    force: bool,
+) -> None:
+    """Apply resolution rules for a corrupted framework manifest."""
+    if action == CliAction.SYNC:
+        plan.steps.append(
+            ResolutionStep(
+                action=ResolutionAction.REPAIR_MANIFEST,
+                target="manifest",
+                reason="Manifest corrupted, repairing before sync",
+            )
+        )
+        plan.steps.append(
+            ResolutionStep(
+                action=ResolutionAction.SYNC,
+                target="all",
+                reason="Sync after manifest repair",
+            )
+        )
+        return
+
+    if action == CliAction.INSTALL:
+        reason = "Manifest corrupted, repairing before install"
+        conflict = "Manifest is corrupted. Use --force to repair."
+    elif action == CliAction.UNINSTALL:
+        reason = "Corrupted manifest - repairing before uninstall"
+        conflict = "Manifest is corrupted. Use --force to proceed with uninstall."
+    else:
+        return
+
+    if force:
+        plan.steps.append(
+            ResolutionStep(
+                action=ResolutionAction.REPAIR_MANIFEST,
+                target="manifest",
+                reason=reason,
+            )
+        )
+    else:
+        plan.conflicts.append(conflict)
 
 
 #: Cap on the number of diverged paths spelled out in the adoption conflict.
@@ -513,16 +525,9 @@ def _resolve_provider_dir(
         )
         return
 
-    if is_syncable and action == CliAction.INSTALL:
+    if is_syncable and action in (CliAction.INSTALL, CliAction.UNINSTALL):
         # Empty/partial during install: install will scaffold and sync.
-        return
-
-    if is_syncable and action == CliAction.UNINSTALL:
         # Empty/partial during uninstall: the directory will be removed.
-        return
-
-    if signal == ProviderDirSignal.MIXED and action == CliAction.UNINSTALL:
-        # Already handled above (MIXED + uninstall with force check).
         return
 
     # All ProviderDirSignal values are handled above.
@@ -878,6 +883,32 @@ def _resolve_gitattributes(
 # ---------------------------------------------------------------------------
 
 
+#: Repair reason per pre-commit signal, for the signals install and sync can
+#: repair in place. ``{entry_prefix}`` is filled with the mode-appropriate
+#: canonical hook entry prefix. NO_FILE is absent: scaffolding an entirely
+#: missing config is a sync-only repair with its own reason.
+_PRECOMMIT_REPAIR_REASONS: dict[PrecommitSignal, str] = {
+    PrecommitSignal.NO_HOOKS: "No vaultspec-core hooks found in pre-commit config",
+    PrecommitSignal.INCOMPLETE: "Missing canonical hooks in pre-commit config",
+    PrecommitSignal.NON_CANONICAL: (
+        "Hook entries use non-canonical pattern; should use '{entry_prefix}'"
+    ),
+}
+
+#: Signals that describe a coherent boundary no resolution step acts on.
+#: UNREFRESHABLE means ``prek.toml`` owns the boundary and lacks the canonical
+#: hooks, so sync cannot repair anything - the doctor surface renders the
+#: actionable advisory (``spec precommit migrate``) instead. ORPHANED means the
+#: hooks live safely in ``prek.toml`` and the leftover
+#: ``.pre-commit-config.yaml`` is superseded and operator-owned; removal is
+#: operator-gated, never a sync-time repair.
+_PRECOMMIT_INERT_SIGNALS = (
+    PrecommitSignal.COMPLETE,
+    PrecommitSignal.UNREFRESHABLE,
+    PrecommitSignal.ORPHANED,
+)
+
+
 def _resolve_precommit(
     plan: ResolutionPlan,
     signal: PrecommitSignal,
@@ -891,11 +922,11 @@ def _resolve_precommit(
     _ = force  # precommit repairs are unconditional
     if not precommit_managed:
         return
-    if signal == PrecommitSignal.COMPLETE:
+    if signal in _PRECOMMIT_INERT_SIGNALS:
         return
 
     if signal == PrecommitSignal.NO_FILE:
-        if precommit_managed and action == CliAction.SYNC:
+        if action == CliAction.SYNC:
             plan.steps.append(
                 ResolutionStep(
                     action=ResolutionAction.REPAIR_PRECOMMIT,
@@ -905,53 +936,16 @@ def _resolve_precommit(
             )
         return
 
-    if signal == PrecommitSignal.NO_HOOKS:
+    reason = _PRECOMMIT_REPAIR_REASONS.get(signal)
+    if reason is not None:
         if action in (CliAction.INSTALL, CliAction.SYNC):
             plan.steps.append(
                 ResolutionStep(
                     action=ResolutionAction.REPAIR_PRECOMMIT,
                     target=".pre-commit-config.yaml",
-                    reason="No vaultspec-core hooks found in pre-commit config",
+                    reason=reason.format(entry_prefix=expected_entry_prefix),
                 )
             )
-        return
-
-    if signal == PrecommitSignal.INCOMPLETE:
-        if action in (CliAction.INSTALL, CliAction.SYNC):
-            plan.steps.append(
-                ResolutionStep(
-                    action=ResolutionAction.REPAIR_PRECOMMIT,
-                    target=".pre-commit-config.yaml",
-                    reason="Missing canonical hooks in pre-commit config",
-                )
-            )
-        return
-
-    if signal == PrecommitSignal.NON_CANONICAL:
-        if action in (CliAction.INSTALL, CliAction.SYNC):
-            plan.steps.append(
-                ResolutionStep(
-                    action=ResolutionAction.REPAIR_PRECOMMIT,
-                    target=".pre-commit-config.yaml",
-                    reason=(
-                        "Hook entries use non-canonical pattern; "
-                        f"should use '{expected_entry_prefix}'"
-                    ),
-                )
-            )
-        return
-
-    if signal == PrecommitSignal.UNREFRESHABLE:
-        # ``prek.toml`` owns this boundary and lacks the canonical hooks,
-        # so sync cannot repair anything here. The doctor surface renders
-        # the actionable advisory (``spec precommit migrate``); resolution
-        # must leave the workspace unchanged.
-        return
-
-    if signal == PrecommitSignal.ORPHANED:
-        # Hooks live safely in ``prek.toml``; the leftover
-        # ``.pre-commit-config.yaml`` is superseded and operator-owned.
-        # Removal is operator-gated, never a sync-time repair.
         return
 
     logger.warning("Unknown PrecommitSignal member: %s (action=%s)", signal, action)

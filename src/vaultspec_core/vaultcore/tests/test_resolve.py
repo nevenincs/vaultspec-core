@@ -9,7 +9,12 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
-from vaultspec_core.vaultcore.hydration import create_vault_doc, hydrate_template
+from vaultspec_core.vaultcore.hydration import (
+    DocumentIdentity,
+    TemplateFields,
+    create_vault_doc,
+    hydrate_template,
+)
 from vaultspec_core.vaultcore.models import DocType
 from vaultspec_core.vaultcore.resolve import (
     RelatedResolutionError,
@@ -228,7 +233,7 @@ class TestHydrateWithRelatedAndTags:
             template,
             "feat",
             "2026-03-01",
-            related=["[[2026-03-01-feat-research]]"],
+            TemplateFields(related=["[[2026-03-01-feat-research]]"]),
         )
         assert "[[2026-03-01-feat-research]]" in result
         assert "{yyyy-mm-dd-*}" not in result
@@ -239,7 +244,9 @@ class TestHydrateWithRelatedAndTags:
             "date: '2026-03-01'\n"
             'related:\n  - "[[{yyyy-mm-dd-*}]]"\n---\n# Title\n'
         )
-        result = hydrate_template(template, "feat", "2026-03-01", related=[])
+        result = hydrate_template(
+            template, "feat", "2026-03-01", TemplateFields(related=[])
+        )
         assert "related: []" in result
         assert "{yyyy-mm-dd-*}" not in result
 
@@ -253,7 +260,7 @@ class TestHydrateWithRelatedAndTags:
             template,
             "feat",
             "2026-03-01",
-            related=["[[doc-a]]", "[[doc-b]]", "[[doc-c]]"],
+            TemplateFields(related=["[[doc-a]]", "[[doc-b]]", "[[doc-c]]"]),
         )
         assert "[[doc-a]]" in result
         assert "[[doc-b]]" in result
@@ -268,7 +275,7 @@ class TestHydrateWithRelatedAndTags:
             template,
             "feat",
             "2026-03-01",
-            extra_tags=["#scope-backend", "#priority-high"],
+            TemplateFields(extra_tags=["#scope-backend", "#priority-high"]),
         )
         assert "#scope-backend" in result
         assert "#priority-high" in result
@@ -323,11 +330,10 @@ class TestCreateVaultDocWithRelated:
     def test_create_with_resolved_related(self, vault_env: Path) -> None:
         path = create_vault_doc(
             vault_env,
-            DocType.ADR,
-            "test-feat",
-            "2026-03-15",
-            title="Decision",
-            related=["[[2026-03-01-test-feat-research]]"],
+            DocumentIdentity(DocType.ADR, "test-feat", "2026-03-15"),
+            TemplateFields(
+                title="Decision", related=["[[2026-03-01-test-feat-research]]"]
+            ),
         )
         content = path.read_text(encoding="utf-8")
         assert "[[2026-03-01-test-feat-research]]" in content
@@ -336,11 +342,8 @@ class TestCreateVaultDocWithRelated:
     def test_create_with_extra_tags(self, vault_env: Path) -> None:
         path = create_vault_doc(
             vault_env,
-            DocType.ADR,
-            "tag-feat",
-            "2026-03-15",
-            title="Tags Test",
-            extra_tags=["#scope-api"],
+            DocumentIdentity(DocType.ADR, "tag-feat", "2026-03-15"),
+            TemplateFields(title="Tags Test", extra_tags=["#scope-api"]),
         )
         content = path.read_text(encoding="utf-8")
         assert "#scope-api" in content
@@ -350,10 +353,8 @@ class TestCreateVaultDocWithRelated:
     def test_create_without_related_defaults_to_empty(self, vault_env: Path) -> None:
         path = create_vault_doc(
             vault_env,
-            DocType.ADR,
-            "no-rel-feat",
-            "2026-03-15",
-            title="No Related",
+            DocumentIdentity(DocType.ADR, "no-rel-feat", "2026-03-15"),
+            TemplateFields(title="No Related"),
         )
         content = path.read_text(encoding="utf-8")
         # Placeholder must be replaced - created docs must pass validation

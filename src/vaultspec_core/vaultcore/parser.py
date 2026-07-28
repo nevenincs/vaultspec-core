@@ -56,9 +56,13 @@ try:
         # times faster than the pure-Python SafeLoader with identical safe
         # semantics. Every vault scan, graph build, check, and MCP tool call
         # parses frontmatter, so this is the hottest parse path in the system.
-        from yaml import CSafeLoader as _SafeLoader
+        # Both branches bind the name ``SafeLoader`` unaliased: each derives
+        # from ``yaml.constructor.SafeConstructor``, which is what refuses the
+        # ``!!python/object`` tags that would otherwise instantiate arbitrary
+        # objects out of document frontmatter.
+        from yaml import CSafeLoader as SafeLoader
     except ImportError:  # pragma: no cover - PyYAML built without libyaml
-        from yaml import SafeLoader as _SafeLoader
+        from yaml import SafeLoader
 
     def _yaml_load_impl(text: str) -> dict[str, Any]:
         """Load YAML text via PyYAML, falling back to the simple parser on error.
@@ -70,7 +74,7 @@ try:
             Dictionary of parsed key-value pairs.
         """
         try:
-            return yaml.load(text, Loader=_SafeLoader) or {}
+            return yaml.load(text, Loader=SafeLoader) or {}
         except yaml.YAMLError as e:
             # PyYAML chokes on unquoted colons in values (e.g.
             # ``description: A test: with colons``).  Fall back to

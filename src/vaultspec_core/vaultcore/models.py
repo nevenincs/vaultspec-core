@@ -24,6 +24,7 @@ __all__ = [
 ]
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 #: Canonical vault date form: ``yyyy-mm-dd`` (ISO 8601 calendar date).
@@ -35,6 +36,69 @@ _YEAR_FIRST_SLASH_RE = re.compile(r"^(\d{4})/(\d{1,2})/(\d{1,2})$")
 #: Two small components and a four-digit year, ``dd-mm-yyyy`` or
 #: ``mm/dd/yyyy`` style, with a consistent ``-`` or ``/`` separator.
 _YEAR_LAST_RE = re.compile(r"^(\d{1,2})([-/])(\d{1,2})\2(\d{4})$")
+
+
+def _parse_canonical(text: str) -> tuple[bool, _dt.date | None]:
+    """Parse a canonical ``yyyy-mm-dd`` string."""
+    if not _CANONICAL_DATE_RE.match(text):
+        return False, None
+    try:
+        return True, _dt.date.fromisoformat(text)
+    except ValueError:
+        return True, None
+
+
+def _parse_iso_timestamp(text: str) -> tuple[bool, _dt.date | None]:
+    """Parse an ISO 8601 timestamp, optionally zoned, 'T' or space separated."""
+    try:
+        return True, _dt.datetime.fromisoformat(text).date()
+    except ValueError:
+        return False, None
+
+
+def _parse_year_first_slash(text: str) -> tuple[bool, _dt.date | None]:
+    """Parse a slash-separated year-first ``yyyy/mm/dd`` string."""
+    m = _YEAR_FIRST_SLASH_RE.match(text)
+    if m is None:
+        return False, None
+    year, month, day = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    try:
+        return True, _dt.date(year, month, day)
+    except ValueError:
+        return True, None
+
+
+def _parse_year_last(text: str) -> tuple[bool, _dt.date | None]:
+    """Parse an unambiguous year-last ``dd-mm-yyyy`` / ``mm/dd/yyyy`` string."""
+    m = _YEAR_LAST_RE.match(text)
+    if m is None:
+        return False, None
+    first, second, year = int(m.group(1)), int(m.group(3)), int(m.group(4))
+    if first > 12 and 1 <= second <= 12:
+        day, month = first, second
+    elif second > 12 and 1 <= first <= 12:
+        month, day = first, second
+    else:
+        # Both components could be a month: ambiguous - reject
+        # rather than guess (D3b).
+        return True, None
+    try:
+        return True, _dt.date(year, month, day)
+    except ValueError:
+        return True, None
+
+
+#: The string parsers in precedence order. Each reports whether it claims
+#: the text and, when it does, the date it parsed - ``None`` standing for a
+#: claimed but ambiguous or out-of-range value. The first claim wins, so a
+#: malformed value in a recognised shape is rejected rather than reparsed
+#: by a later, looser parser.
+_STRING_PARSERS: tuple[Callable[[str], tuple[bool, _dt.date | None]], ...] = (
+    _parse_canonical,
+    _parse_iso_timestamp,
+    _parse_year_first_slash,
+    _parse_year_last,
+)
 
 
 def parse_lenient_date(value: object) -> _dt.date | None:
@@ -82,10 +146,8 @@ def parse_lenient_date(value: object) -> _dt.date | None:
         :meth:`DocumentMetadata.validate` for the validation policy
         built on this helper.
     """
-    if isinstance(value, _dt.datetime):
-        return value.date()
     if isinstance(value, _dt.date):
-        return value
+        return value.date() if isinstance(value, _dt.datetime) else value
     if not isinstance(value, str):
         return None
 
@@ -93,43 +155,10 @@ def parse_lenient_date(value: object) -> _dt.date | None:
     if not text:
         return None
 
-    if _CANONICAL_DATE_RE.match(text):
-        try:
-            return _dt.date.fromisoformat(text)
-        except ValueError:
-            return None
-
-    # ISO 8601 timestamps, optionally zoned ('Z' or offset), with either
-    # a 'T' or a space separator (Python 3.11+ fromisoformat handles both).
-    try:
-        return _dt.datetime.fromisoformat(text).date()
-    except ValueError:
-        pass
-
-    m = _YEAR_FIRST_SLASH_RE.match(text)
-    if m:
-        year, month, day = int(m.group(1)), int(m.group(2)), int(m.group(3))
-        try:
-            return _dt.date(year, month, day)
-        except ValueError:
-            return None
-
-    m = _YEAR_LAST_RE.match(text)
-    if m:
-        first, second, year = int(m.group(1)), int(m.group(3)), int(m.group(4))
-        if first > 12 and 1 <= second <= 12:
-            day, month = first, second
-        elif second > 12 and 1 <= first <= 12:
-            month, day = first, second
-        else:
-            # Both components could be a month: ambiguous - reject
-            # rather than guess (D3b).
-            return None
-        try:
-            return _dt.date(year, month, day)
-        except ValueError:
-            return None
-
+    for parser in _STRING_PARSERS:
+        claimed, parsed = parser(text)
+        if claimed:
+            return parsed
     return None
 
 

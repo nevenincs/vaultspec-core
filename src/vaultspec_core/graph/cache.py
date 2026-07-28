@@ -266,6 +266,55 @@ def validate(
     return seen == manifest.keys()
 
 
+def _is_fingerprint_row(value: object) -> bool:
+    """Return ``True`` when *value* is a serialised :data:`Fingerprint`.
+
+    A manifest value round-trips through JSON as the three-element list
+    ``[st_size, st_mtime_ns, sha256_hex]``.  The shape check precedes the
+    per-element checks so element access is only reached once *value* is
+    known to be a list of exactly three items.
+
+    Args:
+        value: A decoded JSON value from a cache file's manifest.
+
+    Returns:
+        ``True`` when the row can be read back as a fingerprint.
+    """
+    if not isinstance(value, list) or len(value) != 3:
+        return False
+    size, mtime_ns, content_hash = value
+    return (
+        isinstance(size, int)
+        and isinstance(mtime_ns, int)
+        and isinstance(content_hash, str)
+    )
+
+
+def _is_encoding_issue_row(row: object) -> bool:
+    """Return ``True`` when *row* is a serialised encoding-issue tuple.
+
+    An encoding issue round-trips through JSON as the four-element list
+    ``[path, kind, detail, start]``, where ``start`` is the optional byte
+    offset of the failure and so may be ``null``.  As above, the shape
+    check precedes the per-element checks.
+
+    Args:
+        row: A decoded JSON value from a cache file's issue list.
+
+    Returns:
+        ``True`` when the row can be read back as an encoding issue.
+    """
+    if not isinstance(row, list) or len(row) != 4:
+        return False
+    doc_path, kind, detail, start = row
+    return (
+        isinstance(doc_path, str)
+        and isinstance(kind, str)
+        and isinstance(detail, str)
+        and (start is None or isinstance(start, int))
+    )
+
+
 def load(path: Path) -> GraphCachePayload | None:
     """Read and parse a cache file, returning ``None`` on any failure.
 
@@ -312,14 +361,7 @@ def load(path: Path) -> GraphCachePayload | None:
 
     manifest: dict[str, Fingerprint] = {}
     for key, value in raw_manifest.items():
-        if (
-            not isinstance(key, str)
-            or not isinstance(value, list)
-            or len(value) != 3
-            or not isinstance(value[0], int)
-            or not isinstance(value[1], int)
-            or not isinstance(value[2], str)
-        ):
+        if not isinstance(key, str) or not _is_fingerprint_row(value):
             logger.debug("Graph cache manifest entry %r is malformed; ignoring", key)
             return None
         manifest[key] = (value[0], value[1], value[2])
@@ -336,14 +378,7 @@ def load(path: Path) -> GraphCachePayload | None:
 
     encoding: list[tuple[str, str, str, int | None]] = []
     for row in raw_encoding:
-        if (
-            not isinstance(row, list)
-            or len(row) != 4
-            or not isinstance(row[0], str)
-            or not isinstance(row[1], str)
-            or not isinstance(row[2], str)
-            or not (row[3] is None or isinstance(row[3], int))
-        ):
+        if not _is_encoding_issue_row(row):
             logger.debug(
                 "Graph cache encoding-issue row %r is malformed; ignoring", row
             )

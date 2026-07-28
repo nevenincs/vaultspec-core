@@ -24,6 +24,7 @@ __all__ = ["resolve_related_inputs", "validate_feature_dependencies"]
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
 
@@ -120,8 +121,6 @@ def _resolve_single(
     Returns:
         The canonical stem string, or ``None`` if unresolvable.
     """
-    import pathlib
-
     cleaned = raw.strip()
     if not cleaned:
         return None
@@ -135,52 +134,59 @@ def _resolve_single(
         inner = inner.strip()
         if inner.endswith(".md"):
             inner = inner[:-3]
-        key = inner.lower()
-        if key in stem_index:
-            return stem_index[key].stem
-        return None
+        match = stem_index.get(inner.lower())
+        return match.stem if match is not None else None
 
     # Strip .md extension if present
     if cleaned.endswith(".md"):
         cleaned = cleaned[:-3]
 
+    for key in _candidate_keys(cleaned, root_dir):
+        match = stem_index.get(key)
+        if match is not None:
+            return match.stem
+
+    return None
+
+
+def _candidate_keys(cleaned: str, root_dir: Path) -> Iterator[str]:
+    """Yield the stem-index lookup keys for one reference, in priority order.
+
+    Args:
+        cleaned: The trimmed reference with any ``.md`` extension removed.
+        root_dir: Project root directory, the base for relative paths.
+
+    Yields:
+        Lowercase stem keys: the bare stem first (the most common case),
+        then the stem of the reference read as a path, then its final
+        component.
+    """
+    import pathlib
+
     # Try as bare stem first (most common case)
-    key = cleaned.lower()
-    if key in stem_index:
-        return stem_index[key].stem
+    yield cleaned.lower()
 
     # Try as a path (absolute or relative)
     try:
         candidate = pathlib.Path(cleaned)
         # If it looks like it has directory components, resolve it
         if len(candidate.parts) > 1:
-            # Try absolute
             if candidate.is_absolute():
-                stem_key = candidate.stem.lower()
-                if stem_key in stem_index:
-                    return stem_index[stem_key].stem
+                yield candidate.stem.lower()
             else:
                 # Resolve relative to root_dir
-                resolved_path = (root_dir / candidate).resolve()
-                stem_key = resolved_path.stem.lower()
-                if stem_key in stem_index:
-                    return stem_index[stem_key].stem
+                yield (root_dir / candidate).resolve().stem.lower()
     except (OSError, ValueError):
         pass
 
     # Try matching just the final component as a stem
     try:
-        candidate = pathlib.Path(cleaned)
-        final = candidate.name
+        final = pathlib.Path(cleaned).name
         if final.endswith(".md"):
             final = final[:-3]
-        key = final.lower()
-        if key in stem_index:
-            return stem_index[key].stem
+        yield final.lower()
     except (OSError, ValueError):
         pass
-
-    return None
 
 
 def validate_feature_dependencies(

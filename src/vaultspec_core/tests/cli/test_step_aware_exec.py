@@ -296,6 +296,71 @@ def test_step_aware_bulk_scaffolding(runner, synthetic_project):
     assert "updated" in result3.output
 
 
+def test_step_aware_bulk_scaffolding_dry_run(runner, synthetic_project):
+    """A bulk dry run previews every record without writing one to disk."""
+    setup_test_plan(synthetic_project)
+    base_dir = synthetic_project / ".vault" / "exec" / "2026-05-17-test-feature"
+
+    result = runner.invoke(
+        app,
+        [
+            "--target",
+            str(synthetic_project),
+            "vault",
+            "add",
+            "exec",
+            "--feature",
+            "test-feature",
+            "--all-steps",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "would create" in result.output
+    assert not base_dir.exists()
+
+    # An existing record is previewed as an overwrite only under --force.
+    base_dir.mkdir(parents=True)
+    existing = base_dir / "2026-05-17-test-feature-P01-S01.md"
+    existing.write_text("sentinel\n", encoding="utf-8")
+
+    skipped = runner.invoke(
+        app,
+        [
+            "--target",
+            str(synthetic_project),
+            "vault",
+            "add",
+            "exec",
+            "--feature",
+            "test-feature",
+            "--all-steps",
+            "--dry-run",
+        ],
+    )
+    assert skipped.exit_code == 0
+    assert "skipped; exists" in skipped.output
+
+    forced = runner.invoke(
+        app,
+        [
+            "--target",
+            str(synthetic_project),
+            "vault",
+            "add",
+            "exec",
+            "--feature",
+            "test-feature",
+            "--all-steps",
+            "--dry-run",
+            "--force",
+        ],
+    )
+    assert forced.exit_code == 0
+    assert "would overwrite" in forced.output
+    assert existing.read_text(encoding="utf-8") == "sentinel\n"
+
+
 def test_step_aware_bulk_scaffolding_json(runner, synthetic_project):
     """Bulk scaffolding with --json outputs the outcome in envelope schema."""
     setup_test_plan(synthetic_project)

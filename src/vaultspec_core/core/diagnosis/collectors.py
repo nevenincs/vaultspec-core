@@ -11,7 +11,7 @@ import json
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .signals import (
     BuiltinVersionSignal,
@@ -30,7 +30,7 @@ from .signals import (
 )
 
 if TYPE_CHECKING:
-    from ..enums import InstallMode
+    from ..enums import InstallMode, Tool
 
 logger = logging.getLogger(__name__)
 
@@ -204,6 +204,33 @@ def collect_manifest_coherence(target: Path) -> dict[str, ManifestEntrySignal]:
     return result
 
 
+def _provider_children(target: Path, tool_value: str) -> list[Path] | None:
+    """Return the entries of a provider's directory.
+
+    Args:
+        target: Workspace root directory.
+        tool_value: The :class:`~vaultspec_core.core.enums.Tool` ``.value``
+            string (e.g. ``"claude"``).
+
+    Returns:
+        The directory's entries, or ``None`` when the provider has no known
+        directory, the directory does not exist, or it cannot be read.
+    """
+    dir_name = _TOOL_DIR.get(tool_value)
+    if dir_name is None:
+        return None
+
+    provider_dir = target / dir_name
+    if not provider_dir.exists():
+        return None
+
+    try:
+        return list(provider_dir.iterdir())
+    except OSError as exc:
+        logger.warning("Cannot read provider directory %s: %s", provider_dir, exc)
+        return None
+
+
 def collect_provider_dir_state(target: Path, tool_value: str) -> ProviderDirSignal:
     """Assess the completeness of a provider's configuration directory.
 
@@ -219,19 +246,8 @@ def collect_provider_dir_state(target: Path, tool_value: str) -> ProviderDirSign
     from ..enums import Tool
     from ..types import get_context
 
-    dir_name = _TOOL_DIR.get(tool_value)
-    if dir_name is None:
-        return ProviderDirSignal.MISSING
-
-    provider_dir = target / dir_name
-    if not provider_dir.exists():
-        return ProviderDirSignal.MISSING
-
-    # Check if directory is empty
-    try:
-        children = list(provider_dir.iterdir())
-    except OSError as exc:
-        logger.warning("Cannot read provider directory %s: %s", provider_dir, exc)
+    children = _provider_children(target, tool_value)
+    if children is None:
         return ProviderDirSignal.MISSING
 
     if not children:
@@ -326,10 +342,7 @@ def collect_provider_dir_state(target: Path, tool_value: str) -> ProviderDirSign
     if has_foreign:
         return ProviderDirSignal.MIXED
 
-    if all_present:
-        return ProviderDirSignal.COMPLETE
-
-    return ProviderDirSignal.PARTIAL
+    return ProviderDirSignal.COMPLETE if all_present else ProviderDirSignal.PARTIAL
 
 
 def collect_builtin_version_state(target: Path) -> BuiltinVersionSignal:
@@ -363,6 +376,19 @@ def collect_builtin_version_state(target: Path) -> BuiltinVersionSignal:
     return BuiltinVersionSignal.CURRENT
 
 
+def _provider_config_file(tool: Tool) -> Path | None:
+    """Return a provider's root config file path, or ``None`` when unresolvable."""
+    from ..types import get_context
+
+    try:
+        ctx = get_context()
+        cfg = ctx.tool_configs.get(tool)
+    except LookupError:
+        return None
+
+    return cfg.config_file if cfg is not None else None
+
+
 def collect_config_state(tool_value: str) -> ConfigSignal:
     """Assess the state of a provider's root configuration file.
 
@@ -375,24 +401,9 @@ def collect_config_state(tool_value: str) -> ConfigSignal:
         reflecting the observed state.
     """
     from ..enums import Tool
-    from ..types import get_context
 
-    tool = Tool(tool_value)
-
-    try:
-        ctx = get_context()
-        cfg = ctx.tool_configs.get(tool)
-    except LookupError:
-        return ConfigSignal.MISSING
-
-    if cfg is None:
-        return ConfigSignal.MISSING
-
-    config_file = cfg.config_file
-    if config_file is None:
-        return ConfigSignal.MISSING
-
-    if not config_file.exists():
+    config_file = _provider_config_file(Tool(tool_value))
+    if config_file is None or not config_file.exists():
         return ConfigSignal.MISSING
 
     try:
@@ -408,6 +419,49 @@ def collect_config_state(tool_value: str) -> ConfigSignal:
     return ConfigSignal.FOREIGN
 
 
+def _read_mcp_servers(mcp_path: Path) -> dict[str, object] | None:
+    """Return the ``mcpServers`` mapping from an ``.mcp.json`` file.
+
+    Args:
+        mcp_path: Path to the MCP configuration file.
+
+    Returns:
+        The deployed server entries, or ``None`` when the file is absent,
+        unreadable, or does not carry a ``mcpServers`` mapping.
+    """
+    if not mcp_path.exists():
+        return None
+
+    try:
+        raw = json.loads(mcp_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Cannot read MCP config %s: %s", mcp_path, exc)
+        return None
+
+    if not isinstance(raw, dict):
+        return None
+
+    servers = raw.get("mcpServers")
+    if not isinstance(servers, dict):
+        return None
+
+    return servers
+
+
+def _registry_mcp_signal(
+    servers: dict[str, object],
+    registry: dict[str, tuple[Path, dict[str, Any]]],
+) -> ConfigSignal:
+    """Classify deployed MCP entries against the rendered registry definitions."""
+    for name, (_path, expected_config) in registry.items():
+        if name not in servers or servers[name] != expected_config:
+            return ConfigSignal.REGISTRY_DRIFT
+
+    if set(servers.keys()) - set(registry.keys()):
+        return ConfigSignal.USER_MCP
+    return ConfigSignal.OK
+
+
 def collect_mcp_config_state(target: Path) -> ConfigSignal:
     """Assess the state of the ``.mcp.json`` MCP configuration.
 
@@ -418,21 +472,8 @@ def collect_mcp_config_state(target: Path) -> ConfigSignal:
         :class:`~vaultspec_core.core.diagnosis.signals.ConfigSignal`
         reflecting the observed MCP configuration state.
     """
-    mcp_path = target / ".mcp.json"
-    if not mcp_path.exists():
-        return ConfigSignal.PARTIAL_MCP
-
-    try:
-        raw = json.loads(mcp_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as exc:
-        logger.warning("Cannot read MCP config %s: %s", mcp_path, exc)
-        return ConfigSignal.PARTIAL_MCP
-
-    if not isinstance(raw, dict):
-        return ConfigSignal.PARTIAL_MCP
-
-    servers = raw.get("mcpServers")
-    if not isinstance(servers, dict):
+    servers = _read_mcp_servers(target / ".mcp.json")
+    if servers is None:
         return ConfigSignal.PARTIAL_MCP
 
     # Check registry drift: compare deployed entries against definitions
@@ -446,17 +487,7 @@ def collect_mcp_config_state(target: Path) -> ConfigSignal:
 
     registry = collect_mcp_servers(mode=resolve_render_mode(target), target=target)
     if registry:
-        managed_names = set(registry.keys())
-        for name, (_path, expected_config) in registry.items():
-            if name not in servers:
-                return ConfigSignal.REGISTRY_DRIFT
-            if servers[name] != expected_config:
-                return ConfigSignal.REGISTRY_DRIFT
-
-        has_user_entries = bool(set(servers.keys()) - managed_names)
-        if has_user_entries:
-            return ConfigSignal.USER_MCP
-        return ConfigSignal.OK
+        return _registry_mcp_signal(servers, registry)
 
     # Fallback when no registry is available (pre-registry workspace)
     if "vaultspec-core" not in servers:
@@ -562,10 +593,8 @@ def collect_gitignore_state(target: Path) -> GitignoreSignal:
 
     # Check if all recommended entries are present in the block.
     # We allow extra entries (idempotency is handled by ensure_gitignore_block).
-    if all(entry in block_entries for entry in recommended):
-        return GitignoreSignal.COMPLETE
-
-    return GitignoreSignal.PARTIAL
+    complete = all(entry in block_entries for entry in recommended)
+    return GitignoreSignal.COMPLETE if complete else GitignoreSignal.PARTIAL
 
 
 def collect_content_integrity(tool_value: str) -> dict[str, ContentSignal]:
@@ -817,10 +846,47 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
     return PrecommitSignal.UNREFRESHABLE
 
 
-def _collect_precommit_yaml_state(target: Path) -> PrecommitSignal:
-    """Assess ``.pre-commit-config.yaml`` hook state, ignoring ``prek.toml``."""
+def _local_precommit_hooks(config_path: Path) -> list[dict[str, object]] | None:
+    """Return the hook mappings declared by ``repo: local`` entries.
+
+    Args:
+        config_path: Path to ``.pre-commit-config.yaml``.
+
+    Returns:
+        The local hook mappings, or ``None`` when the file is absent or cannot
+        be parsed. An empty list means the config parsed but declares no local
+        hooks, which includes a config whose top level or ``repos`` key carries
+        an unexpected shape.
+    """
     import yaml
 
+    if not config_path.exists():
+        return None
+
+    try:
+        data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    except (yaml.YAMLError, OSError) as exc:
+        logger.warning("Cannot read .pre-commit-config.yaml %s: %s", config_path, exc)
+        return None
+
+    if not isinstance(data, dict):
+        return []
+
+    repos = data.get("repos", [])
+    if not isinstance(repos, list):
+        return []
+
+    local_hooks: list[dict[str, object]] = []
+    for repo in repos:
+        if isinstance(repo, dict) and repo.get("repo") == "local":
+            hooks = repo.get("hooks", [])
+            if isinstance(hooks, list):
+                local_hooks.extend(h for h in hooks if isinstance(h, dict))
+    return local_hooks
+
+
+def _collect_precommit_yaml_state(target: Path) -> PrecommitSignal:
+    """Assess ``.pre-commit-config.yaml`` hook state, ignoring ``prek.toml``."""
     from ..commands import CANONICAL_HOOK_IDS, canonical_hook_entries_for_mode
     from ..workspace_mode import resolve_render_mode
 
@@ -831,30 +897,9 @@ def _collect_precommit_yaml_state(target: Path) -> PrecommitSignal:
     # expectations. P04 layers a dedicated mode-mismatch signal on top of this.
     expected_entries = canonical_hook_entries_for_mode(resolve_render_mode(target))
 
-    config_path = target / ".pre-commit-config.yaml"
-    if not config_path.exists():
+    local_hooks = _local_precommit_hooks(target / ".pre-commit-config.yaml")
+    if local_hooks is None:
         return PrecommitSignal.NO_FILE
-
-    try:
-        data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    except (yaml.YAMLError, OSError) as exc:
-        logger.warning("Cannot read .pre-commit-config.yaml %s: %s", config_path, exc)
-        return PrecommitSignal.NO_FILE
-
-    if not isinstance(data, dict):
-        return PrecommitSignal.NO_HOOKS
-
-    repos = data.get("repos", [])
-    if not isinstance(repos, list):
-        return PrecommitSignal.NO_HOOKS
-
-    # Collect all hooks from local repos
-    local_hooks: list[dict[str, object]] = []
-    for repo in repos:
-        if isinstance(repo, dict) and repo.get("repo") == "local":
-            hooks = repo.get("hooks", [])
-            if isinstance(hooks, list):
-                local_hooks.extend(h for h in hooks if isinstance(h, dict))
 
     found_ids = {
         str(h.get("id")) for h in local_hooks if h.get("id") in CANONICAL_HOOK_IDS
@@ -907,8 +952,6 @@ def _observed_precommit_mode(
         canonical hook entry agrees on, or ``None`` when there is no config, no
         canonical hook, the entries disagree, or *package* is not core.
     """
-    import yaml
-
     from ..commands import CANONICAL_HOOK_IDS, entry_prefix_for_mode
     from ..enums import InstallMode
     from ..workspace_mode import CORE_DISTRIBUTION_NAME, _canonical_distribution_name
@@ -917,18 +960,8 @@ def _observed_precommit_mode(
     if _canonical_distribution_name(pkg) != CORE_DISTRIBUTION_NAME:
         return None
 
-    config_path = target / ".pre-commit-config.yaml"
-    if not config_path.exists():
-        return None
-    try:
-        data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    except (yaml.YAMLError, OSError) as exc:
-        logger.warning("Cannot read .pre-commit-config.yaml %s: %s", config_path, exc)
-        return None
-    if not isinstance(data, dict):
-        return None
-    repos = data.get("repos", [])
-    if not isinstance(repos, list):
+    local_hooks = _local_precommit_hooks(target / ".pre-commit-config.yaml")
+    if local_hooks is None:
         return None
 
     # Longest prefix first so tool mode's "uvx --from vaultspec-core
@@ -940,20 +973,14 @@ def _observed_precommit_mode(
     )
 
     observed: set[InstallMode] = set()
-    for repo in repos:
-        if not isinstance(repo, dict) or repo.get("repo") != "local":
+    for hook in local_hooks:
+        if hook.get("id") not in CANONICAL_HOOK_IDS:
             continue
-        hooks = repo.get("hooks", [])
-        if not isinstance(hooks, list):
-            continue
-        for hook in hooks:
-            if not isinstance(hook, dict) or hook.get("id") not in CANONICAL_HOOK_IDS:
-                continue
-            entry = str(hook.get("entry", ""))
-            for prefix, mode in prefixes:
-                if entry.startswith(prefix):
-                    observed.add(mode)
-                    break
+        entry = str(hook.get("entry", ""))
+        for prefix, mode in prefixes:
+            if entry.startswith(prefix):
+                observed.add(mode)
+                break
 
     if len(observed) == 1:
         return next(iter(observed))
@@ -976,6 +1003,25 @@ def _legacy_dependency_args(module: str) -> list[str]:
 
     _, current_args = render_launch_for_mode(InstallMode.DEPENDENCY, "", module)
     return [arg for arg in current_args if arg != "--no-sync"]
+
+
+def _launch_module(args: list[Any]) -> str | None:
+    """Return the runnable module a deployed launch argv names after ``-m``.
+
+    Args:
+        args: The ``args`` list of a deployed MCP server entry.
+
+    Returns:
+        The module name, or ``None`` when the argv carries no ``-m`` token, the
+        token is last, or the value after it is not a string.
+    """
+    if "-m" not in args:
+        return None
+    module_index = args.index("-m") + 1
+    if module_index >= len(args):
+        return None
+    module = args[module_index]
+    return module if isinstance(module, str) else None
 
 
 def _observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode | None:
@@ -1016,18 +1062,8 @@ def _observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode 
 
     pkg = package if package is not None else CORE_DISTRIBUTION_NAME
 
-    mcp_path = target / ".mcp.json"
-    if not mcp_path.exists():
-        return None
-    try:
-        raw = json.loads(mcp_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as exc:
-        logger.warning("Cannot read MCP config %s: %s", mcp_path, exc)
-        return None
-    if not isinstance(raw, dict):
-        return None
-    servers = raw.get("mcpServers")
-    if not isinstance(servers, dict):
+    servers = _read_mcp_servers(target / ".mcp.json")
+    if servers is None:
         return None
     entry = servers.get(pkg)
     if not isinstance(entry, dict):
@@ -1035,13 +1071,8 @@ def _observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode 
 
     command = entry.get("command")
     args = entry.get("args")
-    if not isinstance(args, list) or "-m" not in args:
-        return None
-    module_index = args.index("-m") + 1
-    if module_index >= len(args):
-        return None
-    module = args[module_index]
-    if not isinstance(module, str):
+    module = _launch_module(args) if isinstance(args, list) else None
+    if module is None:
         return None
 
     for mode in (InstallMode.TOOL, InstallMode.DEPENDENCY):
