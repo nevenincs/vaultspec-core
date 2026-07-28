@@ -332,7 +332,7 @@ class TestPrekShortCircuit:
     ) -> None:
         (tmp_path / "prek.toml").write_text("", encoding="utf-8")
 
-        caplog.set_level("INFO", logger="vaultspec_core.core.commands")
+        caplog.set_level("INFO", logger="vaultspec_core.core.precommit")
         result = _scaffold_precommit(tmp_path)
 
         assert result == []
@@ -357,7 +357,7 @@ class TestPrekShortCircuit:
             render_prek_hook_block(InstallMode.DEPENDENCY), encoding="utf-8"
         )
 
-        caplog.set_level("INFO", logger="vaultspec_core.core.commands")
+        caplog.set_level("INFO", logger="vaultspec_core.core.precommit")
         result = _scaffold_precommit(tmp_path)
 
         assert result == []
