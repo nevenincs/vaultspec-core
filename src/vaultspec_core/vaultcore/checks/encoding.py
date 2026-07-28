@@ -1,7 +1,7 @@
 """Surface vault documents that are not valid UTF-8.
 
 The framework treats ``.vault/`` as a UTF-8 corpus. Every discovery path -
-``scan_vault``/``list_features`` in the scanner, ``_scan_all`` in the query
+``scan_vault``/``list_features`` in the scanner, ``scan_all`` in the query
 layer, the graph builder, and the snapshot-backed checks - reads documents
 with ``read_text(encoding="utf-8")`` and silently skips a file that fails to
 decode (``UnicodeDecodeError``). A UTF-16 or Latin-1 ``.md`` is therefore

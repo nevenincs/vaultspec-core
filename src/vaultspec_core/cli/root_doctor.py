@@ -61,7 +61,7 @@ def cmd_doctor(
     import typer
 
     from vaultspec_core.cli.rendering import json_envelope
-    from vaultspec_core.cli.spec_cmd import _doctor_exit_code, _render_diagnosis_table
+    from vaultspec_core.cli.spec_cmd import doctor_exit_code, render_diagnosis_table
     from vaultspec_core.console import get_console
     from vaultspec_core.core.diagnosis import diagnose
     from vaultspec_core.vaultcore.checks import render_check_result, run_all_checks
@@ -96,7 +96,7 @@ def cmd_doctor(
         if json_output:
             logging.disable(previous_logging_disable)
 
-    spec_exit_code = _doctor_exit_code(diag)
+    spec_exit_code = doctor_exit_code(diag)
     vault_has_errors = any(r.error_count for r in results)
     vault_has_warnings = any(r.warning_count for r in results)
 
@@ -121,7 +121,7 @@ def cmd_doctor(
         raise typer.Exit(code=exit_code)
 
     console = get_console()
-    _render_diagnosis_table(console, diag)
+    render_diagnosis_table(console, diag)
     console.print()
     console.print("[bold]Vault Check - All[/bold]")
     for r in results:

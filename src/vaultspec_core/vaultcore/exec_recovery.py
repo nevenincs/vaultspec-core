@@ -20,10 +20,10 @@ from ..core.exceptions import VaultSpecError
 from ..core.helpers import advisory_lock, atomic_write_bytes
 from ..plan.commands.step_ops import find_step
 from ..plan.parser import Plan, parse_plan
-from .checks.exec_mapping import _link_stem
+from .checks.exec_mapping import link_stem
 from .models import refresh_modified_stamp
 from .parser import parse_vault_metadata
-from .rename_engine import _assert_within, docs_lock_target
+from .rename_engine import assert_within, docs_lock_target
 from .rename_ops import split_keepends
 
 if TYPE_CHECKING:
@@ -110,7 +110,7 @@ def resolve_exec_parent_plan(root_dir: Path, record_path: Path) -> ExecRecoveryC
     plan_dir = (docs_dir / "plan").resolve()
     contexts: list[ExecRecoveryContext] = []
     for link in metadata.related:
-        stem = _link_stem(link)
+        stem = link_stem(link)
         if stem is None:
             continue
         if not _is_safe_plan_stem(stem):
@@ -279,7 +279,7 @@ def _validate_archive_destination(
 ) -> None:
     """Reject an existing or out-of-vault archive destination before apply."""
     docs_dir = (context.root_dir / get_config().docs_dir).resolve()
-    _assert_within(docs_dir, archive_path)
+    assert_within(docs_dir, archive_path)
     if archive_path.exists() or archive_path.is_symlink():
         raise ExecRecoveryError(f"Archive destination already exists: {archive_path}")
 
@@ -287,10 +287,10 @@ def _validate_archive_destination(
 def _archive_record(context: ExecRecoveryContext, archive_path: Path) -> None:
     """Atomically archive one record without replacing an existing destination."""
     docs_dir = (context.root_dir / get_config().docs_dir).resolve()
-    _assert_within(docs_dir, context.record_path)
+    assert_within(docs_dir, context.record_path)
     _validate_archive_destination(context, archive_path)
     archive_path.parent.mkdir(parents=True, exist_ok=True)
-    _assert_within(docs_dir, archive_path)
+    assert_within(docs_dir, archive_path)
     if context.record_path.is_symlink() or not context.record_path.is_file():
         raise ExecRecoveryError(
             f"Execution record changed before archive: {context.record_path}"

@@ -737,7 +737,7 @@ class TestEncodingIssuesSurviveCache:
 class TestUnreadableDocumentsExcludedFromGraphDerivedQueries:
     """The graph-backed query path must drop what the disk path drops.
 
-    ``_scan_all`` skips a document it cannot decode. The graph still creates
+    ``scan_all`` skips a document it cannot decode. The graph still creates
     a node for such a file, with empty frontmatter and body, which is
     indistinguishable from a genuinely empty document by its fields alone.
     """

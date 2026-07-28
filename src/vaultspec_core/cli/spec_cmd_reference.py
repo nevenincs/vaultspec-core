@@ -10,7 +10,7 @@ from typing import Annotated
 import typer
 
 from vaultspec_core.cli._app import make_app
-from vaultspec_core.cli.spec_cmd_shared import _emit_json
+from vaultspec_core.cli.spec_cmd_shared import emit_json
 
 reference_app = make_app(
     help="Generate the derivable regions of the bundled CLI reference",
@@ -54,7 +54,7 @@ def cmd_reference_generate(
         results = generate_all(check=check)
     except (ReferenceMarkerError, OSError) as exc:
         if json_output:
-            _emit_json("spec.reference.generate", "failed", {"message": str(exc)})
+            emit_json("spec.reference.generate", "failed", {"message": str(exc)})
         else:
             typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
@@ -74,7 +74,7 @@ def cmd_reference_generate(
     if check:
         if not out_of_sync:
             if json_output:
-                _emit_json(
+                emit_json(
                     "spec.reference.generate",
                     "unchanged",
                     {"files": files, "in_sync": True},
@@ -84,7 +84,7 @@ def cmd_reference_generate(
                 typer.echo(f"Generated references in sync: {names}.")
             raise typer.Exit(0)
         if json_output:
-            _emit_json(
+            emit_json(
                 "spec.reference.generate",
                 "failed",
                 {"files": files, "in_sync": False},
@@ -105,7 +105,7 @@ def cmd_reference_generate(
 
     if not out_of_sync:
         if json_output:
-            _emit_json(
+            emit_json(
                 "spec.reference.generate",
                 "unchanged",
                 {"files": files, "in_sync": True},
@@ -116,7 +116,7 @@ def cmd_reference_generate(
         raise typer.Exit(0)
 
     if json_output:
-        _emit_json(
+        emit_json(
             "spec.reference.generate",
             "updated",
             {"files": files},

@@ -38,9 +38,8 @@ from .collectors_mode import (
     observed_mcp_mode,
 )
 from .collectors_precommit import (
-    _collect_precommit_yaml_state,
-    _observed_precommit_mode,
     collect_precommit_state,
+    observed_precommit_mode,
 )
 from .collectors_provider import (
     collect_builtin_version_state,
@@ -49,14 +48,7 @@ from .collectors_provider import (
     collect_provider_dir_state,
 )
 
-#: Backward-compatible alias for external callers still importing the
-#: previously private name; identical to the public :func:`observed_mcp_mode`.
-_observed_mcp_mode = observed_mcp_mode
-
 __all__ = [
-    "_collect_precommit_yaml_state",
-    "_observed_mcp_mode",
-    "_observed_precommit_mode",
     "collect_builtin_version_state",
     "collect_config_state",
     "collect_content_integrity",
@@ -74,4 +66,5 @@ __all__ = [
     "collect_vault_content_state",
     "collect_version_floor_state",
     "observed_mcp_mode",
+    "observed_precommit_mode",
 ]

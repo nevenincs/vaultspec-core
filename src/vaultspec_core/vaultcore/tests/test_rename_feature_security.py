@@ -31,10 +31,10 @@ import pytest
 from ...config import reset_config
 from ...core.exceptions import VaultSpecError
 from ..query import (
-    _assert_within_docs,
-    _rewrite_feature_tag_block,
+    assert_within_docs,
     list_documents,
     rename_feature,
+    rewrite_feature_tag_block,
 )
 from .test_rename_feature import authored_doc, snapshot_md
 
@@ -279,20 +279,20 @@ class TestContainmentGuardUnit:
         docs_dir = tmp_path / ".vault"
         docs_dir.mkdir()
         candidate = docs_dir / "adr" / "2026-06-26-x-adr.md"
-        assert _assert_within_docs(docs_dir, candidate) == candidate
+        assert assert_within_docs(docs_dir, candidate) == candidate
 
     def test_sibling_outside_docs_raises(self, tmp_path: Path):
         docs_dir = tmp_path / ".vault"
         docs_dir.mkdir()
         with pytest.raises(VaultSpecError, match="outside the managed directory tree"):
-            _assert_within_docs(docs_dir, docs_dir.parent / "outside.md")
+            assert_within_docs(docs_dir, docs_dir.parent / "outside.md")
 
     def test_parent_traversal_raises(self, tmp_path: Path):
         docs_dir = tmp_path / ".vault"
         docs_dir.mkdir()
         traversal = docs_dir / "adr" / ".." / ".." / "outside.md"
         with pytest.raises(VaultSpecError, match="outside the managed directory tree"):
-            _assert_within_docs(docs_dir, traversal)
+            assert_within_docs(docs_dir, traversal)
 
 
 # ---------------------------------------------------------------------------
@@ -491,7 +491,7 @@ class TestMalformedContent:
     def test_unclosed_frontmatter_tag_rewriter_bails(self):
         # The rewriter must refuse to persist a rewrite of a never-closed
         # frontmatter: it returns the content unchanged with changed=False.
-        out, changed = _rewrite_feature_tag_block(
+        out, changed = rewrite_feature_tag_block(
             self._UNCLOSED, "widget-engine", "gadget-engine"
         )
         assert out == self._UNCLOSED
@@ -527,7 +527,7 @@ class TestMalformedContent:
             "# body\n"
         )
         with pytest.raises(VaultSpecError, match="inline tags"):
-            _rewrite_feature_tag_block(content, "widget-engine", "gadget-engine")
+            rewrite_feature_tag_block(content, "widget-engine", "gadget-engine")
 
     def test_malformed_inline_tags_raises_and_rolls_back(self, tmp_path: Path):
         # End to end: a doc whose tags span a multi-line flow sequence parses
@@ -612,7 +612,7 @@ class TestMalformedContent:
             "\r\n"
             "# body\r\n"
         )
-        out, changed = _rewrite_feature_tag_block(
+        out, changed = rewrite_feature_tag_block(
             bom_crlf, "widget-engine", "gadget-engine"
         )
         assert changed is True

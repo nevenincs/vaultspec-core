@@ -20,7 +20,7 @@ from vaultspec_core.cli._target import (
     apply_target,
     resolve_effective_target,
 )
-from vaultspec_core.cli.root_preflight import _run_preflight
+from vaultspec_core.cli.root_preflight import run_preflight
 from vaultspec_core.core.enums import CliAction
 
 if TYPE_CHECKING:
@@ -278,7 +278,7 @@ def cmd_sync(
     except LookupError:
         sync_target = resolve_effective_target(target)
 
-    _run_preflight(
+    run_preflight(
         sync_target,
         action=CliAction.SYNC,
         provider=provider,

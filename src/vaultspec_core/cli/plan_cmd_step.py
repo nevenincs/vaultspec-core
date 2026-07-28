@@ -12,8 +12,8 @@ import typer
 from vaultspec_core.cli._target import PlanPathArg
 from vaultspec_core.cli.plan_cmd_app import step_app
 from vaultspec_core.cli.plan_cmd_shared import (
-    _render_user_errors,
-    _save_plan_or_dry_run,
+    render_user_errors,
+    save_plan_or_dry_run,
 )
 
 __all__ = [
@@ -29,7 +29,7 @@ __all__ = [
 
 
 @step_app.command("toggle")
-@_render_user_errors
+@render_user_errors
 def cmd_step_toggle(
     path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -53,7 +53,7 @@ def cmd_step_toggle(
     plan = parse_plan(original_text)
     step = toggle_step(plan, step_id)
     new_state = "closed" if step.checked else "open"
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -66,7 +66,7 @@ def cmd_step_toggle(
 
 
 @step_app.command("check")
-@_render_user_errors
+@render_user_errors
 def cmd_step_check(
     path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -89,7 +89,7 @@ def cmd_step_check(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     check_step(plan, step_id)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -102,7 +102,7 @@ def cmd_step_check(
 
 
 @step_app.command("uncheck")
-@_render_user_errors
+@render_user_errors
 def cmd_step_uncheck(
     path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -125,7 +125,7 @@ def cmd_step_uncheck(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     uncheck_step(plan, step_id)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -141,7 +141,7 @@ def cmd_step_uncheck(
 
 
 @step_app.command("add")
-@_render_user_errors
+@render_user_errors
 def cmd_step_add(
     path: PlanPathArg,
     action: Annotated[str, typer.Option("--action", help="Imperative-verb statement")],
@@ -172,7 +172,7 @@ def cmd_step_add(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     step = add_step(plan, action=action, scope=scope, phase_id=phase_id)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -185,7 +185,7 @@ def cmd_step_add(
 
 
 @step_app.command("insert")
-@_render_user_errors
+@render_user_errors
 def cmd_step_insert(
     path: PlanPathArg,
     action: Annotated[str, typer.Option("--action", help="Imperative-verb statement")],
@@ -217,7 +217,7 @@ def cmd_step_insert(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     step = insert_step(plan, action=action, scope=scope, before=before, after=after)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -230,7 +230,7 @@ def cmd_step_insert(
 
 
 @step_app.command("edit")
-@_render_user_errors
+@render_user_errors
 def cmd_step_edit(
     path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -259,7 +259,7 @@ def cmd_step_edit(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     edit_step(plan, step_id, action=action, scope=scope)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -272,7 +272,7 @@ def cmd_step_edit(
 
 
 @step_app.command("move")
-@_render_user_errors
+@render_user_errors
 def cmd_step_move(
     path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -304,7 +304,7 @@ def cmd_step_move(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     step = move_step(plan, step_id, to_phase=to_phase, before=before, after=after)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -317,7 +317,7 @@ def cmd_step_move(
 
 
 @step_app.command("remove")
-@_render_user_errors
+@render_user_errors
 def cmd_step_remove(
     path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -340,7 +340,7 @@ def cmd_step_remove(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     retired = remove_step(plan, step_id)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,

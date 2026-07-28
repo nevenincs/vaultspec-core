@@ -16,11 +16,11 @@ from . import types as _t
 from .enums import Tool
 from .exceptions import ResourceExistsError
 from .helpers import (
-    _launch_editor,
     atomic_write,
     build_file,
     collect_md_resources,
     ensure_dir,
+    launch_editor,
 )
 from .sync import sync_to_all_tools
 
@@ -166,7 +166,7 @@ def rules_add(
             atomic_write(file_path, scaffold)
             logger.info("Opening editor (%s) for %s...", editor, file_path)
             try:
-                _launch_editor(editor, str(file_path))
+                launch_editor(editor, str(file_path))
                 logger.info("Rule saved to %s", file_path)
             except Exception as e:
                 logger.error("Error opening editor: %s", e, exc_info=True)
@@ -235,9 +235,9 @@ def converge_spec_layer_gitignore(rules_src_dir: Path) -> bool:
     Returns:
         ``True`` if the file was rewritten, ``False`` otherwise.
     """
-    from vaultspec_core.builtins import _builtins_root
+    from vaultspec_core.builtins import builtins_root
 
-    template = _builtins_root() / "rules" / ".gitignore"
+    template = builtins_root() / "rules" / ".gitignore"
     try:
         want = template.read_bytes()
     except OSError:

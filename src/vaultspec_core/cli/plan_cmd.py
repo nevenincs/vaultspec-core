@@ -53,11 +53,11 @@ from vaultspec_core.cli.plan_cmd_phase import (
 )
 from vaultspec_core.cli.plan_cmd_read import cmd_check, cmd_query, cmd_status
 from vaultspec_core.cli.plan_cmd_shared import (
-    _emit_plan_mutation_json,
-    _invalidate_graph_cache_for_plan,
-    _render_user_errors,
-    _resolve_vault_root,
-    _save_plan_or_dry_run,
+    emit_plan_mutation_json,
+    invalidate_graph_cache_for_plan,
+    render_user_errors,
+    resolve_vault_root,
+    save_plan_or_dry_run,
 )
 from vaultspec_core.cli.plan_cmd_step import (
     cmd_step_add,
@@ -84,11 +84,6 @@ from vaultspec_core.cli.plan_cmd_wave import (
 )
 
 __all__ = [
-    "_emit_plan_mutation_json",
-    "_invalidate_graph_cache_for_plan",
-    "_render_user_errors",
-    "_resolve_vault_root",
-    "_save_plan_or_dry_run",
     "cmd_check",
     "cmd_epic_intent_edit",
     "cmd_epic_intent_show",
@@ -118,10 +113,15 @@ __all__ = [
     "cmd_wave_insert",
     "cmd_wave_move",
     "cmd_wave_remove",
+    "emit_plan_mutation_json",
     "epic_app",
     "epic_intent_app",
+    "invalidate_graph_cache_for_plan",
     "phase_app",
     "plan_app",
+    "render_user_errors",
+    "resolve_vault_root",
+    "save_plan_or_dry_run",
     "step_app",
     "tier_app",
     "trailer_app",

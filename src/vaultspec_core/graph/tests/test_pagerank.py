@@ -1,7 +1,7 @@
 """Exact-value behavioural tests for the pure-Python PageRank helper.
 
 The project ships neither NumPy nor SciPy, so :func:`networkx.pagerank` cannot
-run here; :func:`vaultspec_core.graph.api._pagerank` is the deterministic
+run here; :func:`vaultspec_core.graph.algorithms.pagerank` is the deterministic
 pure-Python power-iteration substitute used for node sizing.  These tests
 exercise that real function over real :class:`networkx.DiGraph` structures - no
 mocks, no patched networkx - and assert analytic values.
@@ -19,14 +19,14 @@ from __future__ import annotations
 import networkx as nx
 import pytest
 
-from ...graph.algorithms import _pagerank
+from ...graph.algorithms import pagerank
 
 pytestmark = [pytest.mark.unit]
 
 
 def test_empty_graph_yields_empty_mapping() -> None:
     """An empty graph has no nodes to rank."""
-    assert _pagerank(nx.DiGraph()) == {}
+    assert pagerank(nx.DiGraph()) == {}
 
 
 class TestSymmetricCycle:
@@ -39,7 +39,7 @@ class TestSymmetricCycle:
         return g
 
     def test_each_node_is_one_third(self):
-        scores = _pagerank(self._cycle())
+        scores = pagerank(self._cycle())
         # By symmetry the stationary distribution is uniform: 1/3 each.  The
         # cycle has no dangling nodes and the teleport term is uniform, so the
         # uniform vector is an exact fixed point reached on the first iterate.
@@ -47,7 +47,7 @@ class TestSymmetricCycle:
             assert scores[node] == pytest.approx(1.0 / 3.0, abs=1e-12)
 
     def test_vector_sums_to_one(self):
-        scores = _pagerank(self._cycle())
+        scores = pagerank(self._cycle())
         assert sum(scores.values()) == pytest.approx(1.0, abs=1e-12)
 
 
@@ -69,13 +69,13 @@ class TestStarHubRanksAboveLeaves:
         return g
 
     def test_hub_outranks_every_leaf(self):
-        scores = _pagerank(self._star())
+        scores = pagerank(self._star())
         leaves = ("leaf-a", "leaf-b", "leaf-c")
         for leaf in leaves:
             assert scores["hub"] > scores[leaf]
 
     def test_vector_sums_to_one(self):
-        scores = _pagerank(self._star())
+        scores = pagerank(self._star())
         assert sum(scores.values()) == pytest.approx(1.0, abs=1e-9)
 
 
@@ -90,7 +90,7 @@ class TestDanglingNodeMassConservation:
         return g
 
     def test_mass_is_conserved(self):
-        scores = _pagerank(self._with_dangling())
+        scores = pagerank(self._with_dangling())
         assert "sink" in scores
         assert sum(scores.values()) == pytest.approx(1.0, abs=1e-9)
 
@@ -114,8 +114,8 @@ class TestDeterminismUnderInsertionOrder:
         reverse: nx.DiGraph[str] = nx.DiGraph()
         reverse.add_edges_from(list(reversed(self._edges())))
 
-        forward_scores = _pagerank(forward)
-        reverse_scores = _pagerank(reverse)
+        forward_scores = pagerank(forward)
+        reverse_scores = pagerank(reverse)
 
         assert set(forward_scores) == set(reverse_scores)
         for node in forward_scores:

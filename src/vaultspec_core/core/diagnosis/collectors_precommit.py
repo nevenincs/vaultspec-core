@@ -20,12 +20,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# ``_observed_precommit_mode`` is consumed by :mod:`.collectors_mode` (the
-# mode-mismatch collector) and re-exported by :mod:`.collectors` under this
-# module's leading-underscore convention for shared-but-internal helpers;
-# the explicit re-export marks that cross-module contract for the type
-# checker.
-__all__ = ["_collect_precommit_yaml_state", "_observed_precommit_mode"]
+# ``observed_precommit_mode`` is consumed by :mod:`.collectors_mode` (the
+# mode-mismatch collector) and re-exported by :mod:`.collectors`.
 
 
 def collect_precommit_state(target: Path) -> PrecommitSignal:
@@ -155,7 +151,7 @@ def _collect_precommit_yaml_state(target: Path) -> PrecommitSignal:
     return PrecommitSignal.COMPLETE
 
 
-def _observed_precommit_mode(
+def observed_precommit_mode(
     target: Path, package: str | None = None
 ) -> InstallMode | None:
     """Infer the install mode the deployed hook entries are shaped for.
@@ -186,10 +182,10 @@ def _observed_precommit_mode(
     """
     from ..commands import CANONICAL_HOOK_IDS, entry_prefix_for_mode
     from ..enums import InstallMode
-    from ..workspace_mode import CORE_DISTRIBUTION_NAME, _canonical_distribution_name
+    from ..workspace_mode import CORE_DISTRIBUTION_NAME, canonical_distribution_name
 
     pkg = package if package is not None else CORE_DISTRIBUTION_NAME
-    if _canonical_distribution_name(pkg) != CORE_DISTRIBUTION_NAME:
+    if canonical_distribution_name(pkg) != CORE_DISTRIBUTION_NAME:
         return None
 
     local_hooks = _local_precommit_hooks(target / ".pre-commit-config.yaml")

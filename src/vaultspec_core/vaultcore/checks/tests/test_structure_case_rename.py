@@ -11,7 +11,7 @@ from vaultspec_core.config import reset_config
 
 from ...models import DocumentMetadata
 from ...rename_ops import rename_document_path
-from ..structure import _fix_filename, check_structure
+from ..structure import check_structure
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -140,21 +140,28 @@ def test_case_only_rename_uses_short_temp_name_for_long_filenames(
 def test_fix_filename_reports_final_path_after_multi_step_rename(
     tmp_path: Path,
 ) -> None:
+    """A missing suffix plus case drift takes two renames through check_structure.
+
+    Drives the same two-step rename cascade the private ``_fix_filename``
+    helper performs, but through the public ``check_structure`` entry
+    point so the fixed count and diagnostic paths it reports stay
+    observable without reaching into the module's internals.
+    """
     source = tmp_path / ".vault" / "research" / "2026-05-15-Repair-Case.md"
     source.parent.mkdir(parents=True)
     source.write_text("# Repair case\n", encoding="utf-8")
+    final_path = tmp_path / ".vault" / "research" / "2026-05-15-repair-case-research.md"
 
-    from .._base import CheckResult
+    snapshot: VaultSnapshot = {
+        source: (
+            DocumentMetadata(tags=["#research", "#repair-case"], date="2026-05-15"),
+            "",
+        ),
+    }
 
-    result = CheckResult(check_name="structure", supports_fix=True)
+    result = check_structure(tmp_path, snapshot=snapshot, fix=True)
 
-    renames, final_path = _fix_filename(source, tmp_path, result)
-
-    assert final_path == (
-        tmp_path / ".vault" / "research" / "2026-05-15-repair-case-research.md"
-    )
     assert final_path.exists()
-    assert len(renames) == 2
     assert result.fixed_count == 2
     assert [diag.path for diag in result.diagnostics] == [
         final_path.relative_to(tmp_path),

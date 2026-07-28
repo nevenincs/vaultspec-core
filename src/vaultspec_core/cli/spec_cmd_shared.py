@@ -22,15 +22,15 @@ from vaultspec_core.cli._errors import handle_error as _handle_error
 __all__ = [
     "COMPLETE_SYNC_COMMAND",
     "PROVIDER_OUTPUTS",
-    "_apply_provider_filter",
-    "_emit_json",
-    "_emit_sync_result",
-    "_print_complete_sync_notice",
-    "_print_source_mutation_notice",
-    "_resource_path",
-    "_restore_resource_command",
-    "_run_edit_command",
-    "_spec_status_command",
+    "apply_provider_filter",
+    "emit_json",
+    "emit_sync_result",
+    "print_complete_sync_notice",
+    "print_source_mutation_notice",
+    "resource_path",
+    "restore_resource_command",
+    "run_edit_command",
+    "spec_status_command",
 ]
 
 COMPLETE_SYNC_COMMAND = "vaultspec-core sync"
@@ -39,7 +39,7 @@ PROVIDER_OUTPUTS = (
 )
 
 
-def _print_complete_sync_notice(*, resource: str, mcp: bool = False) -> None:
+def print_complete_sync_notice(*, resource: str, mcp: bool = False) -> None:
     """Note, as a quiet footnote, that this is a scoped sync.
 
     Rendered dim rather than yellow: it is informational guidance toward
@@ -55,7 +55,7 @@ def _print_complete_sync_notice(*, resource: str, mcp: bool = False) -> None:
     )
 
 
-def _emit_sync_result(
+def emit_sync_result(
     result: "SyncResult",
     *,
     label: str,
@@ -99,7 +99,7 @@ def _emit_sync_result(
     raise typer.Exit(code)
 
 
-def _apply_provider_filter(provider: str) -> None:
+def apply_provider_filter(provider: str) -> None:
     """Validate provider is installed and filter tool_configs in active context."""
     from dataclasses import replace
 
@@ -136,15 +136,15 @@ def _apply_provider_filter(provider: str) -> None:
     # Reuse the single provider-to-tool map rather than re-deriving it here, so
     # the CLI filter cannot drift from the install/sync mapping. "all" is handled
     # by the early return above; "core" never reaches here (not in SYNC_PROVIDERS).
-    from vaultspec_core.core.commands import _PROVIDER_TO_TOOLS
+    from vaultspec_core.core.commands import PROVIDER_TO_TOOLS
 
-    requested: set[Tool] = set(_PROVIDER_TO_TOOLS.get(provider, []))
+    requested: set[Tool] = set(PROVIDER_TO_TOOLS.get(provider, []))
 
     narrowed = {k: v for k, v in ctx.tool_configs.items() if k in requested}
     set_context(replace(ctx, tool_configs=narrowed))
 
 
-def _print_source_mutation_notice(path: Path, *, action: str) -> None:
+def print_source_mutation_notice(path: Path, *, action: str) -> None:
     """Explain that source-side resource changes need top-level sync."""
     from vaultspec_core.console import get_console
 
@@ -157,12 +157,12 @@ def _print_source_mutation_notice(path: Path, *, action: str) -> None:
     )
 
 
-def _resource_path(base_dir: Path, name: str, *, suffix: str = ".md") -> Path:
+def resource_path(base_dir: Path, name: str, *, suffix: str = ".md") -> Path:
     filename = name if name.endswith(suffix) else f"{name}{suffix}"
     return base_dir / filename
 
 
-def _emit_json(command: str, status: str, data: Mapping[str, object]) -> None:
+def emit_json(command: str, status: str, data: Mapping[str, object]) -> None:
     """Print a command payload as the canonical ``--json`` envelope.
 
     Per the ``cli-json-consistency`` ADR every ``--json`` output shares
@@ -175,7 +175,7 @@ def _emit_json(command: str, status: str, data: Mapping[str, object]) -> None:
     typer.echo(json.dumps(json_envelope(command, status, data), indent=2, default=str))
 
 
-def _restore_resource_command(
+def restore_resource_command(
     *,
     category: str,
     label: str,
@@ -200,9 +200,9 @@ def _restore_resource_command(
 
     if json_output:
         if reverted:
-            _emit_json(f"spec.{category}.restore", "restored", {"name": resolved})
+            emit_json(f"spec.{category}.restore", "restored", {"name": resolved})
         else:
-            _emit_json(f"spec.{category}.restore", "failed", {"message": reason})
+            emit_json(f"spec.{category}.restore", "failed", {"message": reason})
         raise typer.Exit(0 if reverted else 1)
 
     if reverted:
@@ -212,7 +212,7 @@ def _restore_resource_command(
     raise typer.Exit(code=1)
 
 
-def _spec_status_command(result: "SyncResult", label: str, json_output: bool) -> None:
+def spec_status_command(result: "SyncResult", label: str, json_output: bool) -> None:
     missing: list[str] = []
     drifted: list[str] = []
     stale: list[str] = []
@@ -243,7 +243,7 @@ def _spec_status_command(result: "SyncResult", label: str, json_output: bool) ->
         "errors": errors,
     }
     if json_output:
-        _emit_json(f"spec.{label.lower()}.status", status_str, data)
+        emit_json(f"spec.{label.lower()}.status", status_str, data)
         raise typer.Exit(0 if status_str == "ok" else 1)
 
     from vaultspec_core.cli.rendering import Field, render_record
@@ -272,7 +272,7 @@ def _spec_status_command(result: "SyncResult", label: str, json_output: bool) ->
         raise typer.Exit(1)
 
 
-def _run_edit_command(
+def run_edit_command(
     name: str,
     base_dir: Path,
     label: str,

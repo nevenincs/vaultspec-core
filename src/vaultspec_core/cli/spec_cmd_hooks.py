@@ -18,11 +18,11 @@ from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
 from vaultspec_core.cli.spec_cmd_shared import (
-    _apply_provider_filter,
-    _emit_json,
-    _emit_sync_result,
-    _print_complete_sync_notice,
-    _print_source_mutation_notice,
+    apply_provider_filter,
+    emit_json,
+    emit_sync_result,
+    print_complete_sync_notice,
+    print_source_mutation_notice,
 )
 
 # =============================================================================
@@ -47,7 +47,7 @@ def cmd_hooks_list(
     data = hooks_list_data()
 
     if json_output:
-        _emit_json("spec.hooks.list", "unchanged", data)
+        emit_json("spec.hooks.list", "unchanged", data)
         raise typer.Exit(0)
 
     from vaultspec_core.cli.rendering import Cell, Column, render_listing, summary_line
@@ -139,11 +139,11 @@ def cmd_hooks_add(
         return
 
     if json_output:
-        _emit_json("spec.hooks.add", "created", {"path": str(file_path)})
+        emit_json("spec.hooks.add", "created", {"path": str(file_path)})
         raise typer.Exit(0)
 
     action = "Would create hook source" if dry_run else "Hook source updated"
-    _print_source_mutation_notice(file_path, action=action)
+    print_source_mutation_notice(file_path, action=action)
 
 
 @hooks_app.command("show")
@@ -160,7 +160,7 @@ def cmd_hooks_show(
     try:
         content = hooks_show(name=name)
         if json_output:
-            _emit_json(
+            emit_json(
                 "spec.hooks.show", "unchanged", {"name": name, "content": content}
             )
             raise typer.Exit(0)
@@ -229,14 +229,14 @@ def cmd_hooks_rename(
         return
 
     if json_output:
-        _emit_json(
+        emit_json(
             "spec.hooks.rename",
             "updated",
             {"old_name": old_name, "new_name": new_name, "path": str(new_path)},
         )
         raise typer.Exit(0)
 
-    _print_source_mutation_notice(new_path, action="Hook source renamed")
+    print_source_mutation_notice(new_path, action="Hook source renamed")
 
 
 @hooks_app.command("remove")
@@ -270,13 +270,13 @@ def cmd_hooks_remove(
         return
 
     if json_output:
-        _emit_json("spec.hooks.remove", "removed", {"removed": name})
+        emit_json("spec.hooks.remove", "removed", {"removed": name})
         raise typer.Exit(0)
 
-    from vaultspec_core.core.hooks import _resolve_hook_path
+    from vaultspec_core.core.hooks import resolve_hook_path
 
-    _print_source_mutation_notice(
-        _resolve_hook_path(name),
+    print_source_mutation_notice(
+        resolve_hook_path(name),
         action="Hook source removed",
     )
 
@@ -291,7 +291,7 @@ def cmd_hooks_restore(
     apply_target(target)
     _ = filename
     if json_output:
-        _emit_json(
+        emit_json(
             "spec.hooks.restore",
             "failed",
             {"message": "Custom hooks cannot be restored"},
@@ -319,14 +319,14 @@ def cmd_hooks_sync(
 ) -> None:
     """Sync only hooks files; use vaultspec-core sync for complete refresh."""
     apply_target(target)
-    _apply_provider_filter(provider)
+    apply_provider_filter(provider)
     from vaultspec_core.core import hooks_sync
 
     result = hooks_sync(prune=force, dry_run=dry_run)
 
     if not json_output:
-        _print_complete_sync_notice(resource="hook")
-    _emit_sync_result(result, label="Hooks", dry_run=dry_run, json_output=json_output)
+        print_complete_sync_notice(resource="hook")
+    emit_sync_result(result, label="Hooks", dry_run=dry_run, json_output=json_output)
 
 
 @hooks_app.command("status")
@@ -341,7 +341,7 @@ def cmd_hooks_status(
     status = hooks_status()
 
     if json_output:
-        _emit_json("spec.hooks.status", status["status"], status)
+        emit_json("spec.hooks.status", status["status"], status)
         raise typer.Exit(0 if status["status"] == "ok" else 1)
 
     from vaultspec_core.cli.rendering import Field, render_record
@@ -389,7 +389,7 @@ def cmd_hooks_run(
         return
 
     if json_output:
-        _emit_json("spec.hooks.run", "unchanged", {"results": results})
+        emit_json("spec.hooks.run", "unchanged", {"results": results})
         raise typer.Exit(0)
 
     console = get_console()
@@ -458,7 +458,7 @@ def cmd_precommit_migrate(
 
     ok = result.status in ("migrated", "unchanged")
     if json_output:
-        _emit_json(
+        emit_json(
             "spec.precommit.migrate",
             result.status if ok else "failed",
             {

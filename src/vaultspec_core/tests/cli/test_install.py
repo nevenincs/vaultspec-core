@@ -26,7 +26,7 @@ class TestProviderRegistry:
 
     def test_provider_sets_derive_from_tool_enum(self) -> None:
         from vaultspec_core.core.commands import (
-            _PROVIDER_TO_TOOLS,
+            PROVIDER_TO_TOOLS,
             SYNC_PROVIDERS,
             VALID_PROVIDERS,
         )
@@ -34,12 +34,12 @@ class TestProviderRegistry:
 
         # Every tool has a single-tool entry; the aggregate selectors are present.
         for tool in Tool:
-            assert _PROVIDER_TO_TOOLS[tool.value] == [tool]
-        assert _PROVIDER_TO_TOOLS["all"] == list(Tool)
-        assert _PROVIDER_TO_TOOLS["core"] == []
+            assert PROVIDER_TO_TOOLS[tool.value] == [tool]
+        assert PROVIDER_TO_TOOLS["all"] == list(Tool)
+        assert PROVIDER_TO_TOOLS["core"] == []
 
         # Derived sets stay consistent with the map - no second hand-listed copy.
-        assert set(_PROVIDER_TO_TOOLS) == VALID_PROVIDERS
+        assert set(PROVIDER_TO_TOOLS) == VALID_PROVIDERS
         assert VALID_PROVIDERS - {"core"} == SYNC_PROVIDERS
 
 

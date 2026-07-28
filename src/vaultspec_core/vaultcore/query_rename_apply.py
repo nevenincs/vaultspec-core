@@ -18,14 +18,14 @@ from ..core.helpers import atomic_write
 from .models import refresh_modified_stamp
 from .query_rename import (
     RenameCollision,
-    _analyze_cross_feature_links,
-    _assert_within_docs,
-    _compute_rename_plan,
-    _predict_rewrites,
-    _rel,
-    _RenamePlan,
-    _rewrite_feature_tag_block,
-    _validate_feature_rename,
+    RenamePlan,
+    analyze_cross_feature_links,
+    assert_within_docs,
+    compute_rename_plan,
+    predict_rewrites,
+    rel,
+    rewrite_feature_tag_block,
+    validate_feature_rename,
 )
 from .rename_ops import rewrite_incoming_refs
 
@@ -36,10 +36,6 @@ if TYPE_CHECKING:
     from .rename_engine import RenameTransaction
 
 logger = logging.getLogger(__name__)
-
-#: Re-exported (with underscore intact) for :mod:`vaultspec_core.vaultcore.query`,
-#: the single public import surface for the feature rename engine.
-__all__ = ["_apply_rename_plan", "_refresh_rename_stamps", "_regenerate_feature_index"]
 
 
 class RenameLinkPair(TypedDict):
@@ -109,7 +105,7 @@ def _regenerate_feature_index(
     # Refuse to regenerate the index outside the vault: if ``index/`` is a
     # directory symlink pointing elsewhere, the resolved index path escapes
     # ``docs_dir`` and the write would land out of bounds.
-    _assert_within_docs(docs_dir, index_path)
+    assert_within_docs(docs_dir, index_path)
     existed = index_path.exists()
 
     graph = VaultGraph(root_dir, use_cache=False)
@@ -151,7 +147,7 @@ def _refresh_rename_stamps(
 
 
 def _apply_rename_plan(
-    root_dir: Path, plan: _RenamePlan, old: str, new: str
+    root_dir: Path, plan: RenamePlan, old: str, new: str
 ) -> RenameApplyResult:
     """Apply *plan* through a :class:`RenameTransaction`, rolling back on failure.
 
@@ -200,7 +196,7 @@ def _apply_rename_plan(
 
             # (1) Ensure destination exec folders exist before any record moves.
             for _old_folder, new_folder, _date in plan.exec_dir_renames:
-                _assert_within_docs(docs_dir, new_folder)
+                assert_within_docs(docs_dir, new_folder)
                 if not new_folder.exists():
                     new_folder.mkdir(parents=True, exist_ok=True)
                     tx.record_created_dir(new_folder)
@@ -212,8 +208,8 @@ def _apply_rename_plan(
             for src, dst in plan.file_renames:
                 if not tx.rename(src, dst):
                     raise VaultSpecError(
-                        f"Filesystem rename failed: {_rel(src, root_dir)} -> "
-                        f"{_rel(dst, root_dir)} (destination may already exist)."
+                        f"Filesystem rename failed: {rel(src, root_dir)} -> "
+                        f"{rel(dst, root_dir)} (destination may already exist)."
                     )
 
             # (3) Remove now-empty old exec folders.
@@ -226,7 +222,7 @@ def _apply_rename_plan(
             tag_rewrites = 0
             for _src, dst in plan.file_renames:
                 text = dst.read_bytes().decode("utf-8")
-                new_text, changed = _rewrite_feature_tag_block(text, old, new)
+                new_text, changed = rewrite_feature_tag_block(text, old, new)
                 if changed:
                     atomic_write(dst, new_text)
                     tag_rewrites += 1
@@ -313,10 +309,10 @@ def rename_feature(
     """
     from ..core.exceptions import VaultSpecError
 
-    old_clean, new_clean, src_docs = _validate_feature_rename(
+    old_clean, new_clean, src_docs = validate_feature_rename(
         root_dir, old, new, force=force
     )
-    plan = _compute_rename_plan(root_dir, old_clean, new_clean, src_docs)
+    plan = compute_rename_plan(root_dir, old_clean, new_clean, src_docs)
 
     if plan.collisions:
         detail = "; ".join(
@@ -328,28 +324,28 @@ def rename_feature(
             f"{len(plan.collisions)} destination collision(s): {detail}"
         )
 
-    cross_links = _analyze_cross_feature_links(root_dir, src_docs, old_clean)
+    cross_links = analyze_cross_feature_links(root_dir, src_docs, old_clean)
 
     paths: list[RenameLinkPair] = [
-        {"old": _rel(src, root_dir), "new": _rel(dst, root_dir)}
+        {"old": rel(src, root_dir), "new": rel(dst, root_dir)}
         for src, dst in plan.file_renames
     ]
     exec_folders: list[RenameLinkPair] = [
-        {"old": _rel(old_folder, root_dir), "new": _rel(new_folder, root_dir)}
+        {"old": rel(old_folder, root_dir), "new": rel(new_folder, root_dir)}
         for old_folder, new_folder, _date in plan.exec_dir_renames
     ]
     link_renames: list[RenameLinkPair] = [
         {"old": o, "new": n} for o, n in plan.stem_renames
     ]
     index_info: RenameIndexInfo = {
-        "old": _rel(plan.index_old_path, root_dir)
+        "old": rel(plan.index_old_path, root_dir)
         if plan.index_old_path is not None
         else None,
-        "new": _rel(plan.index_new_path, root_dir),
+        "new": rel(plan.index_new_path, root_dir),
     }
 
     if dry_run:
-        predicted_tag, predicted_related = _predict_rewrites(
+        predicted_tag, predicted_related = predict_rewrites(
             root_dir, plan, old_clean, new_clean
         )
         return {
@@ -369,7 +365,7 @@ def rename_feature(
         }
 
     applied = _apply_rename_plan(root_dir, plan, old_clean, new_clean)
-    index_info["new"] = _rel(applied["new_index_path"], root_dir)
+    index_info["new"] = rel(applied["new_index_path"], root_dir)
 
     return {
         "old": old_clean,

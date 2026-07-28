@@ -78,7 +78,7 @@ def migrate(workspace: Path) -> MigrationResult:
     """
     from ..config import get_config
     from ..vaultcore import normalize_date, parse_vault_metadata
-    from ..vaultcore.checks.modified_stamp import _filename_date, _write_stamp
+    from ..vaultcore.checks.modified_stamp import filename_date, write_stamp
 
     cfg = get_config()
     docs_dir = workspace / cfg.docs_dir
@@ -104,7 +104,7 @@ def migrate(workspace: Path) -> MigrationResult:
             counts["already"] += 1
             continue
 
-        value = normalize_date(metadata.date) or _filename_date(doc)
+        value = normalize_date(metadata.date) or filename_date(doc)
         if value is None:
             counts["skipped"] += 1
             logger.info(
@@ -115,7 +115,7 @@ def migrate(workspace: Path) -> MigrationResult:
             continue
 
         try:
-            written = _write_stamp(doc, value)
+            written = write_stamp(doc, value)
         except OSError as exc:
             raise MigrationError(
                 f"{_NAME}: failed to write stamp to {doc}: {exc}"

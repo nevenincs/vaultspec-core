@@ -255,7 +255,7 @@ def test_step_remove_unknown_id_emits_clean_error(
     """A typed handler error renders as ``error: ...`` plus exit 1, not a traceback.
 
     Regression for the H-NEW-2 finding: every mutating wrapper now applies the
-    ``_render_user_errors`` decorator that converts ``StepNotFoundError`` and
+    ``render_user_errors`` decorator that converts ``StepNotFoundError`` and
     its peers into user-grade CLI messages.
     """
     rng = random.Random(9)
@@ -489,9 +489,9 @@ def test_cli_stable_insertion_uses_alpha_suffixes_for_waves_and_phases(
 def test_unexpected_retirement_check_direct(tmp_path: Path) -> None:
     """Verify that unexpected retirement check raises PlanCommandError.
 
-    Tests calling _save_plan_or_dry_run directly.
+    Tests calling save_plan_or_dry_run directly.
     """
-    from vaultspec_core.cli.plan_cmd import _save_plan_or_dry_run
+    from vaultspec_core.cli.plan_cmd import save_plan_or_dry_run
     from vaultspec_core.plan.commands._errors import PlanCommandError
     from vaultspec_core.plan.parser import parse_plan
 
@@ -519,7 +519,7 @@ related: []
 
     # If we don't pass S01 in expected_retired, it should raise PlanCommandError
     with pytest.raises(PlanCommandError) as exc_info:
-        _save_plan_or_dry_run(
+        save_plan_or_dry_run(
             path=plan_path,
             plan=plan,
             original_text=original_text,
@@ -534,19 +534,19 @@ related: []
 
 
 def test_resolve_vault_root_from_plan_path_under_docs_dir(tmp_path: Path) -> None:
-    """``_resolve_vault_root`` derives the root from a plan under ``.vault/plan/``.
+    """``resolve_vault_root`` derives the root from a plan under ``.vault/plan/``.
 
     Regression for issue #157: the mutation verbs never initialise the
     workspace context, so the cache root must be recoverable from the plan
     path alone.
     """
-    from vaultspec_core.cli.plan_cmd import _resolve_vault_root
+    from vaultspec_core.cli.plan_cmd import resolve_vault_root
 
     plan_path = tmp_path / ".vault" / "plan" / "2026-06-13-x-plan.md"
     plan_path.parent.mkdir(parents=True, exist_ok=True)
     plan_path.write_text("# x plan\n", encoding="utf-8")
 
-    assert _resolve_vault_root(plan_path) == tmp_path.resolve()
+    assert resolve_vault_root(plan_path) == tmp_path.resolve()
 
 
 def test_step_check_in_empty_context_exits_zero(tmp_path: Path) -> None:
@@ -589,7 +589,7 @@ def test_invalidate_graph_cache_for_plan_drops_cache_without_context(
     """The post-save hook drops the right cache file even with no context."""
     import contextvars
 
-    from vaultspec_core.cli.plan_cmd import _invalidate_graph_cache_for_plan
+    from vaultspec_core.cli.plan_cmd import invalidate_graph_cache_for_plan
     from vaultspec_core.graph.cache import cache_path
 
     plan_path = tmp_path / ".vault" / "plan" / "2026-06-13-cache-plan.md"
@@ -600,7 +600,7 @@ def test_invalidate_graph_cache_for_plan_drops_cache_without_context(
         cache_file = cache_path(tmp_path)
         cache_file.parent.mkdir(parents=True, exist_ok=True)
         cache_file.write_text("{}", encoding="utf-8")
-        _invalidate_graph_cache_for_plan(plan_path)
+        invalidate_graph_cache_for_plan(plan_path)
         return cache_file
 
     cache_file = contextvars.Context().run(_seed_and_invalidate)

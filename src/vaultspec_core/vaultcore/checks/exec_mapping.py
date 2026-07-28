@@ -41,14 +41,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["_link_stem", "check_exec_mapping"]
+__all__ = ["check_exec_mapping", "link_stem"]
 
 #: Strip the ``[[`` / ``]]`` wrapper (and any ``#anchor`` / ``|alias``) from a
 #: ``related:`` wiki-link, yielding the bare document stem.
 _WIKILINK_RE = re.compile(r"^\[\[([^\]#|]+)")
 
 
-def _link_stem(link: str) -> str | None:
+def link_stem(link: str) -> str | None:
     """Return the bare document stem from a ``[[wiki-link]]`` string."""
     match = _WIKILINK_RE.match(link.strip())
     if match:
@@ -122,7 +122,7 @@ def check_exec_mapping(
         # first link resolving to a live plan wins; failing that, an archived
         # plan is recognised as the expected steady state.
         candidate_stems = [
-            stem for link in metadata.related if (stem := _link_stem(link))
+            stem for link in metadata.related if (stem := link_stem(link))
         ]
         live_plan_path, archived = _resolve_parent_plan(
             candidate_stems,

@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
     from ..models import DocType, DocumentMetadata
 
-__all__ = ["_fix_frontmatter", "check_frontmatter"]
+__all__ = ["check_frontmatter"]
 
 
 _KNOWN_KEYS = frozenset(

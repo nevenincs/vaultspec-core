@@ -11,8 +11,8 @@ import typer
 from vaultspec_core.cli._target import PlanPathArg
 from vaultspec_core.cli.plan_cmd_app import wave_app
 from vaultspec_core.cli.plan_cmd_shared import (
-    _render_user_errors,
-    _save_plan_or_dry_run,
+    render_user_errors,
+    save_plan_or_dry_run,
 )
 
 __all__ = [
@@ -25,7 +25,7 @@ __all__ = [
 
 
 @wave_app.command("add")
-@_render_user_errors
+@render_user_errors
 def cmd_wave_add(
     path: PlanPathArg,
     title: Annotated[str, typer.Option("--title", help="Wave heading title")],
@@ -49,7 +49,7 @@ def cmd_wave_add(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     wave = add_wave(plan, title=title, intent=intent)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -62,7 +62,7 @@ def cmd_wave_add(
 
 
 @wave_app.command("insert")
-@_render_user_errors
+@render_user_errors
 def cmd_wave_insert(
     path: PlanPathArg,
     title: Annotated[str, typer.Option("--title", help="Wave heading title")],
@@ -94,7 +94,7 @@ def cmd_wave_insert(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     wave = insert_wave(plan, title=title, intent=intent, before=before, after=after)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -107,7 +107,7 @@ def cmd_wave_insert(
 
 
 @wave_app.command("edit")
-@_render_user_errors
+@render_user_errors
 def cmd_wave_edit(
     path: PlanPathArg,
     wave_id: Annotated[str, typer.Argument(help="Wave canonical id (W##)")],
@@ -136,7 +136,7 @@ def cmd_wave_edit(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     edit_wave(plan, wave_id, title=title, intent=intent)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -149,7 +149,7 @@ def cmd_wave_edit(
 
 
 @wave_app.command("move")
-@_render_user_errors
+@render_user_errors
 def cmd_wave_move(
     path: PlanPathArg,
     wave_id: Annotated[str, typer.Argument(help="Wave canonical id (W##)")],
@@ -178,7 +178,7 @@ def cmd_wave_move(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     wave = move_wave(plan, wave_id, before=before, after=after)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -191,7 +191,7 @@ def cmd_wave_move(
 
 
 @wave_app.command("remove")
-@_render_user_errors
+@render_user_errors
 def cmd_wave_remove(
     path: PlanPathArg,
     wave_id: Annotated[str, typer.Argument(help="Wave canonical id (W##)")],
@@ -216,7 +216,7 @@ def cmd_wave_remove(
     retired_wave, retired_phases, retired_steps = remove_wave(plan, wave_id)
     phases_str = f"{', '.join(retired_phases) if retired_phases else '(none)'}"
     steps_str = f"{', '.join(retired_steps) if retired_steps else '(none)'}"
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,

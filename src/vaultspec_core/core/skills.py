@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 from . import types as _t
 from .enums import FileName, Tool
 from .exceptions import ResourceExistsError
-from .helpers import _launch_editor, atomic_write, build_file, ensure_dir
+from .helpers import atomic_write, build_file, ensure_dir, launch_editor
 from .sync import sync_to_all_tools
 
 if TYPE_CHECKING:
@@ -185,7 +185,7 @@ def skills_add(
             editor = get_config().editor
             logger.info("Opening editor (%s) for %s...", editor, file_path)
             try:
-                _launch_editor(editor, str(file_path))
+                launch_editor(editor, str(file_path))
                 logger.info("Skill saved to %s", file_path)
             except Exception as e:
                 logger.error("Error opening editor: %s", e, exc_info=True)

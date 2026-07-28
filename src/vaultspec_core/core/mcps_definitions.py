@@ -17,34 +17,31 @@ from . import types as _t
 from .enums import InstallMode, McpScope, McpTargetFormat, Tool
 from .exceptions import ResourceExistsError, ResourceNotFoundError, VaultSpecError
 from .helpers import atomic_write, ensure_dir
-from .mcps_mode import _render_definition_for_sync
+from .mcps_mode import render_definition_for_sync
 from .mcps_native import (
-    _LEGACY_MANAGED_KEY,
-    _TOML_BLOCK_TYPE,
-    _json_server_map,
-    _managed_toml_content,
-    _normalized_sources,
-    _toml_servers,
+    LEGACY_MANAGED_KEY,
+    TOML_BLOCK_TYPE,
+    json_server_map,
+    managed_toml_content,
+    normalized_sources,
+    toml_servers,
 )
 from .mcps_ownership import (
-    _owned_names,
-    _ownership_path,
-    _OwnershipState,
-    _read_ownership,
+    OwnershipState,
+    owned_names,
+    ownership_path,
+    read_ownership,
 )
-from .mcps_targets import _coerce_scope, resolve_mcp_targets
+from .mcps_targets import coerce_scope, resolve_mcp_targets
 from .tags import TagError, strip_block
 from .types import McpTarget, SyncResult
 
 logger = logging.getLogger(__name__)
 
-#: Re-exported (with underscore intact) for :mod:`vaultspec_core.core.mcps`
-#: and :mod:`vaultspec_core.core.mcps_sync`, which reach into these as the
-#: single public import surface for MCP definitions.
-__all__ = ["_get_mcps_src_dir", "_server_name"]
+__all__ = ["get_mcps_src_dir", "server_name"]
 
 
-def _server_name(filename: str) -> str:
+def server_name(filename: str) -> str:
     """Derive the MCP server name from a definition filename.
 
     Strips ``.builtin.json`` as a unit first, then falls back to ``.json``.
@@ -78,7 +75,7 @@ def _validate_server_name(name: str) -> None:
         )
 
 
-def _get_mcps_src_dir() -> Path | None:
+def get_mcps_src_dir() -> Path | None:
     """Return the MCP source directory from the active context, or ``None``."""
     try:
         return _t.get_context().mcps_src_dir
@@ -105,7 +102,7 @@ def collect_mcp_servers(
     (core as a dependency, a companion package as a tool) stable, since each
     managed entry is written in its own declared shape rather than flattened
     onto whichever single mode the caller resolved for core. See
-    :func:`~vaultspec_core.core.mcps_mode._render_definition_for_sync` for the
+    :func:`~vaultspec_core.core.mcps_mode.render_definition_for_sync` for the
     resolution rule. The merge pipeline that feeds
     :func:`~vaultspec_core.core.mcps_sync.mcp_sync` therefore writes the
     correctly-shaped form for every entry into each provider-native target.
@@ -125,7 +122,7 @@ def collect_mcp_servers(
     Returns:
         Mapping of server name to ``(source_path, config_dict)``.
     """
-    mcps_dir = _get_mcps_src_dir()
+    mcps_dir = get_mcps_src_dir()
     if mcps_dir is None or not mcps_dir.exists():
         return {}
 
@@ -140,11 +137,11 @@ def collect_mcp_servers(
                     warnings.append(msg)
                 continue
             payload = cast("dict[str, Any]", raw)
-            name = _server_name(f.name)
+            name = server_name(f.name)
             if not name:
                 continue
             if mode is not None:
-                payload = _render_definition_for_sync(payload, mode, target)
+                payload = render_definition_for_sync(payload, mode, target)
             sources[name] = (f, payload)
         except (json.JSONDecodeError, OSError) as e:
             msg = f"Failed to read/parse MCP definition {f}: {e}"
@@ -160,13 +157,13 @@ def mcp_list() -> list[dict[str, str]]:
     Each dict contains ``"name"`` and ``"source"`` (``"Built-in"`` or
     ``"Custom"``).
     """
-    mcps_dir = _get_mcps_src_dir()
+    mcps_dir = get_mcps_src_dir()
     if mcps_dir is None or not mcps_dir.exists():
         return []
 
     items: dict[str, dict[str, str]] = {}
     for f in sorted(mcps_dir.glob("*.json")):
-        name = _server_name(f.name)
+        name = server_name(f.name)
         if not name:
             continue
         is_builtin = f.name.endswith(".builtin.json")
@@ -240,20 +237,20 @@ def _read_target_native_state(
             if not isinstance(raw, dict):
                 raise VaultSpecError("JSON root is not an object.")
             payload = cast("dict[str, Any]", raw)
-            native = _json_server_map(payload, target, root)
+            native = json_server_map(payload, target, root)
             servers = {
                 str(name): dict(cast("dict[str, Any]", config))
                 for name, config in native.items()
                 if isinstance(config, dict)
             }
-            legacy = payload.get(_LEGACY_MANAGED_KEY, [])
+            legacy = payload.get(LEGACY_MANAGED_KEY, [])
             if isinstance(legacy, list):
                 legacy_items = cast("list[Any]", legacy)
                 managed.update(name for name in legacy_items if isinstance(name, str))
         else:
             content = target.path.read_text(encoding="utf-8")
-            outside = _toml_servers(strip_block(content, _TOML_BLOCK_TYPE))
-            block = _toml_servers(_managed_toml_content(content))
+            outside = toml_servers(strip_block(content, TOML_BLOCK_TYPE))
+            block = toml_servers(managed_toml_content(content))
             servers = {**outside, **block}
             managed.update(block)
     except (
@@ -303,7 +300,7 @@ def _evaluate_provider_target(
     sources: dict[str, tuple[Path, dict[str, Any]]],
     definitions: list[str],
     root: Path,
-    state: _OwnershipState,
+    state: OwnershipState,
 ) -> dict[str, Any]:
     """Assess one resolved MCP target's enrollment health.
 
@@ -319,8 +316,8 @@ def _evaluate_provider_target(
         `mcp_status` payload.
     """
     normalization = SyncResult()
-    target_sources = _normalized_sources(sources, target, normalization)
-    managed = _owned_names(state, target)
+    target_sources = normalized_sources(sources, target, normalization)
+    managed = owned_names(state, target)
     target_warnings = list(normalization.warnings)
 
     servers, native_managed, parse_warning = _read_target_native_state(target, root)
@@ -404,7 +401,7 @@ def mcp_status(
     from .workspace_mode import CORE_DISTRIBUTION_NAME, resolve_render_mode
 
     try:
-        resolved_scope = _coerce_scope(scope)
+        resolved_scope = coerce_scope(scope)
         targets = resolve_mcp_targets(
             provider,
             scope=resolved_scope,
@@ -423,7 +420,7 @@ def mcp_status(
 
     warnings = list(parse_warnings)
     try:
-        state = _read_ownership(_ownership_path(root, resolved_scope))
+        state = read_ownership(ownership_path(root, resolved_scope))
     except VaultSpecError as exc:
         return _empty_mcp_status(
             "invalid_target", [*warnings, str(exc)], definitions=definitions
@@ -482,7 +479,7 @@ def mcp_add(
     Raises:
         ResourceExistsError: If the definition exists and *force* is ``False``.
     """
-    mcps_dir = _get_mcps_src_dir()
+    mcps_dir = get_mcps_src_dir()
     if mcps_dir is None:
         raise ResourceNotFoundError(
             "MCP source directory not configured.",
@@ -531,7 +528,7 @@ def mcp_remove(name: str) -> Path:
     """
     _validate_server_name(name)
 
-    mcps_dir = _get_mcps_src_dir()
+    mcps_dir = get_mcps_src_dir()
     if mcps_dir is None or not mcps_dir.exists():
         raise ResourceNotFoundError(
             f"MCP definition '{name}' not found.",

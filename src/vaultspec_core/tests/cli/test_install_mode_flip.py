@@ -23,7 +23,7 @@ import pytest
 from vaultspec_core.core.diagnosis.collectors import collect_mode_mismatch_state
 from vaultspec_core.core.diagnosis.signals import ModeMismatchSignal
 from vaultspec_core.core.enums import InstallMode
-from vaultspec_core.core.mcps import _MODE_MCP_LAUNCH
+from vaultspec_core.core.mcps import MODE_MCP_LAUNCH
 from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
 if TYPE_CHECKING:
@@ -31,8 +31,8 @@ if TYPE_CHECKING:
 
 pytestmark = [pytest.mark.unit]
 
-_DEPENDENCY_COMMAND, _DEPENDENCY_ARGS = _MODE_MCP_LAUNCH[InstallMode.DEPENDENCY]
-_TOOL_COMMAND, _TOOL_ARGS = _MODE_MCP_LAUNCH[InstallMode.TOOL]
+_DEPENDENCY_COMMAND, _DEPENDENCY_ARGS = MODE_MCP_LAUNCH[InstallMode.DEPENDENCY]
+_TOOL_COMMAND, _TOOL_ARGS = MODE_MCP_LAUNCH[InstallMode.TOOL]
 
 
 def _write_pyproject_with_vaultspec(root: Path) -> None:
@@ -147,10 +147,10 @@ class TestModeFlipForcesManagedEntry:
         import json as _json
 
         from vaultspec_core.core.mcps import (
-            _MODE_ARGS_TOKEN,
-            _MODE_COMMAND_TOKEN,
-            _MODE_MODULE_KEY,
-            _MODE_PACKAGE_KEY,
+            MODE_ARGS_TOKEN,
+            MODE_COMMAND_TOKEN,
+            MODE_MODULE_KEY,
+            MODE_PACKAGE_KEY,
             mcp_sync,
         )
         from vaultspec_core.core.workspace_mode import (
@@ -174,10 +174,10 @@ class TestModeFlipForcesManagedEntry:
         (mcps_dir / f"{rag_package}.builtin.json").write_text(
             _json.dumps(
                 {
-                    "command": _MODE_COMMAND_TOKEN,
-                    "args": [_MODE_ARGS_TOKEN],
-                    _MODE_PACKAGE_KEY: rag_package,
-                    _MODE_MODULE_KEY: rag_module,
+                    "command": MODE_COMMAND_TOKEN,
+                    "args": [MODE_ARGS_TOKEN],
+                    MODE_PACKAGE_KEY: rag_package,
+                    MODE_MODULE_KEY: rag_module,
                 },
                 indent=2,
             )

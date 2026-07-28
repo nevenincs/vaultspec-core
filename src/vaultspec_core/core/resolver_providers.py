@@ -318,11 +318,3 @@ def resolve_config(
     # Config resolution only applies to "sync" action; other actions handled
     # by the main command directly.  All ConfigSignal values covered above.
     logger.warning("Unknown ConfigSignal member: %s (action=%s)", signal, action)
-
-
-#: Backward-compatible aliases for external callers still importing the
-#: previously private names.
-_resolve_manifest_entry = resolve_manifest_entry
-_resolve_provider_dir = resolve_provider_dir
-_resolve_content = resolve_content
-_resolve_config = resolve_config

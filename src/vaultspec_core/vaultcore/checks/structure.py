@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from contextlib import AbstractContextManager
     from pathlib import Path
 
-__all__ = ["_fix_filename", "check_structure", "ensure_index_directory_tag"]
+__all__ = ["check_structure", "ensure_index_directory_tag"]
 
 logger = logging.getLogger(__name__)
 
@@ -263,12 +263,6 @@ def ensure_index_directory_tag(content: str) -> tuple[str, bool]:
     new_line = f"{tag_indent}- '{_INDEX_TAG}'{newline}"
     new_lines = [*lines[:insert_idx], new_line, *lines[insert_idx:]]
     return "".join(new_lines), True
-
-
-#: Back-compat alias for the pre-existing callers (the index-subfolder
-#: migration and its tests) that import this helper under its original
-#: underscore-prefixed name.
-_ensure_index_directory_tag = ensure_index_directory_tag
 
 
 def _detect_legacy_root_indexes(

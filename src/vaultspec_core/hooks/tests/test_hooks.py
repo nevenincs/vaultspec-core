@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sys
+import threading
+import time
 from typing import TYPE_CHECKING
 
 import pytest
@@ -11,14 +13,9 @@ from ...hooks import (
     SUPPORTED_EVENTS,
     Hook,
     HookAction,
+    HookResult,
     load_hooks,
     trigger,
-)
-from ...hooks.engine import (
-    _interpolate,
-    _parse_action,
-    _parse_hook,
-    _triggering,
 )
 
 if TYPE_CHECKING:
@@ -43,77 +40,85 @@ class TestSupportedEvents:
 
 
 class TestParseAction:
-    """Test action parsing from dicts."""
+    """Test action parsing, exercised through load_hooks() (the public entry
+    point that drives the private action/hook parsers)."""
 
-    def test_shell_action(self):
-        raw = {"type": "shell", "command": "echo hello"}
-        action = _parse_action(raw)
-        assert action is not None
+    @staticmethod
+    def _load_single_hook(tmp_path: Path, actions_yaml: str) -> Hook:
+        (tmp_path / "test.yaml").write_text(
+            f"event: config.synced\nactions:\n{actions_yaml}",
+            encoding="utf-8",
+        )
+        hooks = load_hooks(tmp_path)
+        assert len(hooks) == 1
+        return hooks[0]
+
+    def test_shell_action(self, tmp_path: Path) -> None:
+        hook = self._load_single_hook(
+            tmp_path, "  - type: shell\n    command: echo hello\n"
+        )
+        assert len(hook.actions) == 1
+        action = hook.actions[0]
         assert action.action_type == "shell"
         assert action.command == "echo hello"
 
-    def test_shell_missing_command(self):
-        assert _parse_action({"type": "shell"}) is None
+    def test_shell_missing_command(self, tmp_path: Path) -> None:
+        hook = self._load_single_hook(tmp_path, "  - type: shell\n")
+        assert hook.actions == []
 
-    def test_unknown_type(self):
-        assert _parse_action({"type": "webhook"}) is None
+    def test_unknown_type(self, tmp_path: Path) -> None:
+        hook = self._load_single_hook(tmp_path, "  - type: webhook\n")
+        assert hook.actions == []
 
-    def test_empty_dict(self):
-        assert _parse_action({}) is None
+    def test_empty_dict(self, tmp_path: Path) -> None:
+        hook = self._load_single_hook(tmp_path, "  - {}\n")
+        assert hook.actions == []
 
 
 class TestParseHook:
-    """Test hook parsing from YAML dicts."""
+    """Test hook parsing from YAML files via load_hooks()."""
 
     def test_valid_hook(self, tmp_path: Path) -> None:
-        path = tmp_path / "test.yaml"
-        data = {
-            "event": "config.synced",
-            "actions": [
-                {"type": "shell", "command": "echo done"},
-            ],
-        }
-        hook = _parse_hook(path, data)
-        assert hook is not None
+        (tmp_path / "test.yaml").write_text(
+            "event: config.synced\nactions:\n  - type: shell\n    command: echo done\n",
+            encoding="utf-8",
+        )
+        hooks = load_hooks(tmp_path)
+        assert len(hooks) == 1
+        hook = hooks[0]
         assert hook.name == "test"
         assert hook.event == "config.synced"
         assert len(hook.actions) == 1
         assert hook.enabled is True
 
     def test_missing_event(self, tmp_path: Path) -> None:
-        path = tmp_path / "test.yaml"
-        assert _parse_hook(path, {}) is None
+        (tmp_path / "test.yaml").write_text("enabled: true\n", encoding="utf-8")
+        assert load_hooks(tmp_path) == []
 
     def test_unsupported_event(self, tmp_path: Path) -> None:
-        path = tmp_path / "test.yaml"
-        data = {"event": "unknown.event"}
-        assert _parse_hook(path, data) is None
+        (tmp_path / "test.yaml").write_text("event: unknown.event\n", encoding="utf-8")
+        assert load_hooks(tmp_path) == []
 
     def test_disabled_hook(self, tmp_path: Path) -> None:
-        path = tmp_path / "test.yaml"
-        data = {
-            "event": "config.synced",
-            "enabled": False,
-            "actions": [
-                {"type": "shell", "command": "echo x"},
-            ],
-        }
-        hook = _parse_hook(path, data)
-        assert hook is not None
-        assert hook.enabled is False
+        (tmp_path / "test.yaml").write_text(
+            "event: config.synced\nenabled: false\n"
+            "actions:\n  - type: shell\n    command: echo x\n",
+            encoding="utf-8",
+        )
+        hooks = load_hooks(tmp_path)
+        assert len(hooks) == 1
+        assert hooks[0].enabled is False
 
     def test_multiple_actions(self, tmp_path: Path) -> None:
-        path = tmp_path / "test.yaml"
-        data = {
-            "event": "vault.document.created",
-            "actions": [
-                {"type": "shell", "command": "echo 1"},
-                {"type": "shell", "command": "echo 2"},
-            ],
-        }
-        hook = _parse_hook(path, data)
-        assert hook is not None
-        assert len(hook.actions) == 2
+        (tmp_path / "test.yaml").write_text(
+            "event: vault.document.created\nactions:\n"
+            "  - type: shell\n    command: echo 1\n"
+            "  - type: shell\n    command: echo 2\n",
+            encoding="utf-8",
+        )
+        hooks = load_hooks(tmp_path)
+        assert len(hooks) == 1
+        assert len(hooks[0].actions) == 2
 
 
 class TestLoadHooks:
@@ -163,23 +168,46 @@ class TestLoadHooks:
 
 
 class TestInterpolate:
-    """Test template variable interpolation."""
+    """Test template variable interpolation, exercised through trigger()
+    (the public entry point that drives the private interpolation step)."""
 
-    def test_basic(self):
-        assert _interpolate("hello {name}", {"name": "world"}) == ("hello world")
-
-    def test_multiple_vars(self):
-        result = _interpolate(
-            "{a} and {b}",
-            {"a": "X", "b": "Y"},
+    @staticmethod
+    def _interpolated_output(tmp_path: Path, template: str, ctx: dict[str, str]) -> str:
+        script = tmp_path / "echo_arg.py"
+        script.write_text("import sys; print(sys.argv[1])", encoding="utf-8")
+        exe = sys.executable.replace("\\", "/")
+        script_path = str(script).replace("\\", "/")
+        hook = Hook(
+            name="test",
+            event="config.synced",
+            actions=[
+                HookAction(
+                    action_type="shell",
+                    command=f"{exe} {script_path} {template}",
+                ),
+            ],
         )
-        assert result == "X and Y"
+        results = trigger([hook], "config.synced", ctx)
+        assert len(results) == 1
+        assert results[0].success is True
+        return results[0].output
 
-    def test_missing_var_unchanged(self):
-        assert _interpolate("{missing}", {}) == "{missing}"
+    def test_basic(self, tmp_path: Path) -> None:
+        assert self._interpolated_output(
+            tmp_path, "hello_{name}", {"name": "world"}
+        ) == ("hello_world")
 
-    def test_empty_context(self):
-        assert _interpolate("no vars", {}) == "no vars"
+    def test_multiple_vars(self, tmp_path: Path) -> None:
+        result = self._interpolated_output(
+            tmp_path, "{a}_and_{b}", {"a": "X", "b": "Y"}
+        )
+        assert result == "X_and_Y"
+
+    def test_missing_var_unchanged(self, tmp_path: Path) -> None:
+        assert self._interpolated_output(tmp_path, "{missing}", {}) == "{missing}"
+
+    def test_empty_context(self, tmp_path: Path) -> None:
+        assert self._interpolated_output(tmp_path, "no_vars", {}) == "no_vars"
 
 
 class TestTrigger:
@@ -299,32 +327,55 @@ class TestDeduplication:
 
 
 class TestReentrantGuard:
-    """Test that recursive trigger of the same event is blocked."""
+    """Test that a concurrent trigger() of an in-flight event is blocked, and
+    that the guard is released once the in-flight call completes.
 
-    def test_reentrant_trigger_returns_empty(self):
-        # Directly mutate the module-level _triggering set to simulate a
-        # re-entrant call (as if trigger() is already running for this event).
-        # This avoids mocking  - we exercise the real guard path in trigger().
+    These exercise the real guard through the public trigger() entry point: a
+    background thread is given a genuinely slow shell action so a second,
+    concurrent trigger() call for the same event observes the guard while the
+    first is still running.
+    """
+
+    def test_reentrant_trigger_returns_empty(self, tmp_path: Path) -> None:
+        marker = tmp_path / "started"
+        script = tmp_path / "slow.py"
+        script.write_text(
+            "import pathlib, time\n"
+            f"pathlib.Path({str(marker)!r}).touch()\n"
+            "time.sleep(1)\n",
+            encoding="utf-8",
+        )
+        exe = sys.executable.replace("\\", "/")
+        script_path = str(script).replace("\\", "/")
         hook = Hook(
             name="test",
             event="config.synced",
-            actions=[
-                HookAction(
-                    action_type="shell",
-                    command=f"{sys.executable.replace('\\', '/')} -V",
-                )
-            ],
+            actions=[HookAction(action_type="shell", command=f"{exe} {script_path}")],
         )
-        _triggering.add("config.synced")
+
+        outer_results: list[HookResult] = []
+
+        def run_outer() -> None:
+            outer_results.extend(trigger([hook], "config.synced"))
+
+        outer_thread = threading.Thread(target=run_outer)
+        outer_thread.start()
         try:
-            results = trigger([hook], "config.synced")
-            assert results == []
+            deadline = time.monotonic() + 5
+            while not marker.exists() and time.monotonic() < deadline:
+                time.sleep(0.02)
+            assert marker.exists(), "outer trigger's shell action never started"
+
+            inner_results = trigger([hook], "config.synced")
+            assert inner_results == []
         finally:
-            _triggering.discard("config.synced")
+            outer_thread.join(timeout=5)
+
+        assert len(outer_results) == 1
+        assert outer_results[0].success is True
 
     def test_non_reentrant_trigger_works(self):
-        # Ensure the guard does not affect a different event or a clean state.
-        _triggering.discard("config.synced")
+        # A normal, non-concurrent call is never affected by the guard.
         hook = Hook(
             name="test",
             event="config.synced",
@@ -339,7 +390,9 @@ class TestReentrantGuard:
         assert len(results) == 1
         assert results[0].success is True
 
-    def test_triggering_set_cleaned_up_after_execution(self):
+    def test_guard_released_after_execution(self):
+        # If the guard were not released, this second call would be blocked
+        # and return [] just like the reentrant case above.
         hook = Hook(
             name="test",
             event="audit.completed",
@@ -350,8 +403,13 @@ class TestReentrantGuard:
                 )
             ],
         )
-        trigger([hook], "audit.completed")
-        assert "audit.completed" not in _triggering
+        first = trigger([hook], "audit.completed")
+        assert len(first) == 1
+        assert first[0].success is True
+
+        second = trigger([hook], "audit.completed")
+        assert len(second) == 1
+        assert second[0].success is True
 
 
 class TestFireHooksIntegration:

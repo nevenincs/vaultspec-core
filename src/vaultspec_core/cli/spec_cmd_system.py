@@ -13,10 +13,10 @@ import typer
 from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._target import TargetOption, apply_target
 from vaultspec_core.cli.spec_cmd_shared import (
-    _apply_provider_filter,
-    _emit_json,
-    _emit_sync_result,
-    _print_complete_sync_notice,
+    apply_provider_filter,
+    emit_json,
+    emit_sync_result,
+    print_complete_sync_notice,
 )
 
 system_app = make_app(
@@ -37,7 +37,7 @@ def cmd_system_show(
     data = system_show()
 
     if json_output:
-        _emit_json("spec.system.show", "unchanged", data)
+        emit_json("spec.system.show", "unchanged", data)
         raise typer.Exit(0)
 
     from vaultspec_core.cli.rendering import Column, render_listing, summary_line
@@ -94,11 +94,11 @@ def cmd_system_sync(
 ) -> None:
     """Sync only system prompts; use vaultspec-core sync for complete refresh."""
     apply_target(target)
-    _apply_provider_filter(provider)
+    apply_provider_filter(provider)
     from vaultspec_core.core import system_sync
 
     result = system_sync(dry_run=dry_run, force=force)
 
     if not json_output:
-        _print_complete_sync_notice(resource="system prompt")
-    _emit_sync_result(result, label="System", dry_run=dry_run, json_output=json_output)
+        print_complete_sync_notice(resource="system prompt")
+    emit_sync_result(result, label="System", dry_run=dry_run, json_output=json_output)

@@ -15,15 +15,15 @@ from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
 from vaultspec_core.cli.spec_cmd_shared import (
-    _apply_provider_filter,
-    _emit_json,
-    _emit_sync_result,
-    _print_complete_sync_notice,
-    _print_source_mutation_notice,
-    _resource_path,
-    _restore_resource_command,
-    _run_edit_command,
-    _spec_status_command,
+    apply_provider_filter,
+    emit_json,
+    emit_sync_result,
+    print_complete_sync_notice,
+    print_source_mutation_notice,
+    resource_path,
+    restore_resource_command,
+    run_edit_command,
+    spec_status_command,
 )
 
 rules_app = make_app(
@@ -44,7 +44,7 @@ def cmd_rules_list(
     items = rules_list()
 
     if json_output:
-        _emit_json("spec.rules.list", "unchanged", {"items": items})
+        emit_json("spec.rules.list", "unchanged", {"items": items})
         raise typer.Exit(0)
 
     from vaultspec_core.cli.rendering import Column, render_listing, summary_line
@@ -103,11 +103,11 @@ def cmd_rules_add(
         return
 
     if json_output:
-        _emit_json("spec.rules.add", "created", {"path": str(file_path)})
+        emit_json("spec.rules.add", "created", {"path": str(file_path)})
         raise typer.Exit(0)
 
     action = "Would create rule source" if dry_run else "Rule source updated"
-    _print_source_mutation_notice(file_path, action=action)
+    print_source_mutation_notice(file_path, action=action)
 
 
 @rules_app.command("show")
@@ -127,7 +127,7 @@ def cmd_rules_show(
             name=name, base_dir=get_context().rules_src_dir, label="Rule"
         )
         if json_output:
-            _emit_json(
+            emit_json(
                 "spec.rules.show", "unchanged", {"name": name, "content": content}
             )
             raise typer.Exit(0)
@@ -158,7 +158,7 @@ def cmd_rules_edit(
     apply_target(target)
     from vaultspec_core.core.types import get_context
 
-    _run_edit_command(
+    run_edit_command(
         name=name,
         base_dir=get_context().rules_src_dir,
         label="Rule",
@@ -201,11 +201,11 @@ def cmd_rules_remove(
         return
 
     if json_output:
-        _emit_json("spec.rules.remove", "removed", {"removed": name})
+        emit_json("spec.rules.remove", "removed", {"removed": name})
         raise typer.Exit(0)
 
-    _print_source_mutation_notice(
-        _resource_path(get_context().rules_src_dir, name),
+    print_source_mutation_notice(
+        resource_path(get_context().rules_src_dir, name),
         action="Rule source removed",
     )
 
@@ -238,14 +238,14 @@ def cmd_rules_rename(
         return
 
     if json_output:
-        _emit_json(
+        emit_json(
             "spec.rules.rename",
             "updated",
             {"old_name": old_name, "new_name": new_name, "path": str(new_path)},
         )
         raise typer.Exit(0)
 
-    _print_source_mutation_notice(new_path, action="Rule source renamed")
+    print_source_mutation_notice(new_path, action="Rule source renamed")
 
 
 @rules_app.command("sync")
@@ -266,14 +266,14 @@ def cmd_rules_sync(
 ) -> None:
     """Sync only rule files; use vaultspec-core sync for complete refresh."""
     apply_target(target)
-    _apply_provider_filter(provider)
+    apply_provider_filter(provider)
     from vaultspec_core.core import rules_sync
 
     result = rules_sync(prune=force, dry_run=dry_run)
 
     if not json_output:
-        _print_complete_sync_notice(resource="rule")
-    _emit_sync_result(result, label="Rules", dry_run=dry_run, json_output=json_output)
+        print_complete_sync_notice(resource="rule")
+    emit_sync_result(result, label="Rules", dry_run=dry_run, json_output=json_output)
 
 
 @rules_app.command("restore")
@@ -284,7 +284,7 @@ def cmd_rules_restore(
 ) -> None:
     """Restore a rule to its snapshotted original."""
     apply_target(target)
-    _restore_resource_command(
+    restore_resource_command(
         category="rules", label="rule", filename=filename, json_output=json_output
     )
 
@@ -299,4 +299,4 @@ def cmd_rules_status(
     from vaultspec_core.core import rules_sync
 
     result = rules_sync(prune=True, dry_run=True)
-    _spec_status_command(result, label="Rules", json_output=json_output)
+    spec_status_command(result, label="Rules", json_output=json_output)

@@ -107,8 +107,8 @@ def migrate(workspace: Path) -> MigrationResult:
     """
     from ..core.enums import ManagedState
     from ..core.gitignore import (
-        _find_markers,
         ensure_gitignore_block,
+        find_markers,
         get_recommended_entries,
     )
     from ..core.rules import converge_spec_layer_gitignore
@@ -138,7 +138,7 @@ def migrate(workspace: Path) -> MigrationResult:
         raise MigrationError(f"{_NAME}: failed to read {gi_path}: {exc}") from exc
 
     lines = content.splitlines()
-    begins, ends = _find_markers(lines)
+    begins, ends = find_markers(lines)
     if len(begins) != 1 or len(ends) != 1 or begins[0] >= ends[0]:
         # No single well-formed managed block: nothing this migration owns.
         return MigrationResult(

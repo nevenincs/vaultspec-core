@@ -66,7 +66,7 @@ if TYPE_CHECKING:
     from vaultspec_core.vaultcore.checks._base import CheckResult
     from vaultspec_core.vaultcore.edit_engine import EditResult
 
-__all__ = ["_execute_rename", "register_edit_commands", "register_rename_command"]
+__all__ = ["register_edit_commands", "register_rename_command"]
 
 
 # ---------------------------------------------------------------------------
@@ -366,8 +366,8 @@ def _refresh_doc_stamps(paths: list[Path]) -> None:
     """Refresh the ``modified:`` stamp on each touched document.
 
     Mirrors the feature-rename backend's
-    :func:`~vaultspec_core.vaultcore.query._refresh_rename_stamps`: the shared
-    ``related:`` cascade rewrites wiki-links but does not bump the modified
+    :func:`~vaultspec_core.vaultcore.query_rename_apply._refresh_rename_stamps`:
+    the shared ``related:`` cascade rewrites wiki-links but does not bump the modified
     stamp, so the renamed document and every relinked document are stamped here
     (vault-orientation ADR decision D3 - a link mutation refreshes the target's
     stamp). Newlines are preserved byte-for-byte and an unwritable document logs

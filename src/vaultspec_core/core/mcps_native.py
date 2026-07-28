@@ -21,24 +21,24 @@ from .tags import find_blocks
 if TYPE_CHECKING:
     from .types import McpTarget, SyncResult
 
-_LEGACY_MANAGED_KEY = "_vaultspecManaged"
-_TOML_BLOCK_TYPE = "mcps"
+LEGACY_MANAGED_KEY = "_vaultspecManaged"
+TOML_BLOCK_TYPE = "mcps"
 _STDIO_FIELDS = frozenset({"command", "args", "env"})
 
 __all__ = [
-    "_LEGACY_MANAGED_KEY",
-    "_TOML_BLOCK_TYPE",
-    "_json_server_map",
-    "_managed_toml_content",
-    "_normalized_sources",
-    "_render_codex_servers",
-    "_strip_external_codex_server",
-    "_toml_servers",
-    "_write_json_target",
+    "LEGACY_MANAGED_KEY",
+    "TOML_BLOCK_TYPE",
+    "json_server_map",
+    "managed_toml_content",
+    "normalized_sources",
+    "render_codex_servers",
+    "strip_external_codex_server",
+    "toml_servers",
+    "write_json_target",
 ]
 
 
-def _normalized_sources(
+def normalized_sources(
     sources: dict[str, tuple[Path, dict[str, Any]]],
     target: McpTarget,
     result: SyncResult,
@@ -100,7 +100,7 @@ def _normalized_sources(
     return normalized
 
 
-def _json_server_map(
+def json_server_map(
     raw: dict[str, Any], target: McpTarget, root: Path
 ) -> dict[str, Any]:
     """Return the native JSON server map for a Claude/Antigravity target."""
@@ -146,7 +146,7 @@ def _drop_empty_json_server_map(
         raw.pop("mcpServers", None)
 
 
-def _write_json_target(
+def write_json_target(
     path: Path, raw: dict[str, Any], target: McpTarget, root: Path
 ) -> None:
     _drop_empty_json_server_map(raw, target, root)
@@ -179,7 +179,7 @@ def _toml_value(value: Any) -> str:
     )
 
 
-def _render_codex_servers(servers: dict[str, dict[str, Any]]) -> str:
+def render_codex_servers(servers: dict[str, dict[str, Any]]) -> str:
     sections: list[str] = []
     for name, config in sorted(servers.items()):
         lines = [f"[mcp_servers.{json.dumps(name, ensure_ascii=False)}]"]
@@ -190,7 +190,7 @@ def _render_codex_servers(servers: dict[str, dict[str, Any]]) -> str:
     return "\n\n".join(sections)
 
 
-def _toml_servers(content: str) -> dict[str, dict[str, Any]]:
+def toml_servers(content: str) -> dict[str, dict[str, Any]]:
     if not content.strip():
         return {}
     parsed = tomllib.loads(content)
@@ -206,9 +206,9 @@ def _toml_servers(content: str) -> dict[str, dict[str, Any]]:
     return servers
 
 
-def _managed_toml_content(content: str) -> str:
+def managed_toml_content(content: str) -> str:
     for block in find_blocks(content):
-        if block.block_type == _TOML_BLOCK_TYPE:
+        if block.block_type == TOML_BLOCK_TYPE:
             lines = content.splitlines()
             return "\n".join(lines[block.content_start - 1 : block.content_end])
     return ""
@@ -234,7 +234,7 @@ def _toml_header_path(header: str) -> tuple[str, ...] | None:
     return tuple(path) if isinstance(current, dict) else None
 
 
-def _strip_external_codex_server(content: str, name: str) -> str:
+def strip_external_codex_server(content: str, name: str) -> str:
     """Remove one external Codex server's table sections without reformatting."""
     kept: list[str] = []
     removing = False

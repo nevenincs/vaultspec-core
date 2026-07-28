@@ -37,10 +37,10 @@ __all__ = [
     "SyncResult",
     "ToolConfig",
     "WorkspaceContext",
-    "_workspace_ctx",
     "get_context",
     "init_paths",
     "set_context",
+    "workspace_ctx",
 ]
 
 # AUTO-GENERATED header constant
@@ -199,7 +199,7 @@ class WorkspaceContext:
     tool_configs: dict[Tool, ToolConfig] = field(default_factory=dict)
 
 
-_workspace_ctx: ContextVar[WorkspaceContext] = ContextVar("_workspace_ctx")
+workspace_ctx: ContextVar[WorkspaceContext] = ContextVar("workspace_ctx")
 
 
 def get_context() -> WorkspaceContext:
@@ -209,12 +209,12 @@ def get_context() -> WorkspaceContext:
         LookupError: If :func:`init_paths` has not been called in this
             execution context.
     """
-    return _workspace_ctx.get()
+    return workspace_ctx.get()
 
 
 def set_context(ctx: WorkspaceContext) -> None:
     """Explicitly set the active :class:`WorkspaceContext`."""
-    _workspace_ctx.set(ctx)
+    workspace_ctx.set(ctx)
 
 
 def _validate_tool_containment(
@@ -378,5 +378,5 @@ def init_paths(layout: Any) -> WorkspaceContext:
         mcps_src_dir=mcps_src_dir,
         tool_configs=tool_configs,
     )
-    _workspace_ctx.set(ctx)
+    workspace_ctx.set(ctx)
     return ctx

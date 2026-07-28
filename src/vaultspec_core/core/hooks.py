@@ -19,13 +19,13 @@ from .exceptions import ResourceExistsError, ResourceNotFoundError
 from .types import SyncResult
 
 __all__ = [
-    "_resolve_hook_path",
+    "resolve_hook_path",
 ]
 
 logger = logging.getLogger(__name__)
 
 
-def _resolve_hook_path(name: str) -> Path:
+def resolve_hook_path(name: str) -> Path:
     """Resolve a hook name to its YAML file path."""
     ctx = _t.get_context()
     if name.endswith((".yaml", ".yml")):
@@ -64,12 +64,12 @@ def hooks_add(
     Raises:
         ResourceExistsError: If the hook exists and *force* is ``False``.
     """
-    from .helpers import _launch_editor, atomic_write, ensure_dir
+    from .helpers import atomic_write, ensure_dir, launch_editor
 
     ctx = _t.get_context()
     ensure_dir(ctx.hooks_dir)
 
-    file_path = _resolve_hook_path(name)
+    file_path = resolve_hook_path(name)
 
     if file_path.exists() and not force:
         raise ResourceExistsError(
@@ -105,7 +105,7 @@ def hooks_add(
             editor = get_config().editor
             logger.info("Opening editor (%s) for %s...", editor, file_path)
             try:
-                _launch_editor(editor, str(file_path))
+                launch_editor(editor, str(file_path))
                 logger.info("Hook saved to %s", file_path)
             except Exception as e:
                 logger.error("Error opening editor: %s", e)
@@ -144,7 +144,7 @@ def hooks_show(name: str) -> str:
     Raises:
         ResourceNotFoundError: If the hook does not exist.
     """
-    file_path = _resolve_hook_path(name)
+    file_path = resolve_hook_path(name)
     if not file_path.exists():
         raise ResourceNotFoundError(f"Hook '{name}' not found.")
     return file_path.read_text(encoding="utf-8")
@@ -166,7 +166,7 @@ def hooks_edit(name: str, editor: str | None = None) -> Path:
     )
     from .local_config import resolve_editor
 
-    file_path = _resolve_hook_path(name)
+    file_path = resolve_hook_path(name)
     if not file_path.exists():
         raise ResourceNotFoundError(f"Hook '{name}' not found.")
 
@@ -224,7 +224,7 @@ def hooks_remove(
     Raises:
         ResourceNotFoundError: If the hook does not exist.
     """
-    file_path = _resolve_hook_path(name)
+    file_path = resolve_hook_path(name)
     if not file_path.exists():
         raise ResourceNotFoundError(f"Hook '{name}' not found.")
 
@@ -260,19 +260,19 @@ def hooks_rename(old_name: str, new_name: str) -> Path:
     """
     from ..vaultcore.rename_engine import (
         RenameTransaction,
-        _assert_within,
+        assert_within,
         resource_lock_target,
     )
 
     hooks_dir = _t.get_context().hooks_dir
 
-    old_path = _resolve_hook_path(old_name)
+    old_path = resolve_hook_path(old_name)
     ext = old_path.suffix
     new_file = new_name if new_name.endswith((".yaml", ".yml")) else f"{new_name}{ext}"
     new_path = hooks_dir / new_file
 
-    _assert_within(hooks_dir, old_path)
-    _assert_within(hooks_dir, new_path)
+    assert_within(hooks_dir, old_path)
+    assert_within(hooks_dir, new_path)
 
     if not old_path.exists():
         raise ResourceNotFoundError(f"Hook '{old_name}' not found.")
@@ -347,7 +347,7 @@ def _action_warnings(name: str, actions: object) -> list[str]:
 def hooks_status() -> dict[str, Any]:
     """Perform deep compliancy verification of YAML hook definitions."""
     from vaultspec_core.hooks import SUPPORTED_EVENTS
-    from vaultspec_core.hooks.engine import _is_provider_hook_event, _parse_yaml
+    from vaultspec_core.hooks.engine import is_provider_hook_event, parse_yaml
 
     hooks_dir = _t.get_context().hooks_dir
 
@@ -369,10 +369,10 @@ def hooks_status() -> dict[str, Any]:
         for path in sorted(hooks_dir.glob(ext)):
             try:
                 raw_text = path.read_text(encoding="utf-8")
-                data = _parse_yaml(raw_text)
+                data = parse_yaml(raw_text)
 
                 event = data.get("event", "")
-                if _is_provider_hook_event(event):
+                if is_provider_hook_event(event):
                     # Provider (agent-runtime) hook; rendered by
                     # provider_hooks, not a CLI-lifecycle hook. Not our concern.
                     continue

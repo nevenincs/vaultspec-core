@@ -47,7 +47,7 @@ class PlanWriteGuardError(PlanCommandError):
     """A serialised plan write was refused by an integrity guard.
 
     Subclasses :class:`~vaultspec_core.plan.commands._errors.PlanCommandError`
-    so the CLI's ``_render_user_errors`` decorator renders it as a one-line
+    so the CLI's ``render_user_errors`` decorator renders it as a one-line
     error exactly as before the extraction, while the MCP tool handlers surface
     it as a protocol ``isError`` result like any other whole-call failure.
     """

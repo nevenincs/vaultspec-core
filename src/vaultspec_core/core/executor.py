@@ -131,9 +131,9 @@ def execute_plan(
             ResolutionAction.ADOPT_DIRECTORY,
         ):
             try:
-                from .commands import _ensure_tool_configs
+                from .commands import ensure_tool_configs
 
-                _ensure_tool_configs(target)
+                ensure_tool_configs(target)
             except Exception:
                 logger.debug("Tool config bootstrap failed", exc_info=True)
             _bootstrapped = True
@@ -216,9 +216,9 @@ def _execute_adopt_framework(target: Path, _step: ResolutionStep) -> None:
 
 def _execute_scaffold(target: Path, step: ResolutionStep) -> None:
     """Scaffold directories for a single provider."""
-    from .commands import _ensure_tool_configs, scaffold_provider
+    from .commands import ensure_tool_configs, scaffold_provider
 
-    _ensure_tool_configs(target)
+    ensure_tool_configs(target)
 
     try:
         tool = Tool(step.target)
@@ -246,9 +246,9 @@ def _execute_repair_gitattributes(target: Path, _step: ResolutionStep) -> None:
 
 def _execute_repair_precommit(target: Path, _step: ResolutionStep) -> None:
     """Scaffold or repair canonical pre-commit hooks."""
-    from .commands import _scaffold_precommit
+    from .commands import scaffold_precommit
 
-    _scaffold_precommit(target)
+    scaffold_precommit(target)
 
 
 #: Maps each preflight action to the handler that executes it. Defined after

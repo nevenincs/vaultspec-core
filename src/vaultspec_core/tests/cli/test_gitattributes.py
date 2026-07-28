@@ -13,8 +13,8 @@ from vaultspec_core.core.gitattributes import (
     DEFAULT_ENTRIES,
     MARKER_BEGIN,
     MARKER_END,
-    _find_markers,
     ensure_gitattributes_block,
+    find_markers,
 )
 
 if TYPE_CHECKING:
@@ -227,7 +227,7 @@ class TestFileWithoutNewline:
 class TestInvertedMarkers:
     def test_find_markers_inverted_returns_both(self) -> None:
         lines = ["some content", MARKER_END, "*.entry", MARKER_BEGIN]
-        begins, ends = _find_markers(lines)
+        begins, ends = find_markers(lines)
         assert begins == [3]
         assert ends == [1]
 

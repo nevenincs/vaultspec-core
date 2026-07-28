@@ -40,7 +40,7 @@ class _TargetRecord(TypedDict, total=False):
     managed: dict[str, Any]
 
 
-class _OwnershipState(TypedDict):
+class OwnershipState(TypedDict):
     """The full on-disk ownership sidecar shape, keyed by target key."""
 
     version: int
@@ -48,39 +48,37 @@ class _OwnershipState(TypedDict):
 
 
 __all__ = [
-    "_OWNERSHIP_FILENAME",
-    "_OWNERSHIP_VERSION",
-    "_OwnershipState",
-    "_discard_owned_names",
-    "_fingerprint",
-    "_launch_repr",
-    "_owned_fingerprints",
-    "_owned_names",
-    "_ownership_path",
-    "_ownership_target_key",
-    "_read_ownership",
-    "_set_owned_names",
-    "_target_lock",
-    "_write_ownership",
+    "OwnershipState",
+    "discard_owned_names",
+    "fingerprint",
+    "launch_repr",
+    "owned_fingerprints",
+    "owned_names",
     "ownership_path",
+    "ownership_target_key",
     "read_ownership",
+    "set_owned_names",
+    "target_lock",
+    "write_ownership",
 ]
 
 
-def _ownership_path(root: Path, scope: McpScope) -> Path:
+def ownership_path(root: Path, scope: McpScope) -> Path:
+    """Return the ownership sidecar path for *scope*."""
     if scope in {McpScope.PROJECT, McpScope.LOCAL}:
         return root / ".vaultspec" / _OWNERSHIP_FILENAME
     return Path.home() / ".vaultspec" / _OWNERSHIP_FILENAME
 
 
-def _ownership_target_key(target: McpTarget) -> str:
+def ownership_target_key(target: McpTarget) -> str:
     base = f"{target.provider.value}:{target.scope.value}"
     if target.scope is McpScope.USER:
         return f"{base}:{target.path.resolve()}"
     return base
 
 
-def _read_ownership(path: Path) -> _OwnershipState:
+def read_ownership(path: Path) -> OwnershipState:
+    """Read and validate the MCP ownership sidecar at *path*."""
     if not path.exists():
         return {"version": _OWNERSHIP_VERSION, "targets": {}}
     try:
@@ -104,42 +102,32 @@ def _read_ownership(path: Path) -> _OwnershipState:
     version = raw.get("version")
     if version != _OWNERSHIP_VERSION:
         raise VaultSpecError(f"Unsupported MCP ownership version at {path}: {version}")
-    return cast("_OwnershipState", raw)
+    return cast("OwnershipState", raw)
 
 
-def ownership_path(root: Path, scope: McpScope) -> Path:
-    """Return the ownership sidecar path for *scope*."""
-    return _ownership_path(root, scope)
-
-
-def read_ownership(path: Path) -> _OwnershipState:
-    """Read and validate the MCP ownership sidecar at *path*."""
-    return _read_ownership(path)
-
-
-def _write_ownership(path: Path, state: _OwnershipState) -> None:
+def write_ownership(path: Path, state: OwnershipState) -> None:
     ensure_dir(path.parent)
     atomic_write(path, json.dumps(state, indent=2, sort_keys=True) + "\n")
 
 
-def _target_lock(path: Path, *, dry_run: bool) -> Any:
+def target_lock(path: Path, *, dry_run: bool) -> Any:
     """Return a no-op context for previews and a real advisory lock for writes."""
     return nullcontext() if dry_run else advisory_lock(path)
 
 
-def _fingerprint(config: dict[str, Any]) -> str:
+def fingerprint(config: dict[str, Any]) -> str:
     """Return the stable observed-content fingerprint stored in ownership state."""
     encoded = json.dumps(config, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _owned_names(state: _OwnershipState, target: McpTarget) -> set[str]:
-    raw = state["targets"].get(_ownership_target_key(target), {})
+def owned_names(state: OwnershipState, target: McpTarget) -> set[str]:
+    raw = state["targets"].get(ownership_target_key(target), {})
     managed = raw.get("managed", {})
     return {str(name) for name in managed}
 
 
-def _owned_fingerprints(state: _OwnershipState, target: McpTarget) -> dict[str, str]:
+def owned_fingerprints(state: OwnershipState, target: McpTarget) -> dict[str, str]:
     """Return the recorded name-to-fingerprint map for one target's managed entries.
 
     A name present here with a matching current fingerprint proves the deployed
@@ -148,14 +136,14 @@ def _owned_fingerprints(state: _OwnershipState, target: McpTarget) -> dict[str, 
     from this map (legacy name-only ownership record) cannot be verified and
     keeps the existing skip-and-warn behavior.
     """
-    raw = state["targets"].get(_ownership_target_key(target), {})
+    raw = state["targets"].get(ownership_target_key(target), {})
     managed = raw.get("managed", {})
     return {
         str(name): value for name, value in managed.items() if isinstance(value, str)
     }
 
 
-def _launch_repr(config: dict[str, Any]) -> str:
+def launch_repr(config: dict[str, Any]) -> str:
     """Return a human-readable one-line rendering of a server's launch command."""
     command = str(config.get("command", ""))
     args_obj: object = config.get("args", [])
@@ -164,10 +152,10 @@ def _launch_repr(config: dict[str, Any]) -> str:
     return " ".join(part for part in parts if part)
 
 
-def _set_owned_names(
-    state: _OwnershipState, target: McpTarget, servers: dict[str, dict[str, Any]]
+def set_owned_names(
+    state: OwnershipState, target: McpTarget, servers: dict[str, dict[str, Any]]
 ) -> None:
-    key = _ownership_target_key(target)
+    key = ownership_target_key(target)
     if not servers:
         state["targets"].pop(key, None)
         return
@@ -176,15 +164,15 @@ def _set_owned_names(
         "scope": target.scope.value,
         "path": str(target.path.resolve()),
         "managed": {
-            name: _fingerprint(config) for name, config in sorted(servers.items())
+            name: fingerprint(config) for name, config in sorted(servers.items())
         },
     }
 
 
-def _discard_owned_names(
-    state: _OwnershipState, target: McpTarget, names: set[str]
+def discard_owned_names(
+    state: OwnershipState, target: McpTarget, names: set[str]
 ) -> None:
-    key = _ownership_target_key(target)
+    key = ownership_target_key(target)
     record = state["targets"].get(key)
     if not isinstance(record, dict):
         return

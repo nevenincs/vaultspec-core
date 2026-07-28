@@ -13,8 +13,8 @@ from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._target import PlanPathArg
 from vaultspec_core.cli.plan_cmd_app import epic_app
 from vaultspec_core.cli.plan_cmd_shared import (
-    _render_user_errors,
-    _save_plan_or_dry_run,
+    render_user_errors,
+    save_plan_or_dry_run,
 )
 
 __all__ = ["cmd_epic_intent_edit", "cmd_epic_intent_show", "epic_intent_app"]
@@ -39,7 +39,7 @@ def cmd_epic_intent_show(
 
 
 @epic_intent_app.command("edit")
-@_render_user_errors
+@render_user_errors
 def cmd_epic_intent_edit(
     path: PlanPathArg,
     text: Annotated[
@@ -67,7 +67,7 @@ def cmd_epic_intent_edit(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     edit_epic_intent(plan, text=text)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,

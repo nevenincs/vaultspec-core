@@ -19,9 +19,6 @@ from vaultspec_core.core.commands import (
     entry_prefix_for_mode,
 )
 from vaultspec_core.core.diagnosis.collectors import (
-    _collect_precommit_yaml_state,
-    _observed_mcp_mode,
-    _observed_precommit_mode,
     collect_builtin_version_state,
     collect_config_state,
     collect_content_integrity,
@@ -34,6 +31,8 @@ from vaultspec_core.core.diagnosis.collectors import (
     collect_provider_dir_state,
     collect_vault_content_state,
     collect_version_floor_state,
+    observed_mcp_mode,
+    observed_precommit_mode,
 )
 from vaultspec_core.core.diagnosis.diagnosis import WorkspaceDiagnosis, diagnose
 from vaultspec_core.core.diagnosis.signals import (
@@ -52,10 +51,10 @@ from vaultspec_core.core.diagnosis.signals import (
 from vaultspec_core.core.enums import CliAction, InstallMode, Tool
 from vaultspec_core.core.gitignore import DEFAULT_ENTRIES, MARKER_BEGIN, MARKER_END
 from vaultspec_core.core.mcps import (
-    _MODE_ARGS_TOKEN,
-    _MODE_COMMAND_TOKEN,
-    _MODE_MODULE_KEY,
-    _MODE_PACKAGE_KEY,
+    MODE_ARGS_TOKEN,
+    MODE_COMMAND_TOKEN,
+    MODE_MODULE_KEY,
+    MODE_PACKAGE_KEY,
     render_launch_for_mode,
     render_mcp_definition_for_mode,
 )
@@ -640,7 +639,7 @@ class TestModeMismatchState:
 
 
 # ---------------------------------------------------------------------------
-# _observed_mcp_mode: current, legacy, and unguarded launch shapes
+# observed_mcp_mode: current, legacy, and unguarded launch shapes
 # ---------------------------------------------------------------------------
 class TestObservedMcpMode:
     _MODULE = "vaultspec_core.mcp_server.app"
@@ -653,7 +652,7 @@ class TestObservedMcpMode:
             "uv",
             ["run", "--no-sync", "python", "-m", self._MODULE],
         )
-        assert _observed_mcp_mode(tmp_path, "vaultspec-core") == InstallMode.DEPENDENCY
+        assert observed_mcp_mode(tmp_path, "vaultspec-core") == InstallMode.DEPENDENCY
 
     def test_legacy_bare_shape_is_dependency(self, tmp_path: Path) -> None:
         """The pre-amendment bare uv run shape (no --no-sync) still maps to
@@ -662,7 +661,7 @@ class TestObservedMcpMode:
         _write_mcp_server_entry(
             tmp_path, "vaultspec-core", "uv", ["run", "python", "-m", self._MODULE]
         )
-        assert _observed_mcp_mode(tmp_path, "vaultspec-core") == InstallMode.DEPENDENCY
+        assert observed_mcp_mode(tmp_path, "vaultspec-core") == InstallMode.DEPENDENCY
 
     def test_tool_shape_is_tool(self, tmp_path: Path) -> None:
         _write_mcp_server_entry(
@@ -671,7 +670,7 @@ class TestObservedMcpMode:
             "uvx",
             ["--from", "vaultspec-core", "python", "-m", self._MODULE],
         )
-        assert _observed_mcp_mode(tmp_path, "vaultspec-core") == InstallMode.TOOL
+        assert observed_mcp_mode(tmp_path, "vaultspec-core") == InstallMode.TOOL
 
     def test_arbitrary_unguarded_shape_is_none(self, tmp_path: Path) -> None:
         """An un-guarded shape that is neither the current nor the legacy
@@ -684,36 +683,42 @@ class TestObservedMcpMode:
             "uv",
             ["run", "--isolated", "python", "-m", self._MODULE],
         )
-        assert _observed_mcp_mode(tmp_path, "vaultspec-core") is None
+        assert observed_mcp_mode(tmp_path, "vaultspec-core") is None
 
 
 # ---------------------------------------------------------------------------
 # .pre-commit-config.yaml shapes the hook readers must tolerate
 # ---------------------------------------------------------------------------
 class TestPrecommitYamlState:
-    """Malformed and shape-surprising configs classify without crashing."""
+    """Malformed and shape-surprising configs classify without crashing.
+
+    No ``prek.toml`` exists in any of these fixtures, so prek never owns the
+    boundary and ``collect_precommit_state`` falls straight through to its
+    YAML-only assessment - the public entry point exercises the same path
+    the private helper would, without reaching into the module's internals.
+    """
 
     def test_absent_config_is_no_file(self, tmp_path: Path) -> None:
-        assert _collect_precommit_yaml_state(tmp_path) == PrecommitSignal.NO_FILE
+        assert collect_precommit_state(tmp_path) == PrecommitSignal.NO_FILE
 
     def test_unparseable_config_is_no_file(self, tmp_path: Path) -> None:
         (tmp_path / ".pre-commit-config.yaml").write_text(
             "repos: [unclosed\n", encoding="utf-8"
         )
-        assert _collect_precommit_yaml_state(tmp_path) == PrecommitSignal.NO_FILE
+        assert collect_precommit_state(tmp_path) == PrecommitSignal.NO_FILE
 
     def test_non_mapping_document_is_no_hooks(self, tmp_path: Path) -> None:
         """A parseable but non-mapping document declares no hooks, not no file."""
         (tmp_path / ".pre-commit-config.yaml").write_text(
             "- first\n- second\n", encoding="utf-8"
         )
-        assert _collect_precommit_yaml_state(tmp_path) == PrecommitSignal.NO_HOOKS
+        assert collect_precommit_state(tmp_path) == PrecommitSignal.NO_HOOKS
 
     def test_non_list_repos_key_is_no_hooks(self, tmp_path: Path) -> None:
         (tmp_path / ".pre-commit-config.yaml").write_text(
             "repos: not-a-list\n", encoding="utf-8"
         )
-        assert _collect_precommit_yaml_state(tmp_path) == PrecommitSignal.NO_HOOKS
+        assert collect_precommit_state(tmp_path) == PrecommitSignal.NO_HOOKS
 
     def test_remote_only_repos_is_no_hooks(self, tmp_path: Path) -> None:
         (tmp_path / ".pre-commit-config.yaml").write_text(
@@ -724,7 +729,7 @@ class TestPrecommitYamlState:
             "      - id: something-else\n",
             encoding="utf-8",
         )
-        assert _collect_precommit_yaml_state(tmp_path) == PrecommitSignal.NO_HOOKS
+        assert collect_precommit_state(tmp_path) == PrecommitSignal.NO_HOOKS
 
     def test_mode_inference_tolerates_a_non_list_repos_key(
         self, tmp_path: Path
@@ -732,7 +737,7 @@ class TestPrecommitYamlState:
         (tmp_path / ".pre-commit-config.yaml").write_text(
             "repos: not-a-list\n", encoding="utf-8"
         )
-        assert _observed_precommit_mode(tmp_path) is None
+        assert observed_precommit_mode(tmp_path) is None
 
     def test_mode_inference_tolerates_an_unparseable_config(
         self, tmp_path: Path
@@ -740,7 +745,7 @@ class TestPrecommitYamlState:
         (tmp_path / ".pre-commit-config.yaml").write_text(
             "repos: [unclosed\n", encoding="utf-8"
         )
-        assert _observed_precommit_mode(tmp_path) is None
+        assert observed_precommit_mode(tmp_path) is None
 
 
 # ---------------------------------------------------------------------------
@@ -1144,7 +1149,7 @@ class TestRenderLaunchForMode:
 class TestRenderMcpDefinitionForMode:
     @staticmethod
     def _tokened(**extra: str) -> dict[str, Any]:
-        return {"command": _MODE_COMMAND_TOKEN, "args": [_MODE_ARGS_TOKEN], **extra}
+        return {"command": MODE_COMMAND_TOKEN, "args": [MODE_ARGS_TOKEN], **extra}
 
     def test_core_tool_mode(self) -> None:
         rendered = render_mcp_definition_for_mode(self._tokened(), InstallMode.TOOL)
@@ -1174,8 +1179,8 @@ class TestRenderMcpDefinitionForMode:
         package's launch, and the metadata keys never reach the output."""
         definition = self._tokened(
             **{
-                _MODE_PACKAGE_KEY: "vaultspec-rag",
-                _MODE_MODULE_KEY: "vaultspec_rag.server",
+                MODE_PACKAGE_KEY: "vaultspec-rag",
+                MODE_MODULE_KEY: "vaultspec_rag.server",
             }
         )
         rendered = render_mcp_definition_for_mode(definition, InstallMode.TOOL)
@@ -1187,8 +1192,8 @@ class TestRenderMcpDefinitionForMode:
             "-m",
             "vaultspec_rag.server",
         ]
-        assert _MODE_PACKAGE_KEY not in rendered
-        assert _MODE_MODULE_KEY not in rendered
+        assert MODE_PACKAGE_KEY not in rendered
+        assert MODE_MODULE_KEY not in rendered
 
     def test_user_definition_passes_through_unchanged(self) -> None:
         definition = {"command": "node", "args": ["server.js"]}
@@ -1200,8 +1205,8 @@ class TestRenderMcpDefinitionForMode:
         definition = self._tokened()
         render_mcp_definition_for_mode(definition, InstallMode.TOOL)
         assert definition == {
-            "command": _MODE_COMMAND_TOKEN,
-            "args": [_MODE_ARGS_TOKEN],
+            "command": MODE_COMMAND_TOKEN,
+            "args": [MODE_ARGS_TOKEN],
         }
 
 

@@ -12,8 +12,8 @@ import typer
 from vaultspec_core.cli._target import PlanPathArg
 from vaultspec_core.cli.plan_cmd_app import phase_app
 from vaultspec_core.cli.plan_cmd_shared import (
-    _render_user_errors,
-    _save_plan_or_dry_run,
+    render_user_errors,
+    save_plan_or_dry_run,
 )
 
 __all__ = [
@@ -27,7 +27,7 @@ __all__ = [
 
 
 @phase_app.command("add")
-@_render_user_errors
+@render_user_errors
 def cmd_phase_add(
     path: PlanPathArg,
     title: Annotated[str, typer.Option("--title", help="Phase heading title")],
@@ -54,7 +54,7 @@ def cmd_phase_add(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     phase = add_phase(plan, title=title, intent=intent, wave_id=wave_id)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -67,7 +67,7 @@ def cmd_phase_add(
 
 
 @phase_app.command("insert")
-@_render_user_errors
+@render_user_errors
 def cmd_phase_insert(
     path: PlanPathArg,
     title: Annotated[str, typer.Option("--title", help="Phase heading title")],
@@ -99,7 +99,7 @@ def cmd_phase_insert(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     phase = insert_phase(plan, title=title, intent=intent, before=before, after=after)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -112,7 +112,7 @@ def cmd_phase_insert(
 
 
 @phase_app.command("edit")
-@_render_user_errors
+@render_user_errors
 def cmd_phase_edit(
     path: PlanPathArg,
     phase_id: Annotated[str, typer.Argument(help="Phase canonical id (P##)")],
@@ -141,7 +141,7 @@ def cmd_phase_edit(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     edit_phase(plan, phase_id, title=title, intent=intent)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -154,7 +154,7 @@ def cmd_phase_edit(
 
 
 @phase_app.command("move")
-@_render_user_errors
+@render_user_errors
 def cmd_phase_move(
     path: PlanPathArg,
     phase_id: Annotated[str, typer.Argument(help="Phase canonical id (P##)")],
@@ -186,7 +186,7 @@ def cmd_phase_move(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     phase = move_phase(plan, phase_id, to_wave=to_wave, before=before, after=after)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -199,7 +199,7 @@ def cmd_phase_move(
 
 
 @phase_app.command("renumber")
-@_render_user_errors
+@render_user_errors
 def cmd_phase_renumber(
     path: PlanPathArg,
     phase_id: Annotated[str, typer.Argument(help="Existing Phase canonical id (P##)")],
@@ -229,7 +229,7 @@ def cmd_phase_renumber(
     original_text = path.read_text(encoding="utf-8")
     plan = parse_plan(original_text)
     phase = renumber_phase(plan, phase_id, to=to)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -242,7 +242,7 @@ def cmd_phase_renumber(
 
 
 @phase_app.command("remove")
-@_render_user_errors
+@render_user_errors
 def cmd_phase_remove(
     path: PlanPathArg,
     phase_id: Annotated[str, typer.Argument(help="Phase canonical id (P##)")],
@@ -266,7 +266,7 @@ def cmd_phase_remove(
     plan = parse_plan(original_text)
     retired_phase, retired_steps = remove_phase(plan, phase_id)
     cascaded_str = f"{', '.join(retired_steps) if retired_steps else '(none)'}"
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,

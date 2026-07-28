@@ -23,14 +23,11 @@ from .signals import (
 
 logger = logging.getLogger(__name__)
 
-#: Re-exported (with underscore intact) for
-#: :mod:`vaultspec_core.core.diagnosis.collectors_content`.
-__all__ = ["_TOOL_DIR"]
-
 # Tool -> primary directory name mapping.  Kept here rather than imported from
 # enums to avoid pulling the full enum module at import time; the mapping is
 # stable and mirrors :class:`~vaultspec_core.core.enums.DirName`.
-_TOOL_DIR: dict[str, str] = {
+#: Shared with :mod:`vaultspec_core.core.diagnosis.collectors_content`.
+TOOL_DIR: dict[str, str] = {
     "claude": ".claude",
     "gemini": ".gemini",
     "antigravity": ".agents",
@@ -65,7 +62,7 @@ _tool_dir_validated = False
 
 
 def _validate_tool_dir() -> None:
-    """Verify ``_TOOL_DIR`` covers every Tool member.
+    """Verify ``TOOL_DIR`` covers every Tool member.
 
     Called once on first use to catch drift between the mapping and the enum.
     """
@@ -76,12 +73,12 @@ def _validate_tool_dir() -> None:
     from ..enums import Tool
 
     enum_values = {t.value for t in Tool}
-    mapping_keys = set(_TOOL_DIR)
+    mapping_keys = set(TOOL_DIR)
     if mapping_keys != enum_values:
         missing = enum_values - mapping_keys
         extra = mapping_keys - enum_values
         raise RuntimeError(
-            f"_TOOL_DIR is out of sync with Tool enum: missing={missing} extra={extra}"
+            f"TOOL_DIR is out of sync with Tool enum: missing={missing} extra={extra}"
         )
     _tool_dir_validated = True
 
@@ -174,7 +171,7 @@ def collect_manifest_coherence(target: Path) -> dict[str, ManifestEntrySignal]:
     result: dict[str, ManifestEntrySignal] = {}
 
     for tool in Tool:
-        dir_name = _TOOL_DIR.get(tool.value)
+        dir_name = TOOL_DIR.get(tool.value)
         if dir_name is None:
             continue
 
@@ -209,7 +206,7 @@ def _provider_children(target: Path, tool_value: str) -> list[Path] | None:
         The directory's entries, or ``None`` when the provider has no known
         directory, the directory does not exist, or it cannot be read.
     """
-    dir_name = _TOOL_DIR.get(tool_value)
+    dir_name = TOOL_DIR.get(tool_value)
     if dir_name is None:
         return None
 

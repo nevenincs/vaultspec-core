@@ -3,7 +3,7 @@
 Defines :func:`cmd_doctor`, mounted by :mod:`vaultspec_core.cli.spec_cmd`
 as the ``doctor`` command on :data:`~vaultspec_core.cli.spec_cmd_app.spec_app`.
 Also hosts the diagnosis-table rendering and exit-code helpers, some of
-which (:func:`_doctor_exit_code`, :func:`_render_diagnosis_table`) are
+which (:func:`doctor_exit_code`, :func:`render_diagnosis_table`) are
 re-exported from :mod:`vaultspec_core.cli.spec_cmd` for use by tests and
 :mod:`vaultspec_core.cli.root`.
 """
@@ -19,7 +19,7 @@ from vaultspec_core.cli._target import (
     apply_target,
     resolve_effective_target,
 )
-from vaultspec_core.cli.spec_cmd_shared import _emit_json
+from vaultspec_core.cli.spec_cmd_shared import emit_json
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -27,13 +27,10 @@ if TYPE_CHECKING:
     from vaultspec_core.core.diagnosis import ProviderDiagnosis, WorkspaceDiagnosis
 
 __all__ = [
-    "_doctor_exit_code",
-    "_gate",
-    "_provider_status",
-    "_render_diagnosis_table",
-    "_signal_status",
     "cmd_doctor",
+    "doctor_exit_code",
     "logger",
+    "render_diagnosis_table",
 ]
 
 logger = logging.getLogger(__name__)
@@ -101,21 +98,21 @@ def cmd_doctor(
 
     if json_output:
         data = dataclasses.asdict(diag)
-        exit_code = _doctor_exit_code(diag)
+        exit_code = doctor_exit_code(diag)
         gated = _gate(exit_code, gate_errors=gate_errors)
-        _emit_json("spec.doctor", "failed" if gated else "unchanged", data)
+        emit_json("spec.doctor", "failed" if gated else "unchanged", data)
         raise typer.Exit(code=gated)
 
     from vaultspec_core.console import get_console
 
     console = get_console()
-    _render_diagnosis_table(console, diag)
+    render_diagnosis_table(console, diag)
 
-    exit_code = _doctor_exit_code(diag)
+    exit_code = doctor_exit_code(diag)
     raise typer.Exit(code=_gate(exit_code, gate_errors=gate_errors))
 
 
-def _render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> None:
+def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> None:
     """Render the workspace diagnosis as a box-free listing.
 
     The ``_console`` argument is retained for call-site compatibility; the
@@ -529,7 +526,7 @@ def _provider_status(
     return ("ok", "green")
 
 
-def _doctor_exit_code(
+def doctor_exit_code(
     diag: "WorkspaceDiagnosis",
 ) -> int:
     """Compute the doctor exit code from a diagnosis.

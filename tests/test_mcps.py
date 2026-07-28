@@ -51,29 +51,29 @@ def _owned_names(path, target_key: str = "claude:project") -> set[str]:
 @pytest.mark.unit
 class TestServerName:
     def test_builtin_suffix(self):
-        from vaultspec_core.core.mcps import _server_name
+        from vaultspec_core.core.mcps import server_name
 
-        assert _server_name("vaultspec-core.builtin.json") == "vaultspec-core"
+        assert server_name("vaultspec-core.builtin.json") == "vaultspec-core"
 
     def test_json_suffix(self):
-        from vaultspec_core.core.mcps import _server_name
+        from vaultspec_core.core.mcps import server_name
 
-        assert _server_name("my-server.json") == "my-server"
+        assert server_name("my-server.json") == "my-server"
 
     def test_multi_dot_builtin(self):
-        from vaultspec_core.core.mcps import _server_name
+        from vaultspec_core.core.mcps import server_name
 
-        assert _server_name("foo.bar.builtin.json") == "foo.bar"
+        assert server_name("foo.bar.builtin.json") == "foo.bar"
 
     def test_multi_dot_json(self):
-        from vaultspec_core.core.mcps import _server_name
+        from vaultspec_core.core.mcps import server_name
 
-        assert _server_name("foo.bar.json") == "foo.bar"
+        assert server_name("foo.bar.json") == "foo.bar"
 
     def test_no_json_suffix(self):
-        from vaultspec_core.core.mcps import _server_name
+        from vaultspec_core.core.mcps import server_name
 
-        assert _server_name("something") == "something"
+        assert server_name("something") == "something"
 
 
 @pytest.mark.unit

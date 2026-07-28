@@ -208,11 +208,3 @@ def resolve_precommit(
         return
 
     logger.warning("Unknown PrecommitSignal member: %s (action=%s)", signal, action)
-
-
-# Backward-compatible private aliases: ``core/resolver.py`` and its tests
-# (outside this round's scope) still import these by their original
-# underscore names. New callers should prefer the public names above.
-_resolve_gitignore = resolve_gitignore
-_resolve_gitattributes = resolve_gitattributes
-_resolve_precommit = resolve_precommit

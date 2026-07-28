@@ -15,9 +15,7 @@ from .helpers import atomic_write_bytes
 
 logger = logging.getLogger(__name__)
 
-#: Re-exported (with underscore intact) for
-#: :mod:`vaultspec_core.core.diagnosis.collectors_config`.
-__all__ = ["_find_markers"]
+__all__ = ["find_markers"]
 
 MARKER_BEGIN = "# >>> vaultspec-managed (do not edit this block) >>>"
 MARKER_END = "# <<< vaultspec-managed <<<"
@@ -41,7 +39,7 @@ def has_valid_block(lines: list[str]) -> bool:
     Returns:
         ``True`` when the block structure is valid.
     """
-    begins, ends = _find_markers(lines)
+    begins, ends = find_markers(lines)
     return len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]
 
 
@@ -92,7 +90,7 @@ def ensure_gitattributes_block(
 
     content = text.decode("utf-8")
     lines = content.splitlines()
-    begins, ends = _find_markers(lines)
+    begins, ends = find_markers(lines)
 
     if state == ManagedState.ABSENT:
         return _remove_block(ga_path, lines, begins, ends, eol, bom)
@@ -106,7 +104,7 @@ def _detect_line_ending(raw: bytes) -> str:
     return "\r\n" if crlf > lf else "\n"
 
 
-def _find_markers(lines: list[str]) -> tuple[list[int], list[int]]:
+def find_markers(lines: list[str]) -> tuple[list[int], list[int]]:
     """Return ``(begin_indices, end_indices)`` of the managed block markers."""
     begins: list[int] = []
     ends: list[int] = []
@@ -158,7 +156,7 @@ def _purge_markers(
         for start, end in sorted(ranges, key=lambda x: x[0], reverse=True):
             lines[start : end + 1] = []
 
-        begins_left, ends_left = _find_markers(lines)
+        begins_left, ends_left = find_markers(lines)
         to_pop = sorted(begins_left + ends_left, reverse=True)
         for idx in to_pop:
             lines.pop(idx)

@@ -1,8 +1,8 @@
 """Pure helper functions backing the vault graph build and analysis passes.
 
-Node-content helpers (:func:`_extract_title`, :func:`_extract_feature`,
-:func:`_edge_kind`, :func:`_docnode_from_attrs`) and graph algorithms
-(:func:`_top_n`, :func:`_betweenness_centrality`, :func:`_pagerank`) used by
+Node-content helpers (:func:`extract_title`, :func:`extract_feature`,
+:func:`edge_kind`, :func:`docnode_from_attrs`) and graph algorithms
+(:func:`top_n`, :func:`betweenness_centrality`, :func:`pagerank`) used by
 :class:`~vaultspec_core.graph.api.VaultGraph` during construction and
 :meth:`~vaultspec_core.graph.api.VaultGraph.metrics`.  None of these touch the
 filesystem; they operate on already-parsed content, tag sets, or an
@@ -23,13 +23,13 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "PAGERANK_ALPHA",
-    "_betweenness_centrality",
-    "_docnode_from_attrs",
-    "_edge_kind",
-    "_extract_feature",
-    "_extract_title",
-    "_pagerank",
-    "_top_n",
+    "betweenness_centrality",
+    "docnode_from_attrs",
+    "edge_kind",
+    "extract_feature",
+    "extract_title",
+    "pagerank",
+    "top_n",
 ]
 
 # PageRank damping factor.  Pinned so node-size hints are reproducible across
@@ -37,7 +37,7 @@ __all__ = [
 PAGERANK_ALPHA = 0.85
 
 
-def _extract_title(body: str) -> str | None:
+def extract_title(body: str) -> str | None:
     """Return the text of the first ``# ...`` heading, or ``None``."""
     for line in body.splitlines():
         stripped = line.strip()
@@ -46,7 +46,7 @@ def _extract_title(body: str) -> str | None:
     return None
 
 
-def _extract_feature(tags: set[str]) -> str | None:
+def extract_feature(tags: set[str]) -> str | None:
     """Return the feature name (no ``#``) from a document's tags.
 
     The feature is the lexicographically smallest non-directory tag.  Sorting
@@ -69,7 +69,7 @@ def _extract_feature(tags: set[str]) -> str | None:
     return None
 
 
-def _top_n(
+def top_n(
     scores: dict[str, float],
     n: int = 10,
 ) -> dict[str, float]:
@@ -78,7 +78,7 @@ def _top_n(
     return dict(ranked[:n])
 
 
-def _betweenness_centrality(g: nx.DiGraph[str]) -> dict[str, float]:
+def betweenness_centrality(g: nx.DiGraph[str]) -> dict[str, float]:
     """Compute betweenness centrality via the C-backed engine when available.
 
     Betweenness is the one O(V*E) algorithm on the opt-in analysis surface;
@@ -103,7 +103,7 @@ def _betweenness_centrality(g: nx.DiGraph[str]) -> dict[str, float]:
     return {rgraph[index]: score for index, score in scores.items()}
 
 
-def _pagerank(
+def pagerank(
     g: nx.DiGraph[str],
     *,
     alpha: float = 0.85,
@@ -189,7 +189,7 @@ def _pagerank(
     return rank
 
 
-def _docnode_from_attrs(name: str, attrs: dict[str, Any]) -> DocNode:
+def docnode_from_attrs(name: str, attrs: dict[str, Any]) -> DocNode:
     """Reconstruct a :class:`DocNode` from cached networkx node attributes.
 
     Inverts :meth:`DocNode.to_nx_attrs`: the stored ``path`` string becomes a
@@ -228,7 +228,7 @@ def _docnode_from_attrs(name: str, attrs: dict[str, Any]) -> DocNode:
     )
 
 
-def _edge_kind(provenance: set[str]) -> str:
+def edge_kind(provenance: set[str]) -> str:
     """Map a set of provenance sources to a single edge ``kind`` value.
 
     Args:

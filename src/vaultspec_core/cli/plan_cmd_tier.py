@@ -12,8 +12,8 @@ import typer
 from vaultspec_core.cli._target import PlanPathArg
 from vaultspec_core.cli.plan_cmd_app import tier_app
 from vaultspec_core.cli.plan_cmd_shared import (
-    _render_user_errors,
-    _save_plan_or_dry_run,
+    render_user_errors,
+    save_plan_or_dry_run,
 )
 
 __all__ = ["cmd_tier_demote", "cmd_tier_promote", "cmd_tier_show"]
@@ -46,7 +46,7 @@ def cmd_tier_show(
 
 
 @tier_app.command("promote")
-@_render_user_errors
+@render_user_errors
 def cmd_tier_promote(
     path: PlanPathArg,
     target: Annotated[
@@ -178,7 +178,7 @@ def cmd_tier_promote(
         wave_intent=wave_intent,
         epic_intent=epic_intent,
     )
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,
@@ -191,7 +191,7 @@ def cmd_tier_promote(
 
 
 @tier_app.command("demote")
-@_render_user_errors
+@render_user_errors
 def cmd_tier_demote(
     path: PlanPathArg,
     target: Annotated[
@@ -248,7 +248,7 @@ def cmd_tier_demote(
             expected_retired.update(p.canonical_id for p in plan.phases)
 
     new_tier = demote_tier(plan, target=target_tier, force=force)
-    _save_plan_or_dry_run(
+    save_plan_or_dry_run(
         path=path,
         plan=plan,
         original_text=original_text,

@@ -19,8 +19,6 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "PROVIDER_ARTIFACT_PATTERNS",
-    "_UNTRACK_PREFIXES",
-    "_is_git_repo",
     "check_staged_provider_artifacts",
 ]
 
@@ -49,12 +47,6 @@ def has_gitattributes_block(ga_path: Path) -> bool:
         return False
 
 
-#: Backward-compatible aliases for external callers still importing the
-#: previously private names.
-_has_gitignore_block = has_gitignore_block
-_has_gitattributes_block = has_gitattributes_block
-
-
 def _is_git_repo(target: Path) -> bool:
     """Return ``True`` if *target* is inside a git repository.
 
@@ -74,7 +66,7 @@ def _is_git_repo(target: Path) -> bool:
 # recorded in the manifest, only for files that match the managed
 # gitignore entries."  Concretely, ``get_recommended_entries`` emits
 # these directories when the manifest records the provider as installed
-# and the directory exists on disk; :func:`_untrack_managed_paths` only
+# and the directory exists on disk; :func:`untrack_managed_paths` only
 # acts on entries it receives, so a provider that was never installed
 # cannot be accidentally untracked.
 _UNTRACK_PREFIXES: tuple[str, ...] = (
@@ -215,11 +207,6 @@ def untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
     for path in actually_untracked:
         logger.info("Untracked previously-committed managed path: %s", path)
     return actually_untracked
-
-
-#: Backward-compatible alias for external callers still importing the
-#: previously private name.
-_untrack_managed_paths = untrack_managed_paths
 
 
 # Patterns that must never be committed.  Used by the

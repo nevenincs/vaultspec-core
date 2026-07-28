@@ -1,7 +1,7 @@
 """Concurrency-safety tests for the docs-domain advisory lock.
 
-The rename-convergence work commits every docs-domain mutator - ``vault rename``
-(``_execute_rename``), ``rename_feature``, and the structure-rename cascade
+The rename-convergence work commits every docs-domain mutator - ``vault rename``,
+``rename_feature``, and the structure-rename cascade
 (``check_structure`` with ``fix=True``) - to one well-known advisory-lock
 sentinel (:func:`~vaultspec_core.vaultcore.rename_engine.docs_lock_target`).
 These tests prove that commitment deterministically: a holder thread acquires it
@@ -231,15 +231,18 @@ _BETA = (
 
 
 def test_document_rename_blocks_on_held_docs_lock(tmp_path: Path) -> None:
-    """``vault rename`` (``_execute_rename``) serializes on the docs sentinel.
+    """``vault rename`` serializes on the docs sentinel.
 
     With the docs sentinel held, a real document rename cannot proceed; once
     released it completes and the final state is consistent: the file is moved,
     the old path is gone, and the incoming link is re-pointed (no lost update).
+    Drives the rename through the public CLI entry point (``vault rename``)
+    rather than the private ``_execute_rename`` helper it dispatches to.
     """
-    from ...cli.edit_cmd import _execute_rename
+    from typer.testing import CliRunner
+
+    from ...cli import app
     from ...core.commands import install_run
-    from ...core.types import init_paths
 
     root = tmp_path / "project"
     adr_dir = root / ".vault" / "adr"
@@ -256,17 +259,21 @@ def test_document_rename_blocks_on_held_docs_lock(tmp_path: Path) -> None:
     gamma = adr_dir / "2026-01-01-gamma-adr.md"
 
     def _run_rename() -> None:
-        # ContextVars do not propagate to a fresh thread; establish this
-        # thread's workspace context before driving the real rename verb.
-        init_paths(root)
-        _execute_rename(
-            ref="2026-01-01-alpha-adr",
-            new_stem="2026-01-01-gamma-adr",
-            expected_blob_hash=None,
-            run_checks=False,
-            dry_run=False,
-            json_output=True,
+        result = CliRunner().invoke(
+            app,
+            [
+                "--target",
+                str(root),
+                "vault",
+                "rename",
+                "2026-01-01-alpha-adr",
+                "--to",
+                "2026-01-01-gamma-adr",
+                "--no-check",
+                "--json",
+            ],
         )
+        assert result.exit_code == 0, result.output
 
     _prove_serialized_by(docs_lock_target(docs_dir), _run_rename)
 

@@ -28,9 +28,6 @@ existing import site keeps working unchanged.
 from __future__ import annotations
 
 from .mcps_definitions import (
-    _server_name as _server_name,
-)
-from .mcps_definitions import (
     collect_mcp_servers as collect_mcp_servers,
 )
 from .mcps_definitions import (
@@ -45,32 +42,26 @@ from .mcps_definitions import (
 from .mcps_definitions import (
     mcp_status as mcp_status,
 )
-from .mcps_mode import (
-    _DEFAULT_MCP_MODULE as _DEFAULT_MCP_MODULE,
+from .mcps_definitions import (
+    server_name as server_name,
 )
 from .mcps_mode import (
-    _DEFAULT_MCP_PACKAGE as _DEFAULT_MCP_PACKAGE,
+    MODE_ARGS_TOKEN as MODE_ARGS_TOKEN,
 )
 from .mcps_mode import (
-    _MODE_ARGS_TOKEN as _MODE_ARGS_TOKEN,
+    MODE_COMMAND_TOKEN as MODE_COMMAND_TOKEN,
 )
 from .mcps_mode import (
-    _MODE_COMMAND_TOKEN as _MODE_COMMAND_TOKEN,
+    MODE_MCP_LAUNCH as MODE_MCP_LAUNCH,
 )
 from .mcps_mode import (
-    _MODE_MCP_LAUNCH as _MODE_MCP_LAUNCH,
+    MODE_MODULE_KEY as MODE_MODULE_KEY,
 )
 from .mcps_mode import (
-    _MODE_MODULE_KEY as _MODE_MODULE_KEY,
+    MODE_PACKAGE_KEY as MODE_PACKAGE_KEY,
 )
 from .mcps_mode import (
-    _MODE_PACKAGE_KEY as _MODE_PACKAGE_KEY,
-)
-from .mcps_mode import (
-    _MODE_TOOL_SPEC_KEY as _MODE_TOOL_SPEC_KEY,
-)
-from .mcps_mode import (
-    _render_definition_for_sync as _render_definition_for_sync,
+    render_definition_for_sync as render_definition_for_sync,
 )
 from .mcps_mode import (
     render_launch_for_mode as render_launch_for_mode,
@@ -79,28 +70,16 @@ from .mcps_mode import (
     render_mcp_definition_for_mode as render_mcp_definition_for_mode,
 )
 from .mcps_ownership import (
-    _OWNERSHIP_FILENAME as _OWNERSHIP_FILENAME,
-)
-from .mcps_ownership import (
-    _OWNERSHIP_VERSION as _OWNERSHIP_VERSION,
-)
-from .mcps_ownership import (
-    _ownership_path as _ownership_path,
-)
-from .mcps_ownership import (
-    _ownership_target_key as _ownership_target_key,
-)
-from .mcps_ownership import (
-    _read_ownership as _read_ownership,
-)
-from .mcps_ownership import (
-    _write_ownership as _write_ownership,
-)
-from .mcps_ownership import (
     ownership_path as ownership_path,
 )
 from .mcps_ownership import (
+    ownership_target_key as ownership_target_key,
+)
+from .mcps_ownership import (
     read_ownership as read_ownership,
+)
+from .mcps_ownership import (
+    write_ownership as write_ownership,
 )
 from .mcps_sync import mcp_sync as mcp_sync
 from .mcps_targets import resolve_mcp_targets as resolve_mcp_targets

@@ -6,7 +6,7 @@ Covers the five install-layer problem domains ratified for this fix:
   ``.vaultspec/providers.json`` from the git index on install.
 * D2 - lock sentinels are absent from ``git status --porcelain`` after
   install because the managed block now ignores them.
-* D3 - ``_scaffold_precommit`` skips when ``prek.toml`` is present.
+* D3 - ``scaffold_precommit`` skips when ``prek.toml`` is present.
 * D4 - ``check_staged_provider_artifacts`` ignores staged deletions.
 * D5 - ``_fix_filename`` rewrites incoming ``related:`` wiki-link
   references so renames do not leave dangling links.
@@ -23,9 +23,9 @@ from typing import TYPE_CHECKING
 import pytest
 
 from vaultspec_core.core.commands import (
-    _scaffold_precommit,
     check_staged_provider_artifacts,
     install_run,
+    scaffold_precommit,
     untrack_managed_paths,
 )
 
@@ -327,7 +327,7 @@ class TestUntrackManagedPaths:
 
 
 class TestPrekShortCircuit:
-    """``_scaffold_precommit`` must not write YAML when ``prek.toml`` exists."""
+    """``scaffold_precommit`` must not write YAML when ``prek.toml`` exists."""
 
     def test_skips_when_prek_toml_present(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
@@ -335,14 +335,14 @@ class TestPrekShortCircuit:
         (tmp_path / "prek.toml").write_text("", encoding="utf-8")
 
         caplog.set_level("INFO", logger="vaultspec_core.core.precommit")
-        result = _scaffold_precommit(tmp_path)
+        result = scaffold_precommit(tmp_path)
 
         assert result == []
         assert not (tmp_path / ".pre-commit-config.yaml").exists()
         assert any("prek.toml detected" in rec.message for rec in caplog.records)
 
     def test_scaffolds_when_prek_toml_absent(self, tmp_path: Path) -> None:
-        result = _scaffold_precommit(tmp_path)
+        result = scaffold_precommit(tmp_path)
 
         assert result == [(".pre-commit-config.yaml", "precommit")]
         assert (tmp_path / ".pre-commit-config.yaml").exists()
@@ -360,7 +360,7 @@ class TestPrekShortCircuit:
         )
 
         caplog.set_level("INFO", logger="vaultspec_core.core.precommit")
-        result = _scaffold_precommit(tmp_path)
+        result = scaffold_precommit(tmp_path)
 
         assert result == []
         assert not (tmp_path / ".pre-commit-config.yaml").exists()
@@ -559,7 +559,7 @@ class TestSpecCheckGateEntry:
         return next(h["entry"] for h in local["hooks"] if h["id"] == "spec-check")
 
     def test_scaffold_emits_gate_errors_form(self, tmp_path: Path) -> None:
-        _scaffold_precommit(tmp_path)
+        scaffold_precommit(tmp_path)
         assert self._spec_check_entry(tmp_path).endswith("spec doctor --gate-errors")
 
     def test_bare_entry_is_upgraded_to_gate_form(self, tmp_path: Path) -> None:
@@ -591,7 +591,7 @@ class TestSpecCheckGateEntry:
             encoding="utf-8",
         )
 
-        changed = _scaffold_precommit(tmp_path)
+        changed = scaffold_precommit(tmp_path)
 
         assert changed == [(".pre-commit-config.yaml", "precommit")]
         assert self._spec_check_entry(tmp_path).endswith("spec doctor --gate-errors")
@@ -599,10 +599,10 @@ class TestSpecCheckGateEntry:
     def test_gate_form_entry_is_noop(self, tmp_path: Path) -> None:
         # First scaffold renders the canonical gating form; a second pass over
         # the identical config must make no change (no clobber loop).
-        _scaffold_precommit(tmp_path)
+        scaffold_precommit(tmp_path)
         before = (tmp_path / ".pre-commit-config.yaml").read_text(encoding="utf-8")
 
-        second = _scaffold_precommit(tmp_path)
+        second = scaffold_precommit(tmp_path)
 
         assert second == []
         assert (tmp_path / ".pre-commit-config.yaml").read_text(
@@ -671,7 +671,7 @@ class TestScaffoldPreservesAuthorContent:
         config.write_text(self._authored_config(), encoding="utf-8")
 
         # This pass edits the spec-check entry, so it reassembles the file.
-        changed = _scaffold_precommit(factory.root)
+        changed = scaffold_precommit(factory.root)
         assert changed == [(".pre-commit-config.yaml", "precommit")]
 
         rendered = config.read_text(encoding="utf-8")
@@ -688,12 +688,12 @@ class TestScaffoldPreservesAuthorContent:
         config = factory.root / ".pre-commit-config.yaml"
         config.write_text(self._authored_config(), encoding="utf-8")
 
-        _scaffold_precommit(factory.root)
+        scaffold_precommit(factory.root)
         first = config.read_text(encoding="utf-8")
 
         # A second pass over the now-canonical config must be a no-op, and a
         # forced re-render must reproduce the same bytes.
-        second_result = _scaffold_precommit(factory.root)
+        second_result = scaffold_precommit(factory.root)
         assert second_result == []
         assert config.read_text(encoding="utf-8") == first
 

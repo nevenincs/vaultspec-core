@@ -17,31 +17,31 @@ from . import types as _t
 from .enums import InstallMode, McpScope, McpTargetFormat, Tool
 from .exceptions import VaultSpecError
 from .helpers import atomic_write, ensure_dir
-from .mcps_definitions import _get_mcps_src_dir, _server_name, collect_mcp_servers
+from .mcps_definitions import collect_mcp_servers, get_mcps_src_dir, server_name
 from .mcps_native import (
-    _LEGACY_MANAGED_KEY,
-    _TOML_BLOCK_TYPE,
-    _json_server_map,
-    _managed_toml_content,
-    _normalized_sources,
-    _render_codex_servers,
-    _strip_external_codex_server,
-    _toml_servers,
-    _write_json_target,
+    LEGACY_MANAGED_KEY,
+    TOML_BLOCK_TYPE,
+    json_server_map,
+    managed_toml_content,
+    normalized_sources,
+    render_codex_servers,
+    strip_external_codex_server,
+    toml_servers,
+    write_json_target,
 )
 from .mcps_ownership import (
-    _fingerprint,
-    _launch_repr,
-    _owned_fingerprints,
-    _owned_names,
-    _ownership_path,
-    _OwnershipState,
-    _read_ownership,
-    _set_owned_names,
-    _target_lock,
-    _write_ownership,
+    OwnershipState,
+    fingerprint,
+    launch_repr,
+    owned_fingerprints,
+    owned_names,
+    ownership_path,
+    read_ownership,
+    set_owned_names,
+    target_lock,
+    write_ownership,
 )
-from .mcps_targets import _coerce_scope, resolve_mcp_targets
+from .mcps_targets import coerce_scope, resolve_mcp_targets
 from .tags import TagError, strip_block, upsert_block
 from .types import McpTarget, SyncResult
 
@@ -61,12 +61,12 @@ def _existing_source_server_names() -> set[str]:
     silently delete the corresponding provider-native enrollment on the next
     ``sync --force``, which is destructive and hard to recover from.
     """
-    mcps_dir = _get_mcps_src_dir()
+    mcps_dir = get_mcps_src_dir()
     if mcps_dir is None or not mcps_dir.exists():
         return set()
     names: set[str] = set()
     for f in mcps_dir.glob("*.json"):
-        name = _server_name(f.name)
+        name = server_name(f.name)
         if name:
             names.add(name)
     return names
@@ -103,11 +103,11 @@ def _apply_server_merge(
                 result.updated += 1
                 result.items.append((name, "[UPDATE]"))
                 changed = True
-            elif recorded_fingerprints.get(name) == _fingerprint(servers[name]):
+            elif recorded_fingerprints.get(name) == fingerprint(servers[name]):
                 # Bytes still match what vaultspec last wrote, so the drift is
                 # provably ours to converge, not a hand edit: refresh in place.
-                old_launch = _launch_repr(servers[name])
-                new_launch = _launch_repr(config)
+                old_launch = launch_repr(servers[name])
+                new_launch = launch_repr(config)
                 servers[name] = config
                 result.updated += 1
                 result.items.append((name, "[REFRESH]"))
@@ -165,7 +165,7 @@ def _apply_server_merge(
 def _sync_json_target(
     target: McpTarget,
     root: Path,
-    state: _OwnershipState,
+    state: OwnershipState,
     sources: dict[str, tuple[Path, dict[str, Any]]],
     *,
     dry_run: bool,
@@ -175,7 +175,7 @@ def _sync_json_target(
     force_managed: frozenset[str],
 ) -> None:
     """Reconcile a Claude or Antigravity JSON target without host-only keys."""
-    with _target_lock(target.path, dry_run=dry_run):
+    with target_lock(target.path, dry_run=dry_run):
         raw: dict[str, Any] = {}
         if target.path.exists():
             try:
@@ -191,7 +191,7 @@ def _sync_json_target(
             raw = cast("dict[str, Any]", loaded)
 
         try:
-            untyped_servers = _json_server_map(raw, target, root)
+            untyped_servers = json_server_map(raw, target, root)
         except VaultSpecError as exc:
             result.errors.append(str(exc))
             result.errored += 1
@@ -208,9 +208,9 @@ def _sync_json_target(
             result.errored += 1
             return
 
-        managed = _owned_names(state, target) & set(servers)
-        recorded_fingerprints = _owned_fingerprints(state, target)
-        legacy = raw.pop(_LEGACY_MANAGED_KEY, None)
+        managed = owned_names(state, target) & set(servers)
+        recorded_fingerprints = owned_fingerprints(state, target)
+        legacy = raw.pop(LEGACY_MANAGED_KEY, None)
         migrated: set[str] = set()
         if isinstance(legacy, list):
             legacy_items = cast("list[Any]", legacy)
@@ -241,16 +241,16 @@ def _sync_json_target(
         )
         untyped_servers.clear()
         untyped_servers.update(servers)
-        _set_owned_names(
+        set_owned_names(
             state, target, {name: servers[name] for name in managed if name in servers}
         )
         if changed and not dry_run:
-            _write_json_target(target.path, raw, target, root)
+            write_json_target(target.path, raw, target, root)
 
 
 def _sync_toml_target(
     target: McpTarget,
-    state: _OwnershipState,
+    state: OwnershipState,
     sources: dict[str, tuple[Path, dict[str, Any]]],
     *,
     dry_run: bool,
@@ -260,7 +260,7 @@ def _sync_toml_target(
     force_managed: frozenset[str],
 ) -> None:
     """Reconcile Codex tables inside one comment-bounded managed block."""
-    with _target_lock(target.path, dry_run=dry_run):
+    with target_lock(target.path, dry_run=dry_run):
         content = ""
         if target.path.exists():
             try:
@@ -272,10 +272,10 @@ def _sync_toml_target(
         try:
             if content.strip():
                 tomllib.loads(content)
-            managed_content = _managed_toml_content(content)
-            outside_content = strip_block(content, _TOML_BLOCK_TYPE)
-            outside = _toml_servers(outside_content)
-            block_servers = _toml_servers(managed_content)
+            managed_content = managed_toml_content(content)
+            outside_content = strip_block(content, TOML_BLOCK_TYPE)
+            outside = toml_servers(outside_content)
+            block_servers = toml_servers(managed_content)
         except (TagError, tomllib.TOMLDecodeError, VaultSpecError) as exc:
             result.errors.append(f"Cannot parse {target.path}: {exc}")
             result.errored += 1
@@ -283,9 +283,9 @@ def _sync_toml_target(
 
         if force:
             for name in sorted(set(sources) & set(outside)):
-                stripped = _strip_external_codex_server(content, name)
+                stripped = strip_external_codex_server(content, name)
                 try:
-                    remaining = _toml_servers(strip_block(stripped, _TOML_BLOCK_TYPE))
+                    remaining = toml_servers(strip_block(stripped, TOML_BLOCK_TYPE))
                 except (TagError, tomllib.TOMLDecodeError, VaultSpecError) as exc:
                     result.errors.append(
                         f"Cannot adopt Codex MCP server '{name}' in "
@@ -303,8 +303,8 @@ def _sync_toml_target(
                     return
                 content = stripped
 
-        recorded = _owned_names(state, target)
-        recorded_fingerprints = _owned_fingerprints(state, target)
+        recorded = owned_names(state, target)
+        recorded_fingerprints = owned_fingerprints(state, target)
         managed = (recorded | set(block_servers)) & set(block_servers)
         servers = {**outside, **block_servers}
         external = set(outside)
@@ -325,13 +325,13 @@ def _sync_toml_target(
             for name in managed
             if name in servers and name not in external
         }
-        _set_owned_names(state, target, new_managed)
+        set_owned_names(state, target, new_managed)
         if changed and not dry_run:
-            rendered = _render_codex_servers(new_managed)
+            rendered = render_codex_servers(new_managed)
             updated = (
-                upsert_block(content, _TOML_BLOCK_TYPE, rendered, comment_prefix="# ")
+                upsert_block(content, TOML_BLOCK_TYPE, rendered, comment_prefix="# ")
                 if rendered
-                else strip_block(content, _TOML_BLOCK_TYPE)
+                else strip_block(content, TOML_BLOCK_TYPE)
             )
             ensure_dir(target.path.parent)
             if updated:
@@ -385,7 +385,7 @@ def mcp_sync(
         return result
 
     try:
-        resolved_scope = _coerce_scope(scope)
+        resolved_scope = coerce_scope(scope)
         targets = resolve_mcp_targets(
             provider, scope=resolved_scope, target_dir=root, enrolled=enrolled
         )
@@ -402,10 +402,10 @@ def mcp_sync(
     parse_warnings: list[str] = []
     sources = collect_mcp_servers(warnings=parse_warnings, mode=mode, target=root)
     result.warnings.extend(parse_warnings)
-    ownership_path = _ownership_path(root, resolved_scope)
-    with _target_lock(ownership_path, dry_run=dry_run):
+    state_path = ownership_path(root, resolved_scope)
+    with target_lock(state_path, dry_run=dry_run):
         try:
-            state = _read_ownership(ownership_path)
+            state = read_ownership(state_path)
         except VaultSpecError as exc:
             result.errors.append(str(exc))
             result.errored += 1
@@ -413,7 +413,7 @@ def mcp_sync(
         before_state = json.dumps(state, sort_keys=True)
         for target in targets:
             sub = SyncResult()
-            target_sources = _normalized_sources(sources, target, sub)
+            target_sources = normalized_sources(sources, target, sub)
             if target.format is McpTargetFormat.JSON:
                 _sync_json_target(
                     target,
@@ -441,8 +441,8 @@ def mcp_sync(
             result.per_tool[target.provider.value] = sub
         if not dry_run and json.dumps(state, sort_keys=True) != before_state:
             if state["targets"]:
-                _write_ownership(ownership_path, state)
-            elif ownership_path.exists():
-                ownership_path.unlink()
+                write_ownership(state_path, state)
+            elif state_path.exists():
+                state_path.unlink()
 
     return result

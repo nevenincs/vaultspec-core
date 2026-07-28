@@ -26,10 +26,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-#: Re-exported (with underscore intact) for
-#: :mod:`vaultspec_core.core.diagnosis.collectors_mode`.
-__all__ = ["_read_mcp_servers"]
-
 
 def _provider_config_file(tool: Tool) -> Path | None:
     """Return a provider's root config file path, or ``None`` when unresolvable."""
@@ -74,7 +70,8 @@ def collect_config_state(tool_value: str) -> ConfigSignal:
     return ConfigSignal.FOREIGN
 
 
-def _read_mcp_servers(mcp_path: Path) -> dict[str, object] | None:
+# Shared with :mod:`vaultspec_core.core.diagnosis.collectors_mode`.
+def read_mcp_servers(mcp_path: Path) -> dict[str, object] | None:
     """Return the ``mcpServers`` mapping from an ``.mcp.json`` file.
 
     Args:
@@ -128,7 +125,7 @@ def collect_mcp_config_state(target: Path) -> ConfigSignal:
         :class:`~vaultspec_core.core.diagnosis.signals.ConfigSignal`
         reflecting the observed MCP configuration state.
     """
-    servers = _read_mcp_servers(target / ".mcp.json")
+    servers = read_mcp_servers(target / ".mcp.json")
     if servers is None:
         return ConfigSignal.PARTIAL_MCP
 
@@ -206,7 +203,7 @@ def collect_gitignore_state(target: Path) -> GitignoreSignal:
         :class:`~vaultspec_core.core.diagnosis.signals.GitignoreSignal`
         reflecting the observed state.
     """
-    from ..gitignore import _find_markers, get_recommended_entries
+    from ..gitignore import find_markers, get_recommended_entries
 
     gi_path = target / ".gitignore"
     if not gi_path.exists():
@@ -219,7 +216,7 @@ def collect_gitignore_state(target: Path) -> GitignoreSignal:
         return GitignoreSignal.NO_FILE
 
     lines = [line.strip() for line in content.splitlines()]
-    begins, ends = _find_markers(lines)
+    begins, ends = find_markers(lines)
 
     if not begins and not ends:
         return GitignoreSignal.NO_ENTRIES
@@ -263,7 +260,7 @@ def collect_gitattributes_state(target: Path) -> GitattributesSignal:
         :class:`~vaultspec_core.core.diagnosis.signals.GitattributesSignal`
         reflecting the observed state.
     """
-    from ..gitattributes import DEFAULT_ENTRIES, _find_markers, has_valid_block
+    from ..gitattributes import DEFAULT_ENTRIES, find_markers, has_valid_block
 
     ga_path = target / ".gitattributes"
     if not ga_path.exists():
@@ -276,7 +273,7 @@ def collect_gitattributes_state(target: Path) -> GitattributesSignal:
         return GitattributesSignal.NO_FILE
 
     lines = [line.strip() for line in content.splitlines()]
-    begins, ends = _find_markers(lines)
+    begins, ends = find_markers(lines)
 
     if not begins and not ends:
         return GitattributesSignal.NO_ENTRIES
