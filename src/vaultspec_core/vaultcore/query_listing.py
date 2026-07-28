@@ -25,15 +25,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-#: Re-exported (with underscore intact) for :mod:`vaultspec_core.vaultcore.query`
-#: and :mod:`vaultspec_core.vaultcore.query_archive`, which reach into these as
+#: Re-exported for :mod:`vaultspec_core.vaultcore.query` and
+#: :mod:`vaultspec_core.vaultcore.query_archive`, which reach into these as
 #: the single public import surface for document listing.
 __all__ = [
-    "_docs_from_graph",
-    "_feature_from_tags_or_meta",
-    "_parse_date_from_filename",
-    "_parse_feature_from_tags",
-    "_scan_all",
+    "docs_from_graph",
+    "feature_from_tags_or_meta",
+    "scan_all",
 ]
 
 
@@ -91,15 +89,15 @@ def _parse_feature_from_tags(tags: list[str], doc_type_tag: str | None) -> str |
     return None
 
 
-def _feature_from_tags_or_meta(
+def feature_from_tags_or_meta(
     tags: list[str], meta: Mapping[str, object], doc_type_tag: str | None
 ) -> str | None:
     """Derive a document's feature tag, with the bare ``feature:`` fallback.
 
     Primarily reads *tags* via :func:`_parse_feature_from_tags`, falling
     back to a bare top-level ``feature:`` frontmatter key when no
-    tag-derived feature is found. Shared by :func:`_scan_all` and
-    :func:`_docs_from_graph` so both callers apply the identical fallback
+    tag-derived feature is found. Shared by :func:`scan_all` and
+    :func:`docs_from_graph` so both callers apply the identical fallback
     chain against the same parsed frontmatter shape.
 
     Args:
@@ -117,7 +115,7 @@ def _feature_from_tags_or_meta(
     return feature
 
 
-def _scan_all(root_dir: Path, *, doc_type: str | None = None) -> list[VaultDocument]:
+def scan_all(root_dir: Path, *, doc_type: str | None = None) -> list[VaultDocument]:
     """Scan the vault and parse every document into a :class:`VaultDocument`.
 
     Used internally by :func:`list_documents`, :func:`get_stats`,
@@ -149,7 +147,7 @@ def _scan_all(root_dir: Path, *, doc_type: str | None = None) -> list[VaultDocum
         tags = meta.get("tags", [])
         if isinstance(tags, str):
             tags = [tags]
-        feature = _feature_from_tags_or_meta(tags, meta, dt_str)
+        feature = feature_from_tags_or_meta(tags, meta, dt_str)
         date = meta.get("date") or _parse_date_from_filename(doc_path.name)
 
         docs.append(
@@ -165,7 +163,7 @@ def _scan_all(root_dir: Path, *, doc_type: str | None = None) -> list[VaultDocum
     return docs
 
 
-def _docs_from_graph(
+def docs_from_graph(
     graph: VaultGraph,
     *,
     doc_type: str | None = None,
@@ -176,10 +174,10 @@ def _docs_from_graph(
 
     Reuses the frontmatter each node already parsed during the graph build
     instead of re-reading and re-parsing every file from disk, while
-    reproducing :func:`_scan_all`'s exact field derivation (including the
+    reproducing :func:`scan_all`'s exact field derivation (including the
     bare ``feature:`` fallback and the filename-date fallback) so the
     result is byte-for-byte identical to the uncached path. Phantom nodes
-    and ref-scoped nodes (``path is None``) are never part of ``_scan_all``'s
+    and ref-scoped nodes (``path is None``) are never part of ``scan_all``'s
     domain and are skipped; a stem-collision node's qualified ``name`` is
     sidestepped by deriving the document name from ``node.path.stem``
     instead.
@@ -198,7 +196,7 @@ def _docs_from_graph(
         Ordered list of :class:`VaultDocument` instances matching all
         supplied filters.
     """
-    # ``_scan_all`` drops a document it cannot read or decode, so the graph
+    # ``scan_all`` drops a document it cannot read or decode, so the graph
     # path must drop it too. The graph still creates a node for such a file
     # (with empty frontmatter and body), which is indistinguishable from a
     # genuinely empty document by its fields alone; the ingress read records
@@ -217,7 +215,7 @@ def _docs_from_graph(
         tags = meta.get("tags", [])
         if isinstance(tags, str):
             tags = [tags]
-        doc_feature = _feature_from_tags_or_meta(tags, meta, dt_str)
+        doc_feature = feature_from_tags_or_meta(tags, meta, dt_str)
         doc_date = meta.get("date") or _parse_date_from_filename(node.path.name)
 
         docs.append(
@@ -282,7 +280,7 @@ def list_documents(
         # The pseudo-types are graph predicates over the same derived set, so
         # they filter the graph-backed listing rather than triggering a second
         # full scan alongside the graph they already needed.
-        docs = _docs_from_graph(
+        docs = docs_from_graph(
             graph, doc_type=None if doc_type in ("orphaned", "invalid") else doc_type
         )
         if doc_type == "orphaned":
@@ -298,7 +296,7 @@ def list_documents(
     else:
         # A concrete doc-type filter is path-derived and applied inside the
         # scan, before any file is read.
-        docs = _scan_all(root_dir, doc_type=doc_type)
+        docs = scan_all(root_dir, doc_type=doc_type)
 
     if feature:
         feature = feature.lstrip("#")
@@ -338,7 +336,7 @@ def get_stats(
         graph: Optional pre-built :class:`~vaultspec_core.graph.VaultGraph`
             to reuse. When *doc_type* is not the ``"orphaned"``/``"invalid"``
             pseudo-type, the graph's already-parsed frontmatter also backs
-            the document listing (via :func:`_docs_from_graph`) instead of
+            the document listing (via :func:`docs_from_graph`) instead of
             a fresh disk scan; callers that already hold a graph (the
             orientation rollup) pass it so the stats path never rebuilds
             or rescans the corpus a second time.
@@ -363,7 +361,7 @@ def get_stats(
     # graph-backed semantics; every concrete type (and the unfiltered case)
     # reads from the already-built graph instead of rescanning the corpus.
     if graph is not None and doc_type not in ("orphaned", "invalid"):
-        docs = _docs_from_graph(graph, feature=feature, doc_type=doc_type, date=date)
+        docs = docs_from_graph(graph, feature=feature, doc_type=doc_type, date=date)
     else:
         docs = list_documents(root_dir, feature=feature, doc_type=doc_type, date=date)
 
@@ -424,7 +422,7 @@ def list_feature_details(
     Returns:
         List of :class:`FeatureDetail` rows sorted by feature name.
     """
-    docs = _scan_all(root_dir)
+    docs = scan_all(root_dir)
 
     # Group by feature
     by_feature: dict[str, list[VaultDocument]] = {}

@@ -56,11 +56,11 @@ def vaultspec(tmp_path: Path) -> Iterator[Path]:
         templates_dir=vs / "rules" / "templates",
         hooks_dir=vs / "rules" / "hooks",
     )
-    token = _types._workspace_ctx.set(ctx)
+    token = _types.workspace_ctx.set(ctx)
     try:
         yield vs
     finally:
-        _types._workspace_ctx.reset(token)
+        _types.workspace_ctx.reset(token)
 
 
 def _write_rule(rules_dir: Path, name: str, *, body: str = "Rule body.\n") -> Path:

@@ -16,11 +16,11 @@ from .enums import ManagedState, ProviderCapability, Tool
 from .exceptions import ProviderError
 from .gitattributes import ensure_gitattributes_block
 from .gitignore import (
-    _collect_provider_artifacts,
+    collect_provider_artifacts,
     ensure_gitignore_block,
     get_recommended_entries,
 )
-from .helpers import _rmtree_robust
+from .helpers import rmtree_robust
 from .manifest import (
     ManifestData,
     providers_sharing_dir,
@@ -29,32 +29,19 @@ from .manifest import (
     remove_provider,
     write_manifest_data,
 )
-from .precommit import _ALL_MANAGED_HOOK_IDS, _strip_managed_precommit_hooks
+from .precommit import ALL_MANAGED_HOOK_IDS, strip_managed_precommit_hooks
 from .provider_registry import (
-    _PROVIDER_TO_TOOLS,
+    PROVIDER_TO_TOOLS,
     filter_tools,
     rel,
     validate_provider,
     validate_skip,
 )
-from .provision import _ensure_tool_configs
+from .provision import ensure_tool_configs
 
 logger = logging.getLogger(__name__)
 
-#: Re-exported (with underscore intact) for :mod:`vaultspec_core.core.commands`,
-#: which is the single public import surface for uninstall orchestration.
 __all__ = [
-    "_UNINSTALL_DIR_LABELS",
-    "_UNINSTALL_DIR_OWNERS",
-    "_UNINSTALL_FILE_LABELS",
-    "_UNINSTALL_FILE_OWNERS",
-    "_delete_managed_dir",
-    "_delete_managed_file",
-    "_reconcile_uninstall_git_blocks",
-    "_uninstall_everything",
-    "_uninstall_mcp_targets",
-    "_uninstall_precommit_hooks",
-    "_uninstall_provider_artifacts",
     "uninstall_run",
 ]
 
@@ -103,7 +90,7 @@ def _delete_managed_dir(
     if dry_run:
         return True
     try:
-        _rmtree_robust(directory)
+        rmtree_robust(directory)
     except OSError as exc:
         errors.append(f"Failed to remove {rel(root, directory)}: {exc}")
         return False
@@ -183,11 +170,11 @@ def _uninstall_precommit_hooks(
             raw = precommit_path.read_text(encoding="utf-8")
         except OSError:
             return
-        if any(f"id: {hid}" in raw for hid in _ALL_MANAGED_HOOK_IDS):
+        if any(f"id: {hid}" in raw for hid in ALL_MANAGED_HOOK_IDS):
             removed.append((rel(root, precommit_path), "precommit"))
         return
 
-    if not _strip_managed_precommit_hooks(precommit_path):
+    if not strip_managed_precommit_hooks(precommit_path):
         return
     removed.append((rel(root, precommit_path), "precommit"))
     try:
@@ -284,7 +271,7 @@ def _uninstall_provider_artifacts(
     Directories and files another installed provider still owns are logged and
     left in place; the manifest is updated once every tool is off disk.
     """
-    tools = filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
+    tools = filter_tools(PROVIDER_TO_TOOLS.get(provider, []), skip)
 
     if "mcp" not in skip:
         active_ctx = _t.get_context()
@@ -304,7 +291,7 @@ def _uninstall_provider_artifacts(
             )
 
     for tool in tools:
-        dirs, files = _collect_provider_artifacts(root, tool)
+        dirs, files = collect_provider_artifacts(root, tool)
 
         for directory in dirs:
             if not directory.exists():
@@ -395,7 +382,7 @@ def uninstall_run(
             "or use --dry-run to preview."
         )
 
-    # Bootstrap a minimal context so _ensure_tool_configs can proceed
+    # Bootstrap a minimal context so ensure_tool_configs can proceed
     _t.set_context(
         _t.WorkspaceContext(
             root_dir=path,
@@ -408,7 +395,7 @@ def uninstall_run(
             hooks_dir=path,
         )
     )
-    _ensure_tool_configs(path)
+    ensure_tool_configs(path)
 
     # Uninstalling "core" cascades to all providers
     effective_provider = "all" if provider == "core" else provider

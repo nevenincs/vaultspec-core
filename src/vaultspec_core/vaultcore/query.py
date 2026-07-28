@@ -13,9 +13,10 @@ implementations live in sibling modules, split along natural seams
 :mod:`.query_archive` for feature archive/unarchive, and
 :mod:`.query_rename` + :mod:`.query_rename_apply` for the two halves of
 feature rename - plan computation and transactional apply). Importing this
-module re-exports the full prior public surface, including the
-underscore-prefixed helpers other modules and tests import directly, so no
-import site outside this package needs to change.
+module re-exports the public surface of each sibling module, so no import
+site outside this package needs to change. Helpers that stay private to
+their defining module (never imported by another module or a test) are not
+re-exported here.
 """
 
 from __future__ import annotations
@@ -24,48 +25,36 @@ from .query_archive import (
     FeatureArchiveResult,
     FeatureCrossLink,
     FeatureUnarchiveResult,
-    _cleanup_empty_dirs,
     archive_feature,
     unarchive_feature,
 )
 from .query_listing import (
     FeatureDetail,
     VaultDocument,
-    _docs_from_graph,
-    _feature_from_tags_or_meta,
-    _parse_date_from_filename,
-    _parse_feature_from_tags,
-    _scan_all,
+    docs_from_graph,
+    feature_from_tags_or_meta,
     get_stats,
     list_documents,
     list_feature_details,
     logger,
+    scan_all,
 )
 from .query_rename import (
     RenameCollision,
-    _analyze_cross_feature_links,
-    _assert_within_docs,
-    _compute_rename_plan,
-    _count_related_refs,
-    _match_exec_folder_date,
-    _parse_inline_tags,
-    _predict_rewrites,
-    _rel,
-    _RenamePlan,
-    _rewrite_feature_tag_block,
-    _same_file,
-    _swap_authored_filename,
-    _swap_exec_filename,
-    _validate_feature_rename,
+    RenamePlan,
+    analyze_cross_feature_links,
+    assert_within_docs,
+    compute_rename_plan,
+    predict_rewrites,
+    rel,
+    rewrite_feature_tag_block,
+    validate_feature_rename,
 )
 from .query_rename_apply import (
     FeatureRenameResult,
     RenameApplyResult,
     RenameIndexInfo,
     RenameLinkPair,
-    _apply_rename_plan,
-    _refresh_rename_stamps,
-    _regenerate_feature_index,
     rename_feature,
 )
 
@@ -79,35 +68,23 @@ __all__ = [
     "RenameCollision",
     "RenameIndexInfo",
     "RenameLinkPair",
+    "RenamePlan",
     "VaultDocument",
-    "_RenamePlan",
-    "_analyze_cross_feature_links",
-    "_apply_rename_plan",
-    "_assert_within_docs",
-    "_cleanup_empty_dirs",
-    "_compute_rename_plan",
-    "_count_related_refs",
-    "_docs_from_graph",
-    "_feature_from_tags_or_meta",
-    "_match_exec_folder_date",
-    "_parse_date_from_filename",
-    "_parse_feature_from_tags",
-    "_parse_inline_tags",
-    "_predict_rewrites",
-    "_refresh_rename_stamps",
-    "_regenerate_feature_index",
-    "_rel",
-    "_rewrite_feature_tag_block",
-    "_same_file",
-    "_scan_all",
-    "_swap_authored_filename",
-    "_swap_exec_filename",
-    "_validate_feature_rename",
+    "analyze_cross_feature_links",
     "archive_feature",
+    "assert_within_docs",
+    "compute_rename_plan",
+    "docs_from_graph",
+    "feature_from_tags_or_meta",
     "get_stats",
     "list_documents",
     "list_feature_details",
     "logger",
+    "predict_rewrites",
+    "rel",
     "rename_feature",
+    "rewrite_feature_tag_block",
+    "scan_all",
     "unarchive_feature",
+    "validate_feature_rename",
 ]

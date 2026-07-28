@@ -16,7 +16,7 @@ from vaultspec_core.core.enums import Tool
 from vaultspec_core.core.provider_hooks import (
     HookEvent,
     HookSpec,
-    _compose_flat_hooks,
+    compose_flat_hooks,
     load_provider_hook_specs,
     render_hooks_payload,
     supported_events,
@@ -159,7 +159,7 @@ class TestComposeOwnership:
         payload1 = render_hooks_payload(
             [_spec(HookEvent.PRE_TOOL_USE, command="v1")], Tool.CLAUDE
         )
-        native1, managed1 = _compose_flat_hooks(existing, {}, payload1)
+        native1, managed1 = compose_flat_hooks(existing, {}, payload1)
         # User group preserved, vaultspec group added, unrelated key intact.
         assert user_group in native1["hooks"]["PreToolUse"]
         assert native1["otherSetting"] is True
@@ -175,7 +175,7 @@ class TestComposeOwnership:
         payload2 = render_hooks_payload(
             [_spec(HookEvent.PRE_TOOL_USE, command="v2")], Tool.CLAUDE
         )
-        native2, _managed2 = _compose_flat_hooks(native1, managed1, payload2)
+        native2, _managed2 = compose_flat_hooks(native1, managed1, payload2)
         cmds = [g["hooks"][0]["command"] for g in native2["hooks"]["PreToolUse"]]
         assert "user" in cmds and "v2" in cmds and "v1" not in cmds
 
@@ -186,8 +186,8 @@ class TestComposeOwnership:
         payload = render_hooks_payload(
             [_spec(HookEvent.STOP, command="v1")], Tool.CLAUDE
         )
-        with_managed, managed = _compose_flat_hooks(existing, {}, payload)
-        cleared, managed_after = _compose_flat_hooks(with_managed, managed, None)
+        with_managed, managed = compose_flat_hooks(existing, {}, payload)
+        cleared, managed_after = compose_flat_hooks(with_managed, managed, None)
         cmds = [g["hooks"][0]["command"] for g in cleared["hooks"]["Stop"]]
         assert cmds == ["user"]
         assert managed_after == {}
@@ -198,10 +198,10 @@ class TestLifecycleCoexistence:
 
     def test_lifecycle_loader_silently_skips_provider_events(self, tmp_path: Path):
         from vaultspec_core.hooks import load_hooks
-        from vaultspec_core.hooks.engine import _is_provider_hook_event
+        from vaultspec_core.hooks.engine import is_provider_hook_event
 
-        assert _is_provider_hook_event("session_start") is True
-        assert _is_provider_hook_event("vault.document.created") is False
+        assert is_provider_hook_event("session_start") is True
+        assert is_provider_hook_event("vault.document.created") is False
 
         # A provider hook and a lifecycle hook side by side.
         (tmp_path / "orient.yaml").write_text(

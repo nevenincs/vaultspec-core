@@ -27,16 +27,16 @@ from .gitignore import (
     prune_orphaned_lock_sentinels,
 )
 from .install_mode import (
-    _write_mode_declaration,
     fresh_install_schema_version,
     infer_upgrade_mode,
     persist_resolved_mode,
     stamp_manifest_version_no_downgrade,
+    write_mode_declaration,
 )
 from .manifest import add_providers, read_manifest_data, write_manifest_data
-from .precommit import _scaffold_precommit
+from .precommit import scaffold_precommit
 from .provider_registry import (
-    _PROVIDER_TO_TOOLS,
+    PROVIDER_TO_TOOLS,
     filter_tools,
     rel,
     require_reconciliation_success,
@@ -48,19 +48,8 @@ from .scaffold import scaffold_core, scaffold_provider
 
 logger = logging.getLogger(__name__)
 
-#: Re-exported (with underscore intact) for :mod:`vaultspec_core.core.commands`
-#: and :mod:`vaultspec_core.core.uninstall`, which reach into these as the
-#: single public import surface for provisioning.
 __all__ = [
-    "_detect_precommit_managed",
-    "_ensure_tool_configs",
-    "_finalize_upgrade_manifest",
-    "_migrate_mcp_launch_shape",
-    "_preview_install_manifest",
-    "_preview_mcp_targets",
-    "_preview_upgrade_items",
-    "_reseed_builtins",
-    "_run_upgrade",
+    "ensure_tool_configs",
     "init_run",
     "install_run",
 ]
@@ -133,7 +122,7 @@ def init_run(
     init_paths(layout)
 
     # Scaffold provider directories
-    tools = filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
+    tools = filter_tools(PROVIDER_TO_TOOLS.get(provider, []), skip)
     for tool in tools:
         created.extend(scaffold_provider(target, tool))
 
@@ -158,7 +147,7 @@ def init_run(
             if provider_result and provider_result.items:
                 created.append((rel(target, mcp_target.path), "mcp"))
     if "precommit" not in skip:
-        created.extend(_scaffold_precommit(target, mode=mode))
+        created.extend(scaffold_precommit(target, mode=mode))
 
     # Write provider manifest
     provider_names = [t.value for t in tools]
@@ -173,7 +162,7 @@ def init_run(
     return list(seen.items())
 
 
-def _ensure_tool_configs(path: Path) -> None:
+def ensure_tool_configs(path: Path) -> None:
     """Ensure TOOL_CONFIGS is populated, bootstrapping if needed.
 
     On a fresh project where ``.vaultspec/`` doesn't exist yet, uses a
@@ -239,7 +228,7 @@ def _preview_upgrade_items(
     Raises:
         VaultSpecError: If the provider reconciliation preview fails.
     """
-    _ensure_tool_configs(path)
+    ensure_tool_configs(path)
     items: list[tuple[str, str]] = []
     if not skip_core:
         from vaultspec_core.builtins import seed_builtins
@@ -285,7 +274,7 @@ def _preview_install_manifest(
     Raises:
         VaultSpecError: If the MCP enrollment preview fails.
     """
-    _ensure_tool_configs(path)
+    ensure_tool_configs(path)
 
     manifest: list[tuple[str, str]] = []
     if not skip_core:
@@ -297,7 +286,7 @@ def _preview_install_manifest(
         for builtin_rel in list_builtins():
             manifest.append((f".vaultspec/{builtin_rel}", "builtin"))
 
-    tools = filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
+    tools = filter_tools(PROVIDER_TO_TOOLS.get(provider, []), skip)
     for tool in tools:
         manifest.extend(scaffold_provider(path, tool, dry_run=True))
     if "mcp" not in skip:
@@ -307,7 +296,7 @@ def _preview_install_manifest(
             )
         )
     if "precommit" not in skip:
-        manifest.extend(_scaffold_precommit(path, dry_run=True, mode=resolved_mode))
+        manifest.extend(scaffold_precommit(path, dry_run=True, mode=resolved_mode))
 
     # Deduplicate preserving order (by relative path)
     seen: dict[str, str] = {}
@@ -500,7 +489,7 @@ def _run_upgrade(
     # later. Writing it here threads the inferred mode into this same run's
     # rendering, mirroring the fresh-install ordering. The manifest echo and
     # floor reconciliation still run once, later, via persist_resolved_mode.
-    _write_mode_declaration(path, resolved_mode)
+    write_mode_declaration(path, resolved_mode)
 
     # Detect a mode flip before the sync below re-renders any artifact.
     # The pre-commit and declaration renderers rewrite unconditionally, but
@@ -511,12 +500,10 @@ def _run_upgrade(
     # audit finding). Captured here against the still-old .mcp.json, this
     # flags whether the deployed MCP launch shape disagrees with the mode
     # this upgrade resolved to; the targeted force below closes the gap.
-    from .diagnosis.collectors import _observed_mcp_mode
+    from .diagnosis.collectors import observed_mcp_mode
 
-    observed_mcp_mode = _observed_mcp_mode(path)
-    mcp_mode_flipped = (
-        observed_mcp_mode is not None and observed_mcp_mode != resolved_mode
-    )
+    observed_mode = observed_mcp_mode(path)
+    mcp_mode_flipped = observed_mode is not None and observed_mode != resolved_mode
 
     sync_target = provider if provider not in ("all", "core") else "all"
     # `sync_provider` rejects `core` in its skip set (`allow_core=False`).
@@ -534,7 +521,7 @@ def _run_upgrade(
     )
 
     if "precommit" not in skip:
-        _scaffold_precommit(path, mode=resolved_mode)
+        scaffold_precommit(path, mode=resolved_mode)
 
     # Skipped when --force already rewrote it, when the mode did not flip
     # (preserving today's force-gated semantics for a same-mode divergent entry,
@@ -714,7 +701,7 @@ def install_run(
     # otherwise clobber the tool-mode artifacts init_run just wrote. The manifest
     # echo and floor reconciliation still happen once, later, via
     # persist_resolved_mode after the manifest is read.
-    _write_mode_declaration(path, resolved_mode)
+    write_mode_declaration(path, resolved_mode)
 
     post_errors: list[str] = []
 
@@ -743,7 +730,7 @@ def install_run(
         "mcps": len(collect_mcp_servers()),
     }
 
-    tools = filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
+    tools = filter_tools(PROVIDER_TO_TOOLS.get(provider, []), skip)
     provider_names = [t.value for t in tools]
     from .mcps import resolve_mcp_targets
 

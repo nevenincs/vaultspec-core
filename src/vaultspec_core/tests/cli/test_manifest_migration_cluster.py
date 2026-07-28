@@ -145,9 +145,9 @@ def _rules_gitignore(root: Path) -> Path:
 
 
 def _shipped_policy() -> str:
-    from vaultspec_core.builtins import _builtins_root
+    from vaultspec_core.builtins import builtins_root
 
-    return (_builtins_root() / "rules" / ".gitignore").read_text(encoding="utf-8")
+    return (builtins_root() / "rules" / ".gitignore").read_text(encoding="utf-8")
 
 
 class TestNestedGitignoreConvergence:

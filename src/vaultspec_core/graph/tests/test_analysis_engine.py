@@ -17,7 +17,7 @@ import pytest
 
 from ...config import reset_config
 from ...testing.synthetic import build_synthetic_vault
-from ..algorithms import _betweenness_centrality
+from ..algorithms import betweenness_centrality
 from ..api import VaultGraph
 
 if TYPE_CHECKING:
@@ -52,7 +52,7 @@ class TestEngineParity:
         graph = VaultGraph(vault_root, use_cache=False)
         g = graph.subgraph()
 
-        seam = _betweenness_centrality(g)
+        seam = betweenness_centrality(g)
         reference = nx.betweenness_centrality(g)
 
         assert seam.keys() == reference.keys()
@@ -64,7 +64,7 @@ class TestEngineParity:
         feature = graph.get_features()[0]
         g = graph.subgraph(feature=feature)
 
-        seam = _betweenness_centrality(g)
+        seam = betweenness_centrality(g)
         reference = nx.betweenness_centrality(g)
 
         assert seam.keys() == reference.keys()

@@ -16,14 +16,14 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "_builtins_root",
+    "builtins_root",
     "check_outdated",
     "list_builtins",
     "seed_builtins",
 ]
 
 
-def _builtins_root() -> Path:
+def builtins_root() -> Path:
     """Return the filesystem path to the bundled builtins directory."""
     return Path(str(resources.files(__package__)))
 
@@ -48,7 +48,7 @@ def seed_builtins(
         changed content) or ``[UNCHANGED]`` (already current). Builtins
         skipped because they exist and *force* is False are omitted.
     """
-    src = _builtins_root()
+    src = builtins_root()
     results: list[tuple[str, str]] = []
 
     # Walk the bundled builtins tree
@@ -100,7 +100,7 @@ def list_builtins() -> list[str]:
     Returns:
         Sorted list of relative paths (forward-slash separated).
     """
-    src = _builtins_root()
+    src = builtins_root()
     paths: list[str] = []
     for f in sorted(src.rglob("*")):
         if not f.is_file():
@@ -118,7 +118,7 @@ def check_outdated(target_dir: Path) -> list[str]:
         List of relative paths (forward-slash separated) present in the
         package but missing or content-different at the target.
     """
-    src = _builtins_root()
+    src = builtins_root()
     outdated: list[str] = []
     for src_file in sorted(src.rglob("*")):
         if not src_file.is_file():

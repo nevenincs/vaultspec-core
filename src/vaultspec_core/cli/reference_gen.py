@@ -64,9 +64,9 @@ def end_marker(region_id: str) -> str:
 
 def bundled_reference_path() -> Path:
     """Return the filesystem path to the bundled ``reference/cli.md``."""
-    from vaultspec_core.builtins import _builtins_root
+    from vaultspec_core.builtins import builtins_root
 
-    return _builtins_root() / "reference" / "cli.md"
+    return builtins_root() / "reference" / "cli.md"
 
 
 def docs_handbook_path() -> Path:

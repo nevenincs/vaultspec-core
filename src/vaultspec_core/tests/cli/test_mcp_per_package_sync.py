@@ -17,10 +17,10 @@ import pytest
 
 from vaultspec_core.core.enums import InstallMode
 from vaultspec_core.core.mcps import (
-    _MODE_ARGS_TOKEN,
-    _MODE_COMMAND_TOKEN,
-    _MODE_MODULE_KEY,
-    _MODE_PACKAGE_KEY,
+    MODE_ARGS_TOKEN,
+    MODE_COMMAND_TOKEN,
+    MODE_MODULE_KEY,
+    MODE_PACKAGE_KEY,
     mcp_sync,
     render_launch_for_mode,
 )
@@ -76,10 +76,10 @@ def _add_companion_definition(root: Path) -> None:
     mcps_dir = root / ".vaultspec" / "mcps"
     mcps_dir.mkdir(parents=True, exist_ok=True)
     definition = {
-        "command": _MODE_COMMAND_TOKEN,
-        "args": [_MODE_ARGS_TOKEN],
-        _MODE_PACKAGE_KEY: _RAG_PACKAGE,
-        _MODE_MODULE_KEY: _RAG_MODULE,
+        "command": MODE_COMMAND_TOKEN,
+        "args": [MODE_ARGS_TOKEN],
+        MODE_PACKAGE_KEY: _RAG_PACKAGE,
+        MODE_MODULE_KEY: _RAG_MODULE,
     }
     (mcps_dir / f"{_RAG_PACKAGE}.builtin.json").write_text(
         json.dumps(definition, indent=2) + "\n", encoding="utf-8"
@@ -292,20 +292,20 @@ class TestFingerprintVerifiedRefresh:
         mcp_sync(provider="claude")
 
         from vaultspec_core.core.mcps import (
-            _ownership_path,
-            _ownership_target_key,
-            _read_ownership,
-            _write_ownership,
+            ownership_path,
+            ownership_target_key,
+            read_ownership,
+            write_ownership,
         )
 
         target = _claude_target(tmp_path)
-        path = _ownership_path(tmp_path, target.scope)
-        state = _read_ownership(path)
-        key = _ownership_target_key(target)
+        path = ownership_path(tmp_path, target.scope)
+        state = read_ownership(path)
+        key = ownership_target_key(target)
         managed = state["targets"][key].get("managed", {})
         managed["probe"] = None
         state["targets"][key]["managed"] = managed
-        _write_ownership(path, state)
+        write_ownership(path, state)
 
         # Change the standard so the entry now differs from its definition.
         _write_probe_definition(tmp_path, args=["-m", "probe", "--new"])

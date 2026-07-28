@@ -12,11 +12,13 @@ import pytest
 from ....config import reset_config
 from ....migrations.m_0_1_21_frontmatter_lifecycle import migrate as migrate_0_1_21
 from ... import DocumentMetadata, parse_vault_metadata
-from ..frontmatter import _fix_frontmatter
+from ..frontmatter import check_frontmatter
 
 if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
+
+    from .._base import CheckResult
 
 pytestmark = [pytest.mark.unit]
 
@@ -31,6 +33,19 @@ def reset_cfg() -> Generator[None]:
 def _make_skeleton(root: Path) -> None:
     for sub in ("adr", "audit", "exec", "plan", "reference", "research"):
         (root / ".vault" / sub).mkdir(parents=True, exist_ok=True)
+
+
+def _run_fix(doc: Path, root_dir: Path) -> CheckResult:
+    """Drive the frontmatter fixer through its public entry point.
+
+    Builds a one-document snapshot from *doc*'s current on-disk content
+    and runs :func:`check_frontmatter` with ``fix=True``, mirroring how
+    the real ``vault check`` pipeline invokes the (private) fixer.
+    """
+    content = doc.read_text(encoding="utf-8")
+    metadata, body = parse_vault_metadata(content)
+    snapshot = {doc: (metadata, body)}
+    return check_frontmatter(root_dir, snapshot=snapshot, fix=True)
 
 
 def test_parse_new_fields_inline_and_bulleted() -> None:
@@ -128,9 +143,11 @@ archived: 2026-05-22
     )
 
     # Run fixing
-    desc = _fix_frontmatter(doc, tmp_path)
-    assert desc is not None
-    assert "constructed tags from feature field" in desc
+    result = _run_fix(doc, tmp_path)
+    assert result.fixed_count == 1
+    assert any(
+        "constructed tags from feature field" in d.message for d in result.diagnostics
+    )
 
     # Re-read and parse
     new_content = doc.read_text(encoding="utf-8")
@@ -173,8 +190,11 @@ trailing_unknown: also kept
         encoding="utf-8",
     )
 
-    desc = _fix_frontmatter(doc, tmp_path)
-    assert desc == "normalized tag # prefixes"
+    result = _run_fix(doc, tmp_path)
+    assert result.fixed_count == 1
+    assert any(
+        d.message == "Fixed: normalized tag # prefixes" for d in result.diagnostics
+    )
 
     new_content = doc.read_text(encoding="utf-8")
     assert "custom_scalar: kept" in new_content
@@ -202,7 +222,8 @@ date: 2026-05-17
 """
     doc.write_text(original, encoding="utf-8")
 
-    assert _fix_frontmatter(doc, tmp_path) is None
+    result = _run_fix(doc, tmp_path)
+    assert result.fixed_count == 0
     assert doc.read_text(encoding="utf-8") == original
 
 
@@ -221,7 +242,9 @@ date: "2026-05-17 10:30"
         encoding="utf-8",
     )
 
-    assert _fix_frontmatter(doc, tmp_path) == "normalized date format"
+    result = _run_fix(doc, tmp_path)
+    assert result.fixed_count == 1
+    assert any(d.message == "Fixed: normalized date format" for d in result.diagnostics)
 
     meta, _ = parse_vault_metadata(doc.read_text(encoding="utf-8"))
     assert meta.date == "2026-05-17"

@@ -10,7 +10,7 @@ from ...graph import VaultGraph
 from ...testing.synthetic import CorpusManifest, build_synthetic_vault
 from ..query import (
     VaultDocument,
-    _docs_from_graph,
+    docs_from_graph,
     get_stats,
     list_documents,
     list_feature_details,
@@ -189,8 +189,8 @@ class TestArchiveFeature:
 
 
 class TestDocsFromGraph:
-    """``_docs_from_graph`` must be byte-for-byte equivalent to the
-    ``list_documents``/``_scan_all`` disk-scanning path it replaces inside
+    """``docs_from_graph`` must be byte-for-byte equivalent to the
+    ``list_documents``/``scan_all`` disk-scanning path it replaces inside
     ``get_stats``/``collect_all_statuses``."""
 
     def _graph(self, root: Path) -> VaultGraph:
@@ -200,7 +200,7 @@ class TestDocsFromGraph:
         self, vault_project: CorpusManifest
     ) -> None:
         via_scan = list_documents(vault_project.root)
-        via_graph = _docs_from_graph(self._graph(vault_project.root))
+        via_graph = docs_from_graph(self._graph(vault_project.root))
 
         def key(d: VaultDocument) -> str:
             return str(d.path)
@@ -220,7 +220,7 @@ class TestDocsFromGraph:
         self, vault_project: CorpusManifest
     ) -> None:
         via_scan = list_documents(vault_project.root, doc_type="adr")
-        via_graph = _docs_from_graph(self._graph(vault_project.root), doc_type="adr")
+        via_graph = docs_from_graph(self._graph(vault_project.root), doc_type="adr")
 
         assert {str(d.path) for d in via_scan} == {str(d.path) for d in via_graph}
         assert via_graph
@@ -233,7 +233,7 @@ class TestDocsFromGraph:
         feature = next(d.feature for d in docs if d.feature)
 
         via_scan = list_documents(vault_project.root, feature=feature)
-        via_graph = _docs_from_graph(self._graph(vault_project.root), feature=feature)
+        via_graph = docs_from_graph(self._graph(vault_project.root), feature=feature)
 
         assert {str(d.path) for d in via_scan} == {str(d.path) for d in via_graph}
         assert via_graph
@@ -246,7 +246,7 @@ class TestDocsFromGraph:
         date = next(d.date for d in docs if d.date)
 
         via_scan = list_documents(vault_project.root, date=date)
-        via_graph = _docs_from_graph(self._graph(vault_project.root), date=date)
+        via_graph = docs_from_graph(self._graph(vault_project.root), date=date)
 
         assert {str(d.path) for d in via_scan} == {str(d.path) for d in via_graph}
         assert via_graph
@@ -268,7 +268,7 @@ class TestDocsFromGraph:
             "fixture must actually produce a phantom node"
         )
 
-        docs = _docs_from_graph(graph)
+        docs = docs_from_graph(graph)
         assert len(docs) == 1
         assert docs[0].name == "2026-04-01-broken-link-adr"
 
@@ -287,11 +287,20 @@ class TestDocsFromGraph:
             )
 
         graph = self._graph(tmp_path)
-        assert any(len(v) > 1 for v in graph._stem_index.values()), (
+        # Rebuild the stem index from public node data (mirrors what
+        # `VaultGraph` itself derives internally) instead of reaching into
+        # the private `_stem_index` attribute.
+        keys_by_stem: dict[str, list[str]] = {}
+        for key, node in graph.nodes.items():
+            if node.phantom:
+                continue
+            bare_stem = key.split("/", 1)[1] if "/" in key else key
+            keys_by_stem.setdefault(bare_stem, []).append(key)
+        assert any(len(v) > 1 for v in keys_by_stem.values()), (
             "fixture must actually produce a stem collision"
         )
 
-        docs = _docs_from_graph(graph)
+        docs = docs_from_graph(graph)
         names = {d.name for d in docs}
         assert names == {stem}, (
             f"expected the bare stem {stem!r} for both documents, got {names}"
@@ -310,7 +319,7 @@ class TestDocsFromGraph:
         )
 
         via_scan = list_documents(tmp_path)
-        via_graph = _docs_from_graph(self._graph(tmp_path))
+        via_graph = docs_from_graph(self._graph(tmp_path))
 
         assert len(via_scan) == 1
         assert len(via_graph) == 1
@@ -328,7 +337,7 @@ class TestDocsFromGraph:
         )
 
         via_scan = list_documents(tmp_path)
-        via_graph = _docs_from_graph(self._graph(tmp_path))
+        via_graph = docs_from_graph(self._graph(tmp_path))
 
         assert len(via_scan) == 1
         assert len(via_graph) == 1
@@ -396,19 +405,19 @@ class TestListDocumentsGraphParity:
     def test_graph_listing_matches_disk_scan(
         self, vault_project: CorpusManifest, doc_type: str | None
     ) -> None:
-        from ..query import _scan_all
+        from ..query import scan_all
 
         via_graph = list_documents(vault_project.root, doc_type=doc_type)
-        via_disk = _scan_all(vault_project.root, doc_type=doc_type)
+        via_disk = scan_all(vault_project.root, doc_type=doc_type)
 
         assert self._key(via_graph) == self._key(via_disk)
 
     def test_feature_and_date_filters_match_disk_scan(
         self, vault_project: CorpusManifest
     ) -> None:
-        from ..query import _scan_all
+        from ..query import scan_all
 
-        all_disk = _scan_all(vault_project.root)
+        all_disk = scan_all(vault_project.root)
         feature = next((d.feature for d in all_disk if d.feature), None)
         date = next((d.date for d in all_disk if d.date), None)
         assert feature is not None and date is not None

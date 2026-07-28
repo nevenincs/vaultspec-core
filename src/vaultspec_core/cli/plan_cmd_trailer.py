@@ -14,13 +14,13 @@ from typing import Annotated
 import typer
 
 from vaultspec_core.cli.plan_cmd_app import trailer_app
-from vaultspec_core.cli.plan_cmd_shared import _render_user_errors
+from vaultspec_core.cli.plan_cmd_shared import render_user_errors
 
 __all__ = ["cmd_trailer_emit", "cmd_trailer_validate"]
 
 
 @trailer_app.command("emit")
-@_render_user_errors
+@render_user_errors
 def cmd_trailer_emit(
     step: Annotated[
         str | None,

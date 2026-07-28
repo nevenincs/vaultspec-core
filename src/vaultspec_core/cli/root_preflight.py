@@ -1,6 +1,6 @@
 """Shared pre-flight diagnosis-and-resolution helper.
 
-Defines :func:`_run_preflight`, used by the ``install``, ``uninstall``, and
+Defines :func:`run_preflight`, used by the ``install``, ``uninstall``, and
 ``sync`` commands (:mod:`.root_install`, :mod:`.root_sync`) to run
 preflight-safe resolution steps and display their outcomes before the main
 command body executes.
@@ -20,14 +20,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# ``_run_preflight`` is consumed by :mod:`.root_install`, :mod:`.root_sync`,
-# and :mod:`.root` under this module's leading-underscore convention for a
-# shared-but-internal helper; the explicit re-export marks that cross-module
-# contract for the type checker.
-__all__ = ["_run_preflight"]
+# ``run_preflight`` is consumed by :mod:`.root_install`, :mod:`.root_sync`,
+# and :mod:`.root`; the explicit re-export marks that cross-module contract
+# for the type checker.
+__all__ = ["run_preflight"]
 
 
-def _run_preflight(
+def run_preflight(
     target: Path,
     action: str,
     provider: str = "all",

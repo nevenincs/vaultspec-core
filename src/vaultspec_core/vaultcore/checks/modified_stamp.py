@@ -64,7 +64,7 @@ if TYPE_CHECKING:
 
     from ..models import DocumentMetadata
 
-__all__ = ["_filename_date", "_write_stamp", "check_modified_stamp"]
+__all__ = ["check_modified_stamp", "filename_date", "write_stamp"]
 
 #: Fraction of documents which, once concentrated on the largest few mtime
 #: dates, is read as a git-operation signature and suppresses staleness.
@@ -96,7 +96,7 @@ _DATE_LINE_RE = re.compile(
 )
 
 
-def _filename_date(path: Path) -> str | None:
+def filename_date(path: Path) -> str | None:
     """Return the canonical ``yyyy-mm-dd`` filename prefix, or ``None``.
 
     Args:
@@ -131,7 +131,7 @@ def _mtime_date(path: Path) -> datetime.date | None:
     return datetime.datetime.fromtimestamp(ts).date()
 
 
-def _write_stamp(doc_path: Path, value: str) -> bool:
+def write_stamp(doc_path: Path, value: str) -> bool:
     """Add or rewrite the ``modified:`` stamp to *value* in place.
 
     Operates on full document text and preserves every other byte,
@@ -308,8 +308,8 @@ def check_modified_stamp(
         raw_modified = metadata.modified
 
         if not raw_modified:
-            backfill = normalize_date(metadata.date) or _filename_date(doc_path)
-            if fix and backfill is not None and _write_stamp(doc_path, backfill):
+            backfill = normalize_date(metadata.date) or filename_date(doc_path)
+            if fix and backfill is not None and write_stamp(doc_path, backfill):
                 result.fixed_count += 1
                 result.diagnostics.append(
                     CheckDiagnostic(
@@ -351,7 +351,7 @@ def check_modified_stamp(
         # Non-canonical-but-parseable: the stored value is not the bare
         # canonical string (e.g. an ISO timestamp or yyyy/mm/dd).
         if raw_modified != canonical:
-            if fix and _write_stamp(doc_path, canonical):
+            if fix and write_stamp(doc_path, canonical):
                 result.fixed_count += 1
                 result.diagnostics.append(
                     CheckDiagnostic(
@@ -384,7 +384,7 @@ def check_modified_stamp(
         mtime_date = mtime_by_path.get(doc_path)
         if mtime_date is not None and mtime_date > parsed:
             stale_value = mtime_date.isoformat()
-            if fix and _write_stamp(doc_path, stale_value):
+            if fix and write_stamp(doc_path, stale_value):
                 result.fixed_count += 1
                 result.diagnostics.append(
                     CheckDiagnostic(

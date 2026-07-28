@@ -42,13 +42,13 @@ from ..vaultcore.models import DocumentMetadata
 from . import api_export, rendering
 from .algorithms import (
     PAGERANK_ALPHA,
-    _betweenness_centrality,
-    _docnode_from_attrs,
-    _edge_kind,
-    _extract_feature,
-    _extract_title,
-    _pagerank,
-    _top_n,
+    betweenness_centrality,
+    docnode_from_attrs,
+    edge_kind,
+    extract_feature,
+    extract_title,
+    pagerank,
+    top_n,
 )
 from .models import DocNode, EncodingIssue, GraphCounts, GraphMetrics
 
@@ -314,7 +314,7 @@ class VaultGraph:
         by_stem: dict[str, list[str]] = {}
         for key in self._digraph.nodes():
             attrs = self._digraph.nodes[key]
-            self.nodes[key] = _docnode_from_attrs(key, attrs)
+            self.nodes[key] = docnode_from_attrs(key, attrs)
             # The node body is held on the DocNode, not the nx node; pull it
             # back off the cached node attrs and drop it so the nx node
             # attribute set matches a fresh build exactly.
@@ -507,11 +507,11 @@ class VaultGraph:
         node.tags = set(metadata.tags)
         node.date = metadata.date
         node.modified = metadata.modified
-        node.feature = _extract_feature(node.tags)
+        node.feature = extract_feature(node.tags)
         node.frontmatter = raw_fm
         node.body = body
         node.word_count = len(body.split())
-        node.title = _extract_title(body)
+        node.title = extract_title(body)
 
     def _assemble_from_by_stem(self, by_stem: dict[str, list[DocNode]]) -> None:
         """Run the shared graph-assembly passes over the collected nodes.
@@ -601,7 +601,7 @@ class VaultGraph:
                 node.out_links = set(target_counts)
 
                 for target_key, multiplicity in target_counts.items():
-                    kind = _edge_kind(target_kinds[target_key])
+                    kind = edge_kind(target_kinds[target_key])
                     if target_key in self.nodes:
                         self.nodes[target_key].in_links.add(name)
                         self._digraph.add_edge(
@@ -672,17 +672,17 @@ class VaultGraph:
 
         # Pass 4: node-size hints.  Attach pagerank and raw in-degree so a GUI
         # consumer can size nodes without recomputing.  PageRank uses the
-        # pure-Python power iteration in _pagerank with a fixed damping factor
+        # pure-Python power iteration in pagerank with a fixed damping factor
         # (PAGERANK_ALPHA) and a uniform initial vector, so the result is
         # deterministic for a fixed graph and exactly testable.  An empty
         # graph yields no scores.
         if self._digraph.number_of_nodes():
-            pagerank = _pagerank(self._digraph, alpha=PAGERANK_ALPHA)
+            pagerank_scores = pagerank(self._digraph, alpha=PAGERANK_ALPHA)
         else:
-            pagerank = {}
+            pagerank_scores = {}
         in_degree = dict(self._digraph.in_degree())
         for name in self._digraph.nodes():
-            self._digraph.nodes[name]["pagerank"] = pagerank.get(name, 0.0)
+            self._digraph.nodes[name]["pagerank"] = pagerank_scores.get(name, 0.0)
             self._digraph.nodes[name]["in_degree"] = in_degree.get(name, 0)
 
         logger.info(
@@ -1022,7 +1022,7 @@ class VaultGraph:
         Delegates to ``nx.density``, ``nx.in_degree_centrality``,
         ``nx.number_weakly_connected_components``, and betweenness
         centrality through the C-backed engine seam
-        (:func:`_betweenness_centrality`, ``rustworkx`` with a networkx
+        (:func:`betweenness_centrality`, ``rustworkx`` with a networkx
         fallback) instead of manual computation.
 
         Args:
@@ -1073,8 +1073,8 @@ class VaultGraph:
         in_cent: dict[str, float] = {}
         btwn_cent: dict[str, float] = {}
         if n_nodes > 1:
-            in_cent = _top_n(nx.in_degree_centrality(g))
-            btwn_cent = _top_n(_betweenness_centrality(g))
+            in_cent = top_n(nx.in_degree_centrality(g))
+            btwn_cent = top_n(betweenness_centrality(g))
 
         # --- feature / type counts (excludes phantoms) ---
         features: set[str] = set()

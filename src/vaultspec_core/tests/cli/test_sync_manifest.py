@@ -53,11 +53,11 @@ def sync_workspace(tmp_path: Path) -> Generator[Path]:
         hooks_dir=tmp_path / ".vaultspec" / "hooks",
         tool_configs=tool_configs,
     )
-    token = _t._workspace_ctx.set(ctx)
+    token = _t.workspace_ctx.set(ctx)
 
     yield tmp_path
 
-    _t._workspace_ctx.reset(token)
+    _t.workspace_ctx.reset(token)
 
 
 def _noop_transform(_tool: Tool, name: str, meta: dict[str, Any], body: str) -> str:

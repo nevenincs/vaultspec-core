@@ -12,8 +12,8 @@ from vaultspec_core.core.enums import ManagedState
 from vaultspec_core.core.gitignore import (
     MARKER_BEGIN,
     MARKER_END,
-    _find_markers,
     ensure_gitignore_block,
+    find_markers,
     get_recommended_entries,
 )
 
@@ -212,7 +212,7 @@ class TestFileWithoutNewline:
 class TestInvertedMarkers:
     def test_find_markers_inverted_returns_both(self) -> None:
         lines = ["some content", MARKER_END, ".entry/", MARKER_BEGIN]
-        begins, ends = _find_markers(lines)
+        begins, ends = find_markers(lines)
         assert begins == [3]
         assert ends == [1]
 
@@ -234,7 +234,7 @@ class TestInvertedMarkers:
 class TestDuplicateBeginMarkers:
     def test_find_markers_duplicate_begin_returns_all(self) -> None:
         lines = [MARKER_BEGIN, ".entry/", MARKER_BEGIN, ".entry2/", MARKER_END]
-        begins, ends = _find_markers(lines)
+        begins, ends = find_markers(lines)
         assert begins == [0, 2]
         assert ends == [4]
 
@@ -253,7 +253,7 @@ class TestDuplicateBeginMarkers:
 class TestDuplicateEndMarkers:
     def test_find_markers_duplicate_end_returns_all(self) -> None:
         lines = [MARKER_BEGIN, ".entry/", MARKER_END, MARKER_END]
-        begins, ends = _find_markers(lines)
+        begins, ends = find_markers(lines)
         assert begins == [0]
         assert ends == [2, 3]
 
@@ -335,11 +335,11 @@ class TestProviderArtifactOwnership:
 
         Lifecycle gap fix: a provider with an mcp_config_file (e.g. Antigravity's
         .agents/mcp_config.json) must have that file claimed by
-        _collect_provider_artifacts so per-provider uninstall and gitignore
+        collect_provider_artifacts so per-provider uninstall and gitignore
         reconciliation own it, rather than relying on it sitting under a removed
         directory.
         """
-        from vaultspec_core.core.gitignore import _collect_provider_artifacts
+        from vaultspec_core.core.gitignore import collect_provider_artifacts
         from vaultspec_core.core.types import get_context
 
         ctx = get_context()
@@ -354,7 +354,7 @@ class TestProviderArtifactOwnership:
         assert tool is not None, "expected a provider with a native MCP config"
         mcp_path = ctx.tool_configs[tool].mcp_config_file
 
-        _dirs, files = _collect_provider_artifacts(synthetic_project, tool)
+        _dirs, files = collect_provider_artifacts(synthetic_project, tool)
         assert mcp_path in files
 
 

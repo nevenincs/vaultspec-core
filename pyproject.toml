@@ -260,51 +260,7 @@ typeCheckingMode = "strict"
 
   [[tool.basedpyright.executionEnvironments]]
   reportPrivateUsage = false
-  root = "src/vaultspec_core/config/tests"
-
-  [[tool.basedpyright.executionEnvironments]]
-  reportPrivateUsage = false
-  root = "src/vaultspec_core/core/tests"
-
-  [[tool.basedpyright.executionEnvironments]]
-  reportPrivateUsage = false
-  root = "src/vaultspec_core/graph/tests"
-
-  [[tool.basedpyright.executionEnvironments]]
-  reportPrivateUsage = false
-  root = "src/vaultspec_core/hooks/tests"
-
-  [[tool.basedpyright.executionEnvironments]]
-  reportPrivateUsage = false
-  root = "src/vaultspec_core/metrics/tests"
-
-  [[tool.basedpyright.executionEnvironments]]
-  reportPrivateUsage = false
-  root = "src/vaultspec_core/migrations/tests"
-
-  [[tool.basedpyright.executionEnvironments]]
-  reportPrivateUsage = false
-  root = "src/vaultspec_core/protocol/tests"
-
-  [[tool.basedpyright.executionEnvironments]]
-  reportPrivateUsage = false
-  root = "src/vaultspec_core/testing/tests"
-
-  [[tool.basedpyright.executionEnvironments]]
-  reportPrivateUsage = false
   root = "src/vaultspec_core/tests"
-
-  [[tool.basedpyright.executionEnvironments]]
-  reportPrivateUsage = false
-  root = "src/vaultspec_core/vaultcore/checks/tests"
-
-  [[tool.basedpyright.executionEnvironments]]
-  reportPrivateUsage = false
-  root = "src/vaultspec_core/vaultcore/tests"
-
-  [[tool.basedpyright.executionEnvironments]]
-  reportPrivateUsage = false
-  root = "src/vaultspec_core/verification/tests"
 
 # Cognitive complexity - how much state a reader must hold to follow a
 # function, as distinct from the number of paths through it that `xenon`

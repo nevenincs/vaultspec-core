@@ -237,7 +237,7 @@ class TestInstallSkip:
         Contract: the `core` provider installs the framework directory only
         (`docs/CLI.md`: "core installs `.vaultspec/` only, without any
         provider config"). `init_run` enforces this via
-        `_PROVIDER_TO_TOOLS["core"] == []`, so no provider tool is enrolled.
+        `PROVIDER_TO_TOOLS["core"] == []`, so no provider tool is enrolled.
 
         The post-init `sync_provider` call maps `core` to the `all` sync
         target, but that pass only ever propagates to *enrolled* providers.

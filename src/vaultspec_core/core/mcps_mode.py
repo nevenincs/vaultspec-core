@@ -11,21 +11,13 @@ from typing import Any
 
 from .enums import InstallMode, render_mode
 
-# ``_render_definition_for_sync`` is consumed by
-# :mod:`vaultspec_core.core.mcps_definitions` and :mod:`vaultspec_core.core.mcps`
-# under this module's leading-underscore convention for shared-but-internal
-# helpers; the explicit re-export marks that cross-module contract for the
-# type checker.
 __all__ = [
-    "_DEFAULT_MCP_MODULE",
-    "_DEFAULT_MCP_PACKAGE",
-    "_MODE_ARGS_TOKEN",
-    "_MODE_COMMAND_TOKEN",
-    "_MODE_MCP_LAUNCH",
-    "_MODE_MODULE_KEY",
-    "_MODE_PACKAGE_KEY",
-    "_MODE_TOOL_SPEC_KEY",
-    "_render_definition_for_sync",
+    "MODE_ARGS_TOKEN",
+    "MODE_COMMAND_TOKEN",
+    "MODE_MCP_LAUNCH",
+    "MODE_MODULE_KEY",
+    "MODE_PACKAGE_KEY",
+    "render_definition_for_sync",
 ]
 
 #: Sentinel tokens carried by the mode-neutral builtin MCP definition
@@ -36,8 +28,8 @@ __all__ = [
 #: (keeping the ``BuiltinVersionSignal`` snapshot hash stable); substitution
 #: happens only here, downstream, and only the substituted concrete command is
 #: ever written into provider-native host configuration.
-_MODE_COMMAND_TOKEN = "@@VAULTSPEC_INSTALL_MODE_COMMAND@@"
-_MODE_ARGS_TOKEN = "@@VAULTSPEC_INSTALL_MODE_ARGS@@"
+MODE_COMMAND_TOKEN = "@@VAULTSPEC_INSTALL_MODE_COMMAND@@"
+MODE_ARGS_TOKEN = "@@VAULTSPEC_INSTALL_MODE_ARGS@@"
 
 #: Optional metadata keys a mode-neutral MCP definition may carry alongside the
 #: sentinel tokens to name the distribution and runnable module its launch
@@ -47,8 +39,8 @@ _MODE_ARGS_TOKEN = "@@VAULTSPEC_INSTALL_MODE_ARGS@@"
 #: produces *that* package's ``uv run``/``uvx`` launch without a second renderer.
 #: They are consumed and stripped during substitution, so they never reach
 #: provider-native host configuration.
-_MODE_PACKAGE_KEY = "_vaultspec_mode_package"
-_MODE_MODULE_KEY = "_vaultspec_mode_module"
+MODE_PACKAGE_KEY = "_vaultspec_mode_package"
+MODE_MODULE_KEY = "_vaultspec_mode_module"
 _MODE_TOOL_SPEC_KEY = "_vaultspec_mode_tool_spec"
 
 #: The distribution and module core's own MCP server launches through. Used as
@@ -111,7 +103,7 @@ def render_launch_for_mode(
 #: same module entry point through an ephemeral ``uvx`` invocation. Only the two
 #: rendered shapes are keyed (``DEV`` collapses onto ``DEPENDENCY``), which is
 #: what the observed-shape matcher and the mode-flip tests read.
-_MODE_MCP_LAUNCH: dict[InstallMode, tuple[str, list[str]]] = {
+MODE_MCP_LAUNCH: dict[InstallMode, tuple[str, list[str]]] = {
     mode: render_launch_for_mode(mode, _DEFAULT_MCP_PACKAGE, _DEFAULT_MCP_MODULE)
     for mode in (InstallMode.DEPENDENCY, InstallMode.TOOL)
 }
@@ -123,9 +115,9 @@ def render_mcp_definition_for_mode(
     """Return *definition* with its mode-neutral tokens substituted for *mode*.
 
     Substitution is surgical and token-guarded: the ``command`` field is
-    rewritten only when it equals :data:`_MODE_COMMAND_TOKEN`, and the ``args``
+    rewritten only when it equals :data:`MODE_COMMAND_TOKEN`, and the ``args``
     field only when it equals the single-element token list
-    ``[_MODE_ARGS_TOKEN]``. A definition that carries neither token - a
+    ``[MODE_ARGS_TOKEN]``. A definition that carries neither token - a
     user-authored custom MCP server, or an already-rendered entry - passes
     through unchanged, so this is safe to apply to every collected definition
     regardless of origin.
@@ -137,7 +129,7 @@ def render_mcp_definition_for_mode(
     byte-identically to :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY`
     rather than falling off a two-key table. The distribution and module the
     launch targets come from the definition's own
-    :data:`_MODE_PACKAGE_KEY`/:data:`_MODE_MODULE_KEY` metadata, defaulting to
+    :data:`MODE_PACKAGE_KEY`/:data:`MODE_MODULE_KEY` metadata, defaulting to
     core's package and module when absent. Those keys and the optional
     :data:`_MODE_TOOL_SPEC_KEY` are stripped during substitution so launch
     metadata never reaches provider-native host configuration.
@@ -152,12 +144,12 @@ def render_mcp_definition_for_mode(
         removed. The input is not mutated.
     """
     rendered = dict(definition)
-    package = str(rendered.pop(_MODE_PACKAGE_KEY, _DEFAULT_MCP_PACKAGE))
-    module = str(rendered.pop(_MODE_MODULE_KEY, _DEFAULT_MCP_MODULE))
+    package = str(rendered.pop(MODE_PACKAGE_KEY, _DEFAULT_MCP_PACKAGE))
+    module = str(rendered.pop(MODE_MODULE_KEY, _DEFAULT_MCP_MODULE))
     raw_tool_spec = rendered.pop(_MODE_TOOL_SPEC_KEY, None)
     tool_spec = str(raw_tool_spec) if raw_tool_spec is not None else None
-    has_command_token = rendered.get("command") == _MODE_COMMAND_TOKEN
-    has_args_token = rendered.get("args") == [_MODE_ARGS_TOKEN]
+    has_command_token = rendered.get("command") == MODE_COMMAND_TOKEN
+    has_args_token = rendered.get("args") == [MODE_ARGS_TOKEN]
     if not (has_command_token or has_args_token):
         return rendered
     command, args = render_launch_for_mode(mode, package, module, tool_spec)
@@ -168,7 +160,7 @@ def render_mcp_definition_for_mode(
     return rendered
 
 
-def _render_definition_for_sync(
+def render_definition_for_sync(
     definition: dict[str, Any],
     sync_mode: InstallMode,
     target: Path | None,
@@ -176,7 +168,7 @@ def _render_definition_for_sync(
     """Render one collected definition at its own declaring package's mode.
 
     The seam that keeps a mixed-mode workspace stable. A definition that names
-    its own declaring package through :data:`_MODE_PACKAGE_KEY` renders at *that*
+    its own declaring package through :data:`MODE_PACKAGE_KEY` renders at *that*
     package's committed render mode
     (:func:`~vaultspec_core.core.workspace_mode.resolve_render_mode`), not the
     sync-wide *sync_mode*, so a workspace that provisioned core as a dependency
@@ -202,7 +194,7 @@ def _render_definition_for_sync(
     Returns:
         The mode-rendered definition (a copy; the input is not mutated).
     """
-    package = definition.get(_MODE_PACKAGE_KEY)
+    package = definition.get(MODE_PACKAGE_KEY)
     if package is not None and target is not None:
         from .workspace_mode import resolve_render_mode
 

@@ -15,7 +15,7 @@ import typer
 
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target_install
-from vaultspec_core.cli.root_preflight import _run_preflight
+from vaultspec_core.cli.root_preflight import run_preflight
 from vaultspec_core.core.enums import CliAction, InstallMode
 
 logger = logging.getLogger(__name__)
@@ -125,7 +125,7 @@ def cmd_install(
 
     adopting = collect_framework_presence(path) is FrameworkSignal.ADOPTABLE
 
-    _run_preflight(
+    run_preflight(
         path,
         action=CliAction.UPGRADE if upgrade else CliAction.INSTALL,
         provider=provider,
@@ -323,7 +323,7 @@ def cmd_uninstall(
         typer.echo(f"Error: Target directory does not exist: {path}", err=True)
         raise typer.Exit(code=1)
 
-    _run_preflight(
+    run_preflight(
         path,
         action=CliAction.UNINSTALL,
         provider=provider,

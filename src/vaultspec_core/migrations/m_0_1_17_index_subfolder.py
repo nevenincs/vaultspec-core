@@ -48,7 +48,7 @@ def migrate(workspace: Path) -> MigrationResult:
        :func:`pathlib.Path.read_text` would clobber CRLF before the
        caller could see it).
     2. Calls
-       :func:`vaultspec_core.vaultcore.checks.structure._ensure_index_directory_tag`
+       :func:`vaultspec_core.vaultcore.checks.structure.ensure_index_directory_tag`
        to insert ``#index`` into the YAML ``tags:`` block when missing,
        preserving the file's existing newline convention.
     3. Atomically writes the rewritten content to the canonical

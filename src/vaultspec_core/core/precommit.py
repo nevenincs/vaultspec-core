@@ -23,23 +23,17 @@ from .prek_boundary import PrekBoundaryState, collect_prek_boundary
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "ALL_MANAGED_HOOK_IDS",
     "CANONICAL_ENTRY_PREFIX",
     "CANONICAL_HOOK_ENTRIES",
     "CANONICAL_HOOK_IDS",
     "CANONICAL_PRECOMMIT_HOOKS",
-    "_ALL_MANAGED_HOOK_IDS",
-    "_HOOK_META",
-    "_HOOK_SUBCOMMAND",
-    "_MODE_ENTRY_PREFIX",
-    "_drop_managed_hook_entries",
-    "_dump_precommit_yaml",
-    "_precommit_yaml",
-    "_scaffold_precommit",
-    "_strip_managed_precommit_hooks",
     "canonical_hook_entries_for_mode",
     "canonical_precommit_hooks_for_mode",
     "entry_prefix_for_mode",
     "hook_defs_for_mode",
+    "scaffold_precommit",
+    "strip_managed_precommit_hooks",
 ]
 
 
@@ -180,7 +174,7 @@ CANONICAL_HOOK_IDS: frozenset[str] = frozenset(h.value for h in PrecommitHook)
 #: Backward-compatible module-level canonical hooks and entries, pinned to
 #: dependency mode. The doctor's canonical-entry check still imports
 #: ``CANONICAL_HOOK_ENTRIES`` and compares against the single dependency-mode
-#: shape; making that check mode-aware is the next phase. ``_scaffold_precommit``
+#: shape; making that check mode-aware is the next phase. ``scaffold_precommit``
 #: renders through :func:`canonical_precommit_hooks_for_mode` instead.
 CANONICAL_PRECOMMIT_HOOKS: list[dict[str, object]] = canonical_precommit_hooks_for_mode(
     InstallMode.DEPENDENCY
@@ -190,7 +184,7 @@ CANONICAL_HOOK_ENTRIES: dict[str, str] = canonical_hook_entries_for_mode(
 )
 
 # All managed hook IDs for uninstall filtering.
-_ALL_MANAGED_HOOK_IDS: frozenset[str] = CANONICAL_HOOK_IDS
+ALL_MANAGED_HOOK_IDS: frozenset[str] = CANONICAL_HOOK_IDS
 
 
 def _precommit_yaml() -> YAML:
@@ -243,7 +237,7 @@ def _drop_managed_hook_entries(repos: list[Any]) -> bool:
             i
             for i, h in enumerate(hooks)
             if (hook := _as_mapping(h)) is not None
-            and hook.get("id") in _ALL_MANAGED_HOOK_IDS
+            and hook.get("id") in ALL_MANAGED_HOOK_IDS
         ]
         for i in reversed(managed_idx):
             del hooks[i]
@@ -254,7 +248,7 @@ def _drop_managed_hook_entries(repos: list[Any]) -> bool:
     return changed
 
 
-def _strip_managed_precommit_hooks(config_file: Path) -> bool:
+def strip_managed_precommit_hooks(config_file: Path) -> bool:
     """Remove vaultspec-managed hooks from an existing ``.pre-commit-config.yaml``.
 
     The file is rewritten in place, or deleted when nothing but the managed
@@ -415,7 +409,7 @@ def _reconcile_precommit_repos(
     return _merge_local_repo_hooks(existing_hooks, canonical_hooks)
 
 
-def _scaffold_precommit(
+def scaffold_precommit(
     target: Path, *, dry_run: bool = False, mode: InstallMode | None = None
 ) -> list[tuple[str, str]]:
     """Scaffold or merge vaultspec-core hooks into .pre-commit-config.yaml.

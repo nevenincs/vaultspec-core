@@ -16,7 +16,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from .helpers import _rmtree_robust, atomic_write, ensure_dir
+from .helpers import atomic_write, ensure_dir, rmtree_robust
 from .types import CONFIG_HEADER, SyncResult
 
 logger = logging.getLogger(__name__)
@@ -240,7 +240,7 @@ def sync_files(
                 result.items.append((abs_path, "[DELETE]"))
                 if not dry_run:
                     if is_skill:
-                        _rmtree_robust(item)
+                        rmtree_robust(item)
                     else:
                         item.unlink()
                 result.pruned += 1

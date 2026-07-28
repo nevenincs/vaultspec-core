@@ -22,7 +22,7 @@ from vaultspec_core.core.diagnosis.collectors import (
     collect_stale_seed_definitions,
 )
 from vaultspec_core.core.diagnosis.signals import PrecommitSignal
-from vaultspec_core.core.mcps import _MODE_COMMAND_TOKEN
+from vaultspec_core.core.mcps import MODE_COMMAND_TOKEN
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -82,7 +82,7 @@ class TestPrekUnrefreshableAdvisory:
     def test_unrefreshable_warns_the_doctor(self, tmp_path: Path) -> None:
         """Content-verified genuine stranding is a warning: prek.toml owns
         the boundary, lacks the canonical hooks, and nothing runs them."""
-        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+        from vaultspec_core.cli.spec_cmd import doctor_exit_code
         from vaultspec_core.core.diagnosis.diagnosis import WorkspaceDiagnosis
         from vaultspec_core.core.diagnosis.signals import FrameworkSignal
 
@@ -90,11 +90,11 @@ class TestPrekUnrefreshableAdvisory:
             framework=FrameworkSignal.PRESENT,
             precommit=PrecommitSignal.UNREFRESHABLE,
         )
-        assert _doctor_exit_code(diag) == 1
+        assert doctor_exit_code(diag) == 1
 
     def test_orphaned_never_fails_the_doctor(self, tmp_path: Path) -> None:
         """A superseded YAML next to a healthy prek.toml is benign info."""
-        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+        from vaultspec_core.cli.spec_cmd import doctor_exit_code
         from vaultspec_core.core.diagnosis.diagnosis import WorkspaceDiagnosis
         from vaultspec_core.core.diagnosis.signals import FrameworkSignal
 
@@ -102,7 +102,7 @@ class TestPrekUnrefreshableAdvisory:
             framework=FrameworkSignal.PRESENT,
             precommit=PrecommitSignal.ORPHANED,
         )
-        assert _doctor_exit_code(diag) == 0
+        assert doctor_exit_code(diag) == 0
 
 
 class TestPrekContentAwareSignal:
@@ -120,9 +120,9 @@ class TestPrekContentAwareSignal:
         self, tmp_path: Path
     ) -> None:
         """Even a fully canonical YAML is superseded: prek never reads it."""
-        from vaultspec_core.core.commands import _scaffold_precommit
+        from vaultspec_core.core.commands import scaffold_precommit
 
-        _scaffold_precommit(tmp_path)
+        scaffold_precommit(tmp_path)
         assert collect_precommit_state(tmp_path) is PrecommitSignal.COMPLETE
 
         _write_prek_hooks(tmp_path)
@@ -273,7 +273,7 @@ class TestStaleSeedAdvisory:
             encoding="utf-8",
         )
         (mcps / "vaultspec-core.builtin.json").write_text(
-            json.dumps({"command": _MODE_COMMAND_TOKEN, "args": []}),
+            json.dumps({"command": MODE_COMMAND_TOKEN, "args": []}),
             encoding="utf-8",
         )
         (mcps / "my-server.json").write_text(
@@ -287,7 +287,7 @@ class TestStaleSeedAdvisory:
         mcps = tmp_path / ".vaultspec" / "mcps"
         mcps.mkdir(parents=True)
         (mcps / "vaultspec-core.builtin.json").write_text(
-            json.dumps({"command": _MODE_COMMAND_TOKEN, "args": []}),
+            json.dumps({"command": MODE_COMMAND_TOKEN, "args": []}),
             encoding="utf-8",
         )
 
@@ -297,7 +297,7 @@ class TestStaleSeedAdvisory:
         assert collect_stale_seed_definitions(tmp_path) == []
 
     def test_stale_seed_never_fails_the_doctor(self, tmp_path: Path) -> None:
-        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+        from vaultspec_core.cli.spec_cmd import doctor_exit_code
         from vaultspec_core.core.diagnosis.diagnosis import WorkspaceDiagnosis
         from vaultspec_core.core.diagnosis.signals import FrameworkSignal
 
@@ -305,4 +305,4 @@ class TestStaleSeedAdvisory:
             framework=FrameworkSignal.PRESENT,
             stale_mcp_seeds=["vaultspec-rag"],
         )
-        assert _doctor_exit_code(diag) == 0
+        assert doctor_exit_code(diag) == 0

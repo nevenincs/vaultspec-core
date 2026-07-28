@@ -31,24 +31,13 @@ from .gitignore import (
 from .helpers import ensure_dir
 from .install_mode import stamp_manifest_version_no_downgrade
 from .manifest import read_manifest, read_manifest_data, write_manifest_data
-from .precommit import _scaffold_precommit
+from .precommit import scaffold_precommit
 from .provider_registry import SYNC_PROVIDERS, rel, validate_skip
 
 logger = logging.getLogger(__name__)
 
-#: Re-exported (with underscore intact) for :mod:`vaultspec_core.core.commands`,
-#: which is the single public import surface for sync orchestration.
 __all__ = [
-    "_SYNC_PROVIDER_TOOLS",
-    "_backfill_structures",
-    "_empty_sync_results",
-    "_mcp_sync_pass",
-    "_reconcile_gitattributes_opt_out",
-    "_reconcile_gitignore_opt_out",
-    "_reconcile_precommit_management",
-    "_run_all_syncs",
-    "_stamp_last_synced",
-    "_sync_all_providers",
+    "sync_provider",
 ]
 
 # Single-provider sync targets mapped to the tool they narrow the context to.
@@ -71,7 +60,7 @@ def _backfill_structures(*, skip: set[str], dry_run: bool) -> _t.SyncResult:
     Content files are backfilled by the per-resource sync passes (their
     ``apply_file_sync`` adds any missing destination), but a content-less
     structural directory such as a provider's ``workflows/`` is only ever
-    created by ``install``/``_scaffold_provider``. After an upgrade that
+    created by ``install``/``scaffold_provider``. After an upgrade that
     introduces such a directory, ``sync`` left the provider ``partial``
     while reporting success ("will be addressed by sync") - a no-op. This
     backfill makes that promise real: it creates only directories that are
@@ -208,7 +197,7 @@ def _reconcile_precommit_management(target_dir: Path) -> None:
         write_manifest_data(target_dir, mdata)
         logger.info("Pre-commit hooks removed by user, disabling management")
         return
-    _scaffold_precommit(target_dir)
+    scaffold_precommit(target_dir)
 
 
 def _reconcile_gitignore_opt_out(target_dir: Path) -> None:

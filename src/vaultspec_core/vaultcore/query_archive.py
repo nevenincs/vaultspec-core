@@ -11,16 +11,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, TypedDict
 
-from .query_listing import _feature_from_tags_or_meta, list_documents
+from .query_listing import feature_from_tags_or_meta, list_documents
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 logger = logging.getLogger(__name__)
-
-#: Re-exported (with underscore intact) for :mod:`vaultspec_core.vaultcore.query`,
-#: the single public import surface for the feature archive/rename engine.
-__all__ = ["_cleanup_empty_dirs"]
 
 
 class FeatureCrossLink(TypedDict):
@@ -185,7 +181,7 @@ def unarchive_feature(
         if isinstance(tags, str):
             tags = [tags]
 
-        feature_val = _feature_from_tags_or_meta(tags, meta, dt_str)
+        feature_val = feature_from_tags_or_meta(tags, meta, dt_str)
 
         if feature_val == feature.lower():
             archived_docs.append((doc_path, rel_path))

@@ -214,13 +214,13 @@ def validate_feature_dependencies(
         hard failures that should block creation. Entries prefixed with
         ``WARNING:`` are advisory.
     """
-    from .query import _scan_all
+    from .query import scan_all
 
     diagnostics: list[str] = []
 
     # Collect existing doc types for this feature
     existing_types: set[str] = set()
-    for doc in _scan_all(root_dir):
+    for doc in scan_all(root_dir):
         if doc.feature == feature:
             existing_types.add(doc.doc_type)
 

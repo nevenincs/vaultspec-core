@@ -1,7 +1,7 @@
 """Byte-fidelity tests for the feature-rename line-ending handling.
 
 These tests prove that the two rewriters in the feature-rename backend -
-:func:`vaultspec_core.vaultcore.query._rewrite_feature_tag_block` and
+:func:`vaultspec_core.vaultcore.query.rewrite_feature_tag_block` and
 :func:`vaultspec_core.vaultcore.rename_ops.rewrite_incoming_refs` - touch only
 the bytes of the lines they intend to edit. Cross-platform vaults carry mixed
 line endings (LF, CRLF, classic-Mac CR, and all three mixed in one file) and
@@ -23,7 +23,7 @@ import pytest
 
 from ...config import reset_config
 from ..checks._base import CheckResult
-from ..query import _rewrite_feature_tag_block, rename_feature
+from ..query import rename_feature, rewrite_feature_tag_block
 from ..rename_ops import rewrite_incoming_refs, split_keepends
 
 if TYPE_CHECKING:
@@ -138,13 +138,13 @@ class TestSplitKeepends:
 
 
 # ===========================================================================
-# _rewrite_feature_tag_block byte fidelity
+# rewrite_feature_tag_block byte fidelity
 # ===========================================================================
 
 
 class TestRewriteFeatureTagBlock:
     def _swap(self, src: str) -> tuple[str, bool]:
-        return _rewrite_feature_tag_block(src, "old", "new")
+        return rewrite_feature_tag_block(src, "old", "new")
 
     def _assert_byte_exact(self, src: str, expected: str) -> None:
         out, changed = self._swap(src)

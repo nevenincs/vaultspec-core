@@ -234,25 +234,25 @@ class TestDoctorExitCode:
         before the fix, MIXED set has_warn and the doctor exited 1, which the
         bundled spec-check pre-commit hook turned into a blocked markdown commit.
         """
-        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+        from vaultspec_core.cli.spec_cmd import doctor_exit_code
 
         prov = ProviderDiagnosis(
             tool=Tool.CLAUDE,
             dir_state=ProviderDirSignal.MIXED,
             manifest_entry=ManifestEntrySignal.COHERENT,
         )
-        assert _doctor_exit_code(self._clean_workspace(prov)) == 0
+        assert doctor_exit_code(self._clean_workspace(prov)) == 0
 
     def test_partial_provider_dir_still_warns(self) -> None:
         """PARTIAL remains a genuine warning - the fix is scoped to MIXED."""
-        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+        from vaultspec_core.cli.spec_cmd import doctor_exit_code
 
         prov = ProviderDiagnosis(
             tool=Tool.CLAUDE,
             dir_state=ProviderDirSignal.PARTIAL,
             manifest_entry=ManifestEntrySignal.COHERENT,
         )
-        assert _doctor_exit_code(self._clean_workspace(prov)) == 1
+        assert doctor_exit_code(self._clean_workspace(prov)) == 1
 
 
 class TestDoctorModeAndFloorWeighting:
@@ -286,33 +286,33 @@ class TestDoctorModeAndFloorWeighting:
         )
 
     def test_clean_mode_and_no_floor_exit_zero(self) -> None:
-        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+        from vaultspec_core.cli.spec_cmd import doctor_exit_code
 
-        assert _doctor_exit_code(self._workspace()) == 0
+        assert doctor_exit_code(self._workspace()) == 0
 
     def test_unknown_mode_is_not_a_warning(self) -> None:
-        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+        from vaultspec_core.cli.spec_cmd import doctor_exit_code
 
         diag = self._workspace(mode_mismatch=ModeMismatchSignal.UNKNOWN)
-        assert _doctor_exit_code(diag) == 0
+        assert doctor_exit_code(diag) == 0
 
     def test_mode_mismatch_warns(self) -> None:
-        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+        from vaultspec_core.cli.spec_cmd import doctor_exit_code
 
         diag = self._workspace(mode_mismatch=ModeMismatchSignal.MISMATCH)
-        assert _doctor_exit_code(diag) == 1
+        assert doctor_exit_code(diag) == 1
 
     def test_below_floor_is_an_error(self) -> None:
-        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+        from vaultspec_core.cli.spec_cmd import doctor_exit_code
 
         diag = self._workspace(version_floor=VersionFloorSignal.BELOW)
-        assert _doctor_exit_code(diag) == 2
+        assert doctor_exit_code(diag) == 2
 
     def test_below_floor_outranks_mode_warning(self) -> None:
-        from vaultspec_core.cli.spec_cmd import _doctor_exit_code
+        from vaultspec_core.cli.spec_cmd import doctor_exit_code
 
         diag = self._workspace(
             mode_mismatch=ModeMismatchSignal.MISMATCH,
             version_floor=VersionFloorSignal.BELOW,
         )
-        assert _doctor_exit_code(diag) == 2
+        assert doctor_exit_code(diag) == 2

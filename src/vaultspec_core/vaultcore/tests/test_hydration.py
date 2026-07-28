@@ -316,54 +316,50 @@ def test_create_vault_doc_replaces_stale_template_schema_stamp(
 def test_emit_time_validator_rejects_invalid_plan_tier(tmp_path: Path) -> None:
     """A plan template that hydrates to an invalid tier value must refuse to write.
 
-    Exercises the scaffolder-integrity invariant: scaffolders never write
-    content the framework's own validator would reject. Closes umbrella
-    plan W01.P03.S07.
+    Exercises the scaffolder-integrity invariant through the public
+    ``create_vault_doc`` entry point: scaffolders never write content the
+    framework's own validator would reject. A ``tier`` value that hydrates
+    into frontmatter the plan parser cannot read is exactly the B2-shape
+    antipattern the emit-time guard exists to catch. Closes umbrella plan
+    W01.P03.S07.
     """
     from vaultspec_core.builtins import seed_builtins
-    from vaultspec_core.vaultcore.hydration import (
-        ScaffoldValidationError,
-        _assert_scaffolded_content_valid,
-    )
+    from vaultspec_core.vaultcore.hydration import ScaffoldValidationError
 
     rules_dir = tmp_path / ".vaultspec"
     rules_dir.mkdir(parents=True)
     seed_builtins(rules_dir, force=True)
+    for dt in DocType:
+        (tmp_path / ".vault" / dt.value).mkdir(parents=True, exist_ok=True)
 
-    # Hand-craft a hydrated plan body whose frontmatter would crash the
-    # parse path. This is exactly the B2-shape antipattern.
-    invalid_plan = (
-        "---\n"
-        "tags:\n"
-        "  - '#plan'\n"
-        "  - '#bad-tier'\n"
-        "date: '2026-05-19'\n"
-        "tier: L{#}\n"
-        "related: []\n"
-        "---\n"
-        "# `bad-tier` plan\n"
-    )
     with pytest.raises(ScaffoldValidationError, match="frontmatter validator"):
-        _assert_scaffolded_content_valid(invalid_plan, DocType.PLAN)
+        create_vault_doc(
+            tmp_path,
+            DocumentIdentity(DocType.PLAN, "bad-tier", "2026-05-19"),
+            TemplateFields(title="Bad tier", tier="L{#}"),
+        )
+
+    # The scaffolder must not have written the rejected content.
+    assert not (tmp_path / ".vault" / "plan" / "2026-05-19-bad-tier-plan.md").exists()
 
 
 def test_emit_time_validator_accepts_valid_plan(tmp_path: Path) -> None:
     """A well-formed plan passes the emit-time validator without raising."""
-    from vaultspec_core.vaultcore.hydration import _assert_scaffolded_content_valid
+    from vaultspec_core.builtins import seed_builtins
 
-    valid_plan = (
-        "---\n"
-        "tags:\n"
-        "  - '#plan'\n"
-        "  - '#good-tier'\n"
-        "date: '2026-05-19'\n"
-        "tier: L1\n"
-        "related: []\n"
-        "---\n"
-        "# `good-tier` plan\n"
+    rules_dir = tmp_path / ".vaultspec"
+    rules_dir.mkdir(parents=True)
+    seed_builtins(rules_dir, force=True)
+    for dt in DocType:
+        (tmp_path / ".vault" / dt.value).mkdir(parents=True, exist_ok=True)
+
+    # Should not raise, and the document lands on disk.
+    path = create_vault_doc(
+        tmp_path,
+        DocumentIdentity(DocType.PLAN, "good-tier", "2026-05-19"),
+        TemplateFields(title="Good tier", tier="L1"),
     )
-    # Should not raise.
-    _assert_scaffolded_content_valid(valid_plan, DocType.PLAN)
+    assert path.exists()
 
 
 def test_create_vault_doc_plan_default_tier_l1(tmp_path: Path) -> None:

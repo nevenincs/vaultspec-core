@@ -10,11 +10,7 @@ from .helpers import advisory_lock, atomic_write_bytes
 
 logger = logging.getLogger(__name__)
 
-# ``_collect_provider_artifacts`` is consumed by
-# :mod:`vaultspec_core.core.uninstall` under this module's leading-underscore
-# convention for shared-but-internal helpers; the explicit re-export marks
-# that cross-module contract for the type checker.
-__all__ = ["_collect_provider_artifacts", "_find_markers"]
+__all__ = ["collect_provider_artifacts", "find_markers"]
 
 MARKER_BEGIN = "# >>> vaultspec-managed (do not edit this block) >>>"
 MARKER_END = "# <<< vaultspec-managed <<<"
@@ -252,14 +248,14 @@ def block_is_pre_reversal(target: Path) -> bool:
         lines = gi_path.read_text(encoding="utf-8").splitlines()
     except OSError:
         return False
-    begins, ends = _find_markers(lines)
+    begins, ends = find_markers(lines)
     if len(begins) != 1 or len(ends) != 1 or begins[0] >= ends[0]:
         return False
     block = {line.strip() for line in lines[begins[0] + 1 : ends[0]]}
     return any(marker in block for marker in _PRE_REVERSAL_MARKERS)
 
 
-def _collect_provider_artifacts(
+def collect_provider_artifacts(
     path: Path, tool: ManagedState | Tool
 ) -> tuple[list[Path], list[Path]]:
     """Return ``(directories, files)`` managed by a single provider.
@@ -314,7 +310,7 @@ def _detect_line_ending(raw: bytes) -> str:
     return "\r\n" if crlf > lf else "\n"
 
 
-def _find_markers(lines: list[str]) -> tuple[list[int], list[int]]:
+def find_markers(lines: list[str]) -> tuple[list[int], list[int]]:
     """Return ``(begin_indices, end_indices)`` of the managed block markers."""
     begins: list[int] = []
     ends: list[int] = []
@@ -377,7 +373,7 @@ def ensure_gitignore_block(
 
         content = text.decode("utf-8")
         lines = content.splitlines()
-        begins, ends = _find_markers(lines)
+        begins, ends = find_markers(lines)
 
         if state == ManagedState.ABSENT:
             return _remove_block(gi_path, lines, begins, ends, eol, bom)
@@ -430,7 +426,7 @@ def _add_block(
             lines[start : end + 1] = []
 
         # If any orphaned markers remain (unpaired), remove them individually.
-        begins_left, ends_left = _find_markers(lines)
+        begins_left, ends_left = find_markers(lines)
         to_pop = sorted(begins_left + ends_left, reverse=True)
         for idx in to_pop:
             lines.pop(idx)
@@ -484,7 +480,7 @@ def _remove_block(
                 lines[start : end + 1] = []
 
             # Clean up any remaining orphaned markers.
-            begins_left, ends_left = _find_markers(lines)
+            begins_left, ends_left = find_markers(lines)
             to_pop = sorted(begins_left + ends_left, reverse=True)
             for idx in to_pop:
                 lines.pop(idx)

@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from .collectors_provider import _TOOL_DIR
+from .collectors_provider import TOOL_DIR
 from .signals import ContentSignal, RenameIntegritySignal
 
 logger = logging.getLogger(__name__)
@@ -138,9 +138,9 @@ def collect_divergent_projections(target: Path) -> list[str]:
 
     try:
         try:
-            from ..commands import _ensure_tool_configs
+            from ..commands import ensure_tool_configs
 
-            _ensure_tool_configs(target)
+            ensure_tool_configs(target)
             ctx = get_context()
         except Exception:
             logger.debug(
@@ -150,7 +150,7 @@ def collect_divergent_projections(target: Path) -> list[str]:
 
         diverged: set[str] = set()
         for tool in Tool:
-            dir_name = _TOOL_DIR.get(tool.value)
+            dir_name = TOOL_DIR.get(tool.value)
             if dir_name is None or not (target / dir_name).is_dir():
                 continue
             cfg = ctx.tool_configs.get(tool)

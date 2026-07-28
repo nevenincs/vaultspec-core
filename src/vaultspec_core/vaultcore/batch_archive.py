@@ -8,9 +8,9 @@ from typing import TYPE_CHECKING
 
 from ..config import get_config
 from ..core.exceptions import VaultSpecError
-from .checks.exec_mapping import _link_stem
+from .checks.exec_mapping import link_stem
 from .parser import parse_vault_metadata
-from .rename_engine import RenameTransaction, _assert_within, docs_lock_target
+from .rename_engine import RenameTransaction, assert_within, docs_lock_target
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -287,7 +287,7 @@ def _preflight(
     for value in relative_paths:
         source, source_relative = _resolve_source(root, docs_dir, value)
         destination = docs_dir / "_archive" / source_relative
-        _assert_within(docs_dir, destination)
+        assert_within(docs_dir, destination)
         if source in seen_sources:
             raise ArchiveDocumentsError(f"Duplicate archive source: {source}")
         if destination in seen_destinations:
@@ -320,7 +320,7 @@ def _restore_preflight(
         source, destination_relative = _resolve_restore_source(root, docs_dir, value)
         destination = docs_dir / destination_relative
         try:
-            _assert_within(docs_dir, destination)
+            assert_within(docs_dir, destination)
         except VaultSpecError as exc:
             raise RestoreDocumentsError(
                 f"Restore destination escapes vault: {destination}"
@@ -375,7 +375,7 @@ def _resolve_source(root: Path, docs_dir: Path, value: str | Path) -> tuple[Path
         )
     _require_no_symlink_components(docs_dir, raw_source)
     source = raw_source.resolve(strict=False)
-    _assert_within(docs_dir, source)
+    assert_within(docs_dir, source)
     _require_regular_document(source)
     return source, vault_relative
 
@@ -408,7 +408,7 @@ def _resolve_restore_source(
     )
     source = raw_source.resolve(strict=False)
     try:
-        _assert_within(docs_dir, source)
+        assert_within(docs_dir, source)
     except VaultSpecError as exc:
         raise RestoreDocumentsError(f"Restore source escapes vault: {source}") from exc
     _require_regular_document(
@@ -491,7 +491,7 @@ def _require_safe_destination_parent(
     operation: str = "archive",
 ) -> None:
     try:
-        _assert_within(docs_dir, parent)
+        assert_within(docs_dir, parent)
     except VaultSpecError as exc:
         raise error_type(
             f"{operation.capitalize()} destination parent escapes vault: {parent}"
@@ -554,7 +554,7 @@ def _cross_link_paths(
             metadata, _body = parse_vault_metadata(path.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, ValueError):
             continue
-        if any(_link_stem(link) in archived_stems for link in metadata.related):
+        if any(link_stem(link) in archived_stems for link in metadata.related):
             linked.append(path.relative_to(root))
     return tuple(sorted(linked))
 
@@ -590,7 +590,7 @@ def _restore_cross_link_paths(
             metadata, _body = parse_vault_metadata(path.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, ValueError):
             continue
-        if any(_link_stem(link) in restored_stems for link in metadata.related):
+        if any(link_stem(link) in restored_stems for link in metadata.related):
             linked.append(path.relative_to(root))
     return tuple(sorted(linked))
 

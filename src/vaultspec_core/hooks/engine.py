@@ -29,14 +29,10 @@ __all__ = [
     "Hook",
     "HookAction",
     "HookResult",
-    "_interpolate",
-    "_is_provider_hook_event",
-    "_parse_action",
-    "_parse_hook",
-    "_parse_yaml",
-    "_triggering",
     "fire_hooks",
+    "is_provider_hook_event",
     "load_hooks",
+    "parse_yaml",
     "trigger",
 ]
 
@@ -102,7 +98,7 @@ class HookResult:
     error: str = ""
 
 
-def _parse_yaml(text: str) -> dict[str, Any]:
+def parse_yaml(text: str) -> dict[str, Any]:
     """Parse YAML text into a dict.
 
     Args:
@@ -149,7 +145,7 @@ def load_hooks(hooks_dir: Path) -> list[Hook]:
 
     for path in seen.values():
         try:
-            data = _parse_yaml(path.read_text(encoding="utf-8"))
+            data = parse_yaml(path.read_text(encoding="utf-8"))
             hook = _parse_hook(path, data)
             if hook is not None:
                 hooks.append(hook)
@@ -159,7 +155,7 @@ def load_hooks(hooks_dir: Path) -> list[Hook]:
     return hooks
 
 
-def _is_provider_hook_event(event: str) -> bool:
+def is_provider_hook_event(event: str) -> bool:
     """Return ``True`` for canonical provider-hook events handled elsewhere.
 
     Provider (agent-runtime) hooks live alongside CLI-lifecycle hooks in the
@@ -192,7 +188,7 @@ def _parse_hook(path: Path, data: dict[str, Any]) -> Hook | None:
         return None
 
     if event not in SUPPORTED_EVENTS:
-        if _is_provider_hook_event(event):
+        if is_provider_hook_event(event):
             # Provider (agent-runtime) hooks share this directory but are
             # rendered by vaultspec_core.core.provider_hooks, not fired by this
             # CLI-lifecycle engine. Skip silently rather than warn.

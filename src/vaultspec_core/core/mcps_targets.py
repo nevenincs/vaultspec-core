@@ -15,12 +15,10 @@ from .enums import McpScope, McpTargetFormat, ProviderCapability, Tool
 from .exceptions import VaultSpecError
 from .types import McpTarget
 
-#: Re-exported (with underscore intact) for the sibling ``mcps_*`` modules
-#: that reach into this as the single public import surface for scope coercion.
-__all__ = ["_coerce_scope"]
+__all__ = ["coerce_scope"]
 
 
-def _coerce_scope(scope: McpScope | str) -> McpScope:
+def coerce_scope(scope: McpScope | str) -> McpScope:
     try:
         return scope if isinstance(scope, McpScope) else McpScope(scope)
     except ValueError as exc:
@@ -110,7 +108,7 @@ def resolve_mcp_targets(
     root = target_dir or ctx.target_dir
     if ctx.target_dir.resolve() != root.resolve():
         ctx = _t.init_paths(root)
-    resolved_scope = _coerce_scope(scope)
+    resolved_scope = coerce_scope(scope)
     tools = _selected_mcp_tools(provider, enrolled=enrolled)
     targets: list[McpTarget] = []
 

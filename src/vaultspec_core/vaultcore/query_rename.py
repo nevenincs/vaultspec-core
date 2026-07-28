@@ -34,26 +34,19 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# These helpers are consumed by :mod:`.query` (compatibility re-export) and
+# These names are consumed by :mod:`.query` (compatibility re-export) and
 # :mod:`.query_rename_apply` (the transactional apply half of the rename
-# pipeline) under this module's leading-underscore convention for
-# shared-but-internal helpers; the explicit re-export marks that cross-module
-# contract for the type checker.
+# pipeline); the explicit re-export marks that cross-module contract for the
+# type checker.
 __all__ = [
-    "_RenamePlan",
-    "_analyze_cross_feature_links",
-    "_assert_within_docs",
-    "_compute_rename_plan",
-    "_count_related_refs",
-    "_match_exec_folder_date",
-    "_parse_inline_tags",
-    "_predict_rewrites",
-    "_rel",
-    "_rewrite_feature_tag_block",
-    "_same_file",
-    "_swap_authored_filename",
-    "_swap_exec_filename",
-    "_validate_feature_rename",
+    "RenamePlan",
+    "analyze_cross_feature_links",
+    "assert_within_docs",
+    "compute_rename_plan",
+    "predict_rewrites",
+    "rel",
+    "rewrite_feature_tag_block",
+    "validate_feature_rename",
 ]
 
 
@@ -89,11 +82,11 @@ _WINDOWS_RESERVED_NAMES = frozenset(
 )
 
 
-def _assert_within_docs(docs_dir: Path, path: Path) -> Path:
+def assert_within_docs(docs_dir: Path, path: Path) -> Path:
     """Return *path* iff its real location is inside *docs_dir*, else raise.
 
     Thin docs-scoped wrapper over the root-generalized
-    :func:`~vaultspec_core.vaultcore.rename_engine._assert_within`; retained as
+    :func:`~vaultspec_core.vaultcore.rename_engine.assert_within`; retained as
     a stable import surface for callers and tests that bind the containment
     guard to the vault document root.
 
@@ -107,13 +100,13 @@ def _assert_within_docs(docs_dir: Path, path: Path) -> Path:
     Raises:
         VaultSpecError: When *path* resolves outside *docs_dir*.
     """
-    from .rename_engine import _assert_within
+    from .rename_engine import assert_within
 
-    return _assert_within(docs_dir, path)
+    return assert_within(docs_dir, path)
 
 
 @dataclass
-class _RenamePlan:
+class RenamePlan:
     """A fully-computed rename plan that mutates nothing on its own.
 
     Attributes:
@@ -136,7 +129,7 @@ class _RenamePlan:
     collisions: list[RenameCollision]
 
 
-def _rel(path: Path, root_dir: Path) -> str:
+def rel(path: Path, root_dir: Path) -> str:
     """Return *path* relative to *root_dir*, or its string form on failure."""
     try:
         return str(path.relative_to(root_dir))
@@ -155,7 +148,7 @@ def _same_file(a: Path, b: Path) -> bool:
 # -- S05: validation helpers ------------------------------------------------
 
 
-def _validate_feature_rename(
+def validate_feature_rename(
     root_dir: Path, old: str, new: str, *, force: bool
 ) -> tuple[str, str, list[VaultDocument]]:
     """Validate a feature rename request before any plan is computed.
@@ -344,7 +337,7 @@ def _parse_inline_tags(after: str) -> list[str]:
     raise VaultSpecError(f"Inline tags value is not a sequence: {after!r}")
 
 
-def _rewrite_feature_tag_block(content: str, old: str, new: str) -> tuple[str, bool]:
+def rewrite_feature_tag_block(content: str, old: str, new: str) -> tuple[str, bool]:
     """Rewrite the single ``#old`` feature tag to ``#new`` in ``tags:``.
 
     Operates strictly on the YAML ``tags:`` block inside the leading
@@ -470,9 +463,9 @@ def _rewrite_feature_tag_block(content: str, old: str, new: str) -> tuple[str, b
 # -- S08: plan computation + collision detection ----------------------------
 
 
-def _compute_rename_plan(
+def compute_rename_plan(
     root_dir: Path, old: str, new: str, src_docs: list[VaultDocument]
-) -> _RenamePlan:
+) -> RenamePlan:
     """Build the full rename plan without mutating anything on disk.
 
     Args:
@@ -483,7 +476,7 @@ def _compute_rename_plan(
             :func:`list_documents`).
 
     Returns:
-        A :class:`_RenamePlan` describing every file rename, exec-folder
+        A :class:`RenamePlan` describing every file rename, exec-folder
         rename, the index plan, the wiki-link stem map, and any per-file
         destination collisions.
 
@@ -565,8 +558,8 @@ def _compute_rename_plan(
         if dkey in seen_dest:
             collisions.append(
                 {
-                    "destination": _rel(dst, root_dir),
-                    "sources": [_rel(seen_dest[dkey], root_dir), _rel(src, root_dir)],
+                    "destination": rel(dst, root_dir),
+                    "sources": [rel(seen_dest[dkey], root_dir), rel(src, root_dir)],
                     "reason": "two source files map to the same destination",
                 }
             )
@@ -575,8 +568,8 @@ def _compute_rename_plan(
         if dst.is_file() and not _same_file(src, dst):
             collisions.append(
                 {
-                    "destination": _rel(dst, root_dir),
-                    "sources": [_rel(src, root_dir)],
+                    "destination": rel(dst, root_dir),
+                    "sources": [rel(src, root_dir)],
                     "reason": "a file already exists at the destination",
                 }
             )
@@ -589,7 +582,7 @@ def _compute_rename_plan(
     if index_old_path is not None:
         stem_renames.append((f"{old}.index", f"{new}.index"))
 
-    return _RenamePlan(
+    return RenamePlan(
         file_renames=file_renames,
         exec_dir_renames=exec_dir_renames,
         index_old_path=index_old_path,
@@ -599,7 +592,7 @@ def _compute_rename_plan(
     )
 
 
-def _analyze_cross_feature_links(
+def analyze_cross_feature_links(
     root_dir: Path, docs: list[VaultDocument], feature: str
 ) -> list[FeatureCrossLink]:
     """Find incoming wiki-links from other features (mirrors ``archive``).
@@ -647,8 +640,8 @@ def _analyze_cross_feature_links(
     return cross_links
 
 
-def _predict_rewrites(
-    root_dir: Path, plan: _RenamePlan, old: str, new: str
+def predict_rewrites(
+    root_dir: Path, plan: RenamePlan, old: str, new: str
 ) -> tuple[int, int]:
     """Predict tag and incoming-link rewrite counts without mutating.
 
@@ -671,7 +664,7 @@ def _predict_rewrites(
     tag_rewrites = 0
     for src, _dst in plan.file_renames:
         # Never read through a symlinked source during the dry-run preview: the
-        # apply path refuses it via ``_assert_within_docs``, so the preview must
+        # apply path refuses it via ``assert_within_docs``, so the preview must
         # not read its out-of-bounds target either (mirrors the related-count
         # loop below and keeps dry-run and apply symmetric).
         if src.is_symlink():
@@ -680,7 +673,7 @@ def _predict_rewrites(
             text = src.read_bytes().decode("utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        _new_text, changed = _rewrite_feature_tag_block(text, old, new)
+        _new_text, changed = rewrite_feature_tag_block(text, old, new)
         if changed:
             tag_rewrites += 1
 

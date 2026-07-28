@@ -3,7 +3,7 @@
 Covers test gaps identified in the cli-ambiguous-states rolling audit:
 shared-dir protection, gitignore opt-out detection, lifecycle chains,
 install/sync/uninstall flag combinations, doctor edge cases, and
-validation of Phase 1-2 fixes (_rmtree_robust, surgical .mcp.json,
+validation of Phase 1-2 fixes (rmtree_robust, surgical .mcp.json,
 SyncResult.errors display).
 """
 
@@ -416,12 +416,12 @@ class TestDoctorV1Manifest:
 
 
 class TestRmtreeRobustSymlink:
-    """Validate _rmtree_robust with symlinked directories."""
+    """Validate rmtree_robust with symlinked directories."""
 
     def test_rmtree_robust_unlinks_symlink_preserves_target(
         self, tmp_path: Path
     ) -> None:
-        from vaultspec_core.core.helpers import _rmtree_robust
+        from vaultspec_core.core.helpers import rmtree_robust
 
         # Create a real directory with content
         real_dir = tmp_path / "real_data"
@@ -438,7 +438,7 @@ class TestRmtreeRobustSymlink:
                 "do not hide filesystem coverage with a runtime skip."
             ) from exc
 
-        _rmtree_robust(link_dir)
+        rmtree_robust(link_dir)
 
         # Symlink should be gone
         assert not link_dir.exists()

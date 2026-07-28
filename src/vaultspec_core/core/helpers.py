@@ -24,12 +24,7 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-# ``_rmtree_robust`` and ``_launch_editor`` are consumed by several sibling
-# modules (config generation, sync, uninstall, hooks/rules/skills scaffolding)
-# under the module's leading-underscore convention for shared-but-internal
-# helpers; the explicit re-export marks that cross-module contract for the
-# type checker.
-__all__ = ["_launch_editor", "_rmtree_robust"]
+__all__ = ["launch_editor", "rmtree_robust"]
 
 
 _thread_locks: dict[str, threading.Lock] = {}
@@ -207,7 +202,7 @@ def ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
-def _rmtree_robust(path: Path) -> None:
+def rmtree_robust(path: Path) -> None:
     """Remove a directory tree, handling symlinks and Windows read-only files.
 
     Symlinks are unlinked directly rather than followed. On Windows, a
@@ -335,7 +330,7 @@ def atomic_write(path: Path, content: str) -> None:
         raise
 
 
-def _launch_editor(editor: str, file_path: str) -> None:
+def launch_editor(editor: str, file_path: str) -> None:
     """Launch editor, handling Windows .cmd/.bat wrappers.
 
     Args:

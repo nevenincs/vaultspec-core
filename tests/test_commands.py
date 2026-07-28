@@ -100,7 +100,7 @@ def test_scaffold_precommit_repairs_non_canonical_entries() -> None:
     import yaml
 
     from vaultspec_core.core.commands import (
-        _scaffold_precommit,
+        scaffold_precommit,
     )
 
     # Pick the first canonical ID to simulate an old config
@@ -130,7 +130,7 @@ def test_scaffold_precommit_repairs_non_canonical_entries() -> None:
         config_path = tmp_path / ".pre-commit-config.yaml"
         config_path.write_text(yaml.dump(old_config, sort_keys=False), encoding="utf-8")
 
-        _scaffold_precommit(tmp_path)
+        scaffold_precommit(tmp_path)
 
         config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
         hooks = config["repos"][0]["hooks"]
@@ -603,7 +603,7 @@ def test_sync_all_result_count_matches_resource_labels() -> None:
     contract (one result per resource label plus the backfill) and that the
     real outcome-collector consumes the results without raising.
     """
-    from vaultspec_core.cli.root import _collect_sync_outcomes
+    from vaultspec_core.cli.root import collect_sync_outcomes
 
     tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"sync-labels-{uuid4().hex}"
     try:
@@ -633,7 +633,7 @@ def test_sync_all_result_count_matches_resource_labels() -> None:
 
         # The collector must consume the variable-length results without the
         # historical strict-zip ValueError.
-        outcomes = _collect_sync_outcomes(results, "all", [])
+        outcomes = collect_sync_outcomes(results, "all", [])
         assert isinstance(outcomes, list)
     finally:
         reset_config()

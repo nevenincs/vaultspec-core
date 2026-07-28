@@ -33,9 +33,7 @@ from .enums import InstallMode
 from .exceptions import VaultSpecError
 from .helpers import advisory_lock, atomic_write, parse_version_tuple
 
-#: Re-exported (with underscore intact) for
-#: :mod:`vaultspec_core.core.diagnosis.collectors_precommit`.
-__all__ = ["_canonical_distribution_name"]
+__all__ = ["canonical_distribution_name"]
 
 WORKSPACE_FILENAME = "workspace.json"
 
@@ -344,7 +342,7 @@ def _read_packages_map(target: Path) -> dict[str, PackageDeclaration] | None:
             )
         packages_raw = cast("dict[str, Any]", packages_raw)
         return {
-            _canonical_distribution_name(str(name)): _parse_package_entry(
+            canonical_distribution_name(str(name)): _parse_package_entry(
                 path, name, entry
             )
             for name, entry in packages_raw.items()
@@ -397,7 +395,7 @@ def read_package_declaration(target: Path, package: str) -> PackageDeclaration |
     packages = _read_packages_map(target)
     if packages is None:
         return None
-    return packages.get(_canonical_distribution_name(package))
+    return packages.get(canonical_distribution_name(package))
 
 
 def read_package_declarations(target: Path) -> dict[str, PackageDeclaration]:
@@ -517,7 +515,7 @@ def write_package_declaration(
         declaration: The :class:`PackageDeclaration` to persist for *package*.
     """
     path = _workspace_path(target)
-    key = _canonical_distribution_name(package)
+    key = canonical_distribution_name(package)
     with advisory_lock(path):
         packages = _read_packages_map(target) or {}
         packages[key] = declaration
@@ -554,7 +552,7 @@ def write_workspace_declaration(
     )
 
 
-def _canonical_distribution_name(name: str) -> str:
+def canonical_distribution_name(name: str) -> str:
     """Canonicalize a distribution name for comparison per PEP 503.
 
     Lowercases and collapses any run of ``-``, ``_``, or ``.`` to a single
@@ -589,7 +587,7 @@ def _requirement_names(entries: Iterable[Any]) -> Iterator[str]:
             continue
         head = _REQUIREMENT_NAME_BOUNDARY.split(entry.strip(), maxsplit=1)[0]
         if head:
-            yield _canonical_distribution_name(head)
+            yield canonical_distribution_name(head)
 
 
 def detect_package_evidence(pyproject: Path, package: str) -> DependencyEvidence:
@@ -629,7 +627,7 @@ def detect_package_evidence(pyproject: Path, package: str) -> DependencyEvidence
     except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError):
         return DependencyEvidence.NONE
 
-    key = _canonical_distribution_name(package)
+    key = canonical_distribution_name(package)
 
     runtime_candidates: list[Any] = []
     project = data.get("project")
@@ -792,7 +790,7 @@ def resolve_install_mode(
     of which precedence branch resolves the mode. This makes a corrupt
     ``.vaultspec/workspace.json`` fail fast here - at the same point as the
     impossible-combo refusal - rather than surfacing later inside
-    :func:`_persist_resolved_mode` after migrations, builtin re-seeding, and
+    :func:`persist_resolved_mode` after migrations, builtin re-seeding, and
     provider sync have already run and left a partial-upgrade state. Callers may
     therefore treat a successful return as proof the declaration is
     well-formed.

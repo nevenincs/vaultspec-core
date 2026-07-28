@@ -2,7 +2,7 @@
 
 Provides the typed-error rendering decorator, the JSON-envelope emitter, the
 vault-root resolver used to invalidate the graph cache, and the
-serialise/diff/write helper (:func:`_save_plan_or_dry_run`) shared by the
+serialise/diff/write helper (:func:`save_plan_or_dry_run`) shared by the
 step, phase, wave, epic, and tier command modules under
 :mod:`vaultspec_core.cli`. Kept separate from :mod:`vaultspec_core.cli.plan_cmd`
 so each container-scoped module can import just this shared surface without
@@ -18,15 +18,15 @@ from typing import Any, cast
 import typer
 
 __all__ = [
-    "_emit_plan_mutation_json",
-    "_invalidate_graph_cache_for_plan",
-    "_render_user_errors",
-    "_resolve_vault_root",
-    "_save_plan_or_dry_run",
+    "emit_plan_mutation_json",
+    "invalidate_graph_cache_for_plan",
+    "render_user_errors",
+    "resolve_vault_root",
+    "save_plan_or_dry_run",
 ]
 
 
-def _render_user_errors[F: Callable[..., None]](func: F) -> F:
+def render_user_errors[F: Callable[..., None]](func: F) -> F:
     """Render handler-raised typed errors as one-line CLI messages.
 
     Every command-handler typed exception inherits from
@@ -64,7 +64,7 @@ def _render_user_errors[F: Callable[..., None]](func: F) -> F:
     return cast("F", wrapper)
 
 
-def _emit_plan_mutation_json(
+def emit_plan_mutation_json(
     command: str, *, status: str, data: dict[str, object]
 ) -> None:
     """Emit a plan-mutation result as the canonical ``--json`` envelope.
@@ -79,7 +79,7 @@ def _emit_plan_mutation_json(
     typer.echo(json.dumps(json_envelope(command, status, data), indent=2))
 
 
-def _resolve_vault_root(plan_path: Path) -> Path | None:
+def resolve_vault_root(plan_path: Path) -> Path | None:
     """Return the vault root that owns *plan_path*, or ``None``.
 
     A plan document lives under ``<root>/<docs_dir>/plan/...``.  The mutation
@@ -105,7 +105,7 @@ def _resolve_vault_root(plan_path: Path) -> Path | None:
         return None
 
 
-def _invalidate_graph_cache_for_plan(plan_path: Path) -> None:
+def invalidate_graph_cache_for_plan(plan_path: Path) -> None:
     """Drop the graph cache for the vault owning *plan_path*.
 
     Never raises: a successful plan write must not be turned into a non-zero
@@ -113,12 +113,12 @@ def _invalidate_graph_cache_for_plan(plan_path: Path) -> None:
     """
     from vaultspec_core.cli._cache_hook import invalidate_graph_cache
 
-    root = _resolve_vault_root(plan_path)
+    root = resolve_vault_root(plan_path)
     if root is not None:
         invalidate_graph_cache(root)
 
 
-def _save_plan_or_dry_run(
+def save_plan_or_dry_run(
     path: Path,
     plan: Any,
     original_text: str,
@@ -170,7 +170,7 @@ def _save_plan_or_dry_run(
         )
         diff_str = "".join(diff)
         if json_output:
-            _emit_plan_mutation_json(
+            emit_plan_mutation_json(
                 command,
                 status="unchanged",
                 data={
@@ -193,7 +193,7 @@ def _save_plan_or_dry_run(
         path.write_text(new_text, encoding="utf-8")
     preserved_count = 0 if canonicalise else len(plan.unknown_blocks)
     if json_output:
-        _emit_plan_mutation_json(
+        emit_plan_mutation_json(
             command,
             status="updated" if wrote else "unchanged",
             data={
@@ -207,4 +207,4 @@ def _save_plan_or_dry_run(
     else:
         typer.echo(f"{success_msg} (Preserved {preserved_count} unknown blocks)")
     if wrote:
-        _invalidate_graph_cache_for_plan(path)
+        invalidate_graph_cache_for_plan(path)

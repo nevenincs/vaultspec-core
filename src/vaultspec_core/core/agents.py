@@ -23,21 +23,18 @@ from .enums import (
 )
 from .exceptions import ResourceExistsError
 from .helpers import (
-    _launch_editor,
     atomic_write,
     build_file,
     collect_md_resources,
     ensure_dir,
+    launch_editor,
 )
 from .sync import sync_files
 from .types import SyncResult
 
 logger = logging.getLogger(__name__)
 
-# ``_codex_managed_agent_names`` is consumed by the ``m_0_1_24`` migration to
-# de-duplicate legacy Codex agent tables; the explicit re-export marks that
-# cross-module contract for the type checker.
-__all__ = ["_codex_managed_agent_names", "sanitize_legacy_codex_agents"]
+__all__ = ["codex_managed_agent_names", "sanitize_legacy_codex_agents"]
 
 
 def _toml_quote(value: str) -> str:
@@ -504,7 +501,7 @@ def _strip_agent_tables_in_segment(lines: list[str], names: set[str]) -> list[st
     return out
 
 
-def _codex_managed_agent_names(content: str) -> set[str]:
+def codex_managed_agent_names(content: str) -> set[str]:
     """Return agent names declared inside the managed ``agents`` block."""
     from .tags import TagError, find_blocks
 
@@ -718,7 +715,7 @@ def agents_add(
             editor = get_config().editor
             logger.info("Opening editor (%s) for %s...", editor, file_path)
             try:
-                _launch_editor(editor, str(file_path))
+                launch_editor(editor, str(file_path))
                 logger.info("Agent saved to %s", file_path)
             except Exception as e:
                 logger.error("Error opening editor: %s", e)

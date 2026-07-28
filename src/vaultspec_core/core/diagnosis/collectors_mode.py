@@ -14,8 +14,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from .collectors_config import _read_mcp_servers
-from .collectors_precommit import _observed_precommit_mode
+from .collectors_config import read_mcp_servers
+from .collectors_precommit import observed_precommit_mode
 from .signals import ModeMismatchSignal, VersionFloorSignal
 
 if TYPE_CHECKING:
@@ -34,7 +34,7 @@ def _builtin_server_name(filename: str) -> str:
 
 #: The pre-``--no-sync`` dependency-mode MCP launch shape. Deployed workspaces
 #: seeded before the guard was introduced still carry this exact byte sequence, so
-#: :func:`_observed_mcp_mode` recognizes it as a bounded, explicit legacy
+#: :func:`observed_mcp_mode` recognizes it as a bounded, explicit legacy
 #: candidate rather than silently reporting ``None`` for every not-yet-refreshed
 #: dependency-mode workspace. It is derived from the current renderer's args
 #: with the ``--no-sync`` element removed, so it can never drift into a second
@@ -69,7 +69,7 @@ def _launch_module(args: list[object]) -> str | None:
     return module if isinstance(module, str) else None
 
 
-def _observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode | None:
+def observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode | None:
     """Infer the install mode *package*'s deployed MCP launch command is shaped for.
 
     Reads ``.mcp.json`` and matches *package*'s server entry (the server name is
@@ -91,6 +91,9 @@ def _observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode 
     reports as ordinary drift with a fix hint pointing at
     ``spec mcps sync --force`` or ``install --upgrade``.
 
+    Companion packages (vaultspec-rag's upgrade inference and mode-flip
+    detection) also consume this observation directly.
+
     Args:
         target: Workspace root directory.
         package: Distribution name whose server entry to read; ``None`` means
@@ -107,7 +110,7 @@ def _observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode 
 
     pkg = package if package is not None else CORE_DISTRIBUTION_NAME
 
-    servers = _read_mcp_servers(target / ".mcp.json")
+    servers = read_mcp_servers(target / ".mcp.json")
     if servers is None:
         return None
     entry = servers.get(pkg)
@@ -191,8 +194,8 @@ def collect_mode_mismatch_state(
     observed = {
         mode
         for mode in (
-            _observed_precommit_mode(target, pkg),
-            _observed_mcp_mode(target, pkg),
+            observed_precommit_mode(target, pkg),
+            observed_mcp_mode(target, pkg),
         )
         if mode is not None
     }
@@ -252,25 +255,6 @@ def collect_version_floor_state(
 
     running_v, floor = violation
     return VersionFloorSignal.BELOW, running_v, floor
-
-
-def observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode | None:
-    """Public accessor for the deployed MCP entry's observed install mode.
-
-    Companion packages (vaultspec-rag's upgrade inference and mode-flip
-    detection) consume this observation; the private helper stays the
-    internal implementation.
-
-    Args:
-        target: Workspace root directory.
-        package: Distribution name whose server entry to read; ``None``
-            means ``vaultspec-core``.
-
-    Returns:
-        The :class:`~vaultspec_core.core.enums.InstallMode` the deployed
-        entry is shaped for, or ``None`` when unobservable.
-    """
-    return _observed_mcp_mode(target, package)
 
 
 def collect_stale_seed_definitions(target: Path) -> list[str]:

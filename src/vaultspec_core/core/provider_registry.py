@@ -17,21 +17,19 @@ from . import types as _t
 from .enums import Tool
 from .exceptions import ProviderError, VaultSpecError
 
-#: Re-exported (with underscore intact) for the sibling command modules that
-#: reach into this as the single public import surface for provider vocabulary.
-__all__ = ["_PROVIDER_TO_TOOLS"]
+__all__ = ["PROVIDER_TO_TOOLS"]
 
 # Map provider argument names to Tool enum members. The per-tool entries derive
 # from the Tool enum so adding a provider is a single-site change; "all" selects
 # every tool and "core" selects none (framework-only). VALID_PROVIDERS and
 # SYNC_PROVIDERS are derived from this map so the provider vocabulary has one
 # source of truth.
-_PROVIDER_TO_TOOLS: dict[str, list[Tool]] = {t.value: [t] for t in Tool}
-_PROVIDER_TO_TOOLS["all"] = list(Tool)
-_PROVIDER_TO_TOOLS["core"] = []
+PROVIDER_TO_TOOLS: dict[str, list[Tool]] = {t.value: [t] for t in Tool}
+PROVIDER_TO_TOOLS["all"] = list(Tool)
+PROVIDER_TO_TOOLS["core"] = []
 
 # Valid provider arguments for install/uninstall commands (every selector).
-VALID_PROVIDERS = set(_PROVIDER_TO_TOOLS)
+VALID_PROVIDERS = set(PROVIDER_TO_TOOLS)
 
 # Valid sync provider targets exposed to the CLI.
 SYNC_PROVIDERS = VALID_PROVIDERS - {"core"}
@@ -99,15 +97,3 @@ def require_reconciliation_success(
             f"{operation} failed.",
             hint=" ".join(errors),
         )
-
-
-# Backward-compatible private aliases: several ``core`` modules outside this
-# round's scope still import these helpers by their original underscore
-# names (e.g. ``core/commands.py``'s re-export surface, ``core/provision.py``,
-# ``core/scaffold.py``, ``core/uninstall.py``). Keep them resolvable without
-# touching those call sites; new callers should prefer the public names.
-_rel = rel
-_validate_provider = validate_provider
-_validate_skip = validate_skip
-_filter_tools = filter_tools
-_require_reconciliation_success = require_reconciliation_success

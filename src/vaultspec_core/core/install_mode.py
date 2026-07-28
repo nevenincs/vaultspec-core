@@ -19,10 +19,7 @@ if TYPE_CHECKING:
     from .manifest import ManifestData
     from .workspace_mode import ResolvedMode
 
-#: Re-exported (with underscore intact) for :mod:`vaultspec_core.core.commands`
-#: and :mod:`vaultspec_core.core.provision`, which reach into this as the
-#: single public import surface for mode resolution.
-__all__ = ["_write_mode_declaration"]
+__all__ = ["write_mode_declaration"]
 
 
 def stamp_manifest_version_no_downgrade(mdata: ManifestData) -> None:
@@ -82,12 +79,12 @@ def persist_resolved_mode(path: Path, mdata: ManifestData, mode: InstallMode) ->
             place, not written here.
         mode: The resolved provisioning mode to persist.
     """
-    floor = _write_mode_declaration(path, mode)
+    floor = write_mode_declaration(path, mode)
     mdata.resolved_mode = mode
     mdata.resolved_floor_version = floor
 
 
-def _write_mode_declaration(path: Path, mode: InstallMode) -> str | None:
+def write_mode_declaration(path: Path, mode: InstallMode) -> str | None:
     """Write core's committed mode entry, preserving its floor and any siblings.
 
     Reads and writes only ``vaultspec-core``'s own entry in the shared
@@ -136,7 +133,7 @@ def infer_upgrade_mode(target: Path, explicit: InstallMode | None) -> ResolvedMo
     canonical hook entries are ``uv run``-shaped *and* the target's
     ``pyproject.toml`` lists ``vaultspec-core``; tool mode in every other case.
 
-    The hook-shape signal is read through the same ``_observed_precommit_mode``
+    The hook-shape signal is read through the same ``observed_precommit_mode``
     collector the doctor's mode-mismatch check consumes, so migration and
     diagnosis can never disagree on what a deployed artifact shape means - the
     ``install-mode`` constraint against introducing a second comparator.
@@ -160,7 +157,7 @@ def infer_upgrade_mode(target: Path, explicit: InstallMode | None) -> ResolvedMo
             when *explicit* names an impossible combination or a persisted
             declaration is malformed.
     """
-    from .diagnosis.collectors import _observed_precommit_mode
+    from .diagnosis.collectors import observed_precommit_mode
     from .workspace_mode import (
         CORE_DISTRIBUTION_NAME,
         ModeProvenance,
@@ -176,15 +173,7 @@ def infer_upgrade_mode(target: Path, explicit: InstallMode | None) -> ResolvedMo
         return resolve_install_mode_with_provenance(target, explicit=None)
 
     detected = resolve_install_mode(target, explicit=None)
-    observed = _observed_precommit_mode(target)
+    observed = observed_precommit_mode(target)
     if detected is InstallMode.DEPENDENCY and observed is InstallMode.DEPENDENCY:
         return ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.INFERRED)
     return ResolvedMode(InstallMode.TOOL, ModeProvenance.INFERRED)
-
-
-#: Backward-compatible aliases for external callers still importing the
-#: previously private names.
-_stamp_manifest_version_no_downgrade = stamp_manifest_version_no_downgrade
-_fresh_install_schema_version = fresh_install_schema_version
-_persist_resolved_mode = persist_resolved_mode
-_infer_upgrade_mode = infer_upgrade_mode

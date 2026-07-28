@@ -55,11 +55,6 @@ def is_cli_managed(path_or_content: str | Path) -> bool:
     return "<vaultspec " in content or _t.CONFIG_HEADER in content
 
 
-#: Backward-compatible alias for external callers still importing the
-#: previously private name.
-_is_cli_managed = is_cli_managed
-
-
 def _collect_rule_refs(cfg: ToolConfig) -> list[str]:
     """Scan the rule-reference directory for markdown rule files.
 

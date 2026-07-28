@@ -33,15 +33,15 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-#: Re-exported (with underscore intact) for every CRUD surface that reaches
-#: into this module's containment guard: :mod:`vaultspec_core.core.hooks`,
+#: Re-exported for every CRUD surface that reaches into this module's
+#: containment guard: :mod:`vaultspec_core.core.hooks`,
 #: :mod:`vaultspec_core.core.resources`, :mod:`vaultspec_core.vaultcore.batch_archive`,
 #: :mod:`vaultspec_core.vaultcore.exec_recovery`, and
 #: :mod:`vaultspec_core.vaultcore.query_rename`.
-__all__ = ["_assert_within"]
+__all__ = ["assert_within"]
 
 
-def _assert_within(managed_root: Path, path: Path) -> Path:
+def assert_within(managed_root: Path, path: Path) -> Path:
     """Return *path* iff its real location is inside *managed_root*, else raise.
 
     Resolves every symlink and ``..`` segment in *path* (and in any existing
@@ -245,8 +245,8 @@ class RenameTransaction:
         Raises:
             VaultSpecError: When either endpoint resolves outside the root.
         """
-        _assert_within(self.managed_root, src)
-        _assert_within(self.managed_root, dst)
+        assert_within(self.managed_root, src)
+        assert_within(self.managed_root, dst)
         ok = rename_document_path(src, dst)
         if ok:
             self.file_renames.append((src, dst))

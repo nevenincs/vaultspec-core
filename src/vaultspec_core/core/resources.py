@@ -13,7 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from .exceptions import ResourceExistsError, ResourceNotFoundError, VaultSpecError
-from .helpers import _rmtree_robust, ensure_dir
+from .helpers import ensure_dir, rmtree_robust
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +176,7 @@ def resource_remove(
             return False
 
     if is_dir:
-        _rmtree_robust(check_path)
+        rmtree_robust(check_path)
     else:
         file_path.unlink()
     logger.info("Removed %s: %s", label, name)
@@ -213,7 +213,7 @@ def resource_rename(
     from ..vaultcore import parse_frontmatter
     from ..vaultcore.rename_engine import (
         RenameTransaction,
-        _assert_within,
+        assert_within,
         resource_lock_target,
     )
     from .helpers import atomic_write, build_file
@@ -244,8 +244,8 @@ def resource_rename(
         new_path = base_dir / new_name
 
         # Contain the directory endpoints (not just SKILL.md) before any work.
-        _assert_within(base_dir, old_path)
-        _assert_within(base_dir, new_path)
+        assert_within(base_dir, old_path)
+        assert_within(base_dir, new_path)
 
         if not old_path.exists():
             raise ResourceNotFoundError(f"{label} '{old_name}' not found.")
@@ -292,8 +292,8 @@ def resource_rename(
         # de-nests rather than re-creating the nested location.
         new_path = base_dir / new_file
 
-        _assert_within(base_dir, old_path)
-        _assert_within(base_dir, new_path)
+        assert_within(base_dir, old_path)
+        assert_within(base_dir, new_path)
 
         if not old_path.exists():
             raise ResourceNotFoundError(f"{label} '{old_name}' not found.")

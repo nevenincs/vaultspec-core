@@ -14,11 +14,11 @@ from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
 from vaultspec_core.cli.spec_cmd_shared import (
-    _apply_provider_filter,
-    _emit_json,
-    _emit_sync_result,
-    _print_complete_sync_notice,
-    _print_source_mutation_notice,
+    apply_provider_filter,
+    emit_json,
+    emit_sync_result,
+    print_complete_sync_notice,
+    print_source_mutation_notice,
 )
 
 mcps_app = make_app(
@@ -39,7 +39,7 @@ def cmd_mcps_list(
     items = mcp_list()
 
     if json_output:
-        _emit_json("spec.mcps.list", "unchanged", {"items": items})
+        emit_json("spec.mcps.list", "unchanged", {"items": items})
         raise typer.Exit(0)
 
     from vaultspec_core.cli.rendering import Column, render_listing, summary_line
@@ -72,13 +72,13 @@ def cmd_mcps_status(
 ) -> None:
     """Inspect provider-native MCP enrollment status."""
     apply_target(target)
-    _apply_provider_filter(provider)
+    apply_provider_filter(provider)
     from vaultspec_core.core import mcp_status
 
     status = mcp_status(provider=provider, scope=scope)
 
     if json_output:
-        _emit_json("spec.mcps.status", "unchanged", status)
+        emit_json("spec.mcps.status", "unchanged", status)
         raise typer.Exit(0 if status["status"] == "ok" else 1)
 
     from vaultspec_core.cli.rendering import Column, render_listing
@@ -153,10 +153,10 @@ def cmd_mcps_add(
         return
 
     if json_output:
-        _emit_json("spec.mcps.add", "created", {"path": str(file_path)})
+        emit_json("spec.mcps.add", "created", {"path": str(file_path)})
         raise typer.Exit(0)
 
-    _print_source_mutation_notice(file_path, action="MCP source updated")
+    print_source_mutation_notice(file_path, action="MCP source updated")
 
 
 @mcps_app.command("remove")
@@ -181,10 +181,10 @@ def cmd_mcps_remove(
         return
 
     if json_output:
-        _emit_json("spec.mcps.remove", "removed", {"removed": name})
+        emit_json("spec.mcps.remove", "removed", {"removed": name})
         raise typer.Exit(0)
 
-    _print_source_mutation_notice(removed_path, action="MCP source removed")
+    print_source_mutation_notice(removed_path, action="MCP source removed")
 
 
 @mcps_app.command("sync")
@@ -216,7 +216,7 @@ def cmd_mcps_sync(
 ) -> None:
     """Reconcile canonical definitions into provider-native enrollment."""
     apply_target(target)
-    _apply_provider_filter(provider)
+    apply_provider_filter(provider)
     from vaultspec_core.core import mcp_sync
 
     result = mcp_sync(
@@ -228,8 +228,8 @@ def cmd_mcps_sync(
     )
 
     if not json_output:
-        _print_complete_sync_notice(resource="MCP", mcp=True)
-    _emit_sync_result(result, label="MCPs", dry_run=dry_run, json_output=json_output)
+        print_complete_sync_notice(resource="MCP", mcp=True)
+    emit_sync_result(result, label="MCPs", dry_run=dry_run, json_output=json_output)
 
 
 @mcps_app.command("uninstall")
@@ -257,7 +257,7 @@ def cmd_mcps_uninstall(
 ) -> None:
     """Remove Vaultspec-owned provider-native MCP enrollment."""
     apply_target(target)
-    _apply_provider_filter(provider)
+    apply_provider_filter(provider)
     if not force and not dry_run:
         typer.echo(
             "Error: MCP uninstall is destructive. Pass --force or use --dry-run.",
@@ -273,7 +273,7 @@ def cmd_mcps_uninstall(
         scope=scope,
         dry_run=dry_run,
     )
-    _emit_sync_result(
+    emit_sync_result(
         result,
         label="MCPs uninstall",
         dry_run=dry_run,

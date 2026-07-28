@@ -48,11 +48,11 @@ def hooks_dir(tmp_path: Path) -> Iterator[Path]:
         templates_dir=vs / "rules" / "templates",
         hooks_dir=hooks,
     )
-    token = _types._workspace_ctx.set(ctx)
+    token = _types.workspace_ctx.set(ctx)
     try:
         yield hooks
     finally:
-        _types._workspace_ctx.reset(token)
+        _types.workspace_ctx.reset(token)
 
 
 def _write_hook(hooks: Path, name: str, *, body: str = _HOOK_BODY) -> Path:

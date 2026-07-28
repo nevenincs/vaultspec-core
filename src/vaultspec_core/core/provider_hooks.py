@@ -47,7 +47,7 @@ __all__ = [
     "PROVIDER_EVENT_NAMES",
     "HookEvent",
     "HookSpec",
-    "_compose_flat_hooks",
+    "compose_flat_hooks",
     "load_provider_hook_specs",
     "provider_hooks_sync",
     "render_hooks_payload",
@@ -353,7 +353,7 @@ def _read_json(path: Path) -> dict[str, Any]:
     return cast("dict[str, Any]", raw)
 
 
-def _compose_flat_hooks(
+def compose_flat_hooks(
     existing: dict[str, Any],
     prev_managed: dict[str, Any],
     payload: dict[str, Any] | None,
@@ -457,7 +457,7 @@ def _sync_one(
     else:
         sidecar_path = target_dir / subdir / _SIDECAR_NAME
         prev_managed = _read_json(sidecar_path)
-        composed, new_managed = _compose_flat_hooks(existing, prev_managed, payload)
+        composed, new_managed = compose_flat_hooks(existing, prev_managed, payload)
 
     native_changed = composed != existing
     sidecar_changed = sidecar_path is not None and new_managed != prev_managed

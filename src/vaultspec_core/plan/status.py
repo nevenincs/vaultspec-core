@@ -129,7 +129,7 @@ class ExecRecordIndex:
 
         if graph is not None:
             from vaultspec_core.vaultcore.models import DocType
-            from vaultspec_core.vaultcore.query import _feature_from_tags_or_meta
+            from vaultspec_core.vaultcore.query import feature_from_tags_or_meta
 
             # Match the disk path, which skips records it cannot read or
             # decode; the graph still nodes such a file with empty frontmatter.
@@ -147,7 +147,7 @@ class ExecRecordIndex:
                 tags = meta.get("tags", [])
                 if isinstance(tags, str):
                     tags = [tags]
-                feature = _feature_from_tags_or_meta(tags, meta, DocType.EXEC.value)
+                feature = feature_from_tags_or_meta(tags, meta, DocType.EXEC.value)
                 step_id: str | None = None
                 raw_step_id = meta.get("step_id")
                 if raw_step_id:
@@ -361,12 +361,12 @@ def collect_all_statuses(
         returns them.
     """
     from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.vaultcore.query import _docs_from_graph, list_documents
+    from vaultspec_core.vaultcore.query import docs_from_graph, list_documents
 
     exec_index = ExecRecordIndex.build(root_dir, graph=graph)
     entries: list[PlanStatusEntry] = []
     docs = (
-        _docs_from_graph(graph, doc_type="plan")
+        docs_from_graph(graph, doc_type="plan")
         if graph is not None
         else list_documents(root_dir, doc_type="plan")
     )

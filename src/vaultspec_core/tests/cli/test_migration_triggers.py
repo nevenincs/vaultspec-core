@@ -432,8 +432,8 @@ class TestUpgradeModeInference:
         self, tmp_path: Path
     ) -> None:
         from vaultspec_core.core.diagnosis.collectors import (
-            _observed_precommit_mode,
             collect_mode_mismatch_state,
+            observed_precommit_mode,
         )
         from vaultspec_core.core.diagnosis.signals import ModeMismatchSignal
         from vaultspec_core.core.enums import InstallMode
@@ -443,7 +443,7 @@ class TestUpgradeModeInference:
         # leaves exactly the legacy dependency shape Q6 must recognize.
         self._write_pyproject_with_dependency(tmp_path)
         factory = WorkspaceFactory(tmp_path).install("all", mode=InstallMode.DEPENDENCY)
-        assert _observed_precommit_mode(tmp_path) is InstallMode.DEPENDENCY
+        assert observed_precommit_mode(tmp_path) is InstallMode.DEPENDENCY
         self._make_legacy(tmp_path)
         assert self._read_declaration(tmp_path) is None
 
@@ -454,7 +454,7 @@ class TestUpgradeModeInference:
         assert decl.install_mode is InstallMode.DEPENDENCY
         # The inferred mode matches the deployed shape, so the workspace stays
         # coherent: no artifact was flipped and diagnosis is clean.
-        assert _observed_precommit_mode(tmp_path) is InstallMode.DEPENDENCY
+        assert observed_precommit_mode(tmp_path) is InstallMode.DEPENDENCY
         assert collect_mode_mismatch_state(tmp_path) is ModeMismatchSignal.CLEAN
 
     def test_legacy_tool_shaped_workspace_infers_tool_and_renders_uvx(
@@ -467,9 +467,9 @@ class TestUpgradeModeInference:
         # declaration were written after those calls, the hooks would render
         # uv-run and contradict the tool declaration recorded moments later.
         from vaultspec_core.core.diagnosis.collectors import (
-            _observed_mcp_mode,
-            _observed_precommit_mode,
             collect_mode_mismatch_state,
+            observed_mcp_mode,
+            observed_precommit_mode,
         )
         from vaultspec_core.core.diagnosis.signals import ModeMismatchSignal
         from vaultspec_core.core.enums import InstallMode
@@ -480,7 +480,7 @@ class TestUpgradeModeInference:
         # shape whose inference conjunction resolves to tool.
         self._write_pyproject_with_dependency(tmp_path)
         factory = WorkspaceFactory(tmp_path).install("all", mode=InstallMode.DEPENDENCY)
-        assert _observed_precommit_mode(tmp_path) is InstallMode.DEPENDENCY
+        assert observed_precommit_mode(tmp_path) is InstallMode.DEPENDENCY
         self._make_legacy(tmp_path)
         (tmp_path / "pyproject.toml").unlink()
         # A pre-existing managed MCP entry that diverges from the target mode is
@@ -496,8 +496,8 @@ class TestUpgradeModeInference:
         assert decl.install_mode is InstallMode.TOOL
         # Both the hooks and the freshly-added MCP command were rendered to the
         # tool shape in this same run.
-        assert _observed_precommit_mode(tmp_path) is InstallMode.TOOL
-        assert _observed_mcp_mode(tmp_path) is InstallMode.TOOL
+        assert observed_precommit_mode(tmp_path) is InstallMode.TOOL
+        assert observed_mcp_mode(tmp_path) is InstallMode.TOOL
         assert collect_mode_mismatch_state(tmp_path) is ModeMismatchSignal.CLEAN
 
     def test_second_upgrade_is_content_idempotent(self, tmp_path: Path) -> None:

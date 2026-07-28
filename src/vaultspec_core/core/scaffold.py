@@ -211,9 +211,3 @@ def scaffold_provider(
         _add(rel(target, cfg.native_config_file), "config")
 
     return created
-
-
-#: Backward-compatible aliases for external callers still importing the
-#: previously private names.
-_scaffold_core = scaffold_core
-_scaffold_provider = scaffold_provider

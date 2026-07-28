@@ -16,23 +16,23 @@ from .enums import McpScope, McpTargetFormat, Tool
 from .exceptions import VaultSpecError
 from .helpers import atomic_write
 from .mcps_native import (
-    _LEGACY_MANAGED_KEY,
-    _TOML_BLOCK_TYPE,
-    _json_server_map,
-    _managed_toml_content,
-    _render_codex_servers,
-    _toml_servers,
-    _write_json_target,
+    LEGACY_MANAGED_KEY,
+    TOML_BLOCK_TYPE,
+    json_server_map,
+    managed_toml_content,
+    render_codex_servers,
+    toml_servers,
+    write_json_target,
 )
 from .mcps_ownership import (
-    _discard_owned_names,
-    _owned_names,
-    _ownership_path,
-    _read_ownership,
-    _target_lock,
-    _write_ownership,
+    discard_owned_names,
+    owned_names,
+    ownership_path,
+    read_ownership,
+    target_lock,
+    write_ownership,
 )
-from .mcps_targets import _coerce_scope, resolve_mcp_targets
+from .mcps_targets import coerce_scope, resolve_mcp_targets
 from .tags import TagError, strip_block, upsert_block
 from .types import McpTarget, SyncResult
 
@@ -50,7 +50,7 @@ def _uninstall_json_target(
     if not isinstance(raw, dict):
         raise VaultSpecError("JSON root is not an object.")
     payload = cast("dict[str, Any]", raw)
-    servers = _json_server_map(payload, target, root)
+    servers = json_server_map(payload, target, root)
     present = requested & set(servers)
     result.pruned += len(present)
     result.items.extend((name, "[DELETE]") for name in sorted(present))
@@ -58,8 +58,8 @@ def _uninstall_json_target(
         return
     for name in present:
         servers.pop(name, None)
-    payload.pop(_LEGACY_MANAGED_KEY, None)
-    _write_json_target(target.path, payload, target, root)
+    payload.pop(LEGACY_MANAGED_KEY, None)
+    write_json_target(target.path, payload, target, root)
 
 
 def _uninstall_toml_target(
@@ -71,7 +71,7 @@ def _uninstall_toml_target(
 ) -> None:
     """Drop *requested* owned servers from a Codex TOML target."""
     content = target.path.read_text(encoding="utf-8")
-    block_servers = _toml_servers(_managed_toml_content(content))
+    block_servers = toml_servers(managed_toml_content(content))
     present = requested & set(block_servers)
     result.pruned += len(present)
     result.items.extend((name, "[DELETE]") for name in sorted(present))
@@ -79,11 +79,11 @@ def _uninstall_toml_target(
         return
     for name in present:
         block_servers.pop(name, None)
-    rendered = _render_codex_servers(block_servers)
+    rendered = render_codex_servers(block_servers)
     updated = (
-        upsert_block(content, _TOML_BLOCK_TYPE, rendered, comment_prefix="# ")
+        upsert_block(content, TOML_BLOCK_TYPE, rendered, comment_prefix="# ")
         if rendered
-        else strip_block(content, _TOML_BLOCK_TYPE)
+        else strip_block(content, TOML_BLOCK_TYPE)
     )
     if updated:
         atomic_write(target.path, updated)
@@ -108,7 +108,7 @@ def mcp_uninstall(
     result = SyncResult()
     selected_names = frozenset(names) if names is not None else None
     try:
-        resolved_scope = _coerce_scope(scope)
+        resolved_scope = coerce_scope(scope)
         targets = resolve_mcp_targets(
             provider,
             scope=resolved_scope,
@@ -119,25 +119,25 @@ def mcp_uninstall(
         result.errors.append(str(exc))
         result.errored += 1
         return result
-    ownership_path = _ownership_path(target_dir, resolved_scope)
-    with _target_lock(ownership_path, dry_run=dry_run):
+    state_path = ownership_path(target_dir, resolved_scope)
+    with target_lock(state_path, dry_run=dry_run):
         try:
-            state = _read_ownership(ownership_path)
+            state = read_ownership(state_path)
         except VaultSpecError as exc:
             result.errors.append(str(exc))
             result.errored += 1
             return result
         for target in targets:
             sub = SyncResult()
-            managed = _owned_names(state, target)
+            managed = owned_names(state, target)
             requested = managed if selected_names is None else managed & selected_names
             if not requested or not target.path.exists():
                 if not dry_run:
-                    _discard_owned_names(state, target, requested)
+                    discard_owned_names(state, target, requested)
                 result.per_tool[target.provider.value] = sub
                 continue
             succeeded = False
-            with _target_lock(target.path, dry_run=dry_run):
+            with target_lock(target.path, dry_run=dry_run):
                 try:
                     if target.format is McpTargetFormat.JSON:
                         _uninstall_json_target(
@@ -167,12 +167,12 @@ def mcp_uninstall(
                         f"Cannot uninstall MCPs from {target.path}: {exc}"
                     )
             if not dry_run and succeeded:
-                _discard_owned_names(state, target, requested)
+                discard_owned_names(state, target, requested)
             result.merge(sub)
             result.per_tool[target.provider.value] = sub
         if not dry_run:
             if state["targets"]:
-                _write_ownership(ownership_path, state)
-            elif ownership_path.exists():
-                ownership_path.unlink()
+                write_ownership(state_path, state)
+            elif state_path.exists():
+                state_path.unlink()
     return result

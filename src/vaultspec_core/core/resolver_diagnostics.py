@@ -262,10 +262,3 @@ def resolve_version_warning(
             )
     except Exception:
         logger.debug("Version comparison failed", exc_info=True)
-
-
-#: Backward-compatible aliases for external callers still importing the
-#: previously private names.
-_resolve_builtin_version = resolve_builtin_version
-_resolve_mode_mismatch = resolve_mode_mismatch
-_resolve_version_warning = resolve_version_warning

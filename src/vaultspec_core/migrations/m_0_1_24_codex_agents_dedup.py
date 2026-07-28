@@ -60,7 +60,7 @@ def migrate(workspace: Path) -> MigrationResult:
             version is not bumped and the next invocation retries.
     """
     from ..core.agents import (
-        _codex_managed_agent_names,
+        codex_managed_agent_names,
         sanitize_legacy_codex_agents,
     )
     from ..core.helpers import atomic_write
@@ -81,7 +81,7 @@ def migrate(workspace: Path) -> MigrationResult:
     except OSError as exc:
         raise MigrationError(f"{_NAME}: failed to read {config_path}: {exc}") from exc
 
-    names = _codex_managed_agent_names(content)
+    names = codex_managed_agent_names(content)
     sanitized = sanitize_legacy_codex_agents(content, names)
     if sanitized == content:
         return MigrationResult(

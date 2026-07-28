@@ -22,7 +22,7 @@ from .resolver_diagnostics import (
     resolve_mode_mismatch,
     resolve_version_warning,
 )
-from .resolver_framework import _resolve_framework
+from .resolver_framework import resolve_framework
 from .resolver_providers import (
     resolve_config,
     resolve_content,
@@ -86,7 +86,7 @@ def resolve(
     fw_action = CliAction.INSTALL if action == CliAction.UPGRADE else action
     prov_action = CliAction.SYNC if action == CliAction.UPGRADE else action
 
-    _resolve_framework(
+    resolve_framework(
         plan,
         diagnosis.framework,
         fw_action,
