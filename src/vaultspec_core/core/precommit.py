@@ -19,6 +19,11 @@ from ruamel.yaml import YAML, YAMLError
 from .enums import InstallMode, PrecommitHook, render_mode
 from .helpers import advisory_lock, atomic_write
 from .prek_boundary import PrekBoundaryState, collect_prek_boundary
+from .workspace_mode import (
+    CORE_DISTRIBUTION_NAME,
+    read_hooks_declaration,
+    resolve_render_mode,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -428,18 +433,36 @@ def scaffold_precommit(
     caller passes its resolved mode explicitly, because the declaration is
     written only after scaffolding.
 
-    Skips scaffolding entirely when ``prek.toml`` is present at *target*
-    (assessed through
+    Skips scaffolding entirely in two cases.
+
+    The first is a committed opt-out: a workspace whose declaration sets
+    ``hooks.pre_commit`` to ``false`` has decided it runs its gates explicitly
+    and forbids a commit hook, so no install or sync writes the file. The
+    declaration is read on every call rather than resolved once at provision
+    time, so the choice survives every later run instead of being re-decided by
+    whichever verb happens to reach here.
+
+    The second is ``prek.toml`` being present at *target* (assessed through
     :func:`~vaultspec_core.core.prek_boundary.collect_prek_boundary`):
     prek reads ``prek.toml`` exclusively and silently ignores a co-present
     ``.pre-commit-config.yaml``, so writing the YAML would leave hooks prek
     never runs. The operator transplants hooks into ``prek.toml`` with
     ``spec precommit migrate``; the log messages distinguish a healthy
     transplant (hooks already in ``prek.toml``) from stranded hooks.
-    """
-    if mode is None:
-        from .workspace_mode import CORE_DISTRIBUTION_NAME, resolve_render_mode
 
+    Neither skip deletes an existing ``.pre-commit-config.yaml``. Declining
+    future scaffolding is a policy statement; removing a file the operator may
+    still have reasons to keep is a destructive act they ask for explicitly.
+    """
+    if not read_hooks_declaration(target).pre_commit:
+        logger.info(
+            "The workspace declaration at %s sets hooks.pre_commit to false; "
+            "skipping .pre-commit-config.yaml scaffolding.",
+            target,
+        )
+        return []
+
+    if mode is None:
         mode = resolve_render_mode(target, package=CORE_DISTRIBUTION_NAME)
     canonical_hooks = canonical_precommit_hooks_for_mode(mode)
 

@@ -165,6 +165,14 @@ project running vaultspec-core beside a companion package can declare each in it
 mode; `vaultspec-core install --upgrade` records a mode for a workspace provisioned
 before modes existed by inferring it from the existing hook and dependency shape.
 
+**Or decline the hooks entirely.** Not every project wants a commit hook: a tree-wide
+hook that rewrites the working tree to the staged state is unsafe when several workers
+share one checkout, and some teams run their gates explicitly instead.
+`vaultspec-core spec precommit disable` records that in the same committed
+`workspace.json`, so no later `install` or `sync` regenerates `.pre-commit-config.yaml`
+and the managed `.gitignore` block starts ignoring it.
+`vaultspec-core spec precommit enable` reverses the decision.
+
 **Maintain.** `vaultspec-core vault check all --fix` validates and repairs the vault,
 and `vaultspec-core vault graph --feature search-api` visualizes a feature. The CLI
 maintains each document's `modified:` and `date:` stamps; never hand-edit them.
