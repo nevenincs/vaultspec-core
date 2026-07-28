@@ -14,11 +14,16 @@ If the subcommand target is ``None``, the root target is used as
 fallback.  If both are ``None``, the current working directory is used.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
+
+if TYPE_CHECKING:
+    from vaultspec_core.vaultcore.query import VaultDocument
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +236,7 @@ def _vault_base() -> Path:
     return _root_target or Path.cwd()
 
 
-def _plan_documents(base: Path) -> list:
+def _plan_documents(base: Path) -> list[VaultDocument]:
     """List the vault's plan documents, or ``[]`` when none are scannable."""
     from vaultspec_core.vaultcore.query import list_documents
 
