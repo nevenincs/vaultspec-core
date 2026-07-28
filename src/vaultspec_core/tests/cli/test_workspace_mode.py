@@ -13,6 +13,7 @@ from vaultspec_core.core.workspace_mode import (
     DEPENDENCY_LEAK_ADVISORY,
     WORKSPACE_SCHEMA_VERSION,
     DependencyEvidence,
+    HooksDeclaration,
     ModeProvenance,
     PackageDeclaration,
     ResolvedMode,
@@ -20,10 +21,12 @@ from vaultspec_core.core.workspace_mode import (
     dependency_leak_advisory,
     detect_package_evidence,
     newly_establishes_dependency,
+    read_hooks_declaration,
     read_package_declaration,
     read_workspace_declaration,
     resolve_install_mode,
     resolve_install_mode_with_provenance,
+    write_hooks_declaration,
     write_package_declaration,
     write_workspace_declaration,
 )
@@ -499,6 +502,96 @@ class TestV2CorruptEntries:
 
         with pytest.raises(VaultSpecError, match="Malformed 'packages' map"):
             read_workspace_declaration(factory.root)
+
+
+class TestHooksDeclaration:
+    """The committed git-hook policy: absent means permissive, false declines."""
+
+    def test_absent_file_is_permissive(self, factory: WorkspaceFactory) -> None:
+        assert read_hooks_declaration(factory.root).pre_commit is True
+
+    def test_declaration_without_hooks_key_is_permissive(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        write_workspace_declaration(
+            factory.root, WorkspaceDeclaration(install_mode=InstallMode.TOOL)
+        )
+
+        assert read_hooks_declaration(factory.root).pre_commit is True
+
+    def test_default_policy_writes_no_hooks_key(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        """An untouched workspace never gains the key, so no file churns."""
+        write_workspace_declaration(
+            factory.root, WorkspaceDeclaration(install_mode=InstallMode.TOOL)
+        )
+
+        raw = json.loads(_declaration_path(factory.root).read_text(encoding="utf-8"))
+        assert "hooks" not in raw
+
+    def test_opt_out_round_trips(self, factory: WorkspaceFactory) -> None:
+        write_hooks_declaration(factory.root, HooksDeclaration(pre_commit=False))
+
+        raw = json.loads(_declaration_path(factory.root).read_text(encoding="utf-8"))
+        assert raw["hooks"] == {"pre_commit": False}
+        assert read_hooks_declaration(factory.root).pre_commit is False
+
+    def test_opt_out_survives_a_mode_write(self, factory: WorkspaceFactory) -> None:
+        """The declaration must outlive every later install or sync.
+
+        The write primitive emits the whole document, so a mode write that
+        failed to carry the hook policy through would silently clear the
+        opt-out - the exact regression this asserts against.
+        """
+        write_hooks_declaration(factory.root, HooksDeclaration(pre_commit=False))
+
+        write_workspace_declaration(
+            factory.root, WorkspaceDeclaration(install_mode=InstallMode.DEPENDENCY)
+        )
+
+        assert read_hooks_declaration(factory.root).pre_commit is False
+        mode = read_workspace_declaration(factory.root)
+        assert mode is not None
+        assert mode.install_mode is InstallMode.DEPENDENCY
+
+    def test_hook_write_preserves_package_entries(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        write_package_declaration(
+            factory.root,
+            "vaultspec-rag",
+            PackageDeclaration(install_mode=InstallMode.TOOL),
+        )
+
+        write_hooks_declaration(factory.root, HooksDeclaration(pre_commit=False))
+
+        assert read_package_declaration(factory.root, "vaultspec-rag") is not None
+
+    def test_non_object_hooks_raises(self, factory: WorkspaceFactory) -> None:
+        _write_raw(
+            factory.root,
+            json.dumps({"schema_version": "2.1", "packages": {}, "hooks": False}),
+        )
+
+        with pytest.raises(VaultSpecError, match="Malformed 'hooks' object"):
+            read_hooks_declaration(factory.root)
+
+    def test_non_boolean_pre_commit_raises(self, factory: WorkspaceFactory) -> None:
+        """A malformed opt-out must fail loud, never fall back to emitting."""
+        _write_raw(
+            factory.root,
+            json.dumps(
+                {
+                    "schema_version": "2.1",
+                    "packages": {},
+                    "hooks": {"pre_commit": "false"},
+                }
+            ),
+        )
+
+        with pytest.raises(VaultSpecError, match=r"Invalid hooks\.pre_commit"):
+            read_hooks_declaration(factory.root)
 
 
 def _pyproject(root: Path, body: str) -> Path:

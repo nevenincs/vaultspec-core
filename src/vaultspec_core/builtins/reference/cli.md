@@ -280,6 +280,10 @@ hand-edit between the markers.
 
 #### Precommit
 
+- `vaultspec-core spec precommit disable` - Decline vaultspec-managed
+  .pre-commit-config.yaml scaffolding.
+- `vaultspec-core spec precommit enable` - Restore vaultspec-managed
+  .pre-commit-config.yaml scaffolding.
 - `vaultspec-core spec precommit migrate` - Transplant the canonical vaultspec hooks
   into prek.toml.
 
@@ -755,10 +759,14 @@ the shared `--body`, `--from-file`, `--force`, and `--dry-run` flags; `edit` tak
 
 ### vaultspec-core spec precommit
 
-Manage the project's pre-commit integration. `vaultspec-core spec precommit migrate`
-converts a legacy `.pre-commit-config.yaml` to `prek.toml`, and takes `--remove-yaml` to
-delete the superseded YAML once the canonical hooks are verifiably present in
-`prek.toml`, plus `--dry-run` and `--json`.
+Manage the project's pre-commit integration. `vaultspec-core spec precommit disable`
+records `hooks.pre_commit = false` in the committed `.vaultspec/workspace.json`, so no
+later `install` or `sync` scaffolds `.pre-commit-config.yaml` and the managed
+`.gitignore` block starts ignoring it; `enable` clears that declaration. Both are
+idempotent, take `--json`, and leave any existing `.pre-commit-config.yaml` on disk.
+`vaultspec-core spec precommit migrate` converts a legacy `.pre-commit-config.yaml` to
+`prek.toml`, and takes `--remove-yaml` to delete the superseded YAML once the canonical
+hooks are verifiably present in `prek.toml`, plus `--dry-run` and `--json`.
 
 ### vaultspec-core spec reference
 

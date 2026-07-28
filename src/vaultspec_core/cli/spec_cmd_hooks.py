@@ -415,9 +415,97 @@ def cmd_hooks_run(
 # =============================================================================
 
 precommit_app = make_app(
-    help="Manage the pre-commit hook boundary for prek-owned workspaces.",
+    help="Manage whether and where vaultspec's pre-commit hooks are scaffolded.",
     no_args_is_help=True,
 )
+
+
+def _set_precommit_policy(
+    *, enabled: bool, json_output: bool, target: Path | None
+) -> None:
+    """Persist the workspace's pre-commit policy and report the outcome.
+
+    The one implementation behind ``enable`` and ``disable``, which differ only
+    by the boolean they persist and the sentence they print. Both are idempotent
+    and report an already-satisfied request as success, so a sync script can set
+    the policy unconditionally.
+    """
+    apply_target(target)
+    from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.types import get_context
+    from vaultspec_core.core.workspace_mode import (
+        HooksDeclaration,
+        read_hooks_declaration,
+        write_hooks_declaration,
+    )
+
+    root = get_context().target_dir
+    try:
+        already = read_hooks_declaration(root).pre_commit == enabled
+        if not already:
+            write_hooks_declaration(root, HooksDeclaration(pre_commit=enabled))
+    except (VaultSpecError, OSError) as exc:
+        _handle_error(exc, json_output=json_output)
+        return
+
+    status = "unchanged" if already else "updated"
+    if json_output:
+        emit_json(
+            "spec.precommit.enable" if enabled else "spec.precommit.disable",
+            status,
+            {"pre_commit": enabled, "workspace": str(root)},
+        )
+        raise typer.Exit(0)
+
+    from vaultspec_core.console import get_console
+
+    console = get_console()
+    if enabled:
+        console.print(
+            f"[green]{status}[/green]: vaultspec-core scaffolds "
+            ".pre-commit-config.yaml in this workspace."
+        )
+    else:
+        console.print(
+            f"[green]{status}[/green]: vaultspec-core will not scaffold "
+            ".pre-commit-config.yaml in this workspace."
+        )
+        console.print(
+            "  [dim]Any existing .pre-commit-config.yaml is left in place; "
+            "delete it yourself if you no longer want it.[/dim]"
+        )
+    raise typer.Exit(0)
+
+
+@precommit_app.command("disable")
+def cmd_precommit_disable(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Decline vaultspec-managed .pre-commit-config.yaml scaffolding.
+
+    Records hooks.pre_commit = false in the committed
+    .vaultspec/workspace.json, so no later install or sync regenerates the
+    file, and the vaultspec-managed .gitignore block starts ignoring it so a
+    resurrected copy cannot be committed by accident. For projects that run
+    their gates explicitly and forbid a commit hook. Any existing
+    .pre-commit-config.yaml is left on disk untouched.
+    """
+    _set_precommit_policy(enabled=False, json_output=json_output, target=target)
+
+
+@precommit_app.command("enable")
+def cmd_precommit_enable(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Restore vaultspec-managed .pre-commit-config.yaml scaffolding.
+
+    Clears a previously recorded opt-out so the next install or sync scaffolds
+    the canonical hooks again. This is the default for a workspace that has
+    never declared a preference, so running it there is a no-op.
+    """
+    _set_precommit_policy(enabled=True, json_output=json_output, target=target)
 
 
 @precommit_app.command("migrate")

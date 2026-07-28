@@ -345,6 +345,10 @@ full options.
 
 #### Precommit
 
+- `vaultspec-core spec precommit disable` - Decline vaultspec-managed
+  .pre-commit-config.yaml scaffolding.
+- `vaultspec-core spec precommit enable` - Restore vaultspec-managed
+  .pre-commit-config.yaml scaffolding.
 - `vaultspec-core spec precommit migrate` - Transplant the canonical vaultspec hooks
   into prek.toml.
 
@@ -2351,8 +2355,23 @@ vaultspec-core spec precommit [OPTIONS] COMMAND [ARGS]...
 
 #### Subcommands
 
+- `disable` (`--json`) - Decline vaultspec-managed `.pre-commit-config.yaml`
+  scaffolding.
+- `enable` (`--json`) - Restore vaultspec-managed `.pre-commit-config.yaml` scaffolding.
 - `migrate` (`--remove-yaml`, `--dry-run`, `--json`) - Transplant the canonical
   vaultspec hooks into `prek.toml`.
+
+By default every `install` and `sync` scaffolds `.pre-commit-config.yaml` and reconciles
+the canonical hooks into it. `disable` records `hooks.pre_commit = false` in the
+committed `.vaultspec/workspace.json`, which declines that permanently: no later run
+regenerates the file, and the vaultspec-managed `.gitignore` block starts ignoring
+`/.pre-commit-config.yaml` so a resurrected copy cannot be committed by accident. Use it
+in projects that run their gates explicitly and forbid a commit hook - a tree-wide hook
+that rewrites the working tree to the staged state is unsafe when several workers share
+one checkout. Neither verb touches an existing `.pre-commit-config.yaml`; declining is a
+policy statement, and deleting the file is yours to do. `enable` clears the declaration
+again, and is a no-op in a workspace that never declared one. Both are idempotent and
+exit zero when the requested state already holds.
 
 When `prek.toml` owns the hook boundary, sync no longer scaffolds
 `.pre-commit-config.yaml` and prek silently ignores it. `migrate` renders the canonical
@@ -2363,12 +2382,25 @@ present in `prek.toml`.
 
 #### Options
 
-- `--remove-yaml` (default off) - Also delete the superseded `.pre-commit-config.yaml`
-  once the canonical hooks are verifiably present in `prek.toml`.
-- `--dry-run` (default off) - Preview without writing.
+- `--remove-yaml` (default off, `migrate` only) - Also delete the superseded
+  `.pre-commit-config.yaml` once the canonical hooks are verifiably present in
+  `prek.toml`.
+- `--dry-run` (default off, `migrate` only) - Preview without writing.
 - `--json` (default off) - Emit the result as JSON.
 
 #### Examples
+
+- **Stop vaultspec from ever writing the hook config again**:
+
+  ```bash
+  vaultspec-core spec precommit disable
+  ```
+
+- **Restore managed scaffolding**:
+
+  ```bash
+  vaultspec-core spec precommit enable
+  ```
 
 - **Preview the transplant without writing**:
 
