@@ -12,7 +12,7 @@ import io
 import logging
 from contextlib import nullcontext
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ruamel.yaml import YAML, YAMLError
 
@@ -21,6 +21,51 @@ from .helpers import advisory_lock, atomic_write
 from .prek_boundary import PrekBoundaryState, collect_prek_boundary
 
 logger = logging.getLogger(__name__)
+
+__all__ = [
+    "CANONICAL_ENTRY_PREFIX",
+    "CANONICAL_HOOK_ENTRIES",
+    "CANONICAL_HOOK_IDS",
+    "CANONICAL_PRECOMMIT_HOOKS",
+    "_ALL_MANAGED_HOOK_IDS",
+    "_HOOK_META",
+    "_HOOK_SUBCOMMAND",
+    "_MODE_ENTRY_PREFIX",
+    "_drop_managed_hook_entries",
+    "_dump_precommit_yaml",
+    "_precommit_yaml",
+    "_scaffold_precommit",
+    "_strip_managed_precommit_hooks",
+    "canonical_hook_entries_for_mode",
+    "canonical_precommit_hooks_for_mode",
+    "entry_prefix_for_mode",
+    "hook_defs_for_mode",
+]
+
+
+def _as_mapping(value: object) -> dict[str, Any] | None:
+    """Narrow *value* to a plain dict, or ``None`` when it isn't one.
+
+    A thin wrapper around ``isinstance(value, dict)``: narrowing an
+    honestly-``Any`` YAML payload via a bare ``isinstance(x, dict)`` only
+    recovers ``dict[Unknown, Unknown]``, so every downstream ``.get()`` stays
+    partially unknown until the result is re-typed here.
+    """
+    if isinstance(value, dict):
+        return cast("dict[str, Any]", value)
+    return None
+
+
+def _as_list(value: object) -> list[Any] | None:
+    """Narrow *value* to a plain list, or ``None`` when it isn't one.
+
+    See :func:`_as_mapping` - the same bare-``isinstance`` narrowing gap
+    applies to lists pulled out of a YAML payload.
+    """
+    if isinstance(value, list):
+        return cast("list[Any]", value)
+    return None
+
 
 # The canonical CLI-invocation prefix each pre-commit hook entry is built from,
 # keyed by provisioning mode. Dependency mode resolves ``vaultspec-core`` through
@@ -170,7 +215,7 @@ def _precommit_yaml() -> YAML:
     return handler
 
 
-def _dump_precommit_yaml(handler: YAML, data: object) -> str:
+def _dump_precommit_yaml(handler: YAML, data: dict[str, Any]) -> str:
     """Serialise *data* to a string through the round-trip *handler*."""
     buffer = io.StringIO()
     handler.dump(data, buffer)
@@ -188,15 +233,17 @@ def _drop_managed_hook_entries(repos: list[Any]) -> bool:
     """
     changed = False
     for r in list(repos):
-        if not (isinstance(r, dict) and r.get("repo") == "local"):
+        record = _as_mapping(r)
+        if record is None or record.get("repo") != "local":
             continue
-        hooks = r.get("hooks", [])
-        if not isinstance(hooks, list):
+        hooks = _as_list(record.get("hooks", []))
+        if hooks is None:
             continue
         managed_idx = [
             i
             for i, h in enumerate(hooks)
-            if isinstance(h, dict) and h.get("id") in _ALL_MANAGED_HOOK_IDS
+            if (hook := _as_mapping(h)) is not None
+            and hook.get("id") in _ALL_MANAGED_HOOK_IDS
         ]
         for i in reversed(managed_idx):
             del hooks[i]
@@ -219,11 +266,12 @@ def _strip_managed_precommit_hooks(config_file: Path) -> bool:
     """
     handler = _precommit_yaml()
     try:
-        data = handler.load(config_file.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
+        loaded: object = handler.load(config_file.read_text(encoding="utf-8"))
+        data = _as_mapping(loaded)
+        if data is None:
             return False
-        repos = data.get("repos", [])
-        if not isinstance(repos, list):
+        repos = _as_list(data.get("repos", []))
+        if repos is None:
             return False
         if not _drop_managed_hook_entries(repos):
             return False
@@ -295,12 +343,13 @@ def _load_existing_precommit_config(
     """
     try:
         raw = config_file.read_text(encoding="utf-8")
-        data = handler.load(raw) or {}
+        loaded: object = handler.load(raw) or {}
     except (YAMLError, OSError):
         return None
-    if not isinstance(data, dict):
+    data = _as_mapping(loaded)
+    if data is None:
         return None
-    if not isinstance(data.setdefault("repos", []), list):
+    if _as_list(data.setdefault("repos", [])) is None:
         return None
     return data
 
@@ -316,7 +365,11 @@ def _merge_local_repo_hooks(
     Returns:
         ``True`` when *existing_hooks* was changed.
     """
-    existing_by_id = {h.get("id"): h for h in existing_hooks if isinstance(h, dict)}
+    existing_by_id: dict[Any, dict[str, Any]] = {}
+    for raw_hook in existing_hooks:
+        hook = _as_mapping(raw_hook)
+        if hook is not None:
+            existing_by_id[hook.get("id")] = hook
     changed = False
     for canonical in canonical_hooks:
         hook_id = str(canonical["id"])
@@ -345,15 +398,19 @@ def _reconcile_precommit_repos(
     Returns:
         ``True`` when *data* should be written back to disk.
     """
-    repos = data["repos"]
-    local_repos = [r for r in repos if isinstance(r, dict) and r.get("repo") == "local"]
+    repos = cast("list[Any]", data["repos"])
+    local_repos = [
+        rec
+        for r in repos
+        if (rec := _as_mapping(r)) is not None and rec.get("repo") == "local"
+    ]
     if not local_repos:
         repos.append({"repo": "local", "hooks": [dict(h) for h in canonical_hooks]})
         return True
 
     local_repo = local_repos[0]
-    existing_hooks = local_repo.setdefault("hooks", [])
-    if not isinstance(existing_hooks, list):
+    existing_hooks = _as_list(local_repo.setdefault("hooks", []))
+    if existing_hooks is None:
         return False
     return _merge_local_repo_hooks(existing_hooks, canonical_hooks)
 
