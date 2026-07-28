@@ -19,7 +19,7 @@ from ..migrations import MigrationStatus, migration_status, run_pending_migratio
 from .checks import CheckDiagnostic, CheckResult, Severity, run_all_checks
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
     from pathlib import Path
 
 __all__ = [
@@ -81,6 +81,32 @@ class RepairRun:
         )
 
 
+@dataclass
+class _PipelineState:
+    """Scratch state threaded through the repair pipeline stages.
+
+    Each stage function receives the same :class:`_PipelineState` instance,
+    mutates ``run`` in place, and reports back whether the pipeline should
+    stop by returning ``True``. Splitting the pipeline into per-phase
+    functions keeps each stage's own branch, statement, and return count
+    small; only ``run_repair_pipeline`` iterates the stage sequence.
+    """
+
+    root_dir: Path
+    run: RepairRun
+    feat: str | None
+    dry_run: bool
+    include_index: bool
+    before: dict[str, tuple[int, int]]
+    current: dict[str, tuple[int, int]]
+    initial_checks: list[CheckResult] = field(default_factory=list)
+
+    def refresh_fingerprints(self) -> dict[str, tuple[int, int]]:
+        """Recompute and store the current vault file fingerprints."""
+        self.current = _vault_file_fingerprints(self.root_dir)
+        return self.current
+
+
 def run_repair_pipeline(
     root_dir: Path,
     *,
@@ -102,18 +128,29 @@ def run_repair_pipeline(
     feat = feature.lstrip("#") if feature else None
     run = RepairRun(dry_run=dry_run, feature=feat, include_index=include_index)
     before = _vault_file_fingerprints(root_dir)
-    current = before
+    state = _PipelineState(
+        root_dir=root_dir,
+        run=run,
+        feat=feat,
+        dry_run=dry_run,
+        include_index=include_index,
+        before=before,
+        current=before,
+    )
 
-    def refresh_fingerprints() -> dict[str, tuple[int, int]]:
-        nonlocal current
-        current = _vault_file_fingerprints(root_dir)
-        return current
+    for stage in _REPAIR_STAGES:
+        if stage(state):
+            break
 
-    def finalize_current() -> None:
-        _finalize(run, before, current)
+    _finalize(run, state.before, state.current)
+    return run
 
+
+def _stage_preflight(state: _PipelineState) -> bool:
+    """Check migration status and apply pending migrations. Returns stop."""
+    run = state.run
     try:
-        status, pending_names = migration_status(root_dir)
+        status, pending_names = migration_status(state.root_dir)
     except Exception as exc:
         _record_failure(run, RepairPhase.PREFLIGHT, exc)
         run.phases.append(
@@ -121,24 +158,24 @@ def run_repair_pipeline(
                 "phase": RepairPhase.PREFLIGHT.value,
                 "migration_status": "unknown",
                 "pending_migrations": [],
-                "platform": _platform_summary(root_dir),
+                "platform": _platform_summary(state.root_dir),
                 "applied_migrations": [],
                 "skipped": False,
                 "failed": True,
                 "error": str(exc),
             }
         )
-        finalize_current()
-        return run
+        return True
+
     preflight: dict[str, Any] = {
         "phase": RepairPhase.PREFLIGHT.value,
         "migration_status": status.value,
         "pending_migrations": pending_names,
-        "platform": _platform_summary(root_dir),
+        "platform": _platform_summary(state.root_dir),
         "applied_migrations": [],
         "skipped": False,
     }
-    if dry_run and status == MigrationStatus.PENDING:
+    if state.dry_run and status == MigrationStatus.PENDING:
         preflight["skipped"] = True
         preflight["message"] = (
             "Dry-run skipped vault scanning because pending migrations would "
@@ -154,22 +191,20 @@ def run_repair_pipeline(
                 "path": None,
             }
         )
-        finalize_current()
-        return run
+        return True
 
-    if not dry_run:
+    if not state.dry_run:
         try:
-            applied = run_pending_migrations(root_dir)
+            applied = run_pending_migrations(state.root_dir)
         except Exception as exc:
             _record_failure(run, RepairPhase.PREFLIGHT, exc)
             preflight["failed"] = True
             preflight["error"] = str(exc)
             run.phases.append(preflight)
-            refresh_fingerprints()
-            finalize_current()
-            return run
+            state.refresh_fingerprints()
+            return True
         if applied:
-            refresh_fingerprints()
+            state.refresh_fingerprints()
         preflight["applied_migrations"] = [
             {
                 "name": result.name,
@@ -180,89 +215,97 @@ def run_repair_pipeline(
             for result in applied
         ]
     run.phases.append(preflight)
+    return False
 
+
+def _stage_check(state: _PipelineState) -> bool:
+    """Run the read-only check pass and stash its results. Returns stop."""
+    run = state.run
     try:
-        initial = run_all_checks(root_dir, feature=feat, fix=False)
+        initial = run_all_checks(state.root_dir, feature=state.feat, fix=False)
     except Exception as exc:
         _record_failure(run, RepairPhase.CHECK, exc)
         run.phases.append(_failed_phase(RepairPhase.CHECK, exc))
-        finalize_current()
-        return run
+        return True
     run.phases.append(_checks_phase(RepairPhase.CHECK, initial))
     run.planned_fixes = _collect_fixable(initial)
     run.root_causes = _group_root_causes(initial)
+    state.initial_checks = initial
+    return False
 
-    if dry_run:
-        for item in run.planned_fixes:
+
+def _stage_dry_run_finish(state: _PipelineState) -> bool:
+    """Report planned fixes and indexes for a dry-run. Returns stop."""
+    if not state.dry_run:
+        return False
+
+    run = state.run
+    root_dir = state.root_dir
+    for item in run.planned_fixes:
+        _record_journal(
+            run,
+            RepairPhase.FIX,
+            action="planned-fix",
+            status="planned",
+            path=item.get("path"),
+            check=item.get("check"),
+            message=item.get("fix_description") or item.get("message"),
+        )
+    run.phases.append(
+        {
+            "phase": RepairPhase.FIX.value,
+            "dry_run": True,
+            "fixed_count": 0,
+            "planned_count": len(run.planned_fixes),
+            "skipped": False,
+        }
+    )
+    if state.include_index:
+        planned_indexes = _index_paths(root_dir, state.feat)
+        run.generated_indexes = [_rel_str(p, root_dir) for p in planned_indexes]
+        for path in run.generated_indexes:
             _record_journal(
                 run,
-                RepairPhase.FIX,
-                action="planned-fix",
+                RepairPhase.INDEX,
+                action="refresh-index",
                 status="planned",
-                path=item.get("path"),
-                check=item.get("check"),
-                message=item.get("fix_description") or item.get("message"),
+                path=path,
             )
         run.phases.append(
             {
-                "phase": RepairPhase.FIX.value,
+                "phase": RepairPhase.INDEX.value,
                 "dry_run": True,
-                "fixed_count": 0,
-                "planned_count": len(run.planned_fixes),
+                "planned": run.generated_indexes,
+                "generated": [],
                 "skipped": False,
             }
         )
-        if include_index:
-            planned_indexes = _index_paths(root_dir, feat)
-            run.generated_indexes = [_rel_str(p, root_dir) for p in planned_indexes]
-            for path in run.generated_indexes:
-                _record_journal(
-                    run,
-                    RepairPhase.INDEX,
-                    action="refresh-index",
-                    status="planned",
-                    path=path,
-                )
-            run.phases.append(
-                {
-                    "phase": RepairPhase.INDEX.value,
-                    "dry_run": True,
-                    "planned": run.generated_indexes,
-                    "generated": [],
-                    "skipped": False,
-                }
-            )
-        else:
-            run.phases.append(_skipped_index_phase("disabled by --no-index"))
-        run.postcheck = initial
-        run.phases.append(_checks_phase(RepairPhase.POSTCHECK, initial, dry_run=True))
-        run.unresolved = _collect_unresolved(initial)
-        finalize_current()
-        return run
+    else:
+        run.phases.append(_skipped_index_phase("disabled by --no-index"))
+    run.postcheck = state.initial_checks
+    run.phases.append(
+        _checks_phase(RepairPhase.POSTCHECK, state.initial_checks, dry_run=True)
+    )
+    run.unresolved = _collect_unresolved(state.initial_checks)
+    return True
 
-    phase_before = current
+
+def _stage_fix(state: _PipelineState) -> bool:
+    """Apply fixes, then restamp documents the fix pass rewrote. Returns stop."""
+    run = state.run
+    root_dir = state.root_dir
+    phase_before = state.current
     try:
-        fixed = run_all_checks(root_dir, feature=feat, fix=True)
+        fixed = run_all_checks(root_dir, feature=state.feat, fix=True)
     except Exception as exc:
         _record_failure(run, RepairPhase.FIX, exc)
         run.phases.append(_failed_phase(RepairPhase.FIX, exc))
-        phase_after = refresh_fingerprints()
-        _record_file_deltas(
-            run,
-            RepairPhase.FIX,
-            phase_before,
-            phase_after,
-        )
-        finalize_current()
-        return run
+        phase_after = state.refresh_fingerprints()
+        _record_file_deltas(run, RepairPhase.FIX, phase_before, phase_after)
+        return True
     run.phases.append(_checks_phase(RepairPhase.FIX, fixed))
-    phase_after = refresh_fingerprints()
-    _record_file_deltas(
-        run,
-        RepairPhase.FIX,
-        phase_before,
-        phase_after,
-    )
+    phase_after = state.refresh_fingerprints()
+    _record_file_deltas(run, RepairPhase.FIX, phase_before, phase_after)
 
     # Vault-orientation ADR (decision D3): the fix pass rewrote documents,
     # so refresh the modified stamp on exactly those the fix touched. Only
@@ -270,81 +313,99 @@ def run_repair_pipeline(
     # untouched documents are left byte-for-byte intact. Re-fingerprint
     # afterwards so the index and postcheck phases observe the restamped
     # state rather than reporting the stamp write as fresh drift.
-    if not dry_run:
-        rewritten = _changed_files(phase_before, phase_after)
-        if _restamp_modified(root_dir, rewritten):
-            phase_after = refresh_fingerprints()
+    rewritten = _changed_files(phase_before, phase_after)
+    if _restamp_modified(root_dir, rewritten):
+        state.refresh_fingerprints()
+    return False
 
-    if include_index:
-        phase_before = current
-        try:
-            generated = _refresh_indexes(root_dir, feat)
-        except Exception as exc:
-            _record_failure(run, RepairPhase.INDEX, exc)
-            run.phases.append(
-                {
-                    "phase": RepairPhase.INDEX.value,
-                    "dry_run": False,
-                    "generated": [],
-                    "skipped": False,
-                    "failed": True,
-                    "error": str(exc),
-                }
-            )
-            phase_after = refresh_fingerprints()
-            _record_file_deltas(
-                run,
-                RepairPhase.INDEX,
-                phase_before,
-                phase_after,
-            )
-            failure_unresolved = list(run.unresolved)
-            try:
-                postcheck = run_all_checks(root_dir, feature=feat, fix=False)
-            except Exception as postcheck_exc:
-                _record_failure(run, RepairPhase.POSTCHECK, postcheck_exc)
-                run.phases.append(_failed_phase(RepairPhase.POSTCHECK, postcheck_exc))
-                finalize_current()
-                return run
-            run.postcheck = postcheck
-            run.unresolved = failure_unresolved + _collect_unresolved(postcheck)
-            run.root_causes = _group_root_causes(postcheck)
-            run.phases.append(_checks_phase(RepairPhase.POSTCHECK, postcheck))
-            finalize_current()
-            return run
-        run.generated_indexes = [_rel_str(path, root_dir) for path in generated]
-        run.phases.append(
-            {
-                "phase": RepairPhase.INDEX.value,
-                "dry_run": False,
-                "generated": run.generated_indexes,
-                "skipped": False,
-            }
-        )
-        phase_after = refresh_fingerprints()
-        _record_file_deltas(
-            run,
-            RepairPhase.INDEX,
-            phase_before,
-            phase_after,
-        )
-    else:
+
+def _stage_index(state: _PipelineState) -> bool:
+    """Refresh generated feature indexes after the fix pass. Returns stop."""
+    run = state.run
+    root_dir = state.root_dir
+    if not state.include_index:
         run.phases.append(_skipped_index_phase("disabled by --no-index"))
+        return False
 
+    phase_before = state.current
     try:
-        postcheck = run_all_checks(root_dir, feature=feat, fix=False)
+        generated = _refresh_indexes(root_dir, state.feat)
+    except Exception as exc:
+        return _handle_index_failure(state, exc, phase_before)
+
+    run.generated_indexes = [_rel_str(path, root_dir) for path in generated]
+    run.phases.append(
+        {
+            "phase": RepairPhase.INDEX.value,
+            "dry_run": False,
+            "generated": run.generated_indexes,
+            "skipped": False,
+        }
+    )
+    phase_after = state.refresh_fingerprints()
+    _record_file_deltas(run, RepairPhase.INDEX, phase_before, phase_after)
+    return False
+
+
+def _handle_index_failure(
+    state: _PipelineState,
+    exc: Exception,
+    phase_before: dict[str, tuple[int, int]],
+) -> bool:
+    """Record an index-refresh failure and still attempt a postcheck."""
+    run = state.run
+    _record_failure(run, RepairPhase.INDEX, exc)
+    run.phases.append(
+        {
+            "phase": RepairPhase.INDEX.value,
+            "dry_run": False,
+            "generated": [],
+            "skipped": False,
+            "failed": True,
+            "error": str(exc),
+        }
+    )
+    phase_after = state.refresh_fingerprints()
+    _record_file_deltas(run, RepairPhase.INDEX, phase_before, phase_after)
+
+    failure_unresolved = list(run.unresolved)
+    try:
+        postcheck = run_all_checks(state.root_dir, feature=state.feat, fix=False)
+    except Exception as postcheck_exc:
+        _record_failure(run, RepairPhase.POSTCHECK, postcheck_exc)
+        run.phases.append(_failed_phase(RepairPhase.POSTCHECK, postcheck_exc))
+        return True
+    run.postcheck = postcheck
+    run.unresolved = failure_unresolved + _collect_unresolved(postcheck)
+    run.root_causes = _group_root_causes(postcheck)
+    run.phases.append(_checks_phase(RepairPhase.POSTCHECK, postcheck))
+    return True
+
+
+def _stage_postcheck(state: _PipelineState) -> bool:
+    """Run the final read-only postcheck pass. Returns stop."""
+    run = state.run
+    try:
+        postcheck = run_all_checks(state.root_dir, feature=state.feat, fix=False)
     except Exception as exc:
         _record_failure(run, RepairPhase.POSTCHECK, exc)
         run.phases.append(_failed_phase(RepairPhase.POSTCHECK, exc))
-        finalize_current()
-        return run
+        return True
     run.postcheck = postcheck
     run.unresolved = _collect_unresolved(postcheck)
     run.root_causes = _group_root_causes(postcheck)
     run.phases.append(_checks_phase(RepairPhase.POSTCHECK, postcheck))
+    return False
 
-    finalize_current()
-    return run
+
+_REPAIR_STAGES: tuple[Callable[[_PipelineState], bool], ...] = (
+    _stage_preflight,
+    _stage_check,
+    _stage_dry_run_finish,
+    _stage_fix,
+    _stage_index,
+    _stage_postcheck,
+)
 
 
 def _checks_phase(

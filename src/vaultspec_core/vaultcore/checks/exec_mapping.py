@@ -104,45 +104,11 @@ def check_exec_mapping(
     archived_stem_cache: dict[str, bool] = {}
     plan_ids_cache: dict[Path, tuple[set[str], set[str]] | Exception] = {}
 
-    def _is_archived(stem: str) -> bool:
-        cached = archived_stem_cache.get(stem)
-        if cached is None:
-            cached = (archive_plan_dir / f"{stem}.md").is_file()
-            archived_stem_cache[stem] = cached
-        return cached
-
-    def _step_ids(plan_path: Path) -> tuple[set[str], set[str]] | Exception:
-        cached = plan_ids_cache.get(plan_path)
-        if cached is None:
-            source: str | Path = plan_path
-            if raw_texts is not None:
-                entry = raw_texts.get(plan_path)
-                if entry is None:
-                    # The plan is in the corpus but its text never survived
-                    # ingress (read or decode failure). The single-ingress
-                    # contract forbids a disk fallback, so classify it as
-                    # unparseable - which a disk read of an unreadable file
-                    # would conclude anyway.
-                    cached = ValueError(
-                        "plan document could not be read during ingress"
-                    )
-                    plan_ids_cache[plan_path] = cached
-                    return cached
-                source = entry[0]
-            try:
-                cached = _plan_step_ids(source)
-            except Exception as exc:
-                cached = exc
-            plan_ids_cache[plan_path] = cached
-        return cached
-
     for doc_path, (metadata, _body) in sorted(snapshot.items()):
         if get_doc_type(doc_path, root_dir) is not DocType.EXEC:
             continue
-        if feature:
-            feat = feature.lstrip("#")
-            if feat not in extract_feature_tags(metadata.tags):
-                continue
+        if feature and feature.lstrip("#") not in extract_feature_tags(metadata.tags):
+            continue
 
         step_id = metadata.step_id
         if not step_id:
@@ -158,95 +124,207 @@ def check_exec_mapping(
         candidate_stems = [
             stem for link in metadata.related if (stem := _link_stem(link))
         ]
-        live_plan_path: Path | None = None
-        archived_stem: str | None = None
-        for stem in candidate_stems:
-            if f"{stem}.md" in live_plan_names:
-                live_plan_path = plan_dir / f"{stem}.md"
-                break
-            if _is_archived(stem):
-                archived_stem = stem
+        live_plan_path, archived = _resolve_parent_plan(
+            candidate_stems,
+            plan_dir=plan_dir,
+            live_plan_names=live_plan_names,
+            archive_plan_dir=archive_plan_dir,
+            archived_stem_cache=archived_stem_cache,
+        )
 
         if live_plan_path is None:
-            if archived_stem is not None:
+            if archived:
                 # Archived parent plan: expected and benign. No finding.
                 continue
-            plan_hint = next((s for s in candidate_stems if s.endswith("-plan")), None)
-            named = f" '{plan_hint}'" if plan_hint else ""
             result.diagnostics.append(
-                CheckDiagnostic(
-                    path=rel_path,
-                    message=(
-                        f"Execution record declares step {step_id} but its "
-                        f"parent plan{named} was not found in .vault/plan/ or "
-                        ".vault/_archive/plan/."
-                    ),
-                    severity=Severity.WARNING,
-                    fixable=False,
-                    fix_description=(
-                        "Point related: at the correct parent plan, or archive "
-                        "the record if its plan is gone."
-                    ),
-                )
+                _missing_plan_diagnostic(rel_path, step_id, candidate_stems)
             )
             continue
 
-        ids_or_error = _step_ids(live_plan_path)
+        ids_or_error = _resolve_step_ids(
+            live_plan_path, raw_texts=raw_texts, cache=plan_ids_cache
+        )
         if isinstance(ids_or_error, Exception):
-            exc = ids_or_error
-            logger.debug("Could not parse plan %s: %s", live_plan_path, exc)
             result.diagnostics.append(
-                CheckDiagnostic(
-                    path=live_plan_path.relative_to(root_dir),
-                    message=(
-                        "Parent plan could not be parsed, so the execution "
-                        f"record for step {step_id} cannot be verified: {exc}"
-                    ),
-                    severity=Severity.WARNING,
-                    fixable=False,
-                    fix_description="Repair the plan document structure.",
+                _unparseable_plan_diagnostic(
+                    live_plan_path, root_dir, step_id, ids_or_error
                 )
             )
             continue
 
         live_ids, retired_ids = ids_or_error
-        if step_id in live_ids:
-            continue
-        if step_id in retired_ids:
-            result.diagnostics.append(
-                CheckDiagnostic(
-                    path=rel_path,
-                    message=(
-                        f"Execution record references retired Step {step_id}: "
-                        f"the Step was removed from '{live_plan_path.stem}' and "
-                        "its id is never reused."
-                    ),
-                    severity=Severity.WARNING,
-                    fixable=False,
-                    fix_description=(
-                        "Re-point the record at a live Step, or retire the "
-                        "record alongside its Step."
-                    ),
-                )
-            )
-            continue
-
-        result.diagnostics.append(
-            CheckDiagnostic(
-                path=rel_path,
-                message=(
-                    f"Execution record declares Step {step_id}, which does not "
-                    f"exist in parent plan '{live_plan_path.stem}'."
-                ),
-                severity=Severity.WARNING,
-                fixable=False,
-                fix_description=(
-                    "Correct the step_id to a Step that exists in the parent plan."
-                ),
-            )
+        diagnostic = _step_mapping_diagnostic(
+            rel_path, step_id, live_plan_path, live_ids, retired_ids
         )
+        if diagnostic is not None:
+            result.diagnostics.append(diagnostic)
 
     return result
+
+
+def _is_archived_stem(
+    stem: str, archive_plan_dir: Path, cache: dict[str, bool]
+) -> bool:
+    """Return whether *stem* names a plan under ``.vault/_archive/plan/``.
+
+    Probes are memoized per stem so a stem referenced by many exec records
+    costs one disk check for the whole pass.
+    """
+    cached = cache.get(stem)
+    if cached is None:
+        cached = (archive_plan_dir / f"{stem}.md").is_file()
+        cache[stem] = cached
+    return cached
+
+
+def _resolve_parent_plan(
+    candidate_stems: list[str],
+    *,
+    plan_dir: Path,
+    live_plan_names: set[str],
+    archive_plan_dir: Path,
+    archived_stem_cache: dict[str, bool],
+) -> tuple[Path | None, bool]:
+    """Resolve an exec record's parent plan from its candidate stems.
+
+    The first candidate stem resolving to a live plan wins. Failing that, the
+    remaining stems are still probed against the archive so the caller can
+    tell "the parent is archived" (benign) apart from "no parent exists at
+    all" (a defect).
+
+    Returns:
+        A ``(live_plan_path, archived)`` pair: *live_plan_path* is ``None``
+        when no candidate stem names a live plan, and *archived* is ``True``
+        when, in that case, some candidate stem names an archived plan.
+    """
+    archived = False
+    for stem in candidate_stems:
+        if f"{stem}.md" in live_plan_names:
+            return plan_dir / f"{stem}.md", False
+        if not archived and _is_archived_stem(
+            stem, archive_plan_dir, archived_stem_cache
+        ):
+            archived = True
+    return None, archived
+
+
+def _resolve_step_ids(
+    plan_path: Path,
+    *,
+    raw_texts: Mapping[Path, tuple[str, bool]] | None,
+    cache: dict[Path, tuple[set[str], set[str]] | Exception],
+) -> tuple[set[str], set[str]] | Exception:
+    """Return the memoized (live, retired) Step id sets for *plan_path*.
+
+    With *raw_texts* supplied, the plan is parsed from the ingress read's
+    text rather than from disk; a plan present in the corpus whose text never
+    survived ingress is classified as unparseable, matching what a disk read
+    of an unreadable file would conclude anyway.
+    """
+    cached = cache.get(plan_path)
+    if cached is not None:
+        return cached
+
+    source: str | Path = plan_path
+    if raw_texts is not None:
+        entry = raw_texts.get(plan_path)
+        if entry is None:
+            error: tuple[set[str], set[str]] | Exception = ValueError(
+                "plan document could not be read during ingress"
+            )
+            cache[plan_path] = error
+            return error
+        source = entry[0]
+
+    try:
+        resolved: tuple[set[str], set[str]] | Exception = _plan_step_ids(source)
+    except Exception as exc:
+        resolved = exc
+    cache[plan_path] = resolved
+    return resolved
+
+
+def _missing_plan_diagnostic(
+    rel_path: Path, step_id: str, candidate_stems: list[str]
+) -> CheckDiagnostic:
+    """Build the WARNING for an exec record whose parent plan is not found."""
+    plan_hint = next((s for s in candidate_stems if s.endswith("-plan")), None)
+    named = f" '{plan_hint}'" if plan_hint else ""
+    return CheckDiagnostic(
+        path=rel_path,
+        message=(
+            f"Execution record declares step {step_id} but its "
+            f"parent plan{named} was not found in .vault/plan/ or "
+            ".vault/_archive/plan/."
+        ),
+        severity=Severity.WARNING,
+        fixable=False,
+        fix_description=(
+            "Point related: at the correct parent plan, or archive "
+            "the record if its plan is gone."
+        ),
+    )
+
+
+def _unparseable_plan_diagnostic(
+    live_plan_path: Path, root_dir: Path, step_id: str, exc: Exception
+) -> CheckDiagnostic:
+    """Build the WARNING for a parent plan that failed to parse."""
+    logger.debug("Could not parse plan %s: %s", live_plan_path, exc)
+    return CheckDiagnostic(
+        path=live_plan_path.relative_to(root_dir),
+        message=(
+            "Parent plan could not be parsed, so the execution "
+            f"record for step {step_id} cannot be verified: {exc}"
+        ),
+        severity=Severity.WARNING,
+        fixable=False,
+        fix_description="Repair the plan document structure.",
+    )
+
+
+def _step_mapping_diagnostic(
+    rel_path: Path,
+    step_id: str,
+    live_plan_path: Path,
+    live_ids: set[str],
+    retired_ids: set[str],
+) -> CheckDiagnostic | None:
+    """Classify *step_id* against a parent plan's live and retired Step ids.
+
+    Returns ``None`` when *step_id* is live (no finding); otherwise a WARNING
+    distinguishing a retired Step (removed, id never reused) from a Step id
+    that never existed in the plan.
+    """
+    if step_id in live_ids:
+        return None
+    if step_id in retired_ids:
+        return CheckDiagnostic(
+            path=rel_path,
+            message=(
+                f"Execution record references retired Step {step_id}: "
+                f"the Step was removed from '{live_plan_path.stem}' and "
+                "its id is never reused."
+            ),
+            severity=Severity.WARNING,
+            fixable=False,
+            fix_description=(
+                "Re-point the record at a live Step, or retire the "
+                "record alongside its Step."
+            ),
+        )
+    return CheckDiagnostic(
+        path=rel_path,
+        message=(
+            f"Execution record declares Step {step_id}, which does not "
+            f"exist in parent plan '{live_plan_path.stem}'."
+        ),
+        severity=Severity.WARNING,
+        fixable=False,
+        fix_description=(
+            "Correct the step_id to a Step that exists in the parent plan."
+        ),
+    )
 
 
 def _plan_step_ids(source: str | Path) -> tuple[set[str], set[str]]:

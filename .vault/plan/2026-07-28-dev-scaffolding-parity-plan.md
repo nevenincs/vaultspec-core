@@ -20,18 +20,18 @@ Break the twelve production modules over 1000 lines into cohesive units, startin
 
 Split the four largest production modules into cohesive units and lower the module-length ceiling to the new worst.
 
-- [ ] `W01.P01.S01` - Extract the spec command module into cohesive units; `src/vaultspec_core/cli/spec_cmd.py`.
-- [ ] `W01.P01.S02` - Extract the vault command module into cohesive units; `src/vaultspec_core/cli/vault_cmd.py`.
-- [ ] `W01.P01.S03` - Extract the core commands module along its install and sync seams; `src/vaultspec_core/core/commands.py`.
-- [ ] `W01.P01.S04` - Extract the graph api module into query and rendering units; `src/vaultspec_core/graph/api.py`.
-- [ ] `W01.P01.S05` - Lower the module-length ceiling to the post-extraction worst and regenerate its census; `pyproject.toml`.
+- [x] `W01.P01.S01` - Extract the spec command module into cohesive units; `src/vaultspec_core/cli/spec_cmd.py`.
+- [x] `W01.P01.S02` - Extract the vault command module into cohesive units; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `W01.P01.S03` - Extract the core commands module along its install and sync seams; `src/vaultspec_core/core/commands.py`.
+- [x] `W01.P01.S04` - Extract the graph api module into query and rendering units; `src/vaultspec_core/graph/api.py`.
+- [x] `W01.P01.S05` - Lower the module-length ceiling to the post-extraction worst and regenerate its census; `pyproject.toml`.
 
 ### Phase `W01.P02` - extract the eight modules over 1000 lines
 
 Bring the remaining four-figure modules under 1000 lines and ratchet the ceiling again.
 
-- [ ] `W01.P02.S06` - Bring the remaining eight production modules under one thousand lines; `src/vaultspec_core`.
-- [ ] `W01.P02.S07` - Ratchet the module-length ceiling again and regenerate its census; `pyproject.toml`.
+- [x] `W01.P02.S06` - Bring the remaining eight production modules under one thousand lines; `src/vaultspec_core`.
+- [x] `W01.P02.S07` - Ratchet the module-length ceiling again and regenerate its census; `pyproject.toml`.
 
 ## Wave `W02` - pay down the per-function complexity hotspots
 
@@ -41,15 +41,15 @@ Reduce cognitive and cyclomatic complexity toward the tool defaults of 15 and 10
 
 Extract the 57 functions scoring above 30 and lower the cognitive ceiling toward 25.
 
-- [ ] `W02.P03.S08` - Flatten the fifty-seven production functions scoring above cognitive thirty; `src/vaultspec_core`.
-- [ ] `W02.P03.S09` - Lower the cognitive-complexity ceiling toward twenty-five and regenerate its census; `pyproject.toml`.
+- [x] `W02.P03.S08` - Flatten the fifty-seven production functions scoring above cognitive thirty; `src/vaultspec_core`.
+- [x] `W02.P03.S09` - Lower the cognitive-complexity ceiling toward twenty-five and regenerate its census; `pyproject.toml`.
 
 ### Phase `W02.P04` - close the ruff function-size gap
 
 Bring statements, branches, returns, and arguments down toward ruff's own defaults.
 
-- [ ] `W02.P04.S10` - Reduce the worst statement branch return and argument counts toward the ruff defaults; `src/vaultspec_core`.
-- [ ] `W02.P04.S11` - Lower the mccabe and function-size ceilings and regenerate their census; `pyproject.toml`.
+- [x] `W02.P04.S10` - Reduce the worst statement branch return and argument counts toward the ruff defaults; `src/vaultspec_core`.
+- [x] `W02.P04.S11` - Lower the mccabe and function-size ceilings and regenerate their census; `pyproject.toml`.
 
 ## Wave `W03` - close the strict-typing burndown
 

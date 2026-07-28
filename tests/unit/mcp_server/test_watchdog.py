@@ -20,6 +20,7 @@ watchdog can reap the server.
 
 from __future__ import annotations
 
+import gc
 import json
 import os
 import subprocess
@@ -606,6 +607,340 @@ def test_fallback_grace_window_prunes_transient_ancestor(tmp_path: Path) -> None
                 else ["kill", "-9", str(worker_pid)],
                 capture_output=True,
             )
+
+
+def _pid_is_resolvable(pid: int) -> bool:
+    """Whether *pid* still resolves to a process object, on either platform.
+
+    Windows keeps a dead process resolvable for as long as anyone holds a
+    handle to it, so the check is ``OpenProcess``; releasing the last
+    handle is exactly what makes a dead ancestor invisible to the
+    watchdog's walk. POSIX has no such retention, so liveness is the
+    ``os.kill(pid, 0)`` probe - correct there and only there, since on
+    Windows that call terminates the target.
+    """
+    if sys.platform != "win32":
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        return True
+
+    import ctypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.restype = ctypes.c_void_p
+    handle = kernel32.OpenProcess(0x0010_0000, False, ctypes.c_ulong(pid))
+    if not handle:
+        return False
+    kernel32.CloseHandle(ctypes.c_void_p(handle))
+    return True
+
+
+def _orphanable_python() -> str:
+    """The interpreter a genuinely orphanable child has to run under.
+
+    Spawning through the venv's ``python.exe`` is useless for orphan tests:
+    under uv it is a trampoline that stays resident as its child's parent
+    for the child's entire life, so no orphan can form beneath it and the
+    ancestor walk always finds a live anchor. The base interpreter carries
+    no such shim.
+    """
+    return getattr(sys, "_base_executable", None) or sys.executable
+
+
+def _watchdog_source_path() -> str:
+    """Filesystem path of the real watchdog module.
+
+    The orphan workers load it by path rather than importing it. They run
+    under the base interpreter, which has no venv, and
+    ``vaultspec_core.mcp_server.__init__`` eagerly imports the MCP SDK -
+    which imports ``pywintypes`` and fails there. Loading the module file
+    directly executes the same real source with only stdlib imports, so the
+    code under test is genuinely the shipped watchdog.
+    """
+    from pathlib import Path as _Path
+
+    from vaultspec_core.mcp_server import watchdog as watchdog_module
+
+    return str(_Path(watchdog_module.__file__).resolve())
+
+
+def _spawn_unanchored_worker(
+    tmp_path: Path, *, stderr_path: Path, confirmations: int = 2
+) -> int:
+    """Spawn a worker whose entire discovered ancestry is gone before arming.
+
+    Reproduces the field orphan. An intermediary spawns the worker with a
+    non-pipe stdin (so no client PID can resolve) and exits; the worker
+    blocks on a release file until this test has confirmed the dead
+    intermediary is no longer openable, so the ancestor walk provably
+    breaks at it and never reaches this live test process. The watchdog
+    therefore arms with no anchor whatsoever. Timings are compressed
+    through the real arming knobs rather than patched.
+
+    Returns:
+        The worker's PID.
+    """
+    release_file = tmp_path / "release.txt"
+    boot_log = tmp_path / "worker-boot.txt"
+    base = _orphanable_python()
+
+    # Both generations are written to real files: nesting one -c source
+    # inside another quotes badly enough to smuggle in a syntax error, and
+    # a worker that dies at parse time silently passes an exit assertion.
+    worker_py = tmp_path / "orphan_worker.py"
+    worker_py.write_text(
+        textwrap.dedent(
+            f"""
+            import os, sys, time
+
+            # Arm only once the harness has released us: by then the parent
+            # is dead AND unreferenced, so the ancestor snapshot taken at
+            # arming cannot see or open it.
+            deadline = time.monotonic() + 60
+            while not os.path.exists({str(release_file)!r}):
+                if time.monotonic() > deadline:
+                    raise SystemExit("release file never appeared")
+                time.sleep(0.1)
+
+            sys.stderr = open(
+                {str(stderr_path)!r}, "w", encoding="utf-8", buffering=1
+            )
+
+            import importlib.util
+
+            spec = importlib.util.spec_from_file_location(
+                "vaultspec_watchdog_under_test", {_watchdog_source_path()!r}
+            )
+            watchdog = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(watchdog)
+
+            armed = watchdog.arm_client_watchdog(
+                grace_seconds=0.5,
+                rearm_seconds=0.5,
+                orphan_confirmations={confirmations},
+            )
+            sys.stderr.write(f"armed={{armed}}\\n")
+            time.sleep(120)
+            """
+        ),
+        encoding="utf-8",
+    )
+    intermediary_py = tmp_path / "orphan_launcher.py"
+    intermediary_py.write_text(
+        textwrap.dedent(
+            f"""
+            import os, subprocess
+
+            # The worker gets its own stdio so it never inherits (and holds
+            # open) this launcher's pipes, which would block the parent's
+            # run() for the worker's whole life.
+            with open({str(boot_log)!r}, "w", encoding="utf-8") as log:
+                worker = subprocess.Popen(
+                    [{base!r}, {str(worker_py)!r}],
+                    stdin=subprocess.DEVNULL,
+                    stdout=log,
+                    stderr=log,
+                )
+            print(os.getpid(), flush=True)
+            print(worker.pid, flush=True)
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    # subprocess.run drops its Popen on return, releasing the last handle to
+    # the exited launcher; a retained Popen would keep the process object
+    # alive and OpenProcess would still resolve its PID.
+    completed = subprocess.run(
+        [base, str(intermediary_py)],
+        capture_output=True,
+        text=True,
+        timeout=90,
+        cwd=tmp_path,
+    )
+    assert completed.returncode == 0, completed.stderr
+    intermediary_pid, worker_pid = (int(line) for line in completed.stdout.split())
+
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        gc.collect()
+        if not _pid_is_resolvable(intermediary_pid):
+            break
+        time.sleep(0.2)
+    assert not _pid_is_resolvable(intermediary_pid), (
+        "the launcher still resolves; the worker would find a live anchor"
+    )
+    release_file.write_text("go", encoding="utf-8")
+    return worker_pid
+
+
+def _assert_worker_booted_cleanly(tmp_path: Path) -> None:
+    """Fail if the orphan worker died before it ever armed.
+
+    The worker runs with no console and a dead parent, so a syntax error or
+    a failed import would otherwise be invisible and would satisfy an
+    exit-based assertion for entirely the wrong reason.
+    """
+    boot_log = tmp_path / "worker-boot.txt"
+    noise = (
+        boot_log.read_text(encoding="utf-8", errors="replace")
+        if boot_log.exists()
+        else ""
+    )
+    assert not noise.strip(), f"worker failed before arming:\n{noise}"
+
+
+def _wait_for_worker_armed(stderr_path: Path, timeout: float = 30.0) -> None:
+    """Block until the orphan worker records its arming result."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if stderr_path.exists() and "armed=" in stderr_path.read_text(
+            encoding="utf-8", errors="replace"
+        ):
+            return
+        time.sleep(0.2)
+    raise AssertionError(f"worker never reported arming within {timeout}s")
+
+
+def _kill_pid(pid: int) -> None:
+    """Force-kill *pid* on either platform, ignoring an already-dead target."""
+    subprocess.run(
+        ["taskkill", "/PID", str(pid), "/F"]
+        if sys.platform == "win32"
+        else ["kill", "-9", str(pid)],
+        capture_output=True,
+    )
+
+
+def test_unanchored_worker_reaps_itself_when_all_ancestry_is_gone(
+    tmp_path: Path,
+) -> None:
+    """A worker with no resolvable anchor reaps itself instead of leaking.
+
+    This is the reported defect: pipe resolution declines, every discovered
+    ancestor is already gone, and the process is left running with stdin
+    EOF - documented as unreliable on Windows - as its only exit path. The
+    watchdog must confirm orphanhood across polls and then exit, rather
+    than standing down for the process's lifetime.
+
+    The orphan is built identically on both platforms; only the contract
+    being asserted differs. Reaping a process that was already orphaned
+    before it armed is a Windows behaviour, because EOF cannot be trusted
+    there. POSIX keeps EOF as its primary exit path and its coarse
+    reparent poll anchors on the ppid captured at arming - already the
+    reaper's here - so the asserted POSIX contract is that a backstop
+    still arms, not that this process is reaped.
+    """
+    stderr_path = tmp_path / "worker-stderr.txt"
+    worker_pid = _spawn_unanchored_worker(tmp_path, stderr_path=stderr_path)
+    try:
+        if sys.platform == "win32":
+            assert _wait_for_pid_exit(worker_pid, timeout=60), (
+                "unanchored worker survived; it would have leaked indefinitely"
+            )
+        else:
+            _wait_for_worker_armed(stderr_path)
+        # A worker that died at parse time or on a bad import would also
+        # "exit"; require proof it armed and reaped deliberately.
+        _assert_worker_booted_cleanly(tmp_path)
+        assert "armed=True" in stderr_path.read_text(encoding="utf-8")
+    finally:
+        _kill_pid(worker_pid)
+
+
+def test_unanchored_worker_emits_disarm_and_reasoned_exit_events(
+    tmp_path: Path,
+) -> None:
+    """The unanchored path is observable on stderr, not just in the logs.
+
+    Losing every anchor emits ``stdio_watchdog_disarmed`` so host tooling
+    can detect an unanchored server immediately, and the eventual self-reap
+    carries ``reason=unanchored_orphan`` to distinguish it from an anchor's
+    death. The worker redirects stderr to a file because the parent that
+    owned its pipes is deliberately dead by then.
+
+    The POSIX backstop never disarms and never reaps on this path, so the
+    contract asserted there is the negative one: an armed worker emits no
+    watchdog events at all.
+    """
+    stderr_path = tmp_path / "worker-stderr.txt"
+    worker_pid = _spawn_unanchored_worker(tmp_path, stderr_path=stderr_path)
+    try:
+        if sys.platform != "win32":
+            _wait_for_worker_armed(stderr_path)
+            _assert_worker_booted_cleanly(tmp_path)
+            emitted = [
+                line
+                for line in stderr_path.read_text(encoding="utf-8").splitlines()
+                if line.startswith("{")
+            ]
+            assert not emitted, f"POSIX backstop emitted watchdog events: {emitted}"
+            return
+
+        assert _wait_for_pid_exit(worker_pid, timeout=60), "worker was never reaped"
+        _assert_worker_booted_cleanly(tmp_path)
+        events = [
+            json.loads(line)
+            for line in stderr_path.read_text(encoding="utf-8").splitlines()
+            if line.startswith("{")
+        ]
+        names = [event["event"] for event in events]
+        assert "stdio_watchdog_disarmed" in names, events
+        disarmed = next(e for e in events if e["event"] == "stdio_watchdog_disarmed")
+        assert disarmed["reason"] == "no_anchor_after_grace", disarmed
+        assert disarmed["shim_pid"] == worker_pid
+
+        exits = [e for e in events if e["event"] == "stdio_watchdog_exit"]
+        assert exits, events
+        assert exits[-1]["reason"] == "unanchored_orphan", exits[-1]
+        assert exits[-1]["shim_pid"] == worker_pid
+    finally:
+        _kill_pid(worker_pid)
+
+
+def test_anchored_worker_is_not_reaped_by_the_orphan_poll(tmp_path: Path) -> None:
+    """A live ancestor keeps the worker up well past the confirmation window.
+
+    The orphan reap must fire only on genuine anchorlessness. This worker
+    has a non-pipe stdin (so it takes the ancestor fallback) and a parent
+    that stays alive, and it must still be serving long after an unanchored
+    sibling would have been reaped.
+    """
+    result_file = tmp_path / "anchored-result.txt"
+    worker_code = textwrap.dedent(
+        f"""
+        import time
+        from vaultspec_core.mcp_server.watchdog import arm_client_watchdog
+        armed = arm_client_watchdog(
+            grace_seconds=0.5, rearm_seconds=0.5, orphan_confirmations=2
+        )
+        with open({str(result_file)!r}, "a", encoding="utf-8") as fh:
+            fh.write(f"armed={{armed}}\\n")
+            fh.flush()
+            # Comfortably past grace + every confirmation poll.
+            time.sleep(10)
+            fh.write("still-alive\\n")
+        """
+    )
+    worker = subprocess.Popen(
+        [sys.executable, "-c", worker_code],
+        stdin=subprocess.DEVNULL,
+        cwd=tmp_path,
+    )
+    try:
+        worker.wait(timeout=90)
+        content = result_file.read_text(encoding="utf-8")
+        assert "armed=True" in content, content
+        assert "still-alive" in content, (
+            "an anchored worker was reaped by the orphan confirmation poll"
+        )
+    finally:
+        if worker.poll() is None:
+            worker.kill()
 
 
 def test_real_server_parent_pid_flag_reaps_on_override_death(

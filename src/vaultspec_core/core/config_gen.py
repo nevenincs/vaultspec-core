@@ -277,6 +277,17 @@ def _generate_codex_native_config_body() -> str | None:
 # ---------------------------------------------------------------------------
 
 
+def _upsert_block_or_none(
+    existing: str, block_type: str, body: str, path: Path
+) -> str | None:
+    """Upsert a managed block, logging and returning ``None`` on ``TagError``."""
+    try:
+        return upsert_block(existing, block_type, body)
+    except TagError as e:
+        logger.warning("Cannot update %s: %s", path, e)
+        return None
+
+
 def _sync_managed_md(
     path: Path,
     block_type: str,
@@ -289,53 +300,34 @@ def _sync_managed_md(
 
     Returns the action taken: ``"[ADD]"``, ``"[UPDT]"``, or ``"[SKIP]"``.
     """
-    if path.exists():
-        existing = path.read_text(encoding="utf-8")
-        if has_block(existing, block_type):
-            # Block exists  - check if content actually changed.
-            try:
-                updated = upsert_block(existing, block_type, body)
-            except TagError as e:
-                logger.warning("Cannot update %s: %s", path, e)
-                return "[SKIP]"
-            if updated == existing:
-                return "[SKIP]"
-            if not dry_run:
-                atomic_write(path, updated)
-            return "[UPDT]"
-        if _is_cli_managed(existing) or force:
-            # File is ours or force  - upsert (append block).
-            try:
-                updated = upsert_block(existing, block_type, body)
-            except TagError as e:
-                logger.warning("Cannot update %s: %s", path, e)
-                return "[SKIP]"
-            if updated == existing:
-                return "[SKIP]"
-            if not dry_run:
-                atomic_write(path, updated)
-            return "[UPDT]"
-        # File exists with user content, no managed block, no force.
-        # Append our block without destroying user content.
-        if not dry_run:
-            try:
-                updated = upsert_block(existing, block_type, body)
-            except TagError as e:
-                logger.warning("Cannot update %s: %s", path, e)
-                return "[SKIP]"
-            atomic_write(path, updated)
-        return "[ADD]"
-    else:
-        # New file  - create with managed block only.
-        if not dry_run:
+    is_new = not path.exists()
+    existing = "" if is_new else path.read_text(encoding="utf-8")
+    managed = not is_new and (
+        has_block(existing, block_type) or _is_cli_managed(existing) or force
+    )
+
+    if not managed:
+        # File is new, or exists with user content and no managed block/force.
+        # Append (or create) our block without destroying user content.
+        if dry_run:
+            return "[ADD]"
+        if is_new:
             ensure_dir(path.parent)
-            try:
-                content = upsert_block("", block_type, body)
-            except TagError as e:
-                logger.warning("Cannot update %s: %s", path, e)
-                return "[SKIP]"
-            atomic_write(path, content)
+        updated = _upsert_block_or_none(existing, block_type, body, path)
+        if updated is None:
+            return "[SKIP]"
+        atomic_write(path, updated)
         return "[ADD]"
+
+    # Block already exists, or file is ours / force  - upsert in place.
+    updated = _upsert_block_or_none(existing, block_type, body, path)
+    if updated is None:
+        return "[SKIP]"
+    if updated == existing:
+        return "[SKIP]"
+    if not dry_run:
+        atomic_write(path, updated)
+    return "[UPDT]"
 
 
 def _sync_managed_toml(

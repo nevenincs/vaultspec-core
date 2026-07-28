@@ -287,7 +287,7 @@ class TestInstallSkip:
         (factory.root / ".vaultspec" / "rules").mkdir(parents=True, exist_ok=True)
         factory.create_gitignore()
 
-        caplog.set_level(logging.WARNING, logger="vaultspec_core.core.commands")
+        caplog.set_level(logging.WARNING, logger="vaultspec_core.core.provision")
         factory.install(skip={"core"})
 
         sync_failures = [

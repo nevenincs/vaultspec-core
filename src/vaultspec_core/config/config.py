@@ -176,6 +176,115 @@ class VaultSpecConfig:
 _SENTINEL = object()
 
 
+# Type sentinels for Optional[int] / Optional[float]  - we cannot use
+# ``int | None`` as a registry *value* because the registry needs a single
+# type token to drive parsing.
+
+
+class _OptionalInt:
+    """Sentinel type for registry entries that parse to ``int | None``."""
+
+
+class _OptionalFloat:
+    """Sentinel type for registry entries that parse to ``float | None``."""
+
+
+# Maps a registry ``var_type`` to its ``(converter, skip_validation)`` pair.
+# ``skip_validation`` is ``True`` for types (``bool``, ``Path``, ``list``)
+# whose values bypass the options/range validation applied to the rest.
+# Types absent from this table (``str`` / ``Optional[str]``) need no
+# conversion and are handled by the ``_convert_raw_value`` fallback.
+_TYPE_CONVERTERS: dict[type, tuple[Any, bool]] = {
+    bool: (lambda raw: raw.lower() in ("1", "true", "yes"), True),
+    int: (int, False),
+    float: (float, False),
+    Path: (Path, True),
+    list: (parse_csv_list, True),
+    _OptionalInt: (parse_int_or_none, False),
+    _OptionalFloat: (parse_float_or_none, False),
+}
+
+
+def _convert_raw_value(var: ConfigVariable, raw: str) -> tuple[Any, bool]:
+    """Convert *raw* into the type expected by *var*.
+
+    Args:
+        var: The ``ConfigVariable`` metadata that describes the expected type.
+        raw: The raw string value read from the environment variable.
+
+    Returns:
+        A ``(value, skip_validation)`` tuple. ``skip_validation`` is ``True``
+        for types (``bool``, ``Path``, ``list``) whose values bypass the
+        options/range validation applied to the remaining types; ``value``
+        is ``None`` for ``_OptionalInt``/``_OptionalFloat`` when parsing
+        failed.
+
+    Raises:
+        ValueError: Propagated from ``int()``/``float()`` on malformed input.
+        TypeError: Propagated from the underlying conversion call.
+    """
+    converter_entry = _TYPE_CONVERTERS.get(var.var_type)
+    if converter_entry is None:
+        # str or Optional[str]  - no conversion needed
+        return raw, False
+    converter, skip_validation = converter_entry
+    return converter(raw), skip_validation
+
+
+def _validate_value(var: ConfigVariable, value: Any, source: str | None) -> bool:
+    """Validate an already-converted *value* against *var*'s constraints.
+
+    Args:
+        var: The ``ConfigVariable`` metadata describing the options/range
+            constraints.
+        value: The converted value to validate.
+        source: Human-readable source label for error messages.
+
+    Returns:
+        ``True`` if *value* satisfies every configured constraint, ``False``
+        otherwise (a matching error has already been logged).
+    """
+    if var.options is not None and value not in var.options:
+        logger.error(
+            "%s=%r is not one of %s (source: %s); using default",
+            var.attr_name,
+            value,
+            var.options,
+            source,
+        )
+        return False
+
+    if (
+        var.min_value is not None
+        and isinstance(value, (int, float))
+        and value < var.min_value
+    ):
+        logger.error(
+            "%s=%r is below minimum %s (source: %s); using default",
+            var.attr_name,
+            value,
+            var.min_value,
+            source,
+        )
+        return False
+
+    if (
+        var.max_value is not None
+        and isinstance(value, (int, float))
+        and value > var.max_value
+    ):
+        logger.error(
+            "%s=%r exceeds maximum %s (source: %s); using default",
+            var.attr_name,
+            value,
+            var.max_value,
+            source,
+        )
+        return False
+
+    return True
+
+
 def _parse_raw(var: ConfigVariable, raw: str, source: str | None) -> Any:
     """Parse a raw env-var string into the type expected by *var*.
 
@@ -191,84 +300,7 @@ def _parse_raw(var: ConfigVariable, raw: str, source: str | None) -> Any:
         validation fails (caller should fall back to the dataclass default).
     """
     try:
-        if var.var_type is bool:
-            return raw.lower() in ("1", "true", "yes")
-
-        if var.var_type is int:
-            value = int(raw)
-        elif var.var_type is float:
-            value = float(raw)
-        elif var.var_type is Path:
-            return Path(raw)
-        elif var.var_type is list:
-            return parse_csv_list(raw)
-        elif var.var_type is _OptionalInt:
-            value_or_none = parse_int_or_none(raw)
-            if value_or_none is None:
-                logger.error(
-                    "Could not parse %s=%r as int (source: %s); using default",
-                    var.attr_name,
-                    raw,
-                    source,
-                )
-                return _SENTINEL
-            value = value_or_none
-        elif var.var_type is _OptionalFloat:
-            value_or_none = parse_float_or_none(raw)
-            if value_or_none is None:
-                logger.error(
-                    "Could not parse %s=%r as float (source: %s); using default",
-                    var.attr_name,
-                    raw,
-                    source,
-                )
-                return _SENTINEL
-            value = value_or_none
-        else:
-            # str or Optional[str]  - no conversion needed
-            value = raw
-
-        # Validate options
-        if var.options is not None and value not in var.options:
-            logger.error(
-                "%s=%r is not one of %s (source: %s); using default",
-                var.attr_name,
-                value,
-                var.options,
-                source,
-            )
-            return _SENTINEL
-
-        # Validate range
-        if (
-            var.min_value is not None
-            and isinstance(value, (int, float))
-            and value < var.min_value
-        ):
-            logger.error(
-                "%s=%r is below minimum %s (source: %s); using default",
-                var.attr_name,
-                value,
-                var.min_value,
-                source,
-            )
-            return _SENTINEL
-        if (
-            var.max_value is not None
-            and isinstance(value, (int, float))
-            and value > var.max_value
-        ):
-            logger.error(
-                "%s=%r exceeds maximum %s (source: %s); using default",
-                var.attr_name,
-                value,
-                var.max_value,
-                source,
-            )
-            return _SENTINEL
-
-        return value
-
+        value, skip_validation = _convert_raw_value(var, raw)
     except (ValueError, TypeError) as exc:
         logger.error(
             "Failed to parse %s=%r (source: %s): %s; using default",
@@ -280,18 +312,19 @@ def _parse_raw(var: ConfigVariable, raw: str, source: str | None) -> Any:
         )
         return _SENTINEL
 
+    if var.var_type in (_OptionalInt, _OptionalFloat) and value is None:
+        logger.error(
+            "Could not parse %s=%r as %s (source: %s); using default",
+            var.attr_name,
+            raw,
+            "int" if var.var_type is _OptionalInt else "float",
+            source,
+        )
+        return _SENTINEL
 
-# Type sentinels for Optional[int] / Optional[float]  - we cannot use
-# ``int | None`` as a registry *value* because the registry needs a single
-# type token to drive parsing.
-
-
-class _OptionalInt:
-    """Sentinel type for registry entries that parse to ``int | None``."""
-
-
-class _OptionalFloat:
-    """Sentinel type for registry entries that parse to ``float | None``."""
+    if skip_validation or _validate_value(var, value, source):
+        return value
+    return _SENTINEL
 
 
 @dataclass

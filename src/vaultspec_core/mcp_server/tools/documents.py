@@ -731,6 +731,7 @@ def _find_features(limit: int, want_json: bool) -> list[FindEntry]:
     features = list_feature_details(root_dir)
 
     graph_unavailable = False
+    graph: VaultGraph | None = None
     try:
         graph = VaultGraph(root_dir)
         rankings = dict(graph.get_feature_rankings(limit=100))
