@@ -69,6 +69,7 @@ def collect_all(plan: Plan, source_text: str) -> list[Finding]:
     """
     from vaultspec_core.plan.checks.display_path_check import check_display_path
     from vaultspec_core.plan.checks.frontmatter_check import check_frontmatter
+    from vaultspec_core.plan.checks.heading_level_check import check_heading_levels
     from vaultspec_core.plan.checks.hierarchy_check import check_hierarchy
     from vaultspec_core.plan.checks.identifiers_check import check_identifiers
     from vaultspec_core.plan.checks.row_contract_check import check_row_contract
@@ -77,6 +78,9 @@ def collect_all(plan: Plan, source_text: str) -> list[Finding]:
 
     findings: list[Finding] = []
     findings.extend(check_frontmatter(plan))
+    # Runs before the model-driven rules: a mislevelled container heading is
+    # invisible in the parsed plan, so this reads the source text instead.
+    findings.extend(check_heading_levels(source_text))
     findings.extend(check_hierarchy(plan))
     findings.extend(check_identifiers(plan, source_text))
     findings.extend(check_display_path(plan))
