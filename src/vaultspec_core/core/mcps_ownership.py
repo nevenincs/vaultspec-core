@@ -18,7 +18,7 @@ import hashlib
 import json
 from contextlib import nullcontext
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from .enums import McpScope
 from .exceptions import VaultSpecError
@@ -29,6 +29,37 @@ if TYPE_CHECKING:
 
 _OWNERSHIP_VERSION = 1
 _OWNERSHIP_FILENAME = "mcp-ownership.json"
+
+
+class _TargetRecord(TypedDict, total=False):
+    """One target's ownership record, as persisted under ``targets[key]``."""
+
+    provider: str
+    scope: str
+    path: str
+    managed: dict[str, Any]
+
+
+class _OwnershipState(TypedDict):
+    """The full on-disk ownership sidecar shape, keyed by target key."""
+
+    version: int
+    targets: dict[str, _TargetRecord]
+
+
+__all__ = [
+    "_discard_owned_names",
+    "_fingerprint",
+    "_launch_repr",
+    "_owned_fingerprints",
+    "_owned_names",
+    "_ownership_path",
+    "_ownership_target_key",
+    "_read_ownership",
+    "_set_owned_names",
+    "_target_lock",
+    "_write_ownership",
+]
 
 
 def _ownership_path(root: Path, scope: McpScope) -> Path:
@@ -44,17 +75,23 @@ def _ownership_target_key(target: McpTarget) -> str:
     return base
 
 
-def _read_ownership(path: Path) -> dict[str, Any]:
+def _read_ownership(path: Path) -> _OwnershipState:
     if not path.exists():
         return {"version": _OWNERSHIP_VERSION, "targets": {}}
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw_obj: object = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
         raise VaultSpecError(
             f"Cannot read MCP ownership state at {path}: {exc}",
             hint="Repair or remove the corrupt sidecar before reconciling MCPs.",
         ) from exc
-    if not isinstance(raw, dict) or not isinstance(raw.get("targets"), dict):
+    if not isinstance(raw_obj, dict):
+        raise VaultSpecError(
+            f"Invalid MCP ownership state at {path}.",
+            hint="Expected an object with a 'targets' object.",
+        )
+    raw = cast("dict[str, Any]", raw_obj)
+    if not isinstance(raw.get("targets"), dict):
         raise VaultSpecError(
             f"Invalid MCP ownership state at {path}.",
             hint="Expected an object with a 'targets' object.",
@@ -62,10 +99,10 @@ def _read_ownership(path: Path) -> dict[str, Any]:
     version = raw.get("version")
     if version != _OWNERSHIP_VERSION:
         raise VaultSpecError(f"Unsupported MCP ownership version at {path}: {version}")
-    return raw
+    return cast("_OwnershipState", raw)
 
 
-def _write_ownership(path: Path, state: dict[str, Any]) -> None:
+def _write_ownership(path: Path, state: _OwnershipState) -> None:
     ensure_dir(path.parent)
     atomic_write(path, json.dumps(state, indent=2, sort_keys=True) + "\n")
 
@@ -81,15 +118,13 @@ def _fingerprint(config: dict[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _owned_names(state: dict[str, Any], target: McpTarget) -> set[str]:
+def _owned_names(state: _OwnershipState, target: McpTarget) -> set[str]:
     raw = state["targets"].get(_ownership_target_key(target), {})
-    managed = raw.get("managed", {}) if isinstance(raw, dict) else {}
-    if isinstance(managed, dict):
-        return {str(name) for name in managed}
-    return set()
+    managed = raw.get("managed", {})
+    return {str(name) for name in managed}
 
 
-def _owned_fingerprints(state: dict[str, Any], target: McpTarget) -> dict[str, str]:
+def _owned_fingerprints(state: _OwnershipState, target: McpTarget) -> dict[str, str]:
     """Return the recorded name-to-fingerprint map for one target's managed entries.
 
     A name present here with a matching current fingerprint proves the deployed
@@ -99,30 +134,23 @@ def _owned_fingerprints(state: dict[str, Any], target: McpTarget) -> dict[str, s
     keeps the existing skip-and-warn behavior.
     """
     raw = state["targets"].get(_ownership_target_key(target), {})
-    managed = raw.get("managed", {}) if isinstance(raw, dict) else {}
-    if isinstance(managed, dict):
-        return {
-            str(name): value
-            for name, value in managed.items()
-            if isinstance(value, str)
-        }
-    return {}
+    managed = raw.get("managed", {})
+    return {
+        str(name): value for name, value in managed.items() if isinstance(value, str)
+    }
 
 
 def _launch_repr(config: dict[str, Any]) -> str:
     """Return a human-readable one-line rendering of a server's launch command."""
     command = str(config.get("command", ""))
-    args = config.get("args", [])
-    parts = (
-        [command, *(str(item) for item in args)]
-        if isinstance(args, list)
-        else [command]
-    )
+    args_obj: object = config.get("args", [])
+    args = cast("list[object]", args_obj) if isinstance(args_obj, list) else None
+    parts = [command, *(str(item) for item in args)] if args is not None else [command]
     return " ".join(part for part in parts if part)
 
 
 def _set_owned_names(
-    state: dict[str, Any], target: McpTarget, servers: dict[str, dict[str, Any]]
+    state: _OwnershipState, target: McpTarget, servers: dict[str, dict[str, Any]]
 ) -> None:
     key = _ownership_target_key(target)
     if not servers:
@@ -139,7 +167,7 @@ def _set_owned_names(
 
 
 def _discard_owned_names(
-    state: dict[str, Any], target: McpTarget, names: set[str]
+    state: _OwnershipState, target: McpTarget, names: set[str]
 ) -> None:
     key = _ownership_target_key(target)
     record = state["targets"].get(key)

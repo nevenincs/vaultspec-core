@@ -98,7 +98,7 @@ class EditResult:
     status: str
     path: str | None = None
     blob_hash: str | None = None
-    checks: list[dict] = field(default_factory=list)
+    checks: list[dict[str, object]] = field(default_factory=list)
     error: dict[str, object] | None = None
     warnings: list[str] = field(default_factory=list)
     dry_run: bool = False
@@ -180,7 +180,9 @@ def _split_document(text: str) -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 
 
-def _validate_proposed(doc_path: Path, root_dir: Path, new_text: str) -> list[dict]:
+def _validate_proposed(
+    doc_path: Path, root_dir: Path, new_text: str
+) -> list[dict[str, object]]:
     """Validate proposed full document text without writing it.
 
     Builds a single-document snapshot keyed on *doc_path* from the parsed
@@ -215,14 +217,14 @@ def _validate_proposed(doc_path: Path, root_dir: Path, new_text: str) -> list[di
         check_body_links(root_dir, snapshot=snapshot),
     ]
 
-    diagnostics: list[dict] = []
+    diagnostics: list[dict[str, object]] = []
     for result in results:
         for diag in result.diagnostics:
             diagnostics.append(_diag_to_dict(result.check_name, diag))
     return diagnostics
 
 
-def _diag_to_dict(check_name: str, diag: CheckDiagnostic) -> dict:
+def _diag_to_dict(check_name: str, diag: CheckDiagnostic) -> dict[str, object]:
     """Render a :class:`CheckDiagnostic` as a JSON-safe dict.
 
     Args:
@@ -240,7 +242,7 @@ def _diag_to_dict(check_name: str, diag: CheckDiagnostic) -> dict:
     return payload
 
 
-def _has_error(diagnostics: list[dict]) -> bool:
+def _has_error(diagnostics: list[dict[str, object]]) -> bool:
     """Return ``True`` when any diagnostic is ERROR severity.
 
     Args:
@@ -252,7 +254,7 @@ def _has_error(diagnostics: list[dict]) -> bool:
     return any(d["severity"] == "error" for d in diagnostics)
 
 
-def _warnings_of(diagnostics: list[dict]) -> list[str]:
+def _warnings_of(diagnostics: list[dict[str, object]]) -> list[str]:
     """Return the messages of WARNING-severity diagnostics.
 
     Args:
@@ -604,7 +606,7 @@ def execute_edit(
         # Frontmatter conformance is the model's own validator, run pre-write.
         frontmatter_errors = _frontmatter_validate(proposed_lf)
 
-        checks: list[dict] = []
+        checks: list[dict[str, object]] = []
         if run_checks:
             checks = _validate_proposed(doc_path, root_dir, proposed_lf)
 

@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import pathlib
+    from collections.abc import Callable
 
     from ...core.enums import ModelRegistry
 
@@ -69,7 +70,7 @@ def resolve_includes(
         visited = set()
     resolved_root = root_dir.resolve()
     lines = content.split("\n")
-    resolved_lines = []
+    resolved_lines: list[str] = []
     for line in lines:
         stripped = line.strip()
         if not stripped.startswith("@"):
@@ -160,7 +161,9 @@ def resolve_includes(
     return "\n".join(resolved_lines)
 
 
-def resolve_executable(name: str, which_fn=None) -> tuple[str, list[str]]:
+def resolve_executable(
+    name: str, which_fn: Callable[[str], str | None] | None = None
+) -> tuple[str, list[str]]:
     """Resolve an executable name, handling Windows .cmd/.bat wrappers.
 
     On Windows, tools installed via npm/uv often appear as .cmd batch
@@ -251,7 +254,7 @@ class ExecutionProvider(abc.ABC):
             Combined system prompt string, or an empty string when all inputs
             are blank.
         """
-        parts = []
+        parts: list[str] = []
         if system_instructions.strip():
             parts.append(f"# SYSTEM INSTRUCTIONS\n{system_instructions}")
         if persona.strip():

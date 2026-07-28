@@ -354,7 +354,7 @@ class DocumentMetadata:
         Returns:
             A list of human-readable violation messages; empty list means valid.
         """
-        errors = []
+        errors: list[str] = []
 
         #  Tags: at least one directory tag and one feature tag (minimum 2)
         if len(self.tags) < 2:
@@ -513,7 +513,7 @@ class VaultConstants:
         if not docs_dir.exists():
             return []
 
-        errors = []
+        errors: list[str] = []
         # Check for unsupported directories
         for item in docs_dir.iterdir():
             if item.is_dir():
@@ -565,7 +565,7 @@ class VaultConstants:
         Returns:
             List of violation message strings; empty when the filename is valid.
         """
-        errors = []
+        errors: list[str] = []
 
         if not filename.endswith(".md"):
             msg = f"Vault violation: Filename '{filename}' must have .md extension."
