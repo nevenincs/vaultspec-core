@@ -78,7 +78,7 @@ def _top_n(
     return dict(ranked[:n])
 
 
-def _betweenness_centrality(g: nx.DiGraph) -> dict[str, float]:
+def _betweenness_centrality(g: nx.DiGraph[str]) -> dict[str, float]:
     """Compute betweenness centrality via the C-backed engine when available.
 
     Betweenness is the one O(V*E) algorithm on the opt-in analysis surface;
@@ -104,7 +104,7 @@ def _betweenness_centrality(g: nx.DiGraph) -> dict[str, float]:
 
 
 def _pagerank(
-    g: nx.DiGraph,
+    g: nx.DiGraph[str],
     *,
     alpha: float = 0.85,
     max_iter: int = 100,
@@ -143,12 +143,12 @@ def _pagerank(
     # the summation order affects the last ulp of every score; pinning the
     # order to the sorted keys makes the result bit-identical regardless of the
     # order edges were inserted (the regression guard in test_pagerank).
-    nodes = sorted(g.nodes())
+    nodes: list[str] = sorted(g.nodes())
     n = len(nodes)
     if n == 0:
         return {}
 
-    rank = dict.fromkeys(nodes, 1.0 / n)
+    rank: dict[str, float] = dict.fromkeys(nodes, 1.0 / n)
     teleport = (1.0 - alpha) / n
 
     # Pre-compute weighted out-degree so dangling nodes are detected once.
@@ -159,13 +159,14 @@ def _pagerank(
             total += float(data.get("weight", 1.0))
         out_weight[node] = total
 
+    err = 0.0
     for _ in range(max_iter):
         prev = rank
         # Dangling mass: nodes with no out-edges spread their rank uniformly.
         dangling_mass = alpha * sum(
             prev[node] for node in nodes if out_weight[node] == 0.0
         )
-        nxt = dict.fromkeys(nodes, teleport + dangling_mass / n)
+        nxt: dict[str, float] = dict.fromkeys(nodes, teleport + dangling_mass / n)
         for node in nodes:
             if out_weight[node] == 0.0:
                 continue

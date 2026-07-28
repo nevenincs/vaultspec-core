@@ -29,6 +29,7 @@ from .rename_ops import rename_document_path
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
     from pathlib import Path
+    from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +186,9 @@ class RenameTransaction:
             self._stack.enter_context(advisory_lock(self.lock_target))
         return self
 
-    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> bool:
+    def __exit__(
+        self, exc_type: object, exc_val: object, exc_tb: object
+    ) -> Literal[False]:
         """Roll back on a propagating exception, then release the lock.
 
         Rollback runs while the lock is still held so the restore is serialized

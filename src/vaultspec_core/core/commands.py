@@ -124,7 +124,7 @@ def hooks_list_data() -> dict[str, Any]:
 
     ctx = _t.get_context()
     hooks = load_hooks(ctx.hooks_dir)
-    hooks_data = []
+    hooks_data: list[dict[str, Any]] = []
     for hook in hooks:
         actions = ", ".join(a.command for a in hook.actions if a.action_type == "shell")
         hooks_data.append(

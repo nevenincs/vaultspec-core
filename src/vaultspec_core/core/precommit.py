@@ -18,7 +18,7 @@ from ruamel.yaml import YAML, YAMLError
 
 from .enums import InstallMode, PrecommitHook, render_mode
 from .helpers import advisory_lock, atomic_write
-from .prek_boundary import collect_prek_boundary
+from .prek_boundary import PrekBoundaryState, collect_prek_boundary
 
 logger = logging.getLogger(__name__)
 
@@ -241,6 +241,123 @@ def _strip_managed_precommit_hooks(config_file: Path) -> bool:
     return True
 
 
+def _log_prek_boundary_status(target: Path, boundary: PrekBoundaryState) -> None:
+    """Log why ``.pre-commit-config.yaml`` scaffolding is being skipped.
+
+    Distinguishes a healthy transplant (the canonical hooks already live in
+    ``prek.toml``) from stranded hooks that ``spec precommit migrate`` still
+    needs to move, and flags a co-present, now-superseded YAML config in
+    either case.
+    """
+    config_file = target / ".pre-commit-config.yaml"
+    if boundary.hooks_present:
+        logger.info(
+            "prek.toml at %s already carries the vaultspec-core hooks; "
+            "skipping .pre-commit-config.yaml scaffold.",
+            target,
+        )
+        if config_file.exists():
+            logger.info(
+                "A superseded .pre-commit-config.yaml is still present at %s. "
+                "prek reads prek.toml exclusively; remove the YAML config "
+                "once nothing else consumes it.",
+                target,
+            )
+        return
+    logger.info(
+        "prek.toml detected at %s; skipping .pre-commit-config.yaml "
+        "scaffold. Run 'vaultspec-core spec precommit migrate' to "
+        "transplant the vaultspec-core hooks into prek.toml.",
+        target,
+    )
+    if config_file.exists():
+        logger.warning(
+            "Both prek.toml and .pre-commit-config.yaml are present at "
+            "%s and prek.toml lacks the vaultspec-core hooks. prek "
+            "reads prek.toml exclusively; vaultspec will not refresh "
+            "the YAML hooks. Run 'vaultspec-core spec precommit "
+            "migrate' to transplant them.",
+            target,
+        )
+
+
+def _load_existing_precommit_config(
+    config_file: Path, handler: YAML
+) -> dict[str, Any] | None:
+    """Load and validate an existing ``.pre-commit-config.yaml``.
+
+    Returns:
+        The parsed mapping, with its ``repos`` key defaulted to a list, or
+        ``None`` when the file cannot be read/parsed, isn't a mapping, or its
+        ``repos`` key isn't list-shaped - any of which tells the caller to
+        skip scaffolding for this run rather than risk corrupting a config
+        it doesn't recognize.
+    """
+    try:
+        raw = config_file.read_text(encoding="utf-8")
+        data = handler.load(raw) or {}
+    except (YAMLError, OSError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    if not isinstance(data.setdefault("repos", []), list):
+        return None
+    return data
+
+
+def _merge_local_repo_hooks(
+    existing_hooks: list[Any], canonical_hooks: list[dict[str, object]]
+) -> bool:
+    """Reconcile *existing_hooks* against *canonical_hooks* in place.
+
+    Missing hooks are appended; hooks whose entry drifted from the canonical
+    pattern are updated in place; hooks already canonical are left untouched.
+
+    Returns:
+        ``True`` when *existing_hooks* was changed.
+    """
+    existing_by_id = {h.get("id"): h for h in existing_hooks if isinstance(h, dict)}
+    changed = False
+    for canonical in canonical_hooks:
+        hook_id = str(canonical["id"])
+        existing = existing_by_id.get(hook_id)
+        if existing is None:
+            existing_hooks.append(dict(canonical))
+            logger.info("Added pre-commit hook '%s'", hook_id)
+            changed = True
+            continue
+        if existing.get("entry") == canonical["entry"]:
+            continue
+        existing["entry"] = canonical["entry"]
+        logger.info("Updated pre-commit hook '%s' entry to canonical pattern", hook_id)
+        changed = True
+    return changed
+
+
+def _reconcile_precommit_repos(
+    data: dict[str, Any], canonical_hooks: list[dict[str, object]]
+) -> bool:
+    """Reconcile the local repo's hooks in *data* against *canonical_hooks*.
+
+    Creates the local repo when none exists; otherwise merges via
+    :func:`_merge_local_repo_hooks`.
+
+    Returns:
+        ``True`` when *data* should be written back to disk.
+    """
+    repos = data["repos"]
+    local_repos = [r for r in repos if isinstance(r, dict) and r.get("repo") == "local"]
+    if not local_repos:
+        repos.append({"repo": "local", "hooks": [dict(h) for h in canonical_hooks]})
+        return True
+
+    local_repo = local_repos[0]
+    existing_hooks = local_repo.setdefault("hooks", [])
+    if not isinstance(existing_hooks, list):
+        return False
+    return _merge_local_repo_hooks(existing_hooks, canonical_hooks)
+
+
 def _scaffold_precommit(
     target: Path, *, dry_run: bool = False, mode: InstallMode | None = None
 ) -> list[tuple[str, str]]:
@@ -277,109 +394,30 @@ def _scaffold_precommit(
 
     boundary = collect_prek_boundary(target, mode=mode)
     if boundary.owns_boundary:
-        if boundary.hooks_present:
-            logger.info(
-                "prek.toml at %s already carries the vaultspec-core hooks; "
-                "skipping .pre-commit-config.yaml scaffold.",
-                target,
-            )
-            if (target / ".pre-commit-config.yaml").exists():
-                logger.info(
-                    "A superseded .pre-commit-config.yaml is still present at %s. "
-                    "prek reads prek.toml exclusively; remove the YAML config "
-                    "once nothing else consumes it.",
-                    target,
-                )
-        else:
-            logger.info(
-                "prek.toml detected at %s; skipping .pre-commit-config.yaml "
-                "scaffold. Run 'vaultspec-core spec precommit migrate' to "
-                "transplant the vaultspec-core hooks into prek.toml.",
-                target,
-            )
-            if (target / ".pre-commit-config.yaml").exists():
-                logger.warning(
-                    "Both prek.toml and .pre-commit-config.yaml are present at "
-                    "%s and prek.toml lacks the vaultspec-core hooks. prek "
-                    "reads prek.toml exclusively; vaultspec will not refresh "
-                    "the YAML hooks. Run 'vaultspec-core spec precommit "
-                    "migrate' to transplant them.",
-                    target,
-                )
+        _log_prek_boundary_status(target, boundary)
         return []
 
     config_file = target / ".pre-commit-config.yaml"
     handler = _precommit_yaml()
+    result = [(".pre-commit-config.yaml", "precommit")]
 
     with nullcontext() if dry_run else advisory_lock(config_file):
-        if config_file.exists():
-            try:
-                raw = config_file.read_text(encoding="utf-8")
-                data = handler.load(raw) or {}
-                if not isinstance(data, dict):
-                    return []
-            except (YAMLError, OSError):
-                return []
-
-            repos = data.setdefault("repos", [])
-            if not isinstance(repos, list):
-                return []
-
-            # Find or create local repo
-            local_repos = [
-                r for r in repos if isinstance(r, dict) and r.get("repo") == "local"
-            ]
-            if local_repos:
-                local_repo = local_repos[0]
-                existing_hooks = local_repo.setdefault("hooks", [])
-                if not isinstance(existing_hooks, list):
-                    return []
-
-                existing_by_id = {
-                    h.get("id"): h for h in existing_hooks if isinstance(h, dict)
-                }
-
-                changed = False
-
-                for canonical in canonical_hooks:
-                    hook_id = str(canonical["id"])
-                    existing = existing_by_id.get(hook_id)
-                    if existing is None:
-                        existing_hooks.append(dict(canonical))
-                        logger.info("Added pre-commit hook '%s'", str(canonical["id"]))
-                        changed = True
-                        continue
-                    if existing.get("entry") == canonical["entry"]:
-                        continue
-                    existing["entry"] = canonical["entry"]
-                    logger.info(
-                        "Updated pre-commit hook '%s' entry to canonical pattern",
-                        hook_id,
-                    )
-                    changed = True
-
-                if not changed:
-                    return []
-            else:
-                repos.append(
-                    {
-                        "repo": "local",
-                        "hooks": [dict(h) for h in canonical_hooks],
-                    }
-                )
-
+        if not config_file.exists():
             if not dry_run:
+                data = {
+                    "repos": [
+                        {"repo": "local", "hooks": [dict(h) for h in canonical_hooks]}
+                    ]
+                }
                 atomic_write(config_file, _dump_precommit_yaml(handler, data))
-            return [(".pre-commit-config.yaml", "precommit")]
+            return result
+
+        data = _load_existing_precommit_config(config_file, handler)
+        if data is None:
+            return []
+        if not _reconcile_precommit_repos(data, canonical_hooks):
+            return []
 
         if not dry_run:
-            data = {
-                "repos": [
-                    {
-                        "repo": "local",
-                        "hooks": [dict(h) for h in canonical_hooks],
-                    }
-                ]
-            }
             atomic_write(config_file, _dump_precommit_yaml(handler, data))
-        return [(".pre-commit-config.yaml", "precommit")]
+        return result

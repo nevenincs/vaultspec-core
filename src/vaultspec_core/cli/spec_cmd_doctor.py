@@ -9,6 +9,7 @@ re-exported from :mod:`vaultspec_core.cli.spec_cmd` for use by tests and
 """
 
 import logging
+from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated
 
 import typer
@@ -478,12 +479,11 @@ def _render_diagnosis_table(_console, diag: "WorkspaceDiagnosis") -> None:
 
 
 def _signal_status(
-    signal: object,
+    signal: StrEnum,
     mapping: dict,
 ) -> tuple[str, str]:
     """Map a signal value to a (status_label, style) pair."""
-    val = signal.value if hasattr(signal, "value") else signal
-    return mapping.get(signal, (f"unknown ({val})", "dim"))
+    return mapping.get(signal, (f"unknown ({signal.value})", "dim"))
 
 
 def _provider_status(

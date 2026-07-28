@@ -224,7 +224,9 @@ class TestDryRun:
         assert plan["tag_rewrites"] == 3
         # related: links from adr->research and plan->adr are predicted.
         assert plan["related_rewrites"] >= 2
-        assert plan["index"]["old"].endswith("widget-engine.index.md")
+        old_index_path = plan["index"]["old"]
+        assert old_index_path is not None
+        assert old_index_path.endswith("widget-engine.index.md")
         assert plan["index"]["new"].endswith("gadget-engine.index.md")
         assert plan["collisions"] == []
         # The full set of structural keys is present.

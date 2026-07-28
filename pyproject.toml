@@ -184,17 +184,17 @@ target-version = "py313"
     # between those and the numbers below is the burndown backlog.
     #
     # Cyclomatic census (production blocks):
-    #     over 25:  12      over 15:  87      over 10: 196   <- the default
+    #     over 25:   9      over 15:  67      over 10: 176   <- the default
     [tool.ruff.lint.mccabe]
-    max-complexity = 35 # RATCHETED 58 -> 57 -> 35
+    max-complexity = 28 # RATCHETED 58 -> 57 -> 35 -> 28
 
-    # Worst production value per rule at the census: returns 10, branches 34,
-    # args 17, statements 142.
+    # Worst production value per rule at the census: returns 8, branches 28,
+    # args 17, statements 93.
     #
     # `max-args` has a FLOOR that the other rules do not. A Typer command's
     # parameters are the CLI's flags, so its signature length is the published
-    # interface, not debt: 38 of the 102 offenders are commands or callbacks,
-    # and the current worst (17) is `vault add`. The remaining 64 are plain
+    # interface, not debt: 35 of the 110 offenders are commands or callbacks,
+    # and the current worst (17) is `vault add`. The remaining 75 are plain
     # helpers and are ordinary debt - keep ratcheting on those. Do not chase
     # ruff's default of 5 here by deleting user-facing flags, and do not add a
     # per-file-ignore for the command modules, which would also mask genuine
@@ -204,10 +204,10 @@ target-version = "py313"
     # of 5 and is gated at that default by `just lint nesting`. It is the first
     # dimension to finish its burndown; the rest are still above default.
     [tool.ruff.lint.pylint]
-    max-args = 17        # RATCHETED 20 -> 17 (floor is the worst Typer command)
-    max-branches = 34    # RATCHETED 63 -> 62 -> 34
-    max-returns = 10     # RATCHETED 13 -> 10
-    max-statements = 142 # RATCHETED 214 -> 142
+    max-args = 17       # RATCHETED 20 -> 17 (floor is the worst Typer command)
+    max-branches = 28   # RATCHETED 63 -> 62 -> 34 -> 28
+    max-returns = 8     # RATCHETED 13 -> 10 -> 8
+    max-statements = 93 # RATCHETED 214 -> 142 -> 93
 
     [tool.ruff.lint.per-file-ignores]
     "**/test_*.py" = ["ARG"]
@@ -264,7 +264,7 @@ typeCheckingMode = "strict"
 # measures. Nesting compounds the score here, so a deeply-indented function
 # ranks far worse than a flat one with the same branch count.
 #
-# BASELINE-CALIBRATED (census 2026-07-28): RATCHETED 253 -> 166 -> 154 -> 56.
+# BASELINE-CALIBRATED (census 2026-07-28): RATCHETED 253 -> 166 -> 154 -> 56 -> 51.
 # Never raise. Long-term target: 15, the tool's own default.
 #
 # The 253 -> 166 step cost no work of its own: it fell out of the PLR1702
@@ -275,19 +275,19 @@ typeCheckingMode = "strict"
 #
 # The distance to the target, measured at the same time:
 #
-#     over  30:   46 functions
-#     over  25:   65
-#     over  20:  101
-#     over  18:  129
-#     over  16:  164
-#     over  15:  178      <- the target
+#     over  30:   39 functions
+#     over  25:   55
+#     over  20:   88
+#     over  18:  115
+#     over  16:  147
+#     over  15:  160      <- the target
 #
 # Production only. Tests are measured by `just audit complexity`, which reports
 # without failing: the worst scores belong to guard tests that walk the AST of
 # every module, and that shape is what the guard IS, not debt to pay down.
 [tool.complexipy]
 exclude = ["**/tests/**"]
-max-complexity-allowed = 56
+max-complexity-allowed = 51
 
 # pylint runs with every check off except the four that ruff has no rule for.
 # It is not a second general-purpose linter here - enabling more would produce
@@ -313,25 +313,30 @@ enable = ["C0302", "R0902", "R0904", "R0916"]
 # only, because `ignore-paths` above means those are the only ones this gate
 # measures. Count what the gate counts.
 #
-# Census (2026-07-28, 174 production modules):
+# Census (2026-07-28, 241 production modules, RATCHETED 1668 -> 1312 after the
+# `cli/spec_cmd.py` split cleared prior offenders and left `graph/api.py` the
+# worst remaining module):
 #
-#     over 2000:   3      <- the enforced ceiling sits at the worst of these
-#     over 1500:   7
-#     over 1200:   8
-#     over 1000:  12
-#     over  500:  36      <- where modules should settle
+#     over 2000:   0
+#     over 1500:   0
+#     over 1200:   1      <- the enforced ceiling sits at the worst of these
+#     over 1000:   1
+#     over  500:  31      <- where modules should settle
 #
-# Longest production module: cli/spec_cmd.py at 2782 lines.
+# Longest production module: graph/api.py at 1312 lines.
 #
-# This dimension has NOT moved, and that is the honest reading: the complexity
-# waves extracted helpers within these modules rather than out of them, so
-# per-function scores fell while physical length did not. Only a genuine split
-# into sibling modules moves this number. Measure with `just health census`,
-# which counts physical lines the way pylint's C0302 does - a count that skips
-# blank lines reads ~375 lines short on the longest module here and will set a
-# ceiling the tree cannot meet.
+# The `cli/spec_cmd.py` split (spec_cmd_agents.py, spec_cmd_app.py,
+# spec_cmd_doctor.py, spec_cmd_hooks.py, spec_cmd_mcps.py,
+# spec_cmd_reference.py, spec_cmd_rules.py, spec_cmd_shared.py,
+# spec_cmd_skills.py, spec_cmd_system.py) is what finally moved this
+# dimension: prior complexity waves only extracted helpers within these
+# modules, which paid down per-function scores without touching physical
+# length. Measure with `just health census`, which counts physical lines the
+# way pylint's C0302 does - a count that skips blank lines reads ~375 lines
+# short on the longest module here and will set a ceiling the tree cannot
+# meet.
 [tool.pylint.format]
-max-module-lines = 2782
+max-module-lines = 1312
 
 # BASELINE-CALIBRATED (census 2026-07-28): each sits at the current worst
 # production offender, so the gate is green today and can only be ratcheted

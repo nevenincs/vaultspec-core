@@ -25,7 +25,7 @@ from __future__ import annotations
 import json
 import logging
 from collections import Counter
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import networkx as nx
 from networkx.readwrite import json_graph
@@ -61,6 +61,42 @@ if TYPE_CHECKING:
 
     from ..vaultcore.checks._base import VaultSnapshot
     from . import cache
+
+# networkx's own stubs leave ``node_link_data``, ``node_link_graph``,
+# ``ego_graph``, and ``density`` without return-type annotations, so calling
+# them directly always reports as "partially unknown" regardless of how
+# precisely the input graph is typed. These thin re-bindings declare the
+# signatures actually used below (verified against the runtime behaviour)
+# for type-checking only; the ``else`` branch binds the exact same callables
+# at runtime, so behaviour is unchanged.
+if TYPE_CHECKING:
+
+    def _node_link_data(
+        g: nx.DiGraph[str], *, edges: str = "edges"
+    ) -> dict[str, Any]: ...
+
+    def _node_link_graph(
+        data: dict[str, Any],
+        *,
+        directed: bool = False,
+        multigraph: bool = True,
+        edges: str = "edges",
+    ) -> nx.DiGraph[str]: ...
+
+    def _ego_graph(
+        g: nx.DiGraph[str],
+        n: str,
+        *,
+        radius: float = 1,
+        undirected: bool = False,
+    ) -> nx.DiGraph[str]: ...
+
+    def _graph_density(g: nx.DiGraph[str]) -> float: ...
+else:
+    _node_link_data = json_graph.node_link_data
+    _node_link_graph = json_graph.node_link_graph
+    _ego_graph = nx.ego_graph
+    _graph_density = nx.density
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +156,7 @@ class VaultGraph:
         #: working-tree build. Set only via :meth:`from_ref`.
         self.ref: str | None = None
         self.nodes: dict[str, DocNode] = {}
-        self._digraph: nx.DiGraph = nx.DiGraph()
+        self._digraph: nx.DiGraph[str] = nx.DiGraph()
         self._dangling_links: list[tuple[str, str]] = []
         self._stem_index: dict[str, list[str]] = {}
         self._raw_texts: dict[pathlib.Path, tuple[str, bool]] = {}
@@ -249,7 +285,7 @@ class VaultGraph:
         Returns:
             A node-link ``dict`` with body text attached to each node.
         """
-        data = json_graph.node_link_data(self._digraph, edges="edges")
+        data = _node_link_data(self._digraph, edges="edges")
         for node_dict in data.get("nodes", []):
             nid = node_dict.get("id", "")
             doc = self.nodes.get(nid)
@@ -269,7 +305,7 @@ class VaultGraph:
             payload: A cache payload that has already passed
                 :func:`vaultspec_core.graph.cache.validate`.
         """
-        self._digraph = json_graph.node_link_graph(
+        self._digraph = _node_link_graph(
             payload.graph,
             directed=True,
             multigraph=False,
@@ -714,7 +750,7 @@ class VaultGraph:
             else:
                 matches = list(archive_dir.rglob(f"{target_norm}.md"))
                 if matches:
-                    resolved = []
+                    resolved: list[str] = []
                     for match in matches:
                         rel = match.relative_to(archive_dir)
                         key = str(rel.with_suffix("")).replace("\\", "/")
@@ -727,7 +763,7 @@ class VaultGraph:
     # -- Direct networkx access ----------------------------------------------
 
     @property
-    def digraph(self) -> nx.DiGraph:
+    def digraph(self) -> nx.DiGraph[str]:
         """The underlying ``networkx.DiGraph`` for direct algorithm access.
 
         Consumers may call any ``networkx`` function on this object
@@ -741,7 +777,7 @@ class VaultGraph:
     def subgraph(
         self,
         feature: str | None = None,
-    ) -> nx.DiGraph:
+    ) -> nx.DiGraph[str]:
         """Return a networkx subgraph view, optionally scoped to
         *feature*.
 
@@ -760,7 +796,7 @@ class VaultGraph:
         self,
         node: str,
         depth: int = 1,
-    ) -> nx.DiGraph:
+    ) -> nx.DiGraph[str]:
         """Return the local (ego) subgraph around *node* up to *depth* hops.
 
         Mirrors Obsidian's local-graph view: the centre document plus every
@@ -788,7 +824,7 @@ class VaultGraph:
             raise KeyError(node)
         if depth < 0:
             raise ValueError(f"depth must be >= 0, got {depth}")
-        ego = nx.ego_graph(
+        ego = _ego_graph(
             self._digraph,
             node,
             radius=depth,
@@ -914,9 +950,10 @@ class VaultGraph:
             if node.phantom or node.path is None:
                 continue
             raw_related = node.frontmatter.get("related", [])
-            if not isinstance(raw_related, list):
-                raw_related = []
-            related = [str(r) for r in raw_related if isinstance(r, str)]
+            related: list[str] = []
+            if isinstance(raw_related, list):
+                related_items = cast("list[Any]", raw_related)
+                related = [str(r) for r in related_items if isinstance(r, str)]
             raw_superseded_by = node.frontmatter.get("superseded_by")
             superseded_by = (
                 raw_superseded_by if isinstance(raw_superseded_by, str) else None
@@ -980,7 +1017,7 @@ class VaultGraph:
         self,
         feature: str | None = None,
         *,
-        _g: nx.DiGraph | None = None,
+        _g: nx.DiGraph[str] | None = None,
     ) -> GraphMetrics:
         """Compute aggregate statistics via graph-library algorithms.
 
@@ -1077,7 +1114,7 @@ class VaultGraph:
             total_edges=n_edges,
             total_features=len(features),
             total_words=total_words,
-            density=nx.density(g),
+            density=_graph_density(g),
             avg_in_degree=(n_edges / n_nodes if n_nodes else 0.0),
             avg_out_degree=(n_edges / n_nodes if n_nodes else 0.0),
             max_in_degree=max_in,
@@ -1233,7 +1270,7 @@ class VaultGraph:
         # networkx native serialisation - pass edges="edges" explicitly so
         # the wire key is deterministic regardless of networkx version.
         # networkx changed the default from "links" (<=3.5) to "edges" (>=3.6).
-        data = json_graph.node_link_data(g, edges="edges")
+        data = _node_link_data(g, edges="edges")
 
         # Strip body from nodes unless requested
         if not include_body:

@@ -315,20 +315,15 @@ def _is_encoding_issue_row(row: object) -> bool:
     )
 
 
-def load(path: Path) -> GraphCachePayload | None:
-    """Read and parse a cache file, returning ``None`` on any failure.
-
-    A missing file, unreadable bytes, malformed JSON, a schema mismatch,
-    or a structurally invalid payload all resolve to ``None`` so the
-    caller falls back to a full rebuild.  The cache never raises into the
-    build path: an unreadable cache is a miss, not an error.
+def _read_cache_json(path: Path) -> dict[str, Any] | None:
+    """Read *path* and return its parsed JSON payload if the schema matches.
 
     Args:
         path: Path to the JSON cache file.
 
     Returns:
-        A :class:`GraphCachePayload` on success, or ``None`` when the file
-        is absent, corrupt, or written with a different schema.
+        The parsed top-level JSON object when the file is readable, valid
+        JSON, and stamped with :data:`CACHE_SCHEMA`; ``None`` otherwise.
     """
     try:
         raw = path.read_text(encoding="utf-8")
@@ -349,7 +344,22 @@ def load(path: Path) -> GraphCachePayload | None:
             CACHE_SCHEMA,
         )
         return None
+    return data
 
+
+def _extract_cache_sections(
+    data: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any], list[Any], list[Any]] | None:
+    """Pull and type-check the four top-level cache sections from *data*.
+
+    Args:
+        data: The parsed top-level JSON object from a cache file.
+
+    Returns:
+        The ``(manifest, graph, dangling_links, encoding_issues)`` raw
+        values when all four are present with the expected container
+        type; ``None`` when any section is missing or malformed.
+    """
     raw_manifest = data.get("manifest")
     raw_graph = data.get("graph")
     raw_dangling = data.get("dangling_links")
@@ -358,14 +368,38 @@ def load(path: Path) -> GraphCachePayload | None:
         return None
     if not isinstance(raw_dangling, list) or not isinstance(raw_encoding, list):
         return None
+    return raw_manifest, raw_graph, raw_dangling, raw_encoding
 
+
+def _parse_manifest(raw_manifest: dict[str, Any]) -> dict[str, Fingerprint] | None:
+    """Validate and convert a cache file's raw manifest mapping.
+
+    Args:
+        raw_manifest: The decoded JSON ``manifest`` mapping.
+
+    Returns:
+        The mapping keyed by vault-relative path to :data:`Fingerprint`, or
+        ``None`` when any entry is malformed.
+    """
     manifest: dict[str, Fingerprint] = {}
     for key, value in raw_manifest.items():
         if not isinstance(key, str) or not _is_fingerprint_row(value):
             logger.debug("Graph cache manifest entry %r is malformed; ignoring", key)
             return None
         manifest[key] = (value[0], value[1], value[2])
+    return manifest
 
+
+def _parse_dangling(raw_dangling: list[Any]) -> list[list[str]] | None:
+    """Validate and convert a cache file's raw dangling-link list.
+
+    Args:
+        raw_dangling: The decoded JSON ``dangling_links`` list.
+
+    Returns:
+        The ``[source, target]`` pairs, or ``None`` when any row is
+        malformed.
+    """
     dangling: list[list[str]] = []
     for pair in raw_dangling:
         if (
@@ -375,7 +409,21 @@ def load(path: Path) -> GraphCachePayload | None:
         ):
             return None
         dangling.append([pair[0], pair[1]])
+    return dangling
 
+
+def _parse_encoding_issues(
+    raw_encoding: list[Any],
+) -> list[tuple[str, str, str, int | None]] | None:
+    """Validate and convert a cache file's raw encoding-issues list.
+
+    Args:
+        raw_encoding: The decoded JSON ``encoding_issues`` list.
+
+    Returns:
+        The ``(path, kind, detail, start)`` rows, or ``None`` when any row
+        is malformed.
+    """
     encoding: list[tuple[str, str, str, int | None]] = []
     for row in raw_encoding:
         if not _is_encoding_issue_row(row):
@@ -384,6 +432,41 @@ def load(path: Path) -> GraphCachePayload | None:
             )
             return None
         encoding.append((row[0], row[1], row[2], row[3]))
+    return encoding
+
+
+def load(path: Path) -> GraphCachePayload | None:
+    """Read and parse a cache file, returning ``None`` on any failure.
+
+    A missing file, unreadable bytes, malformed JSON, a schema mismatch,
+    or a structurally invalid payload all resolve to ``None`` so the
+    caller falls back to a full rebuild.  The cache never raises into the
+    build path: an unreadable cache is a miss, not an error.
+
+    Args:
+        path: Path to the JSON cache file.
+
+    Returns:
+        A :class:`GraphCachePayload` on success, or ``None`` when the file
+        is absent, corrupt, or written with a different schema.
+    """
+    data = _read_cache_json(path)
+    if data is None:
+        return None
+    sections = _extract_cache_sections(data)
+    if sections is None:
+        return None
+    raw_manifest, raw_graph, raw_dangling, raw_encoding = sections
+
+    manifest = _parse_manifest(raw_manifest)
+    if manifest is None:
+        return None
+    dangling = _parse_dangling(raw_dangling)
+    if dangling is None:
+        return None
+    encoding = _parse_encoding_issues(raw_encoding)
+    if encoding is None:
+        return None
 
     return GraphCachePayload(
         schema=CACHE_SCHEMA,

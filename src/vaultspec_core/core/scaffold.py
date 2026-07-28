@@ -65,6 +65,84 @@ def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, st
     return created
 
 
+def _is_skill_dir(path: Path) -> bool:
+    """Whether ``path`` is a skill directory (holds a ``SKILL.md``)."""
+    return path.is_dir() and (path / "SKILL.md").exists()
+
+
+def _provider_dir_preview_names(src_dir: Path | None, *, is_skill: bool) -> list[str]:
+    """List the source file/dir names a dry-run preview would deploy.
+
+    Returns an empty list when ``src_dir`` is absent (a true fresh install
+    before the builtins are seeded), which tells the caller to fall back to
+    a single directory-line entry.
+    """
+    if src_dir is None or not src_dir.is_dir():
+        return []
+    if is_skill:
+        return sorted(p.name for p in src_dir.iterdir() if _is_skill_dir(p))
+    return sorted(p.name for p in src_dir.glob("*.md"))
+
+
+def _dir_or_file_rels(
+    target: Path,
+    dest_dir: Path,
+    src_dir: Path | None,
+    *,
+    dry_run: bool,
+    is_skill: bool = False,
+) -> list[str]:
+    """Relative paths to record for a provider directory.
+
+    The dry-run preview lists the individual files sync would deploy, so it
+    matches the per-file granularity of ``sync --dry-run`` instead of
+    understating provider work as a single directory line. Real install only
+    needs the directory created; file content is deployed by the subsequent
+    sync pass. Sources are read read-only (no flattening side effect).
+    """
+    names = _provider_dir_preview_names(src_dir, is_skill=is_skill) if dry_run else []
+    if not names:
+        return [_rel(target, dest_dir)]
+    return [_rel(target, dest_dir / name) for name in names]
+
+
+def _ensure_dir_unless_dry_run(path: Path, *, dry_run: bool) -> None:
+    if not dry_run:
+        ensure_dir(path)
+
+
+def _scaffold_provider_subdir(
+    target: Path,
+    dest_dir: Path,
+    src_dir: Path | None,
+    *,
+    dry_run: bool,
+    is_skill: bool = False,
+) -> list[str]:
+    """Ensure ``dest_dir`` exists (unless dry-run) and list rels to record."""
+    _ensure_dir_unless_dry_run(dest_dir, dry_run=dry_run)
+    return _dir_or_file_rels(
+        target, dest_dir, src_dir, dry_run=dry_run, is_skill=is_skill
+    )
+
+
+def _ensure_plain_config_file(path: Path, *, dry_run: bool) -> None:
+    """Create an empty config file (and its parent dir) if it is missing."""
+    if dry_run or path.exists():
+        return
+    ensure_dir(path.parent)
+    atomic_write(path, "")
+
+
+def _ensure_native_config_file(path: Path, *, dry_run: bool) -> None:
+    """Ensure a native config file's parent dir exists; seed it if missing."""
+    if dry_run:
+        return
+    ensure_dir(path.parent)
+    if not path.exists():
+        atomic_write(path, "")
+
+
 def _scaffold_provider(
     target: Path, tool: Tool, *, dry_run: bool = False
 ) -> list[tuple[str, str]]:
@@ -96,66 +174,37 @@ def _scaffold_provider(
             seen_rels.add(rel)
             created.append((rel, f"{label} ({sublabel})"))
 
-    def _add_dir_or_files(
-        dest_dir: Path, sublabel: str, src_dir: Path | None, *, is_skill: bool = False
-    ) -> None:
-        # The dry-run preview lists the individual files sync would deploy, so it
-        # matches the per-file granularity of ``sync --dry-run`` instead of
-        # understating provider work as a single directory line. Real install
-        # only needs the directory created; file content is deployed by the
-        # subsequent sync pass. Sources are read read-only (no flattening side
-        # effect). When sources are absent (a true fresh install before the
-        # builtins are seeded) the directory line is the honest preview.
-        names: list[str] = []
-        if dry_run and src_dir is not None and src_dir.is_dir():
-            if is_skill:
-                names = sorted(
-                    p.name
-                    for p in src_dir.iterdir()
-                    if p.is_dir() and (p / "SKILL.md").exists()
-                )
-            else:
-                names = sorted(p.name for p in src_dir.glob("*.md"))
-        if names:
-            for name in names:
-                _add(_rel(target, dest_dir / name), sublabel)
-        else:
-            _add(_rel(target, dest_dir), sublabel)
-
     if ProviderCapability.RULES in caps and cfg.rules_dir:
-        if not dry_run:
-            ensure_dir(cfg.rules_dir)
-        _add_dir_or_files(cfg.rules_dir, "rules", ctx.rules_src_dir)
+        for rel in _scaffold_provider_subdir(
+            target, cfg.rules_dir, ctx.rules_src_dir, dry_run=dry_run
+        ):
+            _add(rel, "rules")
 
     if ProviderCapability.SKILLS in caps and cfg.skills_dir:
-        if not dry_run:
-            ensure_dir(cfg.skills_dir)
-        _add_dir_or_files(cfg.skills_dir, "skills", ctx.skills_src_dir, is_skill=True)
+        for rel in _scaffold_provider_subdir(
+            target, cfg.skills_dir, ctx.skills_src_dir, dry_run=dry_run, is_skill=True
+        ):
+            _add(rel, "skills")
 
     if ProviderCapability.AGENTS in caps and cfg.agents_dir:
-        if not dry_run:
-            ensure_dir(cfg.agents_dir)
-        _add_dir_or_files(cfg.agents_dir, "agents", ctx.agents_src_dir)
+        for rel in _scaffold_provider_subdir(
+            target, cfg.agents_dir, ctx.agents_src_dir, dry_run=dry_run
+        ):
+            _add(rel, "agents")
 
     if ProviderCapability.WORKFLOWS in caps and cfg.workflows_dir:
-        if not dry_run:
-            ensure_dir(cfg.workflows_dir)
+        _ensure_dir_unless_dry_run(cfg.workflows_dir, dry_run=dry_run)
         _add(_rel(target, cfg.workflows_dir), "workflows")
 
     if cfg.config_file:
-        if not dry_run and not cfg.config_file.exists():
-            ensure_dir(cfg.config_file.parent)
-            atomic_write(cfg.config_file, "")
+        _ensure_plain_config_file(cfg.config_file, dry_run=dry_run)
         _add(_rel(target, cfg.config_file), "config")
 
     if cfg.rule_ref_config_file:
         _add(_rel(target, cfg.rule_ref_config_file), "config")
 
     if cfg.native_config_file:
-        if not dry_run:
-            ensure_dir(cfg.native_config_file.parent)
-            if not cfg.native_config_file.exists():
-                atomic_write(cfg.native_config_file, "")
+        _ensure_native_config_file(cfg.native_config_file, dry_run=dry_run)
         _add(_rel(target, cfg.native_config_file), "config")
 
     return created

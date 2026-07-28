@@ -9,7 +9,7 @@ wiring for the ``repair`` verb.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -24,7 +24,7 @@ _UNRESOLVED_LIMIT = 20
 _DIAGNOSTIC_LIMIT = 10
 
 
-def repair_payload(run: RepairRun) -> dict:
+def repair_payload(run: RepairRun) -> dict[str, Any]:
     """Convert a :class:`RepairRun` to a JSON-serializable mapping."""
     return {
         "dry_run": run.dry_run,
@@ -67,7 +67,7 @@ def _render_heading(console: Console, run: RepairRun) -> None:
         console.print("[red]  partial repair: at least one phase failed[/red]")
 
 
-def _render_phase(console: Console, phase: dict, *, verbose: bool) -> None:
+def _render_phase(console: Console, phase: dict[str, Any], *, verbose: bool) -> None:
     """Dispatch one pipeline phase to its renderer; unknown phases are silent."""
     name = phase.get("phase", "unknown")
     if name == "preflight":
@@ -83,7 +83,7 @@ def _render_phase(console: Console, phase: dict, *, verbose: bool) -> None:
         _render_summary_phase(console, phase)
 
 
-def _render_preflight_phase(console: Console, phase: dict) -> None:
+def _render_preflight_phase(console: Console, phase: dict[str, Any]) -> None:
     status = phase.get("migration_status", "unknown")
     platform = phase.get("platform", {})
     case_probe = platform.get("case_sensitive_probe", "unknown")
@@ -98,7 +98,9 @@ def _render_preflight_phase(console: Console, phase: dict) -> None:
         console.print(f"    [yellow]{phase['message']}[/yellow]")
 
 
-def _render_check_phase(console: Console, phase: dict, *, verbose: bool) -> None:
+def _render_check_phase(
+    console: Console, phase: dict[str, Any], *, verbose: bool
+) -> None:
     errors = phase.get("error_count", 0)
     warnings = phase.get("warning_count", 0)
     fixed = phase.get("fixed_count", 0)
@@ -113,7 +115,9 @@ def _render_check_phase(console: Console, phase: dict, *, verbose: bool) -> None
         _render_phase_diagnostics(console, phase)
 
 
-def _render_index_phase(console: Console, phase: dict, *, verbose: bool) -> None:
+def _render_index_phase(
+    console: Console, phase: dict[str, Any], *, verbose: bool
+) -> None:
     if phase.get("skipped"):
         console.print(f"  [bold]index[/bold]: skipped ({phase.get('reason')})")
         return
@@ -129,7 +133,7 @@ def _render_index_phase(console: Console, phase: dict, *, verbose: bool) -> None
         console.print(f"    {path}")
 
 
-def _render_summary_phase(console: Console, phase: dict) -> None:
+def _render_summary_phase(console: Console, phase: dict[str, Any]) -> None:
     changed = phase.get("changed_files", [])
     unresolved = phase.get("unresolved_count", 0)
     console.print(f"  [bold]summary[/bold]: {len(changed)} changed files")
@@ -200,7 +204,7 @@ def _render_elision(console: Console, total: int, limit: int, noun: str) -> None
         console.print(f"  ... {total - limit} {noun}")
 
 
-def _render_phase_diagnostics(console: Console, phase: dict) -> None:
+def _render_phase_diagnostics(console: Console, phase: dict[str, Any]) -> None:
     for check in phase.get("checks", []):
         diagnostics = check.get("diagnostics", [])
         if not diagnostics:
