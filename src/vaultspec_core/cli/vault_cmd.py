@@ -25,6 +25,8 @@ from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from rich.console import Console
 
     from vaultspec_core.graph.api import VaultGraph
@@ -355,7 +357,7 @@ def cmd_add(
         raise typer.Exit(0)
 
 
-def _validate_created_doc(console: Console, doc_path) -> None:
+def _validate_created_doc(console: Console, doc_path: Path) -> None:
     """Run frontmatter validation on a newly created document.
 
     Prints warnings if the created document fails the project's own
