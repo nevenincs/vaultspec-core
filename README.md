@@ -4,7 +4,7 @@
 
 # vaultspec-core
 
-**The agent harness: the pipeline, the vault, and the CLI that drives them.**
+**Agent harness: the pipeline, the vault, and the CLI that drives them.**
 
 [![build](https://img.shields.io/github/actions/workflow/status/nevenincs/vaultspec-core/ci.yml?branch=main&style=for-the-badge&label=build&logo=githubactions&logoColor=white&labelColor=1b1a16)](https://github.com/nevenincs/vaultspec-core/actions/workflows/ci.yml)
 [![release](https://img.shields.io/pypi/v/vaultspec-core?style=for-the-badge&label=release&logo=pypi&logoColor=white&labelColor=1b1a16&color=8A72B5)](https://pypi.org/project/vaultspec-core/)
@@ -31,11 +31,6 @@ nothing is throwaway. All work leaves a papertrail in the project's `.vault`. Do
 are bound together by feature tags and wiki-link references, together representing the
 project's decision and execution history - a second brain your agents read before they
 write.
-
-We hold ourselves to it, too: vaultspec-core is developed with vaultspec. Its own
-`.vault` currently holds 900+ CLI-scaffolded documents across 100+ features. Every
-terminal render on this page is real output: the stills are captured against that live
-vault, and the pipeline demo above runs against a scratch project.
 
 ## What is included?
 
