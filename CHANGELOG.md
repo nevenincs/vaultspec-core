@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.55](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.54...vaultspec-core-v0.1.55) (2026-07-29)
+
+
+### Bug Fixes
+
+* **tests:** green the release-acceptance gate on runners without the CLIs ([#287](https://github.com/nevenincs/vaultspec-core/issues/287)) ([1645988](https://github.com/nevenincs/vaultspec-core/commit/164598893eea9554093f468feec0586ff4103e81))
+
 ## [0.1.54](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.53...vaultspec-core-v0.1.54) (2026-07-28)
 
 
