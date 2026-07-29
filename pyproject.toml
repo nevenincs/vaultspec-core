@@ -138,7 +138,19 @@ markers = [
   "e2e: end-to-end tests requiring real LLM API keys",
   "benchmark: slow scale benchmarks, deselected by default",
 ]
-testpaths = ["tests", "src"]
+# Every tree that carries committed Python AND a cohabiting `tests/` package.
+# `dev` is listed for the same reason `src` is: the harness backend has its own
+# in-package test suite, and omitting the tree here meant a bare `pytest`
+# collected none of it. The suite was still gated - `just test harness` and the
+# CI step that runs it name `dev/tests` explicitly - but the default invocation
+# and the gate disagreed about what the suite is, which is exactly how a lane
+# goes unobserved.
+#
+# `scripts` is listed on the same reasoning: the maintainer entry points there
+# (the release binary build, the dependency-audit gate, the two README asset
+# renderers) now carry a cohabiting `scripts/tests` package, and nothing
+# collected it before this entry existed.
+testpaths = ["dev", "scripts", "src", "tests"]
 timeout = 300
 timeout_func_only = true
 
@@ -245,22 +257,108 @@ target-version = "py313"
 python-version = "3.13"
 root = [".", "src"]
 
-# Strict-mode type checking. The burndown reached zero, so this is now a
+# Strict-mode type checking. The burndown reached zero across every tracked
+# Python tree (src, tests, dev, statistic, scripts, tools), so this is a
 # gating check: `just lint type-strict` is in the `lint all` chain. `ty`
 # stays the fast pre-commit gate.
 [tool.basedpyright]
-include = ["src/vaultspec_core"]
+include = ["src", "tests", "dev", "statistic", "scripts", "tools"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 
-  # Tests legitimately reach into the private internals of the modules they
-  # exercise, so reportPrivateUsage is a trust-boundary false positive inside
-  # the test tree (fixing it by making internals public would damage the
-  # design). Every other strict rule stays ON for tests.
+# Individual rules enabled beyond `strict`, curated rather than a blanket
+# `typeCheckingMode = "all"` (4,625 findings on this tree, mostly noise).
+# Every rule below was verified at zero findings before being turned on - a
+# rule that starts red teaches people to ignore red.
+reportPropertyTypeMismatch = "error"
+reportMissingSuperCall = "error"
+reportUninitializedInstanceVariable = "error"
+reportUnnecessaryTypeIgnoreComment = "error"
+reportIgnoreCommentWithoutRule = "error"
+reportImplicitRelativeImport = "error"
+reportUnsafeMultipleInheritance = "error"
+reportImplicitAbstractClass = "error"
+reportIncompatibleUnannotatedOverride = "error"
+reportInvalidAbstractMethod = "error"
+reportSelfClsDefault = "error"
+reportEmptyAbstractUsage = "error"
+
+# An override that drops `@override` loses its link to the base method
+# silently: rename or remove the base method and the override becomes a dead
+# sibling instead of a type error. This makes that relationship checked
+# rather than a naming convention.
+reportImplicitOverride = "error"
+
+# A symbol imported into a module but not re-exported (no `__all__`, no
+# `import X as X`) is that module's private implementation detail; a second
+# module reaching past it is the same trust-boundary violation this repo
+# already forbids for underscore-prefixed names - this is the
+# non-underscore half of that same boundary.
+reportPrivateLocalImportUsage = "error"
+
+reportUnreachable = "error"
+
+# basedpyright's own printed remedy for a validated site - routing through
+# `cast("object", ...)` before the narrowing cast - clears both findings
+# without a suppression, an idiom already precedented elsewhere in this
+# repo, so both call sites were fixed rather than exempted.
+reportInvalidCast = "error"
+
+# Rejected on evidence, not merely unconsidered - do not re-enable without
+# new data. reportUnusedCallResult (2,317 findings): dominated by discarded
+# `write()` return counts and fluent/builder chains where the return value
+# is conventionally ignored. reportImplicitStringConcatenation (375
+# findings): fights this project's house style of splitting long messages
+# across adjacent string literals rather than one wrapped line.
+# reportCallInDefaultInitializer found one real bug (a Typer parameter still
+# using a direct default instead of `Annotated[...]`, since fixed) but its
+# remaining 2 findings are `frozenset[str] = frozenset()` defaults - a
+# frozenset is immutable, so one def-time instance shared across every call
+# is safe by construction, unlike the mutable-default bug this rule exists
+# to catch. Hoisting both to a module-level constant purely to satisfy the
+# rule would be contorting correct code to please a tool, which this
+# campaign has refused throughout, so the rule stays off. Worth
+# re-evaluating if basedpyright ever distinguishes immutable defaults from
+# mutable ones - this is a judgement about today's tool behaviour, not a
+# permanent verdict on the rule.
+
+  # In-package tests reach into the private internals of the modules they
+  # exercise, so reportPrivateUsage is a trust-boundary false positive here
+  # (fixing it by making internals public would damage the design). Every
+  # other strict rule stays ON for tests. See the second entry below for the
+  # repository-root test tree's different justification.
 
   [[tool.basedpyright.executionEnvironments]]
   reportPrivateUsage = false
   root = "src/vaultspec_core/tests"
+
+  # The repository-root test tree gets the same exemption for a DIFFERENT
+  # reason, which is why it is a second entry rather than a widened root. The
+  # in-package tree above reaches into this project's own internals. This one
+  # mostly reaches into THIRD-PARTY internals it has no authority over:
+  # `_windows_temp_compat.py` mirrors pytest's private `TempPathFactory`
+  # attributes to work around a Windows ACL bug, and there is no upstream
+  # symbol to promote.
+  #
+  # The exemption was granted only after every site was read and classified.
+  # 18 of 21 were genuine whitebox; the tail was FIXED rather than covered -
+  # a redundant flag assertion in the logging tests, and an MCP budget test
+  # that reached past `list_tools()` into the SDK's private tool manager and
+  # was, as a result, asserting against a differently-shaped object than the
+  # one real clients receive. Keep that order: fix what can be fixed, then
+  # exempt what remains. An exemption extended by habit is how a gate stops
+  # meaning anything.
+
+  # `extraPaths` is load-bearing, not boilerplate. An executionEnvironment's
+  # `root` also becomes its import-resolution base, so without the project
+  # root restored here, `tests/statistic/*` and `tests/conftest.py` stop
+  # resolving `statistic` and friends. Everything downstream then degrades to
+  # Unknown and the tree reports hundreds of phantom errors that are really
+  # one broken import path.
+  [[tool.basedpyright.executionEnvironments]]
+  extraPaths = ["."]
+  reportPrivateUsage = false
+  root = "tests"
 
 # Cognitive complexity - how much state a reader must hold to follow a
 # function, as distinct from the number of paths through it that `xenon`
