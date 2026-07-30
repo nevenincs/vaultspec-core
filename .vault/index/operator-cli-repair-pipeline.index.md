@@ -3,8 +3,9 @@ generated: true
 tags:
   - '#index'
   - '#operator-cli-repair-pipeline'
-date: '2026-05-15'
-modified: '2026-06-13'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-05-15-operator-cli-repair-pipeline-adr]]'
   - '[[2026-05-15-operator-cli-repair-pipeline-audit]]'
@@ -30,11 +31,11 @@ Auto-generated index of all documents tagged with `#operator-cli-repair-pipeline
 
 ### exec
 
-- `2026-05-15-operator-cli-repair-pipeline-exec` - `operator-cli-repair-pipeline` `P01.S01`
+- `2026-05-15-operator-cli-repair-pipeline-exec` - operator-cli-repair-pipeline exec: P01.S01
 
 ### plan
 
-- `2026-05-15-operator-cli-repair-pipeline-plan` - `operator-cli-repair-pipeline` `operator CLI repair pipeline` plan
+- `2026-05-15-operator-cli-repair-pipeline-plan` - operator-cli-repair-pipeline plan: operator CLI repair pipeline
 
 ### reference
 

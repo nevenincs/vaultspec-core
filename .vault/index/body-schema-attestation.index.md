@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#body-schema-attestation'
-date: '2026-07-27'
-modified: '2026-07-27'
+date: '2026-07-30'
+modified: '2026-07-30'
 body_schema: 'body-v1'
 related:
   - '[[2026-07-27-body-schema-attestation-adr]]'
@@ -19,7 +19,7 @@ Auto-generated index of all documents tagged with `#body-schema-attestation`.
 
 ### adr
 
-- `2026-07-27-body-schema-attestation-adr` - `body-schema-attestation` adr: `body-schema provenance warning default` | (**status:** `proposed`)
+- `2026-07-27-body-schema-attestation-adr` - `body-schema-attestation` adr: `body-schema provenance warning default` | (**status:** `accepted`)
 
 ### reference
 

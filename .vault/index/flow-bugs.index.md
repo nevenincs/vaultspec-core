@@ -1,10 +1,11 @@
 ---
 generated: true
 tags:
-  - '#flow-bugs'
   - '#index'
-date: '2026-04-21'
-modified: '2026-06-13'
+  - '#flow-bugs'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-04-21-flow-bugs-adr]]'
   - '[[2026-04-21-flow-bugs-phase-1-summary-exec]]'
@@ -20,7 +21,7 @@ Auto-generated index of all documents tagged with `#flow-bugs`.
 
 ### adr
 
-- `2026-04-21-flow-bugs-adr` - `flow-bugs` adr: install-layer hygiene contract
+- `2026-04-21-flow-bugs-adr` - `flow-bugs` adr: install-layer hygiene contract | (**status:** `accepted`)
 
 ### exec
 

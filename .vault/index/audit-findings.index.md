@@ -1,10 +1,11 @@
 ---
 generated: true
 tags:
-  - '#audit-findings'
   - '#index'
-date: '2026-04-21'
-modified: '2026-06-13'
+  - '#audit-findings'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-03-30-audit-findings-adr]]'
   - '[[2026-03-30-audit-findings-phase1-4-exec]]'
@@ -22,7 +23,7 @@ Auto-generated index of all documents tagged with `#audit-findings`.
 
 ### adr
 
-- `2026-03-30-audit-findings-adr` - `audit-findings` adr: triage charter for the 91-finding rolling audit
+- `2026-03-30-audit-findings-adr` - `audit-findings` adr: triage charter for the 91-finding rolling audit | (**status:** `accepted`)
 
 ### exec
 

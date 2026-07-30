@@ -1,10 +1,11 @@
 ---
 generated: true
 tags:
-  - '#doctor-dev-repo'
   - '#index'
-date: '2026-05-01'
-modified: '2026-06-13'
+  - '#doctor-dev-repo'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-04-30-doctor-dev-repo-adr]]'
   - '[[2026-04-30-doctor-dev-repo-plan]]'

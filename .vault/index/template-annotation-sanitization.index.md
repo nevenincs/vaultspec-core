@@ -3,8 +3,9 @@ generated: true
 tags:
   - '#index'
   - '#template-annotation-sanitization'
-date: '2026-07-27'
-modified: '2026-07-27'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-05-15-template-annotation-sanitization-adr]]'
   - '[[2026-05-15-template-annotation-sanitization-plan]]'

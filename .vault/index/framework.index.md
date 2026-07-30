@@ -1,10 +1,11 @@
 ---
 generated: true
 tags:
-  - '#framework'
   - '#index'
-date: '2026-04-21'
-modified: '2026-06-13'
+  - '#framework'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-02-16-env-var-research]]'
   - '[[2026-02-16-environment-variable-adr]]'
@@ -23,8 +24,8 @@ Auto-generated index of all documents tagged with `#framework`.
 
 ### adr
 
-- `2026-02-16-environment-variable-adr` - ===== ENUMS =====
-- `2026-02-17-bootstrap-prompt-adr` - bootstrap-prompt adr: framework bootstrap prompt redesign | (**status:** accepted)
+- `2026-02-16-environment-variable-adr` - `framework` adr: `Environment Variable Standardization` | (**status:** `accepted`)
+- `2026-02-17-bootstrap-prompt-adr` - bootstrap-prompt adr: framework bootstrap prompt redesign | (**status:** `accepted`)
 
 ### plan
 

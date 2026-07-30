@@ -3,8 +3,9 @@ generated: true
 tags:
   - '#index'
   - '#vault-check-validators'
-date: '2026-07-23'
-modified: '2026-07-23'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-07-23-vault-check-validators-adr]]'
   - '[[2026-07-23-vault-check-validators-audit]]'

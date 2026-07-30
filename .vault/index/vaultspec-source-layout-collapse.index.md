@@ -3,8 +3,9 @@ generated: true
 tags:
   - '#index'
   - '#vaultspec-source-layout-collapse'
-date: '2026-05-17'
-modified: '2026-06-13'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-05-17-vaultspec-source-layout-collapse-adr]]'
   - '[[2026-05-17-vaultspec-source-layout-collapse-audit]]'
@@ -28,7 +29,7 @@ Auto-generated index of all documents tagged with `#vaultspec-source-layout-coll
 
 ### plan
 
-- `2026-05-17-vaultspec-source-layout-collapse-plan` - `vaultspec-source-layout-collapse` plan
+- `2026-05-17-vaultspec-source-layout-collapse-plan` - `vaultspec-source-layout-collapse` plan: `relocate canonical content and retire the dev-mode carve-out`
 
 ### research
 

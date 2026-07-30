@@ -3,8 +3,9 @@ generated: true
 tags:
   - '#index'
   - '#code-boundary-check'
-date: '2026-07-16'
-modified: '2026-07-16'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-07-16-code-boundary-check-S01]]'
   - '[[2026-07-16-code-boundary-check-S02]]'

@@ -3,8 +3,9 @@ generated: true
 tags:
   - '#index'
   - '#vault-index-folder'
-date: '2026-04-30'
-modified: '2026-06-13'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-04-30-vault-index-folder-adr]]'
   - '[[2026-04-30-vault-index-folder-phase1-2-3-exec]]'

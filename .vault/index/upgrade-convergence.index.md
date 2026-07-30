@@ -3,8 +3,9 @@ generated: true
 tags:
   - '#index'
   - '#upgrade-convergence'
-date: '2026-07-17'
-modified: '2026-07-17'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-07-17-upgrade-convergence-P01-S01]]'
   - '[[2026-07-17-upgrade-convergence-P01-S02]]'

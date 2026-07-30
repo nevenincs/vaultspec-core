@@ -1,10 +1,11 @@
 ---
 generated: true
 tags:
-  - '#skill-audit'
   - '#index'
-date: '2026-04-21'
-modified: '2026-06-13'
+  - '#skill-audit'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-02-22-skill-audit-adr]]'
   - '[[2026-02-22-skill-audit-execution-summary]]'
@@ -20,7 +21,7 @@ Auto-generated index of all documents tagged with `#skill-audit`.
 
 ### adr
 
-- `2026-02-22-skill-audit-adr` - ADR: Standardize Skill Structure
+- `2026-02-22-skill-audit-adr` - ADR: Standardize Skill Structure | (**status:** `accepted`)
 
 ### exec
 

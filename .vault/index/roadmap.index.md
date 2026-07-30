@@ -1,10 +1,11 @@
 ---
 generated: true
 tags:
-  - '#roadmap'
   - '#index'
-date: '2026-04-21'
-modified: '2026-06-13'
+  - '#roadmap'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-02-17-audit-summary-audit]]'
   - '[[2026-02-17-competitive-landscape-audit]]'
@@ -25,7 +26,7 @@ Auto-generated index of all documents tagged with `#roadmap`.
 
 ### adr
 
-- `2026-03-23-roadmap-adr` - `roadmap` adr: `roadmap` | (**status:** `{accepted|rejected|deprecated}`)
+- `2026-03-23-roadmap-adr` - `roadmap` adr: `roadmap` | (**status:** `accepted`)
 
 ### audit
 

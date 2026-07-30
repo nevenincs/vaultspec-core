@@ -1,10 +1,11 @@
 ---
 generated: true
 tags:
-  - '#graph-hardening'
   - '#index'
-date: '2026-04-21'
-modified: '2026-06-13'
+  - '#graph-hardening'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-03-22-graph-hardening-adr]]'
   - '[[2026-03-22-graph-hardening-phase1-audit]]'

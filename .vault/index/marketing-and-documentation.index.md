@@ -1,10 +1,11 @@
 ---
 generated: true
 tags:
-  - '#marketing-and-documentation'
   - '#index'
-date: '2026-04-21'
-modified: '2026-06-13'
+  - '#marketing-and-documentation'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-02-20-marketing-and-documentation-adr]]'
   - '[[2026-02-20-marketing-and-documentation-p1-plan]]'
@@ -25,7 +26,7 @@ Auto-generated index of all documents tagged with `#marketing-and-documentation`
 
 ### adr
 
-- `2026-02-20-marketing-and-documentation-adr` - marketing-and-documentation adr | (**status:** accepted)
+- `2026-02-20-marketing-and-documentation-adr` - marketing-and-documentation adr | (**status:** `accepted`)
 
 ### exec
 

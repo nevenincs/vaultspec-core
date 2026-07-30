@@ -3,8 +3,9 @@ generated: true
 tags:
   - '#index'
   - '#adr-topic-infix'
-date: '2026-07-27'
-modified: '2026-07-27'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-07-27-adr-topic-infix-P01-S01]]'
   - '[[2026-07-27-adr-topic-infix-P01-S02]]'

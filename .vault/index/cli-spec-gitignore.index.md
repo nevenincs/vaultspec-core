@@ -3,8 +3,9 @@ generated: true
 tags:
   - '#index'
   - '#cli-spec-gitignore'
-date: '2026-05-17'
-modified: '2026-06-13'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-05-17-cli-spec-gitignore-adr]]'
   - '[[2026-05-17-cli-spec-gitignore-research]]'

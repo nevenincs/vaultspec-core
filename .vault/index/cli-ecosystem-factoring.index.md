@@ -1,10 +1,11 @@
 ---
 generated: true
 tags:
-  - '#cli-ecosystem-factoring'
   - '#index'
-date: '2026-04-21'
-modified: '2026-06-13'
+  - '#cli-ecosystem-factoring'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
   - '[[2026-02-22-cli-ecosystem-factoring-phase1-summary-exec]]'
@@ -29,7 +30,7 @@ Auto-generated index of all documents tagged with `#cli-ecosystem-factoring`.
 
 ### adr
 
-- `2026-02-22-cli-ecosystem-factoring-adr` - cli-ecosystem-factoring adr: module hierarchy restructuring | (**status:** accepted)
+- `2026-02-22-cli-ecosystem-factoring-adr` - cli-ecosystem-factoring adr: module hierarchy restructuring | (**status:** `accepted`)
 
 ### exec
 

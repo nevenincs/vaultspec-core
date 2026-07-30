@@ -1,10 +1,11 @@
 ---
 generated: true
 tags:
-  - '#cli-restructure'
   - '#index'
-date: '2026-04-21'
-modified: '2026-06-13'
+  - '#cli-restructure'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-03-16-cli-restructure-plan]]'
   - '[[2026-03-23-cli-restructure-adr]]'
@@ -19,7 +20,7 @@ Auto-generated index of all documents tagged with `#cli-restructure`.
 
 ### adr
 
-- `2026-03-23-cli-restructure-adr` - `cli-restructure` adr: `cli restructure` | (**status:** `{accepted|rejected|deprecated}`)
+- `2026-03-23-cli-restructure-adr` - `cli-restructure` adr: `cli restructure` | (**status:** `accepted`)
 
 ### plan
 

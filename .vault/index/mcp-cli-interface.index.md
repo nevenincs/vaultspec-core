@@ -1,10 +1,11 @@
 ---
 generated: true
 tags:
-  - '#mcp-cli-interface'
   - '#index'
-date: '2026-04-21'
-modified: '2026-06-13'
+  - '#mcp-cli-interface'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-03-11-mcp-cli-interface-audit]]'
   - '[[2026-03-17-mcp-interface-alignment-audit]]'

@@ -3,8 +3,9 @@ generated: true
 tags:
   - '#index'
   - '#rag-pipeline-enrollment'
-date: '2026-06-26'
-modified: '2026-06-27'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-06-26-rag-pipeline-enrollment-adr]]'
   - '[[2026-06-26-rag-pipeline-enrollment-research]]'

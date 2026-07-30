@@ -1,10 +1,11 @@
 ---
 generated: true
 tags:
-  - '#vault-api'
   - '#index'
-date: '2026-04-21'
-modified: '2026-06-13'
+  - '#vault-api'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-02-08-vault-api-adr]]'
   - '[[2026-02-08-vault-api-plan]]'
@@ -19,7 +20,7 @@ Auto-generated index of all documents tagged with `#vault-api`.
 
 ### adr
 
-- `2026-02-08-vault-api-adr` - vault-api adr: Modular Docs API and Auditing System | (**status:** accepted)
+- `2026-02-08-vault-api-adr` - vault-api adr: Modular Docs API and Auditing System | (**status:** `accepted`)
 
 ### plan
 

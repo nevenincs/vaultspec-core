@@ -1,10 +1,11 @@
 ---
 generated: true
 tags:
-  - '#cli-target-refactor'
   - '#index'
-date: '2026-04-21'
-modified: '2026-06-13'
+  - '#cli-target-refactor'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-03-05-cli-target-refactor-phase0-step1-exec]]'
   - '[[2026-03-05-cli-target-refactor-phase1-step1-exec]]'
@@ -32,7 +33,7 @@ Auto-generated index of all documents tagged with `#cli-target-refactor`.
 
 ### adr
 
-- `2026-03-23-cli-target-refactor-adr` - `cli-target-refactor` adr: `cli target refactor` | (**status:** `{accepted|rejected|deprecated}`)
+- `2026-03-23-cli-target-refactor-adr` - `cli-target-refactor` adr: `cli target refactor` | (**status:** `accepted`)
 
 ### exec
 

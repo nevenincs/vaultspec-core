@@ -3,8 +3,9 @@ generated: true
 tags:
   - '#index'
   - '#framework-dir-flatten'
-date: '2026-06-25'
-modified: '2026-06-27'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-06-25-framework-dir-flatten-adr]]'
   - '[[2026-06-25-framework-dir-flatten-plan]]'

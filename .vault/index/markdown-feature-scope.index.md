@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#markdown-feature-scope'
-date: '2026-07-27'
-modified: '2026-07-27'
+date: '2026-07-30'
+modified: '2026-07-30'
 body_schema: 'body-v1'
 related:
   - '[[2026-07-27-markdown-feature-scope-P01-S03]]'

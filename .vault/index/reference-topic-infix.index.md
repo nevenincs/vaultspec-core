@@ -3,8 +3,9 @@ generated: true
 tags:
   - '#index'
   - '#reference-topic-infix'
-date: '2026-07-16'
-modified: '2026-07-16'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-07-16-reference-topic-infix-S01]]'
   - '[[2026-07-16-reference-topic-infix-S02]]'
@@ -26,7 +27,7 @@ Auto-generated index of all documents tagged with `#reference-topic-infix`.
 
 ### adr
 
-- `2026-07-16-reference-topic-infix-adr` - `reference-topic-infix` adr: `topic-infix scaffolding for the narrative document trio` | (**status:** `accepted`)
+- `2026-07-16-reference-topic-infix-adr` - `reference-topic-infix` adr: `topic-infix scaffolding for the narrative document trio` | (**status:** `superseded`)
 
 ### audit
 

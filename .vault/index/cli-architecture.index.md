@@ -1,10 +1,11 @@
 ---
 generated: true
 tags:
-  - '#cli-architecture'
   - '#index'
-date: '2026-04-21'
-modified: '2026-06-13'
+  - '#cli-architecture'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-03-05-cli-architecture-audit]]'
   - '[[2026-03-05-cli-audit-notes-reference]]'
@@ -27,8 +28,8 @@ Auto-generated index of all documents tagged with `#cli-architecture`.
 
 ### adr
 
-- `2026-03-05-cli-engine-typer-adr` - ADR: CLI Parsing Engine Migration (Typer + Rich)
-- `2026-03-05-cli-path-resolution-adr` - ADR: CLI Path Resolution & Provider Initialization Overhaul
+- `2026-03-05-cli-engine-typer-adr` - ADR: CLI Parsing Engine Migration (Typer + Rich) | (**status:** `accepted`)
+- `2026-03-05-cli-path-resolution-adr` - ADR: CLI Path Resolution & Provider Initialization Overhaul | (**status:** `accepted`)
 
 ### audit
 

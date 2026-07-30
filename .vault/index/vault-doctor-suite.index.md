@@ -1,10 +1,11 @@
 ---
 generated: true
 tags:
-  - '#vault-doctor-suite'
   - '#index'
-date: '2026-04-21'
-modified: '2026-06-13'
+  - '#vault-doctor-suite'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-02-24-vault-doctor-suite-adr]]'
   - '[[2026-02-24-vault-doctor-suite-p1-plan]]'

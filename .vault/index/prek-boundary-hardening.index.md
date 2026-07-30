@@ -3,8 +3,9 @@ generated: true
 tags:
   - '#index'
   - '#prek-boundary-hardening'
-date: '2026-07-23'
-modified: '2026-07-23'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-07-23-prek-boundary-hardening-P01-S01]]'
   - '[[2026-07-23-prek-boundary-hardening-P01-S02]]'

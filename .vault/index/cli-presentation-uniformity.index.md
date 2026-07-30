@@ -3,8 +3,9 @@ generated: true
 tags:
   - '#index'
   - '#cli-presentation-uniformity'
-date: '2026-06-24'
-modified: '2026-06-25'
+date: '2026-07-30'
+modified: '2026-07-30'
+body_schema: 'body-v1'
 related:
   - '[[2026-06-24-cli-presentation-uniformity-adr]]'
   - '[[2026-06-24-cli-presentation-uniformity-plan]]'
