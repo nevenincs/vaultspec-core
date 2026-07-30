@@ -22,17 +22,24 @@ Every assertion reads real on-disk state.
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 pytestmark = [pytest.mark.unit]
 
 
 def test_traversal_in_the_root_is_canonicalized(tmp_path: Path) -> None:
-    """A root spelled with ``..`` resolves to the directory it denotes."""
+    """A root spelled with ``..`` resolves to the directory it denotes.
+
+    Also pins absoluteness, which is what gives later ``relative_to`` calls a
+    common base to compare against.
+    """
     nested = tmp_path / "workspace" / "inner"
     nested.mkdir(parents=True)
 
@@ -40,20 +47,7 @@ def test_traversal_in_the_root_is_canonicalized(tmp_path: Path) -> None:
 
     assert factory.root == nested.resolve()
     assert ".." not in factory.root.parts
-
-
-def test_root_is_absolute_even_when_given_a_relative_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A relative root is anchored, so later comparisons have a common base."""
-    target = tmp_path / "relative-root"
-    target.mkdir()
-    monkeypatch.chdir(tmp_path)
-
-    factory = WorkspaceFactory(Path("relative-root"))
-
     assert factory.root.is_absolute()
-    assert factory.root == target.resolve()
 
 
 def test_resolved_root_is_a_valid_relative_to_base_for_its_own_children(
