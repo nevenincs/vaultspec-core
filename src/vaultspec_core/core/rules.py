@@ -345,13 +345,13 @@ def rule_promote(
     Returns:
         The Path to the scaffolded rule file.
     """
-    import datetime as _dt
     import re
 
     from ..config import get_config
     from ..vaultcore import (
         parse_vault_metadata,
         refresh_modified_stamp,
+        vault_today,
     )
     from .exceptions import ResourceExistsError, ResourceNotFoundError, VaultSpecError
 
@@ -503,7 +503,7 @@ derived_from:
     # audit's frontmatter (appending the promoted rule reference), so the
     # audit is mutated and its modified stamp is refreshed. The rule file
     # is freshly scaffolded with its own stamp and needs no refresh here.
-    final_audit_content = refresh_modified_stamp(final_audit_content, _dt.date.today())
+    final_audit_content = refresh_modified_stamp(final_audit_content, vault_today())
 
     if not dry_run:
         # Write rule file

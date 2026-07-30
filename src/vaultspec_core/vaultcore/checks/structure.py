@@ -13,9 +13,9 @@ from __future__ import annotations
 import logging
 import re
 from contextlib import nullcontext
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from ..models import vault_today
 from ..rename_ops import rename_document_path as _rename_document_path
 from ..rename_ops import rewrite_incoming_refs as _rewrite_incoming_refs
 from ._base import (
@@ -124,11 +124,10 @@ def _fix_filename(
                 return renames, doc_path
 
     if not re.match(r"^\d{4}-\d{2}-\d{2}-", filename):
-        # UTC date prefix so the rename is deterministic regardless of
-        # the runner's local timezone.  Matches the manifest timestamps
-        # in ``core/commands.py`` that also use ``datetime.UTC``.
-        today = datetime.now(UTC).strftime("%Y-%m-%d")
-        new_filename = f"{today}-{filename}"
+        # The vault's single canonical clock (UTC), so the backfilled
+        # prefix agrees with every other vault document date regardless
+        # of the runner's local timezone. See `vault_today` for why.
+        new_filename = f"{vault_today().isoformat()}-{filename}"
         new_path = doc_path.parent / new_filename
 
         if _rename_document_path(doc_path, new_path):

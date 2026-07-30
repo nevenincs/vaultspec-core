@@ -15,7 +15,7 @@ import logging
 from typing import TYPE_CHECKING, TypedDict
 
 from ..core.helpers import atomic_write
-from .models import refresh_modified_stamp
+from .models import refresh_modified_stamp, vault_today
 from .query_rename import (
     RenameCollision,
     RenamePlan,
@@ -127,9 +127,7 @@ def _refresh_rename_stamps(
         file_renames: Applied renames; their destinations are stamped.
         cascade_paths: Absolute paths the ``related:`` cascade rewrote.
     """
-    from datetime import date
-
-    today = date.today()
+    today = vault_today()
     targets: set[Path] = {dst for _src, dst in file_renames} | set(cascade_paths)
     for path in targets:
         if not path.is_file():
@@ -156,9 +154,20 @@ def _apply_rename_plan(
     for its lifetime; ``advisory_lock`` no-ops when ``.vault/data`` is absent,
     and the transaction never creates it. The caller-supplied snapshot set is
     the whole non-archive docs tree because a feature rename touches all of it.
-    Any exception inside the ``with`` block triggers the transaction's reverse
-    journal (restoring the vault byte-for-byte) before the wrapped error is
-    raised.
+    Alongside the domain lock, the transaction also takes a per-document
+    advisory lock (:func:`~vaultspec_core.vaultcore.edit_engine.document_lock_target`)
+    for every document being renamed (keyed on its pre-rename path, the one a
+    concurrent ``execute_edit`` would resolve and lock against) plus every
+    referrer :func:`~vaultspec_core.vaultcore.rename_ops.find_rewrite_targets`
+    confirms ``plan.stem_renames`` will actually rewrite - the same sentinel
+    ``execute_edit`` takes, so a concurrent edit of any mutated document is
+    excluded rather than racing the cascade, exactly as ``vault rename``
+    closes it for the single-document case. Any exception inside the ``with``
+    block triggers the transaction's reverse journal (restoring the vault
+    byte-for-byte) before the wrapped error is raised; the per-document locks
+    stay held through that rollback (the transaction only releases its whole
+    lock stack after restoring), so a concurrent edit cannot race the
+    restore either.
 
     Args:
         root_dir: Project root directory.
@@ -176,11 +185,13 @@ def _apply_rename_plan(
     from ..config import get_config
     from ..core.exceptions import VaultSpecError
     from .checks._base import CheckResult
+    from .edit_engine import document_lock_target
     from .rename_engine import (
         RenameTransaction,
         docs_lock_target,
         iter_snapshot_docs,
     )
+    from .rename_ops import find_rewrite_targets
 
     cfg = get_config()
     docs_dir = root_dir / cfg.docs_dir
@@ -188,8 +199,38 @@ def _apply_rename_plan(
     index_dir_existed = index_dir.exists()
     lock_target = docs_lock_target(docs_dir)
 
+    # Per-document locks for the MUTATED set: every document being renamed
+    # (keyed on its CURRENT path - the one a concurrent execute_edit would
+    # resolve and lock against, not the not-yet-existing destination), plus
+    # every referrer find_rewrite_targets confirms plan.stem_renames will
+    # actually rewrite. `plan` is already fully computed before this
+    # transaction starts, so both sets are known with the same confidence
+    # `vault rename` has for its single-document case - this is the same
+    # cascade, just over more pairs. Documents the cascade only reads and
+    # finds no match in stay unlocked (locking the whole snapshot tree would
+    # be a global edit freeze in N acquisitions); a document that starts
+    # referencing a renamed stem only after this scan - a concurrent edit
+    # landing in the window between it and the cascade's write - can be
+    # missed, surfacing as a repairable `vault check links` finding rather
+    # than a silent lost update.
+    mutated_paths: list[Path] = [src for src, _dst in plan.file_renames]
+    mutated_paths.extend(
+        find_rewrite_targets(
+            root_dir, plan.stem_renames, exclude_dirs=frozenset({"_archive"})
+        )
+    )
+    document_lock_targets = sorted(
+        {document_lock_target(p, root_dir) for p in mutated_paths}, key=str
+    )
+    for doc_lock_target in document_lock_targets:
+        doc_lock_target.parent.mkdir(parents=True, exist_ok=True)
+
     try:
-        with RenameTransaction(docs_dir, lock_target=lock_target) as tx:
+        with RenameTransaction(
+            docs_dir,
+            lock_target=lock_target,
+            document_lock_targets=document_lock_targets,
+        ) as tx:
             # Snapshot the whole non-archive docs tree under the lock so the
             # reverse journal can restore any moved/rewritten file byte-for-byte.
             tx.snapshot(iter_snapshot_docs(docs_dir))

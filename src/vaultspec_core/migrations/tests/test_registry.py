@@ -21,6 +21,7 @@ from vaultspec_core.core.manifest import (
     read_manifest_data,
     write_manifest_data,
 )
+from vaultspec_core.graph import cache as cache_mod
 from vaultspec_core.migrations import (
     Migration,
     MigrationResult,
@@ -329,3 +330,80 @@ class TestStatusHelpers:
         future, _ = _noop("future", "0.3.0")
         pending = list_pending(workspace, registry=[ancient, equal, future])
         assert [m.name for m in pending] == ["future"]
+
+
+class TestGraphCacheInvalidation:
+    """A migration that mutates ``.vault/`` documents drops the graph cache.
+
+    Migration bodies write directly to disk (``modified_stamp_backfill``,
+    ``index_subfolder``) instead of going through the mutating CLI verbs, so
+    they never pass through
+    :func:`vaultspec_core.cli._cache_hook.invalidate_graph_cache`. Without
+    the driver's own invalidation call, a stale graph cache would only be
+    caught by the per-file fingerprint self-healing - sound for today's two
+    migrations (both change a file's size or its manifest key) but not a
+    guarantee for a future same-size in-place rewrite. These tests pin the
+    driver's own safety net directly, independent of what any particular
+    migration body happens to touch.
+    """
+
+    def _prime_cache(self, workspace: Path) -> Path:
+        """Write a real, loadable graph cache file for *workspace*."""
+        cache_file = cache_mod.cache_path(workspace)
+        cache_mod.save(
+            cache_file,
+            manifest={},
+            graph={"nodes": [], "edges": []},
+            dangling_links=[],
+        )
+        assert cache_file.exists()
+        return cache_file
+
+    def test_applied_migration_drops_the_cache(self, workspace: Path) -> None:
+        cache_file = self._prime_cache(workspace)
+
+        def _migrate(w: Path) -> MigrationResult:
+            # A real content mutation, mirroring how a live migration body
+            # rewrites a `.vault/` document directly.
+            doc = w / ".vault" / "adr" / "2026-01-01-example-adr.md"
+            doc.parent.mkdir(parents=True, exist_ok=True)
+            doc.write_text("# migrated\n", encoding="utf-8")
+            return MigrationResult(
+                name="rewrites-doc", target_version="0.2.0", summary=""
+            )
+
+        m = Migration(target_version="0.2.0", name="rewrites-doc", migrate=_migrate)
+
+        run_pending_migrations(workspace, registry=[m])
+
+        assert not cache_file.exists(), (
+            "run_pending_migrations must drop the graph cache after applying "
+            "a migration, not rely solely on the per-file fingerprint"
+        )
+
+    def test_no_pending_migration_leaves_cache_untouched(self, workspace: Path) -> None:
+        # Manifest already covers every registered migration: the driver
+        # short-circuits before running anything and must not touch a cache
+        # it never had reason to invalidate.
+        data = read_manifest_data(workspace)
+        data.vaultspec_version = "9.9.9"
+        write_manifest_data(workspace, data)
+        cache_file = self._prime_cache(workspace)
+        m, _ = _noop("alpha", "0.2.0")
+
+        run_pending_migrations(workspace, registry=[m])
+
+        assert cache_file.exists()
+
+    def test_raising_migration_still_drops_the_cache(self, workspace: Path) -> None:
+        # The failing migration's own bump is suppressed, but a prior
+        # successful migration in the same run may already have mutated the
+        # corpus; the cache must not survive as a stale artifact.
+        cache_file = self._prime_cache(workspace)
+        m_first, _ = _noop("first", "0.2.0")
+        m_second = _raising("second", "0.3.0")
+
+        with pytest.raises(RuntimeError, match="second intentionally failed"):
+            run_pending_migrations(workspace, registry=[m_first, m_second])
+
+        assert not cache_file.exists()

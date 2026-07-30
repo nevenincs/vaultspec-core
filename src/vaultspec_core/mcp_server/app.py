@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 
@@ -168,14 +168,16 @@ def _serve(
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
-    parent_pid: int | None = typer.Option(
-        None,
-        "--parent-pid",
-        help=(
-            "Explicit client PID for the stdio lifetime watchdog "
-            "(watched in addition to the discovered client)"
+    parent_pid: Annotated[
+        int | None,
+        typer.Option(
+            "--parent-pid",
+            help=(
+                "Explicit client PID for the stdio lifetime watchdog "
+                "(watched in addition to the discovered client)"
+            ),
         ),
-    ),
+    ] = None,
 ) -> None:
     """Typer callback entrypoint for vaultspec-mcp.
 

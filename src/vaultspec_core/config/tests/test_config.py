@@ -36,6 +36,7 @@ class TestConfigParsing:
         assert parse_int_or_none("-1") == -1
         assert parse_int_or_none("abc") is None
         assert parse_int_or_none("") is None
+        assert parse_int_or_none(None) is None
 
     def test_parse_float_or_none(self):
         assert parse_float_or_none("1.23") == 1.23
@@ -43,6 +44,7 @@ class TestConfigParsing:
         assert parse_float_or_none(".5") == 0.5
         assert parse_float_or_none("abc") is None
         assert parse_float_or_none("") is None
+        assert parse_float_or_none(None) is None
 
 
 class TestVaultSpecConfig:

@@ -37,7 +37,7 @@ class Cmd:
     """
 
     argv: tuple[str, ...]
-    env: Mapping[str, str] = field(default_factory=dict)
+    env: Mapping[str, str] = field(default_factory=dict[str, str])
 
 
 @dataclass(frozen=True)

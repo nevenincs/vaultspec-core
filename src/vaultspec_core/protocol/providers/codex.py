@@ -10,7 +10,7 @@ result types, and capability-tier model selection defined by the base layer.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 if TYPE_CHECKING:
     import pathlib
@@ -36,6 +36,7 @@ class CodexProvider(ExecutionProvider):
     """
 
     @property
+    @override
     def name(self) -> str:
         """Return the provider identifier string.
 
@@ -45,6 +46,7 @@ class CodexProvider(ExecutionProvider):
         return "codex"
 
     @property
+    @override
     def models(self) -> ModelRegistry:
         """Return the Codex model registry.
 
@@ -53,6 +55,7 @@ class CodexProvider(ExecutionProvider):
         """
         return CodexModels
 
+    @override
     def load_system_prompt(self, root_dir: pathlib.Path) -> str:
         """Load the root ``AGENTS.md`` if it exists (deployed by CLI sync).
 
@@ -67,6 +70,7 @@ class CodexProvider(ExecutionProvider):
             return ""
         return system_file.read_text(encoding="utf-8")
 
+    @override
     def load_rules(self, root_dir: pathlib.Path) -> str:
         """Load and inline-resolve rules from ``.codex/rules/``.
 

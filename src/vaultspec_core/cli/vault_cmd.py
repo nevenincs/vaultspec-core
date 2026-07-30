@@ -203,8 +203,6 @@ def cmd_add(
     Supported types: adr, audit, exec, plan, reference, research.
     """
     apply_target(target)
-    from datetime import UTC, datetime
-
     from vaultspec_core.cli import _add_ops
     from vaultspec_core.console import get_console
     from vaultspec_core.core.types import get_context as _get_ctx
@@ -216,7 +214,7 @@ def cmd_add(
         WritePolicy,
         create_vault_doc,
     )
-    from vaultspec_core.vaultcore.models import DocType
+    from vaultspec_core.vaultcore.models import DocType, vault_today
 
     console = get_console()
     root_dir = _get_ctx().target_dir
@@ -234,8 +232,8 @@ def cmd_add(
         console, root_dir, dt, feat, json_output=json_output
     )
 
-    # Default date to today (UTC for deterministic vault doc dates)
-    date_str = date or datetime.now(UTC).strftime("%Y-%m-%d")
+    # Default date to today on the vault's single canonical clock (UTC).
+    date_str = date or vault_today().isoformat()
 
     identity = DocumentIdentity(
         doc_type=dt, feature=feat, date=date_str, topic=topic_value

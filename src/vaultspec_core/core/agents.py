@@ -50,7 +50,7 @@ def _toml_quote(value: str) -> str:
 # `.vaultspec/agents/*.md` to canonical Gemini built-in tool
 # identifiers (`GeminiBuiltinTool` enum members). The enum values are
 # pinned to upstream gemini-cli constants by a live drift test in
-# `tests/cli/test_agents_render.py::TestUpstreamGeminiToolPin`.
+# `src/vaultspec_core/tests/cli/test_agents_render.py::TestUpstreamGeminiToolPin`.
 _CLAUDE_TO_GEMINI_TOOLS: dict[str, GeminiBuiltinTool] = {
     "Read": GeminiBuiltinTool.READ_FILE,
     "Write": GeminiBuiltinTool.WRITE_FILE,

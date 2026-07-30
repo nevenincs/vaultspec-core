@@ -9,7 +9,7 @@ by the base provider layer.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 if TYPE_CHECKING:
     import pathlib
@@ -33,6 +33,7 @@ class ClaudeProvider(ExecutionProvider):
     """
 
     @property
+    @override
     def name(self) -> str:
         """Return the provider identifier string.
 
@@ -42,6 +43,7 @@ class ClaudeProvider(ExecutionProvider):
         return "claude"
 
     @property
+    @override
     def models(self) -> ModelRegistry:
         """Return the Claude model registry.
 
@@ -50,6 +52,7 @@ class ClaudeProvider(ExecutionProvider):
         """
         return ClaudeModels
 
+    @override
     def load_system_prompt(self, root_dir: pathlib.Path) -> str:
         """Load ``.claude/CLAUDE.md`` if it exists (deployed by CLI sync).
 
@@ -64,6 +67,7 @@ class ClaudeProvider(ExecutionProvider):
             return ""
         return system_file.read_text(encoding="utf-8")
 
+    @override
     def load_rules(self, root_dir: pathlib.Path) -> str:
         """Load rules from ``.claude/rules/``.
 

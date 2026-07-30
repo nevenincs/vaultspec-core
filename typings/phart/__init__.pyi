@@ -11,6 +11,8 @@ from typing import Any
 
 import networkx as nx
 
+from phart.styles import LayoutOptions, NodeStyle
+
 class ASCIIRenderer:
     graph: nx.Graph[Any]
 
@@ -18,11 +20,11 @@ class ASCIIRenderer:
         self,
         graph: nx.Graph[Any],
         *,
-        node_style: Any = ...,
+        node_style: NodeStyle = ...,
         node_spacing: int = ...,
         layer_spacing: int = ...,
         use_ascii: bool | None = ...,
         custom_decorators: dict[str, tuple[str, str]] | None = ...,
-        options: Any = ...,
+        options: LayoutOptions | None = ...,
     ) -> None: ...
     def render(self, print_config: bool | None = ...) -> str: ...

@@ -70,17 +70,19 @@ def compute_rollup(
         graph: Optional pre-built :class:`~vaultspec_core.graph.VaultGraph`
             to reuse; one is built from *root_dir* when omitted.
         today: Reference date for the *since_days* window, defaulting to
-            :meth:`datetime.date.today`. Exposed for deterministic tests.
+            :func:`~vaultspec_core.vaultcore.models.vault_today`. Exposed
+            for deterministic tests.
 
     Returns:
         A fully populated :class:`Rollup`.
     """
     from ..graph.api import VaultGraph
     from ..plan.status import collect_all_statuses
+    from .models import vault_today
     from .query import get_stats
 
     g = graph if graph is not None else VaultGraph(root_dir)
-    reference = today if today is not None else _dt.date.today()
+    reference = today if today is not None else vault_today()
 
     # Index documents are derived aggregates of a feature's other docs;
     # including them in feature counts or the recent set double-counts and
@@ -116,7 +118,12 @@ def compute_rollup(
             real_nodes, limit=limit, since_days=since_days, reference=reference
         )
     )
-    totals = cast("dict[str, object]", get_stats(root_dir, graph=g))
+    # Invariant: `get_stats` is fully typed as returning `VaultStats`, so this
+    # is a widening cast (TypedDict -> plain dict), not a hopeful narrowing -
+    # there is no unproven shape here. The intermediate `object` step is
+    # required because a TypedDict and a `dict[K, V]` are never considered
+    # sufficiently overlapping types for a direct cast in either direction.
+    totals = cast("dict[str, object]", cast("object", get_stats(root_dir, graph=g)))
 
     return Rollup(
         active_features=active_features,

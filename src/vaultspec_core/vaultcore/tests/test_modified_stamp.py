@@ -148,6 +148,19 @@ class TestParseLenientDate:
     def test_iso_timestamp_space_separator(self):
         assert parse_lenient_date("2026-06-12 14:30:05") == datetime.date(2026, 6, 12)
 
+    def test_iso_timestamp_offset_crossing_utc_midnight(self):
+        # Regression: a zone-aware timestamp used to take its date from its
+        # own literal wall clock instead of converting to UTC first, the
+        # same clock-mismatch bug already fixed for file-mtime reads. An
+        # offset large enough to cross a UTC calendar-day boundary must
+        # shift the returned date accordingly, in either direction.
+        assert parse_lenient_date("2026-02-08T23:00:00-05:00") == datetime.date(
+            2026, 2, 9
+        )
+        assert parse_lenient_date("2026-02-08T02:00:00+05:00") == datetime.date(
+            2026, 2, 7
+        )
+
     def test_year_first_slashes(self):
         assert parse_lenient_date("2026/06/12") == datetime.date(2026, 6, 12)
         assert parse_lenient_date("2026/6/2") == datetime.date(2026, 6, 2)

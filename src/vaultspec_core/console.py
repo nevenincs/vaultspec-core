@@ -10,11 +10,14 @@ import contextlib
 import io
 import os
 import sys
-from typing import Any, TextIO
+from typing import TYPE_CHECKING, Any, TextIO
 
 from rich.console import Console
 
-__all__ = ["configure_stdio", "get_console", "reset_console"]
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+__all__ = ["configure_stdio", "get_console", "override_console", "reset_console"]
 
 _console: Console | None = None
 
@@ -117,3 +120,42 @@ def reset_console() -> None:
     """
     global _console
     _console = None
+
+
+@contextlib.contextmanager
+def override_console(console: Console) -> Generator[None]:
+    """Temporarily install ``console`` as the shared console singleton.
+
+    Every :func:`get_console` call made anywhere in the process - including
+    from code the caller does not control, such as CLI commands invoked
+    in-process - returns ``console`` for the duration of the ``with``
+    block. The previous singleton, including ``None`` when none had been
+    constructed yet, is restored on exit, whether the block completes
+    normally or raises.
+
+    Intended for callers that need to redirect CLI output into a
+    caller-owned :class:`~rich.console.Console` - for example, a recording
+    console (``record=True``) used to capture ANSI output for rendering
+    README screenshots or GIFs - without leaving the shared singleton
+    mutated for whatever runs next in the same process.
+
+    This mutates a bare module global with no lock or contextvar, so it is
+    not safe for concurrent or reentrant use across threads or overlapping
+    async tasks; nested calls on a single thread restore correctly, but
+    overlapping overrides from different threads or tasks will clobber
+    each other's saved state.
+
+    Args:
+        console: The console instance to install for the duration of the
+            context.
+
+    Yields:
+        None.
+    """
+    global _console
+    previous = _console
+    _console = console
+    try:
+        yield
+    finally:
+        _console = previous

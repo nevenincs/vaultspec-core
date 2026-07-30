@@ -32,7 +32,6 @@ validation refusal, resolution failure, or write error).
 from __future__ import annotations
 
 import dataclasses
-import datetime as _dt
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -45,6 +44,7 @@ if TYPE_CHECKING:
 __all__ = [
     "EditError",
     "EditResult",
+    "document_lock_target",
     "enforce_blob_hash",
     "execute_edit",
     "invalidate_graph_cache",
@@ -296,6 +296,13 @@ def _frontmatter_validate(proposed_lf: str) -> list[str]:
 def enforce_blob_hash(doc_path: Path, expected: str | None) -> None:
     """Enforce optimistic-concurrency against the pre-write on-disk bytes.
 
+    This function only compares hashes; it takes no lock itself.  A caller
+    that follows a passing check with a write MUST hold
+    :func:`~vaultspec_core.core.helpers.advisory_lock` on *doc_path*'s
+    :func:`document_lock_target` across both the check and the write (as
+    :func:`execute_edit` does), or a writer racing between the two can still
+    land undetected.
+
     Args:
         doc_path: The document whose current bytes are hashed.
         expected: The blob OID the caller believes is current, or ``None``
@@ -321,6 +328,59 @@ def enforce_blob_hash(doc_path: Path, expected: str | None) -> None:
                 "path": str(doc_path),
             },
         )
+
+
+def document_lock_target(doc_path: Path, root_dir: Path) -> Path:
+    """Return the per-document advisory-lock target for *doc_path*.
+
+    :func:`~vaultspec_core.core.helpers.advisory_lock` derives its sentinel
+    as a sibling of whatever path it is given (``<path>.lock``).  Passing
+    *doc_path* itself would drop a permanent, untracked ``<document>.md.lock``
+    beside the real document: `.vault/`'s managed-ignore policy
+    (:mod:`vaultspec_core.core.gitignore`) enumerates lock sentinels by exact
+    path for a small fixed set of files it owns (``.gitignore``,
+    ``.mcp.json``, provider configs); it has no notion of - and deliberately
+    does not glob for - arbitrary document-content locks, so a sibling
+    sentinel is invisible to it and pollutes the tracked corpus.
+
+    Instead the sentinel lives under the docs directory's already-ignored
+    ``data/`` runtime subtree (the same convention
+    :func:`~vaultspec_core.vaultcore.rename_engine.docs_lock_target` uses for
+    the domain-wide rename sentinel), named by a SHA-1 digest of the
+    document's path relative to the docs directory. A digest - rather than a
+    flattened relative path - keeps the on-disk sentinel name fixed-length
+    and legal on Windows regardless of how deep or long the real document
+    path is, and is collision-free in practice: two distinct relative paths
+    hashing to the same digest is not a real-world risk at this document
+    count. Using the *resolved* relative path (not the raw string a caller
+    supplied) means two references to the same on-disk file always derive
+    the same sentinel even if they were spelled differently.
+
+    Args:
+        doc_path: The document being locked (resolved by
+            :func:`resolve_document_path`, always an absolute, canonical
+            path under the docs directory).
+        root_dir: The project root whose ``.vault/`` holds the document.
+
+    Returns:
+        The lock target path; :func:`~vaultspec_core.core.helpers.advisory_lock`
+        derives the actual ``<digest>.lock`` sentinel from it.
+    """
+    import hashlib
+
+    from vaultspec_core.config import get_config
+
+    docs_dir = (root_dir / get_config().docs_dir).resolve()
+    resolved = doc_path.resolve()
+    try:
+        rel = resolved.relative_to(docs_dir)
+    except ValueError:
+        # Outside the docs directory (should not happen for a resolved
+        # vault document) - fall back to the resolved absolute path so the
+        # digest is still deterministic and collision-free per file.
+        rel = resolved
+    digest = hashlib.sha1(rel.as_posix().encode("utf-8"), usedforsecurity=False)
+    return docs_dir / "data" / "locks" / digest.hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -480,7 +540,7 @@ def _compose_new_text(
     Raises:
         EditError: When the document cannot be read.
     """
-    from vaultspec_core.vaultcore.models import refresh_modified_stamp
+    from vaultspec_core.vaultcore.models import refresh_modified_stamp, vault_today
     from vaultspec_core.vaultcore.related_surgery import read_preserve_newlines
 
     try:
@@ -499,7 +559,7 @@ def _compose_new_text(
         body = new_body
 
     proposed = frontmatter_block + body
-    proposed = refresh_modified_stamp(proposed, _dt.date.today())
+    proposed = refresh_modified_stamp(proposed, vault_today())
     return proposed, source_newline
 
 
@@ -510,6 +570,21 @@ def _write_proposed(doc_path: Path, proposed_lf: str, source_newline: str) -> No
         doc_path: The destination document.
         proposed_lf: The proposed text (LF-normalised).
         source_newline: The newline convention to restore on write.
+
+    Raises:
+        EditError: When the destination cannot be written - most often
+            because it vanished between resolution and write.
+            :func:`~vaultspec_core.vaultcore.related_surgery.atomic_write_restore`
+            copies the original to a ``.bak`` before its own ``try``, so a
+            missing file raises there rather than through its restore path.
+            The advisory lock serializes vaultspec-core's own mutators
+            against each other, but nothing binds an external actor: an open
+            editor, a ``git checkout``, or a sync client can remove the file
+            inside this window. Folding the ``OSError`` into the pipeline's
+            own error type keeps that a reported failure the caller can act
+            on, rather than a traceback escaping :func:`execute_edit` - whose
+            contract is that every reachable failure arrives as an
+            :class:`EditResult` with ``status == "failed"``.
     """
     from vaultspec_core.vaultcore.related_surgery import atomic_write_restore
 
@@ -518,7 +593,13 @@ def _write_proposed(doc_path: Path, proposed_lf: str, source_newline: str) -> No
         if source_newline == "\n"
         else proposed_lf.replace("\n", source_newline)
     )
-    atomic_write_restore(doc_path, out)
+    try:
+        atomic_write_restore(doc_path, out)
+    except OSError as exc:
+        raise EditError(
+            f"Could not write {doc_path.name}: {exc}",
+            {"path": str(doc_path), "write_failed": True},
+        ) from exc
 
 
 def invalidate_graph_cache(root_dir: Path) -> None:
@@ -571,7 +652,24 @@ def execute_edit(
     (unresolvable reference, blob-hash conflict, validation refusal, or
     read/write error) is folded into ``status == "failed"`` with a
     structured ``error`` payload, so batch callers report it as a per-item
-    result rather than a whole-call error.
+    result rather than a whole-call error. This includes the target
+    vanishing (deleted or replaced by something other than vaultspec-core -
+    the advisory lock is not enforced on external tools) between the guard
+    passing and the write landing: :func:`_write_proposed` folds that
+    ``OSError`` into the pipeline's own :class:`EditError` itself, and the
+    symmetric post-write re-read here does the same, so nothing escapes
+    uncaught regardless of which of the two file operations hits the
+    vanished target.
+
+    The guard-through-write sequence (:func:`enforce_blob_hash`, compose,
+    validate, and the eventual write) runs under a per-document
+    :func:`~vaultspec_core.core.helpers.advisory_lock` on the sentinel
+    :func:`document_lock_target` derives (a digest keyed under the docs
+    directory's ignored ``data/`` subtree, not a visible sibling of the
+    document), so the hash check and the write it authorizes are atomic with
+    respect to any other vaultspec-core mutator racing on the same file: no
+    writer can land between the check and the write, which would otherwise
+    let a concurrent change through undetected (a silent lost update).
 
     Args:
         root_dir: The project root whose ``.vault/`` holds the document.
@@ -590,78 +688,110 @@ def execute_edit(
     Returns:
         The typed :class:`EditResult` for the operation.
     """
+    from vaultspec_core.core.helpers import advisory_lock
     from vaultspec_core.vaultcore.blob_hash import git_blob_oid
 
     try:
         doc_path = resolve_document_path(ref, root_dir)
+        lock_target = document_lock_target(doc_path, root_dir)
 
-        # Concurrency guard is enforced against the *current* on-disk bytes,
-        # before any mutation or even composition is trusted.
-        enforce_blob_hash(doc_path, expected_blob_hash)
+        # advisory_lock no-ops when its sentinel's parent directory is
+        # missing (deliberately, to avoid directory-creation side effects on
+        # a preview). A dry run honors that and may end up unlocked if the
+        # runtime dir has never been created; a real write must never
+        # silently skip the guard, so it materializes the (per-machine,
+        # already-gitignored) lock directory itself before locking.
+        if not dry_run:
+            lock_target.parent.mkdir(parents=True, exist_ok=True)
 
-        proposed_lf, source_newline = _compose_new_text(
-            doc_path,
-            new_body=new_body,
-            date=date,
-            tags=tags,
-            related=related,
-        )
+        # The guard, the composition it authorizes, and the eventual write all
+        # run under one per-document lock: a hash check that passed outside a
+        # lock could still be invalidated by a writer that lands before the
+        # write actually happens. Locking only the write would not help either
+        # since the check itself must be re-taken inside the same critical
+        # section. See module docstring / execute_edit docstring.
+        with advisory_lock(lock_target):
+            # Concurrency guard is enforced against the *current* on-disk
+            # bytes, before any mutation or even composition is trusted.
+            enforce_blob_hash(doc_path, expected_blob_hash)
 
-        # Frontmatter conformance is the model's own validator, run pre-write.
-        frontmatter_errors = _frontmatter_validate(proposed_lf)
-
-        checks: list[dict[str, object]] = []
-        if run_checks:
-            checks = validate_proposed(doc_path, root_dir, proposed_lf)
-
-        if frontmatter_errors or _has_error(checks):
-            error: dict[str, object] = {
-                "path": str(doc_path),
-                "refused": True,
-                "checks": checks,
-            }
-            if frontmatter_errors:
-                error["errors"] = frontmatter_errors
-            return EditResult(
-                status="failed",
-                path=str(doc_path),
-                checks=checks,
-                error=error,
-                warnings=_warnings_of(checks),
+            proposed_lf, source_newline = _compose_new_text(
+                doc_path,
+                new_body=new_body,
+                date=date,
+                tags=tags,
+                related=related,
             )
 
-        original_bytes = doc_path.read_bytes()
-        proposed_bytes = (
-            proposed_lf
-            if source_newline == "\n"
-            else proposed_lf.replace("\n", source_newline)
-        ).encode("utf-8", errors="surrogateescape")
+            # Frontmatter conformance is the model's own validator, run
+            # pre-write.
+            frontmatter_errors = _frontmatter_validate(proposed_lf)
 
-        changed = proposed_bytes != original_bytes
+            checks: list[dict[str, object]] = []
+            if run_checks:
+                checks = validate_proposed(doc_path, root_dir, proposed_lf)
 
-        if dry_run:
+            if frontmatter_errors or _has_error(checks):
+                error: dict[str, object] = {
+                    "path": str(doc_path),
+                    "refused": True,
+                    "checks": checks,
+                }
+                if frontmatter_errors:
+                    error["errors"] = frontmatter_errors
+                return EditResult(
+                    status="failed",
+                    path=str(doc_path),
+                    checks=checks,
+                    error=error,
+                    warnings=_warnings_of(checks),
+                )
+
+            original_bytes = doc_path.read_bytes()
+            proposed_bytes = (
+                proposed_lf
+                if source_newline == "\n"
+                else proposed_lf.replace("\n", source_newline)
+            ).encode("utf-8", errors="surrogateescape")
+
+            changed = proposed_bytes != original_bytes
+
+            if dry_run:
+                return EditResult(
+                    status="updated" if changed else "unchanged",
+                    path=str(doc_path),
+                    blob_hash=git_blob_oid(proposed_bytes),
+                    checks=checks,
+                    warnings=_warnings_of(checks),
+                    dry_run=True,
+                    changed=changed,
+                )
+
+            if changed:
+                # _write_proposed raises the typed EditError itself (see its
+                # docstring) when the target vanished out from under an
+                # external actor the advisory lock cannot bind - no OSError
+                # can escape this call.
+                _write_proposed(doc_path, proposed_lf, source_newline)
+                invalidate_graph_cache(root_dir)
+
+            try:
+                # Symmetric with the write above: the same external actor
+                # could remove the just-written file before this re-read,
+                # and nothing lower in the stack converts that for us here.
+                post_hash = git_blob_oid(doc_path.read_bytes())
+            except OSError as exc:
+                raise EditError(
+                    f"Cannot read document '{doc_path}' after write: {exc}",
+                    {"path": str(doc_path)},
+                ) from exc
             return EditResult(
                 status="updated" if changed else "unchanged",
                 path=str(doc_path),
-                blob_hash=git_blob_oid(proposed_bytes),
+                blob_hash=post_hash,
                 checks=checks,
                 warnings=_warnings_of(checks),
-                dry_run=True,
-                changed=changed,
             )
-
-        if changed:
-            _write_proposed(doc_path, proposed_lf, source_newline)
-            invalidate_graph_cache(root_dir)
-
-        post_hash = git_blob_oid(doc_path.read_bytes())
-        return EditResult(
-            status="updated" if changed else "unchanged",
-            path=str(doc_path),
-            blob_hash=post_hash,
-            checks=checks,
-            warnings=_warnings_of(checks),
-        )
     except EditError as exc:
         return EditResult(
             status="failed",

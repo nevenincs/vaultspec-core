@@ -21,6 +21,7 @@ __all__ = [
     "normalize_date",
     "parse_lenient_date",
     "refresh_modified_stamp",
+    "vault_today",
 ]
 
 if TYPE_CHECKING:
@@ -49,11 +50,26 @@ def _parse_canonical(text: str) -> tuple[bool, _dt.date | None]:
 
 
 def _parse_iso_timestamp(text: str) -> tuple[bool, _dt.date | None]:
-    """Parse an ISO 8601 timestamp, optionally zoned, 'T' or space separated."""
+    """Parse an ISO 8601 timestamp, optionally zoned, 'T' or space separated.
+
+    A zone-aware timestamp is converted to UTC before its calendar date is
+    taken, matching the vault's single UTC clock (:func:`vault_today`) that
+    every ``date:``/``modified:`` stamp and file-mtime comparison is
+    anchored to. Taking the date from the timestamp's own literal
+    wall-clock offset instead - as :meth:`datetime.datetime.date` does by
+    default - silently disagrees with that clock for any offset that
+    crosses a UTC calendar-day boundary: ``2026-02-08T23:00:00-05:00`` is
+    ``2026-02-09`` in UTC but reads as ``2026-02-08`` unconverted, the same
+    class of clock mismatch already fixed for file-mtime reads. A naive
+    (unzoned) timestamp carries no offset to convert and is read as-is.
+    """
     try:
-        return True, _dt.datetime.fromisoformat(text).date()
+        parsed = _dt.datetime.fromisoformat(text)
     except ValueError:
         return False, None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(_dt.UTC)
+    return True, parsed.date()
 
 
 def _parse_year_first_slash(text: str) -> tuple[bool, _dt.date | None]:
@@ -119,7 +135,10 @@ def parse_lenient_date(value: object) -> _dt.date | None:
     - Canonical ``yyyy-mm-dd`` strings.
     - ISO 8601 timestamps (``yyyy-mm-ddTHH:MM:SS`` with optional
       fractional seconds and zone offset; a space separator is also
-      accepted).
+      accepted). A zone offset (including ``Z``) is converted to UTC
+      before the date is taken, so the offset can shift which calendar
+      day is returned relative to the timestamp's own literal wall clock.
+      A naive (unzoned) timestamp is read as-is.
     - Slash-separated year-first dates (``yyyy/mm/dd``).
     - Year-last forms (``dd-mm-yyyy``, ``mm/dd/yyyy``) **only when
       unambiguous**: one of the two leading components must exceed 12
@@ -182,6 +201,35 @@ def normalize_date(value: object) -> str | None:
     return parsed.isoformat() if parsed is not None else None
 
 
+def vault_today() -> _dt.date:
+    """Return today's calendar day on the vault's single canonical clock.
+
+    Every date a vault document carries - the ``date:`` frontmatter field
+    stamped at scaffold time, the ``yyyy-mm-dd`` filename prefix, the
+    ``modified:`` stamp :func:`refresh_modified_stamp` refreshes on every
+    mutation, and the recency comparisons that read those fields back -
+    is, by design, one shared clock. UTC is that clock, matching the
+    scaffold-time stamping already done by
+    :func:`vaultspec_core.cli.vault_cmd.cmd_add` and
+    :func:`vaultspec_core.mcp_server.tools.documents.register_document_tools`.
+
+    Calling :meth:`datetime.date.today` (or any other local-clock
+    equivalent) directly anywhere a vault document's date is computed is
+    the bug this helper exists to prevent: a document's ``date:`` (UTC,
+    set once) and its ``modified:`` stamp (previously local, refreshed on
+    every mutation) could disagree by a full calendar day for any
+    contributor whose local day and UTC day differ at the moment of the
+    call, which in turn let the ``modified:`` staleness checker and the
+    recency-window comparisons misfire on nothing more than a timezone
+    skew. Every site that needs "today" for a vault document routes
+    through this one function so the clock can never drift back apart.
+
+    Returns:
+        The current UTC calendar date.
+    """
+    return _dt.datetime.now(_dt.UTC).date()
+
+
 def refresh_modified_stamp(text: str, today: _dt.date) -> str:
     """Refresh (or add) the frontmatter ``modified:`` stamp to *today*.
 
@@ -212,7 +260,8 @@ def refresh_modified_stamp(text: str, today: _dt.date) -> str:
 
     Args:
         text: Full document text, including any YAML frontmatter.
-        today: The date to stamp, normally :meth:`datetime.date.today`.
+        today: The date to stamp; callers pass :func:`vault_today` so the
+            stamp lands on the vault's single canonical UTC clock.
 
     Returns:
         The document text with its ``modified:`` stamp refreshed or

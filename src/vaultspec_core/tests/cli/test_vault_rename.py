@@ -408,3 +408,75 @@ class TestVaultRename:
         # cascade excludes _archive and the rollback snapshot never captures it,
         # so neither the related: rewrite nor the stamp refresh may touch it.
         assert archived.read_bytes() == before
+
+
+class TestRenameExcludesConcurrentEdit:
+    """The rename and the edit paths must serialize on one document sentinel.
+
+    ``.vault`` documents were covered by two disjoint advisory-lock domains:
+    ``execute_edit`` took a per-document sentinel, while ``RenameTransaction``
+    took a single domain-wide one, and no caller nested them. A rename and an
+    edit of the SAME document therefore did not exclude each other, and the
+    interleaving was silently destructive: the edit's backup copy succeeded
+    while the file still existed, the rename moved it, and the edit's atomic
+    replace then RESURRECTED the old path - leaving the renamed document stale
+    without the edit, plus an orphaned original carrying it with no incoming
+    links and outside the vault's index bookkeeping.
+
+    Holding the document sentinel and observing that a real ``vault rename``
+    cannot proceed is the direct proof that the two domains now intersect.
+    """
+
+    def test_rename_blocks_while_the_document_lock_is_held(
+        self, runner: CliRunner, tmp_path: Path
+    ):
+        import threading
+
+        from vaultspec_core.core.helpers import advisory_lock
+        from vaultspec_core.vaultcore.edit_engine import document_lock_target
+
+        root = _make_vault(tmp_path)
+        doc = _alpha(root)
+
+        lock_target = document_lock_target(doc, root)
+        lock_target.parent.mkdir(parents=True, exist_ok=True)
+
+        started = threading.Event()
+        finished = threading.Event()
+        outcome: list[Result] = []
+
+        def rename_worker() -> None:
+            started.set()
+            outcome.append(
+                _run(
+                    runner,
+                    "vault",
+                    "rename",
+                    "2026-01-01-alpha-adr",
+                    "--to",
+                    "2026-01-01-renamed-adr",
+                    target=root,
+                )
+            )
+            finished.set()
+
+        with advisory_lock(lock_target):
+            worker = threading.Thread(target=rename_worker)
+            worker.start()
+            assert started.wait(timeout=10)
+            # The rename must not complete while the document sentinel is held.
+            # A generous window keeps this deterministic rather than timing
+            # sensitive: if the lock were not shared the rename would finish in
+            # milliseconds, so any pass here means real exclusion, not luck.
+            assert not finished.wait(timeout=3), (
+                "vault rename completed while the document lock was held; the "
+                "rename and edit paths are not serializing on one sentinel"
+            )
+            assert doc.exists(), "the document was renamed despite the lock"
+
+        # Released: the rename may now proceed and must succeed.
+        worker.join(timeout=60)
+        assert not worker.is_alive()
+        assert outcome and outcome[0].exit_code == 0
+        assert not doc.exists()
+        assert (root / ".vault" / "adr" / "2026-01-01-renamed-adr.md").exists()

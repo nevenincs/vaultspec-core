@@ -170,6 +170,18 @@ class RenameTransaction:
             lifetime, or ``None`` to run without a lock.  ``advisory_lock``
             skips locking when the target's parent directory is absent, and the
             transaction never creates that parent.
+        document_lock_targets: Per-document advisory-lock targets for the
+            documents this transaction will MUTATE, acquired inside the domain
+            lock. Callers derive them from
+            :func:`~vaultspec_core.vaultcore.edit_engine.document_lock_target`
+            and are responsible for creating the parent directory, since
+            ``advisory_lock`` silently skips a target whose parent is absent.
+            Pass nothing to run on the domain lock alone - the behaviour every
+            caller had before per-document locking existed. Supply only a set
+            the caller can determine confidently: widening it to the whole
+            snapshot tree would be a global edit freeze in N acquisitions,
+            which costs more than the domain lock it sits beside and buys
+            nothing.
         file_renames: ``(src, dst)`` renames actually applied, in order.
         created_dirs: Directories created during apply.
         removed_dirs: Directories removed once emptied during apply.
@@ -177,9 +189,16 @@ class RenameTransaction:
         snapshots: Original bytes of every snapshotted file, keyed by path.
     """
 
-    def __init__(self, managed_root: Path, *, lock_target: Path | None = None) -> None:
+    def __init__(
+        self,
+        managed_root: Path,
+        *,
+        lock_target: Path | None = None,
+        document_lock_targets: Iterable[Path] | None = None,
+    ) -> None:
         self.managed_root = managed_root
         self.lock_target = lock_target
+        self.document_lock_targets = sorted(set(document_lock_targets or ()), key=str)
         self._stack = contextlib.ExitStack()
         self.file_renames: list[tuple[Path, Path]] = []
         self.created_dirs: list[Path] = []
@@ -188,19 +207,42 @@ class RenameTransaction:
         self.snapshots: dict[Path, bytes] = {}
 
     def __enter__(self) -> RenameTransaction:
-        """Acquire the domain advisory lock (if any) and return ``self``."""
+        """Acquire the domain lock, then any per-document locks, and return self.
+
+        The acquisition ORDER is the deadlock argument, so it lives here rather
+        than at each call site: the domain sentinel is taken first, then the
+        per-document sentinels in a deterministic sorted order.
+        :func:`~vaultspec_core.vaultcore.edit_engine.execute_edit` takes only a
+        per-document sentinel and never requests the domain lock, so no caller
+        can hold one while waiting on the other and no cycle is constructible.
+        Centralising it means a call site cannot re-implement the convention
+        slightly wrong.
+
+        Holding the per-document locks HERE rather than around the ``with``
+        block also keeps them held through rollback: :meth:`__exit__` restores
+        the journal before closing this stack, so a concurrent edit cannot race
+        the restore of a document the transaction mutated.
+        """
         if self.lock_target is not None:
             self._stack.enter_context(advisory_lock(self.lock_target))
+        for target in self.document_lock_targets:
+            self._stack.enter_context(advisory_lock(target))
         return self
 
     def __exit__(
         self, exc_type: object, exc_val: object, exc_tb: object
     ) -> Literal[False]:
-        """Roll back on a propagating exception, then release the lock.
+        """Roll back on a propagating exception, then release the locks.
 
-        Rollback runs while the lock is still held so the restore is serialized
-        against other mutators in the domain; the lock is released afterwards.
-        The exception is never suppressed.
+        Rollback runs while EVERY lock is still held - the domain sentinel and
+        the per-document sentinels alike - so the restore is serialized both
+        against other domain mutators and against a concurrent
+        :func:`~vaultspec_core.vaultcore.edit_engine.execute_edit` on a
+        document this transaction mutated. The ordering is load-bearing and is
+        why the per-document locks are acquired here rather than by the caller:
+        held on the caller's side they would already have been released by the
+        time this runs, leaving the restore racing an edit. The exception is
+        never suppressed.
         """
         try:
             if exc_type is not None:

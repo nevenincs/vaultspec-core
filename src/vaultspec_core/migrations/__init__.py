@@ -79,6 +79,38 @@ MIGRATION_LOGGER = "vaultspec_core.migrations"
 logger = logging.getLogger(MIGRATION_LOGGER)
 
 
+def _invalidate_graph_cache(workspace: Path) -> None:
+    """Drop the graph cache for *workspace* after a migration mutates it.
+
+    Migration bodies rewrite or relocate ``.vault/`` documents directly
+    (``modified_stamp_backfill``, ``index_subfolder``) rather than through
+    the mutating CLI verbs, so they never pass through
+    :func:`vaultspec_core.cli._cache_hook.invalidate_graph_cache`. The
+    per-file fingerprint in :mod:`vaultspec_core.graph.cache` self-heals
+    against a content or file-set change regardless (a rewritten document
+    changes size, a relocated one changes its manifest key), but that
+    protection is an accident of what today's migrations happen to touch,
+    not a guarantee: a future same-size, in-place rewrite would fall into
+    the same accepted racily-clean residual window the mutating CLI verbs
+    close by dropping the cache outright. Mirrors
+    :func:`vaultspec_core.cli._cache_hook.invalidate_graph_cache` without
+    importing the ``cli`` package, which would invert this module's
+    dependency direction. Never raises: a missing cache, an unresolvable
+    path, or a delete error all degrade to a no-op, because the fingerprint
+    manifest remains a correct fallback guard and a failed invalidation
+    must not turn a successful migration run into an error.
+
+    Args:
+        workspace: Workspace root whose graph cache should be invalidated.
+    """
+    from ..graph import cache as cache_mod
+
+    try:
+        cache_mod.cache_path(workspace).unlink(missing_ok=True)
+    except OSError as exc:
+        logger.debug("Graph cache invalidation skipped for %s: %s", workspace, exc)
+
+
 class MigrationStatus(Enum):
     """High-level migration state for a workspace.
 
@@ -371,6 +403,14 @@ def run_pending_migrations(
             result = migration.migrate(workspace)
             logger.info("vaultspec migration: %s", result.summary)
             results.append(result)
+
+            # Invalidate immediately after each migration body returns, not
+            # once after the whole loop: a later entry in the same run can
+            # still raise, and this migration's mutation must not be left
+            # behind a graph cache that predates it. See
+            # `_invalidate_graph_cache` for why this cannot rely solely on
+            # the per-file fingerprint self-healing.
+            _invalidate_graph_cache(workspace)
 
             manifest.vaultspec_version = migration.target_version
             write_manifest_data(workspace, manifest)

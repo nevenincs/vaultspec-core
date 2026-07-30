@@ -7,6 +7,7 @@ management, config generation, syncing, and hook execution.
 
 from __future__ import annotations
 
+import errno
 import logging
 import os
 import secrets
@@ -37,6 +38,36 @@ def _get_thread_lock(key: str) -> threading.Lock:
         if key not in _thread_locks:
             _thread_locks[key] = threading.Lock()
         return _thread_locks[key]
+
+
+def _acquire_windows_lock(fd: int) -> None:
+    """Block until the byte-range lock on *fd* is held.
+
+    :func:`msvcrt.locking` with ``LK_LOCK`` is not a blocking acquire despite
+    the name: it retries ten times at one-second intervals and then raises
+    ``OSError(EDEADLOCK)``. Any operation holding a lock past that budget - a
+    large repair, a slow or network volume, an antivirus scan mid-write -
+    would make a concurrent caller fail with an opaque "Resource deadlock
+    avoided" rather than wait its turn. Retrying on exactly that errno keeps
+    the contract this module documents, matching :func:`fcntl.flock` with
+    ``LOCK_EX`` on Unix, which blocks indefinitely.
+
+    Any other ``OSError`` is a genuine failure - a bad descriptor, a
+    permission problem - and propagates rather than spinning forever.
+
+    Args:
+        fd: Open file descriptor of the ``.lock`` sibling file.
+    """
+    import msvcrt
+
+    while True:
+        try:
+            msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+        except OSError as exc:
+            if exc.errno != errno.EDEADLOCK:
+                raise
+            continue
+        return
 
 
 @contextmanager
@@ -72,7 +103,7 @@ def advisory_lock(path: Path) -> Generator[None]:
             if sys.platform == "win32":
                 import msvcrt
 
-                msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+                _acquire_windows_lock(fd)
                 try:
                     yield
                 finally:

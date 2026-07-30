@@ -171,6 +171,83 @@ def test_resolver_accepts_real_hash_attested_legacy_fixture(tmp_path: Path) -> N
     )
 
 
+def test_resolver_is_stable_across_a_frontmatter_only_modified_stamp_refresh(
+    tmp_path: Path,
+) -> None:
+    """A ``modified:`` stamp refresh must never move the attested body digest.
+
+    ``body_sha256`` is computed from the parsed body only, which begins after
+    the closing frontmatter fence, so a frontmatter-only mutation - the
+    ``modified:`` stamp refresh every mutating verb performs - must leave the
+    digest, and therefore the attestation, unchanged.
+    """
+    body = "# Legacy\n\n## Findings\n\nEvidence.\n"
+    rel_path = ".vault/research/2026-01-01-legacy-research.md"
+    doc_path = tmp_path / rel_path
+    doc_path.parent.mkdir(parents=True)
+    doc_path.write_text(
+        "---\ntags:\n  - '#research'\n  - '#legacy'\n"
+        "date: '2026-01-01'\nmodified: '2026-01-01'\n---\n" + body,
+        encoding="utf-8",
+    )
+    _write_baseline(tmp_path, [_entry(rel_path, body, "legacy-research-v1")])
+
+    metadata, parsed_body = parse_vault_metadata(doc_path.read_text(encoding="utf-8"))
+    before = resolve_body_schema(tmp_path, doc_path, metadata, parsed_body)
+    assert before.source == "attested"
+
+    # Simulate a mutating verb's stamp refresh: only the frontmatter changes.
+    doc_path.write_text(
+        "---\ntags:\n  - '#research'\n  - '#legacy'\n"
+        "date: '2026-01-01'\nmodified: '2026-07-29'\n---\n" + body,
+        encoding="utf-8",
+    )
+    metadata, parsed_body = parse_vault_metadata(doc_path.read_text(encoding="utf-8"))
+    after = resolve_body_schema(tmp_path, doc_path, metadata, parsed_body)
+
+    assert after.source == "attested"
+    assert after.required_sections == before.required_sections
+
+
+def test_resolver_digest_is_invariant_to_source_newline_convention(
+    tmp_path: Path,
+) -> None:
+    """A CRLF-saved document must attest identically to its LF equivalent.
+
+    ``resolve_body_schema`` is always handed a body produced by universal-
+    newline text reads (``Path.read_text`` and the graph's byte-level mirror
+    of it), so the same logical content attests the same way regardless of
+    whether the file on disk uses ``\\n`` or ``\\r\\n`` line endings. The
+    ledger entry is computed from the LF-normalized body - the only form the
+    application ever hashes - so a CRLF source must still match it.
+    """
+    lf_body = "# Legacy\n\n## Findings\n\nEvidence held in the record.\n"
+    rel_path = ".vault/research/2026-01-01-crlf-legacy-research.md"
+    doc_path = tmp_path / rel_path
+    doc_path.parent.mkdir(parents=True)
+    crlf_document = (
+        "---\r\ntags:\r\n  - '#research'\r\n  - '#legacy'\r\n"
+        "date: '2026-01-01'\r\n---\r\n" + lf_body.replace("\n", "\r\n")
+    )
+    doc_path.write_bytes(crlf_document.encode("utf-8"))
+    assert b"\r\n" in doc_path.read_bytes()
+
+    # The ledger attests the LF-normalized body, exactly as any populator
+    # must, since that is the only form ``resolve_body_schema`` ever hashes.
+    _write_baseline(tmp_path, [_entry(rel_path, lf_body, "legacy-research-v1")])
+
+    # ``read_text`` performs universal-newline translation on read, so the
+    # parsed body is LF-only even though the file on disk is CRLF.
+    metadata, parsed_body = parse_vault_metadata(doc_path.read_text(encoding="utf-8"))
+    assert parsed_body == lf_body
+
+    resolution = resolve_body_schema(tmp_path, doc_path, metadata, parsed_body)
+
+    assert resolution.source == "attested"
+    assert resolution.schema_id == "legacy-research-v1"
+    assert resolution.required_sections == ("Findings",)
+
+
 def test_resolver_rejects_tampered_legacy_body(tmp_path: Path) -> None:
     body = "# Legacy\n\n## Findings\n\nEvidence.\n"
     doc_path = tmp_path / ".vault" / "research" / "2026-01-01-legacy-research.md"

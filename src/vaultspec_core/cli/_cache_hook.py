@@ -14,6 +14,14 @@ Verbs call :func:`invalidate_graph_cache` after a successful, non-dry-run
 write.  Dropping the cache file is idempotent and cheap: a missing cache is
 simply a miss on the next build, which rebuilds from the corpus and rewrites
 a fresh cache.
+
+Schema migrations mutate ``.vault/`` documents outside this hook - a
+migration body runs ahead of the mutating CLI verbs, from inside
+:func:`vaultspec_core.vaultcore.scanner.scan_vault` itself - so
+:func:`vaultspec_core.migrations.run_pending_migrations` carries its own
+equivalent invalidation call rather than importing this module (which would
+invert the ``migrations`` -> ``cli`` dependency direction). See
+:func:`vaultspec_core.migrations._invalidate_graph_cache`.
 """
 
 from __future__ import annotations

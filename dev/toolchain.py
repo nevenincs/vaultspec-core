@@ -25,21 +25,70 @@ from dev.runner import Cmd, Echo, Ref, Step, ToolOrDocker, uv_run
 
 PACKAGE = "src/vaultspec_core"
 
-#: Python trees that carry committed source and are therefore linted. `scripts`
-#: and `statistic` were historically excluded while holding real code; the
-#: per-file-ignores in pyproject.toml already name `statistic`, so the config
-#: always intended a scope the invocation never applied. `tools` holds the
-#: code-health report, which is committed source like any other and must not
-#: lint itself into an exception.
-PYTHON_PATHS = ("src", "tests", "scripts", "statistic", "dev", "tools")
+#: The code-health instrument, named once because all three `health` targets
+#: run the same script and differ only in the flag they pass it.
+HEALTH_REPORT = "dev/health/health_report.py"
+
+#: Python trees that carry committed source and are therefore linted. Every
+#: development instrument the harness invokes - the release builder, the
+#: supply-chain gate, the code-health report, the transcript analytics - now
+#: lives under `dev`, and the documentation-asset renderers live beside the
+#: assets they write, under `docs`. Naming those two trees covers what four
+#: separate root folders used to, and none of them can lint itself into an
+#: exception by sitting outside the list.
+#:
+#: `tests` is absent because the repository root no longer carries one: the
+#: repo-wide contract guards that lived there moved to `dev/guards`, so they
+#: are linted by the `dev` entry along with everything else in that tree.
+PYTHON_PATHS = ("src", "dev", "docs")
+
+#: Trees carrying an instrument and its cohabiting guards. `harness` runs them
+#: as one lane, and `testpaths` in pyproject.toml names the same two, so the
+#: default `pytest` invocation and the gate cannot disagree about the suite.
+INSTRUMENT_PATHS = ("dev", "docs")
 
 #: Markers requiring credentials or live network, excluded from every gate.
 EXCLUDED_MARKERS = "not gemini and not claude and not network"
 
-#: Trees whose Markdown is formatted and linted.
-MARKDOWN_PATHS = ("README.md", "docs/", ".vault/", "src/vaultspec_core/builtins/")
+#: What a lane testing the LIBRARY selects. The two populations in this suite
+#: are told apart by marker, not by directory: `repo` tests assert facts about
+#: this checkout - the workflow contracts, the packaging metadata, the shipped
+#: templates, the `typings/` stubs - and are meaningless outside a source tree,
+#: while everything else exercises `vaultspec_core` itself and must never know a
+#: repository exists.
+#:
+#: Excluding `repo` by MARKER rather than by path is the load-bearing part. A
+#: repository-health guard still filed under `src` - and the audit of that
+#: boundary is finding them - is correctly kept out of `unit` and `broad` and
+#: correctly picked up by the `repo` lane the moment it is marked, before it is
+#: moved anywhere. Relocating it afterwards is then a move, with no lane to
+#: re-plumb.
+LIBRARY_MARKERS = f"not repo and {EXCLUDED_MARKERS}"
 
-#: User-facing Markdown additionally held to a hard wrap.
+#: Trees whose Markdown is formatted and linted. The four root READMEs are named
+#: individually rather than by their enclosing directory - `dev/`, `src/`, and
+#: `typings/` each cohabit with non-Markdown trees (and `dev/` cohabits with test
+#: fixture Markdown that documents a *format*, not a repository surface, and must
+#: not be held to this gate) - so naming the file is what scopes the gate to the
+#: convention it enforces without also picking up what happens to sit nearby.
+MARKDOWN_PATHS = (
+    "README.md",
+    "docs/",
+    ".vault/",
+    "src/vaultspec_core/builtins/",
+    "dev/README.md",
+    "src/README.md",
+    "typings/README.md",
+    "bucket/README.md",
+)
+
+#: User-facing Markdown additionally held to a hard wrap. The root READMEs added
+#: above to `MARKDOWN_PATHS` are deliberately absent here: each describes a
+#: contributor-facing repository surface - the dev harness, the distributed
+#: package's internal test layout, third-party type stubs, the Scoop manifest -
+#: read by someone with a checkout, not the shipped-to-users prose (the project's
+#: front door, the linked doc pages, the builtins a consumer's install renders)
+#: this list holds to a fixed column width.
 WRAPPED_MARKDOWN = (
     "README.md",
     "docs/framework.md",
@@ -156,7 +205,7 @@ LINT = Verb(
         Target(
             "type",
             "Ty type checking.",
-            (uv_run("python", "-m", "ty", "check", PACKAGE),),
+            (uv_run("python", "-m", "ty", "check", *PYTHON_PATHS),),
         ),
         Target(
             "toml",
@@ -326,7 +375,7 @@ AUDIT = Verb(
         Target(
             "deps",
             "Dependency vulnerability audit (GATES).",
-            (Cmd(("uv", "run", "python", "scripts/dependency_audit.py")),),
+            (Cmd(("uv", "run", "python", "dev/audit/dependency_audit.py")),),
         ),
         Target(
             "security",
@@ -400,19 +449,14 @@ TEST = Verb(
                     "-q",
                     "--tb=short",
                     "-m",
-                    f"unit and {EXCLUDED_MARKERS}",
+                    f"unit and {LIBRARY_MARKERS}",
                 ),
             ),
         ),
         Target(
             "broad",
             "The whole package suite minus credential-gated markers.",
-            (uv_run("pytest", PACKAGE, "-q", "--tb=short", "-m", EXCLUDED_MARKERS),),
-        ),
-        Target(
-            "repo",
-            "The repository-root tests/ tree (automation and suite-quality guards).",
-            (uv_run("pytest", "tests", "-q", "--tb=short", "-m", EXCLUDED_MARKERS),),
+            (uv_run("pytest", PACKAGE, "-q", "--tb=short", "-m", LIBRARY_MARKERS),),
         ),
         Target(
             "vault-repair",
@@ -434,17 +478,66 @@ TEST = Verb(
         ),
         Target(
             "harness",
-            "The dev/ harness registry integrity guards.",
-            (uv_run("pytest", "dev/tests", "-q", "--tb=short"),),
+            "The dev/ and docs/ development-instrument guards.",
+            # Every instrument guard runs in ONE lane rather than one lane per
+            # instrument, because they all guard the same surface: each
+            # instrument is invoked BY this registry, and the drift it can
+            # suffer - a moved script, a flag the recipe passes and the
+            # instrument rejects - is only visible when the registry and the
+            # instrument are read together. The CI job that runs the code-health
+            # report is advisory and cannot fail, so this lane is the only place
+            # that disagreement gates.
+            #
+            # Naming the two trees rather than each `tests` package inside them
+            # is deliberate: a new instrument gets its guards run by existing
+            # here, instead of by someone remembering to extend a list.
+            #
+            # `not repo` keeps this lane to the instrument guards. The
+            # repository-health guards also live under `dev`, but what they
+            # assert has nothing to do with an instrument, and the `repo` lane
+            # below collects them wherever they sit. Without this the two lanes
+            # would overlap on `dev/guards` and a repo-health failure would be
+            # reported by a lane whose name says it measures something else.
+            (
+                uv_run(
+                    "pytest",
+                    *INSTRUMENT_PATHS,
+                    "-q",
+                    "--tb=short",
+                    "-m",
+                    f"not repo and {EXCLUDED_MARKERS}",
+                ),
+            ),
+        ),
+        Target(
+            "repo",
+            "The repository-health guards, selected by marker across every tree.",
+            # Selected by MARKER over every tree that carries committed Python,
+            # not by naming a directory. A repository-health guard is defined by
+            # what it asserts, not by where it sits, and this suite has already
+            # paid for the other approach twice: a repository-root `tests/` tree
+            # whose lane nothing invoked, and repository guards still filed
+            # inside the package. Marking one is enough to gate it correctly
+            # from either place, so moving it later needs no change here.
+            (
+                uv_run(
+                    "pytest",
+                    *PYTHON_PATHS,
+                    "-q",
+                    "--tb=short",
+                    "-m",
+                    f"repo and {EXCLUDED_MARKERS}",
+                ),
+            ),
         ),
         Target(
             "all",
-            "The broad suite, vault-repair cohort, harness guards, and repo tests.",
-            # `repo` is in this aggregate deliberately. It was previously
-            # reachable only by naming it, and no CI lane named it either, so
-            # the tree it runs - the automation contracts and the suite-quality
-            # guards - was unobserved. A guard nothing runs is not a guard: the
-            # test-doubles check in it had been failing undetected.
+            "The broad suite, vault-repair cohort, harness guards, and repo health.",
+            # `repo` is in this aggregate deliberately. The lane it replaces was
+            # reachable only by naming it, and no CI job named it either, so the
+            # guards it runs went unobserved and the test-doubles check among
+            # them had been failing undetected. A guard nothing runs is not a
+            # guard, so this lane is wired into both the aggregate and CI.
             (Ref("broad"), Ref("vault-repair"), Ref("harness"), Ref("repo")),
         ),
     ),
@@ -544,22 +637,30 @@ FRAMEWORK = Verb(
     ),
 )
 
-ASSETS = Verb(
-    name="assets",
-    summary="Regenerate the committed README terminal renders and demo GIF.",
-    note="Both renderers drive real commands against a throwaway synthetic vault.",
+DOCS = Verb(
+    name="docs",
+    summary="Regenerate the committed documentation assets under docs/assets/.",
+    note=(
+        "Both renderers drive real commands against a throwaway synthetic vault, "
+        "and both are invoked as modules rather than file paths so the demo "
+        "renderer's import of its sibling resolves by its real dotted name."
+    ),
     targets=(
         Target(
-            "readme",
+            "renders",
             "Regenerate the terminal-render SVGs.",
-            (uv_run("python", "scripts/render_readme_assets.py"),),
+            (uv_run("python", "-m", "docs._render.render_readme_assets"),),
         ),
         Target(
             "demo",
             "Regenerate the pipeline demo GIF (needs agg on PATH).",
-            (uv_run("python", "scripts/render_readme_demo.py"),),
+            (uv_run("python", "-m", "docs._render.render_readme_demo"),),
         ),
-        Target("all", "Regenerate every asset.", (Ref("readme"), Ref("demo"))),
+        Target(
+            "all",
+            "Regenerate every documentation asset.",
+            (Ref("renders"), Ref("demo")),
+        ),
     ),
 )
 
@@ -577,19 +678,19 @@ HEALTH = Verb(
         Target(
             "report",
             "Worst offenders per dimension, including strict types.",
-            (Cmd(uv_run("python", "tools/health_report.py").argv, UTF8),),
+            (Cmd(uv_run("python", HEALTH_REPORT).argv, UTF8),),
             advisory=True,
         ),
         Target(
             "fast",
             "The same report without the basedpyright section.",
-            (Cmd(uv_run("python", "tools/health_report.py", "--fast").argv, UTF8),),
+            (Cmd(uv_run("python", HEALTH_REPORT, "--fast").argv, UTF8),),
             advisory=True,
         ),
         Target(
             "census",
             "Baseline-calibration distributions for the ratchet thresholds.",
-            (Cmd(uv_run("python", "tools/health_report.py", "--census").argv, UTF8),),
+            (Cmd(uv_run("python", HEALTH_REPORT, "--census").argv, UTF8),),
             advisory=True,
         ),
     ),
@@ -628,7 +729,7 @@ VERBS: tuple[Verb, ...] = (
     BUILD,
     VAULT,
     FRAMEWORK,
-    ASSETS,
+    DOCS,
     HEALTH,
     CI,
 )
@@ -643,7 +744,7 @@ DEFAULTS: dict[str, str] = {
     "build": "python",
     "vault": "check",
     "framework": "doctor",
-    "assets": "all",
+    "docs": "all",
     "health": "report",
     "ci": "all",
 }

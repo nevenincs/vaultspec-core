@@ -11,6 +11,6 @@ Consumed by :mod:`vaultspec_core.cli` graph sub-commands.
 """
 
 from .api import DocNode as DocNode
-from .api import GraphCounts as GraphCounts
 from .api import GraphMetrics as GraphMetrics
 from .api import VaultGraph as VaultGraph
+from .models import GraphCounts as GraphCounts

@@ -2,13 +2,23 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
+from vaultspec_core.builtins import builtins_root
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
 pytestmark = [pytest.mark.unit]
 
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
+#: The bundled builtins package this module asserts against. Resolved through
+#: the package's own accessor rather than by walking to a repository root: the
+#: content under test is a sibling of the module that owns it and ships inside
+#: the distributed package, so it is addressable package-relatively wherever
+#: the package is installed.
+BUILTINS_ROOT = builtins_root()
 
 
 def _existing_markdown_files(root: Path) -> list[Path]:
@@ -28,7 +38,7 @@ def test_top_level_doc_guidance_omits_phase_filename_segment() -> None:
         "yyyy-mm-dd-{feature}-" + "{phase}-adr.md",
         "yyyy-mm-dd-<feature>-" + "<phase>-adr.md",
     )
-    checked_roots = (PROJECT_ROOT / "src" / "vaultspec_core" / "builtins",)
+    checked_roots = (BUILTINS_ROOT,)
 
     offenders: list[str] = []
     for root in checked_roots:
@@ -36,7 +46,7 @@ def test_top_level_doc_guidance_omits_phase_filename_segment() -> None:
             text = path.read_text(encoding="utf-8")
             for pattern in stale_patterns:
                 if pattern in text:
-                    offenders.append(f"{path.relative_to(PROJECT_ROOT)}: {pattern}")
+                    offenders.append(f"{path.relative_to(BUILTINS_ROOT)}: {pattern}")
 
     assert offenders == []
 
@@ -48,8 +58,8 @@ def test_rule_guidance_uses_canonical_file_placeholders() -> None:
         "YYYY-MM-DD-<Feature>",
     )
     checked_roots = (
-        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "skills",
-        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "agents",
+        BUILTINS_ROOT / "skills",
+        BUILTINS_ROOT / "agents",
     )
 
     offenders: list[str] = []
@@ -58,7 +68,7 @@ def test_rule_guidance_uses_canonical_file_placeholders() -> None:
             text = path.read_text(encoding="utf-8")
             for pattern in stale_patterns:
                 if pattern in text:
-                    offenders.append(f"{path.relative_to(PROJECT_ROOT)}: {pattern}")
+                    offenders.append(f"{path.relative_to(BUILTINS_ROOT)}: {pattern}")
 
     assert offenders == []
 
@@ -66,19 +76,8 @@ def test_rule_guidance_uses_canonical_file_placeholders() -> None:
 def test_code_review_guidance_persists_audit_artifacts() -> None:
     """Code-review reports use the audit template and audit directory."""
     checked_paths = (
-        PROJECT_ROOT
-        / "src"
-        / "vaultspec_core"
-        / "builtins"
-        / "skills"
-        / "vaultspec-code-review"
-        / "SKILL.md",
-        PROJECT_ROOT
-        / "src"
-        / "vaultspec_core"
-        / "builtins"
-        / "agents"
-        / "vaultspec-code-reviewer.md",
+        BUILTINS_ROOT / "skills" / "vaultspec-code-review" / "SKILL.md",
+        BUILTINS_ROOT / "agents" / "vaultspec-code-reviewer.md",
     )
     stale_patterns = (
         ".vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-review.md",
@@ -93,7 +92,7 @@ def test_code_review_guidance_persists_audit_artifacts() -> None:
         text = path.read_text(encoding="utf-8")
         for pattern in stale_patterns:
             if pattern in text:
-                offenders.append(f"{path.relative_to(PROJECT_ROOT)}: {pattern}")
+                offenders.append(f"{path.relative_to(BUILTINS_ROOT)}: {pattern}")
 
     assert offenders == []
 
@@ -105,8 +104,8 @@ def test_exec_step_guidance_is_not_l2_only() -> None:
         ".vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-<step>.md",
     )
     checked_roots = (
-        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "skills",
-        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "agents",
+        BUILTINS_ROOT / "skills",
+        BUILTINS_ROOT / "agents",
     )
 
     offenders: list[str] = []
@@ -115,7 +114,7 @@ def test_exec_step_guidance_is_not_l2_only() -> None:
             text = path.read_text(encoding="utf-8")
             for pattern in stale_patterns:
                 if pattern in text:
-                    offenders.append(f"{path.relative_to(PROJECT_ROOT)}: {pattern}")
+                    offenders.append(f"{path.relative_to(BUILTINS_ROOT)}: {pattern}")
 
     assert offenders == []
 
@@ -123,19 +122,8 @@ def test_exec_step_guidance_is_not_l2_only() -> None:
 def test_curator_guidance_matches_current_frontmatter_contract() -> None:
     """Curator instructions should not reintroduce removed YAML guidance."""
     checked_paths = (
-        PROJECT_ROOT
-        / "src"
-        / "vaultspec_core"
-        / "builtins"
-        / "skills"
-        / "vaultspec-curate"
-        / "SKILL.md",
-        PROJECT_ROOT
-        / "src"
-        / "vaultspec_core"
-        / "builtins"
-        / "agents"
-        / "vaultspec-docs-curator.md",
+        BUILTINS_ROOT / "skills" / "vaultspec-curate" / "SKILL.md",
+        BUILTINS_ROOT / "agents" / "vaultspec-docs-curator.md",
     )
     stale_patterns = (
         "mandatory comment `# ALLOWED TAGS",
@@ -151,7 +139,7 @@ def test_curator_guidance_matches_current_frontmatter_contract() -> None:
         text = path.read_text(encoding="utf-8")
         for pattern in stale_patterns:
             if pattern in text:
-                offenders.append(f"{path.relative_to(PROJECT_ROOT)}: {pattern}")
+                offenders.append(f"{path.relative_to(BUILTINS_ROOT)}: {pattern}")
 
     assert offenders == []
 
@@ -159,9 +147,9 @@ def test_curator_guidance_matches_current_frontmatter_contract() -> None:
 def test_rule_guidance_does_not_forbid_template_extra_tags() -> None:
     """Template guidance allows tags beyond the required pair."""
     checked_roots = (
-        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "skills",
-        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "agents",
-        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "rules",
+        BUILTINS_ROOT / "skills",
+        BUILTINS_ROOT / "agents",
+        BUILTINS_ROOT / "rules",
     )
 
     offenders: list[str] = []
@@ -169,7 +157,7 @@ def test_rule_guidance_does_not_forbid_template_extra_tags() -> None:
         for path in _existing_markdown_files(root):
             text = path.read_text(encoding="utf-8")
             if "EXACTLY TWO" in text:
-                offenders.append(f"{path.relative_to(PROJECT_ROOT)}: EXACTLY TWO")
+                offenders.append(f"{path.relative_to(BUILTINS_ROOT)}: EXACTLY TWO")
 
     assert offenders == []
 
@@ -182,9 +170,9 @@ def test_rule_guidance_uses_template_quote_style() -> None:
         'tags: ["#',
     )
     checked_roots = (
-        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "skills",
-        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "agents",
-        PROJECT_ROOT / "src" / "vaultspec_core" / "builtins" / "rules",
+        BUILTINS_ROOT / "skills",
+        BUILTINS_ROOT / "agents",
+        BUILTINS_ROOT / "rules",
     )
 
     offenders: list[str] = []
@@ -193,6 +181,6 @@ def test_rule_guidance_uses_template_quote_style() -> None:
             text = path.read_text(encoding="utf-8")
             for pattern in stale_patterns:
                 if pattern in text:
-                    offenders.append(f"{path.relative_to(PROJECT_ROOT)}: {pattern}")
+                    offenders.append(f"{path.relative_to(BUILTINS_ROOT)}: {pattern}")
 
     assert offenders == []

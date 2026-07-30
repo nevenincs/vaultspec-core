@@ -33,7 +33,7 @@ project's decision and execution history - a second brain your agents read befor
 write.
 
 We hold ourselves to it, too: vaultspec-core is developed with vaultspec. Its own
-`.vault` currently holds 900+ CLI-scaffolded documents across 100+ features. Every
+`.vault` currently holds 1200+ CLI-scaffolded documents across 120 features. Every
 terminal render on this page is real output: the stills are captured against that live
 vault, and the pipeline demo above runs against a scratch project.
 

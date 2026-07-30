@@ -9,7 +9,6 @@ carries one points the operator at the right ``--target``.
 
 from __future__ import annotations
 
-import datetime as _dt
 import json
 from typing import TYPE_CHECKING
 
@@ -17,6 +16,7 @@ import pytest
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
+from vaultspec_core.vaultcore import vault_today
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -41,8 +41,9 @@ def _doc(doc_type: str, feature: str, *, date: str) -> str:
 def _build(root: Path) -> None:
     (root / ".vaultspec").mkdir(parents=True, exist_ok=True)
     vault = root / ".vault"
-    # A fresh feature (recent) and a stale one (old).
-    fresh_date = _dt.date.today().isoformat()
+    # A fresh feature (recent) and a stale one (old). Dated on the vault's
+    # canonical clock so "fresh" matches what the CLI itself would stamp.
+    fresh_date = vault_today().isoformat()
     (vault / "research").mkdir(parents=True, exist_ok=True)
     (vault / "research" / f"{fresh_date}-fresh-feature-research.md").write_text(
         _doc("research", "fresh-feature", date=fresh_date), encoding="utf-8"

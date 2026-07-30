@@ -29,6 +29,7 @@ import pytest
 
 from ....config import reset_config
 from ....graph import VaultGraph
+from ...models import vault_today
 from .._base import Severity
 from ..modified_stamp import check_modified_stamp
 
@@ -270,6 +271,47 @@ class TestStaleness:
         assert result.fixed_count == 1
         assert "modified: '2026-05-01'" in stale.read_text(encoding="utf-8")
 
+    def test_utc_stamped_instant_is_not_stale_across_local_day_boundary(
+        self, tmp_path: Path
+    ) -> None:
+        """A document stamped and stat'd at the same instant is never
+        stale, even when that instant's local calendar day differs from
+        its UTC calendar day.
+
+        Regression for the mtime/stamp clock-mismatch bug: ``_mtime_date``
+        used to read the file's mtime through the naive local clock while
+        every ``modified:``/``date:`` stamp is UTC-anchored. On a host
+        east of UTC (this suite's environment is UTC+2), 23:30 on a UTC
+        calendar day already reads as the following calendar day local, so
+        a document scaffolded and stat'd in the very same instant read as
+        if hand-edited a day in the future - false staleness with no edit
+        involved, and under ``--fix`` a silent rewrite of ``modified:`` to
+        a day past its own ``date:``.
+        """
+        _skeleton(tmp_path)
+        self._diverse_fresh_fillers(tmp_path)
+
+        doc = _write_doc(
+            tmp_path,
+            "2026-02-08-alpha-adr",
+            date_line="date: '2026-02-08'",
+            modified_line="modified: '2026-02-08'",
+        )
+        # 23:30 UTC on 2026-02-08: the same UTC calendar day as the stamp,
+        # but already 2026-02-09 local at any positive UTC offset of 30
+        # minutes or more.
+        utc_instant = datetime.datetime(2026, 2, 8, 23, 30, 0, tzinfo=datetime.UTC)
+        ts = utc_instant.timestamp()
+        os.utime(doc, (ts, ts))
+
+        result = _check(tmp_path)
+        stale_findings = [d for d in result.diagnostics if "Stale" in d.message]
+        assert stale_findings == []
+
+        fixed = _check(tmp_path, fix=True)
+        assert fixed.fixed_count == 0
+        assert "modified: '2026-02-08'" in doc.read_text(encoding="utf-8")
+
 
 class TestCloneSignatureGuard:
     def test_uniform_mtime_suppresses_staleness(self, tmp_path: Path):
@@ -372,6 +414,218 @@ class TestCloneSignatureGuard:
         assert infos == []
         stale_findings = [d for d in result.diagnostics if "Stale" in d.message]
         assert len(stale_findings) == 10
+
+    def test_small_vault_trivial_clustering_suppresses_genuine_staleness(
+        self, tmp_path: Path
+    ):
+        """Documents accepted, deliberate behavior at low sample sizes.
+
+        With only 3 documents, the vault can carry at most 2 distinct
+        mtime dates or 3; whenever it carries 2 or fewer -
+        :data:`_GIT_SIGNATURE_MAX_INSTANTS` - the top-2 tally is
+        mathematically guaranteed to equal the total, so the ratio is
+        always 100% regardless of whether a git operation actually
+        happened. This is not fixable by adding a minimum-sample floor:
+        that would only flip the failure mode, reintroducing false "stale"
+        floods (and, under ``--fix``, destructive rewrites) for exactly the
+        small freshly-cloned vaults the guard exists to protect. Between a
+        non-destructive missed warning and a destructive silent rewrite,
+        the guard is deliberately biased toward the former - so a small
+        vault with a coincidental 2-of-3 mtime cluster suppresses a
+        genuinely stale third document too. This test pins that trade-off
+        so it reads as intentional, not an oversight.
+        """
+        _skeleton(tmp_path)
+        stale = _write_doc(
+            tmp_path,
+            "2026-01-01-stale-adr",
+            date_line="date: '2026-01-01'",
+            modified_line="modified: '2026-01-01'",
+        )
+        _set_mtime(stale, datetime.date(2026, 5, 1))
+        fresh_a = _write_doc(
+            tmp_path,
+            "2026-02-08-fresh-a-adr",
+            date_line="date: '2026-02-08'",
+            modified_line="modified: '2026-02-08'",
+        )
+        fresh_b = _write_doc(
+            tmp_path,
+            "2026-02-08-fresh-b-adr",
+            date_line="date: '2026-02-08'",
+            modified_line="modified: '2026-02-08'",
+        )
+        _set_mtime(fresh_a, datetime.date(2026, 2, 8))
+        _set_mtime(fresh_b, datetime.date(2026, 2, 8))
+
+        result = _check(tmp_path)
+
+        infos = [d for d in result.diagnostics if "Skipping staleness" in d.message]
+        assert len(infos) == 1
+        stale_findings = [d for d in result.diagnostics if "Stale" in d.message]
+        assert stale_findings == []
+
+
+class TestModifiedPredatesDate:
+    """A canonical ``modified:`` earlier than the document's own ``date:``
+    is a nonsense state (D3b: the stamp starts equal to ``date:`` and only
+    ever moves forward). Staleness only ever compares against mtime, so
+    without this check the value would sail through every other branch
+    looking clean forever."""
+
+    def test_modified_before_date_is_flagged(self, tmp_path: Path):
+        _skeleton(tmp_path)
+        doc = _write_doc(
+            tmp_path,
+            "2026-02-08-alpha-adr",
+            date_line="date: '2026-02-08'",
+            modified_line="modified: '2026-01-01'",
+        )
+        _uniform_mtime(tmp_path, datetime.date(2026, 2, 8))
+
+        result = _check(tmp_path)
+
+        warnings = [d for d in result.diagnostics if d.severity == Severity.WARNING]
+        assert len(warnings) == 1
+        assert "predates its own date" in warnings[0].message
+        assert warnings[0].fixable is True
+        # Never auto-fixed without --fix: the original value survives.
+        assert "modified: '2026-01-01'" in doc.read_text(encoding="utf-8")
+
+    def test_fix_raises_modified_to_date(self, tmp_path: Path):
+        _skeleton(tmp_path)
+        doc = _write_doc(
+            tmp_path,
+            "2026-02-08-alpha-adr",
+            date_line="date: '2026-02-08'",
+            modified_line="modified: '2026-01-01'",
+        )
+        _uniform_mtime(tmp_path, datetime.date(2026, 2, 8))
+
+        result = _check(tmp_path, fix=True)
+
+        assert result.fixed_count == 1
+        assert "modified: '2026-02-08'" in doc.read_text(encoding="utf-8")
+        infos = [d for d in result.diagnostics if d.severity == Severity.INFO]
+        assert any("raised to '2026-02-08'" in d.message for d in infos)
+
+    def test_absurdly_old_modified_is_caught_by_the_floor(self, tmp_path: Path):
+        # A year-1900 stamp is a valid, parseable date - not garbage per
+        # parse_lenient_date - but nonsense relative to date:. The floor
+        # check catches it long before mtime would (mtime staleness would
+        # also fire, but only on a run the git-signature guard permits).
+        _skeleton(tmp_path)
+        doc = _write_doc(
+            tmp_path,
+            "2026-02-08-alpha-adr",
+            date_line="date: '2026-02-08'",
+            modified_line="modified: '1900-01-01'",
+        )
+        _uniform_mtime(tmp_path, datetime.date(2026, 2, 8))
+
+        result = _check(tmp_path, fix=True)
+
+        assert result.fixed_count == 1
+        assert "modified: '2026-02-08'" in doc.read_text(encoding="utf-8")
+
+    def test_modified_equal_to_date_is_not_flagged(self, tmp_path: Path):
+        _skeleton(tmp_path)
+        _write_doc(
+            tmp_path,
+            "2026-02-08-alpha-adr",
+            date_line="date: '2026-02-08'",
+            modified_line="modified: '2026-02-08'",
+        )
+        _uniform_mtime(tmp_path, datetime.date(2026, 2, 8))
+
+        result = _check(tmp_path)
+
+        assert not any("predates" in d.message for d in result.diagnostics)
+
+
+class TestFutureMtime:
+    """A file mtime ahead of today (clock skew, a bad archive, a manual
+    ``os.utime``) must never be written verbatim into ``modified:`` - that
+    would durably corrupt the corpus, since the stamp could never again
+    register as stale until real wall-clock time caught up to it."""
+
+    def _diverse_fresh_fillers(self, tmp_path: Path, count: int = 9) -> None:
+        for i in range(count):
+            day = 1 + i
+            stamp = f"2026-03-{day:02d}"
+            doc = _write_doc(
+                tmp_path,
+                f"2026-03-{day:02d}-filler-{i}-adr",
+                date_line=f"date: '{stamp}'",
+                modified_line=f"modified: '{stamp}'",
+            )
+            _set_mtime(doc, datetime.date(2026, 3, day))
+
+    def test_future_mtime_is_flagged_stale(self, tmp_path: Path):
+        _skeleton(tmp_path)
+        doc = _write_doc(
+            tmp_path,
+            "2026-02-08-alpha-adr",
+            date_line="date: '2026-02-08'",
+            modified_line="modified: '2026-02-08'",
+        )
+        future = vault_today() + datetime.timedelta(days=30)
+        _set_mtime(doc, future)
+        self._diverse_fresh_fillers(tmp_path)
+
+        result = _check(tmp_path)
+
+        stale_findings = [d for d in result.diagnostics if "Stale" in d.message]
+        assert len(stale_findings) == 1
+        assert "beyond today" in stale_findings[0].message
+
+    def test_fix_clamps_future_mtime_to_today_not_the_raw_future_date(
+        self, tmp_path: Path
+    ):
+        _skeleton(tmp_path)
+        doc = _write_doc(
+            tmp_path,
+            "2026-02-08-alpha-adr",
+            date_line="date: '2026-02-08'",
+            modified_line="modified: '2026-02-08'",
+        )
+        future = vault_today() + datetime.timedelta(days=30)
+        _set_mtime(doc, future)
+        self._diverse_fresh_fillers(tmp_path)
+
+        result = _check(tmp_path, fix=True)
+
+        assert result.fixed_count == 1
+        today_stamp = vault_today().isoformat()
+        assert f"modified: '{today_stamp}'" in doc.read_text(encoding="utf-8")
+        # The raw future mtime date was never written.
+        assert future.isoformat() not in doc.read_text(encoding="utf-8")
+
+
+class TestTimezoneCarryingStamp:
+    """An ISO timestamp with an explicit zone offset must resolve to the
+    same UTC calendar day the vault's other clocks (mtime, ``vault_today``)
+    use, not the offset's own literal wall-clock day."""
+
+    def test_offset_crossing_utc_midnight_normalizes_to_the_utc_day(
+        self, tmp_path: Path
+    ):
+        # 23:00 on 2026-02-08 at UTC-05:00 is 2026-02-09T04:00:00 in UTC:
+        # the canonical value must land on the 9th, not the offset's own
+        # local calendar day (the 8th).
+        _skeleton(tmp_path)
+        doc = _write_doc(
+            tmp_path,
+            "2026-02-08-alpha-adr",
+            date_line="date: '2026-02-08'",
+            modified_line="modified: '2026-02-08T23:00:00-05:00'",
+        )
+        _uniform_mtime(tmp_path, datetime.date(2026, 2, 9))
+
+        result = _check(tmp_path, fix=True)
+
+        assert result.fixed_count == 1
+        assert "modified: '2026-02-09'" in doc.read_text(encoding="utf-8")
 
 
 class TestCheckResultShape:

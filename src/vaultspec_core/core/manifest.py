@@ -12,11 +12,14 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .enums import InstallMode, Tool
 from .exceptions import VaultSpecError
 from .helpers import advisory_lock, atomic_write
+
+if TYPE_CHECKING:
+    from .types import ToolConfig
 
 logger = logging.getLogger(__name__)
 
@@ -380,7 +383,7 @@ def providers_sharing_dir(
     return sharing
 
 
-def installed_tool_configs() -> dict[Tool, Any]:
+def installed_tool_configs() -> dict[Tool, ToolConfig]:
     """Return TOOL_CONFIGS filtered to only installed providers.
 
     Returns an empty dict when no manifest exists (framework not installed).

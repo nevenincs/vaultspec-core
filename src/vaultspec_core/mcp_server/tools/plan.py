@@ -15,7 +15,6 @@ CLI verbs do.
 
 from __future__ import annotations
 
-import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -234,10 +233,10 @@ def _save_plan(
     from ...core.helpers import atomic_write
     from ...plan.serialiser import serialise_plan
     from ...plan.write_guard import guard_plan_write
-    from ...vaultcore import refresh_modified_stamp
+    from ...vaultcore import refresh_modified_stamp, vault_today
 
     new_text = serialise_plan(plan, canonicalise=False)
-    new_text = refresh_modified_stamp(new_text, datetime.date.today())
+    new_text = refresh_modified_stamp(new_text, vault_today())
     guard_plan_write(original_text, new_text, expected_retired, path_name=path.name)
     if new_text == original_text:
         return False

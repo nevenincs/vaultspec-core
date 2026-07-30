@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from contextlib import nullcontext
+from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
@@ -102,7 +102,14 @@ def read_ownership(path: Path) -> OwnershipState:
     version = raw.get("version")
     if version != _OWNERSHIP_VERSION:
         raise VaultSpecError(f"Unsupported MCP ownership version at {path}: {version}")
-    return cast("OwnershipState", raw)
+    # Invariant: the three checks above already prove this shape - `raw` is a
+    # dict, `raw["targets"]` is a dict, and `raw["version"]` is exactly
+    # `_OWNERSHIP_VERSION`. The `dict[str, Any]` -> `OwnershipState` cast is
+    # still routed through `object` because a plain dict and a TypedDict are
+    # never considered sufficiently overlapping types for a direct cast,
+    # regardless of prior validation; the intermediate `object` step is
+    # required to express that, not evidence the shape is unproven.
+    return cast("OwnershipState", cast("object", raw))
 
 
 def write_ownership(path: Path, state: OwnershipState) -> None:
@@ -110,7 +117,7 @@ def write_ownership(path: Path, state: OwnershipState) -> None:
     atomic_write(path, json.dumps(state, indent=2, sort_keys=True) + "\n")
 
 
-def target_lock(path: Path, *, dry_run: bool) -> Any:
+def target_lock(path: Path, *, dry_run: bool) -> AbstractContextManager[None]:
     """Return a no-op context for previews and a real advisory lock for writes."""
     return nullcontext() if dry_run else advisory_lock(path)
 

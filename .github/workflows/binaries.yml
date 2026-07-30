@@ -64,7 +64,7 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           uv run --no-project --python 3.13 -- \
-            python scripts/build_pyapp.py --tag "${TAG}" --target "${TARGET}" --outdir dist-bin
+            python dev/binaries/build_pyapp.py --tag "${TAG}" --target "${TARGET}" --outdir dist-bin
 
       - name: Upload binaries
         uses: actions/upload-artifact@v7

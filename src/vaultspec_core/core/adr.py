@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime as _dt
 import logging
 import re
 from pathlib import Path
@@ -12,6 +11,7 @@ from ..vaultcore import (
     DocumentMetadata,
     parse_vault_metadata,
     refresh_modified_stamp,
+    vault_today,
 )
 from . import types as _t
 from .enums import AdrStatus
@@ -245,7 +245,7 @@ def adr_supersede(
     # the superseding document. Applied to the final rendered text (after
     # any CRLF reapplication) so the helper sees the exact bytes about to
     # be written; it preserves the document's line-ending convention.
-    today = _dt.date.today()
+    today = vault_today()
     final_old_content = refresh_modified_stamp(final_old_content, today)
     final_new_content = refresh_modified_stamp(final_new_content, today)
 

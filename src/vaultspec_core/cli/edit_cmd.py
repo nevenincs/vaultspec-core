@@ -40,7 +40,6 @@ Exit codes:
 
 from __future__ import annotations
 
-import datetime as _dt
 import json
 import sys
 from pathlib import Path
@@ -53,6 +52,7 @@ from vaultspec_core.vaultcore.edit_engine import (
     EditError as _EditError,
 )
 from vaultspec_core.vaultcore.edit_engine import (
+    document_lock_target,
     enforce_blob_hash,
     execute_edit,
     invalidate_graph_cache,
@@ -376,13 +376,13 @@ def _refresh_doc_stamps(paths: list[Path]) -> None:
     Args:
         paths: Absolute paths to stamp; non-files and duplicates are skipped.
     """
-    from vaultspec_core.vaultcore.models import refresh_modified_stamp
+    from vaultspec_core.vaultcore.models import refresh_modified_stamp, vault_today
     from vaultspec_core.vaultcore.related_surgery import (
         atomic_write_restore,
         read_preserve_newlines,
     )
 
-    today = _dt.date.today()
+    today = vault_today()
     seen: set[Path] = set()
     for path in paths:
         if path in seen or not path.is_file():
@@ -418,12 +418,20 @@ def _execute_rename(
     """Rename a document's identity-bearing file and re-point incoming links.
 
     Cursory pre-checks (blob-hash concurrency, target-stem grammar, collision)
-    run BEFORE any mutation. The mutation then drives the shared
-    :class:`~vaultspec_core.vaultcore.rename_engine.RenameTransaction` on the
-    docs domain: it acquires the docs advisory lock, snapshots the renamed doc
-    plus every doc carrying an incoming ``related:`` link, physically renames
-    the file FIRST (closing the prior dangling-link window where links were
-    rewritten before the rename), then runs the shared
+    run BEFORE any mutation, purely to fail fast. The mutation then drives the
+    shared :class:`~vaultspec_core.vaultcore.rename_engine.RenameTransaction`
+    on the docs domain: it acquires the docs advisory lock, then this verb
+    additionally acquires a per-document advisory lock (see
+    :func:`~vaultspec_core.vaultcore.edit_engine.document_lock_target`) for
+    the renamed document and every referrer
+    :func:`~vaultspec_core.vaultcore.rename_ops.find_rewrite_targets` reports
+    will actually be rewritten - the same per-document sentinel
+    ``execute_edit`` takes, so a concurrent edit of any of those documents is
+    excluded rather than silently racing the cascade. RE-VERIFIES the
+    blob-hash guard now that both locks are held (a writer could have raced
+    between the cursory pre-check and the lock acquisition), then physically
+    renames the file FIRST (closing the prior dangling-link window where
+    links were rewritten before the rename), then runs the shared
     :func:`~vaultspec_core.vaultcore.rename_ops.rewrite_incoming_refs` cascade
     and refreshes the ``modified:`` stamp on every touched doc. Any failure
     inside the transaction rolls the vault back byte-for-byte. The renamed
@@ -437,6 +445,7 @@ def _execute_rename(
         dry_run: When ``True``, do everything except mutate.
         json_output: When ``True``, emit the JSON envelope.
     """
+
     from vaultspec_core.config import get_config
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.blob_hash import git_blob_oid
@@ -447,7 +456,10 @@ def _execute_rename(
         docs_lock_target,
         iter_snapshot_docs,
     )
-    from vaultspec_core.vaultcore.rename_ops import rewrite_incoming_refs
+    from vaultspec_core.vaultcore.rename_ops import (
+        find_rewrite_targets,
+        rewrite_incoming_refs,
+    )
 
     command = "vault.rename"
     root_dir = _get_ctx().target_dir
@@ -525,7 +537,71 @@ def _execute_rename(
         # document rename never mutates an archived doc (matching
         # ``rename_feature``).
         cascade = CheckResult(check_name="vault-rename")
-        with RenameTransaction(docs_dir, lock_target=docs_lock_target(docs_dir)) as tx:
+        # Two lock domains cover `.vault/` documents: this transaction's
+        # domain-wide sentinel, and the per-document sentinel `execute_edit`
+        # takes. They are disjoint, so a rename and an edit of the SAME
+        # document did not exclude each other. Interleaved, the edit's backup
+        # copy would succeed while the file still existed, the rename would
+        # move it, and the edit's atomic replace would then RESURRECT the old
+        # path: the renamed file left stale without the edit, and an orphaned
+        # original carrying it with no incoming links.
+        #
+        # Taking per-document locks here closes that. The ordering is
+        # load-bearing: the domain lock is acquired first (by the
+        # transaction), the per-document locks second - sorted, so this
+        # transaction's own acquisition order is deterministic - and
+        # `execute_edit` never requests the domain lock at all, so no caller
+        # can hold one while waiting on the other and no cycle is
+        # constructible.
+        #
+        # Scope is the renamed document PLUS every referrer
+        # `rewrite_incoming_refs` will actually rewrite (computed by
+        # `find_rewrite_targets`, which shares its exact matching logic) -
+        # not the whole snapshot set. A document the cascade merely reads and
+        # finds no match in is never written, so nothing a concurrent edit
+        # does to it can conflict with the cascade; locking it anyway would
+        # be a global edit freeze in N acquisitions, costing more than the
+        # domain lock it replaces and buying nothing. The residual is
+        # narrower and bounded: a document that starts referencing
+        # `old_stem` only AFTER the scan below - a concurrent `execute_edit`
+        # adding a `related:` entry in the window between this scan and the
+        # cascade's actual write - is not in the locked set and can be
+        # missed, leaving a dangling wiki-link. That surfaces in
+        # `vault check links` and is repairable - a categorically better
+        # failure than a silently resurrected document.
+        mutated_paths = [
+            old_path,
+            *find_rewrite_targets(
+                root_dir,
+                [(old_stem, new_stem)],
+                exclude_dirs=frozenset({"_archive"}),
+            ),
+        ]
+        lock_targets = sorted(
+            {document_lock_target(p, root_dir) for p in mutated_paths},
+            key=str,
+        )
+        # `advisory_lock` silently skips a target whose parent is absent, so
+        # the directory must exist before the transaction acquires it - a
+        # no-op lock would look exactly like a held one.
+        for lock_target in lock_targets:
+            lock_target.parent.mkdir(parents=True, exist_ok=True)
+
+        # The transaction owns the acquisition ORDER (domain lock, then these
+        # in sorted order) so the deadlock argument lives in one place, and
+        # holds them through its own rollback so a restore cannot race a
+        # concurrent edit on a document it mutated.
+        with RenameTransaction(
+            docs_dir,
+            lock_target=docs_lock_target(docs_dir),
+            document_lock_targets=lock_targets,
+        ) as tx:
+            # Re-verify under the domain lock and the renamed document's own
+            # lock: the cursory pre-check above ran before either was
+            # acquired, so a concurrent writer could have changed the
+            # document in that window without either caller noticing. This
+            # is the authoritative check.
+            enforce_blob_hash(old_path, expected_blob_hash)
             tx.snapshot(iter_snapshot_docs(docs_dir))
             if not tx.rename(old_path, new_path):
                 raise _EditError(

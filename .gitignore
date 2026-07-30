@@ -183,7 +183,7 @@ test-project/
 tmp-ref/
 
 # Dev-only transcript analytics outputs (personal-data-derived, never committed)
-statistic/out/
+dev/statistics/out/
 # >>> vaultspec-managed (do not edit this block) >>>
 .vault/.obsidian/
 .vault/.trash/

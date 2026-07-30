@@ -14,14 +14,13 @@ so no drift can develop between them.
 
 from __future__ import annotations
 
-import datetime as _dt
 import re
 from typing import TYPE_CHECKING, cast
 
 import yaml
 
 from ..core.helpers import atomic_write_bytes
-from .models import refresh_modified_stamp
+from .models import refresh_modified_stamp, vault_today
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -162,7 +161,7 @@ def remove_related_entries(path: Path, targets: list[str]) -> int:
     new_content = source_newline.join(new_lines)
     # Vault-orientation ADR (decision D3): a link mutation refreshes the
     # target document's modified stamp.
-    new_content = refresh_modified_stamp(new_content, _dt.date.today())
+    new_content = refresh_modified_stamp(new_content, vault_today())
     atomic_write_restore(path, new_content)
     return removed
 
@@ -306,7 +305,7 @@ def append_related_entry(path: Path, wiki_link: str) -> bool:
     new_content = source_newline.join(new_lines)
     # Vault-orientation ADR (decision D3): a link mutation refreshes the
     # target document's modified stamp.
-    new_content = refresh_modified_stamp(new_content, _dt.date.today())
+    new_content = refresh_modified_stamp(new_content, vault_today())
     atomic_write_restore(path, new_content)
     return True
 

@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 from .models import DocumentMetadata
 
-__all__ = ["parse_frontmatter", "parse_vault_metadata"]
+__all__ = ["SafeLoader", "parse_frontmatter", "parse_vault_metadata"]
 
 logger = logging.getLogger(__name__)
 

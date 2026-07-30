@@ -285,6 +285,291 @@ def test_document_rename_blocks_on_held_docs_lock(tmp_path: Path) -> None:
     assert "[[2026-01-01-alpha-adr]]" not in beta_text
 
 
+def test_rename_blocks_while_the_renamed_document_is_locked_by_an_edit(
+    tmp_path: Path,
+) -> None:
+    """``vault rename`` now serializes against a concurrent edit of the SAME doc.
+
+    Closes repro B from the blob-hash concurrency audit: before this fix,
+    ``execute_edit``'s per-document lock and the rename's domain lock were two
+    disjoint sentinels, so a rename could complete while an edit of the SAME
+    document was still in flight. The edit's eventual write - landing after
+    the rename had already moved the file - silently RESURRECTED the old
+    path: the renamed file left stale (missing the edit) and an orphaned
+    duplicate at the old name with no incoming links (reproduced with real
+    threads during the audit; the fix below makes that interleaving
+    unconstructible, so this test proves the lock rather than re-deriving the
+    race). With the renamed document's own advisory lock held by another
+    holder, ``vault rename`` must block, and once released must complete
+    correctly with no resurrection.
+    """
+    from typer.testing import CliRunner
+
+    from ...cli import app
+    from ...core.commands import install_run
+    from ..edit_engine import document_lock_target
+
+    root = tmp_path / "project"
+    adr_dir = root / ".vault" / "adr"
+    adr_dir.mkdir(parents=True)
+    (adr_dir / "2026-01-01-alpha-adr.md").write_text(_ALPHA, encoding="utf-8")
+    (adr_dir / "2026-01-01-beta-adr.md").write_text(_BETA, encoding="utf-8")
+    install_run(path=root, provider="all", upgrade=False, dry_run=False, force=True)
+    # Materialise the lock-file parent so the advisory lock actually engages.
+    (root / ".vault" / "data").mkdir(parents=True, exist_ok=True)
+
+    alpha = adr_dir / "2026-01-01-alpha-adr.md"
+    gamma = adr_dir / "2026-01-01-gamma-adr.md"
+    lock_target = document_lock_target(alpha, root)
+    lock_target.parent.mkdir(parents=True, exist_ok=True)
+
+    def _run_rename() -> None:
+        result = CliRunner().invoke(
+            app,
+            [
+                "--target",
+                str(root),
+                "vault",
+                "rename",
+                "2026-01-01-alpha-adr",
+                "--to",
+                "2026-01-01-gamma-adr",
+                "--no-check",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+
+    _prove_serialized_by(lock_target, _run_rename)
+
+    # No resurrection: the old path is gone and the new path exists - never a
+    # stale-and-orphaned pair.
+    assert gamma.exists()
+    assert not alpha.exists()
+
+
+def test_rename_blocks_while_a_referrer_document_is_locked_by_an_edit(
+    tmp_path: Path,
+) -> None:
+    """``vault rename`` also serializes against an edit of a REFERRER document.
+
+    Closes the wider half of the same gap: the cascade rewrites ``beta``'s
+    ``related:`` block to point at the renamed stem, so an edit racing on
+    ``beta`` (not the renamed document itself) needs the same exclusion, or
+    the cascade's write and the edit's write could still race each other even
+    with only the renamed document locked.
+    :func:`~vaultspec_core.vaultcore.rename_ops.find_rewrite_targets` computes
+    exactly this referrer set before the mutation begins, and the rename
+    locks every document in it, sorted, alongside the renamed document.
+    """
+    from typer.testing import CliRunner
+
+    from ...cli import app
+    from ...core.commands import install_run
+    from ..edit_engine import document_lock_target
+
+    root = tmp_path / "project"
+    adr_dir = root / ".vault" / "adr"
+    adr_dir.mkdir(parents=True)
+    (adr_dir / "2026-01-01-alpha-adr.md").write_text(_ALPHA, encoding="utf-8")
+    (adr_dir / "2026-01-01-beta-adr.md").write_text(_BETA, encoding="utf-8")
+    install_run(path=root, provider="all", upgrade=False, dry_run=False, force=True)
+    (root / ".vault" / "data").mkdir(parents=True, exist_ok=True)
+
+    alpha = adr_dir / "2026-01-01-alpha-adr.md"
+    beta = adr_dir / "2026-01-01-beta-adr.md"
+    gamma = adr_dir / "2026-01-01-gamma-adr.md"
+    lock_target = document_lock_target(beta, root)
+    lock_target.parent.mkdir(parents=True, exist_ok=True)
+
+    def _run_rename() -> None:
+        result = CliRunner().invoke(
+            app,
+            [
+                "--target",
+                str(root),
+                "vault",
+                "rename",
+                "2026-01-01-alpha-adr",
+                "--to",
+                "2026-01-01-gamma-adr",
+                "--no-check",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+
+    _prove_serialized_by(lock_target, _run_rename)
+
+    assert gamma.exists()
+    assert not alpha.exists()
+    beta_text = beta.read_text(encoding="utf-8")
+    assert "[[2026-01-01-gamma-adr]]" in beta_text
+    assert "[[2026-01-01-alpha-adr]]" not in beta_text
+
+
+def test_no_deadlock_under_concurrent_rename_and_edit_load(tmp_path: Path) -> None:
+    """Real concurrent rename-plus-edit load never deadlocks, either direction.
+
+    ``execute_edit`` only ever acquires a per-document lock; the rename-class
+    mutators acquire the domain lock first, then per-document locks for the
+    mutated set second. Since ``execute_edit`` never requests the domain
+    lock, no thread can hold one lock type while waiting on the other in a
+    way that forms a cycle - argued when the design was proposed, stress-
+    tested here empirically instead of only argued: one rename thread races
+    concurrent edit threads targeting the renamed document, a referrer, and
+    an unrelated document, all under a generous bounded timeout. A real
+    deadlock would leave a thread alive past that bound; correct behaviour
+    completes well within it regardless of which side wins the race.
+
+    Drives the rename through ``_execute_rename`` directly rather than
+    through ``CliRunner`` - ``CliRunner.invoke`` swaps ``sys.stdout``
+    process-globally for its duration, which is not safe to run
+    concurrently with other threads that are themselves writing to stdout
+    (the edit threads' own logging); that is a test-harness limitation of
+    running Click's IO-capturing runner from multiple threads at once, not
+    a product concern, so it is sidestepped here rather than worked around.
+    """
+    from vaultspec_core.cli.edit_cmd import _execute_rename
+
+    from ...core.commands import install_run
+    from ...core.types import init_paths
+    from ..edit_engine import EditResult, execute_edit
+
+    root = tmp_path / "project"
+    adr_dir = root / ".vault" / "adr"
+    adr_dir.mkdir(parents=True)
+    (adr_dir / "2026-01-01-alpha-adr.md").write_text(_ALPHA, encoding="utf-8")
+    (adr_dir / "2026-01-01-beta-adr.md").write_text(_BETA, encoding="utf-8")
+    _write(
+        adr_dir / "2026-01-01-gamma-adr.md",
+        "---\ntags:\n  - '#adr'\n  - '#concurrency'\n"
+        "date: '2026-01-01'\nmodified: '2026-01-01'\nrelated: []\n---\n\n# Gamma\n",
+    )
+    install_run(path=root, provider="all", upgrade=False, dry_run=False, force=True)
+    (root / ".vault" / "data").mkdir(parents=True, exist_ok=True)
+
+    errors: list[BaseException] = []
+    gamma_results: list[EditResult] = []
+    results_guard = threading.Lock()
+
+    def _record_error(exc: BaseException) -> None:
+        with results_guard:
+            errors.append(exc)
+
+    def _run_rename() -> None:
+        try:
+            # _execute_rename reads the target from the workspace context,
+            # which is thread-local (a contextvars.ContextVar, not process-
+            # global) - it must be initialised on THIS thread, not borrowed
+            # from the thread that set it up.
+            init_paths(root)
+            _execute_rename(
+                ref="2026-01-01-alpha-adr",
+                new_stem="2026-01-01-zeta-adr",
+                expected_blob_hash=None,
+                run_checks=False,
+                dry_run=False,
+                json_output=True,
+            )
+        except BaseException as exc:
+            _record_error(exc)
+
+    def _run_edit(ref: str, marker: str, *, track: bool = False) -> None:
+        try:
+            # run_checks=False mirrors every other concurrency test in this
+            # module (the CLI side runs `--no-check`) - keeps this test
+            # targeted at locking rather than the conformance checkers.
+            result = execute_edit(
+                root,
+                ref=ref,
+                new_body=f"\n# Doc\n\n{marker}\n",
+                run_checks=False,
+            )
+            # Any EditResult - including a clean "failed" once alpha has
+            # been renamed away - is an acceptable outcome; only an escaped
+            # exception (a crash) or a hang (caught by the join timeout
+            # below) would be a bug.
+            if track:
+                with results_guard:
+                    gamma_results.append(result)
+        except BaseException as exc:
+            _record_error(exc)
+
+    threads = [threading.Thread(target=_run_rename, name="renamer")]
+    for i in range(4):
+        threads.append(
+            threading.Thread(
+                target=_run_edit,
+                args=("2026-01-01-alpha-adr", f"alpha edit {i}"),
+                name=f"edit-alpha-{i}",
+            )
+        )
+        threads.append(
+            threading.Thread(
+                target=_run_edit,
+                args=("2026-01-01-beta-adr", f"beta edit {i}"),
+                name=f"edit-beta-{i}",
+            )
+        )
+        threads.append(
+            threading.Thread(
+                target=_run_edit,
+                kwargs={
+                    "ref": "2026-01-01-gamma-adr",
+                    "marker": f"gamma edit {i}",
+                    "track": True,
+                },
+                name=f"edit-gamma-{i}",
+            )
+        )
+
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=20.0)
+        assert not t.is_alive(), f"{t.name} did not complete - possible deadlock"
+
+    assert not errors, f"unexpected errors under concurrent load: {errors!r}"
+
+    # Self-consistent final state: never both the old and new name present.
+    alpha = adr_dir / "2026-01-01-alpha-adr.md"
+    zeta = adr_dir / "2026-01-01-zeta-adr.md"
+    assert not (alpha.exists() and zeta.exists())
+    assert alpha.exists() or zeta.exists()
+
+    # The unrelated document was never BLOCKED by the domain-wide rename -
+    # per-document granularity survives the fix: every gamma thread completed
+    # within the bounded join above rather than waiting out the whole rename,
+    # and each produced a typed result, never a hang or a crash.
+    #
+    # One outcome is tolerated rather than asserted away here: gamma is
+    # outside the rename's locked (mutated) set - correctly, since the
+    # cascade never writes it - but `RenameTransaction.snapshot()` still
+    # READS every non-archive document, gamma included, for the rollback
+    # journal, without taking gamma's advisory lock (there is nothing to
+    # exclude a reader from; only writers race writers). On Windows this can
+    # transiently collide with a concurrent gamma WRITE: `os.replace` can
+    # deny access to a destination another handle has open for read at that
+    # exact instant. This is real, but it is a property of
+    # `atomic_write_bytes` versus a concurrent reader in general - orthogonal
+    # to the blob-hash guard and the per-document locking this test exists to
+    # prove, and already folds cleanly into a typed failed EditResult rather
+    # than crashing (confirming the repro-A fix generalises beyond the one
+    # cause it was written for). Any OTHER failure shape is still a bug.
+    assert len(gamma_results) == 4
+    _access_denied = "Access is denied"
+    for result in gamma_results:
+        if result.status == "updated":
+            continue
+        message = str((result.error or {}).get("message", ""))
+        assert _access_denied in message, (
+            result.status,
+            result.blob_hash,
+            result.error,
+        )
+
+
 def test_feature_rename_blocks_on_held_docs_lock(tmp_path: Path) -> None:
     """``rename_feature`` serializes on the docs sentinel.
 
@@ -338,3 +623,57 @@ def test_feature_rename_blocks_on_held_docs_lock(tmp_path: Path) -> None:
     adr_text = renamed_adr.read_text(encoding="utf-8")
     assert "[[2026-01-01-beta-feature-research]]" in adr_text
     assert "[[2026-01-01-alpha-feature-research]]" not in adr_text
+
+
+def test_rename_feature_blocks_while_a_renamed_document_is_locked_by_an_edit(
+    tmp_path: Path,
+) -> None:
+    """``rename_feature`` also takes per-document locks for its mutated set.
+
+    Extends the ``vault rename`` fix to the second real docs-domain mutator:
+    ``_apply_rename_plan`` now passes ``document_lock_targets`` -
+    ``plan.file_renames``' sources plus ``find_rewrite_targets``'s referrer
+    set - into ``RenameTransaction``, so the SAME repro-B race (an in-flight
+    edit's write resurrecting a document a rename already moved) is closed
+    for a whole-feature rename, not just a single-document one. Proven the
+    same way: with the ADR's own advisory lock held by another holder,
+    ``rename_feature`` must block, and once released must complete correctly.
+    """
+    from ..edit_engine import document_lock_target
+    from ..query import rename_feature
+
+    root = tmp_path / "project"
+    docs_dir = root / ".vault"
+    research_dir = docs_dir / "research"
+    adr_dir = docs_dir / "adr"
+    research_dir.mkdir(parents=True)
+    adr_dir.mkdir(parents=True)
+
+    research = research_dir / "2026-01-01-alpha-feature-research.md"
+    adr = adr_dir / "2026-01-01-alpha-feature-adr.md"
+    _write(
+        research,
+        "---\ntags:\n  - '#research'\n  - '#alpha-feature'\n"
+        "date: '2026-01-01'\nmodified: '2026-01-01'\nrelated: []\n---\n\n# Alpha\n",
+    )
+    _write(
+        adr,
+        "---\ntags:\n  - '#adr'\n  - '#alpha-feature'\n"
+        "date: '2026-01-01'\nmodified: '2026-01-01'\n"
+        "related:\n  - '[[2026-01-01-alpha-feature-research]]'\n---\n\n# Alpha ADR\n",
+    )
+    (docs_dir / "data").mkdir(parents=True, exist_ok=True)
+
+    renamed_adr = adr_dir / "2026-01-01-beta-feature-adr.md"
+    lock_target = document_lock_target(adr, root)
+    lock_target.parent.mkdir(parents=True, exist_ok=True)
+
+    def _run_rename() -> None:
+        result = rename_feature(root, "alpha-feature", "beta-feature")
+        assert result["status"] == "updated"
+
+    _prove_serialized_by(lock_target, _run_rename)
+
+    # No resurrection: the old-feature path is gone, the new one exists.
+    assert renamed_adr.exists()
+    assert not adr.exists()

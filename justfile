@@ -10,10 +10,34 @@
 #  command with no shell branching, no pipes, no conditionals, and no `sh`
 #  versus PowerShell dialect. All of the logic - target dispatch, step
 #  chaining, tool-or-Docker fallback, advisory-versus-gating exit codes - lives
-#  in the `dev/` Python package, which imports only the standard library and
-#  therefore behaves identically on every platform. There is no shell script
+#  in the modules directly under `dev/`, which import only the standard library
+#  and therefore behave identically on every platform. There is no shell script
 #  backing this file. To change what a target runs, edit `dev/toolchain.py`,
 #  which is the single declarative source of truth for the whole toolchain.
+#
+#  The sub-packages beside those modules - `dev/audit`, `dev/binaries`,
+#  `dev/health`, `dev/statistics` - are the INSTRUMENTS the verbs invoke when a
+#  measurement or a build is too large to express as a command line. They are
+#  free to depend on whatever they measure with, which is exactly why they sit
+#  one level down from the stdlib-only dispatch core rather than inside it.
+#  Each carries its own cohabiting `tests` package.
+#
+#  One instrument lives OUTSIDE `dev/`: the documentation-asset renderers in
+#  `docs/_render/`, which sit with the `docs/assets/` output they write rather
+#  than with the tooling that invokes them. `just docs` drives them.
+#
+#  Two sub-packages beside the instruments are not instruments at all.
+#  `dev/guards` holds the repository-health guards - the checks on these
+#  recipes, on the CI workflows, on `pyproject.toml`, on the installed
+#  `.vaultspec/templates` and on `typings/` - which have no module to cohabit
+#  with because their subject is this checkout's own configuration. They carry
+#  the `repo` pytest marker and `just test repo` selects them BY THAT MARKER
+#  across every tree, so a repository-health guard is gated by what it asserts
+#  rather than by where it is filed; `just test unit` and `just test broad`
+#  exclude the same marker, so the library lanes never run them.
+#  `dev/smoke` holds the distribution smoke check, run
+#  by path against a built wheel and sdist by `.github/workflows/publish.yml`,
+#  never by pytest.
 #
 #  The verbs split by CONSEQUENCE, not by tool:
 #
@@ -117,12 +141,17 @@ framework target='doctor':
     {{dev}} framework {{target}}
 
 # ===========================================================================
-#  Assets and analytics
+#  Documentation assets and analytics
 # ===========================================================================
 
-# Regenerate the committed README terminal renders and demo GIF.
-assets target='all':
-    {{dev}} assets {{target}}
+# Named for the domain it operates on, matching `vault` and `framework` rather
+# than the action-named gating verbs. The renderers live in `docs/_render/` and
+# write into `docs/assets/`, so `just docs` regenerates the documentation
+# assets and `just docs help` lists the individual renderers.
+
+# Regenerate the committed documentation assets under docs/assets/.
+docs target='all':
+    {{dev}} docs {{target}}
 
 # MEASUREMENT ONLY - always exits 0. Composes the gates rather than
 # re-implementing any threshold, so the report and the gate cannot disagree.
@@ -134,13 +163,13 @@ health target='report':
     {{dev}} health {{target}}
 
 # Dev-only and unshipped: it reads the operator's own ~/.claude and ~/.codex
-# transcripts and writes into the gitignored statistic/out/. Every
+# transcripts and writes into the gitignored dev/statistics/out/. Every
 # machine-varying input is a flag with a home-derived default, so the bare
 # invocation is the normal one. Pass --help for the flag list.
 
 # Report CLI usage analytics from the local agent transcript corpora.
 analytics *args='':
-    uv run --no-sync python -m statistic {{args}}
+    uv run --no-sync python -m dev.statistics {{args}}
 
 # ===========================================================================
 #  Release artifacts
@@ -159,7 +188,7 @@ analytics *args='':
 
 # Build the standalone PyApp binaries for one release tag and Rust target.
 binaries tag rust_target outdir='dist-bin':
-    uv run --no-project --python 3.13 -- python scripts/build_pyapp.py --tag {{tag}} --target {{rust_target}} --outdir {{outdir}}
+    uv run --no-project --python 3.13 -- python dev/binaries/build_pyapp.py --tag {{tag}} --target {{rust_target}} --outdir {{outdir}}
 
 # ===========================================================================
 #  Aggregate pipeline

@@ -34,7 +34,12 @@ if TYPE_CHECKING:
 
     from .checks._base import CheckResult
 
-__all__ = ["rename_document_path", "rewrite_incoming_refs", "split_keepends"]
+__all__ = [
+    "find_rewrite_targets",
+    "rename_document_path",
+    "rewrite_incoming_refs",
+    "split_keepends",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -444,6 +449,82 @@ def _rewrite_document_refs(
         atomic_write(md_path, new_content)
     except OSError as exc:
         logger.warning("Failed to rewrite %s: %s", md_path, exc)
+
+
+def find_rewrite_targets(
+    root_dir: Path,
+    renames: list[tuple[str, str]],
+    *,
+    exclude_dirs: frozenset[str] = frozenset(),
+) -> list[Path]:
+    """Return every document :func:`rewrite_incoming_refs` would actually WRITE.
+
+    A read-only mirror of :func:`rewrite_incoming_refs`'s own scan - same skip
+    rules (:func:`_is_skipped_document`), same block-scoped match logic
+    (:func:`_scan_related_block`) - used to determine the exact MUTATED set
+    for a rename set before any mutation happens. A caller drives a rename
+    through a domain-wide lock (see
+    :class:`~vaultspec_core.vaultcore.rename_engine.RenameTransaction`) but
+    that lock alone does not exclude an unrelated ``execute_edit`` call on one
+    of the referrer documents the cascade is about to rewrite; taking a
+    per-document lock for exactly this set closes that gap without locking
+    the whole docs tree (which every OTHER document the cascade merely reads
+    and finds no match in does not need to be excluded from).
+
+    Because it shares the identical matching logic, the set this returns is
+    exactly the set :func:`rewrite_incoming_refs` would write for the same
+    *renames* against the same on-disk state; it stays accurate between the
+    two calls only because the caller holds the docs-domain lock across both
+    (see :class:`~vaultspec_core.vaultcore.rename_engine.RenameTransaction`).
+    A document that starts referencing the renamed stem only after this scan
+    (a concurrent ``execute_edit`` adding a ``related:`` entry, landing in the
+    window between this scan and the cascade) is not in the returned set and
+    so is not locked; that residual is bounded and named at the call site
+    that decides how to use this function, not swallowed here.
+
+    Args:
+        root_dir: Project root (the caller's workspace).
+        renames: ``(old_stem, new_stem)`` pairs, exactly as passed to
+            :func:`rewrite_incoming_refs`.
+        exclude_dirs: Additional top-level docs subdirectories to skip,
+            mirroring :func:`rewrite_incoming_refs`'s parameter of the same
+            name.
+
+    Returns:
+        Absolute paths of every document whose ``related:`` block contains a
+        wiki-link this rename set would rewrite, sorted for a deterministic
+        lock-acquisition order. Never includes the renamed document itself -
+        a rename is not a self-referencing rewrite - so a caller that also
+        needs the renamed document locked adds it separately.
+    """
+    raw_map = {old: new for old, new in renames if old != new}
+    if not raw_map:
+        return []
+    rename_map = _collapse_rename_chains(raw_map)
+
+    from ..config import get_config
+
+    vault_root = root_dir / get_config().docs_dir
+    if not vault_root.is_dir():
+        return []
+
+    rename_map_lower = {k.lower(): v for k, v in rename_map.items()}
+    non_schema_dirs = frozenset({"data", "logs"}) | exclude_dirs
+
+    targets: list[Path] = []
+    for md_path in sorted(vault_root.rglob("*.md")):
+        if _is_skipped_document(md_path, vault_root, non_schema_dirs):
+            continue
+        content = _read_document_text(md_path)
+        if content is None:
+            continue
+        if content.startswith("﻿"):
+            content = content[1:]
+        pairs = split_keepends(content)
+        events, *_rest = _scan_related_block(pairs, rename_map, rename_map_lower)
+        if events:
+            targets.append(md_path)
+    return targets
 
 
 def rewrite_incoming_refs(

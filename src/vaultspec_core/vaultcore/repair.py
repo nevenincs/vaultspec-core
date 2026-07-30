@@ -22,6 +22,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
     from pathlib import Path
 
+    from ..graph.cache import Fingerprint
+
 __all__ = [
     "RepairPhase",
     "RepairRun",
@@ -97,13 +99,24 @@ class _PipelineState:
     feat: str | None
     dry_run: bool
     include_index: bool
-    before: dict[str, tuple[int, int]]
-    current: dict[str, tuple[int, int]]
+    before: dict[str, Fingerprint]
+    current: dict[str, Fingerprint]
+    boundary_ns: int | None = None
     initial_checks: list[CheckResult] = field(default_factory=list)
 
-    def refresh_fingerprints(self) -> dict[str, tuple[int, int]]:
-        """Recompute and store the current vault file fingerprints."""
-        self.current = _vault_file_fingerprints(self.root_dir)
+    def refresh_fingerprints(self) -> dict[str, Fingerprint]:
+        """Recompute and store the current vault file fingerprints.
+
+        Reuses each file's previously-computed content hash when its
+        ``(st_size, st_mtime_ns)`` still matches *and* its mtime is
+        strictly older than :attr:`boundary_ns` - the racily-clean rule
+        :func:`_vault_file_fingerprints` documents. Only files touched
+        since the last capture (or racy relative to the run's start) pay
+        the hash cost again.
+        """
+        self.current = _vault_file_fingerprints(
+            self.root_dir, previous=self.current, boundary_ns=self.boundary_ns
+        )
         return self.current
 
 
@@ -128,6 +141,12 @@ def run_repair_pipeline(
     feat = feature.lstrip("#") if feature else None
     run = RepairRun(dry_run=dry_run, feature=feat, include_index=include_index)
     before = _vault_file_fingerprints(root_dir)
+    # Captured once, immediately after the full-hash "before" snapshot and
+    # before any stage can mutate a document: every write the pipeline goes
+    # on to make happens strictly after this instant, so it is a sound
+    # racily-clean boundary for every later refresh in this run (see
+    # _vault_file_fingerprints).
+    boundary_ns = _repair_boundary_ns(root_dir)
     state = _PipelineState(
         root_dir=root_dir,
         run=run,
@@ -136,6 +155,7 @@ def run_repair_pipeline(
         include_index=include_index,
         before=before,
         current=before,
+        boundary_ns=boundary_ns,
     )
 
     for stage in _REPAIR_STAGES:
@@ -350,7 +370,7 @@ def _stage_index(state: _PipelineState) -> bool:
 def _handle_index_failure(
     state: _PipelineState,
     exc: Exception,
-    phase_before: dict[str, tuple[int, int]],
+    phase_before: dict[str, Fingerprint],
 ) -> bool:
     """Record an index-refresh failure and still attempt a postcheck."""
     run = state.run
@@ -599,8 +619,8 @@ def _skipped_index_phase(reason: str) -> dict[str, Any]:
 def _record_file_deltas(
     run: RepairRun,
     phase: RepairPhase,
-    before: dict[str, tuple[int, int]],
-    after: dict[str, tuple[int, int]],
+    before: dict[str, Fingerprint],
+    after: dict[str, Fingerprint],
 ) -> None:
     for path in sorted(set(before) | set(after)):
         old = before.get(path)
@@ -624,8 +644,8 @@ def _record_file_deltas(
 
 def _finalize(
     run: RepairRun,
-    before: dict[str, tuple[int, int]],
-    after: dict[str, tuple[int, int]],
+    before: dict[str, Fingerprint],
+    after: dict[str, Fingerprint],
 ) -> None:
     run.changed_files = _changed_files(before, after)
     run.phases.append(
@@ -667,12 +687,10 @@ def _restamp_modified(root_dir: Path, rewritten: Iterable[str]) -> bool:
         ``True`` when at least one document's stamp was rewritten, so
         the caller knows to re-fingerprint.
     """
-    import datetime as _dt
-
     from ..core.helpers import atomic_write
-    from .models import refresh_modified_stamp
+    from .models import refresh_modified_stamp, vault_today
 
-    today = _dt.date.today()
+    today = vault_today()
     changed = False
     for rel in rewritten:
         if not rel.endswith(".md"):
@@ -702,13 +720,54 @@ def _restamp_modified(root_dir: Path, rewritten: Iterable[str]) -> bool:
     return changed
 
 
-def _vault_file_fingerprints(root_dir: Path) -> dict[str, tuple[int, int]]:
+def _vault_file_fingerprints(
+    root_dir: Path,
+    *,
+    previous: dict[str, Fingerprint] | None = None,
+    boundary_ns: int | None = None,
+) -> dict[str, Fingerprint]:
+    """Fingerprint every ``.vault/`` document as ``(size, mtime_ns, sha256)``.
+
+    Size and mtime alone cannot detect every mutation: rewriting the
+    fixed-width ``modified: 'yyyy-mm-dd'`` frontmatter stamp - the single
+    most common repair-pipeline write - never changes ``st_size``, so a
+    same-tick rewrite (ordinary, not pathological, on coarse-grained or
+    even NTFS-class filesystems under a fast fix pass) is invisible to
+    ``st_mtime_ns`` alone. The content hash closes that gap and matches
+    the primitive :mod:`vaultspec_core.graph.cache` already uses.
+
+    Hashing every document on every call is too expensive to pay on each
+    of the several fingerprint captures a single repair run makes (a
+    ~600ms full pass over this project's own ~1200-document corpus), so
+    this follows the same racily-clean reuse rule as
+    :func:`vaultspec_core.graph.cache.validate`: when *previous* carries a
+    file at the identical ``(size, mtime_ns)`` and that mtime is strictly
+    older than *boundary_ns*, the file could not have been rewritten since
+    *previous* was captured (mtime quantization is monotonic), so its
+    prior hash is reused instead of re-read. Every other file - new,
+    size/mtime-changed, or racy - is freshly hashed. The very first call
+    in a run (``previous=None``) therefore pays one full-hash pass, and
+    every later call in the same run reuses hashes for everything the
+    pipeline did not touch.
+
+    Args:
+        root_dir: Project root directory.
+        previous: The fingerprint mapping from the last capture in this
+            run, or ``None`` for the first capture (forces a full hash).
+        boundary_ns: A filesystem-quantized instant that predates every
+            write this repair run can make (see :func:`_repair_boundary_ns`).
+            ``None`` degrades every file to racy - sound, never unsound.
+
+    Returns:
+        Mapping of vault-relative POSIX path to :data:`Fingerprint`.
+    """
     from ..config import get_config
+    from ..graph.cache import hash_file
 
     docs_dir = root_dir / get_config().docs_dir
     if not docs_dir.is_dir():
         return {}
-    fingerprints: dict[str, tuple[int, int]] = {}
+    fingerprints: dict[str, Fingerprint] = {}
     for path in sorted(docs_dir.rglob("*.md")):
         try:
             rel_parts = path.relative_to(docs_dir).parts
@@ -722,7 +781,18 @@ def _vault_file_fingerprints(root_dir: Path) -> dict[str, tuple[int, int]]:
             rel = str(path)
         try:
             stat = path.stat()
-            fingerprints[rel] = (stat.st_size, stat.st_mtime_ns)
+            size, mtime_ns = stat.st_size, stat.st_mtime_ns
+            prior = previous.get(rel) if previous else None
+            racy = boundary_ns is None or mtime_ns >= boundary_ns
+            if (
+                prior is not None
+                and not racy
+                and (prior[0], prior[1]) == (size, mtime_ns)
+            ):
+                content_hash = prior[2]
+            else:
+                content_hash = hash_file(path)
+            fingerprints[rel] = (size, mtime_ns, content_hash)
         except OSError:
             continue
     return fingerprints
@@ -732,9 +802,45 @@ def _is_fingerprint_excluded_dir(part: str) -> bool:
     return part.startswith(".") or part in _FINGERPRINT_EXCLUDED_DIR_NAMES
 
 
+def _repair_boundary_ns(root_dir: Path) -> int | None:
+    """Return a filesystem-quantized "now", the racily-clean hash boundary.
+
+    Stats a throwaway sentinel file instead of reading the wall clock so
+    the boundary passes through the exact same mtime quantization as every
+    document mtime it is later compared against - the same reasoning
+    :func:`vaultspec_core.graph.cache.validate` applies to a cache file's
+    own mtime. On a coarse-grained filesystem an unquantized wall-clock
+    reading can floor to a tick *earlier* than a real write that happened
+    after it was taken, which would silently defeat the guard; routing
+    both sides through an identical stat call cannot.
+
+    Args:
+        root_dir: Project root directory to probe alongside.
+
+    Returns:
+        The sentinel's ``st_mtime_ns``, or ``None`` when the probe cannot
+        be created - callers treat that as "every file is racy", which is
+        sound (falls back to always hashing) rather than unsound.
+    """
+    try:
+        probe = tempfile.TemporaryDirectory(
+            prefix=".vaultspec-repair-boundary-",
+            dir=root_dir,
+        )
+    except OSError:
+        return None
+    with probe as probe_dir_name:
+        marker = pathlib.Path(probe_dir_name) / "boundary.tmp"
+        try:
+            marker.write_text("boundary", encoding="utf-8")
+            return marker.stat().st_mtime_ns
+        except OSError:
+            return None
+
+
 def _changed_files(
-    before: dict[str, tuple[int, int]],
-    after: dict[str, tuple[int, int]],
+    before: dict[str, Fingerprint],
+    after: dict[str, Fingerprint],
 ) -> list[str]:
     paths = sorted(set(before) | set(after))
     return [path for path in paths if before.get(path) != after.get(path)]

@@ -16,11 +16,10 @@ owes.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 from typer.testing import CliRunner
 
+from vaultspec_core.builtins import builtins_root
 from vaultspec_core.cli import app
 from vaultspec_core.tests.cli.reference_contract import (
     GLOBAL_FLAGS,
@@ -33,8 +32,11 @@ from vaultspec_core.tests.cli.reference_contract import (
 pytestmark = [pytest.mark.integration]
 
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]
-_REFERENCE = _REPO_ROOT / "src" / "vaultspec_core" / "builtins" / "reference" / "cli.md"
+# The bundled reference ships inside the distributed package alongside the
+# other builtins, so it is addressed through the package's own accessor rather
+# than by walking out to a repository root that exists only in a checkout.
+_BUILTINS_ROOT = builtins_root()
+_REFERENCE = _BUILTINS_ROOT / "reference" / "cli.md"
 
 
 def test_reference_exists() -> None:
@@ -57,7 +59,7 @@ def test_every_cli_command_is_in_reference() -> None:
 
     assert not missing, (
         "The following CLI commands are registered in code but not mentioned "
-        f"in {_REFERENCE.relative_to(_REPO_ROOT)}:\n  - "
+        f"in {_REFERENCE.relative_to(_BUILTINS_ROOT)}:\n  - "
         + "\n  - ".join(sorted(missing))
     )
 
@@ -78,7 +80,7 @@ def test_every_cli_option_is_in_reference() -> None:
 
     assert not missing, (
         "The following CLI options appear in `--help` but are not mentioned "
-        f"anywhere in {_REFERENCE.relative_to(_REPO_ROOT)}:\n  - "
+        f"anywhere in {_REFERENCE.relative_to(_BUILTINS_ROOT)}:\n  - "
         + "\n  - ".join(sorted(missing))
     )
 
@@ -120,6 +122,6 @@ def test_p03_surfaced_tokens_are_in_reference() -> None:
     missing = sorted(t for t in _P03_REQUIRED_TOKENS if t not in reference_text)
     assert not missing, (
         "The following tokens the P03 reference update documented are no longer "
-        f"present in {_REFERENCE.relative_to(_REPO_ROOT)}:\n  - "
+        f"present in {_REFERENCE.relative_to(_BUILTINS_ROOT)}:\n  - "
         + "\n  - ".join(missing)
     )

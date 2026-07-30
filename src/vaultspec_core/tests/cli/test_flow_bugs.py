@@ -966,8 +966,8 @@ class TestStructureRenameUpdatesRefs:
         from vaultspec_core.vaultcore.checks._base import (
             CheckResult,
         )
-        from vaultspec_core.vaultcore.checks.structure import (
-            _rewrite_incoming_refs,
+        from vaultspec_core.vaultcore.rename_ops import (
+            rewrite_incoming_refs,
         )
 
         vault = tmp_path / ".vault"
@@ -987,7 +987,7 @@ class TestStructureRenameUpdatesRefs:
         )
 
         result = CheckResult(check_name="structure", supports_fix=True)
-        _rewrite_incoming_refs(tmp_path, [("alpha", "beta"), ("beta", "gamma")], result)
+        rewrite_incoming_refs(tmp_path, [("alpha", "beta"), ("beta", "gamma")], result)
 
         written = backref.read_text(encoding="utf-8")
         assert "[[gamma]]" in written
@@ -1005,8 +1005,8 @@ class TestStructureRenameUpdatesRefs:
     def test_rewrite_preserves_trailing_yaml_comment(self, tmp_path: Path) -> None:
         """A ``related:`` entry with a trailing YAML comment must be rewritten."""
         from vaultspec_core.vaultcore.checks._base import CheckResult
-        from vaultspec_core.vaultcore.checks.structure import (
-            _rewrite_incoming_refs,
+        from vaultspec_core.vaultcore.rename_ops import (
+            rewrite_incoming_refs,
         )
 
         vault = tmp_path / ".vault"
@@ -1026,7 +1026,7 @@ class TestStructureRenameUpdatesRefs:
         )
 
         result = CheckResult(check_name="structure", supports_fix=True)
-        _rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
+        rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
 
         written = backref.read_text(encoding="utf-8")
         assert '"[[beta]]"' in written
@@ -1043,8 +1043,8 @@ class TestStructureRenameUpdatesRefs:
         not assume column-zero anchoring.
         """
         from vaultspec_core.vaultcore.checks._base import CheckResult
-        from vaultspec_core.vaultcore.checks.structure import (
-            _rewrite_incoming_refs,
+        from vaultspec_core.vaultcore.rename_ops import (
+            rewrite_incoming_refs,
         )
 
         vault = tmp_path / ".vault"
@@ -1065,7 +1065,7 @@ class TestStructureRenameUpdatesRefs:
         )
 
         result = CheckResult(check_name="structure", supports_fix=True)
-        _rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
+        rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
 
         written = backref.read_text(encoding="utf-8")
         assert '"[[beta]]"' in written
@@ -1078,8 +1078,10 @@ class TestStructureRenameUpdatesRefs:
             CheckResult,
             Severity,
         )
-        from vaultspec_core.vaultcore.checks.structure import _rewrite_incoming_refs
-        from vaultspec_core.vaultcore.rename_ops import _FRONTMATTER_LINE_BUDGET
+        from vaultspec_core.vaultcore.rename_ops import (
+            _FRONTMATTER_LINE_BUDGET,
+            rewrite_incoming_refs,
+        )
 
         vault = tmp_path / ".vault"
         adr_dir = vault / "adr"
@@ -1095,7 +1097,7 @@ class TestStructureRenameUpdatesRefs:
         )
 
         result = CheckResult(check_name="structure", supports_fix=True)
-        _rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
+        rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
 
         warnings = [d for d in result.diagnostics if d.severity == Severity.WARNING]
         assert any("Frontmatter exceeds" in d.message for d in warnings), (
@@ -1106,8 +1108,8 @@ class TestStructureRenameUpdatesRefs:
         """Wiki-links with ``#anchor`` or ``|alias`` must rewrite the stem
         only, leaving the anchor/alias intact."""
         from vaultspec_core.vaultcore.checks._base import CheckResult
-        from vaultspec_core.vaultcore.checks.structure import (
-            _rewrite_incoming_refs,
+        from vaultspec_core.vaultcore.rename_ops import (
+            rewrite_incoming_refs,
         )
 
         vault = tmp_path / ".vault"
@@ -1129,7 +1131,7 @@ class TestStructureRenameUpdatesRefs:
         )
 
         result = CheckResult(check_name="structure", supports_fix=True)
-        _rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
+        rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
 
         written = backref.read_text(encoding="utf-8")
         assert "[[beta#section-one]]" in written
@@ -1142,8 +1144,8 @@ class TestStructureRenameUpdatesRefs:
         """When a rewrite would produce a duplicate ``related:`` entry
         the duplicate line must be dropped, not written twice."""
         from vaultspec_core.vaultcore.checks._base import CheckResult
-        from vaultspec_core.vaultcore.checks.structure import (
-            _rewrite_incoming_refs,
+        from vaultspec_core.vaultcore.rename_ops import (
+            rewrite_incoming_refs,
         )
 
         vault = tmp_path / ".vault"
@@ -1165,7 +1167,7 @@ class TestStructureRenameUpdatesRefs:
 
         result = CheckResult(check_name="structure", supports_fix=True)
         # Both alpha and beta collapse onto gamma: alpha -> beta, beta -> gamma.
-        _rewrite_incoming_refs(tmp_path, [("alpha", "beta"), ("beta", "gamma")], result)
+        rewrite_incoming_refs(tmp_path, [("alpha", "beta"), ("beta", "gamma")], result)
 
         written = backref.read_text(encoding="utf-8")
         # Only one [[gamma]] line should remain.
@@ -1282,8 +1284,8 @@ class TestStructureRenameUpdatesRefs:
         rewritten - those dirs hold internal state and log output.
         """
         from vaultspec_core.vaultcore.checks._base import CheckResult
-        from vaultspec_core.vaultcore.checks.structure import (
-            _rewrite_incoming_refs,
+        from vaultspec_core.vaultcore.rename_ops import (
+            rewrite_incoming_refs,
         )
 
         vault = tmp_path / ".vault"
@@ -1308,7 +1310,7 @@ class TestStructureRenameUpdatesRefs:
         logs_doc.write_text(original, encoding="utf-8")
 
         result = CheckResult(check_name="structure", supports_fix=True)
-        _rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
+        rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
 
         assert data_doc.read_text(encoding="utf-8") == original, (
             ".vault/data/ docs must not be mutated"
@@ -1323,8 +1325,8 @@ class TestStructureRenameUpdatesRefs:
         must still hit the rename map when only the case differs.
         """
         from vaultspec_core.vaultcore.checks._base import CheckResult
-        from vaultspec_core.vaultcore.checks.structure import (
-            _rewrite_incoming_refs,
+        from vaultspec_core.vaultcore.rename_ops import (
+            rewrite_incoming_refs,
         )
 
         vault = tmp_path / ".vault"
@@ -1345,7 +1347,7 @@ class TestStructureRenameUpdatesRefs:
 
         # rename_map key is the lowercase on-disk stem.
         result = CheckResult(check_name="structure", supports_fix=True)
-        _rewrite_incoming_refs(tmp_path, [("my-doc", "your-doc")], result)
+        rewrite_incoming_refs(tmp_path, [("my-doc", "your-doc")], result)
 
         written = backref.read_text(encoding="utf-8")
         assert "[[your-doc]]" in written, (
@@ -1364,8 +1366,8 @@ class TestStructureRenameUpdatesRefs:
         deterministic, intent-preserving behaviour.
         """
         from vaultspec_core.vaultcore.checks._base import CheckResult
-        from vaultspec_core.vaultcore.checks.structure import (
-            _rewrite_incoming_refs,
+        from vaultspec_core.vaultcore.rename_ops import (
+            rewrite_incoming_refs,
         )
 
         vault = tmp_path / ".vault"
@@ -1386,7 +1388,7 @@ class TestStructureRenameUpdatesRefs:
 
         # Both an exact-case and a lowercase entry in the rename_map.
         result = CheckResult(check_name="structure", supports_fix=True)
-        _rewrite_incoming_refs(
+        rewrite_incoming_refs(
             tmp_path,
             [("My-Doc", "exact-target"), ("my-doc", "lowercase-target")],
             result,
@@ -1401,8 +1403,8 @@ class TestStructureRenameUpdatesRefs:
         be rewritten - they hold editor state, not vault content.
         """
         from vaultspec_core.vaultcore.checks._base import CheckResult
-        from vaultspec_core.vaultcore.checks.structure import (
-            _rewrite_incoming_refs,
+        from vaultspec_core.vaultcore.rename_ops import (
+            rewrite_incoming_refs,
         )
 
         vault = tmp_path / ".vault"
@@ -1427,7 +1429,7 @@ class TestStructureRenameUpdatesRefs:
         trash_doc.write_text(original, encoding="utf-8")
 
         result = CheckResult(check_name="structure", supports_fix=True)
-        _rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
+        rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
 
         assert obsidian_doc.read_text(encoding="utf-8") == original, (
             ".obsidian/ docs must not be mutated"
@@ -1440,8 +1442,8 @@ class TestStructureRenameUpdatesRefs:
     def test_rewrite_skips_three_node_rename_cycle(self, tmp_path: Path) -> None:
         """A 3-cycle (A -> B -> C -> A) must be detected and dropped."""
         from vaultspec_core.vaultcore.checks._base import CheckResult
-        from vaultspec_core.vaultcore.checks.structure import (
-            _rewrite_incoming_refs,
+        from vaultspec_core.vaultcore.rename_ops import (
+            rewrite_incoming_refs,
         )
 
         vault = tmp_path / ".vault"
@@ -1461,7 +1463,7 @@ class TestStructureRenameUpdatesRefs:
         backref.write_text(original, encoding="utf-8")
 
         result = CheckResult(check_name="structure", supports_fix=True)
-        _rewrite_incoming_refs(
+        rewrite_incoming_refs(
             tmp_path,
             [("alpha", "beta"), ("beta", "gamma"), ("gamma", "alpha")],
             result,
@@ -1476,8 +1478,8 @@ class TestStructureRenameUpdatesRefs:
     def test_rewrite_skips_rename_cycles(self, tmp_path: Path) -> None:
         """A 2-cycle in raw_map must not produce phantom self-rewrites."""
         from vaultspec_core.vaultcore.checks._base import CheckResult
-        from vaultspec_core.vaultcore.checks.structure import (
-            _rewrite_incoming_refs,
+        from vaultspec_core.vaultcore.rename_ops import (
+            rewrite_incoming_refs,
         )
 
         vault = tmp_path / ".vault"
@@ -1497,7 +1499,7 @@ class TestStructureRenameUpdatesRefs:
         backref.write_text(original, encoding="utf-8")
 
         result = CheckResult(check_name="structure", supports_fix=True)
-        _rewrite_incoming_refs(tmp_path, [("alpha", "beta"), ("beta", "alpha")], result)
+        rewrite_incoming_refs(tmp_path, [("alpha", "beta"), ("beta", "alpha")], result)
 
         # Cycle resolution must drop both entries; file must be unchanged.
         assert backref.read_text(encoding="utf-8") == original

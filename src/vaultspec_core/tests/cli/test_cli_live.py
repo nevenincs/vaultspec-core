@@ -17,13 +17,13 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 import pytest
 from typer.testing import CliRunner, Result
 
 from vaultspec_core.cli import app
+from vaultspec_core.vaultcore import vault_today
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -774,7 +774,7 @@ class TestVaultAdd:
             "#hash-feat",
         )
         assert result.exit_code == 0
-        date_str = datetime.now().strftime("%Y-%m-%d")
+        date_str = vault_today().isoformat()
         expected = synthetic_project / ".vault" / "adr" / f"{date_str}-hash-feat-adr.md"
         assert expected.exists()
 
@@ -971,11 +971,15 @@ class TestVaultFeature:
         )
         assert res_b.exit_code == 0
 
-        # Find the files:
+        # Identify the two documents by the feature segment their filenames
+        # already carry, not by mtime order. Both were scaffolded back to back,
+        # so an `st_mtime` sort is only as reliable as the filesystem's
+        # timestamp granularity - two seconds on FAT, one second on many
+        # network filesystems - and a same-tick pair sorts arbitrarily, which
+        # would silently swap the two documents and assert the wrong linkage.
         adr_dir = synthetic_project / ".vault" / "adr"
-        files = sorted(adr_dir.glob("*.md"), key=lambda p: p.stat().st_mtime)
-        doc_b_path = files[-1]
-        doc_a_path = files[-2]
+        doc_a_path = next(adr_dir.glob("*-feature-a-adr.md"))
+        doc_b_path = next(adr_dir.glob("*-feature-b-adr.md"))
 
         # Add cross-feature link from doc-b to doc-a
         new_content = f"""---

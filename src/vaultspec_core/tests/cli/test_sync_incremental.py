@@ -39,16 +39,27 @@ class TestIncrementalRules:
         assert not dest.exists()
 
     def test_idempotent_resync(self, synthetic_project: Path) -> None:
-        """Syncing with no changes doesn't update files."""
+        """Syncing with no changes doesn't update files.
+
+        Asserted on the recorded classification rather than on the
+        destination's timestamp alone. An ``st_mtime`` comparison cannot
+        distinguish "was not rewritten" from "was rewritten inside a single
+        mtime tick", and that window is real: ``st_mtime_ns`` is
+        nanosecond-typed but filesystem-limited, to two seconds on FAT and
+        one second on many network filesystems. A test whose assertion can
+        be satisfied by the bug it guards against is not a guard, so the
+        timestamp is kept only as corroboration.
+        """
         rule_src = synthetic_project / ".vaultspec" / "rules" / "stable.md"
         rule_src.write_text("---\nname: stable\n---\n\nBody", encoding="utf-8")
         rules_sync()
         dest = synthetic_project / ".claude" / "rules" / "stable.md"
-        mtime1 = dest.stat().st_mtime
+        mtime1_ns = dest.stat().st_mtime_ns
 
-        rules_sync()
-        mtime2 = dest.stat().st_mtime
-        assert mtime1 == mtime2
+        result = rules_sync()
+
+        assert (str(dest).replace("\\", "/"), "[UNCHANGED]") in result.items
+        assert dest.stat().st_mtime_ns == mtime1_ns
 
     def test_cross_destination_consistency(self, synthetic_project: Path) -> None:
         """Rules are synced to all available tool destinations."""
@@ -120,21 +131,26 @@ class TestIncrementalSystem:
         assert "# Base v2" in gemini_sys.read_text(encoding="utf-8")
 
     def test_system_idempotent(self, synthetic_project: Path) -> None:
-        """Syncing system twice with no changes produces identical output."""
+        """Syncing system twice with no changes produces identical output.
+
+        Asserted on the recorded classification, for the same reason as
+        :meth:`TestIncrementalRules.test_idempotent_resync`. The previous
+        form slept 0.1s to open a detectable timestamp gap, which cannot
+        work: the sleep is shorter than the one- and two-second timestamp
+        granularity of the filesystems where a same-tick rewrite is actually
+        possible, so it bought no guarantee and only slowed the suite.
+        """
         (synthetic_project / ".vaultspec" / "system" / "base.md").write_text(
             "---\n---\n\n# Stable base", encoding="utf-8"
         )
         system_sync(force=True)
         gemini_sys = synthetic_project / ".gemini" / "SYSTEM.md"
-        mtime1 = gemini_sys.stat().st_mtime
+        mtime1_ns = gemini_sys.stat().st_mtime_ns
 
-        import time
+        result = system_sync(force=True)
 
-        time.sleep(0.1)
-
-        system_sync(force=True)
-        mtime2 = gemini_sys.stat().st_mtime
-        assert mtime1 == mtime2
+        assert (str(gemini_sys).replace("\\", "/"), "[UNCHANGED]") in result.items
+        assert gemini_sys.stat().st_mtime_ns == mtime1_ns
 
 
 class TestIncrementalConfig:

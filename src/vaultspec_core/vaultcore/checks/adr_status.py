@@ -18,14 +18,13 @@ Surfaces, all as warnings so the suite never hard-fails an existing corpus:
 
 from __future__ import annotations
 
-import datetime as _dt
 import logging
 import re
 from typing import TYPE_CHECKING
 
 from ...core.enums import AdrStatus
 from ...core.helpers import atomic_write
-from ..models import refresh_modified_stamp
+from ..models import refresh_modified_stamp, vault_today
 from ._base import CheckDiagnostic, CheckResult, Severity
 
 if TYPE_CHECKING:
@@ -117,7 +116,7 @@ def _normalize_h1_quote(doc_path: Path, token: str) -> bool:
     # The quoting rewrite is a content mutation, so refresh the recency stamp in
     # the same pass (mirroring adr_supersede); the helper preserves the line
     # ending convention, so apply it before reapplying CRLF below.
-    rendered = refresh_modified_stamp(rendered, _dt.date.today())
+    rendered = refresh_modified_stamp(rendered, vault_today())
     new_content = rendered if newline == "\n" else rendered.replace("\n", newline)
     bak = doc_path.with_suffix(doc_path.suffix + ".bak")
     bak.write_bytes(raw_bytes)

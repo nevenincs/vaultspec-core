@@ -229,7 +229,7 @@ class GeminiBuiltinTool(StrEnum):
     ``Invalid tool name`` errors at agent load time.
 
     Drift is guarded at test time by the live source-pin test
-    (``tests/cli/test_agents_render.py::TestUpstreamGeminiToolPin``),
+    (``src/vaultspec_core/tests/cli/test_agents_render.py::TestUpstreamGeminiToolPin``),
     which fetches ``base-declarations.ts`` from the upstream main
     branch and asserts every enum value matches the upstream constant.
     """

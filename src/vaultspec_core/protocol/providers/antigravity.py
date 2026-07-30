@@ -10,7 +10,7 @@ reference-only and is never emitted into synced artifacts.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 if TYPE_CHECKING:
     import pathlib
@@ -36,6 +36,7 @@ class AntigravityProvider(ExecutionProvider):
     """
 
     @property
+    @override
     def name(self) -> str:
         """Return the provider identifier string.
 
@@ -45,6 +46,7 @@ class AntigravityProvider(ExecutionProvider):
         return "antigravity"
 
     @property
+    @override
     def models(self) -> ModelRegistry:
         """Return the Antigravity reference model registry.
 
@@ -54,7 +56,8 @@ class AntigravityProvider(ExecutionProvider):
         """
         return AntigravityModels
 
-    def load_system_prompt(self, root_dir: pathlib.Path) -> str:  # noqa: ARG002
+    @override
+    def load_system_prompt(self, root_dir: pathlib.Path) -> str:
         """Return an empty string; Antigravity has no dedicated system file.
 
         Args:
@@ -66,6 +69,7 @@ class AntigravityProvider(ExecutionProvider):
         """
         return ""
 
+    @override
     def load_rules(self, root_dir: pathlib.Path) -> str:
         """Load and inline-resolve rules from ``.agents/rules/``.
 

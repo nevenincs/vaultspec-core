@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from dev.runner import Ref
-from dev.toolchain import DEFAULTS, VERBS, find_verb, public_targets
+from dev.toolchain import DEFAULTS, VERBS, Verb, find_verb, public_targets
 
 pytestmark = pytest.mark.unit
 
@@ -39,7 +39,7 @@ DELIBERATELY_MANUAL = {
 
 
 @pytest.mark.parametrize("verb", VERBS, ids=lambda verb: verb.name)
-def test_every_reference_resolves(verb) -> None:
+def test_every_reference_resolves(verb: Verb) -> None:
     """Each aggregate target references a target that exists in its verb."""
     for target in verb.targets:
         for step in target.steps:
@@ -53,12 +53,14 @@ def test_every_reference_resolves(verb) -> None:
 def test_every_test_lane_is_reachable_from_an_aggregate_or_ci() -> None:
     """No test lane may be runnable only by someone naming it from memory.
 
-    This guards a defect that actually shipped. The ``repo`` lane - which runs
+    This guards a defect that actually shipped. The ``repo`` lane - which ran
     the repository-root ``tests/`` tree holding the automation contracts and
     the test-suite-quality guards - was in neither ``test all`` nor any CI job.
     Its own registry description said so. The doubles guard inside that tree
     had consequently been failing undetected: a guard nothing runs is not a
-    guard.
+    guard. Both the lane and the tree are gone now - those guards live in
+    ``dev/guards`` and are collected by the ``harness`` lane, which CI does
+    run - but the check below is what keeps the next lane from repeating it.
 
     A lane is considered reachable when ``test all`` references it, a CI
     workflow step invokes it by name, or it is named in
@@ -93,14 +95,14 @@ def test_every_test_lane_is_reachable_from_an_aggregate_or_ci() -> None:
 
 
 @pytest.mark.parametrize("verb", VERBS, ids=lambda verb: verb.name)
-def test_no_duplicate_target_names(verb) -> None:
+def test_no_duplicate_target_names(verb: Verb) -> None:
     """A verb never defines the same target token twice."""
     names = verb.target_names()
     assert len(names) == len(set(names)), f"{verb.name} has duplicate targets: {names}"
 
 
 @pytest.mark.parametrize("verb", VERBS, ids=lambda verb: verb.name)
-def test_targets_are_documented_and_executable(verb) -> None:
+def test_targets_are_documented_and_executable(verb: Verb) -> None:
     """Every target carries a summary for `help` and at least one step."""
     for target in verb.targets:
         assert target.summary.strip(), f"{verb.name}.{target.name} has no summary"
@@ -108,7 +110,7 @@ def test_targets_are_documented_and_executable(verb) -> None:
 
 
 @pytest.mark.parametrize("verb", VERBS, ids=lambda verb: verb.name)
-def test_default_target_exists(verb) -> None:
+def test_default_target_exists(verb: Verb) -> None:
     """Each verb declares a default target, and that target is defined."""
     assert verb.name in DEFAULTS, f"{verb.name} has no entry in DEFAULTS"
     default = DEFAULTS[verb.name]
@@ -118,7 +120,7 @@ def test_default_target_exists(verb) -> None:
 
 
 @pytest.mark.parametrize("verb", VERBS, ids=lambda verb: verb.name)
-def test_references_terminate(verb) -> None:
+def test_references_terminate(verb: Verb) -> None:
     """No aggregate target can reach itself, directly or transitively."""
 
     def walk(name: str, seen: frozenset[str]) -> None:

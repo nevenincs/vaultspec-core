@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 import typer
 
 if TYPE_CHECKING:
+    from vaultspec_core.core.enums import Tool
     from vaultspec_core.core.types import SyncResult
 
 from vaultspec_core.cli._errors import handle_error as _handle_error
@@ -107,7 +108,7 @@ def apply_provider_filter(provider: str) -> None:
 
     from vaultspec_core.core.commands import SYNC_PROVIDERS
     from vaultspec_core.core.manifest import read_manifest
-    from vaultspec_core.core.types import Tool, get_context, set_context
+    from vaultspec_core.core.types import get_context, set_context
 
     if provider not in SYNC_PROVIDERS:
         typer.echo(

@@ -74,9 +74,11 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "CACHE_SCHEMA",
+    "Fingerprint",
     "GraphCachePayload",
     "cache_path",
     "fingerprint_vault",
+    "hash_file",
     "load",
     "save",
     "validate",
@@ -139,8 +141,13 @@ def cache_path(root_dir: Path) -> Path:
     return docs_dir / "data" / ".graph-cache" / "graph.json"
 
 
-def _hash_file(path: Path) -> str:
+def hash_file(path: Path) -> str:
     """Return the hex SHA-256 of *path*'s bytes.
+
+    Shared with :mod:`vaultspec_core.vaultcore.repair`, which fingerprints
+    ``.vault/`` documents with the same ``(st_size, st_mtime_ns,
+    sha256_hex)`` primitive and the same racily-clean reuse rule this
+    module documents above, so the two fingerprint concepts stay one.
 
     Args:
         path: File to hash.
@@ -197,7 +204,7 @@ def fingerprint_vault(
         except OSError:
             continue
         try:
-            content_hash = _hash_file(path)
+            content_hash = hash_file(path)
         except OSError:
             continue
         manifest[_manifest_key(path, root_dir)] = (
@@ -259,7 +266,7 @@ def validate(
         racy = cache_mtime_ns is None or stat.st_mtime_ns >= cache_mtime_ns
         if deep or racy:
             try:
-                if _hash_file(path) != content_hash:
+                if hash_file(path) != content_hash:
                     return False
             except OSError:
                 return False

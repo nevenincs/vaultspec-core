@@ -50,9 +50,9 @@ def _filter_stale_features(
     """
     import datetime as _dt
 
-    from vaultspec_core.vaultcore.models import parse_lenient_date
+    from vaultspec_core.vaultcore.models import parse_lenient_date, vault_today
 
-    cutoff = _dt.date.today() - _dt.timedelta(days=stale_days)
+    cutoff = vault_today() - _dt.timedelta(days=stale_days)
     stale: list[FeatureDetail] = []
     for feature in features:
         parsed = parse_lenient_date(feature.get("latest_activity"))

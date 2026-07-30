@@ -6,14 +6,13 @@ Covers vault add, vault stats, vault check, etc.
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from vaultspec_core.cli import app
 
-from ...vaultcore import DocType
+from ...vaultcore import DocType, vault_today
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -69,7 +68,7 @@ class TestAddSubcommand:
     def test_add_generates_correct_filename(
         self, runner: CliRunner, synthetic_project: Path
     ):
-        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
+        date_str = vault_today().isoformat()
 
         # Cleanup potential leftover from previous failed tests
         expected_path = (
@@ -98,7 +97,7 @@ class TestAddSubcommand:
     def test_add_topic_infix_generates_disambiguated_filename(
         self, runner: CliRunner, synthetic_project: Path
     ):
-        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
+        date_str = vault_today().isoformat()
         expected_path = (
             synthetic_project
             / ".vault"
@@ -171,7 +170,7 @@ class TestAddSubcommand:
         self, runner: CliRunner, synthetic_project: Path
     ):
         """Creating with #feature should strip the hash."""
-        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
+        date_str = vault_today().isoformat()
 
         expected_path = (
             synthetic_project / ".vault" / "adr" / f"{date_str}-my-feat-adr.md"
@@ -293,7 +292,7 @@ class TestAddSubcommand:
         """Created documents must pass the project's own frontmatter validation."""
         from vaultspec_core.vaultcore.parser import parse_vault_metadata
 
-        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
+        date_str = vault_today().isoformat()
         expected_path = (
             synthetic_project
             / ".vault"
@@ -330,7 +329,7 @@ class TestAddSubcommand:
         self, runner: CliRunner, synthetic_project: Path
     ):
         """Hydration must not strip agent-facing template instructions."""
-        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
+        date_str = vault_today().isoformat()
         expected_path = (
             synthetic_project
             / ".vault"

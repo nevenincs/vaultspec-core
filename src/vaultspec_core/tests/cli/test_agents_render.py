@@ -15,11 +15,11 @@ import shutil
 import subprocess
 import tomllib
 import urllib.request
-from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from vaultspec_core.builtins import builtins_root
 from vaultspec_core.core.agents import (
     _CLAUDE_TO_GEMINI_TOOLS,
     _render_claude_agent,
@@ -32,11 +32,16 @@ from vaultspec_core.core.agents import (
 from vaultspec_core.core.enums import GeminiBuiltinTool, Tool
 from vaultspec_core.vaultcore import parse_frontmatter
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 pytestmark = [pytest.mark.unit]
 
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]
-_AGENTS_SRC = _REPO_ROOT / "src" / "vaultspec_core" / "builtins" / "agents"
+# The shipped source agents are a sibling of the renderer under test and live
+# inside the distributed package, so they are addressed through the package's
+# own accessor rather than by walking out to a repository root.
+_AGENTS_SRC = builtins_root() / "agents"
 _GEMINI_TOOL_SET = frozenset(t.value for t in GeminiBuiltinTool)
 
 # URL of the upstream gemini-cli source file that defines the canonical

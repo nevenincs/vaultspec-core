@@ -217,11 +217,14 @@ jobs:
       - name: Run development harness guards
         run: just test harness
 
-      # The repository-root tests/ tree holds the automation contracts and the
-      # test-suite-quality guards. No CI lane named it until now, and the
-      # doubles guard inside it had been failing unobserved as a result. A
-      # guard nothing runs is not a guard.
-      - name: Run repository automation and suite-quality guards
+      # The repository-health guards - the automation contracts, the packaging
+      # metadata, the shipped templates, the typings/ stubs, the suite-quality
+      # checks. They are selected by the `repo` MARKER rather than by path, so
+      # this step gates them wherever they are filed, including the ones the
+      # package-boundary audit is still finding inside src/. It exists because
+      # the equivalent lane once had no CI step at all and the doubles guard
+      # inside it failed unobserved: a guard nothing runs is not a guard.
+      - name: Run repository-health guards
         run: just test repo
 
   broad-tests:

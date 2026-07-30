@@ -192,7 +192,7 @@ jobs:
 
             - Leave `.vault/` alone. It is a development-records corpus, and
               its model mentions are historical records of what was observed.
-            - Leave the Codex transcript fixtures under `tests/statistic/`
+            - Leave the Codex transcript fixtures under `dev/statistics/tests/`
               alone. Those model strings are opaque parser sample data, not
               configuration.
             - Do not commit provider artifacts (`.claude/`, `.codex/`,

@@ -66,11 +66,11 @@ def _build_scan_groups(root_dir: Path) -> list[tuple[str, bool, Path]]:
         return scan_groups
 
     for tool_type, cfg in active_configs.items():
-        if getattr(cfg, "rules_dir", None) and cfg.rules_dir.exists():
+        if cfg.rules_dir and cfg.rules_dir.exists():
             scan_groups.append((f"Rule ({tool_type.value})", False, cfg.rules_dir))
-        if getattr(cfg, "skills_dir", None) and cfg.skills_dir.exists():
+        if cfg.skills_dir and cfg.skills_dir.exists():
             scan_groups.append((f"Skill ({tool_type.value})", True, cfg.skills_dir))
-        if getattr(cfg, "agents_dir", None) and cfg.agents_dir.exists():
+        if cfg.agents_dir and cfg.agents_dir.exists():
             scan_groups.append((f"Agent ({tool_type.value})", False, cfg.agents_dir))
 
     return scan_groups

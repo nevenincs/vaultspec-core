@@ -16,7 +16,6 @@ batch) raise to the protocol ``isError`` layer.
 
 from __future__ import annotations
 
-import datetime
 import logging
 import re
 from typing import TYPE_CHECKING, Any
@@ -26,7 +25,7 @@ from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
 from ...core.types import get_context as _get_ctx
-from ...vaultcore.models import DocType
+from ...vaultcore.models import DocType, vault_today
 from ..isolation import isolated_context as _isolated_context
 from ..results import BatchResult, ItemResult, build_batch, build_item
 
@@ -947,7 +946,7 @@ def register_document_tools(mcp: MCPServer[None]) -> None:
 
         _ = ctx
         root_dir = _get_ctx().target_dir
-        today = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d")
+        today = vault_today().isoformat()
 
         logger.info("create: %d document(s)", len(documents))
 

@@ -16,7 +16,6 @@ observable, non-tautological change.
 
 from __future__ import annotations
 
-import datetime
 from typing import TYPE_CHECKING
 
 import pytest
@@ -24,7 +23,7 @@ from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
 from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
-from vaultspec_core.vaultcore import parse_vault_metadata
+from vaultspec_core.vaultcore import parse_vault_metadata, vault_today
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -38,7 +37,14 @@ _CREATED = "2024-03-04"
 
 
 def _today() -> str:
-    return datetime.date.today().isoformat()
+    """Return today's date on the vault's canonical clock.
+
+    Every mutator under test refreshes ``modified:`` via
+    :func:`~vaultspec_core.vaultcore.models.vault_today`, so the
+    expectation here must read the same clock rather than the local one,
+    or the two would drift apart for part of every day.
+    """
+    return vault_today().isoformat()
 
 
 def _run(root: Path, *args: str):

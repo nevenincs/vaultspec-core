@@ -14,7 +14,7 @@ from typing import IO, Any
 class YAMLError(Exception): ...
 
 class YAML:
-    preserve_quotes: bool
+    preserve_quotes: bool | None
     width: int | None
 
     def __init__(

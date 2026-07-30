@@ -14,6 +14,7 @@ from vaultspec_core.config import reset_config
 from vaultspec_core.vaultcore.checks import run_all_checks
 from vaultspec_core.vaultcore.repair import (
     RepairRun,
+    _changed_files,
     _vault_file_fingerprints,
     run_repair_pipeline,
 )
@@ -495,6 +496,101 @@ class TestVaultRepair:
         assert all("/data/" not in path for path in fingerprints)
         assert all("/logs/" not in path for path in fingerprints)
         assert all("_archive" not in path for path in fingerprints)
+
+    def test_fingerprints_detect_same_size_same_tick_content_change(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Size and mtime alone cannot see a fixed-width rewrite.
+
+        Rewriting the ``modified: 'yyyy-mm-dd'`` frontmatter stamp - the
+        single most common repair-pipeline mutation - never changes
+        ``st_size``, since the canonical value is always a 12-byte quoted
+        date. If that rewrite also lands within the same mtime tick as the
+        prior stat (ordinary on this project's own NTFS volume under a
+        fast successive-write loop, not just a theoretical FAT/exFAT
+        concern), a ``(size, mtime_ns)``-only fingerprint cannot
+        distinguish the rewritten file from the original. Force the
+        collision deterministically with ``os.utime`` rather than racing
+        the clock.
+        """
+        root = tmp_path / "dummy-repo"
+        root.mkdir()
+        doc = _write_doc(root, "research", "2026-05-15-collision", "collision")
+        frozen_ns = 1_700_000_000_123_456_700
+        os.utime(doc, ns=(frozen_ns, frozen_ns))
+
+        before = _vault_file_fingerprints(root)
+
+        content = doc.read_text(encoding="utf-8")
+        rewritten = content.replace("date: '2026-05-15'", "date: '2026-05-16'")
+        assert len(rewritten) == len(content), "the rewrite must stay same-size"
+        doc.write_text(rewritten, encoding="utf-8")
+        os.utime(doc, ns=(frozen_ns, frozen_ns))
+
+        after = _vault_file_fingerprints(root)
+
+        rel = ".vault/research/2026-05-15-collision-research.md"
+        assert before[rel][0] == after[rel][0], "size must collide for this repro"
+        assert before[rel][1] == after[rel][1], "mtime must collide for this repro"
+        assert before[rel] != after[rel], "the content hash must still tell them apart"
+        assert rel in _changed_files(before, after)
+
+    def test_fingerprints_reuse_prior_hash_when_not_racy(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """A file older than the racy boundary trusts its prior hash.
+
+        Full-hashing every document on every fingerprint capture is too
+        expensive to pay several times per repair run (measured ~600ms
+        for a single pass over this project's own ~1200-document vault),
+        so captures after the first reuse a file's previously-computed
+        hash whenever its ``(size, mtime_ns)`` still matches *and* its
+        mtime is strictly older than the racy boundary. Feed a
+        deliberately wrong prior hash for such a file and confirm it
+        passes through unrecomputed - proving the reuse path actually
+        fires rather than merely producing an output indistinguishable
+        from a fresh hash.
+        """
+        root = tmp_path / "dummy-repo"
+        root.mkdir()
+        doc = _write_doc(root, "research", "2026-05-15-reuse", "reuse")
+        rel = ".vault/research/2026-05-15-reuse-research.md"
+        stat = doc.stat()
+        boundary_ns = stat.st_mtime_ns + 1
+        previous = {rel: (stat.st_size, stat.st_mtime_ns, "deliberately-wrong-hash")}
+
+        fingerprints = _vault_file_fingerprints(
+            root, previous=previous, boundary_ns=boundary_ns
+        )
+
+        assert fingerprints[rel][2] == "deliberately-wrong-hash"
+
+    def test_fingerprints_rehash_when_racy(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """A file at or after the racy boundary is always freshly hashed.
+
+        The counterpart to the reuse test: a file whose mtime is not
+        strictly older than the boundary might have been rewritten since
+        *previous* was captured, so its hash must never be trusted from
+        *previous* even when ``(size, mtime_ns)`` still matches.
+        """
+        root = tmp_path / "dummy-repo"
+        root.mkdir()
+        doc = _write_doc(root, "research", "2026-05-15-racy", "racy")
+        rel = ".vault/research/2026-05-15-racy-research.md"
+        stat = doc.stat()
+        boundary_ns = stat.st_mtime_ns
+        previous = {rel: (stat.st_size, stat.st_mtime_ns, "deliberately-wrong-hash")}
+
+        fingerprints = _vault_file_fingerprints(
+            root, previous=previous, boundary_ns=boundary_ns
+        )
+
+        assert fingerprints[rel][2] != "deliberately-wrong-hash"
 
     def test_repair_dry_run_journal_matches_planned_mutation_classes(
         self,

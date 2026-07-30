@@ -137,11 +137,9 @@ def save_plan_or_dry_run(
     outcome. The text and JSON surfaces describe the same mutation, so they
     cannot drift.
     """
-    import datetime as _dt
-
     from vaultspec_core.plan.serialiser import serialise_plan
     from vaultspec_core.plan.write_guard import guard_plan_write
-    from vaultspec_core.vaultcore import refresh_modified_stamp
+    from vaultspec_core.vaultcore import refresh_modified_stamp, vault_today
 
     new_text = serialise_plan(plan, canonicalise=canonicalise)
 
@@ -150,7 +148,7 @@ def save_plan_or_dry_run(
     # before the diff is built so a dry-run preview stays truthful (the
     # stamp change is visible) and before the write so the persisted file
     # carries it. A pure dry-run still writes nothing.
-    new_text = refresh_modified_stamp(new_text, _dt.date.today())
+    new_text = refresh_modified_stamp(new_text, vault_today())
 
     # Integrity guards shared with the MCP plan tools (issues #150 and #125):
     # refuse any write that retires an active identifier outside the expected

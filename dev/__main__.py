@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import sys
 import textwrap
+from typing import assert_never
 
 from dev.runner import Cmd, Echo, Ref, ToolOrDocker, run, run_tool_or_docker
 from dev.toolchain import (
@@ -76,26 +77,26 @@ def _execute(verb: Verb, target: Target) -> int:
     """
     worst = 0
     for step in target.steps:
-        if isinstance(step, Echo):
-            print(f"\n{step.text}", flush=True)
-            continue
-        if isinstance(step, Ref):
-            referenced = verb.find(step.target)
-            if referenced is None:
-                print(
-                    f"internal error: {verb.name} references undefined target "
-                    f"'{step.target}'",
-                    file=sys.stderr,
-                )
-                return 1
-            code = _execute(verb, referenced)
-        elif isinstance(step, ToolOrDocker):
-            code = run_tool_or_docker(step)
-        elif isinstance(step, Cmd):
-            code = run(step.argv, step.env)
-        else:
-            print(f"internal error: unknown step {step!r}", file=sys.stderr)
-            return 1
+        match step:
+            case Echo():
+                print(f"\n{step.text}", flush=True)
+                continue
+            case Ref():
+                referenced = verb.find(step.target)
+                if referenced is None:
+                    print(
+                        f"internal error: {verb.name} references undefined target "
+                        f"'{step.target}'",
+                        file=sys.stderr,
+                    )
+                    return 1
+                code = _execute(verb, referenced)
+            case ToolOrDocker():
+                code = run_tool_or_docker(step)
+            case Cmd():
+                code = run(step.argv, step.env)
+            case _:
+                assert_never(step)
 
         if code != 0:
             worst = code

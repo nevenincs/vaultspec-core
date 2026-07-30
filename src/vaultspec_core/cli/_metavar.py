@@ -22,7 +22,7 @@ same function, so the live CLI and every generated document cannot diverge.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from typer.core import TyperArgument
 
@@ -81,6 +81,7 @@ class CanonicalTyperArgument(TyperArgument):
     one grammar rather than a per-surface variant.
     """
 
+    @override
     def make_metavar(self, ctx: ClickContext | None = None, **_kwargs: Any) -> str:
         """Return the canonical metavar token for this argument.
 

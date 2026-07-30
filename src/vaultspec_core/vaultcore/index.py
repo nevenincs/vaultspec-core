@@ -9,8 +9,9 @@ tag and links to them via ``related:`` frontmatter.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+
+from .models import vault_today
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -57,7 +58,7 @@ def generate_feature_index(
     docs_dir = root_dir / cfg.docs_dir
     index_dir = docs_dir / cfg.index_dir
     index_path = index_dir / f"{feature}.index.md"
-    date = date_str or datetime.now(UTC).strftime("%Y-%m-%d")
+    date = date_str or vault_today().isoformat()
 
     # Build related links from all feature nodes (excluding self)
     related_links: list[str] = []

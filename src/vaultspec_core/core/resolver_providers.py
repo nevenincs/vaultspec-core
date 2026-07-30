@@ -9,6 +9,7 @@ group evaluated once per configured provider.
 from __future__ import annotations
 
 import logging
+from typing import assert_never
 
 from .diagnosis.signals import (
     ConfigSignal,
@@ -316,5 +317,8 @@ def resolve_config(
         return
 
     # Config resolution only applies to "sync" action; other actions handled
-    # by the main command directly.  All ConfigSignal values covered above.
-    logger.warning("Unknown ConfigSignal member: %s (action=%s)", signal, action)
+    # by the main command directly. Every ConfigSignal member is covered by
+    # a branch above, so this is a check-time exhaustiveness guarantee, not
+    # a runtime fallback: adding a member without a matching branch here is
+    # now a type error rather than a silent warning.
+    assert_never(signal)

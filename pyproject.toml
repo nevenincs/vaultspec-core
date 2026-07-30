@@ -82,7 +82,7 @@ dev = [
   # measures. Configured from [tool.complexipy] below.
   "complexipy>=6.2",
   "deptry>=0.25.1",
-  # Sole consumer is `scripts/dependency_audit.py`, which posts the locked
+  # Sole consumer is `dev/audit/dependency_audit.py`, which posts the locked
   # package set to the OSV querybatch API. Declared here rather than relied on
   # transitively: `mcp@2.0.0` moved to `httpx2`, so nothing in the runtime tree
   # pulls httpx any more.
@@ -116,6 +116,13 @@ dev = [
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
+# Tests cohabit with the source they exercise, which puts them inside the
+# distributed package tree. They are development artifacts and must never ship:
+# a test that walks to a repository root, or writes scratch beside the source it
+# imports, is meaningless once installed and hostile to the installing user's
+# filesystem. The exclusion is what keeps the cohabitation convention honest -
+# without it, co-locating a test silently publishes it.
+exclude = ["**/tests", "**/tests/**"]
 packages = ["src/vaultspec_core"]
 
 [tool.pytest.ini_options]
@@ -125,11 +132,27 @@ log_cli = true
 log_cli_date_format = "%H:%M:%S"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s: %(message)s"
 log_cli_level = "INFO"
-log_file = "test-debug.log"
+# The debug trail a failing run leaves behind. It lives under `.pytest-tmp/`
+# rather than the repository root so a test run cannot dirty the root: the
+# `.pytest*/` line in .gitignore already covers the directory, and pytest
+# creates missing parent directories for `log_file` itself (verified by
+# deleting the directory and running the suite), so no bootstrap step is
+# needed.
+log_file = ".pytest-tmp/test-debug.log"
 log_file_level = "DEBUG"
 markers = [
   "api: API-level tests covering stable public analysis surfaces",
   "unit: fast tests with no external dependencies",
+  # The counterpart population to every marker around it. Those select a slice
+  # of the tests OF THE LIBRARY - by speed, by kind, by what they need
+  # installed. This one names a different subject entirely: a test that asserts
+  # something about the checkout it is running inside rather than about
+  # `vaultspec_core`. Such a test legitimately needs a repository root, is
+  # meaningless outside a source tree, and must never be swept into a library
+  # lane. The marker is what makes that distinction selectable, rather than
+  # leaving it implied by whichever directory a file happens to sit in - which
+  # is how the two populations got confused in the first place.
+  "repo: asserts a fact about this checkout, not about the shipped library",
   "integration: requires CLI tools and network",
   "network: requires live network access (upstream drift guards); excluded from gating suites",
   "gemini: requires Gemini CLI installed",
@@ -142,15 +165,28 @@ markers = [
 # `dev` is listed for the same reason `src` is: the harness backend has its own
 # in-package test suite, and omitting the tree here meant a bare `pytest`
 # collected none of it. The suite was still gated - `just test harness` and the
-# CI step that runs it name `dev/tests` explicitly - but the default invocation
+# CI step that runs it name the tree explicitly - but the default invocation
 # and the gate disagreed about what the suite is, which is exactly how a lane
 # goes unobserved.
 #
-# `scripts` is listed on the same reasoning: the maintainer entry points there
-# (the release binary build, the dependency-audit gate, the two README asset
-# renderers) now carry a cohabiting `scripts/tests` package, and nothing
-# collected it before this entry existed.
-testpaths = ["dev", "scripts", "src", "tests"]
+# One `dev` entry now covers every instrument that lives there - the release
+# binary build, the dependency-audit gate, the code-health report, the
+# transcript analytics - each carrying a cohabiting `tests` package inside its
+# own sub-package, so collection follows the tree rather than a list that has to
+# be extended by hand whenever an instrument is added. `docs` is here for the
+# one instrument that lives outside `dev`: the asset renderers in
+# `docs/_render/`, which sit with the `docs/assets/` output they write.
+#
+# The same `dev` entry also collects `dev/guards`, the repository-wide contract
+# guards. Those have no module to cohabit with - their subject is this
+# checkout's own committed configuration - so they used to live in a
+# repository-root `tests/` tree with its own collection root and its own test
+# lane. The root is gone; the guards now ride the tree that already runs.
+#
+# These are the same two trees `INSTRUMENT_PATHS` in dev/toolchain.py names, so
+# the default `pytest` invocation and the `test harness` gate cannot disagree
+# about what the instrument suite is.
+testpaths = ["dev", "docs", "src"]
 timeout = 300
 timeout_func_only = true
 
@@ -242,7 +278,7 @@ target-version = "py313"
     "src/vaultspec_core/mcp_server/tools/gateway.py" = ["TC002"]
     # Pydantic resolves field annotations from module globals at model-build time,
     # so the CallRecord field types must stay runtime imports, not TYPE_CHECKING.
-    "statistic/normalize/models.py" = ["TC001", "TC003"]
+    "dev/statistics/normalize/models.py" = ["TC001", "TC003"]
 
     [tool.ruff.lint.isort]
     known-first-party = ["vaultspec_core"]
@@ -257,12 +293,19 @@ target-version = "py313"
 python-version = "3.13"
 root = [".", "src"]
 
-# Strict-mode type checking. The burndown reached zero across every tracked
-# Python tree (src, tests, dev, statistic, scripts, tools), so this is a
-# gating check: `just lint type-strict` is in the `lint all` chain. `ty`
-# stays the fast pre-commit gate.
+# Strict-mode type checking, gating: `just lint type-strict` is in the `lint
+# all` chain, and `ty` stays the fast pre-commit gate.
+#
+# `include` names every tree that carries tracked Python. It is deliberately
+# NOT a claim that the burndown is finished - run the gate and read its own
+# summary line for that. The list changed when the development tooling was
+# consolidated: `statistic`, `scripts` and `tools` are gone as top-level trees,
+# `dev` absorbed the instruments they held, and `docs` entered because the
+# asset renderers in `docs/_render/` live with the output they write. `tests`
+# left last, when the repository-wide contract guards it still held moved to
+# `dev/guards` and the repository root was emptied of Python entirely.
 [tool.basedpyright]
-include = ["src", "tests", "dev", "statistic", "scripts", "tools"]
+include = ["src", "dev", "docs"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 
@@ -332,33 +375,142 @@ reportInvalidCast = "error"
   reportPrivateUsage = false
   root = "src/vaultspec_core/tests"
 
-  # The repository-root test tree gets the same exemption for a DIFFERENT
-  # reason, which is why it is a second entry rather than a widened root. The
-  # in-package tree above reaches into this project's own internals. This one
-  # mostly reaches into THIRD-PARTY internals it has no authority over:
-  # `_windows_temp_compat.py` mirrors pytest's private `TempPathFactory`
-  # attributes to work around a Windows ACL bug, and there is no upstream
-  # symbol to promote.
-  #
-  # The exemption was granted only after every site was read and classified.
-  # 18 of 21 were genuine whitebox; the tail was FIXED rather than covered -
-  # a redundant flag assertion in the logging tests, and an MCP budget test
-  # that reached past `list_tools()` into the SDK's private tool manager and
-  # was, as a result, asserting against a differently-shaped object than the
-  # one real clients receive. Keep that order: fix what can be fixed, then
-  # exempt what remains. An exemption extended by habit is how a gate stops
-  # meaning anything.
+  # `src/vaultspec_core/vaultcore/tests` is a SEPARATE entry rather than a
+  # widened `root` above, because `root` matches by literal directory prefix
+  # only - no glob, no wildcard. `"src/vaultspec_core/**/tests"` was tested
+  # directly against this tree: it matched nothing, and basedpyright raised
+  # no complaint about the root being unmatched, so a glob "fix" here would
+  # look correct while checking nothing. This directory reaches into its own
+  # module's internals for the same reason the block above does.
+  # `test_basedpyright_private_usage_exemption_covers_every_tests_directory`
+  # in dev/guards/test_automation_contracts.py fails loudly if another
+  # in-package `tests/` directory starts doing the same without a matching entry
+  # here, rather than it silently losing the exemption it needs.
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/vaultcore/tests"
 
-  # `extraPaths` is load-bearing, not boilerplate. An executionEnvironment's
-  # `root` also becomes its import-resolution base, so without the project
-  # root restored here, `tests/statistic/*` and `tests/conftest.py` stop
-  # resolving `statistic` and friends. Everything downstream then degrades to
-  # Unknown and the tree reports hundreds of phantom errors that are really
-  # one broken import path.
+  # There was a third entry here, rooted at the repository's own `tests/` tree,
+  # exempted for a DIFFERENT reason than the two above: the in-package trees
+  # reach into this project's internals, whereas that one reached into
+  # THIRD-PARTY internals it had no authority over - `_windows_temp_compat.py`
+  # mirrored pytest's private `TempPathFactory` attributes to work around a
+  # Windows ACL bug, and there was no upstream symbol to promote. It carried an
+  # `extraPaths = ["."]` of its own, because an executionEnvironment's `root` is
+  # also its import-resolution base and the tree's `from tests.<module> import`
+  # lines stopped resolving without the project root restored.
+  #
+  # Both the tree and the shim are gone. The repository-wide guards it held now
+  # live in `dev/guards`, reach into nobody's internals, and resolve their
+  # imports through the ordinary project root, so they need neither the
+  # exemption nor the extra path. The classification order that produced the
+  # original entry is still the one to follow if a tree ever needs an exemption
+  # again: read every site, FIX what can be fixed, and exempt only the
+  # remainder. An exemption extended by habit is how a gate stops meaning
+  # anything.
+
+  # Every remaining submodule that co-locates a `tests/` package beside the code
+  # it exercises, one literal entry each for the prefix-matching reason given
+  # above. These are mechanical: the guard named in that comment derives the
+  # required set by walking every tree in `include` above for directories named
+  # `tests`, so this list is exactly what it demands and adding a co-located
+  # suite without its entry fails there rather than in the gate.
+  #
+  # `dev/guards` is the one `include`d directory holding tests that is NOT a
+  # co-located suite and so never appears in that set: its subject is this
+  # checkout's own committed configuration rather than a neighbouring module, so
+  # it has no internals to reach into and needs no exemption. An exemption
+  # granted before anything needs it is how a gate stops meaning anything; if
+  # those guards ever do go whitebox, the gate will say so and an entry can be
+  # added then, with the reason recorded.
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/config/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/core/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/graph/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/hooks/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/mcp_server/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/metrics/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/migrations/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/protocol/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/testing/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/vaultcore/checks/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/verification/tests"
+
+  # The instrument trees co-locate their tests under the same convention, so
+  # they carry the same exemption. `dev/guards` is the exception that proves
+  # the rule and needs no entry: its subject is this checkout's own committed
+  # configuration rather than a neighbouring module, so it has no internals to
+  # reach into.
+  #
+  # Each one needs `extraPaths` for the reason documented above: a `root` is
+  # also the import-resolution base, and these suites import their subject by
+  # its fully-qualified name (`dev.audit.dependency_audit`, `dev.health`, and
+  # so on), which only resolves with the project root on the path. The
+  # in-package entries above need no such line because `src` is already a
+  # resolution root. Omitting it here does not fail loudly - it degrades every
+  # import to Unknown and reports several hundred phantom errors that are
+  # really one broken path.
   [[tool.basedpyright.executionEnvironments]]
   extraPaths = ["."]
   reportPrivateUsage = false
-  root = "tests"
+  root = "dev/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  extraPaths = ["."]
+  reportPrivateUsage = false
+  root = "dev/audit/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  extraPaths = ["."]
+  reportPrivateUsage = false
+  root = "dev/binaries/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  extraPaths = ["."]
+  reportPrivateUsage = false
+  root = "dev/health/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  extraPaths = ["."]
+  reportPrivateUsage = false
+  root = "dev/statistics/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  extraPaths = ["."]
+  reportPrivateUsage = false
+  root = "docs/_render/tests"
 
 # Cognitive complexity - how much state a reader must hold to follow a
 # function, as distinct from the number of paths through it that `xenon`
@@ -535,7 +687,7 @@ known_first_party = ["vaultspec_core"]
   # the SDK to `httpx2`, so httpx stopped being a transitive of the runtime tree
   # entirely and the declaration was pinning a floor on a package nothing
   # installed or imported. Its only first-party import is the unshipped
-  # `scripts/dependency_audit.py`, so it moved to the `dev` dependency group.
+  # `dev/audit/dependency_audit.py`, so it moved to the `dev` dependency group.
   #
   # The remaining names are the legacy `[project.optional-dependencies] dev`
   # extra, which duplicates the PEP 735 `dev` dependency group below it. They

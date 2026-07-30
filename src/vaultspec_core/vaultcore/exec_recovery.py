@@ -9,7 +9,6 @@ authored body bytes, and use atomic filesystem operations.
 
 from __future__ import annotations
 
-import datetime as dt
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -21,7 +20,7 @@ from ..core.helpers import advisory_lock, atomic_write_bytes
 from ..plan.commands.step_ops import find_step
 from ..plan.parser import Plan, parse_plan
 from .checks.exec_mapping import link_stem
-from .models import refresh_modified_stamp
+from .models import refresh_modified_stamp, vault_today
 from .parser import parse_vault_metadata
 from .rename_engine import assert_within, docs_lock_target
 from .rename_ops import split_keepends
@@ -391,5 +390,5 @@ def _normalise_metadata_newlines(text: str) -> str:
 
 
 def _write_stamped(path: Path, text: str) -> None:
-    stamped = refresh_modified_stamp(text, dt.date.today())
+    stamped = refresh_modified_stamp(text, vault_today())
     atomic_write_bytes(path, stamped.encode("utf-8"))
