@@ -519,6 +519,7 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
             "just deps sync",
             "just lint python",
             "just lint type",
+            "just lint type-platforms",
             "just lint toml",
             "just lint links",
             "just lint markdown",

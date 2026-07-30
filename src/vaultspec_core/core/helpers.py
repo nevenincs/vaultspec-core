@@ -57,7 +57,17 @@ def _acquire_windows_lock(fd: int) -> None:
 
     Args:
         fd: Open file descriptor of the ``.lock`` sibling file.
+
+    Raises:
+        RuntimeError: If called off Windows. The sole caller reaches this
+            only inside a ``sys.platform == "win32"`` branch, so the guard
+            is unreachable in practice; it is what lets a type checker
+            resolve the Windows-only ``msvcrt`` surface below when
+            checking against a non-Windows platform.
     """
+    if sys.platform != "win32":
+        raise RuntimeError("_acquire_windows_lock is a Windows-only helper")
+
     import msvcrt
 
     while True:

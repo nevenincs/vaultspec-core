@@ -207,6 +207,30 @@ LINT = Verb(
             "Ty type checking.",
             (uv_run("python", "-m", "ty", "check", *PYTHON_PATHS),),
         ),
+        # `type` above checks whichever platform it runs on, so a Windows
+        # contributor's green is not Linux's green: this repository carries
+        # both `msvcrt`/`ctypes.WinDLL` and `fcntl` paths, and a
+        # platform-specific attribute resolves on one OS and not the other.
+        # CI runs Linux, so unguarded Windows-only code passed every local
+        # gate and failed only after push - the exact "green here, red
+        # there" split a gate exists to prevent. Checking all three targets
+        # makes the local run reproduce CI regardless of the host.
+        Target(
+            "type-platforms",
+            "Ty type checking against every target platform.",
+            tuple(
+                uv_run(
+                    "python",
+                    "-m",
+                    "ty",
+                    "check",
+                    "--python-platform",
+                    plat,
+                    *PYTHON_PATHS,
+                )
+                for plat in ("linux", "darwin", "win32")
+            ),
+        ),
         Target(
             "toml",
             "Taplo TOML linting.",
@@ -307,6 +331,7 @@ LINT = Verb(
                 for name in (
                     "python",
                     "type",
+                    "type-platforms",
                     "toml",
                     "links",
                     "markdown",

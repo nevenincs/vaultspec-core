@@ -119,6 +119,15 @@ jobs:
       - name: Ty
         run: just lint type
 
+      # This job runs Linux, so `just lint type` above only ever proves the
+      # Linux view. The tree carries both Windows (`msvcrt`, `ctypes.WinDLL`)
+      # and POSIX (`fcntl`) branches, so a contributor on either OS can be
+      # green locally while the other platform is broken. Checking all three
+      # targets here means CI and a local run agree regardless of host.
+      - name: Ty (all target platforms)
+        if: always()
+        run: just lint type-platforms
+
       - name: Taplo
         run: just lint toml
 

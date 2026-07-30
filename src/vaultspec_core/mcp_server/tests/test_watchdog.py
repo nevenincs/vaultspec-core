@@ -121,6 +121,9 @@ def _wait_for_pid_exit(pid: int, timeout: float) -> bool:
         ``True`` when the process exited within *timeout* seconds (or was
         already gone), ``False`` when it is still alive at the deadline.
     """
+    if sys.platform != "win32":
+        return _wait_for_posix_pid_exit(pid, timeout)
+
     import ctypes
 
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
