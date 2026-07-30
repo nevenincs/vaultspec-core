@@ -3,7 +3,7 @@ tags:
   - '#plan'
   - '#dev-scaffolding-parity'
 date: '2026-07-28'
-modified: '2026-07-28'
+modified: '2026-07-30'
 tier: L3
 related:
   - '[[2026-07-28-dev-scaffolding-parity-adr]]'
@@ -59,15 +59,15 @@ Annotate the codebase until basedpyright strict reports zero, then promote the d
 
 Clear the 7950 errors concentrated in the five reportUnknown/reportMissing rules.
 
-- [ ] `W03.P05.S12` - Annotate the parameters the missing-parameter-type rule reports; `src/vaultspec_core`.
-- [ ] `W03.P05.S13` - Resolve the unknown member argument variable and parameter type errors; `src/vaultspec_core`.
+- [x] `W03.P05.S12` - Annotate the parameters the missing-parameter-type rule reports; `src/vaultspec_core`.
+- [x] `W03.P05.S13` - Resolve the unknown member argument variable and parameter type errors; `src/vaultspec_core`.
 
 ### Phase `W03.P06` - promote strict typing to a gate
 
 Resolve the residual tail, including the genuine possibly-unbound findings, then make the dimension gating.
 
-- [ ] `W03.P06.S14` - Resolve the possibly-unbound and attribute-access findings which can denote real defects; `src/vaultspec_core`.
-- [ ] `W03.P06.S15` - Promote strict typing to a gate by removing its continue-on-error key; `.github/workflows/ci.yml`.
+- [x] `W03.P06.S14` - Resolve the possibly-unbound and attribute-access findings which can denote real defects; `src/vaultspec_core`.
+- [x] `W03.P06.S15` - Promote strict typing to a gate by removing its continue-on-error key; `.github/workflows/ci.yml`.
 
 ## Description
 
