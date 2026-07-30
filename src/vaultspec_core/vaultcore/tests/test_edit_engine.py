@@ -86,7 +86,7 @@ def vault_root() -> Iterator[Path]:
     engine's scanner, resolver, and checkers resolve the target.
     """
     reset_config()
-    root = Path(tempfile.mkdtemp(prefix="vsc-edit-engine-"))
+    root = Path(tempfile.mkdtemp(prefix="vsc-edit-engine-")).resolve()
     try:
         WorkspaceFactory(root).install()
         adr_dir = root / ".vault" / "adr"

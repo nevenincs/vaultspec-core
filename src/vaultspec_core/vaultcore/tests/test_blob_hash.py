@@ -34,7 +34,7 @@ def tmp_dir() -> Iterator[Path]:
     """Yield a real temporary directory, removed on teardown."""
     import shutil
 
-    root = Path(tempfile.mkdtemp(prefix="vsc-blob-hash-"))
+    root = Path(tempfile.mkdtemp(prefix="vsc-blob-hash-")).resolve()
     try:
         yield root
     finally:

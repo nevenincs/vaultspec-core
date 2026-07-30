@@ -63,7 +63,16 @@ class WorkspaceFactory:
     """
 
     def __init__(self, root: Path) -> None:
-        self.root = root
+        # Resolved for the same reason `resolve_effective_target` resolves a
+        # user-supplied `--target`: scaffolding computes provider paths with
+        # `Path.relative_to`, which is a lexical comparison. A `tempfile`
+        # root on a Windows CI runner arrives in 8.3 short form
+        # (`C:\Users\RUNNER~1\...`) while the paths walked under it come back
+        # expanded (`C:\Users\runneradmin\...`), and `relative_to` then
+        # raises even though one really is inside the other. Every real entry
+        # point resolves before building a workspace; a factory that does not
+        # is simply less faithful than the CLI it stands in for.
+        self.root = root.resolve()
         self._installed = False
         self._runner = CliRunner(env={"NO_COLOR": "1"})
 

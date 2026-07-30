@@ -38,7 +38,7 @@ def vault_root() -> Iterator[Path]:
     scan a real vault, and write real files.
     """
     reset_config()
-    root = Path(tempfile.mkdtemp(prefix="vsc-mcp-doc-"))
+    root = Path(tempfile.mkdtemp(prefix="vsc-mcp-doc-")).resolve()
     try:
         WorkspaceFactory(root).install()
         init_paths(root)

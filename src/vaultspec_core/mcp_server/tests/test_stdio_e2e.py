@@ -156,7 +156,7 @@ def test_mcp_stdio_end_to_end_invoke_does_not_inherit_transport_stdin() -> None:
     plugin marker and fails fast on the hard timeout.
     """
     reset_config()
-    project = Path(tempfile.mkdtemp(prefix="vsc-mcp-e2e-"))
+    project = Path(tempfile.mkdtemp(prefix="vsc-mcp-e2e-")).resolve()
     try:
         WorkspaceFactory(project).install()
 

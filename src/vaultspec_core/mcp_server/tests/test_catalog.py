@@ -103,7 +103,7 @@ def test_search_ranks_a_known_verb_for_its_intent(vault_root: Path) -> None:
 
 def test_missing_marker_block_raises(vault_root: Path) -> None:
     """A reference without the generated markers fails loudly, not silently."""
-    bare = Path(tempfile.mkdtemp(prefix="vsc-cat-nomark-"))
+    bare = Path(tempfile.mkdtemp(prefix="vsc-cat-nomark-")).resolve()
     try:
         ref = bare / "cli.md"
         ref.write_text("# CLI reference\n\nNo inventory here.\n", encoding="utf-8")

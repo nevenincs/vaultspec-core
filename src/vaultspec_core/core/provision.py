@@ -191,7 +191,11 @@ def ensure_tool_configs(path: Path) -> None:
     # Bootstrap in a temporary directory to avoid TOCTOU on the real path.
     # Resolve workspace against the temp dir, then re-initialize with the
     # real target so tool_config paths reference the actual workspace.
-    tmp = Path(tempfile.mkdtemp())
+    # Resolved because this temp directory is immediately used AS a workspace
+    # target, and scaffolding derives provider paths with `Path.relative_to`.
+    # On Windows `tempfile` can hand back an 8.3 short path whose children
+    # enumerate in expanded form, which makes that lexical comparison raise.
+    tmp = Path(tempfile.mkdtemp()).resolve()
     try:
         tmp_fw = tmp / ".vaultspec"
         tmp_fw.mkdir(parents=True, exist_ok=True)
