@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from vaultspec_core.plan.frontmatter import (
     PlanFrontmatter,
@@ -195,6 +195,12 @@ _RE_WAVE_HEADING = re.compile(
     r"^## +Wave +`(?P<id>W\d{2,}[a-z]?)` *- *(?P<title>.+?)\s*$",
 )
 _RE_EPIC_INTENT = re.compile(r"^## +Epic intent\s*$")
+#: The section heading that opens a plan's container content. It is a
+#: *structural* token, not authored prose: the serialiser owns it and
+#: re-emits it unconditionally, so the parser consumes it here rather than
+#: buffering it as an unknown block. Buffering it would stack a second copy
+#: on the next round trip.
+_RE_STEPS_HEADING = re.compile(r"^## +Steps\s*$")
 _RE_PHASE_HEADING = re.compile(
     r"^### +Phase +`(?P<path>(?:W\d{2,}[a-z]?\.)?"
     r"P\d{2,}[a-z]?)` *- *(?P<title>.+?)\s*$",
@@ -338,6 +344,76 @@ def _extract_epic_intent(body: str) -> EpicIntent | None:
     return None
 
 
+class _LineTokens(NamedTuple):
+    """Every structural token a single body line may match.
+
+    Matching all six patterns once per line keeps the walk's branches
+    reading against one immutable snapshot, rather than re-running
+    regexes as each branch needs them.
+
+    Attributes:
+        title: The ``# ...`` document title match, if any.
+        wave: The ``## Wave`` heading match, if any.
+        phase: The ``### Phase`` heading match, if any.
+        step: The Step row match, if any.
+        epic_intent: The ``## Epic intent`` heading match, if any.
+        steps_heading: The ``## Steps`` section heading match, if any.
+    """
+
+    title: re.Match[str] | None
+    wave: re.Match[str] | None
+    phase: re.Match[str] | None
+    step: re.Match[str] | None
+    epic_intent: re.Match[str] | None
+    steps_heading: re.Match[str] | None
+
+    def opens_a_structural_block(self) -> bool:
+        """Return whether this line ends an open Epic intent paragraph.
+
+        The Epic intent runs until the next structural token. ``## Steps``
+        counts: a document that carries the section heading below its Epic
+        intent would otherwise have the heading, and every line after it,
+        swallowed into the intent text.
+        """
+        return bool(
+            self.title or self.wave or self.phase or self.step or self.steps_heading
+        )
+
+
+def _match_line(line: str) -> _LineTokens:
+    """Return every structural token *line* matches."""
+    return _LineTokens(
+        title=_RE_TITLE.match(line),
+        wave=_RE_WAVE_HEADING.match(line),
+        phase=_RE_PHASE_HEADING.match(line),
+        step=_RE_STEP_ROW.match(line),
+        epic_intent=_RE_EPIC_INTENT.match(line),
+        steps_heading=_RE_STEPS_HEADING.match(line),
+    )
+
+
+def _build_wave(match: re.Match[str], index: int) -> Wave:
+    """Construct a :class:`Wave` from a heading match plus its line number."""
+    return Wave(
+        canonical_id=match.group("id"),
+        title=match.group("title"),
+        intent="",
+        line_number=index,
+    )
+
+
+def _build_phase(match: re.Match[str], index: int) -> Phase:
+    """Construct a :class:`Phase` from a heading match plus its line number."""
+    path = match.group("path")
+    return Phase(
+        canonical_id=path.split(".")[-1],
+        display_path=path,
+        title=match.group("title"),
+        intent="",
+        line_number=index,
+    )
+
+
 def _walk_body(
     body: str,
 ) -> tuple[list[Wave], list[Phase], list[Step], list[UnknownBlock], bool]:
@@ -370,14 +446,10 @@ def _walk_body(
             buffered_unknown.clear()
 
     for index, line in enumerate(body.splitlines(), start=1):
-        wave_match = _RE_WAVE_HEADING.match(line)
-        phase_match = _RE_PHASE_HEADING.match(line)
-        step_match = _RE_STEP_ROW.match(line)
-        title_match = _RE_TITLE.match(line)
-        epic_intent_match = _RE_EPIC_INTENT.match(line)
+        tokens = _match_line(line)
 
         # 1. H1 Title line
-        if title_match:
+        if tokens.title:
             _flush_unknown("before_title")
             continue
 
@@ -395,7 +467,7 @@ def _walk_body(
             continue
 
         # 4. Epic intent heading
-        if epic_intent_match:
+        if tokens.epic_intent:
             _flush_intent()
             intent_target = None
             _flush_unknown("before_epic_intent")
@@ -403,60 +475,56 @@ def _walk_body(
             continue
 
         if in_epic_intent:
-            if wave_match or phase_match or step_match or title_match:
+            if tokens.opens_a_structural_block():
                 in_epic_intent = False
             else:
                 continue
 
-        # 5. Wave heading
-        if wave_match:
+        # 5. Steps section heading
+        #
+        # Consumed, never buffered: the serialiser owns this heading and
+        # re-emits it, so letting it fall through to ``buffered_unknown``
+        # would duplicate it on every round trip. Dropping it here is safe
+        # precisely because the emission is unconditional.
+        if tokens.steps_heading:
             _flush_intent()
-            wave_id = wave_match.group("id")
-            _flush_unknown(f"before_wave_{wave_id}")
-            current_wave = Wave(
-                canonical_id=wave_id,
-                title=wave_match.group("title"),
-                intent="",
-                line_number=index,
-            )
+            intent_target = None
+            _flush_unknown("before_steps")
+            continue
+
+        # 6. Wave heading
+        if tokens.wave:
+            _flush_intent()
+            current_wave = _build_wave(tokens.wave, index)
+            _flush_unknown(f"before_wave_{current_wave.canonical_id}")
             waves.append(current_wave)
             current_phase = None
             intent_target = current_wave
             continue
 
-        # 6. Phase heading
-        if phase_match:
+        # 7. Phase heading
+        if tokens.phase:
             _flush_intent()
-            path = phase_match.group("path")
-            phase_id = path.split(".")[-1]
-            _flush_unknown(f"before_phase_{phase_id}")
-            current_phase = Phase(
-                canonical_id=phase_id,
-                display_path=path,
-                title=phase_match.group("title"),
-                intent="",
-                line_number=index,
-            )
+            current_phase = _build_phase(tokens.phase, index)
+            _flush_unknown(f"before_phase_{current_phase.canonical_id}")
             phases.append(current_phase)
             if current_wave is not None:
                 current_wave.phases.append(current_phase)
             intent_target = current_phase
             continue
 
-        # 7. Step row
-        if step_match:
+        # 8. Step row
+        if tokens.step:
             _flush_intent()
             intent_target = None
-            path = step_match.group("path")
-            step_id = path.split(".")[-1]
-            _flush_unknown(f"before_step_{step_id}")
-            step = _build_step(step_match, index, line)
+            step = _build_step(tokens.step, index, line)
+            _flush_unknown(f"before_step_{step.canonical_id}")
             steps.append(step)
             if current_phase is not None:
                 current_phase.steps.append(step)
             continue
 
-        # 8. Intent paragraph checking
+        # 9. Intent paragraph checking
         if intent_target is not None:
             stripped = line.strip()
             if (
@@ -470,7 +538,7 @@ def _walk_body(
                 intent_buffer.append(line)
                 continue
 
-        # 9. Fallthrough to unknown buffered lines
+        # 10. Fallthrough to unknown buffered lines
         buffered_unknown.append(line)
 
     _flush_intent()
