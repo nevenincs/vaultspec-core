@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:d3ac7d6cc1fd571ae22361985c43c00b50e94334a400792f79796ce61b1f554d'
 related:
   - '[[2026-02-20-marketing-and-documentation-adr]]'
   - '[[2026-02-20-marketing-and-documentation-p1-plan]]'

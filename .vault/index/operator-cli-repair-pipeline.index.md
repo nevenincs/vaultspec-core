@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:2d078f0f2bd6deb991c286cf81009352051e7f7f271e21179dba35030df7a538'
 related:
   - '[[2026-05-15-operator-cli-repair-pipeline-adr]]'
   - '[[2026-05-15-operator-cli-repair-pipeline-audit]]'

@@ -4,6 +4,7 @@ tags:
   - '#marketing-audit'
 date: '2026-02-18'
 modified: '2026-06-13'
+body_hash: 'sha256:c1805730ae4b40236b807aecf77fd6f604c92083decbd2d6929aeef557ac318b'
 ---
 
 ## Marketing Audit: Packaging & Distribution Readiness

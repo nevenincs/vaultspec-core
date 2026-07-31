@@ -4,6 +4,7 @@ tags:
   - '#firmware-mcp-primacy'
 date: '2026-07-09'
 modified: '2026-07-10'
+body_hash: 'sha256:ed6fe613241768afec9e46e1588020c3409b9308b5a6352fa21d65c6e13bc8d5'
 tier: L2
 related:
   - '[[2026-07-09-firmware-mcp-primacy-adr]]'

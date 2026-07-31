@@ -4,6 +4,7 @@ tags:
   - '#bundled-cli-reference'
 date: '2026-05-18'
 modified: '2026-06-13'
+body_hash: 'sha256:8ea814384eb85c4bc1fea7ef4125682516877d58c4969cece004f553f19658eb'
 tier: L1
 related:
   - '[[2026-05-18-bundled-cli-reference-adr]]'

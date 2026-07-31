@@ -4,6 +4,7 @@ tags:
   - '#discovery-benchmark'
 date: '2026-06-26'
 modified: '2026-06-27'
+body_hash: 'sha256:1c84ca426a7aff1e05a81e17bff3c2c9db6c7b197d7cae6d13843d4fcf126773'
 related:
   - "[[2026-06-26-discovery-benchmark-research]]"
   - '[[2026-06-26-rag-pipeline-enrollment-adr]]'

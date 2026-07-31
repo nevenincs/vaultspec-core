@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:a5c9cd7eb230f733a3f767931bff683589fea50ff7afe07d2d9a4295ca3a7d18'
 related:
   - '[[2026-05-17-cli-blast-radius-gating-adr]]'
   - '[[2026-05-17-cli-blast-radius-gating-research]]'

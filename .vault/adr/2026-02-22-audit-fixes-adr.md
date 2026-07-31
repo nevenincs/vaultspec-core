@@ -4,6 +4,7 @@ tags:
   - '#audit-fixes'
 date: '2026-02-22'
 modified: '2026-06-28'
+body_hash: 'sha256:8741d3766415643186f8a1ef83f2e5592a54e7557ae423864dcf7053fbb4c36f'
 related:
   - '[[2026-02-22-codebase-audit]]'
   - '[[2026-02-22-codebase-audit-research]]'

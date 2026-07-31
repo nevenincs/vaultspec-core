@@ -4,6 +4,7 @@ tags:
   - '#module-exports'
 date: '2026-02-21'
 modified: '2026-06-13'
+body_hash: 'sha256:bf4e2e92abc2885fbafc73e19eb91f350def4f128c0c93fd720c39d4f089d63c'
 related:
   - '[[2026-02-21-module-exports-part1-research]]'
   - '[[2026-02-21-module-exports-part2-research]]'

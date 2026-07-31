@@ -4,6 +4,7 @@ tags:
   - '#mcp-cli-interface'
 date: '2026-03-21'
 modified: '2026-06-13'
+body_hash: 'sha256:186b92ec2a7804be8349ba50d54e95e96a213f2bf87e80edc66e727d229df687'
 related: []
 ---
 

@@ -4,6 +4,7 @@ tags:
   - '#plan-serializer-fixes'
 date: '2026-06-05'
 modified: '2026-06-13'
+body_hash: 'sha256:420fe456ce80dbc39fde4f31f62dc6498b68986f52778e2cdffe693ac19f4d38'
 related:
   - '[[2026-06-05-plan-serializer-fixes-research]]'
 ---

@@ -4,6 +4,7 @@ tags:
   - '#markdown-feature-scope'
 date: '2026-07-27'
 modified: '2026-07-27'
+body_hash: 'sha256:bd021ddc6cecf7a7dd32c9455d12a0acdc9fbe1483bd7c5e913e814d9d573dde'
 related:
   - "[[2026-07-27-markdown-feature-scope-reference]]"
 ---

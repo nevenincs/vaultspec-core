@@ -4,6 +4,7 @@ tags:
   - '#uncategorized'
 date: '2026-02-24'
 modified: '2026-06-13'
+body_hash: 'sha256:f38fd2a1aa627cc2037773bca38da81b8daa1f41a01b6f06f586d9edcb5af940'
 ---
 
 # Scout-Alpha Violation Report

@@ -4,6 +4,7 @@ tags:
   - '#cli-spec-crud-parity'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:cf7eb8d0614ae77029590cc60c47809c91ea06e5a6cc6c664d6b78f8c3c5cfe8'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-spec-crud-parity-research]]'

@@ -4,6 +4,7 @@ tags:
   - '#mcp-installation'
 date: '2026-03-28'
 modified: '2026-06-13'
+body_hash: 'sha256:b0e9e45f6c867a3f2a5e7f9352bea089c1429ee86ced8d41fa64793a7e6129ef'
 related:
   - '[[2026-02-22-mcp-consolidation-research]]'
   - '[[2026-02-22-mcp-testing-research]]'

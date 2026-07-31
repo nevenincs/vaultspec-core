@@ -4,6 +4,7 @@ tags:
   - '#firmware-code-boundary'
 date: '2026-07-16'
 modified: '2026-07-16'
+body_hash: 'sha256:0d35ad184996065d642af9017b2205684306b0e4ffbb3a98d0d560358418b12e'
 related:
   - "[[2026-07-16-firmware-code-boundary-research]]"
   - '[[2026-06-13-commit-linkage-adr]]'

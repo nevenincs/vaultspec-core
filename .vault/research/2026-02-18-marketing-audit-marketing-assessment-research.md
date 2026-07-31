@@ -4,6 +4,7 @@ tags:
   - '#marketing-audit'
 date: '2026-02-18'
 modified: '2026-06-13'
+body_hash: 'sha256:9114ae17d86db38d8263669912b15c85313f3227446b1b04f3e9a33d80a5c919'
 ---
 
 ## Marketing Audit: Consolidated Marketing Assessment

@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:b3b96127230a7783e85f3389628c3cd5654132e19fd5adcc18ce8a74931ae907'
 related:
   - '[[2026-02-22-audit-fixes-adr]]'
   - '[[2026-02-22-audit-fixes-execution-summary-exec]]'

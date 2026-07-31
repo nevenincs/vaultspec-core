@@ -4,6 +4,7 @@ tags:
   - '#mcp-registry'
 date: '2026-04-11'
 modified: '2026-06-13'
+body_hash: 'sha256:d2094d9f0c2ffcfe0c072761f8823cca857792c68bf6f0e9b72e4ae5211db12b'
 related:
   - '[[2026-03-28-mcp-installation-patterns-research]]'
   - '[[2026-02-22-mcp-consolidation-research]]'

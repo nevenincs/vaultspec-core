@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:64ffa16084c64d2cb67058bdcd0c6a0c450c6322d92c486e99adc7204ba42d8c'
 related:
   - '[[2026-07-27-markdown-feature-scope-P01-S03]]'
   - '[[2026-07-27-markdown-feature-scope-P01-summary]]'

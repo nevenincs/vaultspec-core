@@ -4,6 +4,7 @@ tags:
   - '#cli-simplification-ux'
 date: '2026-05-26'
 modified: '2026-06-13'
+body_hash: 'sha256:e6459aaa7cecc2017d14063da04a47ba50b1524b59fbd85bfcc4dbcf50bbd969'
 step_id: S49
 related:
   - '[[2026-05-17-cli-simplification-ux-plan]]'

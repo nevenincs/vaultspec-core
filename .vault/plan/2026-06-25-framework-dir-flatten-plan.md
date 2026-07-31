@@ -4,6 +4,7 @@ tags:
   - '#framework-dir-flatten'
 date: '2026-06-25'
 modified: '2026-06-27'
+body_hash: 'sha256:b5f0a5f1acb0664e25ca885626968b43595aa67afde8bd77be3b129def4bd920'
 tier: L2
 related:
   - '[[2026-06-25-framework-dir-flatten-adr]]'

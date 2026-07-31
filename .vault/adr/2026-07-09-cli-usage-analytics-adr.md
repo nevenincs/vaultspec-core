@@ -4,6 +4,7 @@ tags:
   - '#cli-usage-analytics'
 date: '2026-07-09'
 modified: '2026-07-10'
+body_hash: 'sha256:6e32d30d73f6f0b0a87eba5ebd73490aab0bd5b486c9fe201c03679b6051853c'
 related:
   - "[[2026-07-09-cli-usage-analytics-research]]"
 ---

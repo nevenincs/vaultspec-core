@@ -4,6 +4,7 @@ tags:
   - '#workspace-context'
 date: '2026-03-22'
 modified: '2026-06-13'
+body_hash: 'sha256:e211e5ca97b23edf0e1e3c637f9e2b3d4bef0b3d091783cc6e890754b7b000e9'
 related:
   - '[[2026-03-21-workspace-context-plan]]'
   - '[[2026-03-21-check-engine-perf-plan]]'

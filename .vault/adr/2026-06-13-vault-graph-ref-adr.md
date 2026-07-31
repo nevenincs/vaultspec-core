@@ -4,6 +4,7 @@ tags:
   - '#vault-graph-ref'
 date: '2026-06-13'
 modified: '2026-06-13'
+body_hash: 'sha256:f1510c7a44987558140a07de0635565c810d0edf24851ea81245aa686c2cc2fc'
 related:
   - '[[2026-06-13-vault-graph-ref-research]]'
 ---

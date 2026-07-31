@@ -4,6 +4,7 @@ tags:
   - '#marketing-audit'
 date: '2026-02-18'
 modified: '2026-06-13'
+body_hash: 'sha256:03f411334541f8e7fa751d70530056cf98c7b7411a51dee498f72080316adb5d'
 ---
 
 ## Marketing Audit: Competitor Landscape

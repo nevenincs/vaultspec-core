@@ -4,6 +4,7 @@ tags:
   - '#cli-architecture'
 date: 2026-03-05
 modified: '2026-06-13'
+body_hash: 'sha256:84b36ada02359424535dd4910a9c6a593cc5077c6765b66aa8aa5c4d4915a994'
 related:
 ---
 

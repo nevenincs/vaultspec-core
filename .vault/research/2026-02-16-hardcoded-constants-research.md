@@ -4,6 +4,7 @@ tags:
   - '#framework'
 date: '2026-02-16'
 modified: '2026-06-13'
+body_hash: 'sha256:c4b8f5a9de41c9eaf038c13e3d29aa3c2a2dc0a7d2aaf92bb5f83639b86b7bbd'
 related:
   - '[[2026-02-16-environment-variable-research]]'
 ---

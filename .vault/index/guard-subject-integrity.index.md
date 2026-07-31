@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:e9bd4a4912bd567be68829fcf92d6c59a6557771e084b43fad2e4eb84affd4d3'
 related:
   - '[[2026-07-30-guard-subject-integrity-adr]]'
   - '[[2026-07-30-guard-subject-integrity-research]]'

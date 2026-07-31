@@ -3,7 +3,9 @@ tags:
   - '#plan'
   - '#mcp-testing'
 date: '2026-02-22'
-modified: '2026-06-13'
+modified: '2026-07-31'
+body_hash: 'sha256:a3608b722a90ecd0a0ca02e89917398592a0db0190c98e9e73d9d10ebb0dc76a'
+tier: L2
 related:
   - '[[2026-02-22-mcp-testing-adr]]'
   - '[[2026-02-22-mcp-testing-research]]'
@@ -11,80 +13,29 @@ related:
 
 # `mcp-testing` plan
 
-Add in-memory MCP client session tests using the SDK's
-`create_connected_server_and_client_session` per
-\[[2026-02-22-mcp-testing-adr]\].
+### Phase `P01` - Session fixtures and transport
 
-## Proposed Changes
+Establish in-memory MCP client-session fixtures over the stdio/in-process transport for protocol-level testing.
 
-Create `src/vaultspec/mcp_server/tests/test_client_session.py` — a new test
-file exercising the full MCP protocol stack via in-memory transport. Two
-fixture variants (with and without lifespan). Tests cover handshake, tool
-discovery, resource discovery, tool round-trips, error propagation, and
-concurrency.
+- [x] `P01.S01` - build client-session fixtures over the in-memory MCP transport; `src/vaultspec_core/mcp_server/tests/conftest.py`.
 
-## Tasks
+### Phase `P02` - Protocol handshake and catalog discovery
 
-- Task 1: Create fixtures
+Verify session initialization, capability negotiation, and tool/catalog discovery over the wire.
 
-  1. `client_session` fixture — uses `create_server()` (with lifespan),
-     calls `initialize_server()` first, passes `raise_exceptions=True`
+- [x] `P02.S02` - cover session handshake and tool catalog discovery; `src/vaultspec_core/mcp_server/tests/test_catalog.py`.
+- [x] `P02.S03` - cover tool-surface parity between the registry and the live server; `src/vaultspec_core/mcp_server/tests/test_tool_surface.py`.
 
-  1. `client_session_no_lifespan` fixture — bare `FastMCP` with tools
-     registered but no lifespan, for focused tests
+### Phase `P03` - Hot-tool round-trip coverage
 
-  1. Helper fixtures: `baker_cache`, `fresh_engine` (reuse existing
-     patterns from `test_mcp_protocol.py`)
+Exercise the nine hot-path MCP tools end-to-end through a live client session.
 
-- Task 2: Protocol handshake + discovery tests
+- [x] `P03.S04` - round-trip the orientation, discovery, and plan hot tools through a live session; `src/vaultspec_core/mcp_server/tests/test_orientation_tools.py`.
+- [x] `P03.S05` - round-trip the create, edit, and find hot tools through a live session; `src/vaultspec_core/mcp_server/tests/test_create_tool.py`.
+- [x] `P03.S06` - round-trip the discover/invoke gateway tools through a live session; `src/vaultspec_core/mcp_server/tests/test_gateway.py`.
 
-  1. `TestProtocolHandshake::test_initialize_succeeds` — session connects
-  1. `TestProtocolHandshake::test_capabilities_include_tools` — tools cap
-  1. `TestProtocolHandshake::test_capabilities_include_resources` — resources cap
-  1. `TestToolDiscovery::test_all_15_tools_listed` — count + names
-  1. `TestToolDiscovery::test_tool_schemas_present` — inputSchema on each
-  1. `TestToolDiscovery::test_tool_annotations_present` — annotations set
-  1. `TestResourceDiscovery::test_agent_resources_listed` — agents:// URIs
-  1. `TestResourceDiscovery::test_read_agent_resource` — returns JSON
+### Phase `P04` - Error propagation and concurrency
 
-- Task 3: Subagent tool round-trip tests
+Verify error surfaces for invalid calls and safety under concurrent and isolated sessions.
 
-  1. `TestSubagentToolsRoundTrip::test_list_agents` — call through protocol
-  1. `TestSubagentToolsRoundTrip::test_dispatch_agent` — dispatch + taskId
-  1. `TestSubagentToolsRoundTrip::test_get_task_status` — poll status
-  1. `TestSubagentToolsRoundTrip::test_cancel_task` — cancel a task
-  1. `TestSubagentToolsRoundTrip::test_get_locks` — empty locks list
-
-- Task 4: Team tool round-trip tests
-
-  1. `TestTeamToolsRoundTrip::test_list_teams` — empty list
-  1. `TestTeamToolsRoundTrip::test_list_teams_after_create` — if feasible
-
-- Task 5: Error propagation tests
-
-  1. `TestErrorPropagation::test_unknown_tool_is_error`
-  1. `TestErrorPropagation::test_dispatch_unknown_agent_is_error`
-  1. `TestErrorPropagation::test_get_status_missing_task_is_error`
-  1. `TestErrorPropagation::test_cancel_missing_task_is_error`
-
-- Task 6: Concurrent calls
-
-  1. `TestConcurrentCalls::test_parallel_list_agents` — fire 5 concurrent
-     `list_agents` calls on one session
-
-## Parallelization
-
-Tasks 2-6 are independent test classes that can be written in parallel by
-separate agents. However, they all go in the same file and share fixtures
-from Task 1, so sequential writing is simpler.
-
-Recommended: single executor agent writes the entire file.
-
-## Verification
-
-- `uv run pytest src/vaultspec/mcp_server/tests/test_client_session.py -v`
-  passes all tests
-
-- No Windows async hangs (in-memory transport)
-
-- Existing 105 tests remain unaffected
+- [x] `P04.S07` - verify concurrent and isolated session safety, including context-budget and watchdog behavior; `src/vaultspec_core/mcp_server/tests/test_isolation.py`.

@@ -4,6 +4,7 @@ tags:
   - '#flow-bugs'
 date: '2026-04-21'
 modified: '2026-06-28'
+body_hash: 'sha256:b9fb0c14e73f063d6ac536c0739a09f3806d90825df55cc8c8f137594d91e391'
 related:
   - '[[2026-04-21-flow-bugs-research]]'
   - '[[2026-03-16-managed-content-blocks-adr]]'

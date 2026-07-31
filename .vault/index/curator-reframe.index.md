@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:b132f513c35cbc92ceb04fba5e4cf7eafe1e4324a05270cef11cf457a711fa6d'
 related:
   - '[[2026-06-28-curator-reframe-adr]]'
   - '[[2026-06-28-curator-reframe-audit]]'

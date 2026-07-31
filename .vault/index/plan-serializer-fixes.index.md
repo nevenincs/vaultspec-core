@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:45a71c2f0edeea9c8dbf9df0808de59c275e8ffdd254cb7c4d5067d8b815786f'
 related:
   - '[[2026-06-05-plan-serializer-fixes-adr]]'
   - '[[2026-06-05-plan-serializer-fixes-plan]]'

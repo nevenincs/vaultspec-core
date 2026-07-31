@@ -4,6 +4,7 @@ tags:
   - '#system-prompt-injection'
 date: '2026-02-22'
 modified: '2026-06-13'
+body_hash: 'sha256:213574548364528c609c719200a9381546f7caa91d72e2e9f4a0c57f3630ba23'
 ---
 
 # Research: System Prompt Injection of Skill Skeletons

@@ -4,6 +4,7 @@ tags:
   - '#firmware-code-boundary'
 date: '2026-07-16'
 modified: '2026-07-16'
+body_hash: 'sha256:96c3e056100036f4eba5913f1cd5bd3189fbae2e6ea044083ed7ea56d1294918'
 step_id: 'S02'
 related:
   - "[[2026-07-16-firmware-code-boundary-plan]]"

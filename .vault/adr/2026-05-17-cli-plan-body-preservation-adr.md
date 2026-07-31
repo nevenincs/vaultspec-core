@@ -4,6 +4,7 @@ tags:
   - '#cli-plan-body-preservation'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:a3c6929071f2f2ab407c2c59ee47aa4f1d21bff1034a8f2361c6a0b321a829e9'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-plan-body-preservation-research]]'

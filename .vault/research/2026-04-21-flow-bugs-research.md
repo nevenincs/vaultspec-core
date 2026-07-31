@@ -4,6 +4,7 @@ tags:
   - '#flow-bugs'
 date: '2026-04-21'
 modified: '2026-06-13'
+body_hash: 'sha256:53b535fe2bf44c4b591a9daeb53e12af476fc29be078a229b497a6f27ba3510a'
 related:
   - '[[2026-03-16-managed-content-blocks-adr]]'
   - '[[2026-03-27-cli-ambiguous-states-gitignore-adr]]'

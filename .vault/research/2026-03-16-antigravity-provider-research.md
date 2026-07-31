@@ -4,6 +4,7 @@ tags:
   - '#install-cmds'
 date: '2026-03-16'
 modified: '2026-06-13'
+body_hash: 'sha256:a216542e3a2d2fb7a2a61748dcea78518b9038efe7e4e771d3e462eaa258740d'
 related:
   - '[[2026-03-15-install-cmds-plan]]'
   - '[[2026-03-15-claude-code-provider-research]]'

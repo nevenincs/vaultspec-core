@@ -4,6 +4,7 @@ tags:
   - '#plan-hardening'
 date: '2026-05-05'
 modified: '2026-06-13'
+body_hash: 'sha256:f22e27ca3820389eb50b0a3ada37ec9b69fb6cd38bc5de276f04421ade5235ea'
 related:
   - '[[2026-05-05-plan-hardening-plan]]'
   - '[[2026-05-05-plan-hardening-adr]]'

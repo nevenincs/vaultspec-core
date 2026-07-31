@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:7e025b76526c1bad471fec97a32b1d242b89f0858c992f5db690715c7ea326c4'
 related:
   - '[[2026-02-18-append-system-prompt-adr]]'
   - '[[2026-02-18-system-prompt-architecture-research]]'

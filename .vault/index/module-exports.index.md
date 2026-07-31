@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:7c30622a3764730eb74d17fabeb975a3f98bd5e7a028c038cb6e1926b13efb9c'
 related:
   - '[[2026-02-21-module-exports-adr]]'
   - '[[2026-02-21-module-exports-p1-step07-exec]]'

@@ -4,6 +4,7 @@ tags:
   - '#cli-memory-lifecycle'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:d733daabc8239cd4cbf270b2ae5072ed0198ab432cd2e17387b1a39bcf905805'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---

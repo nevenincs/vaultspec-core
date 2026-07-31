@@ -5,6 +5,7 @@ tags:
 date: '2026-07-27'
 modified: '2026-07-27'
 body_schema: 'body-v1'
+body_hash: 'sha256:9f5b9a2f97d96f2f85444c1d003f60fe3964c4c2eee643aa4f775002324d4324'
 related:
   - "[[2026-07-27-vault-scale-performance-audit]]"
   - '[[2026-06-10-graph-backend-adr]]'

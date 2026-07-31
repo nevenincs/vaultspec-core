@@ -4,6 +4,7 @@ tags:
   - '#workspace-context'
 date: '2026-03-21'
 modified: '2026-06-13'
+body_hash: 'sha256:a2af5505a8f789e25501797e5133a5f1fddbf382ef734a36a5dbcdf2edc413ce'
 related:
   - '[[2026-03-21-workspace-context-research]]'
   - '[[2026-03-21-feature-documentation-code-review-audit]]'

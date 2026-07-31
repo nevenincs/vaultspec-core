@@ -4,6 +4,7 @@ tags:
   - '#prek-boundary-hardening'
 date: '2026-07-23'
 modified: '2026-07-23'
+body_hash: 'sha256:ae4c52cd4fb2724049b669d1bdce1a66b5aa5c5b598953b70f16d4c920546d0f'
 step_id: 'S11'
 related:
   - "[[2026-07-23-prek-boundary-hardening-plan]]"

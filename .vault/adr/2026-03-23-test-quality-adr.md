@@ -4,6 +4,7 @@ tags:
   - '#test-quality'
 date: '2026-03-23'
 modified: '2026-06-25'
+body_hash: 'sha256:046a1518a535026916d1bc7dd4bd219fa0ddefbfdf7556df2494946281f0a87f'
 related:
   - '[[2026-03-23-test-quality-research]]'
 ---

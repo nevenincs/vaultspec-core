@@ -4,6 +4,7 @@ tags:
   - '#code-boundary-check'
 date: '2026-07-16'
 modified: '2026-07-16'
+body_hash: 'sha256:6f0bc47af4ba4c89396e395b8b12b199983a521eb7c413f0ae3501dab8e8395b'
 related:
   - "[[2026-07-16-firmware-code-boundary-adr]]"
   - '[[2026-07-16-firmware-code-boundary-research]]'

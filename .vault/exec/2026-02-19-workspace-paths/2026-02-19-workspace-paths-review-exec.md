@@ -4,6 +4,7 @@ tags:
   - '#workspace-paths'
 date: '2026-02-19'
 modified: '2026-06-13'
+body_hash: 'sha256:40c2950cb059c64cf5826782d6e57a51e99126e9d3ac75272de245fc1517c492'
 related:
   - '[[2026-02-19-workspace-path-decoupling-adr]]'
   - '[[2026-02-19-workspace-paths-implementation-plan]]'

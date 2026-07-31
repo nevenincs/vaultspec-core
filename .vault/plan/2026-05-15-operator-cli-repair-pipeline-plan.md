@@ -4,6 +4,7 @@ tags:
   - '#operator-cli-repair-pipeline'
 date: '2026-05-15'
 modified: '2026-06-13'
+body_hash: 'sha256:75957771db4abdc3172dfb938a7a2726f9b4d7c396f06940cfe0045596c2331d'
 tier: L2
 related:
   - '[[2026-05-15-operator-cli-repair-pipeline-research]]'

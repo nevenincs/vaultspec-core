@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:07d4d3f44a537a5683e233f6a313edf33e55434d344df3b7f595711345033d77'
 related:
   - '[[2026-05-18-bundled-cli-reference-adr]]'
   - '[[2026-05-18-bundled-cli-reference-plan]]'

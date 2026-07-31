@@ -4,6 +4,7 @@ tags:
   - '#diagnosis-surface-parity'
 date: '2026-06-28'
 modified: '2026-06-28'
+body_hash: 'sha256:a7b5e6877bdd9f3f1d398f6b82c97f5b192abdf07a6cb1a81d551a548dfd181b'
 tier: L2
 related:
   - '[[2026-06-28-diagnosis-surface-parity-adr]]'

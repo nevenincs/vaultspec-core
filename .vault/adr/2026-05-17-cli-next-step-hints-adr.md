@@ -4,6 +4,7 @@ tags:
   - '#cli-next-step-hints'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:23d339a754963acee0b54714f54824ad653f22408d8b0d1ad70fdd5bf4c07874'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-next-step-hints-research]]'

@@ -4,6 +4,7 @@ tags:
   - '#cli-presentation-uniformity'
 date: '2026-06-24'
 modified: '2026-06-25'
+body_hash: 'sha256:441f4b7ee05a5d9259793480996ee938be5a26d673900b348d67269ea4425245'
 related: []
 ---
 

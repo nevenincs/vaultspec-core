@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:3f347fee244522374c64a2138dfb2a916d6838be4dbac2db66b0c7641a47bfb0'
 related:
   - '[[2026-06-24-cli-presentation-uniformity-adr]]'
   - '[[2026-06-24-cli-presentation-uniformity-plan]]'

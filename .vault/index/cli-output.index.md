@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:857d581a159e2999837fba7d994b3cd84d1ce19719ce3dfaa0f8d2f5eed41cbc'
 related:
   - '[[2026-02-23-cli-output-architecture-adr]]'
   - '[[2026-02-23-cli-output-architecture-research]]'

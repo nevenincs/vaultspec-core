@@ -10,6 +10,7 @@ related:
 supersedes:
   - '2026-07-16-reference-topic-infix-adr'
 modified: '2026-07-27'
+body_hash: 'sha256:5e4eda33bd4b1ea0af228260e0f64856d26f3d42c1c3e121e3d9dc8d772def51'
 ---
 
 # `adr-topic-infix` adr: `topic-infixed ADR records` | (**status:** `accepted`)

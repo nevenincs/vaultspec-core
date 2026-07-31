@@ -4,6 +4,7 @@ tags:
   - '#firmware-wording-review'
 date: '2026-06-09'
 modified: '2026-06-13'
+body_hash: 'sha256:f324714b71dadf9101af2178653b738bd9b8daca2b894833eb58362b9ad5c568'
 step_id: S07
 related:
   - '[[2026-06-09-firmware-wording-review-plan]]'

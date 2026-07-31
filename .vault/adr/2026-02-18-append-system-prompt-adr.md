@@ -4,6 +4,7 @@ tags:
   - '#system-prompt'
 date: '2026-02-18'
 modified: '2026-06-28'
+body_hash: 'sha256:76590dff509c7f4909ae41659c199d1a037c8d124c5afa3f4665b74a021a9dc5'
 related:
   - '[[2026-02-18-system-prompt-architecture-research]]'
   - '[[2026-02-18-system-prompt-restructure-adr]]'

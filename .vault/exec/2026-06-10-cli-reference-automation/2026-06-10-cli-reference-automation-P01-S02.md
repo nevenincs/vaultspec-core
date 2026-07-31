@@ -4,6 +4,7 @@ tags:
   - '#cli-reference-automation'
 date: '2026-06-10'
 modified: '2026-06-13'
+body_hash: 'sha256:60ee4728742a52babb8ce2fe73d16d8ab04dc72f655e0dda9135aa066d34809c'
 step_id: S02
 related:
   - '[[2026-06-10-cli-reference-automation-plan]]'

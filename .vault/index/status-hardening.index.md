@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:4373177a6e8f06bfc3a8257bee65dcf290bb3fcb1b9eb4f6b7d3603b50741bf9'
 related:
   - '[[2026-06-13-status-hardening-adr]]'
   - '[[2026-06-13-status-hardening-plan]]'

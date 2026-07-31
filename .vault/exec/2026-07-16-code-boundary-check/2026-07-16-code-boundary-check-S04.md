@@ -4,6 +4,7 @@ tags:
   - '#code-boundary-check'
 date: '2026-07-16'
 modified: '2026-07-16'
+body_hash: 'sha256:0c04a1e86d0431f3fb09596b5ec4ddd5b251fe7b42d26254f8e27ec74e8039c9'
 step_id: 'S04'
 related:
   - "[[2026-07-16-code-boundary-check-plan]]"

@@ -4,6 +4,7 @@ tags:
   - '#task-tool-dispatch'
 date: '2026-02-22'
 modified: '2026-06-13'
+body_hash: 'sha256:aca91fb5e9553108b53d01ef5548b73aae839f66fa5704b948263f850c90ca70'
 related:
   - '[[2026-02-22-cli-ecosystem-factoring-research]]'
   - '[[2026-02-22-mcp-consolidation-research]]'

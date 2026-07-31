@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:5dc6e31863b2f8748a8bd361738f7831f95ec278fca275896904c8187aa4c35d'
 related:
   - '[[2026-03-22-graph-hardening-adr]]'
   - '[[2026-03-22-graph-hardening-phase1-audit]]'

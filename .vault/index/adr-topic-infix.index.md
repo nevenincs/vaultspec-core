@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:2bc9b6106c9fc8d97987fc0b1420744301381c9b2487bc442edbafeb63d89c7a'
 related:
   - '[[2026-07-27-adr-topic-infix-P01-S01]]'
   - '[[2026-07-27-adr-topic-infix-P01-S02]]'

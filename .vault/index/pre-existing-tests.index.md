@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:b455574e3246a2d4ab49ff481f4e542d848b27514a3b090c5c6c12663a9344fb'
 related:
   - '[[2026-05-01-pre-existing-tests-adr]]'
   - '[[2026-05-01-pre-existing-tests-plan]]'

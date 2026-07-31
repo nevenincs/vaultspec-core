@@ -4,6 +4,7 @@ tags:
   - '#health-audit'
 date: '2026-02-18'
 modified: '2026-06-13'
+body_hash: 'sha256:497f04501927a6ce04978e503fd441fa2271c3a7509d01e60786bacdd77bca00'
 ---
 
 # Code Health Audit: Data & Functional Modules

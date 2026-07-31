@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:e5b211cabd033156619ad75ca5649c9e4bce6b371e5fc2883b352b47fd60511c'
 related:
   - '[[2026-04-30-vault-index-folder-adr]]'
   - '[[2026-04-30-vault-index-folder-phase1-2-3-exec]]'

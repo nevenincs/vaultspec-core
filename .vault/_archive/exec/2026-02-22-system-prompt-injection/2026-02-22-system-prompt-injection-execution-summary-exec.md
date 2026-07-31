@@ -4,6 +4,7 @@ tags:
   - '#system-prompt-injection'
 date: '2026-02-22'
 modified: '2026-06-13'
+body_hash: 'sha256:3fac307e3df933d6c53140502b44dcfc1a0d19ff9add5157531868bd919cd7c8'
 related:
   - '[[2026-02-22-system-prompt-injection-plan]]'
 ---

@@ -1,15 +1,16 @@
 ---
 tags:
   - '#plan'
-  - '#cli-target-refactor'
+  - '#test-quality'
 date: '2026-03-23'
 modified: '2026-06-13'
+body_hash: 'sha256:e23d283b2bdb2ef4eba9b4c079d8a32726212597a492ca8b13c6a67799797f27'
 related:
-  - '[[2026-03-23-cli-target-refactor-adr]]'
-  - '[[2026-03-23-cli-target-refactor-research]]'
+  - '[[2026-03-23-test-quality-adr]]'
+  - '[[2026-03-23-test-quality-research]]'
 ---
 
-# `cli-target-refactor` `cli target refactor` plan
+# `test-quality` `test quality` plan
 
 Brief description of the proposed feature, change, or refactor.
 

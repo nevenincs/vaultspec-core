@@ -5,6 +5,7 @@ tags:
   - '#index'
 date: '2026-04-21'
 modified: '2026-06-13'
+body_hash: 'sha256:0a4bdc1cc47b535a9b89566cc63aefaaae111df4994af311353beeadc414f95d'
 related:
   - '[[2026-02-22-system-prompt-injection-adr]]'
   - '[[2026-02-22-system-prompt-injection-execution-summary-exec]]'

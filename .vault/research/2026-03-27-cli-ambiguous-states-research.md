@@ -4,6 +4,7 @@ tags:
   - '#cli-ambiguous-states'
 date: '2026-03-27'
 modified: '2026-06-13'
+body_hash: 'sha256:3e7dc658df74b05f09988ce6cdd47e7180c3cc98a3f49c3e408f5fc92f1d12dc'
 related:
   - '[[2026-03-15-install-cmds-capability-audit]]'
   - '[[2026-03-23-cli-test-coverage-research]]'

@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:e653b70c555ce3424e30ba7ba7d64126fd8a9a41382313afc9ade79526636a12'
 related:
   - '[[2026-02-24-scout-beta-report-exec]]'
   - '[[2026-02-24-strict-audit-verdict-exec]]'

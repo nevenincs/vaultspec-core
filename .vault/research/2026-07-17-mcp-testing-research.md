@@ -4,6 +4,7 @@ tags:
   - '#mcp-testing'
 date: '2026-07-17'
 modified: '2026-07-17'
+body_hash: 'sha256:6d9cb39bbf416905cd9aa5ca3d09a3ae7aaf21c515c90d8401895f16194001d3'
 related:
   - "[[2026-02-22-mcp-testing-adr]]"
 ---

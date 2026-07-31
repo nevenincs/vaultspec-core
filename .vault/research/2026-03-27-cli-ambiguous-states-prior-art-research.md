@@ -4,6 +4,7 @@ tags:
   - '#cli-ambiguous-states'
 date: '2026-03-27'
 modified: '2026-06-13'
+body_hash: 'sha256:78fb61f0723d3146456e9b921b482163ff1f333fbecedadf307844b6501336d2'
 related:
   - '[[2026-03-27-cli-ambiguous-states-research]]'
 ---

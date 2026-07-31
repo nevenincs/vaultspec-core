@@ -4,6 +4,7 @@ tags:
   - '#cli-target-refactor'
 date: '2026-03-23'
 modified: '2026-06-25'
+body_hash: 'sha256:35835a094949fad9e9f3096fac0fb2f38fecea7a6616292cdd0e950eef65e063'
 related:
   - '[[2026-03-23-cli-target-refactor-research]]'
 ---

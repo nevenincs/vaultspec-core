@@ -4,6 +4,7 @@ tags:
   - '#install-cmds'
 date: '2026-03-16'
 modified: '2026-06-13'
+body_hash: 'sha256:ad7ea9427fc6af48fb6503dba4fb8b52d26284d2b4e0d3da356fdadcd8515e57'
 related:
   - '[[2026-03-16-managed-content-blocks-research]]'
   - '[[2026-03-15-install-cmds-capability-audit]]'

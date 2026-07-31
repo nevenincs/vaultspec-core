@@ -3,7 +3,9 @@ tags:
   - '#plan'
   - '#roadmap'
 date: '2026-02-17'
-modified: '2026-06-13'
+modified: '2026-07-31'
+body_hash: 'sha256:6d14d4ee7799ea177c9ee79a2029fbb6183cbee19747b5edd4a9b44dabcc33e2'
+tier: L2
 related:
   - '[[2026-02-17-audit-summary-audit]]'
   - '[[2026-02-17-bootstrap-prompt-adr]]'
@@ -12,159 +14,98 @@ related:
 
 # vaultspec Roadmap: Wave-Based Rollout Plan
 
-## Context
+### Phase `P01` - Critical Blocking Bugs
 
-Six Opus agents conducted a comprehensive audit of vaultspec on 2026-02-17, producing 7 interlinked reports in `.vault/audit/`. The audit scored the project **6.6/10 overall** — Technical 9.0, Tests 8.5, UX 3.5, Docs 3.0, Market 7.5, Protocol 8.0. The core thesis: "the engineering is ahead of the competition; the presentation is behind it." This roadmap addresses every finding across all reports, organized into dependency-ordered waves.
+Fix issues that prevent core features from working.
 
-### Audit Discrepancies Resolved
+- [x] `P01.S01` - fix the crash-on-import bug in the agent dispatch entry point; `src/vaultspec_core/core/executor.py`.
+- [ ] `P01.S02` - correct the cli test runner's test discovery path; `src/vaultspec_core/tests`.
+- [ ] `P01.S03` - add skip markers to the a2a end-to-end tests; `src/vaultspec_core/tests`.
+- [x] `P01.S04` - fix the development typo in the framework readme; `docs/README.md`.
 
-1. **AGENTS.md**: `cli.py config sync` already generates AGENTS.md — but in vaultspec's custom format, NOT the agents.md standard. Gap is **format compliance**, not generation.
-1. **Hybrid Search**: Fully implemented (BM25+ANN+RRF in `rag/store.py`). Protocol research was incorrect. **Struck from gap list.**
-1. **subagent.py bug**: Confirmed — missing `from _paths import ROOT_DIR` bootstrap.
+### Phase `P02` - Self-Dogfooding and Credibility
 
-______________________________________________________________________
+Clean up the vault corpus and agent persona content so the project practices what it governs.
 
-## Wave 0: Critical Blocking Bugs
+- [ ] `P02.S05` - fix vault verification errors across the corpus; `.vault`.
+- [x] `P02.S06` - resolve the phantom workflows directory reference; `.claude/workflows`.
+- [ ] `P02.S07` - populate project-specific context for the workspace; `CLAUDE.md`.
+- [x] `P02.S08` - remove stale rust-specific language from agent persona files; `src/vaultspec_core/builtins/agents/vaultspec-adr-researcher.md`.
+- [ ] `P02.S09` - rename the readme template to documentation-standards; `src/vaultspec_core/builtins/templates`.
 
-**Scope**: Fix issues that prevent core features from working.
-**Effort**: Hours.
-**Sources**: 01-ux-simulation.md S3.3, S7; 03-test-verification.md Failures 1-5
+### Phase `P03` - Onboarding Documentation
 
-| #   | Item                            | File(s)                  | Fix                                                               |
-| --- | ------------------------------- | ------------------------ | ----------------------------------------------------------------- |
-| 0.1 | subagent.py crashes on import   | `subagent.py:1-16`       | Add `from _paths import ROOT_DIR` before logging_config import    |
-| 0.2 | CLI test runner wrong path      | `cli.py:1111`            | Change `.vaultspec/tests` to `.vaultspec/lib/tests`               |
-| 0.3 | A2A e2e tests lack skip markers | `test_e2e_a2a.py`        | Add `@pytest.mark.claude`/`@pytest.mark.gemini` with `skipUnless` |
-| 0.4 | Typo "developmment"             | `.vaultspec/README.md:4` | Fix to "development"                                              |
+Give newcomers a coherent path from README to concepts to CLI reference.
 
-______________________________________________________________________
+- [x] `P03.S10` - rewrite the top-level readme; `README.md`.
+- [ ] `P03.S11` - write a getting started guide; `docs`.
+- [x] `P03.S12` - write a concepts document; `docs/framework.md`.
+- [x] `P03.S13` - write a cli reference document; `docs/CLI.md`.
+- [ ] `P03.S14` - write a configuration reference document; `docs`.
+- [ ] `P03.S15` - write a rag query syntax guide; `docs`.
+- [ ] `P03.S16` - embed architecture diagrams in the concepts document; `docs/framework.md`.
+- [x] `P03.S17` - separate human-facing and agent-facing documentation; `src/vaultspec_core/builtins`.
 
-## Wave 1: Self-Dogfooding & Credibility
+### Phase `P04` - CLI Completeness
 
-**Effort**: 1-3 days. **Depends on**: Wave 0
+Round out the CLI surface with the commands and flags users expect.
 
-| #   | Item                                 | Details                                                      |
-| --- | ------------------------------------ | ------------------------------------------------------------ |
-| 1.1 | Fix 93 vault verification errors     | Naming violations, missing tags, broken links, orphaned docs |
-| 1.2 | Resolve workflows/ phantom directory | Create or remove references                                  |
-| 1.3 | Populate PROJECT.md                  | Example project-specific context                             |
-| 1.4 | Remove stale Rust-specific language  | adr-researcher.md, complex-executor.md                       |
-| 1.5 | Rename templates/readme.md           | -> documentation-standards.md                                |
+- [x] `P04.S18` - add an init/install command; `src/vaultspec_core/cli/root_install.py`.
+- [x] `P04.S19` - add remove commands for rules, agents, and skills; `src/vaultspec_core/cli/spec_cmd_rules.py`.
+- [x] `P04.S20` - add show commands for rules, agents, and skills; `src/vaultspec_core/cli/spec_cmd_rules.py`.
+- [x] `P04.S21` - add rename commands for rules, agents, and skills; `src/vaultspec_core/cli/spec_cmd_rules.py`.
+- [x] `P04.S22` - add edit commands for rules, agents, and skills; `src/vaultspec_core/cli/spec_cmd_rules.py`.
+- [x] `P04.S23` - add a version flag to the cli; `src/vaultspec_core/cli/root_app.py`.
+- [x] `P04.S24` - add a doctor command; `src/vaultspec_core/cli/root_doctor.py`.
+- [x] `P04.S25` - add a template flag to agent and skill add commands; `src/vaultspec_core/cli/spec_cmd_skills.py`.
+- [ ] `P04.S26` - remove gpu/cuda language from search command help text; `src/vaultspec_core/cli`.
 
-______________________________________________________________________
+### Phase `P05` - Ecosystem Integration
 
-## Wave 2: Onboarding Documentation
+Align with external ecosystem standards for agent manifests, embeddings, protocols, and MCP security.
 
-**Effort**: 1-2 weeks. **Depends on**: Wave 1
+- [x] `P05.S27` - bring agents.md generation into standard compliance; `AGENTS.md`.
+- [ ] `P05.S28` - upgrade the default embedding model; `src/vaultspec_core`.
+- [ ] `P05.S29` - upgrade the acp sdk dependency; `pyproject.toml`.
+- [ ] `P05.S30` - apply an mcp security baseline; `src/vaultspec_core/mcp_server`.
 
-| #   | Item                        | File                                               |
-| --- | --------------------------- | -------------------------------------------------- |
-| 2.1 | Rewrite top-level README.md | `README.md`                                        |
-| 2.2 | Getting Started guide       | `docs/getting-started.md`                          |
-| 2.3 | Concepts document           | `docs/concepts.md`                                 |
-| 2.4 | CLI Reference               | `docs/cli-reference.md`                            |
-| 2.5 | Configuration Reference     | `docs/configuration.md`                            |
-| 2.6 | RAG Query Syntax            | `docs/search-guide.md`                             |
-| 2.7 | Architecture diagrams       | Embedded in docs/concepts.md                       |
-| 2.8 | Human/agent doc separation  | `.vaultspec/agents/*.md`, `.vaultspec/skills/*.md` |
+### Phase `P06` - Test Coverage and CI
 
-______________________________________________________________________
+Close test coverage gaps and stand up continuous integration.
 
-## Wave 3: CLI Completeness
+- [x] `P06.S31` - add cli command test coverage; `src/vaultspec_core/tests/cli`.
+- [x] `P06.S32` - add logging configuration test coverage; `src/vaultspec_core/tests/test_logging_config.py`.
+- [ ] `P06.S33` - fix rag search test timeouts; `src/vaultspec_core`.
+- [x] `P06.S34` - expand metrics test coverage; `src/vaultspec_core/metrics/tests/test_metrics.py`.
+- [x] `P06.S35` - add mcp config loading test coverage; `src/vaultspec_core/core/tests/test_mcps.py`.
+- [x] `P06.S36` - register a benchmark test marker; `pyproject.toml`.
+- [x] `P06.S37` - add a continuous integration pipeline; `.github/workflows/ci.yml`.
 
-**Effort**: 1-2 weeks. **Depends on**: Wave 0. Parallel with Wave 2.
+### Phase `P07` - Strategic Features
 
-| #   | Item                  | CLI                                               |
-| --- | --------------------- | ------------------------------------------------- |
-| 3.1 | `init` command        | `cli.py init`                                     |
-| 3.2 | `remove` commands     | `cli.py {rules,agents,skills} remove <name>`      |
-| 3.3 | `show` commands       | `cli.py {rules,agents,skills} show <name>`        |
-| 3.4 | `rename` commands     | `cli.py {rules,agents,skills} rename <old> <new>` |
-| 3.5 | `edit` command        | `cli.py {rules,agents,skills} edit <name>`        |
-| 3.6 | `--version` flag      | All 3 CLIs                                        |
-| 3.7 | `doctor` command      | `cli.py doctor`                                   |
-| 3.8 | `--template` flag     | `cli.py {agents,skills} add`                      |
-| 3.9 | GPU/CUDA in help text | `vault.py index/search --help`                    |
+Add higher-leverage features inspired by the frontier agent tooling landscape.
 
-______________________________________________________________________
+- [ ] `P07.S38` - add an agent readiness assessment; `src/vaultspec_core`.
+- [x] `P07.S39` - add event-driven hooks; `src/vaultspec_core/builtins/hooks`.
+- [ ] `P07.S40` - add a constitution layer; `src/vaultspec_core`.
+- [ ] `P07.S41` - register the project in the acp registry; `pyproject.toml`.
+- [ ] `P07.S42` - add interactive add modes to the cli; `src/vaultspec_core/cli`.
+- [x] `P07.S43` - add a fix flag to the vault audit command; `src/vaultspec_core/cli/vault_check_cmd.py`.
 
-## Wave 4: Ecosystem Integration
+### Phase `P08` - Advanced Features
 
-**Effort**: 2-4 weeks. **Depends on**: Waves 2, 3
+Pursue longer-horizon, research-grade capabilities once the foundation is solid.
 
-| #   | Item                                                         |
-| --- | ------------------------------------------------------------ |
-| 4.1 | AGENTS.md standard compliance                                |
-| 4.2 | Embedding model upgrade (Qwen3-0.6B primary, nomic fallback) |
-| 4.3 | ACP SDK upgrade (0.8.0 -> 0.8.1)                             |
-| 4.4 | MCP security baseline (OWASP MCP01, MCP05, MCP07)            |
-
-______________________________________________________________________
-
-## Wave 5: Test Coverage & CI
-
-**Effort**: 1-2 weeks. **Depends on**: Waves 0, 3. Parallel with Wave 4.
-
-| #   | Item                          |
-| --- | ----------------------------- |
-| 5.1 | vault.py CLI tests            |
-| 5.2 | logging_config tests          |
-| 5.3 | Fix RAG test timeouts         |
-| 5.4 | Metrics test expansion        |
-| 5.5 | mcp.json config loading tests |
-| 5.6 | Include benchmarks in markers |
-| 5.7 | CI pipeline (GitHub Actions)  |
-
-______________________________________________________________________
-
-## Wave 6: Strategic Features
-
-**Effort**: 1-2 months. **Depends on**: Waves 2-5
-
-| #   | Item                       | Inspired By      |
-| --- | -------------------------- | ---------------- |
-| 6.1 | Agent Readiness Assessment | Factory AI       |
-| 6.2 | Event-driven hooks         | Kiro             |
-| 6.3 | Constitution layer         | GitHub Spec Kit  |
-| 6.4 | Register in ACP Registry   | Zed/JetBrains    |
-| 6.5 | Interactive add modes      | UX best practice |
-| 6.6 | `vault.py audit --fix`     | UX best practice |
-
-______________________________________________________________________
-
-## Wave 7: Advanced Features
-
-**Effort**: Quarter+. **Depends on**: Waves 4-6
-
-| #    | Item                                       |
-| ---- | ------------------------------------------ |
-| 7.1  | Agentic RAG                                |
-| 7.2  | GraphRAG                                   |
-| 7.3  | A2A v0.3 features (gRPC, security signing) |
-| 7.4  | MCP Registry integration                   |
-| 7.5  | Agent eval framework                       |
-| 7.6  | Policy Engine with tiers                   |
-| 7.7  | Compliance dashboard                       |
-| 7.8  | Parallel agent execution                   |
-| 7.9  | Spec Registry                              |
-| 7.10 | Reverse spec generation                    |
-| 7.11 | Token optimization                         |
-| 7.12 | Documentation site                         |
-| 7.13 | Migration guide                            |
-
-______________________________________________________________________
-
-## Wave Dependency Graph
-
-```
-Wave 0 (Blocking Bugs)
-  ├── Wave 1 (Self-Dogfooding)
-  │     └── Wave 2 (Documentation) ──┐
-  ├── Wave 3 (CLI Completeness) ─────┤
-  │                                   ├── Wave 4 (Ecosystem Integration)
-  ├── Wave 5 (Tests & CI) ───────────┤
-  │                                   └── Wave 6 (Strategic Features)
-  │                                         └── Wave 7 (Advanced Features)
-```
-
-**Total: 56 items across 8 waves. Every audit finding addressed.**
+- [ ] `P08.S44` - build agentic rag capability; `src/vaultspec_core`.
+- [ ] `P08.S45` - build graphrag capability; `src/vaultspec_core/graph`.
+- [ ] `P08.S46` - add a2a v0.3 features including grpc and security signing; `src/vaultspec_core/protocol`.
+- [ ] `P08.S47` - integrate an mcp registry; `src/vaultspec_core/mcp_server`.
+- [ ] `P08.S48` - build an agent evaluation framework; `src/vaultspec_core/core`.
+- [ ] `P08.S49` - build a tiered policy engine; `src/vaultspec_core/core`.
+- [ ] `P08.S50` - build a compliance dashboard; `src/vaultspec_core`.
+- [ ] `P08.S51` - support parallel agent execution; `src/vaultspec_core/core/executor.py`.
+- [ ] `P08.S52` - build a spec registry; `src/vaultspec_core/vaultcore`.
+- [ ] `P08.S53` - support reverse spec generation; `src/vaultspec_core/vaultcore`.
+- [ ] `P08.S54` - add token usage optimization; `src/vaultspec_core`.
+- [ ] `P08.S55` - publish a documentation site; `docs`.
+- [ ] `P08.S56` - write a migration guide; `src/vaultspec_core/migrations`.

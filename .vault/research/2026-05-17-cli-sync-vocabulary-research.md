@@ -4,6 +4,7 @@ tags:
   - '#cli-sync-vocabulary'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:9d022ec4bcb0878f42c2e520b163222a556d05ee1dbf0cb2b2cfd176755418c1'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---

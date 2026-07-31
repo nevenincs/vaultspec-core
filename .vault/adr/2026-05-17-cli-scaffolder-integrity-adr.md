@@ -4,6 +4,7 @@ tags:
   - '#cli-scaffolder-integrity'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:5fbd432c48de70911ed0dc62d58d885a00c06abf0bf3e058d27dc45c54a83d88'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-scaffolder-integrity-research]]'

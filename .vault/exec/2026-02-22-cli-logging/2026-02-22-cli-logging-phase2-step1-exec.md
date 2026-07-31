@@ -4,6 +4,7 @@ tags:
   - '#cli-logging'
 date: '2026-02-22'
 modified: '2026-06-13'
+body_hash: 'sha256:63d4350fd63e3a95aa05279b72c2a57eb6705503dedcad58e86acd81064cb5fa'
 related:
   - '[[2026-02-22-cli-logging-plan]]'
 ---

@@ -4,6 +4,7 @@ tags:
   - '#cli-architecture'
 date: 2026-03-05
 modified: '2026-06-28'
+body_hash: 'sha256:23a5371bb8a3c2ecb42f1d2570a23478cd78730f7b08c8c487ceed139d5768a2'
 related:
   - '[[2026-03-05-cli-architecture-audit]]'
   - '[[2026-03-05-cli-path-resolution-adr]]'

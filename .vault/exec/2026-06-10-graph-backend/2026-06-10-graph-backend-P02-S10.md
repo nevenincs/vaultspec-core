@@ -4,6 +4,7 @@ tags:
   - '#graph-backend'
 date: '2026-06-10'
 modified: '2026-06-13'
+body_hash: 'sha256:a23aa838bc71b91f302cd16610b840db561b8a0ca16a426940c2fd79e3d6c790'
 step_id: S10
 related:
   - '[[2026-06-10-graph-backend-plan]]'

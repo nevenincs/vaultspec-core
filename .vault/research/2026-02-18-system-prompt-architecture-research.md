@@ -4,6 +4,7 @@ tags:
   - '#system-prompt'
 date: '2026-02-18'
 modified: '2026-06-13'
+body_hash: 'sha256:79a6f57b43dab8426fcc64ccb29b70b6a23e3d89b1998462c5f66b0fdf7bae66'
 related:
   - '[[2026-02-17-tech-audit-audit]]'
 ---

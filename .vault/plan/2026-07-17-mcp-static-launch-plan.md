@@ -4,6 +4,7 @@ tags:
   - '#mcp-static-launch'
 date: '2026-07-17'
 modified: '2026-07-17'
+body_hash: 'sha256:6670fab52e0d2134757c14136096217a95dd2f1fded5ea15a6a253ed20986a91'
 tier: L2
 related:
   - '[[2026-07-17-mcp-static-launch-adr]]'

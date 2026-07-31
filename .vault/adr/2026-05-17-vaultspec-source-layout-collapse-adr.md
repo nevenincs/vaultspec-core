@@ -4,6 +4,7 @@ tags:
   - '#vaultspec-source-layout-collapse'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:fc1a96a5de25fbdac3d90232c3580a2072f665df61fdb9b1b4144b09642541bb'
 related:
   - '[[2026-05-17-vaultspec-source-layout-collapse-research]]'
   - '[[2026-03-21-builtins-build-strategy-adr]]'

@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:c24ddf7dd1169ce35a08ba54b8a9e6b40f2522d8f7c5039b8ce7735322013a3d'
 related:
   - '[[2026-05-17-test-framework-hardening-audit]]'
   - '[[2026-05-17-test-framework-hardening-research]]'

@@ -5,6 +5,7 @@ tags:
 date: '2026-07-27'
 modified: '2026-07-27'
 body_schema: 'body-v1'
+body_hash: 'sha256:67d701823918e9105ec3b2204f24dbe91d9923b7247487a0070321e596d1d05d'
 related:
   - "[[2026-07-27-vault-scale-performance-adr]]"
   - "[[2026-07-27-markdown-feature-scope-adr]]"

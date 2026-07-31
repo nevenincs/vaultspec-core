@@ -4,6 +4,7 @@ tags:
   - '#framework'
 date: '2026-02-17'
 modified: '2026-06-13'
+body_hash: 'sha256:d5404c6aafce28b6c7a098a9f233a2e1a3d89db63c01a0fa330679469f61c5b0'
 related:
   - '[[2026-02-17-bootstrap-prompt-adr]]'
 ---

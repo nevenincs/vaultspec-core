@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:e1c9b5aac1c76c7c9dc4886d5f070872036c1bf5271a7088f2be50d72e37f060'
 related:
   - '[[2026-07-09-cli-usage-analytics-P05-S15]]'
   - '[[2026-07-09-cli-usage-analytics-P05-S16]]'

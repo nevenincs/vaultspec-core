@@ -4,6 +4,7 @@ tags:
   - '#test-framework-hardening'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:414122aa20851e301ccf675a25de85c2ecaa86dbb7f8f69394140635f01ad381'
 related:
   - '[[2026-05-17-test-framework-hardening-research]]'
 ---

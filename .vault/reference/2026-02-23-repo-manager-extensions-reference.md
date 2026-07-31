@@ -4,6 +4,7 @@ tags:
   - '#repo-manager-extensions'
 date: '2026-02-23'
 modified: '2026-06-13'
+body_hash: 'sha256:34f8b97fcec94432982854bb0a55a069954dd63b15ed865c64cc02eec40789a7'
 ---
 
 # repo-manager extensions system reference

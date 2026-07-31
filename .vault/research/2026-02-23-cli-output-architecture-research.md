@@ -4,6 +4,7 @@ tags:
   - '#cli-output'
 date: '2026-02-23'
 modified: '2026-06-13'
+body_hash: 'sha256:d85fa60eddef84423cac3671d67e1669a71d5a4a6c9e921bf0c3eaf249614037'
 related:
   - '[[2026-02-22-cli-logging-research]]'
   - '[[2026-02-22-cli-logging-adr]]'

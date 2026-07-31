@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:40e9756204ac05d470ea4fb410a88acae01a4d0673c358ea598ea8afca3dd640'
 related:
   - '[[2026-03-16-cli-restructure-plan]]'
   - '[[2026-03-23-cli-restructure-adr]]'

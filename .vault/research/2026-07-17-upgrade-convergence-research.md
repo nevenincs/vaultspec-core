@@ -4,6 +4,7 @@ tags:
   - '#upgrade-convergence'
 date: '2026-07-17'
 modified: '2026-07-17'
+body_hash: 'sha256:2dcebab8d4a13e5cdc851997df36580b86dc1e6ab27b2530ea87833980235df4'
 related:
   - '[[2026-07-17-mcp-static-launch-adr]]'
   - '[[2026-07-17-mcp-static-launch-research]]'

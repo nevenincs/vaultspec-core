@@ -4,6 +4,7 @@ tags:
   - '#marketing-and-documentation'
 date: '2026-02-20'
 modified: '2026-06-13'
+body_hash: 'sha256:5d4431a61bede2619de3fe610427fedff5e91d6decb87dd2dc4d624901996a8b'
 related:
   - '[[2026-02-20-marketing-and-documentation-p1-plan]]'
 ---

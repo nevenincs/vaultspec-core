@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:910331c8f005af4becb0d3d567921e7fa895aa08af050909bc4c996857069797'
 related:
   - '[[2026-05-17-cli-simplification-ux-adr]]'
   - '[[2026-05-17-cli-simplification-ux-audit]]'

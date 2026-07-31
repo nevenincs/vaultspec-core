@@ -4,6 +4,7 @@ tags:
   - '#cli-json-consistency'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:e548a465ce621a1c7e808d02507581c10e64efa9a31d80e29f0abc50f14a9696'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---

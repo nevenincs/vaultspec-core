@@ -4,6 +4,7 @@ tags:
   - '#hooks-maturity'
 date: '2026-02-23'
 modified: '2026-06-13'
+body_hash: 'sha256:413b10208d3c20a72a2e73903ee90aa7ac8ed4a4943b9b76bc3bd2edbb21be22'
 related:
   - '[[2026-02-23-hooks-maturity-plan]]'
   - '[[2026-02-23-hooks-maturity-adr]]'

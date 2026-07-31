@@ -4,6 +4,7 @@ tags:
   - '#cli-presentation-uniformity'
 date: '2026-06-24'
 modified: '2026-06-25'
+body_hash: 'sha256:3bca0680686993cbc1684c2578f1eaa8c97cf56750db577695c3fed30b1ff500'
 tier: L2
 related:
   - '[[2026-06-24-cli-presentation-uniformity-adr]]'

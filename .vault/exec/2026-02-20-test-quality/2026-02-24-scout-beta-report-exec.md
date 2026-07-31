@@ -4,6 +4,7 @@ tags:
   - '#test-quality'
 date: '2026-02-20'
 modified: '2026-06-13'
+body_hash: 'sha256:aeb1104ee7fd6ebb10c49df5a3a8d9d41fa34afc8d7b4eaacc2829353d7f2837'
 ---
 
 # Scout Beta Report: CLI, e2e, RAG, Core, Vault, Hooks Tests

@@ -4,6 +4,7 @@ tags:
   - '#naming-surface'
 date: 2026-03-11
 modified: '2026-06-13'
+body_hash: 'sha256:292f248077fdcb233606d5eca3c724f88e26e4bdaa7569c92aaa4451626c2969'
 ---
 
 # Naming And Shipped-Surface Audit

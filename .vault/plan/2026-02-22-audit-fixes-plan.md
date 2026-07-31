@@ -3,7 +3,9 @@ tags:
   - '#plan'
   - '#audit-fixes'
 date: '2026-02-22'
-modified: '2026-06-13'
+modified: '2026-07-31'
+body_hash: 'sha256:426a9f83ba7d719ab273f9e3ab6c2ad6f756588dc95ae10b8158bab6599b03be'
+tier: L2
 related:
   - '[[2026-02-22-audit-fixes-adr]]'
   - '[[2026-03-23-audit-fixes-research]]'
@@ -11,34 +13,29 @@ related:
 
 # Plan: Audit Remediations (Logging & Robustness)
 
-This plan executes the fixes mandated by `2026-02-22-audit-fixes-adr` to improve logging and robustness across the codebase.
+### Phase `P01` - RAG resilience
 
-## Phase 1: RAG Resilience
+Wrap RAG document lookups so a missing GPU falls back to the filesystem path instead of raising
 
-- [ ] **Target:** `src/vaultspec/rag/api.py`
-- [ ] **Action:** Wrap `get_document` call (or internal logic) in a try-except block for `GPUNotAvailableError`.
-- [ ] **Logic:** If GPU is missing, log a warning and return `None` (or raise a specific `RagUnavailableError` that callers handle), triggering the existing filesystem fallback path.
+- [ ] `P01.S01` - wrap the rag document lookup in a GPUNotAvailableError handler that falls back to the filesystem path; `pyproject.toml`.
 
-## Phase 2: CLI Logging Refactor
+### Phase `P02` - CLI logging refactor
 
-- [ ] **Target:** `src/vaultspec/cli.py`
-- [ ] **Action 1:** Initialize logging.
-  - [ ] Call `configure_logging()` at the start of `main()`.
-- [ ] **Action 2:** Replace `print`.
-  - [ ] Identify `print()` calls used for informational/status output.
-  - [ ] Replace with `logger.info()` or `logger.warning()`.
-  - [ ] *Constraint:* Keep `print()` for structured data output meant for stdout (like `skills list` or `config show`) or ensure the logger writes to stderr. (Review `logging_config.py` to confirm stderr target).
+Initialize structured logging at CLI startup and replace informational print statements with logger calls
 
-## Phase 3: Hydration Visibility
+- [x] `P02.S02` - call configure_logging at cli startup; `src/vaultspec_core/cli/root_app.py`.
+- [ ] `P02.S03` - replace informational print calls with logger calls while keeping structured stdout output; `src/vaultspec_core/cli`.
 
-- [ ] **Target:** `src/vaultspec/vaultcore/hydration.py`
-- [ ] **Action:** Add `logging` import and `logger`.
-- [ ] **Action:** Instrument the replacement logic.
-  - [ ] Log warning if a key is missing in the context.
-  - [ ] Log info on successful hydration (at debug level).
+### Phase `P03` - Hydration visibility
 
-## Phase 4: Verification
+Instrument template hydration with warning and debug logging for missing keys and successful replacements
 
-- [ ] **Test RAG:** Run a RAG command (simulating no GPU if possible, or verify logic via unit test).
-- [ ] **Test CLI:** Run `cli.py skills list` and check that logs appear (if verbose) and output remains clean.
-- [ ] **Test Hydration:** Verify logs during a `vault create` operation.
+- [x] `P03.S04` - add a logger and instrument the hydration replacement logic with warning and debug logging; `src/vaultspec_core/vaultcore/hydration.py`.
+
+### Phase `P04` - Verification
+
+Confirm the RAG fallback, CLI logging, and hydration logging behave correctly
+
+- [ ] `P04.S05` - verify the rag fallback path when the gpu is unavailable; `pyproject.toml`.
+- [ ] `P04.S06` - verify cli logging output stays clean on a routine command; `src/vaultspec_core/cli`.
+- [ ] `P04.S07` - verify hydration logging during a vault create operation; `src/vaultspec_core/vaultcore/hydration.py`.

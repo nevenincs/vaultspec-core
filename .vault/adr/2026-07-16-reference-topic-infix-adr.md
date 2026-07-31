@@ -10,6 +10,7 @@ related:
   - "[[2026-07-09-mcp-tool-schema-adr]]"
 superseded_by: '2026-07-27-adr-topic-infix-adr'
 modified: '2026-07-27'
+body_hash: 'sha256:9fbb35a412c6dc59ce03ca6846d4a845b17af73dd683994e67c0df995701bd3f'
 ---
 
 # `reference-topic-infix` adr: `topic-infix scaffolding for the narrative document trio` | (**status:** `superseded`)

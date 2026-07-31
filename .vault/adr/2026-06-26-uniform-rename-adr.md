@@ -4,6 +4,7 @@ tags:
   - '#uniform-rename'
 date: '2026-06-26'
 modified: '2026-06-27'
+body_hash: 'sha256:9583e96e507aa31d58367f737c9522a28170767c5baf4b90f7a8ce6eae9069b6'
 related:
   - "[[2026-06-26-uniform-rename-research]]"
   - "[[2026-06-26-uniform-rename-reference]]"

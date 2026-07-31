@@ -10,6 +10,7 @@ related:
 supersedes:
   - '2026-04-11-mcp-registry-adr'
 modified: '2026-07-15'
+body_hash: 'sha256:747511e99a6d0971daaf32b47bcce7812fadb442ca829b751c04fb4329ca9413'
 ---
 
 # `provider-mcp-enrollment` adr: typed provider-native MCP enrollment with explicit scopes | (**status:** `accepted`)

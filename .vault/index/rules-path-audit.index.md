@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:a61c170890b80b9eaad49de21ef98604b9b51ff0de3a175d620489d6fe4e6442'
 related:
   - '[[2026-02-20-rules-path-audit-reference]]'
 ---

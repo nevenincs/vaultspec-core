@@ -4,6 +4,7 @@ tags:
   - '#vault-check-validators'
 date: '2026-07-23'
 modified: '2026-07-23'
+body_hash: 'sha256:104ebdae70ca454665ff5a1f80870e2f01533a4e39176c8405afd143d77ca401'
 tier: L2
 related:
   - '[[2026-07-23-vault-check-validators-adr]]'

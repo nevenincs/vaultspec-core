@@ -4,6 +4,7 @@ tags:
   - '#status-hardening'
 date: '2026-06-13'
 modified: '2026-07-13'
+body_hash: 'sha256:4ef4f45593b46231a95f449338aec8da485628541a913123cce4235101d06f20'
 tier: L3
 related:
   - '[[2026-06-13-status-hardening-adr]]'

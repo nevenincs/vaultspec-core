@@ -4,6 +4,7 @@ tags:
   - '#vault-orientation'
 date: '2026-06-12'
 modified: '2026-06-13'
+body_hash: 'sha256:2d1b4aedef02f06426ec23635000477f6464dd6d11acde48f135eee791478227'
 step_id: S32
 related:
   - '[[2026-06-12-vault-orientation-plan]]'

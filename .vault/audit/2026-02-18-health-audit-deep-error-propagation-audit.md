@@ -4,6 +4,7 @@ tags:
   - '#code-health'
 date: '2026-02-18'
 modified: '2026-06-13'
+body_hash: 'sha256:5d6d824b70b6abb8b386c9e42a5978e030dfd571668be81ae67d45492aebaa76'
 ---
 
 # Deep Audit: Error Propagation and Silent Failure Paths

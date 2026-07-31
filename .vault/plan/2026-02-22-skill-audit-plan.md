@@ -3,7 +3,9 @@ tags:
   - '#plan'
   - '#skill-audit'
 date: '2026-02-22'
-modified: '2026-06-13'
+modified: '2026-07-31'
+body_hash: 'sha256:ee6b3e93e8498a6e5c009bf263e8aa7ac529ade4f9c39710bbb55ca6283affc4'
+tier: L2
 related:
   - '[[2026-02-22-skill-audit-adr]]'
   - '[[2026-02-22-skill-audit-research]]'
@@ -11,26 +13,26 @@ related:
 
 # Plan: Refactor Skills to Spec
 
-This plan executes the restructuring of `.vaultspec/rules/skills` to comply with the Agent Skills specification.
+### Phase `P01` - Preparation
 
-## Phase 1: Preparation
+Inventory the flat vaultspec-*.md skill files under .vaultspec/skills and confirm the skills-ref validation tooling is available.
 
-- [ ] Verify `skills-ref` tool availability (installed or via cloned repo).
-- [ ] List all target skill files in `.vaultspec/rules/skills`.
+- [x] `P01.S01` - inventory the flat vaultspec-* skill files under .vaultspec/skills; `.vaultspec/skills`.
 
-## Phase 2: Migration
+### Phase `P02` - Migration
 
-- [ ] For each `vaultspec-*.md` file:
-  - [ ] Create directory `.vaultspec/rules/skills/<name>`.
-  - [ ] Move file to `.vaultspec/rules/skills/<name>/SKILL.md`.
-  - [ ] Inject `name: <name>` into YAML frontmatter.
-  - [ ] Remove the original flat file (if not done by move).
+Move each flat skill file into its own <name>/SKILL.md directory with an injected name: frontmatter field.
 
-## Phase 3: Validation
+- [x] `P02.S02` - move each flat skill file into a <name>/SKILL.md directory with an injected name field; `.vaultspec/skills`.
 
-- [ ] Run `skills-ref validate` on each new skill directory.
-- [ ] Verify that no flat `.md` files remain in `.vaultspec/rules/skills`.
+### Phase `P03` - Validation
 
-## Phase 4: Cleanup
+Validate every migrated skill directory and confirm no flat skill files remain.
 
-- [ ] Remove any temporary files or logs.
+- [x] `P03.S03` - verify no flat skill files remain outside their SKILL.md directories; `.vaultspec/skills`.
+
+### Phase `P04` - Cleanup
+
+Remove temporary files or logs left over from the migration.
+
+- [x] `P04.S04` - remove temporary files or logs left over from the migration; `.vaultspec/skills`.

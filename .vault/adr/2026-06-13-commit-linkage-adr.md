@@ -4,6 +4,7 @@ tags:
   - '#commit-linkage'
 date: '2026-06-13'
 modified: '2026-06-13'
+body_hash: 'sha256:5e24000a8fd05f83d8292a16a2659aab31da9adf03961801241be21a30e7e5d2'
 related:
   - '[[2026-06-13-commit-linkage-research]]'
 ---

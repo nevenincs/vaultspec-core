@@ -4,6 +4,7 @@ tags:
   - '#diagnosis-surface-parity'
 date: '2026-06-28'
 modified: '2026-06-28'
+body_hash: 'sha256:fd7e5ff952a1b5d91ed7d6eda8226ca3c1d25679f48c1b678c57cdcde5b76971'
 related:
   - "[[2026-03-27-cli-ambiguous-states-resolver-adr]]"
   - "[[2026-02-24-vault-doctor-suite-adr]]"

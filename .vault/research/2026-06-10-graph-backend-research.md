@@ -4,6 +4,7 @@ tags:
   - '#graph-backend'
 date: '2026-06-10'
 modified: '2026-06-13'
+body_hash: 'sha256:57bb4974676c0c5cdc79664f71c0d553047fa0204e7ac6a7fc10e2e89598f731'
 related:
   - '[[2026-03-22-graph-hardening-research]]'
 ---

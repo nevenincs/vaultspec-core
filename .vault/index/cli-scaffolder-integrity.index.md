@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:266a22b943b091d0e821d51ac416558b26fa95d3bf67c1309c4646da8270fad3'
 related:
   - '[[2026-05-17-cli-scaffolder-integrity-adr]]'
   - '[[2026-05-17-cli-scaffolder-integrity-research]]'

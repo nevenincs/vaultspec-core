@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:d28335adef2f334105904c81f5a24ac854c99eb171d9f82bcf92af52bc7046ed'
 related:
   - '[[2026-06-10-cli-reference-automation-P01-S01]]'
   - '[[2026-06-10-cli-reference-automation-P01-S02]]'

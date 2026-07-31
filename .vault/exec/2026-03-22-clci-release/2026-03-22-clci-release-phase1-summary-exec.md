@@ -4,6 +4,7 @@ tags:
   - '#clci-release'
 date: '2026-03-22'
 modified: '2026-06-13'
+body_hash: 'sha256:2379c3cd80222b018042557ff07d1e7fb088e71464a136021ecccdaa91b9ec8e'
 related:
   - '[[2026-03-22-clci-release-phase1-plan]]'
   - '[[2026-03-22-clci-release-adr]]'

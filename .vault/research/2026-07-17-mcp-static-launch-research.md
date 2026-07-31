@@ -4,6 +4,7 @@ tags:
   - '#mcp-static-launch'
 date: '2026-07-17'
 modified: '2026-07-17'
+body_hash: 'sha256:2f205561b048b993bb269e5b97e04146ba7a15a34be03bc8836912dcc2c4bb99'
 related:
   - '[[2026-07-13-install-mode-adr]]'
   - '[[2026-07-14-install-parity-adr]]'

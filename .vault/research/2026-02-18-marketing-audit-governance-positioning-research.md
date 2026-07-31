@@ -4,6 +4,7 @@ tags:
   - '#marketing-audit'
 date: '2026-02-18'
 modified: '2026-06-13'
+body_hash: 'sha256:f517d134d9f9311fb45be01cad5ca7296fcf61ce99d72aa171c40902c86d1ed3'
 ---
 
 ## Marketing Audit: Governance & SDD Positioning

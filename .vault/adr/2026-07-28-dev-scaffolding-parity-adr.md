@@ -5,6 +5,7 @@ tags:
 date: '2026-07-28'
 modified: '2026-07-28'
 body_schema: 'body-v1'
+body_hash: 'sha256:f240d3b4bb106e9158f9be60cbb17c8fef35b5b2a980634f013e938e48569813'
 related:
   - '[[2026-07-28-dev-scaffolding-parity-rag-aeat-toolchain-survey-research]]'
 ---

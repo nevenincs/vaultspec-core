@@ -4,6 +4,7 @@ tags:
   - '#marketing-audit'
 date: '2026-02-18'
 modified: '2026-06-13'
+body_hash: 'sha256:a4542eb36df25df8c3c596f88b2b2eaa0df55ebc919f27ec6988311d114ebcf5'
 related:
   - '[[2026-02-18-marketing-audit-competitor-landscape-research]]'
   - '[[2026-02-18-marketing-audit-documentation-quality-research]]'

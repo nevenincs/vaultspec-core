@@ -4,6 +4,7 @@ tags:
   - '#uniform-rename'
 date: '2026-06-26'
 modified: '2026-06-27'
+body_hash: 'sha256:a7f5b84ae5f0d6d1d62a84cbd815c9fe10fa3ef7250aae4440286f9bae55e9bd'
 tier: L2
 related:
   - '[[2026-06-26-uniform-rename-adr]]'

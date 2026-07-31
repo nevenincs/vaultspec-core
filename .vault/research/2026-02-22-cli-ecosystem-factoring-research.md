@@ -4,6 +4,7 @@ tags:
   - '#cli-ecosystem-factoring'
 date: '2026-02-22'
 modified: '2026-06-13'
+body_hash: 'sha256:ff47b472374f87d72a66582182de3eb002a1206b05e83928f9bd17477355e86f'
 related:
   - '[[2026-02-22-codebase-audit-research]]'
 ---

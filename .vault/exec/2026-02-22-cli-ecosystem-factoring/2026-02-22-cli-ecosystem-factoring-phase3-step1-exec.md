@@ -4,6 +4,7 @@ tags:
   - '#cli-ecosystem-factoring'
 date: '2026-02-22'
 modified: '2026-06-13'
+body_hash: 'sha256:20d1c952d6aecf605a63e6ebc46a2e5ecc983aab607b3958f6a9fc793cc28c74'
 related:
   - '[[2026-02-22-cli-ecosystem-factoring-plan]]'
   - '[[2026-02-22-cli-ecosystem-factoring-adr]]'

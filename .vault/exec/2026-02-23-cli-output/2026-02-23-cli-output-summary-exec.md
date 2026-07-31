@@ -4,6 +4,7 @@ tags:
   - '#cli-output'
 date: '2026-02-23'
 modified: '2026-06-13'
+body_hash: 'sha256:caa4b13b4449151d9a341e3359dfb0f3c60e41518340ef177be624063bee1d13'
 related:
   - '[[2026-02-23-cli-output-plan]]'
   - '[[2026-02-23-cli-output-architecture-adr]]'

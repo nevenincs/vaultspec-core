@@ -4,6 +4,7 @@ tags:
   - '#rename-convergence'
 date: '2026-06-27'
 modified: '2026-06-27'
+body_hash: 'sha256:552f7047b1f7f0cfbb27a805d8ecbcd599772808356ebd047a91df7560e598f1'
 step_id: 'S18'
 related:
   - "[[2026-06-27-rename-convergence-plan]]"

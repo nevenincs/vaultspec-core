@@ -4,6 +4,7 @@ tags:
   - '#mcp-tool-schema'
 date: '2026-07-09'
 modified: '2026-07-10'
+body_hash: 'sha256:3247687f75185253600801980294d6e41ed19fb3b85c12c0b14cd02ff947fb7d'
 tier: L2
 related:
   - '[[2026-07-09-mcp-tool-schema-adr]]'

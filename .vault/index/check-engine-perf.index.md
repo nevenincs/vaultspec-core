@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:8b352e6fe4e02264a134d6e995ce1b234fcc923265c1a4af53409ea99cc93715'
 related:
   - '[[2026-03-21-check-engine-perf-adr]]'
   - '[[2026-03-21-check-engine-perf-plan]]'

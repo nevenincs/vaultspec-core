@@ -4,6 +4,7 @@ tags:
   - '#cli-rename-integrity'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:ef422b4c7cc630a3e38a220eace50943de2ee25fb0b47b67d21500de3ab31ede'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-rename-integrity-research]]'

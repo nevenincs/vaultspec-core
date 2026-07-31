@@ -4,6 +4,7 @@ tags:
   - '#skill-audit'
 date: '2026-02-22'
 modified: '2026-06-13'
+body_hash: 'sha256:19a76ee99d68e7d43ebf2e45da9e38a58ede0c47a57c95ce634b231c23fee375'
 ---
 
 # Skill Audit and Compliance Research

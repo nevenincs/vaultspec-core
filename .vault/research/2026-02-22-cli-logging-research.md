@@ -4,6 +4,7 @@ tags:
   - '#cli-logging'
 date: '2026-02-22'
 modified: '2026-06-13'
+body_hash: 'sha256:d94397a4b75325a96fed8a82f3649be910f684183214c91e86359bd86d6be5c9'
 ---
 
 # `cli-logging` research: standardize CLI logging with Rich

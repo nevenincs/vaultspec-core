@@ -4,6 +4,7 @@ tags:
   - '#prek-boundary-hardening'
 date: '2026-07-23'
 modified: '2026-07-23'
+body_hash: 'sha256:e7c1412ac8218dc6fd2a614394bcedc1806c19b349a19f4a1d51177ac992f144'
 related:
   - '[[2026-07-23-prek-boundary-hardening-research]]'
 ---

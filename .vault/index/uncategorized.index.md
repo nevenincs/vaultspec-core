@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:63edc101b132413093e281d25e47412115e1ac071a6abf757739352d6d5b270a'
 related:
   - '[[2026-02-20-stale-path-audit-reference]]'
   - '[[2026-02-24-scout-alpha-report-exec]]'

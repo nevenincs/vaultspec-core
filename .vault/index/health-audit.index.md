@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:3f0257b5afa2e30d17e69be96dfa6f1266f3c43a1b3fca4584cd761d372c9541'
 related:
   - '[[2026-02-18-health-audit-deep-contracts-abstractions-audit]]'
   - '[[2026-02-18-health-audit-investigator3-data-functional-audit]]'

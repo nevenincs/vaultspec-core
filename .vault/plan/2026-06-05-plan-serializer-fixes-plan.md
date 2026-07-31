@@ -4,6 +4,7 @@ tags:
   - '#plan-serializer-fixes'
 date: '2026-06-05'
 modified: '2026-06-13'
+body_hash: 'sha256:4f77573c14d5000d628adcba74117c9f18ba49eb6ffedb61789ff6117d5e6072'
 tier: L2
 related:
   - '[[2026-06-05-plan-serializer-fixes-adr]]'

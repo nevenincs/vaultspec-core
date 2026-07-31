@@ -4,6 +4,7 @@ tags:
   - '#packaging-restructure'
 date: '2026-02-21'
 modified: '2026-06-13'
+body_hash: 'sha256:0299eac14ad13506f4a24940d887766a5713208a94cefeff4ed398e7b23edcfd'
 related:
   - '[[2026-02-21-packaging-restructure-p1p2-plan]]'
   - '[[2026-02-21-packaging-restructure-adr]]'

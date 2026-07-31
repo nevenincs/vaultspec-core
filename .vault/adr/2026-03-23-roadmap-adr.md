@@ -4,6 +4,7 @@ tags:
   - '#roadmap'
 date: '2026-03-23'
 modified: '2026-06-25'
+body_hash: 'sha256:6ce297911ae6ba064bdf0055ca8ec469df8f5d92a29e2f6f91b5d1448e585599'
 related:
   - '[[2026-03-23-roadmap-research]]'
 ---

@@ -4,6 +4,7 @@ tags:
   - '#curator-reframe'
 date: '2026-06-28'
 modified: '2026-06-28'
+body_hash: 'sha256:412be72b64962def9ec69ec589585601111b60f1b559b8964f9166ba01084bdd'
 related:
   - "[[2026-06-28-curator-reframe-research]]"
 ---

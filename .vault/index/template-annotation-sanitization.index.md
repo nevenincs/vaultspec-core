@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:b8ae95d411fd81a2534e5d4dd71081b9ba4d946e2c8fe278f79343d99b02c842'
 related:
   - '[[2026-05-15-template-annotation-sanitization-adr]]'
   - '[[2026-05-15-template-annotation-sanitization-plan]]'

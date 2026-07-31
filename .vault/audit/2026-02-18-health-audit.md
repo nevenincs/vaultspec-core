@@ -4,6 +4,7 @@ tags:
   - '#concurrency'
 date: '2026-02-18'
 modified: '2026-06-13'
+body_hash: 'sha256:f8ba85b933e0b33a9711762434a3fc82026b1c11ecf4a738cf06623b40745edd'
 related:
   - '[[2026-02-18-health-audit-deep-contracts-abstractions-audit]]'
   - '[[2026-02-18-health-audit-deep-error-propagation-audit]]'

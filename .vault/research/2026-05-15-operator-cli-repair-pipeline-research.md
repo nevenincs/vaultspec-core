@@ -4,6 +4,7 @@ tags:
   - '#operator-cli-repair-pipeline'
 date: '2026-05-15'
 modified: '2026-06-13'
+body_hash: 'sha256:fd4e8133629cd1a268b6351dfb97a734c73e080cdd40b6172b16a8384199d25e'
 related:
   - '[[2026-05-15-operator-cli-repair-pipeline-reference]]'
 ---

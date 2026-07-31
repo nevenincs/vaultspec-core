@@ -4,6 +4,7 @@ tags:
   - '#cli-restructure'
 date: '2026-03-23'
 modified: '2026-06-25'
+body_hash: 'sha256:540659f359fa0873827829b7e979ffda38d85ea99909869866a1de0fb2cae3eb'
 related:
   - '[[2026-03-23-cli-restructure-research]]'
 ---

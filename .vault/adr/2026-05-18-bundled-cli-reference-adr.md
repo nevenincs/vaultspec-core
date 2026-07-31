@@ -4,6 +4,7 @@ tags:
   - '#bundled-cli-reference'
 date: '2026-05-18'
 modified: '2026-06-13'
+body_hash: 'sha256:297f4077db36e9e40abe7579664d2c3193f885e863c09c1878611a085c063567'
 related:
   - '[[2026-05-18-bundled-cli-reference-research]]'
   - '[[2026-05-17-vaultspec-source-layout-collapse-adr]]'

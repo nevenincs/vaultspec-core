@@ -4,6 +4,7 @@ tags:
   - '#cli-spec-gitignore'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:875a3add3a348abe2c87918952b3938188ab4d0a9b2d419343c5674fec4ae964'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-spec-gitignore-research]]'

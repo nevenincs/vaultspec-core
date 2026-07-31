@@ -6,6 +6,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:25563dda82777e215445cb7317277daaf5ff377a6971023639cab58657a61d9e'
 related:
   - '[[2026-07-17-mcp-static-launch-P01-S01]]'
   - '[[2026-07-17-mcp-static-launch-P01-S02]]'
