@@ -23,26 +23,9 @@ from networkx.readwrite import json_graph
 from .derived import compute_derived_edges
 
 if TYPE_CHECKING:
-    import networkx as nx
-
     from .api import VaultGraph
 
 __all__ = ["relativise_node_path", "to_dict", "to_json"]
-
-# networkx's own stubs leave ``node_link_data`` without a return-type
-# annotation, so calling it directly always reports as "partially unknown"
-# regardless of how precisely the input graph is typed. This thin re-binding
-# declares the signature actually used below (verified against the runtime
-# behaviour) for type-checking only; the ``else`` branch binds the exact same
-# callable at runtime, so behaviour is unchanged. Mirrors the identical
-# pattern in :mod:`vaultspec_core.graph.api`.
-if TYPE_CHECKING:
-
-    def _node_link_data(
-        g: nx.DiGraph[str], *, edges: str = "edges"
-    ) -> dict[str, Any]: ...
-else:
-    _node_link_data = json_graph.node_link_data
 
 
 def relativise_node_path(root_dir: pathlib.Path, raw_path: Any) -> str | None:
@@ -119,7 +102,7 @@ def to_dict(
     # networkx native serialisation - pass edges="edges" explicitly so the
     # wire key is deterministic regardless of networkx version. networkx
     # changed the default from "links" (<=3.5) to "edges" (>=3.6).
-    data = _node_link_data(g, edges="edges")
+    data = json_graph.node_link_data(g, edges="edges")
 
     # Strip body from nodes unless requested
     if not include_body:
