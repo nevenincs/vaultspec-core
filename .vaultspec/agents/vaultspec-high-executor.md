@@ -2,7 +2,7 @@
 description: 'Implement complex, high-reasoning steps: core refactors, architecture, advanced features. Use for the hardest steps.'
 tier: HIGH
 mode: read-write
-tools: [Glob, Grep, Read, Write, Edit, Bash]
+tools: [Glob, Grep, Read, Write, Edit, Bash, SendMessage, TaskList, TaskUpdate]
 ---
 
 # Persona: Lead Implementation Engineer (High-Tier)

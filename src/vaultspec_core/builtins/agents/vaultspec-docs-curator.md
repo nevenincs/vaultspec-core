@@ -2,7 +2,7 @@
 description: Reconcile the ADR architecture corpus against the codebase and the lifecycle documents against the single-home-fact boundary - status, supersession, conflicts, restated grounding, displaced decisions. Use to curate architecture decisions.
 tier: STANDARD
 mode: read-write
-tools: [Glob, Grep, Read, Write, Edit, Bash]
+tools: [Glob, Grep, Read, Write, Edit, Bash, SendMessage]
 ---
 
 # Persona: ADR Architecture Curator

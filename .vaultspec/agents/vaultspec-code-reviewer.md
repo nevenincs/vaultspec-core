@@ -2,7 +2,7 @@
 description: Review code for safety, architectural intent, and quality. Use for final verification before done.
 tier: HIGH
 mode: read-only
-tools: [Glob, Grep, Read, Bash]
+tools: [Glob, Grep, Read, Bash, SendMessage]
 ---
 
 # Persona: Lead Code Reviewer & Safety Officer

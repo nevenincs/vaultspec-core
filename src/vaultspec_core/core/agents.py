@@ -62,6 +62,20 @@ _CLAUDE_TO_GEMINI_TOOLS: dict[str, GeminiBuiltinTool] = {
     "WebSearch": GeminiBuiltinTool.GOOGLE_WEB_SEARCH,
 }
 
+# Host-orchestration tools a persona needs to report back to - and coordinate
+# with - the orchestrator that dispatched it, especially when it runs as a
+# background teammate rather than in the foreground. They address the host's
+# team channel and shared task list, not the project, so a `read-only` persona
+# carrying them still mutates nothing.
+#
+# Gemini CLI exposes no counterpart, so they are dropped from the Gemini render
+# deliberately and silently: the unknown-tool warning exists to catch typos in
+# authored sources, and warning about a tool that is Claude-only by design would
+# fire on every sync of every shipped persona.
+_CLAUDE_ONLY_HOST_TOOLS: frozenset[str] = frozenset(
+    {"SendMessage", "TaskCreate", "TaskList", "TaskUpdate"}
+)
+
 
 def _stem(name: str) -> str:
     return Path(name).stem
@@ -167,7 +181,9 @@ def _render_gemini_agent(
     entry of ``tools`` from Claude vocabulary to Gemini vocabulary via
     :data:`_CLAUDE_TO_GEMINI_TOOLS`. Unmapped source tools are dropped
     and a warning is appended to *warnings* (if provided) so a single
-    typo in one source file does not break the whole sync.
+    typo in one source file does not break the whole sync. The
+    host-orchestration tools in :data:`_CLAUDE_ONLY_HOST_TOOLS` have no
+    Gemini counterpart by design and are dropped without a warning.
     """
     fm: dict[str, Any] = {"name": _stem(name)}
     description = meta.get("description")
@@ -176,6 +192,8 @@ def _render_gemini_agent(
 
     mapped: list[str] = []
     for tool_name in _coerce_tools(meta):
+        if tool_name in _CLAUDE_ONLY_HOST_TOOLS:
+            continue
         gemini_name = _CLAUDE_TO_GEMINI_TOOLS.get(tool_name)
         if gemini_name is None:
             msg = (

@@ -2,7 +2,7 @@
 description: Audit a codebase to produce a Reference of features, patterns, and best practices. Use to document how code works.
 tier: STANDARD
 mode: read-only
-tools: [Glob, Grep, Read, Bash]
+tools: [Glob, Grep, Read, Bash, SendMessage]
 ---
 
 # Persona: Reference Codebase Specialist

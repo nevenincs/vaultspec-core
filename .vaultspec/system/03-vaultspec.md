@@ -111,5 +111,13 @@ files in either mode - so honoring it is persona discipline, not tooling enforce
 Dispatched personas operate vaultspec through the CLI; MCP tools are not assumed inside
 subagents.
 
+Returning findings is part of the persona contract in both dispatch shapes. A persona
+run in the foreground returns them as its final message; a persona run as a background
+teammate has no final message the orchestrator reads, so it relays through the host team
+channel (`SendMessage`) instead - reporting, not mutating, which is why `read-only`
+personas carry it too. Every shipped persona declares that relay tool; a persona left
+without one goes silent when backgrounded, and silence is indistinguishable from finding
+nothing.
+
 Artifacts are persisted in `.vault/`. The user must approve plans before execution
 proceeds. Code review via vaultspec-code-review is mandatory after execution.
