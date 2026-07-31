@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.55](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.54...vaultspec-core-v0.1.55) (2026-07-31)
+
+
+### Bug Fixes
+
+* **tests:** canonicalize workspace roots so provider scaffolding survives 8.3 paths ([75b8a38](https://github.com/nevenincs/vaultspec-core/commit/75b8a383bb72847f64d59dbaf111a397db0f1ee0))
+* **tests:** green the release-acceptance gate on runners without the CLIs ([#287](https://github.com/nevenincs/vaultspec-core/issues/287)) ([1645988](https://github.com/nevenincs/vaultspec-core/commit/164598893eea9554093f468feec0586ff4103e81))
+* **types:** guard the Windows-only branches and check every target platform ([481acef](https://github.com/nevenincs/vaultspec-core/commit/481acef2800c313f424a61e43ac30bf872ffeec6))
+* **vault:** stamp provenance, plan rollup, and parser integrity ([#298](https://github.com/nevenincs/vaultspec-core/issues/298)) ([351a51d](https://github.com/nevenincs/vaultspec-core/commit/351a51d7396d86dd0f297ab3d16bd86b317292e6))
+
 ## [0.1.54](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.53...vaultspec-core-v0.1.54) (2026-07-28)
 
 
