@@ -4,6 +4,7 @@ tags:
   - '#cli-exec-step-records'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:ee12d5fc95f8527168ca132175758dec208e54b7a7970325258167d393b0e60c'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-exec-step-records-research]]'

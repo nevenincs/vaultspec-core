@@ -4,6 +4,7 @@ tags:
   - '#workspace-context'
 date: '2026-03-21'
 modified: '2026-06-13'
+body_hash: 'sha256:5cb18f85d4d9348ce5bb0971caca3cfccd7bfa7293d2c47e5592cbfbe50c62ad'
 related:
   - '[[2026-03-21-workspace-context-plan]]'
 ---

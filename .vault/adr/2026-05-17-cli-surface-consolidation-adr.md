@@ -4,6 +4,7 @@ tags:
   - '#cli-surface-consolidation'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:1895c22f1d35a62758322b0edbbbf54fbf8b5d8b22a3834febc95fedf5020c57'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-surface-consolidation-research]]'

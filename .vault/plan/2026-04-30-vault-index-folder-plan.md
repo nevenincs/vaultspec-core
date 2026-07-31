@@ -3,7 +3,9 @@ tags:
   - '#plan'
   - '#vault-index-folder'
 date: '2026-04-30'
-modified: '2026-06-13'
+modified: '2026-07-31'
+body_hash: 'sha256:22ded8464e254257724ae7ed6ca9403fe52a5193918a45e01cceadbcafa3eaee'
+tier: L2
 related:
   - '[[2026-04-30-vault-index-folder-adr]]'
   - '[[2026-04-30-vault-index-folder-research]]'
@@ -11,174 +13,56 @@ related:
 
 # `vault-index-folder` plan: dedicated index subfolder migration
 
-Implementation plan for `[[2026-04-30-vault-index-folder-adr]]`. Each phase
-ships as one commit on the feature branch with tests landing alongside the
-code that calls them.
+## Steps
 
-## Phase 1 - constants and config
+### Phase `P01` - constants and config
 
-Add `DirName.INDEX = "index"` to `core/enums.py`. Add `index_dir: str` to
-`VaultSpecConfig` defaulting to `DirName.INDEX.value`. Register a
-`ConfigVariable` entry in `CONFIG_REGISTRY` with env name
-`VAULTSPEC_INDEX_DIR`. Add a config-test asserting the default value and the
-override path. Code only - the new constant is unused at this point.
+Add the index directory constant and configurable index_dir so later phases have somewhere to target.
 
-## Phase 2 - models, scanner, taxonomy
+- [x] `P01.S01` - add DirName.INDEX and a configurable index_dir with a VAULTSPEC_INDEX_DIR override; `src/vaultspec_core/core/enums.py`.
 
-Update `vaultcore/models.py`:
+### Phase `P02` - models, scanner, taxonomy
 
-- Extend `VaultConstants.SUPPORTED_DIRECTORIES` so `DocType.INDEX.value` is
-  included.
-- Extend `VaultConstants.SUPPORTED_TAGS` so `#index` is included.
-- Update `validate_vault_structure` so files at the docs root with the
-  `.index.md` suffix are reported as a violation (legacy location), and so
-  the `index/` subdirectory is recognised.
-- Update `validate_filename` so `.index.md` files are accepted in the
-  `index/` subfolder. Filename pattern remains `<feature>.index.md` (no date
-  prefix).
+Recognize the index subdirectory and its #index tag across taxonomy validation and document-type classification.
 
-Update `vaultcore/scanner.py` `get_doc_type`:
+- [x] `P02.S02` - extend supported directories and tags and validate the index subdirectory in vault structure; `src/vaultspec_core/vaultcore/models.py`.
+- [x] `P02.S03` - classify documents under index_dir as DocType.INDEX with a legacy root-level fallback; `src/vaultspec_core/vaultcore/scanner.py`.
 
-- When the path's first part relative to `docs_dir` equals `index_dir`,
-  return `DocType.INDEX`.
-- Keep the existing root-level fallback for back-compat, but tighten it to
-  log a debug message indicating "legacy root-level index" - this surfaces
-  the migration need without breaking unmigrated vaults.
+### Phase `P03` - generator
 
-Update tests under `vaultcore/tests/test_scanner.py` and any model tests to
-cover the new classification.
+Write generated feature indexes into the dedicated index subfolder.
 
-## Phase 3 - generator
+- [x] `P03.S04` - generate feature indexes under docs_dir/index_dir with the #index directory tag; `src/vaultspec_core/vaultcore/index.py`.
 
-Update `vaultcore/index.py`:
+### Phase `P04` - structure-checker migration path
 
-- Resolve the index target as `docs_dir / index_dir / f"{feature}.index.md"`.
-- Ensure the index directory exists (`mkdir(parents=True, exist_ok=True)`).
-- Add the `#index` directory tag to the rendered frontmatter alongside the
-  feature tag.
-- Drop the special case that skips the `generated: true` marker - the marker
-  stays.
+Detect legacy root-level indexes and relocate them to the new subfolder.
 
-Update `vaultcore/tests/test_index.py`: every test that asserts
-`path.name == "f.index.md"` keeps that assertion; add an assertion that
-`path.parent.name == "index"`. Add a tag-shape assertion that the rendered
-frontmatter contains both `#index` and `#<feature>`.
+- [x] `P04.S05` - detect legacy root-level indexes in the structure checker and point operators at the relocation fix; `src/vaultspec_core/vaultcore/checks/structure.py`.
 
-## Phase 4 - migration auto-fix in structure checker
+### Phase `P05` - checkers and features integration
 
-Add a new helper in `vaultcore/checks/structure.py`:
+Keep the feature-index checker and diagnostics aligned with the new location.
 
-- Walk `docs_dir` for `*.index.md` files whose parent equals `docs_dir`
-  (root-level legacy indexes).
-- For each one, emit a `CheckDiagnostic` with `severity=ERROR`,
-  `fixable=True`, message describing the relocation, and
-  `fix_description="Run with --fix to relocate to .vault/index/"`.
-- When `fix=True`, perform the move:
-  - Create `docs_dir / index_dir` if missing.
-  - Atomic rename (`shutil.move` or filesystem-atomic write).
-  - Rewrite frontmatter to insert `#index` directory tag if missing.
-  - Bump `result.fixed_count` and append an INFO diagnostic.
-  - On rename or rewrite failure, leave the file in place and emit an ERROR
-    diagnostic.
+- [x] `P05.S06` - update the feature-index checker fix description to reference the new location; `src/vaultspec_core/vaultcore/checks/features.py`.
 
-Add tests under `vaultcore/checks/tests/test_structure.py` (or a new file
-`test_index_migration.py`):
+### Phase `P06` - CLI, synthetic vault, and template
 
-- Real filesystem fixture using `WorkspaceFactory`.
-- Test: legacy root index detected as ERROR.
-- Test: auto-fix relocates the file and adds `#index` tag.
-- Test: idempotent - running `--fix` twice is a no-op.
-- Test: collision with an existing `index/<feature>.index.md` reports an
-  ERROR and does not overwrite.
+Update the CLI surface, synthetic corpus pathology, and index template for the new location.
 
-## Phase 5 - features checker
+- [x] `P06.S07` - update the feature-index CLI docstring and reference doc for the new location; `src/vaultspec_core/cli/vault_feature_cmd.py`.
+- [x] `P06.S08` - relocate the stale-index synthetic-corpus pathology under the index subfolder; `src/vaultspec_core/testing/synthetic.py`.
+- [x] `P06.S09` - add the #index directory tag to the index template; `src/vaultspec_core/builtins/templates/index.md`.
 
-Update `vaultcore/checks/features.py`:
+### Phase `P07` - documentation and built-in rules
 
-- `_index_exists_for` already matches by filename; no functional change
-  required, but the diagnostic message updates to mention the new path.
-- The "no feature index" warning's `fix_description` becomes
-  `"vault feature index -f {feat_name}"` (unchanged) since the generator now
-  writes to the new location.
+Document the index/ subfolder in project docs and the built-in taxonomy rules.
 
-## Phase 6 - frontmatter / body-links / orphans
+- [x] `P07.S10` - document index/ in the built-in directory-tag taxonomy and CLI reference; `.claude/rules/vaultspec.builtin.md`.
 
-These three checkers all rely on `is_generated_index` (filename-based). No
-behavioural change. Add a regression test in
-`vaultcore/checks/tests/test_index_safety.py` that constructs index paths
-both at root (legacy) and under `index/` (canonical) and asserts both are
-skipped uniformly.
+### Phase `P08` - repo migration and quality gates
 
-## Phase 7 - CLI
+Migrate this repo's own vault to the new layout and confirm quality gates pass clean.
 
-Update `cli/vault_cmd.py`:
-
-- `cmd_feature_index` docstring: change "in the vault root" to "in
-  `.vault/index/`".
-- No behavioural change needed; the docstring is the only callsite that
-  asserts the old location.
-
-## Phase 8 - synthetic vault
-
-Update `testing/synthetic.py`:
-
-- `_apply_stale_index` writes the pathology under
-  `vault_dir / "index" / f"{stem}.md"`.
-- `pathology_details` keeps the same shape; the directory in the manifest
-  changes from `plan` to `index`.
-- Update the generator's docstring.
-
-Add tests under `testing/tests/` if they exist, or extend the existing
-synthetic-corpus assertions to verify the pathology lands in the expected
-location.
-
-## Phase 9 - template
-
-Update `.vaultspec/rules/templates/index.md`:
-
-- Add `#index` directory tag.
-- Update the comment to say "index files live in `.vault/index/`".
-
-## Phase 10 - documentation and built-in rules
-
-`README.md`: update the document-types sentence to include `index` (or add
-a sentence noting that indexes are auto-generated and live in
-`.vault/index/`).
-
-`.vaultspec/CLI.md`: section `### vault feature index` rewords "at the vault
-root" to "in `.vault/index/`".
-
-`.vaultspec/README.md`: add `index/` to the directory enumeration.
-
-`.claude/rules/vaultspec.builtin.md` (parent-shared): add a row to the
-"Directory Tags" table for `.vault/index/` -> `#index`. Update the "Tag
-Taxonomy" allowed-tags list. Update the documentation hierarchy if it
-enumerates folders.
-
-## Phase 11 - migrate this repo's own vault
-
-After phases 1-10 land and tests pass, run
-`uv run --no-sync vaultspec-core vault check structure --fix` against the
-worktree. The 55 root-level `*.index.md` files relocate to `.vault/index/`
-with `#index` tags added. Commit the resulting tree as the final commit
-("apply migration to this repo's vault").
-
-## Phase 12 - quality gates
-
-- `uv run --no-sync pytest` clean.
-- `uv run --no-sync python -m ty check src/vaultspec_core` clean.
-- `uv run --no-sync prek run --all-files` clean (modulo the pre-existing
-  `spec-check` framework error which is out of scope).
-- `uv run --no-sync vaultspec-core vault check all` clean against the
-  migrated `.vault/`.
-- PR body updated with vault artifact links and bot review status.
-
-## Test policy reminders
-
-- No mocks, patches, stubs, fakes, skips. Use `WorkspaceFactory` and the
-  synthetic corpus.
-- No tautological tests. Each test must fail against the wrong
-  implementation.
-- Real filesystem assertions only.
-- Google-style docstrings with Sphinx cross-refs on all new public APIs.
-- No em-dashes anywhere (use spaced hyphens).
+- [x] `P08.S11` - migrate this repo's own vault so root-level indexes relocate to .vault/index/; `.vault/index`.
+- [ ] `P08.S12` - confirm quality gates pass clean against the migrated vault; `src/vaultspec_core`.

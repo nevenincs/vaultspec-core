@@ -4,6 +4,7 @@ tags:
   - '#cli-target-refactor'
 date: 2026-03-05
 modified: '2026-06-13'
+body_hash: 'sha256:4cff1ce5eeb9733f56af6ba025115617981f1dcbe4b0ed3f32ba2af2679cbb45'
 title: 'Phase 1 Step 1: `WorkspaceLayout` Refactoring'
 ---
 

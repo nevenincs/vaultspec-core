@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#mcp-tool-schema'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:6bff6101bc3ed01902cd811bf9f9f4009ec10e22fce61f3c565b8c606b47d21e'
 related:
   - '[[2026-07-09-mcp-tool-schema-P01-S01]]'
   - '[[2026-07-09-mcp-tool-schema-P01-S02]]'

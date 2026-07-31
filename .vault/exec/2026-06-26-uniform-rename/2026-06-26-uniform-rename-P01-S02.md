@@ -4,6 +4,7 @@ tags:
   - '#uniform-rename'
 date: '2026-06-26'
 modified: '2026-06-27'
+body_hash: 'sha256:8ab0f8e15e7358c6c4d6aa76337c1c5d71cca25d03f5104ee4df11b26a6c2db6'
 step_id: 'S02'
 related:
   - "[[2026-06-26-uniform-rename-plan]]"

@@ -4,6 +4,7 @@ tags:
   - '#rules-path-audit'
 date: '2026-02-20'
 modified: '2026-06-13'
+body_hash: 'sha256:9a160c9790393155df9943453854101299e055c9830e5ea4cc9a96202ef07577'
 related:
 ---
 

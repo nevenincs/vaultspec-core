@@ -4,6 +4,7 @@ tags:
   - '#firmware-code-boundary'
 date: '2026-07-16'
 modified: '2026-07-16'
+body_hash: 'sha256:de0e98bc8b0d5275872da577b24e78fac1768f34d3c592d8ff26820a27ba24e7'
 related:
   - '[[2026-07-09-firmware-mcp-primacy-adr]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'

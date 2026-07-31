@@ -1,15 +1,16 @@
 ---
 tags:
   - '#plan'
-  - '#test-quality'
+  - '#docs-curation'
 date: '2026-03-23'
 modified: '2026-06-13'
+body_hash: 'sha256:e7868f76808236fb22734239664b159e7b67b0d7c3b967bfe5a15e27d6b9f52e'
 related:
-  - '[[2026-03-23-test-quality-adr]]'
-  - '[[2026-03-23-test-quality-research]]'
+  - '[[2026-03-23-docs-curation-adr]]'
+  - '[[2026-03-23-docs-curation-research]]'
 ---
 
-# `test-quality` `test quality` plan
+# `docs-curation` `docs curation` plan
 
 Brief description of the proposed feature, change, or refactor.
 

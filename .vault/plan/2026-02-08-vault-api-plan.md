@@ -3,7 +3,9 @@ tags:
   - '#plan'
   - '#vault-api'
 date: '2026-02-08'
-modified: '2026-06-13'
+modified: '2026-07-31'
+body_hash: 'sha256:74bbf561b2172c1098cb71132277d73834287460af0d35dac6ffe5f1b20ce940'
+tier: L2
 related:
   - '[[2026-02-08-vault-api-adr]]'
   - '[[2026-02-08-vault-api-research]]'
@@ -11,35 +13,37 @@ related:
 
 # vault-api plan: Implementation of Docs Verification and Scaffolding
 
-## Goal
+## Steps
 
-Formalize the markdown rule system into a Python backend API and provide a unified CLI tool (`vault.py`) for auditing and managing the `.vault/` universe.
+### Phase `P01` - Core API and Auditing
 
-## Phase 1: Core API and Auditing (Completed)
+Formalize the markdown rule system into a modular Python API with connectivity analysis and reporting.
 
-- [x] **Modular Structure**: Implement `vault`, `verification`, `graph`, and `metrics` modules.
-- [x] **Frontmatter Parsing**: Implement robust YAML extraction and validation.
-- [x] **Connectivity Analysis**: Build Graph API to find hotspots, orphans, and invalid links.
-- [x] **Reporting CLI**: Implement `vault.py audit` with `--summary`, `--verify`, and `--graph`.
-- [x] **JSON Output**: Add `--json` flag for machine readability.
+- [x] `P01.S01` - implement modular vault, verification, graph, and metrics package structure; `src/vaultspec_core/vaultcore`.
+- [x] `P01.S02` - implement robust frontmatter parsing and validation; `src/vaultspec_core/vaultcore/parser.py`.
+- [x] `P01.S03` - build the graph API to find hotspots, orphans, and invalid links; `src/vaultspec_core/graph/api.py`.
+- [x] `P01.S04` - implement the reporting CLI with summary, verify, and graph output; `src/vaultspec_core/cli`.
+- [x] `P01.S05` - add a json flag for machine-readable audit output; `src/vaultspec_core/cli`.
 
-## Phase 2: Write API and Scaffolding (Completed)
+### Phase `P02` - Write API and Scaffolding
 
-- [x] **Template Logic**: Implement hydration system for `.vaultspec/templates/`.
-- [x] **Doc Scaffolding**: Implement `vault.py create` to generate compliant files with correct naming and metadata.
+Add template hydration and document scaffolding to the vault API.
 
-## Phase 3: Vertical Integrity (Pending)
+- [x] `P02.S06` - implement the template hydration system; `src/vaultspec_core/vaultcore/hydration.py`.
+- [x] `P02.S07` - implement document scaffolding with compliant naming and metadata; `src/vaultspec_core/vaultcore/index.py`.
 
-- [ ] **Cross-Type Validation**: Ensure every `#feature` has a master `/plan`.
-- [ ] **Execution Mapping**: Verify `exec` records link back to specific phases in their parent `plan`.
-- [ ] **Body Schema**: Validate Markdown headers against templates (e.g., ADRs must have "Consequences").
+### Phase `P03` - Vertical Integrity
 
-## Phase 4: MCP and Advanced Analysis (Future)
+Validate cross-type relationships, execution mapping, and body schema conformance across the vault.
 
-- [ ] **Docs-MCP**: Wrap the API into a Model Context Protocol server.
-- [ ] **Auto-Healing**: Implement suggestions for fixing broken wiki-links.
-- [ ] **Semantic Bridge**: Integrate vector-based RAG for meaning-aware document lookup.
+- [x] `P03.S08` - validate that every feature has a master plan; `src/vaultspec_core/vaultcore/checks/features.py`.
+- [x] `P03.S09` - validate markdown body sections against document templates; `src/vaultspec_core/vaultcore/checks/body_sections.py`.
+- [x] `P03.S13` - verify exec records link back to phases in their parent plan; `src/vaultspec_core/vaultcore/checks/exec_mapping.py`.
 
-## Status Summary
+### Phase `P04` - MCP and Advanced Analysis
 
-Phase 1 and 2 are fully implemented. The system successfully audited the `mock-project` and is ready for production use in the main workspace.
+Expose the vault API through MCP and add auto-healing and semantic search capabilities.
+
+- [x] `P04.S10` - wrap the vault API into a model context protocol server; `src/vaultspec_core/mcp_server`.
+- [x] `P04.S11` - implement auto-healing for broken wiki-links; `src/vaultspec_core/vaultcore/checks/dangling.py`.
+- [x] `P04.S12` - integrate vector-based rag for semantic document lookup; `src/vaultspec_core/core/workspace_mode.py`.

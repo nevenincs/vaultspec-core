@@ -4,6 +4,7 @@ tags:
   - '#mcp-static-launch'
 date: '2026-07-17'
 modified: '2026-07-17'
+body_hash: 'sha256:edd0333e3504d4ce6baf3075d439f198c227c19edab83772f5431fd6ca6e873c'
 step_id: 'S09'
 related:
   - "[[2026-07-17-mcp-static-launch-plan]]"

@@ -4,6 +4,7 @@ tags:
   - '#cli-ambiguous-states'
 date: '2026-03-27'
 modified: '2026-06-13'
+body_hash: 'sha256:51f63f23f44980c1b676011e424ac6e46a2d450e1968aa13960e1d4677f1e1d2'
 related:
   - '[[2026-03-27-cli-ambiguous-states-resolver-adr]]'
   - '[[2026-03-27-cli-ambiguous-states-gitignore-adr]]'

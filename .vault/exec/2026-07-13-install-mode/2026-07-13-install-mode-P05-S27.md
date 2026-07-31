@@ -4,6 +4,7 @@ tags:
   - '#install-mode'
 date: '2026-07-13'
 modified: '2026-07-13'
+body_hash: 'sha256:ab789aa331e184b3f35170d84ddbe0cbd7d94833534e594da0d5555cf62b99ff'
 step_id: 'S27'
 related:
   - "[[2026-07-13-install-mode-plan]]"

@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#mcp-consolidation'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:fc416af88d7575021cab3fdf506ed1dca59f2fc90d57b4b22291deeb4710a596'
 related:
   - '[[2026-02-22-mcp-consolidation-adr]]'
   - '[[2026-02-22-mcp-consolidation-plan]]'

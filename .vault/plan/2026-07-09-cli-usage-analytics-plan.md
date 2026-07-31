@@ -4,6 +4,7 @@ tags:
   - '#cli-usage-analytics'
 date: '2026-07-09'
 modified: '2026-07-10'
+body_hash: 'sha256:823a0ed8557216423c252ec415d4a0547a616de00dc41162ce30d9f7160b29e3'
 tier: L2
 related:
   - '[[2026-07-09-cli-usage-analytics-adr]]'

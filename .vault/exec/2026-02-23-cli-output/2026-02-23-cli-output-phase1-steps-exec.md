@@ -4,6 +4,7 @@ tags:
   - '#cli-output'
 date: '2026-02-23'
 modified: '2026-06-13'
+body_hash: 'sha256:5a495a6df3972e04319e965b78181d1b62b8aa313ffed57851175ba61b1d6aa5'
 related:
   - '[[2026-02-23-cli-output-plan]]'
 ---

@@ -4,6 +4,7 @@ tags:
   - '#check-engine-perf'
 date: '2026-03-21'
 modified: '2026-06-13'
+body_hash: 'sha256:fa78c5479c7fe16ec466d49afbb92bc827ed5b3490b92d734ed188cdefd5b073'
 related:
   - '[[2026-03-21-feature-documentation-code-review-audit]]'
 ---

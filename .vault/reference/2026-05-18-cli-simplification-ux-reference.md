@@ -4,6 +4,7 @@ tags:
   - '#cli-simplification-ux'
 date: '2026-05-18'
 modified: '2026-06-13'
+body_hash: 'sha256:e43995da8881c01d19e2e91a908deb3edf98cfd0a5ba7fef56aa54e4fab7b458'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-simplification-ux-adr]]'

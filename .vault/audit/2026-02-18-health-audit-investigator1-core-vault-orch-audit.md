@@ -4,6 +4,7 @@ tags:
   - '#code-health'
 date: '2026-02-18'
 modified: '2026-06-13'
+body_hash: 'sha256:3efb63dbe20277cb7b1b8ab98fb9f76df13176f2f8c44ff53132732f04988ce6'
 ---
 
 # Code Health Audit: Core, Vault, Orchestration, Hooks

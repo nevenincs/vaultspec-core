@@ -5,6 +5,7 @@ tags:
 date: '2026-07-27'
 modified: '2026-07-27'
 body_schema: 'body-v1'
+body_hash: 'sha256:2fdfc9d4659fa60d0419f258f1767fe601ede1e5c0c763d0a60dcf81a8c16b23'
 step_id: 'S02'
 related:
   - "[[2026-07-27-vault-scale-performance-plan]]"

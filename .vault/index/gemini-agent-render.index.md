@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#gemini-agent-render'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:3a1c6b58a49cda4ffd4ae58861e5e26903cd442ba225377af4e808a5874e4d0a'
 related:
   - '[[2026-04-12-gemini-agent-render-adr]]'
   - '[[2026-04-12-gemini-agent-render-phase1-review-exec]]'

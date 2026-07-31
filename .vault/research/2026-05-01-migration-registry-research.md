@@ -4,6 +4,7 @@ tags:
   - '#migration-registry'
 date: '2026-05-01'
 modified: '2026-06-13'
+body_hash: 'sha256:4abd1ce7d3835f29529ba9b22ece6bfc70f18e5023155c15e101c78ea83c7bd8'
 related:
   - '[[2026-04-30-vault-index-folder-research]]'
   - '[[2026-04-30-vault-index-folder-adr]]'

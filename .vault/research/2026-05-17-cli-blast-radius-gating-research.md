@@ -4,6 +4,7 @@ tags:
   - '#cli-blast-radius-gating'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:f7fa3a18f2db9c99471ae07d64132988547dae749a1aba59a7a969444a179d48'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
 ---

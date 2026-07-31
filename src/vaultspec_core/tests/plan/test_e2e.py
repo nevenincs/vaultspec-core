@@ -126,6 +126,48 @@ def test_step_check_toggles_persistence_to_disk(
     assert untouched.checked is False
 
 
+def test_unquoted_date_plan_is_reachable_and_recanonicalised(
+    tmp_path: Path, runner: CliRunner
+) -> None:
+    """An unquoted ``date:`` no longer locks a plan out of the owning verbs.
+
+    Reading the plan coerces the YAML-typed date so ``status`` succeeds,
+    and the first mutating verb rewrites the frontmatter through the
+    serialiser, which emits the canonical quoted ``yyyy-mm-dd`` form -
+    so coercion on read does not leave the document non-canonical on
+    disk indefinitely.
+    """
+    plan_path = tmp_path / "2026-03-05-unquoted-date-plan.md"
+    plan_path.write_text(
+        "---\n"
+        "tags:\n"
+        "  - '#plan'\n"
+        "  - '#unquoted-date'\n"
+        "date: 2026-03-05\n"
+        "tier: L1\n"
+        "related:\n"
+        "  - '[[2026-03-05-unquoted-date-adr]]'\n"
+        "---\n"
+        "\n"
+        "# `unquoted-date` plan\n"
+        "\n"
+        "- [ ] `S01` - do the work; `src/a.py`.\n",
+        encoding="utf-8",
+    )
+
+    status = runner.invoke(app, ["vault", "plan", "status", str(plan_path)])
+    assert status.exit_code == 0, status.stdout
+
+    checked = runner.invoke(
+        app, ["vault", "plan", "step", "check", str(plan_path), "S01"]
+    )
+    assert checked.exit_code == 0, checked.stdout
+
+    text = plan_path.read_text(encoding="utf-8")
+    assert "date: '2026-03-05'" in text
+    assert "date: 2026-03-05\n" not in text
+
+
 def test_query_open_filter_lists_uncompleted_steps(
     tmp_path: Path, runner: CliRunner
 ) -> None:

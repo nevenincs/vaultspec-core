@@ -27,6 +27,13 @@ from collections import Counter
 from typing import TYPE_CHECKING, Any, cast
 
 import networkx as nx
+
+# ``density`` is imported from its defining module rather than reached as
+# ``nx.density``: the narrowing stub in ``typings/networkx/classes/function.pyi``
+# is only visible on this path (see that file for why the namespace alias
+# cannot reach it). The other networkx entry points used here need no such
+# treatment and are called through ``nx``/``json_graph`` as usual.
+from networkx.classes.function import density as graph_density
 from networkx.readwrite import json_graph
 
 from ..vaultcore import (
@@ -59,42 +66,6 @@ if TYPE_CHECKING:
 
     from ..vaultcore.checks._base import VaultSnapshot
     from . import cache
-
-# networkx's own stubs leave ``node_link_data``, ``node_link_graph``,
-# ``ego_graph``, and ``density`` without return-type annotations, so calling
-# them directly always reports as "partially unknown" regardless of how
-# precisely the input graph is typed. These thin re-bindings declare the
-# signatures actually used below (verified against the runtime behaviour)
-# for type-checking only; the ``else`` branch binds the exact same callables
-# at runtime, so behaviour is unchanged.
-if TYPE_CHECKING:
-
-    def _node_link_data(
-        g: nx.DiGraph[str], *, edges: str = "edges"
-    ) -> dict[str, Any]: ...
-
-    def _node_link_graph(
-        data: dict[str, Any],
-        *,
-        directed: bool = False,
-        multigraph: bool = True,
-        edges: str = "edges",
-    ) -> nx.DiGraph[str]: ...
-
-    def _ego_graph(
-        g: nx.DiGraph[str],
-        n: str,
-        *,
-        radius: float = 1,
-        undirected: bool = False,
-    ) -> nx.DiGraph[str]: ...
-
-    def _graph_density(g: nx.DiGraph[str]) -> float: ...
-else:
-    _node_link_data = json_graph.node_link_data
-    _node_link_graph = json_graph.node_link_graph
-    _ego_graph = nx.ego_graph
-    _graph_density = nx.density
 
 logger = logging.getLogger(__name__)
 
@@ -283,7 +254,7 @@ class VaultGraph:
         Returns:
             A node-link ``dict`` with body text attached to each node.
         """
-        data = _node_link_data(self._digraph, edges="edges")
+        data = json_graph.node_link_data(self._digraph, edges="edges")
         for node_dict in data.get("nodes", []):
             nid = node_dict.get("id", "")
             doc = self.nodes.get(nid)
@@ -303,7 +274,7 @@ class VaultGraph:
             payload: A cache payload that has already passed
                 :func:`vaultspec_core.graph.cache.validate`.
         """
-        self._digraph = _node_link_graph(
+        self._digraph = json_graph.node_link_graph(
             payload.graph,
             directed=True,
             multigraph=False,
@@ -822,7 +793,7 @@ class VaultGraph:
             raise KeyError(node)
         if depth < 0:
             raise ValueError(f"depth must be >= 0, got {depth}")
-        ego = _ego_graph(
+        ego = nx.ego_graph(
             self._digraph,
             node,
             radius=depth,
@@ -960,6 +931,8 @@ class VaultGraph:
             step_id = raw_step_id if isinstance(raw_step_id, str) else None
             raw_body_schema = node.frontmatter.get("body_schema")
             body_schema = raw_body_schema if isinstance(raw_body_schema, str) else None
+            raw_body_hash = node.frontmatter.get("body_hash")
+            body_hash = raw_body_hash if isinstance(raw_body_hash, str) else None
             metadata = DocumentMetadata(
                 tags=sorted(node.tags),
                 date=node.date,
@@ -968,6 +941,7 @@ class VaultGraph:
                 superseded_by=superseded_by,
                 step_id=step_id,
                 body_schema=body_schema,
+                body_hash=body_hash,
             )
             snapshot[node.path] = (metadata, node.body)
         return snapshot
@@ -1112,7 +1086,7 @@ class VaultGraph:
             total_edges=n_edges,
             total_features=len(features),
             total_words=total_words,
-            density=_graph_density(g),
+            density=graph_density(g),
             avg_in_degree=(n_edges / n_nodes if n_nodes else 0.0),
             avg_out_degree=(n_edges / n_nodes if n_nodes else 0.0),
             max_in_degree=max_in,

@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#test-project-removal'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:29c6af90d4a0cbd31663c78df46f203e66f0df403d0d83224bef79039f95ea7e'
 related:
   - '[[2026-04-12-test-project-removal-adr]]'
   - '[[2026-04-12-test-project-removal-phase1-lift-extend-exec]]'

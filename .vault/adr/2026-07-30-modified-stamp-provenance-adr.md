@@ -5,6 +5,7 @@ tags:
 date: '2026-07-30'
 modified: '2026-07-30'
 body_schema: 'body-v1'
+body_hash: 'sha256:03e8442e0c0f9c99d184fd3836e7d650c6ae06a3e73bab7560134885293a2d9a'
 related:
   - '[[2026-07-30-modified-stamp-provenance-research]]'
   - '[[2026-06-12-vault-orientation-adr]]'
@@ -12,7 +13,7 @@ related:
   - '[[2026-07-23-vault-check-validators-adr]]'
 ---
 
-# `modified-stamp-provenance` adr: `derive stamp staleness from a content fingerprint, not file mtime` | (**status:** `proposed`)
+# `modified-stamp-provenance` adr: `derive stamp staleness from a content fingerprint, not file mtime` | (**status:** `accepted`)
 
 ## Problem Statement
 
@@ -54,6 +55,12 @@ currently-wrong stamps.
   deterministic one-time seed is inside its normal envelope.
 - `vault check all` has no dry-run; the non-fix run is the only preview, so the fix must be
   deterministic for that preview to be truthful.
+- The `vault-fix` pre-commit hook runs `vault check all --fix` unattended with
+  `pass_filenames: false` on every commit touching any markdown, giving a commit-scoped
+  protocol a corpus-wide mutation surface; both bulk stamp-rewrite generations were emitted
+  through this channel, and the hook runner's staging protocol reverts the working tree
+  around hook execution, so any hook-time tree mutation is additionally hazardous in shared
+  worktrees.
 
 ## Considered options
 
@@ -116,6 +123,17 @@ heuristic and its document tally are removed wholesale - once mtime is not evide
 heuristic to excuse mtime has no subject. The module docstring is rewritten to the new
 semantics.
 
+The `vault-fix` pre-commit hook stops running `--fix` unattended: its entry becomes the
+non-mutating `vault check all`, a pure gate. Unattended corpus-mutating repair from inside
+a commit is retired as a discipline, not just detuned: `pass_filenames: false` gives the
+hook the whole corpus as blast radius regardless of what the commit touches, a hook-time
+fix writes dates nobody reviewed into commits that are not about them, and the hook
+runner's revert-based staging protocol makes hook-time tree mutation unsafe in shared
+worktrees. The fingerprint design makes this costless - the non-fix check is an exact,
+deterministic preview, so a failing gate names precisely what a deliberate operator-run
+`--fix` will do - and the fix remains one command away, run on purpose, reviewed like any
+other change.
+
 A one-time migration seeds the field corpus-wide from current body content. Existing
 `modified:` values receive amnesty: they are known to carry two generations of mtime-derived
 fiction, but every candidate recomputation source is worse - mtime is the defect, and git
@@ -164,3 +182,7 @@ writes verifiable facts derived from the content itself.
   on old corpora, by the silence rule.
 - The checker sheds its only heuristic and its only environment-dependent input, simplifying
   both the implementation and its test surface (no more mtime manipulation in tests).
+- Commits with outstanding fixable findings now fail the gate instead of being silently
+  repaired in flight; authors run the fix deliberately and commit its effects visibly. The
+  hook loses its self-healing convenience, which is exactly the property that let two
+  corpus-scale corruptions ship unreviewed.

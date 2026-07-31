@@ -4,6 +4,7 @@ tags:
   - '#vaultspec-source-layout-collapse'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:74e60b90a8380858e09a7488ae3266798b6968fee0b731c3abec9a7b037722fa'
 related: []
 ---
 

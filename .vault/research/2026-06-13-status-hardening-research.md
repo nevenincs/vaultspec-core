@@ -4,6 +4,7 @@ tags:
   - '#status-hardening'
 date: 2026-06-13
 modified: 2026-06-13
+body_hash: 'sha256:bc31ad5700dd5895de9a7a924be6006d8c83dada2cd62a067c91b3868ef224df'
 related:
   - '[[2026-06-12-vault-orientation-adr]]'
   - '[[2026-06-12-vault-orientation-research]]'

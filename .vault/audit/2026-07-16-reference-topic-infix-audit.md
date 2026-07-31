@@ -4,6 +4,7 @@ tags:
   - '#reference-topic-infix'
 date: '2026-07-16'
 modified: '2026-07-16'
+body_hash: 'sha256:d9dc1468578065c50c9bd14743a54a1a0d02776dd9dbb26f0ede4e3f7f20e280'
 related:
   - "[[2026-07-16-reference-topic-infix-plan]]"
   - "[[2026-07-16-reference-topic-infix-adr]]"

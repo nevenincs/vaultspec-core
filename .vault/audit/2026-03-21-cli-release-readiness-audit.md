@@ -4,6 +4,7 @@ tags:
   - '#feature-documentation'
 date: '2026-03-21'
 modified: '2026-06-13'
+body_hash: 'sha256:c4639d9fcbacd5a16bd9fce72e7bf9fff216a488d00071f71d2fe5f117115599'
 related:
   - '[[2026-03-16-cli-restructure-plan]]'
   - '[[2026-03-21-builtins-build-strategy-adr]]'

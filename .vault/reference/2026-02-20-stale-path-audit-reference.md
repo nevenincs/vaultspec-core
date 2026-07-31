@@ -4,6 +4,7 @@ tags:
   - '#uncategorized'
 date: '2026-02-20'
 modified: '2026-06-13'
+body_hash: 'sha256:4e0c989158118c87d955e7a8833408a485a9ffbd208af1911781710e965bfc27'
 ---
 
 ```

@@ -2,7 +2,7 @@
 description: Implement typical feature work and well-defined steps. Use for standard execution.
 tier: STANDARD
 mode: read-write
-tools: [Glob, Grep, Read, Write, Edit, Bash]
+tools: [Glob, Grep, Read, Write, Edit, Bash, SendMessage, TaskList, TaskUpdate]
 ---
 
 # Persona: Lead Implementation Engineer (Standard-Tier)

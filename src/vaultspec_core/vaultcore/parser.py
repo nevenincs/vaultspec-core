@@ -190,6 +190,8 @@ def parse_vault_metadata(content: str) -> tuple[DocumentMetadata, str]:
                 metadata.step_id = val.strip("\"'") or None
             elif key == "body_schema":
                 metadata.body_schema = val.strip("\"'") or None
+            elif key == "body_hash":
+                metadata.body_hash = val.strip("\"'") or None
             elif val.startswith("[") and val.endswith("]"):
                 # Simple inline list parsing: ["#a", "#b"]
                 items = [

@@ -4,6 +4,7 @@ tags:
   - '#reference-topic-infix'
 date: '2026-07-16'
 modified: '2026-07-16'
+body_hash: 'sha256:f75b9d323cf1719a3e8645cefa442b9a01ff9b9a5b68ed581bad195ea5442934'
 tier: L1
 related:
   - '[[2026-07-16-reference-topic-infix-adr]]'

@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#workspace-paths'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:20a216f6540534313bcd2b921fd8e639da1ab218fb700ce544867473e90a746f'
 related:
   - '[[2026-02-19-workspace-path-decoupling-adr]]'
   - '[[2026-02-19-workspace-path-decoupling-research]]'

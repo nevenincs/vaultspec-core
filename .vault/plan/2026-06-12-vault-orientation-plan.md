@@ -4,6 +4,7 @@ tags:
   - '#vault-orientation'
 date: '2026-06-12'
 modified: '2026-06-13'
+body_hash: 'sha256:1519742a6afdf9591496f62444d440801bc05210ae5c6cef3e81f2bb52c27298'
 tier: L3
 related:
   - '[[2026-06-12-vault-orientation-adr]]'

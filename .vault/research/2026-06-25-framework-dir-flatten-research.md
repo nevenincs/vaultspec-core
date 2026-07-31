@@ -4,6 +4,7 @@ tags:
   - '#framework-dir-flatten'
 date: '2026-06-25'
 modified: '2026-06-27'
+body_hash: 'sha256:9861cace78b4006e9793d2aff43051f2918b3f41dcf35a8f8efeacd5bef754fa'
 related: []
 ---
 

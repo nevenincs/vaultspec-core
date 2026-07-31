@@ -4,6 +4,7 @@ tags:
   - '#uniform-rename'
 date: '2026-06-26'
 modified: '2026-06-27'
+body_hash: 'sha256:16809781fa1fbbfc48ab4b893d61b08ee522381f5c61f4dcad114176e5fcc947'
 related:
   - "[[2026-06-26-uniform-rename-reference]]"
   - "[[2026-05-17-cli-rename-integrity-adr]]"

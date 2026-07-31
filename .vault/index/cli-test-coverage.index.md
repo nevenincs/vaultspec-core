@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#cli-test-coverage'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:a802ef469826b465d3780fdc5f7506be51f753dacd062202223359c277aecbc0'
 related:
   - '[[2026-02-23-cli-test-coverage-plan]]'
   - '[[2026-03-23-cli-test-coverage-adr]]'

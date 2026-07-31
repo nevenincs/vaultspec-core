@@ -4,6 +4,7 @@ tags:
   - '#mcp-testing'
 date: '2026-07-17'
 modified: '2026-07-17'
+body_hash: 'sha256:4f883469137bb6f9aa3a73b8cdb526bb2166432e231fa86c36d0e83b1b62056c'
 step_id: 'S04'
 related:
   - "[[2026-07-17-mcp-testing-plan]]"

@@ -4,6 +4,7 @@ tags:
   - '#adr-topic-infix'
 date: '2026-07-27'
 modified: '2026-07-27'
+body_hash: 'sha256:c8f9182c3a5365445081bafdf0bea1c3dbdad29b3f0aa881223a4879a62f6d93'
 step_id: 'S03'
 related:
   - "[[2026-07-27-adr-topic-infix-plan]]"

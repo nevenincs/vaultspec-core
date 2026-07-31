@@ -204,6 +204,38 @@ async def test_plan_edit_empty_batch_is_protocol_error(vault_root: Path) -> None
         assert result.is_error
 
 
+async def test_plan_edit_write_that_does_not_round_trip_is_a_whole_call_error(
+    vault_root: Path,
+) -> None:
+    """A step the document cannot carry fails the call instead of succeeding.
+
+    The row contract reserves ``;`` as the action / scope separator, so an
+    action carrying one persists a row that re-parses into different content.
+    Post-write verification (issue #296) turns that silent wrong state into a
+    whole-call ``isError``, and the operator is told to re-read rather than
+    handed a ``created`` result the plan does not back.
+    """
+    mcp = create_server()
+    async with Client(mcp) as client:
+        await _create_plan(client, "roundtrip")
+        result = await client.call_tool(
+            "plan_edit",
+            {
+                "plan": "roundtrip",
+                "operations": [
+                    {
+                        "operation": "add",
+                        "action": "reconcile the ledger; then re-index",
+                        "scope": "src/a.py",
+                    }
+                ],
+            },
+        )
+        assert result.is_error
+        texts = [getattr(block, "text", "") for block in result.content]
+        assert any("write verification failed" in text for text in texts), texts
+
+
 # ---------------------------------------------------------------------------
 # plan_progress
 # ---------------------------------------------------------------------------

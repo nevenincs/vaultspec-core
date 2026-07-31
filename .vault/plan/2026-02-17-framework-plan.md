@@ -3,7 +3,9 @@ tags:
   - '#plan'
   - '#framework'
 date: '2026-02-17'
-modified: '2026-06-13'
+modified: '2026-07-31'
+body_hash: 'sha256:ae5358f3b1d6d32a2c4d997a7f70a3c39c602c08a14f1a6312c3215e7017ac07'
+tier: L2
 related:
   - '[[2026-02-17-bootstrap-prompt-adr]]'
   - '[[2026-02-16-environment-variable-adr]]'
@@ -12,19 +14,13 @@ related:
 
 # Framework Infrastructure Plan
 
-Consolidation plan for vaultspec internal framework concerns: configuration management, bootstrap prompt engineering, and multi-agent orchestration infrastructure.
+## Steps
 
-## Proposed Changes
+### Phase `P01` - Framework Infrastructure Consolidation
 
-Centralize environment variable management under a unified registry, refine the bootstrap prompt assembly pipeline, and improve multi-agent orchestration patterns based on frontier landscape research.
+Centralize configuration management, refine bootstrap prompt composition, and improve multi-agent orchestration.
 
-## Tasks
-
-- Implement centralized environment variable registry (replacing scattered VS\_*, GEMINI\_*, VS_MCP\_\* patterns)
-- Refine bootstrap prompt composition in system/framework.md
-- Improve multi-agent orchestration dispatch reliability
-- Apply frontier landscape insights to agent tier definitions
-
-## Verification
-
-All configuration accessed through unified registry. Bootstrap prompt generates valid tool-specific configs. Multi-agent dispatch tests pass for all agent tiers.
+- [x] `P01.S01` - implement a centralized environment variable registry; `src/vaultspec_core/config/config.py`.
+- [x] `P01.S02` - refine bootstrap prompt composition in the system assembly pipeline; `src/vaultspec_core/builtins/system/03-vaultspec.md`.
+- [x] `P01.S03` - improve multi-agent orchestration dispatch reliability; `src/vaultspec_core/core/executor.py`.
+- [x] `P01.S04` - apply frontier landscape insights to agent tier definitions; `src/vaultspec_core/core/agents.py`.

@@ -4,6 +4,7 @@ tags:
   - '#prek-boundary-hardening'
 date: '2026-07-23'
 modified: '2026-07-23'
+body_hash: 'sha256:10b8afa85a7a0155d52f1227f68dcab5ae1390b4dfeffb7d7ea27253dfc513ab'
 tier: L2
 related:
   - '[[2026-07-23-prek-boundary-hardening-adr]]'

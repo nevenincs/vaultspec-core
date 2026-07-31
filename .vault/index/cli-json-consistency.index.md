@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#cli-json-consistency'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:64008c32578320f264228e5b737df55a8ff034395669ec11235ae044f217fbfa'
 related:
   - '[[2026-05-17-cli-json-consistency-adr]]'
   - '[[2026-05-17-cli-json-consistency-research]]'

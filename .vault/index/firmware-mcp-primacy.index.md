@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#firmware-mcp-primacy'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:bc4f44da6073688e2ffd1bf6ec8e225d0b18d826d6699d279cf3bbea302bf03b'
 related:
   - '[[2026-07-09-firmware-mcp-primacy-P01-S01]]'
   - '[[2026-07-09-firmware-mcp-primacy-P01-S02]]'

@@ -51,8 +51,10 @@ class FeatureStatus(BaseModel):
             documents, or ``None``.
         has_plan: Whether the feature has at least one plan.
         status: The lifecycle status word from the orientation core.
-        plan_tier: The feature's plan tier, or ``None``.
-        plan_completion_percent: The feature's plan completion percent.
+        plan_tier: The highest tier across the feature's readable plans,
+            or ``None`` when none of them parse.
+        plan_completion_percent: Completion across every plan carrying the
+            feature tag, not one representative plan's figure.
     """
 
     name: str

@@ -4,6 +4,7 @@ tags:
   - '#code-boundary-check'
 date: '2026-07-16'
 modified: '2026-07-16'
+body_hash: 'sha256:516301729757ac282d344423bdf1fd723d5cb1bc04f71e0e356a3b35271e6cf7'
 tier: L1
 related:
   - '[[2026-07-16-code-boundary-check-adr]]'

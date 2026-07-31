@@ -2,7 +2,7 @@
 description: Research a problem and formalize the decision as an ADR. Use to turn open questions into an ADR.
 tier: HIGH
 mode: read-only
-tools: [Glob, Grep, Read, WebFetch, WebSearch, Bash]
+tools: [Glob, Grep, Read, WebFetch, WebSearch, Bash, SendMessage]
 ---
 
 # Persona: Technical Researcher, Frontier Standards & `<ADR>` Decision Support

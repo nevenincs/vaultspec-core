@@ -712,10 +712,14 @@ class TestVaultRepair:
 
         json_result = factory.run("vault", "check", "all", "--json")
         checks = json.loads(json_result.output)["data"]["checks"]
+        # ``modified-stamp`` is the last document-scoped checker in both the
+        # read-only and the --fix branch: its staleness fingerprint is
+        # compared against bodies as the run finally leaves them, so it must
+        # follow every checker that rewrites a body (annotations, markdown
+        # hygiene, wiki-link repair, the adr-status heading rewrite).
         assert [item["check_name"] for item in checks] == [
             "structure",
             "frontmatter",
-            "modified-stamp",
             "annotations",
             "markdown",
             "links",
@@ -730,6 +734,7 @@ class TestVaultRepair:
             "references",
             "schema",
             "adr-status",
+            "modified-stamp",
             "rename-integrity",
             "encoding",
         ]

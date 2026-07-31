@@ -4,6 +4,7 @@ tags:
   - '#cli-output-standardization'
 date: '2026-06-13'
 modified: '2026-06-13'
+body_hash: 'sha256:c350486dcf462d2be286a74960804855227e82fad66f7a1004d759d68b1353f0'
 tier: L2
 related:
   - '[[2026-06-13-cli-output-standardization-adr]]'

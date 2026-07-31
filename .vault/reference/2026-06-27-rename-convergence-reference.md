@@ -4,6 +4,7 @@ tags:
   - '#rename-convergence'
 date: '2026-06-27'
 modified: '2026-06-27'
+body_hash: 'sha256:8c3c623f63d19d53405d92579cdc58d6c6623a1f0819a01a35ac77903fc2327e'
 related:
   - "[[2026-06-26-uniform-rename-adr]]"
 ---

@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#doctor-dev-repo'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:dbfefaeed4708ce18b5293fb1c4b890e48418007cf5c4f839689d83871d0a4a2'
 related:
   - '[[2026-04-30-doctor-dev-repo-adr]]'
   - '[[2026-04-30-doctor-dev-repo-plan]]'

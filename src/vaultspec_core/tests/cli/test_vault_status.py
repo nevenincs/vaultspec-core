@@ -51,8 +51,13 @@ def _plan(
     modified: str,
     steps: list[tuple[str, bool]],
     related: list[str] | None = None,
+    tier: str = "L2",
 ) -> str:
-    """Render an L2 plan with one phase of explicit step rows."""
+    """Render a plan with one phase of explicit step rows.
+
+    The declared *tier* defaults to ``L2``; pass a value outside the tier
+    enum to write a genuinely malformed plan the parser rejects.
+    """
     lines = [
         "---",
         "tags:",
@@ -60,7 +65,7 @@ def _plan(
         f"  - '#{feature}'",
         f"date: '{date}'",
         f"modified: '{modified}'",
-        "tier: L2",
+        f"tier: {tier}",
     ]
     if related:
         lines.append("related:")
@@ -749,3 +754,93 @@ class TestRecencyHygiene:
 
         assert "exec" in payload["recent_documents"]
         assert payload["exec_activity"] == []
+
+
+# ---------------------------------------------------------------------------
+# Feature rollup across several plans carrying one feature tag
+# ---------------------------------------------------------------------------
+
+
+def _build_multi_plan_vault(root: Path) -> dict[str, str]:
+    """Build a feature planned across two documents, one of them legacy.
+
+    The older plan declares no step rows at all (the legacy shape that
+    used to win the rollup outright); the newer one is fully closed.
+    """
+    vault = root / ".vault"
+    (root / ".vaultspec").mkdir(parents=True, exist_ok=True)
+    feature = "split"
+    legacy_stem = f"2026-01-05-{feature}-plan"
+    current_stem = f"2026-06-05-{feature}-plan"
+    _write(
+        vault / "plan" / f"{legacy_stem}.md",
+        _plan(feature, date="2026-01-05", modified="2026-01-05", steps=[]),
+    )
+    _write(
+        vault / "plan" / f"{current_stem}.md",
+        _plan(
+            feature,
+            date="2026-06-05",
+            modified="2026-06-05",
+            steps=[("S01", True), ("S02", True), ("S03", False)],
+        ),
+    )
+    return {"feature": feature, "legacy": legacy_stem, "current": current_stem}
+
+
+class TestFeaturePlanAggregation:
+    """The active-feature row sums every plan carrying the feature tag."""
+
+    def test_step_less_plan_does_not_mask_its_sibling(self, tmp_path: Path) -> None:
+        _build_multi_plan_vault(tmp_path)
+
+        result = _run(tmp_path)
+
+        assert result.exit_code == 0, result.output
+        row = next(
+            line
+            for line in result.output.split("Active features")[1].splitlines()
+            if "split" in line
+        )
+        # The sibling plan's steps reach the row instead of a bare 0/0.
+        assert "L2 2/3 66.7%" in row
+        assert "across 2 plans" in row
+
+    def test_aggregate_counts_in_json(self, tmp_path: Path) -> None:
+        _build_multi_plan_vault(tmp_path)
+
+        payload = json.loads(_run(tmp_path, "--json").output)["data"]
+
+        feature = next(f for f in payload["active_features"] if f["name"] == "split")
+        assert feature["plan_step_count"] == 3
+        assert feature["plan_steps_completed"] == 2
+        assert feature["plan_completion_percent"] == 66.7
+        assert feature["plan_count"] == 2
+        assert feature["plans_unreadable"] == 0
+
+    def test_unreadable_plan_is_reported_not_rendered_as_no_progress(
+        self, tmp_path: Path
+    ) -> None:
+        vault = tmp_path / ".vault"
+        (tmp_path / ".vaultspec").mkdir(parents=True, exist_ok=True)
+        # A real malformed plan: 'L9' is not a member of the tier enum.
+        _write(
+            vault / "plan" / "2026-05-01-cracked-plan.md",
+            _plan(
+                "cracked",
+                date="2026-05-01",
+                modified="2026-05-01",
+                steps=[("S01", True)],
+                tier="L9",
+            ),
+        )
+
+        result = _run(tmp_path)
+
+        assert result.exit_code == 0, result.output
+        row = next(
+            line
+            for line in result.output.split("Active features")[1].splitlines()
+            if "cracked" in line
+        )
+        assert "1 unreadable plan" in row

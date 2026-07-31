@@ -4,6 +4,7 @@ tags:
   - '#mcp-tool-schema'
 date: '2026-07-09'
 modified: '2026-07-10'
+body_hash: 'sha256:307ded298b16252b8217b7cabac4da69cbbf32e6b8d4a30a3f693210b0179ba7'
 step_id: 'S26'
 related:
   - "[[2026-07-09-mcp-tool-schema-plan]]"

@@ -4,6 +4,7 @@ tags:
   - '#marketing-audit'
 date: '2026-02-18'
 modified: '2026-06-13'
+body_hash: 'sha256:dbf3cfd220cda1b9d7bd467d4f2ddeb55bb8c472b9b78b96b0c9bd11960bd967'
 ---
 
 ## Marketing Audit: Positioning & USPs

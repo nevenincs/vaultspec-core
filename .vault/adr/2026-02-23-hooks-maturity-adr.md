@@ -4,6 +4,7 @@ tags:
   - '#hooks-maturity'
 date: '2026-02-23'
 modified: '2026-06-13'
+body_hash: 'sha256:fd0b97f9bbf7fdcb7e853bd337f2cf6cf604d6feff9173970f5dae29b67bf770'
 related:
   - '[[2026-02-23-hooks-maturity-research]]'
 ---

@@ -4,6 +4,7 @@ tags:
   - '#codebase-audit'
 date: '2026-02-22'
 modified: '2026-06-13'
+body_hash: 'sha256:2cacb1fca338e8a3c40a23844f253969184ca9e042636708e4b847c26ed9b03f'
 related:
   - '[[2026-02-22-codebase-audit-research]]'
 ---

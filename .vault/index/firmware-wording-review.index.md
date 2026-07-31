@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#firmware-wording-review'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:33f524db1f894caa1628f2238133ffaf5cfc5bc578d1f21efcb95cb2111f3840'
 related:
   - '[[2026-06-09-firmware-wording-review-P01-S01]]'
   - '[[2026-06-09-firmware-wording-review-P01-S02]]'

@@ -4,6 +4,7 @@ tags:
   - '#firmware-mcp-primacy'
 date: '2026-07-09'
 modified: '2026-07-10'
+body_hash: 'sha256:200d92a33a9ba5da57759148ba01e4e2574de14d5b05e0d14e4b9994a64bce65'
 step_id: 'S14'
 related:
   - "[[2026-07-09-firmware-mcp-primacy-plan]]"

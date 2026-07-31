@@ -4,6 +4,7 @@ tags:
   - '#rag-pipeline-enrollment'
 date: '2026-06-26'
 modified: '2026-06-27'
+body_hash: 'sha256:6f92c18e164cced9495066741874ed76153179e6d25c7d1d4d37ef64cc5823e7'
 related:
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-25-framework-dir-flatten-adr]]'

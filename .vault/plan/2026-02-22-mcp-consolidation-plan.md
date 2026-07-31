@@ -3,7 +3,9 @@ tags:
   - '#plan'
   - '#mcp-consolidation'
 date: '2026-02-22'
-modified: '2026-06-13'
+modified: '2026-07-31'
+body_hash: 'sha256:a79510b70884df87eaa191797c5083a47044ed1be541a18f6e45b31b1eadb68f'
+tier: L2
 related:
   - '[[2026-02-22-mcp-consolidation-adr]]'
   - '[[2026-02-22-mcp-consolidation-research]]'
@@ -13,159 +15,38 @@ related:
 
 # `mcp-consolidation` plan
 
-Consolidate `server.py`, `subagent_server/`, and `mcp_tools/` into a single
-`mcp_server/` package per \[[2026-02-22-mcp-consolidation-adr]\] (Option D).
+## Steps
 
-## Proposed Changes
+### Phase `P01` - Scaffold and move source files
 
-Merge three scattered MCP modules into one coherent package. This is a
-structural refactoring — no behavioral changes. The ADR specifies exact file
-moves, import rewrites, and the target directory structure. The legacy
-standalone `main()` in `subagent_server/server.py` is removed.
+Create the mcp_server package and move server.py, subagent_server, and mcp_tools content into it
 
-## Tasks
+- [x] `P01.S01` - create the mcp_server package and move the subagent, team, vault, and framework tool modules into it; `src/vaultspec_core/mcp_server`.
+- [x] `P01.S02` - move the unified server entry point into mcp_server and update its internal imports; `src/vaultspec_core/mcp_server/app.py`.
+- [x] `P01.S03` - write the mcp_server package init with the public re-exports; `src/vaultspec_core/mcp_server/__init__.py`.
 
-- Phase 1: scaffold and move source files
+### Phase `P02` - Move test files
 
-  1. Create `src/vaultspec/mcp_server/` directory with `__init__.py`
+Move the subagent_server and mcp_tools test suites into mcp_server/tests and update their relative imports
 
-  1. Move `src/vaultspec/subagent_server/server.py` →
-     `src/vaultspec/mcp_server/subagent_tools.py`
+- [x] `P02.S04` - move the subagent_server and mcp_tools test suites into mcp_server tests and update relative imports; `src/vaultspec_core/mcp_server/tests`.
 
-     - Remove the deprecated legacy `main()` function (lines 905-960)
-     - Remove the `if __name__ == "__main__"` guard
-     - Keep all other code unchanged
+### Phase `P03` - Update external references
 
-  1. Move `src/vaultspec/mcp_tools/team_tools.py` →
-     `src/vaultspec/mcp_server/team_tools.py`
+Retarget every external reference to the old server and mcp_tools module paths at the new mcp_server location
 
-     - No content changes needed
+- [ ] `P03.S05` - update the package entry point and __main__ to reference mcp_server.app; `src/vaultspec_core/__main__.py`.
+- [x] `P03.S06` - update pyproject.toml's vaultspec-mcp entry point to mcp_server.app; `pyproject.toml`.
 
-  1. Move `src/vaultspec/mcp_tools/vault_tools.py` →
-     `src/vaultspec/mcp_server/vault_tools.py`
+### Phase `P04` - Delete old packages
 
-  1. Move `src/vaultspec/mcp_tools/framework_tools.py` →
-     `src/vaultspec/mcp_server/framework_tools.py`
+Delete the superseded server.py, subagent_server, and mcp_tools modules once all references are retargeted
 
-  1. Move `src/vaultspec/server.py` →
-     `src/vaultspec/mcp_server/app.py`
+- [x] `P04.S07` - delete the standalone server.py, subagent_server, and mcp_tools packages; `src/vaultspec_core`.
 
-     - Update imports:
-       `from .subagent_server import ...` → `from .subagent_tools import ...`
-       `from .mcp_tools import ...` → `from .team_tools import ...`
-       `from .mcp_tools.team_tools import ...` → `from .team_tools import ...`
+### Phase `P05` - Verify
 
-  1. Write `src/vaultspec/mcp_server/__init__.py` with public re-exports
-     (see ADR for exact symbols)
+Confirm the mcp_server test suites pass and the consolidated import paths resolve
 
-- Phase 2: move test files
-
-  1. Create `src/vaultspec/mcp_server/tests/` with `__init__.py`
-
-  1. Move `src/vaultspec/subagent_server/tests/conftest.py` →
-     `src/vaultspec/mcp_server/tests/conftest.py`
-
-  1. Move `src/vaultspec/subagent_server/tests/test_mcp_tools.py` →
-     `src/vaultspec/mcp_server/tests/test_mcp_tools.py`
-
-     - Update: `from .. import server as srv` → `from .. import subagent_tools as srv`
-     - Update: `from .. import initialize_server` → `from ..subagent_tools import initialize_server`
-     - Update all `from ..server import ...` → `from ..subagent_tools import ...`
-
-  1. Move `src/vaultspec/subagent_server/tests/test_mcp_protocol.py` →
-     `src/vaultspec/mcp_server/tests/test_mcp_protocol.py`
-
-     - Update: `from .. import server as srv` → `from .. import subagent_tools as srv`
-     - Update: `from ...server import create_server` → `from ..app import create_server`
-
-  1. Move `src/vaultspec/subagent_server/tests/test_helpers.py` →
-     `src/vaultspec/mcp_server/tests/test_helpers.py`
-
-     - Update: `from ..server import ...` → `from ..subagent_tools import ...`
-
-  1. Move `src/vaultspec/subagent_server/tests/test_task_engine_integration.py` →
-     `src/vaultspec/mcp_server/tests/test_task_engine_integration.py`
-
-  1. Move `src/vaultspec/mcp_tools/tests/test_team_tools.py` →
-     `src/vaultspec/mcp_server/tests/test_team_tools.py`
-
-     - Update any relative imports from `..team_tools` (already correct)
-
-- Phase 3: update external references
-
-  1. `src/vaultspec/__main__.py`:
-     `from .server import main as run` → `from .mcp_server.app import main as run`
-
-  1. `src/vaultspec/subagent_cli.py`:
-     `from .subagent_server.server import main as server_main` →
-     `from .mcp_server.app import main as server_main`
-
-  1. `src/vaultspec/__init__.py`:
-     Update any re-exports referencing `server` or `subagent_server`
-
-  1. `src/vaultspec/orchestration/tests/test_team_lifecycle.py`:
-     `from ...server import create_server` →
-     `from ...mcp_server.app import create_server`
-     `from ...mcp_tools.team_tools import ...` →
-     `from ...mcp_server.team_tools import ...`
-
-  1. `src/vaultspec/tests/cli/test_team_cli.py`:
-     `from ...mcp_tools.team_tools import ...` →
-     `from ...mcp_server.team_tools import ...`
-
-  1. `pyproject.toml`:
-     `vaultspec-mcp = "vaultspec.server:main"` →
-     `vaultspec-mcp = "vaultspec.mcp_server.app:main"`
-
-- Phase 4: update documentation
-
-  1. `.vaultspec/docs/cli-reference.md` — update module path references
-  1. `.vaultspec/docs/concepts.md` — update module path references
-  1. `.claude/rules/vaultspec-subagents.builtin.md` — update references
-
-- Phase 5: delete old packages
-
-  1. Delete `src/vaultspec/subagent_server/` entirely
-  1. Delete `src/vaultspec/mcp_tools/` entirely
-  1. Delete `src/vaultspec/server.py`
-
-- Phase 6: verify
-
-  1. Run `uv run pytest src/vaultspec/mcp_server/tests/ -x -q`
-  1. Run `uv run pytest src/vaultspec/orchestration/tests/test_team_lifecycle.py -x -q`
-  1. Run `uv run pytest src/vaultspec/tests/cli/test_team_cli.py -x -q`
-  1. Run `uv run python -c "from vaultspec.mcp_server import create_server, initialize_server"`
-  1. Run full test suite: `uv run pytest src/ tests/ -x -q`
-
-## Parallelization
-
-- Phases 1-2 must be sequential (tests depend on source files existing)
-- Phase 3 and Phase 4 can run in parallel (external refs and docs are independent)
-- Phase 5 depends on all prior phases
-- Phase 6 depends on Phase 5
-
-Team structure:
-
-- **Agent A (complex-executor)**: Phases 1 + 2 + 5 (file moves, core refactoring)
-- **Agent B (standard-executor)**: Phase 3 (external import rewrites)
-- **Agent C (simple-executor)**: Phase 4 (documentation updates)
-- Agents B and C start after Agent A completes Phases 1-2, run in parallel
-- Agent A deletes old packages (Phase 5) after B and C complete
-- **Agent D (code-reviewer)**: Phase 6 verification + review
-
-## Verification
-
-- All existing tests pass with zero failures
-
-- `from vaultspec.mcp_server import create_server` resolves correctly
-
-- `from vaultspec.mcp_server import initialize_server` resolves correctly
-
-- No remaining imports from `vaultspec.server`, `vaultspec.subagent_server`,
-  or `vaultspec.mcp_tools` exist in the codebase (verified via grep)
-
-- `pyproject.toml` entry point references `vaultspec.mcp_server.app:main`
-
-- No `subagent_server/` or `mcp_tools/` directories remain
-
-- The deprecated legacy `main()` is removed from `subagent_tools.py`
+- [ ] `P05.S08` - run the mcp_server test suites and confirm they pass; `src/vaultspec_core/mcp_server/tests`.
+- [x] `P05.S09` - confirm the mcp_server public entry points import correctly; `src/vaultspec_core/mcp_server/__init__.py`.

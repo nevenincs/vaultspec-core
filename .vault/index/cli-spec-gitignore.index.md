@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#cli-spec-gitignore'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:30d831b0763fac40c74625d5fb643e4ff0c5e7104d91f38fff0595cdba1478f7'
 related:
   - '[[2026-05-17-cli-spec-gitignore-adr]]'
   - '[[2026-05-17-cli-spec-gitignore-research]]'

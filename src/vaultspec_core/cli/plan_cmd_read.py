@@ -83,17 +83,35 @@ def cmd_check(
     ] = False,
 ) -> None:
     """Validate convention compliance; with ``--fix``, apply autofixes."""
+    from vaultspec_core.core.helpers import atomic_write
     from vaultspec_core.plan.checks import collect_all, has_errors
     from vaultspec_core.plan.fixes import apply_all_fixes
     from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.vaultcore import refresh_modified_stamp, vault_today
 
     text = path.read_text(encoding="utf-8")
 
     if fix:
-        fixed_text = apply_all_fixes(text)
-        if fixed_text != text:
-            path.write_text(fixed_text, encoding="utf-8")
-        text = fixed_text
+        repaired = apply_all_fixes(text)
+        if repaired != text:
+            # An autofix is a mutation, so it carries the same provenance
+            # obligation as every other mutating verb (vault-orientation ADR
+            # decision D3): refresh ``modified:`` and re-attest ``body_hash:``
+            # from the repaired text. Without this the repair would land a
+            # body the stored fingerprint no longer describes, and the
+            # document would immediately read as hand-edited to the
+            # modified-stamp reconciliation check.
+            repaired = refresh_modified_stamp(repaired, vault_today())
+            # Routed through atomic_write, not Path.write_text, for two
+            # reasons. It writes the encoded bytes verbatim, where text mode
+            # would translate every ``\n`` into ``\r\n`` on Windows and leave
+            # the repaired document failing the project's LF-only markdown
+            # format gate. And it replaces the file atomically, so a repair
+            # interrupted mid-write leaves the previous document intact
+            # rather than a truncated plan - the same guarantee every other
+            # plan write path already carries (issue #296).
+            atomic_write(path, repaired)
+        text = repaired
 
     plan = parse_plan(text)
     findings = collect_all(plan, text)

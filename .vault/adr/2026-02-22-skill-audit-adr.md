@@ -4,6 +4,7 @@ tags:
   - '#skill-audit'
 date: '2026-02-22'
 modified: '2026-06-28'
+body_hash: 'sha256:e5276fe27ae5b7b0b913e378cb8d04f649b64da8c02949a81b7ffdb26bc6766b'
 related:
   - '[[2026-02-22-skill-audit-research]]'
 ---

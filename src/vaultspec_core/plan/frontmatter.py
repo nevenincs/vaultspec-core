@@ -10,7 +10,9 @@ convention:
   documents; required when the plan contains at least one Step row.
 - ``tags``: YAML list with at least the directory tag (``#plan``) and one
   feature tag (``#<feature>``).
-- ``date``: ``yyyy-mm-dd`` ISO date.
+- ``date``: ``yyyy-mm-dd`` ISO date. An unquoted scalar, which YAML
+  resolves to a :class:`datetime.date`, is normalised to the canonical
+  string rather than rejected.
 
 Defers low-level YAML parsing to :mod:`vaultspec_core.vaultcore.parser`.
 """
@@ -21,6 +23,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, cast
 
+from vaultspec_core.vaultcore.models import normalize_date
 from vaultspec_core.vaultcore.parser import parse_frontmatter
 
 if TYPE_CHECKING:
@@ -62,7 +65,8 @@ class PlanFrontmatter:
             research, reference, prior plan).
         tags: Tag list; first entry is the directory tag (``#plan``),
             subsequent entries include the feature tag.
-        date: ISO ``yyyy-mm-dd`` date string from the frontmatter.
+        date: ISO ``yyyy-mm-dd`` date string from the frontmatter; a
+            date-typed YAML scalar is normalised to that string on read.
         legacy_tier_default: ``True`` when ``tier`` was missing in the
             source document and defaulted to ``L2``; the writer agent or
             ``vaultspec-core vault plan check --fix`` should add the field on
@@ -90,7 +94,8 @@ def parse_plan_frontmatter(source: str | Path) -> PlanFrontmatter:
     Raises:
         PlanFrontmatterError: When ``tier`` is present with an invalid value,
             ``tags`` is missing the directory or feature tag, ``related`` is
-            present but malformed, or the YAML frontmatter is itself
+            present but malformed, ``date`` is neither a string nor a
+            recognisable date, or the YAML frontmatter is itself
             unparseable.
     """
     text = _coerce_to_text(source)
@@ -163,14 +168,44 @@ def _coerce_string_list(value: object, *, field_name: str) -> list[str]:
 
 
 def _coerce_date(value: object) -> str:
-    """Validate the date scalar; return an empty string when absent."""
+    """Normalise the date scalar; return an empty string when absent.
+
+    An unquoted ``date: yyyy-mm-dd`` scalar is resolved by YAML to a
+    :class:`datetime.date` (and an unquoted timestamp to a
+    :class:`datetime.datetime`) rather than to a string. That is an
+    ordinary authoring slip, not corruption, and it is the first input
+    :func:`~vaultspec_core.vaultcore.models.parse_lenient_date` - the
+    vault's single canonical lenient-date helper - is written to
+    absorb. Routing date-typed values through its canonical-string
+    companion keeps such a plan reachable by the owning verbs, which
+    are otherwise the only sanctioned route to repairing it.
+
+    String values pass through verbatim, matching the leniency the rest
+    of the frontmatter contract applies to hand-authored stamps; the
+    serialiser rewrites whatever survives here to the canonical quoted
+    form on the next mutation.
+
+    Args:
+        value: Raw ``date`` value from the parsed YAML frontmatter.
+
+    Returns:
+        The date string, canonicalised to ``yyyy-mm-dd`` when the value
+        arrived as a date object, or an empty string when absent.
+
+    Raises:
+        PlanFrontmatterError: When the value is neither a string nor a
+            recognisable date.
+    """
     if value is None:
         return ""
-    if not isinstance(value, str):
+    if isinstance(value, str):
+        return value
+    normalised = normalize_date(value)
+    if normalised is None:
         raise PlanFrontmatterError(
-            f"date must be a string, got {type(value).__name__}",
+            f"date must be a string or a yyyy-mm-dd date, got {type(value).__name__}",
         )
-    return value
+    return normalised
 
 
 def _require_tag(tags: list[str], required: str) -> None:

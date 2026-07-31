@@ -4,6 +4,7 @@ tags:
   - '#mcp-consolidation'
 date: '2026-02-22'
 modified: '2026-06-13'
+body_hash: 'sha256:d158a4c470e7de037ec637c973ef7f1c9f8f06b51534fe05a6d5299273c85562'
 related:
   - '[[2026-02-21-module-exports-part3-research]]'
   - '[[2026-02-22-cli-ecosystem-factoring-research]]'

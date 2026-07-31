@@ -405,9 +405,15 @@ def render_mode(mode: InstallMode) -> InstallMode:
 class PrecommitHook(StrEnum):
     """Canonical pre-commit hook IDs managed by vaultspec-core.
 
-    ``VAULT_FIX`` runs all vault checkers with ``--fix``, auto-repairing
-    safe issues (naming, frontmatter, annotations, links, dangling,
-    references, schema) and blocking on remaining errors (body-links).
+    ``VAULT_FIX`` runs all vault checkers as a pure gate, reporting naming,
+    frontmatter, annotation, link, dangling, reference, schema, and
+    body-link findings and blocking the commit on them. It does not repair:
+    the hook's ``pass_filenames: false`` scope makes the whole corpus its
+    blast radius regardless of what the commit touches, so a hook-time fix
+    writes changes nobody reviewed into commits that are not about them.
+    Repair is an operator-run ``vault check all --fix``, committed visibly.
+    The member keeps its historical ``vault-fix`` id so existing installs
+    are updated in place rather than growing a second, near-duplicate hook.
 
     ``VAULT_SANITIZE_ANNOTATIONS`` runs the explicit annotation sanitizer so
     generated vault documents do not commit template-only guidance.

@@ -4,6 +4,7 @@ tags:
   - '#feature-documentation'
 date: '2026-03-21'
 modified: '2026-06-13'
+body_hash: 'sha256:910231fc4b7715228d5ff4ff7d681e184b7067f9b877d92633e4e14ed74b3ee6'
 related:
   - '[[2026-03-21-builtins-build-strategy-adr]]'
 ---

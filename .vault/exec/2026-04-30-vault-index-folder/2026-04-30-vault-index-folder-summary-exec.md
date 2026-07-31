@@ -4,6 +4,7 @@ tags:
   - '#vault-index-folder'
 date: '2026-04-30'
 modified: '2026-06-13'
+body_hash: 'sha256:b572f85efa29b3316b9d06b23e3f7f7aa41f576c11cc81e0c2cea773251922c5'
 related:
   - '[[2026-04-30-vault-index-folder-plan]]'
   - '[[2026-04-30-vault-index-folder-adr]]'

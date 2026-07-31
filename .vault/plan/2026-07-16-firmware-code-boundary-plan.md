@@ -4,6 +4,7 @@ tags:
   - '#firmware-code-boundary'
 date: '2026-07-16'
 modified: '2026-07-16'
+body_hash: 'sha256:5254f15b5212e097978daa7579d9fbb9e5d5480a717776075903d4197a90facd'
 tier: L2
 related:
   - '[[2026-07-16-firmware-code-boundary-adr]]'

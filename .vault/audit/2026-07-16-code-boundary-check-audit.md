@@ -4,6 +4,7 @@ tags:
   - '#code-boundary-check'
 date: '2026-07-16'
 modified: '2026-07-16'
+body_hash: 'sha256:c61041fd40db6f8529536998fb71c7f907085dfe0e59744eb488f3ca6b0fa207'
 related:
   - "[[2026-07-16-code-boundary-check-plan]]"
   - "[[2026-07-16-code-boundary-check-adr]]"

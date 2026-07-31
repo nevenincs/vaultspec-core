@@ -4,6 +4,7 @@ tags:
   - '#marketing-audit'
 date: '2026-02-18'
 modified: '2026-06-13'
+body_hash: 'sha256:b4d03cacaac58b88e18541e6b3cda9f07b79f0cef36fdcbf70f17637e0eb45b9'
 ---
 
 ## Marketing Audit: Documentation Quality

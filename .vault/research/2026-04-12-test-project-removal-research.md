@@ -4,6 +4,7 @@ tags:
   - '#test-project-removal'
 date: '2026-04-12'
 modified: '2026-06-13'
+body_hash: 'sha256:832b4ab6b9b1d123517b2bb2ebc0b1c48f6a7317ac152fd9b4ebb1c46e992ef0'
 related:
   - '[[2026-03-23-test-quality-research]]'
   - '[[2026-03-23-cli-test-coverage-research]]'

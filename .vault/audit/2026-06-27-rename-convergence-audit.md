@@ -4,6 +4,7 @@ tags:
   - '#rename-convergence'
 date: '2026-06-27'
 modified: '2026-06-27'
+body_hash: 'sha256:07a927c80953f475d3a6c0b4f0ccfb2f66efac6398175daa44c24bdaaa8b993d'
 related:
   - "[[2026-06-27-rename-convergence-plan]]"
   - "[[2026-06-27-rename-convergence-adr]]"

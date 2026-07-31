@@ -4,6 +4,7 @@ tags:
   - '#roadmap'
 date: '2026-02-17'
 modified: '2026-06-13'
+body_hash: 'sha256:b677cb9b770b5126d3d2294ecd7e69babee89b00bd0e2fc05b7138f8b39226a9'
 related:
   - '[[2026-02-17-ux-simulation-audit]]'
   - '[[2026-02-17-tech-audit-audit]]'

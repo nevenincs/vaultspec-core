@@ -4,6 +4,7 @@ tags:
   - '#graph-backend'
 date: '2026-06-10'
 modified: '2026-06-13'
+body_hash: 'sha256:7378deb0ce1da194e8b47c310d8fbb2444706eb25cd4e99ede3ed67ce33c80b9'
 tier: L2
 related:
   - '[[2026-06-10-graph-backend-adr]]'

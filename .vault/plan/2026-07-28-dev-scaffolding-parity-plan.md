@@ -4,6 +4,7 @@ tags:
   - '#dev-scaffolding-parity'
 date: '2026-07-28'
 modified: '2026-07-30'
+body_hash: 'sha256:ee102cba9a9265bf083e3b91f59f5f341607eff79492bd26505bdde0aaf34f75'
 tier: L3
 related:
   - '[[2026-07-28-dev-scaffolding-parity-adr]]'

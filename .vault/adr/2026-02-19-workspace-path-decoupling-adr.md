@@ -4,6 +4,7 @@ tags:
   - '#workspace-paths'
 date: '2026-02-19'
 modified: '2026-06-13'
+body_hash: 'sha256:84dd2b95cd58360a8cb207037ce5bcb47c76e415ac18a94d14062205f3d1e24c'
 related:
   - '[[2026-02-19-workspace-path-decoupling-research]]'
 ---

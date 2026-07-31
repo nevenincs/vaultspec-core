@@ -2,7 +2,7 @@
 description: Digest research and ADRs into a grounded, auditable implementation plan. Use to author a plan.
 tier: HIGH
 mode: read-write
-tools: [Glob, Grep, Read, Write, Edit, Bash]
+tools: [Glob, Grep, Read, Write, Edit, Bash, SendMessage]
 ---
 
 # Persona: Senior Software Plan Orchestrator & Delegator

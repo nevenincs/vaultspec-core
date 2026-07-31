@@ -4,6 +4,7 @@ tags:
   - '#cli-paper-cuts'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:9782df1529c81a81ea5c01a7bb692acf438f248418c47834692f23b508299b07'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-paper-cuts-research]]'

@@ -205,6 +205,7 @@ def _build_registry() -> list[Migration]:
     from .m_0_1_29_modified_stamp_backfill import MIGRATION as M_MODIFIED_STAMP_BACKFILL
     from .m_0_1_35_framework_flatten import MIGRATION as M_FRAMEWORK_FLATTEN
     from .m_0_1_48_launch_convergence import MIGRATION as M_LAUNCH_CONVERGENCE
+    from .m_0_1_55_body_hash_seed import MIGRATION as M_BODY_HASH_SEED
 
     entries: list[Migration] = [
         M_INDEX_SUBFOLDER,
@@ -214,6 +215,7 @@ def _build_registry() -> list[Migration]:
         M_MODIFIED_STAMP_BACKFILL,
         M_FRAMEWORK_FLATTEN,
         M_LAUNCH_CONVERGENCE,
+        M_BODY_HASH_SEED,
     ]
     return sorted(entries, key=lambda m: parse_version_tuple(m.target_version))
 

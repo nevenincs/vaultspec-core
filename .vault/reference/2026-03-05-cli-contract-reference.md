@@ -1,6 +1,7 @@
 ---
 date: 2026-03-05
 modified: '2026-06-13'
+body_hash: 'sha256:edb8e65125eaa0165b51301730e47a3781e528772ffc3f9fa57414b075d8e9c6'
 tags:
   - '#reference'
   - '#cli-architecture'

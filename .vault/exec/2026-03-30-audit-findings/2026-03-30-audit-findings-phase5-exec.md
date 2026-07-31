@@ -4,6 +4,7 @@ tags:
   - '#audit-findings'
 date: '2026-03-30'
 modified: '2026-06-13'
+body_hash: 'sha256:d00d7a56ddd7fe6a5b79977207045177e742fa00cfec605ece5aa24e631deb86'
 related:
   - '[[2026-03-30-audit-findings-plan]]'
   - '[[2026-03-27-cli-ambiguous-states-audit]]'

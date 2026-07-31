@@ -5,6 +5,7 @@ tags:
   - '#index'
 date: '2026-04-21'
 modified: '2026-06-13'
+body_hash: 'sha256:85f5bfc976cb521696643eda06f666e6c9eb7b64cefa77f05177bdb61ec888f1'
 related:
   - '[[2026-04-11-mcp-registry-adr]]'
   - '[[2026-04-11-mcp-registry-audit]]'

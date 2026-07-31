@@ -4,6 +4,7 @@ tags:
   - '#cli-target-refactor'
 date: 2026-03-05
 modified: '2026-06-13'
+body_hash: 'sha256:21af09f324f269863536dc4767a03c65e0d170876471e1c96f35cb0815d93988'
 title: 'Phase 1 Step 2: Global Reference Updates & Config Registry Cleanup'
 ---
 

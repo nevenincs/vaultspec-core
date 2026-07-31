@@ -4,6 +4,7 @@ tags:
   - '#test-project-removal'
 date: 2026-04-12
 modified: '2026-06-13'
+body_hash: 'sha256:056334001db3ea4de6da628ff5a220ac6d9ad1a50506215a7d81a91972229e94'
 related:
   - '[[2026-04-12-test-project-removal-plan]]'
 ---

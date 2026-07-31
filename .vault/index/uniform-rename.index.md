@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#uniform-rename'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:b2c28e44a746a7c2944afb6729507c0d8be3babab584e27a133c8b43818c181d'
 related:
   - '[[2026-06-26-uniform-rename-P01-S01]]'
   - '[[2026-06-26-uniform-rename-P01-S02]]'

@@ -4,6 +4,7 @@ tags:
   - '#placeholder-markdown-lints'
 date: '2026-06-24'
 modified: '2026-06-25'
+body_hash: 'sha256:20676fa70d9316179c53280ac15ad645bc67e3df79d7de98e8fcc2661fd63646'
 related:
   - "[[2026-06-24-placeholder-markdown-lints-research]]"
 ---

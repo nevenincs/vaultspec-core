@@ -5,6 +5,7 @@ tags:
 date: '2026-07-27'
 modified: '2026-07-28'
 body_schema: 'body-v1'
+body_hash: 'sha256:3e2287d0776776d28581f533c161a33322c75c1ce95a9cfc5030939a0a42f651'
 related:
   - '[[2026-07-27-body-schema-attestation-adr]]'
 ---

@@ -182,6 +182,7 @@ tags:
   - '#feature-name'
 date: '2026-02-06'
 modified: '2026-02-06'
+body_hash: 'sha256:...'
 related:
   - '[[related-file]]'
 ---
@@ -190,6 +191,14 @@ related:
 `modified:` is a CLI-maintained last-modified stamp: set equal to `date:` at scaffold,
 refreshed by every mutating verb and by `vaultspec-core vault check all --fix`, parsed
 leniently but rewritten to the canonical quoted `yyyy-mm-dd` form, never hand-edited.
+
+`body_hash:` is the machine-filled fingerprint of the document body that `modified:`
+attests, written beside the stamp by the same verbs. It is what makes an unstamped body
+edit detectable: the reconciliation check compares the live body against this value, and
+file timestamps are never consulted. Never hand-write or hand-edit it - a value the
+author did not compute is the only way the field can lie. A document that carries no
+`body_hash:` simply makes no claim about its body and is reported clean until a verb or
+migration seeds it.
 
 **Examples:**
 
@@ -257,6 +266,11 @@ instead.
 | `{plan_stem}`     | `vaultspec-core vault add exec`      | The parent plan's filename stem                 |
 | `{scope_block}`   | `vaultspec-core vault add exec`      | A Scope section listing the Step's scoped files |
 | `{document_list}` | `vaultspec-core vault feature index` | The feature's full document list                |
+
+The frontmatter fields `modified:` and `body_hash:` belong to the same machine-filled
+class but carry no template placeholder: their values are derived at write time - from
+the clock and from the rendered body - so they are injected by the owning verb rather
+than substituted into a template token.
 
 ### General Rules
 

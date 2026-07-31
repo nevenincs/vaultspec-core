@@ -4,6 +4,7 @@ tags:
   - '#framework'
 date: '2026-02-16'
 modified: '2026-06-13'
+body_hash: 'sha256:92e2dd1b6b78f125ca4acd9dd2f831cc35b052bfe549df728bcb69ca16f2fd88'
 related:
   - '[[2026-02-16-environment-variable-research]]'
   - '[[2026-02-16-environment-variable-adr]]'

@@ -4,6 +4,7 @@ tags:
   - '#codebase-drift-sweep'
 date: '2026-06-28'
 modified: '2026-06-28'
+body_hash: 'sha256:4b8a3cd57c8f9950f8a4b326ce984f511313910c69ba1420ca32dfc179ae9203'
 tier: L2
 related:
   - '[[2026-06-28-diagnosis-surface-parity-audit]]'

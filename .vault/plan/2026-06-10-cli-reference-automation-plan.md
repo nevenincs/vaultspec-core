@@ -4,6 +4,7 @@ tags:
   - '#cli-reference-automation'
 date: '2026-06-10'
 modified: '2026-06-13'
+body_hash: 'sha256:9c52c22c4935208fe6c5da23986eaaca94a05ebc89ea079e218159ffbd7cdc71'
 tier: L2
 related:
   - '[[2026-06-09-firmware-wording-review-adr]]'

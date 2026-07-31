@@ -4,6 +4,7 @@ tags:
   - '#upgrade-convergence'
 date: '2026-07-17'
 modified: '2026-07-17'
+body_hash: 'sha256:abeca69ce03db2a7f7969d54b48ebfb43499acd787dbd8a8dbcfcc10f9819415'
 related:
   - "[[2026-07-17-upgrade-convergence-research]]"
 ---

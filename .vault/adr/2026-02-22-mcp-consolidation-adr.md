@@ -4,6 +4,7 @@ tags:
   - '#mcp-consolidation'
 date: '2026-02-22'
 modified: '2026-06-13'
+body_hash: 'sha256:5d227a5ee25ecdabfadb3d0c597b6c98dc1cddcf0e3319729080c5cb4cee4afe'
 related:
   - '[[2026-02-22-mcp-consolidation-research]]'
   - '[[2026-02-21-packaging-restructure-adr]]'

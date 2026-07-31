@@ -4,6 +4,7 @@ tags:
   - '#vault-data-dir'
 date: '2026-04-11'
 modified: '2026-06-13'
+body_hash: 'sha256:ab7307dd40e9f9fba570354c2f690d8ed99c65f2599d2e22bc7e31a4d146d53c'
 related:
   - '[[2026-04-11-vault-data-dir-review-audit]]'
 ---

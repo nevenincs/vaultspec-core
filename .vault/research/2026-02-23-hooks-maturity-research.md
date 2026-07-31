@@ -4,6 +4,7 @@ tags:
   - '#hooks-maturity'
 date: '2026-02-23'
 modified: '2026-06-13'
+body_hash: 'sha256:a83944027f4f3c1b2cc8eb8180c50b485bd65a5e6f57cea014bf75c0a52bbbfd'
 ---
 
 # hooks-maturity research: production-readiness audit

@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#body-schema-attestation'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:75558bbc40abf127f46a0f421dad373a41b40d2d370212047deacd8bc147151b'
 related:
   - '[[2026-07-27-body-schema-attestation-adr]]'
   - '[[2026-07-27-body-schema-attestation-reference]]'

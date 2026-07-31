@@ -4,6 +4,7 @@ tags:
   - '#system-prompt'
 date: '2026-02-18'
 modified: '2026-06-28'
+body_hash: 'sha256:412c06774b9335a4a278cbd6b8ccd8a75705cc84415adcc02904e432bb4f65c1'
 related:
   - '[[2026-02-18-system-prompt-architecture-research]]'
   - '[[2026-02-17-bootstrap-prompt-adr]]'

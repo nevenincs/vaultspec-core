@@ -4,6 +4,7 @@ tags:
   - '#migration-registry'
 date: '2026-05-01'
 modified: '2026-06-13'
+body_hash: 'sha256:2cddf05dd5ef043d8f74e1bc32da16e5ac2c2481ecb4ca1c0ce812602742c2ab'
 related:
   - '[[2026-05-01-migration-registry-plan]]'
   - '[[2026-05-01-migration-registry-adr]]'

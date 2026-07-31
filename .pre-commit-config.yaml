@@ -56,8 +56,8 @@ repos:
     - markdown
     exclude: '^CHANGELOG\.md$'
   - id: vault-fix
-    name: Vault Doctor (Fix)
-    entry: uv run --no-sync vaultspec-core vault check all --fix
+    name: Vault gate
+    entry: uv run --no-sync vaultspec-core vault check all
     language: system
     types:
     - markdown

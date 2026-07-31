@@ -4,6 +4,7 @@ tags:
   - '#commit-linkage'
 date: '2026-06-13'
 modified: '2026-07-13'
+body_hash: 'sha256:9a9fdf1b35b5463926999d327e83918a6306230ac4e560598c7de23921324bc5'
 tier: L1
 related:
   - '[[2026-06-13-commit-linkage-adr]]'

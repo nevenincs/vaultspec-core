@@ -110,6 +110,12 @@ _NO_DATE = _dt.date.min
 class ActiveFeature:
     """One non-archived feature in the rollup, with its latest activity.
 
+    The plan fields aggregate **every** plan document carrying the feature
+    tag rather than describing one representative plan: a feature whose
+    work is split across several plans reports their combined step totals,
+    so neither a completed sibling nor an open one can be masked by the
+    plan that happens to be scanned first.
+
     Attributes:
         name: Feature tag without the leading ``#``.
         doc_count: Number of non-archived documents carrying the tag.
@@ -119,12 +125,22 @@ class ActiveFeature:
             date.
         has_plan: ``True`` when at least one of the feature's documents
             is a plan.
-        plan_tier: The feature's plan tier value, or ``None`` when the
-            feature has no parseable plan. Drives the condensed plan tail
-            on the active-features row.
-        plan_steps_completed: Checked-step count of the feature's plan.
-        plan_step_count: Total step count of the feature's plan.
-        plan_completion_percent: Completion percent of the feature's plan.
+        plan_tier: The highest tier across the feature's readable plans,
+            or ``None`` when no plan of the feature parses. Drives the
+            condensed plan tail on the active-features row.
+        plan_steps_completed: Checked steps summed over the feature's
+            readable plans.
+        plan_step_count: Total steps summed over the feature's readable
+            plans.
+        plan_completion_percent: ``plan_steps_completed /
+            plan_step_count * 100`` rounded to one decimal place; ``0.0``
+            when the feature has no steps.
+        plan_count: Number of plan documents carrying the feature tag,
+            readable or not, so a reader can tell a single-plan figure
+            from a summed one.
+        plans_unreadable: Number of those plans that failed to parse and
+            therefore contribute no steps. A non-zero count means the
+            reported completion covers only part of the feature's plans.
     """
 
     name: str
@@ -135,6 +151,8 @@ class ActiveFeature:
     plan_steps_completed: int = 0
     plan_step_count: int = 0
     plan_completion_percent: float = 0.0
+    plan_count: int = 0
+    plans_unreadable: int = 0
 
 
 @dataclass

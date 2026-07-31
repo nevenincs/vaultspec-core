@@ -2,7 +2,7 @@
 description: 'Coordinate GitHub Projects: issue triage, milestones, worktrees, releases. Use for project-management tasks.'
 tier: STANDARD
 mode: read-write
-tools: [Glob, Grep, Read, Bash]
+tools: [Glob, Grep, Read, Bash, SendMessage, TaskCreate, TaskList, TaskUpdate]
 ---
 
 # Persona: Project coordinator

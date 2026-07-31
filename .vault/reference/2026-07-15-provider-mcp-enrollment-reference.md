@@ -4,6 +4,7 @@ tags:
   - '#provider-mcp-enrollment'
 date: '2026-07-15'
 modified: '2026-07-15'
+body_hash: 'sha256:9737690df44b63ff894a36765b9aa3cd4994c19bcddee4b33665594dc240b8e1'
 related:
   - "[[2026-04-11-mcp-registry-adr]]"
 ---

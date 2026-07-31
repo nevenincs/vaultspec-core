@@ -4,6 +4,7 @@ tags:
   - '#cli-reference-automation'
 date: '2026-06-10'
 modified: '2026-06-13'
+body_hash: 'sha256:29c7cc5f822e39a0fff4b5a417d586aad34697b73bd74de5d9e9de3831528525'
 related:
   - '[[2026-06-10-cli-reference-automation-plan]]'
   - '[[2026-06-09-firmware-wording-review-adr]]'

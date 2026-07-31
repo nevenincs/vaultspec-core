@@ -3,7 +3,8 @@ tags:
   - '#plan'
   - '#operator-cli-repair-pipeline'
 date: '2026-05-15'
-modified: '2026-06-13'
+modified: '2026-07-31'
+body_hash: 'sha256:b87803873cad0bc88c4f45af39aa681abe1012106d4189966cc28328205126d9'
 tier: L2
 related:
   - '[[2026-05-15-operator-cli-repair-pipeline-research]]'
@@ -14,6 +15,8 @@ related:
 ---
 
 # operator-cli-repair-pipeline plan: operator CLI repair pipeline
+
+## Steps
 
 ## Phases
 

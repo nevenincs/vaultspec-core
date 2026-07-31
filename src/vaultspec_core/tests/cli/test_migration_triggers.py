@@ -206,11 +206,16 @@ class TestScannerLazyTrigger:
         assert not legacy.exists()
         # The lazy migration trigger fired by ``vault add`` runs the
         # 0.1.29 backfill, which seeds the canonical index's missing
-        # ``modified:`` stamp from its ``date:``. The collision handling
+        # ``modified:`` stamp from its ``date:``, and the 0.1.55 seed,
+        # which attests the body it now carries. The collision handling
         # still preserves the body and every other field verbatim.
+        from vaultspec_core.vaultcore.body_hash import document_body_digest
+
+        digest = document_body_digest("# canonical alpha\n")
         canonical_after = (
             "---\ngenerated: true\ntags:\n  - '#index'\n  - '#alpha'\n"
-            "date: '2026-04-30'\nmodified: '2026-04-30'\nrelated: []\n---\n"
+            f"date: '2026-04-30'\nmodified: '2026-04-30'\n"
+            f"body_hash: '{digest}'\nrelated: []\n---\n"
             "\n# canonical alpha\n"
         )
         assert target.read_text(encoding="utf-8") == canonical_after

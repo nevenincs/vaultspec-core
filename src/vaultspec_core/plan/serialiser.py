@@ -116,6 +116,23 @@ def serialise_plan(plan: Plan, canonicalise: bool = False) -> str:
     parts.append(f"# {plan.title or '(untitled plan)'}")
     parts.append("")
 
+    _emit_block(parts, consumer.take("before_steps"))
+
+    # The section heading that opens the container content. Emitted
+    # unconditionally and at every tier, because it is the only ``h2``
+    # guaranteed to sit between the ``h1`` title and a ``### Phase``
+    # heading: an ``L3``/``L4`` plan gets one from ``## Wave``, but an
+    # ``L1``/``L2`` plan has no Wave, so without this the document skips
+    # from ``h1`` straight to ``h3`` and fails markdownlint's MD001
+    # heading-increment rule. The template carries the same heading, but
+    # as ordinary prose the serialiser did not own - which meant
+    # ``canonicalise=True`` stripped it and nothing put it back. Owning it
+    # here makes the hierarchy valid by construction rather than by
+    # preservation; the parser consumes an authored copy so the two
+    # cannot stack.
+    parts.append("## Steps")
+    parts.append("")
+
     _emit_block(parts, consumer.take("before_epic_intent"))
 
     if plan.frontmatter.tier is Tier.L4 and plan.epic_intent is not None:
@@ -128,6 +145,12 @@ def serialise_plan(plan: Plan, canonicalise: bool = False) -> str:
         for step in plan.steps:
             _emit_block(parts, consumer.take(f"before_step_{step.canonical_id}"))
             parts.append(_render_step_row(step, phase_id=None, wave_id=None))
+        # Terminate the row list with a blank line, exactly as the Phase and
+        # Wave blocks do. Without it an ``after_all`` prose block lands flush
+        # against the final Step row, producing a list and a heading with no
+        # separating blank line - MD032 and MD022. The trailing blank is
+        # harmless when nothing follows: the emitter rstrips the joined text.
+        parts.append("")
     elif plan.frontmatter.tier is Tier.L2:
         for phase in plan.phases:
             parts.extend(_render_phase_block(phase, wave_id=None, consumer=consumer))

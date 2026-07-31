@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#framework'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:9e7cfbe6eb00a7da60c10255cac17429a2687adb43a66e0c58e603e55717d062'
 related:
   - '[[2026-02-16-env-var-research]]'
   - '[[2026-02-16-environment-variable-adr]]'

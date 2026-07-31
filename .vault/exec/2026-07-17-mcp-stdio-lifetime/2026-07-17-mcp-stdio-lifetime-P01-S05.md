@@ -4,6 +4,7 @@ tags:
   - '#mcp-stdio-lifetime'
 date: '2026-07-17'
 modified: '2026-07-17'
+body_hash: 'sha256:9cbb01977fe8933c09d7c002570a9e396d34203c926793c666ceb1e391ab711a'
 step_id: 'S05'
 related:
   - "[[2026-07-17-mcp-stdio-lifetime-plan]]"

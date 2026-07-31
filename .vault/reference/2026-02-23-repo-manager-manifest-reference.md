@@ -4,6 +4,7 @@ tags:
   - '#repo-manager-extension'
 date: '2026-02-23'
 modified: '2026-06-13'
+body_hash: 'sha256:153054fcfac02031f46ae012b8bb71055f01cdb776c9df04dd23c9c8d3334a06'
 ---
 
 # repo-manager manifest and configuration format reference

@@ -9,6 +9,7 @@ related:
   - "[[2026-02-22-mcp-consolidation-adr]]"
 superseded_by: '2026-07-15-provider-mcp-enrollment-adr'
 modified: '2026-07-15'
+body_hash: 'sha256:d07715f3595f842886a53d0815ef9aeff4ab118830818431b721ba3a5843f61e'
 ---
 
 # `mcp-registry` adr: built-in MCP definitions with install/sync/uninstall lifecycle | (**status:** `superseded`)

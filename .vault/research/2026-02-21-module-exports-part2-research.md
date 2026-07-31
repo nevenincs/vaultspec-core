@@ -4,6 +4,7 @@ tags:
   - '#module-exports'
 date: '2026-02-21'
 modified: '2026-06-13'
+body_hash: 'sha256:744adce0cbe02623d7e546848040d53dd21829e027e57de72bee853c2ae4bb77'
 related:
   - '[[2026-02-21-packaging-restructure-adr]]'
 ---

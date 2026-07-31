@@ -4,6 +4,7 @@ tags:
   - '#bundled-cli-reference'
 date: '2026-05-18'
 modified: '2026-06-13'
+body_hash: 'sha256:00f231c2910cc28e01d95e8cb1242506fb156774995adfc0fd0da3c5f8e36e95'
 related: []
 ---
 

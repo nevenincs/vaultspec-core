@@ -105,7 +105,18 @@ CANONICAL_ENTRY_PREFIX = entry_prefix_for_mode(InstallMode.DEPENDENCY)
 # insertion order here is the order hooks are scaffolded into
 # ``.pre-commit-config.yaml`` and must be preserved.
 _HOOK_SUBCOMMAND: dict[PrecommitHook, str] = {
-    PrecommitHook.VAULT_FIX: "vault check all --fix",
+    # A pure gate, deliberately not ``--fix``. Unattended corpus-mutating
+    # repair from inside a commit is retired by the modified-stamp-provenance
+    # decision: ``pass_filenames: false`` hands the hook the whole corpus as
+    # blast radius no matter what the commit touches, a hook-time fix writes
+    # changes nobody reviewed into commits that are not about them, and the
+    # hook runner's revert-based staging protocol makes hook-time tree
+    # mutation unsafe in shared worktrees. The non-fix run is an exact,
+    # deterministic preview, so a failing gate names precisely what a
+    # deliberate operator-run ``--fix`` will do. The hook id keeps its
+    # historical ``vault-fix`` spelling so existing installs are updated in
+    # place rather than accumulating a second, near-duplicate entry.
+    PrecommitHook.VAULT_FIX: "vault check all",
     PrecommitHook.VAULT_SANITIZE_ANNOTATIONS: "vault sanitize annotations",
     PrecommitHook.CHECK_PROVIDER_ARTIFACTS: "check-providers",
     # ``--gate-errors`` folds the doctor's warning exit (1) to 0 so the gate
@@ -117,7 +128,7 @@ _HOOK_SUBCOMMAND: dict[PrecommitHook, str] = {
     PrecommitHook.SPEC_CHECK: "spec doctor --gate-errors",
 }
 _HOOK_META: dict[PrecommitHook, dict[str, object]] = {
-    PrecommitHook.VAULT_FIX: {"name": "Vault fix", "types": ["markdown"]},
+    PrecommitHook.VAULT_FIX: {"name": "Vault gate", "types": ["markdown"]},
     PrecommitHook.VAULT_SANITIZE_ANNOTATIONS: {
         "name": "Vault sanitize annotations",
         "types": ["markdown"],

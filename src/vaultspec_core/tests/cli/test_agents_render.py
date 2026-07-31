@@ -21,6 +21,7 @@ import pytest
 
 from vaultspec_core.builtins import builtins_root
 from vaultspec_core.core.agents import (
+    _CLAUDE_ONLY_HOST_TOOLS,
     _CLAUDE_TO_GEMINI_TOOLS,
     _render_claude_agent,
     _render_codex_agent,
@@ -356,6 +357,86 @@ class TestSourceAgentCoverage:
         assert rendered_meta.get("name") == agent_path.stem
         assert "tier" not in rendered_meta
         assert "mode" not in rendered_meta
+
+    def test_declares_team_relay_tool(self, agent_path: Path):
+        # A persona dispatched as a background teammate has no final message
+        # the orchestrator reads; without SendMessage its findings are lost
+        # and the failure is silent (#290).
+        meta, _body = parse_frontmatter(agent_path.read_text(encoding="utf-8"))
+        tools = meta.get("tools", [])
+        assert isinstance(tools, list)
+        assert "SendMessage" in cast("list[str]", tools), (
+            f"{agent_path.name}: no team relay tool; findings would be "
+            f"discarded when the persona runs in background dispatch"
+        )
+
+    def test_claude_render_preserves_host_tools(self, agent_path: Path):
+        meta, body = parse_frontmatter(agent_path.read_text(encoding="utf-8"))
+        rendered_tools = _fm(
+            transform_agent(Tool.CLAUDE, agent_path.name, meta, body)
+        ).get("tools", [])
+        assert isinstance(rendered_tools, list)
+        assert "SendMessage" in cast("list[str]", rendered_tools)
+
+
+# Personas expected to participate in an orchestrator's shared task list:
+# the executors that work the Steps, and the coordinator that tracks them.
+_SHARED_TASK_LIST_PERSONAS = {
+    "vaultspec-high-executor": {"TaskList", "TaskUpdate"},
+    "vaultspec-standard-executor": {"TaskList", "TaskUpdate"},
+    "vaultspec-low-executor": {"TaskList", "TaskUpdate"},
+    "vaultspec-project-coordinator": {"TaskCreate", "TaskList", "TaskUpdate"},
+}
+
+
+class TestSourceAgentTeamTools:
+    """Shipped personas declare the host tools their dispatch shape needs."""
+
+    @pytest.mark.parametrize(
+        ("stem", "expected"),
+        sorted(_SHARED_TASK_LIST_PERSONAS.items()),
+        ids=sorted(_SHARED_TASK_LIST_PERSONAS),
+    )
+    def test_task_list_participants_declare_task_tools(
+        self, stem: str, expected: set[str]
+    ):
+        agent_path = _AGENTS_SRC / f"{stem}.md"
+        assert agent_path.is_file(), f"missing shipped persona {agent_path}"
+        meta, _body = parse_frontmatter(agent_path.read_text(encoding="utf-8"))
+        tools = set(cast("list[str]", meta.get("tools", [])))
+        assert expected <= tools, f"{stem}: missing {sorted(expected - tools)}"
+
+    def test_every_declared_host_tool_is_recognized(self):
+        # Guards a typo in a source persona from silently rendering a host
+        # tool the Gemini renderer would then warn about.
+        known = set(_CLAUDE_TO_GEMINI_TOOLS) | set(_CLAUDE_ONLY_HOST_TOOLS)
+        for agent_path in _SOURCE_AGENTS:
+            meta, _body = parse_frontmatter(agent_path.read_text(encoding="utf-8"))
+            tools = set(cast("list[str]", meta.get("tools", [])))
+            assert tools <= known, f"{agent_path.name}: unknown {sorted(tools - known)}"
+
+
+class TestClaudeOnlyHostTools:
+    """Host-orchestration tools are Claude-only and drop silently elsewhere."""
+
+    def test_gemini_drops_host_tools_without_warning(self):
+        warnings: list[str] = []
+        meta = {"tools": ["Read", *sorted(_CLAUDE_ONLY_HOST_TOOLS), "Bash"]}
+        out = _render_gemini_agent("x.md", meta, "body", warnings=warnings)
+        assert _fm(out)["tools"] == ["read_file", "run_shell_command"]
+        assert warnings == []
+
+    def test_unknown_tool_still_warns_alongside_host_tools(self):
+        warnings: list[str] = []
+        meta = {"tools": ["SendMessage", "BogusTool"]}
+        _render_gemini_agent("x.md", meta, "body", warnings=warnings)
+        assert any("BogusTool" in w for w in warnings)
+        assert not any("SendMessage" in w for w in warnings)
+
+    def test_claude_keeps_host_tools_verbatim(self):
+        meta = {"tools": ["Read", "SendMessage", "TaskUpdate"]}
+        out = _render_claude_agent("x.md", meta, "body")
+        assert _fm(out)["tools"] == ["Read", "SendMessage", "TaskUpdate"]
 
 
 def _fetch_upstream_base_declarations() -> str:

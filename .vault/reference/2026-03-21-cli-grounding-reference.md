@@ -4,6 +4,7 @@ tags:
   - '#cli-architecture'
 date: 2026-03-21
 modified: '2026-06-13'
+body_hash: 'sha256:628434e9c1f604b64d6c7c9c1e637535989ee981bb87a0e24425bfff0b21c886'
 ---
 
 # CLI Grounding Research: Contract vs Implementation

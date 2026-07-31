@@ -5,6 +5,7 @@ tags:
 date: '2026-07-27'
 modified: '2026-07-27'
 body_schema: 'body-v1'
+body_hash: 'sha256:43363231911ba3d349b97cdfea87c7e3779ad4c7e72f10f39e8d277258065563'
 step_id: 'S05'
 related:
   - "[[2026-07-27-markdown-feature-scope-plan]]"

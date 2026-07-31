@@ -4,6 +4,7 @@ tags:
   - '#mcp-registry'
 date: '2026-04-11'
 modified: '2026-06-13'
+body_hash: 'sha256:cc87a6e6dc72309b825b5c698e027180c04a7168ecfa0b2005429180b73e64dd'
 related:
   - '[[2026-04-11-mcp-registry-adr]]'
   - '[[2026-04-11-mcp-registry-research]]'

@@ -4,6 +4,7 @@ tags:
   - '#doctor-dev-repo'
 date: '2026-04-30'
 modified: '2026-06-13'
+body_hash: 'sha256:aa7eeeb13825f42cf49bf9567968bf604d113093df0c9d4c4b4003c249063e8a'
 related:
   - '[[2026-04-30-doctor-dev-repo-research]]'
   - '[[2026-04-30-doctor-dev-repo-plan]]'

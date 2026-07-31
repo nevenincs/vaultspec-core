@@ -4,6 +4,7 @@ tags:
   - '#operator-cli-sync-authority'
 date: '2026-05-15'
 modified: '2026-06-13'
+body_hash: 'sha256:c5ae2bf2282cfa48f73d808a380b190ea28b6ff8375a512fd2d82f66974894ac'
 related:
   - '[[2026-05-15-operator-cli-repair-pipeline-reference]]'
 ---

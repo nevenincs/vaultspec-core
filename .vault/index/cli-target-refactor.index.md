@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#cli-target-refactor'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:2070a65f2ec32dbcf59a8d8b1c375ddc708a7f4e54946521e8467cb0cad88368'
 related:
   - '[[2026-03-05-cli-target-refactor-phase0-step1-exec]]'
   - '[[2026-03-05-cli-target-refactor-phase1-step1-exec]]'
@@ -21,7 +22,6 @@ related:
   - '[[2026-03-05-cli-target-refactor-phase5-step2-exec]]'
   - '[[2026-03-05-cli-target-refactor-phase5-summary-exec]]'
   - '[[2026-03-23-cli-target-refactor-adr]]'
-  - '[[2026-03-23-cli-target-refactor-plan]]'
   - '[[2026-03-23-cli-target-refactor-research]]'
 ---
 
@@ -50,10 +50,6 @@ Auto-generated index of all documents tagged with `#cli-target-refactor`.
 - `2026-03-05-cli-target-refactor-phase5-step1-exec` - `cli-target-refactor` `phase5` `step1`
 - `2026-03-05-cli-target-refactor-phase5-step2-exec` - `cli-target-refactor` `phase5` `step2`
 - `2026-03-05-cli-target-refactor-phase5-summary-exec` - `cli-target-refactor` `phase5` `summary`
-
-### plan
-
-- `2026-03-23-cli-target-refactor-plan` - `cli-target-refactor` `cli target refactor` plan
 
 ### research
 

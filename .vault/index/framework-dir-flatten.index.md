@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#framework-dir-flatten'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:2a922adc1f750eda23e2a445e62af1fa143ef60da5598949b3574622675209e4'
 related:
   - '[[2026-06-25-framework-dir-flatten-adr]]'
   - '[[2026-06-25-framework-dir-flatten-plan]]'

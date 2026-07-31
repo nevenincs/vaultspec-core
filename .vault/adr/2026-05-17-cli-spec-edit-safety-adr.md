@@ -4,6 +4,7 @@ tags:
   - '#cli-spec-edit-safety'
 date: '2026-05-17'
 modified: '2026-06-13'
+body_hash: 'sha256:98cd4efa87389c33519c7570b97d9b5ab14d35f6385663bdefb049a59029fe9e'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-spec-edit-safety-research]]'

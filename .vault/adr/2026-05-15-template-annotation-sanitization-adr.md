@@ -4,6 +4,7 @@ tags:
   - '#template-annotation-sanitization'
 date: '2026-05-15'
 modified: '2026-06-28'
+body_hash: 'sha256:8912f70dbc88b0090544ce0c8b5231fbb2a6346340100d28938963373e03fd1f'
 related:
   - '[[2026-05-15-template-annotation-sanitization-research]]'
 ---

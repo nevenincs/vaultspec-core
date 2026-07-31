@@ -1559,7 +1559,10 @@ class TestPlanMutatorWithoutWorkspaceContext:
 # expected entry is the mode prefix followed by the subcommand; asserting the
 # whole entry line (not a substring) catches a regression in either half.
 _HOOK_SUBCOMMANDS = {
-    "vault-fix": "vault check all --fix",
+    # A pure gate: the hook reports and blocks, it never repairs. Unattended
+    # corpus-mutating repair from inside a commit is retired, so a stray
+    # ``--fix`` here would be a regression, not a formatting detail.
+    "vault-fix": "vault check all",
     "vault-sanitize-annotations": "vault sanitize annotations",
     "check-provider-artifacts": "check-providers",
     "spec-check": "spec doctor --gate-errors",

@@ -4,6 +4,7 @@ tags:
   - '#graph-hardening'
 date: '2026-03-22'
 modified: '2026-06-13'
+body_hash: 'sha256:9a14f8fc8073f5d82875cf0e309725adb57572d0701e92fb116c94dd35af4ca8'
 related:
   - '[[2026-03-22-graph-hardening-research]]'
 ---

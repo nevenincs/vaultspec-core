@@ -4,6 +4,7 @@ tags:
   - '#pre-existing-tests'
 date: '2026-05-01'
 modified: '2026-06-13'
+body_hash: 'sha256:bfbf41e49cc4657407916ea38d8993bfacd276ffdc76da1c7f2f4b9096a8b5e4'
 related:
   - '[[2026-05-01-pre-existing-tests-research]]'
   - '[[2026-05-01-pre-existing-tests-plan]]'

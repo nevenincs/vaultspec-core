@@ -4,6 +4,7 @@ tags:
   - '#pytest-e2e'
 date: '2026-02-21'
 modified: '2026-06-13'
+body_hash: 'sha256:1024b2d15688b598e3375ddb3ae782d730d23ffc1dcc071d9e15a0abbe42c19e'
 related:
   - '[[2026-02-21-pytest-e2e-observability-impl-plan]]'
   - '[[2026-02-21-pytest-e2e-observability-adr]]'

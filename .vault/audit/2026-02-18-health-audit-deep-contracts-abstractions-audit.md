@@ -4,6 +4,7 @@ tags:
   - '#health-audit'
 date: '2026-02-18'
 modified: '2026-06-13'
+body_hash: 'sha256:20a136f3ca91c4ea696f029414150f2bb0f6d1bfd5a1fac1c3d972987eefb543'
 ---
 
 # Deep Audit: API Contracts, Dead Code, and Abstraction Quality

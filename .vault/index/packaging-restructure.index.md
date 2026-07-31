@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#packaging-restructure'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:33697592fb6bb15354f297e77f3e12d08d36738ed8d86d6fc62fb5da74d1badc'
 related:
   - '[[2026-02-21-packaging-restructure-adr]]'
   - '[[2026-02-21-packaging-restructure-p1-review-exec]]'

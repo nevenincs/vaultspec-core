@@ -474,3 +474,71 @@ def test_restore_rollback_reinstates_a_deduplicated_source_after_later_failure(
     assert live_duplicate.read_bytes() == duplicate_bytes
     assert locked.is_file()
     assert not (tmp_path / ".vault/plan/locked.md").exists()
+
+
+def _tree_snapshot(root: Path) -> dict[str, bytes]:
+    """Map every file under *root* to its bytes, for byte-identity assertions."""
+    return {
+        str(path.relative_to(root)): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
+def test_dry_run_rejects_a_runtime_path_that_is_not_a_directory(
+    tmp_path: Path,
+) -> None:
+    """The runtime-directory precondition is deterministic, so a preview sees it.
+
+    Before the precondition was hoisted out of the apply path it was skipped
+    entirely during ``dry_run``, so a preview reported success for a batch the
+    apply would then refuse.
+    """
+    _write(tmp_path, ".vault/research/first.md")
+    runtime = tmp_path / ".vault/data"
+    runtime.parent.mkdir(parents=True, exist_ok=True)
+    runtime.write_bytes(b"not a directory\n")
+
+    with pytest.raises(ArchiveDocumentsError, match="not a directory"):
+        archive_documents(tmp_path, (".vault/research/first.md",), dry_run=True)
+
+
+def test_dry_run_rejects_a_non_directory_runtime_path_on_restore(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, ".vault/_archive/research/first.md")
+    runtime = tmp_path / ".vault/data"
+    runtime.write_bytes(b"not a directory\n")
+
+    with pytest.raises(RestoreDocumentsError, match="not a directory"):
+        restore_documents(
+            tmp_path, (".vault/_archive/research/first.md",), dry_run=True
+        )
+
+
+def test_dry_run_leaves_the_filesystem_byte_identical(tmp_path: Path) -> None:
+    """A preview must be side-effect-free, including the runtime directory.
+
+    The runtime directory is created only on the apply path, so a preview must
+    not bring it into existence as a side effect of checking it.
+    """
+    _write(tmp_path, ".vault/research/first.md")
+    _write(tmp_path, ".vault/plan/nested/second.md")
+    before = _tree_snapshot(tmp_path)
+    before_dirs = {
+        str(p.relative_to(tmp_path)) for p in tmp_path.rglob("*") if p.is_dir()
+    }
+
+    result = archive_documents(
+        tmp_path,
+        (".vault/research/first.md", ".vault/plan/nested/second.md"),
+        dry_run=True,
+    )
+
+    assert result.archived_count == 2
+    assert _tree_snapshot(tmp_path) == before
+    after_dirs = {
+        str(p.relative_to(tmp_path)) for p in tmp_path.rglob("*") if p.is_dir()
+    }
+    assert after_dirs == before_dirs
+    assert not (tmp_path / ".vault/data").exists()

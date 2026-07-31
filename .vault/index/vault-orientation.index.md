@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#vault-orientation'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:5b13ee0c72346d4bf44877eb9025f22f6836cedc3d0b381608bafd06a0bb6039'
 related:
   - '[[2026-06-12-vault-orientation-W01-P01-S01]]'
   - '[[2026-06-12-vault-orientation-W01-P01-S02]]'

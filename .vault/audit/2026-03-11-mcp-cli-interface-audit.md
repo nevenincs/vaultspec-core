@@ -4,6 +4,7 @@ tags:
   - '#mcp-cli-interface'
 date: '2026-03-11'
 modified: '2026-06-13'
+body_hash: 'sha256:8138665597f10dc0b948187eec1dfba1406c072df30a56e16c9de07360b9dfd3'
 related:
   - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
   - '[[2026-02-22-mcp-consolidation-adr]]'

@@ -4,6 +4,7 @@ tags:
   - '#framework'
 date: '2026-02-16'
 modified: '2026-06-28'
+body_hash: 'sha256:ba966d619c12294b14f05d58de0110272d15731cdd0d43b3f906d8351195967f'
 related:
   - '[[2026-02-16-env-var-research]]'
   - '[[2026-02-16-hardcoded-constants-research]]'

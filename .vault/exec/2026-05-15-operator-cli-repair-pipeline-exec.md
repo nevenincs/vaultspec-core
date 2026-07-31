@@ -4,6 +4,7 @@ tags:
   - '#operator-cli-repair-pipeline'
 date: '2026-05-15'
 modified: '2026-06-13'
+body_hash: 'sha256:94297b2138e9fa5dcf546e4c6a0bdac33f1a9124f7ad169a18af2ed96104367f'
 step_id: S01
 related:
   - '[[2026-05-15-operator-cli-repair-pipeline-plan]]'

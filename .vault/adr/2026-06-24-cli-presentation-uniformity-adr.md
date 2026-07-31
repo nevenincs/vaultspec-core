@@ -4,6 +4,7 @@ tags:
   - '#cli-presentation-uniformity'
 date: '2026-06-24'
 modified: '2026-06-25'
+body_hash: 'sha256:ad84bb5e0840287de06e434f9f8f019f0b500524e1a213b521a7068ba3675764'
 related:
   - "[[2026-06-13-cli-output-standardization-adr]]"
   - "[[2026-05-17-cli-next-step-hints-adr]]"

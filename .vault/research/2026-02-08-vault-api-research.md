@@ -4,6 +4,7 @@ tags:
   - '#vault-api'
 date: '2026-02-08'
 modified: '2026-06-13'
+body_hash: 'sha256:0d625451f28ded24cecc8ac9f5b6a1fdc68b56d9771ad88f64d172c073653c35'
 related:
   - '[[2026-02-08-vault-api-adr]]'
 ---

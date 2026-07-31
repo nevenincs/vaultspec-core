@@ -4,6 +4,7 @@ tags:
   - '#mcp-cli-interface'
 date: '2026-03-17'
 modified: '2026-06-13'
+body_hash: 'sha256:b604bffa81faef1733a94ca4a41ea498aca730b82b523d577ecd25a6f7598e94'
 related:
   - '[[2026-03-11-mcp-cli-interface-audit]]'
   - '[[2026-02-22-mcp-consolidation-adr]]'

@@ -4,6 +4,7 @@ tags:
   - '#firmware-wording-review'
 date: '2026-06-09'
 modified: '2026-06-13'
+body_hash: 'sha256:7224651d8fdde5136279f688e0f6ef37c6c074fc8be6d402f2517e196a5d2434'
 related:
   - '[[2026-03-11-naming-surface-audit]]'
   - '[[2026-02-22-skill-audit-research]]'

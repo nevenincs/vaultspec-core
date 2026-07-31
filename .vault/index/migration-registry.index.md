@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#migration-registry'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:541bd354d50f5b8f51c37d2040abb6d2a635e0d245f249833370987f36efc57b'
 related:
   - '[[2026-05-01-migration-registry-adr]]'
   - '[[2026-05-01-migration-registry-phase1-summary-exec]]'

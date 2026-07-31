@@ -4,6 +4,7 @@ tags:
   - '#reference-topic-infix'
 date: '2026-07-16'
 modified: '2026-07-16'
+body_hash: 'sha256:0d0ebe0a223603b00e487f1c29389cbdb69b60721eee9a800840b35faa0768c6'
 related:
   - '[[2026-06-09-firmware-wording-review-adr]]'
   - '[[2026-06-27-rename-convergence-adr]]'

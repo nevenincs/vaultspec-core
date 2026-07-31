@@ -3,9 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#mcp-stdio-lifetime'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
+body_hash: 'sha256:8c40419274e0b56bd5924eb31eb747e427a5fe0342f85335c9249f2da4bfc4bc'
 related:
   - '[[2026-07-16-mcp-stdio-lifetime-S01]]'
   - '[[2026-07-16-mcp-stdio-lifetime-S02]]'
