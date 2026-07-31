@@ -11,6 +11,7 @@ Implements the vault-orientation ADR decisions D3 and D3b.
 from __future__ import annotations
 
 import datetime
+import hashlib
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -42,9 +43,24 @@ if TYPE_CHECKING:
 pytestmark = [pytest.mark.unit]
 
 
+def _split_body_hash(text: str, ending: str) -> tuple[str, str]:
+    """Return *text* without its ``body_hash:`` line, plus the attested value.
+
+    Asserts the field appears exactly once and carries *ending*, so the
+    caller can then compare the remainder against the byte-exact
+    expectation the stamp rewrite alone should produce.
+    """
+    marker = "body_hash: '"
+    lines = [line for line in text.split(ending) if line.startswith(marker)]
+    assert len(lines) == 1, f"expected one {marker} line, got {lines}"
+    value = lines[0][len(marker) : -1]
+    return text.replace(f"{lines[0]}{ending}", "", 1), value
+
+
 class TestRefreshModifiedStamp:
-    """``refresh_modified_stamp`` rewrites/adds the stamp preserving every other
-    byte, across LF, CRLF, and classic-Mac CR line endings."""
+    """``refresh_modified_stamp`` rewrites/adds the stamp and re-attests the
+    body fingerprint, preserving every other byte, across LF, CRLF, and
+    classic-Mac CR line endings."""
 
     TODAY = datetime.date(2026, 6, 26)
 
@@ -53,8 +69,15 @@ class TestRefreshModifiedStamp:
             "---\ntags:\n  - '#x'\ndate: '2026-01-01'\n"
             "modified: '2026-01-01'\n---\n\nBody.\n"
         )
-        out = refresh_modified_stamp(text, self.TODAY)
-        assert out == text.replace("modified: '2026-01-01'", "modified: '2026-06-26'")
+        stripped, digest = _split_body_hash(
+            refresh_modified_stamp(text, self.TODAY), "\n"
+        )
+        assert stripped == text.replace(
+            "modified: '2026-01-01'", "modified: '2026-06-26'"
+        )
+        # The attestation is the SHA-256 of the canonical body ("Body."),
+        # computed here independently of the production helper.
+        assert digest == "sha256:" + hashlib.sha256(b"Body.").hexdigest()
 
     def test_crlf_rewrites_existing_preserving_crlf(self):
         text = (
@@ -62,8 +85,14 @@ class TestRefreshModifiedStamp:
             "modified: '2026-01-01'\r\n---\r\n\r\nBody.\r\n"
         )
         out = refresh_modified_stamp(text, self.TODAY)
-        assert out == text.replace("modified: '2026-01-01'", "modified: '2026-06-26'")
         assert "\r\n" in out and "\n" not in out.replace("\r\n", "")
+        stripped, digest = _split_body_hash(out, "\r\n")
+        assert stripped == text.replace(
+            "modified: '2026-01-01'", "modified: '2026-06-26'"
+        )
+        # Newline-independent by construction: the CRLF document attests
+        # exactly what its LF twin attests.
+        assert digest == "sha256:" + hashlib.sha256(b"Body.").hexdigest()
 
     def test_cr_only_rewrites_existing_preserving_cr(self):
         # Classic-Mac CR-only document: the stamp must still be refreshed and the
@@ -73,24 +102,31 @@ class TestRefreshModifiedStamp:
             "modified: '2026-01-01'\r---\rBody.\r"
         )
         out = refresh_modified_stamp(text, self.TODAY)
-        assert out == text.replace("modified: '2026-01-01'", "modified: '2026-06-26'")
         assert "\n" not in out
+        stripped, digest = _split_body_hash(out, "\r")
+        assert stripped == text.replace(
+            "modified: '2026-01-01'", "modified: '2026-06-26'"
+        )
+        assert digest == "sha256:" + hashlib.sha256(b"Body.").hexdigest()
 
     def test_cr_only_inserts_after_date_when_absent(self):
         # No modified: field -> insert after date:, preserving CR endings.
         text = "---\rtags:\r  - '#x'\rdate: '2026-01-01'\r---\rBody.\r"
         out = refresh_modified_stamp(text, self.TODAY)
         assert "modified: '2026-06-26'\r" in out
-        assert out == (
+        assert "\n" not in out
+        stripped, _digest = _split_body_hash(out, "\r")
+        assert stripped == (
             "---\rtags:\r  - '#x'\rdate: '2026-01-01'\r"
             "modified: '2026-06-26'\r---\rBody.\r"
         )
-        assert "\n" not in out
 
     def test_lf_inserts_after_date_when_absent(self):
         text = "---\ntags:\n  - '#x'\ndate: '2026-01-01'\n---\n\nBody.\n"
-        out = refresh_modified_stamp(text, self.TODAY)
-        assert out == (
+        stripped, _digest = _split_body_hash(
+            refresh_modified_stamp(text, self.TODAY), "\n"
+        )
+        assert stripped == (
             "---\ntags:\n  - '#x'\ndate: '2026-01-01'\n"
             "modified: '2026-06-26'\n---\n\nBody.\n"
         )
@@ -103,7 +139,35 @@ class TestRefreshModifiedStamp:
         text = "﻿---\r\ndate: '2026-01-01'\r\nmodified: '2026-01-01'\r\n---\r\nBody.\r\n"
         out = refresh_modified_stamp(text, self.TODAY)
         assert out.startswith("﻿")
-        assert out == text.replace("modified: '2026-01-01'", "modified: '2026-06-26'")
+        stripped, _digest = _split_body_hash(out, "\r\n")
+        assert stripped == text.replace(
+            "modified: '2026-01-01'", "modified: '2026-06-26'"
+        )
+
+    def test_reattestation_is_idempotent(self):
+        # The second refresh finds the field already present and rewrites it
+        # in place rather than appending a duplicate - the property the
+        # checker's convergence rests on.
+        text = (
+            "---\ntags:\n  - '#x'\ndate: '2026-01-01'\n"
+            "modified: '2026-01-01'\n---\n\nBody.\n"
+        )
+        once = refresh_modified_stamp(text, self.TODAY)
+        assert refresh_modified_stamp(once, self.TODAY) == once
+        assert once.count("body_hash:") == 1
+
+    def test_attestation_tracks_the_body_it_is_written_with(self):
+        first = refresh_modified_stamp(
+            "---\ndate: '2026-01-01'\nmodified: '2026-01-01'\n---\n\nOne.\n",
+            self.TODAY,
+        )
+        second = refresh_modified_stamp(
+            "---\ndate: '2026-01-01'\nmodified: '2026-01-01'\n---\n\nTwo.\n",
+            self.TODAY,
+        )
+        _, digest_one = _split_body_hash(first, "\n")
+        _, digest_two = _split_body_hash(second, "\n")
+        assert digest_one != digest_two
 
 
 _BUILTIN_TEMPLATES = Path(vaultspec_core.__file__).parent / "builtins" / "templates"
@@ -325,6 +389,56 @@ class TestScaffoldStamp:
         assert metadata.date == "2026-06-12"
         assert metadata.modified == "2026-06-12"
         assert metadata.validate() == []
+
+    @pytest.mark.parametrize(
+        "doc_type",
+        [DocType.ADR, DocType.AUDIT, DocType.PLAN, DocType.RESEARCH, DocType.REFERENCE],
+    )
+    def test_scaffold_attests_the_body_it_renders(
+        self, tmp_path: Path, doc_type: DocType
+    ) -> None:
+        """A new document leaves the scaffolder already attesting its body.
+
+        Without this the very first hand edit to a fresh scaffold would be
+        invisible: an un-attested document is silent by design, so a
+        document that never gained a fingerprint would never reconcile.
+        """
+        from vaultspec_core.vaultcore.body_hash import (
+            document_body_digest,
+            is_canonical_digest,
+        )
+
+        content_root = self._content_root(tmp_path)
+        path = create_vault_doc(
+            tmp_path,
+            DocumentIdentity(doc_type, "hash-feat", "2026-06-12"),
+            TemplateFields(
+                title="hash probe",
+                tier="L1" if doc_type is DocType.PLAN else None,
+            ),
+            content_root=content_root,
+        )
+        content = path.read_text(encoding="utf-8")
+        metadata, _ = parse_vault_metadata(content)
+        assert is_canonical_digest(metadata.body_hash)
+        assert metadata.body_hash == document_body_digest(content)
+
+    def test_scaffold_places_the_fingerprint_after_the_schema_row(
+        self, tmp_path: Path
+    ) -> None:
+        content_root = self._content_root(tmp_path)
+        path = create_vault_doc(
+            tmp_path,
+            DocumentIdentity(DocType.RESEARCH, "hash-feat", "2026-06-12"),
+            TemplateFields(title="placement probe"),
+            content_root=content_root,
+        )
+        frontmatter_block = path.read_text(encoding="utf-8").split("---")[1]
+        lines = [line.strip() for line in frontmatter_block.strip().splitlines()]
+        schema_index = next(
+            i for i, line in enumerate(lines) if line.startswith("body_schema:")
+        )
+        assert lines[schema_index + 1].startswith("body_hash: 'sha256:")
 
     def test_scaffold_exec_step_record_stamps_modified(self, tmp_path: Path) -> None:
         content_root = self._content_root(tmp_path)

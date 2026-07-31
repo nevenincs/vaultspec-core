@@ -175,7 +175,9 @@ and the managed `.gitignore` block starts ignoring it.
 
 **Maintain.** `vaultspec-core vault check all --fix` validates and repairs the vault,
 and `vaultspec-core vault graph --feature search-api` visualizes a feature. The CLI
-maintains each document's `modified:` and `date:` stamps; never hand-edit them.
+maintains each document's `date:` and `modified:` stamps, and the `body_hash:`
+fingerprint that tells it when a document's prose changed without a stamp; never
+hand-edit any of them.
 
 **Connect MCP clients.** `install` scaffolds an `.mcp.json` exposing the workflow to
 Model Context Protocol (MCP) clients over stdio: nine tools covering orientation,

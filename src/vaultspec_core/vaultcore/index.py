@@ -37,9 +37,10 @@ def generate_feature_index(
     with the feature, plus a body listing documents grouped by type. The
     rendered frontmatter carries the standard two-tag shape
     (``#index`` directory tag plus ``#<feature>`` feature tag), the
-    ``generated: true`` marker, and a ``modified:`` stamp equal to
-    ``date:`` so the index reconciles cleanly against the
-    modified-stamp checker like every other CLI-created document.
+    ``generated: true`` marker, a ``modified:`` stamp equal to ``date:``,
+    and a ``body_hash:`` fingerprint of the rendered body, so the index
+    reconciles cleanly against the modified-stamp checker like every other
+    CLI-created document.
 
     Args:
         root_dir: Project root directory.
@@ -113,6 +114,13 @@ def generate_feature_index(
     )
 
     from ..core.helpers import atomic_write
+    from .body_hash import set_body_hash
+
+    # Attest the rendered body like every other stamping path. The generator
+    # rebuilds the whole document from scratch, so the fingerprint is a pure
+    # function of the content just assembled and the byte-equality
+    # short-circuit below stays exact.
+    content = set_body_hash(content)
 
     index_dir.mkdir(parents=True, exist_ok=True)
     try:

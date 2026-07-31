@@ -72,6 +72,33 @@ def _fm_doc(
     )
 
 
+def _lift_body_hash(after: str) -> str:
+    """Return *after* with its inserted ``body_hash:`` line removed.
+
+    Every stamping path now re-attests the body fingerprint beside the
+    ``modified:`` stamp, so a rewritten document legitimately carries one
+    line its predecessor did not. Lifting that single line out - after
+    asserting there is exactly one and that it took its terminator from
+    the neighbouring frontmatter line rather than introducing a foreign
+    one - lets the byte-fidelity assertions below stay exactly as strict
+    as they were about every other line.
+    """
+    pairs = split_keepends(after)
+    indices = [
+        i for i, (content, _) in enumerate(pairs) if content.startswith("body_hash: ")
+    ]
+    assert len(indices) == 1, ("expected exactly one body_hash line", indices)
+    idx = indices[0]
+    assert idx > 0, "body_hash line cannot be the document's first line"
+    assert pairs[idx][1] == pairs[idx - 1][1], (
+        "body_hash line ending differs from its anchor",
+        pairs[idx][1],
+        pairs[idx - 1][1],
+    )
+    del pairs[idx]
+    return "".join(content + ending for content, ending in pairs)
+
+
 def _line_diff(before: str, after: str) -> tuple[list[int], list[tuple[int, str, str]]]:
     """Compare *before* and *after* line-by-line via :func:`split_keepends`.
 
@@ -388,7 +415,7 @@ class TestRewriteIncomingRefsEndToEnd:
 
     def _assert_link_and_modified_only(self, before: bytes, after: bytes) -> None:
         """Endings all preserved; content changed only on link and modified."""
-        violations, diffs = _line_diff(before.decode(), after.decode())
+        violations, diffs = _line_diff(before.decode(), _lift_body_hash(after.decode()))
         assert violations == [], "a line ending was normalized"
         changed_before = {b for _, b, _ in diffs}
         link_old = f"  - '[[{DATE}-{self.OLD}-research]]'"
@@ -525,7 +552,7 @@ class TestRenameFeatureDocBytes:
         return doc
 
     def _assert_tag_and_modified_only(self, before: bytes, after: bytes) -> None:
-        violations, diffs = _line_diff(before.decode(), after.decode())
+        violations, diffs = _line_diff(before.decode(), _lift_body_hash(after.decode()))
         assert violations == [], "a line ending was normalized by the rename"
         tag_old = f"  - '#{self.OLD}'"
         tag_new = f"  - '#{self.NEW}'"

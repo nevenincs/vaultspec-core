@@ -1,9 +1,13 @@
 # Consolidated hooks (scaffolded by default)
 #
-# vault-fix: runs all vault checkers with --fix, auto-repairing safe
-# ongoing-hygiene issues (naming, frontmatter, links, dangling,
-# references) and blocking on remaining errors (body-links). Schema
-# migrations are NOT performed by this hook - they are owned by the
+# vault-fix: runs all vault checkers as a pure gate, reporting naming,
+# frontmatter, link, dangling, reference, and body-link findings and
+# blocking the commit on them. It does NOT repair: unattended
+# corpus-mutating repair from inside a commit is retired by the
+# modified-stamp-provenance decision. Run 'vaultspec-core vault check all
+# --fix' deliberately and commit its effects visibly. The hook id keeps
+# its historical spelling so existing installs update in place.
+# Schema migrations are NOT performed by this hook - they are owned by the
 # vaultspec_core.migrations registry, which runs once per upgrade (or
 # lazily on the first vault command after an upgrade) and never
 # re-runs. Use 'vaultspec-core migrations status' / 'migrations run'
@@ -13,8 +17,8 @@
 # and tooling health.
 
 - id: vault-fix
-  name: Vault fix
-  entry: uv run --no-sync vaultspec-core vault check all --fix
+  name: Vault gate
+  entry: uv run --no-sync vaultspec-core vault check all
   language: system
   types: [markdown]
   pass_filenames: false
