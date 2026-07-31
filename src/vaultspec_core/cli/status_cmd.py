@@ -310,6 +310,8 @@ def _emit_status_rollup(
                 steps_completed=feat.plan_steps_completed,
                 step_count=feat.plan_step_count,
                 completion_percent=feat.plan_completion_percent,
+                plan_count=feat.plan_count,
+                plans_unreadable=feat.plans_unreadable,
             )
             tail_str = f"  [cyan]{tail}[/cyan]" if tail else ""
             activity = (

@@ -16,6 +16,7 @@ module, at call sites outside the package.
 from __future__ import annotations
 
 import datetime as _dt
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from .models import DocType
@@ -96,13 +97,7 @@ def compute_rollup(
     # the in-flight bucket, the recently-completed bucket, and the
     # per-feature plan tail, rather than scanning plans three times.
     entries = collect_all_statuses(root_dir, graph=g)
-    status_by_feature: dict[str, PlanStatus] = {}
-    for entry in entries:
-        feature = entry.document.feature
-        if entry.status is not None and feature and feature not in status_by_feature:
-            status_by_feature[feature] = entry.status
-
-    active_features = _active_features(real_nodes, status_by_feature)
+    active_features = _active_features(real_nodes, _plans_by_feature(entries))
     plans_in_flight, recently_completed = _plan_buckets(entries, g)
     recent_documents = _recent_documents(
         real_nodes,
@@ -137,17 +132,94 @@ def compute_rollup(
     )
 
 
+@dataclass
+class _FeaturePlanTotals:
+    """Combined plan facts for the plans carrying one feature tag.
+
+    A feature tag can be carried by more than one plan document - a
+    legacy plan beside its canonical successor, or an epic split into
+    per-phase plans - so no single plan describes the feature. Selecting
+    one of them (the historical behaviour, whichever plan the scan
+    reached first) both hid completed work and hid open work. These
+    totals sum instead, which stays derivable from the documents: add up
+    the step rows of every plan tagged with the feature.
+
+    Attributes:
+        plan_count: Plan documents carrying the tag, readable or not.
+        unreadable: Plans that failed to parse, contributing no steps.
+        steps_completed: Checked steps summed over the readable plans.
+        step_count: Total steps summed over the readable plans.
+        tier: Highest tier declared by a readable plan, or ``None`` when
+            none parsed. Tier is ordinal, so the maximum is the feature's
+            structural ceiling.
+    """
+
+    plan_count: int = 0
+    unreadable: int = 0
+    steps_completed: int = 0
+    step_count: int = 0
+    tier: str | None = None
+
+    def add(self, status: PlanStatus | None) -> None:
+        """Fold one plan's parsed status into the totals.
+
+        Args:
+            status: The plan's status, or ``None`` when the document
+                failed to parse (counted, never silently treated as an
+                empty plan).
+        """
+        self.plan_count += 1
+        if status is None:
+            self.unreadable += 1
+            return
+        self.steps_completed += status.steps_completed
+        self.step_count += status.step_count
+        tier = status.tier.value
+        if self.tier is None or tier > self.tier:
+            self.tier = tier
+
+    @property
+    def completion_percent(self) -> float:
+        """Combined completion percent, rounded to one decimal place."""
+        if self.step_count <= 0:
+            return 0.0
+        return round(self.steps_completed / self.step_count * 100, 1)
+
+
+def _plans_by_feature(entries: list[PlanStatusEntry]) -> dict[str, _FeaturePlanTotals]:
+    """Aggregate the batched plan statuses per feature tag.
+
+    Args:
+        entries: Every plan's status from
+            :func:`~vaultspec_core.plan.status.collect_all_statuses`,
+            including the entries whose plan failed to parse.
+
+    Returns:
+        One :class:`_FeaturePlanTotals` per feature tag that owns at
+        least one plan document.
+    """
+    totals: dict[str, _FeaturePlanTotals] = {}
+    for entry in entries:
+        feature = entry.document.feature
+        if not feature:
+            continue
+        totals.setdefault(feature, _FeaturePlanTotals()).add(entry.status)
+    return totals
+
+
 def _active_features(
     nodes: list[DocNode],
-    status_by_feature: dict[str, PlanStatus] | None = None,
+    plans_by_feature: dict[str, _FeaturePlanTotals] | None = None,
 ) -> list[ActiveFeature]:
     """Build the active-feature list ordered by latest activity descending.
 
     A feature is active when at least one of its non-archived documents
     carries the tag; archived documents are already excluded from the
-    graph scan, so every feature seen here is active.
+    graph scan, so every feature seen here is active. The plan tail on
+    each row reports the feature's combined plan totals (see
+    :class:`_FeaturePlanTotals`), never one arbitrarily chosen plan.
     """
-    status_by_feature = status_by_feature or {}
+    plans_by_feature = plans_by_feature or {}
     by_feature: dict[str, list[DocNode]] = {}
     for node in nodes:
         if node.feature:
@@ -157,7 +229,7 @@ def _active_features(
     for name, feat_nodes in by_feature.items():
         latest = max(recency_date(n) for n in feat_nodes)
         latest_str = latest.isoformat() if latest is not _NO_DATE else None
-        status = status_by_feature.get(name)
+        totals = plans_by_feature.get(name, _FeaturePlanTotals())
         features.append(
             (
                 latest,
@@ -166,14 +238,12 @@ def _active_features(
                     doc_count=len(feat_nodes),
                     latest_activity=latest_str,
                     has_plan=any(n.doc_type is DocType.PLAN for n in feat_nodes),
-                    plan_tier=status.tier.value if status is not None else None,
-                    plan_steps_completed=(
-                        status.steps_completed if status is not None else 0
-                    ),
-                    plan_step_count=status.step_count if status is not None else 0,
-                    plan_completion_percent=(
-                        status.completion_percent if status is not None else 0.0
-                    ),
+                    plan_tier=totals.tier,
+                    plan_steps_completed=totals.steps_completed,
+                    plan_step_count=totals.step_count,
+                    plan_completion_percent=totals.completion_percent,
+                    plan_count=totals.plan_count,
+                    plans_unreadable=totals.unreadable,
                 ),
             )
         )

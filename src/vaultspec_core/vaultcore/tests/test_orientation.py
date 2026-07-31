@@ -28,6 +28,7 @@ from ..orientation import (
     TargetResolutionError,
     compute_rollup,
     compute_trace,
+    feature_lifecycle_status,
 )
 from ..scanner import scan_vault
 
@@ -63,12 +64,17 @@ def _plan(
     modified: str | None,
     steps: list[tuple[str, bool]],
     related: list[str] | None = None,
+    tier: str = "L2",
 ) -> str:
-    """Render an L2 plan document with one phase of explicit steps."""
+    """Render a plan document with one phase of explicit steps.
+
+    The declared *tier* defaults to ``L2``; pass another value to build a
+    feature whose plans disagree on tier.
+    """
     lines = ["---", "tags:", "  - '#plan'", f"  - '#{feature}'", f"date: '{date}'"]
     if modified is not None:
         lines.append(f"modified: '{modified}'")
-    lines.append("tier: L2")
+    lines.append(f"tier: {tier}")
     if related:
         lines.append("related:")
         lines += [f"  - '[[{r}]]'" for r in related]
@@ -425,6 +431,170 @@ class TestRollupRecencyWindow:
             assert all(d.doc_type == doc_type for d in docs)
         assert "plan" in rollup.recent_documents
         assert stems["plan"] in {d.stem for d in rollup.recent_documents["plan"]}
+
+
+# ---------------------------------------------------------------------------
+# Rollup: multi-plan feature aggregation (D2)
+# ---------------------------------------------------------------------------
+
+
+def _write_multi_plan_feature(
+    root: Path,
+    feature: str,
+    plans: list[tuple[str, list[tuple[str, bool]]]],
+    *,
+    tier: str = "L2",
+) -> None:
+    """Write one feature whose tag is carried by several plan documents.
+
+    Args:
+        root: Project root the vault is written under.
+        feature: Feature tag shared by every plan.
+        plans: One ``(date, steps)`` pair per plan document, where *steps*
+            is the ``(step_id, checked)`` list the plan declares.
+        tier: Tier declared by every plan written here.
+    """
+    vault = root / ".vault"
+    (root / ".vaultspec").mkdir(parents=True, exist_ok=True)
+    for date, steps in plans:
+        _write(
+            vault / "plan" / f"{date}-{feature}-plan.md",
+            _plan(feature, date=date, modified=date, steps=steps, tier=tier),
+        )
+
+
+class TestRollupFeaturePlanAggregation:
+    """A feature's plan tail sums every plan carrying the feature tag."""
+
+    def test_steps_sum_across_every_plan_of_the_feature(self, tmp_path: Path) -> None:
+        _write_multi_plan_feature(
+            tmp_path,
+            "widget",
+            [
+                ("2026-03-01", [("S01", True), ("S02", True), ("S03", False)]),
+                ("2026-05-01", [("S01", True), ("S02", True), ("S03", True)]),
+            ],
+        )
+
+        rollup = compute_rollup(tmp_path)
+
+        feature = next(f for f in rollup.active_features if f.name == "widget")
+        assert feature.plan_step_count == 6
+        assert feature.plan_steps_completed == 5
+        assert feature.plan_completion_percent == pytest.approx(83.3)
+        assert feature.plan_count == 2
+
+    def test_zero_step_plan_does_not_mask_a_completed_sibling(
+        self, tmp_path: Path
+    ) -> None:
+        # The older, step-less legacy plan used to win the rollup outright
+        # and report the whole feature as 0 of 0 steps.
+        _write_multi_plan_feature(
+            tmp_path,
+            "legacy",
+            [
+                ("2026-01-01", []),
+                ("2026-06-01", [("S01", True), ("S02", True), ("S03", True)]),
+            ],
+        )
+
+        rollup = compute_rollup(tmp_path)
+
+        feature = next(f for f in rollup.active_features if f.name == "legacy")
+        assert feature.plan_step_count == 3
+        assert feature.plan_steps_completed == 3
+        assert feature.plan_completion_percent == pytest.approx(100.0)
+        assert feature.plan_count == 2
+
+    def test_open_steps_in_a_sibling_plan_are_not_hidden(self, tmp_path: Path) -> None:
+        _write_multi_plan_feature(
+            tmp_path,
+            "twoplans",
+            [
+                ("2026-02-01", [("S01", True), ("S02", True)]),
+                ("2026-04-01", [("S01", False), ("S02", False), ("S03", False)]),
+            ],
+        )
+
+        rollup = compute_rollup(tmp_path)
+
+        feature = next(f for f in rollup.active_features if f.name == "twoplans")
+        assert feature.plan_step_count == 5
+        assert feature.plan_steps_completed == 2
+        assert feature.plan_completion_percent == pytest.approx(40.0)
+        assert feature_lifecycle_status(feature, {"plan"}) == "In Progress"
+
+    def test_tier_is_the_highest_declared_across_the_plans(
+        self, tmp_path: Path
+    ) -> None:
+        vault = tmp_path / ".vault"
+        (tmp_path / ".vaultspec").mkdir(parents=True, exist_ok=True)
+        _write(
+            vault / "plan" / "2026-03-01-tiered-plan.md",
+            _plan(
+                "tiered",
+                date="2026-03-01",
+                modified="2026-03-01",
+                steps=[("S01", True)],
+                tier="L3",
+            ),
+        )
+        _write(
+            vault / "plan" / "2026-04-01-tiered-plan.md",
+            _plan(
+                "tiered",
+                date="2026-04-01",
+                modified="2026-04-01",
+                steps=[("S01", False)],
+                tier="L1",
+            ),
+        )
+
+        rollup = compute_rollup(tmp_path)
+
+        feature = next(f for f in rollup.active_features if f.name == "tiered")
+        assert feature.plan_tier == "L3"
+
+    def test_unreadable_plan_is_counted_not_reported_as_zero_percent(
+        self, tmp_path: Path
+    ) -> None:
+        vault = tmp_path / ".vault"
+        (tmp_path / ".vaultspec").mkdir(parents=True, exist_ok=True)
+        # A real, malformed plan document: the declared tier is not a
+        # member of the tier enum, so the parser rejects the file.
+        _write(
+            vault / "plan" / "2026-03-01-broken-plan.md",
+            _plan(
+                "broken",
+                date="2026-03-01",
+                modified="2026-03-01",
+                steps=[("S01", True)],
+                tier="L9",
+            ),
+        )
+
+        rollup = compute_rollup(tmp_path)
+
+        feature = next(f for f in rollup.active_features if f.name == "broken")
+        assert feature.plan_step_count == 0
+        assert feature.plan_tier is None
+        assert feature.plan_count == 1
+        assert feature.plans_unreadable == 1
+
+    def test_single_plan_feature_reports_that_plan_unchanged(
+        self, tmp_path: Path
+    ) -> None:
+        stems = _build_single_feature_vault(tmp_path)
+
+        rollup = compute_rollup(tmp_path)
+
+        feature = next(f for f in rollup.active_features if f.name == stems["feature"])
+        assert feature.plan_tier == "L2"
+        assert feature.plan_step_count == 3
+        assert feature.plan_steps_completed == 2
+        assert feature.plan_completion_percent == pytest.approx(66.7)
+        assert feature.plan_count == 1
+        assert feature.plans_unreadable == 0
 
 
 # ---------------------------------------------------------------------------

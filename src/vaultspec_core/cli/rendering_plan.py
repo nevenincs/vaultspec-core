@@ -83,13 +83,38 @@ def active_feature_tail(
     steps_completed: int,
     step_count: int,
     completion_percent: float,
+    plan_count: int = 1,
+    plans_unreadable: int = 0,
 ) -> str:
     """Return the condensed plan tail for an active-features row.
 
-    Shorter than the full plan line: just ``<tier> <k>/<N> <p>%``. Empty
-    string when the feature has no plan (``step_count`` is zero), so the
-    row stays clean for plan-less features.
+    Shorter than the full plan line: just ``<tier> <k>/<N> <p>%``. The
+    counts are the feature's combined totals across every plan carrying
+    its tag, so a feature planned across several documents appends
+    ``across <n> plans`` to say which documents the figure sums. Plans
+    that failed to parse contribute no steps and are called out instead
+    of quietly reading as zero progress.
+
+    Args:
+        tier: Highest tier across the feature's readable plans.
+        steps_completed: Checked steps summed over those plans.
+        step_count: Total steps summed over those plans.
+        completion_percent: Combined completion percent.
+        plan_count: Plan documents carrying the feature tag.
+        plans_unreadable: How many of those plans failed to parse.
+
+    Returns:
+        The tail string, or an empty string when the feature has neither
+        steps nor an unreadable plan to report.
     """
-    if not step_count:
-        return ""
-    return f"{tier or '-'} {steps_completed}/{step_count} {completion_percent:g}%"
+    parts: list[str] = []
+    if step_count:
+        parts.append(
+            f"{tier or '-'} {steps_completed}/{step_count} {completion_percent:g}%"
+        )
+        if plan_count > 1:
+            parts.append(f"across {plan_count} plans")
+    if plans_unreadable:
+        noun = "plan" if plans_unreadable == 1 else "plans"
+        parts.append(f"{plans_unreadable} unreadable {noun}")
+    return "  ".join(parts)
