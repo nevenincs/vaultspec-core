@@ -83,10 +83,10 @@ def run_all_checks(
 ) -> list[CheckResult]:
     """Run all vault health checkers and return their results.
 
-    Executes structure, frontmatter, modified-stamp, annotations, markdown,
-    links, dangling, body-links, placeholders, orphans, features,
-    exec-mapping, body-sections, feature-rename-integrity, references, schema,
-    adr-status, rename-integrity, and encoding checks in order. Builds a single
+    Executes structure, frontmatter, annotations, markdown, links, dangling,
+    body-links, placeholders, orphans, features, exec-mapping, body-sections,
+    feature-rename-integrity, references, schema, adr-status, modified-stamp,
+    rename-integrity, and encoding checks in order. Builds a single
     :class:`~vaultspec_core.graph.VaultGraph` and shares it across
     graph-consuming checkers to avoid redundant I/O.
 
@@ -115,9 +115,6 @@ def run_all_checks(
         return [
             check_structure(root_dir, snapshot=snapshot, fix=False),
             check_frontmatter(root_dir, snapshot=snapshot, feature=feature, fix=False),
-            check_modified_stamp(
-                root_dir, snapshot=snapshot, feature=feature, fix=False
-            ),
             check_annotations(
                 root_dir, feature=feature, fix=False, raw_texts=raw_texts
             ),
@@ -136,6 +133,12 @@ def run_all_checks(
             check_references(root_dir, graph=graph, feature=feature, fix=False),
             check_schema(root_dir, graph=graph, feature=feature, fix=False),
             check_adr_status(root_dir, snapshot=snapshot, feature=feature, fix=False),
+            # Last of the document-scoped checkers so its position matches the
+            # --fix branch, where the staleness fingerprint must be compared
+            # against bodies no later checker will still rewrite.
+            check_modified_stamp(
+                root_dir, snapshot=snapshot, feature=feature, fix=False
+            ),
             check_rename_integrity(root_dir, fix=False),
             check_encoding(root_dir, graph=graph),
         ]
@@ -162,29 +165,17 @@ def run_all_checks(
     )
     append_and_refresh(result)
 
-    # The modified-stamp fix only inserts or rewrites a single frontmatter
-    # line; it never renames files or changes links, so it cannot invalidate
-    # the graph for the downstream checkers. Appending without a graph
-    # rebuild keeps the structure-rename cascade (which the repair pipeline
-    # depends on) intact - a mid-cascade rebuild here re-resolves a
-    # case-only rename against a stale snapshot on case-insensitive
-    # filesystems and strands the original-cased file.
-    result = check_modified_stamp(
-        root_dir,
-        snapshot=graph.to_snapshot(),
-        feature=feature,
-        fix=True,
-    )
-    results.append(result)
-
     result = check_annotations(root_dir, feature=feature, fix=True)
     append_and_refresh(result)
 
     # Markdown hygiene rewrites only line whitespace and blank runs - it never
     # touches frontmatter, links, or filenames, so it cannot invalidate the
-    # graph. Run it after annotations so blank lines left by stripped comment
-    # blocks are collapsed in the same pass.
-    results.append(check_markdown(root_dir, feature=feature, fix=True))
+    # graph's structure. Run it after annotations so blank lines left by
+    # stripped comment blocks are collapsed in the same pass. It does rewrite
+    # bodies, though, so refresh on a mutation: the modified-stamp fingerprint
+    # below reads bodies from the snapshot and must see the hygiene result,
+    # not the text that preceded it.
+    append_and_refresh(check_markdown(root_dir, feature=feature, fix=True))
 
     result = check_links(
         root_dir, snapshot=graph.to_snapshot(), feature=feature, fix=True
@@ -229,6 +220,22 @@ def run_all_checks(
         root_dir, snapshot=graph.to_snapshot(), feature=feature, fix=True
     )
     append_and_refresh(result)
+
+    # Last of the document-scoped fixers, and deliberately so: staleness is a
+    # comparison against the body as it finally stands, so every checker that
+    # rewrites bodies - annotations, markdown hygiene, wiki-link repair, the
+    # adr-status heading rewrite - must already have run. Its own fix writes
+    # the stamp and re-attests the fingerprint together, so it converges
+    # in-place and cannot invalidate anything downstream; appending without a
+    # graph rebuild keeps the structure-rename cascade (which the repair
+    # pipeline depends on) intact.
+    result = check_modified_stamp(
+        root_dir,
+        snapshot=graph.to_snapshot(),
+        feature=feature,
+        fix=True,
+    )
+    results.append(result)
 
     results.append(check_rename_integrity(root_dir, fix=True))
     # Encoding is read-only (non-UTF-8 cannot be auto-rewritten without silently

@@ -34,6 +34,7 @@ _KNOWN_KEYS = frozenset(
         "date",
         "modified",
         "body_schema",
+        "body_hash",
         "related",
         "feature",
         "supersedes",
@@ -155,6 +156,13 @@ def _render_frontmatter_lines(
 
     if metadata.body_schema:
         lines.append(f"body_schema: '{metadata.body_schema}'")
+
+    # Carried through verbatim: the canonical rebuild only reorders and
+    # re-quotes frontmatter, so the body this fingerprint attests is
+    # untouched and dropping the field would silently retract a valid
+    # attestation.
+    if metadata.body_hash:
+        lines.append(f"body_hash: '{metadata.body_hash}'")
 
     if metadata.related:
         lines.append("related:")

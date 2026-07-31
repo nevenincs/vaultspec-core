@@ -312,6 +312,11 @@ def hydrate_template(
     if fields.extra_tags:
         hydrated = _inject_extra_tags(hydrated, fields.extra_tags)
 
+    # Attest the scaffolded body last, once every frontmatter injection above
+    # has landed: the fingerprint covers the body only, but computing it before
+    # the frontmatter is final would attest text this function is still editing.
+    hydrated = _inject_body_hash(hydrated)
+
     # Check for remaining placeholders that might have been missed.
     # Pattern matches {key} or <key> where key is alphanumeric with hyphens.
     # Strip HTML comment regions (<!-- ... -->) first: tokens inside those
@@ -402,6 +407,27 @@ def _inject_body_schema(content: str) -> str:
         + f"body_schema: '{CURRENT_BODY_SCHEMA}'\n"
         + content[insert_at:]
     )
+
+
+def _inject_body_hash(content: str) -> str:
+    """Attest the scaffolded body with its ``body_hash:`` fingerprint.
+
+    The scaffold-time half of the modified-stamp-provenance decision: a new
+    document leaves the scaffolder already attesting its own body, so the
+    very first hand edit to its prose is detectable. Injected here rather
+    than carried by the templates because the value is derived from the
+    rendered body and cannot be a static template literal.
+
+    Args:
+        content: Fully hydrated document text with YAML frontmatter.
+
+    Returns:
+        Document text carrying the ``body_hash:`` field, or the input
+        unchanged when the frontmatter offers no canonical anchor.
+    """
+    from .body_hash import set_body_hash
+
+    return set_body_hash(content)
 
 
 def _inject_related(content: str, related: list[str]) -> str:

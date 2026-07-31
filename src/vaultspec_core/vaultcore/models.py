@@ -231,13 +231,24 @@ def vault_today() -> _dt.date:
 
 
 def refresh_modified_stamp(text: str, today: _dt.date) -> str:
-    """Refresh (or add) the frontmatter ``modified:`` stamp to *today*.
+    """Refresh (or add) the ``modified:`` stamp and re-attest ``body_hash:``.
 
     This is the single shared mutator-side helper mandated by the
     vault-orientation ADR (decision D3): every CLI verb that mutates a
     vault document refreshes that document's ``modified:`` frontmatter
     stamp to the day the mutation lands, so the status rollup's recency
     source travels with the document.
+
+    The modified-stamp-provenance ADR extends that contract to the
+    document's content fingerprint: the same write re-attests
+    ``body_hash:`` from the text being stamped, so the stamp and the body
+    it attests can never disagree after a mutating verb. Routing both
+    fields through one helper is what makes the pairing structural rather
+    than a discipline every call site has to remember - a verb that
+    refreshed the date without re-attesting would leave the document
+    reading as hand-edited the moment it landed. See
+    :mod:`vaultspec_core.vaultcore.body_hash` for the fingerprint's
+    canonical definition.
 
     The function operates on full document text and preserves every
     other byte:
@@ -264,14 +275,18 @@ def refresh_modified_stamp(text: str, today: _dt.date) -> str:
             stamp lands on the vault's single canonical UTC clock.
 
     Returns:
-        The document text with its ``modified:`` stamp refreshed or
-        added, or the input unchanged when no canonical anchor exists.
+        The document text with its ``modified:`` stamp refreshed or added
+        and its ``body_hash:`` re-attested, or the input unchanged when no
+        canonical anchor exists.
 
     See Also:
-        :func:`normalize_date` for the canonical-string companion and
+        :func:`normalize_date` for the canonical-string companion,
+        :func:`vaultspec_core.vaultcore.body_hash.set_body_hash` for the
+        fingerprint half of the same write, and
         :func:`vaultspec_core.vaultcore.hydration._inject_modified` for
         the scaffold-time half of decision D3.
     """
+    from .body_hash import document_body_digest, set_body_hash
     from .rename_ops import split_keepends
 
     # Match the leading frontmatter fence, tolerating LF, CRLF, and classic-Mac
@@ -291,13 +306,19 @@ def refresh_modified_stamp(text: str, today: _dt.date) -> str:
     pairs = split_keepends(text[block_start:block_end])
     canonical = f"'{today.isoformat()}'"
 
+    # The fingerprint is taken from the incoming text: this helper only ever
+    # rewrites frontmatter, so the body it attests is the body the caller is
+    # handing on, before or after this call alike.
+    digest = document_body_digest(text)
+
     # Rewrite an existing ``modified:`` line in place, preserving its ending.
     for pair in pairs:
         m = re.match(r"^(?P<indent>[ \t]*)modified:.*$", pair[0])
         if m is not None:
             pair[0] = f"{m.group('indent')}modified: {canonical}"
             new_block = "".join(content + ending for content, ending in pairs)
-            return text[:block_start] + new_block + text[block_end:]
+            stamped = text[:block_start] + new_block + text[block_end:]
+            return set_body_hash(stamped, digest)
 
     # Otherwise insert the stamp directly after the ``date:`` anchor line,
     # matching that line's indentation and line ending.
@@ -307,7 +328,8 @@ def refresh_modified_stamp(text: str, today: _dt.date) -> str:
             indent = dm.group("indent")
             pairs.insert(idx + 1, [f"{indent}modified: {canonical}", pair[1] or "\n"])
             new_block = "".join(content + ending for content, ending in pairs)
-            return text[:block_start] + new_block + text[block_end:]
+            stamped = text[:block_start] + new_block + text[block_end:]
+            return set_body_hash(stamped, digest)
 
     return text
 
@@ -374,6 +396,12 @@ class DocumentMetadata:
         body_schema: Immutable body-section contract identifier stamped on new
             scaffolds. ``None`` remains valid for historical documents until
             their hash-attested baseline is introduced.
+        body_hash: Machine-filled content fingerprint of the document body,
+            written beside ``modified`` by every stamping path and compared
+            against the live body to detect unstamped hand edits. ``None``
+            means the document makes no claim about its body and earns no
+            staleness finding. See :mod:`vaultspec_core.vaultcore.body_hash`
+            for the canonical definition.
     """
 
     tags: list[str] = field(default_factory=list)
@@ -387,6 +415,7 @@ class DocumentMetadata:
     archived: str | None = None
     step_id: str | None = None
     body_schema: str | None = None
+    body_hash: str | None = None
 
     def validate(self) -> list[str]:
         """Validate the metadata against the vault schema rules.
