@@ -9,6 +9,9 @@ Covers:
   :class:`PlanFrontmatterError`.
 - ``related`` round-trips when present and tolerates absence (empty list).
 - Missing or malformed ``tags`` (no directory tag, no feature tag) raise.
+- An unquoted ``date:`` scalar - which YAML hands back as a
+  :class:`datetime.date` - is normalised to its canonical ``yyyy-mm-dd``
+  string instead of locking the document out of every plan verb.
 - Mixed degradations across many seeds never crash the parser; either
   the document parses or a targeted error is raised.
 """
@@ -16,6 +19,7 @@ Covers:
 from __future__ import annotations
 
 import random
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -25,6 +29,9 @@ from vaultspec_core.plan.frontmatter import (
     parse_plan_frontmatter,
 )
 from vaultspec_core.tests.plan._factories import make_clean_plan
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---- Valid tier values -----------------------------------------------------
 
@@ -214,6 +221,91 @@ def test_related_must_be_a_yaml_list_not_a_scalar() -> None:
         parse_plan_frontmatter(body)
 
 
+# ---- Date-field handling ----------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("date_literal", "expected"),
+    [
+        ("2026-03-05", "2026-03-05"),  # YAML yields a datetime.date
+        ("2026-04-12", "2026-04-12"),
+        ("2026-03-16 09:30:00", "2026-03-16"),  # YAML yields a datetime.datetime
+        ("2026-03-16T09:30:00Z", "2026-03-16"),
+    ],
+)
+def test_unquoted_date_scalar_normalises_to_canonical_string(
+    date_literal: str,
+    expected: str,
+) -> None:
+    """An unquoted ``date:`` parses to its canonical ``yyyy-mm-dd`` string.
+
+    PyYAML resolves an unquoted ``yyyy-mm-dd`` scalar to a
+    :class:`datetime.date` (and a timestamp to a
+    :class:`datetime.datetime`), which is the first input
+    :func:`~vaultspec_core.vaultcore.models.parse_lenient_date` is
+    written to absorb. Missing the quotes is an ordinary authoring slip,
+    so the plan parser normalises rather than rejecting the document.
+    """
+    fm = parse_plan_frontmatter(_frontmatter_with_date_value(date_literal))
+
+    assert fm.date == expected
+
+
+def test_unquoted_date_parses_from_a_real_file_on_disk(tmp_path: Path) -> None:
+    """The path-input route absorbs an unquoted ``date:`` just as the text route does.
+
+    Every plan verb reaches the parser through a real document path, so
+    the reachability guarantee has to hold for a file on disk and not
+    only for in-memory text.
+    """
+    plan_path = tmp_path / "2026-03-05-unquoted-date-plan.md"
+    plan_path.write_text(_frontmatter_with_date_value("2026-03-05"), encoding="utf-8")
+
+    fm = parse_plan_frontmatter(plan_path)
+
+    assert fm.date == "2026-03-05"
+    assert fm.tier == Tier.L1
+
+
+def test_quoted_canonical_date_round_trips_unchanged() -> None:
+    """A canonical quoted ``date:`` is preserved verbatim."""
+    fm = parse_plan_frontmatter(_frontmatter_with_date_value("'2026-05-05'"))
+
+    assert fm.date == "2026-05-05"
+
+
+def test_missing_date_field_yields_empty_string() -> None:
+    """A plan without a ``date:`` field parses with an empty date."""
+    body = (
+        "---\n"
+        "tags:\n"
+        "  - '#plan'\n"
+        "  - '#no-date'\n"
+        "tier: L1\n"
+        "---\n"
+        "\n"
+        "# `no-date` plan\n"
+        "\n"
+        "Plan with no date field.\n"
+    )
+
+    fm = parse_plan_frontmatter(body)
+
+    assert fm.date == ""
+
+
+@pytest.mark.parametrize("bad_date", ["42", "[2026-03-05]", "{y: 2026}"])
+def test_non_date_scalar_raises(bad_date: str) -> None:
+    """Values that are neither a string nor a date are still rejected.
+
+    Coercion is scoped to the date-typed scalars YAML produces from an
+    unquoted stamp; a number, list, or mapping remains a typed parse
+    error rather than being guessed at.
+    """
+    with pytest.raises(PlanFrontmatterError, match="date"):
+        parse_plan_frontmatter(_frontmatter_with_date_value(bad_date))
+
+
 # ---- Randomised stability ---------------------------------------------------
 
 
@@ -244,6 +336,26 @@ def test_random_clean_plan_frontmatter_round_trips(seed: int) -> None:
         tag.startswith("#") and tag != "#plan" and tag not in _DIRECTORY_TAGS
         for tag in fm.tags
     ), "factory must emit a feature tag"
+
+
+def _frontmatter_with_date_value(date_literal: str) -> str:
+    """Render an otherwise-clean plan whose ``date:`` is the given YAML literal."""
+    return (
+        "---\n"
+        "tags:\n"
+        "  - '#plan'\n"
+        "  - '#date-shapes'\n"
+        f"date: {date_literal}\n"
+        "modified: '2026-06-13'\n"
+        "tier: L1\n"
+        "related:\n"
+        "  - '[[2026-03-05-date-shapes-adr]]'\n"
+        "---\n"
+        "\n"
+        "# `date-shapes` plan\n"
+        "\n"
+        "- [ ] `S01` - do the work; `src/a.py`.\n"
+    )
 
 
 def _frontmatter_with_tier_value(tier_literal: str) -> str:
