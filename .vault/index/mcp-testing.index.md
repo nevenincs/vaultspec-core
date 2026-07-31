@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#mcp-testing'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:a58f4b7525601c93c0842560a75c3a17c5d3a371888429c82273b9e2c38efc51'
 related:

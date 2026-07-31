@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#dev-scaffolding-parity'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:50f1209fdeee5c327c9dcb1e8570133195ec3dd1cfe94437d751f4de0676450d'
 related:

@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#plan-serializer-fixes'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:45a71c2f0edeea9c8dbf9df0808de59c275e8ffdd254cb7c4d5067d8b815786f'
 related:

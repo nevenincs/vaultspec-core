@@ -3,8 +3,8 @@ tags:
   - '#plan'
   - '#cli-simplification-ux'
 date: '2026-05-17'
-modified: '2026-06-13'
-body_hash: 'sha256:b3250dcdaeb32b1437fa3083ce4d7bf7115a2d3a3de28725416212a828eb90e4'
+modified: '2026-07-31'
+body_hash: 'sha256:66b95fec881ab2d2af34fbd71be8d9b1b9d3a7a34dede0a6aad5eb8c3ba7d8c0'
 tier: L4
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
@@ -26,6 +26,8 @@ related:
 ---
 
 # `cli-simplification-ux` `CLI simplification and UX hardening epic` plan
+
+## Steps
 
 ## Epic intent
 

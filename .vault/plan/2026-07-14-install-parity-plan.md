@@ -3,8 +3,8 @@ tags:
   - '#plan'
   - '#install-parity'
 date: '2026-07-14'
-modified: '2026-07-14'
-body_hash: 'sha256:ae46f553599c365fb048d164cdc3c9b32fbbce84bd50f5f4ef31de8289dc31e3'
+modified: '2026-07-31'
+body_hash: 'sha256:1abcb67302f9bd0b595ee824862f931228e9c26e5591bd1d18c71f2b4e144abc'
 tier: L3
 related:
   - '[[2026-07-14-install-parity-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # `install-parity` plan
+
+## Steps
 
 ## Wave `W01` - vaultspec-core mode model and rendering parity
 

@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#cli-spec-edit-safety'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:4271371cd987c5e881e0c48bb3ff8800ac5418349af8266da688a0dcd6e12a46'
 related:

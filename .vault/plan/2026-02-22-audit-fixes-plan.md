@@ -4,7 +4,7 @@ tags:
   - '#audit-fixes'
 date: '2026-02-22'
 modified: '2026-07-31'
-body_hash: 'sha256:426a9f83ba7d719ab273f9e3ab6c2ad6f756588dc95ae10b8158bab6599b03be'
+body_hash: 'sha256:d8c07ad2028e0dce8dbbdbafe2a5ef932bb1c266fdc5b1d508b5c30346d84cb3'
 tier: L2
 related:
   - '[[2026-02-22-audit-fixes-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # Plan: Audit Remediations (Logging & Robustness)
+
+## Steps
 
 ### Phase `P01` - RAG resilience
 

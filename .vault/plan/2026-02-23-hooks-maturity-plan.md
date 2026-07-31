@@ -4,7 +4,7 @@ tags:
   - '#hooks-maturity'
 date: '2026-02-23'
 modified: '2026-07-31'
-body_hash: 'sha256:1a391e85275cb741214e73c9e96b5b97470fb69810ac3d4025426d39eda66ef3'
+body_hash: 'sha256:e4d1746d88a7d909737a53204969ea09ebc0ee23c100e68200933011896b63ad'
 tier: L2
 related:
   - '[[2026-02-23-hooks-maturity-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # hooks-maturity implementation plan
+
+## Steps
 
 ### Phase `P01` - Engine hardening
 

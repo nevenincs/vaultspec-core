@@ -4,7 +4,7 @@ tags:
   - '#mcp-testing'
 date: '2026-02-22'
 modified: '2026-07-31'
-body_hash: 'sha256:a3608b722a90ecd0a0ca02e89917398592a0db0190c98e9e73d9d10ebb0dc76a'
+body_hash: 'sha256:c5129d66c99be850cf960a3aad2ec09568c356f680de4e6fa00999adbc0da8fc'
 tier: L2
 related:
   - '[[2026-02-22-mcp-testing-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # `mcp-testing` plan
+
+## Steps
 
 ### Phase `P01` - Session fixtures and transport
 

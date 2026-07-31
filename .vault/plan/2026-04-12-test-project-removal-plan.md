@@ -4,7 +4,7 @@ tags:
   - '#test-project-removal'
 date: '2026-04-12'
 modified: '2026-07-31'
-body_hash: 'sha256:ea0f9da9e510589be4fa1e8b4877051fd27bb774e2d8b5484ef83591c0a81805'
+body_hash: 'sha256:20ce727e71bd598c92e6a6154056afddbf8a3f465c0285647f86ee7d678339c4'
 tier: L2
 related:
   - '[[2026-04-12-test-project-removal-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # `test-project-removal` implementation plan
+
+## Steps
 
 ### Phase `P01` - Lift and extend the synthetic vault generator
 
@@ -25,7 +27,7 @@ Lift synthetic.py from vaultspec-rag into a testing subpackage and extend it wit
 
 Delete the git-checkout conftest smell and wire session and function fixtures onto the synthetic vault generator.
 
-- [x] `P02.S04` - delete the _vault_snapshot_reset git-checkout fixture, dead helpers, and TEST_PROJECT/TEST_VAULT constants; `src/vaultspec_core/tests/cli/conftest.py`.
+- [x] `P02.S04` - delete the \_vault_snapshot_reset git-checkout fixture, dead helpers, and TEST_PROJECT/TEST_VAULT constants; `src/vaultspec_core/tests/cli/conftest.py`.
 - [x] `P02.S05` - introduce the synthetic_vault and synthetic_project pytest fixtures backed by build_synthetic_vault; `src/vaultspec_core/tests/cli/conftest.py`.
 
 ### Phase `P03` - Refactor the consumer test modules

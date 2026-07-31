@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#framework-review'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:2ce1c01f943c38811c1fe4eb170dfbb2747ad1129234d2e23157505d6a84a0e0'
 related:

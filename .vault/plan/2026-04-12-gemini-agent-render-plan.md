@@ -4,7 +4,7 @@ tags:
   - '#gemini-agent-render'
 date: '2026-04-12'
 modified: '2026-07-31'
-body_hash: 'sha256:ac69db75279a7f9364fe16d92583dcf58b4bcb09e57e89978ed171917522cc56'
+body_hash: 'sha256:c30d97d07b13d47cb92c6379f7e416ba02e020b5b0b9e361c980a9e5173e0e2f'
 tier: L2
 related:
   - '[[2026-04-12-gemini-agent-render-research]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # gemini-agent-render plan
+
+## Steps
 
 ### Phase `P01` - Phase 1 implementation
 

@@ -4,7 +4,7 @@ tags:
   - '#vault-api'
 date: '2026-02-08'
 modified: '2026-07-31'
-body_hash: 'sha256:561539a172f234df481e75dd122bffaf42d88f35d31fa24001fdb41f0b47171f'
+body_hash: 'sha256:74bbf561b2172c1098cb71132277d73834287460af0d35dac6ffe5f1b20ce940'
 tier: L2
 related:
   - '[[2026-02-08-vault-api-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # vault-api plan: Implementation of Docs Verification and Scaffolding
+
+## Steps
 
 ### Phase `P01` - Core API and Auditing
 

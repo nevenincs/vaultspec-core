@@ -4,7 +4,7 @@ tags:
   - '#clci-release'
 date: '2026-03-22'
 modified: '2026-07-31'
-body_hash: 'sha256:bd58c8b76d9a2614afb4e7a3907f55a7a4d3a3b48850d104d6e9cb75e6fab808'
+body_hash: 'sha256:c2c7232335ec5cac574f65cb5b21baa7b58db9be547d2588eaaee71ce7a73aae'
 tier: L2
 related:
   - '[[2026-03-22-clci-release-adr]]'
@@ -13,6 +13,8 @@ related:
 ---
 
 # clci-release phase-1 plan
+
+## Steps
 
 ### Phase `P01` - release-please configuration
 

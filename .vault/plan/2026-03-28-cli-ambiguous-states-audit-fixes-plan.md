@@ -4,7 +4,7 @@ tags:
   - '#cli-ambiguous-states'
 date: '2026-03-28'
 modified: '2026-07-31'
-body_hash: 'sha256:950421b36caad7aef8d4ba967a6fb9adf59ad96260688318dd870efb290ed818'
+body_hash: 'sha256:1137067d1d9c274dd68d5e6e3aeb5408a1960f0f7061311b0b86631c9c85e095'
 tier: L2
 related:
   - '[[2026-03-27-cli-ambiguous-states-audit]]'
@@ -14,6 +14,8 @@ related:
 ---
 
 # `cli-ambiguous-states` audit fix plan
+
+## Steps
 
 ### Phase `P01` - Data safety
 

@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#mcp-cli-interface'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:4d965622ffecf735994374f3366460e827ad9dc2392a8d0e63ed6110c773b766'
 related:

@@ -4,7 +4,7 @@ tags:
   - '#vault-index-folder'
 date: '2026-04-30'
 modified: '2026-07-31'
-body_hash: 'sha256:2434e62009eae62e4d2a0b393db9ddc4274b4835a77941765d9c83b8d1455023'
+body_hash: 'sha256:22ded8464e254257724ae7ed6ca9403fe52a5193918a45e01cceadbcafa3eaee'
 tier: L2
 related:
   - '[[2026-04-30-vault-index-folder-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # `vault-index-folder` plan: dedicated index subfolder migration
+
+## Steps
 
 ### Phase `P01` - constants and config
 

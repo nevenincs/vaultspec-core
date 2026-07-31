@@ -3,8 +3,8 @@ tags:
   - '#plan'
   - '#plan-hardening'
 date: '2026-05-05'
-modified: '2026-06-13'
-body_hash: 'sha256:a54d9b304b566e60a6baf03e0da426a2df7203e0da6f23145f33a48427e35c71'
+modified: '2026-07-31'
+body_hash: 'sha256:127b9c7d0b5784965a6fb593600d07a57f2b5a6a44714d651f6596ec3cc98061'
 tier: L3
 related:
   - '[[2026-05-05-plan-hardening-adr]]'
@@ -13,6 +13,8 @@ related:
 ---
 
 # `plan-hardening` plan
+
+## Steps
 
 ## Wave `W01` - language firmware rollout
 

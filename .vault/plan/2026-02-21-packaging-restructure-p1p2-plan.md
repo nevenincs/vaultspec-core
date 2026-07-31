@@ -4,7 +4,7 @@ tags:
   - '#packaging-restructure'
 date: '2026-02-21'
 modified: '2026-07-31'
-body_hash: 'sha256:1fb1a82982a9509ba117f1b9e5e7d42aa72313f82bd047617a71b2921a1363d2'
+body_hash: 'sha256:643527b383aeffff44f41569567f370421c7a25e531c1f907fb4047c296fa64d'
 tier: L2
 related:
   - '[[2026-02-21-packaging-restructure-adr]]'
@@ -13,13 +13,15 @@ related:
 
 # `packaging-restructure` `p1+p2` plan
 
+## Steps
+
 ### Phase `P01` - Package layout and file moves
 
-Move library packages and CLI scripts into src/vaultspec, delete _paths.py, and relocate tests to the top level
+Move library packages and CLI scripts into src/vaultspec, delete \_paths.py, and relocate tests to the top level
 
 - [x] `P01.S01` - create the src/vaultspec package directory structure; `src/vaultspec_core`.
 - [x] `P01.S02` - move all library packages into the src/vaultspec namespace package; `src/vaultspec_core`.
-- [x] `P01.S03` - move cli scripts into the package as proper modules and delete _paths.py; `src/vaultspec_core/cli`.
+- [x] `P01.S03` - move cli scripts into the package as proper modules and delete \_paths.py; `src/vaultspec_core/cli`.
 - [x] `P01.S04` - move test directories to the top level and adjust path derivation; `src/vaultspec_core/tests`.
 
 ### Phase `P02` - Import rewrite to namespaced form
@@ -29,7 +31,7 @@ Rewrite all bare-name imports across production code, servers, CLI modules, and 
 - [x] `P02.S05` - rewrite bare-name imports in leaf packages to vaultspec-prefixed form; `src/vaultspec_core/vaultcore`.
 - [x] `P02.S06` - rewrite bare-name imports in mid-tier packages to vaultspec-prefixed form; `src/vaultspec_core/protocol`.
 - [x] `P02.S07` - rewrite bare-name imports in analytics packages to vaultspec-prefixed form; `src/vaultspec_core/graph`.
-- [x] `P02.S08` - rewrite bare-name imports in server and cli modules and remove _paths references; `src/vaultspec_core/mcp_server`.
+- [x] `P02.S08` - rewrite bare-name imports in server and cli modules and remove \_paths references; `src/vaultspec_core/mcp_server`.
 - [x] `P02.S09` - rewrite bare-name imports in all test and conftest files; `src/vaultspec_core/tests`.
 
 ### Phase `P03` - Packaging configuration

@@ -4,7 +4,7 @@ tags:
   - '#vault-doctor-suite'
 date: '2026-02-24'
 modified: '2026-07-31'
-body_hash: 'sha256:563bc3b6f44ea334f9687ba6cad1e7f2049a7577f5024c2d983863836d3a919c'
+body_hash: 'sha256:6f9bf8b2889a254c1f4b1839a0e88b077d44142afc39b4768c87b4b9bc67d88e'
 tier: L2
 related:
   - '[[2026-02-24-vault-doctor-suite-adr]]'
@@ -14,6 +14,8 @@ related:
 ---
 
 # `vault-doctor-suite` P3 plan: Chain Integrity Checks
+
+## Steps
 
 ### Phase `P01` - Chain integrity checks
 

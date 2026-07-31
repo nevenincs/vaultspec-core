@@ -4,7 +4,7 @@ tags:
   - '#cli-output'
 date: '2026-02-23'
 modified: '2026-07-31'
-body_hash: 'sha256:bd118203e83b359a2d1d407716ff229128b20df8262a3ff3714af3f6a633e08f'
+body_hash: 'sha256:92e5659939061b466a6e5335ff90b6d4ad860f7bab9df99026dabf7a20e3b5ed'
 tier: L2
 related:
   - '[[2026-02-23-cli-output-architecture-adr]]'
@@ -14,6 +14,8 @@ related:
 ---
 
 # `cli-output` phase-1 plan
+
+## Steps
 
 ### Phase `P01` - Infrastructure
 

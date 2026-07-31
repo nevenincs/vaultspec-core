@@ -4,7 +4,7 @@ tags:
   - '#workspace-context'
 date: '2026-03-21'
 modified: '2026-07-31'
-body_hash: 'sha256:e79170caabc65664a209f8e55a46eadc640758929f4ad8ca86d509f86df5d1da'
+body_hash: 'sha256:dca6652e9ff86338bfa589eef9cd615566ac7a937639fa355bf3e00484624c8b'
 tier: L2
 related:
   - '[[2026-03-21-workspace-context-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # workspace-context plan
+
+## Steps
 
 ### Phase `P01` - define WorkspaceContext
 
@@ -31,11 +33,11 @@ replace the swap-and-restore race with an isolated context snapshot per call
 
 - [x] `P03.S03` - replace the swap-and-restore pattern in sync_provider with contextvars.copy_context().run(...); `src/vaultspec_core/core/provider_sync.py`.
 
-### Phase `P04` - fix _ensure_tool_configs and entry points
+### Phase `P04` - fix \_ensure_tool_configs and entry points
 
 stop touching real workspace paths for tool-config resolution and assign context at every entry point
 
-- [x] `P04.S04` - use a temp directory instead of the real workspace in _ensure_tool_configs and set context via init_paths at every entry point; `src/vaultspec_core/core/commands.py`.
+- [x] `P04.S04` - use a temp directory instead of the real workspace in \_ensure_tool_configs and set context via init_paths at every entry point; `src/vaultspec_core/core/commands.py`.
 
 ### Phase `P05` - per-request context isolation in the MCP handler
 

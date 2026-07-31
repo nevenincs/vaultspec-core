@@ -5,7 +5,7 @@ tags:
 date: '2026-07-31'
 modified: '2026-07-31'
 body_schema: 'body-v1'
-body_hash: 'sha256:518c13bac58bea6dd0f4d24327b5ab2a10abd75418ac08c6ade31506167d6c0c'
+body_hash: 'sha256:58580cc7ac2f411c51db3550ed7f131eeeda50ee0be43064ba74c071c2b6abda'
 related:
   - "[[2026-06-27-rename-convergence-adr]]"
 ---
@@ -35,8 +35,7 @@ change between validation and the first rename (`batch_archive.py:153-174`).
 
 `archive_feature` in `src/vaultspec_core/vaultcore/query_archive.py` is the
 tag-scoped path. It selects documents via `list_documents(root_dir, feature=...)`
-and moves each with `shutil.move` after `dest.parent.mkdir(parents=True,
-exist_ok=True)` (`query_archive.py:110-118`): no lock, no transaction, no rollback,
+and moves each with `shutil.move` after `dest.parent.mkdir(parents=True, exist_ok=True)` (`query_archive.py:110-118`): no lock, no transaction, no rollback,
 and no destination-exists preflight. Contrary to the working hypothesis that only
 features can "genuinely" be archived, the feature path is the weaker engine; the
 per-document path is the one built on the transactional rename machinery ratified by

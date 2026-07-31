@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#skill-audit'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:c6f1d7f465eead0af054476ff6ae7be81c2dce76d4b684373f2742c7377f8845'
 related:

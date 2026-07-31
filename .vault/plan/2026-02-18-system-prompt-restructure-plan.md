@@ -4,7 +4,7 @@ tags:
   - '#system-prompt'
 date: '2026-02-18'
 modified: '2026-07-31'
-body_hash: 'sha256:66a07d7b78ad1ad9406e426701c8f842d8a79b88083099db347fd41ffeb44721'
+body_hash: 'sha256:98213186037c799e07d40f85d69ba5061e41774f485cec3654b590646947b8a5'
 tier: L2
 related:
   - '[[2026-02-18-system-prompt-restructure-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # system-prompt restructure plan
+
+## Steps
 
 ### Phase `P01` - Content Restructuring
 

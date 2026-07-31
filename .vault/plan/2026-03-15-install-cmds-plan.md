@@ -4,7 +4,7 @@ tags:
   - '#install-cmds'
 date: '2026-03-15'
 modified: '2026-07-31'
-body_hash: 'sha256:69f9f8950d5fb98b8882e2926dc7173adb89b5ba4a6c182a3f4eb0d0c5e522d5'
+body_hash: 'sha256:805f4c642b2ef2608f77dd91b5050f955c76d3ba4beea1b14e410f8e1c4ea4f7'
 tier: L2
 related:
   - '[[2026-03-16-managed-content-blocks-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # `install-cmds` implementation plan
+
+## Steps
 
 ### Phase `P01` - grounding research
 

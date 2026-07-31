@@ -4,7 +4,7 @@ tags:
   - '#marketing-and-documentation'
 date: '2026-02-20'
 modified: '2026-07-31'
-body_hash: 'sha256:7ea10d91b77a32bbf985cb7b8b07491fa2fde24d1bcb49b41ce81a84d9d7470b'
+body_hash: 'sha256:007391016337c9f1053bb18b76eceffc900a8725d3f053481310e02521851e16'
 tier: L2
 related:
   - '[[2026-02-20-marketing-and-documentation-research]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # `marketing-and-documentation` `phase1` plan
+
+## Steps
 
 ### Phase `P01` - Retire
 

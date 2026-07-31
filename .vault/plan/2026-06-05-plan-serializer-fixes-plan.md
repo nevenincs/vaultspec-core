@@ -3,8 +3,8 @@ tags:
   - '#plan'
   - '#plan-serializer-fixes'
 date: '2026-06-05'
-modified: '2026-06-13'
-body_hash: 'sha256:4f77573c14d5000d628adcba74117c9f18ba49eb6ffedb61789ff6117d5e6072'
+modified: '2026-07-31'
+body_hash: 'sha256:587d848fdbd95cb2362bb1042feeed7346694bd14dcc562e02e552e434c4ace7'
 tier: L2
 related:
   - '[[2026-06-05-plan-serializer-fixes-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # `plan-serializer-fixes` `serializer validation and obsolete codex agents pruning` plan
+
+## Steps
 
 ## Phases
 

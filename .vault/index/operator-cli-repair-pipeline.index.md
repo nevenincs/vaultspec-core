@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#operator-cli-repair-pipeline'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:2d078f0f2bd6deb991c286cf81009352051e7f7f271e21179dba35030df7a538'
 related:

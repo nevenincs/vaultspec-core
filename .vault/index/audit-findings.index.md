@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#audit-findings'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:e314844175c311698564c53b479a81a51c589dfa12558932f82b39b3221676db'
 related:

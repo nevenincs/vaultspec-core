@@ -3,10 +3,10 @@ generated: true
 tags:
   - '#index'
   - '#modified-stamp-provenance'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
-body_hash: 'sha256:69ff37026c179502d336109842a1a449de41d7eba2b8d98355184c591d597911'
+body_hash: 'sha256:8fb82bedf007dab043cf2a8a072288d798fd53de795b4b3b2f8e307652493b8f'
 related:
   - '[[2026-07-30-modified-stamp-provenance-adr]]'
   - '[[2026-07-30-modified-stamp-provenance-research]]'
@@ -20,7 +20,7 @@ Auto-generated index of all documents tagged with `#modified-stamp-provenance`.
 
 ### adr
 
-- `2026-07-30-modified-stamp-provenance-adr` - `modified-stamp-provenance` adr: `derive stamp staleness from a content fingerprint, not file mtime` | (**status:** `proposed`)
+- `2026-07-30-modified-stamp-provenance-adr` - `modified-stamp-provenance` adr: `derive stamp staleness from a content fingerprint, not file mtime` | (**status:** `accepted`)
 
 ### research
 

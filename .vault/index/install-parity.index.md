@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#install-parity'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:2e53b3e704c78f9cbd66f960fdf581382f0f5602657b3d8f53f3799523302ef3'
 related:

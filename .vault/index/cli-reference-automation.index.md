@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#cli-reference-automation'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:d28335adef2f334105904c81f5a24ac854c99eb171d9f82bcf92af52bc7046ed'
 related:

@@ -4,7 +4,7 @@ tags:
   - '#flow-bugs'
 date: '2026-04-21'
 modified: '2026-07-31'
-body_hash: 'sha256:62066f7cc8746a6f3d136a1cefd3f4d2c7806d67d7f0b9f089764ba055a4aeaf'
+body_hash: 'sha256:d6eb04408bb467b2cb4932bdab5aad5b811834acc6b167d193a535d63a454b85'
 tier: L2
 related:
   - '[[2026-04-21-flow-bugs-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # `flow-bugs` plan: install-layer hygiene fixes
+
+## Steps
 
 ### Phase `P01` - install-layer hygiene
 

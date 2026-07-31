@@ -4,7 +4,7 @@ tags:
   - '#cli-architecture'
 date: '2026-03-05'
 modified: '2026-07-31'
-body_hash: 'sha256:a20b1a437ae3203b5946e96cefa998649a6bcff2fc3cedf092a4bc90c5161050'
+body_hash: 'sha256:6105f53fa07dab169afc261d2e64c2155d689b006d5ef2a116f580a9cee35930'
 tier: L2
 related:
   - '[[2026-03-05-cli-path-resolution-adr]]'
@@ -14,6 +14,8 @@ related:
 ---
 
 # `cli-target-refactor` plan
+
+## Steps
 
 ### Phase `P01` - Un-brick the repository
 

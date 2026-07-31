@@ -4,7 +4,7 @@ tags:
   - '#doctor-dev-repo'
 date: '2026-04-30'
 modified: '2026-07-31'
-body_hash: 'sha256:e28eefcb75d6a237fde1597e71acfdcbd78b24035c74a2ff88222ee0fd0e7f6c'
+body_hash: 'sha256:63e551b4cde5758122f6eac5ab3ef074aed8175103d466d67b4d02d49ccc1c67'
 tier: L2
 related:
   - '[[2026-04-30-doctor-dev-repo-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # `doctor-dev-repo` `fix collect_framework_presence dev-repo handling` plan
+
+## Steps
 
 ### Phase `P01` - fix dev-repo false-positive in doctor
 

@@ -4,7 +4,7 @@ tags:
   - '#cli-restructure'
 date: '2026-03-16'
 modified: '2026-07-31'
-body_hash: 'sha256:2450115d18964416700337b88e47a3559e46f6c54fa583a6f57d6c5170a46623'
+body_hash: 'sha256:8df528645a8f70a4ce48cd989df43b1f46101bb82fa4f0b9a639d7b3ddf45f5a'
 tier: L2
 related:
   - '[[2026-03-05-cli-engine-typer-adr]]'
@@ -13,6 +13,8 @@ related:
 ---
 
 # CLI Restructure Implementation Plan
+
+## Steps
 
 ### Phase `P01` - Foundation: console and global options
 
@@ -26,7 +28,7 @@ Fix the Windows Unicode console crash and simplify global CLI options before any
 Build the query, archive, sync-filtering, revert, and dry-run library functions the restructured CLI needs before wiring commands to them.
 
 - [x] `P02.S03` - add the vault query engine composing scan, filter and list over parsed documents; `src/vaultspec_core/vaultcore/query.py`.
-- [x] `P02.S04` - add the feature archive mechanism that moves a feature's documents into .vault/_archive/; `src/vaultspec_core/vaultcore/query_archive.py`.
+- [x] `P02.S04` - add the feature archive mechanism that moves a feature's documents into .vault/\_archive/; `src/vaultspec_core/vaultcore/query_archive.py`.
 - [x] `P02.S05` - make sync_to_all_tools manifest-aware so it skips providers not installed; `src/vaultspec_core/core/sync.py`.
 - [x] `P02.S06` - add the revert mechanism restoring builtin firmware resources to their package original; `src/vaultspec_core/core/revert.py`.
 - [x] `P02.S07` - add the Rich tree renderer for coloured dry-run previews; `src/vaultspec_core/core/dry_run.py`.

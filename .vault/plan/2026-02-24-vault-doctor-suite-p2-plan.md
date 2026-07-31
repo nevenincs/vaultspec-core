@@ -4,7 +4,7 @@ tags:
   - '#vault-doctor-suite'
 date: '2026-02-24'
 modified: '2026-07-31'
-body_hash: 'sha256:fa6bdcd61fa501c78be4fa1b796aeb8b064960b73c9b450d92c5cd8bb10d7627'
+body_hash: 'sha256:0c6d70a3e23312cc0d8f1307de523ec0b30e97a67ec317853cfaaf53255dc7c4'
 tier: L2
 related:
   - '[[2026-02-24-vault-doctor-suite-adr]]'
@@ -14,6 +14,8 @@ related:
 ---
 
 # `vault-doctor-suite` P2 plan: Structure and Links Checks
+
+## Steps
 
 ### Phase `P01` - Structure and links checks
 

@@ -4,7 +4,7 @@ tags:
   - '#audit-findings'
 date: '2026-03-30'
 modified: '2026-07-31'
-body_hash: 'sha256:4ad2dfd8866f759dd0099311fe8dbb45d99eff886f0c5f42fd5550f4c0a6a966'
+body_hash: 'sha256:5a862de4f3940545817e4bce1f61dda336fe0f009dd43b2ca1ef6f30383403b9'
 tier: L2
 related:
   - '[[2026-03-27-cli-ambiguous-states-audit]]'
@@ -16,6 +16,8 @@ related:
 ---
 
 # `audit-findings` plan
+
+## Steps
 
 ### Phase `P01` - Data safety
 

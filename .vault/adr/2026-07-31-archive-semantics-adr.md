@@ -5,7 +5,7 @@ tags:
 date: '2026-07-31'
 modified: '2026-07-31'
 body_schema: 'body-v1'
-body_hash: 'sha256:6fbe5e90e8b87ab6b1d9d079f1d25c1ad74c93dcb15a3192cc99c309a001cdfc'
+body_hash: 'sha256:dc32a6973e97d31b7f8b42904268efe62b112704d1a76f56f021d0fab660adb3'
 related:
   - "[[2026-07-31-archive-semantics-reference]]"
   - "[[2026-06-27-rename-convergence-adr]]"
@@ -110,8 +110,7 @@ sweeps.
 
 ## Consequences
 
-- The legacy-plan retirement campaign proceeds on `vault archive documents
-  --manifest` with a ruled, honest contract; no plan-shaped special case exists to
+- The legacy-plan retirement campaign proceeds on `vault archive documents --manifest` with a ruled, honest contract; no plan-shaped special case exists to
   maintain.
 - Archived plans leave their exec records live by design; the exec-mapping check
   reports them as benign, so a plan's archival never manufactures findings.

@@ -4,7 +4,7 @@ tags:
   - '#roadmap'
 date: '2026-02-17'
 modified: '2026-07-31'
-body_hash: 'sha256:6d14d4ee7799ea177c9ee79a2029fbb6183cbee19747b5edd4a9b44dabcc33e2'
+body_hash: 'sha256:1d1a28dd375a5b30511cc782ea4f0db2c093b752bc148dfee9ebfb8e68918f5a'
 tier: L2
 related:
   - '[[2026-02-17-audit-summary-audit]]'
@@ -13,6 +13,8 @@ related:
 ---
 
 # vaultspec Roadmap: Wave-Based Rollout Plan
+
+## Steps
 
 ### Phase `P01` - Critical Blocking Bugs
 

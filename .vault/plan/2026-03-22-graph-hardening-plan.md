@@ -4,7 +4,7 @@ tags:
   - '#graph-hardening'
 date: '2026-03-22'
 modified: '2026-07-31'
-body_hash: 'sha256:04099643fbb63f917eda2e40fc666b613e6aadeb91b77dfe0ef1dacf2a3772e6'
+body_hash: 'sha256:8587d8b4737bb8178ff922e2f4911940d94634cd755ac263647c701f76b7c3c3'
 tier: L2
 related:
   - '[[2026-03-22-graph-hardening-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # `graph-hardening` plan
+
+## Steps
 
 ### Phase `P01` - phantom nodes in the graph
 

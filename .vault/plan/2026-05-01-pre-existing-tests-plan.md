@@ -4,7 +4,7 @@ tags:
   - '#pre-existing-tests'
 date: '2026-05-01'
 modified: '2026-07-31'
-body_hash: 'sha256:8d05fd0e61bc4a6d75e6fc488ae5b5fa7511e1f5155a02308d53d724a9d66d0a'
+body_hash: 'sha256:90d5029cf7f9f36ac723ff2eecc2e751b852b2bb87ae42066e1445f55015ce3a'
 tier: L2
 related:
   - '[[2026-05-01-pre-existing-tests-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # `pre-existing-tests` plan: pre-existing test failures (#98, #99)
+
+## Steps
 
 ### Phase `P01` - fix pre-existing test failures
 

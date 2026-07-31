@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#workspace-context'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:abb673d644e813ce766c4bcb91e98a12d495e5c2cb932af708e41272bed4fe94'
 related:

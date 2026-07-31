@@ -4,7 +4,7 @@ tags:
   - '#cli-logging'
 date: '2026-02-22'
 modified: '2026-07-31'
-body_hash: 'sha256:74b17a5077566451e802902cdcd5b4fbb5ad688099577fdc249e661099d22f8a'
+body_hash: 'sha256:0935aa7267984b783f4464535dcb769889a2556960e77cc7b2e2d53e46721118'
 tier: L2
 related:
   - '[[2026-02-22-cli-logging-adr]]'
@@ -13,10 +13,11 @@ related:
 
 # `cli-logging` plan
 
+## Steps
+
 ### Phase `P01` - CLI logging infrastructure
 
 Replace the plain StreamHandler with a TTY-aware RichHandler across all CLI entry points and add a --quiet verbosity flag.
-
 
 Standardize all CLI logging with Rich and overhaul agent feed formatting for
 colorized, readable output. Implements \[[2026-02-22-cli-logging-adr]\].

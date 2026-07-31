@@ -4,7 +4,7 @@ tags:
   - '#cli-ambiguous-states'
 date: '2026-03-27'
 modified: '2026-07-31'
-body_hash: 'sha256:751a67b248fa64a37229c0b93651572bd98fcae858c210be42d486dc6fc548e8'
+body_hash: 'sha256:563c1364c82bec50fdb1d8cd867c4466dfea32812e52145ce6a9b47a3465a0ec'
 tier: L2
 related:
   - '[[2026-03-27-cli-ambiguous-states-resolver-adr]]'
@@ -14,6 +14,8 @@ related:
 ---
 
 # `cli-ambiguous-states` implementation plan
+
+## Steps
 
 ### Phase `P01` - Foundation
 

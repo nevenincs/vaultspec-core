@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#clci-release'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:e0238e5d73ed8e5943ee0b8e5a2a90aa9560e66b6399e27f2c9768d5248104ee'
 related:

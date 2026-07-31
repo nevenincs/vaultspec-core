@@ -4,7 +4,7 @@ tags:
   - '#vault-doctor-suite'
 date: '2026-02-24'
 modified: '2026-07-31'
-body_hash: 'sha256:7bdd5fab176dbbc57606dc316b57640f591bfe4a708b7633e5a1ff39397eabe7'
+body_hash: 'sha256:9d6bb8edbd2ab82d961e82c01a359fc11ce9491954e1bfb16c9346314f420f1e'
 tier: L2
 related:
   - '[[2026-02-24-vault-doctor-suite-adr]]'
@@ -14,6 +14,8 @@ related:
 ---
 
 # `vault-doctor-suite` P5 plan: Coverage Matrix and Reporting
+
+## Steps
 
 ### Phase `P01` - Feature coverage reporting
 

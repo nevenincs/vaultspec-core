@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#rename-convergence'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:ea85125571374eadfed92e3dd6bc669cb3f49bbffbd526eda95f1514ee7b93d0'
 related:

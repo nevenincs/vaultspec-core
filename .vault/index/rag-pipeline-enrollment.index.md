@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#rag-pipeline-enrollment'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:b3ddd6a4445f14c0be4cb0f673630f5aba11bb6824ccc31569e98378eb6fc2be'
 related:

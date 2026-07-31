@@ -4,7 +4,7 @@ tags:
   - '#module-exports'
 date: '2026-02-21'
 modified: '2026-07-31'
-body_hash: 'sha256:a7e302205a3b8e6c0d9468d851af49cbd5c2787ab5873adc1e81e70266684fb3'
+body_hash: 'sha256:8eb1babe91b5ca8b3386865e5245c170a694b76b744214b3203e46aeb68f02ab'
 tier: L2
 related:
   - '[[2026-02-21-module-exports-adr]]'
@@ -14,6 +14,8 @@ related:
 ---
 
 # `module-exports` plan
+
+## Steps
 
 ### Phase `P01` - Leaf package exports
 

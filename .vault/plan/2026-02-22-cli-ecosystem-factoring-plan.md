@@ -4,7 +4,7 @@ tags:
   - '#cli-ecosystem-factoring'
 date: '2026-02-22'
 modified: '2026-07-31'
-body_hash: 'sha256:8ff012223a3f9f8c7daa212d0c5fbb6345ea8160ad540d3f226c10ed7f3d8650'
+body_hash: 'sha256:95577ec541afc39c1c6c5acf72f035f2ed99e41464b9af4f6a09b110e62cf3dc'
 tier: L2
 related:
   - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # cli-ecosystem-factoring plan
+
+## Steps
 
 ### Phase `P01` - Rename core to config
 

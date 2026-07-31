@@ -4,7 +4,7 @@ tags:
   - '#vault-doctor-suite'
 date: '2026-02-24'
 modified: '2026-07-31'
-body_hash: 'sha256:7a484467758a38539159c3d5c00716e2953b683e490540d6575433c30590a516'
+body_hash: 'sha256:ff57c8c2afe8d032cbfb0f6126a855c1219d0d4ac9c02fa9595b10bea72a7482'
 tier: L2
 related:
   - '[[2026-02-24-vault-doctor-suite-adr]]'
@@ -14,6 +14,8 @@ related:
 ---
 
 # `vault-doctor-suite` P4 plan: Frontmatter Drift Checks
+
+## Steps
 
 ### Phase `P01` - Frontmatter drift checks
 

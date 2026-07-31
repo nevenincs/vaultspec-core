@@ -4,7 +4,7 @@ tags:
   - '#install-cmds'
 date: '2026-03-16'
 modified: '2026-07-31'
-body_hash: 'sha256:00e3de54d0c8122c70fe1b43f8251dcd198c98dfa191e801d0187280d7c93060'
+body_hash: 'sha256:07edbd59add118fb28cccead299dcd35d97cb9b10670ea874ab8a3e85538c4bc'
 tier: L2
 related:
   - '[[2026-03-15-install-cmds-plan]]'
@@ -14,6 +14,8 @@ related:
 ---
 
 # install-cmds execution plan
+
+## Steps
 
 ### Phase `P01` - provider capability enum and resource additions
 

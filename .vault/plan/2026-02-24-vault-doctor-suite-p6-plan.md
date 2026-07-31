@@ -4,7 +4,7 @@ tags:
   - '#vault-doctor-suite'
 date: '2026-02-24'
 modified: '2026-07-31'
-body_hash: 'sha256:46e693c21d860b37da48396ced19aeeab4eddf40925454c5c1046ec0538a1e3b'
+body_hash: 'sha256:305325bda4b100d58ee01f063118647e3d2c51022a691c2382322aaa15569a6a'
 tier: L2
 related:
   - '[[2026-02-24-vault-doctor-suite-adr]]'
@@ -18,6 +18,8 @@ related:
 ---
 
 # `vault-doctor-suite` P6 plan: Integration, Pre-commit Hooks, MCP Tool, and Docs
+
+## Steps
 
 ### Phase `P01` - Integration, pre-commit, MCP, and docs
 

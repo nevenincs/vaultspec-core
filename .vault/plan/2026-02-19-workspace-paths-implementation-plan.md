@@ -4,7 +4,7 @@ tags:
   - '#workspace-paths'
 date: '2026-02-19'
 modified: '2026-07-31'
-body_hash: 'sha256:de8f2364ec8565a363639c0d87232c0ff62b8fdaef619208f32ef31495a47ac0'
+body_hash: 'sha256:f3915eb619481b97d64d6625188a6b261896a5cbec73ef43de73f029c99a70c2'
 tier: L2
 related:
   - '[[2026-02-19-workspace-path-decoupling-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # `workspace-paths` `implementation` plan
+
+## Steps
 
 ### Phase `P01` - Core Module and Config
 

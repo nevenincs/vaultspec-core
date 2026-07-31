@@ -4,7 +4,7 @@ tags:
   - '#cli-test-coverage'
 date: '2026-02-23'
 modified: '2026-07-31'
-body_hash: 'sha256:b9d2debc688b7f0ae6136f80fe786715bda296477a7d570b78aa382ea10eb371'
+body_hash: 'sha256:6329caff544627aaa0b6b70852eed6687f6e38746eb0c2b4b6808c261b66d83c'
 tier: L2
 related:
   - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # cli-test-coverage plan
+
+## Steps
 
 ### Phase `P01` - Unified router tests
 

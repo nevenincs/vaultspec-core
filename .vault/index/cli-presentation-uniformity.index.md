@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#cli-presentation-uniformity'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:3f347fee244522374c64a2138dfb2a916d6838be4dbac2db66b0c7641a47bfb0'
 related:

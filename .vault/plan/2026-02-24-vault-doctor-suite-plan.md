@@ -4,7 +4,7 @@ tags:
   - '#vault-doctor-suite'
 date: '2026-02-24'
 modified: '2026-07-31'
-body_hash: 'sha256:e5d61d00ef138e7326c61a0e00e6b658fd842e2187be7a0b02e32c3bbab33bbb'
+body_hash: 'sha256:ee419b1c204a6737ca9e80cd43d2738f44b24542fa556572de5c6b4fa078a3eb'
 tier: L2
 related:
   - '[[2026-02-24-vault-doctor-suite-research]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # `vault-doctor-suite` plan
+
+## Steps
 
 ### Phase `P01` - Foundation: check registry, models, and CLI scaffold
 

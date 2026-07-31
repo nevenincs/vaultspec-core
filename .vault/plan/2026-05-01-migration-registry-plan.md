@@ -4,7 +4,7 @@ tags:
   - '#migration-registry'
 date: '2026-05-01'
 modified: '2026-07-31'
-body_hash: 'sha256:07b5630fb480adece390e71de0e964bd5ee7563ed9feba83052e2298dd7082b2'
+body_hash: 'sha256:e7a2936517cb242a044bf1a4691779b88539c87640a58b032e4449ba7f64b78c'
 tier: L2
 related:
   - '[[2026-05-01-migration-registry-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # `migration-registry` plan
+
+## Steps
 
 ### Phase `P01` - implementation
 

@@ -4,7 +4,7 @@ tags:
   - '#check-engine-perf'
 date: '2026-03-21'
 modified: '2026-07-31'
-body_hash: 'sha256:14bdfe20915be268d9fa2a5a752911bd6a031f7d88b0d81a7d4a5a5c6fbd487c'
+body_hash: 'sha256:89abe4f8362b094547250021f73c974c314cc08842e09754bbdb7bc759b23f52'
 tier: L2
 related:
   - '[[2026-03-21-check-engine-perf-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # check-engine-perf plan
+
+## Steps
 
 ### Phase `P01` - graph-consuming checkers
 

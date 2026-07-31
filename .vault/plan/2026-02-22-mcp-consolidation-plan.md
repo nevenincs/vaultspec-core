@@ -4,7 +4,7 @@ tags:
   - '#mcp-consolidation'
 date: '2026-02-22'
 modified: '2026-07-31'
-body_hash: 'sha256:19e5c410dcdfe8384d23dc77396f3fc2d16ab7f498b32ed29ec4118024dec681'
+body_hash: 'sha256:a79510b70884df87eaa191797c5083a47044ed1be541a18f6e45b31b1eadb68f'
 tier: L2
 related:
   - '[[2026-02-22-mcp-consolidation-adr]]'
@@ -14,6 +14,8 @@ related:
 ---
 
 # `mcp-consolidation` plan
+
+## Steps
 
 ### Phase `P01` - Scaffold and move source files
 

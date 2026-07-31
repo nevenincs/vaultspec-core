@@ -4,7 +4,7 @@ tags:
   - '#pytest-e2e'
 date: '2026-02-21'
 modified: '2026-07-31'
-body_hash: 'sha256:6e3ab3004fa02e3cf4747769fec833d7f327a3e1e3e78c27e4d694df2464afa8'
+body_hash: 'sha256:206bb7f9d90757fc1a92b90198ced8f47ef50d66aba79ef9c985d894f17e8850'
 tier: L2
 related:
   - '[[2026-02-21-pytest-e2e-observability-adr]]'
@@ -12,6 +12,8 @@ related:
 ---
 
 # `pytest-e2e` `impl` plan
+
+## Steps
 
 ### Phase `P01` - Infrastructure
 

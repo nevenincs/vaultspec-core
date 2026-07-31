@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#cli-logging'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:735cc07472a8c82ffff59ba7db0370e6003c2a640ae9d7051542a5b715e30de7'
 related:

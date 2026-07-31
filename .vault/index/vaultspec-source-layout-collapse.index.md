@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#vaultspec-source-layout-collapse'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:72bb2ab8e67e41353b83faaf121744f8fd9647e63ad5121cf389dc293c2a8001'
 related:

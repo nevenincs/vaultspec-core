@@ -4,7 +4,7 @@ tags:
   - '#vault-doctor-suite'
 date: '2026-02-24'
 modified: '2026-07-31'
-body_hash: 'sha256:7da1c039c15101919e070c00f626eb356e09b790d555d9c8bac4a896a2e69e31'
+body_hash: 'sha256:74a19c3f4512bfe4c3827d5c4f9c0a52560647bd70bf95a4288ec2c83cee9c97'
 tier: L2
 related:
   - '[[2026-02-24-vault-doctor-suite-adr]]'
@@ -12,7 +12,9 @@ related:
   - '[[2026-02-24-vault-doctor-suite-research]]'
 ---
 
-# `vault-doctor-suite` P1 plan: Foundation — Models, Registry, Safe Writer, CLI Scaffold, Remove `vault audit`
+# `vault-doctor-suite` P1 plan: Foundation - Models, Registry, Safe Writer, CLI Scaffold, Remove `vault audit`
+
+## Steps
 
 ### Phase `P01` - Data models and check registry
 

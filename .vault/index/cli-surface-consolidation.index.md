@@ -3,8 +3,8 @@ generated: true
 tags:
   - '#index'
   - '#cli-surface-consolidation'
-date: '2026-07-30'
-modified: '2026-07-30'
+date: '2026-07-31'
+modified: '2026-07-31'
 body_schema: 'body-v1'
 body_hash: 'sha256:1ae44fde57072e69fb0d1ca9731c6c2287d10317cff81cf469551b91e53ff944'
 related:

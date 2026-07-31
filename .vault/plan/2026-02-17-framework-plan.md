@@ -4,7 +4,7 @@ tags:
   - '#framework'
 date: '2026-02-17'
 modified: '2026-07-31'
-body_hash: 'sha256:70958431d4c0107b516ba8cf9cd373799edfdf31c6055170b4c621ee9d49e0e5'
+body_hash: 'sha256:ae5358f3b1d6d32a2c4d997a7f70a3c39c602c08a14f1a6312c3215e7017ac07'
 tier: L2
 related:
   - '[[2026-02-17-bootstrap-prompt-adr]]'
@@ -13,6 +13,8 @@ related:
 ---
 
 # Framework Infrastructure Plan
+
+## Steps
 
 ### Phase `P01` - Framework Infrastructure Consolidation
 
