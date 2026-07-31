@@ -128,10 +128,18 @@ def archive_documents(
     directory. Each document moves to ``.vault/_archive/<vault-relative-path>``.
     Preflight rejects every unsafe source or destination before the first move;
     an apply runs under the normal docs-domain lock and rolls back on failure.
+
+    A ``dry_run`` evaluates the identical :func:`_preflight` the apply runs -
+    every deterministic precondition, including the runtime-directory one - and
+    writes nothing. Its verdict is point-in-time rather than a reservation: the
+    preview holds no lock, so the apply re-runs the whole preflight under
+    :func:`~vaultspec_core.vaultcore.rename_engine.docs_lock_target` and fails
+    the batch closed if anything moved in between.
     """
     root = root_dir.resolve()
     docs_dir = root / get_config().docs_dir
     _assert_docs_dir(root, docs_dir)
+    _assert_runtime_dir(docs_dir)
 
     supplied = tuple(relative_paths)
     if dry_run:
@@ -139,16 +147,7 @@ def archive_documents(
         cross_links = _cross_link_paths(root, docs_dir, moves)
         return _result(root, moves, cross_links, dry_run=True)
 
-    runtime_dir = docs_dir / "data"
-    if runtime_dir.is_symlink():
-        raise ArchiveDocumentsError(
-            f"Vault runtime directory must not be a symlink: {runtime_dir}"
-        )
-    runtime_dir.mkdir(exist_ok=True)
-    if not runtime_dir.is_dir():
-        raise ArchiveDocumentsError(
-            f"Vault runtime path is not a directory: {runtime_dir}"
-        )
+    _create_runtime_dir(docs_dir)
 
     with RenameTransaction(docs_dir, lock_target=docs_lock_target(docs_dir)) as tx:
         # Re-run the whole preflight while holding the common docs lock. This
@@ -187,10 +186,15 @@ def restore_documents(
     document moves back to the exact vault-relative path encoded after that
     prefix. Preflight rejects every unsafe source or destination before the
     first move; an apply uses the common docs lock and rolls back on failure.
+
+    A ``dry_run`` carries the same contract as :func:`archive_documents`: it
+    evaluates every deterministic precondition the apply enforces, writes
+    nothing, and is a point-in-time preview rather than a reservation.
     """
     root = root_dir.resolve()
     docs_dir = root / get_config().docs_dir
     _assert_docs_dir(root, docs_dir, error_type=RestoreDocumentsError)
+    _assert_runtime_dir(docs_dir, error_type=RestoreDocumentsError)
 
     supplied = tuple(relative_paths)
     if dry_run:
@@ -200,16 +204,7 @@ def restore_documents(
         cross_links = _restore_cross_link_paths(root, docs_dir, moves)
         return _restore_result(root, moves, cross_links, dry_run=True)
 
-    runtime_dir = docs_dir / "data"
-    if runtime_dir.is_symlink():
-        raise RestoreDocumentsError(
-            f"Vault runtime directory must not be a symlink: {runtime_dir}"
-        )
-    runtime_dir.mkdir(exist_ok=True)
-    if not runtime_dir.is_dir():
-        raise RestoreDocumentsError(
-            f"Vault runtime path is not a directory: {runtime_dir}"
-        )
+    _create_runtime_dir(docs_dir, error_type=RestoreDocumentsError)
 
     with RenameTransaction(docs_dir, lock_target=docs_lock_target(docs_dir)) as tx:
         # Match archive's locked preflight so no path can change after the
@@ -273,6 +268,65 @@ def _assert_docs_dir(
         raise error_type(
             f"Configured vault directory escapes the project root: {docs_dir}"
         ) from exc
+
+
+def _assert_runtime_dir(
+    docs_dir: Path,
+    *,
+    error_type: type[ArchiveDocumentsError | RestoreDocumentsError] = (
+        ArchiveDocumentsError
+    ),
+) -> None:
+    """Check the runtime directory without creating it.
+
+    This is the deterministic half of the runtime-directory precondition, split
+    out so a ``dry_run`` can evaluate it too. Creating the directory is the
+    mutating half and stays on the apply path in :func:`_create_runtime_dir`;
+    a preview must leave the filesystem untouched.
+
+    Args:
+        docs_dir: The configured vault document directory.
+        error_type: Exception raised on failure, so the restore path reports
+            its own error type.
+
+    Raises:
+        ArchiveDocumentsError: If the runtime path is a symlink, or exists as
+            something other than a directory. ``error_type`` selects the
+            concrete class.
+    """
+    runtime_dir = docs_dir / "data"
+    if runtime_dir.is_symlink():
+        raise error_type(
+            f"Vault runtime directory must not be a symlink: {runtime_dir}"
+        )
+    if runtime_dir.exists() and not runtime_dir.is_dir():
+        raise error_type(f"Vault runtime path is not a directory: {runtime_dir}")
+
+
+def _create_runtime_dir(
+    docs_dir: Path,
+    *,
+    error_type: type[ArchiveDocumentsError | RestoreDocumentsError] = (
+        ArchiveDocumentsError
+    ),
+) -> None:
+    """Create the runtime directory after re-checking its preconditions.
+
+    Args:
+        docs_dir: The configured vault document directory.
+        error_type: Exception raised on failure, so the restore path reports
+            its own error type.
+
+    Raises:
+        ArchiveDocumentsError: If the deterministic checks in
+            :func:`_assert_runtime_dir` fail, or the path is still not a
+            directory after creation. ``error_type`` selects the concrete class.
+    """
+    _assert_runtime_dir(docs_dir, error_type=error_type)
+    runtime_dir = docs_dir / "data"
+    runtime_dir.mkdir(exist_ok=True)
+    if not runtime_dir.is_dir():
+        raise error_type(f"Vault runtime path is not a directory: {runtime_dir}")
 
 
 def _preflight(
