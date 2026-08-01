@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.56](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.55...vaultspec-core-v0.1.56) (2026-08-01)
+
+
+### Features
+
+* **mcp:** add read-only launch mode ([#302](https://github.com/nevenincs/vaultspec-core/issues/302)) ([afe5489](https://github.com/nevenincs/vaultspec-core/commit/afe5489481ceed22f5310148e98f78766bafe432))
+
 ## [0.1.55](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.54...vaultspec-core-v0.1.55) (2026-07-31)
 
 
