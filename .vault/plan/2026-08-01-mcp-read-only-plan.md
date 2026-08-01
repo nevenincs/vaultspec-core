@@ -42,7 +42,6 @@ related:
      DO NOT add fields beyond those scaffolded; metadata lives
      only in the frontmatter. -->
 
-
 <!-- HIERARCHY AND TIERS:
      Epic > Wave > Phase > Step. Step is the canonical leaf-row
      noun. Execution Record artifact: <Step Record>.

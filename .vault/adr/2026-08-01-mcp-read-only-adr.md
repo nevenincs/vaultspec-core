@@ -10,6 +10,7 @@ related:
   - "[[2026-08-01-mcp-read-only-research]]"
   - "[[2026-07-09-mcp-tool-schema-adr]]"
 ---
+
 # `mcp-read-only` adr: `read-only MCP launch mode` | (**status:** `accepted`)
 
 ## Problem Statement

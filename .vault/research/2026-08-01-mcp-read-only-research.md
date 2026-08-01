@@ -10,6 +10,7 @@ related:
   - "[[2026-07-09-mcp-tool-schema-adr]]"
   - "[[2026-07-09-mcp-tool-schema-reference]]"
 ---
+
 # `mcp-read-only` research: capability-scoped MCP launch
 
 Issue #300 asks whether `vaultspec-mcp` can provide vault grounding to orchestrated agents without exposing a mutation capability. The evidence supports a server-owned launch mode that omits mutation tools from `tools/list`; the remaining design question for an ADR is the exact treatment of `check`, whose normal `fix` option writes to the vault.

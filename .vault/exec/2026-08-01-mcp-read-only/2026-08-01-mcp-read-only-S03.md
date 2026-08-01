@@ -10,6 +10,7 @@ step_id: 'S03'
 related:
   - "[[2026-08-01-mcp-read-only-plan]]"
 ---
+
 # `S03` execution record
 
 ## Description

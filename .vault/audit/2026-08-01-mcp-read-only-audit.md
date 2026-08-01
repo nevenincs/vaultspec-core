@@ -11,6 +11,7 @@ related:
   - '[[2026-08-01-mcp-read-only-adr]]'
   - '[[2026-08-01-mcp-read-only-plan]]'
 ---
+
 # `mcp-read-only` audit: `read-only MCP launch mode`
 
 ## Scope
