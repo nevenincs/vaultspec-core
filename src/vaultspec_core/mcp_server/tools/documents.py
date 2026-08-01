@@ -836,7 +836,9 @@ def _find_documents(
     return rows
 
 
-def register_document_tools(mcp: MCPServer[None]) -> None:
+def register_document_tools(
+    mcp: MCPServer[None], *, include_mutations: bool = True
+) -> None:
     """Register the ``find``, ``create``, and ``edit`` document tools on *mcp*.
 
     ``find`` is read-only and idempotent; ``create`` is non-read-only,
@@ -849,6 +851,7 @@ def register_document_tools(mcp: MCPServer[None]) -> None:
 
     Args:
         mcp: The :class:`~mcp.server.mcpserver.MCPServer` instance to decorate.
+        include_mutations: Whether to register ``create`` and ``edit``.
     """
 
     @mcp.tool(
@@ -913,14 +916,6 @@ def register_document_tools(mcp: MCPServer[None]) -> None:
         logger.debug("Found %d documents.", len(rows))
         return rows
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            read_only_hint=False,
-            destructive_hint=False,
-            idempotent_hint=False,
-            open_world_hint=False,
-        ),
-    )
     @_isolated_context
     async def create(
         ctx: Context[Any, Any], documents: list[DocumentSpec]
@@ -964,14 +959,6 @@ def register_document_tools(mcp: MCPServer[None]) -> None:
         logger.debug("create: %d feature index(es) regenerated", len(affected))
         return build_batch(items)
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            read_only_hint=False,
-            destructive_hint=True,
-            idempotent_hint=False,
-            open_world_hint=False,
-        ),
-    )
     @_isolated_context
     async def edit(
         ctx: Context[Any, Any], operations: list[EditOperation]
@@ -1001,5 +988,23 @@ def register_document_tools(mcp: MCPServer[None]) -> None:
 
         items = [_edit_one(root_dir, idx, op) for idx, op in enumerate(operations)]
         return build_batch(items)
+
+    if include_mutations:
+        mcp.tool(
+            annotations=ToolAnnotations(
+                read_only_hint=False,
+                destructive_hint=False,
+                idempotent_hint=False,
+                open_world_hint=False,
+            ),
+        )(create)
+        mcp.tool(
+            annotations=ToolAnnotations(
+                read_only_hint=False,
+                destructive_hint=True,
+                idempotent_hint=False,
+                open_world_hint=False,
+            ),
+        )(edit)
 
     _ = (find, create, edit)  # bound by the decorator; silence unused warnings

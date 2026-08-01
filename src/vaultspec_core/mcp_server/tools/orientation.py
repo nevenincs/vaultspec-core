@@ -378,7 +378,26 @@ def _checks_to_result(results: list[CheckResult], *, fix: bool) -> CheckResultMo
 # ---------------------------------------------------------------------------
 
 
-def register_orientation_tools(mcp: MCPServer[None]) -> None:
+def _run_check(feature: str | None, *, fix: bool) -> CheckResultModel:
+    """Run vault checks and adapt their results to the MCP response model."""
+    from ...vaultcore.checks import run_all_checks
+
+    logger.info("check: feature=%r fix=%s", feature, fix)
+    root_dir = _get_ctx().target_dir
+    results = run_all_checks(root_dir, feature=feature, fix=fix)
+    report = _checks_to_result(results, fix=fix)
+    logger.debug(
+        "check: %d error(s), %d warning(s), %d fixed",
+        report.total_errors,
+        report.total_warnings,
+        report.total_fixed,
+    )
+    return report
+
+
+def register_orientation_tools(
+    mcp: MCPServer[None], *, include_fix: bool = True
+) -> None:
     """Register the ``status`` and ``check`` orientation tools on *mcp*.
 
     ``status`` is read-only and idempotent. ``check`` is annotated
@@ -389,6 +408,7 @@ def register_orientation_tools(mcp: MCPServer[None]) -> None:
 
     Args:
         mcp: The :class:`~mcp.server.mcpserver.MCPServer` instance to decorate.
+        include_fix: Whether to register the repair-capable ``check`` signature.
     """
 
     @mcp.tool(
@@ -441,52 +461,47 @@ def register_orientation_tools(mcp: MCPServer[None]) -> None:
             raise ValueError(str(exc)) from exc
         return _trace_to_result(trace)
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            read_only_hint=False,
-            destructive_hint=False,
-            idempotent_hint=True,
-            open_world_hint=False,
-        ),
-    )
-    @_isolated_context
-    async def check(
-        ctx: Context[Any, Any],
-        feature: str | None = None,
-        fix: bool = False,
-    ) -> CheckResultModel:
-        """Run the vault health-check suite, optionally repairing.
+    if include_fix:
 
-        Runs every checker over the vault (optionally restricted to one
-        feature) and returns the structured findings. With ``fix``, the
-        supporting checkers auto-correct what they safely can and report the
-        corrected count; a repair never overwrites authored prose, so
-        re-running converges (idempotent).
-
-        Args:
-            ctx: The MCP request context (unused; logging routes through the
-                module logger instead of the deprecated client-facing channel).
-            feature: Restrict per-document checks to this feature tag
-                (without ``#``), or ``None`` for the whole vault.
-            fix: When ``True``, apply the safe auto-corrections.
-
-        Returns:
-            The :class:`CheckResultModel` with per-checker summaries and the
-            flattened error- and warning-severity findings.
-        """
-        _ = ctx
-        from ...vaultcore.checks import run_all_checks
-
-        logger.info("check: feature=%r fix=%s", feature, fix)
-        root_dir = _get_ctx().target_dir
-        results = run_all_checks(root_dir, feature=feature, fix=fix)
-        report = _checks_to_result(results, fix=fix)
-        logger.debug(
-            "check: %d error(s), %d warning(s), %d fixed",
-            report.total_errors,
-            report.total_warnings,
-            report.total_fixed,
+        @mcp.tool(
+            name="check",
+            annotations=ToolAnnotations(
+                read_only_hint=False,
+                destructive_hint=False,
+                idempotent_hint=True,
+                open_world_hint=False,
+            ),
         )
-        return report
+        @_isolated_context
+        async def check_with_fix(
+            ctx: Context[Any, Any],
+            feature: str | None = None,
+            fix: bool = False,
+        ) -> CheckResultModel:
+            """Run the vault health-check suite, optionally repairing."""
+            _ = ctx
+            return _run_check(feature, fix=fix)
 
-    _ = (status, check)  # bound by the decorator; silence unused warnings
+        registered_check = check_with_fix
+
+    else:
+
+        @mcp.tool(
+            name="check",
+            annotations=ToolAnnotations(
+                read_only_hint=True,
+                idempotent_hint=True,
+                open_world_hint=False,
+            ),
+        )
+        @_isolated_context
+        async def check_read_only(
+            ctx: Context[Any, Any], feature: str | None = None
+        ) -> CheckResultModel:
+            """Run the vault health-check suite without repair."""
+            _ = ctx
+            return _run_check(feature, fix=False)
+
+        registered_check = check_read_only
+
+    _ = (status, registered_check)  # bound by the decorators; silence unused warnings

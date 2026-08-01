@@ -42,6 +42,8 @@ _EXPECTED_TOOLS = frozenset(
     }
 )
 
+_READ_ONLY_TOOLS = frozenset({"status", "find", "check", "discover"})
+
 #: The ADR Q6 annotation matrix: each tool mapped to the hints it must declare.
 #: Read-only tools (status/find/discover) leave ``destructive_hint`` unset
 #: (``None``), matching how their :class:`ToolAnnotations` are constructed.
@@ -95,6 +97,25 @@ _ANNOTATIONS = {
     },
 }
 
+_READ_ONLY_ANNOTATIONS = {
+    "status": {
+        "read_only_hint": True,
+        "idempotent_hint": True,
+        "open_world_hint": False,
+    },
+    "find": {"read_only_hint": True, "idempotent_hint": True, "open_world_hint": False},
+    "check": {
+        "read_only_hint": True,
+        "idempotent_hint": True,
+        "open_world_hint": False,
+    },
+    "discover": {
+        "read_only_hint": True,
+        "idempotent_hint": True,
+        "open_world_hint": False,
+    },
+}
+
 
 async def test_surface_registers_exactly_nine_tools_with_schemas(
     vault_root: Path,
@@ -114,6 +135,37 @@ async def test_surface_registers_exactly_nine_tools_with_schemas(
         for hint, value in expected.items():
             actual = getattr(annotations, hint)
             assert actual == value, f"{name}.{hint} == {actual!r}, expected {value!r}"
+
+    assert "fix" in by_name["check"].input_schema.get("properties", {})
+
+
+async def test_read_only_surface_omits_mutation_tools_and_repair(
+    vault_root: Path,
+) -> None:
+    """Read-only mode advertises only validation and orientation operations."""
+    mcp = create_server(read_only=True)
+    tools = await mcp.list_tools()
+    names = {tool.name for tool in tools}
+    assert names == _READ_ONLY_TOOLS, names
+
+    by_name = {tool.name: tool for tool in tools}
+    for name, expected in _READ_ONLY_ANNOTATIONS.items():
+        tool = by_name[name]
+        assert tool.output_schema is not None, f"{name} declares no outputSchema"
+        annotations = tool.annotations
+        assert annotations is not None, f"{name} declares no annotations"
+        for hint, value in expected.items():
+            actual = getattr(annotations, hint)
+            assert actual == value, f"{name}.{hint} == {actual!r}, expected {value!r}"
+
+    check_schema = by_name["check"].input_schema
+    assert "fix" not in check_schema.get("properties", {})
+
+    async with Client(mcp) as client:
+        checked = data_of(await client.call_tool("check", {}))
+        rejected_repair = await client.call_tool("check", {"fix": True})
+    assert checked["fixed"] is False
+    assert rejected_repair.is_error
 
 
 async def test_surface_instructions_name_the_tools_and_version(
@@ -219,9 +271,10 @@ async def test_surface_representative_call_per_tool(vault_root: Path) -> None:
         assert trace["kind"] == "trace"
 
         # check: run the health suite over the vault.
-        checked = data_of(await client.call_tool("check", {}))
+        checked = data_of(await client.call_tool("check", {"fix": True}))
         assert checked["status"] in {"ok", "failed"}
         assert "checks" in checked
+        assert checked["fixed"] is True
 
         # discover: rank the long-tail catalog for a known verb.
         discovered = data_of(
