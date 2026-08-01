@@ -51,6 +51,8 @@ _EXPECTED_TOOLS = frozenset(
     }
 )
 
+_READ_ONLY_TOOLS = frozenset({"status", "find", "check", "discover"})
+
 #: Overall client-session ceiling. Deliberately below the 60s ``invoke``
 #: subprocess timeout so a stdin-inheritance regression trips this bound and
 #: fails fast rather than hanging CI to the per-call ceiling.
@@ -141,6 +143,34 @@ async def _drive_session(project: Path) -> None:
         assert "denylist" in denied_text or "out of scope" in denied_text
 
 
+async def _drive_read_only_session(project: Path) -> None:
+    """Launch the real read-only server and prove its wire-visible surface."""
+    params = StdioServerParameters(
+        command=sys.executable,
+        args=["-m", "vaultspec_core.mcp_server.app", "--read-only"],
+        cwd=str(project),
+        env={**os.environ, "VAULTSPEC_TARGET_DIR": str(project)},
+    )
+
+    async with (
+        stdio_client(params) as (read, write),
+        ClientSession(read, write) as session,
+    ):
+        await session.initialize()
+        listed = await session.list_tools()
+        by_name = {tool.name: tool for tool in listed.tools}
+        assert set(by_name) == _READ_ONLY_TOOLS, by_name
+        assert "fix" not in by_name["check"].input_schema.get("properties", {})
+
+        checked = _unwrap(await session.call_tool("check", {}))
+        assert isinstance(checked, dict)
+        check_dict = cast("dict[str, Any]", checked)
+        assert check_dict["fixed"] is False
+
+        rejected_repair = await session.call_tool("check", {"fix": True})
+        assert rejected_repair.is_error
+
+
 @pytest.mark.integration
 def test_mcp_stdio_end_to_end_invoke_does_not_inherit_transport_stdin() -> None:
     """The server serves a full session over real stdio without stdin hangs.
@@ -162,6 +192,25 @@ def test_mcp_stdio_end_to_end_invoke_does_not_inherit_transport_stdin() -> None:
 
         async def _runner() -> None:
             await asyncio.wait_for(_drive_session(project), timeout=_SESSION_TIMEOUT)
+
+        asyncio.run(_runner())
+    finally:
+        reset_config()
+        shutil.rmtree(project, ignore_errors=True)
+
+
+@pytest.mark.integration
+def test_mcp_stdio_read_only_launch_omits_mutation_tools() -> None:
+    """The real ``--read-only`` launch exposes only non-mutating tools."""
+    reset_config()
+    project = Path(tempfile.mkdtemp(prefix="vsc-mcp-read-only-")).resolve()
+    try:
+        WorkspaceFactory(project).install()
+
+        async def _runner() -> None:
+            await asyncio.wait_for(
+                _drive_read_only_session(project), timeout=_SESSION_TIMEOUT
+            )
 
         asyncio.run(_runner())
     finally:

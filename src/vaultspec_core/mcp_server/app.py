@@ -10,14 +10,18 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, override
 
 import typer
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+    from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
+
+from mcp.server.extension import Extension
 from mcp.server.mcpserver import MCPServer
+from mcp.types import CallToolRequestParams, CallToolResult, TextContent
 
 from vaultspec_core import __version__
 from vaultspec_core.cli._app import make_app
@@ -32,8 +36,33 @@ from .tools import (
 logger = logging.getLogger(__name__)
 
 
-def _build_instructions() -> str:
-    """Compose the server ``instructions`` string naming the nine-tool surface.
+class _ReadOnlyCheckGuard(Extension):
+    """Reject repair arguments that the SDK would otherwise ignore."""
+
+    identifier = "io.vaultspec/read-only-check"
+
+    @override
+    async def intercept_tool_call(
+        self,
+        params: CallToolRequestParams,
+        ctx: ServerRequestContext[Any, Any],
+        call_next: CallNext,
+    ) -> HandlerResult:
+        if params.name == "check" and "fix" in (params.arguments or {}):
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text="read-only check does not accept the 'fix' argument",
+                    )
+                ],
+                is_error=True,
+            )
+        return await call_next(ctx)
+
+
+def _build_instructions(*, read_only: bool) -> str:
+    """Compose the server ``instructions`` string for the selected surface.
 
     Names each first-class tool so a host that surfaces server instructions can
     orient an agent without a round-trip, and carries the tool-schema version
@@ -44,6 +73,16 @@ def _build_instructions() -> str:
     Returns:
         The assembled instructions string.
     """
+    if read_only:
+        return (
+            "Vaultspec-core MCP server in read-only mode (tool-schema version "
+            f"{__version__}). It exposes only 'status' (project orientation and "
+            "grounding traces), 'find' (document and feature discovery with blob "
+            "hashes and resource links), 'check' (vault health validation without "
+            "repair), and 'discover' (read-only search of the verb catalog). "
+            "Mutation tools and the invocation gateway are deliberately absent."
+        )
+
     return (
         "Vaultspec-core MCP server (tool-schema version "
         f"{__version__}). Nine tools cover the vaultspec workflow. Hot path: "
@@ -74,7 +113,7 @@ async def _lifespan(_app: MCPServer[None]) -> AsyncGenerator[None]:
     yield None
 
 
-def create_server() -> MCPServer[None]:
+def create_server(*, read_only: bool = False) -> MCPServer[None]:
     """Create and configure the MCPServer instance.
 
     Instantiates :class:`~mcp.server.mcpserver.MCPServer` and registers the
@@ -83,29 +122,34 @@ def create_server() -> MCPServer[None]:
     :class:`contextvars.Context` so that per-request mutations do not leak
     between concurrent requests.
 
+    Args:
+        read_only: Whether to expose only the non-mutating tool surface.
+
     Returns:
         Configured :class:`~mcp.server.mcpserver.MCPServer` ready to serve.
     """
     mcp = MCPServer(
         name="vaultspec-mcp",
-        instructions=_build_instructions(),
+        instructions=_build_instructions(read_only=read_only),
         lifespan=_lifespan,
+        extensions=[_ReadOnlyCheckGuard()] if read_only else None,
     )
 
-    # Register the full nine-tool surface: find/create/edit (documents),
-    # status/check (orientation), plan_progress/plan_edit (plan), and the
-    # discover/invoke gateway. Every handler runs in a copied context for
-    # concurrent-request isolation.
-    register_document_tools(mcp)
-    register_orientation_tools(mcp)
-    register_plan_tools(mcp)
-    register_gateway_tools(mcp)
+    # The restricted mode is a positive allowlist: only non-mutating handlers
+    # are registered, so no write-capable tool reaches the advertised catalog.
+    register_document_tools(mcp, include_mutations=not read_only)
+    register_orientation_tools(mcp, include_fix=not read_only)
+    if not read_only:
+        register_plan_tools(mcp)
+    register_gateway_tools(mcp, include_invoke=not read_only)
 
     return mcp
 
 
 def _serve(
-    ctx_obj: dict[str, Any] | None = None, parent_pid: int | None = None
+    ctx_obj: dict[str, Any] | None = None,
+    parent_pid: int | None = None,
+    read_only: bool = False,
 ) -> None:
     """Resolve runtime context, initialise paths, and start the MCP stdio server.
 
@@ -116,8 +160,9 @@ def _serve(
     Args:
         ctx_obj: Optional Typer context object injected by the root CLI app.
             Must contain ``"layout"`` and ``"target"`` keys when present.
-        parent_pid: Optional explicit client PID the lifetime watchdog
-            watches ahead of discovery.
+        parent_pid: Optional explicit client PID the lifetime watchdog watches
+            ahead of discovery.
+        read_only: Whether to expose only the non-mutating tool surface.
 
     Raises:
         typer.Exit: If ``root_dir`` cannot be resolved in standalone mode.
@@ -146,7 +191,7 @@ def _serve(
 
     logger.info("Starting vaultspec-mcp server root=%s", root_dir)
 
-    mcp = create_server()
+    mcp = create_server(read_only=read_only)
 
     # Backstop for the stdio lifetime contract: stdin EOF can be defeated by
     # inherited pipe handles, so anchor shutdown to the client process itself
@@ -178,6 +223,13 @@ def main(
             ),
         ),
     ] = None,
+    read_only: Annotated[
+        bool,
+        typer.Option(
+            "--read-only",
+            help="Expose only non-mutating MCP tools.",
+        ),
+    ] = False,
 ) -> None:
     """Typer callback entrypoint for vaultspec-mcp.
 
@@ -186,8 +238,9 @@ def main(
             the root CLI app (contains ``"layout"`` and ``"target"`` keys).
         parent_pid: Optional explicit client PID forwarded to the lifetime
             watchdog.
+        read_only: Whether to expose only the non-mutating tool surface.
     """
-    _serve(ctx.obj, parent_pid=parent_pid)
+    _serve(ctx.obj, parent_pid=parent_pid, read_only=read_only)
 
 
 def run() -> None:

@@ -361,7 +361,9 @@ def _parse_verb(verb: str) -> tuple[str, ...]:
 # ---------------------------------------------------------------------------
 
 
-def register_gateway_tools(mcp: MCPServer[None]) -> None:
+def register_gateway_tools(
+    mcp: MCPServer[None], *, include_invoke: bool = True
+) -> None:
     """Register the ``discover`` and ``invoke`` gateway tools on *mcp*.
 
     ``discover`` is read-only and idempotent: a search never mutates the vault.
@@ -372,6 +374,7 @@ def register_gateway_tools(mcp: MCPServer[None]) -> None:
 
     Args:
         mcp: The :class:`~mcp.server.mcpserver.MCPServer` instance to decorate.
+        include_invoke: Whether to register the mutation-capable ``invoke`` tool.
     """
 
     @mcp.tool(
@@ -433,14 +436,6 @@ def register_gateway_tools(mcp: MCPServer[None]) -> None:
         ]
         return DiscoverResult(query=query, count=len(verbs), verbs=verbs)
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            read_only_hint=False,
-            destructive_hint=True,
-            idempotent_hint=False,
-            open_world_hint=False,
-        ),
-    )
     @_isolated_context
     async def invoke(
         ctx: Context[Any, Any],
@@ -542,7 +537,17 @@ def register_gateway_tools(mcp: MCPServer[None]) -> None:
 
         return _fold_completed(entry.verb, entry.supports_json, completed, command)
 
-    _ = (discover, invoke)  # bound by the decorator; silence unused warnings
+    if include_invoke:
+        mcp.tool(
+            annotations=ToolAnnotations(
+                read_only_hint=False,
+                destructive_hint=True,
+                idempotent_hint=False,
+                open_world_hint=False,
+            ),
+        )(invoke)
+
+    _ = (discover, invoke)  # bound by the decorators; silence unused warnings
 
 
 def _fold_completed(
