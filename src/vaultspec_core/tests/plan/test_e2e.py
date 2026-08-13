@@ -696,9 +696,7 @@ related: []
     plan = parse_plan(original_text)
     plan.steps.pop()
 
-    with pytest.raises(
-        PlanCommandError, match=r"S01 \(1 occurrence\(s\)\)"
-    ):
+    with pytest.raises(PlanCommandError, match=r"S01 \(1 occurrence\(s\)\)"):
         save_plan_or_dry_run(
             path=plan_path,
             plan=plan,
