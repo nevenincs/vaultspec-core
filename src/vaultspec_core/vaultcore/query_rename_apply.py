@@ -96,8 +96,7 @@ def _regenerate_feature_index(
         Path to the regenerated index file.
     """
     from ..config import get_config
-    from ..graph import VaultGraph
-    from .index import generate_feature_index
+    from .index import generate_feature_index_result
 
     cfg = get_config()
     docs_dir = root_dir / cfg.docs_dir
@@ -108,9 +107,8 @@ def _regenerate_feature_index(
     assert_within_docs(docs_dir, index_path)
     existed = index_path.exists()
 
-    graph = VaultGraph(root_dir, use_cache=False)
-    nodes = graph.get_feature_nodes(new)
-    path = generate_feature_index(root_dir, new, nodes=nodes)
+    result = generate_feature_index_result(root_dir, new)
+    path = result.path
     if not index_dir_existed and path.parent.is_dir():
         tx.record_created_dir(path.parent)
     if not existed:

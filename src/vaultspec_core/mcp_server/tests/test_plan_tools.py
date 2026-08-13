@@ -122,6 +122,42 @@ async def test_plan_edit_add_insert_edit_remove_preserves_ids(vault_root: Path) 
         assert s02.action == "Second action v2"
 
 
+async def test_plan_edit_preserves_future_frontmatter_and_reattests_body(
+    vault_root: Path,
+) -> None:
+    """The MCP write path carries future YAML through a truthful re-attestation."""
+    from vaultspec_core.vaultcore import parse_frontmatter
+    from vaultspec_core.vaultcore.body_hash import document_body_digest
+
+    mcp = create_server()
+    async with Client(mcp) as client:
+        await _create_plan(client, "futuremcp")
+        path = _plan_path(vault_root, "futuremcp")
+        source = path.read_text(encoding="utf-8").replace(
+            "tier: L1\n",
+            "tier: L1\n"
+            "future_null: null\n"
+            "future_values: [one, 2, true]\n"
+            "future_map: {mode: strict, retries: 3}\n",
+        )
+        path.write_text(source, encoding="utf-8")
+
+        result = await _plan_edit(
+            client,
+            "futuremcp",
+            [{"operation": "add", "action": "Future safe", "scope": "src/f.py"}],
+        )
+
+        assert result["status"] == "ok"
+        persisted = path.read_text(encoding="utf-8")
+        metadata, _ = parse_frontmatter(persisted)
+        assert metadata["future_null"] is None
+        assert metadata["future_values"] == ["one", 2, True]
+        assert metadata["future_map"] == {"mode": "strict", "retries": 3}
+        assert persisted.count("body_hash:") == 1
+        assert metadata["body_hash"] == document_body_digest(persisted)
+
+
 async def test_plan_edit_failed_op_does_not_abort_batch(vault_root: Path) -> None:
     """A bad op fails per-item while a good op in the same batch still applies."""
     mcp = create_server()

@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from vaultspec_core.vaultcore.models import normalize_date
 from vaultspec_core.vaultcore.parser import parse_frontmatter
@@ -71,6 +71,9 @@ class PlanFrontmatter:
             source document and defaulted to ``L2``; the writer agent or
             ``vaultspec-core vault plan check --fix`` should add the field on
             first edit.
+        extra: Frontmatter fields not owned by the plan model. These values
+            are carried through a parse/serialise round trip so a writer does
+            not erase metadata introduced by a newer VaultSpec version.
     """
 
     tier: Tier
@@ -78,6 +81,7 @@ class PlanFrontmatter:
     tags: list[str] = field(default_factory=list)
     date: str = ""
     legacy_tier_default: bool = False
+    extra: dict[str, Any] = field(default_factory=dict)
 
 
 def parse_plan_frontmatter(source: str | Path) -> PlanFrontmatter:
@@ -115,6 +119,11 @@ def parse_plan_frontmatter(source: str | Path) -> PlanFrontmatter:
         tags=tags,
         date=date,
         legacy_tier_default=legacy_default,
+        extra={
+            key: value
+            for key, value in raw.items()
+            if key not in {"tier", "related", "tags", "date"}
+        },
     )
 
 

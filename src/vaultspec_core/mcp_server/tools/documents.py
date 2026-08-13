@@ -689,14 +689,10 @@ def _regenerate_indexes(root_dir: Path, features: set[str]) -> None:
         root_dir: The project root.
         features: The normalized feature names to regenerate indexes for.
     """
-    from ...graph import VaultGraph
-    from ...vaultcore.index import generate_feature_index
+    from ...vaultcore.index import generate_feature_index_result
 
-    graph = VaultGraph(root_dir)
     for feature in sorted(features):
-        nodes = graph.get_feature_nodes(feature)
-        if nodes:
-            generate_feature_index(root_dir, feature, nodes=nodes)
+        generate_feature_index_result(root_dir, feature)
 
 
 # ---------------------------------------------------------------------------

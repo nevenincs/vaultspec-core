@@ -580,31 +580,32 @@ def _group_root_causes(results: Iterable[CheckResult]) -> list[dict[str, Any]]:
 
 def _refresh_indexes(root_dir: Path, feature: str | None) -> list[Path]:
     from ..graph import VaultGraph
-    from .index import generate_feature_index
+    from .index import generate_feature_index_result
 
     graph = VaultGraph(root_dir)
     features = [feature] if feature else graph.get_features()
     generated: list[Path] = []
     for feat in features:
-        nodes = graph.get_feature_nodes(feat)
-        if not nodes:
-            continue
-        generated.append(generate_feature_index(root_dir, feat, nodes=nodes))
+        result = generate_feature_index_result(root_dir, feat)
+        if result.changed:
+            generated.append(result.path)
     return generated
 
 
 def _index_paths(root_dir: Path, feature: str | None) -> list[Path]:
-    from ..config import get_config
     from ..graph import VaultGraph
+    from .index import generate_feature_index_result
 
-    cfg = get_config()
-    index_dir = root_dir / cfg.docs_dir / cfg.index_dir
     graph = VaultGraph(root_dir)
-    if feature:
-        features = [feature] if graph.get_feature_nodes(feature) else []
-    else:
-        features = graph.get_features()
-    return [index_dir / f"{feat}.index.md" for feat in features if feat]
+    features = [feature] if feature else graph.get_features()
+    return [
+        result.path
+        for feat in features
+        if feat
+        and (
+            result := generate_feature_index_result(root_dir, feat, dry_run=True)
+        ).changed
+    ]
 
 
 def _skipped_index_phase(reason: str) -> dict[str, Any]:

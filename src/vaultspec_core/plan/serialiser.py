@@ -176,6 +176,8 @@ def _emit_block(parts: list[str], content: str | None) -> None:
 
 
 def _render_frontmatter(plan: Plan) -> str:
+    from vaultspec_core.core.helpers import dump_yaml
+
     fm = plan.frontmatter
     lines = ["---", "tags:"]
     for tag in fm.tags:
@@ -186,6 +188,8 @@ def _render_frontmatter(plan: Plan) -> str:
         lines.append("related:")
         for entry in fm.related:
             lines.append(f"  - '{entry}'")
+    if fm.extra:
+        lines.extend(dump_yaml(fm.extra).splitlines())
     lines.append("---")
     return "\n".join(lines)
 
