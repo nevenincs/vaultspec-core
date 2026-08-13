@@ -14,6 +14,7 @@ from vaultspec_core.cli.plan_cmd_app import tier_app
 from vaultspec_core.cli.plan_cmd_shared import (
     render_user_errors,
     save_plan_or_dry_run,
+    serialise_plan_mutation,
 )
 
 __all__ = ["cmd_tier_demote", "cmd_tier_promote", "cmd_tier_show"]
@@ -47,6 +48,7 @@ def cmd_tier_show(
 
 @tier_app.command("promote")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_tier_promote(
     path: PlanPathArg,
     target: Annotated[
@@ -192,6 +194,7 @@ def cmd_tier_promote(
 
 @tier_app.command("demote")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_tier_demote(
     path: PlanPathArg,
     target: Annotated[

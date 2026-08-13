@@ -15,6 +15,7 @@ from vaultspec_core.cli.plan_cmd_app import epic_app
 from vaultspec_core.cli.plan_cmd_shared import (
     render_user_errors,
     save_plan_or_dry_run,
+    serialise_plan_mutation,
 )
 
 __all__ = ["cmd_epic_intent_edit", "cmd_epic_intent_show", "epic_intent_app"]
@@ -40,6 +41,7 @@ def cmd_epic_intent_show(
 
 @epic_intent_app.command("edit")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_epic_intent_edit(
     path: PlanPathArg,
     text: Annotated[

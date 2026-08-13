@@ -14,6 +14,7 @@ from vaultspec_core.cli.plan_cmd_app import phase_app
 from vaultspec_core.cli.plan_cmd_shared import (
     render_user_errors,
     save_plan_or_dry_run,
+    serialise_plan_mutation,
 )
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
 
 @phase_app.command("add")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_phase_add(
     path: PlanPathArg,
     title: Annotated[str, typer.Option("--title", help="Phase heading title")],
@@ -68,6 +70,7 @@ def cmd_phase_add(
 
 @phase_app.command("insert")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_phase_insert(
     path: PlanPathArg,
     title: Annotated[str, typer.Option("--title", help="Phase heading title")],
@@ -113,6 +116,7 @@ def cmd_phase_insert(
 
 @phase_app.command("edit")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_phase_edit(
     path: PlanPathArg,
     phase_id: Annotated[str, typer.Argument(help="Phase canonical id (P##)")],
@@ -155,6 +159,7 @@ def cmd_phase_edit(
 
 @phase_app.command("move")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_phase_move(
     path: PlanPathArg,
     phase_id: Annotated[str, typer.Argument(help="Phase canonical id (P##)")],
@@ -200,6 +205,7 @@ def cmd_phase_move(
 
 @phase_app.command("renumber")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_phase_renumber(
     path: PlanPathArg,
     phase_id: Annotated[str, typer.Argument(help="Existing Phase canonical id (P##)")],
@@ -244,6 +250,7 @@ def cmd_phase_renumber(
 
 @phase_app.command("remove")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_phase_remove(
     path: PlanPathArg,
     phase_id: Annotated[str, typer.Argument(help="Phase canonical id (P##)")],

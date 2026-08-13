@@ -13,6 +13,7 @@ from vaultspec_core.cli.plan_cmd_app import wave_app
 from vaultspec_core.cli.plan_cmd_shared import (
     render_user_errors,
     save_plan_or_dry_run,
+    serialise_plan_mutation,
 )
 
 __all__ = [
@@ -26,6 +27,7 @@ __all__ = [
 
 @wave_app.command("add")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_wave_add(
     path: PlanPathArg,
     title: Annotated[str, typer.Option("--title", help="Wave heading title")],
@@ -63,6 +65,7 @@ def cmd_wave_add(
 
 @wave_app.command("insert")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_wave_insert(
     path: PlanPathArg,
     title: Annotated[str, typer.Option("--title", help="Wave heading title")],
@@ -108,6 +111,7 @@ def cmd_wave_insert(
 
 @wave_app.command("edit")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_wave_edit(
     path: PlanPathArg,
     wave_id: Annotated[str, typer.Argument(help="Wave canonical id (W##)")],
@@ -150,6 +154,7 @@ def cmd_wave_edit(
 
 @wave_app.command("move")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_wave_move(
     path: PlanPathArg,
     wave_id: Annotated[str, typer.Argument(help="Wave canonical id (W##)")],
@@ -192,6 +197,7 @@ def cmd_wave_move(
 
 @wave_app.command("remove")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_wave_remove(
     path: PlanPathArg,
     wave_id: Annotated[str, typer.Argument(help="Wave canonical id (W##)")],

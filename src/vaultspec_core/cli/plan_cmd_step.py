@@ -14,6 +14,7 @@ from vaultspec_core.cli.plan_cmd_app import step_app
 from vaultspec_core.cli.plan_cmd_shared import (
     render_user_errors,
     save_plan_or_dry_run,
+    serialise_plan_mutation,
 )
 
 __all__ = [
@@ -30,6 +31,7 @@ __all__ = [
 
 @step_app.command("toggle")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_step_toggle(
     path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -67,6 +69,7 @@ def cmd_step_toggle(
 
 @step_app.command("check")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_step_check(
     path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -103,6 +106,7 @@ def cmd_step_check(
 
 @step_app.command("uncheck")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_step_uncheck(
     path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -142,6 +146,7 @@ def cmd_step_uncheck(
 
 @step_app.command("add")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_step_add(
     path: PlanPathArg,
     action: Annotated[str, typer.Option("--action", help="Imperative-verb statement")],
@@ -186,6 +191,7 @@ def cmd_step_add(
 
 @step_app.command("insert")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_step_insert(
     path: PlanPathArg,
     action: Annotated[str, typer.Option("--action", help="Imperative-verb statement")],
@@ -231,6 +237,7 @@ def cmd_step_insert(
 
 @step_app.command("edit")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_step_edit(
     path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -273,6 +280,7 @@ def cmd_step_edit(
 
 @step_app.command("move")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_step_move(
     path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],
@@ -318,6 +326,7 @@ def cmd_step_move(
 
 @step_app.command("remove")
 @render_user_errors
+@serialise_plan_mutation
 def cmd_step_remove(
     path: PlanPathArg,
     step_id: Annotated[str, typer.Argument(help="Step canonical id (S##)")],

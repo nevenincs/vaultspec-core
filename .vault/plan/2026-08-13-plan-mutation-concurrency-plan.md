@@ -4,7 +4,7 @@ tags:
   - '#plan-mutation-concurrency'
 date: '2026-08-13'
 modified: '2026-08-13'
-body_hash: 'sha256:c546fe67095f8a1b1e5f139eac332689efb1092c118a980a5e9fadf3227c5b4e'
+body_hash: 'sha256:91f21cdbb8a5485a62a75db7ea5174e7bd30723f186d52160cf750d619a4221c'
 tier: L2
 related:
   - '[[2026-08-13-plan-mutation-concurrency-adr]]'
@@ -34,7 +34,7 @@ Establish one lock-scoped owner for plan load, mutation, persistence, and verifi
 
 Route every CLI and MCP plan mutator through the shared transaction and prove cross-process preservation.
 
-- [ ] `P02.S02` - Converge CLI plan mutation commands on the shared transaction owner; `src/vaultspec_core/cli plan command modules`.
+- [x] `P02.S02` - Converge CLI plan mutation commands on the shared transaction owner; `src/vaultspec_core/cli plan command modules`.
 - [ ] `P02.S03` - Converge MCP plan edits and add cross-process lost-update regression coverage; `src/vaultspec_core/mcp_server/tools/plan.py, src/vaultspec_core/tests/plan/test_mutation_concurrency.py`.
 
 ### Phase `P03` - Ratchets and delivery
