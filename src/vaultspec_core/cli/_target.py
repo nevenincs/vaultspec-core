@@ -208,8 +208,7 @@ def _nearest_vaultspec_hint(start: Path) -> str:
     """
     if (start / ".vaultspec").is_dir():
         return (
-            f"  Hint: a vaultspec workspace exists at {start}; "
-            f"pass --target {start}."
+            f"  Hint: a vaultspec workspace exists at {start}; pass --target {start}."
         )
     try:
         for sibling in sorted(start.parent.iterdir()):
