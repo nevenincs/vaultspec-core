@@ -67,7 +67,7 @@ version = "0.1.56"
     "pytest-timeout>=2.4.0",
     "ruff>=0.15.2",
     "ty>=0.0.15",
-]
+  ]
 
 [dependency-groups]
 # Local dev tooling only (PEP 735); NOT published in the wheel's Requires-Dist.
@@ -273,9 +273,9 @@ target-version = "py313"
     "src/vaultspec_core/core/diagnosis/diagnosis.py" = ["TC001"]
     # MCPServer inspects tool annotations at runtime, so Context must be importable.
     "src/vaultspec_core/mcp_server/tools/documents.py" = ["TC002"]
+    "src/vaultspec_core/mcp_server/tools/gateway.py" = ["TC002"]
     "src/vaultspec_core/mcp_server/tools/orientation.py" = ["TC002"]
     "src/vaultspec_core/mcp_server/tools/plan.py" = ["TC002"]
-    "src/vaultspec_core/mcp_server/tools/gateway.py" = ["TC002"]
     # Pydantic resolves field annotations from module globals at model-build time,
     # so the CallRecord field types must stay runtime imports, not TYPE_CHECKING.
     "dev/statistics/normalize/models.py" = ["TC001", "TC003"]
@@ -313,18 +313,18 @@ typeCheckingMode = "strict"
 # `typeCheckingMode = "all"` (4,625 findings on this tree, mostly noise).
 # Every rule below was verified at zero findings before being turned on - a
 # rule that starts red teaches people to ignore red.
-reportPropertyTypeMismatch = "error"
-reportMissingSuperCall = "error"
-reportUninitializedInstanceVariable = "error"
-reportUnnecessaryTypeIgnoreComment = "error"
+reportEmptyAbstractUsage = "error"
 reportIgnoreCommentWithoutRule = "error"
-reportImplicitRelativeImport = "error"
-reportUnsafeMultipleInheritance = "error"
 reportImplicitAbstractClass = "error"
+reportImplicitRelativeImport = "error"
 reportIncompatibleUnannotatedOverride = "error"
 reportInvalidAbstractMethod = "error"
+reportMissingSuperCall = "error"
+reportPropertyTypeMismatch = "error"
 reportSelfClsDefault = "error"
-reportEmptyAbstractUsage = "error"
+reportUninitializedInstanceVariable = "error"
+reportUnnecessaryTypeIgnoreComment = "error"
+reportUnsafeMultipleInheritance = "error"
 
 # An override that drops `@override` loses its link to the base method
 # silently: rename or remove the base method and the override becomes a dead
@@ -365,11 +365,11 @@ reportInvalidCast = "error"
 # mutable ones - this is a judgement about today's tool behaviour, not a
 # permanent verdict on the rule.
 
-  # In-package tests reach into the private internals of the modules they
-  # exercise, so reportPrivateUsage is a trust-boundary false positive here
-  # (fixing it by making internals public would damage the design). Every
-  # other strict rule stays ON for tests. See the second entry below for the
-  # repository-root test tree's different justification.
+# In-package tests reach into the private internals of the modules they
+# exercise, so reportPrivateUsage is a trust-boundary false positive here
+# (fixing it by making internals public would damage the design). Every
+# other strict rule stays ON for tests. See the second entry below for the
+# repository-root test tree's different justification.
 
   [[tool.basedpyright.executionEnvironments]]
   reportPrivateUsage = false
@@ -596,10 +596,10 @@ max-module-lines = 1312
 # DOWN. pylint defaults: max-attributes=7, max-public-methods=20,
 # max-bool-expr=5.
 [tool.pylint.design]
-max-attributes = 21     # baseline worst: 21 (core/diagnosis/diagnosis.py)
-max-bool-expr = 5       # RATCHETED 6 -> 5, the pylint default: the three
-                        # 6-expression conditions were extracted into named
-                        # predicates, so this dimension is now fully paid off.
+max-attributes = 21 # baseline worst: 21 (core/diagnosis/diagnosis.py)
+max-bool-expr = 5   # RATCHETED 6 -> 5, the pylint default: the three
+# 6-expression conditions were extracted into named
+# predicates, so this dimension is now fully paid off.
 max-public-methods = 20 # already at the pylint default; no production class exceeds it
 
 # Dead code. Advisory, not gating: vulture infers reachability and cannot see
@@ -713,11 +713,11 @@ known_first_party = ["vaultspec_core"]
   ]
 
 [[tool.uv.index]]
+explicit = true
 name = "pytorch-cu130"
 url = "https://download.pytorch.org/whl/cu130"
-explicit = true
 
 [tool.uv.sources]
 torch = [
-    {index = "pytorch-cu130", marker = "sys_platform == 'linux' or sys_platform == 'win32'"},
+  { index = "pytorch-cu130", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
