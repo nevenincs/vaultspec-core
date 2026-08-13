@@ -575,6 +575,177 @@ related: []
     assert "S01" in str(exc_info.value)
 
 
+def test_wave_add_refuses_mislevelled_wave_without_touching_source(
+    tmp_path: Path, runner: CliRunner
+) -> None:
+    """Issue #305: PLAN070 input must never reach a destructive rewrite."""
+    original_text = """---
+tags:
+  - '#plan'
+  - '#test'
+date: '2026-08-13'
+tier: L3
+related: []
+---
+
+# `test` plan
+
+### Wave `W01` - misplaced wave
+
+Wave intent.
+
+### Phase `W01.P01` - retained phase
+
+Phase intent.
+
+- [ ] `W01.P01.S01` - preserve this step; `src/a.py`.
+"""
+    plan_path = tmp_path / "test-plan.md"
+    plan_path.write_text(original_text, encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "vault",
+            "plan",
+            "wave",
+            "add",
+            str(plan_path),
+            "--title",
+            "new wave",
+            "--intent",
+            "New wave intent.",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "PLAN070" in result.output
+    assert "heading level 3" in result.output
+    assert "Added Wave" not in result.output
+    assert plan_path.read_text(encoding="utf-8") == original_text
+
+
+def test_write_guard_refuses_unexpected_active_identifier_loss(tmp_path: Path) -> None:
+    """Issue #305: the round-trip invariant is independent of PLAN070."""
+    from vaultspec_core.cli.plan_cmd import save_plan_or_dry_run
+    from vaultspec_core.plan.commands._errors import PlanCommandError
+    from vaultspec_core.plan.parser import parse_plan
+
+    original_text = """---
+tags:
+  - '#plan'
+  - '#test'
+date: '2026-08-13'
+tier: L3
+related: []
+---
+
+# `test` plan
+
+## Wave `W01` - existing wave
+
+Wave intent.
+
+### Phase `W01.P01` - existing phase
+
+Phase intent.
+
+- [ ] `W01.P01.S01` - preserve this step; `src/a.py`.
+"""
+    plan_path = tmp_path / "test-plan.md"
+    plan_path.write_text(original_text, encoding="utf-8")
+    plan = parse_plan(original_text)
+    plan.waves = []
+
+    with pytest.raises(PlanCommandError, match="drops active plan items"):
+        save_plan_or_dry_run(
+            path=plan_path,
+            plan=plan,
+            original_text=original_text,
+            dry_run=False,
+            canonicalise=False,
+            success_msg="Mutated plan",
+            expected_retired=set(),
+        )
+
+    assert plan_path.read_text(encoding="utf-8") == original_text
+
+
+def test_write_guard_refuses_loss_of_one_duplicate_identifier(tmp_path: Path) -> None:
+    """Issue #305: active-item preservation counts duplicate occurrences."""
+    from vaultspec_core.cli.plan_cmd import save_plan_or_dry_run
+    from vaultspec_core.plan.commands._errors import PlanCommandError
+    from vaultspec_core.plan.parser import parse_plan
+
+    original_text = """---
+tags:
+  - '#plan'
+  - '#test'
+date: '2026-08-13'
+tier: L1
+related: []
+---
+
+# `test` plan
+
+- [ ] `S01` - preserve first occurrence; `src/a.py`.
+- [ ] `S01` - preserve second occurrence; `src/b.py`.
+"""
+    plan_path = tmp_path / "test-plan.md"
+    plan_path.write_text(original_text, encoding="utf-8")
+    plan = parse_plan(original_text)
+    plan.steps.pop()
+
+    with pytest.raises(PlanCommandError, match=r"S01 \(1 occurrence\(s\)\)"):
+        save_plan_or_dry_run(
+            path=plan_path,
+            plan=plan,
+            original_text=original_text,
+            dry_run=False,
+            canonicalise=False,
+            success_msg="Mutated plan",
+            expected_retired=set(),
+        )
+
+    assert plan_path.read_text(encoding="utf-8") == original_text
+
+
+def test_phase_renumber_declares_the_replaced_identifier(
+    tmp_path: Path, runner: CliRunner
+) -> None:
+    """The loss guard permits the renumber verb's explicit retirement."""
+    original_text = """---
+tags:
+  - '#plan'
+  - '#test'
+date: '2026-08-13'
+tier: L2
+related: []
+---
+
+# `test` plan
+
+### Phase `P01` - existing phase
+
+Phase intent.
+
+- [ ] `P01.S01` - preserve this step; `src/a.py`.
+"""
+    plan_path = tmp_path / "test-plan.md"
+    plan_path.write_text(original_text, encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["vault", "plan", "phase", "renumber", str(plan_path), "P01", "--to", "P02"],
+    )
+
+    assert result.exit_code == 0, result.output
+    content = plan_path.read_text(encoding="utf-8")
+    assert "### Phase `P02`" in content
+    assert "- [ ] `P02.S01`" in content
+    assert "<!-- RETIRED: P01 -->" in content
+
+
 def test_resolve_vault_root_from_plan_path_under_docs_dir(tmp_path: Path) -> None:
     """``resolve_vault_root`` derives the root from a plan under ``.vault/plan/``.
 

@@ -371,6 +371,14 @@ Preamble L4
 
 Old epic intent paragraph.
 
+## Wave `W01` - delivery
+
+Wave intent.
+
+### Phase `W01.P01` - implementation
+
+Phase intent.
+
 - [ ] `W01.P01.S01` - action; `src/a.py`.
 
 Closing text
