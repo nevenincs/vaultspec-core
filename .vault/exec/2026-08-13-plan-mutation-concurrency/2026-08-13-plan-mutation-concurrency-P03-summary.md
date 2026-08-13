@@ -9,6 +9,7 @@ body_hash: 'sha256:afbbefb94002fe0d243c07c36bda6dcaef0a296b4636620dadea7c3f50c65
 related:
   - "[[2026-08-13-plan-mutation-concurrency-plan]]"
 ---
+
 # `plan-mutation-concurrency` `P03` summary
 
 The ratchet and review phase closes local implementation risk and prepares the branch

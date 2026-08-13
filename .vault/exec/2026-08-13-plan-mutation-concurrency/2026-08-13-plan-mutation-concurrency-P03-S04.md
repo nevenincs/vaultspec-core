@@ -10,6 +10,7 @@ step_id: 'S04'
 related:
   - "[[2026-08-13-plan-mutation-concurrency-plan]]"
 ---
+
 # Run strict ratchets, remediate review findings, and complete PR and issue delivery
 
 ## Scope

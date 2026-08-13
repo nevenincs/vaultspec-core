@@ -9,6 +9,7 @@ body_hash: 'sha256:b1447569c88e2806df5dba7f82b20482342939c04b5cd75de75d6c601855b
 related:
   - "[[2026-08-13-plan-mutation-concurrency-plan]]"
 ---
+
 # `plan-mutation-concurrency` audit: `lock-scoped mutation review`
 
 ## Scope
