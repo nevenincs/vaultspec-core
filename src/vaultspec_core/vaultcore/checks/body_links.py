@@ -10,6 +10,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from ...core.helpers import atomic_write
+from ..links import extract_wiki_links, rewrite_wiki_links_as_code_spans
 from ._base import (
     CheckDiagnostic,
     CheckResult,
@@ -22,9 +24,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 __all__ = ["check_body_links"]
-
-# [[target]] or [[target|display]]
-_WIKI_LINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]")
 
 # [display](target) where target is NOT a URL or anchor
 _MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((?!https?://|#|mailto:)([^)]+)\)")
@@ -54,6 +53,7 @@ def check_body_links(
     *,
     snapshot: VaultSnapshot,
     feature: str | None = None,
+    fix: bool = False,
 ) -> CheckResult:
     """Find wiki-links and markdown path links in document body text.
 
@@ -68,14 +68,16 @@ def check_body_links(
         snapshot: Pre-built snapshot mapping document paths to parsed data.
         feature: Restrict checks to documents with this feature tag
             (without ``#``).
+        fix: When ``True``, rewrite prose wiki-links as backtick code spans.
 
     Returns:
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
         check name ``"body-links"``.
     """
+    from ..parser import parse_vault_metadata
     from ._base import extract_feature_tags
 
-    result = CheckResult(check_name="body-links", supports_fix=False)
+    result = CheckResult(check_name="body-links", supports_fix=True)
 
     for doc_path, (metadata, body) in snapshot.items():
         # Skip generated index files
@@ -92,19 +94,40 @@ def check_body_links(
         # Strip code blocks and inline code before scanning
         prose = _strip_non_prose(body)
 
-        # Detect wiki-links in body
-        for match in _WIKI_LINK_RE.finditer(prose):
-            target = match.group(1)
+        wiki_links = extract_wiki_links(body)
+        if fix and wiki_links:
+            raw_content = doc_path.read_bytes().decode("utf-8")
+            _metadata, raw_body = parse_vault_metadata(raw_content)
+            fixed_body, replaced = rewrite_wiki_links_as_code_spans(raw_body)
+            prefix = raw_content[: len(raw_content) - len(raw_body)]
+            atomic_write(doc_path, prefix + fixed_body)
+            result.fixed_count += 1
             result.diagnostics.append(
                 CheckDiagnostic(
                     path=rel_path,
-                    message=(
-                        f"Wiki-link in body text: [[{target}]] "
-                        "- move to related: frontmatter or use backtick code span"
-                    ),
-                    severity=Severity.ERROR,
+                    message=f"Fixed {replaced} body wiki-link(s) as code spans",
+                    severity=Severity.INFO,
                 )
             )
+        else:
+            for target, count in wiki_links.items():
+                for _occurrence in range(count):
+                    result.diagnostics.append(
+                        CheckDiagnostic(
+                            path=rel_path,
+                            message=(
+                                f"Wiki-link in body text: [[{target}]] "
+                                "- move to related: frontmatter or use backtick "
+                                "code span"
+                            ),
+                            severity=Severity.ERROR,
+                            fixable=True,
+                            fix_description=(
+                                "Run body-links check with --fix to convert it "
+                                "to a code span"
+                            ),
+                        )
+                    )
 
         # Detect markdown path links in body
         for match in _MD_LINK_RE.finditer(prose):

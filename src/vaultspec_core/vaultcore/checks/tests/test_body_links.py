@@ -157,7 +157,47 @@ class TestCheckBodyLinks:
         result = check_body_links(root, snapshot=snapshot)
         assert result.is_clean
 
-    def test_does_not_support_fix(self):
+    def test_supports_fix(self):
         root, snapshot = _snap("nope", "Body text.")
         result = check_body_links(root, snapshot=snapshot)
-        assert not result.supports_fix
+        assert result.supports_fix
+
+    def test_fix_rewrites_only_prose_wiki_links(self, tmp_path: Path):
+        vault = tmp_path / ".vault" / "adr"
+        vault.mkdir(parents=True)
+        path = vault / "doc.md"
+        content = (
+            "---\nrelated:\n  - '[[canonical-home]]'\n---\n"
+            "See [[target|Alias]] and [[second]].\n\n"
+            "`[[inline]]`\n\n```toml\n[[fenced]]\n```\n"
+            "<!-- [[commented]] -->\n"
+        )
+        path.write_text(content, encoding="utf-8", newline="")
+        metadata = DocumentMetadata(related=["[[canonical-home]]"])
+        body = content.split("---\n", 2)[2]
+
+        result = check_body_links(tmp_path, snapshot={path: (metadata, body)}, fix=True)
+
+        assert result.fixed_count == 1
+        assert path.read_text(encoding="utf-8") == content.replace(
+            "[[target|Alias]] and [[second]]", "`target` and `second`"
+        )
+
+    def test_fix_is_idempotent(self, tmp_path: Path):
+        vault = tmp_path / ".vault" / "adr"
+        vault.mkdir(parents=True)
+        path = vault / "doc.md"
+        path.write_text("---\n---\nBody [[target]].\n", encoding="utf-8")
+        metadata = DocumentMetadata()
+
+        first = check_body_links(
+            tmp_path, snapshot={path: (metadata, "Body [[target]].\n")}, fix=True
+        )
+        fixed = path.read_bytes()
+        second = check_body_links(
+            tmp_path, snapshot={path: (metadata, "Body `target`.\n")}, fix=True
+        )
+
+        assert first.fixed_count == 1
+        assert second.fixed_count == 0
+        assert path.read_bytes() == fixed

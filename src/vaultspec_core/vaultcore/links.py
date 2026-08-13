@@ -11,7 +11,11 @@ import logging
 import re
 from collections import Counter
 
-__all__ = ["extract_related_links", "extract_wiki_links"]
+__all__ = [
+    "extract_related_links",
+    "extract_wiki_links",
+    "rewrite_wiki_links_as_code_spans",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +26,11 @@ _CODE_FENCE_RE = re.compile(
 )
 _INLINE_CODE_RE = re.compile(r"`[^`]+`")
 _HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+_WIKI_LINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]")
+_NON_PROSE_RE = re.compile(
+    rf"{_CODE_FENCE_RE.pattern}|{_HTML_COMMENT_RE.pattern}|{_INLINE_CODE_RE.pattern}",
+    re.MULTILINE | re.DOTALL,
+)
 
 
 def _strip_non_prose(text: str) -> str:
@@ -55,8 +64,7 @@ def extract_wiki_links(content: str) -> Counter[str]:
     prose = _strip_non_prose(content)
 
     # Matches [[Link Name]] or [[Link Name|Display Name]]
-    pattern = r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]"
-    matches = re.findall(pattern, prose)
+    matches = _WIKI_LINK_RE.findall(prose)
     counts: Counter[str] = Counter()
     for m in matches:
         target = m.strip()
@@ -65,6 +73,39 @@ def extract_wiki_links(content: str) -> Counter[str]:
             target = target[:-3]
         counts[target] += 1
     return counts
+
+
+def rewrite_wiki_links_as_code_spans(content: str) -> tuple[str, int]:
+    """Rewrite prose wiki-links as code spans while preserving non-prose.
+
+    Fenced code blocks, inline code spans, and HTML comments are copied
+    byte-for-byte. Both ``[[target]]`` and ``[[target|alias]]`` become
+    `` `target` `` (without the surrounding spaces). The transform is
+    idempotent because its output is an inline code span.
+
+    Args:
+        content: Markdown body text, excluding YAML frontmatter.
+
+    Returns:
+        A ``(rewritten, count)`` tuple containing the transformed body and the
+        number of wiki-link occurrences replaced.
+    """
+    parts: list[str] = []
+    cursor = 0
+    replaced = 0
+
+    def replace(match: re.Match[str]) -> str:
+        nonlocal replaced
+        replaced += 1
+        return f"`{match.group(1).strip()}`"
+
+    for protected in _NON_PROSE_RE.finditer(content):
+        prose = content[cursor : protected.start()]
+        parts.append(_WIKI_LINK_RE.sub(replace, prose))
+        parts.append(protected.group(0))
+        cursor = protected.end()
+    parts.append(_WIKI_LINK_RE.sub(replace, content[cursor:]))
+    return "".join(parts), replaced
 
 
 def extract_related_links(related: list[str]) -> Counter[str]:

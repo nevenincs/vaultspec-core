@@ -28,14 +28,6 @@ from typing import TYPE_CHECKING, Any, cast
 
 import networkx as nx
 
-# ``density`` is imported from its defining module rather than reached as
-# ``nx.density``: the narrowing stub in ``typings/networkx/classes/function.pyi``
-# is only visible on this path (see that file for why the namespace alias
-# cannot reach it). The other networkx entry points used here need no such
-# treatment and are called through ``nx``/``json_graph`` as usual.
-from networkx.classes.function import density as graph_density
-from networkx.readwrite import json_graph
-
 from ..vaultcore import (
     DocType,
     extract_related_links,
@@ -58,6 +50,14 @@ from .algorithms import (
     top_n,
 )
 from .models import DocNode, EncodingIssue, GraphCounts, GraphMetrics
+from .networkx_runtime import (
+    NetworkXGraph,
+    directed_graph,
+    ego_graph,
+    node_link_data,
+    node_link_graph,
+)
+from .networkx_runtime import density as graph_density
 
 if TYPE_CHECKING:
     import pathlib
@@ -125,7 +125,7 @@ class VaultGraph:
         #: working-tree build. Set only via :meth:`from_ref`.
         self.ref: str | None = None
         self.nodes: dict[str, DocNode] = {}
-        self._digraph: nx.DiGraph[str] = nx.DiGraph()
+        self._digraph: NetworkXGraph = directed_graph()
         self._dangling_links: list[tuple[str, str]] = []
         self._stem_index: dict[str, list[str]] = {}
         self._raw_texts: dict[pathlib.Path, tuple[str, bool]] = {}
@@ -254,7 +254,7 @@ class VaultGraph:
         Returns:
             A node-link ``dict`` with body text attached to each node.
         """
-        data = json_graph.node_link_data(self._digraph, edges="edges")
+        data = node_link_data(self._digraph)
         for node_dict in data.get("nodes", []):
             nid = node_dict.get("id", "")
             doc = self.nodes.get(nid)
@@ -274,12 +274,7 @@ class VaultGraph:
             payload: A cache payload that has already passed
                 :func:`vaultspec_core.graph.cache.validate`.
         """
-        self._digraph = json_graph.node_link_graph(
-            payload.graph,
-            directed=True,
-            multigraph=False,
-            edges="edges",
-        )
+        self._digraph = node_link_graph(payload.graph)
         self.nodes = {}
         self._stem_index = {}
         by_stem: dict[str, list[str]] = {}
@@ -732,7 +727,7 @@ class VaultGraph:
     # -- Direct networkx access ----------------------------------------------
 
     @property
-    def digraph(self) -> nx.DiGraph[str]:
+    def digraph(self) -> NetworkXGraph:
         """The underlying ``networkx.DiGraph`` for direct algorithm access.
 
         Consumers may call any ``networkx`` function on this object
@@ -746,7 +741,7 @@ class VaultGraph:
     def subgraph(
         self,
         feature: str | None = None,
-    ) -> nx.DiGraph[str]:
+    ) -> NetworkXGraph:
         """Return a networkx subgraph view, optionally scoped to
         *feature*.
 
@@ -765,7 +760,7 @@ class VaultGraph:
         self,
         node: str,
         depth: int = 1,
-    ) -> nx.DiGraph[str]:
+    ) -> NetworkXGraph:
         """Return the local (ego) subgraph around *node* up to *depth* hops.
 
         Mirrors Obsidian's local-graph view: the centre document plus every
@@ -793,7 +788,7 @@ class VaultGraph:
             raise KeyError(node)
         if depth < 0:
             raise ValueError(f"depth must be >= 0, got {depth}")
-        ego = nx.ego_graph(
+        ego = ego_graph(
             self._digraph,
             node,
             radius=depth,
@@ -989,7 +984,7 @@ class VaultGraph:
         self,
         feature: str | None = None,
         *,
-        _g: nx.DiGraph[str] | None = None,
+        _g: NetworkXGraph | None = None,
     ) -> GraphMetrics:
         """Compute aggregate statistics via graph-library algorithms.
 

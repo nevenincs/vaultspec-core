@@ -5,22 +5,11 @@
 shape (see ``typings/phart/__init__.pyi``, ``typings/radon/complexity.pyi``,
 ``typings/radon/metrics.pyi``, and ``typings/ruamel/yaml/__init__.pyi``).
 
-``networkx`` is there for a different reason. It is not untyped - typeshed
-ships stubs for it and basedpyright bundles them - but several of the
-functions this project calls are declared upstream without return
-annotations, so their results degrade to ``Unknown`` and contaminate every
-value computed from them. ``typings/networkx/`` restates exactly those
-four (``typings/networkx/readwrite/json_graph/node_link.pyi``,
-``typings/networkx/generators/ego.pyi``, and
-``typings/networkx/classes/function.pyi``). The drift risk is the same or
-worse: a stub that shadows a *typed* upstream module also shadows any
-correction upstream makes to it.
-
 A ``.pyi`` file is erased at runtime: basedpyright checks it, but the
 interpreter never imports it. Every one of these packages is pinned with an
-open lower bound (``radon>=6.0.1``, ``phart>=0.5.0``, ``ruamel.yaml>=0.18``,
-``networkx>=3.6``), so a routine ``uv sync --upgrade`` can move the
-installed version silently. If that upgrade changes the real API, the stub
+open lower bound (``radon>=6.0.1``, ``phart>=0.5.0``, and
+``ruamel.yaml>=0.18``), so a routine ``uv sync --upgrade`` can move the
+installed version silently. If that upgrade changes the real API, the declaration
 keeps asserting the old fiction, the type checker keeps reporting green,
 and the first symptom is an ``AttributeError`` in production. No type gate
 can ever catch that failure mode, by construction.
@@ -53,15 +42,13 @@ from __future__ import annotations
 
 import io
 import textwrap
-from typing import cast
 
-import networkx as nx
 import pytest
-from networkx.classes.function import density
-from networkx.readwrite import json_graph
 from radon.complexity import cc_rank, cc_visit
 from radon.metrics import mi_rank, mi_visit
 from ruamel.yaml import YAML, YAMLError
+
+from vaultspec_core.graph.networkx_runtime import directed_graph
 
 pytestmark = [pytest.mark.repo]
 
@@ -152,7 +139,7 @@ class TestPhartAsciiRendererTypings:
         """A trivial two-node graph must construct and render as non-empty text."""
         from phart import ASCIIRenderer
 
-        graph: nx.DiGraph[str] = nx.DiGraph()
+        graph = directed_graph()
         graph.add_edge("a", "b")
 
         renderer = ASCIIRenderer(graph)
@@ -195,133 +182,3 @@ class TestRuamelYamlTypings:
 
     def test_yaml_error_is_importable_and_is_an_exception(self) -> None:
         assert issubclass(YAMLError, Exception)
-
-
-def _triangle_with_a_tail() -> nx.DiGraph[str]:
-    """Return a small directed graph with a node outside the 1-hop ego set.
-
-    ``a -> b -> c`` plus ``c -> d``: dense enough for ``density`` to return a
-    fraction strictly between 0 and 1, and deep enough that a radius-1 ego
-    graph around ``a`` provably excludes ``d``.
-    """
-    graph: nx.DiGraph[str] = nx.DiGraph()
-    graph.add_edge("a", "b", kind="body")
-    graph.add_edge("b", "c", kind="related")
-    graph.add_edge("c", "d", kind="both")
-    return graph
-
-
-class TestNetworkxNodeLinkTypings:
-    """Pins ``typings/networkx/readwrite/json_graph/node_link.pyi``."""
-
-    def test_node_link_data_returns_a_dict_keyed_by_the_requested_edges_name(
-        self,
-    ) -> None:
-        """The declared ``dict[str, Any]`` return must really be a ``dict``.
-
-        ``edges="edges"`` is passed explicitly at every call site because
-        networkx changed the default wire key from ``"links"`` (<=3.5) to
-        ``"edges"`` (>=3.6); the keyword must therefore keep being honoured,
-        not merely accepted.
-        """
-        data = json_graph.node_link_data(_triangle_with_a_tail(), edges="edges")
-        assert isinstance(data, dict)
-        assert "nodes" in data
-        assert "edges" in data
-        assert "links" not in data
-
-    def test_node_link_graph_round_trips_back_to_a_directed_graph(self) -> None:
-        """The declared ``nx.DiGraph[str]`` return must really be a ``DiGraph``.
-
-        Round-trips the exact keyword set
-        :meth:`~vaultspec_core.graph.api.VaultGraph._load_from_cache` uses,
-        and asserts the edge attributes survive, since the graph cache
-        reconstructs its whole edge payload through this call.
-        """
-        original = _triangle_with_a_tail()
-        data = json_graph.node_link_data(original, edges="edges")
-
-        restored = json_graph.node_link_graph(
-            data,
-            directed=True,
-            multigraph=False,
-            edges="edges",
-        )
-        assert isinstance(restored, nx.DiGraph)
-        assert set(restored.nodes()) == set(original.nodes())
-        assert set(restored.edges()) == set(original.edges())
-        assert restored.edges["a", "b"]["kind"] == "body"
-
-    def test_the_package_re_exports_the_shadowed_leaf_module(self) -> None:
-        """``json_graph.node_link_data`` must stay the ``node_link`` one.
-
-        The declaration shadows the leaf module ``networkx.readwrite.
-        json_graph.node_link``, but production code calls through the alias
-        ``json_graph.node_link_data``. That alias only carries the stub's
-        declaration while the package keeps re-exporting the leaf module's
-        function; if upstream ever re-homes it, the type checker would keep
-        reporting the stub's signature for a different callable.
-        """
-        from networkx.readwrite.json_graph import node_link
-
-        # Reached through ``cast("object", ...)`` because the submodule
-        # attribute resolves to typeshed's unannotated declaration, not to the
-        # stub: typeshed's ``json_graph/__init__.pyi`` re-exports the leaf
-        # module's names with an absolute import (which does route through
-        # ``stubPath``), while the ``node_link`` submodule attribute itself
-        # resolves inside the typeshed package. That asymmetry is the whole
-        # reason this assertion is worth making.
-        assert cast("object", node_link.node_link_data) is json_graph.node_link_data
-        assert cast("object", node_link.node_link_graph) is json_graph.node_link_graph
-
-
-class TestNetworkxEgoGraphTypings:
-    """Pins the surface declared in ``typings/networkx/generators/ego.pyi``."""
-
-    def test_ego_graph_returns_a_graph_scoped_to_the_radius(self) -> None:
-        """The declared ``nx.DiGraph[str]`` return must really be a ``DiGraph``.
-
-        ``radius`` and ``undirected`` are the two keywords
-        :meth:`~vaultspec_core.graph.api.VaultGraph.ego_subgraph` passes, so
-        both are exercised, and the returned node set is checked to prove
-        ``radius`` still bounds the traversal rather than being ignored.
-        """
-        ego = nx.ego_graph(_triangle_with_a_tail(), "a", radius=1, undirected=True)
-        assert isinstance(ego, nx.DiGraph)
-        assert set(ego.nodes()) == {"a", "b"}
-
-    def test_ego_graph_is_re_exported_on_the_networkx_namespace(self) -> None:
-        """``nx.ego_graph`` must stay the ``networkx.generators.ego`` one."""
-        from networkx.generators import ego
-
-        assert nx.ego_graph is ego.ego_graph
-
-
-class TestNetworkxDensityTypings:
-    """Pins the surface declared in ``typings/networkx/classes/function.pyi``."""
-
-    def test_density_returns_a_float(self) -> None:
-        """The declared ``float`` return must really be a ``float``.
-
-        ``GraphMetrics.density`` is typed ``float`` and is fed straight from
-        this call, so an ``int`` (which the empty-graph and complete-graph
-        edge cases could plausibly produce) would be a real divergence.
-        """
-        value = density(_triangle_with_a_tail())
-        assert isinstance(value, float)
-        assert 0.0 < value < 1.0
-
-    def test_density_is_importable_from_its_defining_module(self) -> None:
-        """``density`` must stay in ``networkx.classes.function``.
-
-        The stub only applies on that import path (typeshed re-exports the
-        module into the ``networkx`` namespace with a relative import that
-        never reaches ``stubPath``), and
-        :mod:`vaultspec_core.graph.api` imports it from there for exactly
-        that reason. If upstream re-homed the function, the import would
-        break at runtime while the shadowing stub kept type-checking green.
-        """
-        # ``nx.density`` needs ``cast("object", ...)`` for the very reason
-        # stated above: it is typeshed's unannotated re-export, and only the
-        # ``density`` imported from the defining module carries the stub.
-        assert cast("object", nx.density) is density

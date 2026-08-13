@@ -12,7 +12,7 @@ in-memory ``networkx.DiGraph``.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import networkx as nx
 
@@ -20,6 +20,9 @@ from ..vaultcore import DocType
 from .models import DocNode
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from .networkx_runtime import NetworkXGraph
 
 __all__ = [
     "PAGERANK_ALPHA",
@@ -78,7 +81,7 @@ def top_n(
     return dict(ranked[:n])
 
 
-def betweenness_centrality(g: nx.DiGraph[str]) -> dict[str, float]:
+def betweenness_centrality(g: NetworkXGraph) -> dict[str, float]:
     """Compute betweenness centrality via the C-backed engine when available.
 
     Betweenness is the one O(V*E) algorithm on the opt-in analysis surface;
@@ -104,7 +107,7 @@ def betweenness_centrality(g: nx.DiGraph[str]) -> dict[str, float]:
 
 
 def pagerank(
-    g: nx.DiGraph[str],
+    g: NetworkXGraph,
     *,
     alpha: float = 0.85,
     max_iter: int = 100,

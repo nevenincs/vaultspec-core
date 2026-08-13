@@ -133,7 +133,13 @@ class TestModifiedStampConvergence:
 
         order = [r.check_name for r in run_all_checks(tmp_path, fix=True)]
 
-        for earlier in ("annotations", "markdown", "links", "adr-status"):
+        for earlier in (
+            "annotations",
+            "markdown",
+            "links",
+            "body-links",
+            "adr-status",
+        ):
             assert order.index(earlier) < order.index("modified-stamp"), (
                 f"{earlier} rewrites bodies and must precede modified-stamp"
             )

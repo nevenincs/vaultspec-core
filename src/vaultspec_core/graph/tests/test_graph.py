@@ -216,10 +216,10 @@ class TestVaultGraphBuilding:
         assert graph.digraph.number_of_edges() > 0
 
     def test_digraph_property_exposes_nx_graph(self, vault_root: Path) -> None:
-        import networkx as nx
+        from ..networkx_runtime import is_directed_graph
 
         graph = VaultGraph(vault_root)
-        assert isinstance(graph.digraph, nx.DiGraph)
+        assert is_directed_graph(graph.digraph)
         # The property must forward the live backing graph, not a defensive
         # copy: a node added through it is visible on the next read.
         graph.digraph.add_node("probe-node-identity-check")
