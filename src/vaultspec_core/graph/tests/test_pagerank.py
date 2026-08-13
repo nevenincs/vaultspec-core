@@ -16,24 +16,24 @@ threshold.
 
 from __future__ import annotations
 
-import networkx as nx
 import pytest
 
 from ...graph.algorithms import pagerank
+from ...graph.networkx_runtime import NetworkXGraph, directed_graph
 
 pytestmark = [pytest.mark.unit]
 
 
 def test_empty_graph_yields_empty_mapping() -> None:
     """An empty graph has no nodes to rank."""
-    assert pagerank(nx.DiGraph()) == {}
+    assert pagerank(directed_graph()) == {}
 
 
 class TestSymmetricCycle:
     """A balanced directed cycle ranks every node identically."""
 
-    def _cycle(self) -> nx.DiGraph[str]:
-        g: nx.DiGraph[str] = nx.DiGraph()
+    def _cycle(self) -> NetworkXGraph:
+        g = directed_graph()
         # 0 -> 1 -> 2 -> 0: every node has exactly one in- and one out-edge.
         g.add_edges_from([("0", "1"), ("1", "2"), ("2", "0")])
         return g
@@ -54,8 +54,8 @@ class TestSymmetricCycle:
 class TestStarHubRanksAboveLeaves:
     """A star whose leaves all point at the hub ranks the hub strictly highest."""
 
-    def _star(self) -> nx.DiGraph[str]:
-        g: nx.DiGraph[str] = nx.DiGraph()
+    def _star(self) -> NetworkXGraph:
+        g = directed_graph()
         # Three leaves each link to a single shared hub; the hub links back to
         # one leaf so the hub is not itself dangling.
         g.add_edges_from(
@@ -82,8 +82,8 @@ class TestStarHubRanksAboveLeaves:
 class TestDanglingNodeMassConservation:
     """A node with no out-edges must not leak probability mass."""
 
-    def _with_dangling(self) -> nx.DiGraph[str]:
-        g: nx.DiGraph[str] = nx.DiGraph()
+    def _with_dangling(self) -> NetworkXGraph:
+        g = directed_graph()
         # "sink" has no out-edge; its mass must be redistributed, not lost.
         g.add_edges_from([("a", "b"), ("b", "sink")])
         g.add_node("sink")
@@ -109,9 +109,9 @@ class TestDeterminismUnderInsertionOrder:
         ]
 
     def test_reversed_insertion_order_gives_identical_scores(self):
-        forward: nx.DiGraph[str] = nx.DiGraph()
+        forward = directed_graph()
         forward.add_edges_from(self._edges())
-        reverse: nx.DiGraph[str] = nx.DiGraph()
+        reverse = directed_graph()
         reverse.add_edges_from(list(reversed(self._edges())))
 
         forward_scores = pagerank(forward)

@@ -18,9 +18,8 @@ import json
 import pathlib
 from typing import TYPE_CHECKING, Any
 
-from networkx.readwrite import json_graph
-
 from .derived import compute_derived_edges
+from .networkx_runtime import node_link_data
 
 if TYPE_CHECKING:
     from .api import VaultGraph
@@ -102,7 +101,7 @@ def to_dict(
     # networkx native serialisation - pass edges="edges" explicitly so the
     # wire key is deterministic regardless of networkx version. networkx
     # changed the default from "links" (<=3.5) to "edges" (>=3.6).
-    data = json_graph.node_link_data(g, edges="edges")
+    data = node_link_data(g)
 
     # Strip body from nodes unless requested
     if not include_body:

@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
     from .api import VaultGraph
+    from .networkx_runtime import NetworkXGraph
 
 # networkx's bundled type stubs leave the link-prediction dispatchables
 # (`jaccard_coefficient`, `adamic_adar_index`) untyped - each is a runtime
@@ -50,10 +51,10 @@ if TYPE_CHECKING:
 # signature: both functions accept the graph and an explicit `ebunch` and
 # yield `(node, node, score)` triples.
 _jaccard_coefficient: Callable[
-    [nx.Graph[str], list[tuple[str, str]]], Iterable[tuple[str, str, float]]
+    [NetworkXGraph, list[tuple[str, str]]], Iterable[tuple[str, str, float]]
 ] = nx.__dict__["jaccard_coefficient"]
 _adamic_adar_index: Callable[
-    [nx.Graph[str], list[tuple[str, str]]], Iterable[tuple[str, str, float]]
+    [NetworkXGraph, list[tuple[str, str]]], Iterable[tuple[str, str, float]]
 ] = nx.__dict__["adamic_adar_index"]
 
 __all__ = [
@@ -215,7 +216,7 @@ def _reciprocity_pairs(
 def _undirected_projection(
     graph: VaultGraph,
     scope: set[str] | None = None,
-) -> nx.Graph[str]:
+) -> NetworkXGraph:
     """Return an undirected projection over non-phantom nodes only.
 
     The networkx link-prediction family (Jaccard, Adamic-Adar) operates on an
