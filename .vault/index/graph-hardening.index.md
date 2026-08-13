@@ -4,9 +4,9 @@ tags:
   - '#index'
   - '#graph-hardening'
 date: '2026-07-31'
-modified: '2026-07-31'
+modified: '2026-08-13'
 body_schema: 'body-v1'
-body_hash: 'sha256:5dc6e31863b2f8748a8bd361738f7831f95ec278fca275896904c8187aa4c35d'
+body_hash: 'sha256:c7ac6752d3fc37d3b256a5dd74e47d30c0e1c1e17880f0cccdc9b91129e21be5'
 related:
   - '[[2026-03-22-graph-hardening-adr]]'
   - '[[2026-03-22-graph-hardening-phase1-audit]]'
@@ -15,7 +15,6 @@ related:
   - '[[2026-03-22-graph-hardening-phase3-exec]]'
   - '[[2026-03-22-graph-hardening-phase4-exec]]'
   - '[[2026-03-22-graph-hardening-phase6-exec]]'
-  - '[[2026-03-22-graph-hardening-plan]]'
   - '[[2026-03-22-graph-hardening-research]]'
   - '[[2026-03-22-graph-hardening-summary-exec]]'
 ---
@@ -42,10 +41,6 @@ Auto-generated index of all documents tagged with `#graph-hardening`.
 - `2026-03-22-graph-hardening-phase4-exec` - graph-hardening phase 4 - check_dangling checker
 - `2026-03-22-graph-hardening-phase6-exec` - graph-hardening phase 6 - tests
 - `2026-03-22-graph-hardening-summary-exec` - `graph-hardening` summary
-
-### plan
-
-- `2026-03-22-graph-hardening-plan` - `graph-hardening` plan
 
 ### research
 

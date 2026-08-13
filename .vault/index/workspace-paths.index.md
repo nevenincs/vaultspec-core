@@ -4,13 +4,12 @@ tags:
   - '#index'
   - '#workspace-paths'
 date: '2026-07-31'
-modified: '2026-07-31'
+modified: '2026-08-13'
 body_schema: 'body-v1'
-body_hash: 'sha256:20a216f6540534313bcd2b921fd8e639da1ab218fb700ce544867473e90a746f'
+body_hash: 'sha256:75b3ee3599d69d7c28714e275f32ece8a524b90ad332ee60bc3d2a67ab5a8185'
 related:
   - '[[2026-02-19-workspace-path-decoupling-adr]]'
   - '[[2026-02-19-workspace-path-decoupling-research]]'
-  - '[[2026-02-19-workspace-paths-implementation-plan]]'
   - '[[2026-02-19-workspace-paths-review-exec]]'
 ---
 
@@ -27,10 +26,6 @@ Auto-generated index of all documents tagged with `#workspace-paths`.
 ### exec
 
 - `2026-02-19-workspace-paths-review-exec` - `workspace-paths` code review
-
-### plan
-
-- `2026-02-19-workspace-paths-implementation-plan` - `workspace-paths` `implementation` plan
 
 ### research
 

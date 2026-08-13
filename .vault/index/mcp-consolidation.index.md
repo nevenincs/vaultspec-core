@@ -4,12 +4,11 @@ tags:
   - '#index'
   - '#mcp-consolidation'
 date: '2026-07-31'
-modified: '2026-07-31'
+modified: '2026-08-13'
 body_schema: 'body-v1'
-body_hash: 'sha256:fc416af88d7575021cab3fdf506ed1dca59f2fc90d57b4b22291deeb4710a596'
+body_hash: 'sha256:70f1bc099ab8c5d2c936f693dc0be87196330b9bd11ff6080c7c47e4a6a77de3'
 related:
   - '[[2026-02-22-mcp-consolidation-adr]]'
-  - '[[2026-02-22-mcp-consolidation-plan]]'
   - '[[2026-02-22-mcp-consolidation-research]]'
 ---
 
@@ -22,10 +21,6 @@ Auto-generated index of all documents tagged with `#mcp-consolidation`.
 ### adr
 
 - `2026-02-22-mcp-consolidation-adr` - `mcp-consolidation` adr: `merge server.py, subagent_server/, and mcp_tools/ into mcp_server/` | (**status:** `accepted`)
-
-### plan
-
-- `2026-02-22-mcp-consolidation-plan` - `mcp-consolidation` plan
 
 ### research
 

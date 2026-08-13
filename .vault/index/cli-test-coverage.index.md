@@ -4,11 +4,10 @@ tags:
   - '#index'
   - '#cli-test-coverage'
 date: '2026-07-31'
-modified: '2026-07-31'
+modified: '2026-08-13'
 body_schema: 'body-v1'
-body_hash: 'sha256:a802ef469826b465d3780fdc5f7506be51f753dacd062202223359c277aecbc0'
+body_hash: 'sha256:975d3cd322fba24acdff72bdfc622f38a0c3cb8a9ca5b0604f05eb91dc15c3ca'
 related:
-  - '[[2026-02-23-cli-test-coverage-plan]]'
   - '[[2026-03-23-cli-test-coverage-adr]]'
   - '[[2026-03-23-cli-test-coverage-research]]'
 ---
@@ -22,10 +21,6 @@ Auto-generated index of all documents tagged with `#cli-test-coverage`.
 ### adr
 
 - `2026-03-23-cli-test-coverage-adr` - `cli-test-coverage` adr: `cli test coverage` | (**status:** `accepted`)
-
-### plan
-
-- `2026-02-23-cli-test-coverage-plan` - cli-test-coverage plan
 
 ### research
 

@@ -4,15 +4,14 @@ tags:
   - '#index'
   - '#vault-index-folder'
 date: '2026-07-31'
-modified: '2026-07-31'
+modified: '2026-08-13'
 body_schema: 'body-v1'
-body_hash: 'sha256:e5b211cabd033156619ad75ca5649c9e4bce6b371e5fc2883b352b47fd60511c'
+body_hash: 'sha256:c88103bfc0467ce017fa29d5e5d995e526bbd6c97f69c622b3a392dd6a35bca8'
 related:
   - '[[2026-04-30-vault-index-folder-adr]]'
   - '[[2026-04-30-vault-index-folder-phase1-2-3-exec]]'
   - '[[2026-04-30-vault-index-folder-phase10-11-exec]]'
   - '[[2026-04-30-vault-index-folder-phase4-9-exec]]'
-  - '[[2026-04-30-vault-index-folder-plan]]'
   - '[[2026-04-30-vault-index-folder-research]]'
   - '[[2026-04-30-vault-index-folder-summary-exec]]'
 ---
@@ -33,10 +32,6 @@ Auto-generated index of all documents tagged with `#vault-index-folder`.
 - `2026-04-30-vault-index-folder-phase10-11-exec` - `vault-index-folder` exec: phases 10-11 docs and live migration
 - `2026-04-30-vault-index-folder-phase4-9-exec` - `vault-index-folder` exec: phases 4-9 migration, checkers, template
 - `2026-04-30-vault-index-folder-summary-exec` - `vault-index-folder` exec summary and self-review
-
-### plan
-
-- `2026-04-30-vault-index-folder-plan` - `vault-index-folder` plan: dedicated index subfolder migration
 
 ### research
 

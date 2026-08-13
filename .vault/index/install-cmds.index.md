@@ -4,17 +4,15 @@ tags:
   - '#index'
   - '#install-cmds'
 date: '2026-07-31'
-modified: '2026-07-31'
+modified: '2026-08-13'
 body_schema: 'body-v1'
-body_hash: 'sha256:e2ab07129e14a60349a2ee98897e667619e87868df568383873404c4c0e57b13'
+body_hash: 'sha256:43ea3fc3658d18ddbd81883cfee65181345250e3b9db6c90a34f65218c855e71'
 related:
   - '[[2026-03-15-claude-code-provider-research]]'
   - '[[2026-03-15-gemini-cli-provider-research]]'
   - '[[2026-03-15-install-cmds-capability-audit]]'
-  - '[[2026-03-15-install-cmds-plan]]'
   - '[[2026-03-16-antigravity-provider-research]]'
   - '[[2026-03-16-binding-decisions-research]]'
-  - '[[2026-03-16-install-cmds-execution-plan]]'
   - '[[2026-03-16-managed-content-blocks-adr]]'
   - '[[2026-03-16-managed-content-blocks-research]]'
 ---
@@ -32,11 +30,6 @@ Auto-generated index of all documents tagged with `#install-cmds`.
 ### audit
 
 - `2026-03-15-install-cmds-capability-audit` - install-cmds capability audit
-
-### plan
-
-- `2026-03-15-install-cmds-plan` - `install-cmds` implementation plan
-- `2026-03-16-install-cmds-execution-plan` - install-cmds execution plan
 
 ### research
 

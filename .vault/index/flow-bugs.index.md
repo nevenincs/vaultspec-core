@@ -4,13 +4,12 @@ tags:
   - '#index'
   - '#flow-bugs'
 date: '2026-07-31'
-modified: '2026-07-31'
+modified: '2026-08-13'
 body_schema: 'body-v1'
-body_hash: 'sha256:b3634e792cf5f125a3ec9153a20b4387721cb7e101faf9b96c71e91e55690a26'
+body_hash: 'sha256:0482d26e540b2f25c2bebf1b7606f62f64419de2c7caa2e1e80ff1471caaa8b1'
 related:
   - '[[2026-04-21-flow-bugs-adr]]'
   - '[[2026-04-21-flow-bugs-phase-1-summary-exec]]'
-  - '[[2026-04-21-flow-bugs-plan]]'
   - '[[2026-04-21-flow-bugs-research]]'
 ---
 
@@ -27,10 +26,6 @@ Auto-generated index of all documents tagged with `#flow-bugs`.
 ### exec
 
 - `2026-04-21-flow-bugs-phase-1-summary-exec` - `flow-bugs` phase-1 summary
-
-### plan
-
-- `2026-04-21-flow-bugs-plan` - `flow-bugs` plan: install-layer hygiene fixes
 
 ### research
 

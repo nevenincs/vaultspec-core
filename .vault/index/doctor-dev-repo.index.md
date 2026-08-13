@@ -4,12 +4,11 @@ tags:
   - '#index'
   - '#doctor-dev-repo'
 date: '2026-07-31'
-modified: '2026-07-31'
+modified: '2026-08-13'
 body_schema: 'body-v1'
-body_hash: 'sha256:dbfefaeed4708ce18b5293fb1c4b890e48418007cf5c4f839689d83871d0a4a2'
+body_hash: 'sha256:c8038f0e2cdea4c19fbed84ce818bfe34148da4be35d381caf3e88b1561f1b6c'
 related:
   - '[[2026-04-30-doctor-dev-repo-adr]]'
-  - '[[2026-04-30-doctor-dev-repo-plan]]'
   - '[[2026-04-30-doctor-dev-repo-research]]'
   - '[[2026-04-30-doctor-dev-repo-self-review-exec]]'
 ---
@@ -27,10 +26,6 @@ Auto-generated index of all documents tagged with `#doctor-dev-repo`.
 ### exec
 
 - `2026-04-30-doctor-dev-repo-self-review-exec` - `doctor-dev-repo` `self-review`
-
-### plan
-
-- `2026-04-30-doctor-dev-repo-plan` - `doctor-dev-repo` `fix collect_framework_presence dev-repo handling` plan
 
 ### research
 

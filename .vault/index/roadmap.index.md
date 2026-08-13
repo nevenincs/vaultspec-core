@@ -4,14 +4,13 @@ tags:
   - '#index'
   - '#roadmap'
 date: '2026-07-31'
-modified: '2026-07-31'
+modified: '2026-08-13'
 body_schema: 'body-v1'
-body_hash: 'sha256:9a9f7da5691ef54cee53566a49cb87316ef39dbef276351549d8dbc7c53f2dd5'
+body_hash: 'sha256:dbde4b196cd3e64028adcc8d330c1397c52c5a542df0d6953aff2898aa721cd1'
 related:
   - '[[2026-02-17-audit-summary-audit]]'
   - '[[2026-02-17-competitive-landscape-audit]]'
   - '[[2026-02-17-marketing-ux-audit]]'
-  - '[[2026-02-17-roadmap-plan]]'
   - '[[2026-02-17-tech-audit-audit]]'
   - '[[2026-02-17-test-verification-audit]]'
   - '[[2026-02-17-ux-simulation-audit]]'
@@ -37,10 +36,6 @@ Auto-generated index of all documents tagged with `#roadmap`.
 - `2026-02-17-tech-audit-audit` - Technical Audit: vaultspec Codebase
 - `2026-02-17-test-verification-audit` - Test Verification Report
 - `2026-02-17-ux-simulation-audit` - UX Simulation Report: First-Time User Experience
-
-### plan
-
-- `2026-02-17-roadmap-plan` - vaultspec Roadmap: Wave-Based Rollout Plan
 
 ### research
 
