@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any, TypedDict, cast
 from .enums import McpScope
 from .exceptions import VaultSpecError
 from .helpers import advisory_lock, atomic_write, ensure_dir
+from .home import core_home_layout
 
 if TYPE_CHECKING:
     from .types import McpTarget
@@ -67,7 +68,7 @@ def ownership_path(root: Path, scope: McpScope) -> Path:
     """Return the ownership sidecar path for *scope*."""
     if scope in {McpScope.PROJECT, McpScope.LOCAL}:
         return root / ".vaultspec" / _OWNERSHIP_FILENAME
-    return Path.home() / ".vaultspec" / _OWNERSHIP_FILENAME
+    return core_home_layout().root / _OWNERSHIP_FILENAME
 
 
 def ownership_target_key(target: McpTarget) -> str:

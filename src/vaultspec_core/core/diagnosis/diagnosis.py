@@ -21,6 +21,7 @@ from .signals import (
     ManifestEntrySignal,
     ModeMismatchSignal,
     PrecommitSignal,
+    ProcessRegistrySignal,
     ProviderDirSignal,
     RenameIntegritySignal,
     VaultContentSignal,
@@ -135,6 +136,11 @@ class WorkspaceDiagnosis:
             write. Populated only when ``framework`` is
             :attr:`~vaultspec_core.core.diagnosis.signals.FrameworkSignal.ADOPTABLE`,
             where it names the content an adopting run would destroy.
+        process_registry: State of the optional machine-global ``procs/``
+            registry below Core's home.
+        process_record_count: Count of readable top-level JSON records carrying
+            a positive integer PID.
+        stale_process_records: Record filenames whose PID is no longer alive.
     """
 
     framework: FrameworkSignal
@@ -158,6 +164,9 @@ class WorkspaceDiagnosis:
     version_floor_minimum: str = ""
     packages: dict[str, PackageModeDiagnosis] = field(default_factory=dict)
     divergent_projections: list[str] = field(default_factory=list)
+    process_registry: ProcessRegistrySignal = ProcessRegistrySignal.ABSENT
+    process_record_count: int = 0
+    stale_process_records: tuple[str, ...] = ()
 
 
 def _safe_framework_presence(target: Path) -> FrameworkSignal:
@@ -410,7 +419,9 @@ def _collect_package_diagnoses(target: Path) -> dict[str, PackageModeDiagnosis]:
     return package_diags
 
 
-def _collect_layer1_diagnosis(target: Path, scope: str) -> WorkspaceDiagnosis:
+def _collect_layer1_diagnosis(
+    target: Path, scope: str, core_home: Path | None
+) -> WorkspaceDiagnosis:
     """Collect the always-on layer 1 signals plus the per-package map.
 
     Runs independently of framework presence, so the returned
@@ -430,6 +441,9 @@ def _collect_layer1_diagnosis(target: Path, scope: str) -> WorkspaceDiagnosis:
         _safe_version_floor_state(target)
     )
 
+    from ..home import diagnose_process_registry
+
+    process_registry = diagnose_process_registry(core_home)
     return WorkspaceDiagnosis(
         framework=_safe_framework_presence(target),
         gitignore=_safe_gitignore_state(target),
@@ -447,6 +461,9 @@ def _collect_layer1_diagnosis(target: Path, scope: str) -> WorkspaceDiagnosis:
         version_floor_running=version_floor_running,
         version_floor_minimum=version_floor_minimum,
         packages=_collect_package_diagnoses(target),
+        process_registry=process_registry.signal,
+        process_record_count=process_registry.record_count,
+        stale_process_records=process_registry.stale_records,
     )
 
 
@@ -530,7 +547,9 @@ def _diagnose_providers_full_or_sync(
     return diag
 
 
-def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
+def diagnose(
+    target: Path, *, scope: str = "full", core_home: Path | None = None
+) -> WorkspaceDiagnosis:
     """Run layered diagnostic collection against a workspace.
 
     Args:
@@ -539,6 +558,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
             command), ``"framework"`` runs only framework presence and manifest
             coherence (install), ``"sync"`` adds provider dir, config, and
             gitignore checks.
+        core_home: Explicit machine-global Core home for isolated callers.
 
     Returns:
         Populated :class:`WorkspaceDiagnosis` instance.
@@ -550,7 +570,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         )
 
     # Layer 1: always collected, independent of framework presence.
-    diag = _collect_layer1_diagnosis(target, scope)
+    diag = _collect_layer1_diagnosis(target, scope, core_home)
 
     if diag.framework == FrameworkSignal.MISSING:
         return diag

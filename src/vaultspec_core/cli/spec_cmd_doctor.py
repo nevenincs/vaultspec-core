@@ -129,6 +129,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
         ManifestEntrySignal,
         ModeMismatchSignal,
         PrecommitSignal,
+        ProcessRegistrySignal,
         RenameIntegritySignal,
         VaultContentSignal,
         VersionFloorSignal,
@@ -159,6 +160,33 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             "component": "framework",
             "status": Cell(fw_status, style=fw_style),
             "detail": fw_detail,
+        }
+    )
+
+    process_status, process_style = _signal_status(
+        diag.process_registry,
+        {
+            ProcessRegistrySignal.ABSENT: ("info", "dim"),
+            ProcessRegistrySignal.HEALTHY: ("ok", "green"),
+            ProcessRegistrySignal.STALE: ("warn", "yellow"),
+        },
+    )
+    process_detail = {
+        ProcessRegistrySignal.ABSENT: "~/.vaultspec/procs/ not present",
+        ProcessRegistrySignal.HEALTHY: (
+            f"{diag.process_record_count} process record(s); all recorded PIDs alive"
+        ),
+        ProcessRegistrySignal.STALE: (
+            f"{len(diag.stale_process_records)} stale of "
+            f"{diag.process_record_count} process record(s): "
+            + ", ".join(diag.stale_process_records)
+        ),
+    }.get(diag.process_registry, str(diag.process_registry))
+    rows.append(
+        {
+            "component": "process registry",
+            "status": Cell(process_status, style=process_style),
+            "detail": process_detail,
         }
     )
 
