@@ -121,7 +121,7 @@ def run_all_checks(
             check_markdown(root_dir, feature=feature, fix=False, raw_texts=raw_texts),
             check_links(root_dir, snapshot=snapshot, feature=feature, fix=False),
             check_dangling(root_dir, graph=graph, feature=feature, fix=False),
-            check_body_links(root_dir, snapshot=snapshot, feature=feature),
+            check_body_links(root_dir, snapshot=snapshot, feature=feature, fix=False),
             check_placeholders(root_dir, snapshot=snapshot, feature=feature),
             check_orphans(root_dir, graph=graph, feature=feature),
             check_features(root_dir, snapshot=snapshot, feature=feature),
@@ -185,8 +185,10 @@ def run_all_checks(
     result = check_dangling(root_dir, graph=graph, feature=feature, fix=True)
     append_and_refresh(result)
 
-    results.append(
-        check_body_links(root_dir, snapshot=graph.to_snapshot(), feature=feature)
+    append_and_refresh(
+        check_body_links(
+            root_dir, snapshot=graph.to_snapshot(), feature=feature, fix=True
+        )
     )
     results.append(
         check_placeholders(root_dir, snapshot=graph.to_snapshot(), feature=feature)

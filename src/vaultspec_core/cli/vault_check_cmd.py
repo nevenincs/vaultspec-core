@@ -282,6 +282,10 @@ def _register_check_commands_content(check_app: _typer.Typer) -> None:
 
     @check_app.command("body-links")
     def cmd_check_body_links(  # pyright: ignore[reportUnusedFunction]
+        fix: Annotated[
+            bool,
+            typer.Option("--fix", help="Convert body wiki-links to code spans"),
+        ] = False,
         feature: Annotated[
             str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
         ] = None,
@@ -302,7 +306,7 @@ def _register_check_commands_content(check_app: _typer.Typer) -> None:
         graph = VaultGraph(_get_ctx().target_dir)
         snapshot = graph.to_snapshot()
         result = check_body_links(
-            _get_ctx().target_dir, snapshot=snapshot, feature=feature
+            _get_ctx().target_dir, snapshot=snapshot, feature=feature, fix=fix
         )
         _render_and_exit(
             result, verbose, json_output=json_output, command="vault.check.body-links"
