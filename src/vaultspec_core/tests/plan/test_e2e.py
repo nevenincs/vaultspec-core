@@ -42,6 +42,44 @@ def test_status_command_reports_clean_plan(tmp_path: Path, runner: CliRunner) ->
     assert "Steps" in result.stdout
 
 
+def test_cli_mutation_preserves_future_frontmatter_and_reattests_body(
+    tmp_path: Path, runner: CliRunner
+) -> None:
+    """A real plan verb preserves unowned YAML and writes one truthful hash."""
+    from vaultspec_core.vaultcore import parse_frontmatter
+    from vaultspec_core.vaultcore.body_hash import document_body_digest
+
+    source = (
+        make_clean_plan("L1", rng=random.Random(99), steps=1)
+        .render()
+        .replace(
+            "tier: L1\n",
+            "tier: L1\n"
+            "body_hash: 'sha256:stale'\n"
+            "future_null: null\n"
+            "future_date: 2026-08-13\n"
+            "future_values: [one, 2, true]\n"
+            "future_map: {mode: strict, retries: 3}\n",
+        )
+    )
+    plan_path = tmp_path / "future-plan.md"
+    plan_path.write_text(source, encoding="utf-8")
+
+    result = runner.invoke(
+        app, ["vault", "plan", "step", "check", str(plan_path), "S01"]
+    )
+
+    assert result.exit_code == 0, result.stdout
+    persisted = plan_path.read_text(encoding="utf-8")
+    metadata, _ = parse_frontmatter(persisted)
+    assert metadata["future_null"] is None
+    assert str(metadata["future_date"]) == "2026-08-13"
+    assert metadata["future_values"] == ["one", 2, True]
+    assert metadata["future_map"] == {"mode": "strict", "retries": 3}
+    assert persisted.count("body_hash:") == 1
+    assert metadata["body_hash"] == document_body_digest(persisted)
+
+
 def test_status_json_output_is_valid_json(tmp_path: Path, runner: CliRunner) -> None:
     """``vault plan status --json`` emits a parseable payload."""
     import json

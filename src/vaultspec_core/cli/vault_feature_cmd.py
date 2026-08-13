@@ -28,7 +28,6 @@ if TYPE_CHECKING:
 
     import typer as _typer
 
-    from vaultspec_core.graph import VaultGraph
     from vaultspec_core.vaultcore.query import (
         FeatureArchiveResult,
         FeatureDetail,
@@ -158,26 +157,21 @@ def _emit_feature_index_json(status: str, generated_paths: list[Path]) -> None:
 
 
 def _generate_feature_indexes(
-    graph: VaultGraph,
     root_dir: Path,
     features: list[str],
     json_output: bool,
 ) -> list[Path]:
     """Regenerate the index document for each feature, returning written paths."""
     from vaultspec_core.console import get_console
-    from vaultspec_core.vaultcore.index import generate_feature_index
+    from vaultspec_core.vaultcore.index import generate_feature_index_result
 
     generated_paths: list[Path] = []
     for feat in features:
-        nodes = graph.get_feature_nodes(feat)
-        if not nodes:
+        result = generate_feature_index_result(root_dir, feat)
+        if result.changed:
+            generated_paths.append(result.path)
             if not json_output:
-                get_console().print(f"[dim]No documents found for #{feat}.[/dim]")
-            continue
-        path = generate_feature_index(root_dir, feat, nodes=nodes)
-        generated_paths.append(path)
-        if not json_output:
-            get_console().print(f"[green]Index:[/green] {path}")
+                get_console().print(f"[green]Index:[/green] {result.path}")
     return generated_paths
 
 
@@ -203,7 +197,7 @@ def _run_feature_index(
         get_console().print("[dim]No features found in vault.[/dim]")
         return
 
-    generated_paths = _generate_feature_indexes(graph, root_dir, features, json_output)
+    generated_paths = _generate_feature_indexes(root_dir, features, json_output)
 
     if generated_paths:
         from vaultspec_core.cli._cache_hook import invalidate_graph_cache

@@ -429,6 +429,28 @@ class TestVaultJsonOutput:
         assert result.output.lstrip().startswith("{")
         assert payload == {"generated": []}
 
+    def test_feature_index_json_reports_existing_current_index_unchanged(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        """A semantic no-op reports no generated paths and no update."""
+        factory.install("core")
+        created = factory.run(
+            "vault", "add", "research", "--feature", "stable-index", "--no-hints"
+        )
+        assert created.exit_code == 0, created.output
+        first = factory.run(
+            "vault", "feature", "index", "--feature", "stable-index", "--json"
+        )
+        assert first.exit_code == 0, first.output
+
+        second = factory.run(
+            "vault", "feature", "index", "--feature", "stable-index", "--json"
+        )
+
+        envelope = json.loads(second.output)
+        assert envelope["status"] == "unchanged"
+        assert envelope["data"] == {"generated": []}
+
 
 class TestVaultGraphScopingFlags:
     """vault graph --node/--depth ego scoping and --derived/--no-derived."""
