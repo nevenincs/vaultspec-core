@@ -9,6 +9,7 @@ body_hash: 'sha256:85465885012a5daeb936d50b4a19585a4343ea0688bd35fd19e56393b9812
 related:
   - "[[2026-06-05-plan-serializer-fixes-adr]]"
 ---
+
 # `plan-mutation-loss-guard` audit: `Issue 305 implementation review`
 
 ## Scope
