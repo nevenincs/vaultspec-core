@@ -164,7 +164,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
     )
 
     process_status, process_style = _signal_status(
-        diag.process_registry,
+        diag.process_registry.signal,
         {
             ProcessRegistrySignal.ABSENT: ("info", "dim"),
             ProcessRegistrySignal.HEALTHY: ("ok", "green"),
@@ -174,14 +174,15 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
     process_detail = {
         ProcessRegistrySignal.ABSENT: "~/.vaultspec/procs/ not present",
         ProcessRegistrySignal.HEALTHY: (
-            f"{diag.process_record_count} process record(s); all recorded PIDs alive"
+            f"{diag.process_registry.record_count} process record(s); "
+            "all recorded PIDs alive"
         ),
         ProcessRegistrySignal.STALE: (
-            f"{len(diag.stale_process_records)} stale of "
-            f"{diag.process_record_count} process record(s): "
-            + ", ".join(diag.stale_process_records)
+            f"{len(diag.process_registry.stale_records)} stale of "
+            f"{diag.process_registry.record_count} process record(s): "
+            + ", ".join(diag.process_registry.stale_records)
         ),
-    }.get(diag.process_registry, str(diag.process_registry))
+    }.get(diag.process_registry.signal, str(diag.process_registry.signal))
     rows.append(
         {
             "component": "process registry",

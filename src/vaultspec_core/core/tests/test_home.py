@@ -20,7 +20,12 @@ from vaultspec_core.core import (
     core_home_layout,
     diagnose_process_registry,
 )
-from vaultspec_core.core.diagnosis import FrameworkSignal, WorkspaceDiagnosis, diagnose
+from vaultspec_core.core.diagnosis import (
+    FrameworkSignal,
+    HomeDiagnosis,
+    WorkspaceDiagnosis,
+    diagnose,
+)
 
 
 def _write_record(path: Path, pid: int) -> None:
@@ -72,13 +77,11 @@ def test_dead_process_record_is_a_non_destructive_doctor_warning(
 
     assert result.signal is ProcessRegistrySignal.STALE
     assert result.stale_records == (record.name,)
-    assert diagnosis.process_registry is ProcessRegistrySignal.STALE
-    assert diagnosis.stale_process_records == (record.name,)
+    assert diagnosis.process_registry.signal is ProcessRegistrySignal.STALE
+    assert diagnosis.process_registry.stale_records == (record.name,)
     warning_only = WorkspaceDiagnosis(
         framework=FrameworkSignal.PRESENT,
-        process_registry=diagnosis.process_registry,
-        process_record_count=diagnosis.process_record_count,
-        stale_process_records=diagnosis.stale_process_records,
+        home=HomeDiagnosis(process_registry=diagnosis.process_registry),
     )
     # Machine-global residue is advisory and must not make an otherwise healthy
     # workspace fail its project-local doctor gate.
