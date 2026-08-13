@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.57](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.56...vaultspec-core-v0.1.57) (2026-08-13)
+
+
+### Features
+
+* **core:** support the machine-global process registry home ([#309](https://github.com/nevenincs/vaultspec-core/issues/309)) ([86e7111](https://github.com/nevenincs/vaultspec-core/commit/86e7111e458386e5a0e97300a374e36b5afc6b69))
+
+
+### Bug Fixes
+
+* autofix body wiki-links ([#307](https://github.com/nevenincs/vaultspec-core/issues/307)) ([a28c2a6](https://github.com/nevenincs/vaultspec-core/commit/a28c2a66c760536fbd9b6a687432addccdda59bd))
+* **plan:** prevent destructive structural rewrites ([#310](https://github.com/nevenincs/vaultspec-core/issues/310)) ([b401c69](https://github.com/nevenincs/vaultspec-core/commit/b401c696e8157c6977e9d4d916717c746832f289))
+* **plan:** serialize concurrent mutation verbs ([#312](https://github.com/nevenincs/vaultspec-core/issues/312)) ([ac551d7](https://github.com/nevenincs/vaultspec-core/commit/ac551d7236a331cbcf96ec68e644e5916e3c33f8))
+* **vault:** preserve body hash integrity across rewrites ([#308](https://github.com/nevenincs/vaultspec-core/issues/308)) ([7d6678c](https://github.com/nevenincs/vaultspec-core/commit/7d6678ca369023a0bd2a0d5360c7e4b6b1b730fe))
+
 ## [0.1.56](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.55...vaultspec-core-v0.1.56) (2026-08-01)
 
 
