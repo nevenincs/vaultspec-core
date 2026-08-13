@@ -236,6 +236,7 @@ def cmd_phase_renumber(
         dry_run=dry_run,
         canonicalise=canonicalise,
         success_msg=f"Renumbered Phase `{phase_id}` to `{phase.canonical_id}`.",
+        expected_retired={phase_id},
         json_output=json_output,
         command="vault.plan.phase.renumber",
     )
