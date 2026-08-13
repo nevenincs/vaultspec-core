@@ -1,6 +1,6 @@
 """Integrity guards for serialised plan writes, shared by every write path.
 
-Three defensive checks protect a plan document across the moment its mutated,
+Five defensive checks protect a plan document across the moment its mutated,
 re-serialised text replaces the on-disk bytes, and they must run on *every*
 write path so no surface can corrupt a plan the others protect. Two run
 *before* the write:
@@ -15,6 +15,13 @@ write path so no surface can corrupt a plan the others protect. Two run
   multiplies a plan several times over, so serialised output larger than
   ``max(floor, factor * len(source))`` signals a serialiser fault and the write
   is refused rather than corrupting the file or exhausting the disk.
+- **Source-structure guard** (issue #305): a plan with error-level structural
+  findings is not safe input to a whole-document rewrite. The mutation is
+  refused with the checker's existing diagnosis and repair hint.
+- **Active-identifier preservation guard** (issue #305): every Wave, Phase,
+  and Step visible before a mutation must remain visible afterwards unless the
+  command explicitly retires it. This catches destructive round trips even
+  when no individual checker recognises the malformed input that caused them.
 
 One runs *after* the write:
 
@@ -35,6 +42,7 @@ the check to drift.
 
 from __future__ import annotations
 
+from collections import Counter
 from typing import TYPE_CHECKING
 
 from vaultspec_core.plan.commands._errors import PlanCommandError
@@ -87,6 +95,40 @@ def _retired_ids(plan: Plan) -> set[str]:
     return plan.retired_step_ids | plan.retired_phase_ids | plan.retired_wave_ids
 
 
+def _active_ids(plan: Plan) -> Counter[str]:
+    """Return multiplicity-aware active container and Step identifiers."""
+    return Counter(
+        [wave.canonical_id for wave in plan.waves]
+        + [phase.canonical_id for phase in plan.phases]
+        + [step.canonical_id for step in plan.steps]
+    )
+
+
+def _guard_source_structure(plan: Plan, source_text: str) -> None:
+    """Refuse a whole-document rewrite of structurally invalid source."""
+    from vaultspec_core.plan.checks import Severity, collect_all
+
+    destructive_structure_codes = {"PLAN010", "PLAN070"}
+    errors = [
+        finding
+        for finding in collect_all(plan, source_text)
+        if finding.severity is Severity.ERROR
+        and finding.code in destructive_structure_codes
+    ]
+    if not errors:
+        return
+
+    details = "; ".join(
+        f"{finding.code} line {finding.line_number}: {finding.message} "
+        f"Fix: {finding.fix_hint}"
+        for finding in errors
+    )
+    raise PlanWriteGuardError(
+        "mutation aborted: the source plan has structural errors and is not "
+        f"safe to rewrite. {details}"
+    )
+
+
 def guard_plan_write(
     original_text: str,
     new_text: str,
@@ -96,8 +138,9 @@ def guard_plan_write(
 ) -> None:
     """Run both plan-write integrity guards over a pending serialisation.
 
-    Parses the pre- and post-mutation text once, then enforces the
-    unexpected-retirement and growth-ceiling guards in that order. A parse
+    Parses the pre- and post-mutation text once, then enforces the source
+    structure, unexpected-retirement, active-identifier preservation, and
+    growth-ceiling guards in that order. A parse
     failure on either text is itself a refusal, since an unparseable result is
     never a safe thing to persist.
 
@@ -121,6 +164,8 @@ def guard_plan_write(
         msg = f"Plan validation failed during parsing: {exc}"
         raise PlanWriteGuardError(msg) from exc
 
+    _guard_source_structure(old_plan, original_text)
+
     newly_retired = _retired_ids(new_plan) - _retired_ids(old_plan)
     expected: set[str] = expected_retired if expected_retired is not None else set()
     unexpected = newly_retired - expected
@@ -129,6 +174,21 @@ def guard_plan_write(
         msg = (
             f"mutation aborted: unexpected retirement of active plan items: "
             f"{joined}. This indicates a serialization conflict."
+        )
+        raise PlanWriteGuardError(msg)
+
+    lost_active = _active_ids(old_plan) - _active_ids(new_plan)
+    for identifier in expected:
+        del lost_active[identifier]
+    if lost_active:
+        joined = ", ".join(
+            f"{identifier} ({count} occurrence(s))"
+            for identifier, count in sorted(lost_active.items())
+        )
+        msg = (
+            "mutation aborted: serialised output drops active plan items: "
+            f"{joined}. No write was performed; repair the source structure "
+            "and retry."
         )
         raise PlanWriteGuardError(msg)
 
