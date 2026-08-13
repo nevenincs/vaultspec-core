@@ -38,6 +38,7 @@ from .exceptions import VaultSpecError as VaultSpecError
 from .exceptions import WorkspaceNotInitializedError as WorkspaceNotInitializedError
 from .helpers import atomic_write as atomic_write
 from .helpers import build_file as build_file
+from .helpers import dump_yaml as dump_yaml
 from .helpers import ensure_dir as ensure_dir
 from .home import CoreHomeLayout as CoreHomeLayout
 from .home import ProcessRegistryDiagnosis as ProcessRegistryDiagnosis

@@ -119,6 +119,28 @@ def test_serialised_related_uses_single_quoted_wikilinks(tier: str) -> None:
     assert "  - '[[2026-05-05-test-feature-adr]]'" in rendered
 
 
+def test_round_trip_preserves_unowned_frontmatter_fields() -> None:
+    """A plan writer carries metadata introduced by another version."""
+    spec = make_clean_plan("L2", rng=random.Random(7), phases=1, steps=1).render()
+    source = spec.replace(
+        "tier: L2\n",
+        "tier: L2\n"
+        "body_hash: 'sha256:future-attestation'\n"
+        "future_contract:\n"
+        "  enabled: true\n"
+        "  modes:\n"
+        "    - strict\n",
+    )
+
+    rendered = serialise_plan(parse_plan(source))
+    reparsed = parse_plan(rendered)
+
+    assert reparsed.frontmatter.extra == {
+        "body_hash": "sha256:future-attestation",
+        "future_contract": {"enabled": True, "modes": ["strict"]},
+    }
+
+
 # ---- Stability under randomised parameters ----------------------------------
 
 

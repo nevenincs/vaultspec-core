@@ -5,14 +5,14 @@ made the entire framework un-importable when PyYAML's surface was even
 partially broken (e.g. a corrupt install missing ``yaml/__init__.py``).
 The fix moves the registration into a lazy
 :func:`~vaultspec_core.core.helpers._ensure_literal_representer` that runs
-on first ``_yaml_dump`` call.
+on first ``dump_yaml`` call.
 
 These tests pin that contract:
 
 - importing ``vaultspec_core.core`` does **not** mutate PyYAML's global
   representer registry until a serialization actually happens;
 - the lazy registration is idempotent and survives module reload;
-- ``_yaml_dump`` (and ``build_file``) still produce literal block scalars
+- ``dump_yaml`` (and ``build_file``) still produce literal block scalars
   for multi-line strings, matching the pre-fix output;
 - importing the package on a degraded PyYAML (``add_representer`` missing)
   succeeds; only the *first* dump raises.
@@ -89,7 +89,7 @@ class TestNoImportTimeSideEffect:
 
 
 class TestLazyRegistrationOnDump:
-    """``_yaml_dump`` registers the representer on first call and reuses it."""
+    """``dump_yaml`` registers the representer on first call and reuses it."""
 
     def test_dump_registers_then_marks_flag_true(self) -> None:
         helpers = _reload_helpers()
@@ -98,7 +98,7 @@ class TestLazyRegistrationOnDump:
             "module-level reload must leave the lazy flag unset"
         )
 
-        out = helpers._yaml_dump({"key": "single line"})
+        out = helpers.dump_yaml({"key": "single line"})
 
         assert helpers._literal_representer_registered is True
         assert "key:" in out
@@ -113,7 +113,7 @@ class TestLazyRegistrationOnDump:
     def test_multiline_string_uses_literal_block_scalar(self) -> None:
         helpers = _reload_helpers()
 
-        rendered = helpers._yaml_dump(
+        rendered = helpers.dump_yaml(
             {
                 "name": "single",
                 "body": "line one\nline two\nline three",
@@ -151,7 +151,7 @@ class TestDegradedPyYAML:
         """Simulate the issue #85 scenario: ``yaml.add_representer`` is gone.
 
         Reloading the helpers module under that condition must succeed; only
-        the *first* attempt to call ``_yaml_dump`` should raise, and it must
+        the *first* attempt to call ``dump_yaml`` should raise, and it must
         raise a clear ``AttributeError`` rather than crash at import.
         """
         script = textwrap.dedent(
@@ -167,11 +167,11 @@ class TestDegradedPyYAML:
             assert helpers._literal_representer_registered is False
 
             try:
-                helpers._yaml_dump({"k": "multi\\nline"})
+                helpers.dump_yaml({"k": "multi\\nline"})
             except AttributeError:
                 print("ok")
             else:
-                raise AssertionError("_yaml_dump did not surface AttributeError")
+                raise AssertionError("dump_yaml did not surface AttributeError")
             """
         )
         result = subprocess.run(
@@ -223,7 +223,7 @@ class TestDegradedPyYAML:
 
 
 class TestConcurrentRegistration:
-    """Two threads first-calling _yaml_dump must not race the registration.
+    """Two threads first-calling dump_yaml must not race the registration.
 
     ``yaml.add_representer`` mutates a class-level dict on PyYAML's
     Dumper.  In CPython that single statement is GIL-serialised, but the
@@ -257,7 +257,7 @@ class TestConcurrentRegistration:
             def worker() -> None:
                 try:
                     barrier.wait(timeout=5)
-                    helpers._yaml_dump({"k": "multi\nline"})
+                    helpers.dump_yaml({"k": "multi\nline"})
                 except BaseException as exc:
                     errors.append(exc)
 
@@ -287,7 +287,7 @@ class TestConcurrentRegistration:
         def worker() -> None:
             try:
                 barrier.wait(timeout=5)
-                results.append(helpers._yaml_dump({"body": "a\nb"}))
+                results.append(helpers.dump_yaml({"body": "a\nb"}))
             except BaseException as exc:
                 errors.append(exc)
 

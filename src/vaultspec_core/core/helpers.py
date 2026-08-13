@@ -175,7 +175,7 @@ def _ensure_literal_representer() -> None:
     degraded environment.  See GitHub issue #85.
 
     Uses double-checked locking so that two threads calling
-    :func:`_yaml_dump` concurrently for the first time both observe a
+    :func:`dump_yaml` concurrently for the first time both observe a
     registered representer without either of them entering the critical
     section twice.  ``yaml.add_representer`` mutates a class-level
     ``Dumper.yaml_representers`` dict, and although the GIL serialises
@@ -192,7 +192,7 @@ def _ensure_literal_representer() -> None:
         _literal_representer_registered = True
 
 
-def _yaml_dump(data: dict[str, Any]) -> str:
+def dump_yaml(data: dict[str, Any]) -> str:
     """Serialize a dict to YAML, using literal block style for multi-line values.
 
     Args:
@@ -224,7 +224,7 @@ def build_file(frontmatter: dict[str, Any], body: str) -> str:
     Returns:
         A string of the form ``---\\n<yaml>\\n---\\n\\n<body>``.
     """
-    fm_str = _yaml_dump(frontmatter)
+    fm_str = dump_yaml(frontmatter)
     return f"---\n{fm_str}\n---\n\n{body}"
 
 

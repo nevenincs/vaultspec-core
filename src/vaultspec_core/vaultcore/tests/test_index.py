@@ -124,6 +124,35 @@ class TestGenerateFeatureIndex:
         assert p1 == p2
         assert c1 == c2
 
+    def test_unchanged_body_preserves_creation_and_modified_dates(
+        self, tmp_path: Path
+    ) -> None:
+        """A date rollover does not dirty an index whose body is unchanged."""
+        nodes = [_node(tmp_path, "a", "research", "f", "2026-03-01", "A")]
+        path = generate_feature_index(tmp_path, "f", nodes=nodes, date_str="2026-03-23")
+        before = path.read_bytes()
+
+        generate_feature_index(tmp_path, "f", nodes=nodes, date_str="2026-03-24")
+
+        assert path.read_bytes() == before
+        assert b"date: '2026-03-23'" in before
+        assert b"modified: '2026-03-23'" in before
+
+    def test_unchanged_body_repairs_a_stale_attestation(self, tmp_path: Path) -> None:
+        """A no-op is allowed only when the existing body hash is truthful."""
+        nodes = [_node(tmp_path, "a", "research", "f", "2026-03-01", "A")]
+        path = generate_feature_index(tmp_path, "f", nodes=nodes, date_str="2026-03-23")
+        stale = path.read_text(encoding="utf-8").replace(
+            "body_hash: 'sha256:", "body_hash: 'sha256:stale-"
+        )
+        path.write_text(stale, encoding="utf-8")
+
+        generate_feature_index(tmp_path, "f", nodes=nodes, date_str="2026-03-24")
+
+        repaired = path.read_text(encoding="utf-8")
+        assert "sha256:stale-" not in repaired
+        assert "date: '2026-03-24'" in repaired
+
     def test_update_reflects_new_docs(self, tmp_path: Path) -> None:
         v1 = [_node(tmp_path, "a", "research", "f", "2026-03-01", "A")]
         _gen(tmp_path, "f", v1)

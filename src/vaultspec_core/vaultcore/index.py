@@ -114,7 +114,8 @@ def generate_feature_index(
     )
 
     from ..core.helpers import atomic_write
-    from .body_hash import set_body_hash
+    from .body_hash import document_body_digest, set_body_hash
+    from .parser import parse_frontmatter
 
     # Attest the rendered body like every other stamping path. The generator
     # rebuilds the whole document from scratch, so the fingerprint is a pure
@@ -124,9 +125,16 @@ def generate_feature_index(
 
     index_dir.mkdir(parents=True, exist_ok=True)
     try:
-        if index_path.exists() and index_path.read_text(encoding="utf-8") == content:
-            logger.info("Feature index already current: %s", index_path)
-            return index_path
+        if index_path.exists():
+            existing = index_path.read_text(encoding="utf-8")
+            expected_digest = document_body_digest(content)
+            existing_frontmatter, _ = parse_frontmatter(existing)
+            if (
+                document_body_digest(existing) == expected_digest
+                and existing_frontmatter.get("body_hash") == expected_digest
+            ):
+                logger.info("Feature index body already current: %s", index_path)
+                return index_path
     except OSError:
         pass
     atomic_write(index_path, content)
