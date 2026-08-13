@@ -9,6 +9,7 @@ so each container-scoped module can import just this shared surface without
 pulling in every other container's commands too.
 """
 
+import inspect
 import json
 from collections.abc import Callable
 from functools import wraps
@@ -23,7 +24,28 @@ __all__ = [
     "render_user_errors",
     "resolve_vault_root",
     "save_plan_or_dry_run",
+    "serialise_plan_mutation",
 ]
+
+
+def serialise_plan_mutation[F: Callable[..., None]](func: F) -> F:
+    """Run a plan command's complete handler under its document lock."""
+    command_signature = inspect.signature(func)
+
+    @wraps(func)
+    def wrapper(*args: object, **kwargs: object) -> None:
+        from vaultspec_core.plan.mutation_transaction import run_plan_mutation
+
+        bound = command_signature.bind(*args, **kwargs)
+        path = cast("Path", bound.arguments["path"])
+        dry_run = bool(bound.arguments.get("dry_run", False))
+        run_plan_mutation(
+            path,
+            dry_run=dry_run,
+            operation=lambda: func(*args, **kwargs),
+        )
+
+    return cast("F", wrapper)
 
 
 def render_user_errors[F: Callable[..., None]](func: F) -> F:

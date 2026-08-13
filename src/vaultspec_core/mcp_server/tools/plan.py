@@ -275,6 +275,116 @@ def _reduce(statuses: list[str], success: set[str]) -> str:
     return "mixed"
 
 
+def _mutate_plan_progress(
+    path: Path,
+    stem: str,
+    steps: list[StepStateChange],
+) -> PlanProgressResult:
+    """Apply one progress batch inside the caller's mutation transaction."""
+    from ...plan.commands.step_ops import (
+        AmbiguousStepError,
+        StepNotFoundError,
+        check_step,
+        find_step,
+        uncheck_step,
+    )
+
+    parsed, original_text = _load_plan(path)
+    items: list[StepChangeResult] = []
+    changed = False
+
+    for change in steps:
+        if change.state not in ("checked", "unchecked"):
+            items.append(
+                StepChangeResult(
+                    step_id=change.step_id,
+                    state=change.state,
+                    status="failed",
+                    error={
+                        "message": (
+                            f"Invalid state {change.state!r}; use 'checked' "
+                            "or 'unchecked'."
+                        )
+                    },
+                )
+            )
+            continue
+        want_checked = change.state == "checked"
+        try:
+            step = find_step(parsed, change.step_id)
+        except (StepNotFoundError, AmbiguousStepError) as exc:
+            items.append(
+                StepChangeResult(
+                    step_id=change.step_id,
+                    state=change.state,
+                    status="failed",
+                    error={"message": str(exc)},
+                )
+            )
+            continue
+        already = step.checked == want_checked
+        (check_step if want_checked else uncheck_step)(parsed, change.step_id)
+        if not already:
+            changed = True
+        items.append(
+            StepChangeResult(
+                step_id=change.step_id,
+                state=change.state,
+                status="unchanged" if already else "updated",
+            )
+        )
+
+    if changed:
+        _save_plan(path, parsed, original_text)
+
+    total, completed, percent, next_open = _progress_summary(parsed)
+    return PlanProgressResult(
+        status=_reduce([item.status for item in items], {"updated", "unchanged"}),
+        plan=stem,
+        items=items,
+        total_steps=total,
+        steps_completed=completed,
+        completion_percent=percent,
+        next_open_step=next_open,
+    )
+
+
+def _mutate_plan_edit(
+    path: Path,
+    stem: str,
+    operations: list[PlanEditOperation],
+) -> PlanEditResult:
+    """Apply one authoring batch inside the caller's mutation transaction."""
+    parsed, original_text = _load_plan(path)
+    items: list[PlanEditItemResult] = []
+    expected_retired: set[str] = set()
+    changed = False
+
+    for operation in operations:
+        item = _apply_plan_edit(parsed, operation)
+        items.append(item)
+        if item.status == "failed":
+            continue
+        changed = True
+        if item.status == "removed" and item.step_id is not None:
+            expected_retired.add(item.step_id)
+
+    if changed:
+        _save_plan(path, parsed, original_text, expected_retired=expected_retired)
+
+    total, completed, _percent, next_open = _progress_summary(parsed)
+    return PlanEditResult(
+        status=_reduce(
+            [item.status for item in items], {"created", "updated", "removed"}
+        ),
+        plan=stem,
+        items=items,
+        total_steps=total,
+        steps_completed=completed,
+        next_open_step=next_open,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
@@ -331,13 +441,7 @@ def register_plan_tools(mcp: MCPServer[None]) -> None:
                 plan address does not resolve to a unique plan.
         """
         _ = ctx
-        from ...plan.commands.step_ops import (
-            AmbiguousStepError,
-            StepNotFoundError,
-            check_step,
-            find_step,
-            uncheck_step,
-        )
+        from ...plan.mutation_transaction import run_plan_mutation
         from ..plan_resolver import PlanResolutionError, resolve_plan
 
         if not steps:
@@ -351,63 +455,12 @@ def register_plan_tools(mcp: MCPServer[None]) -> None:
 
         logger.info("plan_progress: %s %d change(s)", resolved.stem, len(steps))
 
-        parsed, original_text = _load_plan(resolved.path)
-        items: list[StepChangeResult] = []
-        changed = False
-
-        for change in steps:
-            if change.state not in ("checked", "unchecked"):
-                items.append(
-                    StepChangeResult(
-                        step_id=change.step_id,
-                        state=change.state,
-                        status="failed",
-                        error={
-                            "message": (
-                                f"Invalid state {change.state!r}; use 'checked' "
-                                "or 'unchecked'."
-                            )
-                        },
-                    )
-                )
-                continue
-            want_checked = change.state == "checked"
-            try:
-                step = find_step(parsed, change.step_id)
-            except (StepNotFoundError, AmbiguousStepError) as exc:
-                items.append(
-                    StepChangeResult(
-                        step_id=change.step_id,
-                        state=change.state,
-                        status="failed",
-                        error={"message": str(exc)},
-                    )
-                )
-                continue
-            already = step.checked == want_checked
-            (check_step if want_checked else uncheck_step)(parsed, change.step_id)
-            if not already:
-                changed = True
-            items.append(
-                StepChangeResult(
-                    step_id=change.step_id,
-                    state=change.state,
-                    status="unchanged" if already else "updated",
-                )
-            )
-
-        if changed:
-            _save_plan(resolved.path, parsed, original_text)
-
-        total, completed, percent, next_open = _progress_summary(parsed)
-        return PlanProgressResult(
-            status=_reduce([i.status for i in items], {"updated", "unchanged"}),
-            plan=resolved.stem,
-            items=items,
-            total_steps=total,
-            steps_completed=completed,
-            completion_percent=percent,
-            next_open_step=next_open,
+        return run_plan_mutation(
+            resolved.path,
+            dry_run=False,
+            operation=lambda: _mutate_plan_progress(
+                resolved.path, resolved.stem, steps
+            ),
         )
 
     @mcp.tool(
@@ -448,6 +501,7 @@ def register_plan_tools(mcp: MCPServer[None]) -> None:
                 not resolve to a unique plan.
         """
         _ = ctx
+        from ...plan.mutation_transaction import run_plan_mutation
         from ..plan_resolver import PlanResolutionError, resolve_plan
 
         if not operations:
@@ -461,37 +515,12 @@ def register_plan_tools(mcp: MCPServer[None]) -> None:
 
         logger.info("plan_edit: %s %d op(s)", resolved.stem, len(operations))
 
-        parsed, original_text = _load_plan(resolved.path)
-        items: list[PlanEditItemResult] = []
-        expected_retired: set[str] = set()
-        changed = False
-
-        for op in operations:
-            item = _apply_plan_edit(parsed, op)
-            items.append(item)
-            if item.status != "failed":
-                changed = True
-                # A ``remove`` legitimately retires its target id; declaring it
-                # here keeps the shared write guard from mistaking the intended
-                # retirement for a serialisation conflict.
-                if item.status == "removed" and item.step_id is not None:
-                    expected_retired.add(item.step_id)
-
-        if changed:
-            _save_plan(
-                resolved.path, parsed, original_text, expected_retired=expected_retired
-            )
-
-        total, completed, _percent, next_open = _progress_summary(parsed)
-        return PlanEditResult(
-            status=_reduce(
-                [i.status for i in items], {"created", "updated", "removed"}
+        return run_plan_mutation(
+            resolved.path,
+            dry_run=False,
+            operation=lambda: _mutate_plan_edit(
+                resolved.path, resolved.stem, operations
             ),
-            plan=resolved.stem,
-            items=items,
-            total_steps=total,
-            steps_completed=completed,
-            next_open_step=next_open,
         )
 
     _ = (plan_progress, plan_edit)  # bound by the decorator; silence unused warnings
