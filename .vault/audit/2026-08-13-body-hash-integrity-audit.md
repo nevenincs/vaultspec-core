@@ -8,6 +8,7 @@ body_schema: 'body-v1'
 body_hash: 'sha256:e7566feb4a3892ba61e4e450e614ffbfa7f8c6e2da9c0856ad22c7e6f5e51bf2'
 related: []
 ---
+
 # `body-hash-integrity` audit: `Body hash integrity review`
 
 ## Scope
