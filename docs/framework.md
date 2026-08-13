@@ -187,11 +187,10 @@ see the [MCP reference](./MCP.md).
 
 ## Core home runtime artifacts
 
-VaultSpec Core reserves `~/.vaultspec/` as the per-account, machine-global home
-shared by VaultSpec tools. This directory is separate from a repository's
-`.vaultspec/` directory. The repository directory contains workspace policy and
-configuration. The home directory coordinates runtime state across repositories
-and concurrent sessions.
+VaultSpec Core reserves `~/.vaultspec/` as the per-account, machine-global home shared
+by VaultSpec tools. This directory is separate from a repository's `.vaultspec/`
+directory. The repository directory contains workspace policy and configuration. The
+home directory coordinates runtime state across repositories and concurrent sessions.
 
 The supported home layout includes:
 
@@ -204,44 +203,41 @@ The supported home layout includes:
         └── <producer-defined lease markers>
 ```
 
-`procs/` and all of its nested paths are reserved runtime-artifact
-namespaces. A process record describes a development process and identifies it
-with a process ID (PID). A lease marker coordinates exclusive or shared access
-to a machine resource. A record is stale when its positive integer `pid` names
-a process that the operating system proves is no longer alive.
+`procs/` and all of its nested paths are reserved runtime-artifact namespaces. A process
+record describes a development process and identifies it with a process ID (PID). A
+lease marker coordinates exclusive or shared access to a machine resource. A record is
+stale when its positive integer `pid` names a process that the operating system proves
+is no longer alive.
 
-Core owns the paths and their preservation contract. The producer owns the
-record and lease schemas, creation, atomic mutation, heartbeat policy, and
-reclamation. Core owns only the narrow doctor rule that a proven-dead positive
-integer PID makes a record stale. Core does not create `procs/` eagerly: a
-producer creates the directory when it first writes runtime state. Core sync,
-prune, and workspace uninstall operations do not rewrite or delete the
-machine-global namespace. This contract applies on every platform supported by
-VaultSpec Core.
+Core owns the paths and their preservation contract. The producer owns the record and
+lease schemas, creation, atomic mutation, heartbeat policy, and reclamation. Core owns
+only the narrow doctor rule that a proven-dead positive integer PID makes a record
+stale. Core does not create `procs/` eagerly: a producer creates the directory when it
+first writes runtime state. Core sync, prune, and workspace uninstall operations do not
+rewrite or delete the machine-global namespace. This contract applies on every platform
+supported by VaultSpec Core.
 
-Resolve the namespace through
-`vaultspec_core.core.core_home_layout()` instead of spelling the path in a new
-Core integration. Keep credentials and token values out of records. Use atomic
-writes for records. Use exclusive creation or an equivalent race-safe primitive
-for claims. The producer remains the authority for heartbeat, ownership,
-cleanup, and schema evolution.
+Resolve the namespace through `vaultspec_core.core.core_home_layout()` instead of
+spelling the path in a new Core integration. Keep credentials and token values out of
+records. Use atomic writes for records. Use exclusive creation or an equivalent
+race-safe primitive for claims. The producer remains the authority for heartbeat,
+ownership, cleanup, and schema evolution.
 
 `vaultspec-core spec doctor` reports the registry without changing it:
 
 - An absent `procs/` directory is informational.
-- The registry is healthy when every readable top-level JSON record names a
-  live PID.
+- The registry is healthy when every readable top-level JSON record names a live PID.
 - A proven-dead PID produces a warning that names the stale record.
-- Malformed records, unknown fields, and nested artifacts such as `leases/`
-  remain opaque to Core.
+- Malformed records, unknown fields, and nested artifacts such as `leases/` remain
+  opaque to Core.
 
-Use `vaultspec-core spec doctor --json` when attaching diagnostic output to an
-issue. Remove or reclaim a stale record only through its producer. The doctor
-command never repairs, removes, or rewrites process records or lease markers.
-See the [CLI reference](CLI.md) for command output contracts. Report unresolved
-integration problems in the
-[VaultSpec Core issue tracker](https://github.com/nevenincs/vaultspec-core/issues)
-with the doctor JSON, operating system, and producer version.
+Use `vaultspec-core spec doctor --json` when attaching diagnostic output to an issue.
+Remove or reclaim a stale record only through its producer. The doctor command never
+repairs, removes, or rewrites process records or lease markers. See the
+[CLI reference](CLI.md) for command output contracts. Report unresolved integration
+problems in the
+[VaultSpec Core issue tracker](https://github.com/nevenincs/vaultspec-core/issues) with
+the doctor JSON, operating system, and producer version.
 
 ## Related documentation
 
