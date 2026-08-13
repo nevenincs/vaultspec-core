@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from ..home import ProcessRegistrySignal as ProcessRegistrySignal
+
 
 class FrameworkSignal(StrEnum):
     """Observed state of the vaultspec framework directory.

@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..enums import InstallMode, Tool
+from ..home import ProcessRegistryDiagnosis, ProcessRegistrySignal
 from .signals import (
     BuiltinVersionSignal,
     ConfigSignal,
@@ -89,6 +90,16 @@ class ProviderDiagnosis:
 
 
 @dataclass
+class HomeDiagnosis:
+    """Non-provider diagnostics that may carry structured detail."""
+
+    process_registry: ProcessRegistryDiagnosis = field(
+        default_factory=lambda: ProcessRegistryDiagnosis(ProcessRegistrySignal.ABSENT)
+    )
+    divergent_projections: list[str] = field(default_factory=list)
+
+
+@dataclass
 class WorkspaceDiagnosis:
     """Top-level diagnosis aggregating framework and provider states.
 
@@ -135,6 +146,7 @@ class WorkspaceDiagnosis:
             write. Populated only when ``framework`` is
             :attr:`~vaultspec_core.core.diagnosis.signals.FrameworkSignal.ADOPTABLE`,
             where it names the content an adopting run would destroy.
+        home: Structured Core-home and adoption diagnostics.
     """
 
     framework: FrameworkSignal
@@ -157,7 +169,21 @@ class WorkspaceDiagnosis:
     version_floor_running: str = ""
     version_floor_minimum: str = ""
     packages: dict[str, PackageModeDiagnosis] = field(default_factory=dict)
-    divergent_projections: list[str] = field(default_factory=list)
+    home: HomeDiagnosis = field(default_factory=HomeDiagnosis)
+
+    @property
+    def divergent_projections(self) -> list[str]:
+        """Workspace projections an adopting run would overwrite."""
+        return self.home.divergent_projections
+
+    @divergent_projections.setter
+    def divergent_projections(self, value: list[str]) -> None:
+        self.home.divergent_projections = value
+
+    @property
+    def process_registry(self) -> ProcessRegistryDiagnosis:
+        """Machine-global process-registry diagnosis."""
+        return self.home.process_registry
 
 
 def _safe_framework_presence(target: Path) -> FrameworkSignal:
@@ -410,7 +436,9 @@ def _collect_package_diagnoses(target: Path) -> dict[str, PackageModeDiagnosis]:
     return package_diags
 
 
-def _collect_layer1_diagnosis(target: Path, scope: str) -> WorkspaceDiagnosis:
+def _collect_layer1_diagnosis(
+    target: Path, scope: str, core_home: Path | None
+) -> WorkspaceDiagnosis:
     """Collect the always-on layer 1 signals plus the per-package map.
 
     Runs independently of framework presence, so the returned
@@ -430,6 +458,9 @@ def _collect_layer1_diagnosis(target: Path, scope: str) -> WorkspaceDiagnosis:
         _safe_version_floor_state(target)
     )
 
+    from ..home import diagnose_process_registry
+
+    process_registry = diagnose_process_registry(core_home)
     return WorkspaceDiagnosis(
         framework=_safe_framework_presence(target),
         gitignore=_safe_gitignore_state(target),
@@ -447,6 +478,7 @@ def _collect_layer1_diagnosis(target: Path, scope: str) -> WorkspaceDiagnosis:
         version_floor_running=version_floor_running,
         version_floor_minimum=version_floor_minimum,
         packages=_collect_package_diagnoses(target),
+        home=HomeDiagnosis(process_registry=process_registry),
     )
 
 
@@ -530,7 +562,9 @@ def _diagnose_providers_full_or_sync(
     return diag
 
 
-def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
+def diagnose(
+    target: Path, *, scope: str = "full", core_home: Path | None = None
+) -> WorkspaceDiagnosis:
     """Run layered diagnostic collection against a workspace.
 
     Args:
@@ -539,6 +573,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
             command), ``"framework"`` runs only framework presence and manifest
             coherence (install), ``"sync"`` adds provider dir, config, and
             gitignore checks.
+        core_home: Explicit machine-global Core home for isolated callers.
 
     Returns:
         Populated :class:`WorkspaceDiagnosis` instance.
@@ -550,7 +585,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         )
 
     # Layer 1: always collected, independent of framework presence.
-    diag = _collect_layer1_diagnosis(target, scope)
+    diag = _collect_layer1_diagnosis(target, scope, core_home)
 
     if diag.framework == FrameworkSignal.MISSING:
         return diag

@@ -39,6 +39,11 @@ from .exceptions import WorkspaceNotInitializedError as WorkspaceNotInitializedE
 from .helpers import atomic_write as atomic_write
 from .helpers import build_file as build_file
 from .helpers import ensure_dir as ensure_dir
+from .home import CoreHomeLayout as CoreHomeLayout
+from .home import ProcessRegistryDiagnosis as ProcessRegistryDiagnosis
+from .home import ProcessRegistrySignal as ProcessRegistrySignal
+from .home import core_home_layout as core_home_layout
+from .home import diagnose_process_registry as diagnose_process_registry
 from .hooks import hooks_add as hooks_add
 from .hooks import hooks_edit as hooks_edit
 from .hooks import hooks_remove as hooks_remove
