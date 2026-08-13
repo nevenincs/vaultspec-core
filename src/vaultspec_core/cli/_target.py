@@ -200,17 +200,17 @@ def _nearest_vaultspec_hint(start: Path) -> str:
 
     A worktree can hold a ``.vault/`` corpus without the ``.vaultspec/``
     framework directory the commands resolve against, so a bare "not found"
-    error strands the operator. This walks up from *start* and then scans
-    its siblings for a ``.vaultspec/`` directory and names the first it
-    finds with a ready-to-paste ``--target``; otherwise it gives generic
+    error strands the operator. This checks *start*, then its immediate
+    siblings, before walking upward. A sibling worktree is more relevant than
+    an unrelated ancestor workspace (for example a home-directory install),
+    so locality wins before the broader fallback. Otherwise it gives generic
     guidance instead of failing silently.
     """
-    for candidate in (start, *start.parents):
-        if (candidate / ".vaultspec").is_dir():
-            return (
-                f"  Hint: a vaultspec workspace exists at {candidate}; "
-                f"pass --target {candidate}."
-            )
+    if (start / ".vaultspec").is_dir():
+        return (
+            f"  Hint: a vaultspec workspace exists at {start}; "
+            f"pass --target {start}."
+        )
     try:
         for sibling in sorted(start.parent.iterdir()):
             if sibling.is_dir() and (sibling / ".vaultspec").is_dir():
@@ -220,6 +220,12 @@ def _nearest_vaultspec_hint(start: Path) -> str:
                 )
     except OSError:
         pass
+    for candidate in start.parents:
+        if (candidate / ".vaultspec").is_dir():
+            return (
+                f"  Hint: a vaultspec workspace exists at {candidate}; "
+                f"pass --target {candidate}."
+            )
     return (
         "  Hint: run from a directory containing .vaultspec/, "
         "or pass --target <workspace>."

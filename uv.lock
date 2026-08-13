@@ -2269,7 +2269,7 @@ dev = [
     { name = "ruff", specifier = ">=0.15.2" },
     { name = "torch", marker = "sys_platform != 'linux' and sys_platform != 'win32'", specifier = ">=2.4" },
     { name = "torch", marker = "sys_platform == 'linux' or sys_platform == 'win32'", specifier = ">=2.4", index = "https://download.pytorch.org/whl/cu130" },
-    { name = "ty", specifier = ">=0.0.15,<0.0.66" },
+    { name = "ty", specifier = ">=0.0.15" },
     { name = "vaultspec-rag", extras = ["mcp"], specifier = ">=0.3.8" },
     { name = "vulture", specifier = ">=2.16" },
     { name = "xenon", specifier = ">=0.9.3" },

@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-
 def test_concurrent_cli_step_adds_all_survive(tmp_path: Path) -> None:
     plan_path = tmp_path / ".vault" / "plan" / "concurrent-writers-plan.md"
     plan_path.parent.mkdir(parents=True)
@@ -57,6 +56,4 @@ def test_concurrent_cli_step_adds_all_survive(tmp_path: Path) -> None:
         step.action
         for step in plan.steps
         if step.action.startswith("record concurrent mutation")
-    } == {
-        f"record concurrent mutation {index}" for index in range(8)
-    }
+    } == {f"record concurrent mutation {index}" for index in range(8)}
