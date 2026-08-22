@@ -17,11 +17,19 @@ write path so no surface can corrupt a plan the others protect. Two run
   is refused rather than corrupting the file or exhausting the disk.
 - **Source-structure guard** (issue #305): a plan with error-level structural
   findings is not safe input to a whole-document rewrite. The mutation is
-  refused with the checker's existing diagnosis and repair hint.
+  refused with the checker's existing diagnosis and repair hint. A freshly
+  scaffolded plan that carries no container at all is exempt: it fails the
+  tier-correspondence rule only because nothing has been added yet, and the
+  mutation being refused is the one that would fix that (issue #313).
 - **Active-identifier preservation guard** (issue #305): every Wave, Phase,
   and Step visible before a mutation must remain visible afterwards unless the
   command explicitly retires it. This catches destructive round trips even
   when no individual checker recognises the malformed input that caused them.
+
+- **Round-trip guard** (issue #313): the serialised text must re-parse into
+  the structure the mutation intended. :func:`verify_plan_roundtrip` asserts
+  that in memory, so a row that cannot survive a serialise / re-parse cycle is
+  refused before the file is touched rather than after it has been rewritten.
 
 One runs *after* the write:
 
@@ -34,9 +42,13 @@ One runs *after* the write:
   independent re-read of the file would reveal.
 
 Both the CLI plan-mutation verbs and the MCP ``plan_edit`` / ``plan_progress``
-tools serialise a mutated plan and write it back; routing both through
-:func:`guard_plan_write` and :func:`verify_plan_write` guarantees the MCP
-surface inherits exactly the integrity the CLI enforces, with no second copy of
+tools serialise a mutated plan and write it back, and both persist it through
+:func:`write_plan_verified`, which sequences the round-trip guard, the atomic
+write, and the post-write verification - restoring the original bytes if that
+last step fails. That sequencing is what makes the surface-level guarantee
+hold: **a plan mutation that exits non-zero leaves the document
+byte-identical**. Sharing one write path with :func:`guard_plan_write` gives
+the MCP surface exactly the integrity the CLI enforces, with no second copy of
 the check to drift.
 """
 
@@ -56,7 +68,9 @@ __all__ = [
     "PlanWriteGuardError",
     "PlanWriteVerificationError",
     "guard_plan_write",
+    "verify_plan_roundtrip",
     "verify_plan_write",
+    "write_plan_verified",
 ]
 
 #: Byte floor below which the growth ceiling never trips, so tiny plans stay
@@ -104,9 +118,35 @@ def _active_ids(plan: Plan) -> Counter[str]:
     )
 
 
+def _is_unpopulated_scaffold(plan: Plan, source_text: str) -> bool:
+    """Return whether *plan* is a scaffold that has not been populated yet.
+
+    A freshly scaffolded plan declares its tier before it holds any container,
+    so ``PLAN010`` legitimately reports "L3 plan must contain at least one Wave
+    heading" - useful authorial feedback from ``plan check``, but not a reason
+    to refuse the very ``wave add`` that would satisfy it. Until issue #313 the
+    scaffold's *commented* grammar examples were parsed as live containers, so
+    the emptiness was invisible and this case never arose.
+
+    The two conditions must hold together. An empty model alone is exactly the
+    symptom issue #305's guard exists to catch - a destructive round trip that
+    dropped every container. Confirming the *source* also carries no structural
+    token outside its comments is what separates "nothing was written yet" from
+    "everything was lost", so the guard keeps its teeth.
+    """
+    from vaultspec_core.plan.parser import carries_live_structure
+
+    if plan.waves or plan.phases or plan.steps or plan.epic_intent is not None:
+        return False
+    return not carries_live_structure(source_text)
+
+
 def _guard_source_structure(plan: Plan, source_text: str) -> None:
     """Refuse a whole-document rewrite of structurally invalid source."""
     from vaultspec_core.plan.checks import Severity, collect_all
+
+    if _is_unpopulated_scaffold(plan, source_text):
+        return
 
     destructive_structure_codes = {"PLAN010", "PLAN070"}
     errors = [
@@ -201,6 +241,127 @@ def guard_plan_write(
             "not an intended edit. The file on disk was left unchanged."
         )
         raise PlanWriteGuardError(msg)
+
+
+def verify_plan_roundtrip(
+    expected_text: str,
+    expected_plan: Plan,
+    *,
+    path_name: str,
+) -> None:
+    """Prove *expected_text* re-parses into *expected_plan* before it is written.
+
+    This is :func:`verify_plan_write`'s structural assertion run entirely in
+    memory, against the text rather than against the file. Running it first is
+    what makes a rejected mutation cost nothing: before issue #313 the only
+    round-trip check ran *after* ``atomic_write``, so a row the serialiser
+    could not round-trip - a Wave serialised into a span the parser read as a
+    comment, an action truncated at a semicolon - was persisted, and the
+    command then exited non-zero over a document it had already changed. The
+    caller saw a failure and a modified plan, which is the one combination a
+    mutation surface must never produce.
+
+    :func:`verify_plan_write` still runs after the write; it owns the
+    assertions this one cannot make, namely that the bytes actually reached
+    the disk and that no concurrent writer replaced them.
+
+    Args:
+        expected_text: The serialised, stamp-refreshed text about to be written.
+        expected_plan: The mutated model *expected_text* was serialised from.
+        path_name: The plan filename, used only in the error message.
+
+    Raises:
+        PlanWriteVerificationError: When *expected_text* does not parse, or
+            parses into a different structure than *expected_plan* holds.
+    """
+    from vaultspec_core.plan.parser import parse_plan
+
+    try:
+        observed_plan = parse_plan(expected_text)
+    except Exception as exc:
+        msg = (
+            f"mutation aborted for {path_name}: the serialised document does "
+            f"not parse back as a plan ({exc}). Nothing was written."
+        )
+        raise PlanWriteVerificationError(msg) from exc
+
+    expected_rows = _document_rows(expected_plan)
+    observed_rows = _document_rows(observed_plan)
+    if expected_rows != observed_rows:
+        msg = (
+            f"mutation aborted for {path_name}: the serialised document does "
+            f"not read back as the mutation that was applied - "
+            f"{_describe_row_divergence(expected_rows, observed_rows)}. The "
+            "row does not survive a serialise / re-parse round trip, so it "
+            "was not written; the document on disk is unchanged."
+        )
+        raise PlanWriteVerificationError(msg)
+
+    if _retired_ids(expected_plan) != _retired_ids(observed_plan):
+        expected_only = _retired_ids(expected_plan) - _retired_ids(observed_plan)
+        observed_only = _retired_ids(observed_plan) - _retired_ids(expected_plan)
+        msg = (
+            f"mutation aborted for {path_name}: the serialised retirement "
+            f"ledger does not read back as applied - missing "
+            f"{sorted(expected_only) or 'nothing'}, unexpected "
+            f"{sorted(observed_only) or 'nothing'}. Nothing was written."
+        )
+        raise PlanWriteVerificationError(msg)
+
+
+def write_plan_verified(
+    path: Path,
+    new_text: str,
+    plan: Plan,
+    *,
+    original_text: str,
+) -> None:
+    """Persist *new_text* so a failure always leaves the plan byte-identical.
+
+    The single write path shared by the CLI plan verbs and the MCP plan tools.
+    Three things happen in order, and the ordering is the guarantee:
+
+    1. :func:`verify_plan_roundtrip` proves in memory that the serialised text
+       reads back as the mutation. A failure here never touches the file.
+    2. ``atomic_write`` replaces the document.
+    3. :func:`verify_plan_write` re-reads the persisted bytes. A failure here
+       restores *original_text* before propagating, so a non-zero exit and a
+       modified document can never be observed together (issue #313).
+
+    Step 3's restore is itself atomic and is attempted exactly once. If it
+    also fails the original failure is re-raised with the restore failure
+    chained onto its message, because at that point the document's state is
+    genuinely unknown and saying so is more useful than a clean-looking error.
+
+    Args:
+        path: The plan document to write.
+        new_text: The serialised, stamp-refreshed text to persist.
+        plan: The mutated model *new_text* was serialised from.
+        original_text: The document's pre-mutation text, restored on a
+            post-write verification failure.
+
+    Raises:
+        PlanWriteVerificationError: When the mutation does not round-trip, or
+            the persisted document does not carry it.
+    """
+    from vaultspec_core.core.helpers import atomic_write
+
+    verify_plan_roundtrip(new_text, plan, path_name=path.name)
+    atomic_write(path, new_text)
+    try:
+        verify_plan_write(path, new_text, plan)
+    except PlanWriteVerificationError as exc:
+        try:
+            atomic_write(path, original_text)
+        except OSError as restore_exc:
+            msg = (
+                f"{exc} The original document could NOT be restored "
+                f"({restore_exc}); {path.name} is in an unknown state on disk "
+                "and must be inspected before further edits."
+            )
+            raise PlanWriteVerificationError(msg) from exc
+        msg = f"{exc} The document was restored to its pre-mutation bytes."
+        raise PlanWriteVerificationError(msg) from exc
 
 
 def verify_plan_write(path: Path, expected_text: str, expected_plan: Plan) -> None:

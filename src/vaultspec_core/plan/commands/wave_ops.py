@@ -20,6 +20,7 @@ from vaultspec_core.plan.identifiers import (
     next_available_wave_suffix,
 )
 from vaultspec_core.plan.parser import Wave
+from vaultspec_core.plan.row_contract import validate_intent, validate_title
 
 if TYPE_CHECKING:
     from vaultspec_core.plan.parser import Plan
@@ -48,6 +49,8 @@ def add_wave(plan: Plan, *, title: str, intent: str) -> Wave:
         AddWaveError: When the plan tier does not support Waves
             (only ``L3`` and ``L4`` do).
     """
+    title = validate_title(title, container="Wave")
+    intent = validate_intent(intent, container="Wave")
     _require_wave_supporting_tier(plan)
     canonical_id = next_available_wave(plan)
     new_wave = Wave(
@@ -69,6 +72,8 @@ def insert_wave(
     after: str | None = None,
 ) -> Wave:
     """Place a Wave at a named document position relative to an anchor."""
+    title = validate_title(title, container="Wave")
+    intent = validate_intent(intent, container="Wave")
     _require_wave_supporting_tier(plan)
     anchor_id = resolve_exactly_one_anchor(
         before, after, op="insert_wave", error=AddWaveError
@@ -121,10 +126,14 @@ def edit_wave(
 ) -> Wave:
     """Edit the Wave's title and / or intent paragraph."""
     wave = find_wave(plan, wave_id)
-    if title is not None:
-        wave.title = title
-    if intent is not None:
-        wave.intent = intent
+    # Validate both fields before mutating either, so a rejected value cannot
+    # leave the in-memory model carrying a half-applied edit.
+    new_title = None if title is None else validate_title(title, container="Wave")
+    new_intent = None if intent is None else validate_intent(intent, container="Wave")
+    if new_title is not None:
+        wave.title = new_title
+    if new_intent is not None:
+        wave.intent = new_intent
     return wave
 
 

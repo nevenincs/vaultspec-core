@@ -10,6 +10,7 @@ related:
   - '[[2026-08-01-mcp-read-only-adr]]'
   - '[[2026-08-01-mcp-read-only-research]]'
 ---
+
 # `mcp-read-only` plan
 
 ## Description

@@ -34,6 +34,9 @@ __all__ = [
     "Step",
     "UnknownBlock",
     "Wave",
+    "carries_live_structure",
+    "mask_html_comments",
+    "mask_html_comments_text",
     "parse_plan",
 ]
 
@@ -213,6 +216,74 @@ _RE_STEP_ROW = re.compile(
 _RE_FRONTMATTER_FENCE = re.compile(r"^---\s*$")
 
 
+# ---- HTML comment masking ---------------------------------------------------
+
+
+def mask_html_comments(lines: list[str]) -> list[str]:
+    """Return *lines* with every HTML comment span replaced by spaces.
+
+    A plan's shipped scaffold documents its own grammar inside HTML comments -
+    a ``### Phase`` heading, Step rows, a ``## Wave`` heading - purely as
+    authorial examples. Those spans are commentary, not document structure, so
+    no structural pass may read a token out of them (issue #313). Masking
+    rather than deleting keeps every returned line at its original index and
+    length, so line numbers and column offsets stay truthful and the caller can
+    still recover the authored text from the unmasked line.
+
+    Comment state carries across lines, so a block comment masks its whole
+    span, and an unterminated ``<!--`` masks everything to the end of the
+    document - the same reading a Markdown renderer applies.
+    """
+    masked: list[str] = []
+    in_comment = False
+    for line in lines:
+        pieces: list[str] = []
+        cursor = 0
+        while cursor < len(line):
+            if in_comment:
+                close = line.find("-->", cursor)
+                if close == -1:
+                    pieces.append(" " * (len(line) - cursor))
+                    cursor = len(line)
+                else:
+                    pieces.append(" " * (close + 3 - cursor))
+                    cursor = close + 3
+                    in_comment = False
+            else:
+                opening = line.find("<!--", cursor)
+                if opening == -1:
+                    pieces.append(line[cursor:])
+                    cursor = len(line)
+                else:
+                    pieces.append(line[cursor:opening])
+                    cursor = opening
+                    in_comment = True
+        masked.append("".join(pieces))
+    return masked
+
+
+def mask_html_comments_text(source_text: str) -> str:
+    """Return *source_text* with HTML comment spans blanked, line count intact."""
+    return "\n".join(mask_html_comments(source_text.splitlines()))
+
+
+def carries_live_structure(source_text: str) -> bool:
+    """Return whether *source_text* holds a container or row outside its comments.
+
+    Distinguishes a plan that was never populated from one whose structure was
+    lost. The two look identical in the parsed model - both hold no Wave, Phase
+    or Step - but only the second is a symptom of a destructive round trip, and
+    a caller deciding whether to refuse a rewrite needs to tell them apart
+    (issue #313).
+    """
+    return any(
+        _RE_WAVE_HEADING.match(line)
+        or _RE_PHASE_HEADING.match(line)
+        or _RE_STEP_ROW.match(line)
+        for line in mask_html_comments(source_text.splitlines())
+    )
+
+
 # ---- Public entry point -----------------------------------------------------
 
 
@@ -308,8 +379,12 @@ def _coerce_to_text(source: str | Path) -> str:
 
 
 def _extract_title(body: str) -> str:
-    """Return the first ``# ...`` heading text in the body, or ``""`` if absent."""
-    for line in body.splitlines():
+    """Return the first ``# ...`` heading text in the body, or ``""`` if absent.
+
+    Scans the comment-masked body so a ``# ...`` line quoted inside an HTML
+    comment can never be mistaken for the document title (issue #313).
+    """
+    for line in mask_html_comments(body.splitlines()):
         match = _RE_TITLE.match(line)
         if match:
             return match.group("title")
@@ -324,16 +399,20 @@ def _extract_epic_intent(body: str) -> EpicIntent | None:
     comment is filtered out so it is not absorbed into authored prose.
     """
     lines = body.splitlines()
-    for index, line in enumerate(lines):
-        if _RE_EPIC_INTENT.match(line):
+    masked_lines = mask_html_comments(lines)
+    for index, masked in enumerate(masked_lines):
+        if _RE_EPIC_INTENT.match(masked):
             text_lines: list[str] = []
-            for follow in lines[index + 1 :]:
+            for offset, follow_masked in enumerate(
+                masked_lines[index + 1 :], start=index + 1
+            ):
                 if (
-                    follow.startswith("# ")
-                    or follow.startswith("## ")
-                    or follow.startswith("### ")
+                    follow_masked.startswith("# ")
+                    or follow_masked.startswith("## ")
+                    or follow_masked.startswith("### ")
                 ):
                     break
+                follow = lines[offset]
                 if _RE_RETIRED_LEDGER.search(follow):
                     continue
                 text_lines.append(follow)
@@ -445,8 +524,18 @@ def _walk_body(
                 unknown_blocks.append(UnknownBlock(anchor=anchor, content=content))
             buffered_unknown.clear()
 
-    for index, line in enumerate(body.splitlines(), start=1):
-        tokens = _match_line(line)
+    # Every structural decision below reads the *masked* line, in which HTML
+    # comment spans have been blanked out, while every text-preserving branch
+    # (intent prose, unknown blocks, a Step's ``raw_line``) reads the original.
+    # A plan's shipped scaffold quotes the row grammar inside comments purely
+    # as an example; parsing those quotes as live rows is what let a mutation
+    # insert a Wave inside a comment and then fail its own verification
+    # (issue #313).
+    source_lines = body.splitlines()
+    for index, (line, masked) in enumerate(
+        zip(source_lines, mask_html_comments(source_lines), strict=True), start=1
+    ):
+        tokens = _match_line(masked)
 
         # 1. H1 Title line
         if tokens.title:
@@ -526,7 +615,7 @@ def _walk_body(
 
         # 9. Intent paragraph checking
         if intent_target is not None:
-            stripped = line.strip()
+            stripped = masked.strip()
             if (
                 stripped.startswith("# ")
                 or stripped.startswith("## ")
@@ -564,17 +653,38 @@ def _build_step(match: re.Match[str], index: int, raw_line: str) -> Step:
     )
 
 
+#: The canonical row tail the serialiser emits: an action, the ``;``
+#: separator, and a backtick-delimited scope closing the line. ``action`` is
+#: greedy, so the *last* qualifying ``; `scope`.`` clause wins and an action
+#: that legitimately contains its own semicolons survives the round trip
+#: (issue #313). This is the exact inverse of
+#: :func:`~vaultspec_core.plan.serialiser._render_step_row`.
+_RE_ROW_TAIL = re.compile(r"^(?P<action>.*);\s*`(?P<scope>[^`]*)`\s*$")
+
+
 def _split_action_and_scope(rest: str) -> tuple[str, str]:
     """Split a row's tail into the imperative action and the file/area scope.
 
-    The convention's row contract uses ``;`` to separate the action from
-    the scope, with a trailing period after the scope's closing backtick.
+    The convention's row contract uses ``;`` to separate the action from the
+    scope, with a trailing period after the scope's closing backtick.
+
+    The split is anchored on the *trailing* backticked scope clause rather
+    than on the first ``;`` in the line. Splitting on the first separator
+    truncated any action that contained a semicolon of its own and folded the
+    remainder into the scope, so the row read back as something other than
+    what was written - a divergence the write verifier then reported after the
+    malformed row had already been persisted (issue #313). When no backticked
+    clause is present the split falls back to the *last* ``;``, which is the
+    same inverse for a hand-authored row that omitted the backticks.
     """
     rest = rest.rstrip(".").rstrip()
+    tail = _RE_ROW_TAIL.match(rest)
+    if tail is not None:
+        return tail.group("action").strip(), tail.group("scope").strip()
     if ";" not in rest:
         raise PlanParseError(
             f"Step row missing ';' separator between action and scope: {rest!r}",
         )
-    action_part, scope_part = rest.split(";", maxsplit=1)
+    action_part, scope_part = rest.rsplit(";", maxsplit=1)
     scope = scope_part.strip().strip("`")
     return action_part.strip(), scope

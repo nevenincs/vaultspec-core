@@ -240,36 +240,63 @@ async def test_plan_edit_empty_batch_is_protocol_error(vault_root: Path) -> None
         assert result.is_error
 
 
-async def test_plan_edit_write_that_does_not_round_trip_is_a_whole_call_error(
+async def test_plan_edit_refuses_a_scope_the_row_cannot_carry(
     vault_root: Path,
 ) -> None:
-    """A step the document cannot carry fails the call instead of succeeding.
+    """A step the document cannot carry fails its item instead of succeeding.
 
-    The row contract reserves ``;`` as the action / scope separator, so an
-    action carrying one persists a row that re-parses into different content.
-    Post-write verification (issue #296) turns that silent wrong state into a
-    whole-call ``isError``, and the operator is told to re-read rather than
-    handed a ``created`` result the plan does not back.
+    A scope carrying the row grammar's own ``;`` delimiter cannot be expressed
+    in the scope span. The refusal happens at the command boundary, before any
+    serialisation, so the operator is told what to change and the plan is left
+    byte-identical rather than handed a ``created`` result the document does
+    not back (issues #296 and #313).
     """
     mcp = create_server()
     async with Client(mcp) as client:
         await _create_plan(client, "roundtrip")
-        result = await client.call_tool(
-            "plan_edit",
-            {
-                "plan": "roundtrip",
-                "operations": [
-                    {
-                        "operation": "add",
-                        "action": "reconcile the ledger; then re-index",
-                        "scope": "src/a.py",
-                    }
-                ],
-            },
+        path = _plan_path(vault_root, "roundtrip")
+        before = path.read_bytes()
+
+        result = await _plan_edit(
+            client,
+            "roundtrip",
+            [
+                {
+                    "operation": "add",
+                    "action": "reconcile the ledger",
+                    "scope": "src/a.py; src/b.py",
+                }
+            ],
         )
-        assert result.is_error
-        texts = [getattr(block, "text", "") for block in result.content]
-        assert any("write verification failed" in text for text in texts), texts
+
+        assert result["status"] == "failed"
+        assert "may not contain" in result["items"][0]["error"]["message"]
+        assert path.read_bytes() == before
+
+
+async def test_plan_edit_accepts_a_semicolon_in_the_action(
+    vault_root: Path,
+) -> None:
+    """An action may carry its own semicolons on the MCP surface too.
+
+    The delimiter reproduction from issue #313: the row used to be written and
+    then failed by post-write verification, leaving the malformed Step
+    persisted after the call reported an error.
+    """
+    mcp = create_server()
+    async with Client(mcp) as client:
+        await _create_plan(client, "semicolonfeat")
+        await _plan_edit(
+            client,
+            "semicolonfeat",
+            [
+                {
+                    "operation": "add",
+                    "action": "Ground the contract; implement the reader",
+                    "scope": "src/cadrumo/core/_credentials.py",
+                }
+            ],
+        )
 
 
 # ---------------------------------------------------------------------------
