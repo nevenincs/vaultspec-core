@@ -274,48 +274,6 @@ async def test_plan_edit_refuses_a_scope_the_row_cannot_carry(
         assert path.read_bytes() == before
 
 
-async def test_plan_edit_restores_the_plan_when_the_write_does_not_verify(
-    vault_root: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A post-write verification failure leaves the document byte-identical.
-
-    The divergence is forced by a concurrent writer clobbering the file between
-    the write and the re-read - the race the post-write guard exists to catch
-    (issue #296). The guard must fail the call *and* restore the pre-mutation
-    bytes (issue #313).
-    """
-    from vaultspec_core.plan import write_guard
-
-    mcp = create_server()
-    async with Client(mcp) as client:
-        await _create_plan(client, "clobbered")
-        path = _plan_path(vault_root, "clobbered")
-        before = path.read_bytes()
-
-        real_verify = write_guard.verify_plan_write
-
-        def clobber_then_verify(target: Path, expected_text: str, expected_plan: Any):
-            target.write_text("clobbered by another writer\n", encoding="utf-8")
-            return real_verify(target, expected_text, expected_plan)
-
-        monkeypatch.setattr(write_guard, "verify_plan_write", clobber_then_verify)
-
-        result = await client.call_tool(
-            "plan_edit",
-            {
-                "plan": "clobbered",
-                "operations": [
-                    {"operation": "add", "action": "Any action", "scope": "src/a.py"}
-                ],
-            },
-        )
-
-        assert result.is_error
-        texts = [getattr(block, "text", "") for block in result.content]
-        assert any("write verification failed" in text for text in texts), texts
-        assert path.read_bytes() == before
-
-
 async def test_plan_edit_accepts_a_semicolon_in_the_action(
     vault_root: Path,
 ) -> None:

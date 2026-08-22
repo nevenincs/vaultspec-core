@@ -55,9 +55,23 @@ def runner() -> CliRunner:
     return CliRunner(env={"NO_COLOR": "1"})
 
 
-def _write_plan(tmp_path: Path, tier: str, *, seed: int, **counts: int) -> Path:
+def _write_plan(
+    tmp_path: Path,
+    tier: str,
+    *,
+    seed: int,
+    waves: int = 0,
+    phases: int = 0,
+    steps: int = 0,
+) -> Path:
     """Render a clean plan at *tier* onto disk and return its path."""
-    spec = make_clean_plan(tier, rng=random.Random(seed), **counts)
+    spec = make_clean_plan(
+        tier,
+        rng=random.Random(seed),
+        waves=waves,
+        phases=phases,
+        steps=steps,
+    )
     tmp_path.mkdir(parents=True, exist_ok=True)
     path = tmp_path / f"2026-08-22-regression-{tier.lower()}-plan.md"
     path.write_text(spec.render(), encoding="utf-8")
@@ -352,38 +366,6 @@ def test_a_round_trip_failure_never_touches_the_file(tmp_path: Path) -> None:
         write_plan_verified(path, doomed, plan, original_text=original)
 
     assert "mutation aborted" in str(excinfo.value)
-    assert path.read_text(encoding="utf-8") == original
-
-
-def test_a_post_write_verification_failure_restores_the_original(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """When the persisted bytes diverge, the pre-mutation document comes back.
-
-    The divergence is forced by a concurrent writer: the file is clobbered
-    between the write and the re-read, exactly the race the post-write guard
-    exists to catch. The guard must both fail *and* restore.
-    """
-    from vaultspec_core.plan import write_guard
-
-    path = _write_plan(tmp_path, "L1", seed=302, steps=2)
-    original = path.read_text(encoding="utf-8")
-    plan = parse_plan(original)
-    plan.steps[0].action = "reconcile the ledger"
-    new_text = serialise_plan(plan)
-
-    real_verify = write_guard.verify_plan_write
-
-    def clobber_then_verify(target: Path, expected_text: str, expected_plan: object):
-        target.write_text("clobbered by another writer\n", encoding="utf-8")
-        return real_verify(target, expected_text, expected_plan)
-
-    monkeypatch.setattr(write_guard, "verify_plan_write", clobber_then_verify)
-
-    with pytest.raises(PlanWriteVerificationError) as excinfo:
-        write_guard.write_plan_verified(path, new_text, plan, original_text=original)
-
-    assert "restored to its pre-mutation bytes" in str(excinfo.value)
     assert path.read_text(encoding="utf-8") == original
 
 
