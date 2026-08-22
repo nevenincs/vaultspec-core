@@ -59,7 +59,9 @@ def collect_all(plan: Plan, source_text: str) -> list[Finding]:
         plan: Parsed :class:`Plan` model.
         source_text: Original markdown text; needed by detection rules
             that scan raw lines (separator convention, structural-noun
-            occurrences in headings).
+            occurrences in headings). Structural rules receive it with HTML
+            comment spans masked out, so commented grammar examples are not
+            reported as document structure.
 
     Returns:
         Flat list of :class:`Finding` instances in the order each rule
@@ -75,17 +77,29 @@ def collect_all(plan: Plan, source_text: str) -> list[Finding]:
     from vaultspec_core.plan.checks.row_contract_check import check_row_contract
     from vaultspec_core.plan.checks.separator_check import check_separator
     from vaultspec_core.plan.checks.vocabulary_check import check_vocabulary
+    from vaultspec_core.plan.parser import mask_html_comments_text
+
+    # The rules that scan raw lines for *structure* read the comment-masked
+    # text, so a heading, row, or identifier quoted inside an HTML comment -
+    # the shipped scaffold documents its own grammar that way - is never
+    # reported as a live structural violation (issue #313). Masking preserves
+    # line count and column offsets, so reported line numbers stay truthful.
+    #
+    # ``check_separator`` deliberately keeps the raw text: a forbidden dash is
+    # a document-wide typographic convention that applies to commentary too,
+    # and its autofix is a plain character replacement that is safe anywhere.
+    masked_text = mask_html_comments_text(source_text)
 
     findings: list[Finding] = []
     findings.extend(check_frontmatter(plan))
     # Runs before the model-driven rules: a mislevelled container heading is
     # invisible in the parsed plan, so this reads the source text instead.
-    findings.extend(check_heading_levels(source_text))
+    findings.extend(check_heading_levels(masked_text))
     findings.extend(check_hierarchy(plan))
-    findings.extend(check_identifiers(plan, source_text))
+    findings.extend(check_identifiers(plan, masked_text))
     findings.extend(check_display_path(plan))
-    findings.extend(check_row_contract(plan, source_text))
-    findings.extend(check_vocabulary(plan, source_text))
+    findings.extend(check_row_contract(plan, masked_text))
+    findings.extend(check_vocabulary(plan, masked_text))
     findings.extend(check_separator(source_text))
     return findings
 

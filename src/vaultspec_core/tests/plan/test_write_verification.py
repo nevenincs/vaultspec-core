@@ -143,15 +143,20 @@ def test_a_row_that_does_not_survive_the_round_trip_fails_verification(
 ) -> None:
     """Byte-identical text that re-parses differently is still a failed write.
 
-    The row contract reserves ``;`` as the action / scope separator, so an
-    action carrying one serialises into a row whose scope clause re-parses as
-    the action's tail. The file matches the text the verb wrote, yet the
-    document means something other than the mutation that was applied - the
-    arm of verification that byte comparison alone cannot reach.
+    A scope carrying an HTML comment opener serialises into a row whose tail
+    is commentary rather than document, so the row reads back with a truncated
+    scope. The file matches the text the verb wrote, yet the document means
+    something other than the mutation that was applied - the arm of
+    verification that byte comparison alone cannot reach.
+
+    The model is mutated directly here because
+    :func:`~vaultspec_core.plan.row_contract.validate_action` refuses this
+    input at every command boundary (issue #313); the assertion is that the
+    verifier remains the backstop for anything that reaches it anyway.
     """
     plan_path = _write_plan(tmp_path, "L1", seed=6, steps=1)
     plan = parse_plan(plan_path.read_text(encoding="utf-8"))
-    plan.steps[0].action = "reconcile the ledger; then re-index"
+    plan.steps[0].scope = "src/module/parser.py <!-- and more"
     intended = serialise_plan(plan)
     plan_path.write_text(intended, encoding="utf-8")
 
@@ -161,6 +166,29 @@ def test_a_row_that_does_not_survive_the_round_trip_fails_verification(
         verify_plan_write(plan_path, intended, plan)
 
     assert "does not carry the mutation that was applied" in str(excinfo.value)
+
+
+def test_a_semicolon_in_an_action_survives_the_round_trip(tmp_path: Path) -> None:
+    """An action may carry its own semicolons; the scope clause still binds.
+
+    The split is anchored on the trailing backticked scope clause, not on the
+    first ``;``, so an action containing a semicolon reads back whole instead
+    of being truncated with its remainder folded into the scope (issue #313).
+    """
+    plan_path = _write_plan(tmp_path, "L1", seed=16, steps=1)
+    plan = parse_plan(plan_path.read_text(encoding="utf-8"))
+    plan.steps[0].action = "Ground the credentials contract; implement the reader"
+    plan.steps[0].scope = "src/cadrumo/core/_credentials.py"
+    intended = serialise_plan(plan)
+    plan_path.write_text(intended, encoding="utf-8")
+
+    verify_plan_write(plan_path, intended, plan)
+
+    reparsed = parse_plan(intended)
+    assert reparsed.steps[0].action == (
+        "Ground the credentials contract; implement the reader"
+    )
+    assert reparsed.steps[0].scope == "src/cadrumo/core/_credentials.py"
 
 
 def test_a_lost_retirement_ledger_fails_verification(tmp_path: Path) -> None:
@@ -204,9 +232,11 @@ def test_step_add_reports_success_only_for_a_document_that_holds_the_step(
 
     Before write verification the verb exited 0 and announced the new Step
     while the document carried a row meaning something else - the exact
-    silent wrong-state issue #296 reports.
+    silent wrong-state issue #296 reports. A line break in the action is such
+    a row: it cannot be expressed in the single-line row grammar at all.
     """
     plan_path = _write_plan(tmp_path, "L2", seed=9, phases=2, steps=2)
+    before = plan_path.read_text(encoding="utf-8")
 
     result = runner.invoke(
         app,
@@ -219,7 +249,7 @@ def test_step_add_reports_success_only_for_a_document_that_holds_the_step(
             "--phase",
             "P01",
             "--action",
-            "reconcile the ledger; then re-index",
+            "reconcile the ledger\nthen re-index",
             "--scope",
             "src/module/parser.py",
         ],
@@ -227,8 +257,45 @@ def test_step_add_reports_success_only_for_a_document_that_holds_the_step(
 
     assert result.exit_code == 1, result.stdout
     combined = result.stdout + (result.stderr or "")
-    assert "write verification failed" in combined
-    assert "does not carry the mutation that was applied" in combined
+    assert "may not contain a line break" in combined
+    # The refusal happens before any write, so the document is untouched.
+    assert plan_path.read_text(encoding="utf-8") == before
+
+
+def test_step_add_accepts_a_semicolon_in_the_action(
+    tmp_path: Path, runner: CliRunner
+) -> None:
+    """The delimiter reproduction from issue #313 now lands as written.
+
+    ``--action "Ground ...; implement ..."`` used to be accepted, written, and
+    then failed by verification because the row parser read its semicolon as
+    the action / scope delimiter - leaving the malformed Step persisted after
+    a non-zero exit.
+    """
+    plan_path = _write_plan(tmp_path, "L2", seed=17, phases=1, steps=1)
+
+    result = runner.invoke(
+        app,
+        [
+            "vault",
+            "plan",
+            "step",
+            "add",
+            str(plan_path),
+            "--phase",
+            "P01",
+            "--action",
+            "Ground the credentials contract; implement the reader",
+            "--scope",
+            "src/cadrumo/core/_credentials.py",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout + (result.stderr or "")
+    after = parse_plan(plan_path.read_text(encoding="utf-8"))
+    added = after.steps[-1]
+    assert added.action == "Ground the credentials contract; implement the reader"
+    assert added.scope == "src/cadrumo/core/_credentials.py"
 
 
 def test_step_add_still_applies_and_verifies_an_ordinary_mutation(

@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 from vaultspec_core.plan.commands._errors import PlanCommandError
 from vaultspec_core.plan.frontmatter import Tier
 from vaultspec_core.plan.parser import EpicIntent
+from vaultspec_core.plan.row_contract import validate_intent
 
 if TYPE_CHECKING:
     from vaultspec_core.plan.parser import Plan
@@ -62,6 +63,7 @@ def edit_epic_intent(plan: Plan, *, text: str) -> EpicIntent:
             f"{plan.frontmatter.tier.value}."
         )
         raise EpicIntentError(msg)
+    text = validate_intent(text, container="Epic")
     if plan.epic_intent is None:
         plan.epic_intent = EpicIntent(text=text, line_number=0)
     else:

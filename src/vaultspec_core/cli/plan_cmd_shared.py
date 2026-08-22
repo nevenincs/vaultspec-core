@@ -155,12 +155,16 @@ def save_plan_or_dry_run(
     """Serialise the plan and emit the result as text or the JSON envelope.
 
     On dry-run, emits a unified diff (text) or a ``diff`` payload (JSON) and
-    writes nothing. On apply, the file is replaced atomically when it changed,
-    the persisted document is verified against the mutation through
-    :func:`~vaultspec_core.plan.write_guard.verify_plan_write`, and only then is
-    the outcome reported. Verifying before emitting is what keeps a write that
-    did not land from being announced as a successful edit (issue #296). The
-    text and JSON surfaces describe the same mutation, so they cannot drift.
+    writes nothing. On apply, the write is persisted through
+    :func:`~vaultspec_core.plan.write_guard.write_plan_verified`, which proves
+    the serialisation round-trips before touching the file, replaces the file
+    atomically, verifies the persisted document, and restores the original
+    bytes if that verification fails. Only then is the outcome reported.
+    Verifying before emitting is what keeps a write that did not land from
+    being announced as a successful edit (issue #296); restoring on failure is
+    what keeps a non-zero exit from leaving a half-applied mutation behind
+    (issue #313). The text and JSON surfaces describe the same mutation, so
+    they cannot drift.
 
     Raises:
         PlanWriteGuardError: When a pre-write integrity guard refuses the
@@ -168,9 +172,8 @@ def save_plan_or_dry_run(
         PlanWriteVerificationError: When the persisted document does not carry
             the mutation that was applied.
     """
-    from vaultspec_core.core.helpers import atomic_write
     from vaultspec_core.plan.serialiser import serialise_plan
-    from vaultspec_core.plan.write_guard import guard_plan_write, verify_plan_write
+    from vaultspec_core.plan.write_guard import guard_plan_write, write_plan_verified
     from vaultspec_core.vaultcore import refresh_modified_stamp, vault_today
 
     new_text = serialise_plan(plan, canonicalise=canonicalise)
@@ -220,18 +223,15 @@ def save_plan_or_dry_run(
 
     wrote = new_text != original_text
     if wrote:
-        # Atomic replace, not an in-place truncate-and-write: a mutation that
-        # fails mid-write must leave the previous document intact rather than a
-        # half-serialised plan (issue #296, observation B). This is the same
-        # primitive the MCP plan tools already write through, so the two
-        # surfaces now persist byte-identical documents; the previous
-        # ``write_text`` also translated the serialiser's LF to CRLF on Windows
-        # alone, which ``.gitattributes`` (``*.md text eol=lf``) then undid.
-        atomic_write(path, new_text)
-        # Prove the mutation actually landed before any success-shaped output
-        # is emitted; a divergence raises PlanWriteVerificationError, which
-        # ``render_user_errors`` renders as a one-line error and exit 1.
-        verify_plan_write(path, new_text, plan)
+        # One shared write path: prove the serialisation round-trips in memory,
+        # replace the file atomically rather than truncating in place (issue
+        # #296, observation B), then prove the mutation landed before any
+        # success-shaped output is emitted. A failure at either verification
+        # leaves the document byte-identical - the round-trip guard never
+        # touches the file, and the post-write guard restores the original
+        # bytes (issue #313). A divergence raises PlanWriteVerificationError,
+        # which ``render_user_errors`` renders as a one-line error and exit 1.
+        write_plan_verified(path, new_text, plan, original_text=original_text)
     preserved_count = 0 if canonicalise else len(plan.unknown_blocks)
     if json_output:
         emit_plan_mutation_json(

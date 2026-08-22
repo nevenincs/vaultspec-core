@@ -22,6 +22,7 @@ from vaultspec_core.plan.identifiers import (
     next_available_phase_suffix,
 )
 from vaultspec_core.plan.parser import Phase
+from vaultspec_core.plan.row_contract import validate_intent, validate_title
 
 if TYPE_CHECKING:
     from vaultspec_core.plan.parser import Plan, Wave
@@ -69,10 +70,14 @@ def edit_phase(
 ) -> Phase:
     """Edit the Phase's title and / or intent paragraph."""
     phase = find_phase(plan, phase_id)
-    if title is not None:
-        phase.title = title
-    if intent is not None:
-        phase.intent = intent
+    # Validate both fields before mutating either, so a rejected value cannot
+    # leave the in-memory model carrying a half-applied edit.
+    new_title = None if title is None else validate_title(title, container="Phase")
+    new_intent = None if intent is None else validate_intent(intent, container="Phase")
+    if new_title is not None:
+        phase.title = new_title
+    if new_intent is not None:
+        phase.intent = new_intent
     return phase
 
 
@@ -357,6 +362,8 @@ def add_phase(
     Raises:
         AddPhaseError: When the parent-resolution rule is violated.
     """
+    title = validate_title(title, container="Phase")
+    intent = validate_intent(intent, container="Phase")
     target_wave = _resolve_wave_for_add(plan, wave_id=wave_id)
     canonical_id = next_available_phase(plan)
     parent_wave_id = target_wave.canonical_id if target_wave is not None else None
@@ -386,6 +393,8 @@ def insert_phase(
     after: str | None = None,
 ) -> Phase:
     """Place a Phase at a named document position; parent inferred from anchor."""
+    title = validate_title(title, container="Phase")
+    intent = validate_intent(intent, container="Phase")
     anchor_id = resolve_exactly_one_anchor(
         before, after, op="insert_phase", error=AddPhaseError
     )

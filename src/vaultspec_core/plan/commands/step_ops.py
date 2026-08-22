@@ -22,6 +22,7 @@ from vaultspec_core.plan.display_path import step_display_path
 from vaultspec_core.plan.frontmatter import Tier
 from vaultspec_core.plan.identifiers import next_available_step
 from vaultspec_core.plan.parser import Step
+from vaultspec_core.plan.row_contract import validate_action, validate_scope
 
 if TYPE_CHECKING:
     from vaultspec_core.plan.parser import Phase, Plan
@@ -91,6 +92,8 @@ def add_step(
             (``phase_id`` required but missing at L2+, or ``phase_id``
             does not exist in the plan).
     """
+    action = validate_action(action)
+    scope = validate_scope(scope)
     target_phase = _resolve_phase_for_add(plan, phase_id=phase_id)
     canonical_id = next_available_step(plan)
 
@@ -146,6 +149,8 @@ def insert_step(
         AddStepError: When neither or both of ``before`` / ``after``
             are supplied, or the anchor identifier is not in ``plan``.
     """
+    action = validate_action(action)
+    scope = validate_scope(scope)
     anchor_id = resolve_exactly_one_anchor(
         before, after, op="insert_step", error=AddStepError
     )
@@ -251,10 +256,14 @@ def edit_step(
         StepNotFoundError: When ``step_id`` is not present.
     """
     step = find_step(plan, step_id)
-    if action is not None:
-        step.action = action
-    if scope is not None:
-        step.scope = scope
+    # Validate both fields before mutating either, so a rejected scope cannot
+    # leave the in-memory model carrying a half-applied edit.
+    new_action = None if action is None else validate_action(action)
+    new_scope = None if scope is None else validate_scope(scope)
+    if new_action is not None:
+        step.action = new_action
+    if new_scope is not None:
+        step.scope = new_scope
     return step
 
 

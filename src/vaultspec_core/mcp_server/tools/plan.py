@@ -214,9 +214,12 @@ def _save_plan(
     surface the same unexpected-retirement and growth-ceiling protection the
     CLI enforces, so a serialisation conflict that would silently drop a live
     step surfaces as a whole-call ``isError`` rather than a corrupt write.
-    :func:`~vaultspec_core.plan.write_guard.verify_plan_write` then re-reads
-    the persisted document and proves it carries the mutation, so a write that
-    did not land can never be reported as a successful edit (issue #296).
+    :func:`~vaultspec_core.plan.write_guard.write_plan_verified` then proves
+    the serialisation round-trips, writes it, and re-reads the persisted
+    document to prove it carries the mutation, so a write that did not land
+    can never be reported as a successful edit (issue #296) and a failed
+    verification restores the pre-mutation bytes rather than leaving a
+    half-applied edit behind (issue #313).
 
     Args:
         path: The plan document path.
@@ -235,9 +238,8 @@ def _save_plan(
         PlanWriteVerificationError: When the persisted document does not carry
             the mutation that was applied.
     """
-    from ...core.helpers import atomic_write
     from ...plan.serialiser import serialise_plan
-    from ...plan.write_guard import guard_plan_write, verify_plan_write
+    from ...plan.write_guard import guard_plan_write, write_plan_verified
     from ...vaultcore import refresh_modified_stamp, vault_today
 
     new_text = serialise_plan(plan, canonicalise=False)
@@ -245,8 +247,7 @@ def _save_plan(
     guard_plan_write(original_text, new_text, expected_retired, path_name=path.name)
     if new_text == original_text:
         return False
-    atomic_write(path, new_text)
-    verify_plan_write(path, new_text, plan)
+    write_plan_verified(path, new_text, plan, original_text=original_text)
     return True
 
 
