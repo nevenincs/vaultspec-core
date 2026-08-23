@@ -4,17 +4,13 @@ tags:
   - '#index'
   - '#code-boundary-check'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
-body_hash: 'sha256:506809e34afbfe14263889f7e3a190a74502623f9f013de9f93271fa96393266'
+modified: '2026-08-23'
+body_schema: 'body-v2'
+body_hash: 'sha256:e53230a19a4e5f532cfddf9adaf8092a8fe6a948f61ff0affb2fdecb2e680f05'
 related:
-  - '[[2026-07-16-code-boundary-check-S01]]'
-  - '[[2026-07-16-code-boundary-check-S02]]'
-  - '[[2026-07-16-code-boundary-check-S03]]'
-  - '[[2026-07-16-code-boundary-check-S04]]'
-  - '[[2026-07-16-code-boundary-check-S05]]'
   - '[[2026-07-16-code-boundary-check-adr]]'
   - '[[2026-07-16-code-boundary-check-audit]]'
+  - '[[2026-07-16-code-boundary-check-ledger]]'
   - '[[2026-07-16-code-boundary-check-plan]]'
   - '[[2026-07-16-code-boundary-check-research]]'
 ---
@@ -35,11 +31,7 @@ Auto-generated index of all documents tagged with `#code-boundary-check`.
 
 ### exec
 
-- `2026-07-16-code-boundary-check-S01` - Implement the code-boundary checker module: needle enumeration from vault stems, excluded-dir source walk, decode guard, size cap, WARNING diagnostics
-- `2026-07-16-code-boundary-check-S02` - Add the standalone vault check code-boundary subcommand with --json and --feature following the existing standalone-verb pattern
-- `2026-07-16-code-boundary-check-S03` - Add unit tests covering stem and wiki-link hits, literal-path non-hit, exclusions, feature filter, skip guards, and advisory exit code
-- `2026-07-16-code-boundary-check-S04` - Regenerate the bundled CLI reference and confirm the drift test
-- `2026-07-16-code-boundary-check-S05` - Run the gates and open the PR closing the issue
+- `2026-07-16-code-boundary-check-ledger` - `code-boundary-check` ledger
 
 ### plan
 

@@ -4,17 +4,14 @@ tags:
   - '#index'
   - '#plan-mutation-concurrency'
 date: '2026-08-13'
-modified: '2026-08-13'
-body_schema: 'body-v1'
-body_hash: 'sha256:e1f8d8fb072dabf2e3dc7917008d40a175fc279ab597d13b4a191c7dcbebe361'
+modified: '2026-08-23'
+body_schema: 'body-v2'
+body_hash: 'sha256:ecb3632962e075a52d24774c4753d9ac53b9ba30c0284e5e7cb1544c98301984'
 related:
-  - '[[2026-08-13-plan-mutation-concurrency-P01-S01]]'
-  - '[[2026-08-13-plan-mutation-concurrency-P02-S02]]'
-  - '[[2026-08-13-plan-mutation-concurrency-P02-S03]]'
-  - '[[2026-08-13-plan-mutation-concurrency-P03-S04]]'
   - '[[2026-08-13-plan-mutation-concurrency-P03-summary]]'
   - '[[2026-08-13-plan-mutation-concurrency-adr]]'
   - '[[2026-08-13-plan-mutation-concurrency-audit]]'
+  - '[[2026-08-13-plan-mutation-concurrency-ledger]]'
   - '[[2026-08-13-plan-mutation-concurrency-plan]]'
   - '[[2026-08-13-plan-mutation-concurrency-reference]]'
   - '[[2026-08-13-plan-mutation-concurrency-research]]'
@@ -36,11 +33,8 @@ Auto-generated index of all documents tagged with `#plan-mutation-concurrency`.
 
 ### exec
 
-- `2026-08-13-plan-mutation-concurrency-P01-S01` - Implement the typed per-document plan mutation transaction and focused real-behavior tests
-- `2026-08-13-plan-mutation-concurrency-P02-S02` - Converge CLI plan mutation commands on the shared transaction owner
-- `2026-08-13-plan-mutation-concurrency-P02-S03` - Converge MCP plan edits and add cross-process lost-update regression coverage
-- `2026-08-13-plan-mutation-concurrency-P03-S04` - Run strict ratchets, remediate review findings, and complete PR and issue delivery
 - `2026-08-13-plan-mutation-concurrency-P03-summary` - `plan-mutation-concurrency` `P03` summary
+- `2026-08-13-plan-mutation-concurrency-ledger` - `plan-mutation-concurrency` ledger
 
 ### plan
 

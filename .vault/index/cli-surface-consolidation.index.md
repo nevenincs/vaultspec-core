@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#cli-surface-consolidation'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:1ae44fde57072e69fb0d1ca9731c6c2287d10317cff81cf469551b91e53ff944'
 related:
   - '[[2026-05-17-cli-surface-consolidation-adr]]'

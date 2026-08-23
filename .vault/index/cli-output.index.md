@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#cli-output'
 date: '2026-07-31'
-modified: '2026-08-13'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:4d2e9985b8a4a952fdc6ebd239425e967fe9e25a677c73b33bc7a482ab8c6b62'
 related:
   - '[[2026-02-23-cli-output-architecture-adr]]'

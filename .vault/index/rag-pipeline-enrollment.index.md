@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#rag-pipeline-enrollment'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:b3ddd6a4445f14c0be4cb0f673630f5aba11bb6824ccc31569e98378eb6fc2be'
 related:
   - '[[2026-06-26-rag-pipeline-enrollment-adr]]'

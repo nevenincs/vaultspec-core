@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#vault-check-validators'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:8f1edbf8b66e9fcebfaf8a897196041e9d56a8b7158921ab15b45bfa6eadce78'
 related:
   - '[[2026-07-23-vault-check-validators-adr]]'

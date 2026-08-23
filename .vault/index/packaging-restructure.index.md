@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#packaging-restructure'
 date: '2026-07-31'
-modified: '2026-08-13'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:c7e9cca2f179ed2d392cdbb63d9b5c2fb303dea76611a306cd123398baffe806'
 related:
   - '[[2026-02-21-packaging-restructure-adr]]'

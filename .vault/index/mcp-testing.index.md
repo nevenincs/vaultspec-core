@@ -4,19 +4,15 @@ tags:
   - '#index'
   - '#mcp-testing'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
-body_hash: 'sha256:a58f4b7525601c93c0842560a75c3a17c5d3a371888429c82273b9e2c38efc51'
+modified: '2026-08-23'
+body_schema: 'body-v2'
+body_hash: 'sha256:11b7d516a4e9043624e7841da3f7ddae4e1359f1b4a3edefcd6cb6e84441ef8e'
 related:
   - '[[2026-02-22-mcp-testing-adr]]'
   - '[[2026-02-22-mcp-testing-plan]]'
   - '[[2026-02-22-mcp-testing-research]]'
-  - '[[2026-07-17-mcp-testing-S01]]'
-  - '[[2026-07-17-mcp-testing-S02]]'
-  - '[[2026-07-17-mcp-testing-S03]]'
-  - '[[2026-07-17-mcp-testing-S04]]'
-  - '[[2026-07-17-mcp-testing-S05]]'
   - '[[2026-07-17-mcp-testing-audit]]'
+  - '[[2026-07-17-mcp-testing-ledger]]'
   - '[[2026-07-17-mcp-testing-plan]]'
   - '[[2026-07-17-mcp-testing-research]]'
 ---
@@ -37,11 +33,7 @@ Auto-generated index of all documents tagged with `#mcp-testing`.
 
 ### exec
 
-- `2026-07-17-mcp-testing-S01` - Ground the sweep: inventory both repos' MCP tests and amend the testing decision with the functional assertion floor
-- `2026-07-17-mcp-testing-S02` - Add a raw JSON-RPC serving probe and wire it into the leaked-pipe and parent-pid watchdog e2es so lifecycle asserts count only from a serving server
-- `2026-07-17-mcp-testing-S03` - Upgrade the entrypoint tests: handshake through the stdout-purity queue, EOF exit proven from a serving session, zero-input EOF kept as the documented exception
-- `2026-07-17-mcp-testing-S04` - Hand the rag half to that repo's board with the inventory and the floor spec
-- `2026-07-17-mcp-testing-S05` - Run gates, dispatch code review, resolve findings, append audit entries, open stacked PR
+- `2026-07-17-mcp-testing-ledger` - `mcp-testing` ledger
 
 ### plan
 

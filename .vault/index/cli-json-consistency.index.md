@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#cli-json-consistency'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:64008c32578320f264228e5b737df55a8ff034395669ec11235ae044f217fbfa'
 related:
   - '[[2026-05-17-cli-json-consistency-adr]]'

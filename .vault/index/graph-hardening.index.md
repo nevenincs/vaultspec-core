@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#graph-hardening'
 date: '2026-07-31'
-modified: '2026-08-13'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:c7ac6752d3fc37d3b256a5dd74e47d30c0e1c1e17880f0cccdc9b91129e21be5'
 related:
   - '[[2026-03-22-graph-hardening-adr]]'

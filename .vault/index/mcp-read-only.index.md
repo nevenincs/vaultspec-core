@@ -4,15 +4,13 @@ tags:
   - '#index'
   - '#mcp-read-only'
 date: '2026-08-01'
-modified: '2026-08-01'
-body_schema: 'body-v1'
-body_hash: 'sha256:2074c8c238b2d6da935b1bba5856c44f68884835ae8f89325897c9ca6f420252'
+modified: '2026-08-23'
+body_schema: 'body-v2'
+body_hash: 'sha256:ca98ab3e7a057d06358c8cb8cdd54e899ab912cf8083208f96bb07b01ee67e64'
 related:
-  - '[[2026-08-01-mcp-read-only-S01]]'
-  - '[[2026-08-01-mcp-read-only-S02]]'
-  - '[[2026-08-01-mcp-read-only-S03]]'
   - '[[2026-08-01-mcp-read-only-adr]]'
   - '[[2026-08-01-mcp-read-only-audit]]'
+  - '[[2026-08-01-mcp-read-only-ledger]]'
   - '[[2026-08-01-mcp-read-only-plan]]'
   - '[[2026-08-01-mcp-read-only-research]]'
 ---
@@ -33,9 +31,7 @@ Auto-generated index of all documents tagged with `#mcp-read-only`.
 
 ### exec
 
-- `2026-08-01-mcp-read-only-S01` - `S01` execution record
-- `2026-08-01-mcp-read-only-S02` - `S02` execution record
-- `2026-08-01-mcp-read-only-S03` - `S03` execution record
+- `2026-08-01-mcp-read-only-ledger` - `mcp-read-only` ledger
 
 ### plan
 

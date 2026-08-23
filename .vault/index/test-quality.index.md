@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#test-quality'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:5e6f558c49ea836755e9f72bf4164fa686aec8657e0857b26afa58a141d4cc28'
 related:
   - '[[2026-02-24-scout-beta-report-exec]]'

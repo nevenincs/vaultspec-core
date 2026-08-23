@@ -1,0 +1,146 @@
+---
+tags:
+  - '#exec'
+  - '#firmware-wording-review'
+date: '2026-06-09'
+modified: '2026-08-23'
+body_schema: 'body-v2'
+body_hash: 'sha256:4174ba5cc6126f471297d33cac82380885195bde094e7ba6648cffa59b6979ef'
+related:
+  - "[[2026-06-09-firmware-wording-review-plan]]"
+---
+
+# `firmware-wording-review` ledger
+
+## Changes
+
+- `S01` `T` `src/vaultspec_core/builtins/system/03-vaultspec.md`
+- `S02` `T` `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`
+- `S03` `T` `src/vaultspec_core/builtins/skills/vaultspec-code-research/SKILL.md`
+- `S04` `T` `src/vaultspec_core/builtins/system/03-vaultspec.md`
+- `S05` `T` `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`
+- `S06` `T` `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`
+- `S07` `T` `src/vaultspec_core/builtins/skills/vaultspec-code-review/SKILL.md`
+- `S08` `T` `src/vaultspec_core/builtins/agents/vaultspec-code-reviewer.md`
+- `S09` `T` `src/vaultspec_core/builtins/templates/code-review.md`
+- `S10` `T` `src/vaultspec_core/builtins/system/03-vaultspec.md`
+- `S11` `T` `src/vaultspec_core/builtins/rules/vaultspec-archive-discipline.builtin.md`
+- `S12` `T` `src/vaultspec_core/builtins/rules/vaultspec-dry-run-discipline.builtin.md`
+- `S13` `T` `src/vaultspec_core/builtins/rules/vaultspec-plan-editing-discipline.builtin.md`
+- `S14` `T` `src/vaultspec_core/builtins/rules/vaultspec-plan-editing-discipline.builtin.md`
+- `S15` `T` `src/vaultspec_core/builtins/reference/cli.md`
+- `S16` `T` `src/vaultspec_core/builtins/reference/cli.md`
+- `S17` `T` `src/vaultspec_core/builtins/reference/cli.md`
+- `S18` `T` `src/vaultspec_core/builtins/reference/cli.md`
+- `S19` `T` `src/vaultspec_core/builtins/reference/cli.md`
+- `S20` `T` `src/vaultspec_core/builtins/skills/vaultspec-adr/SKILL.md`
+- `S21` `T` `src/vaultspec_core/builtins/skills/vaultspec-research/SKILL.md`
+- `S22` `T` `src/vaultspec_core/builtins/skills/vaultspec-write/SKILL.md`
+- `S23` `T` `src/vaultspec_core/builtins/skills/vaultspec-code-review/SKILL.md`
+- `S24` `T` `src/vaultspec_core/builtins/skills/vaultspec-code-research/SKILL.md`
+- `S25` `T` `src/vaultspec_core/builtins/skills/vaultspec-curate/SKILL.md`
+- `S26` `T` `src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md`
+- `S27` `T` `src/vaultspec_core/builtins/agents/vaultspec-code-reviewer.md`
+- `S28` `T` `src/vaultspec_core/builtins/agents/vaultspec-adr-researcher.md`
+- `S29` `T` `src/vaultspec_core/builtins/agents/vaultspec-reference-auditor.md`
+- `S30` `T` `src/vaultspec_core/builtins/system/03-vaultspec.md`
+- `S31` `T` `src/vaultspec_core/builtins/agents/vaultspec-project-coordinator.md`
+- `S32` `T` `src/vaultspec_core/builtins/agents/vaultspec-low-executor.md`
+- `S33` `T` `src/vaultspec_core/builtins/agents/vaultspec-low-executor.md`
+- `S34` `T` `src/vaultspec_core`
+- `S35` `T` `src/vaultspec_core/builtins/agents/vaultspec-standard-executor.md`
+- `S36` `T` `src/vaultspec_core/builtins/agents/vaultspec-codifier.md`
+- `S37` `T` `src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md`
+- `S38` `T` `src/vaultspec_core/builtins/agents/vaultspec-reference-auditor.md`
+- `S39` `T` `src/vaultspec_core/builtins/agents/vaultspec-project-coordinator.md`
+- `S40` `T` `src/vaultspec_core/builtins/agents/vaultspec-researcher.md`
+- `S41` `T` `src/vaultspec_core/builtins/agents/vaultspec-writer.md`
+- `S42` `T` `src/vaultspec_core/builtins/agents/vaultspec-low-executor.md`
+- `S43` `T` `src/vaultspec_core/builtins/agents/vaultspec-standard-executor.md`
+- `S44` `T` `src/vaultspec_core/builtins/agents/vaultspec-high-executor.md`
+- `S45` `T` `src/vaultspec_core/builtins/agents/vaultspec-adr-researcher.md`
+- `S46` `T` `src/vaultspec_core/builtins/skills/vaultspec-adr/SKILL.md`
+- `S47` `T` `src/vaultspec_core/builtins/skills/vaultspec-curate/SKILL.md`
+- `S48` `T` `src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md`
+- `S49` `T` `src/vaultspec_core`
+- `S50` `T` `src/vaultspec_core/builtins/templates/ref-audit.md`
+- `S51` `T` `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`
+- `S52` `T` `src/vaultspec_core/builtins/skills/vaultspec-code-research/SKILL.md`
+- `S53` `T` `src/vaultspec_core/builtins/skills/vaultspec-research/SKILL.md`
+- `S54` `T` `src/vaultspec_core/builtins/system/03-vaultspec.md`
+- `S55` `T` `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`
+- `S56` `T` `src/vaultspec_core/builtins/agents/vaultspec-reference-auditor.md`
+- `S57` `T` `src/vaultspec_core/builtins/agents/vaultspec-reference-auditor.md`
+- `S58` `T` `src/vaultspec_core/builtins/templates/plan.md`
+- `S59` `T` `src/vaultspec_core/builtins/templates/plan.md`
+- `S60` `T` `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`
+- `S61` `T` `src/vaultspec_core/builtins/templates/plan.md`
+- `S62` `T` `src/vaultspec_core/builtins/templates/code-review.md`
+- `S63` `T` `src/vaultspec_core/builtins/templates/code-review.md`
+- `S64` `T` `src/vaultspec_core/builtins/templates/exec-step.md`
+- `S65` `T` `src/vaultspec_core/builtins/templates/exec-summary.md`
+- `S66` `T` `src/vaultspec_core/builtins/templates/audit.md`
+- `S67` `T` `src/vaultspec_core/builtins/templates/adr.md`
+- `S68` `T` `src/vaultspec_core/builtins/templates/index.md`
+- `S69` `T` `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`
+- `S70` `T` `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`
+- `S71` `T` `src/vaultspec_core/builtins/templates/adr.md`
+- `S72` `T` `src/vaultspec_core/builtins/templates/audit.md`
+- `S73` `T` `src/vaultspec_core/builtins/templates/code-review.md`
+- `S74` `T` `src/vaultspec_core/builtins/templates/exec-step.md`
+- `S75` `T` `src/vaultspec_core/builtins/templates/exec-summary.md`
+- `S76` `T` `src/vaultspec_core/builtins/templates/plan.md`
+- `S77` `T` `src/vaultspec_core/builtins/templates/reference.md`
+- `S78` `T` `src/vaultspec_core/builtins/templates/research.md`
+- `S79` `T` `src/vaultspec_core/builtins/skills/vaultspec-adr/SKILL.md`
+- `S80` `T` `src/vaultspec_core/builtins/skills/vaultspec-write/SKILL.md`
+- `S81` `T` `src/vaultspec_core/builtins/skills/vaultspec-code-review/SKILL.md`
+- `S82` `T` `src/vaultspec_core/builtins/skills/vaultspec-research/SKILL.md`
+- `S83` `T` `src/vaultspec_core/builtins/templates/adr.md`
+- `S84` `T` `src/vaultspec_core/builtins/templates/exec-step.md`
+- `S85` `T` `src/vaultspec_core/builtins/system/02-operations.md`
+- `S86` `T` `src/vaultspec_core/builtins/system/01-core.md`
+- `S87` `T` `src/vaultspec_core/builtins/agents/vaultspec-codifier.md`
+- `S88` `T` `src/vaultspec_core/builtins/rules/vaultspec-plan-editing-discipline.builtin.md`
+- `S89` `T` `src/vaultspec_core/builtins/rules/vaultspec-codify.builtin.md`
+- `S90` `T` `src/vaultspec_core/builtins/skills/vaultspec-codify/SKILL.md`
+- `S91` `T` `src/vaultspec_core/builtins/agents/vaultspec-codifier.md`
+- `S92` `T` `src/vaultspec_core/builtins/reference/cli.md`
+- `S93` `T` `src/vaultspec_core/builtins/rules/vaultspec-archive-discipline.builtin.md`
+- `S94` `T` `src/vaultspec_core/builtins/rules/vaultspec-codify.builtin.md`
+- `S95` `T` `src/vaultspec_core/builtins/rules/vaultspec-plan-editing-discipline.builtin.md`
+- `S96` `T` `src/vaultspec_core/builtins/skills/vaultspec-execute/SKILL.md`
+- `S97` `T` `src/vaultspec_core/builtins/skills/vaultspec-team/SKILL.md`
+- `S98` `T` `src/vaultspec_core/builtins/skills/vaultspec-write/SKILL.md`
+- `S99` `T` `src/vaultspec_core/builtins/skills/vaultspec-adr/SKILL.md`
+- `S100` `T` `src/vaultspec_core/builtins/skills/vaultspec-research/SKILL.md`
+- `S101` `T` `src/vaultspec_core/builtins/skills/vaultspec-write/SKILL.md`
+- `S102` `T` `src/vaultspec_core/builtins/skills/vaultspec-curate/SKILL.md`
+- `S103` `T` `src/vaultspec_core/builtins/skills/vaultspec-execute/SKILL.md`
+- `S104` `T` `src/vaultspec_core/builtins/rules/vaultspec-plan-editing-discipline.builtin.md`
+- `S105` `T` `src/vaultspec_core/builtins/rules/vaultspec-dry-run-discipline.builtin.md`
+- `S106` `T` `src/vaultspec_core/builtins/rules/vaultspec-dry-run-discipline.builtin.md`
+- `S107` `T` `src/vaultspec_core/builtins/rules/vaultspec-plan-editing-discipline.builtin.md`
+- `S108` `T` `src/vaultspec_core/builtins/system/03-vaultspec.md`
+- `S109` `T` `src/vaultspec_core/builtins/skills/vaultspec-curate/SKILL.md`
+- `S110` `T` `src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md`
+- `S111` `T` `src/vaultspec_core/builtins/agents/vaultspec-writer.md`
+- `S112` `T` `src/vaultspec_core/builtins/rules/vaultspec.builtin.md`
+- `S113` `T` `src/vaultspec_core/builtins/system/03-vaultspec.md`
+- `S114` `T` `src/vaultspec_core/builtins/rules/vaultspec-codify.builtin.md`
+- `S115` `T` `src/vaultspec_core/builtins/skills/vaultspec-codify/SKILL.md`
+- `S116` `T` `src/vaultspec_core/builtins/agents/vaultspec-codifier.md`
+- `S117` `T` `src/vaultspec_core/builtins/skills/vaultspec-documentation/agents/wireframe-agent.md`
+- `S118` `T` `src/vaultspec_core/builtins/skills/vaultspec-documentation/agents/editorial-reviewer.md`
+- `S119` `T` `src/vaultspec_core/builtins/skills/vaultspec-documentation/agents/wireframe-agent.md`
+- `S120` `T` `src/vaultspec_core/builtins/skills/vaultspec-execute/SKILL.md`
+- `S121` `T` `src/vaultspec_core/builtins`
+- `S122` `T` `.vaultspec/rules`
+- `S123` `T` `.vault`
+- `S124` `T` `tests`
+- `S125` `T` `docs/CLI.md`
+- `S125` `T` `docs/framework.md`
+- `S125` `T` `src/vaultspec_core/tests/cli/test_cli_reference_drift.py`
+- `S126` `T` `src/vaultspec_core/vaultcore/hydration.py`
+- `S126` `T` `src/vaultspec_core/vaultcore/tests/test_hydration.py`
+- `S126` `T` `.vault/audit/2026-06-10-firmware-wording-review-audit.md`

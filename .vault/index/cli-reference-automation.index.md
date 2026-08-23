@@ -4,20 +4,15 @@ tags:
   - '#index'
   - '#cli-reference-automation'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
-body_hash: 'sha256:d28335adef2f334105904c81f5a24ac854c99eb171d9f82bcf92af52bc7046ed'
+modified: '2026-08-23'
+body_schema: 'body-v2'
+body_hash: 'sha256:b72976b3253a0d1e3eabb914a7d7797f99862f6d98d37c781d94f8d91dc7f534'
 related:
-  - '[[2026-06-10-cli-reference-automation-P01-S01]]'
-  - '[[2026-06-10-cli-reference-automation-P01-S02]]'
-  - '[[2026-06-10-cli-reference-automation-P01-S03]]'
   - '[[2026-06-10-cli-reference-automation-P01-summary]]'
-  - '[[2026-06-10-cli-reference-automation-P02-S04]]'
-  - '[[2026-06-10-cli-reference-automation-P02-S05]]'
-  - '[[2026-06-10-cli-reference-automation-P02-S06]]'
   - '[[2026-06-10-cli-reference-automation-P02-summary]]'
   - '[[2026-06-10-cli-reference-automation-adr]]'
   - '[[2026-06-10-cli-reference-automation-audit]]'
+  - '[[2026-06-10-cli-reference-automation-ledger]]'
   - '[[2026-06-10-cli-reference-automation-plan]]'
 ---
 
@@ -37,14 +32,9 @@ Auto-generated index of all documents tagged with `#cli-reference-automation`.
 
 ### exec
 
-- `2026-06-10-cli-reference-automation-P01-S01` - Add a removal-milestone marker to the legacy template-name fallback so the ref-audit.md grace path is scheduled for removal one release after the rename, keeping the existing five fallback tests green (REVIEW-005 fallback)
-- `2026-06-10-cli-reference-automation-P01-S02` - Relocate the in-function current-name template mapping to module scope beside \_LEGACY_TEMPLATE_NAMES for symmetry, keeping tests green (REVIEW-005 fallback)
-- `2026-06-10-cli-reference-automation-P01-S03` - Correct the vault add --feature required-marker annotation to match live --help and grep the reference for any other stale required-markers (P03 doc gap)
 - `2026-06-10-cli-reference-automation-P01-summary` - `cli-reference-automation` `P01` summary
-- `2026-06-10-cli-reference-automation-P02-S04` - Produce a decision ADR weighing a Typer-surface auto-generator for the bundled reference against the existing hand-authored-plus-drift-guard approach, deciding whether to build it (D6 deferral)
-- `2026-06-10-cli-reference-automation-P02-S05` - GATED on the ADR deciding build, implement the generator and wire it into the pre-commit and CI surface beside the drift guard, regenerating the bundled reference from the live Typer tree with covering tests (D6 deferral)
-- `2026-06-10-cli-reference-automation-P02-S06` - GATED on the ADR deciding build, document the generator as the canonical reference-update path in the CLI rule (D6 deferral)
 - `2026-06-10-cli-reference-automation-P02-summary` - `cli-reference-automation` `P02` summary
+- `2026-06-10-cli-reference-automation-ledger` - `cli-reference-automation` ledger
 
 ### plan
 

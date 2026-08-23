@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#cli-exec-step-records'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:48ee5c689f85cdd4a41ea69d24718c883c853d74bc45a899db2ec3f8e7cd25ea'
 related:
   - '[[2026-05-17-cli-exec-step-records-adr]]'

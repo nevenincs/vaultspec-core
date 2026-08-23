@@ -4,24 +4,16 @@ tags:
   - '#index'
   - '#upgrade-convergence'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
-body_hash: 'sha256:36860f1d35183c74e1a34b35b67b830102c2490e02549b3e4e7ae023a20103a4'
+modified: '2026-08-23'
+body_schema: 'body-v2'
+body_hash: 'sha256:624a4d3bb6b8a07ba04bbd674028d9a314e1a6c30cee92834bf1c236505268ef'
 related:
-  - '[[2026-07-17-upgrade-convergence-P01-S01]]'
-  - '[[2026-07-17-upgrade-convergence-P01-S02]]'
-  - '[[2026-07-17-upgrade-convergence-P01-S03]]'
-  - '[[2026-07-17-upgrade-convergence-P01-S04]]'
   - '[[2026-07-17-upgrade-convergence-P01-summary]]'
-  - '[[2026-07-17-upgrade-convergence-P02-S05]]'
-  - '[[2026-07-17-upgrade-convergence-P02-S06]]'
-  - '[[2026-07-17-upgrade-convergence-P02-S07]]'
   - '[[2026-07-17-upgrade-convergence-P02-summary]]'
-  - '[[2026-07-17-upgrade-convergence-P03-S08]]'
-  - '[[2026-07-17-upgrade-convergence-P03-S09]]'
   - '[[2026-07-17-upgrade-convergence-P03-summary]]'
   - '[[2026-07-17-upgrade-convergence-adr]]'
   - '[[2026-07-17-upgrade-convergence-audit]]'
+  - '[[2026-07-17-upgrade-convergence-ledger]]'
   - '[[2026-07-17-upgrade-convergence-plan]]'
   - '[[2026-07-17-upgrade-convergence-research]]'
 ---
@@ -42,18 +34,10 @@ Auto-generated index of all documents tagged with `#upgrade-convergence`.
 
 ### exec
 
-- `2026-07-17-upgrade-convergence-P01-S01` - Open feature branch and draft PR referencing the convergence mandate and the governing decision
-- `2026-07-17-upgrade-convergence-P01-S02` - Add fingerprint-verified refresh to the managed-entry merge with old-to-new narrated warning lines and a refresh item label
-- `2026-07-17-upgrade-convergence-P01-S03` - Widen the upgrade mode-flip force seam from core-only to every package declared in the workspace map
-- `2026-07-17-upgrade-convergence-P01-S04` - Cover untouched-entry refresh, hand-edited preservation, name-only legacy sidecar, and companion seam with real-workspace tests
 - `2026-07-17-upgrade-convergence-P01-summary` - `upgrade-convergence` `P01` summary
-- `2026-07-17-upgrade-convergence-P02-S05` - Register the launch-shape convergence migration invoking mcp_sync per enrolled provider, idempotent against the refresh path
-- `2026-07-17-upgrade-convergence-P02-S06` - Add warn-only doctor advisories for unrefreshable prek.toml hooks and stale static companion seeds with remediation hints
-- `2026-07-17-upgrade-convergence-P02-S07` - Cover migration idempotence on both modes and both advisories with real-workspace tests
 - `2026-07-17-upgrade-convergence-P02-summary` - `upgrade-convergence` `P02` summary
-- `2026-07-17-upgrade-convergence-P03-S08` - Reconcile doctor hints, sync summaries, and the MCP doc convergence passage with the automatic behavior, exceptions, and opt-outs
-- `2026-07-17-upgrade-convergence-P03-S09` - Run gates, dispatch code review, resolve findings, append audit entries, dogfood convergence on this workspace, finalize PR
 - `2026-07-17-upgrade-convergence-P03-summary` - `upgrade-convergence` `P03` summary
+- `2026-07-17-upgrade-convergence-ledger` - `upgrade-convergence` ledger
 
 ### plan
 

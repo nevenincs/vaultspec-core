@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#cli-target-refactor'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:2070a65f2ec32dbcf59a8d8b1c375ddc708a7f4e54946521e8467cb0cad88368'
 related:
   - '[[2026-03-05-cli-target-refactor-phase0-step1-exec]]'

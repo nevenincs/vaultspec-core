@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#system-prompt'
 date: '2026-07-31'
-modified: '2026-08-13'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:738a2a3d87c4a33ab621a60119cc95cf30bf637f20b1ad3e74e958a0ab134dba'
 related:
   - '[[2026-02-18-append-system-prompt-adr]]'

@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#vault-index-folder'
 date: '2026-07-31'
-modified: '2026-08-13'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:c88103bfc0467ce017fa29d5e5d995e526bbd6c97f69c622b3a392dd6a35bca8'
 related:
   - '[[2026-04-30-vault-index-folder-adr]]'

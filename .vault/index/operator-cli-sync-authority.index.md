@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#operator-cli-sync-authority'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:f67ea2d73fd07b8fe64f69623c1eb065df893cc645f0bf0067e4ba06fa1d2527'
 related:
   - '[[2026-05-15-operator-cli-sync-authority-adr]]'

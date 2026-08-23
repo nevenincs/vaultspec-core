@@ -4,22 +4,13 @@ tags:
   - '#index'
   - '#cli-usage-analytics'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
-body_hash: 'sha256:e1c9b5aac1c76c7c9dc4886d5f070872036c1bf5271a7088f2be50d72e37f060'
+modified: '2026-08-23'
+body_schema: 'body-v2'
+body_hash: 'sha256:080a4b86320e7c8e57d43f5d7ee9e6a8fd1cc9524aa6fde2bc600caf8c081526'
 related:
-  - '[[2026-07-09-cli-usage-analytics-P05-S15]]'
-  - '[[2026-07-09-cli-usage-analytics-P05-S16]]'
-  - '[[2026-07-09-cli-usage-analytics-P05-S17]]'
-  - '[[2026-07-09-cli-usage-analytics-P05-S18]]'
-  - '[[2026-07-09-cli-usage-analytics-P05-S19]]'
-  - '[[2026-07-09-cli-usage-analytics-P05-S20]]'
-  - '[[2026-07-09-cli-usage-analytics-P05-S21]]'
-  - '[[2026-07-09-cli-usage-analytics-P05-S22]]'
-  - '[[2026-07-09-cli-usage-analytics-P05-S23]]'
-  - '[[2026-07-09-cli-usage-analytics-P05-S24]]'
   - '[[2026-07-09-cli-usage-analytics-adr]]'
   - '[[2026-07-09-cli-usage-analytics-audit]]'
+  - '[[2026-07-09-cli-usage-analytics-ledger]]'
   - '[[2026-07-09-cli-usage-analytics-plan]]'
   - '[[2026-07-09-cli-usage-analytics-research]]'
 ---
@@ -40,16 +31,7 @@ Auto-generated index of all documents tagged with `#cli-usage-analytics`.
 
 ### exec
 
-- `2026-07-09-cli-usage-analytics-P05-S15` - Implement the verb-hotspots metric as a pure function counting each (verb, subcommand) leaf over the CallRecord stream
-- `2026-07-09-cli-usage-analytics-P05-S16` - Implement the command-and-flag n-gram metric as a pure function over the canonical flag and token sequence
-- `2026-07-09-cli-usage-analytics-P05-S17` - Implement the features-utilized metric as a pure function intersecting distinct (verb, subcommand) pairs with the capability inventory
-- `2026-07-09-cli-usage-analytics-P05-S18` - Implement the feature-tag-usage metric as a pure function distributing --feature and -f values
-- `2026-07-09-cli-usage-analytics-P05-S19` - Implement the tool-call-misses metric as a pure function sequencing records by retry_key to separate corrected retries and genuine misses from by-design non-zero exits
-- `2026-07-09-cli-usage-analytics-P05-S20` - Implement the overuse-and-dead-surface metric as a pure function comparing observed counts against the declared-capability denominator
-- `2026-07-09-cli-usage-analytics-P05-S21` - Implement the token-and-turn-cost-per-class metric as a pure function grouping cost by verb class
-- `2026-07-09-cli-usage-analytics-P05-S22` - Implement the report renderers writing records.jsonl as the full CallRecord stream and report.md as the seven metric families, both aggregates and hashes only with no raw command bodies
-- `2026-07-09-cli-usage-analytics-P05-S23` - Implement the python -m statistic entrypoint wiring source discovery, normalization, metrics, and report rendering into the full pipeline
-- `2026-07-09-cli-usage-analytics-P05-S24` - Run python -m statistic over the operator in-window corpus and verify it emits the real records.jsonl and report.md into gitignored statistic/out/
+- `2026-07-09-cli-usage-analytics-ledger` - `cli-usage-analytics` ledger
 
 ### plan
 

@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#cli-next-step-hints'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:d4d68d4b2e54b8b5ac4ad06d5599a106a83d6d0720739fe275554ebb7de6cb75'
 related:
   - '[[2026-05-17-cli-next-step-hints-adr]]'

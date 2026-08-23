@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#cli-architecture'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:4079ece3f20479da5e654412c01d618301c8bdb4ec90334cc6257fa3c1aeae76'
 related:
   - '[[2026-03-05-cli-architecture-audit]]'

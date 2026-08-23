@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#pre-existing-tests'
 date: '2026-07-31'
-modified: '2026-08-13'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:77fec108433fb8676bf887af96f8fb211a480f254025062aa239f52b4e10a047'
 related:
   - '[[2026-05-01-pre-existing-tests-adr]]'

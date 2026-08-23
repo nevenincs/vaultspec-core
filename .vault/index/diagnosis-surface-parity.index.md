@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#diagnosis-surface-parity'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:a48859d78aa47c6ca964fc9c383038b09bd57372388d49e261590a30a49c390e'
 related:
   - '[[2026-06-28-diagnosis-surface-parity-adr]]'

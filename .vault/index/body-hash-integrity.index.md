@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#body-hash-integrity'
 date: '2026-08-13'
-modified: '2026-08-13'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:6ff73f1dd220b2e5df58f871182b9b46d4b61958677f75338f6544e4838894dd'
 related:
   - '[[2026-08-13-body-hash-integrity-audit]]'

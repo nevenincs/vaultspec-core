@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#clci-release'
 date: '2026-07-31'
-modified: '2026-08-13'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:0324c215187f5a2b06d86c4748c2263ba7bdba41129c6ee66b3daed005f5fb9f'
 related:
   - '[[2026-03-22-clci-release-adr]]'

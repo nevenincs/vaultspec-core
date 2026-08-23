@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#feature-documentation'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:3ef13348505fcaa36d934b1bd3128034809e44ba3f135c368b83b4d88e6a60d9'
 related:
   - '[[2026-03-21-cli-release-readiness-audit]]'

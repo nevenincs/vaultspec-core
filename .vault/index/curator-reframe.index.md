@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#curator-reframe'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:b132f513c35cbc92ceb04fba5e4cf7eafe1e4324a05270cef11cf457a711fa6d'
 related:
   - '[[2026-06-28-curator-reframe-adr]]'

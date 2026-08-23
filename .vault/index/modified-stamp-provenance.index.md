@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#modified-stamp-provenance'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:8fb82bedf007dab043cf2a8a072288d798fd53de795b4b3b2f8e307652493b8f'
 related:
   - '[[2026-07-30-modified-stamp-provenance-adr]]'

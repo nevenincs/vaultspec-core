@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#mcp-cli-interface'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:4d965622ffecf735994374f3366460e827ad9dc2392a8d0e63ed6110c773b766'
 related:
   - '[[2026-03-11-mcp-cli-interface-audit]]'

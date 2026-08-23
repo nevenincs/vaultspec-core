@@ -4,21 +4,15 @@ tags:
   - '#index'
   - '#adr-topic-infix'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
-body_hash: 'sha256:2bc9b6106c9fc8d97987fc0b1420744301381c9b2487bc442edbafeb63d89c7a'
+modified: '2026-08-23'
+body_schema: 'body-v2'
+body_hash: 'sha256:96bb56c40bf5659258644b389efd2acaef20ae10f61108e72a0b24bf1d5530d2'
 related:
-  - '[[2026-07-27-adr-topic-infix-P01-S01]]'
-  - '[[2026-07-27-adr-topic-infix-P01-S02]]'
-  - '[[2026-07-27-adr-topic-infix-P01-S03]]'
   - '[[2026-07-27-adr-topic-infix-P01-summary]]'
-  - '[[2026-07-27-adr-topic-infix-P02-S04]]'
-  - '[[2026-07-27-adr-topic-infix-P02-S05]]'
-  - '[[2026-07-27-adr-topic-infix-P02-S06]]'
-  - '[[2026-07-27-adr-topic-infix-P02-S07]]'
   - '[[2026-07-27-adr-topic-infix-P02-summary]]'
   - '[[2026-07-27-adr-topic-infix-adr]]'
   - '[[2026-07-27-adr-topic-infix-audit]]'
+  - '[[2026-07-27-adr-topic-infix-ledger]]'
   - '[[2026-07-27-adr-topic-infix-plan]]'
   - '[[2026-07-27-adr-topic-infix-reference]]'
   - '[[2026-07-27-adr-topic-infix-research]]'
@@ -40,15 +34,9 @@ Auto-generated index of all documents tagged with `#adr-topic-infix`.
 
 ### exec
 
-- `2026-07-27-adr-topic-infix-P01-S01` - Extend the shared topic-infix admission set to ADR documents
-- `2026-07-27-adr-topic-infix-P01-S02` - Align CLI topic validation and help text with ADR admission
-- `2026-07-27-adr-topic-infix-P01-S03` - Align MCP topic schema and validation with ADR admission
 - `2026-07-27-adr-topic-infix-P01-summary` - `adr-topic-infix` `P01` summary
-- `2026-07-27-adr-topic-infix-P02-S04` - Cover direct scaffolder creation and duplicate rejection for topic-infixed ADRs
-- `2026-07-27-adr-topic-infix-P02-S05` - Cover CLI creation of two same-day topic-infixed ADRs
-- `2026-07-27-adr-topic-infix-P02-S06` - Cover MCP creation of topic-infixed ADRs in a mixed batch
-- `2026-07-27-adr-topic-infix-P02-S07` - Revise the owned topic-infix rule and regenerate its published reference
 - `2026-07-27-adr-topic-infix-P02-summary` - `adr-topic-infix` `P02` summary
+- `2026-07-27-adr-topic-infix-ledger` - `adr-topic-infix` ledger
 
 ### plan
 

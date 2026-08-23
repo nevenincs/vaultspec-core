@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#cli-scaffolder-integrity'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:266a22b943b091d0e821d51ac416558b26fa95d3bf67c1309c4646da8270fad3'
 related:
   - '[[2026-05-17-cli-scaffolder-integrity-adr]]'
