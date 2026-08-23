@@ -34,7 +34,6 @@ __all__ = [
     "Step",
     "UnknownBlock",
     "Wave",
-    "carries_live_structure",
     "mask_html_comments",
     "mask_html_comments_text",
     "parse_plan",
@@ -265,23 +264,6 @@ def mask_html_comments(lines: list[str]) -> list[str]:
 def mask_html_comments_text(source_text: str) -> str:
     """Return *source_text* with HTML comment spans blanked, line count intact."""
     return "\n".join(mask_html_comments(source_text.splitlines()))
-
-
-def carries_live_structure(source_text: str) -> bool:
-    """Return whether *source_text* holds a container or row outside its comments.
-
-    Distinguishes a plan that was never populated from one whose structure was
-    lost. The two look identical in the parsed model - both hold no Wave, Phase
-    or Step - but only the second is a symptom of a destructive round trip, and
-    a caller deciding whether to refuse a rewrite needs to tell them apart
-    (issue #313).
-    """
-    return any(
-        _RE_WAVE_HEADING.match(line)
-        or _RE_PHASE_HEADING.match(line)
-        or _RE_STEP_ROW.match(line)
-        for line in mask_html_comments(source_text.splitlines())
-    )
 
 
 # ---- Public entry point -----------------------------------------------------
