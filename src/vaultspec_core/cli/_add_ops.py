@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import replace
-from typing import TYPE_CHECKING, NoReturn
+from typing import TYPE_CHECKING, NoReturn, cast
 
 import typer
 
@@ -679,7 +679,15 @@ def fold_exec_records(
         raw = meta.get("step_id")
         step_id = str(raw).strip() if raw else None
         records.append((path, step_id, body))
-        for link in meta.get("related", []) or []:
+        # Frontmatter is untyped JSON-ish data, so the related list is
+        # narrowed explicitly rather than iterated as Any.
+        raw_related: object = meta.get("related")
+        related: tuple[object, ...] = (
+            tuple(cast("list[object]", raw_related))
+            if isinstance(raw_related, list)
+            else ()
+        )
+        for link in related:
             stem = link_stem(str(link))
             if stem and stem.endswith("-plan"):
                 plan_stems.append(stem)
