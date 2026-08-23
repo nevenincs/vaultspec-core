@@ -44,6 +44,9 @@ _EXPECTED_DATA_KEYS = frozenset(
         # cannot tell a small graph from a truncated one.
         "derived_edges_total",
         "derived_edges_truncated",
+        # Present whenever the derived set is windowed, so a caller paging
+        # through it knows how many rows this page carries.
+        "derived_edges_returned",
     }
 )
 

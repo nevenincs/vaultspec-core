@@ -1183,6 +1183,8 @@ class VaultGraph:
         node: str | None = None,
         depth: int = 1,
         include_derived: bool = True,
+        derived_limit: int | None = None,
+        derived_offset: int = 0,
     ) -> dict[str, Any]:
         """Return the graph as a JSON-serialisable dictionary.
 
@@ -1222,6 +1224,8 @@ class VaultGraph:
             node=node,
             depth=depth,
             include_derived=include_derived,
+            derived_limit=derived_limit,
+            derived_offset=derived_offset,
         )
 
     def to_json(

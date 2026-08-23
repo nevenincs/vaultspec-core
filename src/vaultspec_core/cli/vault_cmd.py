@@ -652,6 +652,13 @@ def cmd_graph(
             ),
         ),
     ] = False,
+    derived_limit: Annotated[
+        int | None,
+        typer.Option("--derived-limit", help="Maximum derived edges to return"),
+    ] = None,
+    derived_offset: Annotated[
+        int, typer.Option("--derived-offset", help="Derived edges to skip, for paging")
+    ] = 0,
     ref: Annotated[
         str | None,
         typer.Option(
@@ -755,6 +762,8 @@ def cmd_graph(
                 node=node,
                 depth=depth,
                 include_derived=derived,
+                derived_limit=derived_limit,
+                derived_offset=derived_offset,
             ),
             version=2,
         )
