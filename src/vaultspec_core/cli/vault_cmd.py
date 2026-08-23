@@ -50,9 +50,22 @@ from vaultspec_core.cli._target import TargetOption, apply_target
 # One consequence of registering by import: the order above is the order ruff
 # sorts these module names into, which today happens to match the order the
 # old explicit `register_*(app)` calls used. A new sibling module whose name
-# sorts differently would therefore re-order `vault --help` and the generated
-# reference. If that comes up, pin the order deliberately rather than relying
-# on the sort.
+# sorts differently would therefore re-order `vault --help`.
+#
+# That order is contractual, and it is already enforced - no separate test is
+# needed for it. `reference_gen` renders the command inventory in registration
+# order deliberately ("registration order (not alphabetical) is preserved"),
+# and `tests/cli/test_cli_reference_generated.py` byte-compares the committed
+# reference against fresh generator output. So a re-order fails CI even when
+# the command set is identical: moving one command ahead of another, changing
+# nothing else, fails four tests in that module. Verified by doing exactly
+# that and watching them fail.
+#
+# The practical consequence for a contributor adding a sibling module: if the
+# import sort lands it somewhere that shifts the listing, CI will say so, and
+# the fix is to regenerate the reference (`vaultspec-core spec reference
+# generate`) and commit it - accepting the new order - or to place the import
+# so the old order holds. What cannot happen is the listing changing silently.
 #
 # The imports sit at module level rather than at the bottom of the file behind
 # an E402 exemption: with `vault_cmd_app` owning the apps there is no longer a
