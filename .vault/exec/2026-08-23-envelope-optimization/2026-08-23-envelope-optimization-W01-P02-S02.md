@@ -10,6 +10,7 @@ step_id: 'S02'
 related:
   - "[[2026-08-23-envelope-optimization-plan]]"
 ---
+
 # Return an explicit result object carrying a summary text block so the transport stops emitting a second copy
 
 ## Scope
@@ -32,12 +33,12 @@ related:
 Measured against the 10,476-document benchmark corpus. Totals are text bytes plus structured
 bytes on the same call.
 
-| call | before | after | reduction |
-| --- | --- | --- | --- |
-| orientation rollup | 274,751 | 115,011 | 58.1% |
-| health check | 883,863 | 402,967 | 54.4% |
-| document search, default | 10,778 | 4,802 | 55.4% |
-| document search, one type, twenty rows | 25,638 | 12,232 | 52.3% |
+| call                                   | before  | after   | reduction |
+| -------------------------------------- | ------- | ------- | --------- |
+| orientation rollup                     | 274,751 | 115,011 | 58.1%     |
+| health check                           | 883,863 | 402,967 | 54.4%     |
+| document search, default               | 10,778  | 4,802   | 55.4%     |
+| document search, one type, twenty rows | 25,638  | 12,232  | 52.3%     |
 
 Text blocks on a twenty-row search fell from twenty to one, and the duplicate share is zero on
 every call measured.

@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import networkx as nx
 
@@ -355,7 +355,7 @@ def _dominant_kind(signals: dict[str, float]) -> str:
 def _candidate_pairs(
     graph: VaultGraph,
     reals: list[str],
-    undirected: nx.Graph,  # pyright: ignore[reportMissingTypeArgument]
+    undirected: NetworkXGraph,
     reciprocity: set[frozenset[str]],
     co_citation: dict[frozenset[str], int],
 ) -> list[tuple[str, str]]:
@@ -399,9 +399,11 @@ def _candidate_pairs(
     # Shared-neighbour pairs: the only ones where jaccard or adamic-adar can be
     # non-zero. A node of degree d contributes C(d, 2) pairs, so this is bounded
     # by the graph's actual connectivity rather than by its size.
-    for hub in list(undirected.nodes):
+    for hub in cast("list[str]", list(undirected.nodes)):
         neighbours: list[str] = sorted(
-            n for n in undirected.neighbors(hub) if n in in_scope
+            n
+            for n in cast("list[str]", list(undirected.neighbors(hub)))
+            if n in in_scope
         )
         for i, u in enumerate(neighbours):
             for v in neighbours[i + 1 :]:

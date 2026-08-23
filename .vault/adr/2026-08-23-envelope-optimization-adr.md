@@ -9,6 +9,7 @@ body_hash: 'sha256:f6bf0189114dd2c853eb596d2f0c145027bea76ec6d9006c42e49a17a1d43
 related:
   - "[[2026-08-23-envelope-optimization-research]]"
 ---
+
 # `envelope-optimization` adr: `Bounded return envelopes and the context budget ladder` | (**status:** `accepted`)
 
 ## Problem Statement

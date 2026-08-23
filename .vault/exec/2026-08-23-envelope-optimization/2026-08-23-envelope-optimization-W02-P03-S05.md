@@ -10,6 +10,7 @@ step_id: 'S05'
 related:
   - "[[2026-08-23-envelope-optimization-plan]]"
 ---
+
 # Apply elision to the payload ahead of the format branch and derive the human summary line from it
 
 ## Scope
@@ -35,11 +36,11 @@ diagnose.
 
 Measured on a 10,476-document vault with five percent of documents damaged:
 
-| stage | payload |
-| --- | --- |
-| before | 2,550,136 bytes |
-| after bounding the sections | 166,140 bytes |
-| after bounding the nested collections and removing the duplicate phase | 115,167 bytes |
+| stage                                                                  | payload         |
+| ---------------------------------------------------------------------- | --------------- |
+| before                                                                 | 2,550,136 bytes |
+| after bounding the sections                                            | 166,140 bytes   |
+| after bounding the nested collections and removing the duplicate phase | 115,167 bytes   |
 
 A cumulative reduction of 95.5%. On the smaller 1,229-document fixture, 149,214 to 57,645 bytes.
 

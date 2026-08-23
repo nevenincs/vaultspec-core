@@ -8,6 +8,7 @@ body_schema: 'body-v1'
 body_hash: 'sha256:d8b392f80e80b60ed15bfcbfbdf492aa7178b57a8c59ea60941f2cb56c45d790'
 related: []
 ---
+
 # `envelope-optimization` research: `MCP and CLI return-envelope saturation audit`
 
 vaultspec-core sits in an agentic LLM coding pipeline, so every MCP tool result and CLI
@@ -41,14 +42,14 @@ O(matches) with no cap, and exactly one (`status`) accepts a `--limit`.
 Against 1,222 documents unless stated. Ratio is JSON bytes over the human form of the same
 invocation.
 
-| command | JSON bytes | human bytes | ratio | scaling |
-| --- | --- | --- | --- | --- |
-| `vault graph --metrics` | 11,175,730 | 4,794 | 2331x | quadratic |
-| `vault graph` | 11,175,729 | 77,056 | 145x | quadratic |
-| `vault list` | 510,855 | 96,078 | 5.3x | linear in documents |
-| `status` | 60,001 | 5,166 | 11.6x | linear in features |
-| `vault feature list` | 39,400 | 9,742 | 4.0x | linear in features |
-| `vault check all` (clean vault) | 6,962 | 1,427 | 4.9x | linear in diagnostics |
+| command                         | JSON bytes | human bytes | ratio | scaling               |
+| ------------------------------- | ---------- | ----------- | ----- | --------------------- |
+| `vault graph --metrics`         | 11,175,730 | 4,794       | 2331x | quadratic             |
+| `vault graph`                   | 11,175,729 | 77,056      | 145x  | quadratic             |
+| `vault list`                    | 510,855    | 96,078      | 5.3x  | linear in documents   |
+| `status`                        | 60,001     | 5,166       | 11.6x | linear in features    |
+| `vault feature list`            | 39,400     | 9,742       | 4.0x  | linear in features    |
+| `vault check all` (clean vault) | 6,962      | 1,427       | 4.9x  | linear in diagnostics |
 
 Against the 10,476-document corpus: `status --json` 259,453 bytes, `vault list --json`
 5,934,668 bytes, `vault feature list --json` 199,581 bytes. `vault graph --json` did not

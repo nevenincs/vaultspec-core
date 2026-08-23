@@ -10,6 +10,7 @@ step_id: 'S20'
 related:
   - "[[2026-08-23-envelope-optimization-plan]]"
 ---
+
 # Build the vault graph once and reuse it across features in the index preview
 
 ## Scope
@@ -29,11 +30,11 @@ The preview built a fresh, cache-disabled vault graph — a full parse of every 
 per feature, giving a cost proportional to features multiplied by documents. On a
 1,229-document vault with 130 features that is 159,770 document parses.
 
-| corpus | before | after |
-| --- | --- | --- |
-| 1,229 documents, 130 features | 115,100 ms | 3,350 ms |
-| 2,500 documents, 405 features | 865,900 ms | measured linear thereafter |
-| 10,476 documents, 660 features | killed at 600,000 ms, no output | 20,495 ms |
+| corpus                         | before                          | after                      |
+| ------------------------------ | ------------------------------- | -------------------------- |
+| 1,229 documents, 130 features  | 115,100 ms                      | 3,350 ms                   |
+| 2,500 documents, 405 features  | 865,900 ms                      | measured linear thereafter |
+| 10,476 documents, 660 features | killed at 600,000 ms, no output | 20,495 ms                  |
 
 Three independent methods agreed on the cause before anything was changed. Profiling put 97.8%
 of wall clock in the preview stage. An ablation that skips the stage and runs everything else

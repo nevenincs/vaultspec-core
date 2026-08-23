@@ -44,7 +44,6 @@ body_hash: 'sha256:284ab98584de9f8df48a9efe19a81fe4cd0c50e12d7e1d35881e74f20883c
      DO NOT add fields beyond those scaffolded; metadata lives
      only in the frontmatter. -->
 
-
 <!-- HIERARCHY AND TIERS:
      Epic > Wave > Phase > Step. Step is the canonical leaf-row
      noun. Execution Record artifact: <Step Record>.

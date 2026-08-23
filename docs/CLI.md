@@ -940,6 +940,8 @@ List vault documents.
 - `--feature TAG` (`-f`) - Filter by feature tag.
 - `--date DATE` - Filter by date.
 - `--json` (default off) - Emit machine-readable output.
+- `--limit N` (default 50) - Maximum documents to return.
+- `--offset N` (default 0) - Documents to skip, for paging.
 
 #### Examples
 
@@ -996,8 +998,11 @@ Outputs a hierarchical tree grouped by feature and type.
 - `--body` (default off) - Include document body in JSON output.
 - `--node STEM` - Scope JSON to a node's local (ego) neighbourhood.
 - `--depth N` (default 1) - Ego-graph radius in hops; only used with --node.
-- `--derived/--no-derived` (default on) - Include the derived relatedness edge set in
+- `--derived/--no-derived` (default off) - Include the derived relatedness edge set in
   JSON.
+- `--derived-limit N` (default none) - Maximum derived edges to return. The per-node
+  fan-out cap bounds edges per node, not the total.
+- `--derived-offset N` (default 0) - Derived edges to skip, for paging.
 - `--ref REF` - Read the vault corpus from this git ref (branch, tag, or commit) through
   the object database, without checking it out into the working tree.
 
@@ -1086,6 +1091,8 @@ and machine-owned comments such as retired plan markers.
 - `--dry-run` (default off) - Preview annotation removals.
 - `--verbose` (`-v`, default off) - Show stripped files.
 - `--json` (default off) - Emit machine-readable check payloads.
+- `--limit N` (default 50) - Maximum findings to return.
+- `--offset N` (default 0) - Findings to skip, for paging.
 
 #### Examples
 
@@ -1433,6 +1440,9 @@ Run health checks on `.vault/`. Exits with code `1` if errors are found.
 - `--feature TAG` (`-f`) - Limit to a specific feature.
 - `--verbose` (`-v`, default off) - Show INFO-level diagnostics.
 - `--json` (default off) - Emit machine-readable output.
+- `--limit N` (default 50) - Maximum findings to return per check. The per-check and
+  aggregate counts are never windowed, so severity totals stay exact on any page.
+- `--offset N` (default 0) - Findings to skip, for paging.
 
 `vaultspec-core vault check all` additionally accepts `--no-hints` to suppress the
 next-step advisory hints it prints after a run.

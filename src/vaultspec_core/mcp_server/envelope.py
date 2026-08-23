@@ -46,7 +46,7 @@ from __future__ import annotations
 import functools
 import inspect
 import re
-from typing import TYPE_CHECKING, Any, ParamSpec, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ParamSpec, Protocol, TypeVar, cast, override
 
 from mcp.types import CallToolResult, TextContent
 from pydantic import BaseModel, GetJsonSchemaHandler
@@ -136,6 +136,7 @@ class LeanModel(BaseModel):
     docstrings stay in the source, where the maintainer needs them.
     """
 
+    @override
     @classmethod
     def __get_pydantic_json_schema__(
         cls, core_schema: Any, handler: GetJsonSchemaHandler

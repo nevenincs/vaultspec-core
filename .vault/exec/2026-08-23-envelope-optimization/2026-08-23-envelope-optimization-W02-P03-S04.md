@@ -10,6 +10,7 @@ step_id: 'S04'
 related:
   - "[[2026-08-23-envelope-optimization-plan]]"
 ---
+
 # Define the bounded envelope vocabulary carrying returned, total, truncated and next offset
 
 ## Scope

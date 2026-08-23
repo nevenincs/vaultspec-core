@@ -10,6 +10,7 @@ step_id: 'S03'
 related:
   - "[[2026-08-23-envelope-optimization-plan]]"
 ---
+
 # Route every CLI envelope through one emitter using compact separators, with pretty output opt-in
 
 ## Scope
@@ -31,13 +32,13 @@ related:
 
 Measured against the 10,476-document benchmark corpus.
 
-| command | before | after | cut |
-| --- | --- | --- | --- |
-| document listing | 5,934,666 | 4,719,452 | 20.5% |
-| health check, all | 653,418 | 490,743 | 24.9% |
-| orientation rollup | 259,451 | 168,377 | 35.1% |
-| feature listing | 199,579 | 111,383 | 44.2% |
-| vault statistics | 384 | 261 | 32.0% |
+| command            | before    | after     | cut   |
+| ------------------ | --------- | --------- | ----- |
+| document listing   | 5,934,666 | 4,719,452 | 20.5% |
+| health check, all  | 653,418   | 490,743   | 24.9% |
+| orientation rollup | 259,451   | 168,377   | 35.1% |
+| feature listing    | 199,579   | 111,383   | 44.2% |
+| vault statistics   | 384       | 261       | 32.0% |
 
 The share rises with nesting depth, so the payloads least able to afford the surcharge were
 paying the most of it. Every command now sits at its theoretical compact floor plus the

@@ -10,6 +10,7 @@ step_id: 'S01'
 related:
   - "[[2026-08-23-envelope-optimization-plan]]"
 ---
+
 # Serialise the tool definition in the true wire form and add a read-only ceiling
 
 ## Scope
