@@ -1,17 +1,26 @@
 """Vault feature-tag verbs  - list, index, archive, unarchive, and rename.
 
-Registers the ``vaultspec-core vault feature ...`` subcommands (mounted on
-:data:`vaultspec_core.cli.vault_cmd.feature_app`). Split out of
+Defines the ``vaultspec-core vault feature ...`` subcommands, mounted directly
+onto :data:`vaultspec_core.cli.vault_cmd_app.feature_app`. Split out of
 :mod:`vaultspec_core.cli.vault_cmd` to keep that module under the project's
 line-count ceiling; all commands re-export through ``vault_cmd`` so no
 import site outside the package changes. All backend logic lives in
 :mod:`vaultspec_core.vaultcore.query` and :mod:`vaultspec_core.vaultcore.index`.
 
-Each ``@feature_app.command`` closure below is a thin Typer-parsed shim: it
+Each ``@feature_app.command`` function below is a thin Typer-parsed shim: it
 only exists to carry the CLI ``Annotated`` option metadata. The command body
 lives in a module-level ``_run_feature_*`` function (plus small ``_emit_*``/
 ``_print_*`` helpers for the JSON envelope and text-rendering branches), kept
 top-level rather than nested so it is scored, read, and tested on its own.
+
+The commands decorate at module level rather than inside a ``register_*(app)``
+wrapper, which is what lets them be ordinary module functions. Under the old
+wrapper each command was a closure nothing called, which ``basedpyright``
+reported as ``reportUnusedFunction`` and which was answered by an inline
+``# pyright: ignore`` on every command - suppressions this project otherwise
+bans. Importing the app from :mod:`vaultspec_core.cli.vault_cmd_app` removes
+the cycle the wrapper existed to dodge, so the suppressions stop being
+necessary instead of being silenced.
 """
 
 from __future__ import annotations
@@ -22,11 +31,10 @@ import typer
 
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
+from vaultspec_core.cli.vault_cmd_app import feature_app
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    import typer as _typer
 
     from vaultspec_core.vaultcore.query import (
         FeatureArchiveResult,
@@ -35,7 +43,13 @@ if TYPE_CHECKING:
         FeatureUnarchiveResult,
     )
 
-__all__ = ["register_feature_commands"]
+__all__ = [
+    "cmd_feature_archive",
+    "cmd_feature_index",
+    "cmd_feature_list",
+    "cmd_feature_rename",
+    "cmd_feature_unarchive",
+]
 
 
 def _filter_stale_features(
@@ -58,17 +72,6 @@ def _filter_stale_features(
         if parsed is None or parsed < cutoff:
             stale.append(feature)
     return stale
-
-
-def register_feature_commands(feature_app: _typer.Typer) -> None:
-    """Register the ``vault feature ...`` verbs on *feature_app*.
-
-    Args:
-        feature_app: The ``vault feature`` command group to mount the verbs on.
-    """
-    _register_feature_list_commands(feature_app)
-    _register_feature_archive_commands(feature_app)
-    _register_feature_rename_command(feature_app)
 
 
 # ---- vault feature list / index ---------------------------------------------
@@ -210,62 +213,49 @@ def _run_feature_index(
         raise typer.Exit(0)
 
 
-def _register_feature_list_commands(feature_app: _typer.Typer) -> None:
-    """Register the ``list`` and ``index`` verbs on *feature_app*.
+@feature_app.command("list")
+def cmd_feature_list(
+    date: Annotated[str | None, typer.Option("--date", help="Filter by date")] = None,
+    orphaned: Annotated[
+        bool, typer.Option("--orphaned", help="Show only orphaned features")
+    ] = False,
+    type_filter: Annotated[
+        str | None, typer.Option("--type", help="Filter by document type")
+    ] = None,
+    stale_days: Annotated[
+        int | None,
+        typer.Option(
+            "--stale-days",
+            help="Show only features whose latest activity is older than N days",
+        ),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """List all feature tags in the vault."""
+    _run_feature_list(date, orphaned, type_filter, stale_days, json_output, target)
 
-    Args:
-        feature_app: The ``vault feature`` command group to mount the verbs on.
+
+# ---- vault feature index ---------------------------------------------
+
+
+@feature_app.command("index")
+def cmd_feature_index(
+    feature: Annotated[
+        str | None,
+        typer.Option("--feature", "-f", help="Generate index for a specific feature"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Generate or update feature index documents.
+
+    Writes a ``<feature>.index.md`` into ``.vault/index/`` for each
+    feature tag (or a specific one with ``--feature``). Each index links
+    to all documents sharing that feature tag, making implicit feature
+    clusters explicit in the graph.
     """
-
-    @feature_app.command("list")
-    def cmd_feature_list(  # pyright: ignore[reportUnusedFunction]
-        date: Annotated[
-            str | None, typer.Option("--date", help="Filter by date")
-        ] = None,
-        orphaned: Annotated[
-            bool, typer.Option("--orphaned", help="Show only orphaned features")
-        ] = False,
-        type_filter: Annotated[
-            str | None, typer.Option("--type", help="Filter by document type")
-        ] = None,
-        stale_days: Annotated[
-            int | None,
-            typer.Option(
-                "--stale-days",
-                help="Show only features whose latest activity is older than N days",
-            ),
-        ] = None,
-        json_output: Annotated[
-            bool, typer.Option("--json", help="Output as JSON")
-        ] = False,
-        target: TargetOption = None,
-    ) -> None:
-        """List all feature tags in the vault."""
-        _run_feature_list(date, orphaned, type_filter, stale_days, json_output, target)
-
-    # ---- vault feature index ---------------------------------------------
-
-    @feature_app.command("index")
-    def cmd_feature_index(  # pyright: ignore[reportUnusedFunction]
-        feature: Annotated[
-            str | None,
-            typer.Option(
-                "--feature", "-f", help="Generate index for a specific feature"
-            ),
-        ] = None,
-        json_output: Annotated[
-            bool, typer.Option("--json", help="Output as JSON")
-        ] = False,
-        target: TargetOption = None,
-    ) -> None:
-        """Generate or update feature index documents.
-
-        Writes a ``<feature>.index.md`` into ``.vault/index/`` for each
-        feature tag (or a specific one with ``--feature``). Each index links
-        to all documents sharing that feature tag, making implicit feature
-        clusters explicit in the graph.
-        """
-        _run_feature_index(feature, json_output, target)
+    _run_feature_index(feature, json_output, target)
 
     # ---- vault feature archive --------------------------------------------
 
@@ -472,45 +462,36 @@ def _run_feature_unarchive(
         _print_feature_unarchive_result(feature_tag, result)
 
 
-def _register_feature_archive_commands(feature_app: _typer.Typer) -> None:
-    """Register the ``archive`` and ``unarchive`` verbs on *feature_app*.
+@feature_app.command("archive")
+def cmd_feature_archive(
+    feature_tag: Annotated[str, typer.Argument(help="Feature tag to archive")],
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview planned changes")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    no_hints: Annotated[
+        bool, typer.Option("--no-hints", help="Suppress next-step advisory hints")
+    ] = False,
+    target: TargetOption = None,
+) -> None:
+    """Archive all documents for a feature tag."""
+    _run_feature_archive(feature_tag, dry_run, json_output, no_hints, target)
 
-    Args:
-        feature_app: The ``vault feature`` command group to mount the verbs on.
-    """
 
-    @feature_app.command("archive")
-    def cmd_feature_archive(  # pyright: ignore[reportUnusedFunction]
-        feature_tag: Annotated[str, typer.Argument(help="Feature tag to archive")],
-        dry_run: Annotated[
-            bool, typer.Option("--dry-run", help="Preview planned changes")
-        ] = False,
-        json_output: Annotated[
-            bool, typer.Option("--json", help="Output as JSON")
-        ] = False,
-        no_hints: Annotated[
-            bool, typer.Option("--no-hints", help="Suppress next-step advisory hints")
-        ] = False,
-        target: TargetOption = None,
-    ) -> None:
-        """Archive all documents for a feature tag."""
-        _run_feature_archive(feature_tag, dry_run, json_output, no_hints, target)
+# ---- vault feature unarchive -------------------------------------------
 
-    # ---- vault feature unarchive -------------------------------------------
 
-    @feature_app.command("unarchive")
-    def cmd_feature_unarchive(  # pyright: ignore[reportUnusedFunction]
-        feature_tag: Annotated[str, typer.Argument(help="Feature tag to unarchive")],
-        dry_run: Annotated[
-            bool, typer.Option("--dry-run", help="Preview planned changes")
-        ] = False,
-        json_output: Annotated[
-            bool, typer.Option("--json", help="Output as JSON")
-        ] = False,
-        target: TargetOption = None,
-    ) -> None:
-        """Restore all archived documents for a feature tag."""
-        _run_feature_unarchive(feature_tag, dry_run, json_output, target)
+@feature_app.command("unarchive")
+def cmd_feature_unarchive(
+    feature_tag: Annotated[str, typer.Argument(help="Feature tag to unarchive")],
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview planned changes")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Restore all archived documents for a feature tag."""
+    _run_feature_unarchive(feature_tag, dry_run, json_output, target)
 
     # ---- vault feature rename ----------------------------------------------
 
@@ -666,52 +647,41 @@ def _run_feature_rename(
         _print_feature_rename_result(old_feature, new_feature, result)
 
 
-def _register_feature_rename_command(feature_app: _typer.Typer) -> None:
-    """Register the ``rename`` verb on *feature_app*.
-
-    Args:
-        feature_app: The ``vault feature`` command group to mount the verbs on.
-    """
-
-    @feature_app.command("rename")
-    def cmd_feature_rename(  # pyright: ignore[reportUnusedFunction]
-        old_feature: Annotated[
-            str, typer.Argument(help="Current feature tag to rename")
-        ],
-        new_feature: Annotated[str, typer.Argument(help="New feature tag name")],
-        dry_run: Annotated[
-            bool,
-            typer.Option("--dry-run", help="Preview planned changes without writing"),
-        ] = False,
-        force: Annotated[
-            bool,
-            typer.Option(
-                "--force",
-                help=(
-                    "Merge source into an existing target feature "
-                    "(per-file path collisions still refuse)"
-                ),
+@feature_app.command("rename")
+def cmd_feature_rename(
+    old_feature: Annotated[str, typer.Argument(help="Current feature tag to rename")],
+    new_feature: Annotated[str, typer.Argument(help="New feature tag name")],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview planned changes without writing"),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help=(
+                "Merge source into an existing target feature "
+                "(per-file path collisions still refuse)"
             ),
-        ] = False,
-        json_output: Annotated[
-            bool, typer.Option("--json", help="Output as JSON")
-        ] = False,
-        no_hints: Annotated[
-            bool, typer.Option("--no-hints", help="Suppress next-step advisory hints")
-        ] = False,
-        target: TargetOption = None,
-    ) -> None:
-        """Atomically rename a feature tag across every vault surface.
+        ),
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    no_hints: Annotated[
+        bool, typer.Option("--no-hints", help="Suppress next-step advisory hints")
+    ] = False,
+    target: TargetOption = None,
+) -> None:
+    """Atomically rename a feature tag across every vault surface.
 
-        Rewrites document filenames, the exec folder and exec record filenames,
-        the #feature frontmatter tag, related: wiki-links, and the regenerated
-        feature index.  Free-form body prose is never changed.
+    Rewrites document filenames, the exec folder and exec record filenames,
+    the #feature frontmatter tag, related: wiki-links, and the regenerated
+    feature index.  Free-form body prose is never changed.
 
-        A reverse journal is kept during the apply phase; if an error is raised
-        while applying, the changes made so far are rolled back to the pre-rename
-        state.  Use --force to merge the source feature into an existing target
-        feature (per-file path collisions still refuse).
-        """
-        _run_feature_rename(
-            old_feature, new_feature, dry_run, force, json_output, no_hints, target
-        )
+    A reverse journal is kept during the apply phase; if an error is raised
+    while applying, the changes made so far are rolled back to the pre-rename
+    state.  Use --force to merge the source feature into an existing target
+    feature (per-file path collisions still refuse).
+    """
+    _run_feature_rename(
+        old_feature, new_feature, dry_run, force, json_output, no_hints, target
+    )
