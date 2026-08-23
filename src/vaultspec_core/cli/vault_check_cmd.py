@@ -120,7 +120,7 @@ def _render_and_exit(
         raise typer.Exit(code=1)
 
 
-# ---- vault repair -----------------------------------------------------------
+# ---- vault check subcommands ------------------------------------------------
 
 
 @check_app.command("all")

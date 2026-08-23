@@ -17,8 +17,7 @@ nested every command inside a ``register_*(app)`` function so the app could be
 passed in as a parameter. That nesting made each command a closure that nothing
 calls, which ``basedpyright`` correctly reported as
 ``reportUnusedFunction`` - answered by 32 inline ``# pyright: ignore``
-comments, the only ones in the checked tree and the sole exception to this
-project's ban on them (recorded in
+comments, against a project convention that bans them (stated in
 ``dev/guards/test_automation_contracts.py``).
 
 Owning the apps here lets the command modules decorate at module level, exactly
@@ -29,12 +28,22 @@ Three ``# noqa: E402`` markers deliberately survive in
 :mod:`vaultspec_core.cli.vault_cmd`, on the ``link``, ``exec`` and ``archive``
 sub-app mounts. They are not leftovers. Ruff's preamble allowance means the
 first cross-family mount (``plan``) needs no marker, while the ``add_typer``
-call after it ends the preamble and the next three do. Those four mounts could
-be moved here to retire the markers, but that would pull four cross-family
-command modules into what is otherwise a pure app-definition module - the
-thing that keeps :mod:`vaultspec_core.cli.plan_cmd_app` importable from
-anywhere - to save three suppressions ruff itself considers legitimate. The
-boundary is worth more than the markers cost, so they stay.
+call after it ends the preamble, so the next three do.
+
+Those four mounts could be moved here to retire all three markers - the target
+modules have no import edge back, and appending them after the ``adr`` mount
+would preserve the group order exactly. They are not, because this module is a
+leaf of the CLI import graph: it imports :mod:`vaultspec_core.cli._app` and
+nothing else, which is what lets every command module import it without any
+possibility of a cycle. Importing four command families here would make it the
+package's heaviest importer and put the module that every command module
+depends on downstream of them - the shape that produced the cycle this module
+exists to remove. That layering is worth more than three suppressions ruff
+itself considers legitimate.
+
+Note this is an argument about the import *graph*, not about what a process
+loads: ``cli/__init__.py`` does ``from .root import app``, so importing any
+module in this package already builds the whole CLI.
 """
 
 from __future__ import annotations

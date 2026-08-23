@@ -41,8 +41,18 @@ from vaultspec_core.cli._target import TargetOption, apply_target
 # CLI, because registration is now an import-time side effect rather than an
 # explicit `register_*(app)` call. Two things stop that: the names are in
 # `__all__`, so ruff will not autofix them away as unused, and
-# `dev/guards/test_cli_reference_drift.py` fails loudly if any command
-# disappears from the generated reference.
+# `tests/cli/test_cli_reference_generated.py` fails, because the committed
+# reference no longer matches what the generator produces from the live tree.
+# Note it is that byte-fidelity test that catches a *disappearance* - the
+# companion `test_cli_reference_drift.py` asserts coverage (every live command
+# is documented), which a shrunken CLI still satisfies.
+#
+# One consequence of registering by import: the order above is the order ruff
+# sorts these module names into, which today happens to match the order the
+# old explicit `register_*(app)` calls used. A new sibling module whose name
+# sorts differently would therefore re-order `vault --help` and the generated
+# reference. If that comes up, pin the order deliberately rather than relying
+# on the sort.
 #
 # The imports sit at module level rather than at the bottom of the file behind
 # an E402 exemption: with `vault_cmd_app` owning the apps there is no longer a
@@ -93,9 +103,15 @@ from vaultspec_core.cli.vault_feature_cmd import (
     cmd_feature_unarchive,
 )
 
+# Every name this module exports, which is also - deliberately - every
+# side-effecting import above. Pruning an entry here does not merely narrow the
+# export surface: it frees ruff to remove the import, which unregisters that
+# module's commands. The module's own commands are listed too, so this reads as
+# a complete export list rather than an asymmetric one a reader might "tidy".
 __all__ = [
     "adr_app",
     "check_app",
+    "cmd_add",
     "cmd_check_adr_status",
     "cmd_check_all",
     "cmd_check_annotations",
@@ -123,10 +139,14 @@ __all__ = [
     "cmd_feature_list",
     "cmd_feature_rename",
     "cmd_feature_unarchive",
+    "cmd_graph",
+    "cmd_list",
     "cmd_rename",
+    "cmd_repair",
     "cmd_sanitize_annotations",
     "cmd_set_body",
     "cmd_set_frontmatter",
+    "cmd_stats",
     "feature_app",
     "rule_app",
     "sanitize_app",

@@ -4,7 +4,7 @@ Registers the three edge-CRUD verbs: ``list``, ``add``, and ``remove``.
 All mutation touches only the ``related:`` frontmatter block via
 :mod:`vaultspec_core.vaultcore.related_surgery`; body wiki-links are
 never modified.  The subcommand group is mounted onto
-:data:`vaultspec_core.cli.vault_cmd.vault_app` by :mod:`.vault_cmd`.
+:data:`vaultspec_core.cli.vault_cmd_app.vault_app` by :mod:`.vault_cmd`.
 
 JSON envelopes:
     ``vaultspec.vault.link.list.v1``  - list verb output
