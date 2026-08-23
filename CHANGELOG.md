@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.58](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.57...vaultspec-core-v0.1.58) (2026-08-23)
+
+
+### Features
+
+* **exec:** compress execution records to a mechanical log and consolidate them per plan ([#323](https://github.com/nevenincs/vaultspec-core/issues/323)) ([cf3913a](https://github.com/nevenincs/vaultspec-core/commit/cf3913afee16ada9a9acdc22f76988e524827c84))
+
+
+### Bug Fixes
+
+* **ci:** set the board target date through the API, not the gh CLI ([#325](https://github.com/nevenincs/vaultspec-core/issues/325)) ([65e3981](https://github.com/nevenincs/vaultspec-core/commit/65e3981ae245da4beef276e1f80cc6618b32dcf9))
+* **plan:** close both write-guard follow-ups from [#313](https://github.com/nevenincs/vaultspec-core/issues/313) ([#318](https://github.com/nevenincs/vaultspec-core/issues/318)) ([06b30a2](https://github.com/nevenincs/vaultspec-core/commit/06b30a29e3c60c903013b1f4b18c8e869d92ce5f))
+* **plan:** exclude HTML comments from parsing and make mutations atomic ([#314](https://github.com/nevenincs/vaultspec-core/issues/314)) ([bc03f9e](https://github.com/nevenincs/vaultspec-core/commit/bc03f9e0fa0f56f32a439c6c184f6ac5249f9e11))
+* **tests:** decode CLI captures as UTF-8 and report child exit status ([#324](https://github.com/nevenincs/vaultspec-core/issues/324)) ([52598da](https://github.com/nevenincs/vaultspec-core/commit/52598da7076bf2c0d11dce737fd3ba22d6cca712))
+
 ## [0.1.57](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.56...vaultspec-core-v0.1.57) (2026-08-13)
 
 
