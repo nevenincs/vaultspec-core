@@ -195,7 +195,7 @@ async def test_body_full_is_refused_above_a_handful_of_rows(vault_root: Path) ->
         )
 
     assert result.is_error
-    text = " ".join(c.text for c in result.content if hasattr(c, "text"))
+    text = " ".join(str(getattr(c, "text", "")) for c in result.content)
     assert "excerpt" in text
 
 

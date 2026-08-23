@@ -27,7 +27,7 @@ existed to dodge, so the suppressions stop being necessary.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 import typer
 
@@ -38,6 +38,8 @@ from vaultspec_core.core.windowing import windowed_section
 from vaultspec_core.vaultcore.checks._base import DIAGNOSTIC_RENDER_CAP
 
 if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
+
     from vaultspec_core.vaultcore.checks._base import CheckResult
 
 __all__ = [
@@ -131,7 +133,7 @@ def _bounded_check_payload(
     """
     import dataclasses
 
-    payload: dict[str, Any] = dataclasses.asdict(result)  # pyright: ignore[reportArgumentType]
+    payload: dict[str, Any] = dataclasses.asdict(cast("DataclassInstance", result))
     diagnostics = payload.get("diagnostics")
     if isinstance(diagnostics, list):
         payload["diagnostics"] = windowed_section(

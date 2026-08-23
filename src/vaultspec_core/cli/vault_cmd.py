@@ -23,7 +23,7 @@ in the generated command reference.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, cast
 
 import typer
 
@@ -171,6 +171,7 @@ __all__ = [
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from _typeshed import DataclassInstance
     from rich.console import Console
 
     from vaultspec_core.graph.api import VaultGraph
@@ -568,7 +569,7 @@ def _list_row(doc: object) -> dict[str, object]:
 
     from vaultspec_core.core.types import get_context as _get_ctx
 
-    row: dict[str, object] = dataclasses.asdict(doc)  # pyright: ignore[reportArgumentType]
+    row: dict[str, object] = dataclasses.asdict(cast("DataclassInstance", doc))
     row.pop("name", None)
     row.pop("tags", None)
     # `asdict` leaves a Path as a Path, so guarding on `str` alone silently

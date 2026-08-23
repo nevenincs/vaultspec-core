@@ -355,7 +355,7 @@ def _dominant_kind(signals: dict[str, float]) -> str:
 def _candidate_pairs(
     graph: VaultGraph,
     reals: list[str],
-    undirected: nx.Graph[str],
+    undirected: nx.Graph,  # pyright: ignore[reportMissingTypeArgument]
     reciprocity: set[frozenset[str]],
     co_citation: dict[frozenset[str], int],
 ) -> list[tuple[str, str]]:
