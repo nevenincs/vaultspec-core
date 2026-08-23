@@ -28,7 +28,13 @@ from ...core.types import get_context as _get_ctx
 from ...vaultcore.models import DocType, vault_today
 from ..envelope import LeanModel, compact_result
 from ..isolation import isolated_context as _isolated_context
-from ..results import BatchResult, ItemResult, build_batch, build_item
+from ..results import (
+    MAX_BATCH_ITEMS,
+    BatchResult,
+    ItemResult,
+    build_batch,
+    build_item,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -1018,6 +1024,15 @@ def register_document_tools(
         """
         if not documents:
             raise ValueError("create requires at least one document spec")
+        if len(documents) > MAX_BATCH_ITEMS:
+            # Rejected before anything is written: an oversized batch would
+            # otherwise apply every item and then detonate the caller's context
+            # on the way back.
+            msg = (
+                f"create accepts at most {MAX_BATCH_ITEMS} items per call; "
+                f"got {len(documents)}. Split the batch."
+            )
+            raise ValueError(msg)
 
         _ = ctx
         root_dir = _get_ctx().target_dir
@@ -1062,6 +1077,15 @@ def register_document_tools(
         """
         if not operations:
             raise ValueError("edit requires at least one operation")
+        if len(operations) > MAX_BATCH_ITEMS:
+            # Rejected before anything is written: an oversized batch would
+            # otherwise apply every item and then detonate the caller's context
+            # on the way back.
+            msg = (
+                f"edit accepts at most {MAX_BATCH_ITEMS} items per call; "
+                f"got {len(operations)}. Split the batch."
+            )
+            raise ValueError(msg)
 
         _ = ctx
         root_dir = _get_ctx().target_dir

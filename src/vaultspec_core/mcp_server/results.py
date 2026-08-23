@@ -82,11 +82,21 @@ class BatchResult(LeanModel):
     Attributes:
         status: The aggregate outcome - ``ok`` when every item succeeded,
             ``failed`` when every item failed, ``mixed`` when they disagree.
-        items: The per-item results in submission order.
+        items: The rows a caller must read - every failure and every item
+            carrying a warning, plus a sample of plain successes.
+        counts: How many items landed in each status. Exact regardless of
+            how many rows were omitted, so a caller always knows the true
+            outcome of the batch.
+        submitted: Items in the submitted batch.
+        items_omitted: Uneventful successes not enumerated. A batch that
+            wholly succeeded costs about the same at 5,000 items as at 20.
     """
 
     status: str
     items: list[ItemResult]
+    counts: dict[str, int] = Field(default_factory=dict)
+    submitted: int = 0
+    items_omitted: int = 0
 
 
 def build_item(
@@ -150,13 +160,53 @@ def reduce_status(items: list[ItemResult]) -> str:
     return "mixed"
 
 
+#: Items a single batch may carry.
+#:
+#: A rejection names the limit; an unbounded batch instead detonates the
+#: caller's context on the way back, having already applied every write. The
+#: cap is on input so the failure arrives before any file is touched.
+MAX_BATCH_ITEMS = 200
+
+#: Successful items enumerated in a response.
+#:
+#: A batch response was one row per submitted item, unconditionally - a
+#: 5,000-item batch cost roughly 2.4 MB to say "updated" five thousand times,
+#: with each row echoing data the caller had just sent. Failures and warnings
+#: are always enumerated in full, because those are what a caller must act on;
+#: uneventful successes collapse into the counts.
+MAX_ENUMERATED_SUCCESSES = 20
+
+
 def build_batch(items: list[ItemResult]) -> BatchResult:
-    """Wrap per-item results in a :class:`BatchResult` with the aggregate status.
+    """Fold per-item results into the batch response.
+
+    The response is exception-based. Every failed item and every item carrying
+    a warning is enumerated, because those are the rows a caller has to read.
+    Plain successes are summarised in ``counts`` and the first few are kept as
+    a sample, so a wholly successful batch of any size costs about the same as
+    a small one.
 
     Args:
-        items: The per-item results in submission order.
+        items: The per-item outcomes, in submission order.
 
     Returns:
-        The :class:`BatchResult` carrying the reduced aggregate status.
+        The assembled :class:`BatchResult`.
     """
-    return BatchResult(status=reduce_status(items), items=items)
+    counts: dict[str, int] = {}
+    for item in items:
+        counts[item.status] = counts.get(item.status, 0) + 1
+
+    notable = [item for item in items if item.status == "failed" or item.warnings]
+    uneventful = [
+        item for item in items if item.status != "failed" and not item.warnings
+    ]
+    kept = notable + uneventful[:MAX_ENUMERATED_SUCCESSES]
+    kept.sort(key=lambda item: item.index)
+
+    return BatchResult(
+        status=reduce_status(items),
+        items=kept,
+        counts=counts,
+        submitted=len(items),
+        items_omitted=len(items) - len(kept),
+    )

@@ -477,14 +477,12 @@ def register_gateway_tools(
         positionals: list[str] | None = None,
         timeout: float = _DEFAULT_TIMEOUT,
     ) -> InvokeResult:
-        """Execute one cataloged long-tail verb against the installed binary.
-
-        Validates ``verb`` against the parsed catalog and the static denylist
-        before anything spawns, then runs the installed ``vaultspec-core``
-        binary as an argv list (never a shell) with ``--target`` injected and
-        ``--json`` appended where the verb supports it. Returns parsed JSON on a
-        clean exit, captured stdout otherwise; a non-zero exit folds stderr into
-        a structured error payload while remaining a successful call.
+        # The spawn contract - argv list never a shell, --target injected,
+        # denylist checked before anything starts - is documented on the module
+        # rather than in this docstring. It constrains the implementation, not
+        # the caller, and every character here is re-sent on every turn.
+        """Execute one cataloged verb. A verb that runs and fails is still a
+        successful call; its exit code and stderr arrive in the error payload.
 
         Args:
             ctx: The MCP request context (unused; logging routes through the
