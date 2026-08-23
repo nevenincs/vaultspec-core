@@ -293,6 +293,30 @@ target-version = "py313"
 python-version = "3.13"
 root = [".", "src"]
 
+# `typings/` holds hand-written stubs for untyped third-party packages, and it
+# is basedpyright's `stubPath` - which is why basedpyright's own `include`
+# below names only `src`, `dev`, `docs`. A stub there is not source: it exists
+# to describe a dependency's surface TO a checker, and it is only meaningful
+# through the resolution of the checker that consumes it.
+#
+# `ty` resolves those same dependencies from the installed packages instead,
+# so walking `typings/` as if it were first-party source asks the wrong
+# question and can only produce disagreements that say nothing about this
+# codebase. `typings/phart/__init__.pyi` is the live example: `ty` calls
+# `networkx.Graph[Any]` invalid because the installed `Graph` is not generic,
+# while basedpyright reads its own bundled stub where it is generic over three
+# parameters and requires the parameterisation. Neither verdict is about code
+# anyone here wrote.
+#
+# Scoping `ty` to the same three trees basedpyright checks makes a bare `ty
+# check` agree with the gate instead of failing on a directory the gate never
+# claimed. It removes no coverage: every tree carrying tracked Python stays
+# under BOTH checkers at full strictness, and `dev/guards/
+# test_typings_fidelity.py` executes the stubbed surfaces for real, which is
+# the check that actually proves a stub still matches its package.
+[tool.ty.src]
+include = ["src", "dev", "docs"]
+
 # Strict-mode type checking, gating: `just lint type-strict` is in the `lint
 # all` chain, and `ty` stays the fast pre-commit gate.
 #
