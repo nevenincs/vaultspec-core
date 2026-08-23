@@ -9,7 +9,7 @@ related:
   - '[[2026-08-23-envelope-optimization-research]]'
 modified: '2026-08-23'
 body_schema: body-v1
-body_hash: 'sha256:e1ce967349641a09bf5862b6136b9852ed4b7fc384cc0dccd23095d3e6f1626a'
+body_hash: 'sha256:284ab98584de9f8df48a9efe19a81fe4cd0c50e12d7e1d35881e74f20883c90b'
 ---
 
 <!-- LINK RULES:
@@ -211,7 +211,7 @@ Relocate the existing elision helper ahead of the format branch and define the e
 
 Three docstrings specify the machine surface as deliberately uncapped. Leaving them in place guarantees the defect is reintroduced by the next author.
 
-- [ ] `W02.P04.S06` - Replace the uncapped-machine-contract docstrings with the bounded contract; `src/vaultspec_core/vaultcore/checks/_base.py`.
+- [x] `W02.P04.S06` - Replace the uncapped-machine-contract docstrings with the bounded contract; `src/vaultspec_core/vaultcore/checks/_base.py`.
 
 ## Wave `W03` - Bound the quadratic enumeration
 
@@ -221,8 +221,8 @@ Derived-edge generation is a compute defect before it is a payload defect; a res
 
 Replace full pair materialisation with a bounded per-node selection, and invert the CLI default so the expensive product is opt-in.
 
-- [ ] `W03.P05.S07` - Replace full pair materialisation with a bounded per-node selection and a weight floor; `src/vaultspec_core/graph/derived.py`.
-- [ ] `W03.P05.S08` - Invert the derived-edge CLI default and require an explicit scope for a full graph export; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `W03.P05.S07` - Replace full pair materialisation with a bounded per-node selection and a weight floor; `src/vaultspec_core/graph/derived.py`.
+- [x] `W03.P05.S08` - Invert the derived-edge CLI default and require an explicit scope for a full graph export; `src/vaultspec_core/cli/vault_cmd.py`.
 
 ## Wave `W04` - Bound per-command envelopes
 
@@ -232,25 +232,25 @@ Apply the contract to individual commands in measured-byte order, largest first.
 
 The rollup emitted on every session open, and the trace behind it.
 
-- [ ] `W04.P06.S09` - Cap active features in the rollup, rank by recency and emit the total; `src/vaultspec_core/vaultcore/orientation_rollup.py`.
-- [ ] `W04.P06.S10` - Forward a limit from the status tool instead of calling the rollup bare; `src/vaultspec_core/mcp_server/tools/orientation.py`.
-- [ ] `W04.P06.S11` - Evaluate the projection flag before the format flag so a narrowing flag cannot increase the payload; `src/vaultspec_core/cli/vault_cmd.py`.
+- [x] `W04.P06.S09` - Cap active features in the rollup, rank by recency and emit the total; `src/vaultspec_core/vaultcore/orientation_rollup.py`.
+- [x] `W04.P06.S10` - Forward a limit from the status tool instead of calling the rollup bare; `src/vaultspec_core/mcp_server/tools/orientation.py`.
+- [x] `W04.P06.S11` - Evaluate the projection flag before the format flag so a narrowing flag cannot increase the payload; `src/vaultspec_core/cli/vault_cmd.py`.
 
 ### Phase `W04.P07` - Bound the discovery and listing paths
 
 Document search, feature listing and the full-corpus document dump.
 
-- [ ] `W04.P07.S12` - Replace the boolean body flag with a bounded projection and enforce a response byte budget; `src/vaultspec_core/mcp_server/tools/documents.py`.
-- [ ] `W04.P07.S13` - Bound and validate the find limit and split the two-mode result row; `src/vaultspec_core/mcp_server/tools/documents.py`.
-- [ ] `W04.P07.S14` - Add limit and offset to document listing, make paths vault-relative and drop derivable fields; `src/vaultspec_core/vaultcore/query_listing.py`.
+- [x] `W04.P07.S12` - Replace the boolean body flag with a bounded projection and enforce a response byte budget; `src/vaultspec_core/mcp_server/tools/documents.py`.
+- [x] `W04.P07.S13` - Bound and validate the find limit and split the two-mode result row; `src/vaultspec_core/mcp_server/tools/documents.py`.
+- [x] `W04.P07.S14` - Add limit and offset to document listing, make paths vault-relative and drop derivable fields; `src/vaultspec_core/vaultcore/query_listing.py`.
 
 ### Phase `W04.P08` - Bound the diagnostics and batch paths
 
 Payloads whose size grows with how broken the vault is, and batch results that echo one row per submitted item.
 
-- [ ] `W04.P08.S15` - Cap diagnostics per check on the machine surface and honour the verbosity flag there; `src/vaultspec_core/cli/vault_check_cmd.py`.
-- [ ] `W04.P08.S16` - Make the batch result exception-based and cap batch input length; `src/vaultspec_core/mcp_server/results.py`.
-- [ ] `W04.P08.S19` - Emit each repair finding once instead of five times and bound the preview payload; `src/vaultspec_core/cli/_repair_render.py`.
+- [x] `W04.P08.S15` - Cap diagnostics per check on the machine surface and honour the verbosity flag there; `src/vaultspec_core/cli/vault_check_cmd.py`.
+- [x] `W04.P08.S16` - Make the batch result exception-based and cap batch input length; `src/vaultspec_core/mcp_server/results.py`.
+- [x] `W04.P08.S19` - Emit each repair finding once instead of five times and bound the preview payload; `src/vaultspec_core/cli/_repair_render.py`.
 
 ## Wave `W05` - Reduce the static per-turn surface
 
@@ -260,8 +260,8 @@ Fixed cost rather than corpus-scaled, so it ranks last; but it is the only cost 
 
 Output schemas are 61% of the static surface because Pydantic lifts model docstrings into schema descriptions.
 
-- [ ] `W05.P09.S17` - Suppress model docstrings and auto-derived titles in generated schemas; `src/vaultspec_core/mcp_server/results.py`.
-- [ ] `W05.P09.S18` - Trim returns, raises and context prose from tool descriptions and move parameter guidance onto fields; `src/vaultspec_core/mcp_server/tools`.
+- [x] `W05.P09.S17` - Suppress model docstrings and auto-derived titles in generated schemas; `src/vaultspec_core/mcp_server/results.py`.
+- [x] `W05.P09.S18` - Trim returns, raises and context prose from tool descriptions and move parameter guidance onto fields; `src/vaultspec_core/mcp_server/tools`.
 
 ## Wave `W06` - Repair the index-preview regression
 
@@ -272,9 +272,9 @@ Not an envelope defect and not governed by the envelope ADR; tracked here for co
 The preview needs index filenames per feature, not a private graph per feature. One shared graph, reused.
 
 - [x] `W06.P10.S20` - Build the vault graph once and reuse it across features in the index preview; `src/vaultspec_core/vaultcore/repair.py`.
-- [ ] `W06.P10.S21` - Stop disabling the graph cache in feature index generation; `src/vaultspec_core/vaultcore/index.py`.
-- [ ] `W06.P10.S22` - Add a scaling regression guard asserting repair stays linear in document count; `src/vaultspec_core/tests`.
-- [ ] `W06.P10.S23` - Remove the per-feature graph rebuild from the mutating index refresh while keeping the under-lock membership guarantee; `src/vaultspec_core/vaultcore/repair.py`.
+- [x] `W06.P10.S21` - Stop disabling the graph cache in feature index generation; `src/vaultspec_core/vaultcore/index.py`.
+- [x] `W06.P10.S22` - Add a scaling regression guard asserting repair stays linear in document count; `src/vaultspec_core/tests`.
+- [x] `W06.P10.S23` - Remove the per-feature graph rebuild from the mutating index refresh while keeping the under-lock membership guarantee; `src/vaultspec_core/vaultcore/repair.py`.
 
 ## Parallelization
 
