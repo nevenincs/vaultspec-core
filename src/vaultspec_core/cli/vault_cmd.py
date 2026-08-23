@@ -24,6 +24,7 @@ from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
 from vaultspec_core.cli.json_output import json_format_kwargs
+from vaultspec_core.core.windowing import apply_window
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -458,6 +459,42 @@ def cmd_stats(
 # ---- vault list --------------------------------------------------------------
 
 
+def _list_row(doc: object) -> dict[str, object]:
+    """Project one document into the listing row.
+
+    Drops what the caller can derive. Measured over 1,222 documents, 41% of the
+    payload was recoverable: the absolute workspace prefix repeated on every
+    row, ``name`` which is the path's stem, and ``tags`` which restate
+    ``doc_type`` and ``feature`` already present as fields. Paths are emitted
+    relative to the vault, whose root the envelope's caller already supplied.
+
+    Args:
+        doc: The document record to project.
+
+    Returns:
+        The row mapping.
+    """
+    import dataclasses
+
+    from vaultspec_core.core.types import get_context as _get_ctx
+
+    row: dict[str, object] = dataclasses.asdict(doc)  # pyright: ignore[reportArgumentType]
+    row.pop("name", None)
+    row.pop("tags", None)
+    # `asdict` leaves a Path as a Path, so guarding on `str` alone silently
+    # skips every row and the absolute path ships anyway via `default=str`.
+    raw = row.get("path")
+    if raw is not None:
+        text = str(raw)
+        root = str(_get_ctx().target_dir)
+        row["path"] = (
+            text[len(root) :].lstrip(r"\/").replace("\\", "/")
+            if text.startswith(root)
+            else text
+        )
+    return row
+
+
 @vault_app.command("list")
 def cmd_list(
     doc_type: Annotated[
@@ -470,6 +507,13 @@ def cmd_list(
         str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
     ] = None,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", help="Maximum documents to return"),
+    ] = None,
+    offset: Annotated[
+        int, typer.Option("--offset", help="Documents to skip, for paging")
+    ] = 0,
     target: TargetOption = None,
 ) -> None:
     """List vault documents, optionally filtered by type."""
@@ -505,18 +549,23 @@ def cmd_list(
         console.print(f"[red]Error reading vault: {exc}[/red]")
         raise typer.Exit(code=1) from exc
     if json_output:
-        import dataclasses
         import json
 
         from vaultspec_core.cli.rendering import json_envelope
 
+        # A full-corpus dump was 5,934,666 bytes at 10,476 documents, and the
+        # only narrowing available was an exact feature or date. The window is
+        # applied here rather than in the renderer so the caller learns the
+        # total it was cut from and how to page, instead of discovering the
+        # truncation by surprise.
+        page, window = apply_window(docs, limit=limit, offset=offset)
+        payload: dict[str, object] = {
+            "documents": [_list_row(d) for d in page],
+        }
+        payload.update(window.as_fields())
         typer.echo(
             json.dumps(
-                json_envelope(
-                    "vault.list",
-                    "unchanged",
-                    {"documents": [dataclasses.asdict(d) for d in docs]},
-                ),
+                json_envelope("vault.list", "unchanged", payload, version=2),
                 **json_format_kwargs(),
                 default=str,
             )

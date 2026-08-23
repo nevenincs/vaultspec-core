@@ -486,7 +486,8 @@ List vault documents. `DOC_TYPE` filters by type.
 | Option | Short | Default | Description | | --------------- | ----- | ------- |
 ----------------------------- | | `--feature TAG` | `-f` | None | Filter by feature tag.
 | | `--date DATE` | - | None | Filter by date. | | `--json` | - | off | Emit
-machine-readable output. |
+machine-readable output. | | `--limit N` | - | 50 | Maximum documents to return. |
+| `--offset N` | - | 0 | Documents to skip, for paging. |
 
 ### vaultspec-core vault stats
 

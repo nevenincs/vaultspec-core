@@ -460,13 +460,9 @@ class TestVaultRepair:
 
         assert result.exit_code == 0
         assert payload["fixed_count"] == 0
-        assert (
-            sum(1 for diag in payload["diagnostics"] if diag["severity"] == "warning")
-            == 1
-        )
-        assert (
-            "Would remove template annotations" in payload["diagnostics"][0]["message"]
-        )
+        diagnostics = payload["diagnostics"]["items"]
+        assert sum(1 for diag in diagnostics if diag["severity"] == "warning") == 1
+        assert "Would remove template annotations" in diagnostics[0]["message"]
         assert "<!-- Preview this generated annotation. -->" in doc.read_text(
             encoding="utf-8"
         )
