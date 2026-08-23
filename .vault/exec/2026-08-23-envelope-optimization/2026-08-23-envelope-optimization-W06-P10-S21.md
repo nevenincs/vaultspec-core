@@ -5,44 +5,11 @@ tags:
 date: '2026-08-23'
 modified: '2026-08-23'
 body_schema: 'body-v1'
-body_hash: 'sha256:26ae2c35e16d037aaeb1a1729ea7ac72a52507108ad3db7b1737ac2158462529'
+body_hash: 'sha256:41bb0e811d866f84c271f888bcc7cae292f14dbd4179c4a96224ceb18039c770'
 step_id: 'S21'
 related:
   - "[[2026-08-23-envelope-optimization-plan]]"
 ---
-
-<!-- FRONTMATTER RULES:
-     tags: one directory tag (hardcoded #exec) and one feature tag.
-     Replace envelope-optimization with a kebab-case feature tag, e.g. #foo-bar.
-     Additional tags may be appended below the required pair.
-
-     modified: CLI-maintained last-modified stamp; set at scaffold time,
-     refreshed by mutating CLI verbs and vault check fix; never hand-edit.
-
-     step_id is the originating Step's canonical identifier, e.g. S01.
-     The S21 and 2026-08-23-envelope-optimization-plan placeholders are machine-filled by
-     `vaultspec-core vault add exec`; do not fill them by hand.
-
-     Related: use wiki-links as '[[yyyy-mm-dd-foo-bar-plan]]' and link the
-     parent plan.
-
-     DO NOT add fields beyond those scaffolded; metadata lives
-     only in the frontmatter. -->
-
-<!-- LINK RULES:
-     - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
-     - NEVER use [[wiki-links]] or markdown links in the document body.
-     - NEVER reference file paths in the body. If you must name a source file,
-       class, or function, use inline backtick code: `src/module.py`. -->
-
-<!-- STEP RECORD:
-     This file represents one Step from the originating plan. Identified
-     by its canonical leaf identifier (S##) and ancestor display path.
-     The Stop disabling the graph cache in feature index generation and ## Scope
-
-- `src/vaultspec_core/vaultcore/index.py` placeholders below are machine-filled
-     by `vaultspec-core vault add exec` from the originating Step row;
-     do not fill them by hand. -->
 
 # Stop disabling the graph cache in feature index generation
 
@@ -52,10 +19,16 @@ related:
 
 ## Description
 
-<!-- Succinct line-by-line list of steps executed. Use imperative language, mirroring git commit summary lines. -->
+- Stop disabling the graph cache when re-reading feature membership.
 
 ## Outcome
 
+The generator built its graph with the cache disabled, so every call was a full parse of every document - and the repair pipeline calls it once per feature. The mutating path could not take the fix applied to the preview, because omitting the membership argument there is what refreshes membership under the index lock, and that ordering is the property the introducing commit added.
+
+Disabling the cache was pessimism rather than protection. It validates by file set, per-file size and modification time, and a content hash for anything whose timestamp is not older than the cache, and rebuilds on any divergence. It cannot serve a stale membership. The read stays inside the lock; only the redundant re-parse is gone.
+
+A mutating repair over 1,229 documents fell from 125,061 milliseconds to 56,134.
+
 ## Notes
 
-<!-- Incidents. Data loss. Difficulties; persistent failures. Skipped work. Scaffolds left in code. Failures. -->
+Verified equivalent rather than merely faster: identical fixed, error and warning counts, identical generated-index and changed-file totals, identical index paths, and byte-identical index contents between a before and after run on the same fixture.

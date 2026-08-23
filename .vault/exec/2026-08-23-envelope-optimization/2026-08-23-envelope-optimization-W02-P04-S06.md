@@ -5,44 +5,11 @@ tags:
 date: '2026-08-23'
 modified: '2026-08-23'
 body_schema: 'body-v1'
-body_hash: 'sha256:cc9555ce3d413cc4c0ddc9f1f7a31a5b02d53e82f42d55f1505bce452f272ab3'
+body_hash: 'sha256:4e30e60f75a61ede5bf6adf1ef1ab2e16206955281791d67b4737f80136111f9'
 step_id: 'S06'
 related:
   - "[[2026-08-23-envelope-optimization-plan]]"
 ---
-
-<!-- FRONTMATTER RULES:
-     tags: one directory tag (hardcoded #exec) and one feature tag.
-     Replace envelope-optimization with a kebab-case feature tag, e.g. #foo-bar.
-     Additional tags may be appended below the required pair.
-
-     modified: CLI-maintained last-modified stamp; set at scaffold time,
-     refreshed by mutating CLI verbs and vault check fix; never hand-edit.
-
-     step_id is the originating Step's canonical identifier, e.g. S01.
-     The S06 and 2026-08-23-envelope-optimization-plan placeholders are machine-filled by
-     `vaultspec-core vault add exec`; do not fill them by hand.
-
-     Related: use wiki-links as '[[yyyy-mm-dd-foo-bar-plan]]' and link the
-     parent plan.
-
-     DO NOT add fields beyond those scaffolded; metadata lives
-     only in the frontmatter. -->
-
-<!-- LINK RULES:
-     - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
-     - NEVER use [[wiki-links]] or markdown links in the document body.
-     - NEVER reference file paths in the body. If you must name a source file,
-       class, or function, use inline backtick code: `src/module.py`. -->
-
-<!-- STEP RECORD:
-     This file represents one Step from the originating plan. Identified
-     by its canonical leaf identifier (S##) and ancestor display path.
-     The Replace the uncapped-machine-contract docstrings with the bounded contract and ## Scope
-
-- `src/vaultspec_core/vaultcore/checks/_base.py` placeholders below are machine-filled
-     by `vaultspec-core vault add exec` from the originating Step row;
-     do not fill them by hand. -->
 
 # Replace the uncapped-machine-contract docstrings with the bounded contract
 
@@ -52,10 +19,17 @@ related:
 
 ## Description
 
-<!-- Succinct line-by-line list of steps executed. Use imperative language, mirroring git commit summary lines. -->
+- Rewrite the render-cap constant's documentation so it describes a cap that governs both surfaces rather than only the human one.
+- Correct the render function's description, which told a reader the machine surface carried the full set.
+- Change the human truncation notice so it no longer points at the machine surface for everything it withheld.
+- Rewrite the tree render cap's documentation in the graph package for the same reason.
 
 ## Outcome
 
+Three passages specified the machine surface as deliberately uncapped, on the premise that its consumer was a script. The consumer is a context window, so the cap was being given to the reader who can scroll and withheld from the one who cannot. That reading is what allowed a graph export to reach 416 MB.
+
+The wording now matches the behaviour: both surfaces cut at the same constant and both carry the full totals, so neither can mislead about what was withheld.
+
 ## Notes
 
-<!-- Incidents. Data loss. Difficulties; persistent failures. Skipped work. Scaffolds left in code. Failures. -->
+Retiring the wording was deliberately sequenced after the behaviour changed. Doing it first would have replaced a docstring that was honest about an unbounded payload with one that claimed a cap that did not yet exist.

@@ -5,44 +5,11 @@ tags:
 date: '2026-08-23'
 modified: '2026-08-23'
 body_schema: 'body-v1'
-body_hash: 'sha256:0663a850fad671765cb0425b22ed5dbdbfc04eebd96ba92c8b63717b0134094d'
+body_hash: 'sha256:2d65e6889f694d66c7d4b8548fa719136eedc821808d6badc661dffdd31e01cd'
 step_id: 'S19'
 related:
   - "[[2026-08-23-envelope-optimization-plan]]"
 ---
-
-<!-- FRONTMATTER RULES:
-     tags: one directory tag (hardcoded #exec) and one feature tag.
-     Replace envelope-optimization with a kebab-case feature tag, e.g. #foo-bar.
-     Additional tags may be appended below the required pair.
-
-     modified: CLI-maintained last-modified stamp; set at scaffold time,
-     refreshed by mutating CLI verbs and vault check fix; never hand-edit.
-
-     step_id is the originating Step's canonical identifier, e.g. S01.
-     The S19 and 2026-08-23-envelope-optimization-plan placeholders are machine-filled by
-     `vaultspec-core vault add exec`; do not fill them by hand.
-
-     Related: use wiki-links as '[[yyyy-mm-dd-foo-bar-plan]]' and link the
-     parent plan.
-
-     DO NOT add fields beyond those scaffolded; metadata lives
-     only in the frontmatter. -->
-
-<!-- LINK RULES:
-     - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
-     - NEVER use [[wiki-links]] or markdown links in the document body.
-     - NEVER reference file paths in the body. If you must name a source file,
-       class, or function, use inline backtick code: `src/module.py`. -->
-
-<!-- STEP RECORD:
-     This file represents one Step from the originating plan. Identified
-     by its canonical leaf identifier (S##) and ancestor display path.
-     The Emit each repair finding once instead of five times and bound the preview payload and ## Scope
-
-- `src/vaultspec_core/cli/_repair_render.py` placeholders below are machine-filled
-     by `vaultspec-core vault add exec` from the originating Step row;
-     do not fill them by hand. -->
 
 # Emit each repair finding once instead of five times and bound the preview payload
 
@@ -52,10 +19,15 @@ related:
 
 ## Description
 
-<!-- Succinct line-by-line list of steps executed. Use imperative language, mirroring git commit summary lines. -->
+- Emit each repair finding once rather than repeatedly across sections.
+- Bound the preview payload.
 
 ## Outcome
 
+The preview carried the same findings across several sections and returned every one of them. The dry-run postcheck also re-reported the check phase's findings in full - provable from the code rather than inferred, since it is handed the same results object and a dry run writes nothing.
+
+Measured at 10,476 documents with five percent damage, the phase list fell from 114,747 bytes to 63,774 and the whole payload from 166,140 to 115,167.
+
 ## Notes
 
-<!-- Incidents. Data loss. Difficulties; persistent failures. Skipped work. Scaffolds left in code. Failures. -->
+Counts remain, and an explicit marker says why the findings are absent. An unmarked omission would be indistinguishable from a checker that found nothing, which is the silent-truncation defect in miniature.

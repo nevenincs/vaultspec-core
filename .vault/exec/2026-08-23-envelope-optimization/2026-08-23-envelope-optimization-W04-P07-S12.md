@@ -5,44 +5,11 @@ tags:
 date: '2026-08-23'
 modified: '2026-08-23'
 body_schema: 'body-v1'
-body_hash: 'sha256:c98bf87f841af4672ad190b7f892329ea0cfc086f8a2ed1dc8fe4e79a08d732f'
+body_hash: 'sha256:e5a86310c8f7f7f4397dfe1929c29c43eccfdaf1b80aebdba29500f399792d50'
 step_id: 'S12'
 related:
   - "[[2026-08-23-envelope-optimization-plan]]"
 ---
-
-<!-- FRONTMATTER RULES:
-     tags: one directory tag (hardcoded #exec) and one feature tag.
-     Replace envelope-optimization with a kebab-case feature tag, e.g. #foo-bar.
-     Additional tags may be appended below the required pair.
-
-     modified: CLI-maintained last-modified stamp; set at scaffold time,
-     refreshed by mutating CLI verbs and vault check fix; never hand-edit.
-
-     step_id is the originating Step's canonical identifier, e.g. S01.
-     The S12 and 2026-08-23-envelope-optimization-plan placeholders are machine-filled by
-     `vaultspec-core vault add exec`; do not fill them by hand.
-
-     Related: use wiki-links as '[[yyyy-mm-dd-foo-bar-plan]]' and link the
-     parent plan.
-
-     DO NOT add fields beyond those scaffolded; metadata lives
-     only in the frontmatter. -->
-
-<!-- LINK RULES:
-     - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
-     - NEVER use [[wiki-links]] or markdown links in the document body.
-     - NEVER reference file paths in the body. If you must name a source file,
-       class, or function, use inline backtick code: `src/module.py`. -->
-
-<!-- STEP RECORD:
-     This file represents one Step from the originating plan. Identified
-     by its canonical leaf identifier (S##) and ancestor display path.
-     The Replace the boolean body flag with a bounded projection and enforce a response byte budget and ## Scope
-
-- `src/vaultspec_core/mcp_server/tools/documents.py` placeholders below are machine-filled
-     by `vaultspec-core vault add exec` from the originating Step row;
-     do not fill them by hand. -->
 
 # Replace the boolean body flag with a bounded projection and enforce a response byte budget
 
@@ -52,10 +19,16 @@ related:
 
 ## Description
 
-<!-- Succinct line-by-line list of steps executed. Use imperative language, mirroring git commit summary lines. -->
+- Replace the boolean body flag with a three-way projection.
+- Carry the full document size and a truncation marker beside an excerpt.
+- Refuse whole-document requests above a handful of rows, naming the alternative in the refusal.
 
 ## Outcome
 
+The flag inlined complete documents. Twenty rows cost 196,176 bytes at the default limit, on a healthy vault. An excerpt covers the same twenty for 22,389 bytes and states the size it cut from, so a caller knows what it did not receive.
+
+Whole text is now reserved for a caller that has already narrowed, and the refusal names the projection to use instead rather than simply failing.
+
 ## Notes
 
-<!-- Incidents. Data loss. Difficulties; persistent failures. Skipped work. Scaffolds left in code. Failures. -->
+The resource link each row already carries exists precisely so a body does not have to travel inline. Inlining defeated it.

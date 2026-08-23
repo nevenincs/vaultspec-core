@@ -5,44 +5,11 @@ tags:
 date: '2026-08-23'
 modified: '2026-08-23'
 body_schema: 'body-v1'
-body_hash: 'sha256:6bd88a44822da7f05e54eca12b77e9e062f4ce8461d1e89c6f288dc0ac538e7a'
+body_hash: 'sha256:69230ce08f60fa3541c12164739f40af05131af977bcced76fb807ec84b39177'
 step_id: 'S09'
 related:
   - "[[2026-08-23-envelope-optimization-plan]]"
 ---
-
-<!-- FRONTMATTER RULES:
-     tags: one directory tag (hardcoded #exec) and one feature tag.
-     Replace envelope-optimization with a kebab-case feature tag, e.g. #foo-bar.
-     Additional tags may be appended below the required pair.
-
-     modified: CLI-maintained last-modified stamp; set at scaffold time,
-     refreshed by mutating CLI verbs and vault check fix; never hand-edit.
-
-     step_id is the originating Step's canonical identifier, e.g. S01.
-     The S09 and 2026-08-23-envelope-optimization-plan placeholders are machine-filled by
-     `vaultspec-core vault add exec`; do not fill them by hand.
-
-     Related: use wiki-links as '[[yyyy-mm-dd-foo-bar-plan]]' and link the
-     parent plan.
-
-     DO NOT add fields beyond those scaffolded; metadata lives
-     only in the frontmatter. -->
-
-<!-- LINK RULES:
-     - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
-     - NEVER use [[wiki-links]] or markdown links in the document body.
-     - NEVER reference file paths in the body. If you must name a source file,
-       class, or function, use inline backtick code: `src/module.py`. -->
-
-<!-- STEP RECORD:
-     This file represents one Step from the originating plan. Identified
-     by its canonical leaf identifier (S##) and ancestor display path.
-     The Cap active features in the rollup, rank by recency and emit the total and ## Scope
-
-- `src/vaultspec_core/vaultcore/orientation_rollup.py` placeholders below are machine-filled
-     by `vaultspec-core vault add exec` from the originating Step row;
-     do not fill them by hand. -->
 
 # Cap active features in the rollup, rank by recency and emit the total
 
@@ -52,10 +19,15 @@ related:
 
 ## Description
 
-<!-- Succinct line-by-line list of steps executed. Use imperative language, mirroring git commit summary lines. -->
+- Cap the active-feature list in the rollup, ranked by latest activity.
+- Carry the pre-cap total on the rollup so every consumer can report it.
 
 ## Outcome
 
+The orientation call opens every session, so its cost is paid before an agent has done any work, and its largest field was a full dump of every active feature. Measured at 10,476 documents that field was 52% of a 259 kilobyte payload.
+
+What was dropped was largely inert. Of the 660 features the uncapped payload carried, 68% had no plan at all, 42% had no activity in thirty days, and 30% were already complete.
+
 ## Notes
 
-<!-- Incidents. Data loss. Difficulties; persistent failures. Skipped work. Scaffolds left in code. Failures. -->
+The row shape is unchanged - every field survives. The trade is real but narrow: ranking by recency means stalled features fall off first, so a caller surveying for stalled work must page rather than read one response. The total ships beside the list so that loss is visible rather than silent.

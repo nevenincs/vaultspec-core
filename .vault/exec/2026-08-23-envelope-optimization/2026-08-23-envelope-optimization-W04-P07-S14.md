@@ -5,44 +5,11 @@ tags:
 date: '2026-08-23'
 modified: '2026-08-23'
 body_schema: 'body-v1'
-body_hash: 'sha256:ea3357287493645d94c71add4611f8d275190837c6898bc6abb50f6bfc4262fd'
+body_hash: 'sha256:558cd24c9884a21bf7705e1834fd372c77d72f10dc73685b11616e0835bbcb9d'
 step_id: 'S14'
 related:
   - "[[2026-08-23-envelope-optimization-plan]]"
 ---
-
-<!-- FRONTMATTER RULES:
-     tags: one directory tag (hardcoded #exec) and one feature tag.
-     Replace envelope-optimization with a kebab-case feature tag, e.g. #foo-bar.
-     Additional tags may be appended below the required pair.
-
-     modified: CLI-maintained last-modified stamp; set at scaffold time,
-     refreshed by mutating CLI verbs and vault check fix; never hand-edit.
-
-     step_id is the originating Step's canonical identifier, e.g. S01.
-     The S14 and 2026-08-23-envelope-optimization-plan placeholders are machine-filled by
-     `vaultspec-core vault add exec`; do not fill them by hand.
-
-     Related: use wiki-links as '[[yyyy-mm-dd-foo-bar-plan]]' and link the
-     parent plan.
-
-     DO NOT add fields beyond those scaffolded; metadata lives
-     only in the frontmatter. -->
-
-<!-- LINK RULES:
-     - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
-     - NEVER use [[wiki-links]] or markdown links in the document body.
-     - NEVER reference file paths in the body. If you must name a source file,
-       class, or function, use inline backtick code: `src/module.py`. -->
-
-<!-- STEP RECORD:
-     This file represents one Step from the originating plan. Identified
-     by its canonical leaf identifier (S##) and ancestor display path.
-     The Add limit and offset to document listing, make paths vault-relative and drop derivable fields and ## Scope
-
-- `src/vaultspec_core/vaultcore/query_listing.py` placeholders below are machine-filled
-     by `vaultspec-core vault add exec` from the originating Step row;
-     do not fill them by hand. -->
 
 # Add limit and offset to document listing, make paths vault-relative and drop derivable fields
 
@@ -52,10 +19,16 @@ related:
 
 ## Description
 
-<!-- Succinct line-by-line list of steps executed. Use imperative language, mirroring git commit summary lines. -->
+- Apply a window to the document listing before the format branch.
+- Add limit and offset options.
+- Drop the fields a caller can derive and make paths vault-relative.
 
 ## Outcome
 
+A full-corpus dump with no cap: 5,934,666 bytes at 10,476 documents, where the only narrowing available was an exact feature or date. It is the most obvious discovery call an agent makes. It now returns 7,581 bytes.
+
+Rows drop what the caller can derive - the stem of the path, and tags restating the type and feature already present as fields - and paths are emitted relative to the vault rather than repeating the absolute prefix on every row.
+
 ## Notes
 
-<!-- Incidents. Data loss. Difficulties; persistent failures. Skipped work. Scaffolds left in code. Failures. -->
+One trap is worth recording: the dataclass conversion leaves a path as a path object, so guarding the prefix strip on a string type silently skipped every row while the serialiser shipped the absolute path anyway. The projection looked correct and did nothing.

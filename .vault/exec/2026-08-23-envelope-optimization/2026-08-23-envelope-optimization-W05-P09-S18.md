@@ -5,44 +5,11 @@ tags:
 date: '2026-08-23'
 modified: '2026-08-23'
 body_schema: 'body-v1'
-body_hash: 'sha256:45605e6ff680dc62bc4c1e2d040855306ddbd234a635025a8c44509f6910dd84'
+body_hash: 'sha256:b84b70af7cd011c13ba974b788f81d31d0b077bcf5ef9dc3026338df46f00273'
 step_id: 'S18'
 related:
   - "[[2026-08-23-envelope-optimization-plan]]"
 ---
-
-<!-- FRONTMATTER RULES:
-     tags: one directory tag (hardcoded #exec) and one feature tag.
-     Replace envelope-optimization with a kebab-case feature tag, e.g. #foo-bar.
-     Additional tags may be appended below the required pair.
-
-     modified: CLI-maintained last-modified stamp; set at scaffold time,
-     refreshed by mutating CLI verbs and vault check fix; never hand-edit.
-
-     step_id is the originating Step's canonical identifier, e.g. S01.
-     The S18 and 2026-08-23-envelope-optimization-plan placeholders are machine-filled by
-     `vaultspec-core vault add exec`; do not fill them by hand.
-
-     Related: use wiki-links as '[[yyyy-mm-dd-foo-bar-plan]]' and link the
-     parent plan.
-
-     DO NOT add fields beyond those scaffolded; metadata lives
-     only in the frontmatter. -->
-
-<!-- LINK RULES:
-     - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
-     - NEVER use [[wiki-links]] or markdown links in the document body.
-     - NEVER reference file paths in the body. If you must name a source file,
-       class, or function, use inline backtick code: `src/module.py`. -->
-
-<!-- STEP RECORD:
-     This file represents one Step from the originating plan. Identified
-     by its canonical leaf identifier (S##) and ancestor display path.
-     The Trim returns, raises and context prose from tool descriptions and move parameter guidance onto fields and ## Scope
-
-- `src/vaultspec_core/mcp_server/tools` placeholders below are machine-filled
-     by `vaultspec-core vault add exec` from the originating Step row;
-     do not fill them by hand. -->
 
 # Trim returns, raises and context prose from tool descriptions and move parameter guidance onto fields
 
@@ -52,10 +19,13 @@ related:
 
 ## Description
 
-<!-- Succinct line-by-line list of steps executed. Use imperative language, mirroring git commit summary lines. -->
+- Strip the returns, raises and context sections from tool descriptions at registration.
+- Trim the spawn-contract narrative from the gateway's description.
 
 ## Outcome
 
+The returns section restated what the output schema already carried and named Python classes the model cannot see. The raises section described exceptions it never observes, since a protocol error arrives as an error result rather than a traceback. And the request context was documented in eight of nine argument blocks while appearing in no input schema, so it described an argument the caller cannot pass; two tools spent a sentence explaining it was unused.
+
 ## Notes
 
-<!-- Incidents. Data loss. Difficulties; persistent failures. Skipped work. Scaffolds left in code. Failures. -->
+This was done to pay for contract fields added elsewhere rather than raise a ceiling. The first attempt made the description larger: it replaced narrative with a paragraph explaining where the narrative had gone, which itself ships on every turn. The rationale belongs in a source comment, not in the docstring.

@@ -5,44 +5,11 @@ tags:
 date: '2026-08-23'
 modified: '2026-08-23'
 body_schema: 'body-v1'
-body_hash: 'sha256:cdb34c9a5f6cb218dd98dda2078cb1edab2c13e07987f871a0f9353c9590a79e'
+body_hash: 'sha256:77d3eaffb860438acd3aaba6179071ebd8a9ad50ff10009d6418c4ed342446e0'
 step_id: 'S11'
 related:
   - "[[2026-08-23-envelope-optimization-plan]]"
 ---
-
-<!-- FRONTMATTER RULES:
-     tags: one directory tag (hardcoded #exec) and one feature tag.
-     Replace envelope-optimization with a kebab-case feature tag, e.g. #foo-bar.
-     Additional tags may be appended below the required pair.
-
-     modified: CLI-maintained last-modified stamp; set at scaffold time,
-     refreshed by mutating CLI verbs and vault check fix; never hand-edit.
-
-     step_id is the originating Step's canonical identifier, e.g. S01.
-     The S11 and 2026-08-23-envelope-optimization-plan placeholders are machine-filled by
-     `vaultspec-core vault add exec`; do not fill them by hand.
-
-     Related: use wiki-links as '[[yyyy-mm-dd-foo-bar-plan]]' and link the
-     parent plan.
-
-     DO NOT add fields beyond those scaffolded; metadata lives
-     only in the frontmatter. -->
-
-<!-- LINK RULES:
-     - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
-     - NEVER use [[wiki-links]] or markdown links in the document body.
-     - NEVER reference file paths in the body. If you must name a source file,
-       class, or function, use inline backtick code: `src/module.py`. -->
-
-<!-- STEP RECORD:
-     This file represents one Step from the originating plan. Identified
-     by its canonical leaf identifier (S##) and ancestor display path.
-     The Evaluate the projection flag before the format flag so a narrowing flag cannot increase the payload and ## Scope
-
-- `src/vaultspec_core/cli/vault_cmd.py` placeholders below are machine-filled
-     by `vaultspec-core vault add exec` from the originating Step row;
-     do not fill them by hand. -->
 
 # Evaluate the projection flag before the format flag so a narrowing flag cannot increase the payload
 
@@ -52,10 +19,15 @@ related:
 
 ## Description
 
-<!-- Succinct line-by-line list of steps executed. Use imperative language, mirroring git commit summary lines. -->
+- Emit the pre-cap total and truncation state on the orientation payload.
+- Derive the human remainder line from the true total rather than from the length of the capped list.
 
 ## Outcome
 
+The command-line orientation payload fell from 168,377 bytes to 18,459 at 10,476 documents, inside the budget its tier is assigned.
+
+The human surface already capped at ten; it now reports how many were withheld from the same number the machine payload carries, so the two cannot disagree.
+
 ## Notes
 
-<!-- Incidents. Data loss. Difficulties; persistent failures. Skipped work. Scaffolds left in code. Failures. -->
+Before this the only limit the command accepted governed recent documents - the smaller half of the payload - while the larger field it did not reach was uncapped. A flag that narrows the wrong thing is worse than no flag, because a caller reasonably believes it worked.
