@@ -24,6 +24,7 @@ import typer
 
 from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._target import TargetOption, apply_target
+from vaultspec_core.cli.json_output import json_format_kwargs
 
 __all__ = ["link_app"]
 
@@ -89,7 +90,7 @@ def cmd_link_list(
                         "failed",
                         {"message": str(exc)},
                     ),
-                    indent=2,
+                    **json_format_kwargs(),
                 )
             )
         else:
@@ -122,7 +123,7 @@ def cmd_link_list(
                             "failed",
                             {"message": f"Cannot resolve source document: '{src}'"},
                         ),
-                        indent=2,
+                        **json_format_kwargs(),
                     )
                 )
             else:
@@ -145,7 +146,7 @@ def cmd_link_list(
                             "failed",
                             {"message": f"Node not found: {src_stem}"},
                         ),
-                        indent=2,
+                        **json_format_kwargs(),
                     )
                 )
             else:
@@ -172,7 +173,7 @@ def cmd_link_list(
                     "unchanged",
                     {"edges": edges, "count": len(edges)},
                 ),
-                indent=2,
+                **json_format_kwargs(),
             )
         )
         return
@@ -541,7 +542,7 @@ def _emit_fail(
         typer.echo(
             json.dumps(
                 json_envelope(command, "failed", {"message": message}),
-                indent=2,
+                **json_format_kwargs(),
             )
         )
     else:
@@ -589,7 +590,7 @@ def _emit_ok(
         typer.echo(
             json.dumps(
                 json_envelope(command, status, payload),
-                indent=2,
+                **json_format_kwargs(),
             )
         )
     else:

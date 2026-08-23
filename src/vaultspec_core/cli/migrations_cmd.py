@@ -15,6 +15,7 @@ import typer
 
 from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._target import TargetOption, apply_target
+from vaultspec_core.cli.json_output import json_format_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ def cmd_migrations_status(
             ],
         }
         envelope = json_envelope("migrations.status", "unchanged", payload)
-        typer.echo(_json.dumps(envelope, indent=2))
+        typer.echo(_json.dumps(envelope, **json_format_kwargs()))
         raise typer.Exit(code=0 if status != MigrationStatus.PENDING else 1)
 
     from vaultspec_core.cli.rendering import (
@@ -158,7 +159,7 @@ def cmd_migrations_run(
             typer.echo(
                 _json.dumps(
                     json_envelope("migrations.run", "failed", {"error": str(exc)}),
-                    indent=2,
+                    **json_format_kwargs(),
                 )
             )
         else:

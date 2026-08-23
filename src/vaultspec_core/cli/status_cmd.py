@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 
 from vaultspec_core.cli._target import TargetOption, apply_target
+from vaultspec_core.cli.json_output import json_format_kwargs
 
 if TYPE_CHECKING:
     from typing import Any
@@ -251,7 +252,7 @@ def _emit_status_rollup(
             _rollup_payload(rollup),
             hints={"next_steps": hints} if hints is not None else None,
         )
-        typer.echo(json.dumps(envelope, indent=2, default=str))
+        typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
         return
 
     from vaultspec_core.cli.rendering import (
@@ -413,7 +414,7 @@ def _emit_status_trace(
             },
             hints={"next_steps": hints} if hints is not None else None,
         )
-        typer.echo(json.dumps(envelope, indent=2, default=str))
+        typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
         return
 
     console.print(f"[bold]Grounding Trace[/bold]  {trace.target} ({trace.kind})")

@@ -22,6 +22,7 @@ import typer
 
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
+from vaultspec_core.cli.json_output import json_format_kwargs
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -83,7 +84,7 @@ def _emit_feature_list_json(features: list[FeatureDetail]) -> None:
     typer.echo(
         json.dumps(
             json_envelope("vault.feature.list", "unchanged", {"features": features}),
-            indent=2,
+            **json_format_kwargs(),
             default=str,
         )
     )
@@ -151,7 +152,7 @@ def _emit_feature_index_json(status: str, generated_paths: list[Path]) -> None:
                 status,
                 {"generated": [str(p) for p in generated_paths]},
             ),
-            indent=2,
+            **json_format_kwargs(),
         )
     )
 
@@ -289,7 +290,7 @@ def _emit_feature_archive_json(
             json_envelope(
                 "vault.feature.archive", archive_status, result, hints=hint_dict
             ),
-            indent=2,
+            **json_format_kwargs(),
             default=str,
         )
     )
@@ -398,7 +399,7 @@ def _emit_feature_unarchive_json(
     typer.echo(
         json.dumps(
             json_envelope("vault.feature.unarchive", unarchive_status, result),
-            indent=2,
+            **json_format_kwargs(),
             default=str,
         )
     )
@@ -534,7 +535,7 @@ def _emit_feature_rename_json(
             json_envelope(
                 "vault.feature.rename", rename_status, result, hints=hint_dict
             ),
-            indent=2,
+            **json_format_kwargs(),
             default=str,
         )
     )

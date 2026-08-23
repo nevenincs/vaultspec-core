@@ -48,6 +48,7 @@ from typing import TYPE_CHECKING, Annotated, cast
 import typer
 
 from vaultspec_core.cli._target import TargetOption, apply_target
+from vaultspec_core.cli.json_output import json_format_kwargs
 from vaultspec_core.vaultcore.edit_engine import (
     EditError as _EditError,
 )
@@ -238,7 +239,11 @@ def _emit(
 
     if json_output:
         typer.echo(
-            json.dumps(json_envelope(command, status, data), indent=2, default=str)
+            json.dumps(
+                json_envelope(command, status, data),
+                **json_format_kwargs(),
+                default=str,
+            )
         )
         return
 

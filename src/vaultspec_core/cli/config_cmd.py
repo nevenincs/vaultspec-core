@@ -10,6 +10,7 @@ import typer
 from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target_install
+from vaultspec_core.cli.json_output import json_format_kwargs
 from vaultspec_core.core import (
     KNOWN_KEYS,
     get_config_value,
@@ -51,7 +52,7 @@ def cmd_config_get(
                     json_envelope(
                         "config.get", "unchanged", {"key": key, "value": value}
                     ),
-                    indent=2,
+                    **json_format_kwargs(),
                 )
             )
         else:
@@ -86,7 +87,7 @@ def cmd_config_set(
                     json_envelope(
                         "config.set", "updated", {"key": key, "value": value}
                     ),
-                    indent=2,
+                    **json_format_kwargs(),
                 )
             )
         else:
@@ -115,7 +116,8 @@ def cmd_config_unset(
 
             print(
                 _json.dumps(
-                    json_envelope("config.unset", "removed", {"key": key}), indent=2
+                    json_envelope("config.unset", "removed", {"key": key}),
+                    **json_format_kwargs(),
                 )
             )
         else:
@@ -146,7 +148,7 @@ def cmd_config_list(
             print(
                 _json.dumps(
                     json_envelope("config.list", "unchanged", {"entries": entries}),
-                    indent=2,
+                    **json_format_kwargs(),
                 )
             )
         else:

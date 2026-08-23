@@ -15,6 +15,7 @@ import typer
 from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._errors import handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
+from vaultspec_core.cli.json_output import json_format_kwargs
 
 __all__ = ["archive_app"]
 
@@ -82,7 +83,7 @@ def cmd_archive_documents(
         typer.echo(
             json.dumps(
                 json_envelope("vault.archive.documents", result.status, payload),
-                indent=2,
+                **json_format_kwargs(),
             )
         )
         return
@@ -164,7 +165,7 @@ def cmd_restore_documents(
         typer.echo(
             json.dumps(
                 json_envelope("vault.archive.restore", result.status, payload),
-                indent=2,
+                **json_format_kwargs(),
             )
         )
         return

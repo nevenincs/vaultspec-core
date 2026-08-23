@@ -18,6 +18,8 @@ from typing import Any, cast
 
 import typer
 
+from vaultspec_core.cli.json_output import json_format_kwargs
+
 __all__ = [
     "emit_plan_mutation_json",
     "invalidate_graph_cache_for_plan",
@@ -76,7 +78,7 @@ def render_user_errors[F: Callable[..., None]](func: F) -> F:
                         json_envelope(
                             "vault.plan.mutate", "failed", {"message": str(exc)}
                         ),
-                        indent=2,
+                        **json_format_kwargs(),
                     )
                 )
                 raise typer.Exit(1) from exc
@@ -98,7 +100,7 @@ def emit_plan_mutation_json(
     """
     from vaultspec_core.cli.rendering import json_envelope
 
-    typer.echo(json.dumps(json_envelope(command, status, data), indent=2))
+    typer.echo(json.dumps(json_envelope(command, status, data), **json_format_kwargs()))
 
 
 def resolve_vault_root(plan_path: Path) -> Path | None:

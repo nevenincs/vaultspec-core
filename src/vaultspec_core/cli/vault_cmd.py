@@ -23,6 +23,7 @@ import typer
 from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
+from vaultspec_core.cli.json_output import json_format_kwargs
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -421,7 +422,7 @@ def cmd_stats(
         typer.echo(
             json.dumps(
                 json_envelope("vault.stats", "unchanged", stats),
-                indent=2,
+                **json_format_kwargs(),
                 default=str,
             )
         )
@@ -516,7 +517,7 @@ def cmd_list(
                     "unchanged",
                     {"documents": [dataclasses.asdict(d) for d in docs]},
                 ),
-                indent=2,
+                **json_format_kwargs(),
                 default=str,
             )
         )
@@ -661,7 +662,7 @@ def cmd_graph(
                         {"message": f"Node not found: {node}"},
                         version=2,
                     ),
-                    indent=2,
+                    **json_format_kwargs(),
                     default=str,
                 )
             )
@@ -679,7 +680,7 @@ def cmd_graph(
             ),
             version=2,
         )
-        typer.echo(json.dumps(envelope, indent=2, default=str))
+        typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
         return
 
     if not graph.nodes:
@@ -828,7 +829,7 @@ def cmd_rule_promote(
                     status,
                     {"path": str(rule_file)},
                 ),
-                indent=2,
+                **json_format_kwargs(),
             )
         )
         raise typer.Exit(0)
@@ -876,7 +877,7 @@ def cmd_adr_supersede(
                         "failed",
                         {"message": "--by option is required."},
                     ),
-                    indent=2,
+                    **json_format_kwargs(),
                 )
             )
         else:
@@ -905,7 +906,7 @@ def cmd_adr_supersede(
                         "new_path": str(new_file),
                     },
                 ),
-                indent=2,
+                **json_format_kwargs(),
             )
         )
         raise typer.Exit(0)
