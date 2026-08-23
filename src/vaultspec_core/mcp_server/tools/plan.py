@@ -23,6 +23,7 @@ from mcp.types import ToolAnnotations
 from pydantic import BaseModel
 
 from ...core.types import get_context as _get_ctx
+from ..envelope import compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
@@ -412,6 +413,7 @@ def register_plan_tools(mcp: MCPServer[None]) -> None:
             open_world_hint=False,
         ),
     )
+    @compact_result()
     @_isolated_context
     async def plan_progress(
         ctx: _PlanToolContext,
@@ -472,6 +474,7 @@ def register_plan_tools(mcp: MCPServer[None]) -> None:
             open_world_hint=False,
         ),
     )
+    @compact_result()
     @_isolated_context
     async def plan_edit(
         ctx: _PlanToolContext,

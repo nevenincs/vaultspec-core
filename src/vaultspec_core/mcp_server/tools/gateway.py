@@ -38,6 +38,7 @@ from pydantic import BaseModel, Field
 
 from ...core.types import get_context as _get_ctx
 from ..catalog import RESERVED_FLAGS, CatalogEntry, CommandCatalog, build_catalog
+from ..envelope import compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
@@ -361,6 +362,36 @@ def _parse_verb(verb: str) -> tuple[str, ...]:
 # ---------------------------------------------------------------------------
 
 
+def _discover_summary(payload: object) -> str:
+    """Summarise a discover result as its match count.
+
+    Args:
+        payload: The ``DiscoverResult`` the tool returned.
+
+    Returns:
+        A one-line match count.
+    """
+    count = getattr(payload, "count", None)
+    return f"{count} verbs" if count is not None else "verb search"
+
+
+def _invoke_summary(payload: object) -> str:
+    """Summarise an invoke result as its verb and outcome.
+
+    Args:
+        payload: The ``InvokeResult`` the tool returned.
+
+    Returns:
+        A one-line outcome, naming the failure kind when the verb failed.
+    """
+    verb = getattr(payload, "verb", "?")
+    if getattr(payload, "ok", False):
+        return f"{verb}: ok"
+    error = getattr(payload, "error", None)
+    kind = getattr(error, "kind", None)
+    return f"{verb}: failed ({kind})" if kind else f"{verb}: failed"
+
+
 def register_gateway_tools(
     mcp: MCPServer[None], *, include_invoke: bool = True
 ) -> None:
@@ -384,6 +415,7 @@ def register_gateway_tools(
             open_world_hint=False,
         ),
     )
+    @compact_result(_discover_summary)
     @_isolated_context
     async def discover(
         ctx: Context[Any, Any], query: str, limit: int = 10
@@ -436,6 +468,7 @@ def register_gateway_tools(
         ]
         return DiscoverResult(query=query, count=len(verbs), verbs=verbs)
 
+    @compact_result(_invoke_summary)
     @_isolated_context
     async def invoke(
         ctx: Context[Any, Any],

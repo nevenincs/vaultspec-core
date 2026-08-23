@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 
 from ... import __version__
 from ...core.types import get_context as _get_ctx
+from ..envelope import compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
@@ -395,6 +396,41 @@ def _run_check(feature: str | None, *, fix: bool) -> CheckResultModel:
     return report
 
 
+def _status_summary(payload: object) -> str:
+    """Summarise a status result as its headline counts.
+
+    Args:
+        payload: The ``StatusResult`` the tool returned.
+
+    Returns:
+        A one-line orientation summary.
+    """
+    features = getattr(payload, "active_features", None)
+    plans = getattr(payload, "plans_in_flight", None)
+    if features is None and plans is None:
+        return "grounding trace"
+    return (
+        f"{len(features) if features is not None else 0} active features, "
+        f"{len(plans) if plans is not None else 0} plans in flight"
+    )
+
+
+def _check_summary(payload: object) -> str:
+    """Summarise a check result as its error and warning totals.
+
+    Args:
+        payload: The ``CheckResultModel`` the tool returned.
+
+    Returns:
+        A one-line health summary.
+    """
+    errors = getattr(payload, "total_errors", None)
+    warnings = getattr(payload, "total_warnings", None)
+    if errors is None and warnings is None:
+        return "check complete"
+    return f"{errors or 0} errors, {warnings or 0} warnings"
+
+
 def register_orientation_tools(
     mcp: MCPServer[None], *, include_fix: bool = True
 ) -> None:
@@ -418,6 +454,7 @@ def register_orientation_tools(
             open_world_hint=False,
         ),
     )
+    @compact_result(_status_summary)
     @_isolated_context
     async def status(ctx: Context[Any, Any], target: str | None = None) -> StatusResult:
         """Orient in a vaultspec project, project-wide or targeted.
@@ -472,6 +509,7 @@ def register_orientation_tools(
                 open_world_hint=False,
             ),
         )
+        @compact_result(_check_summary)
         @_isolated_context
         async def check_with_fix(
             ctx: Context[Any, Any],
@@ -494,6 +532,7 @@ def register_orientation_tools(
                 open_world_hint=False,
             ),
         )
+        @compact_result(_check_summary)
         @_isolated_context
         async def check_read_only(
             ctx: Context[Any, Any], feature: str | None = None

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 
 from ...core.types import get_context as _get_ctx
 from ...vaultcore.models import DocType, vault_today
+from ..envelope import compact_result
 from ..isolation import isolated_context as _isolated_context
 from ..results import BatchResult, ItemResult, build_batch, build_item
 
@@ -832,6 +833,30 @@ def _find_documents(
     return rows
 
 
+def _batch_summary(payload: object) -> str:
+    """Summarise a batch result as its per-status tally.
+
+    The tally is what a reader tailing a transcript actually wants from a
+    500-item batch, and it stays one line however large the batch grows.
+
+    Args:
+        payload: The ``BatchResult`` the tool returned.
+
+    Returns:
+        A one-line status tally, e.g. ``"ok: 198 created, 2 updated"``.
+    """
+    items = getattr(payload, "items", None)
+    status = getattr(payload, "status", "?")
+    if not isinstance(items, list):
+        return str(status)
+    tally: dict[str, int] = {}
+    for item in cast("list[object]", items):
+        key = str(getattr(item, "status", "?"))
+        tally[key] = tally.get(key, 0) + 1
+    parts = ", ".join(f"{count} {name}" for name, count in sorted(tally.items()))
+    return f"{status}: {parts}" if parts else str(status)
+
+
 def register_document_tools(
     mcp: MCPServer[None], *, include_mutations: bool = True
 ) -> None:
@@ -857,6 +882,7 @@ def register_document_tools(
             open_world_hint=False,
         ),
     )
+    @compact_result()
     @_isolated_context
     async def find(
         ctx: Context[Any, Any],
@@ -912,6 +938,7 @@ def register_document_tools(
         logger.debug("Found %d documents.", len(rows))
         return rows
 
+    @compact_result(_batch_summary)
     @_isolated_context
     async def create(
         ctx: Context[Any, Any], documents: list[DocumentSpec]
@@ -955,6 +982,7 @@ def register_document_tools(
         logger.debug("create: %d feature index(es) regenerated", len(affected))
         return build_batch(items)
 
+    @compact_result(_batch_summary)
     @_isolated_context
     async def edit(
         ctx: Context[Any, Any], operations: list[EditOperation]
