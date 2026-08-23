@@ -38,6 +38,12 @@ _EXPECTED_DATA_KEYS = frozenset(
         "ref",
         "feature",
         "metrics",
+        # Additive: the derived edge set is a similarity ranking capped to each
+        # node's strongest neighbours, so the export states how many existed
+        # before the cap and whether any were withheld. Without these an agent
+        # cannot tell a small graph from a truncated one.
+        "derived_edges_total",
+        "derived_edges_truncated",
     }
 )
 

@@ -18,7 +18,7 @@ import json
 import pathlib
 from typing import TYPE_CHECKING, Any
 
-from .derived import compute_derived_edges
+from .derived import compute_derived_edges, trim_to_top_k
 from .networkx_runtime import node_link_data
 
 if TYPE_CHECKING:
@@ -134,10 +134,19 @@ def to_dict(
     # then filtered away. An unscoped (full-graph) export passes scope=None
     # and computes over every pair.
     derived: list[dict[str, Any]] = []
+    derived_total = 0
     if include_derived:
         scope = None if (node is None and feature is None) else set(g.nodes())
-        derived = [edge.to_dict() for edge in compute_derived_edges(graph, scope)]
+        computed = compute_derived_edges(graph, scope)
+        derived_total = len(computed)
+        # Cap fan-out per node. Derived edges are a similarity ranking, and an
+        # exhaustive ranking is not more useful than a good one: the full set at
+        # 10,476 documents is 1,011,120 edges and 261 MB, 94% of the export.
+        kept = trim_to_top_k(computed)
+        derived = [edge.to_dict() for edge in kept]
     data["derived_edges"] = derived
+    data["derived_edges_total"] = derived_total
+    data["derived_edges_truncated"] = len(derived) < derived_total
 
     # Enrich with vault-specific metadata.
     # Pass the already-computed subgraph so betweenness_centrality runs exactly

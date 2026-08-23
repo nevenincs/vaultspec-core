@@ -597,9 +597,12 @@ def cmd_graph(
         bool,
         typer.Option(
             "--derived/--no-derived",
-            help="Include the derived relatedness edge set in JSON output",
+            help=(
+                "Include the derived relatedness edge set in JSON output "
+                "(opt-in: it is a computed similarity ranking, not vault state)"
+            ),
         ),
-    ] = True,
+    ] = False,
     ref: Annotated[
         str | None,
         typer.Option(
@@ -647,6 +650,32 @@ def cmd_graph(
     except OSError as exc:
         console.print(f"[red]Error reading vault: {exc}[/red]")
         raise typer.Exit(code=1) from exc
+
+    if as_json and metrics:
+        # Projection before format. `--metrics` asks for the summary, so it must
+        # narrow the payload on every surface: it previously had no effect at all
+        # in JSON mode, because this branch returned before the metrics branch
+        # was reached. Measured, `vault graph --metrics --json` returned
+        # 11,175,730 bytes where the human form of the same flag returned 4,794 -
+        # a 2,331x penalty for asking the narrower question, with nothing telling
+        # the caller their flag had been discarded.
+        import json
+
+        from vaultspec_core.cli.rendering import json_envelope
+
+        typer.echo(
+            json.dumps(
+                json_envelope(
+                    "vault.graph",
+                    "unchanged",
+                    {"metrics": graph.metrics(feature=feature)},
+                    version=2,
+                ),
+                **json_format_kwargs(),
+                default=str,
+            )
+        )
+        return
 
     if as_json:
         import json
