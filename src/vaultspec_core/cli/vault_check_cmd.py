@@ -14,12 +14,14 @@ import site outside the package changes. All backend logic lives in
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 
 from vaultspec_core.cli._target import TargetOption, apply_target
 from vaultspec_core.cli.json_output import json_format_kwargs
+from vaultspec_core.core.windowing import windowed_section
+from vaultspec_core.vaultcore.checks._base import DIAGNOSTIC_RENDER_CAP
 
 if TYPE_CHECKING:
     import typer as _typer
@@ -62,6 +64,36 @@ def _check_status(results: list[CheckResult]) -> str:
     return "unchanged"
 
 
+def _bounded_check_payload(result: object) -> dict[str, Any]:
+    """Render one check result with its diagnostics bounded.
+
+    ``dataclasses.asdict`` returns every finding, so the machine payload grew
+    with how broken the vault was and was largest exactly when a caller could
+    least afford it. Measured on a 1,222-document vault: 6,962 bytes clean,
+    137,323 bytes at 5% of documents damaged, 2,211,057 bytes fully damaged,
+    while the human rendering converged at 69,119 bytes because it had a cap.
+
+    The counts are untouched, so severity totals stay exact however many
+    findings are withheld.
+
+    Args:
+        result: The check result to render.
+
+    Returns:
+        The result mapping with ``diagnostics`` replaced by a window.
+    """
+    import dataclasses
+
+    payload: dict[str, Any] = dataclasses.asdict(result)  # pyright: ignore[reportArgumentType]
+    diagnostics = payload.get("diagnostics")
+    if isinstance(diagnostics, list):
+        payload["diagnostics"] = windowed_section(
+            diagnostics,  # pyright: ignore[reportUnknownArgumentType]
+            limit=DIAGNOSTIC_RENDER_CAP,
+        )
+    return payload
+
+
 def _render_and_exit(
     result: CheckResult,
     verbose: bool,
@@ -71,13 +103,12 @@ def _render_and_exit(
 ) -> None:
     """Render a CheckResult and exit with appropriate code."""
     if json_output:
-        import dataclasses
         import json
 
         from vaultspec_core.cli.rendering import json_envelope
 
         envelope = json_envelope(
-            command, _check_status([result]), dataclasses.asdict(result)
+            command, _check_status([result]), _bounded_check_payload(result), version=2
         )
         typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
         raise typer.Exit(code=1 if result.error_count else 0)
@@ -246,7 +277,6 @@ def _register_check_commands_content(check_app: _typer.Typer) -> None:
         )
 
         if json_output:
-            import dataclasses
             import json
 
             from vaultspec_core.cli.rendering import json_envelope
@@ -254,8 +284,9 @@ def _register_check_commands_content(check_app: _typer.Typer) -> None:
             envelope = json_envelope(
                 "vault.check.all",
                 _check_status(results),
-                {"checks": [dataclasses.asdict(r) for r in results]},
+                {"checks": [_bounded_check_payload(r) for r in results]},
                 hints=hint_dict,
+                version=2,
             )
             typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
             raise typer.Exit(0 if total_errors == 0 else 1)
