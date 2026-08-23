@@ -267,6 +267,8 @@ full options.
   retired by its parent plan.
 - `vaultspec-core vault exec detach` - Remove a Step claim only when it resolves to
   neither a live nor retired Step.
+- `vaultspec-core vault exec log` - Append a Step's mechanical rows to its plan's
+  consolidated ledger.
 
 #### Archive
 
@@ -1312,6 +1314,28 @@ Step.
 
 - `--record PATH` - Required live execution-record path.
 - `--dry-run` (default off) - Preview the recovery without writing.
+- `--json` (default off) - Emit the standard machine-readable result envelope.
+
+______________________________________________________________________
+
+### vaultspec-core vault exec log
+
+```bash
+vaultspec-core vault exec log [OPTIONS]
+```
+
+Append one Step's mechanical rows to its plan's consolidated execution ledger, creating
+the ledger on first use. The ledger is append-only: existing rows are never rewritten,
+and re-logging an identical row is idempotent rather than duplicating it.
+
+#### Options
+
+- `--feature FEATURE` - Required feature tag, with or without a leading `#`.
+- `--related PLAN_STEM` - Required stem of the parent plan this ledger records.
+- `--step STEP` - Required canonical Step identifier or display path being logged.
+- `--row SPEC` - Row to append, repeatable. `A:path` added, `M:path` modified, `D:path`
+  deleted, `R:old->new` renamed. The verb never infers an operation from disk state.
+- `--dry-run` (default off) - Resolve and report the target ledger without writing.
 - `--json` (default off) - Emit the standard machine-readable result envelope.
 
 ______________________________________________________________________

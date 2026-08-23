@@ -210,3 +210,80 @@ def cmd_exec_detach(
         json_output=json_output,
         target=target,
     )
+
+
+@exec_app.command("log")
+def cmd_exec_log(
+    feature: Annotated[
+        str, typer.Option("--feature", help="Feature tag (with or without '#')")
+    ],
+    related: Annotated[
+        str, typer.Option("--related", help="Parent plan stem this ledger records")
+    ],
+    step: Annotated[
+        str,
+        typer.Option("--step", help="Canonical Step ID or display path being logged"),
+    ],
+    row: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--row",
+            help=(
+                "Row to append as 'OP:path' (A added, M modified, D deleted) "
+                "or 'R:old->new'; repeatable"
+            ),
+        ),
+    ] = None,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview without writing")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Append a Step's mechanical rows to its plan's consolidated ledger.
+
+    Creates the ledger on first use, so an executor logging its first Step
+    never has to know whether the document exists yet. The ledger is
+    append-only: existing rows are never rewritten, and re-logging the same
+    row is idempotent rather than duplicating it.
+    """
+    apply_target(target, json_output=json_output)
+    from vaultspec_core.cli import _add_ops
+    from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core.types import get_context as _get_ctx
+
+    console = get_console()
+    root_dir = _get_ctx().root_dir
+    rows = _add_ops.parse_row_specs(console, row or [])
+
+    try:
+        ledger_path = _add_ops.log_ledger_rows(
+            console,
+            root_dir=root_dir,
+            feature=feature,
+            plan_stem=related,
+            step=step,
+            rows=rows,
+            dry_run=dry_run,
+            json_output=json_output,
+        )
+    except Exception as exc:
+        handle_error(exc, json_output=json_output)
+        return
+
+    if not dry_run:
+        invalidate_graph_cache(root_dir)
+    if json_output:
+        from vaultspec_core.cli.rendering import json_envelope
+
+        payload: dict[str, object] = {
+            "path": str(ledger_path),
+            "step": step,
+            "rows": len(rows),
+        }
+        if dry_run:
+            payload["dry_run"] = True
+        typer.echo(
+            json.dumps(json_envelope("vault.exec.log", "logged", payload), indent=2)
+        )
