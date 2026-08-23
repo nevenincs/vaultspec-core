@@ -5,7 +5,7 @@ tags:
 date: '2026-08-23'
 modified: '2026-08-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:6cf65e022090f0a5c04141c01ed520698d467549dbfe6765b4753986eb67d27e'
+body_hash: 'sha256:53525b09bdf988c08a69a85fb984e9dc7df00bcfb2facd97225d3bf4a1e453eb'
 related: []
 ---
 
@@ -39,13 +39,13 @@ has 306 Steps and 308 records; `import-centralization` 388 and 388;
 
 Byte-wise the record set dwarfs the plan it derives from:
 
-| plan | Steps | plan KB | exec KB | ratio |
-|---|---|---|---|---|
-| unstructured-document-ingestion | 306 | 237 | 1,532 | 6.4x |
-| profile-password-custody | 208 | 104 | 1,167 | 11.2x |
-| cli-authority-verb-conformance | 287 | 80 | 885 | 11.0x |
-| conformance-cli | 80 | 25 | 523 | 20.7x |
-| live-pull-verification-sweep | 33 | 17 | 307 | 17.4x |
+| plan                            | Steps | plan KB | exec KB | ratio |
+| ------------------------------- | ----- | ------- | ------- | ----- |
+| unstructured-document-ingestion | 306   | 237     | 1,532   | 6.4x  |
+| profile-password-custody        | 208   | 104     | 1,167   | 11.2x |
+| cli-authority-verb-conformance  | 287   | 80      | 885     | 11.0x |
+| conformance-cli                 | 80    | 25      | 523     | 20.7x |
+| live-pull-verification-sweep    | 33    | 17      | 307     | 17.4x |
 
 Reading one plan's execution history is therefore expensive:
 `profile-password-custody` at 207 files and 1.17 MB costs roughly 292k tokens,
@@ -77,11 +77,11 @@ write-only.
 
 ### Growth
 
-| month | files | bytes | mean size |
-|---|---|---|---|
-| 2026-06 | 1,632 | 2.86 MB | 1,749 |
-| 2026-07 | 3,382 | 6.35 MB | 1,877 |
-| 2026-08 (23 days) | 2,288 | 8.40 MB | 3,671 |
+| month             | files | bytes   | mean size |
+| ----------------- | ----- | ------- | --------- |
+| 2026-06           | 1,632 | 2.86 MB | 1,749     |
+| 2026-07           | 3,382 | 6.35 MB | 1,877     |
+| 2026-08 (23 days) | 2,288 | 8.40 MB | 3,671     |
 
 August is roughly 100 records per day at double the previous mean size, and
 accounts for nearly half the corpus in a partial month. Growth is unbounded on
