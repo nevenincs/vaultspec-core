@@ -32,7 +32,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 #: Aggregate ceiling for the full nine-tool wire surface, in characters.
 #:
 #: This is a **ratchet, not a target**. The measured surface is 43,919 chars
-#: (~12.7K tokens at the 3.46 chars/token measured for this codebase's JSON),
+#: (~11.8K tokens at the 3.46 chars/token measured for this codebase's JSON),
 #: and every one of those tokens is re-sent on every turn of every
 #: conversation before any work happens. The ceiling sits just above the
 #: current measurement so the surface cannot grow, and it is meant to be
@@ -44,11 +44,11 @@ pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 #: reST markup included - into ``output_schema.description``, and the tool
 #: descriptions carry ``Returns:``/``Raises:`` prose plus a ``ctx``
 #: parameter that appears in no input schema.
-MAX_TOOL_DEFINITION_CHARS = 45_000
+MAX_TOOL_DEFINITION_CHARS = 41_500
 
 #: Aggregate ceiling for the read-only surface (four tools), same rules.
-#: Measured at 20,131 chars.
-MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 21_000
+#: Measured at 19,707 chars.
+MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 20_000
 
 # Maximum number of tools: the tiered surface is seven hot tools plus the
 # discover/invoke gateway; growth beyond that needs a deliberate decision.

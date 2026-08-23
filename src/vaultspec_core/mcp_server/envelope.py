@@ -44,6 +44,8 @@ on belongs in the structured payload, where it is typed.
 from __future__ import annotations
 
 import functools
+import inspect
+import re
 from typing import TYPE_CHECKING, Any, ParamSpec, Protocol, TypeVar, cast
 
 from mcp.types import CallToolResult, TextContent
@@ -53,7 +55,7 @@ from pydantic_core import to_jsonable_python
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-__all__ = ["compact_result", "describe"]
+__all__ = ["compact_result", "describe", "tool_description"]
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
@@ -68,6 +70,50 @@ class _Summariser(Protocol):
     """Renders a tool's payload as one short human-readable line."""
 
     def __call__(self, payload: Any, /) -> str: ...
+
+
+#: Docstring sections that never reach the model as usable guidance.
+#:
+#: ``Returns:`` restates what ``output_schema`` already carries, and names
+#: Python classes the model cannot see. ``Raises:`` describes exceptions it
+#: never observes - a protocol error arrives as an error result, not a
+#: traceback. Both are maintainer documentation that the SDK lifts verbatim
+#: into the tool description re-sent on every turn of every conversation.
+_DROPPED_SECTIONS = ("Returns:", "Raises:", "Yields:")
+
+#: Matches the ``ctx`` entry inside an ``Args:`` block.
+#:
+#: ``ctx`` is the MCP request context: a parameter of the Python function that
+#: appears in no ``inputSchema``, so documenting it describes an argument the
+#: model cannot pass. Two tools spend a full sentence explaining it is unused.
+_CTX_ARG = re.compile(r"\n\s*ctx:.*?(?=\n\s{8}\w+:|\Z)", re.S)
+
+#: An ``Args:`` heading left with nothing under it after the ctx removal.
+_EMPTY_ARGS = re.compile(r"\n\s*Args:\s*(?=\Z)")
+
+
+def tool_description(fn: object) -> str:
+    """Return *fn*'s docstring trimmed to what the model can act on.
+
+    The summary and the per-parameter guidance survive; the sections that
+    duplicate the schema or describe machinery the caller never touches do
+    not. Applied at registration, so the docstring stays intact in source for
+    whoever maintains the function.
+
+    Args:
+        fn: The tool function whose docstring becomes the tool description.
+
+    Returns:
+        The trimmed description text.
+    """
+    doc = inspect.getdoc(fn) or ""
+    for marker in _DROPPED_SECTIONS:
+        idx = doc.find("\n" + marker)
+        if idx != -1:
+            doc = doc[:idx]
+    doc = _CTX_ARG.sub("", doc)
+    doc = _EMPTY_ARGS.sub("", doc)
+    return doc.strip()
 
 
 def _structured(payload: object) -> Any:
@@ -152,6 +198,7 @@ def compact_result(
                 structured_content=_structured(payload),
             )
 
+        wrapper.__doc__ = tool_description(fn)
         return wrapper
 
     return decorator
