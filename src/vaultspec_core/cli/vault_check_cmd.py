@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 
 from vaultspec_core.cli._target import TargetOption, apply_target
+from vaultspec_core.cli.json_output import json_format_kwargs
 
 if TYPE_CHECKING:
     import typer as _typer
@@ -78,7 +79,7 @@ def _render_and_exit(
         envelope = json_envelope(
             command, _check_status([result]), dataclasses.asdict(result)
         )
-        typer.echo(json.dumps(envelope, indent=2, default=str))
+        typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
         raise typer.Exit(code=1 if result.error_count else 0)
     from vaultspec_core.console import get_console
     from vaultspec_core.vaultcore.checks import render_check_result
@@ -160,8 +161,13 @@ def register_repair_command(vault_app: _typer.Typer) -> None:
                 repair_status = "unchanged"
             typer.echo(
                 json.dumps(
-                    json_envelope("vault.repair", repair_status, repair_payload(run)),
-                    indent=2,
+                    json_envelope(
+                        "vault.repair",
+                        repair_status,
+                        repair_payload(run),
+                        version=2,
+                    ),
+                    **json_format_kwargs(),
                     default=str,
                 )
             )
@@ -251,7 +257,7 @@ def _register_check_commands_content(check_app: _typer.Typer) -> None:
                 {"checks": [dataclasses.asdict(r) for r in results]},
                 hints=hint_dict,
             )
-            typer.echo(json.dumps(envelope, indent=2, default=str))
+            typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
             raise typer.Exit(0 if total_errors == 0 else 1)
 
         console.print("[bold]Vault Check  - All[/bold]")
