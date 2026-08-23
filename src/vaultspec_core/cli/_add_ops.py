@@ -607,3 +607,142 @@ def log_ledger_rows(
             f"{target_step.canonical_id} -> {ledger_path.name}"
         )
     return ledger_path
+
+
+def fold_exec_records(
+    console: Console,
+    *,
+    root_dir: Path,
+    feature: str,
+    dry_run: bool,
+    force: bool,
+    json_output: bool,
+) -> tuple[Path | None, object]:
+    """Fold one feature's per-Step execution records into a single ledger.
+
+    The fold is destructive - it removes the records whose content the
+    ledger now carries - so it refuses to write without ``--force``, and
+    reports exactly what it would do instead. What a dry run prints and what
+    a forced run applies come from one planner, so the preview is the plan.
+
+    Args:
+        console: Console for operator messages.
+        root_dir: Project root directory.
+        feature: Feature tag, with or without a leading ``#``.
+        dry_run: Report the plan without writing.
+        force: Required to apply a destructive fold.
+        json_output: Suppress human-readable lines.
+
+    Returns:
+        The ``(ledger_path, plan)`` pair; ``ledger_path`` is ``None`` when
+        nothing was folded.
+
+    Raises:
+        typer.Exit: When the feature has no execution folder, or when a
+            non-dry run was requested without ``--force``.
+    """
+    import datetime as _dt
+
+    from vaultspec_core.config import get_config
+    from vaultspec_core.core.helpers import atomic_write
+    from vaultspec_core.vaultcore.checks.exec_mapping import link_stem
+    from vaultspec_core.vaultcore.exec_fold import plan_fold, sources_from, summarize
+    from vaultspec_core.vaultcore.exec_ledger import append_rows
+    from vaultspec_core.vaultcore.hydration import (
+        DocumentIdentity,
+        ExecBinding,
+        ParentPlan,
+        TemplateFields,
+        WritePolicy,
+        create_vault_doc,
+    )
+    from vaultspec_core.vaultcore.models import DocType, refresh_modified_stamp
+    from vaultspec_core.vaultcore.parser import parse_frontmatter
+
+    feat = normalize_feature(console, feature)
+    exec_root = root_dir / get_config().docs_dir / "exec"
+    folders = sorted(p for p in exec_root.glob(f"*-{feat}") if p.is_dir())
+    if not folders:
+        console.print(
+            f"[red]Error:[/red] no execution folder found for feature {feat!r}."
+        )
+        raise typer.Exit(code=1)
+
+    folder = folders[0]
+    records: list[tuple[Path, str | None, str]] = []
+    plan_stems: list[str] = []
+    for path in sorted(folder.glob("*.md")):
+        try:
+            meta, body = parse_frontmatter(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, ValueError):
+            continue
+        raw = meta.get("step_id")
+        step_id = str(raw).strip() if raw else None
+        records.append((path, step_id, body))
+        for link in meta.get("related", []) or []:
+            stem = link_stem(str(link))
+            if stem and stem.endswith("-plan"):
+                plan_stems.append(stem)
+
+    plan = plan_fold(sources_from(records))
+    if not json_output:
+        console.print(summarize(plan, folder.name))
+        for skip in plan.skipped:
+            console.print(f"  [dim]skip[/dim] {skip.path.name} - {skip.reason}")
+
+    if plan.is_empty:
+        return None, plan
+
+    if not force:
+        console.print(
+            "[yellow]Refusing to fold without --force:[/yellow] this removes "
+            f"{len(plan.folded)} record(s). Re-run with --force to apply, or "
+            "--dry-run to silence this."
+        )
+        raise typer.Exit(code=1)
+
+    plan_stem = plan_stems[0] if plan_stems else f"{folder.name}-plan"
+    folder_date = folder.name[:10]
+    parent = ParentPlan(date=folder_date, stem=plan_stem)
+    identity = DocumentIdentity(doc_type=DocType.EXEC, feature=feat, date=folder_date)
+    binding = ExecBinding(plan=parent, ledger=True)
+    fields = TemplateFields()
+
+    ledger_path = create_vault_doc(
+        root_dir,
+        identity,
+        fields,
+        exec_binding=binding,
+        write=WritePolicy(force=True, dry_run=True),
+    )
+    if dry_run:
+        if not json_output:
+            console.print(f"[dim]Would write:[/dim] {ledger_path}")
+        return ledger_path, plan
+
+    if not ledger_path.exists():
+        create_vault_doc(
+            root_dir,
+            identity,
+            fields,
+            exec_binding=binding,
+            write=WritePolicy(force=False, dry_run=False),
+        )
+
+    text = ledger_path.read_text(encoding="utf-8")
+    updated = append_rows(text, plan.rows)
+    if updated != text:
+        atomic_write(ledger_path, refresh_modified_stamp(updated, _dt.date.today()))
+
+    # Remove folded records only after the ledger carrying their content is
+    # durably on disk, so an interruption leaves duplication rather than loss.
+    for path in plan.folded:
+        if path != ledger_path:
+            path.unlink(missing_ok=True)
+
+    if not json_output:
+        console.print(
+            f"[green]Folded:[/green] {len(plan.folded)} record(s) into "
+            f"{ledger_path.name}"
+        )
+    return ledger_path, plan

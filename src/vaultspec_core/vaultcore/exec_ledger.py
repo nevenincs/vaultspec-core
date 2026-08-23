@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "LEDGER_SUFFIX",
+    "MIGRATED_OP",
     "LedgerRow",
     "append_rows",
     "format_row",
@@ -44,8 +45,16 @@ LEDGER_SUFFIX = "-ledger"
 #: A canonical leaf Step identifier (``S1``, ``S01``, ``S109``).
 _STEP_RE = re.compile(r"^S\d{1,4}$")
 
-#: The change operations a row may declare.
-_OPS = frozenset({"A", "M", "D", "R"})
+#: The change operations a row may declare. ``T`` ("touched") exists only for
+#: rows recovered by migration from a ``body-v1`` record: that schema never
+#: recorded an operation, so a migrated row attests the path was in the Step's
+#: declared scope without inventing which of add/modify/delete happened.
+_OPS = frozenset({"A", "M", "D", "R", "T"})
+
+#: The operation a migrated row carries. Kept distinct from the natively
+#: logged operations so a reader can always tell recovered evidence from
+#: evidence an executor actually reported.
+MIGRATED_OP = "T"
 
 #: One list row, captured before its backticked cells are split out.
 _ROW_RE = re.compile(r"^[ \t]*[-*][ \t]+(?P<cells>.+?)[ \t]*$")

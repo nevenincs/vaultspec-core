@@ -5,7 +5,7 @@ tags:
 date: '2026-08-23'
 modified: '2026-08-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:bfd5aebd3728b641acec38a03410eba65cf702dc4b6673d22cdec7237edb5c7b'
+body_hash: 'sha256:8cedcdb308e185dbaf4db125c6e7bdb9b3aadea257a06ff1a5e55d7ac1327734'
 related:
   - "[[2026-08-23-exec-record-consolidation-research]]"
   - "[[2026-05-17-cli-exec-step-records-adr]]"
@@ -97,6 +97,14 @@ re-attestation stay paired. Rows are never rewritten, and re-logging a row is
 idempotent. The writer never infers an operation from disk state: an executor
 knows what it did, and guessing would record evidence nobody produced.
 
+Migration is `vault exec fold`. `vaultcore/exec_fold.py` decides the fold as a
+pure plan over parsed records, so a dry run and a real run share one code path
+and what an operator previews is what an operator gets. It recovers the
+machine-usable content - the `## Scope` list the scaffolder filled from the
+Step row - and discards the prose. Folded records are removed only after the
+ledger carrying their content is durably on disk, so an interruption leaves
+duplication rather than loss.
+
 ## Rationale
 
 The rejection recorded in `2026-05-17-cli-exec-step-records-research` turns on
@@ -126,10 +134,29 @@ decision itself, which stands.
   but ordering under concurrency is not guaranteed.
 - Per-Step file granularity is genuinely gone. A per-Step file history no
   longer exists as a view, and per-Step blame becomes a row-level diff.
-- The existing records are not migrated. They keep declaring `body-v1` and
-  remain valid, so the corpus is mixed-shape and any reader must handle both.
-  Migration would discard prose and require reconstructing file lists from git
-  history, and is deliberately left as a separate decision.
+- Existing records migrate through `vault exec fold`, which recovers each
+  record's Scope paths as ledger rows and then removes the folded record. On
+  the measured corpus this folds 7,145 of 7,395 records, recovering 8,520
+  paths into 9,559 rows: 17.6 MB becomes 925 KB and roughly 383 files remain.
+- The fold discards body prose. That is its purpose, and it is bounded rather
+  than irreversible: `.vault/` is tracked, so the commit preceding a fold
+  retains every discarded body. It is not, however, undoable by a forward
+  command - recovery is a git operation.
+- A recovered row cannot state an operation, because `body-v1` never recorded
+  one. Such rows carry `T` (touched), which is deliberately distinguishable
+  from a natively logged `A`/`M`/`D`/`R`, so a reader can always tell
+  recovered evidence from evidence an executor reported. A ledger folded from
+  history is therefore weaker evidence than one written by `vault exec log`,
+  and honestly marked as such.
+- The fold is an explicit operator verb requiring `--force`, not an entry in
+  the auto-run migration registry. Every registered migration to date is
+  additive; deleting thousands of documents during an incidental
+  `install --upgrade` is a different category of act and must stay a decision
+  someone takes deliberately.
+- A record with no `step_id` cannot be attributed to a Step, and a Phase
+  summary rolls up Steps rather than documenting one. Both are skipped and
+  left intact rather than folded, so the corpus stays mixed by design where
+  folding would lose evidence.
 - The `--all-steps` bulk form has no ledger equivalent, because pre-scaffolding
   rows invents evidence for work not yet done, which the mechanical contract
   forbids.

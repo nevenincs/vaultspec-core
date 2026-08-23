@@ -204,6 +204,8 @@ hand-edit between the markers.
   neither a live nor retired Step.
 - `vaultspec-core vault exec log` - Append a Step's mechanical rows to its plan's
   consolidated ledger.
+- `vaultspec-core vault exec fold` - Fold a feature's per-Step execution records into
+  one consolidated ledger.
 
 #### Archive
 
@@ -605,8 +607,11 @@ when its parent plan retired the claimed Step. `detach` takes `--record PATH` an
 removes its Step claim only when the claim resolves to neither a live nor a retired
 Step. `log` takes `--feature`, `--related`, `--step`, and a repeatable `--row`
 (`A:path`, `M:path`, `D:path`, or `R:old->new`) to append one Step's mechanical rows to
-its plan's append-only consolidated ledger, creating the ledger on first use. Every verb
-accepts `--dry-run` and `--json`.
+its plan's append-only consolidated ledger, creating the ledger on first use. `fold`
+takes `--feature` and migrates a `body-v1` corpus by folding a feature's per-Step
+records into one ledger, recovering each record's Scope paths as `T` (touched) rows and
+removing the folded records; it is destructive and refuses to write without `--force`.
+Every verb accepts `--dry-run` and `--json`.
 
 ### vaultspec-core vault feature rename
 

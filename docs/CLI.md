@@ -269,6 +269,8 @@ full options.
   neither a live nor retired Step.
 - `vaultspec-core vault exec log` - Append a Step's mechanical rows to its plan's
   consolidated ledger.
+- `vaultspec-core vault exec fold` - Fold a feature's per-Step execution records into
+  one consolidated ledger.
 
 #### Archive
 
@@ -1314,6 +1316,35 @@ Step.
 
 - `--record PATH` - Required live execution-record path.
 - `--dry-run` (default off) - Preview the recovery without writing.
+- `--json` (default off) - Emit the standard machine-readable result envelope.
+
+______________________________________________________________________
+
+### vaultspec-core vault exec fold
+
+```bash
+vaultspec-core vault exec fold [OPTIONS]
+```
+
+Fold a feature's per-Step execution records into one consolidated ledger, migrating a
+`body-v1` corpus. Each record's `## Scope` paths become ledger rows under its Step id,
+and the folded records are removed once the ledger carrying their content is on disk.
+
+Body prose is discarded - that is the purpose of the fold. It is recoverable from the
+commit preceding it, since `.vault/` is tracked, but there is no forward command that
+undoes it. Recovered rows carry the `T` (touched) operation because `body-v1` never
+recorded whether a path was added, modified, or deleted; `T` stays distinguishable from
+a natively logged `A`/`M`/`D`/`R` so recovered evidence is never mistaken for reported
+evidence.
+
+Records with no `step_id`, and Phase summaries, are skipped and left intact: neither can
+be attributed to a single Step, so folding them would lose evidence.
+
+#### Options
+
+- `--feature FEATURE` - Required feature tag, with or without a leading `#`.
+- `--dry-run` (default off) - Report the fold plan without writing.
+- `--force` (default off) - Required to apply; the fold removes records.
 - `--json` (default off) - Emit the standard machine-readable result envelope.
 
 ______________________________________________________________________
