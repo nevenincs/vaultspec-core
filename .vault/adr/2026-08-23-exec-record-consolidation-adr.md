@@ -5,13 +5,13 @@ tags:
 date: '2026-08-23'
 modified: '2026-08-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:8cedcdb308e185dbaf4db125c6e7bdb9b3aadea257a06ff1a5e55d7ac1327734'
+body_hash: 'sha256:098162fe431b620a0e5c43fe0baaac147adece47f8ed0fedb9c4034927328d54'
 related:
   - "[[2026-08-23-exec-record-consolidation-research]]"
   - "[[2026-05-17-cli-exec-step-records-adr]]"
 ---
 
-# `exec-record-consolidation` adr: `Consolidate execution records into one append-only ledger per plan` | (**status:** `proposed`)
+# `exec-record-consolidation` adr: `Consolidate execution records into one append-only ledger per plan` | (**status:** `accepted`)
 
 ## Problem Statement
 
@@ -97,8 +97,12 @@ re-attestation stay paired. Rows are never rewritten, and re-logging a row is
 idempotent. The writer never infers an operation from disk state: an executor
 knows what it did, and guessing would record evidence nobody produced.
 
-Migration is `vault exec fold`. `vaultcore/exec_fold.py` decides the fold as a
-pure plan over parsed records, so a dry run and a real run share one code path
+Migration has two entry points over one planner:
+`vault exec fold` for a deliberate operator run, and
+`migrations/m_0_1_58_exec_ledger_fold.py` for automatic convergence through the
+registry. Sharing the planner is what keeps them from drifting into two
+different definitions of the same conversion. `vaultcore/exec_fold.py` decides
+the fold as a pure plan over parsed records, so a dry run and a real run share one code path
 and what an operator previews is what an operator gets. It recovers the
 machine-usable content - the `## Scope` list the scaffolder filled from the
 Step row - and discards the prose. Folded records are removed only after the
@@ -148,11 +152,21 @@ decision itself, which stands.
   recovered evidence from evidence an executor reported. A ledger folded from
   history is therefore weaker evidence than one written by `vault exec log`,
   and honestly marked as such.
-- The fold is an explicit operator verb requiring `--force`, not an entry in
-  the auto-run migration registry. Every registered migration to date is
-  additive; deleting thousands of documents during an incidental
-  `install --upgrade` is a different category of act and must stay a decision
-  someone takes deliberately.
+- The fold ships both ways: `vault exec fold` for an operator taking the
+  decision deliberately, and `m_0_1_58_exec_ledger_fold` in the auto-run
+  migration registry so an upgraded workspace converges without anyone having
+  to run anything. This makes it the first registered migration that removes
+  documents; every prior entry is additive.
+- Auto-running a destructive migration is only safe because its scope is
+  narrow: it folds records declaring a pre-`body-v2` schema and nothing else.
+  The driver bumps the manifest to the running package version rather than to
+  a migration's target, so a workspace on a pre-release build re-runs the
+  registry on every vault command. A fold that took current-schema records
+  would then silently consume freshly authored ones, because `vault add exec --step` remains the default authoring path.
+- The migration runs lazily through `scan_vault`, so the conversion can land
+  during an ordinary `vault` command rather than only at upgrade time. That is
+  the cost of convergence without operator action, and it is why the narrow
+  scope above is load-bearing rather than a nicety.
 - A record with no `step_id` cannot be attributed to a Step, and a Phase
   summary rolls up Steps rather than documenting one. Both are skipped and
   left intact rather than folded, so the corpus stays mixed by design where

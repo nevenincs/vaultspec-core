@@ -124,3 +124,48 @@ class TestAppendRows:
     def test_missing_changes_section_raises(self) -> None:
         with pytest.raises(ValueError, match="no '## Changes' section"):
             append_rows("# heading\n\n## Scope\n\n- `a.py`\n", ["- `S01` `M` `a.py`"])
+
+
+class TestLedgerFilenameIsAValidExecName:
+    """The ledger name must be declared beside the other exec conventions.
+
+    A name the convention does not recognise is not merely reported: `vault
+    check structure --fix` renames it to '...-ledger-exec.md', which no
+    longer satisfies `is_ledger_stem`, so the document silently stops being
+    a ledger. This is a regression guard for that.
+    """
+
+    def test_ledger_filename_is_accepted(self) -> None:
+        from vaultspec_core.vaultcore.models import DocType, VaultConstants
+
+        errors = VaultConstants.validate_filename(
+            "2026-08-23-demo-ledger.md", DocType.EXEC
+        )
+
+        assert errors == []
+
+    def test_renamed_ledger_would_not_read_as_a_ledger(self) -> None:
+        """Why the exemption matters, stated as a property."""
+        assert is_ledger_stem("2026-08-23-demo-ledger")
+        assert not is_ledger_stem("2026-08-23-demo-ledger-exec")
+
+    def test_step_and_summary_names_still_accepted(self) -> None:
+        from vaultspec_core.vaultcore.models import DocType, VaultConstants
+
+        assert (
+            VaultConstants.validate_filename("2026-08-23-demo-S01.md", DocType.EXEC)
+            == []
+        )
+        assert (
+            VaultConstants.validate_filename(
+                "2026-08-23-demo-P01-summary.md", DocType.EXEC
+            )
+            == []
+        )
+
+    def test_a_bogus_exec_name_is_still_rejected(self) -> None:
+        from vaultspec_core.vaultcore.models import DocType, VaultConstants
+
+        errors = VaultConstants.validate_filename("not-a-vault-name.md", DocType.EXEC)
+
+        assert errors
