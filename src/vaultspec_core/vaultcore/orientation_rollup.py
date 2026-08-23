@@ -97,7 +97,13 @@ def compute_rollup(
     # the in-flight bucket, the recently-completed bucket, and the
     # per-feature plan tail, rather than scanning plans three times.
     entries = collect_all_statuses(root_dir, graph=g)
-    active_features = _active_features(real_nodes, _plans_by_feature(entries))
+    all_active = _active_features(real_nodes, _plans_by_feature(entries))
+    # `status` opens every session, so its largest field cannot be a full dump.
+    # Measured at 10,476 documents the uncapped list was 52% of a 259 KB
+    # payload, and no flag narrowed it: `limit` reached only recent_documents.
+    # The list is already ordered by latest activity, so the cap keeps the end
+    # a caller orienting themselves actually wants.
+    active_features = all_active[: max(1, limit)]
     plans_in_flight, recently_completed = _plan_buckets(entries, g)
     recent_documents = _recent_documents(
         real_nodes,
@@ -122,6 +128,7 @@ def compute_rollup(
 
     return Rollup(
         active_features=active_features,
+        active_features_total=len(all_active),
         plans_in_flight=plans_in_flight,
         recently_completed=recently_completed,
         recent_documents=recent_documents,

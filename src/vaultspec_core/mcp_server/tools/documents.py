@@ -18,16 +18,23 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ...core.types import get_context as _get_ctx
 from ...vaultcore.models import DocType, vault_today
+from ..envelope import LeanModel, compact_result
 from ..isolation import isolated_context as _isolated_context
-from ..results import BatchResult, ItemResult, build_batch, build_item
+from ..results import (
+    MAX_BATCH_ITEMS,
+    BatchResult,
+    ItemResult,
+    build_batch,
+    build_item,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -48,7 +55,7 @@ __all__ = ["register_document_tools"]
 _DEFAULT_TYPES = ["adr", "plan", "research", "reference"]
 
 
-class FindEntry(BaseModel):
+class FindEntry(LeanModel):
     """One ``find`` result row, covering both find modes as a superset.
 
     Feature-listing mode populates the feature fields (``doc_count`` /
@@ -82,8 +89,12 @@ class FindEntry(BaseModel):
         resource_uri: A ``file://`` resource-link URI for the document body,
             the ``resource_link``-style return with inline ``body`` as the
             fallback (search mode).
-        body: The full document text, present only when ``body=True`` was
-            requested (search mode).
+        body: Document text, present when ``body`` is ``excerpt`` or
+            ``full`` (search mode).
+        body_bytes: The full document size in bytes, so a caller reading an
+            excerpt knows what it did not receive (search mode).
+        body_truncated: Whether ``body`` is an excerpt of a longer document
+            (search mode).
     """
 
     name: str
@@ -103,6 +114,8 @@ class FindEntry(BaseModel):
     blob_hash: str | None = None
     resource_uri: str | None = None
     body: str | None = None
+    body_bytes: int | None = None
+    body_truncated: bool | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +123,7 @@ class FindEntry(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class DocumentSpec(BaseModel):
+class DocumentSpec(LeanModel):
     """One document to scaffold in a batch ``create`` call.
 
     Attributes:
@@ -146,7 +159,7 @@ class DocumentSpec(BaseModel):
     topic: str | None = None
 
 
-class EditOperation(BaseModel):
+class EditOperation(LeanModel):
     """One body-prose operation in a batch ``edit`` call.
 
     Attributes:
@@ -766,11 +779,48 @@ def _find_features(limit: int, want_json: bool) -> list[FindEntry]:
     return rows
 
 
+#: Rows a caller may request whole document text for in one call.
+#:
+#: Twenty adr documents at ``body="full"`` measured 196,176 bytes - past the
+#: ceiling for any single response, from a call using nothing but the default
+#: limit. ``excerpt`` covers the same twenty for 22,389 bytes, so the whole
+#: text is reserved for a caller that has already narrowed to a handful.
+_FULL_BODY_MAX_ROWS = 5
+
+
+#: Characters of document text carried by an ``excerpt`` body request.
+#:
+#: Enough to recognise a document and decide whether to fetch it; not enough
+#: for twenty of them to fill a context window. Measured, twenty adr documents
+#: at ``body="full"`` cost 197,490 bytes - the default limit, on a healthy
+#: vault, past a 50k-token budget for a single exploratory call.
+_EXCERPT_CHARS = 600
+
+
+def _excerpt(text: str) -> str:
+    """Return the leading slice of *text* used for an excerpt body.
+
+    Cuts on a line boundary where one falls near the limit, so an excerpt does
+    not end mid-word and read as corrupted content.
+
+    Args:
+        text: The full document text.
+
+    Returns:
+        The excerpt, or the whole text when it already fits.
+    """
+    if len(text) <= _EXCERPT_CHARS:
+        return text
+    cut = text[:_EXCERPT_CHARS]
+    newline = cut.rfind("\n")
+    return cut[:newline] if newline > _EXCERPT_CHARS // 2 else cut
+
+
 def _find_documents(
     feature: str | None,
     types: list[str] | None,
     date: str | None,
-    body: bool,
+    body: str,
     limit: int,
 ) -> list[FindEntry]:
     """Build the document-search ``find`` result rows.
@@ -824,12 +874,42 @@ def _find_documents(
             blob_hash=git_blob_oid(raw) if raw is not None else None,
             resource_uri=doc.path.as_uri(),
         )
-        if body:
-            entry.body = (
-                raw.decode("utf-8", errors="replace") if raw is not None else ""
-            )
+        if body != "none":
+            text = raw.decode("utf-8", errors="replace") if raw is not None else ""
+            if body == "excerpt":
+                entry.body = _excerpt(text)
+                entry.body_bytes = len(text.encode("utf-8"))
+                entry.body_truncated = len(entry.body) < len(text)
+            else:
+                entry.body = text
+                entry.body_bytes = len(text.encode("utf-8"))
+                entry.body_truncated = False
         rows.append(entry)
     return rows
+
+
+def _batch_summary(payload: object) -> str:
+    """Summarise a batch result as its per-status tally.
+
+    The tally is what a reader tailing a transcript actually wants from a
+    500-item batch, and it stays one line however large the batch grows.
+
+    Args:
+        payload: The ``BatchResult`` the tool returned.
+
+    Returns:
+        A one-line status tally, e.g. ``"ok: 198 created, 2 updated"``.
+    """
+    items = getattr(payload, "items", None)
+    status = getattr(payload, "status", "?")
+    if not isinstance(items, list):
+        return str(status)
+    tally: dict[str, int] = {}
+    for item in cast("list[object]", items):
+        key = str(getattr(item, "status", "?"))
+        tally[key] = tally.get(key, 0) + 1
+    parts = ", ".join(f"{count} {name}" for name, count in sorted(tally.items()))
+    return f"{status}: {parts}" if parts else str(status)
 
 
 def register_document_tools(
@@ -857,15 +937,16 @@ def register_document_tools(
             open_world_hint=False,
         ),
     )
+    @compact_result()
     @_isolated_context
     async def find(
         ctx: Context[Any, Any],
         feature: str | None = None,
         type: list[str] | None = None,
         date: str | None = None,
-        body: bool = False,
+        body: Literal["none", "excerpt", "full"] = "none",
         json: bool = False,
-        limit: int = 20,
+        limit: Annotated[int, Field(ge=1, le=100)] = 20,
     ) -> list[FindEntry]:
         """Find vault documents or list features.
 
@@ -908,10 +989,19 @@ def register_document_tools(
             logger.debug("Listed %d features.", len(rows))
             return rows
 
+        if body == "full" and limit > _FULL_BODY_MAX_ROWS:
+            msg = (
+                f"body='full' returns whole documents, so it is limited to "
+                f"{_FULL_BODY_MAX_ROWS} rows; got limit={limit}. Use "
+                f"body='excerpt' to survey more, then 'full' on the few that "
+                f"matter."
+            )
+            raise ValueError(msg)
         rows = _find_documents(feature, type, date, body, limit)
         logger.debug("Found %d documents.", len(rows))
         return rows
 
+    @compact_result(_batch_summary)
     @_isolated_context
     async def create(
         ctx: Context[Any, Any], documents: list[DocumentSpec]
@@ -934,6 +1024,15 @@ def register_document_tools(
         """
         if not documents:
             raise ValueError("create requires at least one document spec")
+        if len(documents) > MAX_BATCH_ITEMS:
+            # Rejected before anything is written: an oversized batch would
+            # otherwise apply every item and then detonate the caller's context
+            # on the way back.
+            msg = (
+                f"create accepts at most {MAX_BATCH_ITEMS} items per call; "
+                f"got {len(documents)}. Split the batch."
+            )
+            raise ValueError(msg)
 
         _ = ctx
         root_dir = _get_ctx().target_dir
@@ -955,6 +1054,7 @@ def register_document_tools(
         logger.debug("create: %d feature index(es) regenerated", len(affected))
         return build_batch(items)
 
+    @compact_result(_batch_summary)
     @_isolated_context
     async def edit(
         ctx: Context[Any, Any], operations: list[EditOperation]
@@ -977,6 +1077,15 @@ def register_document_tools(
         """
         if not operations:
             raise ValueError("edit requires at least one operation")
+        if len(operations) > MAX_BATCH_ITEMS:
+            # Rejected before anything is written: an oversized batch would
+            # otherwise apply every item and then detonate the caller's context
+            # on the way back.
+            msg = (
+                f"edit accepts at most {MAX_BATCH_ITEMS} items per call; "
+                f"got {len(operations)}. Split the batch."
+            )
+            raise ValueError(msg)
 
         _ = ctx
         root_dir = _get_ctx().target_dir

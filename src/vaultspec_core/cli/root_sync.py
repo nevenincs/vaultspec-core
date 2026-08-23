@@ -20,6 +20,7 @@ from vaultspec_core.cli._target import (
     apply_target,
     resolve_effective_target,
 )
+from vaultspec_core.cli.json_output import json_format_kwargs
 from vaultspec_core.cli.root_preflight import run_preflight
 from vaultspec_core.core.enums import CliAction
 
@@ -78,7 +79,7 @@ def render_sync_dry_run(
         envelope = json_envelope(
             "sync", str(inner["status"]), {"items": inner["items"]}
         )
-        typer.echo(json.dumps(envelope, indent=2))
+        typer.echo(json.dumps(envelope, **json_format_kwargs()))
         raise typer.Exit(0)
 
     from vaultspec_core.cli.rendering import render_dry_run_tree

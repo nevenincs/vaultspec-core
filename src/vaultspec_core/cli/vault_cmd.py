@@ -23,7 +23,7 @@ in the generated command reference.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, cast
 
 import typer
 
@@ -76,6 +76,7 @@ from vaultspec_core.cli.edit_cmd import (
     cmd_set_body,
     cmd_set_frontmatter,
 )
+from vaultspec_core.cli.json_output import json_format_kwargs
 from vaultspec_core.cli.vault_check_cmd import (
     cmd_check_adr_status,
     cmd_check_all,
@@ -115,6 +116,7 @@ from vaultspec_core.cli.vault_feature_cmd import (
     cmd_feature_rename,
     cmd_feature_unarchive,
 )
+from vaultspec_core.core.windowing import apply_window
 
 # Every name this module exports, which is also - deliberately - every
 # side-effecting import above. Pruning an entry here does not merely narrow the
@@ -169,6 +171,7 @@ __all__ = [
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from _typeshed import DataclassInstance
     from rich.console import Console
 
     from vaultspec_core.graph.api import VaultGraph
@@ -511,7 +514,7 @@ def cmd_stats(
         typer.echo(
             json.dumps(
                 json_envelope("vault.stats", "unchanged", stats),
-                indent=2,
+                **json_format_kwargs(),
                 default=str,
             )
         )
@@ -547,6 +550,42 @@ def cmd_stats(
 # ---- vault list --------------------------------------------------------------
 
 
+def _list_row(doc: object) -> dict[str, object]:
+    """Project one document into the listing row.
+
+    Drops what the caller can derive. Measured over 1,222 documents, 41% of the
+    payload was recoverable: the absolute workspace prefix repeated on every
+    row, ``name`` which is the path's stem, and ``tags`` which restate
+    ``doc_type`` and ``feature`` already present as fields. Paths are emitted
+    relative to the vault, whose root the envelope's caller already supplied.
+
+    Args:
+        doc: The document record to project.
+
+    Returns:
+        The row mapping.
+    """
+    import dataclasses
+
+    from vaultspec_core.core.types import get_context as _get_ctx
+
+    row: dict[str, object] = dataclasses.asdict(cast("DataclassInstance", doc))
+    row.pop("name", None)
+    row.pop("tags", None)
+    # `asdict` leaves a Path as a Path, so guarding on `str` alone silently
+    # skips every row and the absolute path ships anyway via `default=str`.
+    raw = row.get("path")
+    if raw is not None:
+        text = str(raw)
+        root = str(_get_ctx().target_dir)
+        row["path"] = (
+            text[len(root) :].lstrip(r"\/").replace("\\", "/")
+            if text.startswith(root)
+            else text
+        )
+    return row
+
+
 @vault_app.command("list")
 def cmd_list(
     doc_type: Annotated[
@@ -559,6 +598,13 @@ def cmd_list(
         str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
     ] = None,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", help="Maximum documents to return"),
+    ] = None,
+    offset: Annotated[
+        int, typer.Option("--offset", help="Documents to skip, for paging")
+    ] = 0,
     target: TargetOption = None,
 ) -> None:
     """List vault documents, optionally filtered by type."""
@@ -594,19 +640,24 @@ def cmd_list(
         console.print(f"[red]Error reading vault: {exc}[/red]")
         raise typer.Exit(code=1) from exc
     if json_output:
-        import dataclasses
         import json
 
         from vaultspec_core.cli.rendering import json_envelope
 
+        # A full-corpus dump was 5,934,666 bytes at 10,476 documents, and the
+        # only narrowing available was an exact feature or date. The window is
+        # applied here rather than in the renderer so the caller learns the
+        # total it was cut from and how to page, instead of discovering the
+        # truncation by surprise.
+        page, window = apply_window(docs, limit=limit, offset=offset)
+        payload: dict[str, object] = {
+            "documents": [_list_row(d) for d in page],
+        }
+        payload.update(window.as_fields())
         typer.echo(
             json.dumps(
-                json_envelope(
-                    "vault.list",
-                    "unchanged",
-                    {"documents": [dataclasses.asdict(d) for d in docs]},
-                ),
-                indent=2,
+                json_envelope("vault.list", "unchanged", payload, version=2),
+                **json_format_kwargs(),
                 default=str,
             )
         )
@@ -686,9 +737,19 @@ def cmd_graph(
         bool,
         typer.Option(
             "--derived/--no-derived",
-            help="Include the derived relatedness edge set in JSON output",
+            help=(
+                "Include the derived relatedness edge set in JSON output "
+                "(opt-in: it is a computed similarity ranking, not vault state)"
+            ),
         ),
-    ] = True,
+    ] = False,
+    derived_limit: Annotated[
+        int | None,
+        typer.Option("--derived-limit", help="Maximum derived edges to return"),
+    ] = None,
+    derived_offset: Annotated[
+        int, typer.Option("--derived-offset", help="Derived edges to skip, for paging")
+    ] = 0,
     ref: Annotated[
         str | None,
         typer.Option(
@@ -737,6 +798,32 @@ def cmd_graph(
         console.print(f"[red]Error reading vault: {exc}[/red]")
         raise typer.Exit(code=1) from exc
 
+    if as_json and metrics:
+        # Projection before format. `--metrics` asks for the summary, so it must
+        # narrow the payload on every surface: it previously had no effect at all
+        # in JSON mode, because this branch returned before the metrics branch
+        # was reached. Measured, `vault graph --metrics --json` returned
+        # 11,175,730 bytes where the human form of the same flag returned 4,794 -
+        # a 2,331x penalty for asking the narrower question, with nothing telling
+        # the caller their flag had been discarded.
+        import json
+
+        from vaultspec_core.cli.rendering import json_envelope
+
+        typer.echo(
+            json.dumps(
+                json_envelope(
+                    "vault.graph",
+                    "unchanged",
+                    {"metrics": graph.metrics(feature=feature)},
+                    version=2,
+                ),
+                **json_format_kwargs(),
+                default=str,
+            )
+        )
+        return
+
     if as_json:
         import json
 
@@ -751,7 +838,7 @@ def cmd_graph(
                         {"message": f"Node not found: {node}"},
                         version=2,
                     ),
-                    indent=2,
+                    **json_format_kwargs(),
                     default=str,
                 )
             )
@@ -766,10 +853,12 @@ def cmd_graph(
                 node=node,
                 depth=depth,
                 include_derived=derived,
+                derived_limit=derived_limit,
+                derived_offset=derived_offset,
             ),
             version=2,
         )
-        typer.echo(json.dumps(envelope, indent=2, default=str))
+        typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
         return
 
     if not graph.nodes:
@@ -927,8 +1016,13 @@ def cmd_repair(
             repair_status = "unchanged"
         typer.echo(
             json.dumps(
-                json_envelope("vault.repair", repair_status, repair_payload(run)),
-                indent=2,
+                json_envelope(
+                    "vault.repair",
+                    repair_status,
+                    repair_payload(run),
+                    version=2,
+                ),
+                **json_format_kwargs(),
                 default=str,
             )
         )
@@ -991,7 +1085,7 @@ def cmd_rule_promote(
                     status,
                     {"path": str(rule_file)},
                 ),
-                indent=2,
+                **json_format_kwargs(),
             )
         )
         raise typer.Exit(0)
@@ -1039,7 +1133,7 @@ def cmd_adr_supersede(
                         "failed",
                         {"message": "--by option is required."},
                     ),
-                    indent=2,
+                    **json_format_kwargs(),
                 )
             )
         else:
@@ -1068,7 +1162,7 @@ def cmd_adr_supersede(
                         "new_path": str(new_file),
                     },
                 ),
-                indent=2,
+                **json_format_kwargs(),
             )
         )
         raise typer.Exit(0)

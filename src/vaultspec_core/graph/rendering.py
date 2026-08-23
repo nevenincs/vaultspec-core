@@ -19,10 +19,13 @@ if TYPE_CHECKING:
     from .api import VaultGraph
     from .models import DocNode
 
-#: Maximum lines the tree render prints.  The title always carries the
-#: full corpus counts, the truncation is explicitly marked, and the
-#: ``--json`` envelope remains the uncapped machine contract, per the
-#: report-volume policy.
+#: Maximum lines the tree render prints. The title always carries the full
+#: corpus counts and the truncation is explicitly marked.
+#:
+#: The ``--json`` envelope is no longer the uncapped counterpart it once was:
+#: the derived edge set is opt-in and fan-out capped, and the export states its
+#: totals alongside. A human cap is not a licence for an unbounded machine
+#: payload - that reading is what let a graph export reach 416 MB.
 TREE_RENDER_CAP = 1000
 
 

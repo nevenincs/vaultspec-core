@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
+from vaultspec_core.cli.json_output import json_format_kwargs
 from vaultspec_core.console import get_console
 
 if TYPE_CHECKING:
@@ -311,7 +312,7 @@ def emit_outcomes(
         if extra_json:
             data.update(extra_json)
         envelope = json_envelope(command, str(inner["status"]), data, hints=hints)
-        print(json.dumps(envelope, indent=2))
+        print(json.dumps(envelope, **json_format_kwargs()))
     else:
         render_outcomes(items, title=title)
     return 1 if any(item.outcome is Outcome.FAILED for item in items) else 0

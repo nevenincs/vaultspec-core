@@ -13,6 +13,7 @@ from typing import Annotated
 import typer
 
 from vaultspec_core.cli._target import PlanPathArg, TargetOption
+from vaultspec_core.cli.json_output import json_format_kwargs
 from vaultspec_core.cli.plan_cmd_app import plan_app
 
 __all__ = ["cmd_check", "cmd_query", "cmd_status"]
@@ -44,7 +45,7 @@ def cmd_status(
         envelope = json_envelope(
             "vault.plan.status", "unchanged", status_to_json_dict(status)
         )
-        typer.echo(json.dumps(envelope, indent=2))
+        typer.echo(json.dumps(envelope, **json_format_kwargs()))
         return
 
     typer.echo(f"Plan: {path}")
@@ -134,7 +135,7 @@ def cmd_check(
         envelope = json_envelope(
             "vault.plan.check", status, {"findings": findings_data}
         )
-        typer.echo(json.dumps(envelope, indent=2))
+        typer.echo(json.dumps(envelope, **json_format_kwargs()))
     else:
         for finding in findings:
             typer.echo(
@@ -207,7 +208,8 @@ def cmd_query(
         }
         typer.echo(
             json.dumps(
-                json_envelope("vault.plan.query", "unchanged", payload), indent=2
+                json_envelope("vault.plan.query", "unchanged", payload),
+                **json_format_kwargs(),
             )
         )
         return

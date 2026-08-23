@@ -13,6 +13,7 @@ from typing import Annotated
 
 import typer
 
+from vaultspec_core.cli.json_output import json_format_kwargs
 from vaultspec_core.cli.plan_cmd_app import trailer_app
 from vaultspec_core.cli.plan_cmd_shared import render_user_errors
 
@@ -98,7 +99,7 @@ def cmd_trailer_validate(
                         "unchanged",
                         {"unreadable": str(message_file), "problems": []},
                     ),
-                    indent=2,
+                    **json_format_kwargs(),
                 )
             )
         else:
@@ -124,7 +125,7 @@ def cmd_trailer_validate(
         typer.echo(
             json.dumps(
                 json_envelope("vault.plan.trailer.validate", "unchanged", payload),
-                indent=2,
+                **json_format_kwargs(),
             )
         )
         return

@@ -20,6 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from vaultspec_core.cli.json_output import json_format_kwargs
 from vaultspec_core.cli.rendering_outcomes import json_envelope
 from vaultspec_core.console import get_console
 from vaultspec_core.core.dry_run import (
@@ -28,6 +29,7 @@ from vaultspec_core.core.dry_run import (
     count_by_status,
     group_by_label,
 )
+from vaultspec_core.core.windowing import Window, apply_window, elision_line
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -169,7 +171,12 @@ def emit_record(
         data: dict[str, object] = dict(record_as_json(fields))
         if extra_json:
             data.update(extra_json)
-        print(json.dumps(json_envelope(command, status, data, hints=hints), indent=2))
+        print(
+            json.dumps(
+                json_envelope(command, status, data, hints=hints),
+                **json_format_kwargs(),
+            )
+        )
     else:
         render_record(fields, title=title)
 
@@ -275,12 +282,23 @@ def emit_listing(
     status: str = "unchanged",
     extra_json: Mapping[str, object] | None = None,
     hints: Mapping[str, object] | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+    noun: str = "rows",
 ) -> None:
     """Emit a listing as text or as the canonical JSON envelope.
 
-    The shared exit point for multi-row surfaces. The text and JSON forms consume
-    the same rows and columns, so they cannot drift. The JSON ``data`` carries
-    ``items`` (the full per-row payload with no truncation).
+    The shared exit point for multi-row surfaces. The text and JSON forms
+    consume the same rows and columns, so they cannot drift.
+
+    When *limit* is supplied the rows are cut to a bounded window **before**
+    the format branch, and both surfaces report that window from the same
+    numbers: the JSON ``data`` carries ``returned`` / ``total`` /
+    ``truncated`` / ``next_offset`` beside ``items``, and the text rendering
+    prints the matching notice. ``limit=None`` leaves the listing unbounded,
+    which is a transitional state - an unbounded machine payload is
+    non-conformant under the envelope ADR, and callers are being moved onto
+    windows one surface at a time.
 
     Args:
         rows: One mapping per item (see :func:`render_listing`).
@@ -293,15 +311,32 @@ def emit_listing(
         status: The envelope's aggregate ``status`` word.
         extra_json: Optional extra keys merged into the envelope ``data``.
         hints: Optional structured next-step hint.
+        limit: Maximum rows to carry. ``None`` leaves the listing unbounded.
+        offset: Rows to skip, for resuming a previous window.
+        noun: Plural noun naming the rows in the text elision notice.
     """
+    window: Window | None = None
+    if limit is not None or offset:
+        rows, window = apply_window(rows, limit=limit, offset=offset)
+
     if json_output:
         import json
 
         data: dict[str, object] = {"items": listing_as_json(rows, columns)}
+        if window is not None:
+            data.update(window.as_fields())
         if extra_json:
             data.update(extra_json)
-        print(json.dumps(json_envelope(command, status, data, hints=hints), indent=2))
+        print(
+            json.dumps(
+                json_envelope(command, status, data, hints=hints),
+                **json_format_kwargs(),
+            )
+        )
     else:
+        notice = elision_line(window, noun) if window is not None else None
+        if notice:
+            summary = f"{summary}\n{notice}" if summary else notice
         render_listing(rows, columns, title=title, summary=summary, empty=empty)
 
 

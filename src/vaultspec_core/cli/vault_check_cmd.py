@@ -27,14 +27,19 @@ existed to dodge, so the suppressions stop being necessary.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 import typer
 
 from vaultspec_core.cli._target import TargetOption, apply_target
+from vaultspec_core.cli.json_output import json_format_kwargs
 from vaultspec_core.cli.vault_cmd_app import check_app, sanitize_app
+from vaultspec_core.core.windowing import windowed_section
+from vaultspec_core.vaultcore.checks._base import DIAGNOSTIC_RENDER_CAP
 
 if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
+
     from vaultspec_core.vaultcore.checks._base import CheckResult
 
 __all__ = [
@@ -92,24 +97,75 @@ def _check_status(results: list[CheckResult]) -> str:
     return "unchanged"
 
 
+#: Shared paging options for the check verbs.
+#:
+#: A cap with no way past it converts a saturation failure into a workflow one:
+#: an agent remediating a broken vault could see the first findings and had no
+#: mechanism to reach the rest. Aggregate counts are never windowed, so
+#: severity totals stay exact on any page.
+LimitOption = Annotated[
+    int | None, typer.Option("--limit", help="Maximum findings to return per check")
+]
+OffsetOption = Annotated[
+    int, typer.Option("--offset", help="Findings to skip, for paging")
+]
+
+
+def _bounded_check_payload(
+    result: object, *, limit: int | None = None, offset: int = 0
+) -> dict[str, Any]:
+    """Render one check result with its diagnostics bounded.
+
+    ``dataclasses.asdict`` returned every finding, so the machine payload grew
+    with how broken the vault was and was largest exactly when a caller could
+    least afford it: measured 6,962 bytes clean, 137,323 at 5% of documents
+    damaged, 2,211,057 fully damaged, while the human rendering converged at
+    69,119 because it had a cap. Counts are untouched, so severity totals stay
+    exact however many findings are withheld.
+
+    Args:
+        result: The check result to render.
+        limit: Maximum findings to carry.
+        offset: Findings to skip, for paging.
+
+    Returns:
+        The result mapping with ``diagnostics`` replaced by a window.
+    """
+    import dataclasses
+
+    payload: dict[str, Any] = dataclasses.asdict(cast("DataclassInstance", result))
+    diagnostics = payload.get("diagnostics")
+    if isinstance(diagnostics, list):
+        payload["diagnostics"] = windowed_section(
+            diagnostics,  # pyright: ignore[reportUnknownArgumentType]
+            limit=DIAGNOSTIC_RENDER_CAP if limit is None else limit,
+            offset=offset,
+        )
+    return payload
+
+
 def _render_and_exit(
     result: CheckResult,
     verbose: bool,
     json_output: bool = False,
     *,
     command: str,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> None:
     """Render a CheckResult and exit with appropriate code."""
     if json_output:
-        import dataclasses
         import json
 
         from vaultspec_core.cli.rendering import json_envelope
 
         envelope = json_envelope(
-            command, _check_status([result]), dataclasses.asdict(result)
+            command,
+            _check_status([result]),
+            _bounded_check_payload(result, limit=limit, offset=offset),
+            version=2,
         )
-        typer.echo(json.dumps(envelope, indent=2, default=str))
+        typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
         raise typer.Exit(code=1 if result.error_count else 0)
     from vaultspec_core.console import get_console
     from vaultspec_core.vaultcore.checks import render_check_result
@@ -136,6 +192,8 @@ def cmd_check_all(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     no_hints: Annotated[
         bool, typer.Option("--no-hints", help="Suppress next-step advisory hints")
     ] = False,
@@ -168,7 +226,6 @@ def cmd_check_all(
     )
 
     if json_output:
-        import dataclasses
         import json
 
         from vaultspec_core.cli.rendering import json_envelope
@@ -176,10 +233,15 @@ def cmd_check_all(
         envelope = json_envelope(
             "vault.check.all",
             _check_status(results),
-            {"checks": [dataclasses.asdict(r) for r in results]},
+            {
+                "checks": [
+                    _bounded_check_payload(r, limit=limit, offset=offset)
+                    for r in results
+                ]
+            },
             hints=hint_dict,
         )
-        typer.echo(json.dumps(envelope, indent=2, default=str))
+        typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
         raise typer.Exit(0 if total_errors == 0 else 1)
 
     console.print("[bold]Vault Check  - All[/bold]")
@@ -222,6 +284,8 @@ def cmd_check_body_links(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Find wiki-links and markdown path links in document body text."""
@@ -236,7 +300,12 @@ def cmd_check_body_links(
         _get_ctx().target_dir, snapshot=snapshot, feature=feature, fix=fix
     )
     _render_and_exit(
-        result, verbose, json_output=json_output, command="vault.check.body-links"
+        result,
+        verbose,
+        json_output=json_output,
+        limit=limit,
+        offset=offset,
+        command="vault.check.body-links",
     )
 
 
@@ -249,6 +318,8 @@ def cmd_check_exec_mapping(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Check execution records map to a live Step in their parent plan."""
@@ -262,7 +333,12 @@ def cmd_check_exec_mapping(
         _get_ctx().target_dir, snapshot=snapshot, feature=feature
     )
     _render_and_exit(
-        result, verbose, json_output=json_output, command="vault.check.exec-mapping"
+        result,
+        verbose,
+        json_output=json_output,
+        limit=limit,
+        offset=offset,
+        command="vault.check.exec-mapping",
     )
 
 
@@ -275,6 +351,8 @@ def cmd_check_body_sections(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Check document bodies carry the sections their template mandates."""
@@ -291,6 +369,8 @@ def cmd_check_body_sections(
         result,
         verbose,
         json_output=json_output,
+        limit=limit,
+        offset=offset,
         command="vault.check.body-sections",
     )
 
@@ -308,6 +388,8 @@ def cmd_check_annotations(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Find generated template annotations in vault documents."""
@@ -317,7 +399,12 @@ def cmd_check_annotations(
 
     result = check_annotations(_get_ctx().target_dir, feature=feature, fix=fix)
     _render_and_exit(
-        result, verbose, json_output=json_output, command="vault.check.annotations"
+        result,
+        verbose,
+        json_output=json_output,
+        limit=limit,
+        offset=offset,
+        command="vault.check.annotations",
     )
 
 
@@ -334,6 +421,8 @@ def cmd_check_markdown(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Check and optionally fix markdown hygiene (whitespace, blank runs, \
@@ -344,7 +433,12 @@ newline)."""
 
     result = check_markdown(_get_ctx().target_dir, feature=feature, fix=fix)
     _render_and_exit(
-        result, verbose, json_output=json_output, command="vault.check.markdown"
+        result,
+        verbose,
+        json_output=json_output,
+        limit=limit,
+        offset=offset,
+        command="vault.check.markdown",
     )
 
 
@@ -357,6 +451,8 @@ def cmd_check_placeholders(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Find unreplaced {...} template placeholders in document body prose."""
@@ -374,6 +470,8 @@ def cmd_check_placeholders(
         result,
         verbose,
         json_output=json_output,
+        limit=limit,
+        offset=offset,
         command="vault.check.placeholders",
     )
 
@@ -391,6 +489,8 @@ def cmd_check_dangling(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Find wiki-links in related: frontmatter that resolve to no document."""
@@ -404,7 +504,12 @@ def cmd_check_dangling(
         _get_ctx().target_dir, graph=graph, feature=feature, fix=fix
     )
     _render_and_exit(
-        result, verbose, json_output=json_output, command="vault.check.dangling"
+        result,
+        verbose,
+        json_output=json_output,
+        limit=limit,
+        offset=offset,
+        command="vault.check.dangling",
     )
 
 
@@ -421,6 +526,8 @@ def cmd_check_orphans(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Find documents with no incoming wiki-links."""
@@ -433,7 +540,12 @@ def cmd_check_orphans(
     graph = VaultGraph(_get_ctx().target_dir)
     result = check_orphans(_get_ctx().target_dir, graph=graph, feature=feature)
     _render_and_exit(
-        result, verbose, json_output=json_output, command="vault.check.orphans"
+        result,
+        verbose,
+        json_output=json_output,
+        limit=limit,
+        offset=offset,
+        command="vault.check.orphans",
     )
 
 
@@ -450,6 +562,8 @@ def cmd_check_frontmatter(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Validate document frontmatter against vault schema."""
@@ -464,7 +578,12 @@ def cmd_check_frontmatter(
         _get_ctx().target_dir, snapshot=snapshot, feature=feature, fix=fix
     )
     _render_and_exit(
-        result, verbose, json_output=json_output, command="vault.check.frontmatter"
+        result,
+        verbose,
+        json_output=json_output,
+        limit=limit,
+        offset=offset,
+        command="vault.check.frontmatter",
     )
 
 
@@ -481,6 +600,8 @@ def cmd_check_modified_stamp(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Validate and reconcile the modified recency stamp on every document."""
@@ -498,6 +619,8 @@ def cmd_check_modified_stamp(
         result,
         verbose,
         json_output=json_output,
+        limit=limit,
+        offset=offset,
         command="vault.check.modified-stamp",
     )
 
@@ -515,6 +638,8 @@ def cmd_check_links(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Check wiki-links follow Obsidian convention (no .md extension)."""
@@ -529,7 +654,12 @@ def cmd_check_links(
         _get_ctx().target_dir, snapshot=snapshot, feature=feature, fix=fix
     )
     _render_and_exit(
-        result, verbose, json_output=json_output, command="vault.check.links"
+        result,
+        verbose,
+        json_output=json_output,
+        limit=limit,
+        offset=offset,
+        command="vault.check.links",
     )
 
 
@@ -546,6 +676,8 @@ def cmd_check_features(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Check feature tag completeness  - missing doc types."""
@@ -559,7 +691,12 @@ def cmd_check_features(
     snapshot = graph.to_snapshot()
     result = check_features(_get_ctx().target_dir, snapshot=snapshot, feature=feature)
     _render_and_exit(
-        result, verbose, json_output=json_output, command="vault.check.features"
+        result,
+        verbose,
+        json_output=json_output,
+        limit=limit,
+        offset=offset,
+        command="vault.check.features",
     )
 
 
@@ -576,6 +713,8 @@ def cmd_check_references(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Check for missing cross-references within features."""
@@ -589,7 +728,12 @@ def cmd_check_references(
         _get_ctx().target_dir, graph=graph, feature=feature, fix=fix
     )
     _render_and_exit(
-        result, verbose, json_output=json_output, command="vault.check.references"
+        result,
+        verbose,
+        json_output=json_output,
+        limit=limit,
+        offset=offset,
+        command="vault.check.references",
     )
 
 
@@ -606,6 +750,8 @@ def cmd_check_schema(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Enforce schema rules: ADRs must ref research, plans must ref ADRs."""
@@ -617,7 +763,12 @@ def cmd_check_schema(
     graph = VaultGraph(_get_ctx().target_dir)
     result = check_schema(_get_ctx().target_dir, graph=graph, feature=feature, fix=fix)
     _render_and_exit(
-        result, verbose, json_output=json_output, command="vault.check.schema"
+        result,
+        verbose,
+        json_output=json_output,
+        limit=limit,
+        offset=offset,
+        command="vault.check.schema",
     )
 
 
@@ -634,6 +785,8 @@ def cmd_check_adr_status(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Validate ADR status against the canonical taxonomy."""
@@ -648,7 +801,12 @@ def cmd_check_adr_status(
         _get_ctx().target_dir, snapshot=snapshot, feature=feature, fix=fix
     )
     _render_and_exit(
-        result, verbose, json_output=json_output, command="vault.check.adr-status"
+        result,
+        verbose,
+        json_output=json_output,
+        limit=limit,
+        offset=offset,
+        command="vault.check.adr-status",
     )
 
 
@@ -666,6 +824,8 @@ def cmd_check_code_boundary(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Scan source files for references to the project's own vault records.
@@ -682,6 +842,8 @@ def cmd_check_code_boundary(
         result,
         verbose,
         json_output=json_output,
+        limit=limit,
+        offset=offset,
         command="vault.check.code-boundary",
     )
 
@@ -696,6 +858,8 @@ def cmd_check_structure(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Check vault directory structure and filename conventions."""
@@ -708,7 +872,12 @@ def cmd_check_structure(
     snapshot = graph.to_snapshot()
     result = check_structure(_get_ctx().target_dir, snapshot=snapshot, fix=fix)
     _render_and_exit(
-        result, verbose, json_output=json_output, command="vault.check.structure"
+        result,
+        verbose,
+        json_output=json_output,
+        limit=limit,
+        offset=offset,
+        command="vault.check.structure",
     )
 
 
@@ -731,6 +900,8 @@ def cmd_check_rename_integrity(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Check name/filename integrity for rules, skills, and agents."""
@@ -753,6 +924,8 @@ def cmd_check_rename_integrity(
         result,
         verbose,
         json_output=json_output,
+        limit=limit,
+        offset=offset,
         command="vault.check.rename-integrity",
     )
 
@@ -763,6 +936,8 @@ def cmd_check_encoding(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Surface .vault/ documents that are not valid UTF-8 (detection only).
@@ -776,7 +951,12 @@ def cmd_check_encoding(
 
     result = check_encoding(_get_ctx().target_dir)
     _render_and_exit(
-        result, verbose, json_output=json_output, command="vault.check.encoding"
+        result,
+        verbose,
+        json_output=json_output,
+        limit=limit,
+        offset=offset,
+        command="vault.check.encoding",
     )
 
 
@@ -786,6 +966,8 @@ def cmd_check_feature_rename_integrity(
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Surface exec folders whose feature disagrees with their records' tag.
@@ -804,6 +986,8 @@ def cmd_check_feature_rename_integrity(
         result,
         verbose,
         json_output=json_output,
+        limit=limit,
+        offset=offset,
         command="vault.check.feature-rename-integrity",
     )
 
@@ -820,6 +1004,8 @@ def cmd_sanitize_annotations(
         bool, typer.Option("--verbose", "-v", help="Show stripped files")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
     """Strip generated template annotations from vault documents."""
@@ -849,5 +1035,7 @@ def cmd_sanitize_annotations(
         result,
         verbose or dry_run,
         json_output=json_output,
+        limit=limit,
+        offset=offset,
         command="vault.sanitize.annotations",
     )

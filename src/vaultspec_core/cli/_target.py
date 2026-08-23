@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from vaultspec_core.cli.json_output import json_format_kwargs
+
 if TYPE_CHECKING:
     from vaultspec_core.vaultcore.query import VaultDocument
 
@@ -165,7 +167,7 @@ def apply_target(
             envelope = json_envelope(
                 "error", "failed", {"message": str(e), "hint": hint}
             )
-            print(json.dumps(envelope, indent=2))
+            print(json.dumps(envelope, **json_format_kwargs()))
         else:
             typer.echo(f"Error: {e}\n{hint}", err=True)
         raise typer.Exit(code=1) from e

@@ -476,26 +476,42 @@ class TestVaultGraphScopingFlags:
         )
         return ranked[0]["id"]
 
-    def test_full_graph_includes_derived_edges_by_default(
-        self, runner: CliRunner, synthetic_project: Path
-    ):
+    def test_derived_edges_are_opt_in(self, runner: CliRunner, synthetic_project: Path):
+        """The default export omits the derived set.
+
+        Derived edges are a computed similarity ranking rather than vault
+        state, and they were 94% of a full export - 261 MB of a 416 MB payload
+        at 10,476 documents. A caller that wants the ranking asks for it.
+        """
         payload = self._graph_json(runner, synthetic_project)
         assert payload["schema"] == "vaultspec.vault.graph.v2"
         data = payload["data"]
         assert "derived_edges" in data
         assert "edges" in data
-        # derived_edges is a distinct array, never folded into edges.
-        assert isinstance(data["derived_edges"], list)
-        assert len(data["derived_edges"]) > 0
+        assert data["derived_edges"] == []
 
-    def test_no_derived_empties_the_derived_array(
+    def test_derived_flag_includes_the_ranking_and_states_its_total(
         self, runner: CliRunner, synthetic_project: Path
     ):
-        payload = self._graph_json(runner, synthetic_project, "--no-derived")
-        assert payload["data"]["derived_edges"] == []
-        # The canonical edges array is unaffected by the derived toggle.
-        with_derived = self._graph_json(runner, synthetic_project)
-        assert payload["data"]["edges"] == with_derived["data"]["edges"]
+        """Asking for the ranking returns it, capped, with its full total."""
+        payload = self._graph_json(runner, synthetic_project, "--derived")
+        data = payload["data"]
+
+        assert isinstance(data["derived_edges"], list)
+        assert len(data["derived_edges"]) > 0
+        assert data["derived_edges_total"] >= len(data["derived_edges"])
+        assert data["derived_edges_truncated"] == (
+            len(data["derived_edges"]) < data["derived_edges_total"]
+        )
+
+    def test_the_derived_toggle_does_not_disturb_canonical_edges(
+        self, runner: CliRunner, synthetic_project: Path
+    ):
+        """The real edge set is the same either way."""
+        default = self._graph_json(runner, synthetic_project)
+        with_derived = self._graph_json(runner, synthetic_project, "--derived")
+
+        assert default["data"]["edges"] == with_derived["data"]["edges"]
 
     def test_node_scopes_to_ego_neighbourhood(
         self, runner: CliRunner, synthetic_project: Path

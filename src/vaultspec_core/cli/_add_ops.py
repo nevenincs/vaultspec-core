@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING, NoReturn, cast
 
 import typer
 
+from vaultspec_core.cli.json_output import json_format_kwargs
+
 if TYPE_CHECKING:
     from collections.abc import Generator, Mapping, Sequence
     from pathlib import Path
@@ -226,7 +228,7 @@ def _echo_dependency_json(diagnostics: Sequence[str], errors: Sequence[str]) -> 
     typer.echo(
         json.dumps(
             json_envelope("vault.add", "failed", {"message": " ".join(errors)}),
-            indent=2,
+            **json_format_kwargs(),
         )
     )
 
@@ -447,7 +449,7 @@ def emit_add_result(
     typer.echo(
         json.dumps(
             json_envelope("vault.add", "created", data, hints=hints),
-            indent=2,
+            **json_format_kwargs(),
         )
     )
 

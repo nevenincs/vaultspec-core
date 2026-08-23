@@ -34,10 +34,11 @@ from typing import TYPE_CHECKING, Any, cast
 
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ...core.types import get_context as _get_ctx
 from ..catalog import RESERVED_FLAGS, CatalogEntry, CommandCatalog, build_catalog
+from ..envelope import LeanModel, compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
@@ -60,7 +61,7 @@ _DEFAULT_TIMEOUT = 60.0
 # ---------------------------------------------------------------------------
 
 
-class FlagSchema(BaseModel):
+class FlagSchema(LeanModel):
     """One declared option of a discovered verb.
 
     Attributes:
@@ -74,7 +75,7 @@ class FlagSchema(BaseModel):
     help: str = ""
 
 
-class ArgumentSchema(BaseModel):
+class ArgumentSchema(LeanModel):
     """One declared positional argument of a discovered verb.
 
     Attributes:
@@ -89,7 +90,7 @@ class ArgumentSchema(BaseModel):
     variadic: bool = False
 
 
-class VerbSchema(BaseModel):
+class VerbSchema(LeanModel):
     """A ranked verb returned by ``discover`` with its full parameter schema.
 
     Attributes:
@@ -110,7 +111,7 @@ class VerbSchema(BaseModel):
     arguments: list[ArgumentSchema] = Field(default_factory=list)
 
 
-class DiscoverResult(BaseModel):
+class DiscoverResult(LeanModel):
     """The whole-call result of a ``discover`` invocation.
 
     Attributes:
@@ -129,7 +130,7 @@ class DiscoverResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class InvokeError(BaseModel):
+class InvokeError(LeanModel):
     """The structured failure payload of a verb that ran but did not succeed.
 
     Attributes:
@@ -147,7 +148,7 @@ class InvokeError(BaseModel):
     message: str
 
 
-class InvokeResult(BaseModel):
+class InvokeResult(LeanModel):
     """The whole-call result of an ``invoke`` invocation.
 
     A verb that runs and exits non-zero is a *successful* ``invoke`` reporting
@@ -361,6 +362,36 @@ def _parse_verb(verb: str) -> tuple[str, ...]:
 # ---------------------------------------------------------------------------
 
 
+def _discover_summary(payload: object) -> str:
+    """Summarise a discover result as its match count.
+
+    Args:
+        payload: The ``DiscoverResult`` the tool returned.
+
+    Returns:
+        A one-line match count.
+    """
+    count = getattr(payload, "count", None)
+    return f"{count} verbs" if count is not None else "verb search"
+
+
+def _invoke_summary(payload: object) -> str:
+    """Summarise an invoke result as its verb and outcome.
+
+    Args:
+        payload: The ``InvokeResult`` the tool returned.
+
+    Returns:
+        A one-line outcome, naming the failure kind when the verb failed.
+    """
+    verb = getattr(payload, "verb", "?")
+    if getattr(payload, "ok", False):
+        return f"{verb}: ok"
+    error = getattr(payload, "error", None)
+    kind = getattr(error, "kind", None)
+    return f"{verb}: failed ({kind})" if kind else f"{verb}: failed"
+
+
 def register_gateway_tools(
     mcp: MCPServer[None], *, include_invoke: bool = True
 ) -> None:
@@ -384,6 +415,7 @@ def register_gateway_tools(
             open_world_hint=False,
         ),
     )
+    @compact_result(_discover_summary)
     @_isolated_context
     async def discover(
         ctx: Context[Any, Any], query: str, limit: int = 10
@@ -436,6 +468,7 @@ def register_gateway_tools(
         ]
         return DiscoverResult(query=query, count=len(verbs), verbs=verbs)
 
+    @compact_result(_invoke_summary)
     @_isolated_context
     async def invoke(
         ctx: Context[Any, Any],
@@ -444,14 +477,12 @@ def register_gateway_tools(
         positionals: list[str] | None = None,
         timeout: float = _DEFAULT_TIMEOUT,
     ) -> InvokeResult:
-        """Execute one cataloged long-tail verb against the installed binary.
-
-        Validates ``verb`` against the parsed catalog and the static denylist
-        before anything spawns, then runs the installed ``vaultspec-core``
-        binary as an argv list (never a shell) with ``--target`` injected and
-        ``--json`` appended where the verb supports it. Returns parsed JSON on a
-        clean exit, captured stdout otherwise; a non-zero exit folds stderr into
-        a structured error payload while remaining a successful call.
+        # The spawn contract - argv list never a shell, --target injected,
+        # denylist checked before anything starts - is documented on the module
+        # rather than in this docstring. It constrains the implementation, not
+        # the caller, and every character here is re-sent on every turn.
+        """Execute one cataloged verb. A verb that runs and fails is still a
+        successful call; its exit code and stderr arrive in the error payload.
 
         Args:
             ctx: The MCP request context (unused; logging routes through the

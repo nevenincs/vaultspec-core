@@ -265,12 +265,18 @@ class Rollup:
         totals: The dict returned by
             :func:`~vaultspec_core.vaultcore.query.get_stats`, reused
             verbatim so the rollup echoes the established stats surface.
-        limit: The recency limit applied to ``recent_documents``.
+        active_features_total: Features active before the cap. ``status`` is
+            the first call of every session, so its largest field is windowed;
+            without the total a caller cannot tell a small vault from a
+            truncated view.
+        limit: The recency limit applied to ``recent_documents`` and to
+            ``active_features``.
         since_days: The day-window applied, or ``None`` when the
             count-based default was used.
     """
 
     active_features: list[ActiveFeature]
+    active_features_total: int
     plans_in_flight: list[PlanInFlight]
     recently_completed: list[PlanInFlight]
     recent_documents: dict[str, list[RecentDocument]]

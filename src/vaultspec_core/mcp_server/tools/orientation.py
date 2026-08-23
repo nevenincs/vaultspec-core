@@ -19,10 +19,11 @@ from typing import TYPE_CHECKING, Any
 
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ... import __version__
 from ...core.types import get_context as _get_ctx
+from ..envelope import LeanModel, compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
@@ -41,7 +42,7 @@ __all__ = ["register_orientation_tools"]
 # ---------------------------------------------------------------------------
 
 
-class FeatureStatus(BaseModel):
+class FeatureStatus(LeanModel):
     """One active feature in the project-wide orientation view.
 
     Attributes:
@@ -66,7 +67,7 @@ class FeatureStatus(BaseModel):
     plan_completion_percent: float = 0.0
 
 
-class PlanProgressLine(BaseModel):
+class PlanProgressLine(LeanModel):
     """A plan in flight, pre-shaped for the orientation view.
 
     Attributes:
@@ -90,7 +91,7 @@ class PlanProgressLine(BaseModel):
     next_open_step: str | None
 
 
-class StepTraceLine(BaseModel):
+class StepTraceLine(LeanModel):
     """One plan step mapped to its execution record in a trace.
 
     Attributes:
@@ -107,7 +108,7 @@ class StepTraceLine(BaseModel):
     record_stem: str | None
 
 
-class PlanTraceLine(BaseModel):
+class PlanTraceLine(LeanModel):
     """The grounding trace for a single plan.
 
     Attributes:
@@ -142,7 +143,7 @@ class PlanTraceLine(BaseModel):
     error: str | None = None
 
 
-class StatusResult(BaseModel):
+class StatusResult(LeanModel):
     """The whole-call result of a ``status`` invocation.
 
     Carries no blob hashes: orientation is hash-free, and the read-then-edit
@@ -153,7 +154,10 @@ class StatusResult(BaseModel):
             survives the stateless protocol where ``initialize`` disappears.
         kind: ``"rollup"`` for the project-wide view or ``"trace"`` for a
             targeted feature-or-plan trace.
-        features: Active features (rollup mode only).
+        features: Active features (rollup mode only), capped and ordered by
+            latest activity.
+        features_total: Active features before the cap, so a caller can tell
+            a small vault from a truncated view (rollup mode only).
         plans_in_flight: Plans with at least one open step (rollup mode only).
         totals: The vault statistics dict (rollup mode only).
         target: The trace target as submitted (trace mode only).
@@ -165,6 +169,7 @@ class StatusResult(BaseModel):
     tool_schema_version: str
     kind: str
     features: list[FeatureStatus] = Field(default_factory=list)
+    features_total: int = 0
     plans_in_flight: list[PlanProgressLine] = Field(default_factory=list)
     totals: dict[str, Any] = Field(default_factory=dict)
     target: str | None = None
@@ -177,7 +182,7 @@ class StatusResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class CheckFinding(BaseModel):
+class CheckFinding(LeanModel):
     """One finding from a vault health check.
 
     Attributes:
@@ -196,7 +201,7 @@ class CheckFinding(BaseModel):
     fixable: bool
 
 
-class CheckReportLine(BaseModel):
+class CheckReportLine(LeanModel):
     """The per-checker summary line.
 
     Attributes:
@@ -216,7 +221,7 @@ class CheckReportLine(BaseModel):
     clean: bool
 
 
-class CheckResultModel(BaseModel):
+class CheckResultModel(LeanModel):
     """The whole-call result of a ``check`` invocation.
 
     Attributes:
@@ -227,7 +232,15 @@ class CheckResultModel(BaseModel):
         total_warnings: Aggregate warning-severity finding count.
         total_fixed: Aggregate auto-corrected count.
         checks: The per-checker summary lines.
-        findings: The flattened error- and warning-severity findings.
+        findings: The flattened error- and warning-severity findings, capped.
+            Payload size tracks how broken the vault is, so this is largest
+            exactly when a caller can least afford it: uncapped it reached
+            402,967 bytes on a 10,476-document vault, past a 200k-token window
+            on its own.
+        findings_total: Findings before the cap. The per-check counts in
+            ``checks`` and the aggregate totals are never capped, so severity
+            arithmetic stays exact however many rows are withheld.
+        findings_truncated: Whether any finding was withheld.
     """
 
     status: str
@@ -237,6 +250,8 @@ class CheckResultModel(BaseModel):
     total_fixed: int
     checks: list[CheckReportLine] = Field(default_factory=list)
     findings: list[CheckFinding] = Field(default_factory=list)
+    findings_total: int = 0
+    findings_truncated: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -249,6 +264,7 @@ def _rollup_to_result(rollup: Rollup) -> StatusResult:
     return StatusResult(
         tool_schema_version=__version__,
         kind="rollup",
+        features_total=rollup.active_features_total,
         features=[
             FeatureStatus(
                 name=f.name,
@@ -327,6 +343,15 @@ def _trace_to_result(trace: GroundingTrace) -> StatusResult:
     )
 
 
+#: Findings carried on the MCP check surface.
+#:
+#: The per-checker counts and the aggregate totals are never capped, so a
+#: caller always knows the true severity picture; the cap governs only how many
+#: individual rows travel. Matches the CLI's render cap so the two surfaces
+#: agree.
+_MCP_FINDING_CAP = 50
+
+
 def _checks_to_result(results: list[CheckResult], *, fix: bool) -> CheckResultModel:
     """Fold the per-checker results into the ``check`` output model."""
     checks: list[CheckReportLine] = []
@@ -362,6 +387,7 @@ def _checks_to_result(results: list[CheckResult], *, fix: bool) -> CheckResultMo
                 )
             )
 
+    capped = findings[:_MCP_FINDING_CAP]
     return CheckResultModel(
         status="ok" if total_errors == 0 else "failed",
         fixed=fix,
@@ -369,7 +395,9 @@ def _checks_to_result(results: list[CheckResult], *, fix: bool) -> CheckResultMo
         total_warnings=total_warnings,
         total_fixed=total_fixed,
         checks=checks,
-        findings=findings,
+        findings=capped,
+        findings_total=len(findings),
+        findings_truncated=len(capped) < len(findings),
     )
 
 
@@ -395,6 +423,44 @@ def _run_check(feature: str | None, *, fix: bool) -> CheckResultModel:
     return report
 
 
+def _status_summary(payload: object) -> str:
+    """Summarise a status result as its headline counts.
+
+    Args:
+        payload: The ``StatusResult`` the tool returned.
+
+    Returns:
+        A one-line orientation summary.
+    """
+    features = getattr(payload, "features", None)
+    plans = getattr(payload, "plans_in_flight", None)
+    if not features and not plans:
+        return "grounding trace"
+    total = getattr(payload, "features_total", 0)
+    shown = len(features) if features is not None else 0
+    suffix = f" of {total}" if total > shown else ""
+    return (
+        f"{shown}{suffix} active features, "
+        f"{len(plans) if plans is not None else 0} plans in flight"
+    )
+
+
+def _check_summary(payload: object) -> str:
+    """Summarise a check result as its error and warning totals.
+
+    Args:
+        payload: The ``CheckResultModel`` the tool returned.
+
+    Returns:
+        A one-line health summary.
+    """
+    errors = getattr(payload, "total_errors", None)
+    warnings = getattr(payload, "total_warnings", None)
+    if errors is None and warnings is None:
+        return "check complete"
+    return f"{errors or 0} errors, {warnings or 0} warnings"
+
+
 def register_orientation_tools(
     mcp: MCPServer[None], *, include_fix: bool = True
 ) -> None:
@@ -418,6 +484,7 @@ def register_orientation_tools(
             open_world_hint=False,
         ),
     )
+    @compact_result(_status_summary)
     @_isolated_context
     async def status(ctx: Context[Any, Any], target: str | None = None) -> StatusResult:
         """Orient in a vaultspec project, project-wide or targeted.
@@ -472,6 +539,7 @@ def register_orientation_tools(
                 open_world_hint=False,
             ),
         )
+        @compact_result(_check_summary)
         @_isolated_context
         async def check_with_fix(
             ctx: Context[Any, Any],
@@ -494,6 +562,7 @@ def register_orientation_tools(
                 open_world_hint=False,
             ),
         )
+        @compact_result(_check_summary)
         @_isolated_context
         async def check_read_only(
             ctx: Context[Any, Any], feature: str | None = None

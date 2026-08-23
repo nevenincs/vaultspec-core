@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
+from ..core.windowing import windowed_section
 from ..migrations import MigrationStatus, migration_status, run_pending_migrations
 from .checks import CheckDiagnostic, CheckResult, Severity, run_all_checks
 
@@ -304,7 +305,17 @@ def _stage_dry_run_finish(state: _PipelineState) -> bool:
         run.phases.append(_skipped_index_phase("disabled by --no-index"))
     run.postcheck = state.initial_checks
     run.phases.append(
-        _checks_phase(RepairPhase.POSTCHECK, state.initial_checks, dry_run=True)
+        # A dry run writes nothing, so re-running the checkers cannot change
+        # what they find: this phase re-reports `state.initial_checks`, the
+        # same object the check phase already carried. Measured at 10,476
+        # documents the two phases held byte-identical diagnostic sets of 170
+        # findings each. Counts stay; the second copy does not.
+        _checks_phase(
+            RepairPhase.POSTCHECK,
+            state.initial_checks,
+            dry_run=True,
+            include_diagnostics=False,
+        )
     )
     run.unresolved = _collect_unresolved(state.initial_checks)
     return True
@@ -433,11 +444,28 @@ def _checks_phase(
     results: list[CheckResult],
     *,
     dry_run: bool = False,
+    include_diagnostics: bool = True,
 ) -> dict[str, Any]:
+    """Summarise one check pass as a phase entry.
+
+    Args:
+        phase: Which pass this is.
+        results: The checker results for the pass.
+        dry_run: Whether the pass ran without writing.
+        include_diagnostics: Whether each checker's findings travel with it.
+            Set ``False`` where the findings are provably identical to a phase
+            already in the payload; counts are always kept.
+
+    Returns:
+        The phase entry.
+    """
     return {
         "phase": phase.value,
         "dry_run": dry_run,
-        "checks": [_result_summary(result) for result in results],
+        "checks": [
+            _result_summary(result, include_diagnostics=include_diagnostics)
+            for result in results
+        ],
         "error_count": sum(result.error_count for result in results),
         "warning_count": sum(result.warning_count for result in results),
         "info_count": sum(result.info_count for result in results),
@@ -445,18 +473,36 @@ def _checks_phase(
     }
 
 
-def _result_summary(result: CheckResult) -> dict[str, Any]:
-    return {
+def _result_summary(
+    result: CheckResult, *, include_diagnostics: bool = True
+) -> dict[str, Any]:
+    """Summarise one checker's result.
+
+    Args:
+        result: The checker's outcome.
+        include_diagnostics: Whether the findings travel with the counts.
+
+    Returns:
+        The per-checker summary. When findings are omitted, the counts remain
+        and ``diagnostics_omitted`` says why, so their absence cannot be read
+        as "this checker found nothing".
+    """
+    summary: dict[str, Any] = {
         "check_name": result.check_name,
         "errors": result.error_count,
         "warnings": result.warning_count,
         "info": result.info_count,
         "fixed_count": result.fixed_count,
         "supports_fix": result.supports_fix,
-        "diagnostics": [
-            _diagnostic_payload(result.check_name, d) for d in result.diagnostics
-        ],
     }
+    if include_diagnostics:
+        summary["diagnostics"] = windowed_section(
+            [_diagnostic_payload(result.check_name, d) for d in result.diagnostics],
+            limit=_NESTED_DIAGNOSTIC_LIMIT,
+        )
+    else:
+        summary["diagnostics_omitted"] = "identical to the check phase"
+    return summary
 
 
 def _diagnostic_payload(check_name: str, diag: CheckDiagnostic) -> dict[str, Any]:
@@ -546,6 +592,18 @@ def _collect_unresolved(results: Iterable[CheckResult]) -> list[dict[str, Any]]:
     return unresolved
 
 
+#: Diagnostics carried inside a nested payload section.
+#:
+#: Bounding the *outer* list does not bound the payload: a root-cause bucket
+#: is one row that embeds every diagnostic it grouped, and a per-check summary
+#: is one row per checker that embeds every finding that checker raised. On a
+#: 10,476-document vault with 5% of documents damaged, four root-cause buckets
+#: - four rows, none of them elided - carried 837 KB, and six phase entries
+#: carried 1.68 MB, together 99% of a 2.5 MB payload. A row cap is not a byte
+#: cap wherever a row can contain a collection.
+_NESTED_DIAGNOSTIC_LIMIT = 20
+
+
 def _group_root_causes(results: Iterable[CheckResult]) -> list[dict[str, Any]]:
     buckets: dict[str, list[dict[str, Any]]] = {
         "structure-and-naming": [],
@@ -572,7 +630,11 @@ def _group_root_causes(results: Iterable[CheckResult]) -> list[dict[str, Any]]:
                 buckets["frontmatter-style"].append(payload)
 
     return [
-        {"root_cause": name, "count": len(items), "diagnostics": items}
+        {
+            "root_cause": name,
+            "count": len(items),
+            "diagnostics": windowed_section(items, limit=_NESTED_DIAGNOSTIC_LIMIT),
+        }
         for name, items in buckets.items()
         if items
     ]
@@ -593,6 +655,29 @@ def _refresh_indexes(root_dir: Path, feature: str | None) -> list[Path]:
 
 
 def _index_paths(root_dir: Path, feature: str | None) -> list[Path]:
+    """Return the feature index paths a repair would rewrite.
+
+    Membership comes from one shared graph, sliced per feature. Omitting
+    ``nodes`` here instead would make :func:`generate_feature_index_result`
+    rebuild a fresh cache-disabled ``VaultGraph`` - a full parse of every
+    document in the vault - once per feature, which is
+    ``O(features x documents)``: 130 rebuilds over 1,229 documents measured at
+    112.6 s of a 115 s run, and a projected ~72 minutes at 10,476 documents.
+
+    Passing shared nodes is safe on *this* path specifically. The parameter is
+    documented as one production callers omit so that membership is re-read
+    under the index lock - but the dry-run branch takes ``nullcontext()`` and
+    holds no lock, so there is no lock-ordering guarantee to preserve. It
+    computes what *would* change and writes nothing. The mutating path is a
+    different case and is deliberately left alone here.
+
+    Args:
+        root_dir: Project root directory.
+        feature: Restrict to one feature, or ``None`` for all.
+
+    Returns:
+        The index paths whose canonical content would change.
+    """
     from ..graph import VaultGraph
     from .index import generate_feature_index_result
 
@@ -603,7 +688,9 @@ def _index_paths(root_dir: Path, feature: str | None) -> list[Path]:
         for feat in features
         if feat
         and (
-            result := generate_feature_index_result(root_dir, feat, dry_run=True)
+            result := generate_feature_index_result(
+                root_dir, feat, nodes=graph.get_feature_nodes(feat), dry_run=True
+            )
         ).changed
     ]
 

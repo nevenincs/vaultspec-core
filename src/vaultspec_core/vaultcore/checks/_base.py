@@ -199,10 +199,19 @@ _SEVERITY_ICON = {
 }
 
 
-#: Maximum diagnostics rendered per check on the human surface.  The count
-#: summary above the listing always carries the full totals, the truncation
-#: is explicitly marked, and ``--json`` remains the uncapped machine
-#: contract, per the report-volume policy.
+#: Maximum diagnostics carried per check, on BOTH surfaces.
+#:
+#: This was once a human-render cap that pointed the machine surface at an
+#: uncapped ``--json`` payload. That premise was inverted: the machine consumer
+#: is a context window, not a script, so the cap was being given to the reader
+#: who can scroll and withheld from the one who cannot. Measured on a
+#: 1,222-document vault, ``--json`` grew from 6,962 bytes clean to 2,211,057
+#: fully damaged while the human form converged at 69,119 - largest exactly
+#: when the caller could least afford it, since payload size tracks how broken
+#: the vault is.
+#:
+#: Both surfaces now cut here and both report the totals, so neither can
+#: mislead about what was withheld.
 DIAGNOSTIC_RENDER_CAP = 50
 
 
@@ -216,8 +225,9 @@ def render_check_result(
     """Render a CheckResult to a Rich console.
 
     At most :data:`DIAGNOSTIC_RENDER_CAP` findings are printed per check; a
-    marked truncation line reports how many more exist and points at
-    ``--json`` for the full set.
+    marked truncation line reports how many more exist. The ``--json`` payload
+    applies the same cap and carries the same totals, so the two surfaces agree
+    on what was withheld.
 
     Args:
         console: Rich Console instance.
@@ -282,6 +292,6 @@ def render_check_result(
     if suppressed:
         console.print(
             f"    [dim]... {suppressed} more finding"
-            f"{'s' if suppressed != 1 else ''} not shown; "
-            "use --json for the full set[/dim]"
+            f"{'s' if suppressed != 1 else ''} not shown "
+            "(counts above are complete)[/dim]"
         )

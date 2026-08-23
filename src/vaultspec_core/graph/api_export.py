@@ -18,7 +18,8 @@ import json
 import pathlib
 from typing import TYPE_CHECKING, Any
 
-from .derived import compute_derived_edges
+from ..core.windowing import apply_window
+from .derived import compute_derived_edges, trim_to_top_k
 from .networkx_runtime import node_link_data
 
 if TYPE_CHECKING:
@@ -61,6 +62,8 @@ def to_dict(
     node: str | None = None,
     depth: int = 1,
     include_derived: bool = True,
+    derived_limit: int | None = None,
+    derived_offset: int = 0,
 ) -> dict[str, Any]:
     """Return *graph* as a JSON-serialisable dictionary.
 
@@ -84,6 +87,9 @@ def to_dict(
             Defaults to ``False`` to keep output compact.
         node: When set, export the ego subgraph around this node key.
         depth: Ego-graph radius in hops; only used when *node* is set.
+        derived_limit: Maximum derived edges to carry. ``None`` applies the
+            per-node fan-out cap only.
+        derived_offset: Derived edges to skip, for paging.
         include_derived: When ``True`` (default), emit the ``derived_edges``
             array; when ``False`` emit an empty one.
 
@@ -134,10 +140,30 @@ def to_dict(
     # then filtered away. An unscoped (full-graph) export passes scope=None
     # and computes over every pair.
     derived: list[dict[str, Any]] = []
+    derived_total = 0
     if include_derived:
         scope = None if (node is None and feature is None) else set(g.nodes())
-        derived = [edge.to_dict() for edge in compute_derived_edges(graph, scope)]
+        computed = compute_derived_edges(graph, scope)
+        derived_total = len(computed)
+        # Cap fan-out per node. Derived edges are a similarity ranking, and an
+        # exhaustive ranking is not more useful than a good one: the full set at
+        # 10,476 documents is 1,011,120 edges and 261 MB, 94% of the export.
+        kept = trim_to_top_k(computed)
+        # The fan-out cap bounds edges per node, not the total, so a large
+        # graph still yields a large set: 68,878 edges at 10,476 documents.
+        # The window makes that navigable rather than merely smaller.
+        if derived_limit is not None or derived_offset:
+            kept, window = apply_window(
+                kept, limit=derived_limit, offset=derived_offset
+            )
+            data.update(
+                {f"derived_edges_{k}": v for k, v in window.as_fields().items()}
+            )
+        derived = [edge.to_dict() for edge in kept]
     data["derived_edges"] = derived
+    data.setdefault("derived_edges_returned", len(derived))
+    data["derived_edges_total"] = derived_total
+    data["derived_edges_truncated"] = len(derived) < derived_total
 
     # Enrich with vault-specific metadata.
     # Pass the already-computed subgraph so betweenness_centrality runs exactly

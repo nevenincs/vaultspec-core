@@ -22,6 +22,7 @@ from ...graph.derived import (
     COEFF_SHARED_TAG,
     DerivedEdge,
     compute_derived_edges,
+    trim_to_top_k,
 )
 
 pytestmark = [pytest.mark.unit]
@@ -374,3 +375,66 @@ class TestDerivedEdgesNeverEnterCanonicalGraph:
         # canonical directed graph (no real reference connects doc-a/doc-b).
         assert not graph.digraph.has_edge("doc-a", "doc-b")
         assert not graph.digraph.has_edge("doc-b", "doc-a")
+
+
+class TestFanOutCap:
+    """The derived edge set is a ranking, so it is capped per node."""
+
+    def test_dense_fan_out_is_capped(self) -> None:
+        """Between well-connected nodes the cap bites."""
+        names = [f"n{i}" for i in range(8)]
+        edges = [
+            DerivedEdge(source=a, target=b, kind="k", signals={}, weight=1.0 - i * 0.01)
+            for i, (a, b) in enumerate(
+                (a, b) for idx, a in enumerate(names) for b in names[idx + 1 :]
+            )
+        ]
+        assert len(edges) == 28
+
+        kept = trim_to_top_k(edges, top_k=2)
+
+        assert len(kept) < len(edges)
+        for name in names:
+            touching = [e for e in kept if name in (e.source, e.target)]
+            assert touching, f"{name} was stranded"
+
+    def test_a_lone_edge_is_never_dropped(self) -> None:
+        """A node's only link survives however small the cap.
+
+        Each endpoint still has its full quota, so nothing strands the
+        periphery. This is why the cap bounds fan-out rather than total edges.
+        """
+        edges = [
+            DerivedEdge(
+                source="hub",
+                target=f"leaf{i}",
+                kind="k",
+                signals={},
+                weight=1.0 / (i + 1),
+            )
+            for i in range(10)
+        ]
+
+        kept = trim_to_top_k(edges, top_k=3)
+
+        assert len(kept) == 10
+
+    def test_a_non_positive_cap_disables_trimming(self) -> None:
+        """Zero means unbounded, for callers that genuinely want everything."""
+        edges = [
+            DerivedEdge(source="a", target=f"b{i}", kind="k", signals={}, weight=1.0)
+            for i in range(5)
+        ]
+
+        assert trim_to_top_k(edges, top_k=0) == edges
+
+    def test_trimming_preserves_input_order(self) -> None:
+        """The cap filters; it does not reorder a ranking already sorted."""
+        edges = [
+            DerivedEdge(
+                source=f"a{i}", target=f"b{i}", kind="k", signals={}, weight=1.0
+            )
+            for i in range(5)
+        ]
+
+        assert trim_to_top_k(edges, top_k=1) == edges

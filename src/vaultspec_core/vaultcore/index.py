@@ -148,7 +148,21 @@ def generate_feature_index_result(
         if nodes is None:
             from ..graph import VaultGraph
 
-            nodes = VaultGraph(root_dir, use_cache=False).get_feature_nodes(feature)
+            # The membership read stays inside the lock: that ordering is the
+            # correctness property, and it is unchanged.
+            #
+            # What changes is `use_cache`. It was disabled here, which meant a
+            # full parse of every document in the vault on every call - and the
+            # repair pipeline calls this once per feature, so the cost was
+            # O(features x documents): 130 rebuilds over 1,229 documents.
+            #
+            # Disabling it was pessimism rather than protection. The cache
+            # validates by file set, per-file size and mtime, and a content
+            # hash for anything whose mtime is not older than the cache, and it
+            # rebuilds on any divergence. It cannot serve a stale membership,
+            # so re-reading under the lock through the cache gives the same
+            # answer the uncached parse gave.
+            nodes = VaultGraph(root_dir).get_feature_nodes(feature)
         if not nodes:
             logger.info("No documents found for feature index: %s", feature)
             return FeatureIndexResult(index_path, changed=False)

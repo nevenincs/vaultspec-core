@@ -10,6 +10,7 @@ from typing import Annotated
 import typer
 
 from vaultspec_core.cli._target import PlanPathArg
+from vaultspec_core.cli.json_output import json_format_kwargs
 from vaultspec_core.cli.plan_cmd_app import tier_app
 from vaultspec_core.cli.plan_cmd_shared import (
     render_user_errors,
@@ -39,7 +40,7 @@ def cmd_tier_show(
         typer.echo(
             json.dumps(
                 json_envelope("vault.plan.tier.show", "unchanged", {"tier": tier}),
-                indent=2,
+                **json_format_kwargs(),
             )
         )
         return

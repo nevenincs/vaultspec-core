@@ -59,7 +59,9 @@ async def test_invoke_readonly_verb_returns_parsed_json(vault_root: Path) -> Non
         assert payload["format"] == "json"
         # The parsed payload is the real ``vault list`` envelope, not raw text.
         assert payload["data"]["schema"].startswith("vaultspec.vault.list")
-        assert payload["stdout"] is None
+        # Optional nulls are pruned from the wire, so an unset field is absent
+        # rather than present-and-null; both read the same to a JSON consumer.
+        assert payload.get("stdout") is None
         assert payload["command"][0] == "vaultspec-core"
 
 

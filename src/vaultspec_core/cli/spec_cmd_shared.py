@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from vaultspec_core.core.types import SyncResult
 
 from vaultspec_core.cli._errors import handle_error as _handle_error
+from vaultspec_core.cli.json_output import json_format_kwargs
 
 __all__ = [
     "COMPLETE_SYNC_COMMAND",
@@ -173,7 +174,11 @@ def emit_json(command: str, status: str, data: Mapping[str, object]) -> None:
 
     from vaultspec_core.cli.rendering import json_envelope
 
-    typer.echo(json.dumps(json_envelope(command, status, data), indent=2, default=str))
+    typer.echo(
+        json.dumps(
+            json_envelope(command, status, data), **json_format_kwargs(), default=str
+        )
+    )
 
 
 def restore_resource_command(

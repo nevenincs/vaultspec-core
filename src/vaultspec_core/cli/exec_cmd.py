@@ -18,6 +18,7 @@ import typer
 from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._errors import handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
+from vaultspec_core.cli.json_output import json_format_kwargs
 
 __all__ = ["exec_app"]
 
@@ -73,7 +74,11 @@ def _emit_result(
     if json_output:
         from vaultspec_core.cli.rendering import json_envelope
 
-        typer.echo(json.dumps(json_envelope(command, result.status, payload), indent=2))
+        typer.echo(
+            json.dumps(
+                json_envelope(command, result.status, payload), **json_format_kwargs()
+            )
+        )
         return
 
     console = get_console()

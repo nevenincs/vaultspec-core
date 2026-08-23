@@ -16,6 +16,7 @@ from vaultspec_core.cli._target import (
     apply_target,
     resolve_effective_target,
 )
+from vaultspec_core.cli.json_output import json_format_kwargs
 
 
 def cmd_check_providers() -> None:
@@ -117,7 +118,7 @@ def cmd_doctor(
             "failed" if exit_code == 2 else "unchanged",
             data,
         )
-        typer.echo(json.dumps(envelope, indent=2, default=str))
+        typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
         raise typer.Exit(code=exit_code)
 
     console = get_console()

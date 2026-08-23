@@ -120,6 +120,89 @@ class TestVaultRepair:
         assert result.exit_code == 0
         assert "repair" in result.output
 
+    def test_growing_sections_carry_their_window(
+        self,
+        factory: WorkspaceFactory,
+    ) -> None:
+        """Every section that grows with the repair reports what it withheld.
+
+        The payload previously returned these lists whole while the human
+        rendering capped them, so the machine surface was largest exactly when
+        the vault was most broken. Each is now a window: the rows, plus the
+        total they were cut from and whether more follow.
+        """
+        factory.install("core")
+        _write_doc(
+            factory.path,
+            "research",
+            "2026-05-15-repair-window",
+            "repair-window",
+        )
+
+        result = factory.run("vault", "repair", "--dry-run", "--json")
+        envelope = json.loads(result.output)
+        payload = _json_payload(result.output)
+
+        assert envelope["schema"] == "vaultspec.vault.repair.v2"
+        for section in (
+            "journal",
+            "changed_files",
+            "generated_indexes",
+            "planned_fixes",
+            "unresolved",
+            "root_causes",
+        ):
+            assert set(payload[section]) >= {
+                "items",
+                "returned",
+                "total",
+                "truncated",
+            }, f"{section} is not a window: {payload[section]}"
+            assert payload[section]["returned"] == len(payload[section]["items"])
+            assert payload[section]["returned"] <= payload[section]["total"]
+
+    def test_nested_diagnostics_are_bounded_too(
+        self,
+        factory: WorkspaceFactory,
+    ) -> None:
+        """A bounded row count does not bound a row that holds a collection.
+
+        Root-cause buckets and per-check summaries each embed the diagnostics
+        they group. Bounding only the outer list left 99% of a 2.5 MB payload
+        in four rows that were never elided, so the nested collections carry
+        their own windows.
+        """
+        factory.install("core")
+        _write_doc(
+            factory.path,
+            "research",
+            "2026-05-15-repair-nested",
+            "repair-nested",
+        )
+
+        payload = _json_payload(
+            factory.run("vault", "repair", "--dry-run", "--json").output
+        )
+
+        for bucket in payload["root_causes"]["items"]:
+            assert set(bucket["diagnostics"]) >= {"items", "returned", "total"}
+            assert bucket["diagnostics"]["returned"] <= bucket["diagnostics"]["total"]
+
+        for phase in payload["phases"]:
+            for check in phase.get("checks", []):
+                # Findings are either carried and bounded, or absent and said
+                # to be absent. A checker that silently omitted them would be
+                # indistinguishable from one that found nothing.
+                if "diagnostics" in check:
+                    assert set(check["diagnostics"]) >= {
+                        "items",
+                        "returned",
+                        "total",
+                    }
+                else:
+                    assert check["diagnostics_omitted"], check
+                    assert {"errors", "warnings", "info"} <= set(check), check
+
     def test_dry_run_reports_index_plan_without_writing(
         self,
         factory: WorkspaceFactory,
@@ -145,8 +228,11 @@ class TestVaultRepair:
 
         assert result.exit_code == 0
         assert payload["dry_run"] is True
-        assert payload["changed_files"] == []
-        assert ".vault/index/repair-dry-run.index.md" in payload["generated_indexes"]
+        assert payload["changed_files"]["items"] == []
+        assert (
+            ".vault/index/repair-dry-run.index.md"
+            in payload["generated_indexes"]["items"]
+        )
         assert not index_path.exists()
 
     def test_repair_refreshes_feature_index(
@@ -173,8 +259,11 @@ class TestVaultRepair:
 
         assert result.exit_code == 0
         assert index_path.exists()
-        assert ".vault/index/repair-index.index.md" in payload["generated_indexes"]
-        assert ".vault/index/repair-index.index.md" in payload["changed_files"]
+        assert (
+            ".vault/index/repair-index.index.md"
+            in payload["generated_indexes"]["items"]
+        )
+        assert ".vault/index/repair-index.index.md" in payload["changed_files"]["items"]
 
     def test_repair_does_not_report_unchanged_index_as_modified(
         self,
@@ -371,13 +460,9 @@ class TestVaultRepair:
 
         assert result.exit_code == 0
         assert payload["fixed_count"] == 0
-        assert (
-            sum(1 for diag in payload["diagnostics"] if diag["severity"] == "warning")
-            == 1
-        )
-        assert (
-            "Would remove template annotations" in payload["diagnostics"][0]["message"]
-        )
+        diagnostics = payload["diagnostics"]["items"]
+        assert sum(1 for diag in diagnostics if diag["severity"] == "warning") == 1
+        assert "Would remove template annotations" in diagnostics[0]["message"]
         assert "<!-- Preview this generated annotation. -->" in doc.read_text(
             encoding="utf-8"
         )
@@ -666,7 +751,7 @@ class TestVaultRepair:
             print("REPAIR OUTPUT:")
             print(result.output)
         assert result.exit_code == 0
-        assert payload["generated_indexes"] == []
+        assert payload["generated_indexes"]["items"] == []
         assert index_phase["planned"] == []
 
     def test_no_index_skips_generated_artifact_refresh(
@@ -695,7 +780,7 @@ class TestVaultRepair:
 
         assert result.exit_code == 0
         assert index_phase["skipped"] is True
-        assert payload["generated_indexes"] == []
+        assert payload["generated_indexes"]["items"] == []
         assert not index_path.exists()
 
     def test_check_order_and_info_visibility_are_stable(

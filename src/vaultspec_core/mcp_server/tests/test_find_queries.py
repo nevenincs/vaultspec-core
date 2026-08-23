@@ -159,7 +159,9 @@ async def test_find_with_body(vault_root: Path) -> None:
     )
     mcp = create_server()
     async with Client(mcp) as client:
-        result = await client.call_tool("find", {"feature": "body-feat", "body": True})
+        result = await client.call_tool(
+            "find", {"feature": "body-feat", "body": "full", "limit": 5}
+        )
         docs = data_of(result)
         assert len(docs) >= 1
         assert "body" in docs[0]
@@ -175,3 +177,61 @@ async def test_find_respects_limit(vault_root: Path) -> None:
         result = await client.call_tool("find", {"type": ["adr"], "limit": 1})
         docs = data_of(result)
         assert len(docs) == 1
+
+
+async def test_body_full_is_refused_above_a_handful_of_rows(vault_root: Path) -> None:
+    """Whole documents are reserved for a caller that has already narrowed.
+
+    Twenty documents at ``body="full"`` measured 196,176 bytes - past the
+    ceiling for one response, using nothing but the default limit. The refusal
+    names ``excerpt`` so the caller has somewhere to go.
+    """
+    _write_doc(vault_root, "research", "full-guard", "2026-01-01")
+
+    mcp = create_server()
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "find", {"type": ["research"], "body": "full", "limit": 20}
+        )
+
+    assert result.is_error
+    text = " ".join(str(getattr(c, "text", "")) for c in result.content)
+    assert "excerpt" in text
+
+
+async def test_an_excerpt_says_what_it_left_behind(vault_root: Path) -> None:
+    """An excerpt carries the full size, so a caller knows what it did not get."""
+    _write_doc(
+        vault_root,
+        "research",
+        "excerpt-feat",
+        "2026-01-01",
+        body="x" * 5000,
+    )
+
+    mcp = create_server()
+    async with Client(mcp) as client:
+        rows = data_of(
+            await client.call_tool(
+                "find", {"feature": "excerpt-feat", "body": "excerpt"}
+            )
+        )
+
+    row = rows[0]
+    assert row["body_truncated"] is True
+    assert row["body_bytes"] > len(row["body"])
+
+
+async def test_a_hostile_limit_is_refused_rather_than_clamped(
+    vault_root: Path,
+) -> None:
+    """A negative limit fails loudly instead of returning nearly everything.
+
+    Regression: an unbounded ``int`` limit reached a Python slice, so
+    ``limit=-1`` silently returned 659 of 660 rows.
+    """
+    mcp = create_server()
+    async with Client(mcp) as client:
+        for bad in (-1, 0, 10_000):
+            result = await client.call_tool("find", {"limit": bad})
+            assert result.is_error, f"limit={bad} was accepted"

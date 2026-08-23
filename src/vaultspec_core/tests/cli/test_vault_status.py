@@ -514,10 +514,20 @@ class TestReviewRefinements:
         assert "Did you mean" not in result.output
         assert "vaultspec-core vault feature list" in result.output
 
-    def test_active_features_capped_in_human_output(self, tmp_path: Path) -> None:
+    def test_active_features_capped_on_both_surfaces(self, tmp_path: Path) -> None:
+        """Both surfaces cap the feature list, and both report the total.
+
+        The machine payload used to stay uncapped while the human render cut at
+        ten - the asymmetry this campaign exists to remove. `status` opens every
+        session, so its largest field cannot be a full dump: measured at 10,476
+        documents the uncapped list was 52% of a 259 KB payload, and no flag
+        narrowed it.
+
+        The list is ordered by latest activity, so the cap keeps the end an
+        orienting caller wants; `active_features_total` says what it did not see.
+        """
         ids = _build_vault(tmp_path)
-        # Twelve extra single-document features push the total past the
-        # ten-feature display cap.
+        # Twelve extra single-document features push the total past the cap.
         for n in range(12):
             feature = f"filler-{n:02d}"
             _write(
@@ -534,10 +544,25 @@ class TestReviewRefinements:
         assert "vaultspec-core vault feature list" in result.output
 
         payload = json.loads(_run(tmp_path, "--json").output)
-        features = payload["data"]["active_features"]
-        # The JSON payload stays uncapped: 12 fillers plus the widget feature.
-        assert len(features) == 13
+        data = payload["data"]
+        features = data["active_features"]
+
+        assert len(features) == 10, "the machine payload must cap too"
+        assert data["active_features_total"] == 13
+        assert data["active_features_truncated"] is True
+        # The most recently active feature survives the cut.
         assert ids["feature"] in {f["name"] for f in features}
+
+    def test_a_feature_list_within_the_cap_is_not_marked_truncated(
+        self, tmp_path: Path
+    ) -> None:
+        """A small vault reports its true total and no truncation."""
+        _build_vault(tmp_path)
+
+        data = json.loads(_run(tmp_path, "--json").output)["data"]
+
+        assert data["active_features_truncated"] is False
+        assert data["active_features_total"] == len(data["active_features"])
 
 
 # ---------------------------------------------------------------------------

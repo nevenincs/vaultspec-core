@@ -15,6 +15,7 @@ import typer
 
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target_install
+from vaultspec_core.cli.json_output import json_format_kwargs
 from vaultspec_core.cli.root_preflight import run_preflight
 from vaultspec_core.core.enums import CliAction, InstallMode
 
@@ -236,7 +237,7 @@ def cmd_install(
         result["path"] = str(result["path"])
         status = "unchanged" if result["action"] == "dry_run" else "created"
         envelope = json_envelope("install", status, result, hints=hint_dict)
-        typer.echo(json.dumps(envelope, indent=2, default=str))
+        typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
         raise typer.Exit(0)
 
     if result["action"] == "dry_run":
@@ -365,7 +366,7 @@ def cmd_uninstall(
         else:
             status = "unchanged"
         envelope = json_envelope("uninstall", status, result)
-        typer.echo(json.dumps(envelope, indent=2, default=str))
+        typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
         raise typer.Exit(0)
 
     # Render result
