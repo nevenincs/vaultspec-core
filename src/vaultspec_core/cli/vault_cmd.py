@@ -7,11 +7,18 @@ Sub-groups: ``vaultspec-core vault feature`` (:data:`feature_app`) and
 all backend logic. Mounted onto :data:`.root.app` as the ``vault`` command group.
 
 This module is the public surface: every command re-exports through it so no
-import site outside the package changes. The ``vault check``/``vault sanitize``/
-``vault repair`` verbs live in :mod:`vaultspec_core.cli.vault_check_cmd` and the
-``vault feature`` verbs live in :mod:`vaultspec_core.cli.vault_feature_cmd`,
-both registered here via the same ``register_*`` pattern used by
-:mod:`vaultspec_core.cli.edit_cmd`.
+import site outside the package changes. The ``vault check`` and
+``vault sanitize`` verbs live in :mod:`vaultspec_core.cli.vault_check_cmd`, the
+``vault feature`` verbs in :mod:`vaultspec_core.cli.vault_feature_cmd`, and the
+document-editing verbs in :mod:`vaultspec_core.cli.edit_cmd`. Each decorates
+the apps owned by :mod:`vaultspec_core.cli.vault_cmd_app` at module level, and
+is imported here for that registration side effect - the same arrangement
+:mod:`vaultspec_core.cli.plan_cmd` uses for its family.
+
+``vault repair`` is defined in this module rather than beside the check verbs:
+it mounts on :data:`vault_app` rather than on a sub-app, and it must register
+after this module's own commands to keep its position in ``vault --help`` and
+in the generated command reference.
 """
 
 from __future__ import annotations
@@ -20,9 +27,131 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
-from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
+
+# Each sibling command module decorates the apps owned by `.vault_cmd_app` as
+# an import-time side effect; importing its command names here, in definition
+# order, both triggers that registration and reproduces the original --help
+# listing order regardless of how ruff would otherwise sort these imports. The
+# names are re-exported (via `__all__`) for call sites that imported them
+# directly from this module, exactly as `.plan_cmd` does for its family.
+#
+# Deleting one of these imports would silently delete its commands from the
+# CLI, because registration is now an import-time side effect rather than an
+# explicit `register_*(app)` call. Two things stop that: the names are in
+# `__all__`, so ruff will not autofix them away as unused, and
+# `tests/cli/test_cli_reference_generated.py` fails, because the committed
+# reference no longer matches what the generator produces from the live tree.
+# Note it is that byte-fidelity test that catches a *disappearance* - the
+# companion `test_cli_reference_drift.py` asserts coverage (every live command
+# is documented), which a shrunken CLI still satisfies.
+#
+# One consequence of registering by import: the order above is the order ruff
+# sorts these module names into, which today happens to match the order the
+# old explicit `register_*(app)` calls used. A new sibling module whose name
+# sorts differently would therefore re-order `vault --help` and the generated
+# reference. If that comes up, pin the order deliberately rather than relying
+# on the sort.
+#
+# The imports sit at module level rather than at the bottom of the file behind
+# an E402 exemption: with `vault_cmd_app` owning the apps there is no longer a
+# cycle back through this module to break.
+from vaultspec_core.cli.edit_cmd import (
+    cmd_edit,
+    cmd_rename,
+    cmd_set_body,
+    cmd_set_frontmatter,
+)
+from vaultspec_core.cli.vault_check_cmd import (
+    cmd_check_adr_status,
+    cmd_check_all,
+    cmd_check_annotations,
+    cmd_check_body_links,
+    cmd_check_body_sections,
+    cmd_check_code_boundary,
+    cmd_check_dangling,
+    cmd_check_encoding,
+    cmd_check_exec_mapping,
+    cmd_check_feature_rename_integrity,
+    cmd_check_features,
+    cmd_check_frontmatter,
+    cmd_check_links,
+    cmd_check_markdown,
+    cmd_check_modified_stamp,
+    cmd_check_orphans,
+    cmd_check_placeholders,
+    cmd_check_references,
+    cmd_check_rename_integrity,
+    cmd_check_schema,
+    cmd_check_structure,
+    cmd_sanitize_annotations,
+)
+from vaultspec_core.cli.vault_cmd_app import (
+    adr_app,
+    check_app,
+    feature_app,
+    rule_app,
+    sanitize_app,
+    vault_app,
+)
+from vaultspec_core.cli.vault_feature_cmd import (
+    cmd_feature_archive,
+    cmd_feature_index,
+    cmd_feature_list,
+    cmd_feature_rename,
+    cmd_feature_unarchive,
+)
+
+# Every name this module exports, which is also - deliberately - every
+# side-effecting import above. Pruning an entry here does not merely narrow the
+# export surface: it frees ruff to remove the import, which unregisters that
+# module's commands. The module's own commands are listed too, so this reads as
+# a complete export list rather than an asymmetric one a reader might "tidy".
+__all__ = [
+    "adr_app",
+    "check_app",
+    "cmd_add",
+    "cmd_check_adr_status",
+    "cmd_check_all",
+    "cmd_check_annotations",
+    "cmd_check_body_links",
+    "cmd_check_body_sections",
+    "cmd_check_code_boundary",
+    "cmd_check_dangling",
+    "cmd_check_encoding",
+    "cmd_check_exec_mapping",
+    "cmd_check_feature_rename_integrity",
+    "cmd_check_features",
+    "cmd_check_frontmatter",
+    "cmd_check_links",
+    "cmd_check_markdown",
+    "cmd_check_modified_stamp",
+    "cmd_check_orphans",
+    "cmd_check_placeholders",
+    "cmd_check_references",
+    "cmd_check_rename_integrity",
+    "cmd_check_schema",
+    "cmd_check_structure",
+    "cmd_edit",
+    "cmd_feature_archive",
+    "cmd_feature_index",
+    "cmd_feature_list",
+    "cmd_feature_rename",
+    "cmd_feature_unarchive",
+    "cmd_graph",
+    "cmd_list",
+    "cmd_rename",
+    "cmd_repair",
+    "cmd_sanitize_annotations",
+    "cmd_set_body",
+    "cmd_set_frontmatter",
+    "cmd_stats",
+    "feature_app",
+    "rule_app",
+    "sanitize_app",
+    "vault_app",
+]
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -32,42 +161,11 @@ if TYPE_CHECKING:
     from vaultspec_core.graph.api import VaultGraph
 
 
-vault_app = make_app(
-    help="Create, query, and audit records in the .vault/ project history.",
-    no_args_is_help=True,
-)
+# The apps themselves live in `vault_cmd_app` so the per-verb command modules
+# can mount onto them without importing back through this module. They are
+# re-exported here because this module is the family's public surface.
 
-feature_app = make_app(
-    help="Manage vault feature tags",
-    no_args_is_help=True,
-)
-vault_app.add_typer(feature_app, name="feature")
-
-check_app = make_app(
-    help="Run vault health checks with optional auto-fix",
-    no_args_is_help=True,
-)
-vault_app.add_typer(check_app, name="check")
-
-sanitize_app = make_app(
-    help="Run explicit vault sanitizers",
-    no_args_is_help=True,
-)
-vault_app.add_typer(sanitize_app, name="sanitize")
-
-rule_app = make_app(
-    help="Manage custom team-shared rules",
-    no_args_is_help=True,
-)
-vault_app.add_typer(rule_app, name="rule")
-
-adr_app = make_app(
-    help="Manage Architecture Decision Records (ADRs)",
-    no_args_is_help=True,
-)
-vault_app.add_typer(adr_app, name="adr")
-
-from vaultspec_core.cli.plan_cmd import plan_app  # noqa: E402
+from vaultspec_core.cli.plan_cmd import plan_app
 
 vault_app.add_typer(plan_app, name="plan")
 
@@ -82,27 +180,6 @@ vault_app.add_typer(exec_app, name="exec")
 from vaultspec_core.cli.archive_cmd import archive_app  # noqa: E402
 
 vault_app.add_typer(archive_app, name="archive")
-
-from vaultspec_core.cli.edit_cmd import (  # noqa: E402
-    register_edit_commands,
-    register_rename_command,
-)
-
-register_edit_commands(vault_app)
-register_rename_command(vault_app)
-
-from vaultspec_core.cli.vault_check_cmd import (  # noqa: E402
-    register_check_commands,
-    register_repair_command,
-    register_sanitize_commands,
-)
-
-register_check_commands(check_app)
-register_sanitize_commands(sanitize_app)
-
-from vaultspec_core.cli.vault_feature_cmd import register_feature_commands  # noqa: E402
-
-register_feature_commands(feature_app)
 
 
 # ---- vault add ---------------------------------------------------------------
@@ -775,7 +852,80 @@ def _print_metrics(
         )
 
 
-register_repair_command(vault_app)
+# ---- vault repair -------------------------------------------------------
+
+
+@vault_app.command("repair")
+def cmd_repair(
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview repair actions without writing"),
+    ] = False,
+    include_index: Annotated[
+        bool,
+        typer.Option(
+            "--include-index/--no-index",
+            help="Refresh generated feature indexes during repair",
+        ),
+    ] = True,
+    feature: Annotated[
+        str | None,
+        typer.Option("--feature", "-f", help="Scope repair to one feature tag"),
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Run the operator repair pipeline for vault content.
+
+    The repair pipeline is broader than ``vaultspec-core vault check all --fix``: it
+    reports preflight and migration state, runs checks, applies safe
+    check-level fixes unless ``--dry-run`` is set, refreshes generated
+    feature indexes unless ``--no-index`` is set, rebuilds graph state,
+    and runs a postcheck pass.
+    """
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.repair import run_repair_pipeline
+
+    run = run_repair_pipeline(
+        _get_ctx().target_dir,
+        dry_run=dry_run,
+        include_index=include_index,
+        feature=feature,
+    )
+    if not dry_run and run.changed_files:
+        from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+
+        invalidate_graph_cache(_get_ctx().target_dir)
+    if json_output:
+        import json
+
+        from vaultspec_core.cli._repair_render import repair_payload
+        from vaultspec_core.cli.rendering import json_envelope
+
+        if run.error_count:
+            repair_status = "failed"
+        elif run.fixed_count:
+            repair_status = "updated"
+        else:
+            repair_status = "unchanged"
+        typer.echo(
+            json.dumps(
+                json_envelope("vault.repair", repair_status, repair_payload(run)),
+                indent=2,
+                default=str,
+            )
+        )
+        raise typer.Exit(code=1 if run.error_count else 0)
+
+    from vaultspec_core.cli._repair_render import render_repair_run
+
+    render_repair_run(run, verbose=verbose)
+    if run.error_count:
+        raise typer.Exit(code=1)
 
 
 # ---- vault rule promote ------------------------------------------------------
