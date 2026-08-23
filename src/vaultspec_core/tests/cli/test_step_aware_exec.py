@@ -188,9 +188,15 @@ def test_step_aware_individual_scaffolding(
     assert "# First step" in content
     assert "## Scope" in content
     assert "- `src/foo.py`" in content
-    assert "## Description" in content
-    assert "## Outcome" in content
-    assert "## Notes" in content
+    # body-v2 reduced the record to its mechanical path log: the narrative
+    # sections are gone, and Notes is an exception-only author addition.
+    # Compared as headings, not substrings - the hint-comment mentions
+    # "## Notes" in prose while emitting no such section.
+    headings = [line for line in content.splitlines() if line.startswith("## ")]
+    assert headings == ["## Scope", "## Changes"]
+    # The scaffold hint-comment must not itself be hydrated (a placeholder
+    # named in prose would be substituted and mangle the comment).
+    assert "Machine-owned: the filename" in content
 
 
 def test_scaffolded_step_record_passes_structure_check(
@@ -666,7 +672,8 @@ def test_summary_scaffolds_phase_summary(
     assert '- "[[2026-05-17-test-feature-plan]]"' in content
     # Heading hydrated with the Phase display path, not the title alias.
     assert "# `test-feature` `P01` summary" in content
-    assert "## Description" in content
+    summary_headings = [line for line in content.splitlines() if line.startswith("## ")]
+    assert summary_headings == ["## Changes"]
     # No unhydrated placeholders survive.
     assert "{phase}" not in content
     assert "{feature}" not in content

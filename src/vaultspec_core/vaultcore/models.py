@@ -677,7 +677,17 @@ class VaultConstants:
             phase_summary = (
                 rf"^{date_feature}-(W\d{{2,}}[a-z]?-)?P\d{{2,}}[a-z]?-summary\.md$"
             )
-            if re.match(step_record, filename) or re.match(phase_summary, filename):
+            # One consolidated ledger per plan carries no container id at all:
+            # the Step identity lives in its rows, not its filename. It must be
+            # declared here beside the other exec conventions, or the generic
+            # pattern below rejects it and `--fix` renames it to
+            # '...-ledger-exec.md', which no longer reads as a ledger.
+            ledger = rf"^{date_feature}-ledger\.md$"
+            if (
+                re.match(step_record, filename)
+                or re.match(phase_summary, filename)
+                or re.match(ledger, filename)
+            ):
                 return errors
 
         # Basic pattern: 2026-02-07-feature-name-adr.md

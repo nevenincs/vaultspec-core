@@ -328,3 +328,66 @@ class TestCollectAllStatusesGraphParity:
             assert a.status.exec_missing_ids == b.status.exec_missing_ids == []
         finally:
             reset_config()
+
+
+class TestExecRecordIndexLedger:
+    """A consolidated ledger maps every Step it covers to one stem."""
+
+    def test_ledger_registers_each_covered_step(self, tmp_path: Path) -> None:
+        from vaultspec_core.config import reset_config
+        from vaultspec_core.graph import VaultGraph
+        from vaultspec_core.plan.status import ExecRecordIndex
+
+        reset_config()
+        try:
+            exec_dir = tmp_path / ".vault" / "exec" / "2026-05-17-test-feature"
+            _write(
+                exec_dir / "2026-05-17-test-feature-ledger.md",
+                "---\ntags:\n  - '#exec'\n  - '#test-feature'\n---\n\n"
+                "# ledger\n\n## Changes\n\n"
+                "- `S01` `M` `src/a.py`\n"
+                "- `S01` `A` `tests/test_a.py`\n"
+                "- `S02` `D` `src/b.py`\n",
+            )
+
+            without_graph = ExecRecordIndex.build(tmp_path)
+            with_graph = ExecRecordIndex.build(tmp_path, graph=VaultGraph(tmp_path))
+
+            stem = "2026-05-17-test-feature-ledger"
+            expected = {
+                ("test-feature", "S01"): stem,
+                ("test-feature", "S02"): stem,
+            }
+            # Both build paths agree, and one document answers both Steps -
+            # the per-Step cross-reference survives consolidation.
+            assert without_graph.by_step == expected
+            assert with_graph.by_step == expected
+            assert without_graph.unlinked_by_feature == {}
+            assert with_graph.unlinked_by_feature == {}
+            assert without_graph.record_for("test-feature", "S02") == stem
+        finally:
+            reset_config()
+
+    def test_ledger_naming_no_step_is_unlinked(self, tmp_path: Path) -> None:
+        from vaultspec_core.config import reset_config
+        from vaultspec_core.graph import VaultGraph
+        from vaultspec_core.plan.status import ExecRecordIndex
+
+        reset_config()
+        try:
+            exec_dir = tmp_path / ".vault" / "exec" / "2026-05-17-test-feature"
+            _write(
+                exec_dir / "2026-05-17-test-feature-ledger.md",
+                "---\ntags:\n  - '#exec'\n  - '#test-feature'\n---\n\n"
+                "# ledger\n\n## Changes\n\n- `M` `src/a.py`\n",
+            )
+
+            without_graph = ExecRecordIndex.build(tmp_path)
+            with_graph = ExecRecordIndex.build(tmp_path, graph=VaultGraph(tmp_path))
+
+            stem = "2026-05-17-test-feature-ledger"
+            assert without_graph.by_step == {}
+            assert without_graph.unlinked_by_feature == {"test-feature": [stem]}
+            assert with_graph.unlinked_by_feature == {"test-feature": [stem]}
+        finally:
+            reset_config()

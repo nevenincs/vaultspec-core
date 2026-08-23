@@ -86,6 +86,11 @@ git commit trailers are the sanctioned linkage channel).
 
   - *Depends on:* Plans.
   - *References:* The Plan being executed.
+  - *Content:* A mechanical log, not a narrative. One `A`/`M`/`D`/`R` line per path
+    touched under `## Changes`, plus the machine-filled `## Scope`. No prose: the Step
+    row states the intent and the commit carries the diff. A `## Notes` section is added
+    only on exception (data loss, skipped work, a scaffold left in code, a persistent
+    failure) and is otherwise omitted.
   - *Location:* Inside feature-specific folder.
   - *Filename:* `{yyyy-mm-dd-feature-{phase}-{step}}.md` where `{phase}` and `{step}`
     are the canonical container identifiers (`P##`, `S##`) from the plan, zero-padded to
@@ -102,6 +107,8 @@ git commit trailers are the sanctioned linkage channel).
 
   - *Depends on:* Execution Records.
   - *References:* The Plan and key Artifacts produced.
+  - *Content:* The deduplicated union of the Phase's Step Record `## Changes` lines, in
+    the same mechanical grammar. Not a retelling of the Step Records.
   - *Location:* Inside feature-specific folder.
   - *Filename:* `{yyyy-mm-dd-feature-{phase}-summary}.md` where `{phase}` is the
     canonical Phase identifier (`P##`).

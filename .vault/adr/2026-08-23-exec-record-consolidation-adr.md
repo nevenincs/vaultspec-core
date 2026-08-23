@@ -1,0 +1,176 @@
+---
+tags:
+  - '#adr'
+  - '#exec-record-consolidation'
+date: '2026-08-23'
+modified: '2026-08-23'
+body_schema: 'body-v2'
+body_hash: 'sha256:098162fe431b620a0e5c43fe0baaac147adece47f8ed0fedb9c4034927328d54'
+related:
+  - "[[2026-08-23-exec-record-consolidation-research]]"
+  - "[[2026-05-17-cli-exec-step-records-adr]]"
+---
+
+# `exec-record-consolidation` adr: `Consolidate execution records into one append-only ledger per plan` | (**status:** `accepted`)
+
+## Problem Statement
+
+`2026-05-17-cli-exec-step-records-adr` (accepted) made `vault add exec`
+Step-aware: one execution record per plan Step. That decision was correct for
+the wall it removed, and it is now the dominant cost in the vault.
+
+`2026-08-23-exec-record-consolidation-research` measures the production corpus
+and establishes the shape of the cost: execution records dominate the vault by
+both bytes and file count, the Step-to-record mapping is exactly 1:1 so count
+grows without bound, the body is overwhelmingly prose that names no file, and no
+consumer reads that prose. Reading a single plan's execution history no longer
+fits in a context window.
+
+Two independent properties drive it - what a record contains, and how many
+records a plan produces. A content fix alone leaves the second untouched.
+
+## Considerations
+
+- The sibling `body-v2` schema change addresses content: a mechanical
+  `## Changes` path log replaces Description, Outcome, and Notes. It does not
+  address cardinality, so 994 files remain 994 files.
+- `2026-05-17-cli-exec-step-records-research` rejected folding Steps into one
+  document on two grounds: it loses the granularity the plan Step ids were
+  introduced to provide, and per-Step records let `vault plan status`
+  cross-reference into a real artifact.
+- Both objections are about losing per-Step identity, not about file count.
+  Identity can live in a row column as well as in a filename.
+- `ExecRecordIndex.by_step` is already a feature-and-Step to stem map, which is
+  many-to-one capable. Only its source, a single `step_id` frontmatter field,
+  was one-to-one.
+- The same research records why the original wall mattered: two agents skipped
+  exec records rather than violate the no-hand-edit rule. Any consolidated
+  shape must therefore be writable by a verb, not by hand.
+
+## Considered options
+
+- **Keep one record per Step, `body-v2` only.** Cuts bytes by roughly 80% but
+  leaves the file count untouched and the 1:1 growth unbounded. Rejected as
+  insufficient: it treats the symptom and leaves the larger cost.
+- **One document per Phase.** Reduces count without a principled unit. A Phase
+  is a planning container, not an execution boundary, and Step identity would
+  still need a row column. Rejected: same mechanism, arbitrary granularity.
+- **One append-only ledger per plan, Step identity in the row.** Chosen. One
+  document per plan, one row per touched path, each row led by its Step id.
+- **Drop execution records entirely.** Rejected: `exec_missing` and the
+  grounding trace are real consumers, and the audit trail is the point of the
+  feature.
+
+## Constraints
+
+- `2026-05-17-cli-exec-step-records-adr` names the `vault add exec` signature a
+  user contract and specifies a deprecation cycle for changing it. The ledger
+  is therefore additive: the per-Step path is unchanged and remains default.
+- The `vault add` Typer signature sits at the repository `max-args` floor of
+  17, a ratchet documented as down-only. The ledger writer cannot add flags
+  there and belongs in the existing `vault exec` group.
+- The immutable body-schema registry forbids editing a published contract, so a
+  ledger must reuse an existing shape or declare a new one.
+- The no-hand-edit rule means rows must be appended by a verb.
+- The 7,362 existing `body-v1` records must keep validating untouched; a schema
+  bump must not reclassify them.
+
+## Implementation
+
+A ledger lives at one path per plan inside the feature folder, named with a
+`-ledger` stem suffix. Its body is a single `## Changes` section of mechanical
+rows, each naming a Step id, a change operation, and the path it touched.
+
+A ledger row is a per-Step record row with a Step-id column prepended, so the
+ledger reuses the `body-v2` `Changes` contract exactly and needs no new schema.
+`vaultcore/exec_ledger.py` is the single parser both consumers share, so the
+index and the check cannot drift. It parses only inside `## Changes`, so a
+`## Notes` exception section can never register coverage.
+
+`ExecRecordIndex.build` registers every Step a ledger names against that ledger
+stem, in both its graph and disk paths. `check_exec_mapping` classifies every
+covered Step against the parent plan, reading the body from the snapshot it
+already holds. Writing is `vault exec log`, which creates the ledger on first
+use and appends thereafter. Appends route through `refresh_modified_stamp`, the
+mandated mutator helper, so the `modified` stamp and the `body_hash`
+re-attestation stay paired. Rows are never rewritten, and re-logging a row is
+idempotent. The writer never infers an operation from disk state: an executor
+knows what it did, and guessing would record evidence nobody produced.
+
+Migration has two entry points over one planner:
+`vault exec fold` for a deliberate operator run, and
+`migrations/m_0_1_58_exec_ledger_fold.py` for automatic convergence through the
+registry. Sharing the planner is what keeps them from drifting into two
+different definitions of the same conversion. `vaultcore/exec_fold.py` decides
+the fold as a pure plan over parsed records, so a dry run and a real run share one code path
+and what an operator previews is what an operator gets. It recovers the
+machine-usable content - the `## Scope` list the scaffolder filled from the
+Step row - and discards the prose. Folded records are removed only after the
+ledger carrying their content is durably on disk, so an interruption leaves
+duplication rather than loss.
+
+## Rationale
+
+The rejection recorded in `2026-05-17-cli-exec-step-records-research` turns on
+granularity, and the ledger preserves it. A Step id resolves through a ledger
+exactly as it does through a per-Step file, so `vault plan status` still
+cross-references a real artifact and a reader can still trace one Step. What is
+lost is one filesystem entry per Step, which was the cost, not the granularity.
+
+The measured effect on the largest plan in the corpus, `import-centralization`
+at 388 Steps, is 659 KB across 388 files becoming roughly 56 KB in one file:
+91.5% smaller and 388 times fewer files. Because identity moved into a column
+rather than being discarded, this is a representation change, not a loss of
+fidelity.
+
+Additive delivery is what makes the reversal safe. The per-Step path is
+untouched and still the default, so this record supersedes the rejection
+recorded in the Considerations of its predecessor, not the Step-awareness
+decision itself, which stands.
+
+## Consequences
+
+- Execution history for a plan becomes one document that fits in context, and
+  exec growth is bounded by plan count rather than Step count.
+- A ledger is a single write target, so two agents logging different Steps of
+  one plan concurrently contend on it where per-Step files did not. Appends are
+  atomic and idempotent, which makes a lost update recoverable by re-logging,
+  but ordering under concurrency is not guaranteed.
+- Per-Step file granularity is genuinely gone. A per-Step file history no
+  longer exists as a view, and per-Step blame becomes a row-level diff.
+- Existing records migrate through `vault exec fold`, which recovers each
+  record's Scope paths as ledger rows and then removes the folded record. On
+  the measured corpus this folds 7,145 of 7,395 records, recovering 8,520
+  paths into 9,559 rows: 17.6 MB becomes 925 KB and roughly 383 files remain.
+- The fold discards body prose. That is its purpose, and it is bounded rather
+  than irreversible: `.vault/` is tracked, so the commit preceding a fold
+  retains every discarded body. It is not, however, undoable by a forward
+  command - recovery is a git operation.
+- A recovered row cannot state an operation, because `body-v1` never recorded
+  one. Such rows carry `T` (touched), which is deliberately distinguishable
+  from a natively logged `A`/`M`/`D`/`R`, so a reader can always tell
+  recovered evidence from evidence an executor reported. A ledger folded from
+  history is therefore weaker evidence than one written by `vault exec log`,
+  and honestly marked as such.
+- The fold ships both ways: `vault exec fold` for an operator taking the
+  decision deliberately, and `m_0_1_58_exec_ledger_fold` in the auto-run
+  migration registry so an upgraded workspace converges without anyone having
+  to run anything. This makes it the first registered migration that removes
+  documents; every prior entry is additive.
+- Auto-running a destructive migration is only safe because its scope is
+  narrow: it folds records declaring a pre-`body-v2` schema and nothing else.
+  The driver bumps the manifest to the running package version rather than to
+  a migration's target, so a workspace on a pre-release build re-runs the
+  registry on every vault command. A fold that took current-schema records
+  would then silently consume freshly authored ones, because `vault add exec --step` remains the default authoring path.
+- The migration runs lazily through `scan_vault`, so the conversion can land
+  during an ordinary `vault` command rather than only at upgrade time. That is
+  the cost of convergence without operator action, and it is why the narrow
+  scope above is load-bearing rather than a nicety.
+- A record with no `step_id` cannot be attributed to a Step, and a Phase
+  summary rolls up Steps rather than documenting one. Both are skipped and
+  left intact rather than folded, so the corpus stays mixed by design where
+  folding would lose evidence.
+- The `--all-steps` bulk form has no ledger equivalent, because pre-scaffolding
+  rows invents evidence for work not yet done, which the mechanical contract
+  forbids.
