@@ -33,6 +33,7 @@ from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
 from vaultspec_core.cli.json_output import json_format_kwargs
 from vaultspec_core.cli.vault_cmd_app import feature_app
+from vaultspec_core.core.windowing import apply_window
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -78,15 +79,35 @@ def _filter_stale_features(
 # ---- vault feature list / index ---------------------------------------------
 
 
-def _emit_feature_list_json(features: list[FeatureDetail]) -> None:
-    """Print the ``vault feature list`` JSON envelope."""
+def _emit_feature_list_json(
+    features: list[FeatureDetail], *, limit: int | None = None, offset: int = 0
+) -> None:
+    """Print the ``vault feature list`` JSON envelope.
+
+    The listing returned every feature whatever the corpus size: 111,383 bytes
+    over 660 features at 10,476 documents, eight times the budget for a listing
+    response. Feature count grows with the corpus, so the payload had no
+    ceiling.
+
+    Args:
+        features: The matched features, in display order.
+        limit: Maximum features to carry; ``None`` applies the default window.
+        offset: Features to skip, for paging.
+    """
     import json
 
     from vaultspec_core.cli.rendering import json_envelope
 
+    # Windowed unconditionally: an absent limit means the default, not "no
+    # cap". Feature count grows with the corpus, so an unbounded default would
+    # leave the payload with no ceiling at exactly the scale that needs one.
+    page, window = apply_window(features, limit=limit, offset=offset)
+    payload: dict[str, object] = {"features": page}
+    payload.update(window.as_fields())
+
     typer.echo(
         json.dumps(
-            json_envelope("vault.feature.list", "unchanged", {"features": features}),
+            json_envelope("vault.feature.list", "unchanged", payload, version=2),
             **json_format_kwargs(),
             default=str,
         )
@@ -115,6 +136,8 @@ def _run_feature_list(
     stale_days: int | None,
     json_output: bool,
     target: Path | None,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> None:
     """Body of ``vault feature list``."""
     apply_target(target)
@@ -132,7 +155,7 @@ def _run_feature_list(
         features = _filter_stale_features(features, stale_days)
 
     if json_output:
-        _emit_feature_list_json(features)
+        _emit_feature_list_json(features, limit=limit, offset=offset)
         raise typer.Exit(0)
 
     if not features:
@@ -231,10 +254,18 @@ def cmd_feature_list(
         ),
     ] = None,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: Annotated[
+        int | None, typer.Option("--limit", help="Maximum features to return")
+    ] = None,
+    offset: Annotated[
+        int, typer.Option("--offset", help="Features to skip, for paging")
+    ] = 0,
     target: TargetOption = None,
 ) -> None:
     """List all feature tags in the vault."""
-    _run_feature_list(date, orphaned, type_filter, stale_days, json_output, target)
+    _run_feature_list(
+        date, orphaned, type_filter, stale_days, json_output, target, limit, offset
+    )
 
 
 # ---- vault feature index ---------------------------------------------

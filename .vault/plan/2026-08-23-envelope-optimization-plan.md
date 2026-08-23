@@ -9,7 +9,7 @@ related:
   - '[[2026-08-23-envelope-optimization-research]]'
 modified: '2026-08-23'
 body_schema: body-v1
-body_hash: 'sha256:284ab98584de9f8df48a9efe19a81fe4cd0c50e12d7e1d35881e74f20883c90b'
+body_hash: 'sha256:78a92e10fa3fb9d1ea263cf73e9d88da7c9a7f0ebd6dd03008afb3d645b4e01b'
 ---
 
 <!-- LINK RULES:
@@ -242,6 +242,7 @@ Document search, feature listing and the full-corpus document dump.
 - [x] `W04.P07.S12` - Replace the boolean body flag with a bounded projection and enforce a response byte budget; `src/vaultspec_core/mcp_server/tools/documents.py`.
 - [x] `W04.P07.S13` - Bound and validate the find limit and split the two-mode result row; `src/vaultspec_core/mcp_server/tools/documents.py`.
 - [x] `W04.P07.S14` - Add limit and offset to document listing, make paths vault-relative and drop derivable fields; `src/vaultspec_core/vaultcore/query_listing.py`.
+- [x] `W04.P07.S24` - Window the feature listing, which returns every feature unbounded; `src/vaultspec_core/cli/vault_feature_cmd.py`.
 
 ### Phase `W04.P08` - Bound the diagnostics and batch paths
 

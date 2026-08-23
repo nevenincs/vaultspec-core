@@ -1120,6 +1120,8 @@ List all feature tags in the vault.
 - `--type TYPE` - Filter by document type.
 - `--stale-days N` - Show only features whose latest activity is older than N days.
 - `--json` (default off) - Emit machine-readable output.
+- `--limit N` (default 50) - Maximum features to return.
+- `--offset N` (default 0) - Features to skip, for paging.
 
 #### Examples
 

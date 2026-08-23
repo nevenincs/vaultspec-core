@@ -558,7 +558,8 @@ List feature tags in the vault.
 | `--orphaned` | off | Show only features with no incoming links. | | `--type TYPE` |
 None | Filter by document type. | | `--stale-days N` | None | Show only features whose
 latest activity is older than N days. | | `--json` | off | Emit machine-readable output.
-|
+| | `--limit N` | - | 50 | Maximum features to return. | | `--offset N` | - | 0 |
+Features to skip, for paging. |
 
 ### vaultspec-core vault feature index
 
