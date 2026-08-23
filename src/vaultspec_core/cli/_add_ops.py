@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import replace
-from typing import TYPE_CHECKING, NoReturn
+from typing import TYPE_CHECKING, NoReturn, cast
 
 import typer
 
@@ -452,3 +452,307 @@ def emit_add_result(
             **json_format_kwargs(),
         )
     )
+
+
+def parse_row_specs(
+    console: Console, specs: Sequence[str]
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Validate ``--row`` specs into ledger row cells.
+
+    Each spec is ``OP:path`` (``A``, ``M``, ``D``) or ``R:old->new``. The
+    scaffolder never infers an operation from disk state: an executor knows
+    what it did, and guessing would record evidence nobody produced.
+
+    Args:
+        console: Console for the refusal message.
+        specs: Raw ``--row`` values.
+
+    Returns:
+        The parsed ``(op, paths)`` pairs.
+
+    Raises:
+        typer.Exit: On a malformed spec, an unknown operation, or a rename
+            missing one of its two paths.
+    """
+    parsed: list[tuple[str, tuple[str, ...]]] = []
+    for spec in specs:
+        op, separator, remainder = spec.partition(":")
+        op = op.strip().upper()
+        if not separator or not remainder.strip():
+            _refuse_row(console, spec, "expected 'OP:path'")
+        if op not in {"A", "M", "D", "R"}:
+            _refuse_row(console, spec, f"unknown operation {op!r}; use A, M, D, or R")
+        if op == "R":
+            old, arrow, new = remainder.partition("->")
+            if not arrow or not old.strip() or not new.strip():
+                _refuse_row(console, spec, "a rename needs 'R:old->new'")
+            parsed.append((op, (old.strip(), new.strip())))
+        else:
+            parsed.append((op, (remainder.strip(),)))
+    return tuple(parsed)
+
+
+def _refuse_row(console: Console, spec: str, reason: str) -> NoReturn:
+    """Refuse a malformed ``--row`` spec with an actionable message."""
+    console.print(f"[red]Error:[/red] invalid --row {spec!r}: {reason}.")
+    raise typer.Exit(code=1)
+
+
+def log_ledger_rows(
+    console: Console,
+    *,
+    root_dir: Path,
+    feature: str,
+    plan_stem: str,
+    step: str,
+    rows: Sequence[tuple[str, tuple[str, ...]]],
+    dry_run: bool,
+    json_output: bool,
+) -> Path:
+    """Create the plan's ledger if absent, then append *step*'s rows to it.
+
+    Creating and appending are one operation because the ledger is
+    append-only: an executor logging its first Step must not have to know
+    whether the document already exists. The append routes through
+    :func:`~vaultspec_core.vaultcore.models.refresh_modified_stamp`, the
+    mandated mutator helper, so the ``modified:`` stamp and the
+    ``body_hash:`` re-attestation stay paired.
+
+    Args:
+        console: Console for operator messages.
+        root_dir: Project root directory.
+        feature: Feature tag, with or without a leading ``#``.
+        plan_stem: Stem of the parent plan the ledger records.
+        step: Canonical Step identifier or display path being logged.
+        rows: Parsed ``(op, paths)`` pairs from :func:`parse_row_specs`.
+        dry_run: Resolve and report the target without writing.
+        json_output: Suppress the human-readable confirmation line.
+
+    Returns:
+        The ledger's path.
+    """
+    import datetime as _dt
+
+    from vaultspec_core.core.helpers import atomic_write
+    from vaultspec_core.plan.parser import parse_plan
+    from vaultspec_core.vaultcore.exec_ledger import append_rows, format_row
+    from vaultspec_core.vaultcore.hydration import (
+        DocumentIdentity,
+        ExecBinding,
+        ParentPlan,
+        TemplateFields,
+        WritePolicy,
+        create_vault_doc,
+    )
+    from vaultspec_core.vaultcore.models import (
+        DocType,
+        refresh_modified_stamp,
+    )
+
+    feat = normalize_feature(console, feature)
+    plan_doc = resolve_parent_plan(console, root_dir, feat, [plan_stem])
+    parsed_plan = parse_plan(plan_doc.path)
+    target_step = resolve_step_row(console, parsed_plan, step)
+
+    plan = ParentPlan(
+        date=plan_doc.date or plan_doc.path.stem[:10], stem=plan_doc.path.stem
+    )
+    identity = DocumentIdentity(
+        doc_type=DocType.EXEC, feature=feat, date=plan.date or ""
+    )
+    binding = ExecBinding(plan=plan, ledger=True)
+    fields = TemplateFields()
+
+    # Resolve the path without writing so an existing ledger is appended to,
+    # never overwritten - a rewrite would discard other Steps' history.
+    ledger_path = create_vault_doc(
+        root_dir,
+        identity,
+        fields,
+        exec_binding=binding,
+        write=WritePolicy(force=True, dry_run=True),
+    )
+    if dry_run:
+        if not json_output:
+            console.print(f"[dim]Would log {len(rows)} row(s) to:[/dim] {ledger_path}")
+        return ledger_path
+
+    if not ledger_path.exists():
+        create_vault_doc(
+            root_dir,
+            identity,
+            fields,
+            exec_binding=binding,
+            write=WritePolicy(force=False, dry_run=False),
+        )
+
+    if not rows:
+        return ledger_path
+
+    text = ledger_path.read_text(encoding="utf-8")
+    rendered = [format_row(target_step.canonical_id, op, *paths) for op, paths in rows]
+    # Appended against the whole document, not a split-off body: frontmatter is
+    # YAML and can never carry a '## Changes' heading, so the section match is
+    # unambiguous and no fragile head/body reassembly is needed.
+    try:
+        updated = append_rows(text, rendered)
+    except ValueError as exc:
+        console.print(f"[red]Error:[/red] {exc}.")
+        raise typer.Exit(code=1) from exc
+
+    if updated != text:
+        atomic_write(ledger_path, refresh_modified_stamp(updated, _dt.date.today()))
+
+    if not json_output:
+        console.print(
+            f"[green]Logged:[/green] {len(rendered)} row(s) for "
+            f"{target_step.canonical_id} -> {ledger_path.name}"
+        )
+    return ledger_path
+
+
+def fold_exec_records(
+    console: Console,
+    *,
+    root_dir: Path,
+    feature: str,
+    dry_run: bool,
+    force: bool,
+    json_output: bool,
+) -> tuple[Path | None, object]:
+    """Fold one feature's per-Step execution records into a single ledger.
+
+    The fold is destructive - it removes the records whose content the
+    ledger now carries - so it refuses to write without ``--force``, and
+    reports exactly what it would do instead. What a dry run prints and what
+    a forced run applies come from one planner, so the preview is the plan.
+
+    Args:
+        console: Console for operator messages.
+        root_dir: Project root directory.
+        feature: Feature tag, with or without a leading ``#``.
+        dry_run: Report the plan without writing.
+        force: Required to apply a destructive fold.
+        json_output: Suppress human-readable lines.
+
+    Returns:
+        The ``(ledger_path, plan)`` pair; ``ledger_path`` is ``None`` when
+        nothing was folded.
+
+    Raises:
+        typer.Exit: When the feature has no execution folder, or when a
+            non-dry run was requested without ``--force``.
+    """
+    import datetime as _dt
+
+    from vaultspec_core.config import get_config
+    from vaultspec_core.core.helpers import atomic_write
+    from vaultspec_core.vaultcore.checks.exec_mapping import link_stem
+    from vaultspec_core.vaultcore.exec_fold import plan_fold, sources_from, summarize
+    from vaultspec_core.vaultcore.exec_ledger import append_rows
+    from vaultspec_core.vaultcore.hydration import (
+        DocumentIdentity,
+        ExecBinding,
+        ParentPlan,
+        TemplateFields,
+        WritePolicy,
+        create_vault_doc,
+    )
+    from vaultspec_core.vaultcore.models import DocType, refresh_modified_stamp
+    from vaultspec_core.vaultcore.parser import parse_frontmatter
+
+    feat = normalize_feature(console, feature)
+    exec_root = root_dir / get_config().docs_dir / "exec"
+    folders = sorted(p for p in exec_root.glob(f"*-{feat}") if p.is_dir())
+    if not folders:
+        console.print(
+            f"[red]Error:[/red] no execution folder found for feature {feat!r}."
+        )
+        raise typer.Exit(code=1)
+
+    folder = folders[0]
+    records: list[tuple[Path, str | None, str]] = []
+    plan_stems: list[str] = []
+    for path in sorted(folder.glob("*.md")):
+        try:
+            meta, body = parse_frontmatter(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, ValueError):
+            continue
+        raw = meta.get("step_id")
+        step_id = str(raw).strip() if raw else None
+        records.append((path, step_id, body))
+        # Frontmatter is untyped JSON-ish data, so the related list is
+        # narrowed explicitly rather than iterated as Any.
+        raw_related: object = meta.get("related")
+        related: tuple[object, ...] = (
+            tuple(cast("list[object]", raw_related))
+            if isinstance(raw_related, list)
+            else ()
+        )
+        for link in related:
+            stem = link_stem(str(link))
+            if stem and stem.endswith("-plan"):
+                plan_stems.append(stem)
+
+    plan = plan_fold(sources_from(records))
+    if not json_output:
+        console.print(summarize(plan, folder.name))
+        for skip in plan.skipped:
+            console.print(f"  [dim]skip[/dim] {skip.path.name} - {skip.reason}")
+
+    if plan.is_empty:
+        return None, plan
+
+    if not force:
+        console.print(
+            "[yellow]Refusing to fold without --force:[/yellow] this removes "
+            f"{len(plan.folded)} record(s). Re-run with --force to apply, or "
+            "--dry-run to silence this."
+        )
+        raise typer.Exit(code=1)
+
+    plan_stem = plan_stems[0] if plan_stems else f"{folder.name}-plan"
+    folder_date = folder.name[:10]
+    parent = ParentPlan(date=folder_date, stem=plan_stem)
+    identity = DocumentIdentity(doc_type=DocType.EXEC, feature=feat, date=folder_date)
+    binding = ExecBinding(plan=parent, ledger=True)
+    fields = TemplateFields()
+
+    ledger_path = create_vault_doc(
+        root_dir,
+        identity,
+        fields,
+        exec_binding=binding,
+        write=WritePolicy(force=True, dry_run=True),
+    )
+    if dry_run:
+        if not json_output:
+            console.print(f"[dim]Would write:[/dim] {ledger_path}")
+        return ledger_path, plan
+
+    if not ledger_path.exists():
+        create_vault_doc(
+            root_dir,
+            identity,
+            fields,
+            exec_binding=binding,
+            write=WritePolicy(force=False, dry_run=False),
+        )
+
+    text = ledger_path.read_text(encoding="utf-8")
+    updated = append_rows(text, plan.rows)
+    if updated != text:
+        atomic_write(ledger_path, refresh_modified_stamp(updated, _dt.date.today()))
+
+    # Remove folded records only after the ledger carrying their content is
+    # durably on disk, so an interruption leaves duplication rather than loss.
+    for path in plan.folded:
+        if path != ledger_path:
+            path.unlink(missing_ok=True)
+
+    if not json_output:
+        console.print(
+            f"[green]Folded:[/green] {len(plan.folded)} record(s) into "
+            f"{ledger_path.name}"
+        )
+    return ledger_path, plan

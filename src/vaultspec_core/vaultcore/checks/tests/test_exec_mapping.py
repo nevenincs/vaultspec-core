@@ -194,3 +194,89 @@ class TestExecMapping:
         result = _run(tmp_path, feature="other")
 
         assert result.diagnostics == []
+
+
+def _write_ledger(
+    root: Path,
+    *,
+    rows: str,
+    plan_stem: str = _PLAN_STEM,
+    stem: str = "2026-02-04-feat-ledger",
+    folder: str = "2026-02-04-feat",
+) -> Path:
+    """Write a consolidated ledger naming its Steps in ``## Changes`` rows."""
+    path = root / ".vault" / "exec" / folder / f"{stem}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frontmatter = (
+        "---",
+        "tags:",
+        "  - '#exec'",
+        "  - '#feat'",
+        "date: '2026-02-04'",
+        "modified: '2026-02-04'",
+        "related:",
+        f"  - '[[{plan_stem}]]'",
+        "---",
+        "",
+        "# `feat` ledger",
+        "",
+        "## Changes",
+        "",
+    )
+    path.write_text("\n".join((*frontmatter, rows)), encoding="utf-8")
+    return path
+
+
+class TestConsolidatedLedger:
+    """A ledger maps one document to every Step it covers."""
+
+    def test_ledger_covering_live_steps_is_clean(self, tmp_path: Path) -> None:
+        _skeleton(tmp_path)
+        _write_plan(tmp_path, ("S01", "S02"))
+        _write_ledger(
+            tmp_path,
+            rows="- `S01` `M` `src/s01.py`\n- `S02` `A` `src/s02.py`\n",
+        )
+
+        result = _run(tmp_path)
+
+        assert result.diagnostics == []
+
+    def test_every_covered_step_is_classified_not_just_the_first(
+        self, tmp_path: Path
+    ) -> None:
+        """A dangling id in a later row must still be caught."""
+        _skeleton(tmp_path)
+        _write_plan(tmp_path, ("S01", "S02"))
+        _write_ledger(
+            tmp_path,
+            rows="- `S01` `M` `src/s01.py`\n- `S99` `M` `src/gone.py`\n",
+        )
+
+        result = _run(tmp_path)
+
+        warnings = [d for d in result.diagnostics if d.severity == Severity.WARNING]
+        assert len(warnings) == 1
+        assert "S99" in warnings[0].message
+
+    def test_notes_prose_never_registers_a_step(self, tmp_path: Path) -> None:
+        _skeleton(tmp_path)
+        _write_plan(tmp_path, ("S01",))
+        path = _write_ledger(tmp_path, rows="- `S01` `M` `src/s01.py`\n")
+        path.write_text(
+            path.read_text(encoding="utf-8") + "\n## Notes\n\n- `S99` was skipped.\n",
+            encoding="utf-8",
+        )
+
+        result = _run(tmp_path)
+
+        assert result.diagnostics == []
+
+    def test_ledger_naming_no_step_is_skipped_not_flagged(self, tmp_path: Path) -> None:
+        _skeleton(tmp_path)
+        _write_plan(tmp_path, ("S01",))
+        _write_ledger(tmp_path, rows="- `M` `src/s01.py`\n")
+
+        result = _run(tmp_path)
+
+        assert result.diagnostics == []

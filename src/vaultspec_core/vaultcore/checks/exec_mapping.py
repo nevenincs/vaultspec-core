@@ -19,6 +19,10 @@ This checker resolves each exec record's parent plan and classifies its
 - The parent plan cannot be parsed -> a single WARNING against that plan rather
   than a crash (No-Crash policy).
 
+A consolidated ledger (a ``-ledger`` stem) carries no single ``step_id``: it
+names its Steps in ``## Changes`` rows instead, and every Step it covers is
+classified against the same parent plan.
+
 A legacy exec record that carries no ``step_id`` (predating the field) cannot
 be back-mapped and is skipped, not flagged. The checker is read-only: no
 dangling reference has an unambiguous automatic repair, so each finding's
@@ -31,6 +35,7 @@ import logging
 import re
 from typing import TYPE_CHECKING
 
+from ..exec_ledger import is_ledger_stem, ledger_step_ids
 from ._base import CheckDiagnostic, CheckResult, Severity, extract_feature_tags
 
 if TYPE_CHECKING:
@@ -104,19 +109,32 @@ def check_exec_mapping(
     archived_stem_cache: dict[str, bool] = {}
     plan_ids_cache: dict[Path, tuple[set[str], set[str]] | Exception] = {}
 
-    for doc_path, (metadata, _body) in sorted(snapshot.items()):
+    for doc_path, (metadata, body) in sorted(snapshot.items()):
         if get_doc_type(doc_path, root_dir) is not DocType.EXEC:
             continue
         if feature and feature.lstrip("#") not in extract_feature_tags(metadata.tags):
             continue
 
-        step_id = metadata.step_id
-        if not step_id:
-            # Legacy record predating the step_id field: unmappable, not a
-            # defect. Skipped without a finding.
+        # A consolidated ledger names its Steps in ``## Changes`` rows rather
+        # than in a single ``step_id:`` field, so one document is validated
+        # against every Step it covers. The body comes from the snapshot the
+        # pass already holds, so this costs no extra read.
+        if is_ledger_stem(doc_path.stem):
+            step_ids = ledger_step_ids(body)
+        elif metadata.step_id:
+            step_ids = (metadata.step_id,)
+        else:
+            step_ids = ()
+
+        if not step_ids:
+            # Legacy record predating the step_id field, or a ledger naming
+            # no Step: unmappable, not a defect. Skipped without a finding.
             continue
 
         rel_path = doc_path.relative_to(root_dir)
+        # Every Step in one document shares one parent plan, so the plan is
+        # resolved once per document and reused across its Steps.
+        step_id = step_ids[0]
 
         # Resolve the parent plan from the record's related wiki-links. The
         # first link resolving to a live plan wins; failing that, an archived
@@ -153,11 +171,12 @@ def check_exec_mapping(
             continue
 
         live_ids, retired_ids = ids_or_error
-        diagnostic = _step_mapping_diagnostic(
-            rel_path, step_id, live_plan_path, live_ids, retired_ids
-        )
-        if diagnostic is not None:
-            result.diagnostics.append(diagnostic)
+        for covered_step_id in step_ids:
+            diagnostic = _step_mapping_diagnostic(
+                rel_path, covered_step_id, live_plan_path, live_ids, retired_ids
+            )
+            if diagnostic is not None:
+                result.diagnostics.append(diagnostic)
 
     return result
 

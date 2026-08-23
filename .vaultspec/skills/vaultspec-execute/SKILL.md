@@ -56,8 +56,12 @@ Assume the persona of a delegator.
   `.vault/exec/yyyy-mm-dd-{feature}/...md` for every completed Step (not per Phase).
   Scaffold the record with
   `vaultspec-core vault add exec --feature <tag> --step <S##> --related <plan-stem>`,
-  then author the body prose. The verb machine-fills the tier-conditional filename from
-  the plan's canonical display path (`yyyy-mm-dd-{feature}-{step}.md` at L1,
+  then fill `## Changes` with the mechanical path log - one `A`/`M`/`D`/`R` line per
+  path touched, no prose. The Step row already states the intent and the commit carries
+  the diff, so a record that narrates them is duplicated context, not evidence. Add
+  `## Notes` only on exception (data loss, skipped work, a scaffold left in code, a
+  persistent failure). The verb machine-fills the tier-conditional filename from the
+  plan's canonical display path (`yyyy-mm-dd-{feature}-{step}.md` at L1,
   `yyyy-mm-dd-{feature}-{phase}-{step}.md` at L2, and
   `yyyy-mm-dd-{feature}-{wave}-{phase}-{step}.md` at L3/L4) and the `step_id:`
   frontmatter field carrying the originating Step's canonical identifier (`S##`).

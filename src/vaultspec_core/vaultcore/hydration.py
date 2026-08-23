@@ -63,6 +63,10 @@ _TOPIC_INFIX_TYPES = frozenset(
 # :func:`get_template_path` / :func:`create_vault_doc`.
 _EXEC_SUMMARY_TEMPLATE = "exec-summary.md"
 
+# The consolidated-ledger template: one document per plan carrying every
+# Step's mechanical rows, selected via the ``ledger`` flag on ``ExecBinding``.
+_EXEC_LEDGER_TEMPLATE = "exec-ledger.md"
+
 # Prior on-disk filenames for templates that have since been renamed in the
 # source tree. A deployed mirror that predates the rename still ships the old
 # filename; :func:`get_template_path` falls back to these so the scaffolder
@@ -162,6 +166,10 @@ class ExecBinding:
         phase_display_path: Display path of the summarised Phase (e.g.
             ``P01`` or ``W01.P01``); fills the ``{phase}`` placeholder and
             the summary filename's identifier segment.
+        ledger: When ``True``, the record is the plan's single consolidated
+            ledger rather than one document per Step, and is scaffolded from
+            the ``exec-ledger.md`` template. Mutually exclusive with
+            ``summary``.
     """
 
     plan: ParentPlan = ParentPlan()
@@ -171,6 +179,7 @@ class ExecBinding:
     step_action: str | None = None
     summary: bool = False
     phase_display_path: str | None = None
+    ledger: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -552,7 +561,11 @@ def create_vault_doc(
         )
 
     template_path = get_template_path(
-        root_dir, doc_type, content_root=content_root, summary=summary
+        root_dir,
+        doc_type,
+        content_root=content_root,
+        summary=summary,
+        ledger=exec_binding.ledger,
     )
     if template_path is None:
         raise FileNotFoundError(
@@ -587,7 +600,17 @@ def create_vault_doc(
         exec_binding,
     )
 
-    if doc_type is DocType.EXEC and summary:
+    if doc_type is DocType.EXEC and exec_binding.ledger:
+        # One ledger per plan, so the filename carries no Step or Phase
+        # segment - the Step identity lives in the rows, not the path.
+        filename = f"{plan_date or date_str}-{feature}-ledger.md"
+        target_dir = (
+            root_dir
+            / get_config().docs_dir
+            / doc_type.value
+            / f"{plan_date or date_str}-{feature}"
+        )
+    elif doc_type is DocType.EXEC and summary:
         suffix = (exec_binding.phase_display_path or "P01").replace(".", "-")
         filename = f"{plan_date or date_str}-{feature}-{suffix}-summary.md"
         target_dir = (
@@ -704,6 +727,7 @@ def get_template_path(
     *,
     content_root: pathlib.Path | None = None,
     summary: bool = False,
+    ledger: bool = False,
 ) -> pathlib.Path | None:
     """Return the filesystem path of the template file for a given DocType.
 
@@ -717,6 +741,9 @@ def get_template_path(
         summary: When ``True`` and *doc_type* is :attr:`DocType.EXEC`, resolve
             the Phase-summary template (``exec-summary.md``) instead of the
             Step-record template (``exec-step.md``).
+        ledger: When ``True`` and *doc_type* is :attr:`DocType.EXEC`, resolve
+            the consolidated-ledger template (``exec-ledger.md``). Takes
+            precedence over *summary*.
 
     Returns:
         Path to the template file, or ``None`` if the type has no mapping or
@@ -724,8 +751,10 @@ def get_template_path(
     """
     from ..config import get_config
 
-    if summary and doc_type is DocType.EXEC:
-        name: str | None = _EXEC_SUMMARY_TEMPLATE
+    if ledger and doc_type is DocType.EXEC:
+        name: str | None = _EXEC_LEDGER_TEMPLATE
+    elif summary and doc_type is DocType.EXEC:
+        name = _EXEC_SUMMARY_TEMPLATE
     else:
         name = _TEMPLATE_NAMES.get(doc_type)
     if not name:

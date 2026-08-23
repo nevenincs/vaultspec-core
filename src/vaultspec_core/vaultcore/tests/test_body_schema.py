@@ -50,8 +50,10 @@ def test_current_contract_is_immutable_and_has_exec_shape_variants() -> None:
     schema = BODY_SCHEMA_REGISTRY[CURRENT_BODY_SCHEMA]
 
     assert schema.required_sections(DocType.RESEARCH) == ("Findings", "Sources")
-    assert schema.required_sections(DocType.EXEC) == ("Description", "Outcome", "Notes")
-    assert schema.required_sections(DocType.EXEC, summary=True) == ("Description",)
+    # body-v2 reduced the execution record to its mechanical path log; the
+    # narrative sections body-v1 required are gone from the contract.
+    assert schema.required_sections(DocType.EXEC) == ("Changes",)
+    assert schema.required_sections(DocType.EXEC, summary=True) == ("Changes",)
 
     # The registry and its section maps are read-only Mappings statically, so
     # a write is expressed through a cast rather than a checker suppression:
@@ -62,6 +64,18 @@ def test_current_contract_is_immutable_and_has_exec_shape_variants() -> None:
         cast("dict[tuple[DocType, bool], Any]", schema.sections)[
             (DocType.RESEARCH, False)
         ] = ("Findings",)
+
+
+def test_superseded_body_v1_is_retained_and_unchanged() -> None:
+    """A superseded contract stays registered so its documents still validate."""
+    schema = BODY_SCHEMA_REGISTRY["body-v1"]
+
+    assert schema.required_sections(DocType.EXEC) == ("Description", "Outcome", "Notes")
+    assert schema.required_sections(DocType.EXEC, summary=True) == ("Description",)
+    # Non-exec contracts were carried across the bump untouched.
+    assert schema.required_sections(DocType.RESEARCH) == (
+        BODY_SCHEMA_REGISTRY[CURRENT_BODY_SCHEMA].required_sections(DocType.RESEARCH)
+    )
 
 
 def test_registry_preserves_all_sixteen_historical_template_contracts() -> None:
@@ -88,6 +102,42 @@ def test_resolver_uses_declared_contract_not_workspace_templates(
     assert resolution.schema_id == CURRENT_BODY_SCHEMA
     assert resolution.required_sections == ("Findings", "Sources")
     assert resolution.diagnostic is None
+
+
+def test_resolver_honours_superseded_declaration_without_attestation(
+    tmp_path: Path,
+) -> None:
+    """A document stamped with the previous contract is not reclassified.
+
+    Regression guard for the schema bump: ``body-v1`` execution records
+    predate ``body-v2`` and carry no ledger entry, so resolving them as
+    ``unknown`` would turn every one of them into a finding.
+    """
+    doc_path = tmp_path / ".vault" / "exec" / "2026-07-27-demo-S01.md"
+
+    resolution = resolve_body_schema(
+        tmp_path,
+        doc_path,
+        _metadata(DocType.EXEC, "body-v1"),
+        "# demo\n\n## Description\n\nDid the thing.\n",
+    )
+
+    assert resolution.source == "declared"
+    assert resolution.schema_id == "body-v1"
+    assert resolution.required_sections == ("Description", "Outcome", "Notes")
+    assert resolution.diagnostic is None
+
+
+def test_resolver_reports_unregistered_non_legacy_schema(tmp_path: Path) -> None:
+    resolution = resolve_body_schema(
+        tmp_path,
+        tmp_path / ".vault" / "exec" / "2026-07-27-demo-S02.md",
+        _metadata(DocType.EXEC, "body-v99"),
+        "# demo\n",
+    )
+
+    assert resolution.source == "unknown"
+    assert resolution.required_sections is None
 
 
 def test_resolver_rejects_forged_legacy_schema_without_attestation(

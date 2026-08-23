@@ -215,3 +215,149 @@ def cmd_exec_detach(
         json_output=json_output,
         target=target,
     )
+
+
+@exec_app.command("log")
+def cmd_exec_log(
+    feature: Annotated[
+        str, typer.Option("--feature", help="Feature tag (with or without '#')")
+    ],
+    related: Annotated[
+        str, typer.Option("--related", help="Parent plan stem this ledger records")
+    ],
+    step: Annotated[
+        str,
+        typer.Option("--step", help="Canonical Step ID or display path being logged"),
+    ],
+    row: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--row",
+            help=(
+                "Row to append as 'OP:path' (A added, M modified, D deleted) "
+                "or 'R:old->new'; repeatable"
+            ),
+        ),
+    ] = None,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview without writing")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Append a Step's mechanical rows to its plan's consolidated ledger.
+
+    Creates the ledger on first use, so an executor logging its first Step
+    never has to know whether the document exists yet. The ledger is
+    append-only: existing rows are never rewritten, and re-logging the same
+    row is idempotent rather than duplicating it.
+    """
+    apply_target(target, json_output=json_output)
+    from vaultspec_core.cli import _add_ops
+    from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core.types import get_context as _get_ctx
+
+    console = get_console()
+    root_dir = _get_ctx().root_dir
+    rows = _add_ops.parse_row_specs(console, row or [])
+
+    try:
+        ledger_path = _add_ops.log_ledger_rows(
+            console,
+            root_dir=root_dir,
+            feature=feature,
+            plan_stem=related,
+            step=step,
+            rows=rows,
+            dry_run=dry_run,
+            json_output=json_output,
+        )
+    except Exception as exc:
+        handle_error(exc, json_output=json_output)
+        return
+
+    if not dry_run:
+        invalidate_graph_cache(root_dir)
+    if json_output:
+        from vaultspec_core.cli.rendering import json_envelope
+
+        payload: dict[str, object] = {
+            "path": str(ledger_path),
+            "step": step,
+            "rows": len(rows),
+        }
+        if dry_run:
+            payload["dry_run"] = True
+        typer.echo(
+            json.dumps(json_envelope("vault.exec.log", "logged", payload), indent=2)
+        )
+
+
+@exec_app.command("fold")
+def cmd_exec_fold(
+    feature: Annotated[
+        str, typer.Option("--feature", help="Feature tag (with or without '#')")
+    ],
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Report the fold plan without writing")
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Required to apply; the fold removes records"),
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Fold a feature's per-Step execution records into one consolidated ledger.
+
+    Recovers each record's ``## Scope`` paths as ledger rows under its Step
+    id. The operation is never invented: ``body-v1`` did not record whether a
+    path was added, modified, or deleted, so recovered rows carry ``T``
+    (touched). Body prose is discarded, which is the point of the fold and is
+    recoverable from the commit preceding it.
+
+    Destructive, so it refuses to write without ``--force`` and reports the
+    plan instead.
+    """
+    apply_target(target, json_output=json_output)
+    from vaultspec_core.cli import _add_ops
+    from vaultspec_core.cli._cache_hook import invalidate_graph_cache
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core.types import get_context as _get_ctx
+
+    console = get_console()
+    root_dir = _get_ctx().root_dir
+
+    try:
+        ledger_path, plan = _add_ops.fold_exec_records(
+            console,
+            root_dir=root_dir,
+            feature=feature,
+            dry_run=dry_run,
+            force=force,
+            json_output=json_output,
+        )
+    except typer.Exit:
+        raise
+    except Exception as exc:
+        handle_error(exc, json_output=json_output)
+        return
+
+    if not dry_run and ledger_path is not None:
+        invalidate_graph_cache(root_dir)
+    if json_output:
+        from vaultspec_core.cli.rendering import json_envelope
+
+        payload: dict[str, object] = {
+            "path": str(ledger_path) if ledger_path else None,
+            "folded": len(getattr(plan, "folded", [])),
+            "rows": len(getattr(plan, "rows", [])),
+            "recovered_paths": getattr(plan, "recovered_paths", 0),
+            "skipped": len(getattr(plan, "skipped", [])),
+        }
+        if dry_run:
+            payload["dry_run"] = True
+        typer.echo(
+            json.dumps(json_envelope("vault.exec.fold", "folded", payload), indent=2)
+        )

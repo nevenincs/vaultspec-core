@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#cli-exec-step-records'
 date: '2026-05-17'
-modified: '2026-06-13'
-body_hash: 'sha256:ee12d5fc95f8527168ca132175758dec208e54b7a7970325258167d393b0e60c'
+modified: '2026-08-23'
+body_hash: 'sha256:2563a346f373bb8cd09ea4585f22f2f540ab8afce3c695e793505a2bd47ce4fc'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-exec-step-records-research]]'
@@ -35,6 +35,10 @@ round 2.
   resolutions: change the rules to fold all Steps into one exec
   document (rejected — see research note), or teach the
   scaffolder Step-awareness. Step-awareness is the right call.
+  **Partially superseded** by `2026-08-23-exec-record-consolidation-adr`: the rejection of a
+  consolidated document is reversed there, on the ground that a
+  per-plan ledger keeps Step identity in a row column. The
+  Step-awareness decision this record makes still stands.
 - The CLI already has a plan parser. It can read the plan
   pointed at by `--related`, enumerate Steps, derive identity,
   derive scope, populate path and frontmatter automatically.
