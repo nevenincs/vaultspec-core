@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#mcp-consolidation'
 date: '2026-07-31'
-modified: '2026-08-13'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:70f1bc099ab8c5d2c936f693dc0be87196330b9bd11ff6080c7c47e4a6a77de3'
 related:
   - '[[2026-02-22-mcp-consolidation-adr]]'

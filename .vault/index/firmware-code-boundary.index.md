@@ -4,24 +4,16 @@ tags:
   - '#index'
   - '#firmware-code-boundary'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
-body_hash: 'sha256:578f372b7e1ade43e93d2aecc304c603b8bf6ed8beff6f1e1d50d005058f4345'
+modified: '2026-08-23'
+body_schema: 'body-v2'
+body_hash: 'sha256:a7072a57111c2366325714004a94aa73e76a247040de16ecdf2256ac625b61e8'
 related:
-  - '[[2026-07-16-firmware-code-boundary-P01-S01]]'
-  - '[[2026-07-16-firmware-code-boundary-P01-S02]]'
-  - '[[2026-07-16-firmware-code-boundary-P01-S03]]'
   - '[[2026-07-16-firmware-code-boundary-P01-summary]]'
-  - '[[2026-07-16-firmware-code-boundary-P02-S04]]'
-  - '[[2026-07-16-firmware-code-boundary-P02-S05]]'
-  - '[[2026-07-16-firmware-code-boundary-P02-S06]]'
   - '[[2026-07-16-firmware-code-boundary-P02-summary]]'
-  - '[[2026-07-16-firmware-code-boundary-P03-S07]]'
-  - '[[2026-07-16-firmware-code-boundary-P03-S08]]'
-  - '[[2026-07-16-firmware-code-boundary-P03-S09]]'
   - '[[2026-07-16-firmware-code-boundary-P03-summary]]'
   - '[[2026-07-16-firmware-code-boundary-adr]]'
   - '[[2026-07-16-firmware-code-boundary-audit]]'
+  - '[[2026-07-16-firmware-code-boundary-ledger]]'
   - '[[2026-07-16-firmware-code-boundary-plan]]'
   - '[[2026-07-16-firmware-code-boundary-research]]'
 ---
@@ -42,18 +34,10 @@ Auto-generated index of all documents tagged with `#firmware-code-boundary`.
 
 ### exec
 
-- `2026-07-16-firmware-code-boundary-P01-S01` - Add the canonical Code-stands-alone mandate bullet (removable scaffolding, one-way reference direction, trailer carve-out) beside the Comments mandate
-- `2026-07-16-firmware-code-boundary-P01-S02` - Add the one-sentence removable-harness characterization with one-way reference direction where the .vault store is introduced
-- `2026-07-16-firmware-code-boundary-P01-S03` - Add the one-clause hierarchy statement that source code sits outside the documentation hierarchy and never references vault or harness contents
 - `2026-07-16-firmware-code-boundary-P01-summary` - `firmware-code-boundary` `P01` summary
-- `2026-07-16-firmware-code-boundary-P02-S04` - Add the byte-identical boundary bullet to the core implementation mandate of all three executor personas
-- `2026-07-16-firmware-code-boundary-P02-S05` - Add the Boundary integrity check to the Intent Domain, mapped to the existing HIGH severity class
-- `2026-07-16-firmware-code-boundary-P02-S06` - Disambiguate the Traceability requirement in place: mapping lives in the Step Record, never as annotations in code
 - `2026-07-16-firmware-code-boundary-P02-summary` - `firmware-code-boundary` `P02` summary
-- `2026-07-16-firmware-code-boundary-P03-S07` - Propagate builtin edits to the deployed mirror with vaultspec-core sync and confirm spec doctor is clean
-- `2026-07-16-firmware-code-boundary-P03-S08` - Run vault check all, prek hooks, and the unit test gate, fixing any drift the gates surface
-- `2026-07-16-firmware-code-boundary-P03-S09` - Register the read-only vault check source-boundary scanner as a GitHub follow-up issue citing the governing decision
 - `2026-07-16-firmware-code-boundary-P03-summary` - `firmware-code-boundary` `P03` summary
+- `2026-07-16-firmware-code-boundary-ledger` - `firmware-code-boundary` ledger
 
 ### plan
 

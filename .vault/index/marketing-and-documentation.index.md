@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#marketing-and-documentation'
 date: '2026-07-31'
-modified: '2026-08-13'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:eda723cdbf867d1687513dbae9e3b2a9b350e17dcd0130a04c12590a9ffce1d2'
 related:
   - '[[2026-02-20-marketing-and-documentation-adr]]'

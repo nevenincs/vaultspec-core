@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#uncategorized'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:63edc101b132413093e281d25e47412115e1ac071a6abf757739352d6d5b270a'
 related:
   - '[[2026-02-20-stale-path-audit-reference]]'

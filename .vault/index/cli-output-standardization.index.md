@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#cli-output-standardization'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:1585b0a67bdfb345eb2b18e5b19a96d0cfcbfd492fcc3af093009c89837182bd'
 related:
   - '[[2026-06-13-cli-output-standardization-adr]]'

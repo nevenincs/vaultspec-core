@@ -4,22 +4,14 @@ tags:
   - '#index'
   - '#provider-mcp-enrollment'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
-body_hash: 'sha256:13b6635aa4338ad32639938549c5dab5e4ce28f8b7822aa95f8ec12f045f2732'
+modified: '2026-08-23'
+body_schema: 'body-v2'
+body_hash: 'sha256:7ec8b1a5758e724b2bc6b44d62fa0f26df1f16e594ffdb36bd3502795b8c2450'
 related:
-  - '[[2026-07-15-provider-mcp-enrollment-P01-S01]]'
-  - '[[2026-07-15-provider-mcp-enrollment-P01-S02]]'
-  - '[[2026-07-15-provider-mcp-enrollment-P01-S03]]'
-  - '[[2026-07-15-provider-mcp-enrollment-P01-S04]]'
-  - '[[2026-07-15-provider-mcp-enrollment-P02-S05]]'
-  - '[[2026-07-15-provider-mcp-enrollment-P02-S06]]'
-  - '[[2026-07-15-provider-mcp-enrollment-P03-S07]]'
-  - '[[2026-07-15-provider-mcp-enrollment-P03-S08]]'
-  - '[[2026-07-15-provider-mcp-enrollment-P03-S09]]'
   - '[[2026-07-15-provider-mcp-enrollment-P03-summary]]'
   - '[[2026-07-15-provider-mcp-enrollment-adr]]'
   - '[[2026-07-15-provider-mcp-enrollment-audit]]'
+  - '[[2026-07-15-provider-mcp-enrollment-ledger]]'
   - '[[2026-07-15-provider-mcp-enrollment-plan]]'
   - '[[2026-07-15-provider-mcp-enrollment-reference]]'
   - '[[2026-07-15-provider-mcp-enrollment-research]]'
@@ -43,15 +35,7 @@ Auto-generated index of all documents tagged with `#provider-mcp-enrollment`.
 
 ### exec
 
-- `2026-07-15-provider-mcp-enrollment-P01-S01` - Define typed MCP scope, target, ownership, and tool-spec contracts
-- `2026-07-15-provider-mcp-enrollment-P01-S02` - Implement ownership state and provider-scope target resolution
-- `2026-07-15-provider-mcp-enrollment-P01-S03` - Implement Claude JSON and Codex TOML reconciliation, status, prune, and uninstall
-- `2026-07-15-provider-mcp-enrollment-P01-S04` - Export the stable package-aware companion reconcile API
-- `2026-07-15-provider-mcp-enrollment-P02-S05` - Wire selected providers and project-default MCP scopes into install, upgrade, sync, and uninstall
-- `2026-07-15-provider-mcp-enrollment-P02-S06` - Add provider-scope MCP controls and provider-native status output
-- `2026-07-15-provider-mcp-enrollment-P03-S07` - Add real-behavior reconciliation, migration, lifecycle, and mode-rendering tests
-- `2026-07-15-provider-mcp-enrollment-P03-S08` - Add isolated Codex and Claude CLI acceptance and update MCP operator guidance
-- `2026-07-15-provider-mcp-enrollment-P03-S09` - Harden atomic provider configuration writes against pre-existing sibling nodes
+- `2026-07-15-provider-mcp-enrollment-ledger` - `provider-mcp-enrollment` ledger
 - `2026-07-15-provider-mcp-enrollment-P03-summary` - `provider-mcp-enrollment` `P03` summary
 
 ### plan

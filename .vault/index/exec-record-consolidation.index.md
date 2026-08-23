@@ -6,7 +6,7 @@ tags:
 date: '2026-08-23'
 modified: '2026-08-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:ad1df21a8fa625e31cade53a6f522a8117072009f83fd767367d0a1e8dece1d4'
+body_hash: 'sha256:c7d973c215b6bb2dc42011bb84571fb8a97e7e07c044f2ec0c191c7dfb7155e8'
 related:
   - '[[2026-08-23-exec-record-consolidation-adr]]'
   - '[[2026-08-23-exec-record-consolidation-research]]'
@@ -20,7 +20,7 @@ Auto-generated index of all documents tagged with `#exec-record-consolidation`.
 
 ### adr
 
-- `2026-08-23-exec-record-consolidation-adr` - `exec-record-consolidation` adr: `Consolidate execution records into one append-only ledger per plan` | (**status:** `proposed`)
+- `2026-08-23-exec-record-consolidation-adr` - `exec-record-consolidation` adr: `Consolidate execution records into one append-only ledger per plan` | (**status:** `accepted`)
 
 ### research
 

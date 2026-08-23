@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#docs-curation'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:5a18b8d16dd4cf1a0c72ad09abf3c7caa51dec9244487750a1b709591d971e8d'
 related:
   - '[[2026-02-21-docs-curation-exec]]'

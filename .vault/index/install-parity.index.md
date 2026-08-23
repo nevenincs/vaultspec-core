@@ -4,51 +4,12 @@ tags:
   - '#index'
   - '#install-parity'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
-body_hash: 'sha256:2e53b3e704c78f9cbd66f960fdf581382f0f5602657b3d8f53f3799523302ef3'
+modified: '2026-08-23'
+body_schema: 'body-v2'
+body_hash: 'sha256:661c3f6aaa36f6b9c59d1877e0f78657d0597fd85d1bb07ac1171b84d8f66d48'
 related:
-  - '[[2026-07-14-install-parity-W01-P01-S01]]'
-  - '[[2026-07-14-install-parity-W01-P01-S02]]'
-  - '[[2026-07-14-install-parity-W01-P01-S03]]'
-  - '[[2026-07-14-install-parity-W01-P01-S04]]'
-  - '[[2026-07-14-install-parity-W01-P01-S05]]'
-  - '[[2026-07-14-install-parity-W01-P01-S06]]'
-  - '[[2026-07-14-install-parity-W01-P01-S07]]'
-  - '[[2026-07-14-install-parity-W01-P02-S08]]'
-  - '[[2026-07-14-install-parity-W01-P02-S09]]'
-  - '[[2026-07-14-install-parity-W01-P02-S10]]'
-  - '[[2026-07-14-install-parity-W01-P02-S11]]'
-  - '[[2026-07-14-install-parity-W01-P02-S12]]'
-  - '[[2026-07-14-install-parity-W01-P02-S13]]'
-  - '[[2026-07-14-install-parity-W01-P03-S14]]'
-  - '[[2026-07-14-install-parity-W01-P03-S15]]'
-  - '[[2026-07-14-install-parity-W01-P03-S16]]'
-  - '[[2026-07-14-install-parity-W01-P03-S17]]'
-  - '[[2026-07-14-install-parity-W01-P03-S18]]'
-  - '[[2026-07-14-install-parity-W01-P03-S19]]'
-  - '[[2026-07-14-install-parity-W01-P03-S20]]'
-  - '[[2026-07-14-install-parity-W01-P03-S28]]'
-  - '[[2026-07-14-install-parity-W01-P04-S21]]'
-  - '[[2026-07-14-install-parity-W01-P04-S22]]'
-  - '[[2026-07-14-install-parity-W01-P04-S23]]'
-  - '[[2026-07-14-install-parity-W01-P04-S24]]'
-  - '[[2026-07-14-install-parity-W01-P04-S25]]'
-  - '[[2026-07-14-install-parity-W02-P05-S26]]'
-  - '[[2026-07-14-install-parity-W02-P05-S27]]'
-  - '[[2026-07-14-install-parity-W02-P06-S29]]'
-  - '[[2026-07-14-install-parity-W02-P06-S30]]'
-  - '[[2026-07-14-install-parity-W02-P06-S31]]'
-  - '[[2026-07-14-install-parity-W02-P06-S32]]'
-  - '[[2026-07-14-install-parity-W02-P06-S33]]'
-  - '[[2026-07-14-install-parity-W02-P06-S34]]'
-  - '[[2026-07-14-install-parity-W02-P07-S35]]'
-  - '[[2026-07-14-install-parity-W02-P07-S36]]'
-  - '[[2026-07-14-install-parity-W02-P07-S37]]'
-  - '[[2026-07-14-install-parity-W02-P07-S38]]'
-  - '[[2026-07-14-install-parity-W02-P07-S39]]'
-  - '[[2026-07-14-install-parity-W02-P07-S40]]'
   - '[[2026-07-14-install-parity-adr]]'
+  - '[[2026-07-14-install-parity-ledger]]'
   - '[[2026-07-14-install-parity-plan]]'
   - '[[2026-07-14-install-parity-research]]'
 ---
@@ -65,46 +26,7 @@ Auto-generated index of all documents tagged with `#install-parity`.
 
 ### exec
 
-- `2026-07-14-install-parity-W01-P01-S01` - Add the DEV member to InstallMode with a docstring describing dev-scoped, non-leaking bookkeeping semantics
-- `2026-07-14-install-parity-W01-P01-S02` - Add a render_mode aliasing helper that maps DEV to DEPENDENCY and passes TOOL and DEPENDENCY through unchanged, as the single rendering-time comparator
-- `2026-07-14-install-parity-W01-P01-S03` - Add a PackageDeclaration dataclass (mode, minimum_vaultspec_version) and bump WORKSPACE_SCHEMA_VERSION to 2.0 for the per-package packages map shape
-- `2026-07-14-install-parity-W01-P01-S04` - Rewrite read_workspace_declaration to parse the v2 packages map and fold a legacy v1 single-key file into packages keyed to the current package on read
-- `2026-07-14-install-parity-W01-P01-S05` - Rewrite write_workspace_declaration to serialize the v2 packages map canonically with sorted keys and the schema_version 2.0 stamp
-- `2026-07-14-install-parity-W01-P01-S06` - Add read_package_declaration and write_package_declaration helpers that read-modify-write a single package's entry under the advisory lock without clobbering sibling packages
-- `2026-07-14-install-parity-W01-P01-S07` - Add legacy v1-to-v2 fold tests and mixed-package configuration round-trip tests using WorkspaceFactory and real filesystem writes
-- `2026-07-14-install-parity-W01-P02-S08` - Generalize dependency detection to report both project-dependency and default-dev-group evidence for a named distribution, keeping a core-scoped wrapper for the existing call sites
-- `2026-07-14-install-parity-W01-P02-S09` - Add a package parameter to resolve_install_mode and insert DEV into the Q5 precedence chain ahead of the TOOL default when dev-group evidence is found
-- `2026-07-14-install-parity-W01-P02-S10` - Accept dev as a valid --mode token for cmd_install and update its help text to document all three provisioning modes
-- `2026-07-14-install-parity-W01-P02-S11` - Add a warn-only dependency-leak advisory to resolve() that appends a plan warning when a package's declared mode is DEPENDENCY, never refusing the placement
-- `2026-07-14-install-parity-W01-P02-S12` - Add DEV precedence and dev-group detection tests covering both packages and the mixed dependency-plus-dev-group configuration
-- `2026-07-14-install-parity-W01-P02-S13` - Add resolver tests asserting the dependency-leak advisory fires for a DEPENDENCY-mode package and stays silent for TOOL or DEV mode
-- `2026-07-14-install-parity-W01-P03-S14` - Add a package parameter to resolve_render_mode, reading only that package's own entry from the v2 map, with the legacy-absent DEPENDENCY bridge as the default package's fallback
-- `2026-07-14-install-parity-W01-P03-S15` - Apply the render_mode aliasing helper in render_mcp_definition_for_mode and key mcp_status and mcp_sync's default resolution to resolve_render_mode(target, package='vaultspec-core')
-- `2026-07-14-install-parity-W01-P03-S16` - Apply the render_mode aliasing helper in entry_prefix_for_mode and hook_defs_for_mode, and key \_scaffold_precommit's default resolution to resolve_render_mode(target, package='vaultspec-core')
-- `2026-07-14-install-parity-W01-P03-S17` - Add a package parameter to collect_mode_mismatch_state and collect_version_floor_state, reading the package's own declared mode and floor against its own observed artifact shape
-- `2026-07-14-install-parity-W01-P03-S18` - Thread the package parameter through the doctor's mode-mismatch and version-floor rows so core's own row reads core's own map entry
-- `2026-07-14-install-parity-W01-P03-S19` - Update \_write_mode_declaration and \_infer_upgrade_mode to read and write core's own entry in the v2 packages map via the per-package helpers, preserving sibling package entries untouched
-- `2026-07-14-install-parity-W01-P03-S20` - Add renderer and doctor tests covering TOOL, DEPENDENCY, and DEV for the core package plus a mixed configuration where a companion package's entry differs, asserting no cross-package branch
-- `2026-07-14-install-parity-W01-P03-S28` - Generalize the MCP launch table from a single hardcoded vaultspec-core module entry to a package-and-module-parameterized render_launch_for_mode helper, keeping vaultspec-core's own launch as the default so companion packages can render through the same sentinel-substitution renderer
-- `2026-07-14-install-parity-W01-P04-S21` - Document the --mode dev flag, the DEV-renders-as-DEPENDENCY nuance, and the v2 per-package workspace.json shape in the MCP and install documentation
-- `2026-07-14-install-parity-W01-P04-S22` - Update the provisioning-mode section to describe the three-mode model and per-package declaration
-- `2026-07-14-install-parity-W01-P04-S23` - Regenerate the locally-resident CLI reference to reflect the dev mode token and updated --mode help text
-- `2026-07-14-install-parity-W01-P04-S24` - Run the full unit gate and perform an ADR-conformance review confirming the schema v2 migration, DEV mode, and per-package renderers match the install-parity ADR before the wave is released
-- `2026-07-14-install-parity-W01-P04-S25` - Update the framework overview's install-mode description to name the three-mode model
-- `2026-07-14-install-parity-W02-P05-S26` - Verify the released vaultspec-core version on PyPI carries the DEV member and schema v2 API - this step blocks the remainder of the wave
-- `2026-07-14-install-parity-W02-P05-S27` - Bump the vaultspec-core dependency floor and refresh uv.lock to the released version carrying the DEV member and schema v2
-- `2026-07-14-install-parity-W02-P06-S29` - Add a --mode tool|dependency|dev option to handle_install and forward it to install_run
-- `2026-07-14-install-parity-W02-P06-S30` - Add a mode parameter to install_run that resolves through core's resolve_install_mode with package='vaultspec-rag' and persists the result via core's write_package_declaration into the shared workspace.json
-- `2026-07-14-install-parity-W02-P06-S31` - Replace the static command and args with core's sentinel tokens, rendering through render_launch_for_mode with package='vaultspec-rag' and module='vaultspec_rag.server' for module-invocation exe-lock parity
-- `2026-07-14-install-parity-W02-P06-S32` - Add upgrade-time mode inference for the vaultspec-rag package, mirroring core's \_infer_upgrade_mode detection evidence and precedence
-- `2026-07-14-install-parity-W02-P06-S33` - Leave the --local-only flag and its per-host local-only.json marker unchanged as an orthogonal storage-backend choice, and add a regression test asserting it is not folded into the shared mode declaration
-- `2026-07-14-install-parity-W02-P06-S34` - Add tests covering --mode tool, dependency, and dev for the rag package, the mixed core-dependency-rag-tool configuration, and the tokenized MCP definition's rendered launch shape
-- `2026-07-14-install-parity-W02-P07-S35` - Add mode-and-floor rows to the doctor output for the vaultspec-rag entry, reading core's per-package mode-mismatch and version-floor collectors
-- `2026-07-14-install-parity-W02-P07-S36` - Document the --mode flag, the three provisioning modes, and the shared per-package workspace.json declaration in the installation guide
-- `2026-07-14-install-parity-W02-P07-S37` - Run rag's full test gate covering the new mode, renderer, and doctor tests
-- `2026-07-14-install-parity-W02-P07-S38` - Review both CLIs' install --help output side by side and confirm the --mode flag vocabulary, help text, and doctor row shape are parity-symmetric between vaultspec-core and vaultspec-rag
-- `2026-07-14-install-parity-W02-P07-S39` - resolve each managed MCP definition's render mode from its own declaring package so mixed-mode workspaces sync stably
-- `2026-07-14-install-parity-W02-P07-S40` - parameterize the dependency-leak advisory by package so companion installs name the right distribution
+- `2026-07-14-install-parity-ledger` - `install-parity` ledger
 
 ### plan
 

@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#vault-graph-ref'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:29bd3177d7e194535e60f5b9f0b2e0dd245441db2dca3f2f528a9039f01ec4fd'
 related:
   - '[[2026-06-13-vault-graph-ref-adr]]'

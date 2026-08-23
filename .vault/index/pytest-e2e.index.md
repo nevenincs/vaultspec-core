@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#pytest-e2e'
 date: '2026-07-31'
-modified: '2026-08-13'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:8c7abf6a947c8845f335da773c27c5fa99c8f6b3bca2eb8fd6117343a6b8d07c'
 related:
   - '[[2026-02-21-pytest-e2e-impl-phase1-exec]]'

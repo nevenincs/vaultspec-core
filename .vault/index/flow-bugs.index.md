@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#flow-bugs'
 date: '2026-07-31'
-modified: '2026-08-13'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:0482d26e540b2f25c2bebf1b7606f62f64419de2c7caa2e1e80ff1471caaa8b1'
 related:
   - '[[2026-04-21-flow-bugs-adr]]'

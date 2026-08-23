@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#install-cmds'
 date: '2026-07-31'
-modified: '2026-08-13'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:43ea3fc3658d18ddbd81883cfee65181345250e3b9db6c90a34f65218c855e71'
 related:
   - '[[2026-03-15-claude-code-provider-research]]'

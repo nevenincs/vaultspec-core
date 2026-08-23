@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#cli-spec-edit-safety'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:4271371cd987c5e881e0c48bb3ff8800ac5418349af8266da688a0dcd6e12a46'
 related:
   - '[[2026-05-17-cli-spec-edit-safety-adr]]'

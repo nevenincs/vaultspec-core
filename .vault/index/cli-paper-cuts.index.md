@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#cli-paper-cuts'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:c6925b8086fa057f1ca7d9df8b98f2723f789a0da07f325be5eec52a3854fa8c'
 related:
   - '[[2026-05-17-cli-paper-cuts-adr]]'

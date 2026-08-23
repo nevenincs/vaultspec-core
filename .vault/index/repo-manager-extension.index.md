@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#repo-manager-extension'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:b30e61e27feb7f43c99177a4bf2846cb2d935e9672c04fb37f76b56643468e45'
 related:
   - '[[2026-02-23-repo-manager-manifest-reference]]'

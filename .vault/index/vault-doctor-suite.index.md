@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#vault-doctor-suite'
 date: '2026-07-31'
-modified: '2026-07-31'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:a2c18014936d5a7884f71d8de625056a6af03fdb7cefab39ba9d2cfc68d0d28f'
 related:
   - '[[2026-02-24-vault-doctor-suite-adr]]'

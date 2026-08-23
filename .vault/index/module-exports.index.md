@@ -4,8 +4,8 @@ tags:
   - '#index'
   - '#module-exports'
 date: '2026-07-31'
-modified: '2026-08-13'
-body_schema: 'body-v1'
+modified: '2026-08-23'
+body_schema: 'body-v2'
 body_hash: 'sha256:3d67e7146b6f42b8bb1fd4d37aa0bf0d06b21711c4f2c7a501908355e40f267b'
 related:
   - '[[2026-02-21-module-exports-adr]]'
