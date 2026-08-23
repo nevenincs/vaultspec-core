@@ -215,6 +215,10 @@ def _rollup_payload(rollup: Rollup) -> dict[str, Any]:
 
     return {
         "active_features": [dataclasses.asdict(f) for f in rollup.active_features],
+        "active_features_total": rollup.active_features_total,
+        "active_features_truncated": (
+            len(rollup.active_features) < rollup.active_features_total
+        ),
         "plans_in_flight": [dataclasses.asdict(p) for p in rollup.plans_in_flight],
         "recently_completed": [
             dataclasses.asdict(p) for p in rollup.recently_completed
@@ -322,7 +326,7 @@ def _emit_status_rollup(
                 f"  [bold]{feat.name}[/bold]  {feat.doc_count} docs"
                 f"{plan_marker}{tail_str}{activity}"
             )
-        remainder = len(rollup.active_features) - len(shown)
+        remainder = rollup.active_features_total - len(shown)
         if remainder > 0:
             console.print(
                 f"  [dim]... and {remainder} more  "

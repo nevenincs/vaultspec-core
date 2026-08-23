@@ -154,7 +154,10 @@ class StatusResult(BaseModel):
             survives the stateless protocol where ``initialize`` disappears.
         kind: ``"rollup"`` for the project-wide view or ``"trace"`` for a
             targeted feature-or-plan trace.
-        features: Active features (rollup mode only).
+        features: Active features (rollup mode only), capped and ordered by
+            latest activity.
+        features_total: Active features before the cap, so a caller can tell
+            a small vault from a truncated view (rollup mode only).
         plans_in_flight: Plans with at least one open step (rollup mode only).
         totals: The vault statistics dict (rollup mode only).
         target: The trace target as submitted (trace mode only).
@@ -166,6 +169,7 @@ class StatusResult(BaseModel):
     tool_schema_version: str
     kind: str
     features: list[FeatureStatus] = Field(default_factory=list)
+    features_total: int = 0
     plans_in_flight: list[PlanProgressLine] = Field(default_factory=list)
     totals: dict[str, Any] = Field(default_factory=dict)
     target: str | None = None
@@ -228,7 +232,15 @@ class CheckResultModel(BaseModel):
         total_warnings: Aggregate warning-severity finding count.
         total_fixed: Aggregate auto-corrected count.
         checks: The per-checker summary lines.
-        findings: The flattened error- and warning-severity findings.
+        findings: The flattened error- and warning-severity findings, capped.
+            Payload size tracks how broken the vault is, so this is largest
+            exactly when a caller can least afford it: uncapped it reached
+            402,967 bytes on a 10,476-document vault, past a 200k-token window
+            on its own.
+        findings_total: Findings before the cap. The per-check counts in
+            ``checks`` and the aggregate totals are never capped, so severity
+            arithmetic stays exact however many rows are withheld.
+        findings_truncated: Whether any finding was withheld.
     """
 
     status: str
@@ -238,6 +250,8 @@ class CheckResultModel(BaseModel):
     total_fixed: int
     checks: list[CheckReportLine] = Field(default_factory=list)
     findings: list[CheckFinding] = Field(default_factory=list)
+    findings_total: int = 0
+    findings_truncated: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -250,6 +264,7 @@ def _rollup_to_result(rollup: Rollup) -> StatusResult:
     return StatusResult(
         tool_schema_version=__version__,
         kind="rollup",
+        features_total=rollup.active_features_total,
         features=[
             FeatureStatus(
                 name=f.name,
@@ -328,6 +343,15 @@ def _trace_to_result(trace: GroundingTrace) -> StatusResult:
     )
 
 
+#: Findings carried on the MCP check surface.
+#:
+#: The per-checker counts and the aggregate totals are never capped, so a
+#: caller always knows the true severity picture; the cap governs only how many
+#: individual rows travel. Matches the CLI's render cap so the two surfaces
+#: agree.
+_MCP_FINDING_CAP = 50
+
+
 def _checks_to_result(results: list[CheckResult], *, fix: bool) -> CheckResultModel:
     """Fold the per-checker results into the ``check`` output model."""
     checks: list[CheckReportLine] = []
@@ -363,6 +387,7 @@ def _checks_to_result(results: list[CheckResult], *, fix: bool) -> CheckResultMo
                 )
             )
 
+    capped = findings[:_MCP_FINDING_CAP]
     return CheckResultModel(
         status="ok" if total_errors == 0 else "failed",
         fixed=fix,
@@ -370,7 +395,9 @@ def _checks_to_result(results: list[CheckResult], *, fix: bool) -> CheckResultMo
         total_warnings=total_warnings,
         total_fixed=total_fixed,
         checks=checks,
-        findings=findings,
+        findings=capped,
+        findings_total=len(findings),
+        findings_truncated=len(capped) < len(findings),
     )
 
 
@@ -405,12 +432,15 @@ def _status_summary(payload: object) -> str:
     Returns:
         A one-line orientation summary.
     """
-    features = getattr(payload, "active_features", None)
+    features = getattr(payload, "features", None)
     plans = getattr(payload, "plans_in_flight", None)
-    if features is None and plans is None:
+    if not features and not plans:
         return "grounding trace"
+    total = getattr(payload, "features_total", 0)
+    shown = len(features) if features is not None else 0
+    suffix = f" of {total}" if total > shown else ""
     return (
-        f"{len(features) if features is not None else 0} active features, "
+        f"{shown}{suffix} active features, "
         f"{len(plans) if plans is not None else 0} plans in flight"
     )
 
