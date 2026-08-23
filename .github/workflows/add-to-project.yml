@@ -14,14 +14,39 @@ jobs:
           project-url: https://github.com/users/nevenincs/projects/3
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
 
+      # Sets the field through the GraphQL API rather than `gh project
+      # item-edit`. The two do the same thing, but the CLI subcommand runs a
+      # client-side scope precheck and refuses to start unless the token
+      # carries `read:org` and `read:discussion`:
+      #
+      #   error: your authentication token is missing required scopes
+      #   [read:org read:discussion]
+      #
+      # The API asks for neither - it authorises the mutation against the
+      # project itself, which this token can already write to, as the step
+      # above demonstrates by creating the item with the very same secret.
+      # So the precheck was failing the job over scopes the work does not
+      # need, and every `issues: opened` event since has gone red here while
+      # the item was added correctly.
+      #
+      # Granting the PAT those two scopes would also fix it and is the more
+      # obvious route; it is not taken because it widens a stored credential
+      # to satisfy a check rather than a requirement.
       - name: Set target date to created_at + 30 days
         env:
           GH_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          ITEM_ID: ${{ steps.add.outputs.itemId }}
         run: |
           DEADLINE=$(date -d "+30 days" +%Y-%m-%d)
-          gh project item-edit \
-            --project-id PVT_kwHOAKyuWc4BS9uc \
-            --id ${{ steps.add.outputs.itemId }} \
-            --field-id PVTF_lAHOAKyuWc4BS9uczhAaFWg \
-            --date "$DEADLINE"
+          gh api graphql \
+            -f query='mutation($project:ID!,$item:ID!,$field:ID!,$value:Date!){
+              updateProjectV2ItemFieldValue(input:{
+                projectId:$project, itemId:$item, fieldId:$field,
+                value:{date:$value}
+              }){ projectV2Item { id } }
+            }' \
+            -f project=PVT_kwHOAKyuWc4BS9uc \
+            -f item="$ITEM_ID" \
+            -f field=PVTF_lAHOAKyuWc4BS9uczhAaFWg \
+            -f value="$DEADLINE"
 
