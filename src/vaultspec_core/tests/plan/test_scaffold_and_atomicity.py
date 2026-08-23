@@ -18,6 +18,13 @@ Three defects, one document each time:
 The tests below pin the contract those defects violated: comments are
 commentary at every structural surface, an action may carry a semicolon, and
 **a plan mutation that exits non-zero leaves the document byte-identical**.
+
+Section 4 covers the boundary of the scaffold exemption that fix #1 required
+(issue #317). Once commented examples stopped being parsed, a fresh scaffold
+correctly held nothing - and the source-structure guard then refused the very
+mutation that would populate it. The exemption added for that has to admit a
+genuinely empty document without admitting one that merely *parses* as empty
+because every row in it is malformed.
 """
 
 from __future__ import annotations
@@ -33,12 +40,15 @@ from vaultspec_core.plan.parser import mask_html_comments_text, parse_plan
 from vaultspec_core.plan.row_contract import (
     RowContentError,
     validate_action,
+    validate_intent,
     validate_scope,
     validate_title,
 )
 from vaultspec_core.plan.serialiser import serialise_plan
 from vaultspec_core.plan.write_guard import (
+    PlanWriteGuardError,
     PlanWriteVerificationError,
+    guard_plan_write,
     write_plan_verified,
 )
 from vaultspec_core.tests.plan._factories import make_clean_plan
@@ -370,6 +380,91 @@ def test_a_round_trip_failure_never_touches_the_file(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
+    ("supplied", "expected"),
+    [
+        ("one\r\ntwo", "one\ntwo"),
+        ("one\rtwo", "one\ntwo"),
+        ("one\ntwo", "one\ntwo"),
+        ("one\r\ntwo\rthree", "one\ntwo\nthree"),
+    ],
+)
+def test_intent_line_endings_are_normalised_at_the_boundary(
+    supplied: str, expected: str
+) -> None:
+    """A caller's carriage returns collapse to ``\\n`` before anything is written.
+
+    A ``\\r`` that reaches the document is written verbatim but reads back as
+    ``\\n``, so the mutation would land, fail its own verification, and roll
+    back over a difference the caller could not act on. Normalising here makes
+    that a no-op instead (issue #316).
+    """
+    assert validate_intent(supplied, container="Phase") == expected
+
+
+def test_a_post_write_verification_failure_restores_the_original(
+    tmp_path: Path,
+) -> None:
+    """When the persisted bytes diverge, the pre-mutation document comes back.
+
+    Reaching this branch needs a divergence the *pre*-write round-trip guard
+    cannot foresee, since anything it can see never reaches the file. A lone
+    carriage return is exactly that:
+    :func:`~vaultspec_core.core.helpers.atomic_write` encodes to UTF-8 and
+    writes the bytes verbatim, while the verifier's
+    :meth:`~pathlib.Path.read_text` applies universal newlines - so the ``\r``
+    is persisted faithfully and reads back as ``\n``. Nothing is patched and
+    no seam is opened for the test: the divergence is a genuine property of
+    the two real calls (issue #316).
+
+    The guard must both fail the write and put the original bytes back.
+    """
+    path = _write_plan(tmp_path, "L2", seed=304, phases=1, steps=2)
+    original = path.read_text(encoding="utf-8")
+    plan = parse_plan(original)
+    # The CR goes in a Phase intent, which is prose: `_document_rows` excludes
+    # intent paragraphs, so the pre-write round-trip guard cannot see this and
+    # the write genuinely happens. A CR in an action would be caught before the
+    # file is touched - which is that guard working, not this branch.
+    plan.phases[0].intent = "Deliver the reconciliation.\rIn two sittings."
+    doomed = serialise_plan(plan)
+
+    with pytest.raises(PlanWriteVerificationError) as excinfo:
+        write_plan_verified(path, doomed, plan, original_text=original)
+
+    message = str(excinfo.value)
+    assert "does not match the text this mutation wrote" in message
+    assert "restored to its pre-mutation bytes" in message
+    assert path.read_text(encoding="utf-8") == original
+
+
+def test_the_restored_document_is_still_a_usable_plan(tmp_path: Path) -> None:
+    """Restoration returns a parseable plan, not merely equal bytes.
+
+    Byte equality is the assertion that matters, but a restore that produced
+    a document the parser could no longer read would satisfy it only because
+    the original was captured before the write. Parsing the restored file
+    proves the plan survived the failed mutation intact.
+    """
+    path = _write_plan(tmp_path, "L2", seed=305, phases=1, steps=2)
+    original = path.read_text(encoding="utf-8")
+    before = parse_plan(original)
+
+    plan = parse_plan(original)
+    plan.phases[0].intent = "Deliver the reconciliation.\rIn two sittings."
+
+    with pytest.raises(PlanWriteVerificationError):
+        write_plan_verified(path, serialise_plan(plan), plan, original_text=original)
+
+    after = parse_plan(path.read_text(encoding="utf-8"))
+    assert [step.canonical_id for step in after.steps] == [
+        step.canonical_id for step in before.steps
+    ]
+    assert [step.action for step in after.steps] == [
+        step.action for step in before.steps
+    ]
+
+
+@pytest.mark.parametrize(
     ("argv", "reason"),
     [
         (
@@ -431,3 +526,104 @@ def test_every_failing_mutator_leaves_the_plan_byte_identical(
 
     assert result.exit_code != 0, f"{reason}: expected a refusal, got {result.stdout}"
     assert path.read_bytes() == before, f"{reason}: the document was modified"
+
+
+# ---- 4. The scaffold exemption admits absence, never lost structure ----------
+
+
+def _l2_plan(body: str) -> str:
+    """Return an L2 plan document whose Steps section holds *body*."""
+    return (
+        "---\n"
+        "tags:\n"
+        "  - '#plan'\n"
+        "  - '#exemption'\n"
+        "date: '2026-08-23'\n"
+        "modified: '2026-08-23'\n"
+        "tier: L2\n"
+        "---\n"
+        "\n"
+        "# `exemption` plan\n"
+        "\n"
+        "## Steps\n"
+        "\n"
+    ) + body
+
+
+def _guard_verdict(source: str) -> str:
+    """Return ``"refused"`` or ``"allowed"`` for a rewrite of *source*.
+
+    Drives the real guard through :func:`guard_plan_write`, the entry point
+    every write path uses, rather than reaching for the private helper.
+    """
+    plan = parse_plan(source)
+    try:
+        guard_plan_write(source, serialise_plan(plan), None, path_name="p.md")
+    except PlanWriteGuardError:
+        return "refused"
+    return "allowed"
+
+
+@pytest.mark.parametrize(
+    ("body", "description"),
+    [
+        ("", "nothing at all"),
+        ("Notes about what this plan will eventually do.\n", "prose but no rows"),
+        ("<!-- ### Phase `P01` - only an example -->\n", "structure only in a comment"),
+    ],
+)
+def test_a_genuinely_empty_plan_stays_mutable(body: str, description: str) -> None:
+    """A plan that never held structure is rewritable, so it can be populated."""
+    assert _guard_verdict(_l2_plan(body)) == "allowed", description
+
+
+@pytest.mark.parametrize(
+    ("body", "code"),
+    [
+        (
+            "### phase `p01` - a phase\n\n- [ ] `p01.s01` - do it; `src/a.py`.\n",
+            "PLAN050 lowercase structural noun",
+        ),
+        (
+            "### Phase `P1` - a phase\n\n- [ ] `P1.S1` - do it; `src/a.py`.\n",
+            "PLAN020 under-padded identifiers",
+        ),
+        (
+            "### Phase `P01` \u2014 a phase\n\n"
+            "- [ ] `P01.S01` \u2014 do it; `src/a.py`.\n",
+            "PLAN060 em-dash separator",
+        ),
+    ],
+)
+def test_a_plan_whose_rows_are_all_malformed_is_refused(body: str, code: str) -> None:
+    """Parsing to nothing is not the same as holding nothing (issue #317).
+
+    Each document below carries a Phase heading and a Step row a reader would
+    call structure, but each is malformed in a way the parser skips - so the
+    model comes back empty and looks exactly like a fresh scaffold. The
+    exemption must not fire: the author is told to repair the rows instead of
+    having them quietly demoted to prose by a rewrite.
+    """
+    assert _guard_verdict(_l2_plan(body)) == "refused", code
+
+
+def test_the_exemption_defers_to_the_checkers_rather_than_its_own_matcher() -> None:
+    """A malformed row is caught because a rule reports it, not by a regex here.
+
+    The predicate this replaced matched the parser's own strict patterns, which
+    cannot work: anything the parser drops is by construction not matched by
+    the patterns the parser matches with. Deferring to the detection rules is
+    what makes the guard see rows the parser cannot, and it keeps one home for
+    "what does a broken plan look like" (issue #317).
+    """
+    from vaultspec_core.plan.checks import Severity, collect_all
+
+    source = _l2_plan("### Phase `P1` - a phase\n\n- [ ] `P1.S1` - go; `a.py`.\n")
+    plan = parse_plan(source)
+    errors = [f for f in collect_all(plan, source) if f.severity is Severity.ERROR]
+
+    # The model is empty, exactly as for a fresh scaffold ...
+    assert not plan.phases
+    assert not plan.steps
+    # ... and the only thing separating the two is what the rules reported.
+    assert {f.code for f in errors} > {"PLAN010"}

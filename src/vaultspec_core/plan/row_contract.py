@@ -140,7 +140,17 @@ def validate_intent(intent: str, *, container: str) -> str:
 
     Intent prose is multi-line by nature, so line breaks are allowed; only the
     comment delimiters are refused.
+
+    Carriage returns are normalised to ``\\n`` rather than rejected. A ``\\r``
+    reaching the document survives the write - ``atomic_write`` emits bytes
+    verbatim - but reads back as ``\\n``, because the verifier decodes with
+    universal newlines. The mutation would therefore write successfully, fail
+    its own post-write verification, and roll back, reporting a mismatch the
+    caller could do nothing about. Normalising here turns that into the
+    no-op it should always have been (issue #316). CRLF is handled first so a
+    Windows caller's line endings collapse to one ``\\n``, not two.
     """
     field = f"A {container} intent"
     _reject_comment_delimiters(intent, field=field)
-    return _require_content(intent, field=field)
+    normalised = intent.replace("\r\n", "\n").replace("\r", "\n")
+    return _require_content(normalised, field=field)
