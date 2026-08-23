@@ -4,53 +4,36 @@ tags:
   - '#{feature}'
 date: '{yyyy-mm-dd}'
 modified: '{yyyy-mm-dd}'
-body_schema: 'body-v1'
+body_schema: 'body-v2'
 step_id: '{step_id}'
 related:
   - '[[{plan_stem}]]'
 ---
 
-<!-- FRONTMATTER RULES:
-     tags: one directory tag (hardcoded #exec) and one feature tag.
-     Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
-     Additional tags may be appended below the required pair.
-
-     modified: CLI-maintained last-modified stamp; set at scaffold time,
-     refreshed by mutating CLI verbs and vault check fix; never hand-edit.
-
-     step_id is the originating Step's canonical identifier, e.g. S01.
-     The {step_id} and {plan_stem} placeholders are machine-filled by
-     `vaultspec-core vault add exec`; do not fill them by hand.
-
-     Related: use wiki-links as '[[yyyy-mm-dd-foo-bar-plan]]' and link the
-     parent plan.
-
-     DO NOT add fields beyond those scaffolded; metadata lives
-     only in the frontmatter. -->
-
-<!-- LINK RULES:
-     - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
-     - NEVER use [[wiki-links]] or markdown links in the document body.
-     - NEVER reference file paths in the body. If you must name a source file,
-       class, or function, use inline backtick code: `src/module.py`. -->
-
-<!-- STEP RECORD:
-     This file represents one Step from the originating plan. Identified
-     by its canonical leaf identifier (S##) and ancestor display path.
-     The {heading} and {scope_block} placeholders below are machine-filled
-     by `vaultspec-core vault add exec` from the originating Step row;
-     do not fill them by hand. -->
+<!-- Machine-owned: the filename, the frontmatter, the title heading and the
+     Scope list are all filled by `vaultspec-core vault add exec` from the
+     originating Step row; never hand-edit them. Add no frontmatter fields.
+     Wiki-links belong in `related:` only, never in the body. -->
 
 # {heading}
 
 {scope_block}
 
-## Description
+## Changes
 
-<!-- Succinct line-by-line list of steps executed. Use imperative language, mirroring git commit summary lines. -->
+<!-- MECHANICAL LOG. One line per path touched, nothing else:
+       `A path` added   `M path` modified   `D path` deleted   `R old -> new` renamed
+     Paths are repo-relative, in backticks. No prose, no sentences, no
+     narration of intent, outcome, or difficulty - the diff and the plan Step
+     already carry those. Example:
 
-## Outcome
+       - `M` `src/vaultspec_core/cli/exec_cmd.py`
+       - `A` `src/vaultspec_core/cli/tests/test_exec_cmd.py`
+       - `D` `src/legacy/shim.py`
 
-## Notes
+     Optional final line, only when a check was run:
+       - `verify:` `<command>` -> `pass` | `fail`
 
-<!-- Incidents. Data loss. Difficulties; persistent failures. Skipped work. Scaffolds left in code. Failures. -->
+     Optional `## Notes` section, ONLY on exception: data loss, skipped work,
+     a scaffold left in code, or a persistent failure. Omit it otherwise -
+     an absent section is correct; an empty one is a check finding. -->

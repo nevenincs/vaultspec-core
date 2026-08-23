@@ -202,6 +202,8 @@ hand-edit between the markers.
   retired by its parent plan.
 - `vaultspec-core vault exec detach` - Remove a Step claim only when it resolves to
   neither a live nor retired Step.
+- `vaultspec-core vault exec log` - Append a Step's mechanical rows to its plan's
+  consolidated ledger.
 
 #### Archive
 
@@ -601,7 +603,10 @@ standard envelope.
 record's mapping to a live Step. `retire` takes `--record PATH` and archives it only
 when its parent plan retired the claimed Step. `detach` takes `--record PATH` and
 removes its Step claim only when the claim resolves to neither a live nor a retired
-Step. Every verb accepts `--dry-run` and `--json`.
+Step. `log` takes `--feature`, `--related`, `--step`, and a repeatable `--row`
+(`A:path`, `M:path`, `D:path`, or `R:old->new`) to append one Step's mechanical rows to
+its plan's append-only consolidated ledger, creating the ledger on first use. Every verb
+accepts `--dry-run` and `--json`.
 
 ### vaultspec-core vault feature rename
 
