@@ -20,7 +20,10 @@ write path so no surface can corrupt a plan the others protect. Two run
   refused with the checker's existing diagnosis and repair hint. A freshly
   scaffolded plan that carries no container at all is exempt: it fails the
   tier-correspondence rule only because nothing has been added yet, and the
-  mutation being refused is the one that would fix that (issue #313).
+  mutation being refused is the one that would fix that (issue #313). The
+  exemption is withheld the moment any *other* rule reports an error, because
+  a document whose rows are merely malformed also parses as empty - and
+  rewriting that one deletes the author's content (issue #317).
 - **Active-identifier preservation guard** (issue #305): every Wave, Phase,
   and Step visible before a mutation must remain visible afterwards unless the
   command explicitly retires it. This catches destructive round trips even
@@ -62,6 +65,7 @@ from vaultspec_core.plan.commands._errors import PlanCommandError
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from vaultspec_core.plan.checks import Finding
     from vaultspec_core.plan.parser import Phase, Plan, Step
 
 __all__ = [
@@ -118,7 +122,13 @@ def _active_ids(plan: Plan) -> Counter[str]:
     )
 
 
-def _is_unpopulated_scaffold(plan: Plan, source_text: str) -> bool:
+#: Findings that make a whole-document rewrite destructive: a container the
+#: parser cannot see (``PLAN070``) or a tier whose structure does not match its
+#: declaration (``PLAN010``).
+_DESTRUCTIVE_STRUCTURE_CODES = frozenset({"PLAN010", "PLAN070"})
+
+
+def _is_unpopulated_scaffold(plan: Plan, errors: list[Finding]) -> bool:
     """Return whether *plan* is a scaffold that has not been populated yet.
 
     A freshly scaffolded plan declares its tier before it holds any container,
@@ -128,32 +138,54 @@ def _is_unpopulated_scaffold(plan: Plan, source_text: str) -> bool:
     scaffold's *commented* grammar examples were parsed as live containers, so
     the emptiness was invisible and this case never arose.
 
-    The two conditions must hold together. An empty model alone is exactly the
-    symptom issue #305's guard exists to catch - a destructive round trip that
-    dropped every container. Confirming the *source* also carries no structural
-    token outside its comments is what separates "nothing was written yet" from
-    "everything was lost", so the guard keeps its teeth.
-    """
-    from vaultspec_core.plan.parser import carries_live_structure
+    Two conditions must hold together, because an empty model *alone* is
+    exactly the symptom issue #305's guard exists to catch - a round trip that
+    dropped every container:
 
+    1. Nothing parsed. With no Wave, Phase, Step, or Epic intent in the model,
+       any ``PLAN010`` finding is necessarily an "at least one" complaint; the
+       "must not contain" arm of that rule cannot fire over containers that do
+       not exist. That is what makes the emptiness safe to read as absence
+       rather than as loss, without matching on message text.
+    2. No other rule found anything wrong. Every detection rule that recognises
+       a malformed container or row - ``PLAN020`` padding, ``PLAN040`` row
+       contract, ``PLAN050`` vocabulary, ``PLAN060`` separator - is evidence
+       that the document *does* carry authored structure which the parser then
+       dropped. Rewriting it would delete that content silently.
+
+    Condition 2 replaces an earlier source-scanning predicate that matched the
+    parser's own strict regexes (issue #317). That predicate could not work:
+    anything the parser drops is by construction not matched by the patterns
+    the parser matches with, so a plan whose only rows were malformed looked
+    identical to an empty one and was waved through. Deferring to the checkers
+    fixes that and keeps a single home for "what does a broken plan look
+    like", rather than a second, weaker copy inside the guard.
+
+    Args:
+        plan: The parsed pre-mutation model.
+        errors: Every error-level finding the checkers reported for the source.
+    """
     if plan.waves or plan.phases or plan.steps or plan.epic_intent is not None:
         return False
-    return not carries_live_structure(source_text)
+    return all(finding.code == "PLAN010" for finding in errors)
 
 
 def _guard_source_structure(plan: Plan, source_text: str) -> None:
     """Refuse a whole-document rewrite of structurally invalid source."""
     from vaultspec_core.plan.checks import Severity, collect_all
 
-    if _is_unpopulated_scaffold(plan, source_text):
-        return
-
-    destructive_structure_codes = {"PLAN010", "PLAN070"}
-    errors = [
+    all_errors = [
         finding
         for finding in collect_all(plan, source_text)
         if finding.severity is Severity.ERROR
-        and finding.code in destructive_structure_codes
+    ]
+    if _is_unpopulated_scaffold(plan, all_errors):
+        return
+
+    errors = [
+        finding
+        for finding in all_errors
+        if finding.code in _DESTRUCTIVE_STRUCTURE_CODES
     ]
     if not errors:
         return
@@ -392,10 +424,22 @@ def verify_plan_write(path: Path, expected_text: str, expected_plan: Plan) -> No
     arm that catches a Phase heading or Step row silently landing with content
     other than the one requested.
 
-    Assertion 1 compares decoded text, not raw bytes, so it is deliberately
-    blind to the newline convention a platform's text layer may have applied
-    on the way out: a differing line terminator is a formatting question the
-    document conventions own, not evidence that the mutation was lost.
+    Assertion 1 compares decoded text, not raw bytes, and it is *not* blind to
+    a difference in line terminators. It used to describe itself as blind,
+    from when the write went through ``Path.write_text`` and a platform text
+    layer could rewrite ``\n`` as ``\r\n`` on the way out - a difference that
+    said nothing about the mutation. Issue #313 replaced that with
+    :func:`~vaultspec_core.core.helpers.atomic_write`, which encodes to UTF-8
+    and writes the bytes verbatim, so no layer can alter a terminator in
+    transit any more.
+
+    What remains is the opposite case, and it is a real divergence: reading
+    with :meth:`~pathlib.Path.read_text` applies universal newlines, so a
+    lone ``\r`` *inside the content* is written faithfully and then reads back
+    as ``\n``. The document on disk genuinely does not say what the mutation
+    said, and failing is correct. The command boundary refuses such content
+    up front (:func:`~vaultspec_core.plan.row_contract.validate_action`), so
+    this arm is a backstop for anything that reaches the write another way.
 
     Args:
         path: The plan document that was just written.
