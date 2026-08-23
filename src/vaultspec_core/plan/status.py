@@ -20,6 +20,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from vaultspec_core.vaultcore.exec_ledger import is_ledger_stem, ledger_step_ids
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -154,7 +156,9 @@ class ExecRecordIndex:
                     step_id = str(raw_step_id).strip()
                 name = node.path.stem
 
-                if feature and step_id:
+                if feature and is_ledger_stem(name):
+                    _index_ledger(index, feature, name, node.path)
+                elif feature and step_id:
                     index.by_step[(feature, step_id)] = name
                 elif feature:
                     index.unlinked_by_feature.setdefault(feature, []).append(name)
@@ -175,7 +179,9 @@ class ExecRecordIndex:
             except (OSError, UnicodeDecodeError):
                 pass
 
-            if feature and step_id:
+            if feature and is_ledger_stem(doc.name):
+                _index_ledger(index, feature, doc.name, doc.path)
+            elif feature and step_id:
                 index.by_step[(feature, step_id)] = doc.name
             elif feature:
                 index.unlinked_by_feature.setdefault(feature, []).append(doc.name)
@@ -193,6 +199,38 @@ class ExecRecordIndex:
             record references that Step.
         """
         return self.by_step.get((feature, step_id))
+
+
+def _index_ledger(
+    index: ExecRecordIndex,
+    feature: str,
+    stem: str,
+    path: Path,
+) -> None:
+    """Register every Step a consolidated ledger covers against its stem.
+
+    A ledger names its Steps in ``## Changes`` rows rather than in a single
+    ``step_id:`` frontmatter field, so one document legitimately maps to many
+    Steps. Reading its body is affordable precisely because consolidation
+    replaced one file per Step with one file per plan.
+
+    A ledger naming no Step is bucketed as unlinked rather than dropped, and
+    an unreadable ledger is skipped, matching how the surrounding scan treats
+    a record whose frontmatter cannot be read (No-Crash policy).
+    """
+    from vaultspec_core.vaultcore.parser import parse_frontmatter
+
+    try:
+        _, body = parse_frontmatter(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError):
+        return
+
+    step_ids = ledger_step_ids(body)
+    if not step_ids:
+        index.unlinked_by_feature.setdefault(feature, []).append(stem)
+        return
+    for step_id in step_ids:
+        index.by_step[(feature, step_id)] = stem
 
 
 def _plan_feature(plan: Plan) -> str | None:
