@@ -1,9 +1,11 @@
 """Immutable body-section contracts and declared-schema resolution.
 
 The contracts in this module are historical records. A newer schema must be
-added under a new identifier; an existing contract is never edited. This lets
-validation use the schema a document attests instead of deriving requirements
-from the mutable template currently installed in a workspace.
+added under a new identifier; an existing contract is never edited. A
+superseded contract stays in the registry so the documents that attest it keep
+validating. This lets validation use the schema a document attests instead of
+deriving requirements from the mutable template currently installed in a
+workspace.
 """
 
 from __future__ import annotations
@@ -35,7 +37,7 @@ __all__ = [
 ]
 
 
-CURRENT_BODY_SCHEMA = "body-v1"
+CURRENT_BODY_SCHEMA = "body-v2"
 BASELINE_RELATIVE_PATH = PurePosixPath(".vaultspec/body-schema-baseline.json")
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -113,12 +115,31 @@ _BODY_V1_SECTIONS = MappingProxyType(
     }
 )
 
+_BODY_V2_SECTIONS = MappingProxyType(
+    {
+        **{
+            key: value
+            for key, value in _BODY_V1_SECTIONS.items()
+            if key[0] is not DocType.EXEC
+        },
+        # An execution record is a mechanical log, not a narrative. ``body-v1``
+        # required Description/Outcome/Notes, which measurement of a production
+        # vault showed to be 83.8% natural-language prose no consumer reads and
+        # 14.5% empty required sections. ``body-v2`` requires only the machine-
+        # usable path log; ``Scope`` stays machine-filled and ``Notes`` becomes
+        # an author-added exception section, ignored when absent.
+        (DocType.EXEC, False): ("Changes",),
+        (DocType.EXEC, True): ("Changes",),
+    }
+)
+
 BODY_SCHEMA_REGISTRY: Mapping[str, BodySchema] = MappingProxyType(
     {
         CURRENT_BODY_SCHEMA: BodySchema(
             schema_id=CURRENT_BODY_SCHEMA,
-            sections=_BODY_V1_SECTIONS,
+            sections=_BODY_V2_SECTIONS,
         ),
+        "body-v1": BodySchema("body-v1", _BODY_V1_SECTIONS),
         # Historical contracts are immutable template records.  They remain
         # distinct even where their headings happen to match ``body-v1``:
         # legacy documents are trusted only through an external body hash.
@@ -407,9 +428,11 @@ def resolve_body_schema(
 ) -> BodySchemaResolution:
     """Resolve a document's declared immutable body schema.
 
-    Only ``body-v1`` frontmatter is a direct declaration. Historical documents
-    must match a path, body SHA-256, and historical contract in the reviewed
-    project ledger; no mutable installed template is consulted.
+    Any registered non-``legacy-`` identifier in frontmatter is a direct
+    declaration, so documents stamped with a superseded-but-registered
+    contract keep validating against the contract they attest. Historical
+    ``legacy-`` documents must match a path, body SHA-256, and contract in the
+    reviewed project ledger; no mutable installed template is consulted.
 
     Args:
         root_dir: Project root directory.
@@ -421,8 +444,16 @@ def resolve_body_schema(
             pass it here; when omitted the ledger is read for this call.
     """
     schema_id = metadata.body_schema
-    if schema_id == CURRENT_BODY_SCHEMA:
-        schema = BODY_SCHEMA_REGISTRY[CURRENT_BODY_SCHEMA]
+    # Any registered non-legacy contract is a direct declaration, not just the
+    # current one. A schema bump must not reclassify every document stamped
+    # with the previous contract as ``unknown``: those documents declared a
+    # contract that is still registered, so they validate against it.
+    if (
+        schema_id is not None
+        and not schema_id.startswith("legacy-")
+        and schema_id in BODY_SCHEMA_REGISTRY
+    ):
+        schema = BODY_SCHEMA_REGISTRY[schema_id]
         is_summary = doc_path.stem.endswith("-summary")
         doc_type = DocType.EXEC if is_summary else _document_type(metadata)
         return BodySchemaResolution(
