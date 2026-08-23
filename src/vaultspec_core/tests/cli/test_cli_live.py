@@ -367,6 +367,8 @@ class TestSync:
             env={**os.environ, "NO_COLOR": "1"},
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=30,
         )
         assert result.returncode == 0, result.stdout + result.stderr
@@ -1051,6 +1053,8 @@ class TestTargetPropagation:
             env={**os.environ, "NO_COLOR": "1"},
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=30,
         )
         assert result.returncode == 0, result.stdout + result.stderr
