@@ -486,8 +486,8 @@ List vault documents. `DOC_TYPE` filters by type.
 | Option | Short | Default | Description | | --------------- | ----- | ------- |
 ----------------------------- | | `--feature TAG` | `-f` | None | Filter by feature tag.
 | | `--date DATE` | - | None | Filter by date. | | `--json` | - | off | Emit
-machine-readable output. | | `--limit N` | - | 50 | Maximum documents to return. |
-| `--offset N` | - | 0 | Documents to skip, for paging. |
+machine-readable output. | | `--limit N` | - | 50 | Maximum documents to return. | |
+`--offset N` | - | 0 | Documents to skip, for paging. |
 
 ### vaultspec-core vault stats
 
@@ -512,9 +512,11 @@ Scope to a single feature. | | `--json` | - | off | Output as networkx node-link
 Render ASCII topology. | | `--body` | - | off | Include document body in JSON output. |
 | `--node STEM` | - | None | Scope JSON to a node's local (ego) neighbourhood. | |
 `--depth N` | - | 1 | Ego-graph radius in hops; only used with --node. | |
-`--derived/--no-derived` | - | on | Include the derived relatedness edge set in JSON. |
-| `--ref REF` | - | None | Read the corpus from this git ref via the object database,
-with no working-tree checkout. |
+`--derived/--no-derived` | - | off | Include the derived relatedness edge set in JSON;
+it is a computed similarity ranking, not vault state. | | `--derived-limit N` | - | None
+| Maximum derived edges to return. | | `--derived-offset N` | - | 0 | Derived edges to
+skip, for paging. | | `--ref REF` | - | None | Read the corpus from this git ref via the
+object database, with no working-tree checkout. |
 
 The `--json` payload (schema `vaultspec.vault.graph.v2`) carries typed weighted explicit
 edges (`kind`, `multiplicity`, `weight`), node-size hints (`pagerank`, `in_degree`), and
