@@ -38,6 +38,12 @@ jobs:
           ITEM_ID: ${{ steps.add.outputs.itemId }}
         run: |
           DEADLINE=$(date -d "+30 days" +%Y-%m-%d)
+          # The $project/$item/$field/$value below are GraphQL variables bound
+          # by the -f flags, not shell variables. Single quotes are required so
+          # the shell leaves them for the API to substitute; expanding them here
+          # would send an empty query. SC2016 warns about exactly the case this
+          # relies on.
+          # shellcheck disable=SC2016
           gh api graphql \
             -f query='mutation($project:ID!,$item:ID!,$field:ID!,$value:Date!){
               updateProjectV2ItemFieldValue(input:{
