@@ -49,13 +49,13 @@ import re
 from typing import TYPE_CHECKING, Any, ParamSpec, Protocol, TypeVar, cast
 
 from mcp.types import CallToolResult, TextContent
-from pydantic import BaseModel
+from pydantic import BaseModel, GetJsonSchemaHandler
 from pydantic_core import to_jsonable_python
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-__all__ = ["compact_result", "describe", "tool_description"]
+__all__ = ["LeanModel", "compact_result", "describe", "tool_description"]
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
@@ -116,8 +116,128 @@ def tool_description(fn: object) -> str:
     return doc.strip()
 
 
+class LeanModel(BaseModel):
+    """Result-model base that keeps maintainer documentation off the wire.
+
+    Pydantic lifts a model's ``__doc__`` into its JSON-schema ``description``,
+    so a Google-style docstring - ``Attributes:`` block and reST markup
+    included - is re-sent to the model on every turn of every conversation.
+    Measured, output schemas were 26,785 of 43,919 characters of the tool
+    surface, and not one of those descriptions sat on a leaf field: each
+    described its fields in prose the model then had to re-associate by name.
+    Maximum bytes, least usable position.
+
+    Derived ``title`` keys go for the same reason: Pydantic title-cases the
+    property name, so ``blob_hash`` yields ``Blob Hash`` - 1,892 characters
+    across the surface carrying nothing the key does not already say.
+
+    What survives is what a caller acts on: the structure, and any
+    ``Field(description=...)`` an author wrote deliberately for the model. The
+    docstrings stay in the source, where the maintainer needs them.
+    """
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: Any, handler: GetJsonSchemaHandler
+    ) -> dict[str, Any]:
+        """Render this model's schema without its class docstring or titles.
+
+        Args:
+            core_schema: The pydantic-core schema for this model.
+            handler: The next handler in the generation chain.
+
+        Returns:
+            The pruned schema fragment.
+        """
+        produced = dict(handler(core_schema))
+        produced.pop("description", None)
+        produced.pop("title", None)
+        properties = produced.get("properties")
+        if isinstance(properties, dict):
+            produced["properties"] = {
+                name: _strip_titles(prop)
+                for name, prop in cast("dict[str, Any]", properties).items()
+            }
+        return produced
+
+
+def _strip_titles(node: Any) -> Any:
+    """Drop derived ``title`` keys from a property fragment.
+
+    Args:
+        node: A schema fragment.
+
+    Returns:
+        The fragment without derived titles.
+    """
+    if isinstance(node, dict):
+        return {
+            key: _strip_titles(value)
+            for key, value in cast("dict[str, Any]", node).items()
+            if key != "title"
+        }
+    if isinstance(node, list):
+        return [_strip_titles(item) for item in cast("list[Any]", node)]
+    return node
+
+
+def _prune_optional_nulls(model: BaseModel, dumped: dict[str, Any]) -> dict[str, Any]:
+    """Drop ``None`` values whose field is optional, keeping required ones.
+
+    A field that is absent and a field that is present-and-null read the same
+    to a caller against an optional schema, and the second costs bytes on every
+    row: ``find`` returns a sixteen-field superset covering two modes, so
+    twelve fields were null on every feature row.
+
+    Blanket ``exclude_none`` is wrong here. A field can be *required* and
+    nullable - ``next_open_step`` is declared ``str | None`` with no default,
+    so dropping it produced a payload that failed its own output-schema
+    validation on the way back out. Required fields keep their nulls; only
+    fields the schema already treats as omissible are pruned.
+
+    Args:
+        model: The result model the dump came from.
+        dumped: Its JSON-mode dump.
+
+    Returns:
+        The dump with optional nulls removed.
+    """
+    optional = {
+        name
+        for name, field in type(model).model_fields.items()
+        if not field.is_required()
+    }
+    return {
+        key: value
+        for key, value in dumped.items()
+        if value is not None or key not in optional
+    }
+
+
+def _prune_any(value: Any) -> Any:
+    """Recursively prune optional nulls from *value*.
+
+    Args:
+        value: A model, a sequence, a mapping, or a scalar.
+
+    Returns:
+        The value with optional nulls removed from every nested model.
+    """
+    if isinstance(value, BaseModel):
+        dumped = value.model_dump(mode="json", by_alias=True)
+        pruned = _prune_optional_nulls(value, dumped)
+        return {
+            key: _prune_any(getattr(value, key, item)) for key, item in pruned.items()
+        }
+    if isinstance(value, list | tuple):
+        return [_prune_any(item) for item in cast("list[Any]", value)]
+    return to_jsonable_python(value, by_alias=True)
+
+
 def _structured(payload: object) -> Any:
     """Render *payload* the way the SDK would for ``structured_content``.
+
+    Optional nulls are pruned; see :func:`_prune_optional_nulls`.
 
     Mirrors ``_try_create_model_and_schema``'s wrapping rule: a ``BaseModel``
     return type maps to the object itself, while any other shape (notably the
@@ -132,8 +252,8 @@ def _structured(payload: object) -> Any:
         The JSON-ready structured content for the wire result.
     """
     if isinstance(payload, BaseModel):
-        return payload.model_dump(mode="json", by_alias=True)
-    return {"result": to_jsonable_python(payload, by_alias=True)}
+        return _prune_any(payload)
+    return {"result": _prune_any(payload)}
 
 
 def describe(payload: object) -> str:

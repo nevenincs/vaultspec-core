@@ -20,7 +20,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from .envelope import LeanModel
 
 __all__ = [
     "BatchResult",
@@ -36,7 +38,7 @@ __all__ = [
 _SUCCESS_STATUSES = frozenset({"created", "updated", "unchanged"})
 
 
-class ItemResult(BaseModel):
+class ItemResult(LeanModel):
     """The outcome of one item in a batch ``create`` or ``edit`` call.
 
     Attributes:
@@ -69,7 +71,7 @@ class ItemResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-class BatchResult(BaseModel):
+class BatchResult(LeanModel):
     """The whole-call result of a batch ``create`` or ``edit`` invocation.
 
     A partially-failed batch is a *successful* call: it returns

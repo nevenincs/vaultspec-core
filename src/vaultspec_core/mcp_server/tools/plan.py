@@ -20,10 +20,9 @@ from typing import TYPE_CHECKING, Any
 
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
-from pydantic import BaseModel
 
 from ...core.types import get_context as _get_ctx
-from ..envelope import compact_result
+from ..envelope import LeanModel, compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
@@ -52,7 +51,7 @@ _PlanToolContext = Context[None, Any]
 # ---------------------------------------------------------------------------
 
 
-class StepStateChange(BaseModel):
+class StepStateChange(LeanModel):
     """One step-state change in a batch ``plan_progress`` call.
 
     Attributes:
@@ -68,7 +67,7 @@ class StepStateChange(BaseModel):
     state: str
 
 
-class PlanEditOperation(BaseModel):
+class PlanEditOperation(LeanModel):
     """One step-authoring operation in a batch ``plan_edit`` call.
 
     Attributes:
@@ -100,7 +99,7 @@ class PlanEditOperation(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class StepChangeResult(BaseModel):
+class StepChangeResult(LeanModel):
     """The outcome of one ``plan_progress`` state change.
 
     Attributes:
@@ -118,7 +117,7 @@ class StepChangeResult(BaseModel):
     error: dict[str, Any] | None = None
 
 
-class PlanProgressResult(BaseModel):
+class PlanProgressResult(LeanModel):
     """The whole-call result of a ``plan_progress`` invocation.
 
     Attributes:
@@ -140,7 +139,7 @@ class PlanProgressResult(BaseModel):
     next_open_step: str | None
 
 
-class PlanEditItemResult(BaseModel):
+class PlanEditItemResult(LeanModel):
     """The outcome of one ``plan_edit`` operation.
 
     Attributes:
@@ -158,7 +157,7 @@ class PlanEditItemResult(BaseModel):
     error: dict[str, Any] | None = None
 
 
-class PlanEditResult(BaseModel):
+class PlanEditResult(LeanModel):
     """The whole-call result of a ``plan_edit`` invocation.
 
     Attributes:

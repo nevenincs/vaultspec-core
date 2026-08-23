@@ -34,11 +34,11 @@ from typing import TYPE_CHECKING, Any, cast
 
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ...core.types import get_context as _get_ctx
 from ..catalog import RESERVED_FLAGS, CatalogEntry, CommandCatalog, build_catalog
-from ..envelope import compact_result
+from ..envelope import LeanModel, compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
@@ -61,7 +61,7 @@ _DEFAULT_TIMEOUT = 60.0
 # ---------------------------------------------------------------------------
 
 
-class FlagSchema(BaseModel):
+class FlagSchema(LeanModel):
     """One declared option of a discovered verb.
 
     Attributes:
@@ -75,7 +75,7 @@ class FlagSchema(BaseModel):
     help: str = ""
 
 
-class ArgumentSchema(BaseModel):
+class ArgumentSchema(LeanModel):
     """One declared positional argument of a discovered verb.
 
     Attributes:
@@ -90,7 +90,7 @@ class ArgumentSchema(BaseModel):
     variadic: bool = False
 
 
-class VerbSchema(BaseModel):
+class VerbSchema(LeanModel):
     """A ranked verb returned by ``discover`` with its full parameter schema.
 
     Attributes:
@@ -111,7 +111,7 @@ class VerbSchema(BaseModel):
     arguments: list[ArgumentSchema] = Field(default_factory=list)
 
 
-class DiscoverResult(BaseModel):
+class DiscoverResult(LeanModel):
     """The whole-call result of a ``discover`` invocation.
 
     Attributes:
@@ -130,7 +130,7 @@ class DiscoverResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class InvokeError(BaseModel):
+class InvokeError(LeanModel):
     """The structured failure payload of a verb that ran but did not succeed.
 
     Attributes:
@@ -148,7 +148,7 @@ class InvokeError(BaseModel):
     message: str
 
 
-class InvokeResult(BaseModel):
+class InvokeResult(LeanModel):
     """The whole-call result of an ``invoke`` invocation.
 
     A verb that runs and exits non-zero is a *successful* ``invoke`` reporting

@@ -19,11 +19,11 @@ from typing import TYPE_CHECKING, Any
 
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ... import __version__
 from ...core.types import get_context as _get_ctx
-from ..envelope import compact_result
+from ..envelope import LeanModel, compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ __all__ = ["register_orientation_tools"]
 # ---------------------------------------------------------------------------
 
 
-class FeatureStatus(BaseModel):
+class FeatureStatus(LeanModel):
     """One active feature in the project-wide orientation view.
 
     Attributes:
@@ -67,7 +67,7 @@ class FeatureStatus(BaseModel):
     plan_completion_percent: float = 0.0
 
 
-class PlanProgressLine(BaseModel):
+class PlanProgressLine(LeanModel):
     """A plan in flight, pre-shaped for the orientation view.
 
     Attributes:
@@ -91,7 +91,7 @@ class PlanProgressLine(BaseModel):
     next_open_step: str | None
 
 
-class StepTraceLine(BaseModel):
+class StepTraceLine(LeanModel):
     """One plan step mapped to its execution record in a trace.
 
     Attributes:
@@ -108,7 +108,7 @@ class StepTraceLine(BaseModel):
     record_stem: str | None
 
 
-class PlanTraceLine(BaseModel):
+class PlanTraceLine(LeanModel):
     """The grounding trace for a single plan.
 
     Attributes:
@@ -143,7 +143,7 @@ class PlanTraceLine(BaseModel):
     error: str | None = None
 
 
-class StatusResult(BaseModel):
+class StatusResult(LeanModel):
     """The whole-call result of a ``status`` invocation.
 
     Carries no blob hashes: orientation is hash-free, and the read-then-edit
@@ -182,7 +182,7 @@ class StatusResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class CheckFinding(BaseModel):
+class CheckFinding(LeanModel):
     """One finding from a vault health check.
 
     Attributes:
@@ -201,7 +201,7 @@ class CheckFinding(BaseModel):
     fixable: bool
 
 
-class CheckReportLine(BaseModel):
+class CheckReportLine(LeanModel):
     """The per-checker summary line.
 
     Attributes:
@@ -221,7 +221,7 @@ class CheckReportLine(BaseModel):
     clean: bool
 
 
-class CheckResultModel(BaseModel):
+class CheckResultModel(LeanModel):
     """The whole-call result of a ``check`` invocation.
 
     Attributes:

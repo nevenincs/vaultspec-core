@@ -32,23 +32,24 @@ pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 #: Aggregate ceiling for the full nine-tool wire surface, in characters.
 #:
 #: This is a **ratchet, not a target**. The measured surface is 43,919 chars
-#: (~11.8K tokens at the 3.46 chars/token measured for this codebase's JSON),
+#: (~5.4K tokens at the 3.46 chars/token measured for this codebase's JSON),
 #: and every one of those tokens is re-sent on every turn of every
 #: conversation before any work happens. The ceiling sits just above the
 #: current measurement so the surface cannot grow, and it is meant to be
 #: *lowered* as the envelope campaign lands - never raised.
 #:
-#: Doctrine target is 5K tokens (~17,300 chars). Getting there is mostly a
+#: Doctrine target is 5K tokens (~17,300 chars); the surface now sits just
+#: above it. What remains is structure, not prose. Getting here was mostly a
 #: matter of not shipping developer documentation to the model: Pydantic
 #: lifts each result model's full docstring - ``Attributes:`` blocks and
 #: reST markup included - into ``output_schema.description``, and the tool
 #: descriptions carry ``Returns:``/``Raises:`` prose plus a ``ctx``
 #: parameter that appears in no input schema.
-MAX_TOOL_DEFINITION_CHARS = 41_500
+MAX_TOOL_DEFINITION_CHARS = 19_000
 
 #: Aggregate ceiling for the read-only surface (four tools), same rules.
-#: Measured at 19,707 chars.
-MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 20_000
+#: Measured at 9,194 chars.
+MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 9_500
 
 # Maximum number of tools: the tiered surface is seven hot tools plus the
 # discover/invoke gateway; growth beyond that needs a deliberate decision.
