@@ -49,6 +49,7 @@ import typer
 
 from vaultspec_core.cli._target import TargetOption, apply_target
 from vaultspec_core.cli.json_output import json_format_kwargs
+from vaultspec_core.cli.vault_cmd_app import vault_app
 from vaultspec_core.vaultcore.edit_engine import (
     EditError as _EditError,
 )
@@ -62,12 +63,15 @@ from vaultspec_core.vaultcore.edit_engine import (
 )
 
 if TYPE_CHECKING:
-    import typer as _typer
-
     from vaultspec_core.vaultcore.checks._base import CheckResult
     from vaultspec_core.vaultcore.edit_engine import EditResult
 
-__all__ = ["register_edit_commands", "register_rename_command"]
+__all__ = [
+    "cmd_edit",
+    "cmd_rename",
+    "cmd_set_body",
+    "cmd_set_frontmatter",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -680,346 +684,290 @@ def _cascade_paths(cascade: CheckResult, root_dir: Path) -> list[Path]:
     return paths
 
 
-def register_rename_command(vault_app: _typer.Typer) -> None:
-    """Register the ``rename`` verb on *vault_app*.
+@vault_app.command("set-body")
+def cmd_set_body(
+    ref: Annotated[
+        str,
+        typer.Argument(
+            help=("Document to edit. Accepts stem, filename, path, or [[wiki-link]].")
+        ),
+    ],
+    body_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--body-file",
+            help="Read the new body text from this file",
+            dir_okay=False,
+            file_okay=True,
+            resolve_path=True,
+        ),
+    ] = None,
+    body_stdin: Annotated[
+        bool,
+        typer.Option("--body-stdin", help="Read the new body text from stdin"),
+    ] = False,
+    expected_blob_hash: Annotated[
+        str | None,
+        typer.Option(
+            "--expected-blob-hash",
+            help="Refuse the write unless the on-disk blob OID matches",
+        ),
+    ] = None,
+    check: Annotated[
+        bool,
+        typer.Option(
+            "--check/--no-check",
+            help="Run conformance checks before writing (default on)",
+        ),
+    ] = True,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview without writing")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Replace only the body prose of a document, keeping its frontmatter.
 
-    Args:
-        vault_app: The ``vault`` command group to mount the verb on.
+    The frontmatter block is preserved byte-for-byte; only the body
+    after the closing ``---`` fence is replaced.  The ``modified:``
+    stamp is refreshed.  With ``--check`` (default) the proposed
+    content is validated before writing and the write is refused if any
+    diagnostic is ERROR severity.
     """
-
-    @vault_app.command("rename")
-    def cmd_rename(  # pyright: ignore[reportUnusedFunction]
-        ref: Annotated[
-            str,
-            typer.Argument(
-                help=(
-                    "Document to rename. Accepts stem, filename, path, or "
-                    "[[wiki-link]]."
-                )
-            ),
-        ],
-        to: Annotated[
-            str,
-            typer.Option(
-                "--to",
-                help="New identity-bearing stem (filename without .md).",
-            ),
-        ],
-        expected_blob_hash: Annotated[
-            str | None,
-            typer.Option(
-                "--expected-blob-hash",
-                help="Refuse the rename unless the on-disk blob OID matches",
-            ),
-        ] = None,
-        check: Annotated[
-            bool,
-            typer.Option(
-                "--check/--no-check",
-                help="Report conformance checks on the renamed doc (default on)",
-            ),
-        ] = True,
-        dry_run: Annotated[
-            bool, typer.Option("--dry-run", help="Preview without writing")
-        ] = False,
-        json_output: Annotated[
-            bool, typer.Option("--json", help="Output as JSON")
-        ] = False,
-        target: TargetOption = None,
-    ) -> None:
-        """Rename a document's file and re-point incoming related references.
-
-        Physically renames the document to ``<--to>.md`` in the same directory,
-        rewrites every other document's ``related: [[old-stem]]`` to the new
-        stem, and refreshes the ``modified:`` stamp. Cursory pre-checks (blob
-        hash, target grammar, collision) run before any mutation; the renamed
-        document's conformance diagnostics ride the envelope.
-        """
-        apply_target(target, json_output=json_output)
-        _execute_rename(
-            ref=ref,
-            new_stem=to,
-            expected_blob_hash=expected_blob_hash,
-            run_checks=check,
-            dry_run=dry_run,
+    apply_target(target, json_output=json_output)
+    try:
+        new_body = _read_body_channel(body_file, body_stdin, required=True)
+    except _EditError as exc:
+        _emit(
+            "vault.set-body",
+            "failed",
+            {"message": exc.message, "path": ref, **exc.data},
             json_output=json_output,
         )
+        raise typer.Exit(code=1) from exc
+
+    _execute_edit(
+        command="vault.set-body",
+        ref=ref,
+        new_body=new_body,
+        date=None,
+        tags=None,
+        related=None,
+        expected_blob_hash=expected_blob_hash,
+        run_checks=check,
+        dry_run=dry_run,
+        json_output=json_output,
+    )
 
 
-def register_edit_commands(vault_app: _typer.Typer) -> None:
-    """Register ``set-body``, ``set-frontmatter``, and ``edit`` on *vault_app*.
+@vault_app.command("set-frontmatter")
+def cmd_set_frontmatter(
+    ref: Annotated[
+        str,
+        typer.Argument(
+            help=("Document to edit. Accepts stem, filename, path, or [[wiki-link]].")
+        ),
+    ],
+    date: Annotated[
+        str | None, typer.Option("--date", help="Set the date field (YYYY-MM-DD)")
+    ] = None,
+    tags: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--tags",
+            help="Set the tags list (repeatable; replaces the whole list)",
+        ),
+    ] = None,
+    related: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--related",
+            "-r",
+            help=(
+                "Set the related list (repeatable; replaces the whole list). "
+                "Each input is resolved to [[wiki-link]] form."
+            ),
+        ),
+    ] = None,
+    expected_blob_hash: Annotated[
+        str | None,
+        typer.Option(
+            "--expected-blob-hash",
+            help="Refuse the write unless the on-disk blob OID matches",
+        ),
+    ] = None,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview without writing")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Edit selected frontmatter fields, keeping the body byte-for-byte.
 
-    Args:
-        vault_app: The ``vault`` command group to mount the verbs on.
+    Only the provided fields (``--date`` / ``--tags`` / ``--related``)
+    are changed; every other key is preserved.  The proposed metadata
+    is validated with :meth:`DocumentMetadata.validate` BEFORE writing
+    and the write is refused on any violation.  The ``modified:`` stamp
+    is refreshed automatically.  There is no ``--title``: the title is
+    the body H1, not a frontmatter field.
     """
+    apply_target(target, json_output=json_output)
+    from vaultspec_core.core.types import get_context as _get_ctx
 
-    @vault_app.command("set-body")
-    def cmd_set_body(  # pyright: ignore[reportUnusedFunction]
-        ref: Annotated[
-            str,
-            typer.Argument(
-                help=(
-                    "Document to edit. Accepts stem, filename, path, or [[wiki-link]]."
-                )
-            ),
-        ],
-        body_file: Annotated[
-            Path | None,
-            typer.Option(
-                "--body-file",
-                help="Read the new body text from this file",
-                dir_okay=False,
-                file_okay=True,
-                resolve_path=True,
-            ),
-        ] = None,
-        body_stdin: Annotated[
-            bool,
-            typer.Option("--body-stdin", help="Read the new body text from stdin"),
-        ] = False,
-        expected_blob_hash: Annotated[
-            str | None,
-            typer.Option(
-                "--expected-blob-hash",
-                help="Refuse the write unless the on-disk blob OID matches",
-            ),
-        ] = None,
-        check: Annotated[
-            bool,
-            typer.Option(
-                "--check/--no-check",
-                help="Run conformance checks before writing (default on)",
-            ),
-        ] = True,
-        dry_run: Annotated[
-            bool, typer.Option("--dry-run", help="Preview without writing")
-        ] = False,
-        json_output: Annotated[
-            bool, typer.Option("--json", help="Output as JSON")
-        ] = False,
-        target: TargetOption = None,
-    ) -> None:
-        """Replace only the body prose of a document, keeping its frontmatter.
-
-        The frontmatter block is preserved byte-for-byte; only the body
-        after the closing ``---`` fence is replaced.  The ``modified:``
-        stamp is refreshed.  With ``--check`` (default) the proposed
-        content is validated before writing and the write is refused if any
-        diagnostic is ERROR severity.
-        """
-        apply_target(target, json_output=json_output)
-        try:
-            new_body = _read_body_channel(body_file, body_stdin, required=True)
-        except _EditError as exc:
-            _emit(
-                "vault.set-body",
-                "failed",
-                {"message": exc.message, "path": ref, **exc.data},
-                json_output=json_output,
-            )
-            raise typer.Exit(code=1) from exc
-
-        _execute_edit(
-            command="vault.set-body",
-            ref=ref,
-            new_body=new_body,
-            date=None,
-            tags=None,
-            related=None,
-            expected_blob_hash=expected_blob_hash,
-            run_checks=check,
-            dry_run=dry_run,
-            json_output=json_output,
-        )
-
-    @vault_app.command("set-frontmatter")
-    def cmd_set_frontmatter(  # pyright: ignore[reportUnusedFunction]
-        ref: Annotated[
-            str,
-            typer.Argument(
-                help=(
-                    "Document to edit. Accepts stem, filename, path, or [[wiki-link]]."
-                )
-            ),
-        ],
-        date: Annotated[
-            str | None, typer.Option("--date", help="Set the date field (YYYY-MM-DD)")
-        ] = None,
-        tags: Annotated[
-            list[str] | None,
-            typer.Option(
-                "--tags",
-                help="Set the tags list (repeatable; replaces the whole list)",
-            ),
-        ] = None,
-        related: Annotated[
-            list[str] | None,
-            typer.Option(
-                "--related",
-                "-r",
-                help=(
-                    "Set the related list (repeatable; replaces the whole list). "
-                    "Each input is resolved to [[wiki-link]] form."
+    if date is None and tags is None and related is None:
+        _emit(
+            "vault.set-frontmatter",
+            "failed",
+            {
+                "message": (
+                    "Nothing to edit: pass at least one of "
+                    "--date, --tags, or --related."
                 ),
-            ),
-        ] = None,
-        expected_blob_hash: Annotated[
-            str | None,
-            typer.Option(
-                "--expected-blob-hash",
-                help="Refuse the write unless the on-disk blob OID matches",
-            ),
-        ] = None,
-        dry_run: Annotated[
-            bool, typer.Option("--dry-run", help="Preview without writing")
-        ] = False,
-        json_output: Annotated[
-            bool, typer.Option("--json", help="Output as JSON")
-        ] = False,
-        target: TargetOption = None,
-    ) -> None:
-        """Edit selected frontmatter fields, keeping the body byte-for-byte.
+                "path": ref,
+            },
+            json_output=json_output,
+        )
+        raise typer.Exit(code=1)
 
-        Only the provided fields (``--date`` / ``--tags`` / ``--related``)
-        are changed; every other key is preserved.  The proposed metadata
-        is validated with :meth:`DocumentMetadata.validate` BEFORE writing
-        and the write is refused on any violation.  The ``modified:`` stamp
-        is refreshed automatically.  There is no ``--title``: the title is
-        the body H1, not a frontmatter field.
-        """
-        apply_target(target, json_output=json_output)
-        from vaultspec_core.core.types import get_context as _get_ctx
-
-        if date is None and tags is None and related is None:
+    resolved_related: list[str] | None = None
+    if related is not None:
+        try:
+            resolved_related = _resolve_related_or_fail(related, _get_ctx().target_dir)
+        except _EditError as exc:
             _emit(
                 "vault.set-frontmatter",
                 "failed",
-                {
-                    "message": (
-                        "Nothing to edit: pass at least one of "
-                        "--date, --tags, or --related."
-                    ),
-                    "path": ref,
-                },
+                {"message": exc.message, "path": ref, **exc.data},
                 json_output=json_output,
             )
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from exc
 
-        resolved_related: list[str] | None = None
-        if related is not None:
-            try:
-                resolved_related = _resolve_related_or_fail(
-                    related, _get_ctx().target_dir
-                )
-            except _EditError as exc:
-                _emit(
-                    "vault.set-frontmatter",
-                    "failed",
-                    {"message": exc.message, "path": ref, **exc.data},
-                    json_output=json_output,
-                )
-                raise typer.Exit(code=1) from exc
+    normalised_tags = (
+        [t if t.startswith("#") else f"#{t}" for t in tags]
+        if tags is not None
+        else None
+    )
 
-        normalised_tags = (
-            [t if t.startswith("#") else f"#{t}" for t in tags]
-            if tags is not None
-            else None
-        )
+    _execute_edit(
+        command="vault.set-frontmatter",
+        ref=ref,
+        new_body=None,
+        date=date,
+        tags=normalised_tags,
+        related=resolved_related,
+        expected_blob_hash=expected_blob_hash,
+        run_checks=True,
+        dry_run=dry_run,
+        json_output=json_output,
+    )
 
-        _execute_edit(
-            command="vault.set-frontmatter",
-            ref=ref,
-            new_body=None,
-            date=date,
-            tags=normalised_tags,
-            related=resolved_related,
-            expected_blob_hash=expected_blob_hash,
-            run_checks=True,
-            dry_run=dry_run,
+
+@vault_app.command("edit")
+def cmd_edit(
+    ref: Annotated[
+        str,
+        typer.Argument(
+            help=("Document to edit. Accepts stem, filename, path, or [[wiki-link]].")
+        ),
+    ],
+    body_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--body-file",
+            help="Read the new body text from this file",
+            dir_okay=False,
+            file_okay=True,
+            resolve_path=True,
+        ),
+    ] = None,
+    body_stdin: Annotated[
+        bool,
+        typer.Option("--body-stdin", help="Read the new body text from stdin"),
+    ] = False,
+    date: Annotated[
+        str | None, typer.Option("--date", help="Set the date field (YYYY-MM-DD)")
+    ] = None,
+    tags: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--tags",
+            help="Set the tags list (repeatable; replaces the whole list)",
+        ),
+    ] = None,
+    related: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--related",
+            "-r",
+            help=(
+                "Set the related list (repeatable; replaces the whole list). "
+                "Each input is resolved to [[wiki-link]] form."
+            ),
+        ),
+    ] = None,
+    expected_blob_hash: Annotated[
+        str | None,
+        typer.Option(
+            "--expected-blob-hash",
+            help="Refuse the write unless the on-disk blob OID matches",
+        ),
+    ] = None,
+    check: Annotated[
+        bool,
+        typer.Option(
+            "--check/--no-check",
+            help="Run conformance checks before writing (default on)",
+        ),
+    ] = True,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview without writing")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Set body and/or frontmatter in one atomic write (single round-trip).
+
+    The dashboard "save": the body channel (``--body-file`` /
+    ``--body-stdin``) and the frontmatter flags are applied together in
+    ONE atomic write with ONE validation pass (frontmatter validate +
+    conformance checks), the same refuse-on-error and the same
+    blob-hash concurrency guard as the single-field verbs.  At least one
+    edit (a body channel or a frontmatter flag) must be supplied.
+    """
+    apply_target(target, json_output=json_output)
+    from vaultspec_core.core.types import get_context as _get_ctx
+
+    try:
+        new_body = _read_body_channel(body_file, body_stdin, required=False)
+    except _EditError as exc:
+        _emit(
+            "vault.edit",
+            "failed",
+            {"message": exc.message, "path": ref, **exc.data},
             json_output=json_output,
         )
+        raise typer.Exit(code=1) from exc
 
-    @vault_app.command("edit")
-    def cmd_edit(  # pyright: ignore[reportUnusedFunction]
-        ref: Annotated[
-            str,
-            typer.Argument(
-                help=(
-                    "Document to edit. Accepts stem, filename, path, or [[wiki-link]]."
-                )
-            ),
-        ],
-        body_file: Annotated[
-            Path | None,
-            typer.Option(
-                "--body-file",
-                help="Read the new body text from this file",
-                dir_okay=False,
-                file_okay=True,
-                resolve_path=True,
-            ),
-        ] = None,
-        body_stdin: Annotated[
-            bool,
-            typer.Option("--body-stdin", help="Read the new body text from stdin"),
-        ] = False,
-        date: Annotated[
-            str | None, typer.Option("--date", help="Set the date field (YYYY-MM-DD)")
-        ] = None,
-        tags: Annotated[
-            list[str] | None,
-            typer.Option(
-                "--tags",
-                help="Set the tags list (repeatable; replaces the whole list)",
-            ),
-        ] = None,
-        related: Annotated[
-            list[str] | None,
-            typer.Option(
-                "--related",
-                "-r",
-                help=(
-                    "Set the related list (repeatable; replaces the whole list). "
-                    "Each input is resolved to [[wiki-link]] form."
+    if new_body is None and date is None and tags is None and related is None:
+        _emit(
+            "vault.edit",
+            "failed",
+            {
+                "message": (
+                    "Nothing to edit: pass a body channel "
+                    "(--body-file/--body-stdin) and/or a frontmatter flag "
+                    "(--date/--tags/--related)."
                 ),
-            ),
-        ] = None,
-        expected_blob_hash: Annotated[
-            str | None,
-            typer.Option(
-                "--expected-blob-hash",
-                help="Refuse the write unless the on-disk blob OID matches",
-            ),
-        ] = None,
-        check: Annotated[
-            bool,
-            typer.Option(
-                "--check/--no-check",
-                help="Run conformance checks before writing (default on)",
-            ),
-        ] = True,
-        dry_run: Annotated[
-            bool, typer.Option("--dry-run", help="Preview without writing")
-        ] = False,
-        json_output: Annotated[
-            bool, typer.Option("--json", help="Output as JSON")
-        ] = False,
-        target: TargetOption = None,
-    ) -> None:
-        """Set body and/or frontmatter in one atomic write (single round-trip).
+                "path": ref,
+            },
+            json_output=json_output,
+        )
+        raise typer.Exit(code=1)
 
-        The dashboard "save": the body channel (``--body-file`` /
-        ``--body-stdin``) and the frontmatter flags are applied together in
-        ONE atomic write with ONE validation pass (frontmatter validate +
-        conformance checks), the same refuse-on-error and the same
-        blob-hash concurrency guard as the single-field verbs.  At least one
-        edit (a body channel or a frontmatter flag) must be supplied.
-        """
-        apply_target(target, json_output=json_output)
-        from vaultspec_core.core.types import get_context as _get_ctx
-
+    resolved_related: list[str] | None = None
+    if related is not None:
         try:
-            new_body = _read_body_channel(body_file, body_stdin, required=False)
+            resolved_related = _resolve_related_or_fail(related, _get_ctx().target_dir)
         except _EditError as exc:
             _emit(
                 "vault.edit",
@@ -1029,52 +977,75 @@ def register_edit_commands(vault_app: _typer.Typer) -> None:
             )
             raise typer.Exit(code=1) from exc
 
-        if new_body is None and date is None and tags is None and related is None:
-            _emit(
-                "vault.edit",
-                "failed",
-                {
-                    "message": (
-                        "Nothing to edit: pass a body channel "
-                        "(--body-file/--body-stdin) and/or a frontmatter flag "
-                        "(--date/--tags/--related)."
-                    ),
-                    "path": ref,
-                },
-                json_output=json_output,
-            )
-            raise typer.Exit(code=1)
+    normalised_tags = (
+        [t if t.startswith("#") else f"#{t}" for t in tags]
+        if tags is not None
+        else None
+    )
 
-        resolved_related: list[str] | None = None
-        if related is not None:
-            try:
-                resolved_related = _resolve_related_or_fail(
-                    related, _get_ctx().target_dir
-                )
-            except _EditError as exc:
-                _emit(
-                    "vault.edit",
-                    "failed",
-                    {"message": exc.message, "path": ref, **exc.data},
-                    json_output=json_output,
-                )
-                raise typer.Exit(code=1) from exc
+    _execute_edit(
+        command="vault.edit",
+        ref=ref,
+        new_body=new_body,
+        date=date,
+        tags=normalised_tags,
+        related=resolved_related,
+        expected_blob_hash=expected_blob_hash,
+        run_checks=check,
+        dry_run=dry_run,
+        json_output=json_output,
+    )
 
-        normalised_tags = (
-            [t if t.startswith("#") else f"#{t}" for t in tags]
-            if tags is not None
-            else None
-        )
 
-        _execute_edit(
-            command="vault.edit",
-            ref=ref,
-            new_body=new_body,
-            date=date,
-            tags=normalised_tags,
-            related=resolved_related,
-            expected_blob_hash=expected_blob_hash,
-            run_checks=check,
-            dry_run=dry_run,
-            json_output=json_output,
-        )
+@vault_app.command("rename")
+def cmd_rename(
+    ref: Annotated[
+        str,
+        typer.Argument(
+            help=("Document to rename. Accepts stem, filename, path, or [[wiki-link]].")
+        ),
+    ],
+    to: Annotated[
+        str,
+        typer.Option(
+            "--to",
+            help="New identity-bearing stem (filename without .md).",
+        ),
+    ],
+    expected_blob_hash: Annotated[
+        str | None,
+        typer.Option(
+            "--expected-blob-hash",
+            help="Refuse the rename unless the on-disk blob OID matches",
+        ),
+    ] = None,
+    check: Annotated[
+        bool,
+        typer.Option(
+            "--check/--no-check",
+            help="Report conformance checks on the renamed doc (default on)",
+        ),
+    ] = True,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview without writing")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Rename a document's file and re-point incoming related references.
+
+    Physically renames the document to ``<--to>.md`` in the same directory,
+    rewrites every other document's ``related: [[old-stem]]`` to the new
+    stem, and refreshes the ``modified:`` stamp. Cursory pre-checks (blob
+    hash, target grammar, collision) run before any mutation; the renamed
+    document's conformance diagnostics ride the envelope.
+    """
+    apply_target(target, json_output=json_output)
+    _execute_rename(
+        ref=ref,
+        new_stem=to,
+        expected_blob_hash=expected_blob_hash,
+        run_checks=check,
+        dry_run=dry_run,
+        json_output=json_output,
+    )
