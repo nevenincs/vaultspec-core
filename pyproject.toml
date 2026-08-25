@@ -590,30 +590,30 @@ enable = ["C0302", "R0902", "R0904", "R0916"]
 # only, because `ignore-paths` above means those are the only ones this gate
 # measures. Count what the gate counts.
 #
-# Census (2026-07-28, 241 production modules, RATCHETED 1668 -> 1312 after the
-# `cli/spec_cmd.py` split cleared prior offenders and left `graph/api.py` the
-# worst remaining module):
+# Census (2026-08-25, 256 production modules, RATCHETED 1668 -> 1312 -> 1171
+# after the `graph/api.py` split cleared the previous worst offender and left
+# `cli/vault_cmd.py` the worst remaining module):
 #
 #     over 2000:   0
 #     over 1500:   0
-#     over 1200:   1      <- the enforced ceiling sits at the worst of these
-#     over 1000:   1
-#     over  500:  31      <- where modules should settle
+#     over 1200:   0
+#     over 1000:   5      <- the enforced ceiling sits at the worst of these
+#     over  500:  43      <- where modules should settle
 #
-# Longest production module: graph/api.py at 1312 lines.
+# Longest production module: cli/vault_cmd.py at 1171 lines.
 #
-# The `cli/spec_cmd.py` split (spec_cmd_agents.py, spec_cmd_app.py,
+# The `graph/api.py` split (graph/building.py) moved this dimension the same
+# way the earlier `cli/spec_cmd.py` split (spec_cmd_agents.py, spec_cmd_app.py,
 # spec_cmd_doctor.py, spec_cmd_hooks.py, spec_cmd_mcps.py,
 # spec_cmd_reference.py, spec_cmd_rules.py, spec_cmd_shared.py,
-# spec_cmd_skills.py, spec_cmd_system.py) is what finally moved this
-# dimension: prior complexity waves only extracted helpers within these
-# modules, which paid down per-function scores without touching physical
-# length. Measure with `just health census`, which counts physical lines the
-# way pylint's C0302 does - a count that skips blank lines reads ~375 lines
-# short on the longest module here and will set a ceiling the tree cannot
-# meet.
+# spec_cmd_skills.py, spec_cmd_system.py) did: prior complexity waves only
+# extracted helpers within these modules, which paid down per-function scores
+# without touching physical length. Measure with `just health census`, which
+# counts physical lines the way pylint's C0302 does - a count that skips blank
+# lines reads ~375 lines short on the longest module here and will set a
+# ceiling the tree cannot meet.
 [tool.pylint.format]
-max-module-lines = 1312
+max-module-lines = 1171
 
 # BASELINE-CALIBRATED (census 2026-07-28): each sits at the current worst
 # production offender, so the gate is green today and can only be ratcheted

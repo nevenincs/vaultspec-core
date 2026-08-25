@@ -2,9 +2,12 @@
 
 Turns ``vaultcore`` scanning, metadata parsing, and wiki-link extraction into
 a queryable directed graph of ``.vault/`` documents backed by
-``networkx.DiGraph``. Delegates rendering to ``phart`` (ASCII topology) and
+``networkx.DiGraph``. Delegates construction to
+:mod:`vaultspec_core.graph.building` (ingress read, cache round-trip, and the
+assembly passes), rendering to ``phart`` (ASCII topology) and
 :func:`~vaultspec_core.cli.rendering.render_tree` (box-free hierarchical tree),
-and serialisation to ``networkx.readwrite.json_graph``.
+and serialisation to :mod:`vaultspec_core.graph.api_export` over
+``networkx.readwrite.json_graph``.
 
 Example::
 
@@ -23,40 +26,16 @@ Exports:
 from __future__ import annotations
 
 import logging
-from collections import Counter
 from typing import TYPE_CHECKING, Any, cast
 
 import networkx as nx
 
-from ..vaultcore import (
-    DocType,
-    extract_related_links,
-    extract_wiki_links,
-    get_doc_type,
-    parse_frontmatter,
-    parse_vault_metadata,
-    scan_vault,
-)
+from ..vaultcore import DocType, scan_vault
 from ..vaultcore.models import DocumentMetadata
-from . import api_export, rendering
-from .algorithms import (
-    PAGERANK_ALPHA,
-    betweenness_centrality,
-    docnode_from_attrs,
-    edge_kind,
-    extract_feature,
-    extract_title,
-    pagerank,
-    top_n,
-)
+from . import api_export, building, rendering
+from .algorithms import betweenness_centrality, top_n
 from .models import DocNode, EncodingIssue, GraphCounts, GraphMetrics
-from .networkx_runtime import (
-    NetworkXGraph,
-    directed_graph,
-    ego_graph,
-    node_link_data,
-    node_link_graph,
-)
+from .networkx_runtime import NetworkXGraph, directed_graph, ego_graph
 from .networkx_runtime import density as graph_density
 
 if TYPE_CHECKING:
@@ -65,7 +44,6 @@ if TYPE_CHECKING:
     from vaultspec_core.cli.rendering import TreeLine
 
     from ..vaultcore.checks._base import VaultSnapshot
-    from . import cache
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +153,7 @@ class VaultGraph:
 
         docs_dir_name = pathlib.Path(get_config().docs_dir).name
         corpus = read_vault_at_ref(root_dir, ref, docs_dir_name)
-        graph._rebuild_from_corpus(corpus, docs_dir_name)
+        building.rebuild_from_corpus(graph, corpus, docs_dir_name)
         return graph
 
     # -- Construction --------------------------------------------------------
@@ -225,17 +203,17 @@ class VaultGraph:
                     cache_mtime_ns=cache_mtime_ns,
                 ):
                     logger.info("Graph cache hit at %s; skipping re-parse", path)
-                    self._load_from_cache(payload)
+                    building.load_from_cache(self, payload)
                     return
             logger.info("Graph cache miss at %s; rebuilding", path)
 
-        self._rebuild_from_files(scanned_files)
+        building.rebuild_from_files(self, scanned_files)
 
         if use_cache:
             cache_mod.save(
                 path,
                 cache_mod.fingerprint_vault(scanned_files, self.root_dir),
-                self._to_cache_graph(),
+                building.to_cache_graph(self),
                 self._dangling_links,
                 [
                     (str(issue.path), issue.kind, issue.detail, issue.start)
@@ -243,168 +221,16 @@ class VaultGraph:
                 ],
             )
 
-    def _to_cache_graph(self) -> dict[str, Any]:
-        """Return the node-link serialisation of the canonical graph for caching.
-
-        Uses the same ``edges="edges"`` node-link contract the JSON export
-        uses, then injects each node's body text (which is held on the
-        :class:`DocNode`, not on the networkx node) so a cache load can
-        reconstruct a behaviourally identical graph, including
-        :meth:`to_dict` with ``include_body=True``.
-
-        Returns:
-            A node-link ``dict`` with body text attached to each node.
-        """
-        data = node_link_data(self._digraph)
-        for node_dict in data.get("nodes", []):
-            nid = node_dict.get("id", "")
-            doc = self.nodes.get(nid)
-            node_dict["body"] = doc.body if doc is not None else ""
-        return data
-
-    def _load_from_cache(self, payload: cache.GraphCachePayload) -> None:
-        """Reconstruct the graph state from a validated cache payload.
-
-        Rebuilds ``self._digraph``, ``self.nodes``, ``self._stem_index``, and
-        ``self._dangling_links`` from the serialised node-link data so the
-        loaded graph is behaviourally identical to a fresh build (same nodes,
-        edges, attributes, and node-size metrics).  No filesystem parsing
-        occurs.
-
-        Args:
-            payload: A cache payload that has already passed
-                :func:`vaultspec_core.graph.cache.validate`.
-        """
-        self._digraph = node_link_graph(payload.graph)
-        self.nodes = {}
-        self._stem_index = {}
-        by_stem: dict[str, list[str]] = {}
-        for key in self._digraph.nodes():
-            attrs = self._digraph.nodes[key]
-            self.nodes[key] = docnode_from_attrs(key, attrs)
-            # The node body is held on the DocNode, not the nx node; pull it
-            # back off the cached node attrs and drop it so the nx node
-            # attribute set matches a fresh build exactly.
-            body = attrs.pop("body", "")
-            self.nodes[key].body = body
-            # Phantoms are excluded from _stem_index to match fresh-build
-            # semantics: _rebuild_from_files only indexes real (non-phantom)
-            # nodes in passes 1a/1b; phantoms are added later in pass 2 and
-            # never entered into _stem_index.
-            if not attrs.get("phantom", False):
-                bare_stem = key.split("/", 1)[1] if "/" in key else key
-                by_stem.setdefault(bare_stem, []).append(key)
-        for bare_stem, keys in by_stem.items():
-            self._stem_index[bare_stem] = sorted(keys)
-        self._dangling_links = [(pair[0], pair[1]) for pair in payload.dangling_links]
-        # A document that failed to read or decode never becomes a usable node,
-        # so the cache carries these separately; restoring them keeps a warm
-        # run's encoding findings identical to a cold one's.
-        from pathlib import Path as _Path
-
-        self._encoding_issues = [
-            EncodingIssue(_Path(raw_path), kind, detail, start)
-            for raw_path, kind, detail, start in payload.encoding_issues
-        ]
-        logger.info(
-            "Graph loaded from cache: %d nodes, %d edges",
-            self._digraph.number_of_nodes(),
-            self._digraph.number_of_edges(),
-        )
-
-    def _rebuild_from_files(self, scanned_files: list[pathlib.Path]) -> None:
-        """Rebuild the graph by parsing every scanned file.
-
-        Uses a two-pass strategy:
-
-        1. **Pass 1**  - create :class:`DocNode` instances, detecting stem
-           collisions.  When two files share the same stem (e.g.
-           ``adr/my-doc.md`` and ``reference/my-doc.md``), all colliding
-           nodes are re-keyed as ``type/stem`` so that no data is silently
-           dropped.
-        2. **Pass 2**  - extract links and create directed edges.  Bare
-           wiki-link stems that match multiple qualified keys fan-out to
-           all variants (with a logged warning).
-
-        Args:
-            scanned_files: The vault document paths to parse, as returned by
-                ``scan_vault``.
-        """
-        self.nodes = {}
-        self._digraph = nx.DiGraph()
-        self._dangling_links = []
-        self._raw_texts = {}
-        self._encoding_issues = []
-
-        # Pass 1a: collect all DocNodes keyed by stem, detecting collisions
-        by_stem: dict[str, list[DocNode]] = {}
-
-        for path in scanned_files:
-            logger.debug("Graph pass 1: reading %s", path)
-            stem = path.stem
-            doc_type = get_doc_type(path, self.root_dir)
-
-            node = DocNode(path=path, name=stem, doc_type=doc_type)
-
-            content = self._ingest_document(path)
-            if content is not None:
-                self._populate_node_from_content(node, content)
-
-            by_stem.setdefault(stem, []).append(node)
-
-        self._assemble_from_by_stem(by_stem)
-
-    def _ingest_document(self, path: pathlib.Path) -> str | None:
-        """Read *path* once, recording its raw text and any encoding issue.
-
-        The single ingress read: the file's bytes are read exactly once,
-        decoded as UTF-8, and newline-normalised the way ``read_text``'s
-        universal-newline mode would (``\\r\\n`` and ``\\r`` become ``\\n``)
-        so the parse consumes identical input to the previous per-consumer
-        reads.  The normalised text and the source's CRLF convention are
-        retained in :attr:`raw_texts` for content-consuming checks, and a
-        read or decode failure is recorded in :attr:`encoding_issues`
-        instead of being silently dropped.
-
-        Returns:
-            The normalised document text, or ``None`` when the file could
-            not be read or decoded.
-        """
-        try:
-            raw_bytes = path.read_bytes()
-        except OSError as e:
-            self._encoding_issues.append(EncodingIssue(path, "read", str(e), None))
-            logger.warning("Failed to read metadata from %s: %s", path, e)
-            return None
-        try:
-            decoded = raw_bytes.decode("utf-8")
-        except UnicodeDecodeError as e:
-            self._encoding_issues.append(
-                EncodingIssue(path, "decode", e.reason, e.start)
-            )
-            logger.warning("Failed to read metadata from %s: %s", path, e)
-            return None
-        crlf = "\r\n" in decoded
-        content = decoded.replace("\r\n", "\n").replace("\r", "\n")
-        self._raw_texts[path] = (content, crlf)
-        return content
-
     def ensure_raw_texts(self) -> None:
         """Guarantee :attr:`raw_texts` is populated for a working-tree graph.
 
         A cold build fills the raw-text map during its parse; a cache-hit
         build parses nothing, so a caller that needs document text (the
         check pipeline) invokes this to perform the run's single ingress
-        read pass.  A no-op when the map is already populated or when the
+        read pass. A no-op when the map is already populated or when the
         graph is ref-scoped (checks do not run against history).
         """
-        if self._raw_texts or self.ref is not None:
-            return
-        from ..vaultcore.scanner import scan_vault
-
-        self._encoding_issues = []
-        for path in scan_vault(self.root_dir, run_migrations=False):
-            self._ingest_document(path)
+        building.ensure_raw_texts(self)
 
     @property
     def raw_texts(self) -> dict[pathlib.Path, tuple[str, bool]]:
@@ -419,311 +245,6 @@ class VaultGraph:
     def encoding_issues(self) -> list[EncodingIssue]:
         """Read and decode failures observed during the ingress read."""
         return self._encoding_issues
-
-    def _rebuild_from_corpus(
-        self, corpus: list[tuple[str, str]], docs_dir_name: str
-    ) -> None:
-        """Rebuild the graph from in-memory ``(tree_path, content)`` pairs.
-
-        The ref-scoped build path (issue #160): instead of walking the working
-        tree, the corpus is read from the git object database by
-        :func:`vaultspec_core.graph.refscan.read_vault_at_ref`. Each pair
-        carries a virtual tree path (e.g. ``.vault/adr/foo.md``) and the blob's
-        UTF-8 text. Document-type classification reads the tree path via
-        :func:`vaultspec_core.vaultcore.scanner.get_doc_type_from_tree_path`,
-        and the node ``path`` is the virtual tree path. After Pass 1a the build
-        is identical to the working-tree path, so the graph is structurally the
-        same as a checkout-based build of the same corpus.
-
-        Args:
-            corpus: ``(tree_path, content)`` pairs for the ref's vault docs.
-            docs_dir_name: The configured docs directory name (e.g. ``.vault``).
-        """
-        import pathlib
-
-        from ..vaultcore.scanner import get_doc_type_from_tree_path
-
-        self.nodes = {}
-        self._digraph = nx.DiGraph()
-        self._dangling_links = []
-
-        by_stem: dict[str, list[DocNode]] = {}
-        for tree_path, content in corpus:
-            stem = pathlib.PurePosixPath(tree_path).stem
-            doc_type = get_doc_type_from_tree_path(tree_path, docs_dir_name)
-            node = DocNode(path=None, name=stem, doc_type=doc_type, tree_path=tree_path)
-            try:
-                self._populate_node_from_content(node, content)
-            except (ValueError, KeyError) as e:
-                logger.warning("Failed to parse blob %s: %s", tree_path, e)
-            by_stem.setdefault(stem, []).append(node)
-
-        self._assemble_from_by_stem(by_stem)
-
-    @staticmethod
-    def _populate_node_from_content(node: DocNode, content: str) -> None:
-        """Parse a document's *content* and populate *node*'s metadata fields.
-
-        Shared by the working-tree and ref-scoped build paths so both derive
-        tags, dates, feature, frontmatter, body, word count, and title from
-        the same content-bound parsers (which never touch the filesystem).
-        """
-        metadata, body = parse_vault_metadata(content)
-        raw_fm, _ = parse_frontmatter(content)
-
-        node.tags = set(metadata.tags)
-        node.date = metadata.date
-        node.modified = metadata.modified
-        node.feature = extract_feature(node.tags)
-        node.frontmatter = raw_fm
-        node.body = body
-        node.word_count = len(body.split())
-        node.title = extract_title(body)
-
-    def _assemble_from_by_stem(self, by_stem: dict[str, list[DocNode]]) -> None:
-        """Run the shared graph-assembly passes over the collected nodes.
-
-        Passes 1b through 4 (key assignment / collision qualification, edge
-        extraction, in/out-link sync, and node-size hints) are identical for
-        the working-tree and ref-scoped build paths, which differ only in how
-        Pass 1a's ``by_stem`` map is produced.
-
-        Args:
-            by_stem: Map of bare stem to the :class:`DocNode` instances that
-                share it, as produced by the Pass-1a collectors.
-        """
-        # Pass 1b: assign unique keys  - qualify colliding stems with
-        # their doc-type prefix, build a stem-to-keys index for link
-        # resolution in pass 2.
-        self._stem_index = {}
-
-        for stem, node_list in by_stem.items():
-            if len(node_list) == 1:
-                # Unique stem  - use it directly as the key.
-                node = node_list[0]
-                self.nodes[stem] = node
-                self._digraph.add_node(stem, **node.to_nx_attrs())
-                self._stem_index[stem] = [stem]
-            else:
-                # Collision  - qualify each with its doc-type directory.
-                keys: list[str] = []
-                for node in node_list:
-                    dt = node.doc_type.value if node.doc_type else "unknown"
-                    qualified = f"{dt}/{stem}"
-                    node.name = qualified
-                    self.nodes[qualified] = node
-                    self._digraph.add_node(
-                        qualified,
-                        **node.to_nx_attrs(),
-                    )
-                    keys.append(qualified)
-                # Sort so the index is deterministic across platforms and
-                # matches the cache-rebuild path (which also sorts); raw scan
-                # order is filesystem-dependent and diverges on Linux vs
-                # Windows, breaking cached-vs-fresh parity.
-                self._stem_index[stem] = sorted(keys)
-                logger.warning(
-                    "Stem collision for '%s': qualified as %s",
-                    stem,
-                    sorted(keys),
-                )
-
-        logger.info(
-            "Graph pass 1: created %d nodes (%d stem collisions)",
-            len(self.nodes),
-            sum(1 for v in self._stem_index.values() if len(v) > 1),
-        )
-
-        # Pass 2: extract links -> edges.  Unresolved targets become
-        # phantom nodes so the graph mirrors Obsidian's "not created"
-        # link model.  Iterate over a snapshot of the real-node keys
-        # because the dict grows as phantoms are added.
-        real_node_keys = list(self.nodes.keys())
-        for name in real_node_keys:
-            node = self.nodes[name]
-            try:
-                # Keep the body and related extractions separate so each
-                # resolved edge can record its provenance (body wiki-link,
-                # related frontmatter, or both).  Both extractors now return
-                # a Counter, preserving per-target multiplicity.
-                body_links = extract_wiki_links(node.body)
-                related_links = extract_related_links(
-                    node.frontmatter.get("related", []),
-                )
-
-                # Resolve each raw target to one or more node keys, summing
-                # the source multiplicity onto every resolved key and unioning
-                # the provenance kinds.  Iterating a Counter yields its keys.
-                target_counts: Counter[str] = Counter()
-                target_kinds: dict[str, set[str]] = {}
-                for raw_target, count in body_links.items():
-                    for resolved_key in self._resolve_link(raw_target):
-                        target_counts[resolved_key] += count
-                        target_kinds.setdefault(resolved_key, set()).add("body")
-                for raw_target, count in related_links.items():
-                    for resolved_key in self._resolve_link(raw_target):
-                        target_counts[resolved_key] += count
-                        target_kinds.setdefault(resolved_key, set()).add("related")
-
-                node.out_links = set(target_counts)
-
-                for target_key, multiplicity in target_counts.items():
-                    kind = edge_kind(target_kinds[target_key])
-                    if target_key in self.nodes:
-                        self.nodes[target_key].in_links.add(name)
-                        self._digraph.add_edge(
-                            name,
-                            target_key,
-                            kind=kind,
-                            multiplicity=multiplicity,
-                        )
-                        if self.nodes[target_key].phantom and not self._is_archived(
-                            target_key
-                        ):
-                            self._dangling_links.append(
-                                (name, target_key),
-                            )
-                    else:
-                        # Create a phantom node (deduplicated).
-                        phantom = DocNode(
-                            path=None,
-                            name=target_key,
-                            phantom=True,
-                        )
-                        self.nodes[target_key] = phantom
-                        self._digraph.add_node(
-                            target_key,
-                            **phantom.to_nx_attrs(),
-                        )
-                        phantom.in_links.add(name)
-                        self._digraph.add_edge(
-                            name,
-                            target_key,
-                            kind=kind,
-                            multiplicity=multiplicity,
-                        )
-                        if not self._is_archived(target_key):
-                            self._dangling_links.append(
-                                (name, target_key),
-                            )
-            except (OSError, UnicodeDecodeError) as e:
-                logger.warning(
-                    "Failed to extract links from %s: %s",
-                    node.path,
-                    e,
-                )
-
-        # Pass 2b: normalise edge weight against the maximum multiplicity in
-        # the graph so the strongest explicit edge has weight 1.0 and every
-        # other edge is its multiplicity as a fraction of that maximum.  The
-        # scheme is linear, deterministic, and exactly testable:
-        #   weight = multiplicity / max_multiplicity_in_graph
-        # When the graph has no edges there is nothing to normalise.
-        multiplicities = [
-            data["multiplicity"] for _, _, data in self._digraph.edges(data=True)
-        ]
-        max_multiplicity = max(multiplicities) if multiplicities else 0
-        for _src, _tgt, data in self._digraph.edges(data=True):
-            data["weight"] = (
-                data["multiplicity"] / max_multiplicity if max_multiplicity else 0.0
-            )
-
-        # Pass 3: sync nx node attrs with updated in_links/out_links
-        for name, node in self.nodes.items():
-            self._digraph.nodes[name]["out_links"] = sorted(
-                node.out_links,
-            )
-            self._digraph.nodes[name]["in_links"] = sorted(
-                node.in_links,
-            )
-
-        # Pass 4: node-size hints.  Attach pagerank and raw in-degree so a GUI
-        # consumer can size nodes without recomputing.  PageRank uses the
-        # pure-Python power iteration in pagerank with a fixed damping factor
-        # (PAGERANK_ALPHA) and a uniform initial vector, so the result is
-        # deterministic for a fixed graph and exactly testable.  An empty
-        # graph yields no scores.
-        if self._digraph.number_of_nodes():
-            pagerank_scores = pagerank(self._digraph, alpha=PAGERANK_ALPHA)
-        else:
-            pagerank_scores = {}
-        in_degree = dict(self._digraph.in_degree())
-        for name in self._digraph.nodes():
-            self._digraph.nodes[name]["pagerank"] = pagerank_scores.get(name, 0.0)
-            self._digraph.nodes[name]["in_degree"] = in_degree.get(name, 0)
-
-        logger.info(
-            "Graph build complete: %d nodes, %d edges",
-            self._digraph.number_of_nodes(),
-            self._digraph.number_of_edges(),
-        )
-
-    def _is_archived(self, target: str) -> bool:
-        """Check if target exists under .vault/_archive/."""
-        from ..config import get_config
-
-        cfg = get_config()
-        archive_dir = self.root_dir / cfg.docs_dir / "_archive"
-        if not archive_dir.exists():
-            return False
-        target_norm = target.replace("\\", "/")
-        if "/" in target_norm:
-            return (archive_dir / f"{target_norm}.md").exists()
-        else:
-            return len(list(archive_dir.rglob(f"{target_norm}.md"))) > 0
-
-    def _resolve_link(self, target: str) -> list[str]:
-        """Resolve a wiki-link target to one or more node keys.
-
-        Resolution order:
-
-        1. Exact match against an existing node key (handles both bare
-           stems and already-qualified ``type/stem`` references).
-        2. Stem index lookup  - if the bare stem maps to multiple
-           qualified keys, all are returned and a warning is logged.
-        3. Match in .vault/_archive/ - returns the resolved archived key
-           so it can be resolved without being flagged as dangling.
-        4. No match  - returns the original target so it is recorded as
-           a dangling link.
-        """
-        # Exact key match (unique stem or qualified reference)
-        if target in self.nodes:
-            return [target]
-
-        # Stem index lookup (handles collisions)
-        keys = self._stem_index.get(target, [])
-        if keys:
-            if len(keys) > 1:
-                logger.debug(
-                    "Ambiguous wiki-link [[%s]] resolved to %d nodes: %s",
-                    target,
-                    len(keys),
-                    keys,
-                )
-            return keys
-
-        # Try to resolve against .vault/_archive/
-        from ..config import get_config
-
-        cfg = get_config()
-        archive_dir = self.root_dir / cfg.docs_dir / "_archive"
-        if archive_dir.exists():
-            target_norm = target.replace("\\", "/")
-            if "/" in target_norm:
-                if (archive_dir / f"{target_norm}.md").exists():
-                    return [target_norm]
-            else:
-                matches = list(archive_dir.rglob(f"{target_norm}.md"))
-                if matches:
-                    resolved: list[str] = []
-                    for match in matches:
-                        rel = match.relative_to(archive_dir)
-                        key = str(rel.with_suffix("")).replace("\\", "/")
-                        resolved.append(key)
-                    return resolved
-
-        # No match  - treat as dangling link
-        return [target]
 
     # -- Direct networkx access ----------------------------------------------
 
