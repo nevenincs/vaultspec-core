@@ -4,11 +4,12 @@ tags:
   - '#index'
   - '#plan-serializer-fixes'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-08-25'
 body_schema: 'body-v2'
-body_hash: 'sha256:45a71c2f0edeea9c8dbf9df0808de59c275e8ffdd254cb7c4d5067d8b815786f'
+body_hash: 'sha256:5a5a2c1b84ce3a3c916386b30b1c993a8f3d374d1faa8275f89030647f3236fd'
 related:
   - '[[2026-06-05-plan-serializer-fixes-adr]]'
+  - '[[2026-06-05-plan-serializer-fixes-ledger]]'
   - '[[2026-06-05-plan-serializer-fixes-plan]]'
   - '[[2026-06-05-plan-serializer-fixes-research]]'
 ---
@@ -22,6 +23,10 @@ Auto-generated index of all documents tagged with `#plan-serializer-fixes`.
 ### adr
 
 - `2026-06-05-plan-serializer-fixes-adr` - `plan-serializer-fixes` adr: `serializer-verification-and-obsolete-agents` | (**status:** `accepted`)
+
+### exec
+
+- `2026-06-05-plan-serializer-fixes-ledger` - `plan-serializer-fixes` ledger
 
 ### plan
 
