@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -1340,29 +1343,54 @@ class TestUserScopeConfigPaths:
 
     A resolver that falls back to ``Path.home()`` writes user-scope enrollment
     to a file the host never reads, and the enrollment silently does nothing.
+
+    Each case resolves the path in a real child process carrying a real
+    environment, because the resolver reads the variable at call time: patching
+    the parent's environment would test the patch rather than the behaviour the
+    host actually sees.
     """
 
-    def test_claude_user_path_honors_claude_config_dir(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
-        from vaultspec_core.core.mcps_targets import _claude_user_config_path
+    @staticmethod
+    def _resolve(function: str, **overrides: str) -> str:
+        """Return *function*'s resolved path from a child process."""
+        env = os.environ.copy()
+        for name, value in overrides.items():
+            if value:
+                env[name] = value
+            else:
+                env.pop(name, None)
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "from vaultspec_core.core.mcps_targets import "
+                f"{function} as resolve; print(resolve())",
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=True,
+        )
+        return result.stdout.strip()
 
-        monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "relocated"))
+    def test_claude_user_path_honors_claude_config_dir(self, tmp_path: Path):
+        relocated = tmp_path / "relocated"
 
-        assert _claude_user_config_path() == tmp_path / "relocated" / ".claude.json"
+        resolved = self._resolve(
+            "_claude_user_config_path", CLAUDE_CONFIG_DIR=str(relocated)
+        )
 
-    def test_claude_user_path_falls_back_to_home(self, monkeypatch: pytest.MonkeyPatch):
-        from vaultspec_core.core.mcps_targets import _claude_user_config_path
+        assert resolved == str(relocated / ".claude.json")
 
-        monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+    def test_claude_user_path_falls_back_to_home(self):
+        resolved = self._resolve("_claude_user_config_path", CLAUDE_CONFIG_DIR="")
 
-        assert _claude_user_config_path() == Path.home() / ".claude.json"
+        assert resolved == str(Path.home() / ".claude.json")
 
-    def test_codex_user_path_honors_codex_home(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
-        from vaultspec_core.core.mcps_targets import _codex_user_config_path
+    def test_codex_user_path_honors_codex_home(self, tmp_path: Path):
+        relocated = tmp_path / "relocated"
 
-        monkeypatch.setenv("CODEX_HOME", str(tmp_path / "relocated"))
+        resolved = self._resolve("_codex_user_config_path", CODEX_HOME=str(relocated))
 
-        assert _codex_user_config_path() == tmp_path / "relocated" / "config.toml"
+        assert resolved == str(relocated / "config.toml")
