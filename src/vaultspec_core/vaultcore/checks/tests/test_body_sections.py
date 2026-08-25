@@ -384,3 +384,68 @@ class TestBodySections:
         )
         result = _run(tmp_path)
         assert result.diagnostics == []
+
+    def test_l3_wave_blocks_satisfy_the_steps_section(self, tmp_path: Path) -> None:
+        """A canonical L3 plan carries its Steps inside ## Wave blocks.
+
+        The plan template mandates Wave blocks as the structure under
+        ## Steps while rendering them at the same heading level, so the
+        Steps heading is legitimately followed by a Wave heading rather
+        than by prose.
+        """
+        _skeleton(tmp_path)
+        sections = _contents("plan")
+        sections["Steps"] = (
+            "## Wave `W01` - instrument\n\n"
+            "One paragraph stating what this Wave delivers.\n\n"
+            "### Phase `W01.P01` - correct the ratchet\n\n"
+            "One sentence stating what this Phase delivers.\n\n"
+            "- [x] `W01.P01.S01` - serialise the tool definition; `src/app.py`."
+        )
+        _write_doc(tmp_path, "plan", "2026-02-04-feat-plan", sections)
+
+        assert _run(tmp_path).diagnostics == []
+
+    def test_l4_epic_intent_block_satisfies_the_steps_section(
+        self, tmp_path: Path
+    ) -> None:
+        _skeleton(tmp_path)
+        sections = _contents("plan")
+        sections["Steps"] = (
+            "## Epic intent\n\n"
+            "One paragraph stating the strategic goal and its association.\n\n"
+            "## Wave `W01` - first wave\n\n"
+            "One paragraph stating what this Wave delivers.\n\n"
+            "### Phase `W01.P01` - first phase\n\n"
+            "One sentence stating what this Phase delivers.\n\n"
+            "- [ ] `W01.P01.S01` - do the thing; `src/app.py`."
+        )
+        _write_doc(tmp_path, "plan", "2026-02-04-feat-plan", sections)
+
+        assert _run(tmp_path).diagnostics == []
+
+    def test_steps_holding_only_a_wave_heading_is_still_empty(
+        self, tmp_path: Path
+    ) -> None:
+        """Folding Wave blocks in must not make an unauthored plan pass."""
+        _skeleton(tmp_path)
+        sections = _contents("plan")
+        sections["Steps"] = "<!-- Replace this scaffold with Wave blocks. -->"
+        _write_doc(tmp_path, "plan", "2026-02-04-feat-plan", sections)
+
+        result = _run(tmp_path)
+
+        assert len(result.diagnostics) == 1
+        assert "'## Steps' is empty" in result.diagnostics[0].message
+
+    def test_a_section_merely_starting_with_wave_still_opens_a_section(
+        self, tmp_path: Path
+    ) -> None:
+        """Only the Wave container heading continues its predecessor."""
+        _skeleton(tmp_path)
+        sections = _contents("plan")
+        sections["Steps"] = "- [x] `S01` - do the thing; `src/app.py`."
+        sections["Wavelength notes"] = "An author-added section, not a Wave block."
+        _write_doc(tmp_path, "plan", "2026-02-04-feat-plan", sections)
+
+        assert _run(tmp_path).diagnostics == []

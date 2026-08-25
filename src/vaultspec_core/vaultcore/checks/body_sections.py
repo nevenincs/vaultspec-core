@@ -61,19 +61,34 @@ _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 #: as empty so an unauthored scaffold section does not satisfy the contract.
 _PLACEHOLDER_ONLY_RE = re.compile(r"^(?:\s*\{[^{}]*\}\s*)+$")
 
+#: Level-two headings that continue the section they follow instead of opening
+#: a new one. The plan template mandates ``## Wave`` blocks at L3 and L4 - and
+#: ``## Epic intent`` at L4 - as the structure *under* ``## Steps``, yet renders
+#: them at the same heading level. Reading them as siblings would end the Steps
+#: section at its own heading line, so every correctly authored L3 plan would be
+#: reported as an unauthored scaffold.
+_CONTINUATION_H2_RE = re.compile(r"Wave\b|Epic intent\Z")
+
 
 def _section_contents(body: str) -> dict[str, str]:
     """Map each ``## `` heading title in *body* to its raw content.
 
-    Content runs from just after the heading line to the next ``## `` heading
-    or the end of the document. A later duplicate heading overwrites an earlier
-    one; documents do not legitimately repeat a required section.
+    Content runs from just after the heading line to the next section-opening
+    ``## `` heading or the end of the document. Wave and Epic-intent headings
+    do not open a section: the plan template places them under ``## Steps``
+    while rendering them at the same level, so they extend the section they
+    follow. A later duplicate heading overwrites an earlier one; documents do
+    not legitimately repeat a required section.
     """
     contents: dict[str, str] = {}
-    matches = list(_H2_RE.finditer(body))
-    for i, match in enumerate(matches):
+    openers = [
+        match
+        for match in _H2_RE.finditer(body)
+        if not _CONTINUATION_H2_RE.match(match.group("title"))
+    ]
+    for i, match in enumerate(openers):
         start = match.end()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
+        end = openers[i + 1].start() if i + 1 < len(openers) else len(body)
         contents[match.group("title")] = body[start:end]
     return contents
 
