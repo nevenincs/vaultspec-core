@@ -11,11 +11,18 @@ permissions:
 jobs:
   bootstrap:
     runs-on: [self-hosted, dev-runner]
-    # Skip edited events unless title or body changed
+    # Disabled (see issue #326): no registered runner carries the
+    # "dev-runner" label, so this job used to queue forever instead of
+    # running, growing an unbounded backlog on every issue event. Skip it
+    # here - before a runner is queued - rather than let it queue and hang.
+    # Re-enable by dropping the "false &&" once a runner carries the
+    # "dev-runner" label (or runs-on is repointed at the runner that hosts
+    # /usr/local/bin/bootstrap.sh) and remove this comment.
     if: >-
-      github.event.action != 'edited' ||
+      false &&
+      (github.event.action != 'edited' ||
       github.event.changes.title != null ||
-      github.event.changes.body != null
+      github.event.changes.body != null)
     concurrency:
       group: bootstrap-issue-${{ github.event.issue.number }}
       cancel-in-progress: false
