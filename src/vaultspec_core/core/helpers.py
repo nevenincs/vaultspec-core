@@ -16,6 +16,7 @@ import stat
 import subprocess
 import sys
 import threading
+import time
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from pathlib import Path
@@ -322,6 +323,49 @@ def _assert_owned_temp(path: Path, identity: tuple[int, int]) -> None:
         raise OSError(f"Atomic write temporary file identity changed: {path}")
 
 
+# ERROR_ACCESS_DENIED, ERROR_SHARING_VIOLATION
+_WINDOWS_TRANSIENT_REPLACE_ERRORS = frozenset({5, 32})
+_WINDOWS_REPLACE_RETRY_BUDGET_SECONDS = 2.0
+_WINDOWS_REPLACE_RETRY_INTERVAL_SECONDS = 0.05
+
+
+def _replace_atomic(tmp: Path, path: Path) -> None:
+    """Call :func:`os.replace`, absorbing a transient Windows scanner race.
+
+    A destination a writer just created or modified is briefly opened by
+    antivirus real-time protection or the search indexer on Windows, which
+    holds the file just long enough for a same-instant ``MoveFileEx`` to fail
+    with ``ERROR_ACCESS_DENIED`` (5) or ``ERROR_SHARING_VIOLATION`` (32) even
+    though no other VaultSpec writer holds the document's advisory lock
+    (issue #321): the lock only serialises this project's own writers, not an
+    external scanner. Retrying briefly rides out that window the same way
+    :func:`_acquire_windows_lock` rides out ``msvcrt``'s own retry budget; a
+    persistent lock - a genuine external handle rather than a momentary scan
+    - still exhausts the budget and surfaces the original error.
+
+    Args:
+        tmp: The exclusively-created temporary file to rename from.
+        path: The destination document path.
+    """
+    if sys.platform != "win32":
+        os.replace(tmp, path)
+        return
+
+    deadline = time.monotonic() + _WINDOWS_REPLACE_RETRY_BUDGET_SECONDS
+    while True:
+        try:
+            os.replace(tmp, path)
+        except PermissionError as exc:
+            if (
+                getattr(exc, "winerror", None) not in _WINDOWS_TRANSIENT_REPLACE_ERRORS
+                or time.monotonic() >= deadline
+            ):
+                raise
+            time.sleep(_WINDOWS_REPLACE_RETRY_INTERVAL_SECONDS)
+            continue
+        return
+
+
 def atomic_write_bytes(path: Path, content: bytes) -> None:
     """Atomically replace *path* from an exclusively created sibling file."""
     destination_mode: int | None = None
@@ -348,7 +392,7 @@ def atomic_write_bytes(path: Path, content: bytes) -> None:
         os.close(fd)
         fd = -1
         _assert_owned_temp(tmp, identity)
-        os.replace(tmp, path)
+        _replace_atomic(tmp, path)
         owns_tmp = False
     finally:
         if fd >= 0:
