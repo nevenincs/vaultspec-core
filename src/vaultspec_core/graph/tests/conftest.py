@@ -20,9 +20,8 @@ def stem_index_of(graph: VaultGraph) -> dict[str, list[str]]:
     ``_stem_index`` maps each document's bare stem to the sorted list of
     non-phantom node keys sharing it (a single-entry list for a unique stem,
     several qualified ``type/stem`` keys for a collision). Both build paths
-    (:func:`vaultspec_core.graph.building.assemble_from_by_stem` and
-    :func:`vaultspec_core.graph.building.load_from_cache`) derive this
-    purely from each
+    (:meth:`VaultGraph._assemble_from_by_stem` and
+    :meth:`VaultGraph._load_from_cache`) derive this purely from each
     non-phantom node's key, so grouping :attr:`VaultGraph.nodes` by bare stem
     here reproduces the same mapping without reaching into the private
     attribute.

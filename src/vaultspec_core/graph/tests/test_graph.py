@@ -727,9 +727,8 @@ def _make_vault_with_archive(tmp_path: Path) -> tuple[Path, Path, Path]:
 
 
 class TestVaultGraphArchiveResolution:
-    """Tests for the archive-resolution branch (the ``resolve_link`` /
-    ``is_archived`` implementation in
-    :mod:`vaultspec_core.graph.building`), driven entirely through the public
+    """Tests for the archive-resolution branch (private ``_resolve_link`` /
+    ``_is_archived`` implementation), driven entirely through the public
     :class:`VaultGraph` surface (``nodes``, ``get_dangling_links()``,
     ``digraph``).
 
