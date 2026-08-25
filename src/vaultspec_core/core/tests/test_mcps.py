@@ -1333,3 +1333,36 @@ class TestProviderNativeMcpEnrollment:
             assert not (path / ".vaultspec" / "mcp-ownership.json").exists()
         finally:
             reset_config()
+
+
+class TestUserScopeConfigPaths:
+    """Both hosts relocate their user store through a dedicated variable.
+
+    A resolver that falls back to ``Path.home()`` writes user-scope enrollment
+    to a file the host never reads, and the enrollment silently does nothing.
+    """
+
+    def test_claude_user_path_honors_claude_config_dir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from vaultspec_core.core.mcps_targets import _claude_user_config_path
+
+        monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "relocated"))
+
+        assert _claude_user_config_path() == tmp_path / "relocated" / ".claude.json"
+
+    def test_claude_user_path_falls_back_to_home(self, monkeypatch: pytest.MonkeyPatch):
+        from vaultspec_core.core.mcps_targets import _claude_user_config_path
+
+        monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+
+        assert _claude_user_config_path() == Path.home() / ".claude.json"
+
+    def test_codex_user_path_honors_codex_home(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from vaultspec_core.core.mcps_targets import _codex_user_config_path
+
+        monkeypatch.setenv("CODEX_HOME", str(tmp_path / "relocated"))
+
+        assert _codex_user_config_path() == tmp_path / "relocated" / "config.toml"

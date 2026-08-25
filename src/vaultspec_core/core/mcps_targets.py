@@ -73,8 +73,10 @@ def _selected_mcp_tools(
 
 
 def _claude_user_config_path() -> Path:
-    """Return Claude Code's user/local MCP store."""
-    return Path.home() / ".claude.json"
+    """Return Claude Code's user/local MCP store, honoring ``CLAUDE_CONFIG_DIR``."""
+    configured = os.environ.get("CLAUDE_CONFIG_DIR")
+    home = Path(configured).expanduser() if configured else Path.home()
+    return home / ".claude.json"
 
 
 def _codex_user_config_path() -> Path:

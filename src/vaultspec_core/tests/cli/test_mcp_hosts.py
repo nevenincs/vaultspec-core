@@ -42,13 +42,26 @@ def _host_executable(name: str) -> str:
 
 
 def _isolated_env(root: Path) -> dict[str, str]:
+    """Point both hosts at scratch user stores.
+
+    Each host resolves its user config through a dedicated variable that wins
+    over the home directory - ``CLAUDE_CONFIG_DIR`` for Claude Code, ``CODEX_HOME``
+    for Codex. Both are given their own directory rather than the isolated home,
+    so a resolver that ignores the variable and falls back to ``Path.home()``
+    writes somewhere the host does not read and the assertion catches it. Copying
+    the ambient environment without overriding them leaks the developer's real
+    user config into the run.
+    """
     home = root / "home"
+    claude_home = root / "claude-home"
     codex_home = root / "codex-home"
     home.mkdir(parents=True)
+    claude_home.mkdir(parents=True)
     codex_home.mkdir(parents=True)
     env = os.environ.copy()
     env["HOME"] = str(home)
     env["USERPROFILE"] = str(home)
+    env["CLAUDE_CONFIG_DIR"] = str(claude_home)
     env["CODEX_HOME"] = str(codex_home)
     return env
 
