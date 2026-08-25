@@ -126,38 +126,41 @@ def factory(tmp_path: Path) -> WorkspaceFactory:
 
 @pytest.fixture(autouse=True)
 def isolate_state() -> Generator[None]:
-    """Save and restore workspace context and console between tests.
+    """Give each test a neutral workspace context, then restore the prior one.
 
     This prevents state leakage when one test's CLI invocation sets the
     workspace context and the next test inherits stale values pointing
-    at the wrong tmp_path.
+    at the wrong tmp_path. Preserving an inherited context is not enough:
+    a test in another package that initialises a workspace and never rolls
+    it back (installing into a tmp_path, say) would otherwise hand its own
+    project directory to every test here, and the tests that assert on the
+    absence of a real workspace would fail on collection order alone.
+
+    So the neutral placeholder is established unconditionally rather than
+    only when no context exists. Tests needing a real workspace build one
+    through ``synthetic_project`` or ``workspace_factory``, which run after
+    this autouse fixture and set the context themselves.
     """
     from vaultspec_core.cli._target import reset as reset_target
     from vaultspec_core.config import reset_config
     from vaultspec_core.console import reset_console
     from vaultspec_core.core.types import workspace_ctx
 
-    # Snapshot current context via token so we can restore to the exact
-    # prior state - including "unset" when no context existed.
-    try:
-        current = workspace_ctx.get()
-        token = workspace_ctx.set(current)  # identity set to obtain token
-    except LookupError:
-        # No context set - set a throwaway value to get a resettable token
-        # whose reset() will restore the "no value" state.
-        _sentinel = Path(".")
-        token = workspace_ctx.set(
-            _t.WorkspaceContext(
-                root_dir=_sentinel,
-                target_dir=_sentinel,
-                rules_src_dir=_sentinel,
-                skills_src_dir=_sentinel,
-                agents_src_dir=_sentinel,
-                system_src_dir=_sentinel,
-                templates_dir=_sentinel,
-                hooks_dir=_sentinel,
-            )
+    # The token restores the exact prior state on teardown - including
+    # "unset" when no context existed before this test.
+    _sentinel = Path(".")
+    token = workspace_ctx.set(
+        _t.WorkspaceContext(
+            root_dir=_sentinel,
+            target_dir=_sentinel,
+            rules_src_dir=_sentinel,
+            skills_src_dir=_sentinel,
+            agents_src_dir=_sentinel,
+            system_src_dir=_sentinel,
+            templates_dir=_sentinel,
+            hooks_dir=_sentinel,
         )
+    )
 
     reset_console()
     reset_target()
