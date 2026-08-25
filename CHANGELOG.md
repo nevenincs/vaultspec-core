@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.59](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.58...vaultspec-core-v0.1.59) (2026-08-25)
+
+
+### Bug Fixes
+
+* **check:** judge plan grounding by what the plan declares ([9b4381b](https://github.com/nevenincs/vaultspec-core/commit/9b4381b8ead3595a9840932be00bc5d7504356a6))
+* **check:** let Wave blocks satisfy a plan's Steps section ([32b3fb1](https://github.com/nevenincs/vaultspec-core/commit/32b3fb126fd41f467efef7ec35a8afc07027f21f))
+* **ci:** stop the bootstrap job queueing against a label no runner carries ([2f637d0](https://github.com/nevenincs/vaultspec-core/commit/2f637d05bbcac0d3066f4c53677ba88105379c4a))
+* **core:** ride out the Windows scanner race on atomic document replace ([4731633](https://github.com/nevenincs/vaultspec-core/commit/47316336fd42b124e8e06d2b91588cf2529e0605))
+* **mcps:** resolve Claude Code user scope through CLAUDE_CONFIG_DIR ([b40a67d](https://github.com/nevenincs/vaultspec-core/commit/b40a67d46d00aefc573c5d7a67ed5e296818689b))
+
+
+### Performance
+
+* bound the MCP and CLI return envelopes, and fix the repair regression ([#322](https://github.com/nevenincs/vaultspec-core/issues/322)) ([cdb0a71](https://github.com/nevenincs/vaultspec-core/commit/cdb0a71b3b7ad0a9bbd2a3c778dc68d31f5bb1d4))
+
 ## [0.1.58](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.57...vaultspec-core-v0.1.58) (2026-08-23)
 
 
