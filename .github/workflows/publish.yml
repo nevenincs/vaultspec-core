@@ -18,9 +18,14 @@ concurrency:
 jobs:
   build:
     name: Build
-    # Artifact builds run on the shared self-hosted fleet (hosted
-    # multiplatform runners are cost-prohibitive); lint/test CI stays hosted.
-    runs-on: [self-hosted, macOS, ARM64]
+    # Hosted, deliberately. The distribution is a py3-none-any wheel, so the
+    # build host cannot affect the artifact, and this repo is public - hosted
+    # minutes are free. The cost argument that keeps binaries.yml on the fleet
+    # is about the multi-platform compile matrix, not a two-minute pure-Python
+    # build. Pinning this path to the fleet is what let 0.1.58 and 0.1.59 tag
+    # while PyPI stayed on 0.1.57: publishing a release must not depend on a
+    # laptop being plugged in.
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -54,7 +59,7 @@ jobs:
   smoke-test:
     name: Smoke Test
     needs: build
-    runs-on: [self-hosted, macOS, ARM64]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -82,9 +87,7 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     needs: smoke-test
-    # OIDC trusted publishing works from self-hosted runners: the id-token
-    # comes from GitHub's OIDC provider, not from the runner host.
-    runs-on: [self-hosted, macOS, ARM64]
+    runs-on: ubuntu-latest
     environment:
       name: pypi
     permissions:
