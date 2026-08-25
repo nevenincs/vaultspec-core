@@ -381,18 +381,25 @@ def _check_plan_grounding(
             )
         )
 
-    # Plans should reference research (soft)
-    if "research" not in linked_types and not _fix_missing_link(
-        node, rel_path, feat_name, feat_type_index, ("research",), result, fix=fix
+    # Plans should rest on evidence (soft). The framework treats research,
+    # reference, and audit documents as interchangeable grounding - the ADR
+    # grounding check above accepts the same three - so a plan executing an
+    # ADR off the back of an audit is grounded, not unevidenced.
+    grounding_types = ("research", "reference", "audit")
+    if not linked_types & set(grounding_types) and not _fix_missing_link(
+        node, rel_path, feat_name, feat_type_index, grounding_types, result, fix=fix
     ):
         result.diagnostics.append(
             CheckDiagnostic(
                 path=rel_path,
-                message="Plan has no references to research documents",
+                message=(
+                    "Plan has no grounding references (research, reference, "
+                    "or audit documents)"
+                ),
                 severity=Severity.WARNING,
                 fix_description=(
-                    "Consider adding research document references "
-                    "for supporting evidence"
+                    "Consider adding a research, reference, or audit "
+                    "document reference for supporting evidence"
                 ),
             )
         )

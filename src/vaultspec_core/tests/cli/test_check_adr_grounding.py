@@ -139,7 +139,7 @@ class TestAdrGroundingFix:
 
 
 class TestPlanSchemaRules:
-    """A plan must reference an ADR and should reference research."""
+    """A plan must reference an ADR and should rest on evidence."""
 
     def test_unlinked_plan_reports_both_rules(self, tmp_path: Path):
         _write_doc(tmp_path, "plan", "2026-07-14-grounding-feat-plan")
@@ -149,7 +149,8 @@ class TestPlanSchemaRules:
         plan_diags = [d for d in result.diagnostics if "Plan has no" in d.message]
         assert [d.message for d in plan_diags] == [
             "Plan has no references to ADR documents",
-            "Plan has no references to research documents",
+            "Plan has no grounding references (research, reference, "
+            "or audit documents)",
         ]
         assert [d.severity.value for d in plan_diags] == ["error", "warning"]
         assert [d.fixable for d in plan_diags] == [True, False]
@@ -183,8 +184,48 @@ class TestPlanSchemaRules:
         messages = [d.message for d in result.diagnostics if "Plan has no" in d.message]
         assert messages == [
             "Plan has no references to ADR documents",
-            "Plan has no references to research documents",
+            "Plan has no grounding references (research, reference, "
+            "or audit documents)",
         ]
+
+    def test_audit_grounding_satisfies_the_plan_nudge(self, tmp_path: Path):
+        """An audit is first-class plan grounding, not a lesser substitute.
+
+        The ADR grounding rule accepts research, reference, or audit
+        interchangeably; a plan resting on an audit is evidenced the same way.
+        """
+        _write_doc(tmp_path, "audit", "2026-07-14-grounding-feat-audit")
+        _write_doc(tmp_path, "adr", "2026-07-14-grounding-feat-adr")
+        _write_doc(
+            tmp_path,
+            "plan",
+            "2026-07-14-grounding-feat-plan",
+            related=[
+                "2026-07-14-grounding-feat-adr",
+                "2026-07-14-grounding-feat-audit",
+            ],
+        )
+
+        result = check_schema(tmp_path, graph=VaultGraph(tmp_path))
+
+        assert not [d for d in result.diagnostics if "Plan has no" in d.message]
+
+    def test_reference_grounding_satisfies_the_plan_nudge(self, tmp_path: Path):
+        _write_doc(tmp_path, "reference", "2026-07-14-grounding-feat-reference")
+        _write_doc(tmp_path, "adr", "2026-07-14-grounding-feat-adr")
+        _write_doc(
+            tmp_path,
+            "plan",
+            "2026-07-14-grounding-feat-plan",
+            related=[
+                "2026-07-14-grounding-feat-adr",
+                "2026-07-14-grounding-feat-reference",
+            ],
+        )
+
+        result = check_schema(tmp_path, graph=VaultGraph(tmp_path))
+
+        assert not [d for d in result.diagnostics if "Plan has no" in d.message]
 
     def test_doc_type_filter_skips_plans(self, tmp_path: Path):
         _write_doc(tmp_path, "plan", "2026-07-14-grounding-feat-plan")
