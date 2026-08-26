@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/logo.svg" alt="vaultspec-core family logo" width="150" />
+<img src="docs/assets/logo.png" alt="vaultspec-core family logo" width="150" />
 
 # vaultspec-core
 
