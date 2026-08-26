@@ -18,6 +18,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp.server.mcpserver import Context
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
@@ -507,7 +508,7 @@ def register_orientation_tools(
             The :class:`StatusResult` for the requested view.
 
         Raises:
-            ValueError: When a ``target`` resolves to no plan or feature.
+            ToolError: When a ``target`` resolves to no plan or feature.
         """
         _ = ctx
         from ...vaultcore.orientation import (
@@ -525,7 +526,7 @@ def register_orientation_tools(
         try:
             trace = compute_trace(root_dir, target)
         except TargetResolutionError as exc:
-            raise ValueError(str(exc)) from exc
+            raise ToolError(str(exc)) from exc
         return _trace_to_result(trace)
 
     if include_fix:

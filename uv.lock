@@ -2668,14 +2668,14 @@ dev = [
     { name = "torch", marker = "sys_platform != 'linux' and sys_platform != 'win32'", specifier = ">=2.4" },
     { name = "torch", marker = "sys_platform == 'linux' or sys_platform == 'win32'", specifier = ">=2.4", index = "https://download.pytorch.org/whl/cu130" },
     { name = "ty", specifier = ">=0.0.15" },
-    { name = "vaultspec-rag", extras = ["mcp"], specifier = ">=0.3.8" },
+    { name = "vaultspec-rag", extras = ["mcp"], specifier = ">=0.4.4" },
     { name = "vulture", specifier = ">=2.16" },
     { name = "xenon", specifier = ">=0.9.3" },
 ]
 
 [[package]]
 name = "vaultspec-rag"
-version = "0.4.3"
+version = "0.4.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -2703,9 +2703,9 @@ dependencies = [
     { name = "vaultspec-core" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d4/7c/594bcaf6fc826c4f3a5c56a39485076bc5a510f37ad8fa494bb01cd80ae2/vaultspec_rag-0.4.3.tar.gz", hash = "sha256:a78fa63e25083892f9f8f8d2761f98cda0674660db19dc50c8961ca782384d97", size = 5975737, upload-time = "2026-08-26T07:56:39.926Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/34/70/266c6282567e1944e11cfe9421477f7f7cc6caed733ed72d7ed1f770d803/vaultspec_rag-0.4.4.tar.gz", hash = "sha256:074ab46b74bffda700e925f33646713128459798ed12bc571a3758e9de6a1480", size = 5983140, upload-time = "2026-08-26T10:48:40.762Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ab/3f/bf047fa3368f6d354cefde4280605b5c1921ee83d04dd43f8fd6b0ade5dd/vaultspec_rag-0.4.3-py3-none-any.whl", hash = "sha256:688dd0ddce7f8622d542a7cb5e79e14f2d58ddb7be118c98a46429d68529947b", size = 1377373, upload-time = "2026-08-26T07:56:38.392Z" },
+    { url = "https://files.pythonhosted.org/packages/7c/fd/2f0e8771e4a11434266cb9912ff58f79e196173ebc5b80324bde285cb00c/vaultspec_rag-0.4.4-py3-none-any.whl", hash = "sha256:18605c9964efa3181f45f56cc362068034634a3dbc1f7e2458c627d6a77eb98a", size = 1378219, upload-time = "2026-08-26T10:48:38.816Z" },
 ]
 
 [package.optional-dependencies]

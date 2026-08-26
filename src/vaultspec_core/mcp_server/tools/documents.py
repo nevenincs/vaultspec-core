@@ -21,6 +21,7 @@ import re
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 from mcp.server.mcpserver import Context
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
@@ -816,12 +817,34 @@ def _excerpt(text: str) -> str:
     return cut[:newline] if newline > _EXCERPT_CHARS // 2 else cut
 
 
+def _matches_text(doc: Any, needle: str) -> bool:
+    """Return whether *doc*'s stem or feature contains *needle*.
+
+    Case-insensitive substring matching over the document's own identifiers,
+    deliberately not its body. ``find`` is a lookup over vault metadata, and a
+    body scan would make an unbounded read of every document on every call
+    while still being a far worse instrument than the semantic search that
+    exists for exactly that job.
+
+    Args:
+        doc: The vault document to test.
+        needle: The already-casefolded search text.
+
+    Returns:
+        ``True`` when the stem or the feature contains *needle*.
+    """
+    if needle in doc.name.casefold():
+        return True
+    return bool(doc.feature) and needle in doc.feature.casefold()
+
+
 def _find_documents(
     feature: str | None,
     types: list[str] | None,
     date: str | None,
     body: str,
     limit: int,
+    text: str | None = None,
 ) -> list[FindEntry]:
     """Build the document-search ``find`` result rows.
 
@@ -841,6 +864,9 @@ def _find_documents(
         date: Exact-date filter, or ``None``.
         body: When ``True``, inline the full document text.
         limit: Maximum number of documents to return across all types combined.
+        text: Case-insensitive substring filter over document stem and
+            feature, or ``None``. Applied before *limit* so the cap bounds
+            matches rather than candidates scanned.
 
     Returns:
         The document rows, ordered by the type list and capped globally at
@@ -857,6 +883,10 @@ def _find_documents(
         all_docs.extend(
             list_documents(root_dir, doc_type=dt, feature=feature, date=date)
         )
+
+    if text:
+        needle = text.casefold()
+        all_docs = [doc for doc in all_docs if _matches_text(doc, needle)]
 
     rows: list[FindEntry] = []
     for doc in all_docs[:limit]:
@@ -944,6 +974,7 @@ def register_document_tools(
         feature: str | None = None,
         type: list[str] | None = None,
         date: str | None = None,
+        text: str | None = None,
         body: Literal["none", "excerpt", "full"] = "none",
         json: bool = False,
         limit: Annotated[int, Field(ge=1, le=100)] = 20,
@@ -953,7 +984,8 @@ def register_document_tools(
         With no filters, returns every feature with its document count and
         graph-weight score; add ``json`` for the orientation-sourced
         lifecycle status and richer metadata.  With any of ``feature`` /
-        ``type`` / ``date``, switches to document search: each result carries
+        ``type`` / ``date`` / ``text``, switches to document search: each
+        result carries
         the document's current ``blob_hash`` and a ``resource_uri``
         resource-link, with the full ``body`` inlined only on request.  The
         ``type`` filter defaults to adr, plan, research, reference; exec and
@@ -964,6 +996,10 @@ def register_document_tools(
             feature: Feature filter without ``#`` (switches to search mode).
             type: Document-type filter (switches to search mode).
             date: Exact-date filter (switches to search mode).
+            text: Case-insensitive substring over document stem and feature
+                (switches to search mode). Composes with the other filters,
+                and is matched over identifiers rather than document bodies -
+                for meaning-based recall over prose, use semantic search.
             body: Inline the full document text in search mode.
             json: Enrich the feature listing with lifecycle status.
             limit: Maximum number of rows to return. In search mode this is a
@@ -975,16 +1011,17 @@ def register_document_tools(
         """
         _ = ctx
         logger.info(
-            "find: feature=%r type=%r date=%r body=%s json=%s limit=%s",
+            "find: feature=%r type=%r date=%r text=%r body=%s json=%s limit=%s",
             feature,
             type,
             date,
+            text,
             body,
             json,
             limit,
         )
 
-        if not feature and not type and not date:
+        if not feature and not type and not date and not text:
             rows = _find_features(limit, json)
             logger.debug("Listed %d features.", len(rows))
             return rows
@@ -996,8 +1033,8 @@ def register_document_tools(
                 f"body='excerpt' to survey more, then 'full' on the few that "
                 f"matter."
             )
-            raise ValueError(msg)
-        rows = _find_documents(feature, type, date, body, limit)
+            raise ToolError(msg)
+        rows = _find_documents(feature, type, date, body, limit, text)
         logger.debug("Found %d documents.", len(rows))
         return rows
 
@@ -1023,7 +1060,7 @@ def register_document_tools(
             A batch result with a per-item outcome for every spec.
         """
         if not documents:
-            raise ValueError("create requires at least one document spec")
+            raise ToolError("create requires at least one document spec")
         if len(documents) > MAX_BATCH_ITEMS:
             # Rejected before anything is written: an oversized batch would
             # otherwise apply every item and then detonate the caller's context
@@ -1032,7 +1069,7 @@ def register_document_tools(
                 f"create accepts at most {MAX_BATCH_ITEMS} items per call; "
                 f"got {len(documents)}. Split the batch."
             )
-            raise ValueError(msg)
+            raise ToolError(msg)
 
         _ = ctx
         root_dir = _get_ctx().target_dir
@@ -1076,7 +1113,7 @@ def register_document_tools(
             A batch result with a per-item outcome for every operation.
         """
         if not operations:
-            raise ValueError("edit requires at least one operation")
+            raise ToolError("edit requires at least one operation")
         if len(operations) > MAX_BATCH_ITEMS:
             # Rejected before anything is written: an oversized batch would
             # otherwise apply every item and then detonate the caller's context
@@ -1085,7 +1122,7 @@ def register_document_tools(
                 f"edit accepts at most {MAX_BATCH_ITEMS} items per call; "
                 f"got {len(operations)}. Split the batch."
             )
-            raise ValueError(msg)
+            raise ToolError(msg)
 
         _ = ctx
         root_dir = _get_ctx().target_dir

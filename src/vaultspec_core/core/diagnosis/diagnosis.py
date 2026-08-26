@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ..enums import InstallMode, Tool
 from ..home import ProcessRegistryDiagnosis, ProcessRegistrySignal
@@ -27,6 +28,9 @@ from .signals import (
     VaultContentSignal,
     VersionFloorSignal,
 )
+
+if TYPE_CHECKING:
+    from .collectors_companion import CompanionCapability
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +101,11 @@ class HomeDiagnosis:
         default_factory=lambda: ProcessRegistryDiagnosis(ProcessRegistrySignal.ABSENT)
     )
     divergent_projections: list[str] = field(default_factory=list)
+    #: Observed provisioning state of the semantic-search companion package,
+    #: or ``None`` when the probe was not run for this scope. Reports
+    #: provisioning only - never liveness; the capability names the companion
+    #: command that answers health.
+    companion: CompanionCapability | None = None
 
 
 @dataclass
@@ -298,6 +307,24 @@ def _safe_mode_mismatch_state(
         return ModeMismatchSignal.CLEAN
 
 
+def _safe_companion_capability(target: Path) -> CompanionCapability | None:
+    """Probe the semantic-search companion's provisioning state.
+
+    Returns ``None`` only when the probe itself fails, which is distinct from
+    the companion being absent - absence is a reported state, not a missing
+    answer. The probe is a total local function over two file reads, so this
+    guard should never fire; it exists so a diagnosis surface can never be
+    taken down by the newest collector on it.
+    """
+    from .collectors_companion import collect_companion_capability
+
+    try:
+        return collect_companion_capability(target)
+    except Exception:
+        logger.warning("Companion capability probe failed", exc_info=True)
+        return None
+
+
 def _safe_version_floor_state(
     target: Path, *, package: str | None = None
 ) -> tuple[VersionFloorSignal, str, str]:
@@ -461,6 +488,7 @@ def _collect_layer1_diagnosis(
     from ..home import diagnose_process_registry
 
     process_registry = diagnose_process_registry(core_home)
+    companion = _safe_companion_capability(target) if scope == "full" else None
     return WorkspaceDiagnosis(
         framework=_safe_framework_presence(target),
         gitignore=_safe_gitignore_state(target),
@@ -478,7 +506,7 @@ def _collect_layer1_diagnosis(
         version_floor_running=version_floor_running,
         version_floor_minimum=version_floor_minimum,
         packages=_collect_package_diagnoses(target),
-        home=HomeDiagnosis(process_registry=process_registry),
+        home=HomeDiagnosis(process_registry=process_registry, companion=companion),
     )
 
 
