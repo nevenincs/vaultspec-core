@@ -235,3 +235,130 @@ async def test_a_hostile_limit_is_refused_rather_than_clamped(
         for bad in (-1, 0, 10_000):
             result = await client.call_tool("find", {"limit": bad})
             assert result.is_error, f"limit={bad} was accepted"
+
+
+async def test_text_filter_matches_document_stem(vault_root: Path) -> None:
+    """A substring of the stem selects the document.
+
+    This is the degraded discovery path made real: without it the answer to
+    "rag is not installed" was grep, which cannot see the vault's structure.
+    """
+    _write_doc(vault_root, "research", "payment-gateway", "2026-01-01")
+    _write_doc(vault_root, "research", "user-profile", "2026-01-02")
+
+    mcp = create_server()
+    async with Client(mcp) as client:
+        result = await client.call_tool("find", {"text": "gateway"})
+
+    names = [row["name"] for row in cast("list[dict[str, Any]]", data_of(result))]
+    assert any("payment-gateway" in n for n in names)
+    assert not any("user-profile" in n for n in names)
+
+
+async def test_text_filter_matches_feature(vault_root: Path) -> None:
+    """The feature tag is matched as well as the stem."""
+    _write_doc(vault_root, "adr", "billing-engine", "2026-01-01")
+
+    mcp = create_server()
+    async with Client(mcp) as client:
+        result = await client.call_tool("find", {"text": "billing"})
+
+    rows = cast("list[dict[str, Any]]", data_of(result))
+    assert rows
+    assert all("billing" in (r.get("feature") or "") for r in rows)
+
+
+async def test_text_filter_is_case_insensitive(vault_root: Path) -> None:
+    _write_doc(vault_root, "research", "payment-gateway", "2026-01-01")
+
+    mcp = create_server()
+    async with Client(mcp) as client:
+        result = await client.call_tool("find", {"text": "GATEWAY"})
+
+    assert cast("list[dict[str, Any]]", data_of(result))
+
+
+async def test_text_filter_switches_to_search_mode_on_its_own(
+    vault_root: Path,
+) -> None:
+    """``text`` alone is a document search, not a feature roll-up.
+
+    A roll-up row carries ``doc_count``; a search row carries ``path``.
+    Asserting on the shape catches a mode-switch regression that a name-only
+    assertion would sail past.
+    """
+    _write_doc(vault_root, "research", "payment-gateway", "2026-01-01")
+
+    mcp = create_server()
+    async with Client(mcp) as client:
+        result = await client.call_tool("find", {"text": "payment"})
+
+    rows = cast("list[dict[str, Any]]", data_of(result))
+    assert rows
+    assert all(r.get("path") for r in rows)
+
+
+async def test_text_filter_composes_with_type(vault_root: Path) -> None:
+    """``text`` narrows within the type filter rather than replacing it."""
+    _write_doc(vault_root, "adr", "shared-name", "2026-01-01")
+    _write_doc(vault_root, "research", "shared-name", "2026-01-02")
+
+    mcp = create_server()
+    async with Client(mcp) as client:
+        result = await client.call_tool("find", {"text": "shared", "type": ["adr"]})
+
+    rows = cast("list[dict[str, Any]]", data_of(result))
+    assert rows
+    assert all(r["type"] == "adr" for r in rows)
+
+
+async def test_text_filter_caps_matches_not_candidates(vault_root: Path) -> None:
+    """``limit`` bounds what matched, not what was scanned.
+
+    Filtering after the cap would let non-matching documents consume the
+    budget and return fewer matches than exist - the failure mode that makes
+    a filter look broken on a large vault and fine on a small one.
+    """
+    for i in range(6):
+        _write_doc(vault_root, "research", f"alpha-{i}", f"2026-02-0{i + 1}")
+    for i in range(6):
+        _write_doc(vault_root, "research", f"beta-{i}", f"2026-03-0{i + 1}")
+
+    mcp = create_server()
+    async with Client(mcp) as client:
+        result = await client.call_tool("find", {"text": "beta", "limit": 5})
+
+    rows = cast("list[dict[str, Any]]", data_of(result))
+    assert len(rows) == 5
+    assert all("beta" in r["name"] for r in rows)
+
+
+async def test_text_filter_with_no_match_returns_empty(vault_root: Path) -> None:
+    _write_doc(vault_root, "research", "payment-gateway", "2026-01-01")
+
+    mcp = create_server()
+    async with Client(mcp) as client:
+        result = await client.call_tool("find", {"text": "nothing-matches-this"})
+
+    assert cast("list[dict[str, Any]]", data_of(result)) == []
+
+
+async def test_text_filter_composes_with_body_tiering(vault_root: Path) -> None:
+    """``text`` and ``body`` compose; the excerpt accounting still applies."""
+    _write_doc(
+        vault_root,
+        "research",
+        "payment-gateway",
+        "2026-01-01",
+        heading="# Heading",
+        body="x" * 4000,
+    )
+
+    mcp = create_server()
+    async with Client(mcp) as client:
+        result = await client.call_tool("find", {"text": "gateway", "body": "excerpt"})
+
+    rows = cast("list[dict[str, Any]]", data_of(result))
+    assert rows
+    assert rows[0]["body_truncated"] is True
+    assert rows[0]["body_bytes"] > len(rows[0]["body"])
