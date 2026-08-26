@@ -327,3 +327,68 @@ def test_registry_entry_launches_this_server_unchanged(vault_root: Path) -> None
 
     assert callable(launched.create_server)
     assert callable(launched.run)
+
+
+async def test_tool_list_is_invariant_under_companion_presence(
+    vault_root: Path,
+) -> None:
+    """Core's advertised tools never vary with whether rag is provisioned.
+
+    The rejected design was conditional registration - advertise search tools
+    when rag is detected, hide them when it is not. It fails on two counts
+    this test pins. A host caches the tool list at connect, so a rag installed
+    or removed mid-session leaves the host confidently wrong in both
+    directions. And core's tool surface would stop being a function of core's
+    version: two workspaces on the same core would present different APIs,
+    which is the precise reproducibility property the install-mode machinery
+    exists to guarantee.
+
+    Both companion states are built through core's own launch renderer rather
+    than a hand-written argv, so the fixture cannot drift from what core
+    actually deploys.
+
+    See ``.vault/adr/2026-08-26-rag-search-exposure-adr.md``.
+    """
+    from vaultspec_core.core.diagnosis.collectors_companion import (
+        RAG_DISTRIBUTION_NAME,
+    )
+    from vaultspec_core.core.enums import InstallMode
+    from vaultspec_core.core.mcps_mode import render_launch_for_mode
+
+    mcp_path = vault_root / ".mcp.json"
+
+    async def _names_now() -> frozenset[str]:
+        return frozenset(t.name for t in await create_server().list_tools())
+
+    original = mcp_path.read_text(encoding="utf-8") if mcp_path.exists() else None
+
+    without_rag = await _names_now()
+
+    command, args = render_launch_for_mode(
+        InstallMode.TOOL,
+        RAG_DISTRIBUTION_NAME,
+        "vaultspec_rag.server",
+        tool_spec=f"{RAG_DISTRIBUTION_NAME}[mcp]",
+    )
+    config = json.loads(original) if original else {}
+    servers = config.setdefault("mcpServers", {})
+    servers[RAG_DISTRIBUTION_NAME] = {"command": command, "args": args}
+    mcp_path.write_text(json.dumps(config), encoding="utf-8")
+
+    try:
+        with_rag = await _names_now()
+    finally:
+        if original is None:
+            mcp_path.unlink(missing_ok=True)
+        else:
+            mcp_path.write_text(original, encoding="utf-8")
+
+    assert with_rag == without_rag, (
+        "core's tool list changed with rag's presence; the surface must be a "
+        "pure function of core's version"
+    )
+    assert with_rag == _EXPECTED_TOOLS
+    assert not any("search" in name for name in with_rag), (
+        "core must not advertise a search tool; semantic search stays on "
+        "rag's own MCP channel"
+    )

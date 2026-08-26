@@ -21,11 +21,15 @@ from vaultspec_core.cli._target import TargetOption, apply_target
 from vaultspec_core.cli.json_output import json_format_kwargs
 
 if TYPE_CHECKING:
+    from pathlib import Path
     from typing import Any
 
     import typer as _typer
     from rich.console import Console
 
+    from vaultspec_core.core.diagnosis.collectors_companion import (
+        CompanionCapability,
+    )
     from vaultspec_core.vaultcore.orientation import (
         GroundingTrace,
         PlanInFlight,
@@ -130,7 +134,13 @@ def cmd_status(
         verbose_exec=verbose_exec,
         graph=graph,
     )
-    _emit_status_rollup(console, rollup, json_output=json_output, no_hints=no_hints)
+    _emit_status_rollup(
+        console,
+        rollup,
+        json_output=json_output,
+        no_hints=no_hints,
+        companion=_safe_companion(root_dir),
+    )
 
 
 # The rollup's human rendering shows at most this many active features;
@@ -209,11 +219,57 @@ def _plan_cells(plan: PlanInFlight) -> list[str]:
     return cells
 
 
-def _rollup_payload(rollup: Rollup) -> dict[str, Any]:
+def _safe_companion(root_dir: Path) -> CompanionCapability | None:
+    """Probe the semantic-search companion for the orientation surface.
+
+    Whether semantic search is available here is orientation data: it decides
+    which discovery move an agent should reach for first. Swallowing a failure
+    is right for the same reason the doctor's guard is - status must never fail
+    because the newest collector on it did.
+    """
+    from vaultspec_core.core.diagnosis.collectors_companion import (
+        collect_companion_capability,
+    )
+
+    try:
+        return collect_companion_capability(root_dir)
+    except Exception:
+        return None
+
+
+def _companion_line(cap: CompanionCapability) -> str:
+    """Render the one-line orientation summary for *cap*.
+
+    Deliberately states provisioning and names the companion's own health
+    command rather than implying core checked liveness, which it did not.
+    """
+    from vaultspec_core.core.diagnosis.collectors_companion import CompanionSignal
+
+    if cap.signal is CompanionSignal.ABSENT:
+        return (
+            f"  [dim]{cap.package} not provisioned - "
+            f"use find and grep for discovery[/dim]"
+        )
+    version = f" {cap.version}" if cap.version else ""
+    floor_note = (
+        f"  [yellow]below advisory floor {cap.floor}[/yellow]"
+        if cap.signal is CompanionSignal.BELOW_FLOOR
+        else ""
+    )
+    return (
+        f"  [green]{cap.package}{version} provisioned[/green]{floor_note}  "
+        f"[dim]liveness: {cap.health_authority}[/dim]"
+    )
+
+
+def _rollup_payload(
+    rollup: Rollup, companion: CompanionCapability | None = None
+) -> dict[str, Any]:
     """Shape a :class:`Rollup` into the JSON envelope's data mapping."""
     import dataclasses
 
     return {
+        "companion": dataclasses.asdict(companion) if companion else None,
         "active_features": [dataclasses.asdict(f) for f in rollup.active_features],
         "active_features_total": rollup.active_features_total,
         "active_features_truncated": (
@@ -240,6 +296,7 @@ def _emit_status_rollup(
     *,
     json_output: bool,
     no_hints: bool,
+    companion: CompanionCapability | None = None,
 ) -> None:
     """Render the vault-wide rollup as text or JSON."""
     if json_output:
@@ -253,7 +310,7 @@ def _emit_status_rollup(
         envelope = json_envelope(
             "vault.status",
             "unchanged",
-            _rollup_payload(rollup),
+            _rollup_payload(rollup, companion),
             hints={"next_steps": hints} if hints is not None else None,
         )
         typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
@@ -334,6 +391,11 @@ def _emit_status_rollup(
             )
     else:
         console.print("  [dim]none[/dim]")
+
+    if companion is not None:
+        console.print()
+        console.print("[bold]Discovery[/bold]")
+        console.print(_companion_line(companion))
 
     totals = rollup.totals
     console.print()

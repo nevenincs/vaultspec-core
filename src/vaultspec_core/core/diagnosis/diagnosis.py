@@ -12,6 +12,7 @@ from pathlib import Path
 
 from ..enums import InstallMode, Tool
 from ..home import ProcessRegistryDiagnosis, ProcessRegistrySignal
+from .collectors_companion import CompanionCapability
 from .signals import (
     BuiltinVersionSignal,
     ConfigSignal,
@@ -146,6 +147,10 @@ class WorkspaceDiagnosis:
             write. Populated only when ``framework`` is
             :attr:`~vaultspec_core.core.diagnosis.signals.FrameworkSignal.ADOPTABLE`,
             where it names the content an adopting run would destroy.
+        companion: Observed provisioning state of the semantic-search
+            companion package, or ``None`` when the probe was not run for this
+            scope. Reports provisioning only - never liveness; the capability
+            names the companion command that answers health.
         home: Structured Core-home and adoption diagnostics.
     """
 
@@ -169,6 +174,7 @@ class WorkspaceDiagnosis:
     version_floor_running: str = ""
     version_floor_minimum: str = ""
     packages: dict[str, PackageModeDiagnosis] = field(default_factory=dict)
+    companion: CompanionCapability | None = None
     home: HomeDiagnosis = field(default_factory=HomeDiagnosis)
 
     @property
@@ -296,6 +302,24 @@ def _safe_mode_mismatch_state(
                 "Mode mismatch collector failed for %s", package, exc_info=True
             )
         return ModeMismatchSignal.CLEAN
+
+
+def _safe_companion_capability(target: Path) -> CompanionCapability | None:
+    """Probe the semantic-search companion's provisioning state.
+
+    Returns ``None`` only when the probe itself fails, which is distinct from
+    the companion being absent - absence is a reported state, not a missing
+    answer. The probe is a total local function over two file reads, so this
+    guard should never fire; it exists so a diagnosis surface can never be
+    taken down by the newest collector on it.
+    """
+    from .collectors_companion import collect_companion_capability
+
+    try:
+        return collect_companion_capability(target)
+    except Exception:
+        logger.warning("Companion capability probe failed", exc_info=True)
+        return None
 
 
 def _safe_version_floor_state(
@@ -461,6 +485,7 @@ def _collect_layer1_diagnosis(
     from ..home import diagnose_process_registry
 
     process_registry = diagnose_process_registry(core_home)
+    companion = _safe_companion_capability(target) if scope == "full" else None
     return WorkspaceDiagnosis(
         framework=_safe_framework_presence(target),
         gitignore=_safe_gitignore_state(target),
@@ -478,6 +503,7 @@ def _collect_layer1_diagnosis(
         version_floor_running=version_floor_running,
         version_floor_minimum=version_floor_minimum,
         packages=_collect_package_diagnoses(target),
+        companion=companion,
         home=HomeDiagnosis(process_registry=process_registry),
     )
 

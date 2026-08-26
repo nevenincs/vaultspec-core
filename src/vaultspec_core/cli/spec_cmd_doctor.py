@@ -112,6 +112,65 @@ def cmd_doctor(
     raise typer.Exit(code=_gate(exit_code, gate_errors=gate_errors))
 
 
+def _append_companion_row(
+    rows: list[dict[str, object]], diag: "WorkspaceDiagnosis"
+) -> None:
+    """Append the semantic-search row, when the probe ran.
+
+    Never error-weighted. Every state this row reports is either an ordinary
+    fact about how the workspace is provisioned or, at worst, an advisory - so
+    it must not move the doctor's exit code. Core has no standing to fail a run
+    over a package it does not depend on.
+
+    The row always names the companion's own health command, because the probe
+    reports provisioning and not liveness. Saying so on every row is the whole
+    guard against the one failure mode this design can still produce: a
+    provisioned-but-dead companion reading as fine.
+    """
+    from vaultspec_core.cli.rendering import Cell
+    from vaultspec_core.core.diagnosis.collectors_companion import CompanionSignal
+
+    cap = diag.companion
+    if cap is None:
+        return
+
+    mode_note = f", {cap.mode.value} mode" if cap.mode is not None else ""
+    detail = {
+        CompanionSignal.ABSENT: (
+            f"{cap.package} not provisioned; core discovery and find cover "
+            f"document lookup without it"
+        ),
+        CompanionSignal.DECLARED: (
+            f"{cap.package} provisioned{mode_note}; version not visible from "
+            f"here - check liveness with {cap.health_authority}"
+        ),
+        CompanionSignal.PRESENT: (
+            f"{cap.package} {cap.version} provisioned{mode_note}; "
+            f"check liveness with {cap.health_authority}"
+        ),
+        CompanionSignal.BELOW_FLOOR: (
+            f"{cap.package} {cap.version} is below the advisory floor "
+            f"{cap.floor}; upgrade with uv tool upgrade {cap.package} "
+            f"(advisory only - core does not depend on it)"
+        ),
+    }.get(cap.signal, str(cap.signal))
+
+    status, style = {
+        CompanionSignal.ABSENT: ("none", "dim"),
+        CompanionSignal.DECLARED: ("ok", "green"),
+        CompanionSignal.PRESENT: ("ok", "green"),
+        CompanionSignal.BELOW_FLOOR: ("warn", "yellow"),
+    }.get(cap.signal, ("none", "dim"))
+
+    rows.append(
+        {
+            "component": "semantic search",
+            "status": Cell(status, style=style),
+            "detail": detail,
+        }
+    )
+
+
 def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> None:
     """Render the workspace diagnosis as a box-free listing.
 
@@ -507,6 +566,8 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
                     ),
                 }
             )
+
+    _append_companion_row(rows, diag)
 
     render_listing(
         rows,
