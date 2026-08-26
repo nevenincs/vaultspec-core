@@ -33,6 +33,7 @@ import sys
 from typing import TYPE_CHECKING, Any, cast
 
 from mcp.server.mcpserver import Context
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
@@ -247,7 +248,7 @@ def _build_argv(
         The full argv list ready for :func:`subprocess.run`.
 
     Raises:
-        ValueError: When an argument names a reserved or undeclared flag.
+        ToolError: When an argument names a reserved or undeclared flag.
     """
     argv: list[str] = [
         sys.executable,
@@ -280,7 +281,7 @@ def _validate_positionals(entry: CatalogEntry, positionals: list[str]) -> None:
         positionals: The caller's ordered positional operands.
 
     Raises:
-        ValueError: When a positional begins with ``-``, the verb declares no
+        ToolError: When a positional begins with ``-``, the verb declares no
             positional arguments but some were supplied, or more were supplied
             than a non-variadic verb accepts.
     """
@@ -293,20 +294,20 @@ def _validate_positionals(entry: CatalogEntry, positionals: list[str]) -> None:
                 "must not look like options (the gateway would otherwise let "
                 "a flag be smuggled through the positional slot)"
             )
-            raise ValueError(msg)
+            raise ToolError(msg)
     if not entry.accepts_positionals:
         msg = (
             f"verb {entry.verb!r} takes no positional arguments, "
             f"but {len(positionals)} were supplied"
         )
-        raise ValueError(msg)
+        raise ToolError(msg)
     ceiling = entry.max_positionals()
     if ceiling is not None and len(positionals) > ceiling:
         msg = (
             f"verb {entry.verb!r} accepts at most {ceiling} positional "
             f"argument(s), but {len(positionals)} were supplied"
         )
-        raise ValueError(msg)
+        raise ToolError(msg)
 
 
 def _render_flags(flag_lookup: Any, arguments: dict[str, Any]) -> list[str]:
@@ -327,7 +328,7 @@ def _render_flags(flag_lookup: Any, arguments: dict[str, Any]) -> list[str]:
         The rendered argv fragments.
 
     Raises:
-        ValueError: On a reserved or undeclared flag.
+        ToolError: On a reserved or undeclared flag.
     """
     rendered: list[str] = []
     for key, value in arguments.items():
@@ -337,11 +338,11 @@ def _render_flags(flag_lookup: Any, arguments: dict[str, Any]) -> list[str]:
                 f"argument {key!r} maps to reserved flag {flag_name!r}; "
                 "the gateway manages --target and --json itself"
             )
-            raise ValueError(msg)
+            raise ToolError(msg)
         declared = flag_lookup(flag_name)
         if declared is None:
             msg = f"unknown flag {flag_name!r} for this verb"
-            raise ValueError(msg)
+            raise ToolError(msg)
         if declared.takes_value:
             values = cast("list[object]", value) if isinstance(value, list) else [value]
             for item in values:
@@ -504,7 +505,7 @@ def register_gateway_tools(
             structured error payload for a verb that ran and failed.
 
         Raises:
-            ValueError: When the verb is unknown, denied, an argument names a
+            ToolError: When the verb is unknown, denied, an argument names a
                 reserved or undeclared flag, or the positionals do not fit the
                 verb's declared arguments - surfaced as a protocol error before
                 any process is spawned.
@@ -515,11 +516,11 @@ def register_gateway_tools(
 
         if catalog.is_denied(verb_path):
             msg = f"verb {verb!r} is out of scope for the gateway (denylisted)"
-            raise ValueError(msg)
+            raise ToolError(msg)
         entry = catalog.get(verb_path)
         if entry is None:
             msg = f"unknown verb {verb!r}; use discover to find a valid verb path"
-            raise ValueError(msg)
+            raise ToolError(msg)
 
         ordered_positionals = list(positionals or [])
         _validate_positionals(entry, ordered_positionals)

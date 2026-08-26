@@ -19,6 +19,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp.server.mcpserver import Context
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 from ...core.types import get_context as _get_ctx
@@ -439,7 +440,7 @@ def register_plan_tools(mcp: MCPServer[None]) -> None:
             post-batch completion facts.
 
         Raises:
-            ValueError: When ``steps`` is empty, a state is invalid, or the
+            ToolError: When ``steps`` is empty, a state is invalid, or the
                 plan address does not resolve to a unique plan.
         """
         _ = ctx
@@ -447,13 +448,13 @@ def register_plan_tools(mcp: MCPServer[None]) -> None:
         from ..plan_resolver import PlanResolutionError, resolve_plan
 
         if not steps:
-            raise ValueError("plan_progress requires at least one step change")
+            raise ToolError("plan_progress requires at least one step change")
 
         root_dir = _get_ctx().target_dir
         try:
             resolved = resolve_plan(root_dir, plan)
         except PlanResolutionError as exc:
-            raise ValueError(str(exc)) from exc
+            raise ToolError(str(exc)) from exc
 
         logger.info("plan_progress: %s %d change(s)", resolved.stem, len(steps))
 
@@ -500,7 +501,7 @@ def register_plan_tools(mcp: MCPServer[None]) -> None:
             post-batch completion facts.
 
         Raises:
-            ValueError: When ``operations`` is empty or the plan address does
+            ToolError: When ``operations`` is empty or the plan address does
                 not resolve to a unique plan.
         """
         _ = ctx
@@ -508,13 +509,13 @@ def register_plan_tools(mcp: MCPServer[None]) -> None:
         from ..plan_resolver import PlanResolutionError, resolve_plan
 
         if not operations:
-            raise ValueError("plan_edit requires at least one operation")
+            raise ToolError("plan_edit requires at least one operation")
 
         root_dir = _get_ctx().target_dir
         try:
             resolved = resolve_plan(root_dir, plan)
         except PlanResolutionError as exc:
-            raise ValueError(str(exc)) from exc
+            raise ToolError(str(exc)) from exc
 
         logger.info("plan_edit: %s %d op(s)", resolved.stem, len(operations))
 
