@@ -28,7 +28,8 @@ decisions (`<ADR>`s), and requirements of the current codebase.
   search - `vaultspec-rag search "<concept>" --type code` (and governing decisions with
   `--type vault --doc-type adr`) - then read the epicenter or nearest existing analogue
   in full and confirm exact symbols and insertion points with `rg`; use `fd` for file
-  discovery. Where `vaultspec-rag` is not installed, `rg`/`fd` carry the locate.
+  discovery. Where `vaultspec-rag` is not installed, the `vaultspec-core` discovery
+  verbs and grep carry the same sequence.
 
 - **Enforce Standards**: Ensure `<ADR>`-driven plans adhere to the project's "Hierarchy
   of Truth": `<ADR>` > `<Research>` > Implementation.

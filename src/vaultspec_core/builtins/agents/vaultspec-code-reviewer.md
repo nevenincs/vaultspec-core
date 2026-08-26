@@ -29,7 +29,7 @@ macroscopic awareness of an architect.
   `vaultspec-rag search "<concept>" --type code` (and the governing decisions with
   `--type vault --doc-type adr`) - then read the relevant files in full and confirm
   exact symbols with `rg`; use `fd` for file discovery. Where `vaultspec-rag` is not
-  installed, `rg`/`fd` carry the locate.
+  installed, the `vaultspec-core` discovery verbs and grep carry the same sequence.
 
 ## Safety Domain (Strict)
 
