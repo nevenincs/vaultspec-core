@@ -6,7 +6,9 @@ Drives the gateway tools over the in-memory MCPServer client on a
 argv-list subprocess - no mocks, stubs, or skips. Covers a read-only verb
 returning parsed JSON, an unknown and a denylisted verb rejected before any
 spawn, a non-zero exit folding stderr into the structured error payload,
-reserved and unknown flag rejection, and the ``discover`` ranking order.
+reserved and unknown flag rejection, the ``discover`` ranking order, and a
+reference stripped of its command-inventory markers refusing with
+remediation text rather than a bare ``Error executing tool``.
 """
 
 from __future__ import annotations
@@ -18,7 +20,10 @@ from mcp import Client
 from mcp.server.mcpserver import MCPServer
 from mcp.types import CallToolResult, TextContent
 
-from vaultspec_core.mcp_server.tools.gateway import register_gateway_tools
+from vaultspec_core.mcp_server.tools.gateway import (
+    _load_catalog,
+    register_gateway_tools,
+)
 
 from .conftest import data_of, vault_root
 
@@ -247,3 +252,32 @@ async def test_discover_excludes_denylisted_verbs(vault_root: Path) -> None:
         )
         payload = data_of(result)
         assert "vault feature index" not in {v["verb"] for v in payload["verbs"]}
+
+
+async def test_unparseable_reference_refuses_with_remediation(
+    vault_root: Path,
+) -> None:
+    """A reference stripped of its markers refuses with text the caller can act on.
+
+    Issue #330 left this one open: the catalog parse failure is reachable from
+    a tool call, but was raised as a bare ``ValueError``, so the caller got
+    ``Error executing tool <name>`` and nothing else - and since every call
+    fails identically until the install is repaired, blind retry never
+    recovers. Both gateway tools must name the condition and the remedy.
+    """
+    reference = vault_root / ".vaultspec" / "reference" / "cli.md"
+    assert reference.is_file()
+    reference.write_text("# CLI reference\n\nNo inventory here.\n", encoding="utf-8")
+    _load_catalog.cache_clear()
+
+    mcp = _gateway_server()
+    async with Client(mcp) as client:
+        for tool, arguments in (
+            ("discover", {"query": "vault list"}),
+            ("invoke", {"verb": "vault list"}),
+        ):
+            result = await client.call_tool(tool, arguments)
+            assert result.is_error, tool
+            text = _error_text(result)
+            assert "command-inventory markers" in text, tool
+            assert "spec reference generate" in text, tool
