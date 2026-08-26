@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/logo.png" alt="vaultspec-core family logo" width="150" />
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/logo.png" alt="vaultspec-core family logo" width="150" />
 
 # vaultspec-core
 
@@ -9,10 +9,10 @@
 [![build](https://img.shields.io/github/actions/workflow/status/nevenincs/vaultspec-core/ci.yml?branch=main&style=for-the-badge&label=build&logo=githubactions&logoColor=white&labelColor=1b1a16)](https://github.com/nevenincs/vaultspec-core/actions/workflows/ci.yml)
 [![release](https://img.shields.io/pypi/v/vaultspec-core?style=for-the-badge&label=release&logo=pypi&logoColor=white&labelColor=1b1a16&color=8A72B5)](https://pypi.org/project/vaultspec-core/)
 [![runtime](https://img.shields.io/badge/runtime-Python%203.13%2B-3F9AA6?style=for-the-badge&logo=python&logoColor=white&labelColor=1b1a16)](https://www.python.org/downloads/)
-[![license](https://img.shields.io/github/license/nevenincs/vaultspec-core?style=for-the-badge&label=license&logo=opensourceinitiative&logoColor=white&labelColor=1b1a16&color=B3823C)](./LICENSE)
+[![license](https://img.shields.io/github/license/nevenincs/vaultspec-core?style=for-the-badge&label=license&logo=opensourceinitiative&logoColor=white&labelColor=1b1a16&color=B3823C)](https://github.com/nevenincs/vaultspec-core/blob/main/LICENSE)
 
-[![cli](https://img.shields.io/badge/cli-bundled-B5703F?style=for-the-badge&logo=gnubash&logoColor=white&labelColor=1b1a16)](./docs/CLI.md)
-[![mcp](https://img.shields.io/badge/mcp-bundled-B05A6B?style=for-the-badge&logo=modelcontextprotocol&logoColor=white&labelColor=1b1a16)](./docs/MCP.md)
+[![cli](https://img.shields.io/badge/cli-bundled-B5703F?style=for-the-badge&logo=gnubash&logoColor=white&labelColor=1b1a16)](https://github.com/nevenincs/vaultspec-core/blob/main/docs/CLI.md)
+[![mcp](https://img.shields.io/badge/mcp-bundled-B05A6B?style=for-the-badge&logo=modelcontextprotocol&logoColor=white&labelColor=1b1a16)](https://github.com/nevenincs/vaultspec-core/blob/main/docs/MCP.md)
 
 [Get started](#getting-started) · [Product](#the-pipeline-at-a-glance) ·
 [Documentation](#learn-more) · [Family](#the-vaultspec-family) ·
@@ -21,7 +21,7 @@
 </div>
 
 <p align="center">
-<img src="docs/assets/demo.gif" alt="vaultspec pipeline demo - provisioning a project, scaffolding research, ADR, and plan, then checking and graphing the vault" width="880" />
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/demo.gif" alt="vaultspec pipeline demo - provisioning a project, scaffolding research, ADR, and plan, then checking and graphing the vault" width="880" />
 </p>
 
 Vaultspec guides agents through a `Research → Decide → Plan → Execute → Verify` pipeline
@@ -46,10 +46,12 @@ machinery that enforces it:
 - **A Model Context Protocol (MCP) server** for MCP-capable clients.
 
 <p align="center">
-<img src="docs/assets/term-status.svg" alt="vaultspec-core status - live output from this repository's own vault" width="880" />
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/term-status.svg" alt="vaultspec-core status - live output from this repository's own vault" width="880" />
 </p>
 
-See the [framework manual](./docs/framework.md) for the full tour.
+See the
+[framework manual](https://github.com/nevenincs/vaultspec-core/blob/main/docs/framework.md)
+for the full tour.
 
 > [!TIP]
 > The framework favours semantic search via the core's optional sister project,
@@ -83,7 +85,9 @@ If you added it as a project dependency, bootstrap from inside your environment:
 uv run vaultspec-core install
 ```
 
-See the [CLI reference](./docs/CLI.md) for installation options.
+See the
+[CLI reference](https://github.com/nevenincs/vaultspec-core/blob/main/docs/CLI.md) for
+installation options.
 
 > [!NOTE]
 > `vaultspec-core install` handles project integration separately: it manages a block in
@@ -139,15 +143,18 @@ into `.vault/` as it goes: a research note, then a decision record, a plan, exec
 records, and a final review. You approve each checkpoint before the agent moves on.
 
 Invoke a stage skill directly - for example `/vaultspec-research` - to enter the
-pipeline at a specific stage. See the [framework manual](./docs/framework.md) for how
-each one works.
+pipeline at a specific stage. See the
+[framework manual](https://github.com/nevenincs/vaultspec-core/blob/main/docs/framework.md)
+for how each one works.
 
 ### Skills
 
 Skills are the slash-commands that drive each stage of the pipeline. Six map to the
-pipeline stages; two helpers - curate and documentation - cover everyday upkeep. The
-[framework manual](./docs/framework.md) gives full guidance on each, plus two further
-skills for team coordination and project management.
+pipeline stages; three helpers - curate, documentation, and rag-discovery - cover
+everyday upkeep. The
+[framework manual](https://github.com/nevenincs/vaultspec-core/blob/main/docs/framework.md)
+gives full guidance on each, plus two further skills for team coordination and project
+management.
 
 **Which skill, when**
 
@@ -161,6 +168,11 @@ skills for team coordination and project management.
 | Audit the finished work by severity           | `/vaultspec-code-review`   |
 | Repair vault links, frontmatter, and naming   | `/vaultspec-curate`        |
 | Draft user-facing documentation               | `/vaultspec-documentation` |
+| Find code, or the ADR behind it, by meaning   | `/vaultspec-rag-discovery` |
+
+`/vaultspec-rag-discovery` drives the optional sister project and needs
+[vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) installed; the other ten
+ship with vaultspec-core.
 
 ## Every feature leaves a paper trail
 
@@ -168,7 +180,7 @@ One feature tag binds a feature's whole lifecycle - research, decision, plan, ex
 records, and audit - into a linked graph the CLI can trace, validate, and visualize:
 
 <p align="center">
-<img src="docs/assets/term-graph.svg" alt="vaultspec-core vault graph - a feature's document graph" width="880" />
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/term-graph.svg" alt="vaultspec-core vault graph - a feature's document graph" width="880" />
 </p>
 
 Documents are scaffolded and structurally maintained through the `vaultspec-core vault`
@@ -191,7 +203,8 @@ vaultspec-core vault graph --feature search-api
 ```
 
 Plans carry deeper structure - waves, phases, and steps. The
-[framework manual](./docs/framework.md) covers that structure.
+[framework manual](https://github.com/nevenincs/vaultspec-core/blob/main/docs/framework.md)
+covers that structure.
 
 ### The vault, rendered in Obsidian
 
@@ -201,7 +214,7 @@ document links render as a navigable graph network, while every document's front
 tags, dates, and `related:` wiki-links - shows up as first-class properties.
 
 <p align="center">
-<img src="docs/assets/obsidian-vault.png" alt="A vaultspec vault opened in Obsidian - the document corpus as a graph network on the left, an accepted ADR with its tags, dates, and related wiki-links on the right" width="880" />
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/obsidian-vault.png" alt="A vaultspec vault opened in Obsidian - the document corpus as a graph network on the left, an accepted ADR with its tags, dates, and related wiki-links on the right" width="880" />
 </p>
 
 A vaultspec project's vault in Obsidian: the whole document corpus as a graph, and an
@@ -215,7 +228,7 @@ placeholders, plan schema, encoding - and every finding ships with a fix hint, w
 `--fix` applying the safe ones automatically:
 
 <p align="center">
-<img src="docs/assets/term-check.svg" alt="vaultspec-core vault check all - validators with fix hints" width="880" />
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/term-check.svg" alt="vaultspec-core vault check all - validators with fix hints" width="880" />
 </p>
 
 ## Ask your history questions
@@ -226,7 +239,7 @@ the codebase for hybrid semantic search, so agents (and you) can ask *why* somet
 decided and get the decision record back:
 
 <p align="center">
-<img src="docs/assets/term-rag.svg" alt="vaultspec-rag search - semantic recall of a decision record" width="880" />
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/term-rag.svg" alt="vaultspec-rag search - semantic recall of a decision record" width="880" />
 </p>
 
 ## MCP server
@@ -237,8 +250,9 @@ its `.mcp.json` by default. Seven tools cover the everyday surface - `find`, `cr
 gateway reaches the rest of the CLI. Where the server is connected, the synced rules
 treat it as the primary transport, falling back to CLI verbs for structural and sync
 operations. The launch command in `.mcp.json` follows the install mode - `uvx` in tool
-mode, `uv run` in dependency mode. See the [MCP reference](./docs/MCP.md) for setup and
-the tool catalog.
+mode, `uv run` in dependency mode. See the
+[MCP reference](https://github.com/nevenincs/vaultspec-core/blob/main/docs/MCP.md) for
+setup and the tool catalog.
 
 ## The vaultspec family
 
@@ -251,11 +265,11 @@ the tool catalog.
 
 ## Learn more
 
-| Guide                                   | What it covers                                              |
-| --------------------------------------- | ----------------------------------------------------------- |
-| [Framework manual](./docs/framework.md) | The development workflow, skills, agents, and customization |
-| [CLI reference](./docs/CLI.md)          | Every command, flag, and option for vaultspec-core          |
-| [MCP reference](./docs/MCP.md)          | The MCP server tools, setup, and configuration              |
+| Guide                                                                                       | What it covers                                              |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| [Framework manual](https://github.com/nevenincs/vaultspec-core/blob/main/docs/framework.md) | The development workflow, skills, agents, and customization |
+| [CLI reference](https://github.com/nevenincs/vaultspec-core/blob/main/docs/CLI.md)          | Every command, flag, and option for vaultspec-core          |
+| [MCP reference](https://github.com/nevenincs/vaultspec-core/blob/main/docs/MCP.md)          | The MCP server tools, setup, and configuration              |
 
 ## Release pipeline
 
@@ -273,4 +287,4 @@ vaultspec-core is in Beta and actively developed. The version badge shows the cu
 release. File bugs and questions on the
 [issue tracker](https://github.com/nevenincs/vaultspec-core/issues). Bug reports,
 feature ideas, and pull requests are welcome. vaultspec-core is released under the
-[MIT License](./LICENSE).
+[MIT License](https://github.com/nevenincs/vaultspec-core/blob/main/LICENSE).
