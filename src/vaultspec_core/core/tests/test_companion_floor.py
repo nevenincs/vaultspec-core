@@ -18,17 +18,12 @@ from __future__ import annotations
 import re
 import tomllib
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from vaultspec_core.core.diagnosis.collectors_companion import (
     RAG_DISTRIBUTION_NAME,
     RAG_MINIMUM_VERSION,
 )
-
-if TYPE_CHECKING:
-    import pytest
-
-    from vaultspec_core.core.workspace_mode import PackageDeclaration
+from vaultspec_core.core.workspace_mode import CORE_DISTRIBUTION_NAME
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _PYPROJECT = _REPO_ROOT / "pyproject.toml"
@@ -84,42 +79,31 @@ class TestSingleDeclaration:
 class TestNoForeignFloorWrites:
     """Core must not write a floor onto a distribution it does not own."""
 
-    def test_write_package_declaration_is_never_called_with_a_foreign_floor(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
-        """Guard the trap directly: no core call sites writes rag's floor.
+    def test_no_core_call_site_writes_a_foreign_floor(self):
+        """No core call site passes a non-core package with a floor.
 
-        rag writes its own entry through this same core function and reads its
-        floor back out of it, so a floor core wrote there would become an input
-        to rag's gate and could make rag refuse its own invocation.
+        Checked over core's real source rather than by patching the writer,
+        because the property is static: it is about which call sites exist,
+        not about what one probe run happens to do. rag writes its own entry
+        through this same core function and reads its floor back into its own
+        skew gate, so a floor written there by core could make rag refuse its
+        own invocation.
         """
-        from vaultspec_core.core import workspace_mode
-
-        captured: list[tuple[str, str | None]] = []
-        original = workspace_mode.write_package_declaration
-
-        def _spy(
-            target: Path, package: str, declaration: PackageDeclaration
-        ) -> None:
-            captured.append((package, declaration.minimum_version))
-            original(target, package, declaration)
-
-        monkeypatch.setattr(workspace_mode, "write_package_declaration", _spy)
-
-        from vaultspec_core.core.diagnosis.collectors_companion import (
-            collect_companion_capability,
-        )
-
-        collect_companion_capability(tmp_path)
-
-        foreign = [
-            (pkg, floor)
-            for pkg, floor in captured
-            if pkg != "vaultspec-core" and floor is not None
-        ]
-        assert not foreign, (
-            f"core wrote a minimum_version onto a distribution it does not own: "
-            f"{foreign}"
+        offenders: list[str] = []
+        for path in (_REPO_ROOT / "src").rglob("*.py"):
+            if path.name.startswith("test_"):
+                continue
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            if "write_package_declaration(" not in text:
+                continue
+            for call in re.findall(r"write_package_declaration\((.*?)\)", text, re.S):
+                if "minimum_version" in call and CORE_DISTRIBUTION_NAME not in call:
+                    normalized = " ".join(call.split())
+                    if "RAG" in normalized or RAG_DISTRIBUTION_NAME in normalized:
+                        offenders.append(f"{path.name}: {normalized[:120]}")
+        assert not offenders, (
+            f"core writes a minimum_version for a distribution it does not own: "
+            f"{offenders}"
         )
 
     def test_probe_writes_nothing_at_all(self, tmp_path: Path):

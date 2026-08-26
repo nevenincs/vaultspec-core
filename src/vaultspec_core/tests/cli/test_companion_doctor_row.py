@@ -18,7 +18,7 @@ from vaultspec_core.core.diagnosis.collectors_companion import (
     CompanionCapability,
     CompanionSignal,
 )
-from vaultspec_core.core.diagnosis.diagnosis import WorkspaceDiagnosis
+from vaultspec_core.core.diagnosis.diagnosis import HomeDiagnosis, WorkspaceDiagnosis
 from vaultspec_core.core.diagnosis.signals import FrameworkSignal
 from vaultspec_core.core.enums import InstallMode
 
@@ -41,7 +41,16 @@ def _capability(
 
 
 def _diagnosis(cap: CompanionCapability | None) -> WorkspaceDiagnosis:
-    return WorkspaceDiagnosis(framework=FrameworkSignal.PRESENT, companion=cap)
+    """Build a diagnosis carrying *cap*.
+
+    The capability lives on :class:`HomeDiagnosis`, which is where both the
+    writer and every reader address it - there is no pass-through accessor on
+    the outer class to go through instead.
+    """
+    return WorkspaceDiagnosis(
+        framework=FrameworkSignal.PRESENT,
+        home=HomeDiagnosis(companion=cap),
+    )
 
 
 class TestRowRendering:

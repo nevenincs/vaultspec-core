@@ -130,7 +130,7 @@ def _append_companion_row(
     from vaultspec_core.cli.rendering import Cell
     from vaultspec_core.core.diagnosis.collectors_companion import CompanionSignal
 
-    cap = diag.companion
+    cap = diag.home.companion
     if cap is None:
         return
 

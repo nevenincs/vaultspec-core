@@ -5,41 +5,12 @@ tags:
 date: '2026-08-26'
 modified: '2026-08-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:18e54276806d8b7bbd993a0efbd321a147d6b3cb4df860b3eb630cacd0a440a2'
+body_hash: 'sha256:7d83f4bbd93e40b71a3f11c0c28475eab6b9424e9ccf0b42285cd7b3de016e72'
 related:
   - "[[2026-08-26-rag-search-exposure-adr]]"
 ---
 
-<!-- FRONTMATTER RULES:
-     tags: one directory tag (hardcoded #research) and one feature tag.
-     Replace rag-search-exposure with a kebab-case feature tag, e.g. #foo-bar.
-     Additional tags may be appended below the required pair.
-
-     Related: use wiki-links as '[[yyyy-mm-dd-foo-bar]]'.
-
-     modified: CLI-maintained last-modified stamp; set at scaffold time,
-     refreshed by mutating CLI verbs and vault check fix; never hand-edit.
-
-     DO NOT add fields beyond those scaffolded; metadata lives
-     only in the frontmatter. -->
-
-<!-- LINK RULES:
-     - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
-     - NEVER use [[wiki-links]] or markdown [label](path) links in the document body.
-     - Cite external sources as bare URLs. Cite code, commits, packages, and
-       standards as inline backtick locators: `src/module.py:42`, commit
-       `abc1234`, `package@1.2.3`, RFC 9110. -->
-
-<!-- DOCUMENT BOUNDARY:
-     Research grounds; the ADR decides. Frame the option space with evidence
-     and trade-offs; at most name the option the evidence favors and what
-     the ADR must settle. Never record the decision here - a decision
-     outside the ADR forks and goes stale when the ADR chooses otherwise. -->
-
 # `rag-search-exposure` research: `How vaultspec-core exposes vaultspec-rag search today`
-
-<!-- Lead: the question, why it matters to `rag-search-exposure`, and what was
-     concluded - the evidence picture, not a decision. -->
 
 ## Findings
 
@@ -66,8 +37,7 @@ cannot express rag's grammar.
 `search_codebase`, `search_documents`, and `search_combined` (22 parameters),
 plus `get_code_file`, four reindex verbs, `get_index_status`, and two clean
 verbs (`src/vaultspec_rag/mcp/_tools.py`). The filter-token grammar in
-`src/vaultspec_rag/search/_parsing.py:26-47` covers `type: feature: date: tag:
-lang: path: func: class: nodetype: intent: status: exclude: only: include:`,
+`src/vaultspec_rag/search/_parsing.py:26-47` covers `type: feature: date: tag: lang: path: func: class: nodetype: intent: status: exclude: only: include:`,
 the last three multi-value. Beyond tokens: `intent` ranking profiles,
 `like_ids` / `unlike_ids` relevance feedback, `prefer`, `dedup_locales`, and
 extractor filters.
@@ -112,8 +82,7 @@ client that fails closed and would surface a fatal error core cannot resolve.
 **rag exempts its observability verbs from that gate.** `stop`, `status`,
 `doctor`, `logs`, and `jobs` work against a daemon of any release
 (`src/vaultspec_rag/serviceclient/_compat.py:217-221`) precisely because they
-are how an operator observes and resolves a mismatch. `vaultspec-rag server
-doctor` is therefore the one surface designed to answer under the degraded
+are how an operator observes and resolves a mismatch. `vaultspec-rag server doctor` is therefore the one surface designed to answer under the degraded
 conditions where a core-side liveness probe would be least trustworthy.
 
 **The loopback transport is better defended than it looks, but its trust root
@@ -148,6 +117,57 @@ what the degraded discovery path should be once prose stops carrying it.
 
 ## Sources
 
-<!-- Each locator cited above, once: `path:line` backtick locators for code,
-     bare URLs for external references. Flag unverified general-knowledge
-     claims. -->
+Read directly at `vaultspec-core@0.1.59` and `vaultspec-rag@0.4.4`.
+
+Core, exposure surface:
+
+- `src/vaultspec_core/mcp_server/tools/documents.py:942` - `find`'s parameters,
+  establishing it carries no query string.
+- `src/vaultspec_core/builtins/agents/` and
+  `src/vaultspec_core/builtins/skills/` - the seventeen documents carrying rag
+  guidance in prose.
+- `pyproject.toml:110` - the PEP 735 dev-group rag pin, `>=0.3.8` at the time
+  of reading.
+
+Core, mechanism:
+
+- `src/vaultspec_core/core/workspace_mode.py:168` - the back-compat constant
+  maintained for rag consumers floored on core 0.1.38.
+- `src/vaultspec_core/core/workspace_mode.py:979-1010` - the committed-floor
+  comparator and skew handshake.
+- `src/vaultspec_core/core/mcps_mode.py:60-98` - `render_launch_for_mode`, the
+  single launch comparator a companion substitutes through.
+- `src/vaultspec_core/core/diagnosis/collectors_mode.py:94` and `:135-138` -
+  companion mode inference, and the `tool_spec` omission that makes it blind to
+  rag's real tool-mode launch.
+- `src/vaultspec_core/core/helpers.py:506-530` - `parse_version_tuple`,
+  returning the empty tuple rather than raising on text with no numeric
+  segment.
+
+rag, capability surface:
+
+- `src/vaultspec_rag/mcp/_tools.py` - the four search tools and their
+  parameters.
+- `src/vaultspec_rag/search/_parsing.py:26-47` - the filter-token grammar and
+  the multi-value domain keys.
+- `src/vaultspec_rag/cli/_search.py:1059-1248` - the CLI flag set, establishing
+  the CLI-versus-MCP capability asymmetry.
+
+rag, coupling and transport:
+
+- `src/vaultspec_rag/commands/_mode.py:215-236` - rag writing its own
+  packages-map entry through core's `write_package_declaration` and preserving
+  the floor it reads back.
+- `src/vaultspec_rag/mcp/_tools.py:199-223` - `_require_port`, failing closed on
+  a foreign release, and why.
+- `src/vaultspec_rag/serviceclient/_compat.py:217-221` - the observability verbs
+  deliberately exempted from that gate.
+- `src/vaultspec_rag/serviceclient/_compat.py:226-232` - port and version both
+  taken from the same on-disk discovery payload.
+- `src/vaultspec_rag/_loopback_http.py` - the 127.0.0.1 pin, proxy-inheritance
+  refusal, and redirect refusal.
+
+MCP SDK, at `mcp@2.1.1`:
+
+- `mcp/server/mcpserver/tools/base.py:134-147` - anticipated failures keep their
+  text, unexpected ones do not.

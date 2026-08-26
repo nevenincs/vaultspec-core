@@ -28,7 +28,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from .collectors_mode import observed_mcp_mode
 
@@ -240,7 +240,8 @@ def _entry_shape_mode(target: Path, package: str) -> InstallMode | None:
     entry = servers.get(package)
     if not isinstance(entry, dict):
         return None
-    command = entry.get("command")  # pyright: ignore[reportUnknownMemberType]
+    entry_map = cast("dict[str, object]", entry)
+    command = entry_map.get("command")
     if command == "uvx":
         return InstallMode.TOOL
     if command == "uv":

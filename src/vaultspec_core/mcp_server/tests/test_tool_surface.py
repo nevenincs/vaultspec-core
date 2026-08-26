@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 from mcp import Client
@@ -370,8 +371,8 @@ async def test_tool_list_is_invariant_under_companion_presence(
         "vaultspec_rag.server",
         tool_spec=f"{RAG_DISTRIBUTION_NAME}[mcp]",
     )
-    config = json.loads(original) if original else {}
-    servers = config.setdefault("mcpServers", {})
+    config: dict[str, Any] = json.loads(original) if original else {}
+    servers: dict[str, Any] = config.setdefault("mcpServers", {})
     servers[RAG_DISTRIBUTION_NAME] = {"command": command, "args": args}
     mcp_path.write_text(json.dumps(config), encoding="utf-8")
 

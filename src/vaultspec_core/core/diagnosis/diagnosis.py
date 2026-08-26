@@ -9,10 +9,10 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ..enums import InstallMode, Tool
 from ..home import ProcessRegistryDiagnosis, ProcessRegistrySignal
-from .collectors_companion import CompanionCapability
 from .signals import (
     BuiltinVersionSignal,
     ConfigSignal,
@@ -28,6 +28,9 @@ from .signals import (
     VaultContentSignal,
     VersionFloorSignal,
 )
+
+if TYPE_CHECKING:
+    from .collectors_companion import CompanionCapability
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +101,11 @@ class HomeDiagnosis:
         default_factory=lambda: ProcessRegistryDiagnosis(ProcessRegistrySignal.ABSENT)
     )
     divergent_projections: list[str] = field(default_factory=list)
+    #: Observed provisioning state of the semantic-search companion package,
+    #: or ``None`` when the probe was not run for this scope. Reports
+    #: provisioning only - never liveness; the capability names the companion
+    #: command that answers health.
+    companion: CompanionCapability | None = None
 
 
 @dataclass
@@ -147,10 +155,6 @@ class WorkspaceDiagnosis:
             write. Populated only when ``framework`` is
             :attr:`~vaultspec_core.core.diagnosis.signals.FrameworkSignal.ADOPTABLE`,
             where it names the content an adopting run would destroy.
-        companion: Observed provisioning state of the semantic-search
-            companion package, or ``None`` when the probe was not run for this
-            scope. Reports provisioning only - never liveness; the capability
-            names the companion command that answers health.
         home: Structured Core-home and adoption diagnostics.
     """
 
@@ -174,7 +178,6 @@ class WorkspaceDiagnosis:
     version_floor_running: str = ""
     version_floor_minimum: str = ""
     packages: dict[str, PackageModeDiagnosis] = field(default_factory=dict)
-    companion: CompanionCapability | None = None
     home: HomeDiagnosis = field(default_factory=HomeDiagnosis)
 
     @property
@@ -503,8 +506,7 @@ def _collect_layer1_diagnosis(
         version_floor_running=version_floor_running,
         version_floor_minimum=version_floor_minimum,
         packages=_collect_package_diagnoses(target),
-        companion=companion,
-        home=HomeDiagnosis(process_registry=process_registry),
+        home=HomeDiagnosis(process_registry=process_registry, companion=companion),
     )
 
 
