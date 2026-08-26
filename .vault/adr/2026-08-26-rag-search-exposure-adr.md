@@ -5,7 +5,7 @@ tags:
 date: '2026-08-26'
 modified: '2026-08-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:ea9f5d2992c6ca0d5805b36668106db120b3973d0fc8919fda9095b80d0dd105'
+body_hash: 'sha256:6de9309d0c3456cbc21ef562b3e705b632a97b993fe81581d9e748fbc1b15278'
 related:
   - '[[2026-08-26-rag-search-exposure-research]]'
 ---
@@ -389,3 +389,24 @@ port-trust question entirely outside core's blast radius.
   restores every message. It is recorded here rather than in a separate ADR
   because it is the reason this feature's own refusals - the `body='full'` row
   ceiling, and the new text filter's composition rules - reach a caller at all.
+
+  Issue #330 carried the three questions that conversion deliberately left
+  open; all three are now closed. The catalog parse failure
+  (`mcp_server/catalog.py`) is reachable from `discover` and `invoke`, and
+  every call fails identically until the install is repaired, so blind retry
+  never recovers - it is now narrowed to a `CatalogParseError` (a `ValueError`
+  subclass, so callers outside the server are unaffected) and translated to a
+  `ToolError` carrying remediation at the gateway boundary, the idiom `plan.py`
+  and `orientation.py` already used. `catalog.py` stays decoupled from the SDK,
+  and an unexpected `ValueError` from the Typer introspection inside
+  `build_catalog` still reads as a crash with its message suppressed. A static
+  conformance test now forbids `raise ValueError` anywhere in
+  `mcp_server/tools/`, drawn one level wider than the bug because whether a
+  given raise escapes to the SDK is not statically decidable; the escape hatch
+  is to raise in a lower layer and translate at the boundary. The wider worry -
+  that the rushed `mcp` 1.28 -> 2.0 migration hid other unreconciled behaviour
+  changes - was audited and found clean: core registers tools only (no
+  resources, so the parallel `ResourceError` path is unreachable), and the
+  suite runs green with `MCPDeprecationWarning` promoted to an error, so none
+  of the capabilities the SDK deprecated on 2026-07-28 - logging,
+  client-to-server progress, roots - is touched.

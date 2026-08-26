@@ -42,6 +42,7 @@ if TYPE_CHECKING:
 __all__ = [
     "DENYLIST",
     "CatalogEntry",
+    "CatalogParseError",
     "CommandArgument",
     "CommandCatalog",
     "CommandFlag",
@@ -84,6 +85,18 @@ _JSON_FLAG = "--json"
 #: argument object: the server injects ``--target`` and appends ``--json``, and
 #: ``--help`` would suppress the command.
 RESERVED_FLAGS: frozenset[str] = frozenset({"--target", _JSON_FLAG, "--help"})
+
+
+class CatalogParseError(ValueError):
+    """The shipped CLI reference carries no usable command inventory.
+
+    Distinct from a bare :class:`ValueError` so the gateway can tell this one
+    anticipated, remediable failure apart from any other ``ValueError`` the
+    Typer introspection in :func:`build_catalog` might raise, and translate
+    only this one into a caller-visible refusal. Subclasses ``ValueError`` so
+    the raise stays a value error to every caller that does not care about the
+    distinction.
+    """
 
 
 @dataclass(frozen=True)
@@ -359,7 +372,7 @@ def _parse_inventory(reference_path: Path) -> dict[tuple[str, ...], str]:
         Each declared verb path mapped to its curated one-line description.
 
     Raises:
-        ValueError: When the reference has no ``vaultspec:generated``
+        CatalogParseError: When the reference has no ``vaultspec:generated``
             command-inventory marker block, which would silently empty the
             catalog; the marker-format contract is surfaced loudly instead.
     """
@@ -369,7 +382,7 @@ def _parse_inventory(reference_path: Path) -> dict[tuple[str, ...], str]:
             f"no vaultspec:generated command-inventory markers found in "
             f"{reference_path}; the gateway catalog cannot be parsed"
         )
-        raise ValueError(msg)
+        raise CatalogParseError(msg)
 
     descriptions: dict[tuple[str, ...], str] = {}
     for bullet in _iter_inventory_bullets(text.splitlines()):
@@ -508,7 +521,8 @@ def build_catalog(
         The populated :class:`CommandCatalog`.
 
     Raises:
-        ValueError: When *reference_path* has no command-inventory markers.
+        CatalogParseError: When *reference_path* has no command-inventory
+            markers.
     """
     if typer_app is None:
         from vaultspec_core.cli import app as typer_app

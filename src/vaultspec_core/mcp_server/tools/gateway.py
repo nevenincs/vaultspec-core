@@ -38,7 +38,13 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from ...core.types import get_context as _get_ctx
-from ..catalog import RESERVED_FLAGS, CatalogEntry, CommandCatalog, build_catalog
+from ..catalog import (
+    RESERVED_FLAGS,
+    CatalogEntry,
+    CatalogParseError,
+    CommandCatalog,
+    build_catalog,
+)
 from ..envelope import LeanModel, compact_result
 from ..isolation import isolated_context as _isolated_context
 
@@ -211,6 +217,39 @@ def _reference_path() -> Path:
         The path to ``.vaultspec/reference/cli.md`` under the server root.
     """
     return _get_ctx().templates_dir.parent / "reference" / "cli.md"
+
+
+def _active_catalog() -> CommandCatalog:
+    """Load the catalog for the active workspace, refusing a broken install.
+
+    A reference without the generated marker block leaves no verb addressable,
+    so every ``discover`` and ``invoke`` call fails identically until the
+    installation is repaired. That is a deterministic, remediable condition
+    rather than a crash, and the SDK discards the text of anything that is not
+    a ``ToolError`` - so the parse failure is translated here, at the tool
+    boundary, and the caller learns to stop retrying and repair instead.
+
+    The translation is deliberately narrow: only
+    :class:`~vaultspec_core.mcp_server.catalog.CatalogParseError` is caught, so
+    an unexpected ``ValueError`` from the Typer introspection inside
+    :func:`build_catalog` stays a crash and keeps its message suppressed.
+
+    Returns:
+        The cached :class:`CommandCatalog` for the resolved reference path.
+
+    Raises:
+        ToolError: When the shipped CLI reference carries no command-inventory
+            marker block.
+    """
+    try:
+        return _load_catalog(_reference_path())
+    except CatalogParseError as exc:
+        msg = (
+            f"{exc}. No verb is addressable until the installation is "
+            f"repaired: reinstall vaultspec-core, or regenerate the reference "
+            f"with 'vaultspec-core spec reference generate'."
+        )
+        raise ToolError(msg) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -437,10 +476,14 @@ def register_gateway_tools(
 
         Returns:
             The :class:`DiscoverResult` with ranked verbs and their schemas.
+
+        Raises:
+            ToolError: When the shipped CLI reference carries no
+                command-inventory marker block, so no verb is addressable.
         """
         _ = ctx
         logger.info("discover: query=%r limit=%d", query, limit)
-        catalog = _load_catalog(_reference_path())
+        catalog = _active_catalog()
         ranked = catalog.search(query, limit=limit)
         verbs = [
             VerbSchema(
@@ -506,13 +549,14 @@ def register_gateway_tools(
 
         Raises:
             ToolError: When the verb is unknown, denied, an argument names a
-                reserved or undeclared flag, or the positionals do not fit the
-                verb's declared arguments - surfaced as a protocol error before
-                any process is spawned.
+                reserved or undeclared flag, the positionals do not fit the
+                verb's declared arguments, or the shipped CLI reference carries
+                no command-inventory marker block - surfaced as a protocol
+                error before any process is spawned.
         """
         _ = ctx
         verb_path = _parse_verb(verb)
-        catalog = _load_catalog(_reference_path())
+        catalog = _active_catalog()
 
         if catalog.is_denied(verb_path):
             msg = f"verb {verb!r} is out of scope for the gateway (denylisted)"
