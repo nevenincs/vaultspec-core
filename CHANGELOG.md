@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.60](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.59...vaultspec-core-v0.1.60) (2026-08-27)
+
+
+### Features
+
+* report semantic-search capability without coupling core to rag ([#331](https://github.com/nevenincs/vaultspec-core/issues/331)) ([80b272e](https://github.com/nevenincs/vaultspec-core/commit/80b272ecce0555cd781b919d66bbaf90c94cac7c))
+
+
+### Bug Fixes
+
+* allow Python 3.14 ([8a07c7f](https://github.com/nevenincs/vaultspec-core/commit/8a07c7fc47c511ac3fbff2e5931def1719b989a4))
+* **ci:** publish from hosted runners so releases do not wait on a laptop ([c92a1eb](https://github.com/nevenincs/vaultspec-core/commit/c92a1eb914b0f0a8eac8b5ef1bc644dd32168f69))
+* **ci:** publish from the macOS runner, not a label no runner carries ([e17faf7](https://github.com/nevenincs/vaultspec-core/commit/e17faf78f51677ef7cb428b1f78cbd72dc6e77f4))
+* **mcp:** surface the catalog refusal and guard the refusal contract ([#332](https://github.com/nevenincs/vaultspec-core/issues/332)) ([48dd9a5](https://github.com/nevenincs/vaultspec-core/commit/48dd9a5970111ba9077732001285bbb40973547f))
+
 ## [0.1.59](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.58...vaultspec-core-v0.1.59) (2026-08-25)
 
 
