@@ -31,7 +31,7 @@ from dev.packaging import products
 from dev.packaging.checksums import require
 
 if TYPE_CHECKING:
-    from dev.packaging.products import Executable, Product
+    from dev.packaging.products import Product
 
 #: Homebrew's platform predicates, in the nesting order the formula emits.
 #: Each entry is (Homebrew OS block, CPU block, Rust target triple).
@@ -43,20 +43,12 @@ _PLATFORMS = (
 )
 
 
-def _resource_block(
-    product: Product,
-    executable: Executable,
-    target: str,
-    version: str,
-    digests: dict[str, str],
-    indent: str,
-) -> list[str]:
+def _resource_block(name: str, url: str, digest: str, indent: str) -> list[str]:
     """Return the lines of one nested ``resource`` declaration."""
-    asset = product.asset_name(executable, target)
     return [
-        f'{indent}resource "{executable.name}" do',
-        f'{indent}  url "{product.release_base_url(version)}/{asset}"',
-        f'{indent}  sha256 "{require(digests, asset)}"',
+        f'{indent}resource "{name}" do',
+        f'{indent}  url "{url}"',
+        f'{indent}  sha256 "{digest}"',
         f"{indent}end",
     ]
 
@@ -70,16 +62,23 @@ def _cpu_block(
 ) -> list[str]:
     """Return the lines of one ``on_arm``/``on_intel`` block."""
     primary, *rest = product.executables
+    base = product.release_base_url(version)
     asset = product.asset_name(primary, target)
     lines = [
         f"    {cpu} do",
-        f'      url "{product.release_base_url(version)}/{asset}"',
+        f'      url "{base}/{asset}"',
         f'      sha256 "{require(digests, asset)}"',
     ]
     for executable in rest:
+        extra = product.asset_name(executable, target)
         lines.append("")
         lines.extend(
-            _resource_block(product, executable, target, version, digests, "      "),
+            _resource_block(
+                executable.name,
+                f"{base}/{extra}",
+                require(digests, extra),
+                "      ",
+            ),
         )
     lines.append("    end")
     return lines
@@ -141,11 +140,27 @@ def _install_body(product: Product) -> list[str]:
     return lines
 
 
+def _caveats_body(product: Product) -> list[str]:
+    """Return a ``caveats`` method carrying the product's channel notes.
+
+    The Homebrew counterpart of the Scoop manifest's ``notes``. Both channels
+    render the same strings from the same Product, so a caveat that matters at
+    install time - a GPU build that has to come from elsewhere, a first launch
+    that needs network - cannot reach one channel's users and not the other's.
+    """
+    if not product.notes:
+        return []
+    lines = ["  def caveats", "    <<~EOS"]
+    lines.extend(f"      {note}" for note in product.notes)
+    lines.extend(["    EOS", "  end"])
+    return lines
+
+
 def render(
     product: Product,
     version: str,
     digests: dict[str, str],
-    available: tuple[str, ...] = products.HOMEBREW_TARGETS,
+    available: tuple[str, ...] | None = None,
 ) -> str:
     """Return the formula as the exact bytes committed to ``Formula/``.
 
@@ -153,7 +168,17 @@ def render(
     the build matrix does not yet cover is omitted from the formula rather
     than emitted with an invented digest, so ``brew install`` reports an
     unsupported platform instead of failing a checksum.
+
+    Defaulting to the product's own supported set - rather than to every
+    triple Homebrew serves - means the renderer cannot offer a platform the
+    product raises on, even when called without an explicit list.
     """
+    if available is None:
+        available = tuple(
+            target for target in products.HOMEBREW_TARGETS if product.serves(target)
+        )
+    else:
+        available = tuple(target for target in available if product.serves(target))
     primary = product.executables[0]
     lines = [
         f"class {product.formula_class} < Formula",
@@ -173,6 +198,8 @@ def render(
         *_os_blocks(product, version, digests, available),
         "",
         *_install_body(product),
+        *([""] if product.notes else []),
+        *_caveats_body(product),
         "",
         "  test do",
         # PyApp resolves the pinned distribution from PyPI on first launch, so

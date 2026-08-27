@@ -54,9 +54,18 @@ jobs:
           # pinning an asset that was never built, and the generator prints a
           # `::warning::` naming the gap on every release.
           #
-          # To close it: register macbook neo as a self-hosted runner on this
-          # repository with the auto-assigned Linux + ARM64 labels, then
-          # uncomment the three lines below. No other change is required.
+          # To close it, on the Linux arm64 guest on macbook neo (the same host
+          # that already serves this label to vaultspec-dashboard and cadrumo):
+          #
+          #   TOKEN=$(gh api -X POST           #     repos/nevenincs/vaultspec-core/actions/runners/registration-token           #     --jq .token)
+          #   ./config.sh --unattended --replace           #     --url https://github.com/nevenincs/vaultspec-core           #     --token "$TOKEN"           #     --name macbook-neo-linux-arm-core           #     --labels linux-arm64
+          #
+          # `nevenincs` is a user account, not an organization, so a runner
+          # cannot be shared across repositories by a runner group - each repo
+          # needs its own registration. `self-hosted`, `Linux` and `ARM64` are
+          # assigned automatically and must not be passed; only the extra
+          # `linux-arm64` label is explicit, matching the dashboard fleet's
+          # convention. Then uncomment the three lines below.
           # - name: linux-aarch64
           #   runner: [self-hosted, Linux, ARM64]
           #   target: aarch64-unknown-linux-gnu

@@ -55,14 +55,17 @@ def formula_path(root: Path, product: Product) -> Path:
 def available_targets(product: Product, digests: dict[str, str]) -> tuple[str, ...]:
     """Return the Homebrew triples this release actually attached.
 
-    A triple counts as available only when EVERY executable was published for
-    it. A half-built target would otherwise render a formula whose primary
-    download resolves and whose resource 404s at install time.
+    A triple counts as available only when the product supports it AND every
+    executable was published for it. A half-built target would otherwise
+    render a formula whose primary download resolves and whose resource 404s
+    at install time; an unsupported one would offer an install that raises at
+    startup.
     """
     return tuple(
         target
         for target in products.HOMEBREW_TARGETS
-        if all(
+        if product.serves(target)
+        and all(
             product.asset_name(executable, target) in digests
             for executable in product.executables
         )
@@ -93,8 +96,12 @@ def generate(root: Path, product: Product, tag: str, checksums: Path) -> list[Pa
             f"release {tag} attached no complete Homebrew target; "
             f"SHA256SUMS lists: {', '.join(sorted(digests))}",
         )
+    # Only a target the product SUPPORTS but did not build is a gap worth
+    # reporting. A platform the product cannot run on is a decision, not a gap.
     missing = tuple(
-        target for target in products.HOMEBREW_TARGETS if target not in targets
+        target
+        for target in products.HOMEBREW_TARGETS
+        if product.serves(target) and target not in targets
     )
     if missing:
         # Not fatal: a gap in the build matrix is a delivery gap to report,

@@ -64,11 +64,7 @@ def render_manifest(
                 "regex": "$sha256\\s+$basename",
             },
         },
-        "notes": [
-            f"Installed: {', '.join(item.name for item in product.executables)}.",
-            f"Verify with: {product.executables[0].name} --version",
-            "First launch bootstraps the Python runtime; it needs network once.",
-        ],
+        "notes": list(product.notes),
     }
 
 

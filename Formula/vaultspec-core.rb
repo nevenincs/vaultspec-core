@@ -56,6 +56,14 @@ class VaultspecCore < Formula
     end
   end
 
+  def caveats
+    <<~EOS
+      Installs vaultspec-core and vaultspec-mcp.
+      First launch bootstraps the pinned runtime; needs network once.
+      Verify with: vaultspec-core --version
+    EOS
+  end
+
   test do
     assert_match version.to_s, shell_output("#{bin}/vaultspec-core --version")
   end

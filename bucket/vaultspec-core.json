@@ -36,8 +36,8 @@
     }
   },
   "notes": [
-    "Installed: vaultspec-core, vaultspec-mcp.",
-    "Verify with: vaultspec-core --version",
-    "First launch bootstraps the Python runtime; it needs network once."
+    "Installs vaultspec-core and vaultspec-mcp.",
+    "First launch bootstraps the pinned runtime; needs network once.",
+    "Verify with: vaultspec-core --version"
   ]
 }

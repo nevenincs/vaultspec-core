@@ -57,6 +57,17 @@ class Product:
     #: the formula's primary ``url``; the rest become Homebrew ``resource``
     #: blocks, because a formula has exactly one primary download.
     executables: tuple[Executable, ...]
+    #: Channel-specific caveats surfaced to whoever installs from a manifest.
+    notes: tuple[str, ...] = ()
+    #: The triples this product can actually RUN on. Distinct from what a
+    #: package manager serves: Homebrew runs on macOS, but a CUDA-only
+    #: product cannot, and offering an install there ships a binary that
+    #: raises at startup. Empty means "every target the channel serves".
+    supported_targets: tuple[str, ...] = ()
+
+    def serves(self, target: str) -> bool:
+        """Return whether this product may be offered on ``target``."""
+        return not self.supported_targets or target in self.supported_targets
 
     def version_from_tag(self, tag: str) -> str:
         """Return the version a release tag names.
@@ -101,6 +112,13 @@ VAULTSPEC_CORE = Product(
     executables=(
         Executable(name="vaultspec-core", summary="the vaultspec-core CLI"),
         Executable(name="vaultspec-mcp", summary="the vaultspec MCP server"),
+    ),
+    # vaultspec-core is pure Python behind the bootstrap, so it runs on every
+    # target the channels serve; supported_targets is left at its default.
+    notes=(
+        "Installs vaultspec-core and vaultspec-mcp.",
+        "First launch bootstraps the pinned runtime; needs network once.",
+        "Verify with: vaultspec-core --version",
     ),
 )
 
