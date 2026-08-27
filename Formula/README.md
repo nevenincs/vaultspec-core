@@ -30,17 +30,26 @@ bump - not the formula's internal strategy.
 
 ## Coverage
 
-| Platform     | Status                                                       |
-| ------------ | ------------------------------------------------------------ |
-| macOS arm64  | served                                                       |
-| macOS x86-64 | served                                                       |
-| Linux x86-64 | served                                                       |
-| Linux arm64  | **gap** - no build; see the matrix comment in `binaries.yml` |
+| Platform     | Status                                 |
+| ------------ | -------------------------------------- |
+| macOS arm64  | served                                 |
+| macOS x86-64 | served                                 |
+| Linux x86-64 | served                                 |
+| Linux arm64  | built from the next release; see below |
 
-Homebrew supports Linux arm64, so the missing `aarch64-unknown-linux-gnu` build is
-a platform the formula cannot offer an install on at all. The generator omits it
-rather than pinning an asset that was never published, and prints a `::warning::`
-naming the gap on every release.
+Linux arm64 was a gap and is not one any more: the build matrix in `binaries.yml`
+now carries an `aarch64-unknown-linux-gnu` leg, served by a colima container on
+macbook neo registered as `macbook-neo-linux-arm-core`.
+
+The committed formula still omits that platform, correctly — it pins release
+`0.1.60`, which was built before the leg existed, and the generator omits a target
+the release did not attach rather than inventing a digest for it. The first release
+built after this change picks it up automatically, with no edit here.
+
+One property of this fleet is worth knowing when a release seems slow: **runners
+serve only on AC power.** On battery the host's power gate stops every runner once
+it is idle, never mid-job, and GitHub queues new jobs until AC returns. An
+unplugged laptop makes a release wait, not fail.
 
 ## Maintenance
 

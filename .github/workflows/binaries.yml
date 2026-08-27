@@ -37,38 +37,22 @@ jobs:
           - name: macos-x86_64
             runner: [self-hosted, macOS, ARM64]
             target: x86_64-apple-darwin
-          # DELIVERY GAP, deliberately left unschedulable rather than silently
-          # absent. Homebrew supports Linux ARM64, so the missing
-          # aarch64-unknown-linux-gnu build is a platform the formula cannot
-          # offer an install on at all - not a platform this product declines
-          # to serve. The machine exists and already carries this label on the
-          # dashboard and cadrumo fleets (`macbook-neo-linux-arm-vaultspec`,
-          # `gw-macbook-linux-arm`); it was simply never registered against
-          # this repository.
+          # Linux ARM64 runs in a colima container on macbook neo, registered
+          # as `macbook-neo-linux-arm-core` and provisioned by
+          # ~/action-runners/containers/vaultspec-core-linux-arm/runner-entry.sh
+          # on that host. It is enrolled in the host's two fleet scripts, which
+          # is what makes it a fleet member rather than a stray runner:
+          # runner-powergate.sh (AC-only policy) and runner-deploy-hooks.sh
+          # (post-job disk hygiene).
           #
-          # The leg stays COMMENTED OUT until that registration happens. A
-          # label no registered runner carries does not fail the release - it
-          # queues, silently and indefinitely, and `release` needs the whole
-          # matrix, so enabling this early would hang every publication. Until
-          # then dev/packaging omits the platform from the formula rather than
-          # pinning an asset that was never built, and the generator prints a
-          # `::warning::` naming the gap on every release.
-          #
-          # To close it, on the Linux arm64 guest on macbook neo (the same host
-          # that already serves this label to vaultspec-dashboard and cadrumo):
-          #
-          #   TOKEN=$(gh api -X POST           #     repos/nevenincs/vaultspec-core/actions/runners/registration-token           #     --jq .token)
-          #   ./config.sh --unattended --replace           #     --url https://github.com/nevenincs/vaultspec-core           #     --token "$TOKEN"           #     --name macbook-neo-linux-arm-core           #     --labels linux-arm64
-          #
-          # `nevenincs` is a user account, not an organization, so a runner
-          # cannot be shared across repositories by a runner group - each repo
-          # needs its own registration. `self-hosted`, `Linux` and `ARM64` are
-          # assigned automatically and must not be passed; only the extra
-          # `linux-arm64` label is explicit, matching the dashboard fleet's
-          # convention. Then uncomment the three lines below.
-          # - name: linux-aarch64
-          #   runner: [self-hosted, Linux, ARM64]
-          #   target: aarch64-unknown-linux-gnu
+          # THE FLEET SERVES ONLY ON AC POWER. On battery the gate stops every
+          # runner on this host once it is idle - it never kills a running job -
+          # and GitHub queues new ones until AC returns. So a release dispatched
+          # while the laptop is unplugged does not fail, it waits. That is true
+          # of the macOS legs above as well; this leg is not special.
+          - name: linux-aarch64
+            runner: [self-hosted, Linux, ARM64]
+            target: aarch64-unknown-linux-gnu
     # Artifact builds run on the shared self-hosted fleet (hosted multiplatform
     # runners are cost-prohibitive); see publish.yml for the same constraint.
     runs-on: ${{ matrix.runner }}
