@@ -86,6 +86,24 @@ def test_write_checksum_emits_sha256sum_format(tmp_path: Path) -> None:
     assert checksum.read_text(encoding="utf-8") == f"{ABC_DIGEST}  {asset.name}\n"
 
 
+def test_write_checksum_is_lf_terminated_on_every_build_host(tmp_path: Path) -> None:
+    """The sidecar bytes are LF, so the aggregated SHA256SUMS is not mixed.
+
+    Asserted on raw bytes deliberately. The sibling assertion above reads the
+    file in text mode, which translates CRLF back to LF on Windows and so
+    reports a passing contract for a file that carries the host's endings -
+    the exact reason the CRLF defect behind vaultspec-core-v0.1.60's empty
+    Scoop hashes shipped under a green suite.
+    """
+    asset = tmp_path / "vaultspec-core-x86_64-pc-windows-msvc.exe"
+    asset.write_bytes(b"abc")
+
+    raw = write_checksum(asset).read_bytes()
+
+    assert b"\r" not in raw
+    assert raw == f"{ABC_DIGEST}  {asset.name}\n".encode()
+
+
 def test_write_checksum_hashes_the_asset_bytes(tmp_path: Path) -> None:
     """Distinct payloads produce their published digests, not a cached one."""
     empty = tmp_path / "empty.bin"

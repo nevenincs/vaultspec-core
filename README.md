@@ -77,6 +77,24 @@ uv tool install vaultspec-core
 uv add vaultspec-core
 ```
 
+Or install the standalone binaries, which need no Python toolchain on the machine:
+
+```powershell
+# Windows, via Scoop
+scoop bucket add vaultspec-core https://github.com/nevenincs/vaultspec-core
+scoop install vaultspec-core
+```
+
+```bash
+# macOS and Linux, via Homebrew
+brew tap nevenincs/vaultspec-core https://github.com/nevenincs/vaultspec-core
+brew install vaultspec-core
+```
+
+Both place `vaultspec-core` and `vaultspec-mcp`. The first launch of either
+bootstraps its pinned runtime and needs network once. Homebrew covers macOS on
+Apple Silicon and Intel, and Linux on x86-64.
+
 ### 2. Bootstrap
 
 If you added it as a project dependency, bootstrap from inside your environment:

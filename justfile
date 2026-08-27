@@ -190,6 +190,13 @@ analytics *args='':
 binaries tag rust_target outdir='dist-bin':
     uv run --no-project --python 3.13 -- python dev/binaries/build_pyapp.py --tag {{tag}} --target {{rust_target}} --outdir {{outdir}}
 
+# Regenerate the Scoop manifest and Homebrew formula for one released tag.
+# Same command the release job runs, so a maintainer can reproduce or repair a
+# channel pointer without copying CI's invocation. Point `checksums` at the
+# release's SHA256SUMS (locally built, or downloaded from the release).
+channels tag checksums='dist-bin/SHA256SUMS':
+    uv run --no-project --python 3.13 -- python -m dev.packaging.generate --tag {{tag}} --checksums {{checksums}}
+
 # ===========================================================================
 #  Aggregate pipeline
 # ===========================================================================
