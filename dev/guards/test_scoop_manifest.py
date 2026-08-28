@@ -63,19 +63,24 @@ def test_every_url_points_at_the_manifests_own_version(
 ) -> None:
     """A url left on the previous tag serves old bytes under a new version."""
     version: str = manifest["version"]
-    for url in manifest["url"]:
+    urls: list[str] = manifest["url"]
+    for url in urls:
         assert f"/vaultspec-core-v{version}/" in url, url
 
 
 def test_every_declared_bin_is_downloaded_by_a_url(manifest: dict[str, Any]) -> None:
     """A ``bin`` entry with no matching download shims a file scoop never wrote."""
-    downloaded = {url.rsplit("/", 1)[-1] for url in manifest["url"]}
-    for entry in manifest["bin"]:
+    urls: list[str] = manifest["url"]
+    downloaded = {url.rsplit("/", 1)[-1] for url in urls}
+    # A scoop ``bin`` entry is either a bare filename or ``[filename, alias]``.
+    entries: list[str | list[str]] = manifest["bin"]
+    for entry in entries:
         filename = entry[0] if isinstance(entry, list) else entry
         assert filename in downloaded, f"{filename} is shimmed but never downloaded"
 
 
 def test_downloads_are_served_over_https(manifest: dict[str, Any]) -> None:
     """The digest is the only integrity check; the transport must not be plain."""
-    for url in manifest["url"]:
+    urls: list[str] = manifest["url"]
+    for url in urls:
         assert url.startswith("https://"), url
