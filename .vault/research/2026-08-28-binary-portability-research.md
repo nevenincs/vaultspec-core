@@ -5,9 +5,10 @@ tags:
 date: '2026-08-28'
 modified: '2026-08-28'
 body_schema: 'body-v2'
-body_hash: 'sha256:7d5c7bcbfd6c07ebb1c99f82990dd0ae6bc56fafd442e7d1abb8620daa117f3e'
+body_hash: 'sha256:29285b4b12b8c14ccea1e3ca394c26271d4aa61899883eeea00a65cfe1e99689'
 related: []
 ---
+
 # `binary-portability` research: `what the standalone binaries actually promise on each platform`
 
 The release publishes eight binaries across four target triples and calls them
@@ -30,11 +31,11 @@ The published `vaultspec-core-x86_64-unknown-linux-gnu` from
 `vaultspec-core-v0.1.60` fails in the dynamic loader, before `main`, on every
 distribution tested:
 
-| image | glibc | result |
-| --- | --- | --- |
-| `debian:bookworm-slim` | 2.36 | `version 'GLIBC_2.39' not found` |
-| `ubuntu:22.04` | 2.35 | `version 'GLIBC_2.39' not found` |
-| `almalinux:9` | 2.34 | `version 'GLIBC_2.39' not found` |
+| image                  | glibc | result                           |
+| ---------------------- | ----- | -------------------------------- |
+| `debian:bookworm-slim` | 2.36  | `version 'GLIBC_2.39' not found` |
+| `ubuntu:22.04`         | 2.35  | `version 'GLIBC_2.39' not found` |
+| `almalinux:9`          | 2.34  | `version 'GLIBC_2.39' not found` |
 
 The floor comes from exactly two symbols, both referenced weakly, both from the
 Rust standard library's pidfd-aware process spawn path:

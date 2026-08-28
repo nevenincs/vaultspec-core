@@ -10,6 +10,7 @@ related:
   - "[[2026-03-22-clci-release-adr]]"
   - '[[2026-08-28-binary-portability-research]]'
 ---
+
 # `binary-portability` adr: `declare the binary platform contract and enforce it at build time` | (**status:** `proposed`)
 
 ## Problem Statement
