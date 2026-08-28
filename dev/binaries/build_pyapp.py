@@ -155,10 +155,16 @@ def asset_name(binary: Binary, target: str) -> str:
 
 
 def write_checksum(asset: Path) -> Path:
-    """Write ``<asset>.sha256`` in ``sha256sum``-compatible format."""
+    """Write ``<asset>.sha256`` in ``sha256sum``-compatible format.
+
+    Written as bytes with an explicit LF rather than through text mode: the
+    sidecars are concatenated into the published ``SHA256SUMS`` manifest, and
+    a CRLF from a Windows builder leaves a trailing CR inside the asset name.
+    That defeats ``sha256sum -c`` and every consumer that matches on the name.
+    """
     digest = hashlib.sha256(asset.read_bytes()).hexdigest()
     checksum = asset.with_name(asset.name + ".sha256")
-    checksum.write_text(f"{digest}  {asset.name}\n", encoding="utf-8")
+    checksum.write_bytes(f"{digest}  {asset.name}\n".encode())
     return checksum
 
 

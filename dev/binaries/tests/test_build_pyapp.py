@@ -76,14 +76,38 @@ def test_asset_names_are_unique_across_binaries_on_one_target() -> None:
 
 
 def test_write_checksum_emits_sha256sum_format(tmp_path: Path) -> None:
-    """The sidecar is a real ``sha256sum`` line naming the asset, not the path."""
+    """The sidecar is a real ``sha256sum`` line naming the asset, not the path.
+
+    Asserted over raw bytes on purpose. ``read_text`` applies universal-newline
+    translation, so a CRLF sidecar written by a Windows builder reads back as LF
+    and the assertion passes over a file that is wrong on disk. Reverting
+    ``write_checksum`` to ``write_text`` must fail this test on Windows.
+    """
     asset = tmp_path / "vaultspec-core-x86_64-unknown-linux-gnu"
     asset.write_bytes(b"abc")
 
     checksum = write_checksum(asset)
 
     assert checksum == asset.with_name(f"{asset.name}.sha256")
-    assert checksum.read_text(encoding="utf-8") == f"{ABC_DIGEST}  {asset.name}\n"
+    assert checksum.read_bytes() == f"{ABC_DIGEST}  {asset.name}\n".encode()
+
+
+def test_write_checksum_never_emits_a_carriage_return(tmp_path: Path) -> None:
+    """A CR rides into the asset name once the sidecars are concatenated.
+
+    The published ``SHA256SUMS`` is the union of these fragments. A ``\r`` ahead
+    of the newline makes the trailing field ``<name>\r``, which no ``sha256sum
+    -c`` run and no name-matching consumer resolves - the release then ships an
+    integrity manifest that silently matches nothing for that asset, and the
+    scoop bump reads an empty hash for it.
+    """
+    asset = tmp_path / "vaultspec-core-x86_64-pc-windows-msvc.exe"
+    asset.write_bytes(b"abc")
+
+    raw = write_checksum(asset).read_bytes()
+
+    assert b"\r" not in raw
+    assert raw.split(b"  ", 1)[1] == asset.name.encode() + b"\n"
 
 
 def test_write_checksum_hashes_the_asset_bytes(tmp_path: Path) -> None:

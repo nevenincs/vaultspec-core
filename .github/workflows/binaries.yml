@@ -103,11 +103,31 @@ jobs:
       - name: Aggregate checksums
         shell: bash
         run: |
+          set -euo pipefail
           cd dist-bin
           # Per-asset .sha256 files are produced by build_pyapp.py; fold them
           # into one sha256sum-compatible manifest and drop the fragments.
           cat ./*.sha256 > SHA256SUMS
           rm -f ./*.sha256
+          # A CR anywhere in the manifest lands inside an asset name, so the
+          # entry matches nothing: not `sha256sum -c`, not the scoop bump below,
+          # not a user verifying the download. Refuse to publish one.
+          if LC_ALL=C grep -q $'\r' SHA256SUMS; then
+            echo "::error::SHA256SUMS contains a carriage return; a builder wrote CRLF"
+            LC_ALL=C grep -n $'\r' SHA256SUMS >&2
+            exit 1
+          fi
+          # Every uploaded asset must be described, and every described digest
+          # must match the bytes about to be published. This is the only place
+          # the manifest and the artifacts are both in hand.
+          for asset in *; do
+            [ "$asset" = "SHA256SUMS" ] && continue
+            if ! awk -v a="$asset" '$2 == a { found = 1 } END { exit !found }' SHA256SUMS; then
+              echo "::error::${asset} is being uploaded with no SHA256SUMS entry"
+              exit 1
+            fi
+          done
+          sha256sum -c SHA256SUMS
           {
             echo "### Binary checksums"
             echo '```'
@@ -139,7 +159,13 @@ jobs:
           MCP_ASSET="vaultspec-mcp-x86_64-pc-windows-msvc.exe"
           H_CORE=$(awk -v a="$CORE_ASSET" '$2==a{print $1}' dist-bin/SHA256SUMS)
           H_MCP=$(awk -v a="$MCP_ASSET" '$2==a{print $1}' dist-bin/SHA256SUMS)
-          test -n "$VERSION" && test -n "$H_CORE" && test -n "$H_MCP"
+          # Checked one per statement. `set -e` exempts every command in an
+          # AND-list except the last, so `test -n "$A" && test -n "$B"` does not
+          # abort when $A is empty - it just returns 1 and execution continues.
+          # That is how an empty hash reached the committed manifest before.
+          : "${VERSION:?empty version derived from tag ${TAG}}"
+          : "${H_CORE:?no digest for ${CORE_ASSET} in SHA256SUMS}"
+          : "${H_MCP:?no digest for ${MCP_ASSET} in SHA256SUMS}"
           # Refuse to bump the manifest to a version older than what is already
           # committed (guards against a stale re-run clobbering a newer bump).
           CURRENT=$(jq -r '.version' "$MANIFEST")
