@@ -10,7 +10,7 @@ rather than invented, and a pointer never moves backward.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -79,13 +79,15 @@ def test_scoop_manifest_pins_the_release_digests() -> None:
 
     manifest = scoop.render_manifest(VAULTSPEC_CORE, VERSION, digests)
 
-    urls = manifest["url"]
-    hashes = manifest["hash"]
-    assert isinstance(urls, list)
-    assert isinstance(hashes, list)
+    # The manifest is a JSON document, so its values are `object`. Narrow
+    # explicitly rather than letting the element types stay unknown: the
+    # assertion below is about the pairing of URLs to digests, and a silently
+    # unknown element type would let that pairing be checked as `object`.
+    urls = cast("list[str]", manifest["url"])
+    hashes = cast("list[str]", manifest["hash"])
     assert len(urls) == len(hashes) == len(VAULTSPEC_CORE.executables)
     for url, digest in zip(urls, hashes, strict=True):
-        assert digest == digests[str(url).rsplit("/", 1)[-1]]
+        assert digest == digests[url.rsplit("/", 1)[-1]]
 
 
 def test_scoop_manifest_never_emits_an_empty_hash() -> None:
