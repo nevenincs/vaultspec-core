@@ -5,7 +5,7 @@ tags:
 date: '2026-08-28'
 modified: '2026-08-28'
 body_schema: 'body-v2'
-body_hash: 'sha256:ee0ee33e0d4a9a16db7cae91430673a054f8003780e0ce35308dc83715135f03'
+body_hash: 'sha256:a6c77484ae95e7d5fb9e2f85fb1f0b00e9f9f9114fd213b623bafd50a120c421'
 related:
   - "[[2026-03-22-clci-release-adr]]"
   - '[[2026-08-28-binary-portability-research]]'
@@ -74,9 +74,10 @@ better supported on gnu. Rejected as disproportionate.
   and the Rust toolchain support, and above by the oldest platform the project
   intends to serve. Any image at or under the floor works; the floor is the
   decision, the image is an implementation detail.
-- The full PyApp build inside a container is unproven - the probe covered the
-  compiler and libc, not `cargo install pyapp` with `uv` present. This is the
-  one frontier risk and it gates the Linux half of the work.
+- The container build carries no remaining frontier risk: the full builder
+  reproduces inside the pinned image and the artifact runs on the platform the
+  published one cannot load on (`2026-08-28-binary-portability-research`). The
+  image must have the toolchain provisioned into it, which is the only cost.
 - Executing artifacts depends on the self-hosted fleet, which has no Intel
   macOS host and no host for any platform below the declared floor. The
   contract must therefore be satisfiable by static assertion alone for those.

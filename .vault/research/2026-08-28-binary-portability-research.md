@@ -5,7 +5,7 @@ tags:
 date: '2026-08-28'
 modified: '2026-08-28'
 body_schema: 'body-v2'
-body_hash: 'sha256:29285b4b12b8c14ccea1e3ca394c26271d4aa61899883eeea00a65cfe1e99689'
+body_hash: 'sha256:261cdd87d90d182f0b3392a458b24a0dab596baeb69642bee6d84aa55eb2dec6'
 related: []
 ---
 
@@ -129,13 +129,31 @@ release asset. They are recorded here so the ADR can decide whether the
 enforcement point it establishes covers them, and are not otherwise
 investigated.
 
+### The real build reproduces end to end in the pinned container
+
+The full builder - not the probe - was run inside
+`quay.io/pypa/manylinux_2_28_x86_64` against version `0.1.60`, with `rustup`
+and `uv` provisioned into the image. Both binaries built, and the resulting
+`vaultspec-core-x86_64-unknown-linux-gnu` requires nothing above `GLIBC_2.28`:
+
+```
+GLIBC_2.2.5  GLIBC_2.3   GLIBC_2.3.2 GLIBC_2.3.4 GLIBC_2.4  GLIBC_2.6
+GLIBC_2.7    GLIBC_2.9   GLIBC_2.12  GLIBC_2.14  GLIBC_2.15 GLIBC_2.16
+GLIBC_2.17   GLIBC_2.18  GLIBC_2.25  GLIBC_2.27  GLIBC_2.28
+```
+
+The same artifact then ran on `almalinux:9` and reported `0.1.60`, which is the
+platform the published binary fails to load on at all. Artifact size is
+unchanged at 37 MB.
+
+This closes the only frontier risk the approach carried: the image needs the
+toolchain installed into it, and nothing else about the build changes.
+
 ### What was not investigated
 
-Whether the full PyApp build - as opposed to the probe above - succeeds inside
-the same container; it needs `cargo` and `uv`, neither of which the image
-carries by default. Whether embedding
-the project wheel changes the artifact size enough to matter - the Linux binary
-is currently 37 MB and the wheel is small, but this was not measured. Whether
+Whether embedding the project wheel changes the artifact size enough to matter
+\- the Linux binary is currently 37 MB and the wheel is small, but this was not
+measured. Whether
 the `linux-arm64` runner already registered to the repository should carry an
 `aarch64-unknown-linux-gnu` target, which is a matrix-coverage question rather
 than a portability one. No macOS host was reachable for direct inspection, so
