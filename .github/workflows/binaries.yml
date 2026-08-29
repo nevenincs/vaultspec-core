@@ -7,6 +7,11 @@ on:
         description: "Release tag to build binaries for (e.g. vaultspec-core-v0.1.48)"
         required: true
         type: string
+      allow_queue:
+        description: "Build even if a leg's runner is offline (the job will queue, not fail)."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -16,7 +21,75 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Refuse to start a build whose runners cannot serve it.
+  #
+  # A job whose `runs-on` matches no ONLINE runner does not fail - it QUEUES,
+  # and a queued job is not bounded by `timeout-minutes`, so nothing in this
+  # file can rescue it. v0.1.57, v0.1.58 and v0.1.59 ran 19h53m, 24h00m03s and
+  # 24h00m03s before failing, and all three shipped no binaries.
+  #
+  # Three of this matrix's five legs land on the one power-gated MacBook, which
+  # serves runners only on AC. That is correct behaviour and this job does not
+  # fight it - it just refuses to spend a day discovering it. Dispatch again
+  # once the host is on AC, or set `allow_queue` to wait deliberately.
+  #
+  # Hosted, deliberately: a preflight that needs the fleet cannot report that
+  # the fleet is down.
+  preflight:
+    name: Preflight runners
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every matrix selector has an online runner
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ALLOW_QUEUE: ${{ inputs.allow_queue }}
+        run: |
+          set -euo pipefail
+          runners=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runners"             --jq '.runners[] | [.status, ([.labels[].name] | map(ascii_downcase) | join(","))] | @tsv')
+          [ -n "${runners}" ] || { echo "::error::no self-hosted runners are registered"; exit 1; }
+
+          # The selectors this workflow's matrix actually requires. Kept as an
+          # array rather than a here-doc so every line stays inside the YAML
+          # block scalar's indentation.
+          selectors=(
+            "self-hosted,linux,x64,build"
+            "self-hosted,windows,x64"
+            "self-hosted,macos,arm64"
+            "self-hosted,linux,arm64"
+          )
+
+          failed=0
+          for want in "${selectors[@]}"; do
+            online=0; registered=0
+            while IFS=$'	' read -r status labels; do
+              missing=0
+              IFS=',' read -ra parts <<< "${want}"
+              for part in "${parts[@]}"; do
+                case ",${labels}," in *",${part},"*) ;; *) missing=1; break ;; esac
+              done
+              [ "${missing}" -eq 0 ] || continue
+              registered=$((registered + 1))
+              [ "${status}" = "online" ] && online=$((online + 1))
+            done <<< "${runners}"
+
+            if [ "${online}" -gt 0 ]; then
+              echo "ok        [${want}] -> ${online} online"
+            elif [ "${ALLOW_QUEUE}" = "true" ]; then
+              echo "::warning::[${want}] has no online runner; continuing because allow_queue is set."
+            elif [ "${registered}" -eq 0 ]; then
+              echo "::error::[${want}] is carried by no registered runner." >&2
+              failed=1
+            else
+              echo "::error::[${want}] matches ${registered} runner(s), none online - usually the power-gated host on battery. Dispatch again on AC." >&2
+              failed=1
+            fi
+          done
+
+          [ "${failed}" -eq 0 ] || { echo "::error::preflight refused a build that would queue rather than run" >&2; exit 1; }
+
   build:
+    needs: preflight
     name: Build ${{ matrix.name }}
     strategy:
       fail-fast: false
