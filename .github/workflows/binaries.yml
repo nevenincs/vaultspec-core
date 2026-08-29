@@ -7,6 +7,11 @@ on:
         description: "Release tag to build binaries for (e.g. vaultspec-core-v0.1.48)"
         required: true
         type: string
+      allow_queue:
+        description: "Build even if a leg's runner is offline (the job will queue, not fail)."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -16,7 +21,90 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Refuse to start a build whose runners cannot serve it.
+  #
+  # A job whose `runs-on` matches no ONLINE runner does not fail - it QUEUES,
+  # and a queued job is not bounded by `timeout-minutes`, so nothing in this
+  # file can rescue it. v0.1.57, v0.1.58 and v0.1.59 ran 19h53m, 24h00m03s and
+  # 24h00m03s before failing, and all three shipped no binaries.
+  #
+  # Three of this matrix's five legs land on the one power-gated MacBook, which
+  # serves runners only on AC. That is correct behaviour and this job does not
+  # fight it - it just refuses to spend a day discovering it. Dispatch again
+  # once the host is on AC, or set `allow_queue` to wait deliberately.
+  #
+  # Hosted, deliberately: a preflight that needs the fleet cannot report that
+  # the fleet is down.
+  preflight:
+    name: Preflight runners
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every matrix selector has an online runner
+        shell: bash
+        env:
+          # A PAT with `administration: read` if configured; the default token
+          # otherwise. The default GITHUB_TOKEN CANNOT read `actions/runners` -
+          # that endpoint needs admin - so without the PAT this check is blind
+          # and says so rather than guessing.
+          GH_TOKEN: ${{ secrets.FLEET_PREFLIGHT_TOKEN || secrets.GITHUB_TOKEN }}
+          ALLOW_QUEUE: ${{ inputs.allow_queue }}
+        run: |
+          # NOT `set -e`. An unobservable preflight must not refuse a build: the
+          # `gh api` below returns 403 under the default GITHUB_TOKEN, and under
+          # `set -e` that aborts the step and skips everything downstream. It
+          # blocked vaultspec-dashboard v0.1.6 exactly that way. A check that
+          # cannot tell "no runner" from "cannot see runners" must not speak for
+          # the first.
+          set -uo pipefail
+          if ! runners=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runners" --jq '.runners[] | [.status, ([.labels[].name] | map(ascii_downcase) | join(","))] | @tsv' 2>&1); then
+            echo "::warning::preflight cannot read the runner list: ${runners}"
+            echo "::warning::The default GITHUB_TOKEN cannot read actions/runners. Set FLEET_PREFLIGHT_TOKEN to a PAT with administration:read to enable this check."
+            echo "::warning::SKIPPING - unobservable is not the same as unserviceable."
+            exit 0
+          fi
+          [ -n "${runners}" ] || { echo "::error::no self-hosted runners are registered"; exit 1; }
+
+          # The selectors this workflow's matrix actually requires. Kept as an
+          # array rather than a here-doc so every line stays inside the YAML
+          # block scalar's indentation.
+          selectors=(
+            "self-hosted,linux,x64,build"
+            "self-hosted,windows,x64"
+            "self-hosted,macos,arm64"
+            "self-hosted,linux,arm64"
+          )
+
+          failed=0
+          for want in "${selectors[@]}"; do
+            online=0; registered=0
+            while IFS=$'	' read -r status labels; do
+              missing=0
+              IFS=',' read -ra parts <<< "${want}"
+              for part in "${parts[@]}"; do
+                case ",${labels}," in *",${part},"*) ;; *) missing=1; break ;; esac
+              done
+              [ "${missing}" -eq 0 ] || continue
+              registered=$((registered + 1))
+              [ "${status}" = "online" ] && online=$((online + 1))
+            done <<< "${runners}"
+
+            if [ "${online}" -gt 0 ]; then
+              echo "ok        [${want}] -> ${online} online"
+            elif [ "${ALLOW_QUEUE}" = "true" ]; then
+              echo "::warning::[${want}] has no online runner; continuing because allow_queue is set."
+            elif [ "${registered}" -eq 0 ]; then
+              echo "::error::[${want}] is carried by no registered runner." >&2
+              failed=1
+            else
+              echo "::error::[${want}] matches ${registered} runner(s), none online - usually the power-gated host on battery. Dispatch again on AC." >&2
+              failed=1
+            fi
+          done
+
+          [ "${failed}" -eq 0 ] || { echo "::error::preflight refused a build that would queue rather than run" >&2; exit 1; }
+
   build:
+    needs: preflight
     name: Build ${{ matrix.name }}
     strategy:
       fail-fast: false
@@ -154,18 +242,32 @@ jobs:
     permissions:
       contents: write
     steps:
-      # Check out main so the channel-pointer steps can regenerate and
-      # commit the in-repo Scoop manifest and Homebrew formula after the
-      # assets are attached. The SSH deploy
-      # key authenticates the manifest push: main is protected by a ruleset
-      # that requires status checks, and a deploy-key push is a bypass actor,
-      # so the automated bump lands without a human-gated PR while every other
-      # push stays gated.
+      # This repo, for the generator itself. No deploy key and no push: the
+      # channel pointers no longer live here.
       - name: Checkout
         uses: actions/checkout@v6
         with:
           ref: main
-          ssh-key: ${{ secrets.SCOOP_DEPLOY_KEY }}
+
+      # The ORG-WIDE distribution repository, which is where Scoop manifests
+      # and Homebrew formulae belong. `nevenincs/homebrew-tap` serves both
+      # package managers for every product under the account, so a user taps or
+      # bucket-adds ONCE, ever - not once per product.
+      #
+      # Publishing into the product repo instead, as this workflow used to,
+      # costs two things its own README argues against: it multiplies that
+      # one-time step by the number of products, and it commits to a public
+      # product repo's default branch on every release. The odd-looking name is
+      # the whole price of the arrangement - Homebrew's one-argument tap form
+      # requires a `homebrew-` prefix, and Scoop constrains nothing, so one
+      # repository satisfies both.
+      - name: Checkout the distribution repository
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.repository_owner }}/homebrew-tap
+          ref: main
+          path: channels
+          ssh-key: ${{ secrets.CHANNEL_ROOT_DEPLOY_KEY }}
 
       # The channel generator runs in this job, so it needs an interpreter
       # here too; previously only the build matrix installed one.
@@ -252,7 +354,11 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          uv run --no-project --python 3.13 --             python -m dev.packaging.generate               --tag "${TAG}"               --checksums dist-bin/SHA256SUMS
+          # --root is why this needed no generator change: the paths were
+          # always parameterised (root/bucket/<product>.json,
+          # root/Formula/<product>.rb) and only the workflow assumed they were
+          # this repository's.
+          uv run --no-project --python 3.13 --             python -m dev.packaging.generate               --tag "${TAG}"               --checksums dist-bin/SHA256SUMS               --root channels
 
       - name: Commit the Scoop manifest and Homebrew formula
         shell: bash
@@ -260,18 +366,36 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          if git diff --quiet -- bucket Formula; then
+          cd channels
+
+          # Stage only THIS product's two files. The distribution repo serves
+          # every product under the account, so `git add -- bucket Formula`
+          # would sweep up a sibling's pointer if two releases raced, and
+          # publish it under this tag's commit message.
+          git add -- bucket/vaultspec-core.json Formula/vaultspec-core.rb
+
+          # Compare the INDEX against HEAD, not the worktree. `git diff` reports
+          # only tracked paths, so on the first release into a channel - when
+          # these files are new and nothing tracks them yet - it reports no
+          # change and this step exits zero having published nothing. That is
+          # not hypothetical here: the distribution repo currently holds two
+          # .gitkeep files and nothing else, so the first run WILL be that case.
+          if git diff --cached --quiet -- bucket Formula; then
             echo "channels already at ${TAG}; nothing to commit"
             exit 0
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -- bucket Formula
-          git commit -m "chore(release): point scoop and homebrew at ${TAG}"
-          # This job runs after a long matrix build, so main may have advanced
-          # meanwhile. Rebase-and-retry (bounded) so an unrelated commit does not
-          # fail the push non-fast-forward; the backward-bump guard in the
-          # generator still protects against clobbering a newer pointer.
+
+          # Identity passed to this one commit rather than persisted. This
+          # runner is self-hosted and its checkout is reused by later jobs, so a
+          # `git config` identity outlives the run.
+          git -c user.name="github-actions[bot]"               -c user.email="github-actions[bot]@users.noreply.github.com"               commit -m "chore(release): point scoop and homebrew at ${TAG}"
+          # Rebase-and-retry, and it matters more here than it did in-repo.
+          # This branch is now shared by EVERY product under the account, so the
+          # racing commit is no longer just an unrelated push to this repo - it
+          # is a sibling product publishing its own pointer. Per-product staging
+          # above means such a rebase never carries someone else's file, and the
+          # generator's backward-bump refusal still stops a stale re-run from
+          # clobbering a newer pointer.
           attempt=1
           max_attempts=3
           until git push origin main; do
