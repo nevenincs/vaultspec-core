@@ -22,21 +22,33 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # A Linux binary's minimum glibc is whatever its build machine happens
+          # to offer, so this leg builds inside an image pinned at the floor
+          # dev/binaries/build_pyapp.py declares rather than on the runner,
+          # whose glibc moves whenever the host is upgraded. The builder
+          # re-reads the floor off the artifact and fails the job if it is
+          # exceeded, so the image and that declaration cannot drift apart
+          # silently. Pinned by digest: the build environment is downloaded and
+          # executed, so a mutable tag is not an acceptable input.
           - name: linux-x86_64
             runner: [self-hosted, Linux, X64, build]
             target: x86_64-unknown-linux-gnu
+            container: quay.io/pypa/manylinux_2_28_x86_64@sha256:4dc41da7df20400310c80d162a2fe2d2c2f3d9734d8dec20f6b9843711618deb
           - name: windows-x86_64
             runner: [self-hosted, Windows, X64]
             target: x86_64-pc-windows-msvc
+            container: ""
           - name: macos-aarch64
             runner: [self-hosted, macOS, ARM64]
             target: aarch64-apple-darwin
+            container: ""
           # No self-hosted macOS x86_64 host exists; PyApp cross-builds it on
           # the Apple Silicon runner (the CPython distribution is selected from
           # the cargo target triple, and clang links both arches natively).
           - name: macos-x86_64
             runner: [self-hosted, macOS, ARM64]
             target: x86_64-apple-darwin
+            container: ""
           # Linux ARM64 runs in a colima container on macbook neo, registered
           # as `macbook-neo-linux-arm-core` and provisioned by
           # ~/action-runners/containers/vaultspec-core-linux-arm/runner-entry.sh
@@ -50,12 +62,21 @@ jobs:
           # and GitHub queues new ones until AC returns. So a release dispatched
           # while the laptop is unplugged does not fail, it waits. That is true
           # of the macOS legs above as well; this leg is not special.
+          #
+          # Containerised for the same reason as the x86_64 leg: without a
+          # pinned image this artifact inherits the colima guest's glibc, and
+          # the floor check fails the job when an artifact requires more than
+          # its target declares. Same baseline, aarch64 image, likewise pinned.
           - name: linux-aarch64
             runner: [self-hosted, Linux, ARM64]
             target: aarch64-unknown-linux-gnu
+            container: quay.io/pypa/manylinux_2_28_aarch64@sha256:15ac47b9d4ff96443e73bd2165e26fa412c3044a962e96bc1593bd5798b1dc65
     # Artifact builds run on the shared self-hosted fleet (hosted multiplatform
     # runners are cost-prohibitive); see publish.yml for the same constraint.
     runs-on: ${{ matrix.runner }}
+    # Empty for every leg but the two Linux ones, which GitHub reads as
+    # "no container".
+    container: ${{ matrix.container }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -128,11 +149,32 @@ jobs:
       - name: Aggregate checksums
         shell: bash
         run: |
+          set -euo pipefail
           cd dist-bin
           # Per-asset .sha256 files are produced by build_pyapp.py; fold them
           # into one sha256sum-compatible manifest and drop the fragments.
           cat ./*.sha256 > SHA256SUMS
           rm -f ./*.sha256
+          # The generator raises on a CR, but SHA256SUMS is published as an
+          # asset in its own right and consumed by `sha256sum -c` directly, so
+          # it is verified here too - a CR lands inside an asset name and makes
+          # that entry match nothing for anyone verifying a download by hand.
+          if LC_ALL=C grep -q $'\r' SHA256SUMS; then
+            echo "::error::SHA256SUMS contains a carriage return; a builder wrote CRLF"
+            LC_ALL=C grep -n $'\r' SHA256SUMS >&2
+            exit 1
+          fi
+          # Every uploaded asset must be described, and every described digest
+          # must match the bytes about to be published. This is the only place
+          # the manifest and the artifacts are both in hand.
+          for asset in *; do
+            [ "$asset" = "SHA256SUMS" ] && continue
+            if ! awk -v a="$asset" '$2 == a { found = 1 } END { exit !found }' SHA256SUMS; then
+              echo "::error::${asset} is being uploaded with no SHA256SUMS entry"
+              exit 1
+            fi
+          done
+          sha256sum -c SHA256SUMS
           {
             echo "### Binary checksums"
             echo '```'

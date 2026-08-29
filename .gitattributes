@@ -53,6 +53,7 @@ justfile        text eol=lf
 *.7z      binary
 *.ttf     binary
 *.pyc     binary
+*.elf     binary
 *.pyo     binary
 *.pyd     binary
 *.so      binary
