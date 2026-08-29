@@ -37,6 +37,22 @@ jobs:
           - name: macos-x86_64
             runner: [self-hosted, macOS, ARM64]
             target: x86_64-apple-darwin
+          # Linux ARM64 runs in a colima container on macbook neo, registered
+          # as `macbook-neo-linux-arm-core` and provisioned by
+          # ~/action-runners/containers/vaultspec-core-linux-arm/runner-entry.sh
+          # on that host. It is enrolled in the host's two fleet scripts, which
+          # is what makes it a fleet member rather than a stray runner:
+          # runner-powergate.sh (AC-only policy) and runner-deploy-hooks.sh
+          # (post-job disk hygiene).
+          #
+          # THE FLEET SERVES ONLY ON AC POWER. On battery the gate stops every
+          # runner on this host once it is idle - it never kills a running job -
+          # and GitHub queues new ones until AC returns. So a release dispatched
+          # while the laptop is unplugged does not fail, it waits. That is true
+          # of the macOS legs above as well; this leg is not special.
+          - name: linux-aarch64
+            runner: [self-hosted, Linux, ARM64]
+            target: aarch64-unknown-linux-gnu
     # Artifact builds run on the shared self-hosted fleet (hosted multiplatform
     # runners are cost-prohibitive); see publish.yml for the same constraint.
     runs-on: ${{ matrix.runner }}
@@ -81,8 +97,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      # Check out main so the scoop-bump step can rewrite and commit the
-      # in-repo bucket manifest after the assets are attached. The SSH deploy
+      # Check out main so the channel-pointer steps can regenerate and
+      # commit the in-repo Scoop manifest and Homebrew formula after the
+      # assets are attached. The SSH deploy
       # key authenticates the manifest push: main is protected by a ruleset
       # that requires status checks, and a deploy-key push is a bypass actor,
       # so the automated bump lands without a human-gated PR while every other
@@ -92,6 +109,14 @@ jobs:
         with:
           ref: main
           ssh-key: ${{ secrets.SCOOP_DEPLOY_KEY }}
+
+      # The channel generator runs in this job, so it needs an interpreter
+      # here too; previously only the build matrix installed one.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install Python
+        run: uv python install 3.13
 
       - name: Download binaries
         uses: actions/download-artifact@v8
@@ -122,59 +147,51 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: gh release upload "${TAG}" dist-bin/* --clobber
 
-      # Bump the committed scoop manifest to the released version, reading the
-      # Windows hashes straight from the SHA256SUMS just built (scoop's
-      # checkver/autoupdate stanzas only serve maintainer tooling; `scoop
-      # install` reads the committed url/hash). Mirrors the dashboard repo's
-      # scoop-bump idiom, including the backward-bump guard.
-      - name: Bump scoop manifest
+      # Regenerate BOTH release-channel pointers from the SHA256SUMS just
+      # built, then commit them. A Scoop manifest and a Homebrew formula are
+      # pointers a user's package manager acts on, so they are generated whole
+      # by dev/packaging rather than edited in place here.
+      #
+      # This replaced an inline jq rewrite, and the reason is worth keeping:
+      # that version looked digests up with awk and guarded the result with
+      # `test -n "$A" && test -n "$B" && test -n "$C"`, which is INERT under
+      # `set -e` - bash exempts every command in an && list except the one
+      # after the final &&. When the Windows build leg emitted CRLF checksum
+      # sidecars, the awk lookup matched nothing, the guard did not fire, and
+      # vaultspec-core-v0.1.60 published a manifest with empty hashes out of a
+      # green run. The generator raises on a missing digest, refuses a
+      # backward bump, and omits an unbuilt platform instead of inventing one.
+      - name: Generate release channel pointers
         shell: bash
         env:
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          MANIFEST="bucket/vaultspec-core.json"
-          VERSION="${TAG#vaultspec-core-v}"
-          CORE_ASSET="vaultspec-core-x86_64-pc-windows-msvc.exe"
-          MCP_ASSET="vaultspec-mcp-x86_64-pc-windows-msvc.exe"
-          H_CORE=$(awk -v a="$CORE_ASSET" '$2==a{print $1}' dist-bin/SHA256SUMS)
-          H_MCP=$(awk -v a="$MCP_ASSET" '$2==a{print $1}' dist-bin/SHA256SUMS)
-          test -n "$VERSION" && test -n "$H_CORE" && test -n "$H_MCP"
-          # Refuse to bump the manifest to a version older than what is already
-          # committed (guards against a stale re-run clobbering a newer bump).
-          CURRENT=$(jq -r '.version' "$MANIFEST")
-          if [ "$CURRENT" != "0.0.0" ] && [ "$CURRENT" != "$VERSION" ] && \
-             [ "$(printf '%s\n' "$CURRENT" "$VERSION" | sort -V | tail -1)" = "$CURRENT" ]; then
-            echo "manifest is at ${CURRENT}, refusing to bump backward to ${VERSION}"
-            exit 1
-          fi
-          BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
-          jq \
-            --arg v "$VERSION" \
-            --arg uc "${BASE}/${CORE_ASSET}" \
-            --arg um "${BASE}/${MCP_ASSET}" \
-            --arg hc "$H_CORE" \
-            --arg hm "$H_MCP" \
-            '.version = $v | .url = [$uc, $um] | .hash = [$hc, $hm]' \
-            "$MANIFEST" > "${MANIFEST}.tmp"
-          mv "${MANIFEST}.tmp" "$MANIFEST"
-          if git diff --quiet -- "$MANIFEST"; then
-            echo "manifest already at ${VERSION}; nothing to bump"
+          uv run --no-project --python 3.13 --             python -m dev.packaging.generate               --tag "${TAG}"               --checksums dist-bin/SHA256SUMS
+
+      - name: Commit the Scoop manifest and Homebrew formula
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- bucket Formula; then
+            echo "channels already at ${TAG}; nothing to commit"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "$MANIFEST"
-          git commit -m "chore(scoop): bump manifest to ${TAG}"
+          git add -- bucket Formula
+          git commit -m "chore(release): point scoop and homebrew at ${TAG}"
           # This job runs after a long matrix build, so main may have advanced
           # meanwhile. Rebase-and-retry (bounded) so an unrelated commit does not
-          # fail the push non-fast-forward; the backward-bump guard above still
-          # protects against clobbering a newer manifest.
+          # fail the push non-fast-forward; the backward-bump guard in the
+          # generator still protects against clobbering a newer pointer.
           attempt=1
           max_attempts=3
           until git push origin main; do
             if [ "$attempt" -ge "$max_attempts" ]; then
-              echo "::error::scoop manifest push failed after ${max_attempts} attempts"
+              echo "::error::channel pointer push failed after ${max_attempts} attempts"
               exit 1
             fi
             echo "push rejected (attempt ${attempt}/${max_attempts}); rebasing onto origin/main"

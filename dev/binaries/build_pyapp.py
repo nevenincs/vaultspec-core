@@ -155,10 +155,21 @@ def asset_name(binary: Binary, target: str) -> str:
 
 
 def write_checksum(asset: Path) -> Path:
-    """Write ``<asset>.sha256`` in ``sha256sum``-compatible format."""
+    """Write ``<asset>.sha256`` in ``sha256sum``-compatible format.
+
+    ``newline=""`` is load-bearing, not cosmetic. Without it Python's text
+    layer rewrites the trailing newline to the host line ending, so the
+    Windows leg of the release matrix emits CRLF while every other leg emits
+    LF. The aggregated ``SHA256SUMS`` then carries mixed endings and both
+    downstream readers break on exactly the Windows rows: ``sha256sum -c``
+    refuses to verify them, and a field-splitting reader sees the asset name
+    with a trailing carriage return, so a lookup by name finds nothing. That
+    is how vaultspec-core-v0.1.60 published a Scoop manifest with empty
+    hashes out of a green run.
+    """
     digest = hashlib.sha256(asset.read_bytes()).hexdigest()
     checksum = asset.with_name(asset.name + ".sha256")
-    checksum.write_text(f"{digest}  {asset.name}\n", encoding="utf-8")
+    checksum.write_text(f"{digest}  {asset.name}\n", encoding="utf-8", newline="")
     return checksum
 
 
