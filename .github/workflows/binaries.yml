@@ -1,6 +1,21 @@
 name: Binaries
 
+# BUILDS ON A TAG, not only on dispatch.
+#
+# Dispatch-only is what let vaultspec-rag-v0.4.12 become `latest` carrying the
+# Python distribution and no platform binaries at all: cutting a release simply
+# did not build them, and nobody was going to remember. The artifact-less-release
+# guard could not catch it either - that guard lives in THIS workflow, and a
+# workflow that never runs cannot demote anything. It was unreachable, not
+# broken.
+#
+# vaultspec-dashboard has never had this problem because its release workflow
+# runs on tag push. This brings core to the same shape. Dispatch is kept for
+# repairing a tag whose build failed.
 on:
+  push:
+    tags:
+      - "vaultspec-core-v*"
   workflow_dispatch:
     inputs:
       tag:
@@ -17,7 +32,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: binaries-${{ inputs.tag }}
+  group: binaries-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -178,7 +193,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.tag || github.ref_name }}
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -194,7 +209,7 @@ jobs:
       - name: Build binaries
         shell: bash
         env:
-          TAG: ${{ inputs.tag }}
+          TAG: ${{ inputs.tag || github.ref_name }}
           TARGET: ${{ matrix.target }}
         run: |
           uv run --no-project --python 3.13 -- \
@@ -291,7 +306,7 @@ jobs:
           # `gh release download` fails, the merge no-ops, and that is
           # indistinguishable from success.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
           # With partial attach allowed, "no artifacts at all" is now reachable -
@@ -355,7 +370,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: gh release upload "${TAG}" dist-bin/* --clobber
 
       # Regenerate BOTH release-channel pointers from the SHA256SUMS just
@@ -375,7 +390,7 @@ jobs:
       - name: Generate release channel pointers
         shell: bash
         env:
-          TAG: ${{ inputs.tag }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
           # --root is why this needed no generator change: the paths were
@@ -387,7 +402,7 @@ jobs:
       - name: Commit the Scoop manifest and Homebrew formula
         shell: bash
         env:
-          TAG: ${{ inputs.tag }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
           cd channels
@@ -442,7 +457,7 @@ jobs:
       - name: Assert every declared target attached
         shell: bash
         env:
-          TAG: ${{ inputs.tag }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
           expected=(
