@@ -525,6 +525,11 @@ reportInvalidCast = "error"
   [[tool.basedpyright.executionEnvironments]]
   extraPaths = ["."]
   reportPrivateUsage = false
+  root = "dev/packaging/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  extraPaths = ["."]
+  reportPrivateUsage = false
   root = "dev/health/tests"
 
   [[tool.basedpyright.executionEnvironments]]

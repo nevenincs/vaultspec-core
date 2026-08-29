@@ -1,11 +1,4 @@
 {
-  "##": [
-    "version/url/hash are rewritten by the scoop-bump step in binaries.yml once a",
-    "vaultspec-core-vX.Y.Z release publishes the Windows assets and SHA256SUMS.",
-    "`scoop install` reads the committed url/hash pair, so an empty hash means the",
-    "download runs with no integrity check at all; the checkver + autoupdate stanzas",
-    "below only serve maintainer tooling and are not consulted on install."
-  ],
   "version": "0.1.60",
   "description": "Spec-driven development framework - vaultspec-core CLI and MCP server",
   "homepage": "https://github.com/nevenincs/vaultspec-core",
@@ -13,6 +6,10 @@
   "url": [
     "https://github.com/nevenincs/vaultspec-core/releases/download/vaultspec-core-v0.1.60/vaultspec-core-x86_64-pc-windows-msvc.exe",
     "https://github.com/nevenincs/vaultspec-core/releases/download/vaultspec-core-v0.1.60/vaultspec-mcp-x86_64-pc-windows-msvc.exe"
+  ],
+  "hash": [
+    "7452312e47a9eb7a7674174d359b78dd9689b60b1c6c955ac39387a71c42a365",
+    "a3794b80af72b16e030825590c6664113c20e7e10e4ae18d983636916e9f1f2a"
   ],
   "bin": [
     [
@@ -38,8 +35,9 @@
       "regex": "$sha256\\s+$basename"
     }
   },
-  "hash": [
-    "7452312e47a9eb7a7674174d359b78dd9689b60b1c6c955ac39387a71c42a365",
-    "a3794b80af72b16e030825590c6664113c20e7e10e4ae18d983636916e9f1f2a"
+  "notes": [
+    "Installs vaultspec-core and vaultspec-mcp.",
+    "First launch bootstraps the pinned runtime; needs network once.",
+    "Verify with: vaultspec-core --version"
   ]
 }

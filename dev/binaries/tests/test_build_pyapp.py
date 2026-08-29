@@ -92,14 +92,14 @@ def test_write_checksum_emits_sha256sum_format(tmp_path: Path) -> None:
     assert checksum.read_bytes() == f"{ABC_DIGEST}  {asset.name}\n".encode()
 
 
-def test_write_checksum_never_emits_a_carriage_return(tmp_path: Path) -> None:
-    """A CR rides into the asset name once the sidecars are concatenated.
+def test_write_checksum_is_lf_terminated_on_every_build_host(tmp_path: Path) -> None:
+    """The sidecar bytes are LF, so the aggregated SHA256SUMS is not mixed.
 
-    The published ``SHA256SUMS`` is the union of these fragments. A ``\r`` ahead
-    of the newline makes the trailing field ``<name>\r``, which no ``sha256sum
-    -c`` run and no name-matching consumer resolves - the release then ships an
-    integrity manifest that silently matches nothing for that asset, and the
-    scoop bump reads an empty hash for it.
+    Asserted on raw bytes deliberately. The sibling assertion above reads the
+    file in text mode, which translates CRLF back to LF on Windows and so
+    reports a passing contract for a file that carries the host's endings -
+    the exact reason the CRLF defect behind vaultspec-core-v0.1.60's empty
+    Scoop hashes shipped under a green suite.
     """
     asset = tmp_path / "vaultspec-core-x86_64-pc-windows-msvc.exe"
     asset.write_bytes(b"abc")
@@ -107,7 +107,7 @@ def test_write_checksum_never_emits_a_carriage_return(tmp_path: Path) -> None:
     raw = write_checksum(asset).read_bytes()
 
     assert b"\r" not in raw
-    assert raw.split(b"  ", 1)[1] == asset.name.encode() + b"\n"
+    assert raw == f"{ABC_DIGEST}  {asset.name}\n".encode()
 
 
 def test_write_checksum_hashes_the_asset_bytes(tmp_path: Path) -> None:
