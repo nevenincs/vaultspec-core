@@ -40,6 +40,7 @@ import argparse
 import hashlib
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -56,6 +57,31 @@ PROJECT_NAME = "vaultspec-core"
 
 # Embedded CPython series. Must satisfy the package's requires-python.
 PYTHON_VERSION = "3.13"
+
+# The platform contract, per target triple: the highest ``GLIBC_x.y`` symbol
+# version an artifact for that target is permitted to require. This is the
+# promise a download makes about which systems it loads on, and it is declared
+# here rather than inherited from whichever machine ran the build - an
+# inherited floor moves silently the next time a runner is upgraded.
+#
+# 2.28 is the manylinux_2_28 baseline and sits below every distribution the
+# install documentation names; RHEL 9 and its rebuilds are the binding
+# constraint at 2.34.
+#
+# A target absent from this table declares no libc floor: macOS and Windows
+# pin theirs through the SDK and the CRT, neither of which is expressed as an
+# ELF symbol version.
+GLIBC_FLOOR: dict[str, tuple[int, ...]] = {
+    "x86_64-unknown-linux-gnu": (2, 28),
+    "aarch64-unknown-linux-gnu": (2, 28),
+}
+
+# Section type of the GNU version-requirements table (``.gnu.version_r``).
+SHT_GNU_VERNEED = 0x6FFFFFFE
+
+
+class PlatformFloorError(RuntimeError):
+    """An artifact requires a platform newer than its target triple declares."""
 
 
 @dataclass(frozen=True)
@@ -173,6 +199,111 @@ def write_checksum(asset: Path) -> Path:
     return checksum
 
 
+def _cstring(blob: bytes, offset: int) -> str:
+    """Read the NUL-terminated string starting at *offset*."""
+    end = blob.index(b"\x00", offset)
+    return blob[offset:end].decode("utf-8")
+
+
+def required_symbol_versions(asset: Path) -> set[str]:
+    """Return every versioned symbol requirement recorded in an ELF binary.
+
+    Read from the binary's own ``.gnu.version_r`` table, which is what the
+    dynamic loader consults. A requirement recorded there is fatal at load time
+    when the host's libc does not define that version, whether or not the
+    symbols naming it are weak - so this, not the symbol bindings, is the thing
+    that decides where an artifact can run.
+
+    Parsed here rather than shelled out to ``readelf`` so the check needs
+    nothing on the build machine but the standard library, and runs identically
+    on a maintainer's laptop.
+    """
+    blob = asset.read_bytes()
+    if blob[:4] != b"\x7fELF":
+        raise PlatformFloorError(f"{asset.name} is not an ELF binary")
+    if (blob[4], blob[5]) != (2, 1):
+        raise PlatformFloorError(
+            f"{asset.name} is not little-endian ELF64; "
+            "every Linux target this builder produces is"
+        )
+
+    (section_table,) = struct.unpack_from("<Q", blob, 0x28)
+    entry_size, count = struct.unpack_from("<HH", blob, 0x3A)
+
+    versions: set[str] = set()
+    for index in range(count):
+        header = section_table + index * entry_size
+        (kind,) = struct.unpack_from("<I", blob, header + 0x04)
+        if kind != SHT_GNU_VERNEED:
+            continue
+        (offset,) = struct.unpack_from("<Q", blob, header + 0x18)
+        strings, entries = struct.unpack_from("<II", blob, header + 0x28)
+        # sh_link names the string table the version names live in; sh_info
+        # counts the top-level entries, one per needed shared object.
+        (string_table,) = struct.unpack_from(
+            "<Q", blob, section_table + strings * entry_size + 0x18
+        )
+        versions |= _verneed_names(blob, offset, entries, string_table)
+    return versions
+
+
+def _verneed_names(
+    blob: bytes, offset: int, entries: int, string_table: int
+) -> set[str]:
+    """Walk one ``.gnu.version_r`` table, returning the versions it requires."""
+    names: set[str] = set()
+    for _ in range(entries):
+        auxiliary, next_entry = struct.unpack_from("<II", blob, offset + 0x08)
+        cursor = offset + auxiliary
+        (auxiliary_count,) = struct.unpack_from("<H", blob, offset + 0x02)
+        for _ in range(auxiliary_count):
+            name, next_auxiliary = struct.unpack_from("<II", blob, cursor + 0x08)
+            names.add(_cstring(blob, string_table + name))
+            if not next_auxiliary:
+                break
+            cursor += next_auxiliary
+        if not next_entry:
+            break
+        offset += next_entry
+    return names
+
+
+def glibc_version(requirement: str) -> tuple[int, ...] | None:
+    """Return the numeric version of a ``GLIBC_x.y`` requirement, else None."""
+    prefix = "GLIBC_"
+    if not requirement.startswith(prefix):
+        return None
+    parts = requirement[len(prefix) :].split(".")
+    if not all(part.isdigit() for part in parts):
+        return None
+    return tuple(int(part) for part in parts)
+
+
+def check_platform_floor(asset: Path, target: str) -> None:
+    """Fail the build when *asset* requires a libc newer than *target* allows.
+
+    The build machine's glibc is what an unpinned Linux build ends up
+    advertising, so this runs on the produced artifact rather than on the
+    toolchain: it is the artifact, not the builder, that a user downloads.
+    """
+    floor = GLIBC_FLOOR.get(target)
+    if floor is None:
+        return
+    exceeded = sorted(
+        requirement
+        for requirement in required_symbol_versions(asset)
+        if (version := glibc_version(requirement)) is not None and version > floor
+    )
+    if exceeded:
+        declared = ".".join(str(part) for part in floor)
+        raise PlatformFloorError(
+            f"{asset.name} requires {', '.join(exceeded)} but {target} declares a "
+            f"floor of GLIBC_{declared}. The binary will not load on any host "
+            f"below the versions it requires. Build this target against a libc "
+            f"at or below the declared floor rather than the build machine's."
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group(required=True)
@@ -205,6 +336,7 @@ def main() -> int:
             shutil.copy2(raw, asset)
             if not target.endswith("windows-msvc"):
                 asset.chmod(0o755)
+            check_platform_floor(asset, target)
             checksum = write_checksum(asset)
             produced.extend((asset, checksum))
             print(f"built {asset} ({asset.stat().st_size} bytes)", flush=True)
