@@ -42,11 +42,26 @@ jobs:
       - name: Every matrix selector has an online runner
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A PAT with `administration: read` if configured; the default token
+          # otherwise. The default GITHUB_TOKEN CANNOT read `actions/runners` -
+          # that endpoint needs admin - so without the PAT this check is blind
+          # and says so rather than guessing.
+          GH_TOKEN: ${{ secrets.FLEET_PREFLIGHT_TOKEN || secrets.GITHUB_TOKEN }}
           ALLOW_QUEUE: ${{ inputs.allow_queue }}
         run: |
-          set -euo pipefail
-          runners=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runners"             --jq '.runners[] | [.status, ([.labels[].name] | map(ascii_downcase) | join(","))] | @tsv')
+          # NOT `set -e`. An unobservable preflight must not refuse a build: the
+          # `gh api` below returns 403 under the default GITHUB_TOKEN, and under
+          # `set -e` that aborts the step and skips everything downstream. It
+          # blocked vaultspec-dashboard v0.1.6 exactly that way. A check that
+          # cannot tell "no runner" from "cannot see runners" must not speak for
+          # the first.
+          set -uo pipefail
+          if ! runners=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runners" --jq '.runners[] | [.status, ([.labels[].name] | map(ascii_downcase) | join(","))] | @tsv' 2>&1); then
+            echo "::warning::preflight cannot read the runner list: ${runners}"
+            echo "::warning::The default GITHUB_TOKEN cannot read actions/runners. Set FLEET_PREFLIGHT_TOKEN to a PAT with administration:read to enable this check."
+            echo "::warning::SKIPPING - unobservable is not the same as unserviceable."
+            exit 0
+          fi
           [ -n "${runners}" ] || { echo "::error::no self-hosted runners are registered"; exit 1; }
 
           # The selectors this workflow's matrix actually requires. Kept as an
