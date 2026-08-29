@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.61](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.60...vaultspec-core-v0.1.61) (2026-08-29)
+
+
+### Features
+
+* **ci:** assert main's tip actually received a CI verdict ([#346](https://github.com/nevenincs/vaultspec-core/issues/346)) ([be0afbb](https://github.com/nevenincs/vaultspec-core/commit/be0afbb966eef0957f6020fd6e743f3e87a9359d))
+* **delivery:** generate scoop and homebrew pointers, add the linux-arm64 leg ([#344](https://github.com/nevenincs/vaultspec-core/issues/344)) ([bb2a6df](https://github.com/nevenincs/vaultspec-core/commit/bb2a6df0fed3d68550e3e653b3b20ff7a0474db5))
+
+
+### Bug Fixes
+
+* **binaries:** make the published binaries verifiable and loadable where promised ([#343](https://github.com/nevenincs/vaultspec-core/issues/343)) ([c2493cb](https://github.com/nevenincs/vaultspec-core/commit/c2493cbe5b55e3309d874c895deeaa2ebc4b392f))
+* **ci:** stop cancelling the gate run on main ([#347](https://github.com/nevenincs/vaultspec-core/issues/347)) ([5627985](https://github.com/nevenincs/vaultspec-core/commit/5627985817f4784430322cd3b0a399ac71faac04))
+* **core:** treat EACCES from the Windows lock as contention, not a fault ([#349](https://github.com/nevenincs/vaultspec-core/issues/349)) ([68e8f6b](https://github.com/nevenincs/vaultspec-core/commit/68e8f6b379beeed6f139b63333039b1a17edff6f))
+
 ## [0.1.60](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.59...vaultspec-core-v0.1.60) (2026-08-27)
 
 
