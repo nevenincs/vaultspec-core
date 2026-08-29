@@ -1,6 +1,14 @@
 name: Publish
 
 on:
+  # Tag-triggered, matching vaultspec-rag. Dispatch-only is what let 0.1.58 and
+  # 0.1.59 tag while PyPI stayed on 0.1.57: publishing depended on a human
+  # remembering, and nothing went red when they did not. The comment in this
+  # file already says a release must not depend on a laptop being plugged in;
+  # it should not depend on someone recalling a second dispatch either.
+  push:
+    tags:
+      - "vaultspec-core-v*"
   workflow_dispatch:
     inputs:
       tag:
@@ -30,7 +38,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -64,7 +72,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -105,3 +113,50 @@ jobs:
 
       - name: Publish to PyPI
         run: uv publish --check-url https://pypi.org/simple/ dist/*
+
+      # The wheel and sdist reach PyPI but never reached the GitHub Release, so
+      # the release carried binaries with no Python distribution beside them and
+      # no digests for it. vaultspec-rag attaches both; this brings core level.
+      - name: Generate checksums
+        working-directory: dist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          sha256sum ./* > SHA256SUMS
+          # MERGE rather than replace. binaries.yml publishes a SHA256SUMS to
+          # this same release, and neither workflow knows which runs first -
+          # vaultspec-rag v0.4.11 lost its wheel and sdist digests exactly this
+          # way, leaving assets on a release with nothing to verify them
+          # against. Entries for the files this run publishes are dropped from
+          # the inherited copy first, so a re-run replaces its own lines rather
+          # than duplicating them.
+          if gh release download "${TAG}" --repo "$GITHUB_REPOSITORY"                --pattern SHA256SUMS --output inherited.txt 2>/dev/null; then
+            while read -r _digest name; do
+              [ -n "${name}" ] || continue
+              grep -v -- "  ${name}$" inherited.txt > inherited.tmp || true
+              mv inherited.tmp inherited.txt
+            done < SHA256SUMS
+            cat inherited.txt >> SHA256SUMS
+            rm -f inherited.txt
+            LC_ALL=C sort -k2 -o SHA256SUMS SHA256SUMS
+          fi
+
+      - name: Ensure the GitHub Release exists
+        # release-please normally creates it before this runs, but the tag-push
+        # trigger can fire against a tag with no Release yet. --verify-tag
+        # refuses to invent one for an unpushed tag; the only failure left once
+        # the tag verifies is "already exists", which is the no-op we want.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          gh release create "${TAG}" --repo "$GITHUB_REPOSITORY"             --verify-tag --generate-notes || true
+
+      - name: Attach the distribution to the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          gh release upload "${TAG}" dist/* --repo "$GITHUB_REPOSITORY" --clobber

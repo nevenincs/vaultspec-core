@@ -286,6 +286,12 @@ jobs:
 
       - name: Aggregate checksums
         shell: bash
+        env:
+          # Needed by the merge at the end of this step. Without them
+          # `gh release download` fails, the merge no-ops, and that is
+          # indistinguishable from success.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           # With partial attach allowed, "no artifacts at all" is now reachable -
@@ -320,6 +326,24 @@ jobs:
             fi
           done
           sha256sum -c SHA256SUMS
+
+          # MERGE only after the local verification above. publish.yml writes a
+          # SHA256SUMS to this same release for the wheel and sdist, and neither
+          # workflow knows which runs first - vaultspec-rag v0.4.11 lost its
+          # distribution digests exactly that way. Merging BEFORE the check
+          # would break it instead: `sha256sum -c` verifies every line, and the
+          # inherited entries name files that are not in this directory.
+          if gh release download "${TAG}" --repo "$GITHUB_REPOSITORY"                --pattern SHA256SUMS --output inherited.txt 2>/dev/null; then
+            while read -r _digest name; do
+              [ -n "${name}" ] || continue
+              grep -v -- "  ${name}$" inherited.txt > inherited.tmp || true
+              mv inherited.tmp inherited.txt
+            done < SHA256SUMS
+            cat inherited.txt >> SHA256SUMS
+            rm -f inherited.txt
+            LC_ALL=C sort -k2 -o SHA256SUMS SHA256SUMS
+          fi
+
           {
             echo "### Binary checksums"
             echo '```'
