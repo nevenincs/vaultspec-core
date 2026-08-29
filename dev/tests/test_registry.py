@@ -24,7 +24,14 @@ JUSTFILE = Path(__file__).resolve().parents[2] / "justfile"
 #: Recipes that deliberately do not route through `python -m dev`: `bootstrap`
 #: must work before a virtual environment exists, and the rest wrap a single
 #: external entry point that has no target dispatch to model.
-NON_REGISTRY_RECIPES = frozenset({"default", "bootstrap", "analytics", "binaries"})
+NON_REGISTRY_RECIPES = frozenset(
+    # `binaries` and `channels` are release-path recipes: each invokes a
+    # `dev/` script directly under a bare `--no-project` interpreter, exactly
+    # as the release workflow does, so a local reproduction and CI run the
+    # same command. Routing them through the dev runner would put a project
+    # environment between the maintainer and the thing being reproduced.
+    {"default", "bootstrap", "analytics", "binaries", "channels"},
+)
 
 #: Test lanes deliberately reachable only by naming them, each with its reason.
 #: Every other lane must be in `test all` or a CI step - see

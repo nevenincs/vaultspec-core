@@ -80,12 +80,14 @@ MARKDOWN_PATHS = (
     "src/README.md",
     "typings/README.md",
     "bucket/README.md",
+    "Formula/README.md",
 )
 
 #: User-facing Markdown additionally held to a hard wrap. The root READMEs added
 #: above to `MARKDOWN_PATHS` are deliberately absent here: each describes a
 #: contributor-facing repository surface - the dev harness, the distributed
-#: package's internal test layout, third-party type stubs, the Scoop manifest -
+#: package's internal test layout, third-party type stubs, the Scoop manifest
+#: and the Homebrew tap -
 #: read by someone with a checkout, not the shipped-to-users prose (the project's
 #: front door, the linked doc pages, the builtins a consumer's install renders)
 #: this list holds to a fixed column width.
