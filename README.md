@@ -8,7 +8,7 @@
 
 [![build](https://img.shields.io/github/actions/workflow/status/nevenincs/vaultspec-core/ci.yml?branch=main&style=for-the-badge&label=build&logo=githubactions&logoColor=white&labelColor=1b1a16)](https://github.com/nevenincs/vaultspec-core/actions/workflows/ci.yml)
 [![release](https://img.shields.io/pypi/v/vaultspec-core?style=for-the-badge&label=release&logo=pypi&logoColor=white&labelColor=1b1a16&color=8A72B5)](https://pypi.org/project/vaultspec-core/)
-[![runtime](https://img.shields.io/badge/runtime-Python%203.13%2B-3F9AA6?style=for-the-badge&logo=python&logoColor=white&labelColor=1b1a16)](https://www.python.org/downloads/)
+[![runtime](https://img.shields.io/badge/runtime-Python%203.13%20%7C%203.14-3F9AA6?style=for-the-badge&logo=python&logoColor=white&labelColor=1b1a16)](https://www.python.org/downloads/)
 [![license](https://img.shields.io/github/license/nevenincs/vaultspec-core?style=for-the-badge&label=license&logo=opensourceinitiative&logoColor=white&labelColor=1b1a16&color=B3823C)](https://github.com/nevenincs/vaultspec-core/blob/main/LICENSE)
 
 [![cli](https://img.shields.io/badge/cli-bundled-B5703F?style=for-the-badge&logo=gnubash&logoColor=white&labelColor=1b1a16)](https://github.com/nevenincs/vaultspec-core/blob/main/docs/CLI.md)
@@ -61,7 +61,26 @@ for the full tour.
 
 ### 1. Install
 
-For the quickest, dependency-free project bootstrap, run from a git project folder:
+Every command below is run through [uv](https://docs.astral.sh/uv/), which is the one
+thing you need beforehand. It is not usually already present — a stock macOS machine has
+neither `uv` nor Homebrew, and its system Python is 3.9, below what this package
+supports.
+
+```bash
+# macOS and Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+```powershell
+# Windows
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+uv fetches a supported interpreter itself, so you do not need to install Python
+separately. The supported range is whatever `requires-python` in `pyproject.toml`
+declares — currently 3.13 and 3.14.
+
+Then, for the quickest project bootstrap, run from a git project folder:
 
 ```bash
 uvx vaultspec-core install
