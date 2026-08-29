@@ -118,18 +118,32 @@ jobs:
     permissions:
       contents: write
     steps:
-      # Check out main so the channel-pointer steps can regenerate and
-      # commit the in-repo Scoop manifest and Homebrew formula after the
-      # assets are attached. The SSH deploy
-      # key authenticates the manifest push: main is protected by a ruleset
-      # that requires status checks, and a deploy-key push is a bypass actor,
-      # so the automated bump lands without a human-gated PR while every other
-      # push stays gated.
+      # This repo, for the generator itself. No deploy key and no push: the
+      # channel pointers no longer live here.
       - name: Checkout
         uses: actions/checkout@v6
         with:
           ref: main
-          ssh-key: ${{ secrets.SCOOP_DEPLOY_KEY }}
+
+      # The ORG-WIDE distribution repository, which is where Scoop manifests
+      # and Homebrew formulae belong. `nevenincs/homebrew-tap` serves both
+      # package managers for every product under the account, so a user taps or
+      # bucket-adds ONCE, ever - not once per product.
+      #
+      # Publishing into the product repo instead, as this workflow used to,
+      # costs two things its own README argues against: it multiplies that
+      # one-time step by the number of products, and it commits to a public
+      # product repo's default branch on every release. The odd-looking name is
+      # the whole price of the arrangement - Homebrew's one-argument tap form
+      # requires a `homebrew-` prefix, and Scoop constrains nothing, so one
+      # repository satisfies both.
+      - name: Checkout the distribution repository
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.repository_owner }}/homebrew-tap
+          ref: main
+          path: channels
+          ssh-key: ${{ secrets.CHANNEL_ROOT_DEPLOY_KEY }}
 
       # The channel generator runs in this job, so it needs an interpreter
       # here too; previously only the build matrix installed one.
@@ -209,7 +223,11 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          uv run --no-project --python 3.13 --             python -m dev.packaging.generate               --tag "${TAG}"               --checksums dist-bin/SHA256SUMS
+          # --root is why this needed no generator change: the paths were
+          # always parameterised (root/bucket/<product>.json,
+          # root/Formula/<product>.rb) and only the workflow assumed they were
+          # this repository's.
+          uv run --no-project --python 3.13 --             python -m dev.packaging.generate               --tag "${TAG}"               --checksums dist-bin/SHA256SUMS               --root channels
 
       - name: Commit the Scoop manifest and Homebrew formula
         shell: bash
@@ -217,18 +235,36 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          if git diff --quiet -- bucket Formula; then
+          cd channels
+
+          # Stage only THIS product's two files. The distribution repo serves
+          # every product under the account, so `git add -- bucket Formula`
+          # would sweep up a sibling's pointer if two releases raced, and
+          # publish it under this tag's commit message.
+          git add -- bucket/vaultspec-core.json Formula/vaultspec-core.rb
+
+          # Compare the INDEX against HEAD, not the worktree. `git diff` reports
+          # only tracked paths, so on the first release into a channel - when
+          # these files are new and nothing tracks them yet - it reports no
+          # change and this step exits zero having published nothing. That is
+          # not hypothetical here: the distribution repo currently holds two
+          # .gitkeep files and nothing else, so the first run WILL be that case.
+          if git diff --cached --quiet -- bucket Formula; then
             echo "channels already at ${TAG}; nothing to commit"
             exit 0
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -- bucket Formula
-          git commit -m "chore(release): point scoop and homebrew at ${TAG}"
-          # This job runs after a long matrix build, so main may have advanced
-          # meanwhile. Rebase-and-retry (bounded) so an unrelated commit does not
-          # fail the push non-fast-forward; the backward-bump guard in the
-          # generator still protects against clobbering a newer pointer.
+
+          # Identity passed to this one commit rather than persisted. This
+          # runner is self-hosted and its checkout is reused by later jobs, so a
+          # `git config` identity outlives the run.
+          git -c user.name="github-actions[bot]"               -c user.email="github-actions[bot]@users.noreply.github.com"               commit -m "chore(release): point scoop and homebrew at ${TAG}"
+          # Rebase-and-retry, and it matters more here than it did in-repo.
+          # This branch is now shared by EVERY product under the account, so the
+          # racing commit is no longer just an unrelated push to this repo - it
+          # is a sibling product publishing its own pointer. Per-product staging
+          # above means such a rebase never carries someone else's file, and the
+          # generator's backward-bump refusal still stops a stale re-run from
+          # clobbering a newer pointer.
           attempt=1
           max_attempts=3
           until git push origin main; do
