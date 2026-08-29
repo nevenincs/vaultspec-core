@@ -41,20 +41,62 @@ def _get_thread_lock(key: str) -> threading.Lock:
         return _thread_locks[key]
 
 
+# The two errno values Microsoft documents `_locking` as setting for a
+# LOCKING VIOLATION under `LK_LOCK` - that is, "someone else holds the range",
+# which is contention rather than a fault:
+#
+#   EDEADLOCK  the range could not be locked after its ten internal attempts
+#              (spelled EDEADLK here: the two names are the same value on
+#              every platform, and only EDEADLK resolves off Windows)
+#   EACCES     locking violation (the region is already locked)
+#
+# Both mean "wait and try again". Only EDEADLOCK was retried here, so real
+# contention that surfaced as EACCES propagated as `PermissionError(13,
+# 'Permission denied')` and read like a filesystem permission fault - which is
+# what made the Windows concurrency suite flaky (issue #321). Note the absence
+# of a `winerror` on that exception: it comes from the CRT's errno, not from
+# the Win32 error layer, which is what distinguishes it from the scanner race
+# `_replace_atomic` absorbs.
+_WINDOWS_LOCK_CONTENTION_ERRORS = frozenset({errno.EDEADLK, errno.EACCES})
+
+# `LK_LOCK` blocks for about ten seconds before reporting EDEADLOCK, so that
+# path needs no pause. An EACCES violation can come back immediately, so a
+# short sleep keeps a contended acquire from becoming a hot spin.
+_WINDOWS_LOCK_RETRY_INTERVAL_SECONDS = 0.05
+
+
+def _is_windows_lock_contention(exc: OSError) -> bool:
+    """Whether *exc* means the lock is held elsewhere rather than unusable.
+
+    Kept separate from the acquire loop so the classification is testable on
+    every platform: the loop itself needs a real Windows file descriptor, the
+    decision it makes does not.
+
+    Args:
+        exc: The error raised by :func:`msvcrt.locking`.
+
+    Returns:
+        ``True`` when the call should be retried, ``False`` when it is a
+        genuine failure - a bad descriptor, an unreadable volume - that should
+        propagate rather than spin forever.
+    """
+    return exc.errno in _WINDOWS_LOCK_CONTENTION_ERRORS
+
+
 def _acquire_windows_lock(fd: int) -> None:
     """Block until the byte-range lock on *fd* is held.
 
     :func:`msvcrt.locking` with ``LK_LOCK`` is not a blocking acquire despite
-    the name: it retries ten times at one-second intervals and then raises
-    ``OSError(EDEADLOCK)``. Any operation holding a lock past that budget - a
+    the name: it retries ten times at one-second intervals and then reports a
+    locking violation. Any operation holding a lock past that budget - a
     large repair, a slow or network volume, an antivirus scan mid-write -
-    would make a concurrent caller fail with an opaque "Resource deadlock
-    avoided" rather than wait its turn. Retrying on exactly that errno keeps
-    the contract this module documents, matching :func:`fcntl.flock` with
-    ``LOCK_EX`` on Unix, which blocks indefinitely.
+    would make a concurrent caller fail rather than wait its turn. Retrying on
+    exactly the contention errnos keeps the contract this module documents,
+    matching :func:`fcntl.flock` with ``LOCK_EX`` on Unix, which blocks
+    indefinitely.
 
-    Any other ``OSError`` is a genuine failure - a bad descriptor, a
-    permission problem - and propagates rather than spinning forever.
+    Any other ``OSError`` is a genuine failure - a bad descriptor, an
+    unreadable volume - and propagates rather than spinning forever.
 
     Args:
         fd: Open file descriptor of the ``.lock`` sibling file.
@@ -75,8 +117,9 @@ def _acquire_windows_lock(fd: int) -> None:
         try:
             msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
         except OSError as exc:
-            if exc.errno != errno.EDEADLOCK:
+            if not _is_windows_lock_contention(exc):
                 raise
+            time.sleep(_WINDOWS_LOCK_RETRY_INTERVAL_SECONDS)
             continue
         return
 
