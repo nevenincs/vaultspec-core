@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import json
 import subprocess
 import sys
@@ -12,7 +13,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from vaultspec_core.core.helpers import advisory_lock
+from vaultspec_core.core.helpers import (
+    _WINDOWS_LOCK_RETRY_INTERVAL_SECONDS,
+    _is_windows_lock_contention,
+    advisory_lock,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -268,3 +273,55 @@ class TestAdvisoryLockConcurrency:
         # Having waited out the holder proves the acquire blocked rather than
         # giving up: the retry budget expires around nine seconds.
         assert waited > 10, f"acquired after only {waited:.1f}s; lock did not block"
+
+
+class TestWindowsLockContentionClassification:
+    """Which `msvcrt.locking` failures mean "wait" rather than "give up".
+
+    `LK_LOCK` reports a LOCKING VIOLATION - someone else holds the range -
+    through two different errnos, and Microsoft documents both:
+
+      EDEADLK    the range could not be locked after its ten internal attempts
+      EACCES     locking violation (the region is already locked)
+
+    Only EDEADLOCK used to be retried, so contention that arrived as EACCES
+    escaped as `PermissionError(13, 'Permission denied')` and was
+    indistinguishable from a filesystem permission fault. That is what made the
+    Windows concurrency suite intermittently red (issue #321).
+
+    Classified by a pure predicate so this is provable on every platform: the
+    acquire loop needs a real Windows descriptor, the decision does not.
+    """
+
+    def test_deadlock_is_contention(self) -> None:
+        """The documented "could not lock after ten attempts" outcome waits."""
+        assert _is_windows_lock_contention(OSError(errno.EDEADLK, "deadlock"))
+
+    def test_access_denied_is_contention_not_a_permission_fault(self) -> None:
+        """EACCES from `_locking` means the region is held, not unreachable.
+
+        This is the regression. The exception carries errno 13 and NO
+        `winerror`, because it comes from the CRT rather than the Win32 error
+        layer - which is exactly why it reads like a permission problem and
+        why retrying it is correct rather than papering over a fault.
+        """
+        exc = PermissionError(errno.EACCES, "Permission denied")
+
+        assert getattr(exc, "winerror", None) is None
+        assert _is_windows_lock_contention(exc)
+
+    @pytest.mark.parametrize(
+        "code",
+        [errno.EBADF, errno.EINVAL, errno.ENOSPC],
+    )
+    def test_a_genuine_failure_still_propagates(self, code: int) -> None:
+        """A bad descriptor or invalid argument must never spin forever."""
+        assert not _is_windows_lock_contention(OSError(code, "genuine failure"))
+
+    def test_the_retry_interval_is_short_but_not_a_hot_spin(self) -> None:
+        """EACCES can return instantly, so the loop must pause between tries.
+
+        Zero would burn a core while another writer holds the lock; a long
+        wait would make every contended acquire feel stalled.
+        """
+        assert 0 < _WINDOWS_LOCK_RETRY_INTERVAL_SECONDS <= 0.5
