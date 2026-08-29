@@ -284,9 +284,15 @@ jobs:
           )
           missing=()
           for triple in "${expected[@]}"; do
-            if ! ls dist-bin | grep -q -- "${triple}"; then
-              missing+=("${triple}")
-            fi
+            # Glob rather than `ls | grep`: shellcheck SC2010, and the glob is
+            # also correct for filenames a word-split `ls` would mangle.
+            found=0
+            for asset in dist-bin/*"${triple}"*; do
+              [ -e "${asset}" ] || continue
+              found=1
+              break
+            done
+            [ "${found}" -eq 1 ] || missing+=("${triple}")
           done
           if [ ${#missing[@]} -ne 0 ]; then
             echo "::error::${TAG} is a PARTIAL release. Attached what built; missing: ${missing[*]}"
