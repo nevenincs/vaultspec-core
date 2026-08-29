@@ -1,0 +1,130 @@
+# Asserts that main's tip commit actually received a CI verdict.
+#
+# The `Protect Main` ruleset lists ten required status checks, but required
+# checks gate PULL REQUEST MERGES only - they do not gate a direct push, and
+# admin and deploy-key pushes bypass the PR requirement outright. Most commits
+# reach main here by direct push, so the push-triggered CI run is the only
+# thing between such a push and an unvalidated main.
+#
+# On 2026-08-26 that run ended in `startup_failure` - zero jobs, zero logs,
+# zero duration - and nothing signalled it. main sat unvalidated until an
+# unrelated PR merged on top 80 minutes later and happened to re-validate the
+# tree. That was luck, not a mechanism.
+#
+# This runs on GitHub-hosted infrastructure ON PURPOSE. A sentinel on the
+# self-hosted fleet is unavailable in precisely the conditions it exists to
+# report, and one of the three shapes it must catch is a run that was never
+# created because no runner picked it up.
+name: Main CI Sentinel
+
+on:
+  schedule:
+    # Hourly, off the top of the hour: every repository that asks for "hourly"
+    # gets minute 0, and this check has no reason to join that stampede.
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: main-ci-sentinel
+  cancel-in-progress: false
+
+jobs:
+  assert-main-was-validated:
+    name: Assert main's tip has a CI verdict
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Kept in one place: the issue is found again by exact title, which is
+      # what stops an hourly schedule opening a new one every hour.
+      ISSUE_TITLE: "Main CI Sentinel: main's tip has no passing CI run"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Judge main's tip
+        id: judge
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq '.sha')
+          landed=$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" \
+            --jq '.commit.committer.date')
+          age=$(( ( $(date -u +%s) - $(date -u -d "${landed}" +%s) ) / 60 ))
+
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${sha}&per_page=50" \
+            > runs.json
+
+          # The module is standard-library only, so the sentinel needs nothing
+          # provisioned - one less thing that can be the reason it does not run.
+          set +e
+          verdict=$(python3 dev/ci_sentinel/main_ci_health.py \
+            --commit-age-minutes "${age}" < runs.json)
+          rc=$?
+          set -e
+
+          {
+            echo "sha=${sha}"
+            echo "verdict=${verdict}"
+            echo "healthy=$( [ "$rc" -eq 0 ] && echo true || echo false )"
+          } >> "$GITHUB_OUTPUT"
+          echo "${verdict}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Open an issue and fail
+        if: ${{ steps.judge.outputs.healthy == 'false' }}
+        shell: bash
+        env:
+          SHA: ${{ steps.judge.outputs.sha }}
+          VERDICT: ${{ steps.judge.outputs.verdict }}
+        run: |
+          set -euo pipefail
+          # Reuse the open issue rather than filing one an hour. A human closing
+          # it while main is still unvalidated re-opens a fresh one next tick,
+          # which is the right behaviour: the condition, not the paperwork, is
+          # what clears it.
+          existing=$(gh issue list --state open --search "\"${ISSUE_TITLE}\" in:title" \
+            --json number,title --jq \
+            "[.[] | select(.title == \"${ISSUE_TITLE}\")] | .[0].number // empty")
+
+          if [ -z "${existing}" ]; then
+            gh issue create --title "${ISSUE_TITLE}" --body "$(printf '%s\n' \
+              "\`main\` is at \`${SHA}\` and CI has not validated it." \
+              "" \
+              "> ${VERDICT}" \
+              "" \
+              "Required status checks gate pull request merges only, so a direct" \
+              "push to \`main\` is covered by its push-triggered CI run and nothing" \
+              "else. This issue means that run failed, was cancelled, ended in" \
+              "\`startup_failure\`, or was never created." \
+              "" \
+              "It closes itself once \`main\`'s tip has a passing CI run." \
+              "" \
+              "Opened by \`.github/workflows/main-ci-sentinel.yml\`.")"
+          else
+            gh issue comment "${existing}" --body \
+              "Still unvalidated at \`${SHA}\`: ${VERDICT}"
+          fi
+
+          echo "::error::${VERDICT}"
+          exit 1
+
+      - name: Close the sentinel issue once main is validated again
+        if: ${{ steps.judge.outputs.healthy == 'true' }}
+        shell: bash
+        env:
+          SHA: ${{ steps.judge.outputs.sha }}
+        run: |
+          set -euo pipefail
+          existing=$(gh issue list --state open --search "\"${ISSUE_TITLE}\" in:title" \
+            --json number,title --jq \
+            "[.[] | select(.title == \"${ISSUE_TITLE}\")] | .[0].number // empty")
+          if [ -n "${existing}" ]; then
+            gh issue close "${existing}" --comment \
+              "\`main\` is validated again at \`${SHA}\`; closing."
+          fi
