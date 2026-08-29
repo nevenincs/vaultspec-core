@@ -224,6 +224,20 @@ jobs:
   release:
     name: Attach to release
     needs: build
+    # Runs even when a build leg failed, deliberately. `needs: build` alone
+    # SKIPS this job on any leg failure, which throws away every binary that did
+    # build: vaultspec-core-v0.1.61 had four green legs - windows, both macOS,
+    # and linux-x86_64 - and published zero assets because linux-aarch64 could
+    # not initialise its container. Four working artifacts were discarded to
+    # punish a fifth.
+    #
+    # Attaching a partial set is coherent with how this repo already treats a
+    # half-built matrix: dev/packaging omits an unbuilt platform from the
+    # channel pointers rather than inventing an asset for it, so the manifests
+    # stay truthful about a partial release. What must NOT happen is a partial
+    # release going green, so the completeness check below fails the job AFTER
+    # the assets are up.
+    if: ${{ !cancelled() }}
     runs-on: [self-hosted, Linux, X64, build]
     permissions:
       contents: write
@@ -274,6 +288,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # With partial attach allowed, "no artifacts at all" is now reachable -
+          # every leg failed. Say that plainly rather than dying on a glob that
+          # matched nothing.
+          if [ -z "$(ls -A dist-bin 2>/dev/null)" ]; then
+            echo "::error::no build leg produced an artifact; there is nothing to attach"
+            exit 1
+          fi
           cd dist-bin
           # Per-asset .sha256 files are produced by build_pyapp.py; fold them
           # into one sha256sum-compatible manifest and drop the fragments.
@@ -387,3 +408,42 @@ jobs:
             git rebase origin/main
             attempt=$((attempt + 1))
           done
+      # The matrix is only complete when every declared target attached. This
+      # runs LAST on purpose. The binaries that built are more useful on the
+      # release than withheld, and the channel generator already omits an
+      # unbuilt platform rather than pinning an asset that was never made - so
+      # letting the pointers regenerate first leaves them truthful about a
+      # partial release instead of stale about a whole one. The red run is what
+      # says the set is short; silence would let partial read as complete.
+      - name: Assert every declared target attached
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          expected=(
+            x86_64-unknown-linux-gnu
+            aarch64-unknown-linux-gnu
+            x86_64-pc-windows-msvc
+            aarch64-apple-darwin
+            x86_64-apple-darwin
+          )
+          missing=()
+          for triple in "${expected[@]}"; do
+            # Glob rather than `ls | grep`: shellcheck SC2010, and the glob is
+            # also correct for filenames a word-split `ls` would mangle.
+            found=0
+            for asset in dist-bin/*"${triple}"*; do
+              [ -e "${asset}" ] || continue
+              found=1
+              break
+            done
+            [ "${found}" -eq 1 ] || missing+=("${triple}")
+          done
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::${TAG} is a PARTIAL release. Attached what built; missing: ${missing[*]}"
+            echo "### Partial release" >> "$GITHUB_STEP_SUMMARY"
+            echo "Missing targets: \`${missing[*]}\`" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "all ${#expected[@]} declared targets attached to ${TAG}"
