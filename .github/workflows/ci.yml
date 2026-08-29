@@ -12,7 +12,19 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Superseding a run is right on a branch and wrong on the default one.
+  #
+  # `main` here takes direct pushes, and required status checks gate pull
+  # request merges only - so for a direct push the push-triggered run IS the
+  # gate. Cancelling it on the next push destroys that gate, and a cancelled
+  # run reports as `cancelled`, not `failed`: it is not red in the Actions
+  # list and nothing downstream reacts to it. Twenty-five of the last hundred
+  # `main` runs ended that way, so a quarter of the default branch's history
+  # carries no verdict at all.
+  #
+  # On any other ref an in-flight run is genuinely obsolete once a newer commit
+  # arrives, so keep cancelling there.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   NO_COLOR: "1"
