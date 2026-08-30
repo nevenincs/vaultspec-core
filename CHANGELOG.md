@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.65](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.64...vaultspec-core-v0.1.65) (2026-08-30)
+
+
+### Bug Fixes
+
+* **binaries:** dispatch the acquisition check, which cannot see a release ([#371](https://github.com/nevenincs/vaultspec-core/issues/371)) ([bb69ac5](https://github.com/nevenincs/vaultspec-core/commit/bb69ac503b0e63a20261ec5f394ef728858c1a4c))
+* **binaries:** stop executing a bootstrapper before its package exists ([#369](https://github.com/nevenincs/vaultspec-core/issues/369)) ([f10697c](https://github.com/nevenincs/vaultspec-core/commit/f10697c48930eee8aeceefb678009f6f5cb590e1))
+* **publish:** the job that uploads a release asset needs contents: write ([#368](https://github.com/nevenincs/vaultspec-core/issues/368)) ([c6b04d7](https://github.com/nevenincs/vaultspec-core/commit/c6b04d73b25180c6dacf17811a0bf5968c02b78e))
+
 ## [0.1.64](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.63...vaultspec-core-v0.1.64) (2026-08-30)
 
 
