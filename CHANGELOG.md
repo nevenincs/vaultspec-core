@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.72](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.71...vaultspec-core-v0.1.72) (2026-08-30)
+
+
+### Features
+
+* **ci:** acquire the aarch64 Linux binary, and derive that coverage ([#392](https://github.com/nevenincs/vaultspec-core/issues/392)) ([6b7c864](https://github.com/nevenincs/vaultspec-core/commit/6b7c8641ac3bcd17ec30a08e3349a428ad178f35))
+
 ## [0.1.71](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.70...vaultspec-core-v0.1.71) (2026-08-30)
 
 
