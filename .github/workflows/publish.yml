@@ -99,8 +99,18 @@ jobs:
     environment:
       name: pypi
     permissions:
+      # `id-token: write` is for PyPI trusted publishing. `contents: WRITE`,
+      # not read, because this job also uploads the wheel and sdist to the
+      # GitHub Release - and an asset upload is a write to the repository.
+      #
+      # Declared `contents: read`, the upload fails with
+      #   HTTP 403: Resource not accessible by integration
+      # naming an uploads.github.com URL, which reads like a credential problem
+      # with PyPI rather than a permission this workflow declines to ask for.
+      # v0.1.64 published to PyPI and then failed here, so the distribution
+      # reached the index and never reached the release it belongs to.
       id-token: write
-      contents: read
+      contents: write
     steps:
       - name: Download dist artifacts
         uses: actions/download-artifact@v8
