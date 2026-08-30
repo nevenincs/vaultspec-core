@@ -169,3 +169,93 @@ jobs:
       - name: Clean up
         if: always()
         run: rm -rf "${RUNNER_TEMP}/acq" "${RUNNER_TEMP}/fresh-home" "${RUNNER_TEMP}/proj" || true
+
+  acquire-windows:
+    name: acquire on Windows
+    # NATIVE, like the macOS leg and for the same reason: the container on the
+    # Linux legs exists to supply an OLDER libc than the build host, and Windows
+    # has no equivalent knob. What this adds is that the artifact is EXECUTED.
+    #
+    # This closes the last platform in the matrix. Until now the Windows binary
+    # was built, checksummed, pinned into the Scoop manifest and published with
+    # nothing ever launching it - the same shape that let
+    # `vaultspec-core-x86_64-apple-darwin` ship for several releases exiting 1.
+    # Scoop is the channel most exposed to it: a manifest pins a digest, and a
+    # correct digest for a binary that cannot start is exactly what the 0.1.60
+    # empty-hash failure taught us to stop trusting on its own.
+    runs-on: [self-hosted, Windows, X64]
+    steps:
+      - name: Acquire the published binary
+        shell: pwsh
+        env:
+          REPO: ${{ github.repository }}
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = if ($env:EVENT_TAG) { $env:EVENT_TAG } elseif ($env:INPUT_TAG) { $env:INPUT_TAG } else { '' }
+          if (-not $tag) {
+            $latest = Invoke-RestMethod "https://api.github.com/repos/$env:REPO/releases/latest"
+            $tag = $latest.tag_name
+          }
+          if (-not $tag) { Write-Error '::error::could not resolve a release tag'; exit 1 }
+          "TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+          # Its own directory, not the shared work tree. A reused self-hosted
+          # checkout is the warm state this check exists to avoid, and this
+          # runner is long-lived.
+          $acq = Join-Path $env:RUNNER_TEMP 'acq'
+          Remove-Item -Recurse -Force $acq -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $acq | Out-Null
+          "ACQ=$acq" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+          $url = "https://github.com/$env:REPO/releases/download/$tag/vaultspec-core-x86_64-pc-windows-msvc.exe"
+          Invoke-WebRequest -Uri $url -OutFile (Join-Path $acq 'vaultspec-core.exe')
+
+          # Windows marks a downloaded file with a Zone.Identifier stream, which
+          # is what a user gets from a browser too. Scoop clears it for them.
+          # Strip it so this leg tests the binary rather than the mark.
+          Unblock-File -Path (Join-Path $acq 'vaultspec-core.exe')
+
+      - name: Use it the way a new user would
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # A user's machine has none of this job's state.
+          $home_ = Join-Path $env:RUNNER_TEMP 'fresh-home'
+          $proj  = Join-Path $env:RUNNER_TEMP 'proj'
+          Remove-Item -Recurse -Force $home_, $proj -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $home_, $proj | Out-Null
+          $env:USERPROFILE = $home_
+          $env:HOME = $home_
+
+          $exe = Join-Path $env:ACQ 'vaultspec-core.exe'
+
+          # THE ASSERTION THIS LEG EXISTS FOR: it starts.
+          & $exe --version
+          if ($LASTEXITCODE -ne 0) { Write-Error "::error::--version exited $LASTEXITCODE"; exit 1 }
+
+          Set-Location $proj
+          git init -q
+          git config user.email acquisition@example.invalid
+          git config user.name "Acquisition Check"
+
+          & $exe install
+          if ($LASTEXITCODE -ne 0) { Write-Error "::error::install exited $LASTEXITCODE"; exit 1 }
+
+          # Behaviour, not exit codes.
+          if (-not (Test-Path '.vault')) {
+            Write-Error '::error::install exited zero but scaffolded no .vault/'
+            exit 1
+          }
+          & $exe vault check all
+          if ($LASTEXITCODE -ne 0) { Write-Error "::error::vault check all exited $LASTEXITCODE"; exit 1 }
+
+      - name: Clean up
+        if: always()
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force `
+            (Join-Path $env:RUNNER_TEMP 'acq'), `
+            (Join-Path $env:RUNNER_TEMP 'fresh-home'), `
+            (Join-Path $env:RUNNER_TEMP 'proj') -ErrorAction SilentlyContinue
