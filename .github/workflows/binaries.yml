@@ -460,13 +460,30 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          expected=(
-            x86_64-unknown-linux-gnu
-            aarch64-unknown-linux-gnu
-            x86_64-pc-windows-msvc
-            aarch64-apple-darwin
-            x86_64-apple-darwin
-          )
+          # DERIVED from the matrix in this same file, never hand-listed.
+          #
+          # A hand-written list goes stale the moment the matrix changes, and it
+          # did: this step expected aarch64-unknown-linux-gnu, which core has
+          # NOT built since core#356 declared it excluded (the containerised
+          # path dies - the runner is itself a container with no reachable
+          # docker daemon - and a native build emits GLIBC_2.39 against a
+          # declared 2.28 floor). So every release failed here having attached
+          # everything it owed. vaultspec-core-v0.1.62 carried all four
+          # artifacts, `latest` was correct, and this step still went red.
+          #
+          # A check that fails on a correct release is worse than no check: it
+          # trains people to ignore a red release run, which is exactly how
+          # vaultspec-dashboard's gate went unread for six weeks.
+          #
+          # This job checks out main, so the file read here IS the workflow
+          # definition that ran. Expectation and matrix cannot diverge.
+          workflow=".github/workflows/binaries.yml"
+          mapfile -t expected < <(awk '/^[[:space:]]+target:[[:space:]]/ {print $2}' "${workflow}" | sort -u)
+          if [ ${#expected[@]} -eq 0 ]; then
+            echo "::error::could not derive any target from ${workflow}; refusing to pass vacuously"
+            exit 1
+          fi
+          echo "derived ${#expected[@]} target(s) from the matrix: ${expected[*]}"
           missing=()
           for triple in "${expected[@]}"; do
             # Glob rather than `ls | grep`: shellcheck SC2010, and the glob is
