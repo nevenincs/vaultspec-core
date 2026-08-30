@@ -449,6 +449,20 @@ jobs:
           # this repository's.
           uv run --no-project --python 3.13 --             python -m dev.packaging.generate               --tag "${TAG}"               --checksums dist-bin/SHA256SUMS               --root channels
 
+      # Between generating the pointers and committing them, which is the
+      # only point where a bad pointer can still be STOPPED rather than
+      # reported afterwards.
+      #
+      # This assertion used to live in dev/packaging/tests, reading this
+      # repository's own bucket/ and Formula/. Those are gone - the channel
+      # root is per-account, not per-product - and the test kept passing
+      # against files nothing wrote any more. Green, and guarding nothing.
+      - name: Refuse an uninstallable channel pointer
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run --no-project --python 3.13 -- python -m dev.packaging.validate --root channels
+
       - name: Commit the Scoop manifest and Homebrew formula
         shell: bash
         env:

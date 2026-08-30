@@ -1,105 +1,35 @@
-"""Guards on the channel pointers actually committed to this repository.
+"""Guards on how the release job produces channel pointers.
 
-The generators are unit-tested against synthetic input elsewhere. These
-assertions are about the real files a user's package manager will read from
-this checkout, and they are the ones that would have caught
-vaultspec-core-v0.1.60 shipping a Scoop manifest with empty hashes: the
-release job was green, the unit tests were green, and nothing looked at what
-had been committed.
+This module used to assert on ``bucket/vaultspec-core.json`` and
+``Formula/vaultspec-core.rb`` in this repository. Those files are gone: a
+channel root is per-account rather than per-product, so the pointers a user
+installs live in ``nevenincs/homebrew-tap`` and the release job generates
+straight into a checkout of it.
 
-They are offline by construction. Verifying a digest against the release
-would need the network, so what is checked here is internal consistency -
-well-formed digests, agreement between the two channels, and agreement with
-the asset names the build matrix produces.
+The assertions did not survive the move unchanged, and the reason is worth
+recording. They had already stopped guarding anything: the release job wrote to
+the tap while these tests read the in-repo copies, so the committed files went
+four releases stale while the suite stayed green. A test decoupled from what it
+protects is worse than an absent one, because its green is read as evidence.
+
+They now live in two better places. The digest and consistency checks moved into
+``dev/packaging/validate.py``, which the release job runs against the real
+generated pointers between writing and committing them - earlier in time and
+against the files that actually ship. What remains here is the assertion that
+cannot move, because its subject is this repository: the shape of the release
+job itself.
 """
 
 from __future__ import annotations
 
-import json
-import re
 from typing import TYPE_CHECKING
 
 import pytest
-
-from dev.binaries.build_pyapp import BINARIES, asset_name
-from dev.packaging import products
-from dev.packaging.generate import formula_path, scoop_path
-from dev.packaging.pointer import existing_homebrew_version, existing_scoop_version
-from dev.packaging.products import VAULTSPEC_CORE
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 pytestmark = pytest.mark.repo
-
-SHA256 = re.compile(r"^[0-9a-f]{64}$")
-
-
-def test_the_committed_scoop_manifest_pins_real_digests(repo_root: Path) -> None:
-    """Every hash is 64 hex characters - never blank, never a placeholder.
-
-    This is the direct guard on the 0.1.60 failure: the manifest carried the
-    released version and correct URLs alongside ``"hash": ["", ""]``, which
-    Scoop cannot install.
-    """
-    manifest = json.loads(
-        scoop_path(repo_root, VAULTSPEC_CORE).read_text(encoding="utf-8"),
-    )
-
-    assert manifest["hash"], "manifest pins no hashes"
-    assert len(manifest["hash"]) == len(manifest["url"])
-    for digest in manifest["hash"]:
-        assert SHA256.match(digest), f"not a sha256 digest: {digest!r}"
-
-
-def test_the_committed_formula_pins_real_digests(repo_root: Path) -> None:
-    """The formula's every ``sha256`` is a real digest, on every platform."""
-    formula = formula_path(repo_root, VAULTSPEC_CORE).read_text(encoding="utf-8")
-
-    digests = re.findall(r'sha256 "([^"]*)"', formula)
-    assert digests, "formula pins no digests"
-    for digest in digests:
-        assert SHA256.match(digest), f"not a sha256 digest: {digest!r}"
-
-
-def test_both_channels_point_at_the_same_release(repo_root: Path) -> None:
-    """Scoop and Homebrew must not disagree about what the current release is.
-
-    They are generated together from one aggregate, so a divergence means one
-    of them was hand-edited or a generation half-failed.
-    """
-    scoop_version = existing_scoop_version(scoop_path(repo_root, VAULTSPEC_CORE))
-    brew_version = existing_homebrew_version(formula_path(repo_root, VAULTSPEC_CORE))
-
-    assert scoop_version is not None
-    assert scoop_version == brew_version
-
-
-def test_committed_channels_name_assets_the_build_matrix_produces(
-    repo_root: Path,
-) -> None:
-    """Every asset a channel points at is one the builder is able to emit."""
-    manifest = json.loads(
-        scoop_path(repo_root, VAULTSPEC_CORE).read_text(encoding="utf-8"),
-    )
-    formula = formula_path(repo_root, VAULTSPEC_CORE).read_text(encoding="utf-8")
-    referenced = {str(url).rsplit("/", 1)[-1] for url in manifest["url"]}
-    referenced |= set(re.findall(r'url "[^"]*/([^"/]+)"', formula))
-
-    buildable = {
-        asset_name(binary, target)
-        for binary in BINARIES
-        for target in (
-            products.WINDOWS_X86_64,
-            products.MACOS_ARM64,
-            products.MACOS_X86_64,
-            products.LINUX_X86_64,
-            products.LINUX_ARM64,
-        )
-    }
-    assert referenced <= buildable, (
-        f"unbuildable assets: {sorted(referenced - buildable)}"
-    )
 
 
 def test_the_release_workflow_generates_rather_than_edits_the_pointers(
@@ -108,7 +38,8 @@ def test_the_release_workflow_generates_rather_than_edits_the_pointers(
     """The channels are produced by the generator, not rewritten by shell.
 
     The inline ``jq``/``awk`` bump this replaced could write a manifest with
-    empty hashes out of a green run; pinning the invocation keeps the release
+    empty hashes out of a green run - which is exactly what
+    vaultspec-core-v0.1.60 shipped. Pinning the invocation keeps the release
     path from drifting back to editing a pointer in place.
     """
     workflow = (repo_root / ".github" / "workflows" / "binaries.yml").read_text(
@@ -118,3 +49,38 @@ def test_the_release_workflow_generates_rather_than_edits_the_pointers(
     assert "dev.packaging.generate" in workflow
     assert "--checksums dist-bin/SHA256SUMS" in workflow
     assert "jq \\" not in workflow
+
+
+def test_the_release_workflow_validates_before_committing(repo_root: Path) -> None:
+    """Generation is not enough on its own; the result must be checked.
+
+    The 0.1.60 manifest was *generated* and still uninstallable. The validator
+    is what turns that from a release that ships to a release that stops, so
+    the release job losing this step would silently restore the old failure
+    mode - with the reassuring `generate` invocation above still in place.
+    """
+    workflow = (repo_root / ".github" / "workflows" / "binaries.yml").read_text(
+        encoding="utf-8",
+    )
+
+    assert "dev.packaging.validate" in workflow, (
+        "the release job no longer validates the pointers it generates"
+    )
+    assert workflow.index("dev.packaging.generate") < workflow.index(
+        "dev.packaging.validate",
+    ), "validation must run after generation, not before"
+
+
+def test_this_repository_carries_no_second_channel_root(repo_root: Path) -> None:
+    """No ``bucket/`` or ``Formula/`` here. One product must have one root.
+
+    Two roots for one product is not a tidiness problem: while both existed,
+    every install instruction in the README named the stale one, so anyone who
+    followed the documented path was pinned to 0.1.61 permanently and silently
+    while the live tap moved on to 0.1.65.
+    """
+    for stale in ("bucket", "Formula"):
+        assert not (repo_root / stale).exists(), (
+            f"{stale}/ is back. Channel pointers belong in nevenincs/homebrew-tap; "
+            f"see docs/channels.md."
+        )
