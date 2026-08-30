@@ -43,7 +43,7 @@ jobs:
   # file can rescue it. v0.1.57, v0.1.58 and v0.1.59 ran 19h53m, 24h00m03s and
   # 24h00m03s before failing, and all three shipped no binaries.
   #
-  # Three of this matrix's five legs land on the one power-gated MacBook, which
+  # One of this matrix's three legs lands on the power-gated MacBook, which
   # serves runners only on AC. That is correct behaviour and this job does not
   # fight it - it just refuses to spend a day discovering it. Dispatch again
   # once the host is on AC, or set `allow_queue` to wait deliberately.
@@ -54,6 +54,14 @@ jobs:
     name: Preflight runners
     runs-on: ubuntu-latest
     steps:
+      # Only the workflow directory, only this commit: the step below reads the
+      # matrix out of this file to learn which selectors it must check.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout: .github/workflows
+          sparse-checkout-cone-mode: false
+
       - name: Every matrix selector has an online runner
         shell: bash
         env:
@@ -79,15 +87,37 @@ jobs:
           fi
           [ -n "${runners}" ] || { echo "::error::no self-hosted runners are registered"; exit 1; }
 
-          # The selectors this workflow's matrix actually requires. Kept as an
-          # array rather than a here-doc so every line stays inside the YAML
-          # block scalar's indentation.
-          selectors=(
-            "self-hosted,linux,x64,build"
-            "self-hosted,windows,x64"
-            "self-hosted,macos,arm64"
-            "self-hosted,linux,arm64"
-          )
+          # The selectors this matrix actually requires, DERIVED from the
+          # matrix rather than hand-listed.
+          #
+          # The hand-kept list outlived its matrix. It still named
+          # `self-hosted,linux,arm64` long after #356 removed that leg: no job
+          # in this repository selects that label set any more - not build, not
+          # release, not verify-release-assets, not acquisition.yml - but the
+          # runner carrying it is still registered. So the first time that host
+          # was down while every real leg was up, this check would have taken
+          # its `registered>0, online=0` branch and refused a build every leg
+          # could serve, citing a target that does not exist.
+          #
+          # That is the same defect #361/#364 fixed one job below, where a
+          # hand-kept target list left `aarch64-unknown-linux-gnu` behind and
+          # made v0.1.62 report a false partial. The fix there was to derive
+          # from the matrix; this is the same fix for the same reason. A list
+          # that must be edited in lockstep with the matrix eventually is not,
+          # and neither copy of the mistake was visible in review.
+          #
+          # This matters more than it looks. The check is unarmed today -
+          # FLEET_PREFLIGHT_TOKEN does not exist, so every run takes the blind
+          # path above - which means the staleness is currently harmless and
+          # arming the token is exactly what would detonate it.
+          workflow=".github/workflows/binaries.yml"
+          [ -f "${workflow}" ] || { echo "::error::${workflow} not checked out; cannot derive selectors" >&2; exit 1; }
+          mapfile -t selectors < <(awk -F'[][]' '/^[[:space:]]*runner:/ && NF > 2 {print $2}' "${workflow}" | tr -d ' ' | tr 'A-Z' 'a-z' | sort -u)
+          if [ "${#selectors[@]}" -eq 0 ]; then
+            echo "::error::derived no runner selector from ${workflow}; refusing to pass vacuously" >&2
+            exit 1
+          fi
+          printf 'derived selector: %s\n' "${selectors[@]}"
 
           failed=0
           for want in "${selectors[@]}"; do
