@@ -67,6 +67,43 @@ jobs:
             "https://github.com/${REPO}/releases/download/${tag}/vaultspec-core-x86_64-unknown-linux-gnu"
           chmod +x /opt/acq/vaultspec-core
 
+      # WAIT FOR PyPI FIRST. The binary is a PyApp bootstrapper: launching it
+      # resolves `vaultspec-core==<version>` from PyPI, so until the wheel is
+      # there the artefact cannot start for a reason that has nothing to do
+      # with the artefact.
+      #
+      # v0.1.67 is why. This check was dispatched by the release guard the
+      # moment the assets attached, while `publish.yml` was still uploading,
+      # and three of four legs failed with:
+      #
+      #     No solution found when resolving dependencies:
+      #     Because there is no version of vaultspec-core==0.1.67 ...
+      #
+      # The fourth passed only because it happened to run a minute later. A
+      # check whose result depends on which container got scheduled first is
+      # not a check, and the failure it reports is a lie about the binary.
+      #
+      # release-please dispatches publish.yml and binaries.yml together rather
+      # than in sequence, deliberately - the binaries do not need PyPI to BUILD.
+      # They need it to RUN, which is what this workflow does and nothing else
+      # in the lane does.
+      - name: Wait for the release to reach PyPI
+        env:
+          TAG: ${{ env.TAG }}
+        run: |
+          set -eu
+          version="${TAG##*-v}"
+          for attempt in $(seq 1 40); do
+            if curl -fsSL "https://pypi.org/pypi/vaultspec-core/${version}/json" >/dev/null 2>&1; then
+              echo "vaultspec-core ${version} is on PyPI"
+              exit 0
+            fi
+            echo "waiting for vaultspec-core ${version} on PyPI (${attempt}/40)"
+            sleep 15
+          done
+          echo "::error::vaultspec-core ${version} never appeared on PyPI. The binary bootstraps from there, so acquisition cannot be tested until publish.yml completes."
+          exit 1
+
       - name: Use it the way a new user would
         run: |
           set -eux
@@ -138,6 +175,43 @@ jobs:
           # Homebrew clears it for them. Strip it so this leg tests the binary
           # rather than the quarantine attribute.
           xattr -d com.apple.quarantine "${acq}/vaultspec-core" 2>/dev/null || true
+
+      # WAIT FOR PyPI FIRST. The binary is a PyApp bootstrapper: launching it
+      # resolves `vaultspec-core==<version>` from PyPI, so until the wheel is
+      # there the artefact cannot start for a reason that has nothing to do
+      # with the artefact.
+      #
+      # v0.1.67 is why. This check was dispatched by the release guard the
+      # moment the assets attached, while `publish.yml` was still uploading,
+      # and three of four legs failed with:
+      #
+      #     No solution found when resolving dependencies:
+      #     Because there is no version of vaultspec-core==0.1.67 ...
+      #
+      # The fourth passed only because it happened to run a minute later. A
+      # check whose result depends on which container got scheduled first is
+      # not a check, and the failure it reports is a lie about the binary.
+      #
+      # release-please dispatches publish.yml and binaries.yml together rather
+      # than in sequence, deliberately - the binaries do not need PyPI to BUILD.
+      # They need it to RUN, which is what this workflow does and nothing else
+      # in the lane does.
+      - name: Wait for the release to reach PyPI
+        env:
+          TAG: ${{ env.TAG }}
+        run: |
+          set -eu
+          version="${TAG##*-v}"
+          for attempt in $(seq 1 40); do
+            if curl -fsSL "https://pypi.org/pypi/vaultspec-core/${version}/json" >/dev/null 2>&1; then
+              echo "vaultspec-core ${version} is on PyPI"
+              exit 0
+            fi
+            echo "waiting for vaultspec-core ${version} on PyPI (${attempt}/40)"
+            sleep 15
+          done
+          echo "::error::vaultspec-core ${version} never appeared on PyPI. The binary bootstraps from there, so acquisition cannot be tested until publish.yml completes."
+          exit 1
 
       - name: Use it the way a new user would
         run: |
@@ -216,6 +290,44 @@ jobs:
           # is what a user gets from a browser too. Scoop clears it for them.
           # Strip it so this leg tests the binary rather than the mark.
           Unblock-File -Path (Join-Path $acq 'vaultspec-core.exe')
+
+      # WAIT FOR PyPI FIRST. The binary is a PyApp bootstrapper: launching it
+      # resolves `vaultspec-core==<version>` from PyPI, so until the wheel is
+      # there the artefact cannot start for a reason that has nothing to do
+      # with the artefact.
+      #
+      # v0.1.67 is why. This check was dispatched by the release guard the
+      # moment the assets attached, while `publish.yml` was still uploading,
+      # and three of four legs failed with:
+      #
+      #     No solution found when resolving dependencies:
+      #     Because there is no version of vaultspec-core==0.1.67 ...
+      #
+      # The fourth passed only because it happened to run a minute later. A
+      # check whose result depends on which container got scheduled first is
+      # not a check, and the failure it reports is a lie about the binary.
+      #
+      # release-please dispatches publish.yml and binaries.yml together rather
+      # than in sequence, deliberately - the binaries do not need PyPI to BUILD.
+      # They need it to RUN, which is what this workflow does and nothing else
+      # in the lane does.
+      - name: Wait for the release to reach PyPI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = $env:TAG -replace '^.*-v', ''
+          for ($i = 1; $i -le 40; $i++) {
+            try {
+              Invoke-RestMethod "https://pypi.org/pypi/vaultspec-core/$version/json" -TimeoutSec 20 | Out-Null
+              Write-Host "vaultspec-core $version is on PyPI"
+              exit 0
+            } catch {
+              Write-Host "waiting for vaultspec-core $version on PyPI ($i/40)"
+              Start-Sleep -Seconds 15
+            }
+          }
+          Write-Error "::error::vaultspec-core $version never appeared on PyPI. The binary bootstraps from there, so acquisition cannot be tested until publish.yml completes."
+          exit 1
 
       - name: Use it the way a new user would
         shell: pwsh
