@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.73](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.72...vaultspec-core-v0.1.73) (2026-08-30)
+
+
+### Features
+
+* **ci:** acquire at the declared glibc floor, not only above it ([#395](https://github.com/nevenincs/vaultspec-core/issues/395)) ([8c84e70](https://github.com/nevenincs/vaultspec-core/commit/8c84e70a0b058ef693d1e449c0054a6f555113e7))
+
 ## [0.1.72](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.71...vaultspec-core-v0.1.72) (2026-08-30)
 
 
