@@ -532,25 +532,68 @@ jobs:
       TAG: ${{ inputs.tag || github.ref_name }}
       RELEASE_RESULT: ${{ needs.release.result }}
     steps:
+      # The guard derives its expectation from the matrix in this file, so
+      # it needs the file. Checked out explicitly rather than relying on
+      # whatever tree a previous job happened to leave on this runner.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout: .github/workflows
+          sparse-checkout-cone-mode: false
+
       - name: Require artifacts on the published release
         shell: bash
         run: |
           set -euo pipefail
-          assets=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
-            --json assets --jq '.assets | length')
+          names=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          assets=$(printf '%s' "${names}" | grep -c . || true)
           echo "release ${TAG} carries ${assets} asset(s); release job=${RELEASE_RESULT}"
 
-          if [ "${assets}" -gt 0 ]; then
+          # EVERY DECLARED TARGET, not "any asset at all". v0.1.64 is why.
+          #
+          # Two of its build legs failed, so only part of the matrix reached the
+          # release - yet the wheel, the sdist and SHA256SUMS were already
+          # attached. The old check asked only whether the asset count was above
+          # zero, saw five, and passed a release missing half its binaries. It
+          # was caught by hand; the guard that exists for exactly this reported
+          # success.
+          #
+          # Attaching the wheel and sdist also made the old threshold
+          # unreachable: a release now carries three assets before a single
+          # binary is built, so "greater than zero" can no longer be false. An
+          # improvement elsewhere silently disarmed this check.
+          #
+          # The per-target assert in `Attach to release` cannot cover this - it
+          # lives in the job that does not run when a build leg fails.
+          #
+          # Targets are DERIVED from the matrix rather than listed again: a
+          # second list drifts, and a stranded expectation shipped v0.1.62 red.
+          workflow=".github/workflows/binaries.yml"
+          [ -f "${workflow}" ] || { echo "::error::${workflow} not checked out; cannot derive targets"; exit 1; }
+          mapfile -t expected < <(awk '/^[[:space:]]+target:[[:space:]]/ {print $2}' "${workflow}" | sort -u)
+          if [ ${#expected[@]} -eq 0 ]; then
+            echo "::error::could not derive any target from ${workflow}; refusing to pass vacuously"
+            exit 1
+          fi
+
+          missing=()
+          for triple in "${expected[@]}"; do
+            printf '%s' "${names}" | grep -q -- "${triple}" || missing+=("${triple}")
+          done
+
+          if [ ${#missing[@]} -eq 0 ]; then
+            echo "all ${#expected[@]} declared target(s) present on ${TAG}"
             exit 0
           fi
 
-          if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
-                  --json isPrerelease --jq '.isPrerelease')" != "true" ]; then
+          echo "::warning::${TAG} is missing: ${missing[*]}"
+
+          if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY"                   --json isPrerelease --jq '.isPrerelease')" != "true" ]; then
             gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease
             echo "::notice::demoted ${TAG} to a prerelease so latest skips it"
           fi
 
-          echo "::error::${TAG} carries no artifacts (release job=${RELEASE_RESULT}). It has been demoted to a prerelease so it cannot serve as latest. Fix the build and re-dispatch this workflow for this tag; the next step promotes it back once artifacts attach."
+          echo "::error::${TAG} is INCOMPLETE - missing ${missing[*]} (release job=${RELEASE_RESULT}). It has been demoted to a prerelease so it cannot serve as latest. Fix the build and re-dispatch this workflow for this tag; the next step promotes it back once every declared target attaches."
           exit 1
 
       # Undo an earlier demotion once a re-dispatch actually attaches something.
