@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.70](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.69...vaultspec-core-v0.1.70) (2026-08-30)
+
+
+### Bug Fixes
+
+* **acquisition:** wait on the binary bootstrapping, not on a PyPI endpoint ([#389](https://github.com/nevenincs/vaultspec-core/issues/389)) ([50c7ca1](https://github.com/nevenincs/vaultspec-core/commit/50c7ca1581df536030ec358779218232e2c3a371))
+* **acquisition:** wait on the index the installer reads, not the JSON API ([#385](https://github.com/nevenincs/vaultspec-core/issues/385)) ([a8d1d72](https://github.com/nevenincs/vaultspec-core/commit/a8d1d72c231006dbad23f47dd735b8f4bb027aaf))
+
 ## [0.1.69](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.68...vaultspec-core-v0.1.69) (2026-08-30)
 
 
