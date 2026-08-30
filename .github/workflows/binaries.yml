@@ -637,6 +637,22 @@ jobs:
           fi
 
           echo "::warning::${TAG} is missing: ${missing[*]}"
+          # WHAT A RE-DISPATCH CAN AND CANNOT REPAIR, because the two
+          # halves come from different places and only one of them moves.
+          #
+          # A dispatch resolves THIS FILE from the ref it is dispatched
+          # against, but the build job checks out `inputs.tag` for the
+          # SOURCE. So a fix to the matrix or to this guard can reach an
+          # older tag; a fix to build scripts or packaging code cannot,
+          # and that needs a NEW release.
+          #
+          # vaultspec-rag learned the second half on v0.4.15: the aarch64
+          # floor fix sat on main and the repair dispatch kept compiling
+          # the tag. This repository learned the first half on v0.1.66,
+          # which shipped a binary a merged PR had already removed from
+          # the matrix - because release-please dispatches with
+          # `ref=${TAG}`, freezing the workflow too.
+          echo "::error::Re-dispatch repairs a fix to THIS FILE (use --ref main), not a fix to tracked source. A source-level build fix needs a new release."
 
           if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY"                   --json isPrerelease --jq '.isPrerelease')" != "true" ]; then
             gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease
