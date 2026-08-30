@@ -88,15 +88,30 @@ jobs:
       # They need it to RUN, which is what this workflow does and nothing else
       # in the lane does.
       # WAIT UNTIL THE BINARY CAN ACTUALLY START, rather than until an endpoint
-      # says it should be able to. Design and evidence from #386; it was closed
-      # only because an automatic merge landed the weaker endpoint-polling fix
-      # first, so this restores it.
+      # says it should be able to. Design and evidence from #386.
       #
-      # Polling PyPI - the JSON API or the simple index - is a PROXY, and every
-      # such surface LEADS the resolver the binary actually uses. On v0.1.69 the
-      # JSON API reported the version present and three seconds later `uv`
-      # inside the binary still said `no version of vaultspec-core==0.1.69`;
-      # macOS and debian failed while Windows and ubuntu passed, on one release.
+      # #386 WAS CLOSED DELIBERATELY, not by accident. Its author closed it
+      # judging #385 the better call: it targeted the measured cause more
+      # cheaply, and the only argument for this design was an `Accept`-vary
+      # risk between the HTML and PEP 691 representations of the simple index
+      # which had not been measured. GitHub records no auto-merge on #385
+      # (`autoMergeRequest: none`, merged directly, no reviews), so the
+      # restoring PR's account of an automatic merge is not what happened.
+      # The code below is unchanged by this correction - only the history is.
+      #
+      # Polling PyPI is a PROXY, and the JSON API was MEASURED to lead the
+      # resolver: on v0.1.69 it reported the version present and three seconds
+      # later `uv` inside the binary still said `no version of
+      # vaultspec-core==0.1.69`; macOS and debian failed while Windows and
+      # ubuntu passed, on one release.
+      #
+      # The SIMPLE INDEX is a different and much closer proxy - it is the
+      # surface the resolver reads, and #385 polled it from the runner, so it
+      # saw the same CDN edge. It was never shown to lead anything. #385
+      # shipped on main without a release ever exercising it, and this replaced
+      # it before v0.1.70 ran, so whether the cheap fix would have sufficed is
+      # now unknowable. Do not cite this comment as evidence that it would not
+      # have.
       #
       # The condition this workflow depends on is "the PyApp bootstrapper can
       # resolve its own distribution from THIS machine". Nothing observes that
