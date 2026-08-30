@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.67](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.66...vaultspec-core-v0.1.67) (2026-08-30)
+
+
+### Features
+
+* **acquisition:** execute the Windows binary, closing the last platform ([#376](https://github.com/nevenincs/vaultspec-core/issues/376)) ([a55eea7](https://github.com/nevenincs/vaultspec-core/commit/a55eea7c60b84d4d865db821f188ed4904db7360))
+
+
+### Bug Fixes
+
+* **binaries:** drop the Intel leg, derive the preflight selectors, host the guard ([#372](https://github.com/nevenincs/vaultspec-core/issues/372)) ([3cd128d](https://github.com/nevenincs/vaultspec-core/commit/3cd128d8de3683ea73b6ecdff20054b0c12e70c2))
+* **binaries:** require every declared target, not any asset at all ([#377](https://github.com/nevenincs/vaultspec-core/issues/377)) ([778788c](https://github.com/nevenincs/vaultspec-core/commit/778788cbe54caf1e11e2b74d8420c527ad102cbc))
+* **release-please:** dispatch binaries from main, not from the tag ([#378](https://github.com/nevenincs/vaultspec-core/issues/378)) ([e1b578a](https://github.com/nevenincs/vaultspec-core/commit/e1b578a34d5b7f7011cc366ecf97b115cf5ac13e))
+
 ## [0.1.66](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.65...vaultspec-core-v0.1.66) (2026-08-30)
 
 
