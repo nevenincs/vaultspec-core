@@ -1,0 +1,96 @@
+name: Acquisition check
+
+# Everything else in this repository tests what is IN the tree. This tests what
+# a user actually receives: it installs from the published release only, on a
+# machine with no checkout, no warm cache and no toolchain, and asserts the
+# tool then does its job rather than merely exiting zero.
+#
+# It cannot run before publication, so it runs after - and on a schedule,
+# because the ways acquisition rots are not caused by any commit: a yanked
+# release, a renamed asset, a distribution whose glibc is older than the floor
+# the artifact was built against.
+
+on:
+  release:
+    types: [published]
+  schedule:
+    # Weekly, off the hour: nothing here is urgent and the fleet is shared.
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to acquire (defaults to the latest release)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  acquire:
+    name: acquire on ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Distributions OLDER than the build host, because the Linux artifact
+        # links against whatever glibc built it and the floor is only proven by
+        # running somewhere that has less. bookworm is 2.36, jammy is 2.35;
+        # both sit above the declared 2.28 floor and below the build host.
+        image:
+          - debian:bookworm-slim
+          - ubuntu:22.04
+    runs-on: [self-hosted, Linux, X64, build]
+    container: ${{ matrix.image }}
+    steps:
+      - name: Install what acquisition itself needs
+        run: |
+          set -eux
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends curl git ca-certificates
+
+      - name: Acquire the published binary
+        env:
+          REPO: ${{ github.repository }}
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -eux
+          tag="${EVENT_TAG:-${INPUT_TAG:-}}"
+          if [ -z "${tag}" ]; then
+            tag=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
+                  | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
+          fi
+          [ -n "${tag}" ] || { echo "::error::could not resolve a release tag"; exit 1; }
+          echo "TAG=${tag}" >> "$GITHUB_ENV"
+          mkdir -p /opt/acq
+          curl -fsSL -o /opt/acq/vaultspec-core \
+            "https://github.com/${REPO}/releases/download/${tag}/vaultspec-core-x86_64-unknown-linux-gnu"
+          chmod +x /opt/acq/vaultspec-core
+
+      - name: Use it the way a new user would
+        run: |
+          set -eux
+          # A user's machine has none of this job's state. Give the binary a
+          # home of its own so a warm cache cannot make a broken acquisition
+          # look like a working one.
+          export HOME=/tmp/fresh-home
+          rm -rf "$HOME" /tmp/proj
+          mkdir -p "$HOME" /tmp/proj
+
+          /opt/acq/vaultspec-core --version
+
+          cd /tmp/proj
+          git init -q
+          git config user.email acquisition@example.invalid
+          git config user.name "Acquisition Check"
+
+          /opt/acq/vaultspec-core install
+
+          # Behaviour, not exit codes: the install has to leave a vault behind,
+          # and the tool has to be able to read back what it just wrote.
+          [ -d .vault ] || { echo "::error::install exited zero but scaffolded no .vault/"; exit 1; }
+          /opt/acq/vaultspec-core vault check all
+
+      - name: Return the workspace to the runner's user
+        if: always()
+        run: chown -R --reference=/__w "$GITHUB_WORKSPACE" || true
