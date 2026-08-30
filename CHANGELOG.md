@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.63](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.62...vaultspec-core-v0.1.63) (2026-08-30)
+
+
+### Bug Fixes
+
+* **binaries:** derive the expected targets from the matrix that builds them ([#364](https://github.com/nevenincs/vaultspec-core/issues/364)) ([5b3cb2e](https://github.com/nevenincs/vaultspec-core/commit/5b3cb2e85e857c65751efecb953e96afdf96731a))
+* **binaries:** expect the targets the matrix builds, not one it cannot ([#361](https://github.com/nevenincs/vaultspec-core/issues/361)) ([41e9a77](https://github.com/nevenincs/vaultspec-core/commit/41e9a7752a94789af35e87afe2bd2f1d0c54b9a0))
+
 ## [0.1.62](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.61...vaultspec-core-v0.1.62) (2026-08-30)
 
 
