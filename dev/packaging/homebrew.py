@@ -1,11 +1,11 @@
 """Render the Homebrew formula that installs the release binaries.
 
-The repository is its own tap. Homebrew reads formulae from ``Formula/`` in
-any repository when the tap is added with an explicit URL, so this ships
-through Homebrew without a second repository, matching what ``bucket/`` does
-for Scoop::
+The formula is committed to the ACCOUNT channel root,
+``nevenincs/homebrew-tap``, rather than to this repository - the same root the
+Scoop manifest goes to, for the same reason: a tap resolves to a repository, so
+a per-product tap is one `brew tap` per product::
 
-    brew tap nevenincs/vaultspec-core https://github.com/nevenincs/vaultspec-core
+    brew tap nevenincs/tap https://github.com/nevenincs/homebrew-tap
     brew install vaultspec-core
 
 This is a BINARY formula - it places the pre-built PyApp assets attached to
