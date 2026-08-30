@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.71](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.70...vaultspec-core-v0.1.71) (2026-08-30)
+
+
+### Features
+
+* **binaries:** build linux-aarch64 on a hosted ARM64 runner ([#387](https://github.com/nevenincs/vaultspec-core/issues/387)) ([2240f7e](https://github.com/nevenincs/vaultspec-core/commit/2240f7ea287e6a0519f3c2e3ded4e2c42e955a7d))
+
 ## [0.1.70](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.69...vaultspec-core-v0.1.70) (2026-08-30)
 
 
