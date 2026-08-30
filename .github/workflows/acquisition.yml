@@ -28,7 +28,7 @@ permissions:
 
 jobs:
   acquire:
-    name: acquire on ${{ matrix.image }}
+    name: acquire ${{ matrix.arch }} on ${{ matrix.image }}
     strategy:
       fail-fast: false
       matrix:
@@ -36,10 +36,35 @@ jobs:
         # links against whatever glibc built it and the floor is only proven by
         # running somewhere that has less. bookworm is 2.36, jammy is 2.35;
         # both sit above the declared 2.28 floor and below the build host.
-        image:
-          - debian:bookworm-slim
-          - ubuntu:22.04
-    runs-on: [self-hosted, Linux, X64, build]
+        #
+        # BOTH Linux architectures, because a published asset nobody executes
+        # is an untested asset. aarch64 was built, attached and shipped in
+        # v0.1.71 while this matrix still fetched only the x86_64 file, so that
+        # binary reached users having never been started anywhere. The coverage
+        # assertion in ci.yml is what stops this recurring silently.
+        #
+        # The arm64 legs run on the SAME hosted runner class that BUILDS that
+        # target, so their availability is already proven by the build rather
+        # than assumed here. Both images publish arm64 variants, so the
+        # older-libc property holds identically on each architecture.
+        include:
+          - image: debian:bookworm-slim
+            arch: x86_64
+            runner: [self-hosted, Linux, X64, build]
+            asset: vaultspec-core-x86_64-unknown-linux-gnu
+          - image: ubuntu:22.04
+            arch: x86_64
+            runner: [self-hosted, Linux, X64, build]
+            asset: vaultspec-core-x86_64-unknown-linux-gnu
+          - image: debian:bookworm-slim
+            arch: aarch64
+            runner: ubuntu-24.04-arm
+            asset: vaultspec-core-aarch64-unknown-linux-gnu
+          - image: ubuntu:22.04
+            arch: aarch64
+            runner: ubuntu-24.04-arm
+            asset: vaultspec-core-aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
     container: ${{ matrix.image }}
     steps:
       - name: Install what acquisition itself needs
@@ -53,6 +78,7 @@ jobs:
           REPO: ${{ github.repository }}
           EVENT_TAG: ${{ github.event.release.tag_name }}
           INPUT_TAG: ${{ inputs.tag }}
+          ASSET: ${{ matrix.asset }}
         run: |
           set -eux
           tag="${EVENT_TAG:-${INPUT_TAG:-}}"
@@ -64,7 +90,7 @@ jobs:
           echo "TAG=${tag}" >> "$GITHUB_ENV"
           mkdir -p /opt/acq
           curl -fsSL -o /opt/acq/vaultspec-core \
-            "https://github.com/${REPO}/releases/download/${tag}/vaultspec-core-x86_64-unknown-linux-gnu"
+            "https://github.com/${REPO}/releases/download/${tag}/${ASSET}"
           chmod +x /opt/acq/vaultspec-core
 
       # WAIT FOR PyPI FIRST. The binary is a PyApp bootstrapper: launching it
