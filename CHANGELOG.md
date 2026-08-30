@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.66](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.65...vaultspec-core-v0.1.66) (2026-08-30)
+
+
+### Features
+
+* **acquisition:** execute the macOS binary, which nothing currently does ([#374](https://github.com/nevenincs/vaultspec-core/issues/374)) ([30b8dc5](https://github.com/nevenincs/vaultspec-core/commit/30b8dc55953e757aba21564f5c77fd9b21fb9ea8))
+
 ## [0.1.65](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.64...vaultspec-core-v0.1.65) (2026-08-30)
 
 
