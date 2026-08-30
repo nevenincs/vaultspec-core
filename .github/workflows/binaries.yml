@@ -525,6 +525,8 @@ jobs:
     runs-on: [self-hosted, Linux, X64, build]
     permissions:
       contents: write
+      # Dispatching the acquisition check is a write to the Actions API.
+      actions: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       TAG: ${{ inputs.tag || github.ref_name }}
@@ -558,6 +560,28 @@ jobs:
       # full releases here, so anything carrying a prerelease marker in its name
       # was meant to be one and must not be promoted into `latest` by a guard
       # that only knows about assets.
+      # The acquisition check cannot see this release by itself. A release
+      # published with the default token raises no workflow events, so its
+      # `release: published` trigger never fires for anything this lane
+      # produces - only its weekly schedule does, which is days of blindness
+      # after every release. A dispatch is explicitly exempt from that rule,
+      # which is why the binaries build is dispatched rather than waiting on a
+      # tag push, and this is the same move for the same reason.
+      #
+      # A failure to dispatch does not fail the release: the artifacts are
+      # already attached and verified by this point, and the weekly run still
+      # covers the release eventually. It warns rather than passing silently.
+      - name: Ask the acquisition check to try this release
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh workflow run acquisition.yml --repo "$GITHUB_REPOSITORY"                --ref "${GITHUB_REF_NAME}" -f tag="$TAG"; then
+            echo "dispatched the acquisition check for ${TAG}"
+          else
+            echo "::warning::could not dispatch the acquisition check for ${TAG}; its weekly run still covers this release"
+          fi
+
       - name: Promote a repaired release back to latest
         if: ${{ success() }}
         shell: bash
