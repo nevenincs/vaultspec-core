@@ -112,7 +112,7 @@ jobs:
           # arming the token is exactly what would detonate it.
           workflow=".github/workflows/binaries.yml"
           [ -f "${workflow}" ] || { echo "::error::${workflow} not checked out; cannot derive selectors" >&2; exit 1; }
-          mapfile -t selectors < <(awk -F'[][]' '/^[[:space:]]*runner:/ && NF > 2 {print $2}' "${workflow}" | tr -d ' ' | tr 'A-Z' 'a-z' | sort -u)
+          mapfile -t selectors < <(awk -F'[][]' '/^[[:space:]]*runner:/ && NF > 2 {print $2}' "${workflow}" | tr -d ' ' | tr '[:upper:]' '[:lower:]' | sort -u)
           if [ "${#selectors[@]}" -eq 0 ]; then
             echo "::error::derived no runner selector from ${workflow}; refusing to pass vacuously" >&2
             exit 1
