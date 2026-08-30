@@ -80,6 +80,29 @@ jobs:
       # Both surfaces carry it now, so the check was not wrong about PyPI - it
       # was answering a different question from the one that matters.
       #
+      # WHY NOT JUST POLL THE RIGHT ENDPOINT. #385 proposed exactly that and
+      # diagnosed it more precisely than the paragraph above: the JSON API and
+      # the simple index are SEPARATE CACHES, and the simple index is the
+      # surface an installer resolves against, so polling the index rather
+      # than the JSON API closes most of this gap at a fraction of the cost.
+      # That is correct, and it is the better description of what went wrong.
+      #
+      # It was not taken because it leaves the same shape of gap one layer
+      # down. `uv` requests the PEP 691 JSON representation of that index;
+      # `curl` gets the HTML one. CDNs commonly vary on `Accept`, so the two
+      # representations can propagate independently - one path, but not
+      # necessarily one cached object. No divergence there has been measured,
+      # so this is a structural risk rather than an observed failure.
+      #
+      # The deciding argument is the history rather than that risk. This is
+      # the third fix to one check: no wait at all, then a wait on the JSON
+      # API, then a wait on the index. Each replaced a proxy with a closer
+      # proxy and each was correct about the surface it polled. Running the
+      # bootstrapper cannot drift from the condition it claims to test, and
+      # the cost of doing so is small here because PYAPP_DISTRIBUTION_EMBED=1
+      # bakes CPython into the binary - an attempt is a package install, not a
+      # runtime download.
+      #
       # The condition this workflow depends on is "the PyApp bootstrapper can
       # resolve its own distribution from this machine". Nothing observes that
       # except running it, so that is what this waits on. The exit code is not
@@ -186,6 +209,29 @@ jobs:
       #
       # Both surfaces carry it now, so the check was not wrong about PyPI - it
       # was answering a different question from the one that matters.
+      #
+      # WHY NOT JUST POLL THE RIGHT ENDPOINT. #385 proposed exactly that and
+      # diagnosed it more precisely than the paragraph above: the JSON API and
+      # the simple index are SEPARATE CACHES, and the simple index is the
+      # surface an installer resolves against, so polling the index rather
+      # than the JSON API closes most of this gap at a fraction of the cost.
+      # That is correct, and it is the better description of what went wrong.
+      #
+      # It was not taken because it leaves the same shape of gap one layer
+      # down. `uv` requests the PEP 691 JSON representation of that index;
+      # `curl` gets the HTML one. CDNs commonly vary on `Accept`, so the two
+      # representations can propagate independently - one path, but not
+      # necessarily one cached object. No divergence there has been measured,
+      # so this is a structural risk rather than an observed failure.
+      #
+      # The deciding argument is the history rather than that risk. This is
+      # the third fix to one check: no wait at all, then a wait on the JSON
+      # API, then a wait on the index. Each replaced a proxy with a closer
+      # proxy and each was correct about the surface it polled. Running the
+      # bootstrapper cannot drift from the condition it claims to test, and
+      # the cost of doing so is small here because PYAPP_DISTRIBUTION_EMBED=1
+      # bakes CPython into the binary - an attempt is a package install, not a
+      # runtime download.
       #
       # The condition this workflow depends on is "the PyApp bootstrapper can
       # resolve its own distribution from this machine". Nothing observes that
@@ -299,6 +345,29 @@ jobs:
       #
       # Both surfaces carry it now, so the check was not wrong about PyPI - it
       # was answering a different question from the one that matters.
+      #
+      # WHY NOT JUST POLL THE RIGHT ENDPOINT. #385 proposed exactly that and
+      # diagnosed it more precisely than the paragraph above: the JSON API and
+      # the simple index are SEPARATE CACHES, and the simple index is the
+      # surface an installer resolves against, so polling the index rather
+      # than the JSON API closes most of this gap at a fraction of the cost.
+      # That is correct, and it is the better description of what went wrong.
+      #
+      # It was not taken because it leaves the same shape of gap one layer
+      # down. `uv` requests the PEP 691 JSON representation of that index;
+      # `curl` gets the HTML one. CDNs commonly vary on `Accept`, so the two
+      # representations can propagate independently - one path, but not
+      # necessarily one cached object. No divergence there has been measured,
+      # so this is a structural risk rather than an observed failure.
+      #
+      # The deciding argument is the history rather than that risk. This is
+      # the third fix to one check: no wait at all, then a wait on the JSON
+      # API, then a wait on the index. Each replaced a proxy with a closer
+      # proxy and each was correct about the surface it polled. Running the
+      # bootstrapper cannot drift from the condition it claims to test, and
+      # the cost of doing so is small here because PYAPP_DISTRIBUTION_EMBED=1
+      # bakes CPython into the binary - an attempt is a package install, not a
+      # runtime download.
       #
       # The condition this workflow depends on is "the PyApp bootstrapper can
       # resolve its own distribution from this machine". Nothing observes that
