@@ -167,6 +167,17 @@ jobs:
             runner: [self-hosted, Linux, X64, build]
             target: x86_64-unknown-linux-gnu
             container: quay.io/pypa/manylinux_2_28_x86_64@sha256:4dc41da7df20400310c80d162a2fe2d2c2f3d9734d8dec20f6b9843711618deb
+          # Same manylinux RELEASE as the leg above (2026.08.24-1), not merely
+          # the same floor. Two legs pinned to different builds of the toolchain
+          # can differ in ways the floor check does not measure, and the whole
+          # point of pinning is that the build environment is an input.
+          #
+          # HOSTED, and the only leg that is. See the note below `runs-on` for
+          # why that is now the honest choice rather than a concession.
+          - name: linux-aarch64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            container: quay.io/pypa/manylinux_2_28_aarch64@sha256:29a6ceb78de5b00494e6e7456a72782a4cb54238de102e7491d15fe47789b4d1
           - name: windows-x86_64
             runner: [self-hosted, Windows, X64]
             target: x86_64-pc-windows-msvc
@@ -216,25 +227,44 @@ jobs:
           # while the laptop is unplugged does not fail, it waits. That is true
           # of the macOS legs above as well; this leg is not special.
           #
-          # NO linux-aarch64 LEG, and the gap is declared rather than silent.
-          # This host cannot build one that meets the target's floor by either
-          # route. It has no reachable docker daemon, so a pinned manylinux
-          # image cannot start at all - the job dies in `Initialize containers`
-          # before checkout. Building natively instead does start, and produces
-          # an artifact requiring GLIBC_2.39 against a declared floor of 2.28,
-          # measured from the sibling project's uncontainerised aarch64 build on
-          # this same host. So the floor check rejects it eleven glibc releases
-          # out, which is the guard working, not a way around this.
+          # THIS HOST STILL CANNOT SERVE linux-aarch64, and that has not
+          # changed - the leg above simply stopped asking it to.
           #
-          # `HOMEBREW_TARGETS` still names the target, so `generate.py` prints
-          # `::warning::no Homebrew coverage for: aarch64-unknown-linux-gnu` on
-          # every release and omits the platform from the formula, rather than
-          # pinning an asset nothing built. The gap stays visible each release.
+          # The colima-hosted ARM64 runner has no reachable docker daemon, so a
+          # pinned manylinux image dies in `Initialize containers` before
+          # checkout; and an uncontainerised build there produces an artifact
+          # requiring GLIBC_2.39 against a declared floor of 2.28. Both routes
+          # were closed, which is why this leg was absent rather than broken.
           #
-          # Restore the leg the moment this label is served by a host that can
-          # run the pinned image; the container line is the only thing missing.
-    # Artifact builds run on the shared self-hosted fleet (hosted multiplatform
-    # runners are cost-prohibitive); see publish.yml for the same constraint.
+          # The standing note said to restore it "the moment this label is
+          # served by a host that can run the pinned image". That host was
+          # always available: `ubuntu-24.04-arm` is a GitHub-hosted ARM64
+          # runner with a working docker daemon, and it is FREE for public
+          # repositories - which this repository is. The blocker was never the
+          # gap analysis above, all of which still holds; it was the blanket
+          # "hosted runners are cost-prohibitive" assumption recorded under
+          # `runs-on`, which is true of private repositories and was carried
+          # over to this one without being re-checked.
+          #
+          # `HOMEBREW_TARGETS` already named this triple and `generate.py` has
+          # been printing `::warning::no Homebrew coverage for:
+          # aarch64-unknown-linux-gnu` on every release. That warning should
+          # now stop by itself; if it does not, the asset name and the formula
+          # disagree and that is a real defect, not a leftover.
+    # Artifact builds run on the shared self-hosted fleet, with ONE exception:
+    # linux-aarch64 runs on a GitHub-hosted ARM64 runner because no host in
+    # this fleet can build that target to its declared floor.
+    #
+    # The note this replaces said hosted multiplatform runners are
+    # "cost-prohibitive". That is true for private repositories, where ARM64
+    # and macOS hosted minutes bill at a multiplier. It is NOT true here:
+    # hosted runners are free for public repositories, and this one is public.
+    # The claim was correct where it was first written and was then applied to
+    # a repository it did not describe, which cost this project one build
+    # target for as long as it stood.
+    #
+    # publish.yml carries the same sentence for the same reason; it is worth
+    # re-reading there rather than assuming it transfers.
     runs-on: ${{ matrix.runner }}
     # Empty for every leg but the two Linux ones, which GitHub reads as
     # "no container".
