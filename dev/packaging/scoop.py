@@ -1,12 +1,16 @@
 """Render the Scoop manifest that installs the Windows release binaries.
 
-The repository is its own Scoop bucket: Scoop resolves app manifests from a
-``bucket/`` subdirectory when one is present, so the product ships through
-Scoop without a second repository existing to be kept in sync. Installing is
-then::
+The manifest is committed to the ACCOUNT channel root,
+``nevenincs/homebrew-tap``, rather than to this repository. Scoop resolves a
+bucket to a repository, so a per-product bucket makes a user add one for every
+vaultspec product they install; the account root is added once and carries them
+all. Installing is then::
 
-    scoop bucket add vaultspec-core https://github.com/nevenincs/vaultspec-core
+    scoop bucket add nevenincs https://github.com/nevenincs/homebrew-tap
     scoop install vaultspec-core
+
+This module only renders the bytes - ``dev/packaging/generate.py`` decides where
+they land, via its ``--root``. See ``docs/channels.md``.
 
 ``checkver`` and ``autoupdate`` are emitted alongside the pinned fields, but
 they serve maintainer tooling only - ``scoop install`` reads the committed

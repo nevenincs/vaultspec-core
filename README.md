@@ -100,19 +100,23 @@ Or install the standalone binaries, which need no Python toolchain on the machin
 
 ```powershell
 # Windows, via Scoop
-scoop bucket add vaultspec-core https://github.com/nevenincs/vaultspec-core
+scoop bucket add nevenincs https://github.com/nevenincs/homebrew-tap
 scoop install vaultspec-core
 ```
 
 ```bash
 # macOS and Linux, via Homebrew
-brew tap nevenincs/vaultspec-core https://github.com/nevenincs/vaultspec-core
+brew tap nevenincs/tap https://github.com/nevenincs/homebrew-tap
 brew install vaultspec-core
 ```
 
 Both place `vaultspec-core` and `vaultspec-mcp`. The first launch of either bootstraps
 its pinned runtime and needs network once. Homebrew covers macOS on Apple Silicon and
-Intel, and Linux on x86-64.
+Linux on x86-64; Intel macOS and Linux arm64 are not built, and
+[docs/channels.md](docs/channels.md) says why.
+
+The tap is the **account** root rather than this repository, so it is added once and
+carries every vaultspec product.
 
 ### 2. Bootstrap
 

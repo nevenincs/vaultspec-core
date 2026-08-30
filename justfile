@@ -190,12 +190,17 @@ analytics *args='':
 binaries tag rust_target outdir='dist-bin':
     uv run --no-project --python 3.13 -- python dev/binaries/build_pyapp.py --tag {{tag}} --target {{rust_target}} --outdir {{outdir}}
 
-# Regenerate the Scoop manifest and Homebrew formula for one released tag.
-# Same command the release job runs, so a maintainer can reproduce or repair a
-# channel pointer without copying CI's invocation. Point `checksums` at the
-# release's SHA256SUMS (locally built, or downloaded from the release).
-channels tag checksums='dist-bin/SHA256SUMS':
-    uv run --no-project --python 3.13 -- python -m dev.packaging.generate --tag {{tag}} --checksums {{checksums}}
+# `root` is REQUIRED and is a checkout of nevenincs/homebrew-tap - the account
+# channel root, which is where these pointers live. It used to default to this
+# repository, which quietly wrote into a local `bucket/` and `Formula/` that the
+# release job never read; the two roots drifted four releases apart before anyone
+# noticed, and every install instruction named the stale one. See
+# docs/channels.md. Point `checksums` at the release's SHA256SUMS.
+#
+# Regenerate and validate a release's channel pointers, as the release job does.
+channels tag root checksums='dist-bin/SHA256SUMS':
+    uv run --no-project --python 3.13 -- python -m dev.packaging.generate --tag {{tag}} --checksums {{checksums}} --root {{root}}
+    uv run --no-project --python 3.13 -- python -m dev.packaging.validate --root {{root}}
 
 # ===========================================================================
 #  Aggregate pipeline
