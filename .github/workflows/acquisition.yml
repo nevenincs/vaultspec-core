@@ -94,3 +94,78 @@ jobs:
       - name: Return the workspace to the runner's user
         if: always()
         run: chown -R --reference=/__w "$GITHUB_WORKSPACE" || true
+
+  acquire-macos:
+    name: acquire on macOS (Apple Silicon)
+    # NATIVE, no container - macOS runners cannot host one, and none is needed:
+    # the point of a container on the Linux legs is to supply an OLDER libc than
+    # the build host. macOS has no equivalent knob here; what this leg adds is
+    # simply that the artifact is EXECUTED at all.
+    #
+    # This host is power-gated and serves runners only on AC, so this job can
+    # queue. That is acceptable and deliberate: acquisition runs after
+    # publication and gates nothing, so a wait costs nothing but time. It must
+    # never be made a release gate for that reason.
+    runs-on: [self-hosted, macOS, ARM64]
+    steps:
+      - name: Acquire the published binary
+        env:
+          REPO: ${{ github.repository }}
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -eux
+          tag="${EVENT_TAG:-${INPUT_TAG:-}}"
+          if [ -z "${tag}" ]; then
+            tag=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
+                  | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
+          fi
+          [ -n "${tag}" ] || { echo "::error::could not resolve a release tag"; exit 1; }
+          echo "TAG=${tag}" >> "$GITHUB_ENV"
+
+          # A directory of this job's own, not the shared work tree: a reused
+          # self-hosted checkout is exactly the warm state this check exists to
+          # avoid, and macOS runners here are long-lived.
+          acq="${RUNNER_TEMP}/acq"
+          rm -rf "${acq}"; mkdir -p "${acq}"
+          echo "ACQ=${acq}" >> "$GITHUB_ENV"
+          curl -fsSL -o "${acq}/vaultspec-core" \
+            "https://github.com/${REPO}/releases/download/${tag}/vaultspec-core-aarch64-apple-darwin"
+          chmod +x "${acq}/vaultspec-core"
+
+          # Gatekeeper quarantines a curl-downloaded executable. A user gets the
+          # same treatment from a browser download and clears it the same way;
+          # Homebrew clears it for them. Strip it so this leg tests the binary
+          # rather than the quarantine attribute.
+          xattr -d com.apple.quarantine "${acq}/vaultspec-core" 2>/dev/null || true
+
+      - name: Use it the way a new user would
+        run: |
+          set -eux
+          export HOME="${RUNNER_TEMP}/fresh-home"
+          proj="${RUNNER_TEMP}/proj"
+          rm -rf "$HOME" "${proj}"
+          mkdir -p "$HOME" "${proj}"
+
+          # THE ASSERTION THIS LEG EXISTS FOR. A macOS binary that cannot start
+          # exits non-zero here and nowhere else in this repository - not in the
+          # build, which only produced it, and not in the Linux legs above.
+          # vaultspec-core-x86_64-apple-darwin shipped for several releases
+          # exiting 1 on launch, and reached users through the tap, because
+          # nothing ever ran it.
+          "${ACQ}/vaultspec-core" --version
+
+          cd "${proj}"
+          git init -q
+          git config user.email acquisition@example.invalid
+          git config user.name "Acquisition Check"
+
+          "${ACQ}/vaultspec-core" install
+
+          # Behaviour, not exit codes.
+          [ -d .vault ] || { echo "::error::install exited zero but scaffolded no .vault/"; exit 1; }
+          "${ACQ}/vaultspec-core" vault check all
+
+      - name: Clean up
+        if: always()
+        run: rm -rf "${RUNNER_TEMP}/acq" "${RUNNER_TEMP}/fresh-home" "${RUNNER_TEMP}/proj" || true
