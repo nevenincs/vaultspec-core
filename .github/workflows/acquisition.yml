@@ -87,27 +87,39 @@ jobs:
       # than in sequence, deliberately - the binaries do not need PyPI to BUILD.
       # They need it to RUN, which is what this workflow does and nothing else
       # in the lane does.
-      - name: Wait for the release to reach PyPI
-        env:
-          TAG: ${{ env.TAG }}
+      # WAIT UNTIL THE BINARY CAN ACTUALLY START, rather than until an endpoint
+      # says it should be able to. Design and evidence from #386; it was closed
+      # only because an automatic merge landed the weaker endpoint-polling fix
+      # first, so this restores it.
+      #
+      # Polling PyPI - the JSON API or the simple index - is a PROXY, and every
+      # such surface LEADS the resolver the binary actually uses. On v0.1.69 the
+      # JSON API reported the version present and three seconds later `uv`
+      # inside the binary still said `no version of vaultspec-core==0.1.69`;
+      # macOS and debian failed while Windows and ubuntu passed, on one release.
+      #
+      # The condition this workflow depends on is "the PyApp bootstrapper can
+      # resolve its own distribution from THIS machine". Nothing observes that
+      # except running it. The exit code is not asserted here - failing to start
+      # is the normal state for the first minute after a release - only that it
+      # eventually does; the step after this one tests the behaviour.
+      #
+      # The probe gets its OWN home so its warm cache cannot make the real
+      # check pass on a broken release.
+      - name: Wait until the published binary can bootstrap
         run: |
           set -eu
-          version="${TAG##*-v}"
+          export HOME=/tmp/bootstrap-probe
+          rm -rf "$HOME"; mkdir -p "$HOME"
           for attempt in $(seq 1 40); do
-            # The SIMPLE INDEX, not the JSON API: that is the surface the
-            # installer resolves against, and the two are separate caches.
-            # v0.1.69 proved the difference - the JSON API already served the
-            # version while macOS and debian still could not resolve it, so
-            # this leg reported "on PyPI" and the install then failed with
-            # `no version of vaultspec-core==0.1.69`.
-            if curl -fsSL "https://pypi.org/simple/vaultspec-core/" 2>/dev/null | grep -q "vaultspec_core-${version}-"; then
-              echo "vaultspec-core ${version} is on PyPI"
+            if /opt/acq/vaultspec-core --version >/dev/null 2>&1; then
+              echo "the bootstrapper resolved its distribution (attempt ${attempt})"
               exit 0
             fi
-            echo "waiting for vaultspec-core ${version} on PyPI (${attempt}/40)"
+            echo "waiting for the release to be resolvable from this machine (${attempt}/40)"
             sleep 15
           done
-          echo "::error::vaultspec-core ${version} never appeared on PyPI. The binary bootstraps from there, so acquisition cannot be tested until publish.yml completes."
+          echo "::error::the published binary never resolved its distribution. It bootstraps from PyPI, so this is publish.yml not having completed - or a genuinely unresolvable release."
           exit 1
 
       - name: Use it the way a new user would
@@ -202,27 +214,23 @@ jobs:
       # than in sequence, deliberately - the binaries do not need PyPI to BUILD.
       # They need it to RUN, which is what this workflow does and nothing else
       # in the lane does.
-      - name: Wait for the release to reach PyPI
-        env:
-          TAG: ${{ env.TAG }}
+      # Same reasoning as the containerised leg above: wait on the binary
+      # resolving its own distribution, not on an endpoint that leads it.
+      # Design and evidence from #386.
+      - name: Wait until the published binary can bootstrap
         run: |
           set -eu
-          version="${TAG##*-v}"
+          export HOME="${RUNNER_TEMP}/bootstrap-probe"
+          rm -rf "$HOME"; mkdir -p "$HOME"
           for attempt in $(seq 1 40); do
-            # The SIMPLE INDEX, not the JSON API: that is the surface the
-            # installer resolves against, and the two are separate caches.
-            # v0.1.69 proved the difference - the JSON API already served the
-            # version while macOS and debian still could not resolve it, so
-            # this leg reported "on PyPI" and the install then failed with
-            # `no version of vaultspec-core==0.1.69`.
-            if curl -fsSL "https://pypi.org/simple/vaultspec-core/" 2>/dev/null | grep -q "vaultspec_core-${version}-"; then
-              echo "vaultspec-core ${version} is on PyPI"
+            if "${ACQ}/vaultspec-core" --version >/dev/null 2>&1; then
+              echo "the bootstrapper resolved its distribution (attempt ${attempt})"
               exit 0
             fi
-            echo "waiting for vaultspec-core ${version} on PyPI (${attempt}/40)"
+            echo "waiting for the release to be resolvable from this machine (${attempt}/40)"
             sleep 15
           done
-          echo "::error::vaultspec-core ${version} never appeared on PyPI. The binary bootstraps from there, so acquisition cannot be tested until publish.yml completes."
+          echo "::error::the published binary never resolved its distribution. It bootstraps from PyPI, so this is publish.yml not having completed - or a genuinely unresolvable release."
           exit 1
 
       - name: Use it the way a new user would
@@ -323,25 +331,41 @@ jobs:
       # than in sequence, deliberately - the binaries do not need PyPI to BUILD.
       # They need it to RUN, which is what this workflow does and nothing else
       # in the lane does.
-      - name: Wait for the release to reach PyPI
+      # Same reasoning as the Linux and macOS legs: wait on the binary
+      # resolving its own distribution, not on an endpoint that leads it.
+      # Design and evidence from #386. The probe gets its own profile - shaped
+      # the way #383 established, because a bare directory is not a profile the
+      # platform API accepts - and the environment is restored afterwards so
+      # the real check still runs against its own fresh profile.
+      - name: Wait until the published binary can bootstrap
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $version = $env:TAG -replace '^.*-v', ''
+          $ErrorActionPreference = 'Continue'
+          $probe = Join-Path $env:RUNNER_TEMP 'bootstrap-probe'
+          Remove-Item -Recurse -Force $probe -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path (Join-Path $probe 'AppData\Local'), (Join-Path $probe 'AppData\Roaming') | Out-Null
+          $saved = @{ USERPROFILE = $env:USERPROFILE; HOME = $env:HOME; APPDATA = $env:APPDATA; LOCALAPPDATA = $env:LOCALAPPDATA }
+          $env:USERPROFILE = $probe
+          $env:HOME = $probe
+          $env:APPDATA = Join-Path $probe 'AppData\Roaming'
+          $env:LOCALAPPDATA = Join-Path $probe 'AppData\Local'
+          $exe = Join-Path $env:ACQ 'vaultspec-core.exe'
+          $ok = $false
           for ($i = 1; $i -le 40; $i++) {
-            try {
-              # The SIMPLE INDEX, not the JSON API - see the Linux legs above.
-              $index = Invoke-RestMethod "https://pypi.org/simple/vaultspec-core/" -TimeoutSec 20
-              if ($index -notmatch [regex]::Escape("vaultspec_core-$version-")) { throw "not on the simple index yet" }
-              Write-Host "vaultspec-core $version is on PyPI"
-              exit 0
-            } catch {
-              Write-Host "waiting for vaultspec-core $version on PyPI ($i/40)"
-              Start-Sleep -Seconds 15
+            & $exe --version *> $null
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "the bootstrapper resolved its distribution (attempt $i)"
+              $ok = $true
+              break
             }
+            Write-Host "waiting for the release to be resolvable from this machine ($i/40)"
+            Start-Sleep -Seconds 15
           }
-          Write-Error "::error::vaultspec-core $version never appeared on PyPI. The binary bootstraps from there, so acquisition cannot be tested until publish.yml completes."
-          exit 1
+          foreach ($k in $saved.Keys) { Set-Item -Path "env:$k" -Value $saved[$k] }
+          if (-not $ok) {
+            Write-Error "::error::the published binary never resolved its distribution. It bootstraps from PyPI, so this is publish.yml not having completed - or a genuinely unresolvable release."
+            exit 1
+          }
 
       - name: Use it the way a new user would
         shell: pwsh
