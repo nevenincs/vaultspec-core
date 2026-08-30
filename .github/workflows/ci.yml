@@ -92,6 +92,47 @@ jobs:
       - name: Lint GitHub Actions workflows
         uses: docker://rhysd/actionlint:1.7.11
 
+      # A published binary nobody executes is an untested binary. The
+      # acquisition check is the only thing that starts a release asset on a
+      # machine with no checkout and no toolchain, so a target it does not
+      # cover ships unexercised.
+      #
+      # That is not hypothetical: v0.1.71 attached
+      # vaultspec-core-aarch64-unknown-linux-gnu and the acquisition matrix
+      # still fetched only the x86_64 file. The release guards were already
+      # derived from the build matrix and stayed green, because they assert the
+      # asset EXISTS, not that anything ran it. This seam had no derivation at
+      # all, which is why adding a target quietly left a hole.
+      #
+      # Runs on every pull request rather than at release time, so the branch
+      # that adds a target is the one that goes red.
+      - name: Every built Linux target is acquired
+        shell: bash
+        run: |
+          set -euo pipefail
+          binaries=.github/workflows/binaries.yml
+          acquisition=.github/workflows/acquisition.yml
+          mapfile -t targets < <(
+            awk '/^[[:space:]]+target:[[:space:]]/ {print $2}' "${binaries}" |
+              grep -- '-linux-gnu$' | sort -u
+          )
+          # A derivation that yields nothing would pass every run without
+          # asserting anything. Refuse to run rather than pass vacuously.
+          if [ ${#targets[@]} -eq 0 ]; then
+            echo "::error::No Linux targets found in ${binaries}; the acquisition-coverage assertion cannot run"
+            exit 1
+          fi
+          echo "Derived ${#targets[@]} Linux target(s) from ${binaries}: ${targets[*]}"
+          missing=()
+          for triple in "${targets[@]}"; do
+            grep -qF -- "vaultspec-core-${triple}" "${acquisition}" || missing+=("${triple}")
+          done
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::${acquisition} acquires no asset for: ${missing[*]}. A target that is built and published must also be executed from the published release."
+            exit 1
+          fi
+          echo "all ${#targets[@]} Linux target(s) are acquired"
+
   lint-and-type:
     name: Lint, Type, Config, Link, and Markdown Checks
     runs-on: ubuntu-latest

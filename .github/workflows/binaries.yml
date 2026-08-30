@@ -561,13 +561,12 @@ jobs:
           # expectation was left behind, so the assertion failed on a target
           # nothing was building any more.
           #
-          # That target is deliberately ABSENT from the matrix, not forgotten.
-          # Its leg was removed because that runner is a container with no
-          # reachable docker daemon, so the pinned manylinux image cannot start,
-          # and an uncontainerised build there produces GLIBC_2.39 against a
-          # declared 2.28 floor. The gap is stated in the matrix comment above
-          # and the channel generator warns about it on every release. Restoring
-          # the leg now restores the expectation with it, in one edit not two.
+          # That target is back in the matrix, on a hosted arm64 runner that can
+          # start the pinned manylinux image. It was absent for as long as the
+          # only arm64 host was a container with no reachable docker daemon,
+          # where an uncontainerised build produced GLIBC_2.39 against a
+          # declared 2.28 floor. Deriving is what made both the removal and the
+          # restoration cost one edit instead of two.
           workflow=.github/workflows/binaries.yml
           mapfile -t expected < <(awk '/^[[:space:]]+target:[[:space:]]/ {print $2}' "${workflow}" | sort -u)
           # A derivation that yields nothing would turn this guard into a no-op
