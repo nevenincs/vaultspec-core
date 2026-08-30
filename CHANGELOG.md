@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.64](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.63...vaultspec-core-v0.1.64) (2026-08-30)
+
+
+### Features
+
+* **ci:** check what users acquire, not only what the tree builds ([#367](https://github.com/nevenincs/vaultspec-core/issues/367)) ([c18a8f5](https://github.com/nevenincs/vaultspec-core/commit/c18a8f56ddef72bfaf9cc816ef45497c24eb67de))
+
+
+### Bug Fixes
+
+* **binaries:** execute every artifact before it is uploaded ([#365](https://github.com/nevenincs/vaultspec-core/issues/365)) ([c9e844f](https://github.com/nevenincs/vaultspec-core/commit/c9e844f20ae78438a3490f742183f92ed4991a3c))
+
 ## [0.1.63](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.62...vaultspec-core-v0.1.63) (2026-08-30)
 
 
