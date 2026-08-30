@@ -338,8 +338,24 @@ jobs:
           $proj  = Join-Path $env:RUNNER_TEMP 'proj'
           Remove-Item -Recurse -Force $home_, $proj -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force -Path $home_, $proj | Out-Null
-          $env:USERPROFILE = $home_
-          $env:HOME = $home_
+          # ISOLATE THE CACHE, NOT THE PROFILE. PyApp resolves its data
+          # directory through the platform's own API - on Windows that is
+          # LOCALAPPDATA, on Linux $HOME/.local/share, which is why the Linux
+          # legs above set HOME and this one must not.
+          #
+          # Overriding USERPROFILE here broke the binary outright rather than
+          # isolating it: v0.1.68 failed with
+          #
+          #     Error: unable to find platform directories
+          #
+          # because a bare directory with no profile structure is not a home
+          # the platform API accepts. Setting LOCALAPPDATA and APPDATA gives
+          # the same guarantee the Linux legs get - no warm cache can make a
+          # broken acquisition look like a working one - without pretending a
+          # scratch folder is a user profile.
+          $env:LOCALAPPDATA = Join-Path $home_ 'Local'
+          $env:APPDATA = Join-Path $home_ 'Roaming'
+          New-Item -ItemType Directory -Force -Path $env:LOCALAPPDATA, $env:APPDATA | Out-Null
 
           $exe = Join-Path $env:ACQ 'vaultspec-core.exe'
 
