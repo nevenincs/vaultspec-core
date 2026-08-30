@@ -31,7 +31,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from dev.binaries.build_pyapp import BINARIES, asset_name
 from dev.packaging import products
@@ -93,6 +93,37 @@ def _buildable_asset_names(repo_root: Path) -> set[str]:
     }
 
 
+def _string_list(manifest: dict[str, object], key: str) -> list[str]:
+    """The manifest's ``key`` as a list of strings, however it was written.
+
+    ``json.loads`` returns ``Any``, so anything read out of it is untyped from
+    that point on - and this module's whole job is to be certain about the
+    contents of a file it did not write. Narrowing at the boundary keeps the
+    checks below concrete, and a manifest whose `hash` is a string rather than
+    a list stops being a type error and becomes a finding.
+    """
+    value = manifest.get(key)
+    if isinstance(value, list):
+        return [str(item) for item in cast("list[object]", value)]
+    if isinstance(value, str):
+        return [value]
+    return []
+
+
+def _read_manifest(path: Path) -> dict[str, object]:
+    """The Scoop manifest as a mapping, or empty when it is not one at all.
+
+    The ``isinstance`` is the real check - a manifest that is not a JSON object
+    becomes a reported finding rather than an exception. The ``cast`` only
+    tells the type checker what that check established, which is the idiom this
+    repository already uses for parsed data it did not write.
+    """
+    parsed: object = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(parsed, dict):
+        return {}
+    return cast("dict[str, object]", parsed)
+
+
 def validate(root: Path, product: Product, repo_root: Path | None = None) -> list[str]:
     """Return every reason these channel pointers are unfit to publish.
 
@@ -116,22 +147,25 @@ def validate(root: Path, product: Product, repo_root: Path | None = None) -> lis
     if problems:
         return problems
 
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest = _read_manifest(manifest_path)
     formula = formula_path_.read_text(encoding="utf-8")
+    if not manifest:
+        problems.append(f"{manifest_path}: is not a JSON object")
+        return problems
 
     # (a) the 0.1.60 failure itself - a pointer with blank digests.
-    hashes = manifest.get("hash") or []
+    hashes = _string_list(manifest, "hash")
+    urls = _string_list(manifest, "url")
     if not hashes:
         problems.append(f"{manifest_path}: pins no hashes")
-    if len(hashes) != len(manifest.get("url") or []):
+    if len(hashes) != len(urls):
         problems.append(
-            f"{manifest_path}: {len(hashes)} hash(es) for "
-            f"{len(manifest.get('url') or [])} url(s)",
+            f"{manifest_path}: {len(hashes)} hash(es) for {len(urls)} url(s)",
         )
     problems.extend(
         f"{manifest_path}: not a sha256 digest: {digest!r}"
         for digest in hashes
-        if not SHA256.match(str(digest))
+        if not SHA256.match(digest)
     )
 
     digests = re.findall(r'sha256 "([^"]*)"', formula)
@@ -158,7 +192,7 @@ def validate(root: Path, product: Product, repo_root: Path | None = None) -> lis
 
     # (c) every asset pointed at is one the builder can emit. A typo here is a
     #     404 at install time and nowhere earlier.
-    referenced = {str(url).rsplit("/", 1)[-1] for url in manifest.get("url") or []}
+    referenced = {url.rsplit("/", 1)[-1] for url in urls}
     referenced |= set(re.findall(r'url "[^"]*/([^"/]+)"', formula))
     try:
         buildable = _buildable_asset_names(repo_root)
