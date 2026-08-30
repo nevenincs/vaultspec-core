@@ -34,8 +34,10 @@ jobs:
       matrix:
         # Distributions OLDER than the build host, because the Linux artifact
         # links against whatever glibc built it and the floor is only proven by
-        # running somewhere that has less. bookworm is 2.36, jammy is 2.35;
-        # both sit above the declared 2.28 floor and below the build host.
+        # running somewhere that has less. The rows come in two bands: one AT
+        # the declared floor, which is the only band that can fail when a
+        # container pin stops working, and one above it in the range a user is
+        # most likely to be running.
         #
         # BOTH Linux architectures, because a published asset nobody executes
         # is an untested asset. aarch64 was built, attached and shipped in
@@ -45,22 +47,47 @@ jobs:
         #
         # The arm64 legs run on the SAME hosted runner class that BUILDS that
         # target, so their availability is already proven by the build rather
-        # than assumed here. Both images publish arm64 variants, so the
-        # older-libc property holds identically on each architecture.
+        # than assumed here. Every image here publishes an arm64 variant, so
+        # the older-libc property holds identically on each architecture.
         include:
+          # AT the declared floor, on both architectures. Nothing else here
+          # tests 2.28 itself: the Debian and Ubuntu images below sit
+          # comfortably above it, so they would keep passing if the floor
+          # slipped a version or two. RHEL 8's glibc is 2.28 exactly, which
+          # makes these the two legs that can actually fail when a container
+          # pin in binaries.yml stops doing its job.
+          #
+          # Package manager differs, so the install command travels with the
+          # row rather than being branched on inside the step.
+          - image: almalinux:8
+            setup: dnf install -y -q curl git
+            arch: x86_64
+            runner: [self-hosted, Linux, X64, build]
+            asset: vaultspec-core-x86_64-unknown-linux-gnu
+          - image: almalinux:8
+            setup: dnf install -y -q curl git
+            arch: aarch64
+            runner: ubuntu-24.04-arm
+            asset: vaultspec-core-aarch64-unknown-linux-gnu
+          # Above the floor and below the build host, which is the band a user
+          # is most likely to be in. bookworm is 2.36, jammy is 2.35.
           - image: debian:bookworm-slim
+            setup: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl git ca-certificates
             arch: x86_64
             runner: [self-hosted, Linux, X64, build]
             asset: vaultspec-core-x86_64-unknown-linux-gnu
           - image: ubuntu:22.04
+            setup: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl git ca-certificates
             arch: x86_64
             runner: [self-hosted, Linux, X64, build]
             asset: vaultspec-core-x86_64-unknown-linux-gnu
           - image: debian:bookworm-slim
+            setup: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl git ca-certificates
             arch: aarch64
             runner: ubuntu-24.04-arm
             asset: vaultspec-core-aarch64-unknown-linux-gnu
           - image: ubuntu:22.04
+            setup: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl git ca-certificates
             arch: aarch64
             runner: ubuntu-24.04-arm
             asset: vaultspec-core-aarch64-unknown-linux-gnu
@@ -70,8 +97,7 @@ jobs:
       - name: Install what acquisition itself needs
         run: |
           set -eux
-          apt-get update -qq
-          apt-get install -y -qq --no-install-recommends curl git ca-certificates
+          ${{ matrix.setup }}
 
       - name: Acquire the published binary
         env:
