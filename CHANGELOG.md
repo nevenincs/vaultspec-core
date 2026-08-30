@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.62](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.61...vaultspec-core-v0.1.62) (2026-08-30)
+
+
+### Features
+
+* **binaries:** refuse to let an artifact-less release serve as latest ([#355](https://github.com/nevenincs/vaultspec-core/issues/355)) ([bfd6010](https://github.com/nevenincs/vaultspec-core/commit/bfd6010ebec5a8eb8178e567fa7e3aa10ebf7248))
+* **publish:** trigger on tag, attach the distribution, and share the manifest ([#357](https://github.com/nevenincs/vaultspec-core/issues/357)) ([d652163](https://github.com/nevenincs/vaultspec-core/commit/d652163d282f4071e9335dd81617370cc0497d00))
+* **release:** publish channel pointers to the org distribution repo ([#351](https://github.com/nevenincs/vaultspec-core/issues/351)) ([e705132](https://github.com/nevenincs/vaultspec-core/commit/e70513222e93efc841de37085cad5418b0944a25))
+
+
+### Bug Fixes
+
+* **binaries:** attach the binaries that built instead of discarding them ([#354](https://github.com/nevenincs/vaultspec-core/issues/354)) ([bc38b67](https://github.com/nevenincs/vaultspec-core/commit/bc38b6786531d02da7b7fc02547fceb31e822903))
+* **binaries:** build on the tag, not only on a dispatch nobody remembers ([#360](https://github.com/nevenincs/vaultspec-core/issues/360)) ([6d77a0d](https://github.com/nevenincs/vaultspec-core/commit/6d77a0d50949f74955abf86e4e27e3eac035c342))
+* **binaries:** declare the linux-aarch64 gap instead of failing every release ([#356](https://github.com/nevenincs/vaultspec-core/issues/356)) ([f7fb1fa](https://github.com/nevenincs/vaultspec-core/commit/f7fb1fa6bcb128e7e11886a16042a5d743be7971))
+* **binaries:** return the containerised leg's workspace to the runner's user ([#359](https://github.com/nevenincs/vaultspec-core/issues/359)) ([a0e8566](https://github.com/nevenincs/vaultspec-core/commit/a0e8566a893eb2ea4009eb06365b5b065619584d))
+
 ## [0.1.61](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.60...vaultspec-core-v0.1.61) (2026-08-29)
 
 
