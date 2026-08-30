@@ -340,6 +340,16 @@ jobs:
           New-Item -ItemType Directory -Force -Path $home_, $proj | Out-Null
           $env:USERPROFILE = $home_
           $env:HOME = $home_
+          # PyApp resolves its data directory from APPDATA/LOCALAPPDATA on
+          # Windows, NOT from USERPROFILE. Redirecting only the latter left it
+          # with no usable path, so the binary died on `unable to find platform
+          # directories` and this leg failed EVERY release while the artifact
+          # was perfectly good - measured against the published v0.1.68 exe:
+          # USERPROFILE+HOME alone exits 1 with that error; adding these two
+          # exits 0 and prints the version.
+          $env:APPDATA = Join-Path $home_ 'AppData\Roaming'
+          $env:LOCALAPPDATA = Join-Path $home_ 'AppData\Local'
+          New-Item -ItemType Directory -Force -Path $env:APPDATA, $env:LOCALAPPDATA | Out-Null
 
           $exe = Join-Path $env:ACQ 'vaultspec-core.exe'
 
