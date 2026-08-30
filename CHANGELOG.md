@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.68](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.67...vaultspec-core-v0.1.68) (2026-08-30)
+
+
+### Bug Fixes
+
+* **acquisition:** wait for PyPI, which the binary needs in order to start ([#380](https://github.com/nevenincs/vaultspec-core/issues/380)) ([b65763a](https://github.com/nevenincs/vaultspec-core/commit/b65763a40f0b80e01593e731936a885c337c51c6))
+* **channels:** one channel root per product, and a guard that watches it ([#373](https://github.com/nevenincs/vaultspec-core/issues/373)) ([e420699](https://github.com/nevenincs/vaultspec-core/commit/e420699108f7c71d3a4e21563b1a5e584cdb5b00))
+
 ## [0.1.67](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.66...vaultspec-core-v0.1.67) (2026-08-30)
 
 
