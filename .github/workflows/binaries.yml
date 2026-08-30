@@ -572,7 +572,22 @@ jobs:
     name: Verify the release carries artifacts
     needs: release
     if: ${{ always() }}
-    runs-on: [self-hosted, Linux, X64, build]
+    # HOSTED, for the same reason the preflight above is hosted: a guard that
+    # needs the fleet cannot act when the fleet is the problem.
+    #
+    # This job's whole purpose is to demote a release whose build just failed -
+    # and a build fails most often when the fleet is congested or down, which
+    # is exactly when a self-hosted job will not be scheduled. It is not
+    # hypothetical: vaultspec-dashboard v0.1.7 failed every Compose leg, and
+    # its guard then sat QUEUED for over an hour behind the one Linux/X64
+    # runner it shares with the build, while the empty release went on serving
+    # as `latest` and had to be demoted by hand.
+    #
+    # Nothing here needs a fleet capability. The job calls `gh release view`,
+    # `gh release edit` and `gh workflow run`, and reads the workflow file with
+    # awk - all of which a hosted runner does, without competing for the
+    # machine that just failed.
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       # Dispatching the acquisition check is a write to the Actions API.
