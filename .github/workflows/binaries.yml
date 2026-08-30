@@ -486,3 +486,75 @@ jobs:
             exit 1
           fi
           echo "all ${#expected[@]} declared targets attached to ${TAG}"
+
+  # A release with no artifacts must not serve as `latest`.
+  #
+  # This is the fault that cost two releases today. vaultspec-core-v0.1.61 was
+  # published by release-please, Binaries had not been dispatched for it, and the
+  # empty release immediately became `latest` - where the README badges, the
+  # install prose and the channel manifests all point. Nothing went red, because
+  # nothing was watching. vaultspec-rag-v0.4.11 did the same thing an hour later.
+  #
+  # Ported from vaultspec-dashboard, which already carries this guard, adapted to
+  # this repo's dispatch-driven shape: there is no `plan` job here, so the tag
+  # itself says whether a prerelease was intended.
+  #
+  # Demotion is reversible and lossless. A prerelease keeps the tag, the notes
+  # and the URL intact and reachable; it only stops that release answering as
+  # `latest`. Re-dispatch after fixing the build and the promote step undoes it.
+  verify-release-assets:
+    name: Verify the release carries artifacts
+    needs: release
+    if: ${{ always() }}
+    runs-on: [self-hosted, Linux, X64, build]
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ inputs.tag }}
+      RELEASE_RESULT: ${{ needs.release.result }}
+    steps:
+      - name: Require artifacts on the published release
+        shell: bash
+        run: |
+          set -euo pipefail
+          assets=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets | length')
+          echo "release ${TAG} carries ${assets} asset(s); release job=${RELEASE_RESULT}"
+
+          if [ "${assets}" -gt 0 ]; then
+            exit 0
+          fi
+
+          if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+                  --json isPrerelease --jq '.isPrerelease')" != "true" ]; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease
+            echo "::notice::demoted ${TAG} to a prerelease so latest skips it"
+          fi
+
+          echo "::error::${TAG} carries no artifacts (release job=${RELEASE_RESULT}). It has been demoted to a prerelease so it cannot serve as latest. Fix the build and re-dispatch this workflow for this tag; the next step promotes it back once artifacts attach."
+          exit 1
+
+      # Undo an earlier demotion once a re-dispatch actually attaches something.
+      # Without this a repaired release stays invisible to `latest` forever.
+      #
+      # The tag decides whether promotion is wanted. release-please publishes
+      # full releases here, so anything carrying a prerelease marker in its name
+      # was meant to be one and must not be promoted into `latest` by a guard
+      # that only knows about assets.
+      - name: Promote a repaired release back to latest
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${TAG}" in
+            *-rc*|*-alpha*|*-beta*|*-dev*)
+              echo "${TAG} names a prerelease; leaving its flag alone"
+              exit 0
+              ;;
+          esac
+          if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+                  --json isPrerelease --jq '.isPrerelease')" = "true" ]; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false
+            echo "::notice::promoted ${TAG} back to a full release"
+          fi
