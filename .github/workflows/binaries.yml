@@ -511,7 +511,7 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      TAG: ${{ inputs.tag }}
+      TAG: ${{ inputs.tag || github.ref_name }}
       RELEASE_RESULT: ${{ needs.release.result }}
     steps:
       - name: Require artifacts on the published release
