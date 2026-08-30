@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.69](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.68...vaultspec-core-v0.1.69) (2026-08-30)
+
+
+### Bug Fixes
+
+* **acquisition:** give the Windows leg a profile the binary can actually use ([#383](https://github.com/nevenincs/vaultspec-core/issues/383)) ([7e9fd87](https://github.com/nevenincs/vaultspec-core/commit/7e9fd87e6ffbdc167c22f9284fc7391705389228))
+
 ## [0.1.68](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.67...vaultspec-core-v0.1.68) (2026-08-30)
 
 
