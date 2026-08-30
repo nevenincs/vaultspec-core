@@ -122,8 +122,32 @@ jobs:
             exit 1
           fi
           echo "Dispatching binaries.yml for tag: ${TAG}"
+          # `ref=main`, NOT `ref=${TAG}`, and that distinction is the point.
+          #
+          # A dispatch resolves the WORKFLOW from `ref`, while binaries.yml's
+          # build job checks out `inputs.tag` for the SOURCE. Those answer two
+          # different questions:
+          #
+          #   what to build    the matrix - repository policy, current
+          #   what to compile  the tag's tree - the released source
+          #
+          # Dispatching at the tag freezes BOTH, so a change to the matrix can
+          # never reach a release and a repair dispatch rebuilds exactly what
+          # failed. vaultspec-core-v0.1.66 is the demonstration: #372 removes
+          # the macos-x86_64 leg because that binary exits 1 on launch, and
+          # 0.1.66 built and attached it anyway from the tag's four-leg matrix.
+          # generate.py then saw complete digests for the triple, emitted the
+          # `on_intel` block, and moved the tap onto a binary that cannot start.
+          #
+          # With `ref=main` the source stays the tag's and the matrix is whatever
+          # this repository currently says it builds. It also makes repair work:
+          # dispatching again for an older tag picks up any workflow-level fix
+          # merged since.
+          #
+          # vaultspec-rag already does this (its release-please.yml uses
+          # `--ref main`). The two disagreed, and this was the brittle half.
           gh api --method POST \
             "repos/${GITHUB_REPOSITORY}/actions/workflows/binaries.yml/dispatches" \
-            -f "ref=${TAG}" \
+            -f "ref=main" \
             -f "inputs[tag]=${TAG}"
           echo "Dispatched binaries.yml for ${TAG}" >> "$GITHUB_STEP_SUMMARY"
