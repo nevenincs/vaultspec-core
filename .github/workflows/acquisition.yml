@@ -94,7 +94,13 @@ jobs:
           set -eu
           version="${TAG##*-v}"
           for attempt in $(seq 1 40); do
-            if curl -fsSL "https://pypi.org/pypi/vaultspec-core/${version}/json" >/dev/null 2>&1; then
+            # The SIMPLE INDEX, not the JSON API: that is the surface the
+            # installer resolves against, and the two are separate caches.
+            # v0.1.69 proved the difference - the JSON API already served the
+            # version while macOS and debian still could not resolve it, so
+            # this leg reported "on PyPI" and the install then failed with
+            # `no version of vaultspec-core==0.1.69`.
+            if curl -fsSL "https://pypi.org/simple/vaultspec-core/" 2>/dev/null | grep -q "vaultspec_core-${version}-"; then
               echo "vaultspec-core ${version} is on PyPI"
               exit 0
             fi
@@ -203,7 +209,13 @@ jobs:
           set -eu
           version="${TAG##*-v}"
           for attempt in $(seq 1 40); do
-            if curl -fsSL "https://pypi.org/pypi/vaultspec-core/${version}/json" >/dev/null 2>&1; then
+            # The SIMPLE INDEX, not the JSON API: that is the surface the
+            # installer resolves against, and the two are separate caches.
+            # v0.1.69 proved the difference - the JSON API already served the
+            # version while macOS and debian still could not resolve it, so
+            # this leg reported "on PyPI" and the install then failed with
+            # `no version of vaultspec-core==0.1.69`.
+            if curl -fsSL "https://pypi.org/simple/vaultspec-core/" 2>/dev/null | grep -q "vaultspec_core-${version}-"; then
               echo "vaultspec-core ${version} is on PyPI"
               exit 0
             fi
@@ -318,7 +330,9 @@ jobs:
           $version = $env:TAG -replace '^.*-v', ''
           for ($i = 1; $i -le 40; $i++) {
             try {
-              Invoke-RestMethod "https://pypi.org/pypi/vaultspec-core/$version/json" -TimeoutSec 20 | Out-Null
+              # The SIMPLE INDEX, not the JSON API - see the Linux legs above.
+              $index = Invoke-RestMethod "https://pypi.org/simple/vaultspec-core/" -TimeoutSec 20
+              if ($index -notmatch [regex]::Escape("vaultspec_core-$version-")) { throw "not on the simple index yet" }
               Write-Host "vaultspec-core $version is on PyPI"
               exit 0
             } catch {
