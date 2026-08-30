@@ -145,13 +145,33 @@ jobs:
             runner: [self-hosted, macOS, ARM64]
             target: aarch64-apple-darwin
             container: ""
-          # No self-hosted macOS x86_64 host exists; PyApp cross-builds it on
-          # the Apple Silicon runner (the CPython distribution is selected from
-          # the cargo target triple, and clang links both arches natively).
-          - name: macos-x86_64
-            runner: [self-hosted, macOS, ARM64]
-            target: x86_64-apple-darwin
-            container: ""
+          # macos-x86_64 IS DROPPED, and the artifact it produced is why.
+          #
+          # It cross-built on the Apple Silicon runner and attached cleanly for
+          # months. vaultspec-core#365 executed the published v0.1.63 asset and
+          # it exits 1: the bootstrap installs `cryptography`, which publishes
+          # macOS wheels for arm64 ONLY, so on x86_64 it falls back to a source
+          # build needing a Rust toolchain that is not there. Rosetta 2 runs the
+          # Mach-O correctly - the architecture was never the problem.
+          #
+          # The alternative was holding `cryptography` back to a release with an
+          # x86_64 macOS wheel. Pinning a SECURITY library backwards to serve a
+          # platform Apple stopped selling in 2023 is the worse trade, and the
+          # Homebrew formula was meanwhile offering Intel users a binary that
+          # does not start - worse than offering none.
+          #
+          # HOMEBREW_TARGETS deliberately still names the triple, exactly as it
+          # does for the absent linux-aarch64 leg: generate.py prints a
+          # `::warning::` naming the gap on every release and omits the platform
+          # from the formula rather than pinning an asset that was never built.
+          # The gap stays visible instead of being quietly erased.
+          #
+          # Intel macOS retains a working acquisition path: `pip install
+          # vaultspec-core` from PyPI, which is a source-compatible install
+          # rather than a frozen binary.
+          #
+          # Restore this leg in the same change that settles the dependency -
+          # not before, or it ships a binary that exits 1 again.
           # Linux ARM64 runs in a colima container on macbook neo, registered
           # as `macbook-neo-linux-arm-core` and provisioned by
           # ~/action-runners/containers/vaultspec-core-linux-arm/runner-entry.sh
