@@ -150,6 +150,11 @@ vaultspec-core sync                       # writes .claude/, .gemini/, .codex/, 
 `.gitignore` block keeps per-machine by-products local.
 `vaultspec-core install --upgrade` carries an older workspace onto the shared policy.
 
+**Check.** Run `vaultspec-core vault check all --fix` before you commit, and
+`vaultspec-core doctor` after an install or an upgrade. See
+[verifying a workspace and a vault](./verification.md) for what each check proves and
+which conditions change the exit code.
+
 **Choose an install mode.** Provisioning is mode-aware, with three modes. Tool mode, the
 default, wires the pre-commit hooks and the MCP launch command to run vaultspec-core
 through `uvx`, so a project adopts the framework without vaultspec-core ever entering
@@ -241,11 +246,16 @@ the doctor JSON, operating system, and producer version.
 
 ## Related documentation
 
-| Document                          | What it covers                                      |
-| --------------------------------- | --------------------------------------------------- |
-| [Repository README](../README.md) | Project overview, installation, and getting started |
-| [CLI reference](./CLI.md)         | Every command, flag, and option for vaultspec-core  |
-| [MCP reference](./MCP.md)         | The MCP server tools, setup, and configuration      |
+| Document                                               | What it covers                                           |
+| ------------------------------------------------------ | -------------------------------------------------------- |
+| [Repository README](../README.md)                      | Project overview, installation, and getting started      |
+| [A feature end to end](./examples.md)                  | One feature through the whole pipeline, with real output |
+| [Document syntax](./syntax.md)                         | Frontmatter, tags, links, and the plan row grammar       |
+| [Verifying a workspace and a vault](./verification.md) | The health commands and what each check proves           |
+| [The correctness workflow](./correctness.md)           | How a change is proven right, and the review gate        |
+| [Delivery channels](./channels.md)                     | How releases reach PyPI, Homebrew, and Scoop             |
+| [CLI reference](./CLI.md)                              | Every command, flag, and option for vaultspec-core       |
+| [MCP reference](./MCP.md)                              | The MCP server tools, setup, and configuration           |
 
 For bug reports and feature requests, open an issue on the
 [vaultspec-core issue tracker](https://github.com/nevenincs/vaultspec-core/issues).

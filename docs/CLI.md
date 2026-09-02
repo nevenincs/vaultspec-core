@@ -517,6 +517,15 @@ commands when you already know which half you are investigating.
 
 Exit codes: `0` = all ok, `1` = warnings, `2` = errors.
 
+Not every line the diagnosis prints is weighed. The tool-server configuration line, the
+process registry, and stale package seeds are reported for your attention and do not
+raise the code, so a run can print `warn` and still exit `0`. Do not infer failure from
+the word `warn` in the output: read the exit code, or read `status` under `--json`. The
+conditions that do raise it are the framework layout, the provider directories, the
+builtins, `.gitignore` and `.gitattributes`, migrations, the pre-commit hooks, rename
+integrity, vault content, and an install-mode or version-floor mismatch on any declared
+package.
+
 #### Examples
 
 - **Check the health of the whole project, framework and vault together**:
@@ -2180,6 +2189,15 @@ reported as warnings and are not modified.
   an expected steady state that must not block a commit.
 
 Exit codes: `0` = all ok, `1` = warnings, `2` = errors.
+
+Not every line the diagnosis prints is weighed. The tool-server configuration line, the
+process registry, and stale package seeds are reported for your attention and do not
+raise the code, so a run can print `warn` and still exit `0`. Do not infer failure from
+the word `warn` in the output: read the exit code, or read `status` under `--json`. The
+conditions that do raise it are the framework layout, the provider directories, the
+builtins, `.gitignore` and `.gitattributes`, migrations, the pre-commit hooks, rename
+integrity, vault content, and an install-mode or version-floor mismatch on any declared
+package.
 
 #### Examples
 
