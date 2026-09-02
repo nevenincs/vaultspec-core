@@ -1,19 +1,67 @@
 # Document syntax
 
-Every document in `.vault/` has two halves. The tool owns one and you own the other, and
-most trouble comes from editing the half that is not yours.
+Every document in `.vault/` is part yours and part the tool's. Most trouble comes from
+editing the part that is not yours, so this page starts with which is which.
 
-The tool owns the filename, the frontmatter, and any value derived from the document's
-own content. You own the body prose. Editing prose in a scaffolded document is expected.
-Hand-writing the rest produces a file that looks correct and fails validation.
+"Scaffolded" below means created by `vaultspec-core vault add` rather than by hand.
 
-For the commands that create and check these documents, see the
-[CLI reference](./CLI.md). For the workflow they serve, see the
-[framework manual](./framework.md).
+## Who owns what
+
+Frontmatter, field by field:
+
+| Field         | Who changes it | How                                                                |
+| ------------- | -------------- | ------------------------------------------------------------------ |
+| `tags`        | The tool       | Set from `--feature` at scaffold. Do not add more.                 |
+| `date`        | The tool       | Set at scaffold; the filename embeds the same date.                |
+| `modified`    | The tool       | Refreshed by every command that writes the document.               |
+| `body_schema` | The tool       | Records which body structure the document follows.                 |
+| `body_hash`   | The tool       | A fingerprint of the body that `modified` attests.                 |
+| `related`     | You            | Through `vaultspec-core vault link add` and `remove`.              |
+| `tier`        | You            | Through `vaultspec-core vault plan tier promote` or `tier demote`. |
+| `step_id`     | The tool       | Filled from the Step the record was scaffolded against.            |
+| `generated`   | The tool       | Marks a file that is rebuilt rather than authored.                 |
+
+Bodies, by document type:
+
+| Body                                        | Who changes it | How                                                          |
+| ------------------------------------------- | -------------- | ------------------------------------------------------------ |
+| Prose in any scaffolded document            | You            | `vaultspec-core vault set-body`, or an editor plus a restamp |
+| Rows in a plan                              | You            | `vaultspec-core vault plan` verbs only                       |
+| The `## Scope` block in an execution record | The tool       | Filled at scaffold from the Step's scope                     |
+| A feature index, whole file                 | The tool       | `vaultspec-core vault feature index`                         |
+
+Plan rows are the exception worth remembering: they look like ordinary body prose, and
+they are not, because execution records point at the identifiers in them.
+
+## Editing safely
+
+To change body prose, let the tool write it. `set-body` keeps the frontmatter
+byte-for-byte, refreshes `modified`, and validates the result before writing, refusing
+the write if anything comes back at error severity:
+
+```bash
+vaultspec-core vault set-body <document> --body-file new-body.md
+vaultspec-core vault edit <document>              # body and frontmatter in one write
+vaultspec-core vault rename <document> --to <new-stem>   # also re-points incoming links
+```
+
+If you edit in your own editor instead, the document's `body_hash` no longer matches its
+body, and nothing has restamped `modified`. Run this afterwards:
+
+```bash
+vaultspec-core vault check all --fix
+```
+
+That is the recovery command for most of this page. It restamps, reconciles, and repairs
+what it safely can.
+
+You will hear about a mistake at commit time. `vaultspec-core install` writes a
+pre-commit hook that runs `vault check all` over changed Markdown, so a document that
+fails validation blocks the commit rather than reaching the repository.
 
 ## Frontmatter
 
-Every document carries the same five fields:
+Every document carries the same six fields:
 
 ```yaml
 ---
@@ -22,7 +70,7 @@ tags:
   - '#payment-retries'
 date: '2026-02-06'
 modified: '2026-02-06'
-body_schema: 'body-v1'
+body_schema: 'body-v2'
 body_hash: 'sha256:...'
 related:
   - '[[2026-02-06-payment-retries-adr]]'
@@ -55,13 +103,15 @@ Exactly two tags. One names the directory, one names the feature.
 | `.vault/research/`  | `#research`  |
 
 The feature tag is kebab-case and identical across every document in the feature's
-lifecycle. It is what makes a trail findable: research, decision, plan, execution
-records, and audit all carry `#payment-retries`, so one filter returns the whole story.
+lifecycle. It is what makes a trail findable: research, decision, plan, and audit all
+carry `#payment-retries`, so one filter returns the whole story.
 
-A third tag reads as a second feature tag and fails validation. Resist the urge to add
-`#urgent` or `#frontend`.
+A third tag reads as a second feature tag and fails the `frontmatter` check, which
+reports `Exactly one feature tag (#<feature>) required`. Note that
+`vaultspec-core vault add --tags` will happily write one, so a document scaffolded with
+that flag fails validation immediately. Resist the urge to add `#urgent` or `#frontend`.
 
-## Wiki-links
+## Linking
 
 Links between vault documents are Obsidian-style wiki-links, quoted, and they belong in
 `related:` only:
@@ -72,7 +122,8 @@ related:
   - '[[2026-02-06-payment-retries-adr]]'
 ```
 
-Three rules govern them:
+Change them with `vaultspec-core vault link add` and `vault link remove` rather than by
+hand. Three rules govern the result:
 
 - Quote them. Unquoted, YAML reads `[[...]]` as a nested sequence.
 - Use no relative paths. The namespace is flat, so `[[document-stem]]` resolves wherever
@@ -83,27 +134,28 @@ In body prose, use neither wiki-links nor Markdown path links. Cite code by loca
 instead, in backticks: `src/billing/retry.py:42`, commit `abc1234`, or
 `vaultspec-core@0.1.59`. The `body-links` check enforces this.
 
-The reason is direction. Vault documents cite code; code never cites the vault. Keeping
-links out of body prose keeps the graph in one place, where the checks can see it.
+Vault documents cite code; code never cites the vault. Keeping links out of body prose
+keeps the graph in one place, where the checks can see it.
 
-## Values the tool writes
+## Values you must never write by hand
 
-Four values are derived rather than authored. Writing one by hand is the only way to
-make it lie.
+A hand-written value can disagree with the content it describes. A computed one cannot.
 
-`modified` is a last-modified stamp. Every mutating command refreshes it.
+`modified` is a last-modified stamp, refreshed by every command that writes the
+document.
 
 `body_hash` is a fingerprint of the body that `modified` attests. It appears in no
-template, because it cannot exist before the body it hashes. It is what makes an
-unstamped edit detectable: the `modified-stamp` check compares the live body against
-this value and never consults file timestamps.
+template, because it cannot exist before the body it hashes. It is what makes an edit
+that skipped the tooling detectable: the `modified-stamp` check compares the live body
+against this value and never consults file timestamps.
 
 `body_schema` records which body structure the document follows, so the `body-sections`
-check knows which sections to require.
+check knows which sections to require. New documents are written as `body-v2`.
 
-`step_id`, on an execution record, is filled from the Step it was scaffolded against.
+`step_id`, on an execution record, is filled from the Step it was scaffolded against. It
+holds the canonical identifier, `S01`, not the display path `P01.S01`.
 
-Change the body of a document by hand without restamping, and the check says so:
+Edit a body outside the tooling without restamping, and the check says so:
 
 ```
 ! .vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-S01.md
@@ -111,8 +163,6 @@ Change the body of a document by hand without restamping, and the check says so:
   attested fingerprint (unstamped edit).
   fix: refresh to '2026-02-06' and re-attest the body
 ```
-
-Run `vaultspec-core vault check all --fix` to restamp.
 
 ## Template placeholders
 
@@ -138,8 +188,8 @@ behind.
 
 ## Filenames
 
-The command decides the filename. The patterns are worth recognising when you are
-reading a directory listing:
+`vaultspec-core vault add` decides the filename. You will read these patterns in
+directory listings, so they are here for reference:
 
 | Document                        | Pattern                                         |
 | ------------------------------- | ----------------------------------------------- |
@@ -154,15 +204,18 @@ reading a directory listing:
 Narrative segments are lowercase kebab-case. Container identifiers keep their canonical
 uppercase form: `W01`, `P02`, `S03`.
 
-The topic infix exists for a feature that needs a second decision record or a second
-piece of research. Pass `--topic` rather than inventing a filename; `adr`, `audit`,
-`reference`, and `research` accept it, and nothing else does.
+To give a feature a second decision record or a second piece of research, pass `--topic`
+to `vaultspec-core vault add` rather than inventing a filename. Only `adr`, `audit`,
+`reference`, and `research` accept it.
+
+To rename an existing document, use `vaultspec-core vault rename`, which re-points the
+`related:` entries that pointed at the old name.
 
 ## Plan structure
 
-A plan is the one document whose shape the tooling reads rather than only validates. Its
-rows carry identifiers that execution records point back at, so the grammar is a
-contract and not a convention.
+The tooling parses a plan's rows; for every other document it only checks them.
+Execution records point at the identifiers in those rows, so a change to the grammar
+breaks records already written.
 
 ### Tiers
 
@@ -176,11 +229,12 @@ The tier declared in frontmatter decides which containers exist:
 | `L4` | An Epic frame above Waves, and a declared project-management association |
 
 Choose by the complexity of the work, not by counting containers. A plan does not earn
-`L3` by having enough rows to fill three Waves; it earns `L3` when the work genuinely
-has three stages that must land in order.
+`L3` by having enough rows to fill three Waves; it earns `L3` when the work has three
+stages that must land in order.
 
-Promote later with `vaultspec-core vault plan tier promote`. Promotion adds containers
-and renumbers nothing.
+Change tier later with `vaultspec-core vault plan tier promote` or `tier demote`.
+Promotion adds containers and renumbers nothing. Demotion refuses to collapse a
+container that has several children unless you say so explicitly.
 
 ### Row format
 
@@ -190,17 +244,29 @@ One row per unit of work:
 - [ ] `W01.P02.S07` - Rewrite the retry backoff to read its ceiling from config; `src/billing/retry.py`.
 ```
 
-The parts, in order: a two-state checkbox, the display path in backticks, a spaced
-hyphen, an imperative-verb action, a semicolon, and the file scope in backticks.
+Reading that row left to right:
 
-Only two checkbox states exist. `[ ]` is open and `[x]` is closed. Nothing records "in
-progress", because a row that is half done is a row that was too large.
+| Part                       | Example                         |
+| -------------------------- | ------------------------------- |
+| Checkbox, two states only  | `- [ ]`                         |
+| Display path, in backticks | `` `W01.P02.S07` ``             |
+| Spaced ASCII hyphen        | `-`                             |
+| Imperative-verb action     | `Rewrite the retry backoff ...` |
+| Semicolon                  | `;`                             |
+| File scope, in backticks   | `` `src/billing/retry.py` ``    |
+| Trailing period            | `.`                             |
 
-Write plain ASCII hyphens. Em dashes and en dashes are rejected in plan bodies.
+`[ ]` is open and `[x]` is closed. Nothing records "in progress". If a row turns out to
+be half done, split it with `vaultspec-core vault plan step add` and close the part that
+landed.
 
-Wiki-links and Markdown links are forbidden in a plan body. The documents that authorise
-the work go in the plan's `related:` frontmatter once, and every Step inherits that
-chain. Per-row reference footers do not exist.
+Write plain ASCII hyphens. The `PLAN060` rule rejects em-dashes and en-dashes anywhere
+in a plan: body, headings, frontmatter, and comment hints. `vault plan check --fix`
+replaces them with an ASCII spaced hyphen.
+
+Wiki-links and Markdown links are forbidden in a plan body, as they are in any body. The
+documents that authorise the work go in the plan's `related:` frontmatter once, and
+every Step inherits that chain. Per-row reference footers do not exist.
 
 ### Display paths
 
@@ -218,17 +284,15 @@ always was.
 
 ### Identifiers
 
-`S##`, `P##`, and `W##` are flat, per-document, append-only, and immutable.
+`S##`, `P##`, and `W##` are immutable and append-only. They are numbered per document,
+and a Step's number is independent of the Phase holding it, so `S07` is `S07` wherever
+it sits.
 
-The consequence worth internalising: **gaps are never reused**. Remove Step 7 and the
-next Step added is 8, not 7. The number is retired with the row.
+Gaps are never reused. Remove Step 7 and the next Step added is 8, not 7. The number is
+retired with the row, which is what keeps the record durable: an execution record
+written months ago names `S07`, and no later edit can hand `S07` to different work.
 
-This is what makes the record durable. An execution record written months ago names
-`S07`, and that name still points at the work it described, because no later edit could
-hand `S07` to something else.
-
-Route every identifier-affecting change through the commands rather than editing rows by
-hand:
+Route every identifier-affecting change through the commands:
 
 ```
 vaultspec-core vault plan step add <plan> --phase P02 --action "..." --scope "src/x.py"
@@ -236,18 +300,18 @@ vaultspec-core vault plan step check <plan> S07
 vaultspec-core vault plan step remove <plan> S07
 ```
 
-The parser tolerates a hand-edited row. The `vaultspec-core vault plan check` command
-flags it, and identifier preservation is guaranteed only when the command performs the
-mutation.
+A hand-edited row parses, so the damage is silent until
+`vaultspec-core vault plan check` runs. What no check can recover is a reused
+identifier: once two rows have claimed `S07`, the execution records naming it are
+ambiguous.
 
 ### One action, one row
 
 N self-similar actions means N rows. Never collapse them into "for each handler, add the
-header" or "across all callers, rename the flag".
-
-The rule holds at every tier, and it is about verification rather than tidiness. A
-collapsed row cannot be half closed, so its execution record cannot say which callers
-were touched, and nothing catches the one that was missed.
+header" or "across all callers, rename the flag". No check enforces this; it is a
+convention, and the reason is verification. A collapsed row cannot be half closed, so
+its execution record cannot say which callers were touched, and nothing catches the one
+that was missed.
 
 ## Where to go next
 
