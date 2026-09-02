@@ -10,7 +10,7 @@ set of markdown work records covering research, decisions, plans, and their exec
 plan is a structured implementation document broken into checkable steps, so progress on
 a feature stays visible. A feature is the tag that binds every document tied to one
 piece of work, from its first research note to its final audit. See the
-[README](../README.md) and the [framework manual](./framework.md) for the full story.
+[README](../README.md) and the [framework manual](./framework.md).
 
 Where the server is connected, the agent rules synced into your project use its tools
 first. Where it isn't, the vaultspec-core CLI carries the same operations, so a
@@ -18,7 +18,7 @@ workspace behaves the same either way.
 
 ## Setup
 
-Vaultspec keeps provider-neutral MCP definitions in `.vaultspec/mcps/*.json`.
+vaultspec keeps provider-neutral MCP definitions in `.vaultspec/mcps/*.json`.
 Installation and `vaultspec-core spec mcps sync` render those definitions into each
 selected provider's native configuration:
 
@@ -29,7 +29,7 @@ selected provider's native configuration:
 | Antigravity | `.agents/mcp_config.json` | Broader scopes are unsupported                                           |
 
 Project scope is the safe default. Select user or local scope explicitly. Native host
-files contain only host-valid configuration; Vaultspec records project and local
+files contain only host-valid configuration; vaultspec records project and local
 ownership in the workspace's `.vaultspec/mcp-ownership.json` and user ownership in
 `~/.vaultspec/mcp-ownership.json`, so unrelated host entries remain external. Use
 `vaultspec-core install --skip mcp` if you manage enrollment yourself.
@@ -46,16 +46,34 @@ which blocks `uv sync` and other package operations while the client is connecte
 Module invocation avoids the lock.
 
 > The module path above is the canonical invocation for this reason. The `vaultspec-mcp`
-> console script itself remains core-owned; other packages in the Vaultspec family name
+> console script itself remains core-owned; other packages in the vaultspec family name
 > their own console scripts distinctly (for example, vaultspec-a2a's is
 > `vaultspec-a2a-mcp`) rather than colliding with it.
 
+### Serving a read-only surface
+
+Five of the nine tools mutate the vault, and `invoke` can run most of the CLI. Launch
+the server with `--read-only` to withdraw them:
+
+```
+vaultspec-mcp --read-only
+```
+
+That leaves `status`, `find`, `check`, and `discover`, and removes `create`, `edit`,
+`plan_progress`, `plan_edit`, and `invoke` from the advertised listing rather than
+refusing them on call, so a client is never handed the schema of something it cannot
+use. `check` is kept but narrowed: its `fix` parameter is gone, and its description
+becomes "Run the vault health-check suite without repair."
+
+All mutating tools write directly to the working tree and never commit. Run them on a
+clean tree if you want the diff reviewable.
+
 ### Install modes
 
-The canonical definition records the Vaultspec package and module. Vaultspec renders the
+The canonical definition records the vaultspec package and module. vaultspec renders the
 launch command for the active install mode:
 
-- Tool mode, the default, uses `uvx --from ...` without adding Vaultspec to the
+- Tool mode, the default, uses `uvx --from ...` without adding vaultspec to the
   project's dependencies. A companion may declare a dedicated tool requirement such as
   `vaultspec-rag[mcp]`.
 - Dependency mode uses `uv run --no-sync ...` against the project's environment and
@@ -73,8 +91,8 @@ processes may hold it; repair it explicitly with `uv sync`, then reconnect.
 
 ### Convergence on upgrade
 
-Launch entries that Vaultspec wrote converge to the current standard automatically. A
-managed entry whose bytes still match the fingerprint recorded when Vaultspec last wrote
+Launch entries that vaultspec wrote converge to the current standard automatically. A
+managed entry whose bytes still match the fingerprint recorded when vaultspec last wrote
 it is provably untouched, so `vaultspec-core sync`, `vaultspec-core spec mcps sync`, and
 `vaultspec-core install --upgrade` all refresh it in place - no `--force` required - and
 print exactly what changed: the entry name, the old launch command, the new launch
@@ -88,20 +106,20 @@ Two kinds of entry never converge automatically. An entry you edited by hand (it
 no longer match the recorded fingerprint) is skipped with a warning and requires an
 explicit `vaultspec-core spec mcps sync --force`, which overwrites your edit. An entry
 recorded by a release that predates fingerprinting cannot be verified as untouched and
-keeps the same `--force`-only behavior. External entries Vaultspec never wrote are never
+keeps the same `--force`-only behavior. External entries vaultspec never wrote are never
 adopted or modified without `--force`. To opt out of enrollment management entirely,
 provision with `vaultspec-core install --skip mcp`; a workspace without recorded
 enrollment is never touched by the convergence migration.
 
 `vaultspec-core spec doctor` additionally warns - without failing - about two states
-Vaultspec cannot converge itself: canonical hooks that cannot be refreshed because
+vaultspec cannot converge itself: canonical hooks that cannot be refreshed because
 `prek.toml` is present (transplant the entries manually), and a package-bundled seed
 definition still in a static pre-mode shape (re-run that package's installer with
 `--upgrade`).
 
 Select a mode with `vaultspec-core install --mode tool`,
 `vaultspec-core install --mode dependency`, or `vaultspec-core install --mode dev`.
-Vaultspec consumes the package, module, and optional tool requirement while rendering;
+vaultspec consumes the package, module, and optional tool requirement while rendering;
 that metadata never reaches native host configuration.
 
 The chosen mode is recorded per package in the workspace's committed `workspace.json`,
@@ -129,7 +147,7 @@ renders normalized `command`, `args`, and `env` fields into each selected native
 
 Claude reads project enrollment from `.mcp.json`. Codex reads `.codex/config.toml` for a
 trusted project. Antigravity uses `.agents/mcp_config.json`. Reload or reconnect the
-provider as required by that host. Vaultspec writes enrollment only: it does not start
+provider as required by that host. vaultspec writes enrollment only: it does not start
 the server, grant trust, or bypass provider approval.
 
 Call the `status` tool with no arguments. It returns a rollup report:
@@ -144,11 +162,12 @@ each with a `blob_hash` ready for a later `edit` call.
 
 ## Environment
 
-| Variable               | Default                   | Controls                                                                                        |
-| ---------------------- | ------------------------- | ----------------------------------------------------------------------------------------------- |
-| `VAULTSPEC_TARGET_DIR` | current working directory | The workspace root containing `.vault/` and `.vaultspec/`. Equivalent to `--target` on the CLI. |
+| Variable                   | Default                   | Controls                                                                                                             |
+| -------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `VAULTSPEC_TARGET_DIR`     | current working directory | The workspace root containing `.vault/` and `.vaultspec/`. Equivalent to `--target` on the CLI.                      |
+| `VAULTSPEC_STDIO_WATCHDOG` | enabled                   | Set to `0`, `false`, `off`, or `no` to disable the stdio lifetime watchdog. See [Server lifetime](#server-lifetime). |
 
-This is the only `VAULTSPEC_` variable the MCP server reads directly. See
+Those are the two `VAULTSPEC_` variables the MCP server reads directly. See
 [CLI reference](./CLI.md) for the full `VAULTSPEC_` variable family.
 
 ## Verification
@@ -203,8 +222,8 @@ Other operations have no MCP path at all. Regenerating a feature index runs thro
 `vaultspec-core vault feature index`. For MCP configuration, `list`, `add`, and `remove`
 inspect or mutate canonical definitions; `status` inspects native enrollment and
 ownership health; `sync` reconciles definitions into selected targets; and `uninstall`
-removes Vaultspec-owned enrollment while preserving canonical definitions and external
-host entries. Removing Vaultspec from a workspace runs through
+removes vaultspec-owned enrollment while preserving canonical definitions and external
+host entries. Removing vaultspec from a workspace runs through
 `vaultspec-core uninstall`.
 
 ### Terms
@@ -228,17 +247,18 @@ host entries. Removing Vaultspec from a workspace runs through
 Find vault documents or list features. Read-only, idempotent.
 
 With no arguments, `find` lists features: each row gives a feature's name, document
-count, and graph weight. Pass any filter (`feature`, `type`, or `date`) and `find`
-switches to search mode, returning matching documents instead.
+count, and graph weight. Pass any filter (`feature`, `type`, `date`, or `text`) and
+`find` switches to search mode, returning matching documents instead.
 
-| Parameter | Type                    | Default | Description                                                                                                                                                                                                                                                                                        |
-| --------- | ----------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `feature` | string or null          | `null`  | Feature filter, without the `#` prefix. Passing it switches `find` to search mode.                                                                                                                                                                                                                 |
-| `type`    | list of strings or null | `null`  | Document-type filter (for example, `adr`, `plan`, `research`, `reference`). Passing it switches `find` to search mode. In search mode with no `type` given, the default set is `adr`, `plan`, `research`, and `reference`; `exec` and `audit` documents appear only when you name them explicitly. |
-| `date`    | string or null          | `null`  | Exact ISO-8601 date filter. Passing it switches `find` to search mode.                                                                                                                                                                                                                             |
-| `body`    | boolean                 | `false` | In search mode, inline the full document text in each result row.                                                                                                                                                                                                                                  |
-| `json`    | boolean                 | `false` | In feature-listing mode, enrich each row with `status`, `types`, `earliest_date`, and `has_plan`.                                                                                                                                                                                                  |
-| `limit`   | integer                 | `20`    | Maximum number of rows to return.                                                                                                                                                                                                                                                                  |
+| Parameter | Type                         | Default | Description                                                                                                                                                                                                                                                                                        |
+| --------- | ---------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `feature` | string or null               | `null`  | Feature filter, without the `#` prefix. Passing it switches `find` to search mode.                                                                                                                                                                                                                 |
+| `type`    | list of strings or null      | `null`  | Document-type filter (for example, `adr`, `plan`, `research`, `reference`). Passing it switches `find` to search mode. In search mode with no `type` given, the default set is `adr`, `plan`, `research`, and `reference`; `exec` and `audit` documents appear only when you name them explicitly. |
+| `date`    | string or null               | `null`  | Exact ISO-8601 date filter. Passing it switches `find` to search mode.                                                                                                                                                                                                                             |
+| `text`    | string or null               | `null`  | Case-insensitive substring over the document stem and feature tag. Composes with the other filters, and matches identifiers rather than body prose. Passing it switches `find` to search mode.                                                                                                     |
+| `body`    | `none`, `excerpt`, or `full` | `none`  | In search mode, how much document text to inline in each row. This is an enum, not a boolean: passing `true` is rejected by schema validation.                                                                                                                                                     |
+| `json`    | boolean                      | `false` | In feature-listing mode, enrich each row with `status`, `types`, `earliest_date`, and `has_plan`.                                                                                                                                                                                                  |
+| `limit`   | integer, 1 to 100            | `20`    | Maximum number of rows to return.                                                                                                                                                                                                                                                                  |
 
 Behavior notes:
 
@@ -248,7 +268,7 @@ Behavior notes:
 - Document-search rows report `name` (the file stem), `type`, `feature`, `date`, `path`
   (relative to the vault), `blob_hash` (the git blob object ID (OID) of the document's
   current bytes, or `null` if the file can't be read), `resource_uri` (a `file://`
-  link), and `body` when you set `body` to `true`.
+  link), and `body` when you set `body` to `excerpt` or `full`.
 - In search mode, `limit` is a global cap applied across all matched types combined, not
   a per-type cap. If an early type fills the cap, later types can be crowded out
   entirely. Call `find` once per type when you need a fair spread across types.
@@ -277,6 +297,30 @@ Example document-search response row:
   "resource_uri": "file:///.../2026-07-11-search-api-research.md"
 }
 ```
+
+______________________________________________________________________
+
+### The batch envelope
+
+`create`, `edit`, `plan_progress`, and `plan_edit` take a list and return one envelope
+describing the whole call:
+
+| Field           | Type                    | Meaning                                                                                      |
+| --------------- | ----------------------- | -------------------------------------------------------------------------------------------- |
+| `status`        | `ok`, `mixed`, `failed` | `ok` when every item succeeded, `failed` when every item failed, `mixed` when they disagree. |
+| `items`         | list                    | Item rows. See the sampling rule below.                                                      |
+| `counts`        | object                  | How many items landed in each status. Exact regardless of sampling.                          |
+| `submitted`     | integer                 | How many items were in the request.                                                          |
+| `items_omitted` | integer                 | Uneventful successes left out of `items`.                                                    |
+
+**`items` is a sample, not the full list.** It carries every failure and every item that
+produced a warning, plus some plain successes; the rest are counted in `items_omitted`.
+A client that tallies `items` to learn what happened will undercount on a large batch.
+Read `counts` for the outcome and `items` for the detail.
+
+A partially failed batch is still a successful call. It returns `status: "mixed"` and
+reports each item's outcome rather than raising a protocol error. Only a malformed
+request fails the call itself.
 
 ______________________________________________________________________
 
@@ -323,7 +367,7 @@ Behavior notes:
 - a missing template
 - a file that already exists
 
-Example success item:
+Example item, from the `items` list:
 
 ```json
 {
@@ -440,7 +484,8 @@ plan's steps in full detail (canonical ID, display path, checked state, and the
 execution record stem when one exists), the grounding documents behind the plan (grouped
 by document type), phase and wave summaries, and any execution records that aren't
 linked to a step. A target that resolves to no plan or feature fails the whole call with
-a protocol error. The tool never returns content hashes; that's the `find` tool's job.
+a protocol error. `status` returns no hashes; get a `blob_hash` from `find` to guard an
+edit.
 
 Rollup example:
 
@@ -572,8 +617,8 @@ Each step change reports its own outcome:
 
 A failure in one step change doesn't abort the batch - the aggregate `status` becomes
 `"ok"`, `"mixed"`, or `"failed"` depending on the outcomes. The plan file is written
-once at the end, and only when something actually changed, which refreshes its
-`modified` stamp.
+once, at the end of the batch, and only if a step changed. That write refreshes the
+plan's `modified` stamp.
 
 Every response ends with the plan's post-batch state: `total_steps`, `steps_completed`,
 `completion_percent`, and `next_open_step` (a display path, or `null` when every step is
@@ -603,16 +648,18 @@ removing a step retires its ID permanently - and not idempotent.
 | `plan`       | string                       | - (required)                     | A feature tag or a plan stem/path, resolved the same way as in `plan_progress`. |
 | `operations` | list of plan-edit operations | - (required, at least one entry) | See the operation fields below.                                                 |
 
-Each operation carries:
+Each operation has these fields. Omit a field that does not apply rather than sending
+`null`:
 
-| Field              | Description                                                                              |
-| ------------------ | ---------------------------------------------------------------------------------------- |
-| `operation`        | One of `"add"`, `"insert"`, `"edit"`, or `"remove"`.                                     |
-| `action`           | The step's imperative statement. Required for `add` and `insert`; optional for `edit`.   |
-| `scope`            | The file or area the step touches. Required for `add` and `insert`; optional for `edit`. |
-| `phase_id`         | The `P##` anchor to add under, for plans at tier L2 or higher.                           |
-| `before` / `after` | The `S##` anchor to insert relative to.                                                  |
-| `step_id`          | The target step for `edit` or `remove`.                                                  |
+| Field       | Type           | Default      | Description                                                                              |
+| ----------- | -------------- | ------------ | ---------------------------------------------------------------------------------------- |
+| `operation` | string         | **required** | One of `"add"`, `"insert"`, `"edit"`, or `"remove"`.                                     |
+| `action`    | string or null | `null`       | The step's imperative statement. Required for `add` and `insert`; optional for `edit`.   |
+| `scope`     | string or null | `null`       | The file or area the step touches. Required for `add` and `insert`; optional for `edit`. |
+| `phase_id`  | string or null | `null`       | The `P##` anchor to add under, for plans at tier L2 or higher.                           |
+| `before`    | string or null | `null`       | The `S##` anchor to insert before.                                                       |
+| `after`     | string or null | `null`       | The `S##` anchor to insert after.                                                        |
+| `step_id`   | string or null | `null`       | The target step for `edit` or `remove`.                                                  |
 
 Operations apply in order against a single parsed plan, so an earlier `add` in the same
 call is visible to a later `edit` or `remove`. A failure in one operation doesn't abort
@@ -659,9 +706,14 @@ the verbs the catalog names.
 
 #### `discover`: search the verb catalog
 
-`discover` takes a `query` (the search string - verb words or an intent phrase) and an
-optional `limit` (the maximum number of ranked verbs to return, 10 by default). It
-returns the query echoed back, a count, and a list of ranked verb schemas.
+Read-only, idempotent.
+
+| Parameter | Type    | Default      | Description                                                 |
+| --------- | ------- | ------------ | ----------------------------------------------------------- |
+| `query`   | string  | **required** | Verb words or an intent phrase to rank the catalog against. |
+| `limit`   | integer | `10`         | Maximum number of ranked verbs to return.                   |
+
+It returns the query echoed back, a count, and a list of ranked verb schemas.
 
 Each verb schema carries:
 
@@ -705,17 +757,20 @@ And the response:
 
 #### `invoke`: run a cataloged verb
 
-`invoke` takes the `verb` path returned by `discover`, plus:
+Not read-only. Destructive, because the catalog reaches mutating verbs. Idempotency
+depends on the verb invoked.
 
-- `arguments` - the verb's flags as a mapping. A list value repeats the flag; a boolean
-  passes `true` or `false`.
-- `positionals` - the verb's positional operands, in CLI order.
-- `timeout` - the subprocess wall-clock budget in seconds, 60 by default.
+| Parameter     | Type                    | Default      | Description                                                                                       |
+| ------------- | ----------------------- | ------------ | ------------------------------------------------------------------------------------------------- |
+| `verb`        | string                  | **required** | The space-joined verb path returned by `discover`, for example `"vault list"`.                    |
+| `arguments`   | object or null          | `null`       | The verb's flags as a mapping. A list value repeats the flag; a boolean passes `true` or `false`. |
+| `positionals` | list of strings or null | `null`       | The verb's positional operands, in CLI order.                                                     |
+| `timeout`     | number                  | `60`         | Subprocess wall-clock budget in seconds.                                                          |
 
-Three flags are reserved for the server: `--target`, `--json`, and `--help`. Don't pass
-them in `arguments` - the server sets `--target` to the resolved workspace and adds
-`--json` automatically when the verb supports it. Supplying a reserved flag fails the
-call before any process starts.
+Three flags are reserved for the server: `--target`, `--json`, and `--help`. Do not pass
+them in `arguments`. The server sets `--target` to the resolved workspace and adds
+`--json` automatically when the verb supports it, and supplying a reserved flag fails
+the call before any process starts.
 
 At the user level, `invoke` runs the named verb as a subprocess of the installed
 `vaultspec-core` binary against the resolved workspace. When the verb supports `--json`,
@@ -823,8 +878,7 @@ On Windows the watchdog can also lose track of the client entirely - every launc
 the chain exits before it looks, and stdin is not a pipe it can trace. Rather than give
 up for the rest of the run, it keeps looking on an interval and re-anchors as soon as a
 live ancestor appears. Only if repeated checks agree that no live process is left to
-serve does it write a `"stdio_watchdog_disarmed"` event and then exit as an orphan. This
-is what stops unreachable servers accumulating in the background for hours.
+serve does it write a `"stdio_watchdog_disarmed"` event and then exit as an orphan.
 
 Two knobs control it:
 
@@ -835,8 +889,8 @@ Two knobs control it:
   cannot see through.
 
 A watchdog that cannot start never prevents the server from serving, and an ambiguous
-reading is never treated as a dead client: a server is only ever reaped on evidence, not
-on the absence of it.
+reading is never treated as a dead client: the server exits only when a check confirms
+the client is gone, never when a check is inconclusive.
 
 ## Logging
 
