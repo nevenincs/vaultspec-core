@@ -9,8 +9,6 @@ version of maintaining a constraint about a package core does not depend on:
 2. Core never writes a ``minimum_version`` onto a distribution entry it does
    not own. That map's floor is an input to the owning package's own skew gate,
    so writing one there would be actuation, not advice.
-
-See ``.vault/adr/2026-08-26-rag-search-exposure-adr.md``.
 """
 
 from __future__ import annotations

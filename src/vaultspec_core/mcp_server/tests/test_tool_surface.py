@@ -347,8 +347,6 @@ async def test_tool_list_is_invariant_under_companion_presence(
     Both companion states are built through core's own launch renderer rather
     than a hand-written argv, so the fixture cannot drift from what core
     actually deploys.
-
-    See ``.vault/adr/2026-08-26-rag-search-exposure-adr.md``.
     """
     from vaultspec_core.core.diagnosis.collectors_companion import (
         RAG_DISTRIBUTION_NAME,

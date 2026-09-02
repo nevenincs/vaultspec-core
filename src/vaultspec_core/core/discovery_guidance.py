@@ -24,8 +24,6 @@ Two properties matter and are enforced by that test:
   on its MCP tools and as inline query tokens, with no CLI flag at all. Prose
   that spells them as flags would be confidently wrong, and that is a failure a
   reader cannot detect without going and reading rag's argument parser.
-
-See ``.vault/adr/2026-08-26-rag-search-exposure-adr.md``.
 """
 
 from __future__ import annotations

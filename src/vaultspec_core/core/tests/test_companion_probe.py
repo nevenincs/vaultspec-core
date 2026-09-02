@@ -9,8 +9,6 @@ version lookup would be evidence the seam was in the wrong place.
 ``vaultspec-core`` itself stands in for the companion wherever a
 really-installed distribution is needed. It is guaranteed present whenever
 this suite runs, which a companion package is not.
-
-See ``.vault/adr/2026-08-26-rag-search-exposure-adr.md``.
 """
 
 from __future__ import annotations

@@ -3,9 +3,9 @@ tags:
   - '#adr'
   - '#rag-search-exposure'
 date: '2026-08-26'
-modified: '2026-08-26'
+modified: '2026-09-02'
 body_schema: 'body-v2'
-body_hash: 'sha256:6de9309d0c3456cbc21ef562b3e705b632a97b993fe81581d9e748fbc1b15278'
+body_hash: 'sha256:75e79314017d39e7543ff28a28d0ec2456a5ddd61beb99b0a3b420a6d21e7e2f'
 related:
   - '[[2026-08-26-rag-search-exposure-research]]'
 ---
@@ -301,6 +301,18 @@ rag's version at runtime, and `doctor` has no rag probe.
    core's MCP tool list is invariant under rag's presence. A third asserts core
    never writes a `minimum_version` onto a distribution entry it does not own,
    so step 3's trap cannot be reintroduced by a later well-meaning change.
+
+Code locators for this decision:
+
+- `src/vaultspec_core/core/diagnosis/collectors_companion.py` - the capability probe.
+- `src/vaultspec_core/core/discovery_guidance.py` - the canonical guidance vocabulary.
+- `src/vaultspec_core/core/tests/test_companion_probe.py` and
+  `src/vaultspec_core/core/tests/test_companion_floor.py` - probe states and the
+  no-`minimum_version`-write guard.
+- `src/vaultspec_core/tests/test_discovery_guidance.py` - guidance-vocabulary coverage.
+- `src/vaultspec_core/tests/cli/test_companion_doctor_row.py` - the doctor row.
+- `src/vaultspec_core/mcp_server/tests/test_tool_surface.py` - the tool-list invariance
+  conformance test.
 
 ## Rationale
 

@@ -3,8 +3,6 @@
 The row's whole contract is that it informs without ever acquiring authority:
 it must render every companion state, and it must never move the doctor's exit
 code. Core has no standing to fail a run over a package it does not depend on.
-
-See ``.vault/adr/2026-08-26-rag-search-exposure-adr.md``.
 """
 
 from __future__ import annotations

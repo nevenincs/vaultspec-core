@@ -19,8 +19,6 @@ and dead reports as provisioned. Liveness belongs to the companion's own
 observability verbs, which are designed to answer while degraded, so
 :attr:`CompanionCapability.health_authority` names that command and every
 renderer surfaces it instead of guessing.
-
-See ``.vault/adr/2026-08-26-rag-search-exposure-adr.md``.
 """
 
 from __future__ import annotations

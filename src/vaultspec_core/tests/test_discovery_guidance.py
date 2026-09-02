@@ -9,8 +9,6 @@ and what a model should do when rag is absent.
 Before this suite that fallback was stated in five different wordings across
 seventeen files, two of which named only ``rg``/``fd`` and so described a
 degraded path narrower than the one core actually ships.
-
-See ``.vault/adr/2026-08-26-rag-search-exposure-adr.md``.
 """
 
 from __future__ import annotations
