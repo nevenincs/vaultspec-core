@@ -6,6 +6,7 @@
 
 **Agent harness: the pipeline, the vault, and the CLI that drives them.**
 
+[![install](https://img.shields.io/badge/install-uvx%20vaultspec--core%20install-2E6B45?style=for-the-badge&logo=uv&logoColor=white&labelColor=1b1a16)](#getting-started)
 [![build](https://img.shields.io/github/actions/workflow/status/nevenincs/vaultspec-core/ci.yml?branch=main&style=for-the-badge&label=build&logo=githubactions&logoColor=white&labelColor=1b1a16)](https://github.com/nevenincs/vaultspec-core/actions/workflows/ci.yml)
 [![release](https://img.shields.io/pypi/v/vaultspec-core?style=for-the-badge&label=release&logo=pypi&logoColor=white&labelColor=1b1a16&color=8A72B5)](https://pypi.org/project/vaultspec-core/)
 [![runtime](https://img.shields.io/badge/runtime-Python%203.13%20%7C%203.14-3F9AA6?style=for-the-badge&logo=python&logoColor=white&labelColor=1b1a16)](https://www.python.org/downloads/)

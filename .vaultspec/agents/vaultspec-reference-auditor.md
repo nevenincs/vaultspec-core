@@ -27,11 +27,12 @@ Use:
   reference codebase; each audit task specifies which codebase to analyze.
 
 - **Discover** its architecture. Locate by meaning first when the reference is indexed
-  in this project (`vaultspec-rag search "<concept and domain nouns>" --type code`), and
-  otherwise with `rg`/`fd`. Then read the epicenter module - or the nearest analogue to
-  the feature you are re-implementing - in full, and confirm exact symbols with a
-  targeted grep; reserve broad `rg`/`fd` sweeps for confirmation, not as the primary
-  locate step. Map top-level modules, key abstractions, and architectural boundaries.
+  in this project (`vaultspec-rag search "<concept and domain nouns>" --type code`).
+  Then read the epicenter module - or the nearest analogue to the feature you are
+  re-implementing - in full, and confirm exact symbols with a targeted grep; reserve
+  broad `rg`/`fd` sweeps for confirmation, not as the primary locate step. Map top-level
+  modules, key abstractions, and architectural boundaries. Where `vaultspec-rag` is not
+  installed, the `vaultspec-core` discovery verbs and grep carry the same sequence.
 
 - **Analyze** patterns, architectural decisions, and module interactions relevant to the
   feature being implemented. Locate the relevant modules and files.
