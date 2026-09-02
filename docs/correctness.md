@@ -142,43 +142,62 @@ This takes about a minute per guard. Skip it and the suite's green is uninformat
 
 ## What the execution record contains
 
-Each plan gets one execution ledger, in `.vault/exec/<date>-<feature>/`, appended to as
-steps close. Rows are mechanical: a step id, an operation, and a repo-relative path.
-
-```
-- `S01` `M` `src/billing/retry.py`
-- `S01` `A` `src/billing/tests/test_retry.py`
-- `S02` `D` `src/legacy/shim.py`
-```
-
-The operations are `A` added, `M` modified, `D` deleted, and `R old -> new` renamed.
-Append rows with:
+Closing a Step writes an execution record. The shipped pipeline produces one record per
+Step, scaffolded against the Step it documents:
 
 ```bash
-vaultspec-core vault exec log --feature payment-retries \
-  --related 2026-02-06-payment-retries-plan --step S01 --row "M:src/billing/retry.py"
+vaultspec-core vault add exec --feature payment-retries --step S01   --related 2026-02-06-payment-retries-plan
 ```
 
-The ledger is created on first use and is append-only, so re-logging the same row is
-idempotent rather than duplicating it.
+The filename carries the Step's position, so `S01` under phase `P01` becomes
+`.vault/exec/2026-02-06-payment-retries/2026-02-06-payment-retries-P01-S01.md`, and the
+`step_id` frontmatter field carries the canonical `S01`. That binding is what lets
+`vault check exec-mapping` pair every record with a live Step.
 
-One optional row per step names a check that was run:
+Its `## Changes` section is a mechanical log, one line per path touched:
 
 ```
-- `S01` `verify:` `pytest src/billing/tests/test_retry.py` -> `pass`
+- `M` `src/billing/retry.py`
+- `A` `src/billing/tests/test_retry.py`
+- `D` `src/legacy/shim.py`
 ```
 
-That row is the difference between "this was done" and "this was checked". It is
-optional, which means its absence is information too: a step with no `verify:` row is a
-step nobody claims to have checked.
+The operations are `A` added, `M` modified, `D` deleted, and `R old -> new` renamed. No
+prose: the Step row already states the intent and the commit carries the diff.
+
+One optional final line names a check that was run:
+
+```
+- `verify:` `pytest src/billing/tests/test_retry.py` -> `pass`
+```
+
+That line is the difference between "this was done" and "this was checked". It is
+optional, which makes its absence information too: a Step with no `verify:` line is a
+Step nobody claims to have checked.
 
 A `## Notes` section exists for exceptions only: work skipped, a scaffold left behind, a
-persistent failure, a decision that went against the step as written. An absent Notes
+persistent failure, a decision that went against the Step as written. An absent Notes
 section is the correct state. An empty one is noise, and no check reports it, so leaving
 one behind is on you.
 
-Older vaults hold one document per step instead of a ledger.
-`vaultspec-core vault exec fold` folds them into one.
+### The consolidated ledger
+
+A plan's records can also be folded into a single append-only ledger, one per plan,
+whose rows carry the Step id in the first column:
+
+```
+- `S01` `M` `src/billing/retry.py`
+- `S02` `D` `src/legacy/shim.py`
+```
+
+`vaultspec-core vault exec log` appends rows directly, creating the ledger on first use.
+`vaultspec-core vault exec fold` converts a feature's existing per-Step records into
+one; it deletes those records, so it refuses to run without `--force` and offers
+`--dry-run` to preview.
+
+Both shapes are first-class: `exec-mapping` reads a per-Step record through its
+`step_id` and a ledger through the ids in its rows. The folded form exists because a
+large vault accumulated more prose in per-Step records than any consumer read.
 
 ## What to run before you call something done
 
