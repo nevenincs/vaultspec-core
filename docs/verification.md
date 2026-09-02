@@ -5,20 +5,27 @@ documents it manages are sound. For the workflow those documents come out of, se
 [framework manual](./framework.md); for every flag on every command, the
 [CLI reference](./CLI.md).
 
-Two questions come up, and they have different answers. *Is the framework wired into
-this project properly?* is a workspace question. *Do the documents in `.vault/` hold
-together?* is a vault question. One command answers both.
+Two separate things can be wrong. The framework can be wired into the project badly,
+which is a workspace problem. The documents under `.vault/` can disagree with each
+other, which is a vault problem. Different commands answer them:
 
-## The single command
+| What you want to know                    | Command                                    |
+| ---------------------------------------- | ------------------------------------------ |
+| Are my documents valid?                  | `vaultspec-core vault check all`           |
+| Is the framework installed correctly?    | `vaultspec-core spec doctor`               |
+| Both, under one exit code                | `vaultspec-core doctor`                    |
+| Does my source code reference the vault? | `vaultspec-core vault check code-boundary` |
+
+All four accept `--json` and `--target DIR`.
+
+## Checking everything at once
 
 ```
 vaultspec-core doctor
 ```
 
-It runs the workspace diagnosis and the full vault check suite, and reports both under
-one exit code. Reach for it when you want a yes-or-no answer about the whole project.
-
-The first half reports on the installation itself:
+It runs the workspace diagnosis and the vault check suite, and reports both under one
+exit code. The first half reports on the installation:
 
 ```
 workspace diagnosis
@@ -34,33 +41,48 @@ workspace diagnosis
 
 The second half is the vault check suite, one line per check.
 
-### A printed warning does not always change the exit code
+### Which printed lines change the exit code
 
-The exit codes are `0` for clean, `1` for warnings, and `2` for errors. That covers the
-checks the diagnosis weighs, and the diagnosis prints some lines it does not weigh. A
-workspace with stale process records and an out-of-date package seed reports both as
-warnings and still exits `0`:
+The exit codes are `0` for clean, `1` for warnings, and `2` for errors. Not every
+printed line feeds that code. A line is *weighed* if it can raise the exit code, and the
+diagnosis prints several that never do:
+
+| Printed line                        | Weighed                       |
+| ----------------------------------- | ----------------------------- |
+| `framework`                         | Yes                           |
+| `gitignore`                         | Yes                           |
+| `gitattributes`                     | Yes                           |
+| `builtins`                          | Yes                           |
+| `migration`                         | Yes                           |
+| `precommit`                         | Yes                           |
+| `rename integrity`                  | Yes                           |
+| `vault content`                     | Yes                           |
+| `install mode`                      | Yes, per declared package     |
+| A provider (`claude`, `codex`, ...) | Yes, except the `mixed` state |
+| `mcp`                               | No                            |
+| `process registry`                  | No                            |
+| `mcp seeds`                         | No                            |
+
+So a run can print `warn` and still exit `0`:
 
 ```
   process registry warn 6 stale of 6 process record(s)
-  mcp seeds warn stale package seed definition(s)
+  claude warn dir: mixed
 ```
 
-This matters if you are gating on the command rather than reading it. Do not infer
-failure from the presence of the word `warn` in the output; read the exit code, or read
-`status` under `--json`.
+Both of those are unweighed. `mixed` means the provider directory holds extra files
+vaultspec does not own, which is benign and deliberately excluded so it cannot block a
+commit through the bundled hook. A provider directory that is missing, empty, or partial
+is weighed and does raise the code.
 
-The conditions that do raise the code are the framework layout, the provider
-directories, the builtins, `.gitignore` and `.gitattributes`, migrations, the pre-commit
-hooks, rename integrity, vault content, and an install-mode or version-floor mismatch on
-any declared package.
+If you gate on this command, the word `warn` in its output does not mean it failed. Read
+the exit code.
 
-Three lines are printed and not weighed: the process registry, stale package seeds, and
-the tool-server configuration. The last is worth knowing about - a diagnosis can report
-on `.mcp.json` and still exit `0`.
-
-The same applies to `vaultspec-core spec doctor`, which computes its code the same way
-over the workspace half alone.
+`vaultspec-core spec doctor` computes its exit code the same way over the workspace half
+alone. It also accepts `--gate-errors`, which folds the warning exit to `0` so only
+errors fail, while still printing every warning. That flag is for the pre-commit gate,
+where warning-level provider lag is an expected steady state. `vaultspec-core doctor`
+does not accept it.
 
 ## Checking only the vault
 
@@ -68,53 +90,50 @@ over the workspace half alone.
 vaultspec-core vault check all
 ```
 
-Nineteen checks run, and each prints its own line. What they prove, grouped by the kind
-of damage they catch:
+Nineteen checks run. The `--fix` column says whether a failure can be repaired
+automatically:
 
-**The document is well formed.** `structure` checks directory layout and filenames.
-`frontmatter` validates fields against the schema for the document's type.
-`body-sections` confirms the sections a template requires are present. `markdown`
-applies hygiene rules and can repair them. `encoding` surfaces documents that are not
-valid text.
+| Check                      | Catches                                                | `--fix` |
+| -------------------------- | ------------------------------------------------------ | ------- |
+| `structure`                | Directory layout and filenames                         | Yes     |
+| `frontmatter`              | Fields invalid for the document's type                 | Yes     |
+| `body-sections`            | A section the template requires, missing or empty      | No      |
+| `markdown`                 | Markdown hygiene violations                            | Yes     |
+| `encoding`                 | Documents that are not valid text                      | No      |
+| `placeholders`             | Unreplaced `{...}` template tokens                     | No      |
+| `annotations`              | Template comment blocks that should have been stripped | Yes     |
+| `links`                    | Wiki-links that break the convention                   | Yes     |
+| `dangling`                 | `related:` entries naming a document that is absent    | Yes     |
+| `body-links`               | Links in body prose, where they are forbidden          | Yes     |
+| `orphans`                  | Documents nothing links to                             | No      |
+| `references`               | Missing cross-references between related documents     | Yes     |
+| `schema`                   | An ADR with no research, or a plan with no ADR         | Yes     |
+| `adr-status`               | A status outside the allowed set                       | Yes     |
+| `exec-mapping`             | An execution record naming no live Step                | No      |
+| `features`                 | A feature missing a document type or its index         | No      |
+| `modified-stamp`           | A body edited without restamping                       | Yes     |
+| `rename-integrity`         | A document's name disagreeing with its filename        | Yes     |
+| `feature-rename-integrity` | An exec folder disagreeing with its feature tag        | No      |
 
-**Nothing is left half-authored.** `placeholders` finds unreplaced `{...}` tokens.
-`annotations` finds template comment blocks that were meant to be stripped.
-
-**The graph holds together.** `links` checks wiki-links follow the convention.
-`dangling` finds `related:` entries pointing at documents that do not exist.
-`body-links` finds links in body prose, where they are forbidden. `orphans` finds
-documents nothing links to. `references` finds missing cross-references.
-
-**The lifecycle is coherent.** `schema` enforces that an ADR references research and a
-plan references an ADR. `adr-status` validates status against the allowed set.
-`exec-mapping` checks each execution record maps to a live Step in its parent plan.
-`features` checks feature-tag completeness.
-
-**Nothing has drifted since it was written.** `modified-stamp` reconciles the recency
-stamp against the body hash, which is how an unstamped hand edit becomes visible.
-`rename-integrity` and `feature-rename-integrity` catch names that disagree with their
-filenames or their folders.
-
-Run one check by name when you already know which half you are investigating:
+Run one by name when you already know which failure you are chasing:
 
 ```
 vaultspec-core vault check dangling
 ```
 
-### The check that `all` does not run
+## Checking the code boundary
 
-There are twenty checks; `all` runs nineteen. The exception is `code-boundary`, which
-scans your source files rather than your vault, looking for references to the
-development corpus - vault documents cite code by locator, and code never cites the
-vault. Scanning a source tree costs more than reading a vault, so it is opt-in and runs
-only when you name it:
+`vault check all` runs nineteen of the twenty checks. The twentieth, `code-boundary`,
+scans your source files rather than your vault, looking for source that references the
+development corpus. Vault documents cite code by locator; code never cites the vault.
+Scanning a source tree costs more than reading a vault, so it is opt-in:
 
 ```
 vaultspec-core vault check code-boundary
 ```
 
-A green `vault check all` says nothing about the boundary. If it matters to you, run
-this one separately and gate on it separately.
+An exit-`0` `vault check all` says nothing about the boundary. If it matters to you, run
+and gate on this one separately.
 
 ## Repairing what can be repaired
 
@@ -122,35 +141,51 @@ this one separately and gate on it separately.
 vaultspec-core vault check all --fix
 ```
 
-Anything mechanical is repaired in place: markdown hygiene, frontmatter reconciliation,
-stripped template annotations, refreshed stamps. What cannot be repaired mechanically is
-reported and left alone, because guessing at a fix for a broken cross-reference produces
-a document that passes and lies.
+Everything marked `Yes` in the table above is repaired in place. What cannot be repaired
+is reported and left alone, because guessing at a fix for a broken cross-reference
+produces a document that passes the check while still pointing at the wrong target.
+
+`--fix` does not force a pass. A run that repairs two problems and leaves three
+unfixable ones still exits `1`.
 
 ## Gating a script or a pipeline
 
-Add `--json` and read one field:
+Add `--json` and read the envelope's `status` key. The envelope carries four keys:
 
+```json
+{
+  "schema": "vaultspec.vault.check.all.v1",
+  "status": "unchanged",
+  "data": { "checks": [] },
+  "hints": { "text": "Your vault is clean. Proceed to commit your changes" }
+}
 ```
-vaultspec-core vault check all --json
+
+`status` uses the sync vocabulary rather than a boolean. A clean run reports
+`unchanged`, a run that repaired something reports `updated`, and a run with findings
+left reports `failed`. Test for the failure value rather than for a success value, so a
+new status does not read as a pass:
+
+```bash
+vaultspec-core vault check all --json | jq -e '.status != "failed"'
 ```
 
-The envelope carries `schema`, `status`, `data`, and `hints`. The single question *did
-this run pass* is answered by `status` alone, so a gate reduces to inspecting that one
-key. Diagnostic logging stays on stderr, so stdout is the envelope and nothing else.
+The exit code carries the same verdict and is simpler to gate on: `0` clean, `1`
+findings. Diagnostic logging stays on stderr, so stdout is the envelope and nothing
+else.
 
-Use `--target DIR` to check a project other than the current directory.
+Each entry under `data.checks` carries its own `check_name`, `diagnostics`,
+`fixed_count`, and `supports_fix`, so a report can name which check failed rather than
+only that something did.
 
 ## What to run, and when
 
-Run `vaultspec-core vault check all --fix` before you commit. It is fast, it repairs the
-mechanical problems, and it names the rest.
+Run `vaultspec-core vault check all --fix` before you commit. It repairs the mechanical
+problems and names the rest.
 
-Run `vaultspec-core doctor` after installing, after upgrading, and when something
-behaves in a way the documentation does not explain. Most of what it catches is a
-workspace that drifted rather than a vault that broke.
+Run `vaultspec-core doctor` after installing or upgrading, and when something behaves in
+a way the documentation does not explain. Most of what it catches is workspace drift.
 
-Gate continuous integration on `vaultspec-core vault check all --json` and the `status`
-field. Gate on the vault check rather than on the diagnosis: the vault is what your
-commits change, and the workspace diagnosis reports conditions that are true of a
-machine rather than of a change.
+Gate continuous integration on `vaultspec-core vault check all`. Prefer it over the
+diagnosis: the workspace diagnosis fails on machine state, such as a missing hook or an
+unapplied migration, which a pull request cannot fix.
