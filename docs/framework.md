@@ -274,7 +274,7 @@ other three only read; none is scoped to the files you staged. `vaultspec-core s
 `vaultspec-core spec precommit enable` reverses it.
 
 **MCP clients.** `install` scaffolds an `.mcp.json` exposing the workflow to Model
-Context Protocol clients over stdio: nine tools, plus a gateway to the rest of the CLI.
+Context Protocol clients over stdio: nine tools, two of which are a gateway to the rest of the CLI.
 Verify the configuration with `vaultspec-core spec mcps status --json`; the
 [MCP reference](./MCP.md) lists the tools.
 
