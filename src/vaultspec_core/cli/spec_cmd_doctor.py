@@ -426,7 +426,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
         },
     )
     pc_detail = {
-        PrecommitSignal.COMPLETE: "all hooks present",
+        PrecommitSignal.COMPLETE: "all hooks present in the config",
         PrecommitSignal.INCOMPLETE: "missing canonical hooks",
         PrecommitSignal.NON_CANONICAL: "non-canonical entry pattern",
         PrecommitSignal.UNREFRESHABLE: (
