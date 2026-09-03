@@ -16,7 +16,7 @@ Frontmatter, field by field:
 | `modified`    | The tool       | Refreshed by every command that writes the document.               |
 | `body_schema` | The tool       | Records which body structure the document follows.                 |
 | `body_hash`   | The tool       | A fingerprint of the body that `modified` attests.                 |
-| `related`     | You            | Through `vaultspec-core vault link add` and `remove`.              |
+| `related`     | You            | `--related` when scaffolding, then `vault link add` and `remove`.  |
 | `tier`        | You            | Through `vaultspec-core vault plan tier promote` or `tier demote`. |
 | `step_id`     | The tool       | Filled from the Step the record was scaffolded against.            |
 | `generated`   | The tool       | Marks a file that is rebuilt rather than authored.                 |
@@ -126,8 +126,10 @@ related:
   - '[[2026-02-06-payment-retries-adr]]'
 ```
 
-Change them with `vaultspec-core vault link add` and `vault link remove` rather than by
-hand. Three rules govern the result:
+The first ones are usually set when the document is scaffolded: every
+`vaultspec-core vault add` takes `--related`, which is how an ADR arrives already
+pointing at its research. Afterwards, change them with `vaultspec-core vault link add`
+and `vault link remove` rather than by hand. Three rules govern the result:
 
 - Quote them. Unquoted, YAML reads `[[...]]` as a nested sequence.
 - Use no relative paths. The namespace is flat, so `[[document-stem]]` resolves wherever
