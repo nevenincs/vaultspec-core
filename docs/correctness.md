@@ -14,7 +14,10 @@ that check a vault mechanically, see
 ## Two different questions
 
 *Does this vault hold together?* is mechanical, and `vaultspec-core vault check all`
-answers it completely: a dangling link either resolves or it does not.
+answers it: a dangling link either resolves or it does not. It runs nineteen of the
+twenty checks. The twentieth, `code-boundary`, reads your source for references back
+into the vault and is run on its own, so a clean run here says nothing about that
+boundary.
 
 *Is this change right?* is not mechanical, and nothing in the toolchain can answer it.
 What the framework does instead is refuse to let the question go unasked, and keep the
@@ -29,7 +32,10 @@ should.
 Three things are mechanical, and they are the whole list.
 
 `vaultspec-core install` writes a `.pre-commit-config.yaml` carrying four hooks, the
-first of which runs `vault check all`, so a malformed document blocks the commit. Its
+first of which runs `vault check all`. That file is configuration and not a git hook:
+until you install the `pre-commit` tool and run `pre-commit install`, nothing runs it
+and a commit carrying vault errors is accepted. Once it is wired, a malformed document
+blocks the commit. Its
 scope is the whole vault rather than the files you staged: the hooks pass no filenames,
 and the Markdown type filter decides only whether they fire, not what they read. One of
 the four mutates - `vault sanitize annotations` strips generated template annotations,
