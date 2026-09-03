@@ -6,6 +6,12 @@ bucket to a *repository*, and a user who adds two of them to install two vaultsp
 products has to add a third for the next one. The account root is added once and carries
 every product.
 
+The name says Homebrew and serves both because the two managers read different
+directories of the same repository: Scoop takes JSON manifests from `bucket/`, Homebrew
+takes Ruby formulae from `Formula/`, and the release job writes each product into both.
+A reader who assumes one repository cannot be a bucket and a tap at once is reading the
+name rather than the layout.
+
 ```sh
 # Windows, via Scoop
 scoop bucket add nevenincs https://github.com/nevenincs/homebrew-tap
