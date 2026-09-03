@@ -7,7 +7,11 @@ Two directories matter. `.vault/` holds the documents your features produce, and
 `.vaultspec/` holds the framework policy: the rules, skills, and agent definitions your
 coding agent reads. Commit both. The managed block in `.gitignore` excludes only the
 per-machine by-products underneath them, such as `.vault/data/` and `.vault/logs/`, so
-your teammates get the documents and the policy but not your local state.
+your teammates get the documents and the policy but not your local state. That block is
+written into a `.gitignore` the project already has; the install does not create the
+file, so a project started from an empty directory has nothing ignored until you create
+one and install again. `vaultspec-core doctor` reports `gitignore info no_file` when
+that is the case.
 
 ## How a feature flows into the vault
 
