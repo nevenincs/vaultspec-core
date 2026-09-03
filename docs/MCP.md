@@ -50,6 +50,42 @@ Module invocation avoids the lock.
 > their own console scripts distinctly (for example, vaultspec-a2a's is
 > `vaultspec-a2a-mcp`) rather than colliding with it.
 
+This is the entry the installer renders into `.mcp.json` on a project installed the
+default way. Antigravity's `.agents/mcp_config.json` is byte-identical:
+
+```json
+{
+  "mcpServers": {
+    "vaultspec-core": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "vaultspec-core",
+        "python",
+        "-m",
+        "vaultspec_core.mcp_server.app"
+      ]
+    }
+  }
+}
+```
+
+Codex takes the same invocation as TOML, inside a marked region the installer owns:
+
+```toml
+# <vaultspec type="mcps">
+[mcp_servers."vaultspec-core"]
+args = ["--from", "vaultspec-core", "python", "-m", "vaultspec_core.mcp_server.app"]
+command = "uvx"
+# </vaultspec>
+```
+
+The launch shape follows the install mode rather than being fixed: a project that
+carries vaultspec-core as a dependency gets `uv run --no-sync` with no `--from`,
+because the environment already has the package. Compare against these when you manage
+enrollment yourself, and read the markers as ownership boundaries: edit inside them and
+the next sync declines to touch the entry rather than repairing it.
+
 ### Serving a read-only surface
 
 Five of the nine tools mutate the vault, and `invoke` can run most of the CLI. Launch
