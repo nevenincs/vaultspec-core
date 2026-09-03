@@ -182,9 +182,14 @@ new status does not read as a pass:
 vaultspec-core vault check all --json | jq -e '.status != "failed"'
 ```
 
-The exit code carries the same verdict and is simpler to gate on: `0` clean, `1`
-findings. Diagnostic logging stays on stderr, so stdout is the envelope and nothing
-else.
+The exit code carries the same verdict and is simpler to gate on: `0` when
+nothing failed, `1` when something did. Both are keyed on errors rather than on
+findings, which is the part worth knowing before you gate on either. Measured on
+one vault: `Total: 15 warnings` and no errors exits `0` with `"status":
+"unchanged"`, and a single error in the same vault - `Total: 1 error, 20
+warnings` - exits `1` with `"status": "failed"`. A passing gate is not a clean
+report, so the summary line is worth reading either way. Diagnostic logging stays
+on stderr, so stdout is the envelope and nothing else.
 
 Each entry under `data.checks` carries its own `check_name`, `diagnostics`,
 `fixed_count`, and `supports_fix`, so a report can name which check failed rather than
