@@ -30,14 +30,26 @@ exit code. The first half reports on the installation:
 ```
 workspace diagnosis
   framework ok .vaultspec/ present
+  process registry warn 6 stale of 6 process record(s): engine-dev-mantest.json, ...
   claude ok dir: complete
+  gemini ok dir: complete
+  antigravity ok dir: complete
+  codex ok dir: complete
   builtins ok current
-  gitignore ok complete
+  gitignore warn partial
+  gitattributes ok complete
   mcp ok .mcp.json present
   migration ok all registered migrations applied
+  vault content ok no generated template annotations
   precommit ok all hooks present
-  install mode (vaultspec-core) ok declared dependency; artifacts match
+  rename integrity ok all rules, skills, and agents names are consistent
+  install mode (vaultspec-core) ok declared tool; artifacts match
+  semantic search none vaultspec-rag not provisioned; core discovery and find cover document lookup without it
 ```
+
+That is one workspace's report, with the stale-record filenames after the count cut
+to keep the line readable. A run prints the lines that apply to the workspace it
+finds, so yours may carry lines this one does not.
 
 The second half is the vault check suite, one line per check.
 
