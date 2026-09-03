@@ -56,8 +56,12 @@ That is the recovery command for most of this page. It restamps, reconciles, and
 what it safely can.
 
 You will hear about a mistake at commit time. `vaultspec-core install` writes a
-pre-commit hook that runs `vault check all` over changed Markdown, so a document that
-fails validation blocks the commit rather than reaching the repository.
+`.pre-commit-config.yaml` whose first hook runs `vault check all`, so a document that
+fails validation blocks the commit rather than reaching the repository. It reads the
+whole vault rather than the files you staged, because the hooks pass no filenames; a
+Markdown file in the commit is what makes them run, not what they look at. The config
+is not itself a git hook, so nothing blocks anything until `pre-commit install` has
+written one.
 
 ## Frontmatter
 
