@@ -2787,6 +2787,8 @@ overridden by the `--target` flag.
   `vaultspec-mcp` to locate the workspace. Defaults to the current working directory if
   unset.
 - `VAULTSPEC_DOCS_DIR` (str, default `.vault`) - Vault directory name.
+- `VAULTSPEC_INDEX_DIR` (str, default `index`) - Name of the subdirectory inside the
+  vault that holds the auto-generated feature indexes (`<feature>.index.md`).
 - `VAULTSPEC_FRAMEWORK_DIR` (str, default `.vaultspec`) - Framework directory name.
 - `VAULTSPEC_CLAUDE_DIR` (str, default `.claude`) - Claude tool directory name.
 - `VAULTSPEC_GEMINI_DIR` (str, default `.gemini`) - Gemini tool directory name.
@@ -2800,6 +2802,16 @@ overridden by the `--target` flag.
   `vaultspec-core spec {rules|skills|agents} edit`. Overridden by the project-local
   config `editor` value, and the `--editor` flag. Resolved in order: `--editor` flag,
   project config, `$VISUAL`, `$EDITOR`/`VAULTSPEC_EDITOR`, `vi`.
+- `VAULTSPEC_JSON_PRETTY` (str, unset by default) - Indents `--json` output. Any value
+  other than `0`, `false`, `no`, `off`, or the empty string turns it on; without it the
+  envelope is written as one compact line.
+- `VAULTSPEC_NO_HINTS` (str, unset by default) - Set to `1` to drop the `Next actions`
+  block the commands print after their report. Equivalent to `--no-hints`. Only the
+  exact value `1` counts; anything else leaves the hints in place.
+- `VAULTSPEC_STDIO_WATCHDOG` (str, default on) - Lifetime watchdog for the MCP server.
+  Set it to `0`, `false`, `off`, or `no` to disable it, which leaves the server to exit
+  on stdin EOF alone. Read by `vaultspec-mcp` rather than by the CLI; see the
+  [MCP reference](./MCP.md).
 
 ## See also
 
