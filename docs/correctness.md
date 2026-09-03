@@ -50,6 +50,15 @@ The `modified-stamp` check compares each document's body against the fingerprint
 in its frontmatter, so an audit edited quietly after the fact is detectable. Rewriting
 history leaves a trace.
 
+That third one is detectable rather than blocking, and the distinction matters if you
+gate on the exit code. Measured: appending a line to an accepted ADR by hand and
+re-running the check reports `Stale modified stamp ...; the document body no longer
+matches its attested fingerprint (unstamped edit)` as a **warning**, and warnings do not
+raise the exit code. The `schema` failure above is an error and does. So a pipeline
+gating on `vault check all` catches the plan that appeared from nowhere and does not
+catch the audit rewritten last night; for that one, read the report rather than the
+exit status.
+
 Nothing else is enforced. In particular, **no check fails because a feature has no
 audit**. The `features` check warns about a plan with no ADR and about a missing feature
 index, and says nothing about whether anyone reviewed the work. Review is a discipline
