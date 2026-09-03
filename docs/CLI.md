@@ -1535,13 +1535,13 @@ the frontmatter name. Pick the one whose side you trust.
   (no `.md` extension).
 - `dangling` (`--fix`: yes, `--feature`: yes) - Find `related:` frontmatter wiki-links
   that resolve to no document.
-- `body-links` (`--fix`: no, `--feature`: yes) - Find wiki-links and markdown path links
+- `body-links` (`--fix`: yes, `--feature`: yes) - Find wiki-links and markdown path links
   in document body text.
 - `placeholders` (`--fix`: no, `--feature`: yes) - Find unreplaced `{...}` template
   placeholders in document body prose.
-- `orphans` (`--fix`: yes, `--feature`: yes) - Find documents with no incoming
+- `orphans` (`--fix`: no, `--feature`: yes) - Find documents with no incoming
   wiki-links.
-- `features` (`--fix`: yes, `--feature`: yes) - Check feature tag completeness - missing
+- `features` (`--fix`: no, `--feature`: yes) - Check feature tag completeness - missing
   doc types.
 - `exec-mapping` (`--fix`: no, `--feature`: yes) - Check execution records map to a live
   Step in their parent plan.
