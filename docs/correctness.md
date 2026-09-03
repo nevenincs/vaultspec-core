@@ -211,6 +211,29 @@ large vault accumulated more prose in per-Step records than any consumer read.
 vaultspec-core vault check all --fix
 ```
 
+A vault that is done reads like this, without `--fix` having anything left to do:
+
+```text
+Next action:
+  Your vault is clean. Proceed to commit your changes
+    git commit -m "Commit changes after successful vault checks"
+Vault Check  - All
+  ok structure: clean
+  ok frontmatter: clean
+  ok annotations: clean
+  ok markdown: clean
+  ok links: clean
+  ok dangling: clean
+  ok body-links: clean
+  ok placeholders: clean
+  ok orphans: clean
+```
+
+That capture is cut after the first nine of the nineteen checks; the rest read the
+same way, and the run ends `All checks passed.` A freshly scaffolded vault does not
+look like this and should not: its placeholders are errors until someone writes the
+prose.
+
 `--fix` rewrites documents, so read the diff before committing it. Then the project's
 own tests and gates, then `/vaultspec-code-review`, in that order. The check suite is
 fastest and catches mechanical damage; the tests catch behaviour; the review compares
