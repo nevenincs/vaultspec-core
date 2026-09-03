@@ -83,6 +83,10 @@ Grounding Trace  search-api (feature)
 `no record` means the step is open and nothing has been executed against it yet. The `>`
 marks where work resumes.
 
+The command prints a row for every step; the block above is cut to three of this plan's
+twelve so the shape stays readable. On a large plan the trace is long by design - that
+is what makes it a trace - so pipe it or pass a plan rather than a feature to narrow it.
+
 ## Begin a pipeline
 
 Tell your coding agent what to build, in plain language:
