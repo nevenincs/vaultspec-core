@@ -312,9 +312,24 @@ vaultspec-core vault plan step remove <plan> S07
 ```
 
 A hand-edited row parses, so the damage is silent until
-`vaultspec-core vault plan check` runs. What no check can recover is a reused
-identifier: once two rows have claimed `S07`, the execution records naming it are
-ambiguous.
+`vaultspec-core vault plan check` runs. That verb does find it, and it is the only
+one that does: `vault check all` runs the vault checks and not the plan
+conventions, so a duplicated identifier survives a clean run of it. Measured, on a
+plan whose second row was hand-edited to claim a number already taken:
+
+```
+vaultspec-core vault plan check 2026-09-03-payment-retries-plan
+```
+
+```text
+[error] PLAN021 line 13: Step canonical identifier 'S02' appears 2 times in document order.
+  fix (manual): Remove or rename the duplicate occurrences; the convention forbids re-using retired identifiers.
+```
+
+What no check can recover is that reused identifier - the fix is marked manual
+because the tool cannot know which row the execution records naming `S02` were
+written against. Once two rows have claimed `S07`, the records pointing at it are
+ambiguous, and only the person who wrote them knows which one they meant.
 
 ### One action, one row
 
