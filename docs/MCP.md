@@ -523,38 +523,51 @@ linked to a step. A target that resolves to no plan or feature fails the whole c
 a protocol error. `status` returns no hashes; get a `blob_hash` from `find` to guard an
 edit.
 
-Rollup example:
+Rollup example, captured against this project's own vault and cut to one feature
+and one plan of the eleven and four it returned:
 
 ```json
 {
+  "tool_schema_version": "0.1.73",
   "kind": "rollup",
-  "tool_schema_version": "0.1.37",
   "features": [
     {
-      "name": "search-api",
-      "doc_count": 6,
-      "latest_activity": "2026-07-11",
+      "name": "docs-site",
+      "doc_count": 115,
+      "latest_activity": "2026-09-02",
       "has_plan": true,
-      "status": "in-progress",
-      "plan_tier": "L2",
-      "plan_completion_percent": 50.0
+      "status": "In Progress",
+      "plan_tier": "L3",
+      "plan_completion_percent": 99.1
     }
   ],
+  "features_total": 11,
   "plans_in_flight": [
     {
-      "stem": "2026-07-12-search-api-plan",
-      "feature": "search-api",
-      "tier": "L2",
+      "stem": "2026-08-28-docs-site-plan",
+      "feature": "docs-site",
+      "tier": "L3",
       "open_steps": 1,
-      "closed_steps": 1,
-      "total_steps": 2,
-      "completion_percent": 50.0,
-      "next_open_step": "S02"
+      "closed_steps": 110,
+      "total_steps": 111,
+      "completion_percent": 99.1,
+      "next_open_step": "W09.P18.S109"
     }
   ],
-  "totals": { "documents": 42 }
+  "totals": {
+    "total_docs": 394,
+    "total_features": 11,
+    "counts_by_type": { "adr": 14, "audit": 15, "plan": 11, "exec": 327 },
+    "orphaned_count": 0,
+    "dangling_link_count": 0
+  },
+  "plans": []
 }
 ```
+
+`status` on a feature is written for a person - `In Progress`, `Completed` -
+rather than as a slug, so match it exactly rather than assuming a lowercase
+hyphenated form. `counts_by_type` above is cut to four of its seven keys.
 
 Trace example:
 
