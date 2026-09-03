@@ -34,9 +34,9 @@ network once.
 | macOS arm64    | Homebrew | served                      |
 | macOS x86-64   | Homebrew | not built - see below       |
 | Linux x86-64   | Homebrew | served                      |
-| Linux arm64    | Homebrew | not built - no capable host |
+| Linux arm64    | Homebrew | served                      |
 
-Two gaps, both declared rather than silent. The generator omits a target the release did
+One gap, declared rather than silent. The generator omits a target the release did
 not attach and prints a `::warning::` naming it, so a missing platform is visible in the
 release log instead of becoming a formula whose download 404s.
 
@@ -45,10 +45,12 @@ wheel resolved to a build the PyApp bootstrapper cannot load on that target, so 
 artifact launched and exited 1. Pinning `cryptography` back would have held its CVE
 fixes across every other platform to serve one shrinking one.
 
-**Linux arm64** has no host that can build it to the target's glibc floor. The ARM64
-runner is itself a colima container with no reachable docker daemon, so it cannot start
-the pinned `manylinux_2_28` image, and a native build there inherits the guest's much
-newer glibc. The gap closes when an ARM64 Linux host that can run containers exists.
+**Linux arm64** was the second gap and is one no longer. It had no host that could
+build it to the target's glibc floor: the ARM64 runner is itself a colima container with
+no reachable docker daemon, so it cannot start the pinned `manylinux_2_28` image, and a
+native build there inherits the guest's much newer glibc. The release now attaches an
+`aarch64-unknown-linux-gnu` binary and the generated formula carries it, which is the
+same evidence the table is read from.
 
 ## Why binary formulae
 
