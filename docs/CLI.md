@@ -110,7 +110,7 @@ full options.
 
 ### Top-level commands
 
-- `vaultspec-core install` - Install Vaultspec resources for the selected providers.
+- `vaultspec-core install` - Install vaultspec resources for the selected providers.
 - `vaultspec-core uninstall` - Remove the vaultspec framework from the target directory.
 - `vaultspec-core sync` - Sync rules, skills, agents, configs, system prompts, and MCPs.
 - `vaultspec-core doctor` - Diagnose overall workspace and vault health.
@@ -364,7 +364,7 @@ full options.
 - `vaultspec-core spec mcps remove` - Remove a canonical MCP server definition.
 - `vaultspec-core spec mcps sync` - Reconcile canonical definitions into provider-native
   enrollment.
-- `vaultspec-core spec mcps uninstall` - Remove Vaultspec-owned provider-native MCP
+- `vaultspec-core spec mcps uninstall` - Remove vaultspec-owned provider-native MCP
   enrollment.
 
 #### Reference
@@ -2529,7 +2529,7 @@ outputs.
   `--prune`, `--json`, `--target PATH`) - Reconcile canonical definitions into
   provider-native enrollment.
 - `vaultspec-core spec mcps uninstall [PROVIDER]` (`--scope SCOPE`, `--dry-run`,
-  `--force`, `--json`, `--target PATH`) - Remove only Vaultspec-owned provider-native
+  `--force`, `--json`, `--target PATH`) - Remove only vaultspec-owned provider-native
   enrollment.
 
 `vaultspec-core spec mcps status` exits `0` only when MCP config status is `ok`,
@@ -2565,7 +2565,7 @@ definitions and externally owned host entries.
   vaultspec-core spec mcps status codex --scope project
   ```
 
-- **Preview removal of Vaultspec-owned Claude user enrollment**:
+- **Preview removal of vaultspec-owned Claude user enrollment**:
 
   ```bash
   vaultspec-core spec mcps uninstall claude --scope user --dry-run
