@@ -173,10 +173,12 @@ Add `--json` and read the envelope's `status` key. The envelope carries four key
 }
 ```
 
-`status` uses the sync vocabulary rather than a boolean. A clean run reports
-`unchanged`, a run that repaired something reports `updated`, and a run with findings
-left reports `failed`. Test for the failure value rather than for a success value, so a
-new status does not read as a pass:
+`status` uses the sync vocabulary rather than a boolean. Measured across the three
+states: a run with nothing to report and a run leaving only warnings both report
+`unchanged`, a run that repaired something reports `updated`, and a run leaving an
+error reports `failed`. It is errors that make it `failed`, not findings, which is
+the same line the exit code draws. Test for the failure value rather than for a
+success value, so a new status does not read as a pass:
 
 ```bash
 vaultspec-core vault check all --json | jq -e '.status != "failed"'
