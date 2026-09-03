@@ -157,7 +157,7 @@ _STATUS_ROLLUP_HINTS: tuple[tuple[str, str], ...] = (
         "vaultspec-core status <plan-or-feature>",
     ),
     (
-        "Diagnose vault and workspace health",
+        "Diagnose workspace health",
         "vaultspec-core spec doctor",
     ),
 )
