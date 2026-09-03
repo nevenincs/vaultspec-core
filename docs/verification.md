@@ -41,7 +41,7 @@ workspace diagnosis
   mcp ok .mcp.json present
   migration ok all registered migrations applied
   vault content ok no generated template annotations
-  precommit ok all hooks present
+  precommit ok all hooks present in the config
   rename integrity ok all rules, skills, and agents names are consistent
   install mode (vaultspec-core) ok declared tool; artifacts match
   semantic search none vaultspec-rag not provisioned; core discovery and find cover document lookup without it
