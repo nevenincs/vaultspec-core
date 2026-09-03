@@ -191,7 +191,7 @@ step id, `S01`, to both commands: `P01.S01` is the display path that status prin
 the command derives the phase segment of the filename from the plan.
 
 Without `--step`, the record is not bound to a step. Its frontmatter keeps the
-`step_id: '{S##}'` placeholder, `related` stays empty, and the file lands as
+`step_id: '{step_id}'` placeholder, `related` stays empty, and the file lands as
 `2026-08-28-payment-retries-exec.md` rather than inside the feature folder.
 
 Status moves:
