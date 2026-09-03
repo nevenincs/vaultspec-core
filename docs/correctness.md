@@ -110,9 +110,12 @@ on.
 
 ## What the framework tells the agent
 
-Installing vaultspec seeds a system prompt into each provider it manages, meaning each
-coding-agent integration such as Claude, Codex, or Gemini. Two of its mandates are about
-correctness specifically.
+Installing vaultspec seeds a system prompt into three of the four providers it manages.
+Claude and Codex read it as a rule file, `vaultspec-system.builtin.md`, alongside the
+others; Gemini reads it as `.gemini/SYSTEM.md`. Antigravity gets rules, skills, and
+workflows but no system prompt, so the mandates below are not in front of it. Measured on
+a fresh install: the text appears under `.claude/`, `.codex/`, and `.gemini/`, and nowhere
+under `.agents/`. Two of its mandates are about correctness specifically.
 
 On tests:
 
