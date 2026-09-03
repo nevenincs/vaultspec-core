@@ -27,8 +27,13 @@ _NEXT_STEP_HINTS: dict[tuple[str, str], tuple[str, str]] = {
         "--related {plan_stem}",
         "Scaffold step-aware execution records for your plan",
     ),
+    # The argument is named rather than interpolated: the context this hint is
+    # rendered with carries the stem of the document just created, which for an
+    # exec record is the record and not the plan it belongs to. A placeholder a
+    # reader substitutes beats a plausible stem that resolves to the wrong
+    # document, and `vault plan status` requires the argument either way.
     ("vault.add.exec", "created"): (
-        "vaultspec-core vault plan status",
+        "vaultspec-core vault plan status <plan-or-feature>",
         "Track the progress and verification of your plan",
     ),
     ("vault.add.audit", "created"): (
