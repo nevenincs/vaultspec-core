@@ -152,7 +152,7 @@ Closing a Step writes an execution record. The shipped pipeline produces one rec
 Step, scaffolded against the Step it documents:
 
 ```bash
-vaultspec-core vault add exec --feature payment-retries --step S01   --related 2026-02-06-payment-retries-plan
+vaultspec-core vault add exec --feature payment-retries --step S01 --related 2026-02-06-payment-retries-plan
 ```
 
 The filename carries the Step's position, so `S01` under phase `P01` becomes
