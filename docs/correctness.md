@@ -1,6 +1,6 @@
 # The correctness workflow
 
-Vaultspec does not make code correct. It puts a record behind the claim that code is
+vaultspec does not make code correct. It puts a record behind the claim that code is
 correct: an Architecture Decision Record (ADR) saying what was intended, an execution
 record saying what was done, and an audit saying who checked and what they found.
 

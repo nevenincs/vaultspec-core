@@ -1,4 +1,4 @@
-# Vaultspec framework manual
+# vaultspec framework manual
 
 This manual covers operating the vaultspec workflow in a project that is already set up.
 For what vaultspec-core is and how to install it, see the [README](../README.md).
