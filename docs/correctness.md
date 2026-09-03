@@ -28,8 +28,14 @@ should.
 
 Three things are mechanical, and they are the whole list.
 
-`vaultspec-core install` writes a pre-commit hook that runs `vault check all` over
-changed Markdown, so a malformed document blocks the commit.
+`vaultspec-core install` writes a `.pre-commit-config.yaml` carrying four hooks, the
+first of which runs `vault check all`, so a malformed document blocks the commit. Its
+scope is the whole vault rather than the files you staged: the hooks pass no filenames,
+and the Markdown type filter decides only whether they fire, not what they read. One of
+the four mutates - `vault sanitize annotations` strips generated template annotations,
+across the vault by the same rule - which is why the
+[framework manual](framework.md) treats enabling this in a shared checkout as a
+decision rather than a default.
 
 The `schema` check requires the chain to hold: an ADR must reference the research behind
 it, and a plan must reference its ADR. A plan that appeared from nowhere fails.
