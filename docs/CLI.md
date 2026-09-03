@@ -565,7 +565,7 @@ Create a new `.vault/` document from a template.
   heading.
 - `--topic TOPIC` - Kebab-case filename infix that distinguishes a second document of
   the same type for one feature, producing `{date}-{feature}-{topic}-{type}.md`. Only
-  valid for `audit`, `reference`, and `research`.
+  valid for `adr`, `audit`, `reference`, and `research`.
 - `--related DOC` (`-r`) - Related document(s). Accepts path, filename, stem, or
   `[[wiki-link]]`. Repeatable.
 - `--tags TAG` - Additional tags beyond the required directory and feature tags.

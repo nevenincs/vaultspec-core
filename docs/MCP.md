@@ -341,7 +341,7 @@ at least one entry.
 | `related` | list of strings or null | `null`             | Documents to link in the `related:` frontmatter, resolved to `[[wiki-link]]` entries. Accepts a path, filename, stem, or an existing `[[wiki-link]]`.                                                                                         |
 | `tags`    | list of strings or null | `null`             | Extra tags, beyond the required directory tag and feature tag.                                                                                                                                                                                |
 | `tier`    | string or null          | `"L1"` for plans   | Plan complexity tier, one of `L1` through `L4`. Ignored for non-plan document types.                                                                                                                                                          |
-| `topic`   | string or null          | `null`             | Kebab-case filename infix that distinguishes a second document of the same type for one feature (`{date}-{feature}-{topic}-{type}.md`). Valid only for `audit`, `reference`, and `research`. Mirrors `--topic` on `vaultspec-core vault add`. |
+| `topic`   | string or null          | `null`             | Kebab-case filename infix that distinguishes a second document of the same type for one feature (`{date}-{feature}-{topic}-{type}.md`). Valid only for `adr`, `audit`, `reference`, and `research`. Mirrors `--topic` on `vaultspec-core vault add`. |
 
 Behavior notes:
 
