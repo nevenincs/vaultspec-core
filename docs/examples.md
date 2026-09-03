@@ -260,7 +260,9 @@ vaultspec-core vault check all --fix
   Total: 4 errors, 19 warnings, 19 fixed
 ```
 
-Nineteen repairs, and the four errors stay. They are the placeholders:
+Nineteen repairs, and the four errors stay. The two nineteens do not subtract from the twenty-seven above: `fixed` counts the repairs applied, and the warning count beside it is a fresh reading taken afterwards, against a corpus those repairs have changed. Repairing one thing can settle a check that was not counted and unsettle one that was, so compare runs rather than doing the arithmetic.
+
+The four errors are the placeholders:
 
 ```
 vaultspec-core vault check placeholders
