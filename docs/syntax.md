@@ -210,6 +210,11 @@ directory listings, so they are here for reference:
 Narrative segments are lowercase kebab-case. Container identifiers keep their canonical
 uppercase form: `W01`, `P02`, `S03`.
 
+Every type but one sits directly in its directory. Execution records and phase summaries
+are grouped a level down, in a folder named for the feature, because a feature at `L3`
+produces dozens of them and a flat `exec/` stops being readable:
+`.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-S01.md`.
+
 To give a feature a second decision record or a second piece of research, pass `--topic`
 to `vaultspec-core vault add` rather than inventing a filename. Only `adr`, `audit`,
 `reference`, and `research` accept it.
