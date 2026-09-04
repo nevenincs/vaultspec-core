@@ -36,7 +36,9 @@ optional code-grounding step. A skill runs each stage and writes a document to
 | Review                      | `/vaultspec-code-review`   | `.vault/audit/`     |
 
 Those `/vaultspec-*` names are slash-commands you type into your coding agent, not into
-a shell.
+a shell - where your agent has them. The skills are written for Claude Code and
+Antigravity; Gemini and Codex are enrolled and receive the rules and agent definitions
+but no skills, so on those two the pipeline is driven from the command line instead.
 
 The agent runs the stages. Your part is approving each one before it moves on, and
 stepping in where judgment is needed: shaping the decision, sizing the plan, and
@@ -67,8 +69,9 @@ Active features
 A plan row reads left to right as: the plan's name, its tier, wave progress, phase
 progress, step progress, percent complete, the next open step, and the date it last
 changed. A bare `-` means that level does not exist at this tier, so the `L2` plan above
-has phases but no waves. A completed run also appears under a `Recently completed`
-heading, which this example omits.
+has phases but no waves. The capture is cut after `Active features`: a
+full run also prints `Recently completed` when there is one, plus `Execution activity`,
+`Discovery`, `Totals`, and a `Next actions` block.
 
 Pass a feature or a plan as the target to get its grounding trace: every step mapped to
 the execution record that carried it out, with the feature's other documents grouped
@@ -252,7 +255,7 @@ them. If a check reports that a body changed without a stamp, run
 
 Edit resources under `.vaultspec/` through `vaultspec-core spec`, which is the command
 group that addresses the policy tree, then sync them out to each provider. A provider is
-a coding-agent integration such as Claude, Codex, or Gemini:
+a coding-agent integration: Claude, Codex, Gemini, or Antigravity:
 
 ```bash
 vaultspec-core spec rules add my-project-conventions
