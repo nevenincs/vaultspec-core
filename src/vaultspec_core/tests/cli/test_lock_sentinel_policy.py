@@ -281,3 +281,111 @@ class TestPolicyIsIndependentOfDiskState:
         (tmp_path / ".gitignore.lock").unlink(missing_ok=True)
 
         assert "/.gitignore.lock" in get_recommended_entries(tmp_path)
+
+
+@pytest.mark.integration
+class TestInstallProtectsAWorkspaceWithNothing:
+    """A workspace that starts with no ignore file ends up protected.
+
+    This is the end-to-end shape of GH issue 399: the install completed,
+    printed the sharing-policy statement claiming runtime by-products stay
+    local, exited zero, and left the sentinels it had just written with
+    nothing ignoring them.
+    """
+
+    def test_install_creates_the_ignore_file_and_writes_the_block(
+        self, tmp_path: Path
+    ) -> None:
+        assert not (tmp_path / ".gitignore").exists()
+
+        _installed_workspace(tmp_path)
+
+        text = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+        assert "# >>> vaultspec-managed" in text
+        for entry in get_recommended_entries(tmp_path):
+            assert entry in text.splitlines()
+
+    def test_first_install_writes_what_a_second_one_would(
+        self, tmp_path: Path
+    ) -> None:
+        """The block does not converge over two runs; it is right the first time."""
+        factory = _installed_workspace(tmp_path)
+        first = (tmp_path / ".gitignore").read_bytes()
+
+        factory.install(provider="all", upgrade=True, force=True)
+
+        assert (tmp_path / ".gitignore").read_bytes() == first
+
+    def test_every_generated_sentinel_is_ignored_from_the_first_install(
+        self, tmp_path: Path
+    ) -> None:
+        """Including the ignore file's own sentinel, created by the block write."""
+        _run_git(tmp_path, "init", "-q", "-b", "main")
+
+        _installed_workspace(tmp_path)
+
+        assert (tmp_path / ".gitignore.lock").is_file()
+        not_ignored = [
+            lock
+            for lock in _generated_lock_files(tmp_path)
+            if _run_git(tmp_path, "check-ignore", "-q", "--", lock).returncode != 0
+        ]
+        assert not_ignored == [], f"sentinels git still tracks: {not_ignored!r}"
+
+
+@pytest.mark.integration
+class TestUpgradeReconvergence:
+    """An upgrade repairs a missing block; it does not override an opt-out."""
+
+    def test_legacy_workspace_converges_without_force(self, tmp_path: Path) -> None:
+        """A workspace where management was never established gets a block.
+
+        This is the shape an install by an older version leaves behind: the
+        block writer skipped the absent file, so the manifest records neither
+        management nor an opt-out and the workspace has been unprotected ever
+        since. Repair used to require ``--force``, which nothing told the
+        reader to pass.
+        """
+        from vaultspec_core.core.manifest import (
+            read_manifest_data,
+            write_manifest_data,
+        )
+
+        factory = _installed_workspace(tmp_path)
+        (tmp_path / ".gitignore").write_text("# mine\n", encoding="utf-8")
+        mdata = read_manifest_data(tmp_path)
+        mdata.gitignore_managed = False
+        mdata.gitignore_opted_out = False
+        write_manifest_data(tmp_path, mdata)
+
+        factory.install(provider="all", upgrade=True)
+
+        text = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+        assert "# >>> vaultspec-managed" in text
+        assert "# mine" in text
+
+    def test_deleted_block_stays_deleted_across_an_upgrade(
+        self, tmp_path: Path
+    ) -> None:
+        """Removing the block is an opt-out, and an upgrade honours it."""
+        factory = _installed_workspace(tmp_path)
+        (tmp_path / ".gitignore").write_text("# mine only\n", encoding="utf-8")
+        factory.sync()
+
+        factory.install(provider="all", upgrade=True)
+
+        assert (
+            "vaultspec-managed"
+            not in (tmp_path / ".gitignore").read_text(encoding="utf-8")
+        )
+
+    def test_force_is_the_re_opt_in_gesture(self, tmp_path: Path) -> None:
+        factory = _installed_workspace(tmp_path)
+        (tmp_path / ".gitignore").write_text("# mine only\n", encoding="utf-8")
+        factory.sync()
+
+        factory.install(provider="all", upgrade=True, force=True)
+
+        assert "vaultspec-managed" in (tmp_path / ".gitignore").read_text(
+            encoding="utf-8"
+        )

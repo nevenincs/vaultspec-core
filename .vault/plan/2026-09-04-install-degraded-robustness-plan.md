@@ -9,7 +9,7 @@ related:
   - '[[2026-09-04-install-degraded-robustness-research]]'
 modified: '2026-09-04'
 body_schema: body-v2
-body_hash: 'sha256:f695838b6f3b16e2a03f3fa9e3b4815812344db4456b49b6a7da278d0f404c48'
+body_hash: 'sha256:8af996293071b5d8ff5df4a4746909d6e35769b9e239815deb2e3c8a09155ec2'
 ---
 
 # `install-degraded-robustness` plan
@@ -39,18 +39,20 @@ Makes the managed-block entry set a function of policy rather than of what happe
 
 Removes the absent-file early return so a workspace with no .gitignore is protected by the same locked atomic write that updates an existing one, which is the defect GH issue 399 reports.
 
-- [ ] `P02.S05` - Remove the absent-file early return from ensure_gitignore_block and create the file through the same advisory_lock and atomic_write_bytes path that updates an existing one; `src/vaultspec_core/core/gitignore.py`.
-- [ ] `P02.S06` - Keep the absent-file plus ABSENT-state call a no-op returning False, so uninstall against a workspace with no ignore file does not create one; `src/vaultspec_core/core/gitignore.py`.
-- [ ] `P02.S07` - Update the ensure_gitignore_block docstring to state that it creates the file, and correct the ensure_gitattributes_block docstring that currently cites the divergence; `src/vaultspec_core/core/gitattributes.py`.
-- [ ] `P02.S08` - Add a regression test covering creation on a fresh directory, the ABSENT no-op, and idempotence of a second call; `src/vaultspec_core/tests/cli/test_gitignore.py`.
-- [ ] `P02.S09` - Add an end-to-end test installing into a workspace with no ignore file and asserting the block is complete and byte-identical after a second install; `src/vaultspec_core/tests/cli/test_gitignore.py`.
+- [x] `P02.S05` - Remove the absent-file early return from ensure_gitignore_block and create the file through the same advisory_lock and atomic_write_bytes path that updates an existing one; `src/vaultspec_core/core/gitignore.py`.
+- [x] `P02.S06` - Keep the absent-file plus ABSENT-state call a no-op returning False, so uninstall against a workspace with no ignore file does not create one; `src/vaultspec_core/core/gitignore.py`.
+- [x] `P02.S07` - Update the ensure_gitignore_block docstring to state that it creates the file, and correct the ensure_gitattributes_block docstring that currently cites the divergence; `src/vaultspec_core/core/gitattributes.py`.
+- [x] `P02.S08` - Add a regression test covering creation on a fresh directory, the ABSENT no-op, and idempotence of a second call; `src/vaultspec_core/tests/cli/test_gitignore.py`.
+- [x] `P02.S09` - Add an end-to-end test installing into a workspace with no ignore file and asserting the block is complete and byte-identical after a second install; `src/vaultspec_core/tests/cli/test_lock_sentinel_policy.py`.
+- [x] `P02.S18` - Stop the test workspace factory seeding a gitignore before every install, so the harness no longer supplies the precondition the product now provides; `src/vaultspec_core/tests/cli/workspace_factory.py`.
 
 ### Phase `P03` - reconverge the block on upgrade
 
 Reconciles the managed block on every upgrade rather than only under --force, so a workspace that acquires a .gitignore after installation converges without a flag the reader has no reason to pass.
 
-- [ ] `P03.S10` - Reconcile the managed ignore block unconditionally in _finalize_upgrade_manifest instead of only under the force branch; `src/vaultspec_core/core/provision.py`.
-- [ ] `P03.S11` - Add a regression test asserting a workspace that gains an empty ignore file after install converges on the complete block from a plain upgrade; `src/vaultspec_core/tests/cli/test_gitignore.py`.
+- [x] `P03.S10` - Reconcile the managed ignore block unconditionally in _finalize_upgrade_manifest instead of only under the force branch; `src/vaultspec_core/core/provision.py`.
+- [x] `P03.S11` - Add a regression test asserting a workspace that gains an empty ignore file after install converges on the complete block from a plain upgrade; `src/vaultspec_core/tests/cli/test_lock_sentinel_policy.py`.
+- [x] `P03.S19` - Record a gitignore opt-out explicitly in the manifest so an unconditional upgrade can tell a declined block from one that was never established; `src/vaultspec_core/core/manifest.py`.
 
 ### Phase `P04` - make the unprotected state observable
 

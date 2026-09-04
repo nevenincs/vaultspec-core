@@ -205,7 +205,12 @@ def _reconcile_gitignore_opt_out(target_dir: Path) -> None:
 
     Checks whether the user removed the managed block BEFORE re-creating it.
     If the block is gone but the manifest still says ``managed=True``, the user
-    opted out -- honour that by flipping the flag.
+    opted out -- honour that by flipping the flag and recording the opt-out.
+
+    The opt-out is recorded explicitly rather than inferred from
+    ``gitignore_managed`` being ``False``, which also describes a workspace
+    where management was never established. Upgrades re-establish the second
+    and must leave the first alone.
     """
     mdata = read_manifest_data(target_dir)
     if not mdata.gitignore_managed:
@@ -214,6 +219,7 @@ def _reconcile_gitignore_opt_out(target_dir: Path) -> None:
         ensure_gitignore_block(target_dir, get_recommended_entries(target_dir))
         return
     mdata.gitignore_managed = False
+    mdata.gitignore_opted_out = True
     write_manifest_data(target_dir, mdata)
 
 

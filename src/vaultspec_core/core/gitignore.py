@@ -360,19 +360,33 @@ def ensure_gitignore_block(
     contains the caller-supplied *entries*.  The function is idempotent - it
     returns ``False`` when the file already matches the desired state.
 
+    The file is **created** when it does not exist and *state* is
+    :attr:`~vaultspec_core.core.enums.ManagedState.PRESENT`, through the same
+    locked atomic write that updates an existing one.  Skipping instead was
+    indistinguishable from "nothing needed changing" at the call site, so an
+    install into a workspace without a ``.gitignore`` reported success and left
+    the per-machine artefacts it had just written unignored.
+
     Args:
         target: Workspace root directory containing ``.gitignore``.
         entries: Gitignore patterns to manage inside the block.
         state: Desired state (PRESENT or ABSENT).
 
     Returns:
-        ``True`` if the file was modified, ``False`` otherwise.
+        ``True`` if the file was created or modified, ``False`` otherwise.
     """
     gi_path = target / ".gitignore"
-    if not gi_path.exists():
+    # Removal from a file that is not there is already the requested state.
+    # Checked before the lock so uninstall does not leave a sentinel behind for
+    # a subject it never touched.
+    if state == ManagedState.ABSENT and not gi_path.exists():
         return False
 
     with advisory_lock(gi_path):
+        if not gi_path.exists():
+            _write(gi_path, "\n".join([MARKER_BEGIN, *entries, MARKER_END]) + "\n", b"")
+            return True
+
         raw = gi_path.read_bytes()
         eol = _detect_line_ending(raw)
 

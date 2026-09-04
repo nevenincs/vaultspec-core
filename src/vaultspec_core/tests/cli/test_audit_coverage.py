@@ -184,7 +184,7 @@ class TestGitignoreCreatedAfterInstall:
     ) -> None:
         factory = WorkspaceFactory(tmp_path)
         # Install without .gitignore
-        factory.install(skip_gitignore=True)
+        factory.install()
 
         mdata = read_manifest_data(tmp_path)
         # No gitignore file existed, so gitignore_managed should be False
