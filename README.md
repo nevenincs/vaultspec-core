@@ -202,9 +202,9 @@ vaultspec-core vault check all --fix
 vaultspec-core vault graph --feature search-api
 ```
 
-`vault check` runs twenty validators over the corpus, covering metadata, tags, links,
-dangling references, leftover template placeholders, plan schema, and encoding. Every
-finding carries a fix hint, and `--fix` applies the safe ones:
+`vaultspec-core vault check` runs twenty validators over the corpus, covering metadata,
+tags, links, dangling references, leftover template placeholders, plan schema, and
+encoding. Every finding carries a fix hint, and `--fix` applies the safe ones:
 
 <p align="center">
 <img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/term-check.svg" alt="vaultspec-core vault check all, showing validators with fix hints" width="880" />

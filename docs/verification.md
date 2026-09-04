@@ -207,9 +207,7 @@ vaultspec-core vault check all --json | jq -e '.status != "failed"'
 The exit code carries the same verdict and is simpler to gate on: `0` when
 nothing failed, `1` when something did. Both are keyed on errors rather than on
 findings, which is the part worth knowing before you gate on either. Measured on
-one vault: `Total: 15 warnings` and no errors exits `0` with `"status":
-"unchanged"`, and a single error in the same vault - `Total: 1 error, 20
-warnings` - exits `1` with `"status": "failed"`. The warnings move with the
+one vault: `Total: 15 warnings` and no errors exits `0` with `"status": "unchanged"`, and a single error in the same vault - `Total: 1 error, 20 warnings` - exits `1` with `"status": "failed"`. The warnings move with the
 error rather than staying put, because the document that carries the error
 carries warnings too: measured on an empty vault, scaffolding one research
 document reports `Total: 1 error, 5 warnings`, and deleting that one file
