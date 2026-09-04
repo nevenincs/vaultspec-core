@@ -5,7 +5,7 @@ tags:
 date: '2026-09-04'
 modified: '2026-09-04'
 body_schema: 'body-v2'
-body_hash: 'sha256:fa746c8f4dd21195fb35449b5a7992577906e8847f92004beb492ef81eddad8d'
+body_hash: 'sha256:7506248b0e4f142504e17acea0a8c096d66d5854a05e880855d662c9242ccfdb'
 related:
   - "[[2026-09-04-install-degraded-robustness-plan]]"
   - "[[2026-09-04-install-degraded-robustness-adr]]"
@@ -23,7 +23,7 @@ What this audit covers is the residue: behaviour that changed as a side effect, 
 
 ### unreadable-ignore-file | medium | An unreadable `.gitignore` still reads as benign
 
-`collect_gitignore_state` maps an `OSError` on read to `NO_FILE`, which after this work is the informational reading reserved for a workspace that never asked for management. An installed workspace whose ignore file cannot be read - a permission bit, a lock held by another process - therefore reports `gitignore info no_file` and exits `0`, which is the same shape as the defect this work closed. The collector logs a warning first, so the condition is observable in the log and nowhere in the report. Not touched here because it was outside the plan's Phases and no reproduction was run against it.
+`collect_gitignore_state` maps an `OSError` on read to `NO_FILE`, which after this work is the informational reading reserved for a workspace that never asked for management. An installed workspace whose ignore file cannot be read - a permission bit, a lock held by another process - therefore reports `gitignore info no_file` and exits `0`, which is the same shape as the defect this work closed. The collector logs a warning first, so the condition is observable in the log and nowhere in the report. Repaired in `P07` after this audit named it: an unreadable or undecodable ignore file in an installed workspace now reads as `UNMANAGED`, and the collector's own failure fallback degrades the same way rather than reporting a clean absence. The undecodable case was worse than the permission case this finding described - `read_text` raises `UnicodeDecodeError`, which the collector did not catch at all, so the failure escaped to the outer handler and landed on the same benign reading by a second route.
 
 ### opt-out-inference-window | medium | A deleted block is unrecorded until the next sync
 
@@ -71,7 +71,6 @@ The finding that outlives the repair is the interval. Four gates went red on a p
 
 ## Recommendations
 
-- Map an unreadable `.gitignore` in an installed workspace onto a weighed signal rather than onto `NO_FILE`, so the benign reading means only what it says. Small enough to land without a decision record.
 - Evaluate a first-class opt-out verb for the managed blocks, mirroring `spec precommit disable`, which would record the decision at the moment it is made instead of inferring it on the next sync. This is architecturally significant: a follow-on ADR must decide whether declining a managed block is a per-machine state in the manifest, as it is today, or a committed workspace declaration alongside `hooks.pre_commit`, which would make it travel to teammates.
 - Audit the remaining `WorkspaceFactory` helpers for other preconditions the harness supplies that the product does not, and state in the factory's docstring that seeding a managed artefact before the verb under test writes it is the one thing it must not do.
 - Give `main` a red-CI alarm that reaches someone. The Sentinel workflow already runs and already reports failure; what is missing is the consequence. Four mechanical failures survived a push and a scheduled run without being repaired.

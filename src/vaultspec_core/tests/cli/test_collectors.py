@@ -896,6 +896,26 @@ class TestGitignoreState:
 
         assert collect_gitignore_state(tmp_path) == GitignoreSignal.UNMANAGED
 
+    def test_an_unreadable_file_is_unmanaged_not_absent(self, tmp_path: Path) -> None:
+        """A file whose block cannot be read is not a file whose block is fine.
+
+        The bytes below are not valid UTF-8, so the collector cannot see
+        whether a managed block is there. Reporting the benign absent state
+        would be the same defect one layer up: a condition observed, logged,
+        and then rendered as information.
+        """
+        _write_manifest(tmp_path, ["claude"])
+        (tmp_path / ".gitignore").write_bytes(b"\xff\xfe\xfa")
+
+        assert collect_gitignore_state(tmp_path) == GitignoreSignal.UNMANAGED
+
+    def test_an_unreadable_file_stays_benign_outside_a_workspace(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / ".gitignore").write_bytes(b"\xff\xfe\xfa")
+
+        assert collect_gitignore_state(tmp_path) == GitignoreSignal.NO_FILE
+
     def test_a_recorded_opt_out_keeps_the_benign_reading(self, tmp_path: Path) -> None:
         """Declining management is a decision, not a degraded state."""
         from vaultspec_core.core.manifest import (

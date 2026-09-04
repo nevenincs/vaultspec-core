@@ -5,7 +5,7 @@ tags:
 date: '2026-09-04'
 modified: '2026-09-04'
 body_schema: 'body-v2'
-body_hash: 'sha256:ef5a701d4824a34877bf6747c6a0ae6631261ae9414e81feb16697277f7cf93c'
+body_hash: 'sha256:1dc3759c25eba0c1449160f0fdc47484df7fe3c5736d71a351ff8c736764cee7'
 related:
   - "[[2026-09-04-install-degraded-robustness-plan]]"
 ---
@@ -45,6 +45,9 @@ related:
 - `S16` `M` `docs/verification.md`
 - `S21` `M` `src/vaultspec_core/core/provider_sync.py`
 - `S22` `M` `src/vaultspec_core/tests/cli/test_lock_sentinel_policy.py`
+- `S23` `M` `src/vaultspec_core/core/diagnosis/collectors_config.py`
+- `S24` `M` `src/vaultspec_core/core/diagnosis/diagnosis.py`
+- `S25` `M` `src/vaultspec_core/tests/cli/test_collectors.py`
 
 ## Notes
 

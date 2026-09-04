@@ -9,7 +9,7 @@ related:
   - '[[2026-09-04-install-degraded-robustness-research]]'
 modified: '2026-09-04'
 body_schema: body-v2
-body_hash: 'sha256:ab8dad51fef07fd0740c59ed5566eed478acc41399426062ab9719c30e31722e'
+body_hash: 'sha256:d723652e56a4e573d6492c39b28f2a35f746182208539bd4297c1f3370de2728'
 ---
 
 # `install-degraded-robustness` plan
@@ -77,6 +77,14 @@ The managed git blocks are repository-level, so the opt-out gesture must be reco
 
 - [x] `P06.S21` - Reconcile the gitignore and gitattributes opt-outs in the single-provider sync path as well as the all-providers one; `src/vaultspec_core/core/provider_sync.py`.
 - [x] `P06.S22` - Add a regression test asserting a single-provider sync records a deleted block as an opt-out; `src/vaultspec_core/tests/cli/test_lock_sentinel_policy.py`.
+
+### Phase `P07` - close the diagnosis on conditions it cannot read
+
+An unreadable ignore file, and a collector that failed outright, both fell back to the benign absent reading - the same shape as the defect the diagnosis was just repaired for, one layer up.
+
+- [x] `P07.S23` - Read an unreadable or undecodable ignore file in an installed workspace as unmanaged rather than absent; `src/vaultspec_core/core/diagnosis/collectors_config.py`.
+- [x] `P07.S24` - Degrade the collector's own failure fallback in an installed workspace instead of reporting a clean absence; `src/vaultspec_core/core/diagnosis/diagnosis.py`.
+- [x] `P07.S25` - Add regression tests covering an undecodable ignore file inside and outside an installed workspace; `src/vaultspec_core/tests/cli/test_collectors.py`.
 
 ## Parallelization
 
