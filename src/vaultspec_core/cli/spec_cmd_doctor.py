@@ -297,6 +297,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
         {
             GitignoreSignal.COMPLETE: ("ok", "green"),
             GitignoreSignal.PARTIAL: ("warn", "yellow"),
+            GitignoreSignal.UNMANAGED: ("warn", "yellow"),
             GitignoreSignal.NO_ENTRIES: ("info", "dim"),
             GitignoreSignal.NO_FILE: ("info", "dim"),
             GitignoreSignal.CORRUPTED: ("error", "red"),
@@ -654,6 +655,12 @@ def doctor_exit_code(
         has_warn = True
     if diag.gitignore == GitignoreSignal.CORRUPTED:
         has_error = True
+    # An installed workspace with no managed block, or one that has fallen
+    # behind the recommended set, is not protecting the per-machine artefacts
+    # the install writes. Both used to print and change nothing, so a gate on
+    # this command could not tell the reader their workspace was exposed.
+    if diag.gitignore in (GitignoreSignal.UNMANAGED, GitignoreSignal.PARTIAL):
+        has_warn = True
     if diag.gitattributes == GitattributesSignal.CORRUPTED:
         has_error = True
     if diag.precommit in (

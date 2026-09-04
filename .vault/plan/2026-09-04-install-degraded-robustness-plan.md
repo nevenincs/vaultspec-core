@@ -9,7 +9,7 @@ related:
   - '[[2026-09-04-install-degraded-robustness-research]]'
 modified: '2026-09-04'
 body_schema: body-v2
-body_hash: 'sha256:8af996293071b5d8ff5df4a4746909d6e35769b9e239815deb2e3c8a09155ec2'
+body_hash: 'sha256:d7f0d1e5a77d442b695dc9786574b6c9a5474a68ea766de68e5b98aabfe30d58'
 ---
 
 # `install-degraded-robustness` plan
@@ -58,9 +58,10 @@ Reconciles the managed block on every upgrade rather than only under --force, so
 
 Promotes an installed workspace with an absent or short managed block from an informational line to a weighed degraded signal, so the diagnosis can report the condition it exists to catch.
 
-- [ ] `P04.S12` - Emit a degraded gitignore signal for an installed workspace whose managed block is absent, rather than the informational no-file state; `src/vaultspec_core/core/diagnosis/collectors_config.py`.
-- [ ] `P04.S13` - Weigh the degraded gitignore states in the doctor exit code so a gate on the command reports the unprotected workspace; `src/vaultspec_core/core/diagnosis`.
-- [ ] `P04.S14` - Add a regression test asserting doctor reports the degraded signal and a non-zero exit code for an installed workspace with no managed block; `src/vaultspec_core/tests/cli`.
+- [x] `P04.S12` - Emit a degraded gitignore signal for an installed workspace whose managed block is absent, rather than the informational no-file state; `src/vaultspec_core/core/diagnosis/collectors_config.py`.
+- [x] `P04.S13` - Weigh the degraded gitignore states in the doctor exit code so a gate on the command reports the unprotected workspace; `src/vaultspec_core/core/diagnosis`.
+- [x] `P04.S14` - Add a regression test asserting doctor reports the degraded signal and a non-zero exit code for an installed workspace with no managed block; `src/vaultspec_core/tests/cli/test_doctor.py`.
+- [x] `P04.S20` - Repair an unmanaged block on install through the resolver, and leave sync to read the same absence as the opt-out gesture it already honours; `src/vaultspec_core/core/resolver_repo.py`.
 
 ### Phase `P05` - retire the documentation workaround
 
