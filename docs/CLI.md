@@ -87,7 +87,8 @@ shape regardless of which command produced it:
 
 The `schema` value follows the convention `vaultspec.<dotted-command-path>.v1` - for
 example `vaultspec.sync.v1`, `vaultspec.vault.stats.v1`, or
-`vaultspec.spec.rules.add.v1`. Every schema is currently at version `v1`. Adding new
+`vaultspec.spec.rules.add.v1`. Every schema is at version `v1` except
+`vaultspec.vault.graph.v2`, documented with `vault graph` below. Adding new
 keys under `data` is additive and does not bump the version; renaming or removing a key
 bumps the integer (`v2`, ...). Schema bumps are recorded in the release notes.
 
@@ -1566,7 +1567,9 @@ the frontmatter name. Pick the one whose side you trust.
   the project's own vault records (opt-in; findings are advisory).
 
 `yes` = fully supported, `partial` = only the sub-checks that accept `--fix` apply fixes
-(`all` dispatches to every check), `no` = flag rejected with error. `structure` does not
+(`all` dispatches to every check it runs), `no` = flag rejected with error.
+`all` runs nineteen of the twenty checks above: `code-boundary` is opt-in and
+runs only when named, so an exit-0 `all` makes no claim about it. `structure` does not
 support `--feature` filtering.
 
 Use `vaultspec-core vault repair` when the operator goal is end-to-end recovery with
