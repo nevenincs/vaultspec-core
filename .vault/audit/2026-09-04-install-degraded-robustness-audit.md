@@ -5,7 +5,7 @@ tags:
 date: '2026-09-04'
 modified: '2026-09-04'
 body_schema: 'body-v2'
-body_hash: 'sha256:ff540b3a39326c37a8e60928a24593eb97bcd13e9048e6cd6bd014e0b09f3b5e'
+body_hash: 'sha256:fa746c8f4dd21195fb35449b5a7992577906e8847f92004beb492ef81eddad8d'
 related:
   - "[[2026-09-04-install-degraded-robustness-plan]]"
   - "[[2026-09-04-install-degraded-robustness-adr]]"
@@ -43,19 +43,27 @@ Three Steps (`S18`, `S19`, `S20`) and later `S21`/`S22` were appended into Phase
 
 ### preexisting-mdformat-failures | low | `just lint` fails on three files this work did not touch
 
-`docs/channels.md`, `docs/correctness.md` and `docs/MCP.md` fail the `mdformat --check` step at this branch's base commit `3e268c1c` and still fail. They were left alone rather than reformatted, because a formatting sweep of unrelated documentation does not belong in this change. The lint lane therefore does not pass end to end on this branch; `just lint type` does, and every file this work touched is formatted.
+`docs/channels.md`, `docs/correctness.md` and `docs/MCP.md` fail the `mdformat --check` step at this branch's base commit `3e268c1c` and still fail. Repaired here - see `main-was-red-at-base` below.
 
 ### preexisting-cli-reference-drift | low | The generated CLI reference is out of sync at the base commit
 
-`test_cli_reference_generated` fails three ways on `docs/CLI.md`, which this work does not touch. The differences are paragraph re-wrapping: the checked-in file is wrapped as `mdformat` leaves it and the generator wants its own fill. Both gates are live, so the file cannot satisfy them at once, and regenerating would only move the failure to the `mdformat --check` step. Present at base commit `3e268c1c`; left alone.
+`test_cli_reference_generated` fails three ways on `docs/CLI.md`, which this work does not touch. The differences are paragraph re-wrapping: the checked-in file is wrapped as `mdformat` leaves it and the generator wants its own fill. Both gates are live, so the file cannot satisfy them at once, and regenerating would only move the failure to the `mdformat --check` step. Present at base commit `3e268c1c`. Repaired here - see `main-was-red-at-base` below.
 
 ### preexisting-bare-command-guard | low | Three prose cross-references fail the CLI-language guard
 
-`dev/guards/test_cli_language_contract.py::test_docs_do_not_teach_bare_cli_commands` flags `vault graph` in the CLI reference, `vault sanitize annotations` in the framework manual and `vault check` in the README. All three are prose cross-references rather than runnable snippets, and all three predate this branch. One further offender was introduced here - `install --force` in the framework manual's new opt-out paragraph - and was corrected. The guard's inability to tell a cross-reference from a snippet is a guard-design question, not a documentation defect.
+`dev/guards/test_cli_language_contract.py::test_docs_do_not_teach_bare_cli_commands` flags `vault graph` in the CLI reference, `vault sanitize annotations` in the framework manual and `vault check` in the README. All three are prose cross-references rather than runnable snippets, and all three predate this branch. One further offender was introduced here - `install --force` in the framework manual's new opt-out paragraph - and was corrected. The guard cannot tell a cross-reference from a snippet, which is a guard-design question rather than a documentation defect; the three were given their entry point anyway, because a red gate that everyone learns to ignore is worse than a slightly wordy sentence.
 
 ### preexisting-gemini-binary-test | low | One test fails for want of a local binary
 
 `test_agents_render.py::TestGeminiCliLoadsRenderedAgents::test_all_source_agents_load` fails on `assert gemini_bin is not None`. It is environmental - no `gemini` CLI on this machine - and unrelated to anything here. It was deselected from the full-suite run and is noted so the deselection is not mistaken for a suppression.
+
+### main-was-red-at-base | high | Every gate this branch inherits was already failing
+
+`main` at `3e268c1c` fails its own CI on four counts, none of them introduced here: the markdown format check on three documents, three `test_cli_reference_generated` assertions against a stale `docs/CLI.md`, and the bare-command guard. The scheduled Main CI Sentinel has been failing with them.
+
+They were repaired on this branch rather than filed, because a fix for GH issue 399 that cannot show a green run proves nothing about itself. The repair is mechanical: `just fix markdown` followed by `vaultspec-core spec reference generate`, then the three prose cross-references given their entry point. The two formatters do converge - the earlier reading that they could not was an artefact of running plain `mdformat` without the `--wrap 88` pass the toolchain applies to those five documents, which is a trap for anyone reaching for `mdformat` directly rather than through `just`.
+
+The finding that outlives the repair is the interval. Four gates went red on a push to `main` and stayed red, which is the condition under which a gate stops being read at all - the same failure mode as a check that never runs, arrived at from the other side.
 
 ### harness-supplied-the-precondition | high | The test factory hid the reported defect
 
@@ -66,5 +74,5 @@ Three Steps (`S18`, `S19`, `S20`) and later `S21`/`S22` were appended into Phase
 - Map an unreadable `.gitignore` in an installed workspace onto a weighed signal rather than onto `NO_FILE`, so the benign reading means only what it says. Small enough to land without a decision record.
 - Evaluate a first-class opt-out verb for the managed blocks, mirroring `spec precommit disable`, which would record the decision at the moment it is made instead of inferring it on the next sync. This is architecturally significant: a follow-on ADR must decide whether declining a managed block is a per-machine state in the manifest, as it is today, or a committed workspace declaration alongside `hooks.pre_commit`, which would make it travel to teammates.
 - Audit the remaining `WorkspaceFactory` helpers for other preconditions the harness supplies that the product does not, and state in the factory's docstring that seeding a managed artefact before the verb under test writes it is the one thing it must not do.
-- Reconcile the two formatters that both claim `docs/CLI.md`, so its generation check and the repository's `mdformat` gate can pass together. Until then the repo lane cannot be green and neither failure carries information.
+- Give `main` a red-CI alarm that reaches someone. The Sentinel workflow already runs and already reports failure; what is missing is the consequence. Four mechanical failures survived a push and a scheduled run without being repaired.
 - Decide whether the unconditional upgrade reconciliation should announce itself. It repairs silently today; a one-line advisory naming the file it changed would make the first upgrade after this release explicable to a reader who did not ask for it.
