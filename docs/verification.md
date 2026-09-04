@@ -60,8 +60,12 @@ this command's own, and it is worth pinning down before you gate anything on it,
 because `vault check all` further down this page uses a different one: `0` when
 nothing failed and `1` when something did, with warnings never raising it.
 Measured on one project, before and after its template placeholders were
-filled: with `Total: 3 errors, 14 warnings` the two exit `1` and `2`, and with
-the errors cleared and `Total: 15 warnings` left standing they exit `0` and `1`.
+filled: with `Total: 3 errors, 14 warnings`, `vault check all` exits `1` and
+`doctor` exits `2`; with the errors cleared and `Total: 15 warnings` left
+standing, `vault check all` exits `0` and `doctor` exits `1`. Warnings are the
+whole of the difference, and they are the ordinary state of a freshly scaffolded
+vault, so a gate written on `doctor` fires where one written on
+`vault check all` passes.
 So `doctor` is the stricter of the two, and a warning is a failure to it and not
 to the check suite.
 
