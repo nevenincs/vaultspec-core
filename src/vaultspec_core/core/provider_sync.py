@@ -400,6 +400,14 @@ def sync_provider(
     results = copied.run(_sync_single_provider, narrowed)
 
     if not dry_run:
+        # The managed git blocks are repository-level, not per-provider: a
+        # workspace that deleted one has declined it whichever provider the
+        # reader happened to name. Only the "all" path used to reconcile them,
+        # so `sync claude` left the opt-out unrecorded - and once the diagnosis
+        # weighs an unrecorded absence, that is a warning the reader cannot
+        # clear without knowing which spelling of sync clears it.
+        _reconcile_gitignore_opt_out(ctx.target_dir)
+        _reconcile_gitattributes_opt_out(ctx.target_dir)
         _stamp_last_synced(ctx.target_dir, [tool_type.value for tool_type in requested])
 
     return results

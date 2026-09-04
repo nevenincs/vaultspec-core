@@ -9,7 +9,7 @@ related:
   - '[[2026-09-04-install-degraded-robustness-research]]'
 modified: '2026-09-04'
 body_schema: body-v2
-body_hash: 'sha256:ff61db244643462d2b5f3f60f9bd492d25465d2ae49eb876a49cae1d4497a5b1'
+body_hash: 'sha256:ab8dad51fef07fd0740c59ed5566eed478acc41399426062ab9719c30e31722e'
 ---
 
 # `install-degraded-robustness` plan
@@ -70,6 +70,13 @@ Removes the authored passages that stand in for this behaviour - the file-creati
 - [x] `P05.S15` - Rewrite the framework manual passage that tells the reader the install does not create the ignore file and to install again after making one; `docs/framework.md`.
 - [x] `P05.S16` - Update the weighed-lines table and the worked example in the verification page that document the gitignore partial state as unweighed; `docs/verification.md`.
 - [x] `P05.S17` - Reconcile the remaining gitignore claims in the CLI reference and the README against the changed behaviour; `docs/CLI.md`.
+
+### Phase `P06` - reconcile the managed blocks on any sync
+
+The managed git blocks are repository-level, so the opt-out gesture must be recorded whichever provider a sync names; only the all-providers path did it, which becomes visible once the diagnosis weighs an unrecorded absence.
+
+- [x] `P06.S21` - Reconcile the gitignore and gitattributes opt-outs in the single-provider sync path as well as the all-providers one; `src/vaultspec_core/core/provider_sync.py`.
+- [x] `P06.S22` - Add a regression test asserting a single-provider sync records a deleted block as an opt-out; `src/vaultspec_core/tests/cli/test_lock_sentinel_policy.py`.
 
 ## Parallelization
 

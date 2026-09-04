@@ -386,3 +386,26 @@ class TestUpgradeReconvergence:
         assert "vaultspec-managed" in (tmp_path / ".gitignore").read_text(
             encoding="utf-8"
         )
+
+
+@pytest.mark.integration
+class TestOptOutIsRecordedByEitherSync:
+    """The managed blocks are repository-level, not per-provider.
+
+    Only `sync all` used to reconcile them, so `sync claude` left a deleted
+    block unrecorded - and with the diagnosis weighing an unrecorded absence,
+    that is a warning the reader cannot clear without knowing which spelling
+    of sync clears it.
+    """
+
+    def test_single_provider_sync_records_the_opt_out(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.manifest import read_manifest_data
+
+        factory = _installed_workspace(tmp_path)
+        (tmp_path / ".gitignore").write_text("# mine only\n", encoding="utf-8")
+
+        factory.sync(provider="claude")
+
+        mdata = read_manifest_data(tmp_path)
+        assert mdata.gitignore_opted_out is True
+        assert mdata.gitignore_managed is False
