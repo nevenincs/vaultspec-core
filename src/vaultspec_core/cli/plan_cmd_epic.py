@@ -28,6 +28,7 @@ epic_app.add_typer(epic_intent_app, name="intent")
 
 
 @epic_intent_app.command("show")
+@render_user_errors
 def cmd_epic_intent_show(
     path: PlanPathArg,
 ) -> None:
