@@ -250,6 +250,11 @@ That is correct. Scaffolded documents are not finished documents: every one stil
 carries template annotations and unreplaced placeholders, because nobody has written the
 prose yet.
 
+Both blocks above and below are the report's last line. The full run prints a
+status row for every check first - on one vault that is eighty-eight lines and
+forty-one rows, since a check with several findings prints several - and the
+counts are what the rest of this section reasons about.
+
 `--fix` clears what is mechanical:
 
 ```
