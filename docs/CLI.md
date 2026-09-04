@@ -2819,4 +2819,4 @@ overridden by the `--target` flag.
 - [MCP reference](./MCP.md) - MCP server tools, setup, and configuration.
 
 For bug reports and feature requests, open an issue on the
-[vaultspec-core issue tracker](https://github.com/wgergely/vaultspec-core/issues).
+[vaultspec-core issue tracker](https://github.com/nevenincs/vaultspec-core/issues).
