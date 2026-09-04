@@ -5,9 +5,16 @@ For what vaultspec-core is and how to install it, see the [README](../README.md)
 
 Two directories matter. `.vault/` holds the documents your features produce, and
 `.vaultspec/` holds the framework policy: the rules, skills, and agent definitions your
-coding agent reads. Commit both. The managed block in `.gitignore` excludes only the
-per-machine by-products underneath them, such as `.vault/data/` and `.vault/logs/`, so
-your teammates get the documents and the policy but not your local state. That block is
+coding agent reads. Commit both. The managed block in `.gitignore` excludes the
+per-machine by-products, so your teammates get the documents and the policy but not your
+local state. Measured on a fresh install, that is `.vault/data/`, `.vault/logs/`, the
+Obsidian and trash directories beside them, and inside `.vaultspec/` the
+`_snapshots/` copy of the builtin rules, `providers.json`, `mcp-ownership.json` and
+every `*.lock` - plus the lock files the install leaves at the repository root for
+`.mcp.json`, `.gitignore`, `.pre-commit-config.yaml` and the two provider configs. What
+it deliberately does not exclude is `.vaultspec/workspace.json`: the install mode is
+recorded there and has to travel with the project, or your teammates' commands resolve
+by a different route than yours. That block is
 written into a `.gitignore` the project already has; the install does not create the
 file, so a project started from an empty directory has nothing ignored until you create
 one and install again. `vaultspec-core doctor` reports `gitignore info no_file` when
