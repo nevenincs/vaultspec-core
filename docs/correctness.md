@@ -112,8 +112,11 @@ on.
 
 Installing vaultspec seeds a system prompt into three of the four providers it manages.
 Claude and Codex read it as a rule file, `vaultspec-system.builtin.md`, alongside the
-others; Gemini reads it as `.gemini/SYSTEM.md`. Antigravity gets rules, skills, and
-workflows but no system prompt, so the mandates below are not in front of it. Measured on
+others; Gemini reads it as `.gemini/SYSTEM.md`. Antigravity gets rules and skills but no
+system prompt, so the mandates below are not in front of it. It also gets a
+`workflows` directory, which the installer creates and nothing fills: the
+harness ships no workflows, so that folder is there for the provider's own
+convention rather than for anything of ours. Measured on
 a fresh install: the text appears under `.claude/`, `.codex/`, and `.gemini/`, and nowhere
 under `.agents/`. Two of its mandates are about correctness specifically.
 
