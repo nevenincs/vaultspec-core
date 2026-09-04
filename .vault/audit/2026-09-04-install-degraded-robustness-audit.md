@@ -5,7 +5,7 @@ tags:
 date: '2026-09-04'
 modified: '2026-09-04'
 body_schema: 'body-v2'
-body_hash: 'sha256:1d4abedbdc41c625a32bc389be21e45e5894c0e3d57a4a2b742e793cf6a53576'
+body_hash: 'sha256:ff540b3a39326c37a8e60928a24593eb97bcd13e9048e6cd6bd014e0b09f3b5e'
 related:
   - "[[2026-09-04-install-degraded-robustness-plan]]"
   - "[[2026-09-04-install-degraded-robustness-adr]]"
@@ -45,6 +45,14 @@ Three Steps (`S18`, `S19`, `S20`) and later `S21`/`S22` were appended into Phase
 
 `docs/channels.md`, `docs/correctness.md` and `docs/MCP.md` fail the `mdformat --check` step at this branch's base commit `3e268c1c` and still fail. They were left alone rather than reformatted, because a formatting sweep of unrelated documentation does not belong in this change. The lint lane therefore does not pass end to end on this branch; `just lint type` does, and every file this work touched is formatted.
 
+### preexisting-cli-reference-drift | low | The generated CLI reference is out of sync at the base commit
+
+`test_cli_reference_generated` fails three ways on `docs/CLI.md`, which this work does not touch. The differences are paragraph re-wrapping: the checked-in file is wrapped as `mdformat` leaves it and the generator wants its own fill. Both gates are live, so the file cannot satisfy them at once, and regenerating would only move the failure to the `mdformat --check` step. Present at base commit `3e268c1c`; left alone.
+
+### preexisting-bare-command-guard | low | Three prose cross-references fail the CLI-language guard
+
+`dev/guards/test_cli_language_contract.py::test_docs_do_not_teach_bare_cli_commands` flags `vault graph` in the CLI reference, `vault sanitize annotations` in the framework manual and `vault check` in the README. All three are prose cross-references rather than runnable snippets, and all three predate this branch. One further offender was introduced here - `install --force` in the framework manual's new opt-out paragraph - and was corrected. The guard's inability to tell a cross-reference from a snippet is a guard-design question, not a documentation defect.
+
 ### preexisting-gemini-binary-test | low | One test fails for want of a local binary
 
 `test_agents_render.py::TestGeminiCliLoadsRenderedAgents::test_all_source_agents_load` fails on `assert gemini_bin is not None`. It is environmental - no `gemini` CLI on this machine - and unrelated to anything here. It was deselected from the full-suite run and is noted so the deselection is not mistaken for a suppression.
@@ -58,4 +66,5 @@ Three Steps (`S18`, `S19`, `S20`) and later `S21`/`S22` were appended into Phase
 - Map an unreadable `.gitignore` in an installed workspace onto a weighed signal rather than onto `NO_FILE`, so the benign reading means only what it says. Small enough to land without a decision record.
 - Evaluate a first-class opt-out verb for the managed blocks, mirroring `spec precommit disable`, which would record the decision at the moment it is made instead of inferring it on the next sync. This is architecturally significant: a follow-on ADR must decide whether declining a managed block is a per-machine state in the manifest, as it is today, or a committed workspace declaration alongside `hooks.pre_commit`, which would make it travel to teammates.
 - Audit the remaining `WorkspaceFactory` helpers for other preconditions the harness supplies that the product does not, and state in the factory's docstring that seeding a managed artefact before the verb under test writes it is the one thing it must not do.
+- Reconcile the two formatters that both claim `docs/CLI.md`, so its generation check and the repository's `mdformat` gate can pass together. Until then the repo lane cannot be green and neither failure carries information.
 - Decide whether the unconditional upgrade reconciliation should announce itself. It repairs silently today; a one-line advisory naming the file it changed would make the first upgrade after this release explicable to a reader who did not ask for it.

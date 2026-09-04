@@ -177,28 +177,34 @@ class TestSelfHealAfterDeletion:
 
 
 class TestGitignoreCreatedAfterInstall:
-    """R2-U22: install (no .gitignore) -> create .gitignore -> sync."""
+    """R2-U22: install into a workspace with no .gitignore, then sync.
 
-    def test_sync_adds_block_when_gitignore_created_after_install(
-        self, tmp_path: Path
-    ) -> None:
+    This case used to assert the workspace stayed unmanaged, on the reasoning
+    that an absent file at install time meant the reader had opted out. That
+    conflated declining management with never having been offered it, and it
+    is the state GH issue 399 reports: the install claimed the block kept
+    runtime by-products local while writing nothing at all.
+    """
+
+    def test_install_manages_the_file_it_creates(self, tmp_path: Path) -> None:
         factory = WorkspaceFactory(tmp_path)
-        # Install without .gitignore
         factory.install()
 
         mdata = read_manifest_data(tmp_path)
-        # No gitignore file existed, so gitignore_managed should be False
-        assert mdata.gitignore_managed is False
+        assert mdata.gitignore_managed is True
+        assert mdata.gitignore_opted_out is False
+        assert factory.gitignore_has_block()
 
-        # User creates .gitignore after install
+    def test_sync_leaves_a_deleted_block_deleted(self, tmp_path: Path) -> None:
+        """Deleting the block is the opt-out gesture, and sync records it."""
+        factory = WorkspaceFactory(tmp_path)
+        factory.install()
         factory.create_gitignore("# user project ignores\n")
 
-        # Run sync -- managed=False means sync should NOT add the block
         factory.sync()
 
-        # Because gitignore_managed was False, sync should respect opt-out
-        # The block should NOT have been added
         assert not factory.gitignore_has_block()
+        assert read_manifest_data(tmp_path).gitignore_opted_out is True
 
 
 # ---------------------------------------------------------------------------

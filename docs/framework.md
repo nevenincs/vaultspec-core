@@ -19,8 +19,8 @@ by a different route than yours. The install writes that block into the project'
 empty directory is covered by the same single command.
 
 Deleting the block is how you decline it. The next `vaultspec-core sync` reads the
-absence as your decision, records it, and stops re-adding the block; `install --force`
-is the gesture that opts back in. Until that decision is recorded,
+absence as your decision, records it, and stops re-adding the block;
+`vaultspec-core install --force` is the gesture that opts back in. Until that decision is recorded,
 `vaultspec-core doctor` reports `gitignore warn unmanaged` for an installed project
 carrying no block, and that warning does raise its exit code.
 
