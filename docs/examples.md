@@ -305,5 +305,13 @@ not when the files are created.
 
 ## Where to go next
 
-[Verifying a workspace and a vault](./verification.md) covers every check this page ran
-and what each one proves.
+This run stops where the vault is written, which is one step short of where a real one
+stops. Nothing above says what to stage, and nothing installs a gate:
+
+- [Verifying a workspace and a vault](./verification.md) covers every check this page ran
+  and what each one proves.
+- [The framework manual](./framework.md) opens with what to commit and what the managed
+  `.gitignore` block keeps out, including the one file it deliberately does not exclude.
+- [Correctness](./correctness.md) is where the gate lives: the install writes
+  `.pre-commit-config.yaml` and no git hook, so nothing checks a commit until you install
+  the `pre-commit` tool and run `pre-commit install`.
