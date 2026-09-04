@@ -198,7 +198,12 @@ nothing failed, `1` when something did. Both are keyed on errors rather than on
 findings, which is the part worth knowing before you gate on either. Measured on
 one vault: `Total: 15 warnings` and no errors exits `0` with `"status":
 "unchanged"`, and a single error in the same vault - `Total: 1 error, 20
-warnings` - exits `1` with `"status": "failed"`. A passing gate is not a clean
+warnings` - exits `1` with `"status": "failed"`. The warnings move with the
+error rather than staying put, because the document that carries the error
+carries warnings too: measured on an empty vault, scaffolding one research
+document reports `Total: 1 error, 5 warnings`, and deleting that one file
+returns `All checks passed.` So read the exit code and the error count; the
+warning totals either side of a change are not a subtraction. A passing gate is not a clean
 report, so the summary line is worth reading either way. Diagnostic logging stays
 on stderr, so stdout is the envelope and nothing else.
 
