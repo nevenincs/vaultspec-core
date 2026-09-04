@@ -75,7 +75,7 @@ diagnosis prints several that never do:
 | Printed line                        | Weighed                       |
 | ----------------------------------- | ----------------------------- |
 | `framework`                         | Yes                           |
-| `gitignore`                         | Yes                           |
+| `gitignore`                         | Not in the `partial` state    |
 | `gitattributes`                     | Yes                           |
 | `builtins`                          | Yes                           |
 | `migration`                         | Yes                           |
@@ -95,7 +95,14 @@ So a run can print `warn` and still exit `0`:
   claude warn dir: mixed
 ```
 
-Both of those are unweighed. `mixed` means the provider directory holds extra files
+`gitignore warn partial` belongs with them, which is why the table qualifies that
+row. Measured on a project where the block was written by a refused install and
+so came out two entries short: the diagnosis printed `gitignore warn partial`
+alongside the unweighed `process registry warn`, and the command exited `0`.
+Repairing it with `install --force` is worth doing, but a gate on this exit code
+will not tell you to.
+
+Both of the lines above are unweighed. `mixed` means the provider directory holds extra files
 vaultspec does not own, which is benign and deliberately excluded so it cannot block a
 commit through the bundled hook. A provider directory that is missing, empty, or partial
 is weighed and does raise the code.
