@@ -25,7 +25,6 @@ import pytest
 from vaultspec_core.core.gitignore import (
     get_recommended_entries,
     managed_lock_candidates,
-    managed_lock_paths,
     prune_orphaned_lock_sentinels,
 )
 from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
@@ -97,7 +96,6 @@ class TestGeneratedSentinelsMatchPolicy:
         }
 
         assert expected, "install should enrol at least one in-repo MCP target"
-        assert expected <= set(managed_lock_paths(tmp_path))
         assert expected <= set(managed_lock_candidates(tmp_path))
 
     def test_every_generated_sentinel_is_covered_by_the_policy(
@@ -245,3 +243,41 @@ class TestCleanRepositoryAfterInstall:
         assert not (tmp_path / ".pre-commit-config.yaml.lock").exists()
         status = _run_git(tmp_path, "status", "--porcelain").stdout
         assert ".lock" not in status, f"lock noise after repeat install:\n{status}"
+
+
+@pytest.mark.unit
+class TestPolicyIsIndependentOfDiskState:
+    """The entry set is derived from policy, not from a disk snapshot.
+
+    ``get_recommended_entries`` is called BEFORE the writes that create the
+    subjects it names, most visibly by ``ensure_gitignore_block``, which locks
+    ``.gitignore`` and so produces ``.gitignore.lock`` moments after the block
+    listing it has been computed.  A presence filter over the lock subjects
+    therefore made block completeness a function of call ordering: the first
+    install wrote a block short of what the second one produced.
+    """
+
+    def test_entries_do_not_change_when_lock_subjects_are_absent(
+        self, tmp_path: Path
+    ) -> None:
+        """Removing every locked subject leaves the recommended set unchanged."""
+        _installed_workspace(tmp_path)
+
+        with_subjects = get_recommended_entries(tmp_path)
+
+        for lock in managed_lock_candidates(tmp_path):
+            subject = tmp_path / lock.removesuffix(".lock")
+            subject.unlink(missing_ok=True)
+            (tmp_path / lock).unlink(missing_ok=True)
+
+        assert get_recommended_entries(tmp_path) == with_subjects
+
+    def test_gitignore_sentinel_is_listed_before_its_subject_exists(
+        self, tmp_path: Path
+    ) -> None:
+        """The block covers its own lock sentinel on a workspace with no ignore file."""
+        _installed_workspace(tmp_path)
+        (tmp_path / ".gitignore").unlink(missing_ok=True)
+        (tmp_path / ".gitignore.lock").unlink(missing_ok=True)
+
+        assert "/.gitignore.lock" in get_recommended_entries(tmp_path)

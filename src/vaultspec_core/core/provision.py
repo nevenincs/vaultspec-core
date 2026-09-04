@@ -744,9 +744,9 @@ def install_run(
     )
 
     # Retire sentinels whose subject is gone (e.g. .pre-commit-config.yaml.lock
-    # after a checkout migrates to prek.toml) before the ignore entries are
-    # computed: managed_lock_paths only covers sentinels with a live subject, so
-    # an orphan left in place would stay permanently visible in git status.
+    # after a checkout migrates to prek.toml).  The managed block ignores them
+    # either way; deleting the orphan keeps the working tree honest about which
+    # locks this workspace still takes.
     for orphan in prune_orphaned_lock_sentinels(path):
         logger.info("Removed orphaned lock sentinel %s", orphan)
 

@@ -78,7 +78,7 @@ _UNTRACK_PREFIXES: tuple[str, ...] = (
 )
 
 # Advisory-lock sentinels we create ourselves are enumerated per workspace by
-# :func:`~vaultspec_core.core.gitignore.managed_lock_paths` - the same
+# :func:`~vaultspec_core.core.gitignore.managed_lock_candidates` - the same
 # derivation the managed-ignore policy consumes, so the ownership gate and the
 # ignore block can never drift apart.  The set is deliberately path-exact (not
 # basename-based) so that unrelated lockfiles (``uv.lock``, ``Cargo.lock``,

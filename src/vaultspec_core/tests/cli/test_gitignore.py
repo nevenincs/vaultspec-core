@@ -404,13 +404,20 @@ class TestRecommendedEntries:
         assert "/.mcp.json.lock" in entries
         assert "/.pre-commit-config.yaml.lock" in entries
 
-    def test_root_lock_sentinel_skipped_when_companion_absent(
+    def test_root_lock_sentinel_listed_when_companion_absent(
         self, tmp_path: Path
     ) -> None:
+        """A sentinel is listed before its subject exists.
+
+        The block is computed before the writes that create these subjects -
+        ``ensure_gitignore_block`` locks ``.gitignore`` moments after being
+        handed the entry list naming ``.gitignore.lock``. Filtering on presence
+        made the first install write a block short of the second one's.
+        """
         (tmp_path / ".vaultspec").mkdir()
 
         entries = get_recommended_entries(tmp_path)
 
-        assert "/.gitignore.lock" not in entries
-        assert "/.mcp.json.lock" not in entries
-        assert "/.pre-commit-config.yaml.lock" not in entries
+        assert "/.gitignore.lock" in entries
+        assert "/.mcp.json.lock" in entries
+        assert "/.pre-commit-config.yaml.lock" in entries

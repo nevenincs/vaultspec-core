@@ -9,7 +9,7 @@ related:
   - '[[2026-09-04-install-degraded-robustness-research]]'
 modified: '2026-09-04'
 body_schema: body-v2
-body_hash: 'sha256:1570780a8d012a6528d3701d5c873437502f870de3693f8597f3f230a9b3971d'
+body_hash: 'sha256:f695838b6f3b16e2a03f3fa9e3b4815812344db4456b49b6a7da278d0f404c48'
 ---
 
 # `install-degraded-robustness` plan
@@ -30,10 +30,10 @@ Phase `P05` closes the loop on the filed report: the documentation workaround th
 
 Makes the managed-block entry set a function of policy rather than of what happens to exist on disk when it is computed, closing the R2 ordering exposure before any Phase can trip over it.
 
-- [ ] `P01.S01` - Point the sentinel enumeration in get_recommended_entries at managed_lock_candidates so the entry set no longer depends on which locked subjects exist at call time; `src/vaultspec_core/core/gitignore.py`.
-- [ ] `P01.S02` - Rewrite the enumeration comment to state the ownership-surface rule and retire the companion-less-lock-path carve-out it currently justifies; `src/vaultspec_core/core/gitignore.py`.
-- [ ] `P01.S03` - Retire managed_lock_paths once no production caller remains, and update the cross-references in managed_lock_candidates, prune_orphaned_lock_sentinels and git_artifacts that name it; `src/vaultspec_core/core/gitignore.py`.
-- [ ] `P01.S04` - Add a regression test asserting the recommended entry set is identical with and without the locked subjects present on disk; `src/vaultspec_core/tests/cli/test_lock_sentinel_policy.py`.
+- [x] `P01.S01` - Point the sentinel enumeration in get_recommended_entries at managed_lock_candidates so the entry set no longer depends on which locked subjects exist at call time; `src/vaultspec_core/core/gitignore.py`.
+- [x] `P01.S02` - Rewrite the enumeration comment to state the ownership-surface rule and retire the companion-less-lock-path carve-out it currently justifies; `src/vaultspec_core/core/gitignore.py`.
+- [x] `P01.S03` - Retire managed_lock_paths once no production caller remains, and update the cross-references in managed_lock_candidates, prune_orphaned_lock_sentinels and git_artifacts that name it; `src/vaultspec_core/core/gitignore.py`.
+- [x] `P01.S04` - Add a regression test asserting the recommended entry set is identical with and without the locked subjects present on disk; `src/vaultspec_core/tests/cli/test_lock_sentinel_policy.py`.
 
 ### Phase `P02` - create the ignore file when it is absent
 
