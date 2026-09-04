@@ -189,8 +189,12 @@ scaffolds the document:
 | `{document_list}` | `vaultspec-core vault feature index` |
 
 If one of these survives into a committed document, the document was created by hand
-rather than by the command that owns it. The `placeholders` check finds any `{...}` left
-behind.
+rather than by the command that owns it. The `placeholders` check finds them, and the
+author-replaced ones above, because it matches the tokens the templates ship rather than
+every pair of braces: `{topic}` left in a body is an error and exits `1`, while a
+`{not_a_template_token}` of your own is reported clean. That is the check doing its job -
+it looks for scaffolding you forgot to fill - but it is not a general brace scan, which
+is worth knowing before relying on it to find something else.
 
 ## Filenames
 
