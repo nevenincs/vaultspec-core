@@ -55,8 +55,17 @@ The second half is the vault check suite, one line per check.
 
 ### Which printed lines change the exit code
 
-The exit codes are `0` for clean, `1` for warnings, and `2` for errors. Not every
-printed line feeds that code. A line is *weighed* if it can raise the exit code, and the
+`doctor` exits `0` for clean, `1` for warnings, and `2` for errors. That scale is
+this command's own, and it is worth pinning down before you gate anything on it,
+because `vault check all` further down this page uses a different one: `0` when
+nothing failed and `1` when something did, with warnings never raising it.
+Measured on one project, before and after its template placeholders were
+filled: with `Total: 3 errors, 14 warnings` the two exit `1` and `2`, and with
+the errors cleared and `Total: 15 warnings` left standing they exit `0` and `1`.
+So `doctor` is the stricter of the two, and a warning is a failure to it and not
+to the check suite.
+
+Not every printed line feeds that code. A line is *weighed* if it can raise the exit code, and the
 diagnosis prints several that never do:
 
 | Printed line                        | Weighed                       |
