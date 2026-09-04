@@ -14,11 +14,15 @@ every `*.lock` - plus the lock files the install leaves at the repository root f
 `.mcp.json`, `.gitignore`, `.pre-commit-config.yaml` and the two provider configs. What
 it deliberately does not exclude is `.vaultspec/workspace.json`: the install mode is
 recorded there and has to travel with the project, or your teammates' commands resolve
-by a different route than yours. That block is
-written into a `.gitignore` the project already has; the install does not create the
-file, so a project started from an empty directory has nothing ignored until you create
-one and install again. `vaultspec-core doctor` reports `gitignore info no_file` when
-that is the case.
+by a different route than yours. The install writes that block into the project's
+`.gitignore`, and creates the file when there is not one, so a project started from an
+empty directory is covered by the same single command.
+
+Deleting the block is how you decline it. The next `vaultspec-core sync` reads the
+absence as your decision, records it, and stops re-adding the block; `install --force`
+is the gesture that opts back in. Until that decision is recorded,
+`vaultspec-core doctor` reports `gitignore warn unmanaged` for an installed project
+carrying no block, and that warning does raise its exit code.
 
 ## How a feature flows into the vault
 

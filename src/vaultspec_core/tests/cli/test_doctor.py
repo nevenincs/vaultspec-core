@@ -508,9 +508,7 @@ class TestUnprotectedWorkspaceIsWeighed:
         assert "unmanaged" in result.output
         assert result.exit_code == 1
 
-    def test_a_recorded_opt_out_does_not_raise_the_code(
-        self, tmp_path: Path
-    ) -> None:
+    def test_a_recorded_opt_out_does_not_raise_the_code(self, tmp_path: Path) -> None:
         from vaultspec_core.core.manifest import (
             read_manifest_data,
             write_manifest_data,

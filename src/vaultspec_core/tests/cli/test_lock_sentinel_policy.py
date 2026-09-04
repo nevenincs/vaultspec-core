@@ -305,9 +305,7 @@ class TestInstallProtectsAWorkspaceWithNothing:
         for entry in get_recommended_entries(tmp_path):
             assert entry in text.splitlines()
 
-    def test_first_install_writes_what_a_second_one_would(
-        self, tmp_path: Path
-    ) -> None:
+    def test_first_install_writes_what_a_second_one_would(self, tmp_path: Path) -> None:
         """The block does not converge over two runs; it is right the first time."""
         factory = _installed_workspace(tmp_path)
         first = (tmp_path / ".gitignore").read_bytes()
@@ -374,9 +372,8 @@ class TestUpgradeReconvergence:
 
         factory.install(provider="all", upgrade=True)
 
-        assert (
-            "vaultspec-managed"
-            not in (tmp_path / ".gitignore").read_text(encoding="utf-8")
+        assert "vaultspec-managed" not in (tmp_path / ".gitignore").read_text(
+            encoding="utf-8"
         )
 
     def test_force_is_the_re_opt_in_gesture(self, tmp_path: Path) -> None:

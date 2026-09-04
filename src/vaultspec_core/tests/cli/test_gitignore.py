@@ -92,17 +92,13 @@ class TestBlockInsertion:
         assert changed is False
         assert _read_gi(tmp_path) == first
 
-    def test_absent_gitignore_is_not_created_for_removal(
-        self, tmp_path: Path
-    ) -> None:
+    def test_absent_gitignore_is_not_created_for_removal(self, tmp_path: Path) -> None:
         """Uninstall against a workspace with no ignore file writes nothing.
 
         Not the file, and not the advisory-lock sentinel beside it - the
         absence check runs before the lock is taken.
         """
-        changed = ensure_gitignore_block(
-            tmp_path, ENTRIES, state=ManagedState.ABSENT
-        )
+        changed = ensure_gitignore_block(tmp_path, ENTRIES, state=ManagedState.ABSENT)
 
         assert changed is False
         assert not _gi(tmp_path).exists()

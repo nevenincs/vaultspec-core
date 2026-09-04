@@ -896,9 +896,7 @@ class TestGitignoreState:
 
         assert collect_gitignore_state(tmp_path) == GitignoreSignal.UNMANAGED
 
-    def test_a_recorded_opt_out_keeps_the_benign_reading(
-        self, tmp_path: Path
-    ) -> None:
+    def test_a_recorded_opt_out_keeps_the_benign_reading(self, tmp_path: Path) -> None:
         """Declining management is a decision, not a degraded state."""
         from vaultspec_core.core.manifest import (
             read_manifest_data,

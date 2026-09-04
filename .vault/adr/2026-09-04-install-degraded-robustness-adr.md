@@ -9,6 +9,7 @@ body_hash: 'sha256:ec24c2a18caaa57deb12bd18147f83b3e9b69afaffe707a2389bcd796681c
 related:
   - '[[2026-09-04-install-degraded-robustness-research]]'
 ---
+
 # `install-degraded-robustness` adr: `An absent managed subject is created, not a reason to skip` | (**status:** `accepted`)
 
 ## Problem Statement

@@ -8,6 +8,7 @@ body_schema: 'body-v2'
 body_hash: 'sha256:8b3551d3bd64201669f40c2b2949d609c595835915b1495b0ab7edc2c20cc3e1'
 related: []
 ---
+
 # `install-degraded-robustness` research: `Install and provisioning robustness on degraded workspaces`
 
 GH issue 399 reports that `vaultspec-core install` writes its managed ignore block only into a `.gitignore` that already exists, and does nothing when the file is absent. The report reproduces on `main`. The question this research grounds is not "should the file be created" but "what is the provisioning layer's contract when a managed subject is missing, and how many places currently answer that question differently".

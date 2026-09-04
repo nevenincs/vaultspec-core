@@ -9,7 +9,7 @@ related:
   - '[[2026-09-04-install-degraded-robustness-research]]'
 modified: '2026-09-04'
 body_schema: body-v2
-body_hash: 'sha256:d7f0d1e5a77d442b695dc9786574b6c9a5474a68ea766de68e5b98aabfe30d58'
+body_hash: 'sha256:ff61db244643462d2b5f3f60f9bd492d25465d2ae49eb876a49cae1d4497a5b1'
 ---
 
 # `install-degraded-robustness` plan
@@ -50,7 +50,7 @@ Removes the absent-file early return so a workspace with no .gitignore is protec
 
 Reconciles the managed block on every upgrade rather than only under --force, so a workspace that acquires a .gitignore after installation converges without a flag the reader has no reason to pass.
 
-- [x] `P03.S10` - Reconcile the managed ignore block unconditionally in _finalize_upgrade_manifest instead of only under the force branch; `src/vaultspec_core/core/provision.py`.
+- [x] `P03.S10` - Reconcile the managed ignore block unconditionally in \_finalize_upgrade_manifest instead of only under the force branch; `src/vaultspec_core/core/provision.py`.
 - [x] `P03.S11` - Add a regression test asserting a workspace that gains an empty ignore file after install converges on the complete block from a plain upgrade; `src/vaultspec_core/tests/cli/test_lock_sentinel_policy.py`.
 - [x] `P03.S19` - Record a gitignore opt-out explicitly in the manifest so an unconditional upgrade can tell a declined block from one that was never established; `src/vaultspec_core/core/manifest.py`.
 
@@ -67,9 +67,9 @@ Promotes an installed workspace with an absent or short managed block from an in
 
 Removes the authored passages that stand in for this behaviour - the file-creation caveat, the unweighed-partial qualification, and the repair walkthrough - now that the behaviour they describe has changed.
 
-- [ ] `P05.S15` - Rewrite the framework manual passage that tells the reader the install does not create the ignore file and to install again after making one; `docs/framework.md`.
-- [ ] `P05.S16` - Update the weighed-lines table and the worked example in the verification page that document the gitignore partial state as unweighed; `docs/verification.md`.
-- [ ] `P05.S17` - Reconcile the remaining gitignore claims in the CLI reference and the README against the changed behaviour; `docs/CLI.md`.
+- [x] `P05.S15` - Rewrite the framework manual passage that tells the reader the install does not create the ignore file and to install again after making one; `docs/framework.md`.
+- [x] `P05.S16` - Update the weighed-lines table and the worked example in the verification page that document the gitignore partial state as unweighed; `docs/verification.md`.
+- [x] `P05.S17` - Reconcile the remaining gitignore claims in the CLI reference and the README against the changed behaviour; `docs/CLI.md`.
 
 ## Parallelization
 
