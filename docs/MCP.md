@@ -110,8 +110,9 @@ The canonical definition records the vaultspec package and module. vaultspec ren
 launch command for the active install mode:
 
 - Tool mode, the default, uses `uvx --from ...` without adding vaultspec to the
-  project's dependencies. A companion may declare a dedicated tool requirement such as
-  `vaultspec-rag[mcp]`.
+  project's dependencies. A companion may declare a dedicated tool requirement,
+  extras included: search renders `vaultspec-rag[gpu,mcp]`, which is what its
+  installer writes whichever extras you installed it with.
 - Dependency mode uses `uv run --no-sync ...` against the project's environment and
   ships in built distributions.
 - Development mode also uses `uv run --no-sync ...`, but records a development-only
