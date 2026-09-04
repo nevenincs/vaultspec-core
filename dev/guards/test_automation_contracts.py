@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 import tomllib
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import TypedDict, cast, get_args
 
 import pytest
 import yaml
@@ -21,6 +21,11 @@ pytestmark = [pytest.mark.repo]
 
 #: Repository root (``dev/guards/`` -> ``dev/`` -> repo).
 ROOT = Path(__file__).resolve().parents[2]
+
+#: A sentinel step condition of the form ``outputs.state == 'healthy'``.
+_SENTINEL_STATE_CONDITION = re.compile(
+    r"steps\.judge\.outputs\.state\s*[=!]=\s*'(?P<state>[a-z-]+)'"
+)
 
 
 class _PreCommitHook(TypedDict):
@@ -42,12 +47,13 @@ class _PreCommitConfig(TypedDict):
     repos: list[_PreCommitRepo]
 
 
-class _WorkflowStep(TypedDict, total=False):
-    """One step in a GitHub Actions job."""
-
-    name: str
-    run: str
-    uses: str
+#: One step in a GitHub Actions job. Declared functionally because `if` is a
+#: Python keyword and so cannot be an attribute in the class syntax.
+_WorkflowStep = TypedDict(
+    "_WorkflowStep",
+    {"name": str, "run": str, "uses": str, "if": str},
+    total=False,
+)
 
 
 class _WorkflowJob(TypedDict):
@@ -723,4 +729,119 @@ def test_basedpyright_private_usage_exemption_covers_every_tests_directory() -> 
         f"exemption in pyproject.toml: {missing}. `root` matches by directory "
         "prefix only - no glob - so each needs its own "
         "[[tool.basedpyright.executionEnvironments]] entry."
+    )
+
+
+def _sentinel_workflow() -> _Workflow:
+    """The main-branch CI sentinel, parsed."""
+    text = (ROOT / ".github" / "workflows" / "main-ci-sentinel.yml").read_text(
+        encoding="utf-8"
+    )
+    return cast("_Workflow", yaml.safe_load(text))
+
+
+def _sentinel_step(name_fragment: str) -> _WorkflowStep:
+    """The one sentinel step whose name contains *name_fragment*."""
+    steps = _sentinel_workflow()["jobs"]["assert-main-was-validated"]["steps"]
+    matches = [step for step in steps if name_fragment in step.get("name", "")]
+    assert len(matches) == 1, (
+        f"expected exactly one sentinel step named like {name_fragment!r}, "
+        f"found {[step.get('name') for step in matches]}"
+    )
+    return matches[0]
+
+
+def test_the_sentinel_closes_its_issue_only_on_a_healthy_verdict() -> None:
+    """`pending` must not close the sentinel issue.
+
+    ``Verdict.exit_code`` is 0 for ``healthy`` and for ``pending`` alike,
+    because neither should fail the sentinel job. A workflow that derives
+    health from that exit code therefore cannot tell "main is green" from "no
+    verdict yet" - and closes on both. That is exactly what happened at
+    17:25 UTC on 2026-09-04: the judge logged ``pending: 1 CI run(s) still in
+    flight``, the close step ran anyway, and issue #398 was closed as
+    "validated again" while main's tip was red and its CI still running.
+
+    The condition is asserted literally rather than by behaviour because the
+    failure mode is a silent one: a condition that never matches - a typo, or
+    a negation such as ``!= 'unhealthy'`` that readmits ``pending`` - leaves
+    the step skipped and the job green, which is indistinguishable from
+    working.
+    """
+    step = _sentinel_step("Close the sentinel issue")
+
+    assert step.get("if") == "${{ steps.judge.outputs.state == 'healthy' }}"
+
+
+def test_the_sentinel_opens_its_issue_only_on_an_unhealthy_verdict() -> None:
+    """The other half of the same contract: `pending` must not report a fault.
+
+    A sentinel that files an issue while a run is still in flight fires on
+    every push and gets muted, which leaves main less protected than if it did
+    not exist.
+    """
+    step = _sentinel_step("Open an issue")
+
+    assert step.get("if") == "${{ steps.judge.outputs.state == 'unhealthy' }}"
+
+
+def test_the_sentinel_branches_only_on_states_the_judge_can_return() -> None:
+    """Every state named in a condition must be one the module can produce.
+
+    A misspelled state is the worst shape this workflow can take: the
+    condition is valid YAML, the expression evaluates to false forever, the
+    step is skipped, and the job passes. Nothing reports it.
+    """
+    from dev.ci_sentinel.main_ci_health import State
+
+    known = set(get_args(State))
+    steps = _sentinel_workflow()["jobs"]["assert-main-was-validated"]["steps"]
+    referenced = {
+        match.group("state")
+        for step in steps
+        for match in _SENTINEL_STATE_CONDITION.finditer(str(step.get("if", "")))
+    }
+
+    assert referenced, "no sentinel step branches on the judge's state"
+    assert referenced <= known, (
+        f"these sentinel conditions name states the judge never returns: "
+        f"{sorted(referenced - known)}; it returns {sorted(known)}"
+    )
+
+
+def test_the_sentinel_does_not_derive_health_from_the_judge_exit_code() -> None:
+    """No step may branch on a boolean distilled from the module's exit code.
+
+    Keeping the states apart in the judge step is worth nothing if a later
+    step collapses them again, so the collapsed output is banned by name: the
+    `healthy` output that carried this bug must not come back.
+    """
+    steps = _sentinel_workflow()["jobs"]["assert-main-was-validated"]["steps"]
+
+    offenders = [
+        step.get("name")
+        for step in steps
+        if "outputs.healthy" in str(step.get("if", ""))
+        or "outputs.healthy" in str(step.get("run", ""))
+        or "healthy=$(" in str(step.get("run", ""))
+    ]
+
+    assert not offenders, (
+        f"these sentinel steps read health from the judge's exit code rather "
+        f"than its state: {offenders}. The exit code answers 'should this job "
+        f"fail?', which is 0 for both `healthy` and `pending`."
+    )
+
+
+def test_the_sentinel_fails_when_the_judge_returns_no_verdict() -> None:
+    """A judge that crashed must not read as a quiet pass.
+
+    With the state absent, every condition below evaluates false, no step
+    runs, and the sentinel reports success having judged nothing - the same
+    class of silent skip the sentinel itself exists to catch.
+    """
+    run = _sentinel_step("Judge main's tip").get("run", "")
+
+    assert "the sentinel produced no verdict" in run, (
+        "the judge step must fail loudly when it produces no parseable state"
     )
