@@ -21,6 +21,8 @@ from .body_schema import CURRENT_BODY_SCHEMA
 from .models import DocType
 
 __all__ = [
+    "AUTHOR_FILLED_PLACEHOLDERS",
+    "MACHINE_FILLED_PLACEHOLDERS",
     "DocumentIdentity",
     "ExecBinding",
     "ParentPlan",
@@ -33,10 +35,47 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-_KNOWN_PLACEHOLDERS = (
-    "{yyyy-mm-dd-*}",
-    "[[{yyyy-mm-dd-*}]]",
-    "{proposed|accepted|rejected|deprecated}",
+#: Placeholders :func:`hydrate_template` fills, plus the two the index
+#: generator and the related-link injector own. A template may leave these
+#: outside its hint comments; anything else outside a comment reaches the
+#: author unfilled. ``tests/cli/test_corpus_contracts.py`` holds every shipped
+#: template to this set, so a new placeholder is added here first.
+MACHINE_FILLED_PLACEHOLDERS = frozenset(
+    {
+        "feature",
+        "yyyy-mm-dd",
+        "date",
+        "title",
+        "topic",  # alias of title in the research/reference templates
+        "phase",  # alias of title, or the explicit Phase id on a summary
+        "step",  # alias of title in the exec template
+        "tier",
+        "step_id",
+        "plan_stem",
+        "heading",
+        "scope_block",
+        "yyyy-mm-dd-*",  # related-link seed, stripped by _inject_related
+        "yyyy-mm-dd-*-plan",  # fallback value the hydrator itself inserts
+        "document_list",  # vaultcore/index.py, not hydrate_template
+    }
+)
+
+#: Placeholders the author fills by hand; the template says so beside them.
+AUTHOR_FILLED_PLACEHOLDERS = frozenset(
+    {
+        "proposed|accepted|rejected|superseded|deprecated",  # ADR status enum
+    }
+)
+
+# Machine-filled placeholders that legitimately survive :func:`hydrate_template`:
+# the related-link seed is stripped later by ``_inject_related``.
+_RESIDUE_PLACEHOLDERS = frozenset({"yyyy-mm-dd-*"})
+
+# Residue the post-hydration scan must not warn about. Every other registered
+# placeholder left standing is a hydration miss and is reported.
+_KNOWN_PLACEHOLDERS = frozenset(
+    {f"{{{name}}}" for name in _RESIDUE_PLACEHOLDERS | AUTHOR_FILLED_PLACEHOLDERS}
+    | {"[[{yyyy-mm-dd-*}]]"}
 )
 
 # Current on-disk filename for each template, keyed by document type. A type
@@ -47,9 +86,12 @@ _TEMPLATE_NAMES = {
     DocType.PLAN: "plan.md",
     DocType.RESEARCH: "research.md",
     DocType.REFERENCE: "reference.md",
-    DocType.EXEC: "exec-step.md",
     DocType.INDEX: "index.md",
 }
+
+#: The refusal every scaffold ingress raises for an ``exec`` document that is
+#: not the plan's ledger. Execution has exactly one artifact and one writer.
+EXEC_NOT_SCAFFOLDED = "execution is logged with `vault exec log`"
 
 # Document types that admit the optional topic infix
 # (``{date}-{feature}-{topic}-{type}.md``). Plans retain one execution
@@ -58,13 +100,9 @@ _TOPIC_INFIX_TYPES = frozenset(
     {DocType.ADR, DocType.AUDIT, DocType.REFERENCE, DocType.RESEARCH}
 )
 
-# The exec document type has two templates: the Step-record template (above)
-# and the Phase-summary template, selected via the ``summary`` flag on
-# :func:`get_template_path` / :func:`create_vault_doc`.
-_EXEC_SUMMARY_TEMPLATE = "exec-summary.md"
-
-# The consolidated-ledger template: one document per plan carrying every
-# Step's mechanical rows, selected via the ``ledger`` flag on ``ExecBinding``.
+# The exec document type has exactly one template: the ledger, one document
+# per plan carrying every Step's mechanical rows, selected via the ``ledger``
+# flag on ``ExecBinding``. There is no per-Step or per-Phase template.
 _EXEC_LEDGER_TEMPLATE = "exec-ledger.md"
 
 # Prior on-disk filenames for templates that have since been renamed in the
@@ -148,37 +186,19 @@ class ParentPlan:
 
 @dataclass(frozen=True, slots=True)
 class ExecBinding:
-    """The plan row a scaffolded execution record documents.
+    """The plan an execution ledger records.
 
     Every field is inert for non-execution document types, whose templates
     carry none of the corresponding placeholders.
 
     Attributes:
         plan: Identity of the parent plan.
-        step_id: The Step's canonical identifier (e.g. ``S01``).
-        step_display_path: The Step's display path (e.g. ``W01.P01.S01``),
-            which supplies the filename's identifier segment.
-        step_scope: The Step's declared file or area scope.
-        step_action: The Step's verbatim action text.
-        summary: When ``True``, the record summarises a Phase rather than
-            documenting a Step, and is scaffolded from the
-            ``exec-summary.md`` template.
-        phase_display_path: Display path of the summarised Phase (e.g.
-            ``P01`` or ``W01.P01``); fills the ``{phase}`` placeholder and
-            the summary filename's identifier segment.
-        ledger: When ``True``, the record is the plan's single consolidated
-            ledger rather than one document per Step, and is scaffolded from
-            the ``exec-ledger.md`` template. Mutually exclusive with
-            ``summary``.
+        ledger: When ``True``, the document is the plan's ledger, scaffolded
+            from the ``exec-ledger.md`` template. An ``exec`` document with
+            this flag unset is refused: execution has no other artifact.
     """
 
     plan: ParentPlan = ParentPlan()
-    step_id: str | None = None
-    step_display_path: str | None = None
-    step_scope: str | None = None
-    step_action: str | None = None
-    summary: bool = False
-    phase_display_path: str | None = None
     ledger: bool = False
 
 
@@ -221,9 +241,9 @@ def hydrate_template(
         fields: Author-supplied placeholder values. Defaults to an empty
             :class:`TemplateFields`, leaving every optional placeholder
             for the caller to fill.
-        exec_binding: The plan row an execution record documents. Defaults
-            to an empty :class:`ExecBinding`, which leaves the step-aware
-            placeholders on their generic fallbacks.
+        exec_binding: The plan an execution ledger records. Defaults to an
+            empty :class:`ExecBinding`, which leaves ``{plan_stem}`` on its
+            generic fallback.
 
     Returns:
         The fully-hydrated document string.
@@ -235,9 +255,6 @@ def hydrate_template(
 
     title = fields.title
     tier = fields.tier
-    # The exec-summary template's `{phase}` placeholder only applies to a
-    # summary record; a Step record leaves the title-derived alias in place.
-    phase = exec_binding.phase_display_path if exec_binding.summary else None
 
     hydrated = template_content
 
@@ -250,12 +267,7 @@ def hydrate_template(
     if title:
         placeholders["title"] = title
         placeholders["topic"] = title  # alias used in research template
-        placeholders["phase"] = title  # alias used in plan/exec templates
-        placeholders["step"] = title  # alias used in exec template
-    if phase is not None:
-        # Explicit Phase identifier wins over the title-derived alias; the
-        # exec-summary heading is `# {feature} {phase} summary`.
-        placeholders["phase"] = phase
+        placeholders["phase"] = title  # alias used in the plan template
     if tier:
         placeholders["tier"] = tier
 
@@ -275,36 +287,10 @@ def hydrate_template(
                 logger.debug("Replacing '%s' with '%s'", pattern, value)
                 hydrated = hydrated.replace(pattern, value)
 
-    # Hydrate step-aware placeholders
-    step_id = exec_binding.step_id
+    # Hydrate the ledger's parent-plan placeholder.
     plan_stem = exec_binding.plan.stem
-    val_step_id = step_id if step_id is not None else "{S##}"
     val_plan_stem = plan_stem if plan_stem is not None else "{yyyy-mm-dd-*-plan}"
-
-    step_action = exec_binding.step_action
-    if title is not None:
-        val_heading = title
-    elif step_action is not None:
-        val_heading = step_action
-    else:
-        val_heading = f"{feature} <display-path>"
-
-    val_scope_block = ""
-    step_scope = exec_binding.step_scope
-    if step_scope:
-        scopes = [
-            s.strip().strip("`") for s in re.split(r"[,;]+", step_scope) if s.strip()
-        ]
-        if scopes:
-            lines = ["## Scope", ""]
-            for s in scopes:
-                lines.append(f"- `{s}`")
-            val_scope_block = "\n".join(lines)
-
-    hydrated = hydrated.replace("{step_id}", val_step_id)
     hydrated = hydrated.replace("{plan_stem}", val_plan_stem)
-    hydrated = hydrated.replace("{heading}", val_heading)
-    hydrated = hydrated.replace("{scope_block}", val_scope_block)
 
     # Stamp the CLI-maintained modified field (vault-orientation ADR D3):
     # at scaffold time it equals the creation date. Injected here rather
@@ -522,9 +508,8 @@ def create_vault_doc(
             machine-derived).
         fields: Author-supplied placeholder values. Defaults to an empty
             :class:`TemplateFields`.
-        exec_binding: The plan row an execution record documents. Defaults
-            to an empty :class:`ExecBinding`, which scaffolds the flat
-            (non-step-aware) shape.
+        exec_binding: The plan an execution ledger records. An ``exec``
+            document is scaffolded only with ``ledger=True``.
         write: Overwrite and dry-run policy. Defaults to a
             :class:`WritePolicy` that refuses to overwrite and does write.
         content_root: Explicit content root for template lookup.
@@ -534,6 +519,8 @@ def create_vault_doc(
 
     Raises:
         FileNotFoundError: If no template exists for the identity's type.
+        ValueError: If an ``exec`` document is requested without the ledger
+            binding; execution is logged with ``vault exec log``.
         ResourceExistsError: If the target file already exists and the
             write policy does not force an overwrite.
     """
@@ -550,7 +537,6 @@ def create_vault_doc(
     feature = identity.feature
     date_str = identity.date
     topic = identity.topic
-    summary = exec_binding.summary
     plan_date = exec_binding.plan.date
     plan_stem = exec_binding.plan.stem
 
@@ -559,12 +545,13 @@ def create_vault_doc(
             f"topic infix is not supported for '{doc_type.value}' documents; "
             "admitted types: adr, audit, reference, research"
         )
+    if doc_type is DocType.EXEC and not exec_binding.ledger:
+        raise ValueError(EXEC_NOT_SCAFFOLDED)
 
     template_path = get_template_path(
         root_dir,
         doc_type,
         content_root=content_root,
-        summary=summary,
         ledger=exec_binding.ledger,
     )
     if template_path is None:
@@ -604,25 +591,6 @@ def create_vault_doc(
         # One ledger per plan, so the filename carries no Step or Phase
         # segment - the Step identity lives in the rows, not the path.
         filename = f"{plan_date or date_str}-{feature}-ledger.md"
-        target_dir = (
-            root_dir
-            / get_config().docs_dir
-            / doc_type.value
-            / f"{plan_date or date_str}-{feature}"
-        )
-    elif doc_type is DocType.EXEC and summary:
-        suffix = (exec_binding.phase_display_path or "P01").replace(".", "-")
-        filename = f"{plan_date or date_str}-{feature}-{suffix}-summary.md"
-        target_dir = (
-            root_dir
-            / get_config().docs_dir
-            / doc_type.value
-            / f"{plan_date or date_str}-{feature}"
-        )
-    elif doc_type is DocType.EXEC and exec_binding.step_id is not None:
-        display_path = exec_binding.step_display_path
-        suffix = display_path.replace(".", "-") if display_path else "S01"
-        filename = f"{plan_date or date_str}-{feature}-{suffix}.md"
         target_dir = (
             root_dir
             / get_config().docs_dir
@@ -726,7 +694,6 @@ def get_template_path(
     doc_type: DocType,
     *,
     content_root: pathlib.Path | None = None,
-    summary: bool = False,
     ledger: bool = False,
 ) -> pathlib.Path | None:
     """Return the filesystem path of the template file for a given DocType.
@@ -738,12 +705,8 @@ def get_template_path(
         content_root: Explicit content root (e.g. ``.vaultspec/``). Templates
             live in the content tree. When ``None``, falls back to
             ``root_dir / framework_dir``.
-        summary: When ``True`` and *doc_type* is :attr:`DocType.EXEC`, resolve
-            the Phase-summary template (``exec-summary.md``) instead of the
-            Step-record template (``exec-step.md``).
         ledger: When ``True`` and *doc_type* is :attr:`DocType.EXEC`, resolve
-            the consolidated-ledger template (``exec-ledger.md``). Takes
-            precedence over *summary*.
+            the ledger template (``exec-ledger.md``), the only exec template.
 
     Returns:
         Path to the template file, or ``None`` if the type has no mapping or
@@ -753,8 +716,6 @@ def get_template_path(
 
     if ledger and doc_type is DocType.EXEC:
         name: str | None = _EXEC_LEDGER_TEMPLATE
-    elif summary and doc_type is DocType.EXEC:
-        name = _EXEC_SUMMARY_TEMPLATE
     else:
         name = _TEMPLATE_NAMES.get(doc_type)
     if not name:

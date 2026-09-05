@@ -35,6 +35,7 @@ if TYPE_CHECKING:
         PlanInFlight,
         PlanTrace,
         Rollup,
+        StepTrace,
     )
 
 
@@ -425,7 +426,6 @@ def _plan_trace_payload(plan: PlanTrace) -> dict[str, Any]:
         "next_open_step": plan.next_open_step,
         "exec_missing": plan.exec_missing,
         "steps": [dataclasses.asdict(s) for s in plan.steps],
-        "summaries": list(plan.summaries),
         "unlinked_records": list(plan.unlinked_records),
         "grounding": {k: list(v) for k, v in plan.grounding.items()},
         "error": plan.error,
@@ -500,12 +500,7 @@ def _emit_status_trace(
             # with no glyph at all.
             glyph = r"[green]\[x][/green]" if step.checked else r"[dim]\[ ][/dim]"
             cursor = ">" if step.display_path == plan.next_open_step else " "
-            if step.record_stem:
-                record = step.record_stem
-            elif step.checked:
-                record = "[yellow]unlinked[/yellow]"
-            else:
-                record = "[dim]no record[/dim]"
+            record = _step_evidence_cell(step)
             path = (
                 f"  [dim]{trace.paths[step.record_stem]}[/dim]"
                 if paths and step.record_stem and step.record_stem in trace.paths
@@ -515,7 +510,6 @@ def _emit_status_trace(
                 f"  [cyan]{cursor}[/cyan] {glyph} {step.display_path}  {record}{path}"
             )
 
-        _emit_stem_group(console, "summaries", plan.summaries, trace, paths)
         _emit_stem_group(
             console,
             "unlinked records",
@@ -537,6 +531,28 @@ def _emit_status_trace(
                     console.print(f"    [dim]{doc_type}[/dim]  {stem}{path}")
 
     _emit_status_hints(hint_pairs, json_output=False, no_hints=no_hints)
+
+
+def _step_evidence_cell(step: StepTrace) -> str:
+    """Render the evidence column of one trace row.
+
+    A ledger-mapped step reads ``ledger N rows`` plus its ``verify:`` state;
+    a step mapped by a legacy per-Step record shows that record's stem; a
+    closed step with no rows is ``unlinked``; an open one is ``no rows``.
+    """
+    if step.record_stem and step.rows is not None:
+        noun = "row" if step.rows == 1 else "rows"
+        cell = f"ledger {step.rows} {noun}"
+        if step.verify == "pass":
+            cell += "  [green]verify:pass[/green]"
+        elif step.verify == "fail":
+            cell += "  [red]verify:fail[/red]"
+        return cell
+    if step.record_stem:
+        return step.record_stem
+    if step.checked:
+        return "[yellow]unlinked[/yellow]"
+    return "[dim]no rows[/dim]"
 
 
 def _emit_stem_group(

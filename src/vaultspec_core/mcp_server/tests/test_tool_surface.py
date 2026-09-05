@@ -1,8 +1,8 @@
-"""Full nine-tool surface integration test over the real ``create_server``.
+"""Full ten-tool surface integration test over the real ``create_server``.
 
 Builds the production server through ``create_server`` on a
 :class:`WorkspaceFactory`-installed vault and drives it over the in-memory
-MCPServer client - no mocks, stubs, or skips. Asserts that exactly the nine
+MCPServer client - no mocks, stubs, or skips. Asserts that exactly the ten
 expected tools are registered with the ADR Q6 annotation matrix and an
 ``outputSchema`` each, exercises a representative call on every tool end-to-end
 (including a gateway ``invoke`` of the real ``vault list`` verb), confirms a
@@ -28,7 +28,7 @@ __all__ = ["vault_root"]
 
 pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 
-#: The nine tools the redesigned surface must advertise, and nothing else.
+#: The ten tools the redesigned surface must advertise, and nothing else.
 _EXPECTED_TOOLS = frozenset(
     {
         "status",
@@ -37,6 +37,7 @@ _EXPECTED_TOOLS = frozenset(
         "edit",
         "plan_progress",
         "plan_edit",
+        "log",
         "check",
         "discover",
         "invoke",
@@ -84,6 +85,12 @@ _ANNOTATIONS = {
         "idempotent_hint": False,
         "open_world_hint": False,
     },
+    "log": {
+        "read_only_hint": False,
+        "destructive_hint": False,
+        "idempotent_hint": True,
+        "open_world_hint": False,
+    },
     "check": {
         "read_only_hint": False,
         "destructive_hint": False,
@@ -118,10 +125,10 @@ _READ_ONLY_ANNOTATIONS = {
 }
 
 
-async def test_surface_registers_exactly_nine_tools_with_schemas(
+async def test_surface_registers_exactly_ten_tools_with_schemas(
     vault_root: Path,
 ) -> None:
-    """``create_server`` advertises exactly the nine tools, schema'd and annotated."""
+    """``create_server`` advertises exactly the ten tools, schema'd and annotated."""
     mcp = create_server()
     tools = await mcp.list_tools()
     names = {t.name for t in tools}
@@ -306,7 +313,7 @@ def test_registry_entry_launches_this_server_unchanged(vault_root: Path) -> None
     The builtin registry definition (ADR Q8: installation is a no-op for
     existing projects) must keep resolving to the module whose
     ``create_server`` this test drives, so a synced project picks up the
-    nine-tool surface with no registry migration. Since the install-mode
+    ten-tool surface with no registry migration. Since the install-mode
     model, the seeded registry carries the mode-neutral launch tokens and
     the concrete launch is rendered per install mode; every mode must still
     target this server module.
@@ -323,7 +330,7 @@ def test_registry_entry_launches_this_server_unchanged(vault_root: Path) -> None
         assert rendered["args"][-1] == "vaultspec_core.mcp_server.app", mode
 
     # The module the registry launches exposes the exact bootstrap this test
-    # exercised, so the launched process serves the same nine-tool surface.
+    # exercised, so the launched process serves the same ten-tool surface.
     from vaultspec_core.mcp_server import app as launched
 
     assert callable(launched.create_server)

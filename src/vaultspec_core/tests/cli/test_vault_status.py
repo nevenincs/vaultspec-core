@@ -364,13 +364,13 @@ class TestTrace:
         # The closed S01 step is mapped to its execution-record stem.
         assert ids["exec_s01"] in result.output
 
-    def test_open_step_renders_no_record(self, tmp_path: Path) -> None:
+    def test_open_step_renders_no_rows(self, tmp_path: Path) -> None:
         ids = _build_vault(tmp_path)
 
         result = _run(tmp_path, ids["plan"])
 
         assert result.exit_code == 0, result.output
-        # S03 is open and has no execution record. The plan-line header also
+        # S03 is open and has no ledger rows. The plan-line header also
         # names the cursor ("next P01.S03"), so select the step row by its
         # checkbox glyph rather than the first line mentioning the id.
         s03_line = next(
@@ -378,7 +378,41 @@ class TestTrace:
             for line in result.output.splitlines()
             if "P01.S03" in line and "[ ]" in line
         )
-        assert "no record" in s03_line
+        assert "no rows" in s03_line
+        assert "no record" not in result.output
+
+    def test_ledger_mapped_step_renders_rows_and_verify(self, tmp_path: Path) -> None:
+        ids = _build_vault(tmp_path)
+        feature = ids["feature"]
+        _write(
+            tmp_path
+            / ".vault"
+            / "exec"
+            / f"2026-03-01-{feature}"
+            / f"2026-03-01-{feature}-ledger.md",
+            _exec(
+                feature,
+                date="2026-03-16",
+                modified="2026-03-16",
+                step_id=None,
+                plan_stem=ids["plan"],
+            ).replace(
+                "Execution details.",
+                "## Changes\n\n- `S02` `M` `src/a.py`\n- `S02` `A` `src/b.py`\n"
+                "- `S02` `verify:` `pytest` -> `pass`\n",
+            ),
+        )
+
+        result = _run(tmp_path, ids["plan"])
+
+        assert result.exit_code == 0, result.output
+        s02_line = next(
+            line
+            for line in result.output.splitlines()
+            if "P01.S02" in line and "[x]" in line
+        )
+        assert "ledger 2 rows" in s02_line
+        assert "verify:pass" in s02_line
 
     def test_unlinked_record_is_reported(self, tmp_path: Path) -> None:
         ids = _build_vault(tmp_path)
@@ -465,12 +499,13 @@ class TestTrace:
 class TestReviewRefinements:
     """Refinements applied after the human interface review.
 
-    Phase summaries group under their own heading instead of the unlinked
-    bucket, the active-features listing is capped in human output, and an
-    unresolvable target with no near-matches points at the feature list.
+    A leftover Phase summary is an unlinked exec document like any other
+    (the ledger is the only execution artifact), the active-features listing
+    is capped in human output, and an unresolvable target with no
+    near-matches points at the feature list.
     """
 
-    def test_phase_summary_grouped_not_unlinked(self, tmp_path: Path) -> None:
+    def test_leftover_phase_summary_is_unlinked(self, tmp_path: Path) -> None:
         ids = _build_vault(tmp_path)
         feature = ids["feature"]
         summary_stem = f"2026-03-01-{feature}-P01-summary"
@@ -493,13 +528,12 @@ class TestReviewRefinements:
 
         assert result.exit_code == 0, result.output
         plan = json.loads(result.output)["data"]["plans"][0]
-        assert summary_stem in plan["summaries"]
-        assert summary_stem not in plan["unlinked_records"]
-        # The genuinely unlinked record stays in its bucket.
+        assert "summaries" not in plan
+        assert summary_stem in plan["unlinked_records"]
         assert ids["exec_orphan"] in plan["unlinked_records"]
 
         human = _run(tmp_path, ids["plan"])
-        assert "summaries" in human.output
+        assert "summaries" not in human.output
         assert summary_stem in human.output
 
     def test_unknown_target_without_near_matches_points_to_feature_list(

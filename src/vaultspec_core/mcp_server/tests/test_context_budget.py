@@ -5,7 +5,7 @@ An MCPServer's tool definitions are serialized into every LLM
 request  - keeping them compact is a hard requirement.
 
 The budget is the concern here; the ``test_tool_surface`` module covers what
-the same nine tools do end-to-end and the annotation matrix they declare.
+the same ten tools do end-to-end and the annotation matrix they declare.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 
-#: Aggregate ceiling for the full nine-tool wire surface, in characters.
+#: Aggregate ceiling for the full ten-tool wire surface, in characters.
 #:
 #: This is a **ratchet, not a target**. The measured surface is 43,919 chars
 #: (~5.4K tokens at the 3.46 chars/token measured for this codebase's JSON),
@@ -45,15 +45,20 @@ pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 #: reST markup included - into ``output_schema.description``, and the tool
 #: descriptions carry ``Returns:``/``Raises:`` prose plus a ``ctx``
 #: parameter that appears in no input schema.
-MAX_TOOL_DEFINITION_CHARS = 19_000
+#:
+#: Raised once, by the size of the tenth tool, when ``log`` (the execution
+#: ledger writer) joined the surface: one verb per artifact was the decision,
+#: and a ledger row logged through ``invoke`` would cost a host confirmation
+#: on every Step. Measured at 20,0xx chars with ``log`` at ~1.1K.
+MAX_TOOL_DEFINITION_CHARS = 20_200
 
 #: Aggregate ceiling for the read-only surface (four tools), same rules.
 #: Measured at 9,194 chars.
 MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 9_500
 
-# Maximum number of tools: the tiered surface is seven hot tools plus the
+# Maximum number of tools: the tiered surface is eight hot tools plus the
 # discover/invoke gateway; growth beyond that needs a deliberate decision.
-MAX_TOOL_COUNT = 9
+MAX_TOOL_COUNT = 10
 
 # Exact expected tool surface.
 EXPECTED_TOOLS = {
@@ -63,6 +68,7 @@ EXPECTED_TOOLS = {
     "edit",
     "find",
     "invoke",
+    "log",
     "plan_edit",
     "plan_progress",
     "status",
@@ -212,7 +218,7 @@ async def test_read_only_tool_definitions_within_context_budget(
 ) -> None:
     """The read-only surface has its own ceiling and its own regressions.
 
-    Read-only registers four of the nine tools, so a change that bloats a
+    Read-only registers four of the ten tools, so a change that bloats a
     shared result model surfaces here at a different ratio than on the full
     surface. Guarding only the full surface let this one drift furthest -
     it was the least covered of the two.

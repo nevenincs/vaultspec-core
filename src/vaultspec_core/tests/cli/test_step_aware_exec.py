@@ -1,8 +1,12 @@
-"""Integration tests for step-aware execution record scaffolding and status hinting.
+"""Integration tests for the one-artifact rule on ``vault add exec``.
 
-Covers mutual exclusion, individual step routing and hydration, legacy fallback
-deprecation warning, bulk scaffolding (idempotency, force, outcomes rendering),
-and plan status exec-missing warning hinting.
+Execution has one artifact, the plan's ledger, and one writer,
+``vault exec log``. These tests hold the scaffolder to that: ``vault add
+exec`` refuses before touching disk, the removed Step-aware flags are gone
+from its surface, and plan status pairs closed Steps with ledger rows rather
+than per-Step records.
+
+``setup_test_plan`` is shared with the ledger, fold, and merge suites.
 """
 
 from __future__ import annotations
@@ -21,10 +25,11 @@ from vaultspec_core.cli import app
 
 pytestmark = [pytest.mark.integration]
 
+_PLAN_STEM = "2026-05-17-test-feature-plan"
+
 
 def setup_test_plan(project_dir: Path) -> Path:
-    """Helper to write a clean test plan file with specific checked steps."""
-    # Write the required prerequisite ADR document first
+    """Write a clean L2 test plan (S01, S02 closed; S03 open) and its ADR."""
     adr_dir = project_dir / ".vault" / "adr"
     adr_dir.mkdir(parents=True, exist_ok=True)
     adr_file = adr_dir / "2026-05-17-test-feature-adr.md"
@@ -42,7 +47,7 @@ def setup_test_plan(project_dir: Path) -> Path:
 
     plan_dir = project_dir / ".vault" / "plan"
     plan_dir.mkdir(parents=True, exist_ok=True)
-    plan_file = plan_dir / "2026-05-17-test-feature-plan.md"
+    plan_file = plan_dir / f"{_PLAN_STEM}.md"
     plan_file.write_text(
         "---\n"
         "tags:\n"
@@ -54,7 +59,7 @@ def setup_test_plan(project_dir: Path) -> Path:
         "\n"
         "# `test-feature` plan\n"
         "\n"
-        "## Phase `P01` - Test Phase\n"
+        "### Phase `P01` - Test Phase\n"
         "- [x] `P01.S01` - First step; `src/foo.py`.\n"
         "- [x] `P01.S02` - Second step; `src/bar.py`.\n"
         "- [ ] `P01.S03` - Third step; `src/baz.py`.\n",
@@ -63,617 +68,201 @@ def setup_test_plan(project_dir: Path) -> Path:
     return plan_file
 
 
-def test_step_aware_mutual_exclusion(
-    runner: CliRunner, synthetic_project: Path
-) -> None:
-    """Passing both options, or options with wrong types, must fail."""
-    # Both options supplied on exec
-    result = runner.invoke(
+def _add_exec(runner: CliRunner, project: Path, *extra: str):
+    return runner.invoke(
         app,
         [
             "--target",
-            str(synthetic_project),
+            str(project),
             "vault",
             "add",
             "exec",
             "--feature",
             "test-feature",
+            *extra,
+        ],
+    )
+
+
+def _log(runner: CliRunner, project: Path, step: str, *extra: str):
+    return runner.invoke(
+        app,
+        [
+            "--target",
+            str(project),
+            "vault",
+            "exec",
+            "log",
+            "--feature",
+            "test-feature",
+            "--related",
+            _PLAN_STEM,
             "--step",
+            step,
+            *extra,
+        ],
+    )
+
+
+class TestAddExecRefuses:
+    """``vault add exec`` is not a scaffold path any more."""
+
+    def test_refuses_with_the_ledger_message(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
+        setup_test_plan(synthetic_project)
+
+        result = _add_exec(runner, synthetic_project)
+
+        assert result.exit_code == 1
+        assert "execution is logged with `vault exec log`" in result.output
+
+    def test_refuses_before_touching_disk(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
+        setup_test_plan(synthetic_project)
+        exec_root = synthetic_project / ".vault" / "exec"
+        before = sorted(exec_root.rglob("*.md")) if exec_root.exists() else []
+
+        _add_exec(runner, synthetic_project, "--title", "Legacy Record")
+
+        after = sorted(exec_root.rglob("*.md")) if exec_root.exists() else []
+        assert after == before
+        assert not list(exec_root.glob("*-test-feature-exec.md"))
+
+    def test_refuses_even_with_json(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
+        setup_test_plan(synthetic_project)
+
+        result = _add_exec(runner, synthetic_project, "--json")
+
+        assert result.exit_code == 1
+
+    @pytest.mark.parametrize(
+        "flag",
+        [("--step", "P01.S01"), ("--all-steps",), ("--summary",), ("--phase", "P01")],
+    )
+    def test_step_aware_flags_are_gone(
+        self, runner: CliRunner, synthetic_project: Path, flag: tuple[str, ...]
+    ) -> None:
+        """The removed options are unknown to the parser, not merely ignored."""
+        setup_test_plan(synthetic_project)
+
+        result = _add_exec(runner, synthetic_project, *flag)
+
+        assert result.exit_code != 0
+        assert "No such option" in result.output
+
+    def test_other_types_still_scaffold(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
+        setup_test_plan(synthetic_project)
+
+        result = runner.invoke(
+            app,
+            [
+                "--target",
+                str(synthetic_project),
+                "vault",
+                "add",
+                "audit",
+                "--feature",
+                "test-feature",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert list((synthetic_project / ".vault" / "audit").glob("*test-feature*"))
+
+
+class TestStatusPairsStepsWithLedgerRows:
+    """Plan status reports ``exec-missing`` from ledger rows."""
+
+    def test_exec_missing_clears_as_steps_are_logged(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
+        plan_path = str(setup_test_plan(synthetic_project))
+        status_args = ["--target", str(synthetic_project), "vault", "plan", "status"]
+
+        result = runner.invoke(app, [*status_args, plan_path])
+        assert result.exit_code == 0
+        assert "! exec-missing" in result.output
+        assert "S01" in result.output and "S02" in result.output
+
+        result_json = runner.invoke(app, [*status_args, plan_path, "--json"])
+        assert result_json.exit_code == 0
+        data = json.loads(result_json.output)
+        assert set(data["data"]["exec_missing_ids"]) == {"S01", "S02"}
+
+        logged = _log(runner, synthetic_project, "P01.S01", "--row", "M:src/foo.py")
+        assert logged.exit_code == 0, logged.output
+
+        result2 = runner.invoke(app, [*status_args, plan_path])
+        assert result2.exit_code == 0
+        assert "S01" not in result2.output
+        assert "S02" in result2.output
+
+    def test_trace_shows_ledger_rows_and_verify_state(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
+        setup_test_plan(synthetic_project)
+        _log(
+            runner,
+            synthetic_project,
             "P01.S01",
-            "--all-steps",
-        ],
-    )
-    assert result.exit_code != 0
-    assert (
-        "Error: --step and --all-steps options are mutually exclusive." in result.output
-    )
+            "--row",
+            "M:src/foo.py",
+            "--row",
+            "A:tests/test_foo.py",
+            "--verify",
+            "pytest -q=pass",
+        )
+        _log(runner, synthetic_project, "P01.S02", "--row", "M:src/bar.py")
 
-    # Supplied on wrong type (adr)
-    result = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "adr",
-            "--feature",
-            "test-feature",
-            "--step",
+        result = runner.invoke(
+            app, ["--target", str(synthetic_project), "status", _PLAN_STEM]
+        )
+
+        assert result.exit_code == 0, result.output
+        lines = {
+            key: next(
+                line
+                for line in result.output.splitlines()
+                if key in line and "[" in line
+            )
+            for key in ("P01.S01", "P01.S02", "P01.S03")
+        }
+        assert "ledger 2 rows" in lines["P01.S01"]
+        assert "verify:pass" in lines["P01.S01"]
+        assert "ledger 1 row" in lines["P01.S02"]
+        assert "verify:" not in lines["P01.S02"]
+        assert "no rows" in lines["P01.S03"]
+        assert "no record" not in result.output
+        assert "summaries" not in result.output
+
+    def test_trace_json_carries_rows_and_verify(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
+        setup_test_plan(synthetic_project)
+        _log(
+            runner,
+            synthetic_project,
             "P01.S01",
-        ],
-    )
-    assert result.exit_code != 0
-    assert (
-        "Error: --step, --all-steps, and --summary options are only valid when "
-        "creating 'exec' documents." in result.output
-    )
+            "--row",
+            "M:src/foo.py",
+            "--verify",
+            "pytest=fail",
+        )
 
+        result = runner.invoke(
+            app, ["--target", str(synthetic_project), "status", _PLAN_STEM, "--json"]
+        )
 
-def test_step_aware_legacy_fallback_warning(
-    runner: CliRunner, synthetic_project: Path
-) -> None:
-    """Omitting flags displays warning and falls back to flat scaffolding."""
-    setup_test_plan(synthetic_project)
-
-    result = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "exec",
-            "--feature",
-            "test-feature",
-            "--title",
-            "Legacy Record",
-        ],
-    )
-    assert result.exit_code == 0
-    assert "Deprecation Warning:" in result.output
-
-    # Verify a flat legacy execution file was created
-    legacy_files = list(
-        (synthetic_project / ".vault" / "exec").glob("*-test-feature-exec.md")
-    )
-    assert len(legacy_files) == 1
-    content = legacy_files[0].read_text(encoding="utf-8")
-    assert "Legacy Record" in content or "test-feature" in content
-
-
-def test_step_aware_individual_scaffolding(
-    runner: CliRunner, synthetic_project: Path
-) -> None:
-    """Individual step scaffolding custom routes and hydrates placeholders."""
-    setup_test_plan(synthetic_project)
-
-    result = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "exec",
-            "--feature",
-            "test-feature",
-            "--step",
-            "P01.S01",
-        ],
-    )
-    assert result.exit_code == 0, f"Command failed: {result.output}"
-
-    # Verify customized path routing
-    target_file = (
-        synthetic_project
-        / ".vault"
-        / "exec"
-        / "2026-05-17-test-feature"
-        / "2026-05-17-test-feature-P01-S01.md"
-    )
-    assert target_file.exists()
-
-    content = target_file.read_text(encoding="utf-8")
-
-    # Frontmatter assertions
-    assert "step_id: 'S01'" in content
-    assert "related:" in content
-    assert '- "[[2026-05-17-test-feature-plan]]"' in content
-    assert "tags:" in content
-    assert "- '#exec'" in content
-    assert "- '#test-feature'" in content
-
-    # Hydrated body structure assertions
-    assert "# First step" in content
-    assert "## Scope" in content
-    assert "- `src/foo.py`" in content
-    # body-v2 reduced the record to its mechanical path log: the narrative
-    # sections are gone, and Notes is an exception-only author addition.
-    # Compared as headings, not substrings - the hint-comment mentions
-    # "## Notes" in prose while emitting no such section.
-    headings = [line for line in content.splitlines() if line.startswith("## ")]
-    assert headings == ["## Scope", "## Changes"]
-    # The scaffold hint-comment must not itself be hydrated (a placeholder
-    # named in prose would be substituted and mangle the comment).
-    assert "Machine-owned: the filename" in content
-
-
-def test_scaffolded_step_record_passes_structure_check(
-    runner: CliRunner, synthetic_project: Path
-) -> None:
-    """A scaffolded Step Record must satisfy `vault check structure` (issue #123).
-
-    The scaffolder emits the canonical `<date>-<feature>-P01-S01.md` Step Record
-    name; the structure validator previously rejected it for lacking an `-exec`
-    type token, leaving the documented `vault add exec --step` flow permanently
-    red. Scaffold a record, then assert the structure check finds no filename
-    violation for it.
-    """
-    from vaultspec_core.vaultcore.models import DocType, VaultConstants
-
-    setup_test_plan(synthetic_project)
-    add_result = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "exec",
-            "--feature",
-            "test-feature",
-            "--step",
-            "P01.S01",
-        ],
-    )
-    assert add_result.exit_code == 0, add_result.output
-
-    scaffolded = (
-        synthetic_project
-        / ".vault"
-        / "exec"
-        / "2026-05-17-test-feature"
-        / "2026-05-17-test-feature-P01-S01.md"
-    )
-    assert scaffolded.exists(), add_result.output
-    # The validator that powers `vault check structure` must accept the exact
-    # name the scaffolder produced.
-    assert VaultConstants.validate_filename(scaffolded.name, DocType.EXEC) == []
-
-
-def test_step_aware_bulk_scaffolding(
-    runner: CliRunner, synthetic_project: Path
-) -> None:
-    """Bulk scaffolding creates all records idempotently and obeys --force."""
-    setup_test_plan(synthetic_project)
-
-    # 1. First bulk generation run (should create all steps)
-    result = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "exec",
-            "--feature",
-            "test-feature",
-            "--all-steps",
-        ],
-    )
-    assert result.exit_code == 0
-    assert "created" in result.output
-    assert "2026-05-17-test-feature-P01-S01.md" in result.output
-    assert "2026-05-17-test-feature-P01-S02.md" in result.output
-    assert "2026-05-17-test-feature-P01-S03.md" in result.output
-
-    # Check files exist
-    base_dir = synthetic_project / ".vault" / "exec" / "2026-05-17-test-feature"
-    file_s1 = base_dir / "2026-05-17-test-feature-P01-S01.md"
-    file_s2 = base_dir / "2026-05-17-test-feature-P01-S02.md"
-    file_s3 = base_dir / "2026-05-17-test-feature-P01-S03.md"
-    assert file_s1.exists()
-    assert file_s2.exists()
-    assert file_s3.exists()
-
-    # 2. Second run (idempotency - existing files must be skipped)
-    result2 = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "exec",
-            "--feature",
-            "test-feature",
-            "--all-steps",
-        ],
-    )
-    assert result2.exit_code == 0
-    assert "skipped" in result2.output
-    assert "skipped; exists" in result2.output
-
-    # 3. Third run with --force (overwriting)
-    result3 = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "exec",
-            "--feature",
-            "test-feature",
-            "--all-steps",
-            "--force",
-        ],
-    )
-    assert result3.exit_code == 0
-    assert "updated" in result3.output
-
-
-def test_step_aware_bulk_scaffolding_dry_run(
-    runner: CliRunner, synthetic_project: Path
-) -> None:
-    """A bulk dry run previews every record without writing one to disk."""
-    setup_test_plan(synthetic_project)
-    base_dir = synthetic_project / ".vault" / "exec" / "2026-05-17-test-feature"
-
-    result = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "exec",
-            "--feature",
-            "test-feature",
-            "--all-steps",
-            "--dry-run",
-        ],
-    )
-    assert result.exit_code == 0
-    assert "would create" in result.output
-    assert not base_dir.exists()
-
-    # An existing record is previewed as an overwrite only under --force.
-    base_dir.mkdir(parents=True)
-    existing = base_dir / "2026-05-17-test-feature-P01-S01.md"
-    existing.write_text("sentinel\n", encoding="utf-8")
-
-    skipped = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "exec",
-            "--feature",
-            "test-feature",
-            "--all-steps",
-            "--dry-run",
-        ],
-    )
-    assert skipped.exit_code == 0
-    assert "skipped; exists" in skipped.output
-
-    forced = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "exec",
-            "--feature",
-            "test-feature",
-            "--all-steps",
-            "--dry-run",
-            "--force",
-        ],
-    )
-    assert forced.exit_code == 0
-    assert "would overwrite" in forced.output
-    assert existing.read_text(encoding="utf-8") == "sentinel\n"
-
-
-def test_step_aware_bulk_scaffolding_json(
-    runner: CliRunner, synthetic_project: Path
-) -> None:
-    """Bulk scaffolding with --json outputs the outcome in envelope schema."""
-    setup_test_plan(synthetic_project)
-
-    result = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "exec",
-            "--feature",
-            "test-feature",
-            "--all-steps",
-            "--json",
-        ],
-    )
-    assert result.exit_code == 0
-
-    data = json.loads(result.output)
-    assert data["status"] == "created"
-    assert data["schema"] == "vaultspec.vault.add.v1"
-    assert isinstance(data["data"]["items"], list)
-    assert len(data["data"]["items"]) == 3
-    assert data["data"]["items"][0]["outcome"] == "created"
-
-
-def test_step_aware_status_hinting(runner: CliRunner, synthetic_project: Path) -> None:
-    """Plan status reports exec-missing warning and disappears when resolved."""
-    setup_test_plan(synthetic_project)
-
-    plan_path = str(
-        synthetic_project / ".vault" / "plan" / "2026-05-17-test-feature-plan.md"
-    )
-
-    # 1. Run status when no exec files exist (S01, S02 are checked, should warn)
-    result = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "plan",
-            "status",
-            plan_path,
-        ],
-    )
-    assert result.exit_code == 0
-    assert "! exec-missing" in result.output
-    assert "S01" in result.output
-    assert "S02" in result.output
-
-    # Verify JSON envelope status format
-    result_json = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "plan",
-            "status",
-            plan_path,
-            "--json",
-        ],
-    )
-    assert result_json.exit_code == 0
-    data = json.loads(result_json.output)
-    assert "exec_missing_ids" in data["data"]
-    assert set(data["data"]["exec_missing_ids"]) == {"S01", "S02"}
-
-    # 2. Scaffold execution record for S01
-    runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "exec",
-            "--feature",
-            "test-feature",
-            "--step",
-            "P01.S01",
-        ],
-    )
-
-    # 3. Run status again (only S02 should remain missing)
-    result2 = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "plan",
-            "status",
-            plan_path,
-        ],
-    )
-    assert result2.exit_code == 0
-    assert "S01" not in result2.output
-    assert "S02" in result2.output
-
-
-def test_summary_requires_phase(runner: CliRunner, synthetic_project: Path) -> None:
-    """``--summary`` without ``--phase`` is a clean error (issue #158)."""
-    setup_test_plan(synthetic_project)
-    result = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "exec",
-            "--feature",
-            "test-feature",
-            "--summary",
-        ],
-    )
-    assert result.exit_code != 0
-    assert "--summary requires --phase" in result.output
-
-
-def test_summary_rejected_on_non_exec_type(
-    runner: CliRunner, synthetic_project: Path
-) -> None:
-    """``--summary`` is only valid for exec documents (issue #158)."""
-    result = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "adr",
-            "--feature",
-            "test-feature",
-            "--summary",
-            "--phase",
-            "P01",
-        ],
-    )
-    assert result.exit_code != 0
-    assert "only" in result.output and "exec" in result.output
-
-
-def test_summary_mutually_exclusive_with_step(
-    runner: CliRunner, synthetic_project: Path
-) -> None:
-    """``--summary`` cannot combine with ``--step`` (issue #158)."""
-    setup_test_plan(synthetic_project)
-    result = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "exec",
-            "--feature",
-            "test-feature",
-            "--summary",
-            "--phase",
-            "P01",
-            "--step",
-            "P01.S01",
-        ],
-    )
-    assert result.exit_code != 0
-    assert "--summary cannot be combined with --step" in result.output
-
-
-def test_phase_requires_summary(runner: CliRunner, synthetic_project: Path) -> None:
-    """``--phase`` without ``--summary`` is a clean error (issue #158)."""
-    setup_test_plan(synthetic_project)
-    result = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "exec",
-            "--feature",
-            "test-feature",
-            "--phase",
-            "P01",
-        ],
-    )
-    assert result.exit_code != 0
-    assert "--phase is only valid together with --summary" in result.output
-
-
-def test_summary_unknown_phase_errors_cleanly(
-    runner: CliRunner, synthetic_project: Path
-) -> None:
-    """A non-existent Phase id reports a clean error, not a traceback (#158)."""
-    setup_test_plan(synthetic_project)
-    result = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "exec",
-            "--feature",
-            "test-feature",
-            "--summary",
-            "--phase",
-            "P99",
-        ],
-    )
-    assert result.exit_code != 0
-    assert "P99" in result.output
-    assert "Traceback" not in result.output
-
-
-def _setup_test_plan_with_phase(project_dir: Path) -> Path:
-    """Write an ADR and an L2 plan whose Phase the parser recognises.
-
-    The parser registers a Phase only from a canonical ``### Phase`` heading
-    followed by an intent paragraph, so the summary scaffolder (which calls
-    ``find_phase``) needs a plan shaped this way rather than the flat
-    ``## Phase`` heading used by :func:`setup_test_plan`.
-    """
-    adr_dir = project_dir / ".vault" / "adr"
-    adr_dir.mkdir(parents=True, exist_ok=True)
-    (adr_dir / "2026-05-17-test-feature-adr.md").write_text(
-        "---\ntags:\n  - '#adr'\n  - '#test-feature'\n"
-        "date: '2026-05-17'\n---\n\n# `test-feature` adr: Architectural Decision\n",
-        encoding="utf-8",
-    )
-
-    plan_dir = project_dir / ".vault" / "plan"
-    plan_dir.mkdir(parents=True, exist_ok=True)
-    plan_file = plan_dir / "2026-05-17-test-feature-plan.md"
-    plan_file.write_text(
-        "---\ntags:\n  - '#plan'\n  - '#test-feature'\n"
-        "date: '2026-05-17'\ntier: L2\n---\n\n"
-        "# `test-feature` plan\n\n"
-        "### Phase `P01` - Test Phase\n\n"
-        "Phase P01 delivers a coherent slice of the work.\n\n"
-        "- [x] `P01.S01` - First step; `src/foo.py`.\n"
-        "- [ ] `P01.S02` - Second step; `src/bar.py`.\n",
-        encoding="utf-8",
-    )
-    return plan_file
-
-
-def test_summary_scaffolds_phase_summary(
-    runner: CliRunner, synthetic_project: Path
-) -> None:
-    """``--summary --phase`` scaffolds the canonical Phase-summary record (#158)."""
-    _setup_test_plan_with_phase(synthetic_project)
-    result = runner.invoke(
-        app,
-        [
-            "--target",
-            str(synthetic_project),
-            "vault",
-            "add",
-            "exec",
-            "--feature",
-            "test-feature",
-            "--summary",
-            "--phase",
-            "P01",
-        ],
-    )
-    assert result.exit_code == 0, f"Command failed: {result.output}"
-
-    target_file = (
-        synthetic_project
-        / ".vault"
-        / "exec"
-        / "2026-05-17-test-feature"
-        / "2026-05-17-test-feature-P01-summary.md"
-    )
-    assert target_file.exists()
-
-    content = target_file.read_text(encoding="utf-8")
-    # Frontmatter: directory + feature tags, plan back-link injected.
-    assert "- '#exec'" in content
-    assert "- '#test-feature'" in content
-    assert '- "[[2026-05-17-test-feature-plan]]"' in content
-    # Heading hydrated with the Phase display path, not the title alias.
-    assert "# `test-feature` `P01` summary" in content
-    summary_headings = [line for line in content.splitlines() if line.startswith("## ")]
-    assert summary_headings == ["## Changes"]
-    # No unhydrated placeholders survive.
-    assert "{phase}" not in content
-    assert "{feature}" not in content
+        assert result.exit_code == 0, result.output
+        plan = json.loads(result.output)["data"]["plans"][0]
+        by_step = {s["canonical_id"]: s for s in plan["steps"]}
+        assert by_step["S01"]["rows"] == 1
+        assert by_step["S01"]["verify"] == "fail"
+        assert by_step["S03"]["rows"] is None
+        assert "summaries" not in plan

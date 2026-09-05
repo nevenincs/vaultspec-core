@@ -20,7 +20,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from vaultspec_core.vaultcore.exec_ledger import is_ledger_stem, ledger_step_ids
+from vaultspec_core.vaultcore.exec_ledger import (
+    StepEvidence,
+    is_ledger_stem,
+    ledger_step_evidence,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -102,10 +106,16 @@ class ExecRecordIndex:
             records that carry no resolvable ``step_id:`` frontmatter,
             so the orientation trace can surface them rather than drop
             them silently (the unlinked bucket of decision D5).
+        evidence_by_step: Map from ``(feature, step_id)`` to what the
+            ledger records for that Step: change-row count, the last
+            ``verify:`` result, and the last ``by:`` persona. Only ledger
+            rows populate it; a legacy per-Step record maps a Step without
+            evidence detail.
     """
 
     by_step: dict[tuple[str, str], str] = field(default_factory=dict)
     unlinked_by_feature: dict[str, list[str]] = field(default_factory=dict)
+    evidence_by_step: dict[tuple[str, str], StepEvidence] = field(default_factory=dict)
 
     @classmethod
     def build(
@@ -200,6 +210,14 @@ class ExecRecordIndex:
         """
         return self.by_step.get((feature, step_id))
 
+    def evidence_for(self, feature: str, step_id: str) -> StepEvidence | None:
+        """Return what the ledger records for a Step, or ``None``.
+
+        ``None`` means either no ledger names the Step or the Step is mapped
+        by a legacy per-Step record, which carries no row detail.
+        """
+        return self.evidence_by_step.get((feature, step_id))
+
 
 def _index_ledger(
     index: ExecRecordIndex,
@@ -225,12 +243,13 @@ def _index_ledger(
     except (OSError, UnicodeDecodeError, ValueError):
         return
 
-    step_ids = ledger_step_ids(body)
-    if not step_ids:
+    evidence = ledger_step_evidence(body)
+    if not evidence:
         index.unlinked_by_feature.setdefault(feature, []).append(stem)
         return
-    for step_id in step_ids:
+    for step_id, detail in evidence.items():
         index.by_step[(feature, step_id)] = stem
+        index.evidence_by_step[(feature, step_id)] = detail
 
 
 def _plan_feature(plan: Plan) -> str | None:

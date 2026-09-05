@@ -225,3 +225,144 @@ def test_unknown_feature_is_refused(runner: CliRunner, synthetic_project: Path) 
 
     assert result.exit_code != 0
     assert "no execution folder found" in result.output
+
+
+def _write_v2_record(project: Path, step_id: str, display: str) -> Path:
+    path = project / ".vault" / "exec" / _FOLDER / f"{_FOLDER}-{display}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join(
+            (
+                "---",
+                "tags:",
+                "  - '#exec'",
+                "  - '#test-feature'",
+                "date: '2026-05-17'",
+                "modified: '2026-05-17'",
+                "body_schema: 'body-v2'",
+                f"step_id: '{step_id}'",
+                "related:",
+                f"  - '[[{_PLAN_STEM}]]'",
+                "---",
+                "",
+                "# did a thing",
+                "",
+                "## Changes",
+                "",
+                f"- `M` `src/{step_id.lower()}.py`",
+                "- `verify:` `pytest` -> `pass`",
+                "",
+                "## Notes",
+                "",
+                "skipped the docs.",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _write_summary(project: Path) -> Path:
+    path = project / ".vault" / "exec" / _FOLDER / f"{_FOLDER}-P01-summary.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join(
+            (
+                "---",
+                "tags:",
+                "  - '#exec'",
+                "  - '#test-feature'",
+                "date: '2026-05-17'",
+                "modified: '2026-05-17'",
+                "related:",
+                f"  - '[[{_PLAN_STEM}]]'",
+                "---",
+                "",
+                "# `test-feature` `P01` summary",
+                "",
+                "## Changes",
+                "",
+                "- `M` `src/s01.py`",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_body_v2_records_fold_with_operations_notes_and_summary(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
+    """The one-artifact release: current-schema records fold too."""
+    setup_test_plan(synthetic_project)
+    first = _write_v2_record(synthetic_project, "S01", "P01-S01")
+    second = _write_v2_record(synthetic_project, "S02", "P01-S02")
+    third = _write_v2_record(synthetic_project, "S03", "P01-S03")
+    summary = _write_summary(synthetic_project)
+
+    result = _fold(runner, synthetic_project, "--force")
+
+    assert result.exit_code == 0, result.output
+    text = _ledger(synthetic_project).read_text(encoding="utf-8")
+    assert "- `S01` `M` `src/s01.py`" in text
+    assert "- `S02` `verify:` `pytest` -> `pass`" in text
+    assert "- `S03` skipped the docs." in text
+    assert "`T`" not in text
+    assert not first.exists() and not second.exists() and not third.exists()
+    # Every Step of P01 has rows, so the Phase summary is removed too.
+    assert not summary.exists()
+
+
+def test_summary_is_kept_while_a_step_of_its_phase_has_no_rows(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
+    setup_test_plan(synthetic_project)
+    _write_v2_record(synthetic_project, "S01", "P01-S01")
+    summary = _write_summary(synthetic_project)
+
+    result = _fold(runner, synthetic_project, "--force")
+
+    assert result.exit_code == 0, result.output
+    assert summary.exists()
+    assert "Steps not all logged" in result.output
+
+
+def test_flat_record_with_step_id_folds_into_the_plan_ledger(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
+    setup_test_plan(synthetic_project)
+    flat = synthetic_project / ".vault" / "exec" / "2026-05-22-test-feature-exec.md"
+    flat.write_text(
+        "\n".join(
+            (
+                "---",
+                "tags:",
+                "  - '#exec'",
+                "  - '#test-feature'",
+                "date: '2026-05-22'",
+                "modified: '2026-05-22'",
+                "step_id: 'S02'",
+                "related:",
+                f"  - '[[{_PLAN_STEM}]]'",
+                "---",
+                "",
+                "# flat record",
+                "",
+                "## Scope",
+                "",
+                "- `src/bar.py`",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    result = _fold(runner, synthetic_project, "--force")
+
+    assert result.exit_code == 0, result.output
+    assert not flat.exists()
+    assert "- `S02` `T` `src/bar.py`" in _ledger(synthetic_project).read_text(
+        encoding="utf-8"
+    )

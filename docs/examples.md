@@ -168,14 +168,14 @@ The next open step is named. Start there.
 ## Execute
 
 Write the code the step describes, whether by hand or by asking your assistant to work
-the plan. Then record what changed and close the row:
+the plan. Then log what changed and close the row:
 
 ```
-vaultspec-core vault add exec --feature payment-retries --step S01
+vaultspec-core vault exec log --feature payment-retries --step S01 --related 2026-08-28-payment-retries-plan --row M:src/billing/retry.py
 ```
 
 ```
-Created: <project>/.vault/exec/2026-08-28-payment-retries/2026-08-28-payment-retries-P01-S01.md
+Logged: 1 row(s) for S01 -> 2026-08-28-payment-retries-ledger.md
 ```
 
 ```
@@ -186,13 +186,9 @@ vaultspec-core vault plan step check .vault/plan/2026-08-28-payment-retries-plan
 Closed Step `S01`. (Preserved 3 unknown blocks)
 ```
 
-Fill the record's `## Changes` section with one line per path you touched. Pass the bare
-step id, `S01`, to both commands: `P01.S01` is the display path that status prints, and
-the command derives the phase segment of the filename from the plan.
-
-Without `--step`, the record is not bound to a step. Its frontmatter keeps the
-`step_id: '{step_id}'` placeholder, `related` stays empty, and the file lands as
-`2026-08-28-payment-retries-exec.md` rather than inside the feature folder.
+The ledger is one file per plan, created on the first log and appended to after that;
+each row's first cell is the step id. Pass the bare step id, `S01`, to both commands:
+`P01.S01` is the display path that status prints.
 
 Status moves:
 
@@ -250,10 +246,10 @@ That is correct. Scaffolded documents are not finished documents: every one stil
 carries template annotations and unreplaced placeholders, because nobody has written the
 prose yet.
 
-Both blocks above and below are the report's last line. The full run prints a
-status row for every check first - on one vault that is eighty-eight lines and
-forty-one rows, since a check with several findings prints several - and the
-counts are what the rest of this section reasons about.
+Both blocks above and below are the report's last line. The full run prints a status row
+for every check first - on one vault that is eighty-eight lines and forty-one rows,
+since a check with several findings prints several - and the counts are what the rest of
+this section reasons about.
 
 `--fix` clears what is mechanical:
 
@@ -265,7 +261,11 @@ vaultspec-core vault check all --fix
   Total: 4 errors, 19 warnings, 19 fixed
 ```
 
-Nineteen repairs, and the four errors stay. The two nineteens do not subtract from the twenty-seven above: `fixed` counts the repairs applied, and the warning count beside it is a fresh reading taken afterwards, against a corpus those repairs have changed. Repairing one thing can settle a check that was not counted and unsettle one that was, so compare runs rather than doing the arithmetic.
+Nineteen repairs, and the four errors stay. The two nineteens do not subtract from the
+twenty-seven above: `fixed` counts the repairs applied, and the warning count beside it
+is a fresh reading taken afterwards, against a corpus those repairs have changed.
+Repairing one thing can settle a check that was not counted and unsettle one that was,
+so compare runs rather than doing the arithmetic.
 
 The four errors are the placeholders:
 
@@ -313,10 +313,10 @@ not when the files are created.
 This run stops where the vault is written, which is one step short of where a real one
 stops. Nothing above says what to stage, and nothing installs a gate:
 
-- [Verifying a workspace and a vault](./verification.md) covers every check this page ran
-  and what each one proves.
+- [Verifying a workspace and a vault](./verification.md) covers every check this page
+  ran and what each one proves.
 - [The framework manual](./framework.md) opens with what to commit and what the managed
   `.gitignore` block keeps out, including the one file it deliberately does not exclude.
 - [Correctness](./correctness.md) is where the gate lives: the install writes
-  `.pre-commit-config.yaml` and no git hook, so nothing checks a commit until you install
-  the `pre-commit` tool and run `pre-commit install`.
+  `.pre-commit-config.yaml` and no git hook, so nothing checks a commit until you
+  install the `pre-commit` tool and run `pre-commit install`.

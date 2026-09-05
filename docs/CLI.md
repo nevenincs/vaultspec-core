@@ -88,9 +88,9 @@ shape regardless of which command produced it:
 The `schema` value follows the convention `vaultspec.<dotted-command-path>.v1` - for
 example `vaultspec.sync.v1`, `vaultspec.vault.stats.v1`, or
 `vaultspec.spec.rules.add.v1`. Every schema is at version `v1` except
-`vaultspec.vault.graph.v2`, documented with `vault graph` below. Adding new
-keys under `data` is additive and does not bump the version; renaming or removing a key
-bumps the integer (`v2`, ...). Schema bumps are recorded in the release notes.
+`vaultspec.vault.graph.v2`, documented with `vault graph` below. Adding new keys under
+`data` is additive and does not bump the version; renaming or removing a key bumps the
+integer (`v2`, ...). Schema bumps are recorded in the release notes.
 
 Failures under `--json` emit the same envelope with the fixed schema
 `vaultspec.error.v1` and `status` set to `failed`; `data.message` carries the
@@ -111,7 +111,7 @@ full options.
 
 ### Top-level commands
 
-- `vaultspec-core install` - Install vaultspec resources for the selected providers.
+- `vaultspec-core install` - Install Vaultspec resources for the selected providers.
 - `vaultspec-core uninstall` - Remove the vaultspec framework from the target directory.
 - `vaultspec-core sync` - Sync rules, skills, agents, configs, system prompts, and MCPs.
 - `vaultspec-core doctor` - Diagnose overall workspace and vault health.
@@ -149,8 +149,8 @@ full options.
 - `vaultspec-core vault check all` - Run all vault health checks.
 - `vaultspec-core vault check body-links` - Find wiki-links and markdown path links in
   document body text.
-- `vaultspec-core vault check exec-mapping` - Check execution records map to a live Step
-  in their parent plan.
+- `vaultspec-core vault check exec-mapping` - Pair ledger rows with plan Steps and flag
+  closed Steps without evidence.
 - `vaultspec-core vault check body-sections` - Check document bodies carry the sections
   their template mandates.
 - `vaultspec-core vault check annotations` - Find generated template annotations in
@@ -268,10 +268,9 @@ full options.
   retired by its parent plan.
 - `vaultspec-core vault exec detach` - Remove a Step claim only when it resolves to
   neither a live nor retired Step.
-- `vaultspec-core vault exec log` - Append a Step's mechanical rows to its plan's
-  consolidated ledger.
+- `vaultspec-core vault exec log` - Append a Step's rows to its plan's ledger.
 - `vaultspec-core vault exec fold` - Fold a feature's per-Step execution records into
-  one consolidated ledger.
+  its plan's ledger.
 
 #### Archive
 
@@ -365,7 +364,7 @@ full options.
 - `vaultspec-core spec mcps remove` - Remove a canonical MCP server definition.
 - `vaultspec-core spec mcps sync` - Reconcile canonical definitions into provider-native
   enrollment.
-- `vaultspec-core spec mcps uninstall` - Remove vaultspec-owned provider-native MCP
+- `vaultspec-core spec mcps uninstall` - Remove Vaultspec-owned provider-native MCP
   enrollment.
 
 #### Reference
@@ -562,130 +561,27 @@ Create a new `.vault/` document from a template.
 - `--feature TAG` (`-f`) - Feature tag (kebab-case, lowercase letters, digits, hyphens).
   Required.
 - `--date DATE` (default today) - Override date (ISO 8601, e.g., YYYY-MM-DD).
-- `--title TITLE` - Document title. For execution records, overrides the default
-  heading.
+- `--title TITLE` - Document title.
 - `--topic TOPIC` - Kebab-case filename infix that distinguishes a second document of
   the same type for one feature, producing `{date}-{feature}-{topic}-{type}.md`. Only
   valid for `adr`, `audit`, `reference`, and `research`.
 - `--related DOC` (`-r`) - Related document(s). Accepts path, filename, stem, or
   `[[wiki-link]]`. Repeatable.
 - `--tags TAG` - Additional tags beyond the required directory and feature tags.
-  Repeatable. The taxonomy allows exactly two, so any tag added here is written
-  without complaint and then fails the `frontmatter` check with
-  `Exactly one feature tag (#<feature>) required`. There is no supported third
-  tag; the flag exists for setting the pair itself.
+  Repeatable. The taxonomy allows exactly two, so any tag added here is written without
+  complaint and then fails the `frontmatter` check with
+  `Exactly one feature tag (#<feature>) required`. There is no supported third tag; the
+  flag exists for setting the pair itself.
 - `--force` (default off) - Overwrite an existing document at the resolved path.
 - `--dry-run` (default off) - Preview without writing files.
 - `--json` (default off) - Emit machine-readable JSON output in standard envelope.
 - `--tier TIER` (default L1) - Plan tier (`L1`, `L2`, `L3`, `L4`). Ignored for non-plan
   types.
-- `--step STEP` - Canonical ID or display path of a specific step to scaffold. Only
-  valid for `exec`.
-- `--all-steps` (default off) - Scaffold execution records for all steps in parent plan.
-  Only valid for `exec`.
-- `--summary` (default off) - Scaffold a Phase summary instead of a step record. Only
-  valid for `exec`, and requires `--phase`.
-- `--phase PHASE` - Canonical Phase ID (for example `P01`) to summarize; used with
-  `--summary`.
 - `--no-hints` (default off) - Suppress next-step advisory hints.
 
-#### Step-Aware Execution Scaffolding (`DOC_TYPE=exec`)
-
-When adding an execution record (`exec`), the CLI supports step-aware mechanics to
-target individual or bulk steps from the parent plan.
-
-##### Option Gating and Fallbacks
-
-- **Mutual Exclusion**: `--step` and `--all-steps` are strictly mutually exclusive. If
-  both are provided, or if either is passed with a document type other than `exec`, the
-  CLI aborts with exit code `1`.
-- **Legacy Fallback**: If neither option is provided when creating an `exec` document,
-  the CLI displays a yellow warning:
-  `Deprecation Warning: Scaffolding flat (non-step-aware) execution records is deprecated. Use --step or --all-steps.`
-  It then falls back to scaffolding a flat record routed to
-  `.vault/exec/{date_str}-{feature}-exec.md` without nested folders.
-
-##### Parent Plan Resolution
-
-To resolve step definitions, the CLI searches for the parent plan using a two-tiered
-lookup:
-
-1. **Explicit (`--related` option)**: Scans user-supplied `--related` arguments. If
-   multiple resolved links are provided, the CLI iterates over them and uses the first
-   resolved plan document found.
-1. **Implicit (Unique Feature Lookup)**: Scans the entire vault for plan documents
-   tagged with the corresponding feature tag.
-
-- **Resolution Failures**:
-  - If zero plans are found, the CLI aborts with exit code `1` and prints:
-    `No plan found for feature '{feat}'. Create a plan document before adding execution records.`
-  - If multiple plans are found, the CLI aborts with exit code `1` and prints:
-    `Multiple plans found for feature '{feat}': {names}. Specify the parent plan using --related.`
-
-##### Custom Directory Routing
-
-Step-aware execution records are written to a nested folder structure:
-`.vault/exec/{plan-date}-{feature}/{plan-date}-{feature}-{suffix}.md` where `{suffix}`
-is the step's display path with all dots replaced by hyphens (e.g., display path
-`P01.S01` is saved with suffix `P01-S01`).
-
-##### Parent Plan Link Hydration
-
-The CLI automatically prepends the resolved parent plan's filename stem as a wiki-link
-(e.g., `[[2026-05-17-test-feature-plan]]`) as the first entry in the YAML frontmatter
-`related:` list.
-
-##### Template Placeholder Hydration Rules
-
-The scaffolding engine populates the following placeholders in the execution template:
-
-- `{step_id}`: Hydrated with the step's canonical ID (e.g., `S01`).
-
-- `{plan_stem}`: Hydrated with the parent plan's filename stem (e.g.,
-  `2026-05-17-test-feature-plan`).
-
-- `{heading}`: Hydrated with the step action. If a title is explicitly passed via
-  `--title`, it overrides this heading. Defaults to `{feature} <display-path>` if
-  neither is available.
-
-- `{scope_block}`: If the step defines a scope (e.g., `src/foo.py; src/bar.py`), parses
-  comma/semicolon-separated values and hydrates a clean list block:
-
-  ````markdown
-  ```markdown
-  ## Scope
-
-  - `src/foo.py`
-  - `src/bar.py`
-  ```
-  ````
-
-This block is omitted entirely if the step defines no scope.
-
-##### Bulk Scaffolding & Idempotency
-
-- `--all-steps` iterates over **all steps** (both checked and unchecked) listed in the
-  resolved parent plan.
-- **Idempotency**: Existing files are skipped and reported as `skipped; exists` unless
-  the `--force` flag is supplied, which overwrites them.
-- **Outcome Reporting**: Emits a structured outcome list. Plain-text lists files tagged
-  with lowercase outcome words: `created`, `skipped`, or `updated`. JSON output
-  (`--json`) emits a machine-readable payload adhering to the `vaultspec.vault.add.v1`
-  envelope schema listing details for each file.
-
-##### Examples
-
-- **Scaffold all execution records for a feature plan (Bulk Scaffolding)**:
-
-```bash
-vaultspec-core vault add exec --feature test-feature --all-steps
-```
-
-- **Scaffold an execution record for a specific step**:
-
-```bash
-vaultspec-core vault add exec --feature test-feature --step P01.S01
-```
+`exec` is not a scaffold type. `vaultspec-core vault add exec` exits 1 with the message
+"execution is logged with vault exec log"; the ledger is the only execution artifact and
+`vault exec log` its only writer.
 
 ______________________________________________________________________
 
@@ -889,17 +785,18 @@ top-level zeroth move. Read-only - it never writes and produces no artifact.
 
 **Rollup mode** (no `TARGET`): reports plans in flight, each with a one-line overview
 (tier, completed waves and phases, step completion, and the next open step); plans
-recently completed; recent changes grouped by type with execution records collapsed per
-feature; active features; and vault totals. Outcome semantics: always `unchanged`
-(read-only verb). Advisory hints point at the targeted form and at
-`vaultspec-core spec doctor` for framework health.
+recently completed; recent changes grouped by type with ledgers collapsed per feature;
+active features; and vault totals. Outcome semantics: always `unchanged` (read-only
+verb). Advisory hints point at the targeted form and at `vaultspec-core spec doctor` for
+framework health.
 
 **Targeted mode** (`TARGET` is a plan stem, plan path, or feature handle): renders the
 grounding trace - a plan-line header, then each step (display path, checkbox state, a
-cursor on the next open step) mapped to its execution-record stem, or `no record` for
-open steps without one, or `unlinked` for exec records that reference the plan but lack
-a resolvable `step_id:`. Grounding documents are grouped by type beneath the step list.
-A feature handle traces every plan under that feature.
+cursor on the next open step) mapped to its evidence: `ledger N rows` plus the last
+`verify:` result for a step with ledger rows, `no rows` for an open step without any, or
+`unlinked` for a closed step without any. Exec documents that reference the plan but
+name no step are listed as unlinked records. Grounding documents are grouped by type
+beneath the step list. A feature handle traces every plan under that feature.
 
 `vaultspec-core status` is orientation, not auditing: it describes what exists without
 judging conformance. Use `vaultspec-core vault check` to audit and
@@ -910,8 +807,7 @@ judging conformance. Use `vaultspec-core vault check` to audit and
 - `--limit N` (default `10`) - Recently modified documents to show, per type.
 - `--since N` - Show documents modified within the last N days.
 - `--paths` (default off) - Show each referenced document's path (targeted mode).
-- `--verbose-exec` (default off) - List execution records instead of collapsing them per
-  feature.
+- `--verbose-exec` (default off) - List ledgers instead of collapsing them per feature.
 - `--json` (default off) - Emit machine-readable output (`vaultspec.vault.status.v1`).
 - `--no-hints` (default off) - Suppress next-step advisory hints.
 
@@ -926,7 +822,7 @@ count to a day-window query.
   vaultspec-core status
   ```
 
-- **Trace a specific plan to its execution records and grounding documents**:
+- **Trace a specific plan to its ledger rows and grounding documents**:
 
   ```bash
   vaultspec-core status 2026-05-17-test-feature-plan
@@ -1348,19 +1244,22 @@ ______________________________________________________________________
 vaultspec-core vault exec fold [OPTIONS]
 ```
 
-Fold a feature's per-Step execution records into one consolidated ledger, migrating a
-`body-v1` corpus. Each record's `## Scope` paths become ledger rows under its Step id,
-and the folded records are removed once the ledger carrying their content is on disk.
+Fold a feature's per-Step execution records, from before 0.1.74, into its plan's ledger.
+The folded records are removed once the ledger carrying their content is on disk; the
+upgrade migration runs the same fold on its own.
 
-Body prose is discarded - that is the purpose of the fold. It is recoverable from the
-commit preceding it, since `.vault/` is tracked, but there is no forward command that
-undoes it. Recovered rows carry the `T` (touched) operation because `body-v1` never
-recorded whether a path was added, modified, or deleted; `T` stays distinguishable from
-a natively logged `A`/`M`/`D`/`R` so recovered evidence is never mistaken for reported
-evidence.
+A `body-v1` record's `## Scope` paths become rows carrying the `T` (touched) operation,
+because that schema never recorded whether a path was added, modified, or deleted and
+none is invented; `T` stays distinguishable from a natively logged `A`/`M`/`D`/`R`. A
+`body-v2` record's `## Changes` rows fold with their operations and `verify:` line
+intact, and its `## Notes` lines are carried under the Step id. A flat
+`<date>-<feature>-exec.md` record carrying a `step_id` folds too. Other prose is
+discarded; it is recoverable from the commit preceding the fold, since `.vault/` is
+tracked, but no forward command undoes it.
 
-Records with no `step_id`, and Phase summaries, are skipped and left intact: neither can
-be attributed to a single Step, so folding them would lose evidence.
+A Phase Summary is removed once every Step of its Phase has rows in the ledger, and left
+intact otherwise. A record with no `step_id` cannot be attributed to a Step and is left
+intact.
 
 #### Options
 
@@ -1377,9 +1276,12 @@ ______________________________________________________________________
 vaultspec-core vault exec log [OPTIONS]
 ```
 
-Append one Step's mechanical rows to its plan's consolidated execution ledger, creating
-the ledger on first use. The ledger is append-only: existing rows are never rewritten,
-and re-logging an identical row is idempotent rather than duplicating it.
+Append one Step's rows to its plan's ledger, creating the ledger on first use. The
+ledger is one document per plan and the only execution artifact; it is append-only:
+existing rows are never rewritten, and re-logging an identical row is idempotent rather
+than duplicating it. Concurrent appends to one ledger are serialised by an advisory
+lock, and the managed `.gitattributes` block declares `merge=union` on ledgers so two
+branches appending different Steps merge without a conflict.
 
 #### Options
 
@@ -1388,6 +1290,11 @@ and re-logging an identical row is idempotent rather than duplicating it.
 - `--step STEP` - Required canonical Step identifier or display path being logged.
 - `--row SPEC` - Row to append, repeatable. `A:path` added, `M:path` modified, `D:path`
   deleted, `R:old->new` renamed. The verb never infers an operation from disk state.
+- `--verify SPEC` - A check that ran, as `<command>=pass` or `<command>=fail`; written
+  as a `verify:` row.
+- `--by PERSONA` - The persona that closed the Step; written as a `by:` row.
+- `--note TEXT` - Exception note, repeatable; written as a `## Notes` line under the
+  Step id, the section created on first use.
 - `--dry-run` (default off) - Resolve and report the target ledger without writing.
 - `--json` (default off) - Emit the standard machine-readable result envelope.
 
@@ -1539,16 +1446,18 @@ the frontmatter name. Pick the one whose side you trust.
   (no `.md` extension).
 - `dangling` (`--fix`: yes, `--feature`: yes) - Find `related:` frontmatter wiki-links
   that resolve to no document.
-- `body-links` (`--fix`: yes, `--feature`: yes) - Find wiki-links and markdown path links
-  in document body text.
+- `body-links` (`--fix`: yes, `--feature`: yes) - Find wiki-links and markdown path
+  links in document body text.
 - `placeholders` (`--fix`: no, `--feature`: yes) - Find unreplaced `{...}` template
   placeholders in document body prose.
 - `orphans` (`--fix`: no, `--feature`: yes) - Find documents with no incoming
   wiki-links.
 - `features` (`--fix`: no, `--feature`: yes) - Check feature tag completeness - missing
   doc types.
-- `exec-mapping` (`--fix`: no, `--feature`: yes) - Check execution records map to a live
-  Step in their parent plan.
+- `exec-mapping` (`--fix`: no, `--feature`: yes) - Pair ledger rows with plan Steps: a
+  per-Step record or a closed Step with no row in an existing ledger is an error; a
+  closed Step with no row in a plan without a ledger, a row for an open or unknown Step,
+  is a warning; a row for a retired Step is clean.
 - `body-sections` (`--fix`: no, `--feature`: yes) - Check document bodies carry the
   sections their template mandates.
 - `feature-rename-integrity` (`--fix`: no, `--feature`: yes) - Surface exec folders
@@ -1567,10 +1476,10 @@ the frontmatter name. Pick the one whose side you trust.
   the project's own vault records (opt-in; findings are advisory).
 
 `yes` = fully supported, `partial` = only the sub-checks that accept `--fix` apply fixes
-(`all` dispatches to every check it runs), `no` = flag rejected with error.
-`all` runs nineteen of the twenty checks above: `code-boundary` is opt-in and
-runs only when named, so an exit-0 `all` makes no claim about it. `structure` does not
-support `--feature` filtering.
+(`all` dispatches to every check it runs), `no` = flag rejected with error. `all` runs
+nineteen of the twenty checks above: `code-boundary` is opt-in and runs only when named,
+so an exit-0 `all` makes no claim about it. `structure` does not support `--feature`
+filtering.
 
 Use `vaultspec-core vault repair` when the operator goal is end-to-end recovery with
 generated index refresh, post-fix validation, and a final delta report.
@@ -1870,13 +1779,12 @@ When run without `--json`, the command renders a console summary displaying:
 - **Container Counts**: Total count of Epic, Waves, Phases, and Steps.
 - **Completion Status**: Checked vs. unchecked steps and total progress percentage.
 
-##### Execution Record Verification (`exec-missing`)
+##### Ledger Coverage (`exec-missing`)
 
-The status command performs an active sanity check on execution records:
+The status command pairs every checked step with the plan's ledger:
 
-- If a step is checked (`[x]`) in the plan but no step-aware execution record (e.g.
-  `.vault/exec/{plan-date}-{feature}/{plan-date}-{feature}-P01-S01.md`) exists in the
-  vault, the CLI generates a yellow warning block:
+- If a step is checked (`[x]`) in the plan but the ledger has no row naming it, the CLI
+  generates a yellow warning block:
 
   ```text
   ! exec-missing: checked steps lacking execution records: S01, S02
@@ -1909,7 +1817,7 @@ schema envelope:
 
 ##### Examples
 
-- **Check the progress and execution record status of a plan**:
+- **Check the progress and ledger coverage of a plan**:
 
   ```bash
   vaultspec-core vault plan status .vault/plan/2026-05-17-test-feature-plan.md

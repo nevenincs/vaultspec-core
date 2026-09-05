@@ -3,9 +3,9 @@ tags:
   - '#adr'
   - '#exec-record-consolidation'
 date: '2026-08-23'
-modified: '2026-08-23'
+modified: '2026-09-05'
 body_schema: 'body-v2'
-body_hash: 'sha256:098162fe431b620a0e5c43fe0baaac147adece47f8ed0fedb9c4034927328d54'
+body_hash: 'sha256:cb2ef85b919c860fe91218e02e9416ff9c23a5821c65bef3933dccc405c01525'
 related:
   - "[[2026-08-23-exec-record-consolidation-research]]"
   - "[[2026-05-17-cli-exec-step-records-adr]]"
@@ -123,10 +123,29 @@ at 388 Steps, is 659 KB across 388 files becoming roughly 56 KB in one file:
 rather than being discarded, this is a representation change, not a loss of
 fidelity.
 
-Additive delivery is what makes the reversal safe. The per-Step path is
-untouched and still the default, so this record supersedes the rejection
+Additive delivery is what made the reversal safe at the time. The per-Step path
+was untouched and still the default, so this record superseded the rejection
 recorded in the Considerations of its predecessor, not the Step-awareness
-decision itself, which stands.
+decision itself, which stands: a Step still resolves to a real artifact, now
+a row rather than a file.
+
+Amended 2026-09-05, user approved. Keeping two artifacts was wrong: an agent
+picks either at random and the prose must describe two paths. The ledger is
+now the only execution artifact. `vault add exec` refuses with the message
+"execution is logged with vault exec log"; its `--step`, `--all-steps`,
+`--summary`, and `--phase` options are removed, the per-Step and Phase-summary
+templates are deleted, and the MCP `create` tool refuses `exec` while a
+first-class `log` tool mirrors `vault exec log`. This changes the
+`vault add exec` signature that `2026-05-17-cli-exec-step-records-adr` named
+a user contract; the one-release refusal-with-message is that contract's
+deprecation cycle, and the user accepted it.
+
+Attribution needs no prose. The commit that carries a Step's rows carries its
+author and the `Vaultspec-Step` trailer, so `git blame` on a row is
+row-level attribution; `--by` adds a `by:` row naming the persona, `--verify`
+a `verify:` row, and `--note` an exception line under the Step id in
+`## Notes`. A Phase Summary is redundant under a ledger: a Phase's union is a
+row filter.
 
 ## Consequences
 
@@ -174,3 +193,28 @@ decision itself, which stands.
 - The `--all-steps` bulk form has no ledger equivalent, because pre-scaffolding
   rows invents evidence for work not yet done, which the mechanical contract
   forbids.
+- Since the 2026-09-05 amendment, `exec-mapping` enforces the single artifact:
+  a per-Step record is an error naming `vault exec fold`; a closed Step with
+  no row is an error once the plan's ledger carries a verb-written row (a
+  fold writes only `T` rows) and a warning before that; a row for a still-open Step or an unknown Step is a warning; a row
+  for a retired Step is clean, because ledger rows are history. `status` shows
+  `ledger N rows` and the last `verify:` result per Step, `no rows` for an open
+  Step, and no summaries group.
+- The migration `m_0_1_74_exec_ledger_only` folds every remaining per-Step
+  record, `body-v1` and `body-v2` alike and the flat pre-Step-aware shape, and
+  removes a Phase Summary once every Step of its Phase has rows. The narrow
+  scope of the 0.1.58 fold stops being load-bearing once nothing can author a
+  per-Step record, so the two ship in the same release, never apart. A
+  `body-v2` record folds with its operations, `verify:` line, and `## Notes`
+  lines intact; only `body-v1` prose is discarded.
+- Concurrency is handled at two layers: an advisory lock serialises appends to
+  one ledger inside a workspace, and the managed `.gitattributes` block
+  declares `merge=union` on `.vault/exec/**/*-ledger.md`, so two branches
+  appending different Steps merge without a conflict, add/add included. The
+  plan's `body_hash:` attestation still conflicts when two branches close
+  different Steps of one plan; `vault check modified-stamp --fix` re-attests
+  the merged plan. That is the plan's concurrency cost, not the ledger's.
+- The ledger template's hint comment carried example rows that the parser read
+  as real rows, so a fresh ledger claimed coverage for `S01` and `S02`. The
+  parser now strips HTML comments before reading either section, and the hint
+  uses `S##` placeholders.

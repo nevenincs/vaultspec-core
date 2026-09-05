@@ -28,6 +28,7 @@ from vaultspec_core.cli._app import make_app
 
 from .tools import (
     register_document_tools,
+    register_exec_tools,
     register_gateway_tools,
     register_orientation_tools,
     register_plan_tools,
@@ -141,6 +142,7 @@ def create_server(*, read_only: bool = False) -> MCPServer[None]:
     register_orientation_tools(mcp, include_fix=not read_only)
     if not read_only:
         register_plan_tools(mcp)
+        register_exec_tools(mcp)
     register_gateway_tools(mcp, include_invoke=not read_only)
 
     return mcp

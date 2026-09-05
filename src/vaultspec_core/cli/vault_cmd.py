@@ -261,39 +261,12 @@ def cmd_add(
             ),
         ),
     ] = "L1",
-    step: Annotated[
-        str | None,
-        typer.Option(
-            "--step",
-            help="Canonical ID or display path of step to scaffold",
-        ),
-    ] = None,
-    all_steps: Annotated[
-        bool,
-        typer.Option(
-            "--all-steps",
-            help="Scaffold execution records for all steps in parent plan",
-        ),
-    ] = False,
-    summary: Annotated[
-        bool,
-        typer.Option(
-            "--summary",
-            help="Scaffold a Phase summary (exec only; requires --phase)",
-        ),
-    ] = False,
-    phase: Annotated[
-        str | None,
-        typer.Option(
-            "--phase",
-            help="Canonical Phase ID (e.g. P01) to summarise; used with --summary",
-        ),
-    ] = None,
     target: TargetOption = None,
 ) -> None:
     """Create a new .vault/ document from a template.
 
-    Supported types: adr, audit, exec, plan, reference, research.
+    Supported types: adr, audit, plan, reference, research. Execution is not
+    scaffolded: it is logged with ``vault exec log``.
     """
     apply_target(target)
     from vaultspec_core.cli import _add_ops
@@ -301,8 +274,6 @@ def cmd_add(
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.hydration import (
         DocumentIdentity,
-        ExecBinding,
-        ParentPlan,
         TemplateFields,
         WritePolicy,
         create_vault_doc,
@@ -313,9 +284,6 @@ def cmd_add(
     root_dir = _get_ctx().target_dir
 
     dt = _add_ops.resolve_doc_type(console, doc_type)
-    _add_ops.validate_step_flags(
-        console, dt, step=step, all_steps=all_steps, summary=summary, phase=phase
-    )
     _add_ops.validate_tier(console, dt, tier)
     topic_value = _add_ops.normalize_topic(console, dt, topic)
     feat = _add_ops.normalize_feature(console, feature)
@@ -338,71 +306,10 @@ def cmd_add(
         tier=tier if dt is DocType.PLAN else None,
     )
     write = WritePolicy(force=force, dry_run=dry_run)
-    exec_binding = ExecBinding(summary=summary)
 
-    if dt is DocType.EXEC and (step is not None or all_steps or summary):
-        from vaultspec_core.plan.parser import parse_plan
-
-        parent_plan_doc = _add_ops.resolve_parent_plan(
-            console, root_dir, feat, resolved_related
-        )
-        parsed_plan = parse_plan(parent_plan_doc.path)
-        plan_stem_arg = parent_plan_doc.path.stem
-        parent_plan = ParentPlan(
-            date=parent_plan_doc.date or plan_stem_arg[:10], stem=plan_stem_arg
-        )
-
-        if all_steps:
-            raise typer.Exit(
-                code=_add_ops.scaffold_all_steps(
-                    parsed_plan.steps,
-                    root_dir=root_dir,
-                    identity=identity,
-                    fields=fields,
-                    plan=parent_plan,
-                    write=write,
-                    json_output=json_output,
-                )
-            )
-        if step is not None:
-            target_step = _add_ops.resolve_step_row(console, parsed_plan, step)
-            exec_binding = ExecBinding(
-                plan=parent_plan,
-                step_id=target_step.canonical_id,
-                step_display_path=target_step.display_path,
-                step_scope=target_step.scope,
-                step_action=target_step.action,
-                summary=summary,
-            )
-        else:
-            # The "--summary requires --phase" validation above guarantees a
-            # non-None phase id by the time this branch runs.
-            assert phase is not None
-            exec_binding = ExecBinding(
-                plan=parent_plan,
-                summary=summary,
-                phase_display_path=_add_ops.resolve_phase_display_path(
-                    console, parsed_plan, phase
-                ),
-            )
-
-    elif dt is DocType.EXEC and not json_output:
-        console.print(
-            "[yellow]Deprecation Warning: Scaffolding a flat execution "
-            "record without --step or --all-steps is deprecated and will "
-            "be removed in a future release.[/yellow]"
-        )
-
-    # Single-document scaffolding path (legacy route or --step route)
     with _add_ops.suppress_logging(active=json_output):
         try:
-            path = create_vault_doc(
-                root_dir,
-                identity,
-                fields,
-                exec_binding=exec_binding,
-                write=write,
-            )
+            path = create_vault_doc(root_dir, identity, fields, write=write)
         except Exception as exc:
             _handle_error(exc, json_output=json_output)
             return

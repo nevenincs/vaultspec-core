@@ -1,7 +1,7 @@
 # vaultspec-core CLI reference (bundled)
 
 Machine-facing command reference for `vaultspec-core`, bundled into every consumer
-project on install and seeded to `.vaultspec/rules/reference/cli.md`. This is a
+project on install and seeded to `.vaultspec/reference/cli.md`. This is a
 locally-resident lookup for AI agents: command inventory, options, argument
 enumerations, exit codes, and environment variables. The human-facing prose reference is
 `docs/CLI.md` in the source repository.
@@ -83,8 +83,8 @@ hand-edit between the markers.
 - `vaultspec-core vault check all` - Run all vault health checks.
 - `vaultspec-core vault check body-links` - Find wiki-links and markdown path links in
   document body text.
-- `vaultspec-core vault check exec-mapping` - Check execution records map to a live Step
-  in their parent plan.
+- `vaultspec-core vault check exec-mapping` - Pair ledger rows with plan Steps and flag
+  closed Steps without evidence.
 - `vaultspec-core vault check body-sections` - Check document bodies carry the sections
   their template mandates.
 - `vaultspec-core vault check annotations` - Find generated template annotations in
@@ -202,10 +202,9 @@ hand-edit between the markers.
   retired by its parent plan.
 - `vaultspec-core vault exec detach` - Remove a Step claim only when it resolves to
   neither a live nor retired Step.
-- `vaultspec-core vault exec log` - Append a Step's mechanical rows to its plan's
-  consolidated ledger.
+- `vaultspec-core vault exec log` - Append a Step's rows to its plan's ledger.
 - `vaultspec-core vault exec fold` - Fold a feature's per-Step execution records into
-  one consolidated ledger.
+  its plan's ledger.
 
 #### Archive
 
@@ -389,7 +388,8 @@ outcome (`mixed` when items disagree).
 
 Create a `.vault/` document from a template.
 
-`DOC_TYPE`: `adr`, `audit`, `exec`, `plan`, `reference`, `research`.
+`DOC_TYPE`: `adr`, `audit`, `plan`, `reference`, `research`. `exec` is refused:
+execution is logged with `vault exec log`.
 
 | Option | Short | Default | Description | | --------------- | ----- | ------- |
 -------------------------------------------------------------------- | | `--feature TAG`
@@ -402,11 +402,26 @@ None | Additional freeform tags. Repeatable. | | `--force` | - | off | Overwrite
 existing document. | | `--dry-run` | - | off | Preview without writing. | | `--json` | -
 | off | Emit machine-readable output. | | `--no-hints` | - | off | Suppress next-step
 advisory hints. | | `--tier TIER` | - | `L1` | Plan tier (`L1`..`L4`). Ignored for
-non-plan document types. | | `--step ID` | - | None | Canonical ID or display path of
-the Step to scaffold (exec records). | | `--all-steps` | - | off | Scaffold execution
-records for all Steps in the parent plan. | | `--summary` | - | off | Scaffold a Phase
-summary instead of a Step record (exec only; requires `--phase`). | | `--phase ID` | - |
-None | Canonical Phase ID to summarise; used with `--summary`. |
+non-plan document types. |
+
+### vaultspec-core vault exec log
+
+Append one Step's rows to its plan's ledger, the only execution artifact, creating the
+ledger on first use. Append-only and idempotent; concurrent appends serialise on the
+docs-domain lock and the managed `.gitattributes` block declares `merge=union` on
+ledgers.
+
+| Option           | Default | Description                                                                         |
+| ---------------- | ------- | ----------------------------------------------------------------------------------- |
+| `--feature TAG`  | None    | Feature tag, with or without `#`. Required.                                         |
+| `--related STEM` | None    | Parent plan stem. Required.                                                         |
+| `--step ID`      | None    | Canonical Step id or display path. Required.                                        |
+| `--row SPEC`     | None    | `A:path`, `M:path`, `D:path`, or `R:old->new`; repeatable.                          |
+| `--verify SPEC`  | None    | A check that ran, `<command>=pass` or `<command>=fail`; written as a `verify:` row. |
+| `--by PERSONA`   | None    | The persona that closed the Step; written as a `by:` row.                           |
+| `--note TEXT`    | None    | Exception note under the Step id in `## Notes`; repeatable.                         |
+| `--dry-run`      | off     | Resolve the ledger without writing.                                                 |
+| `--json`         | off     | Emit machine-readable output.                                                       |
 
 ### vaultspec-core vault edit
 
@@ -448,17 +463,18 @@ it never writes and produces no artifact.
 
 **Rollup mode** (no `TARGET`): reports plans in flight, each with a one-line overview
 (tier, completed waves and phases, step completion, and the next open step); plans
-recently completed; recent changes grouped by type with execution records collapsed per
-feature; active features; and vault totals. Advisory hints point at the targeted mode
-and at `vaultspec-core spec doctor` for health checks.
+recently completed; recent changes grouped by type with ledgers collapsed per feature;
+active features; and vault totals. Advisory hints point at the targeted mode and at
+`vaultspec-core spec doctor` for health checks.
 
 **Targeted mode** (`TARGET` is a plan stem, plan path, or feature handle): renders the
 grounding trace for that target - a plan-line header, then each step (display path,
-checkbox state, a cursor on the next open step) mapped to its execution-record stem, or
-`no record` for open steps without one, or `unlinked` for exec records that reference
-the plan without a resolvable `step_id:`. Grounding documents are grouped by type
-beneath the step list. A feature handle traces every plan under the feature. Advisory
-hints point at `vaultspec-core vault graph` for full graph exploration and at
+checkbox state, a cursor on the next open step) mapped to its evidence: `ledger N rows`
+plus the last `verify:` result, `no rows` for an open step without any, or `unlinked`
+for a closed step without any; exec documents that reference the plan but name no step
+are listed as unlinked records. Grounding documents are grouped by type beneath the step
+list. A feature handle traces every plan under the feature. Advisory hints point at
+`vaultspec-core vault graph` for full graph exploration and at
 `vaultspec-core vault plan status` for deep single-plan validation.
 
 `vaultspec-core status` is orientation, not auditing: it describes what exists without
@@ -469,8 +485,8 @@ judging conformance. Use `vaultspec-core vault check` to audit and
 ------------------------------------------------- | | `--limit N` | - | `10` | Recently
 modified documents to show, per type. | | `--since N` | - | None | Show documents
 modified within the last N days. | | `--paths` | - | off | Show each referenced
-document's path (targeted). | | `--verbose-exec` | - | off | List execution records
-instead of collapsing them.| | `--json` | - | off | Emit machine-readable output. | |
+document's path (targeted). | | `--verbose-exec` | - | off | List ledgers instead of
+collapsing them per feature.| | `--json` | - | off | Emit machine-readable output. | |
 `--no-hints` | - | off | Suppress next-step advisory hints. |
 
 `--limit` and `--since` apply only in rollup mode; in targeted mode they are accepted

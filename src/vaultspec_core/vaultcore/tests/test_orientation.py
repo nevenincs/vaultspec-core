@@ -619,9 +619,41 @@ class TestTraceStepMapping:
         assert by_step["S01"].record_stem == stems["exec_s01"]
         assert by_step["S01"].checked is True
         assert by_step["S02"].record_stem == stems["exec_s02"]
-        # Open step with no record maps to None (the explicit no-record state).
+        # Open step with no rows maps to None (the explicit no-rows state).
         assert by_step["S03"].checked is False
         assert by_step["S03"].record_stem is None
+        # Legacy per-Step records carry no row detail.
+        assert by_step["S01"].rows is None and by_step["S01"].verify is None
+
+    def test_ledger_rows_carry_evidence_detail(self, tmp_path: Path) -> None:
+        stems = _build_single_feature_vault(tmp_path)
+        feature = "widget"
+        ledger = _exec(
+            feature,
+            date="2026-03-16",
+            modified="2026-03-16",
+            step_id=None,
+            plan_stem=stems["plan"],
+        ).replace(
+            "Execution details.",
+            "## Changes\n\n- `S03` `M` `src/a.py`\n"
+            "- `S03` `verify:` `pytest` -> `fail`\n- `S03` `by:` `worker`\n",
+        )
+        _write(
+            tmp_path
+            / ".vault"
+            / "exec"
+            / f"2026-03-01-{feature}"
+            / f"2026-03-01-{feature}-ledger.md",
+            ledger,
+        )
+
+        trace = compute_trace(tmp_path, stems["plan"])
+
+        by_step = {s.canonical_id: s for s in trace.plans[0].steps}
+        assert by_step["S03"].record_stem == f"2026-03-01-{feature}-ledger"
+        assert by_step["S03"].rows == 1
+        assert by_step["S03"].verify == "fail"
 
     def test_step_display_paths_are_tier_conditional(self, tmp_path: Path) -> None:
         stems = _build_single_feature_vault(tmp_path)
@@ -726,7 +758,7 @@ class TestTraceTargetResolution:
         with pytest.raises(TargetResolutionError):
             compute_trace(tmp_path, "no-such-thing-at-all")
 
-    def test_phase_summary_grouped_separately(self, tmp_path: Path) -> None:
+    def test_leftover_phase_summary_is_unlinked(self, tmp_path: Path) -> None:
         stems = _build_single_feature_vault(tmp_path)
         feature = "widget"
         summary_stem = f"2026-03-01-{feature}-P01-summary"
@@ -748,10 +780,10 @@ class TestTraceTargetResolution:
         trace = compute_trace(tmp_path, stems["plan"])
 
         plan = trace.plans[0]
-        # A -summary document referencing the plan is a summary by design,
-        # not an unlinked anomaly.
-        assert summary_stem in plan.summaries
-        assert summary_stem not in plan.unlinked_records
+        # A leftover -summary document names no Step, so it is unlinked like
+        # any other exec document that is not the ledger.
+        assert not hasattr(plan, "summaries")
+        assert summary_stem in plan.unlinked_records
         assert stems["exec_orphan"] in plan.unlinked_records
 
 

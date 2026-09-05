@@ -37,8 +37,8 @@ related:
 <!-- LINK RULES:
      - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
      - NEVER use [[wiki-links]] or markdown links in the document body.
-     - NEVER reference file paths in the body. If you must name a source file,
-       class, or function, use inline backtick code: `src/module.py`. -->
+     - Cite code as inline backtick locators: `src/module.py:42`; never as a
+       markdown link. -->
 
 # `{feature}` adr: `{title}` | (**status:** `{proposed|accepted|rejected|superseded|deprecated}`)
 
@@ -70,16 +70,14 @@ Rationale. -->
 
 ## Constraints
 
-<!-- Technical limitations, e.g.: depends on non-mature library, frontier feature, requires rigorous research. 'Frontier' risk, e.g. technology is new and falls outside the implementing model's training cutoff.
-
-List out the blocking constraints, and features, gaps needed for reliable implementation. Must explicitly evaluate how stable 'parent' features are if this adr
-relies on another feature. -->
+<!-- Blocking constraints, and how stable the features this decision relies on are,
+     each cited by stem or locator. -->
 
 ## Implementation
 
-<!-- A high-level overview (not a plan!) of HOW and WHAT will be implemented. Focus on condensed but clear prose that describes functionality layering.
+<!-- A high-level overview (not a plan) of HOW and WHAT will be implemented. Focus on condensed but clear prose that describes functionality layering.
 
-Do not add code; code references must be persisted in a separate `{reference}` document. Important `{reference}` snippets must be summarized and referenced explicitly. -->
+Do not add code; cite the `{reference}` record by stem for any implementation detail. -->
 
 ## Rationale
 

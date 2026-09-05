@@ -49,7 +49,7 @@ _RESOLVER_SNIPPET = (
     "print(resolve_stdin_client_pid(), flush=True)"
 )
 
-#: The nine tools the served surface must advertise; a lifecycle test only
+#: The ten tools the served surface must advertise; a lifecycle test only
 #: counts once the spawned server has proven it serves exactly these.
 _EXPECTED_TOOLS = frozenset(
     {
@@ -59,6 +59,7 @@ _EXPECTED_TOOLS = frozenset(
         "edit",
         "plan_progress",
         "plan_edit",
+        "log",
         "check",
         "discover",
         "invoke",
@@ -72,7 +73,7 @@ def _assert_server_serves(stdin_pipe: IO[bytes], stdout_pipe: IO[bytes]) -> None
     Drives the real newline-delimited JSON-RPC exchange over the given
     binary pipes: ``initialize`` must identify the server,
     ``notifications/initialized`` completes the handshake, and
-    ``tools/list`` must return exactly the nine-tool surface. Liveness
+    ``tools/list`` must return exactly the ten-tool surface. Liveness
     alone is never the pass criterion for a running MCP service.
     """
 
@@ -984,7 +985,7 @@ def test_real_server_parent_pid_flag_reaps_on_override_death(
     )
     try:
         # Functional floor: prove the server serves MCP over its own pipes
-        # (handshake identifies it; tools/list is the exact nine-tool
+        # (handshake identifies it; tools/list is the exact ten-tool
         # surface) before the override-death lifecycle assertion counts.
         assert server.stdin is not None
         assert server.stdout is not None

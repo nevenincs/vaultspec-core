@@ -3,9 +3,9 @@ tags:
   - '#exec'
   - '#cli-simplification-ux'
 date: '2026-05-17'
-modified: '2026-08-23'
+modified: '2026-09-05'
 body_schema: 'body-v2'
-body_hash: 'sha256:18b6cd93b80a574ab724844ad13a449dbc9d841b9113627a33ff7a3d0174990e'
+body_hash: 'sha256:b42e66b1ca24c2364b4812a64cc8838eee0154f306555a5377539762c1d7ac6f'
 related:
   - "[[2026-05-17-cli-simplification-ux-plan]]"
 ---
@@ -72,3 +72,5 @@ related:
 - `S56` `T` `docs/`
 - `S57` `T` `.vaultspec/`
 - `S58` `T` `'*.md'`
+- `S11` `T`
+

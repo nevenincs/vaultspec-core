@@ -440,15 +440,14 @@ class TestScaffoldStamp:
         )
         assert lines[schema_index + 1].startswith("body_hash: 'sha256:")
 
-    def test_scaffold_exec_step_record_stamps_modified(self, tmp_path: Path) -> None:
+    def test_scaffold_exec_ledger_stamps_modified(self, tmp_path: Path) -> None:
         content_root = self._content_root(tmp_path)
         path = create_vault_doc(
             tmp_path,
             DocumentIdentity(DocType.EXEC, "stamp-feat", "2026-06-12"),
             exec_binding=ExecBinding(
                 plan=ParentPlan(stem="2026-06-12-stamp-feat-plan"),
-                step_id="S01",
-                step_display_path="W01.P01.S01",
+                ledger=True,
             ),
             content_root=content_root,
         )
