@@ -15,12 +15,12 @@ only one, read the framework manual.
 
 ## Look these up when you need them
 
-| Guide                                      | What it covers                                                                                            |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| [Verifying a workspace](verification.md)   | Running the health checks, reading what they report, and repairing a document that fails one.             |
-| [The correctness workflow](correctness.md) | What the framework makes an agent prove before work counts as done, and which judgments it leaves to you. |
-| [CLI reference](CLI.md)                    | Every command, argument, flag, and exit code.                                                             |
-| [MCP server](MCP.md)                       | The Model Context Protocol server: its tools, setup, and configuration.                                   |
+| Guide                                             | What it covers                                                                                |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| [Verifying a workspace](verification.md)          | Running the health checks, reading what they report, and repairing a document that fails one. |
+| [Review a feature implementation](correctness.md) | Record review findings, address them, and verify test evidence.                               |
+| [CLI reference](CLI.md)                           | Every command, argument, flag, and exit code.                                                 |
+| [MCP server](MCP.md)                              | The Model Context Protocol server: its tools, setup, and configuration.                       |
 
 Not covered here: installation lives in the [project README](../README.md), and bugs and
 questions go to the [issue tracker](https://github.com/nevenincs/vaultspec-core/issues).

@@ -229,11 +229,9 @@ retired-identifier rule means a reopened step keeps its history.
 
 ## Review the result
 
-`/vaultspec-code-review` audits finished work and writes the result to `.vault/audit/`,
-ranked by severity. It runs at each phase close, at plan close, and before the work is
-handed off for merge. What it finds either gets fixed, which may reopen steps, or gets
-recorded as accepted. [The correctness workflow](./correctness.md) covers what the
-review gate does and does not prove.
+Ask your agent to use `vaultspec-code-review` to compare the implementation with the
+approved decision and plan. Follow the [review guide](./correctness.md) to record
+findings, agree on fixes, and check the resulting changes.
 
 ## Everyday commands
 
@@ -370,7 +368,7 @@ and keep credentials out of them.
 | [Repository README](../README.md)                      | What vaultspec-core is, and installing it          |
 | [Document syntax](./syntax.md)                         | Frontmatter, tags, links, and the plan row grammar |
 | [Verifying a workspace and a vault](./verification.md) | The health commands and what each check proves     |
-| [The correctness workflow](./correctness.md)           | How a change is proven right, and the review gate  |
+| [Review a feature implementation](./correctness.md)    | Review scope, findings, fixes, and test evidence   |
 | [CLI reference](./CLI.md)                              | Every command, flag, and option                    |
 | [MCP reference](./MCP.md)                              | The MCP server tools, setup, and configuration     |
 
