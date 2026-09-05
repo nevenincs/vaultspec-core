@@ -63,25 +63,48 @@ jobs:
 
           # The module is standard-library only, so the sentinel needs nothing
           # provisioned - one less thing that can be the reason it does not run.
+          #
+          # The verdict is read as a state, never inferred from the exit
+          # code. That code is 0 for `healthy` and for `pending` alike,
+          # because neither should fail this job - so a boolean derived
+          # from it cannot tell "main is green" from "no verdict yet".
+          # Reading it that way is how issue #398 was closed as validated
+          # while main's tip was red and its CI run was still in flight.
           set +e
-          verdict=$(python3 dev/ci_sentinel/main_ci_health.py \
-            --commit-age-minutes "${age}" < runs.json)
+          python3 dev/ci_sentinel/main_ci_health.py \
+            --commit-age-minutes "${age}" --format key-value \
+            < runs.json > verdict.env
           rc=$?
           set -e
 
+          state=$(sed -n 's/^state=//p' verdict.env)
+          reason=$(sed -n 's/^reason=//p' verdict.env)
+
+          # A judge that produced no verdict is itself a fault. Without
+          # this, a crash leaves `state` empty, every branch below is
+          # skipped, and the sentinel reports success having judged
+          # nothing.
+          case "${state}" in
+            healthy | pending | unhealthy) ;;
+            *)
+              echo "::error::the sentinel produced no verdict (exit ${rc})"
+              exit 1
+              ;;
+          esac
+
           {
             echo "sha=${sha}"
-            echo "verdict=${verdict}"
-            echo "healthy=$( [ "$rc" -eq 0 ] && echo true || echo false )"
+            echo "state=${state}"
+            echo "reason=${reason}"
           } >> "$GITHUB_OUTPUT"
-          echo "${verdict}" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "${state}: ${reason}" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Open an issue and fail
-        if: ${{ steps.judge.outputs.healthy == 'false' }}
+        if: ${{ steps.judge.outputs.state == 'unhealthy' }}
         shell: bash
         env:
           SHA: ${{ steps.judge.outputs.sha }}
-          VERDICT: ${{ steps.judge.outputs.verdict }}
+          VERDICT: ${{ steps.judge.outputs.reason }}
         run: |
           set -euo pipefail
           # Reuse the open issue rather than filing one an hour. A human closing
@@ -114,8 +137,11 @@ jobs:
           echo "::error::${VERDICT}"
           exit 1
 
+      # Only `healthy` closes. `pending` deliberately does nothing at all:
+      # an outstanding verdict is evidence of neither state, so the issue
+      # stays open until a run actually succeeds.
       - name: Close the sentinel issue once main is validated again
-        if: ${{ steps.judge.outputs.healthy == 'true' }}
+        if: ${{ steps.judge.outputs.state == 'healthy' }}
         shell: bash
         env:
           SHA: ${{ steps.judge.outputs.sha }}

@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 import tomllib
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import TypedDict, cast, get_args
 
 import pytest
 import yaml
@@ -21,6 +21,11 @@ pytestmark = [pytest.mark.repo]
 
 #: Repository root (``dev/guards/`` -> ``dev/`` -> repo).
 ROOT = Path(__file__).resolve().parents[2]
+
+#: A sentinel step condition of the form ``outputs.state == 'healthy'``.
+_SENTINEL_STATE_CONDITION = re.compile(
+    r"steps\.judge\.outputs\.state\s*[=!]=\s*'(?P<state>[a-z-]+)'"
+)
 
 
 class _PreCommitHook(TypedDict):
@@ -42,12 +47,13 @@ class _PreCommitConfig(TypedDict):
     repos: list[_PreCommitRepo]
 
 
-class _WorkflowStep(TypedDict, total=False):
-    """One step in a GitHub Actions job."""
-
-    name: str
-    run: str
-    uses: str
+#: One step in a GitHub Actions job. Declared functionally because `if` is a
+#: Python keyword and so cannot be an attribute in the class syntax.
+_WorkflowStep = TypedDict(
+    "_WorkflowStep",
+    {"name": str, "run": str, "uses": str, "if": str},
+    total=False,
+)
 
 
 class _WorkflowJob(TypedDict):
@@ -144,12 +150,17 @@ def _colocated_test_dirs() -> set[str]:
     moment the others appeared.
     """
     included = _load_basedpyright_config()["include"]
-    return {
+    found = {
         path.relative_to(ROOT).as_posix()
         for tree in included
         for path in (ROOT / tree).rglob("tests")
         if path.is_dir() and "__pycache__" not in path.parts
     }
+    # The caller subtracts this set from the exemption list and asserts the
+    # remainder is empty, so an empty set here passes unconditionally - a
+    # renamed tree under `include` would retire the guard rather than trip it.
+    assert found, f"no co-located tests directories found under {included}"
+    return found
 
 
 def _recipe_exists(justfile_text: str, name: str) -> bool:
@@ -723,4 +734,217 @@ def test_basedpyright_private_usage_exemption_covers_every_tests_directory() -> 
         f"exemption in pyproject.toml: {missing}. `root` matches by directory "
         "prefix only - no glob - so each needs its own "
         "[[tool.basedpyright.executionEnvironments]] entry."
+    )
+
+
+def _workflow_paths() -> list[Path]:
+    """Every workflow file, proven to exist before anything reads them."""
+    workflows = sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+    assert workflows, "no workflow files found under .github/workflows"
+    return workflows
+
+
+def _guard_module_texts() -> list[tuple[str, str]]:
+    """Every guard module under ``dev/guards/`` as ``(relative path, text)``."""
+    modules = sorted((ROOT / "dev" / "guards").rglob("test_*.py"))
+    assert modules, "no guard modules found under dev/guards"
+    return [
+        (path.relative_to(ROOT).as_posix(), path.read_text(encoding="utf-8"))
+        for path in modules
+    ]
+
+
+def _sentinel_workflow() -> _Workflow:
+    """The main-branch CI sentinel, parsed."""
+    text = (ROOT / ".github" / "workflows" / "main-ci-sentinel.yml").read_text(
+        encoding="utf-8"
+    )
+    return cast("_Workflow", yaml.safe_load(text))
+
+
+def _sentinel_step(name_fragment: str) -> _WorkflowStep:
+    """The one sentinel step whose name contains *name_fragment*."""
+    steps = _sentinel_workflow()["jobs"]["assert-main-was-validated"]["steps"]
+    matches = [step for step in steps if name_fragment in step.get("name", "")]
+    assert len(matches) == 1, (
+        f"expected exactly one sentinel step named like {name_fragment!r}, "
+        f"found {[step.get('name') for step in matches]}"
+    )
+    return matches[0]
+
+
+def test_the_sentinel_closes_its_issue_only_on_a_healthy_verdict() -> None:
+    """`pending` must not close the sentinel issue.
+
+    ``Verdict.exit_code`` is 0 for ``healthy`` and for ``pending`` alike,
+    because neither should fail the sentinel job. A workflow that derives
+    health from that exit code therefore cannot tell "main is green" from "no
+    verdict yet" - and closes on both. That is exactly what happened at
+    17:25 UTC on 2026-09-04: the judge logged ``pending: 1 CI run(s) still in
+    flight``, the close step ran anyway, and issue #398 was closed as
+    "validated again" while main's tip was red and its CI still running.
+
+    The condition is asserted literally rather than by behaviour because the
+    failure mode is a silent one: a condition that never matches - a typo, or
+    a negation such as ``!= 'unhealthy'`` that readmits ``pending`` - leaves
+    the step skipped and the job green, which is indistinguishable from
+    working.
+    """
+    step = _sentinel_step("Close the sentinel issue")
+
+    assert step.get("if") == "${{ steps.judge.outputs.state == 'healthy' }}"
+
+
+def test_the_sentinel_opens_its_issue_only_on_an_unhealthy_verdict() -> None:
+    """The other half of the same contract: `pending` must not report a fault.
+
+    A sentinel that files an issue while a run is still in flight fires on
+    every push and gets muted, which leaves main less protected than if it did
+    not exist.
+    """
+    step = _sentinel_step("Open an issue")
+
+    assert step.get("if") == "${{ steps.judge.outputs.state == 'unhealthy' }}"
+
+
+def test_the_sentinel_branches_only_on_states_the_judge_can_return() -> None:
+    """Every state named in a condition must be one the module can produce.
+
+    A misspelled state is the worst shape this workflow can take: the
+    condition is valid YAML, the expression evaluates to false forever, the
+    step is skipped, and the job passes. Nothing reports it.
+    """
+    from dev.ci_sentinel.main_ci_health import State
+
+    known = set(get_args(State))
+    steps = _sentinel_workflow()["jobs"]["assert-main-was-validated"]["steps"]
+    referenced = {
+        match.group("state")
+        for step in steps
+        for match in _SENTINEL_STATE_CONDITION.finditer(str(step.get("if", "")))
+    }
+
+    assert referenced, "no sentinel step branches on the judge's state"
+    assert referenced <= known, (
+        f"these sentinel conditions name states the judge never returns: "
+        f"{sorted(referenced - known)}; it returns {sorted(known)}"
+    )
+
+
+def test_the_sentinel_does_not_derive_health_from_the_judge_exit_code() -> None:
+    """No step may branch on a boolean distilled from the module's exit code.
+
+    Keeping the states apart in the judge step is worth nothing if a later
+    step collapses them again, so the collapsed output is banned by name: the
+    `healthy` output that carried this bug must not come back.
+    """
+    steps = _sentinel_workflow()["jobs"]["assert-main-was-validated"]["steps"]
+
+    offenders = [
+        step.get("name")
+        for step in steps
+        if "outputs.healthy" in str(step.get("if", ""))
+        or "outputs.healthy" in str(step.get("run", ""))
+        or "healthy=$(" in str(step.get("run", ""))
+    ]
+
+    assert not offenders, (
+        f"these sentinel steps read health from the judge's exit code rather "
+        f"than its state: {offenders}. The exit code answers 'should this job "
+        f"fail?', which is 0 for both `healthy` and `pending`."
+    )
+
+
+def test_the_sentinel_fails_when_the_judge_returns_no_verdict() -> None:
+    """A judge that crashed must not read as a quiet pass.
+
+    With the state absent, every condition below evaluates false, no step
+    runs, and the sentinel reports success having judged nothing - the same
+    class of silent skip the sentinel itself exists to catch.
+    """
+    run = _sentinel_step("Judge main's tip").get("run", "")
+
+    assert "the sentinel produced no verdict" in run, (
+        "the judge step must fail loudly when it produces no parseable state"
+    )
+
+
+#: The marker the pre-commit hook selects with, and the flag that selects it.
+_PRECOMMIT_MARKER = "precommit"
+_MARKER_SELECTOR = f"-m {_PRECOMMIT_MARKER}"
+
+
+def _precommit_hook_entries() -> list[str]:
+    """Every ``entry:`` line declared by a local hook in the pre-commit config."""
+    config = cast(
+        "_PreCommitConfig",
+        yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")),
+    )
+    return [
+        hook["entry"]
+        for repo in config["repos"]
+        for hook in repo.get("hooks", [])
+        if "entry" in hook
+    ]
+
+
+def test_the_markdown_guards_run_before_a_commit_not_only_in_ci() -> None:
+    """The bare-reference guard must be reachable without pushing.
+
+    It was CI-only until 2026-09-05, so ``vault check`` - a snippet naming a
+    command group that is not an executable - landed in README.md on
+    2026-09-02 and main stayed red for two days. The guard itself costs 0.02s
+    and reads markdown; only its siblings in the same file are slow, because
+    they shell out to ``--help`` for every command.
+
+    Asserted against the config rather than against behaviour because the
+    failure is silent: a deleted hook removes local coverage and breaks
+    nothing that any test would otherwise notice.
+    """
+    entries = _precommit_hook_entries()
+
+    assert any(_MARKER_SELECTOR in entry for entry in entries), (
+        f"no pre-commit hook selects '{_MARKER_SELECTOR}', so the markdown "
+        "guards run only after a push"
+    )
+
+
+def test_the_precommit_marker_selects_something() -> None:
+    """A marker nothing carries selects nothing, and the hook stops guarding.
+
+    pytest exits 5 on an empty selection, so the hook would fail rather than
+    pass quietly - but it would fail on every markdown commit for a reason
+    that reads like tooling breakage. Naming the cause here is cheaper.
+    """
+    marked = [
+        rel
+        for rel, text in _guard_module_texts()
+        if f"@pytest.mark.{_PRECOMMIT_MARKER}" in text
+    ]
+
+    assert marked, (
+        f"no test in dev/guards carries @pytest.mark.{_PRECOMMIT_MARKER}, so "
+        "the pre-commit hook selects an empty set"
+    )
+
+
+def test_the_precommit_marker_never_becomes_the_ci_selection() -> None:
+    """CI must keep running the whole file, marker or no marker.
+
+    The hook is an accelerator: it runs the cheap subset early. The moment CI
+    selects the same subset, the expensive guards - the ones that compare
+    documentation against live ``--help`` output - stop running anywhere, and
+    the marker silently converts from a speed-up into a coverage cut.
+    """
+    offenders: list[str] = []
+    for path in _workflow_paths():
+        workflow = cast("_Workflow", yaml.safe_load(path.read_text(encoding="utf-8")))
+        for job_name, job in workflow["jobs"].items():
+            for step in job.get("steps", []) or []:
+                if _MARKER_SELECTOR in str(step.get("run", "")):
+                    offenders.append(f"{path.name}:{job_name}:{step.get('name')}")
+
+    assert not offenders, (
+        f"these CI steps select '{_MARKER_SELECTOR}', which would leave the "
+        f"guards outside that marker running nowhere: {offenders}"
     )

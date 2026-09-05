@@ -161,6 +161,15 @@ markers = [
   "timeout: timeout in seconds for individual tests",
   "e2e: end-to-end tests requiring real LLM API keys",
   "benchmark: slow scale benchmarks, deselected by default",
+  # Selects the guards cheap enough to run on every commit, so the
+  # pre-commit hook can name them without listing test names in a config
+  # file - a list that goes quietly out of date the first time one is
+  # renamed. The contract a test accepts by carrying this marker is only
+  # that it is fast and reads the working tree; it is never the sole place
+  # the test runs, because the CI `repo` lane runs the whole file whatever
+  # this marker selects. The hook is an accelerator, not an enforcement
+  # boundary.
+  "precommit: cheap enough to gate every commit; also runs in the repo lane",
 ]
 # Every tree that carries committed Python AND a cohabiting `tests/` package.
 # `dev` is listed for the same reason `src` is: the harness backend has its own

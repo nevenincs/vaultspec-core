@@ -33,6 +33,7 @@ from vaultspec_core.core.diagnosis.collectors import (
     collect_version_floor_state,
     observed_mcp_mode,
     observed_precommit_mode,
+    precommit_hook_installed,
 )
 from vaultspec_core.core.diagnosis.diagnosis import WorkspaceDiagnosis, diagnose
 from vaultspec_core.core.diagnosis.signals import (
@@ -1538,3 +1539,134 @@ class TestInstallModeDevEndToEnd:
         assert "999.999.999" in combined
         # The companion floor violation drives the error exit code.
         assert doctor.exit_code == 2
+
+
+# ---------------------------------------------------------------------------
+# a complete configuration that nothing executes
+# ---------------------------------------------------------------------------
+class TestPrecommitInstallation:
+    """A perfect config and no installed hook is the failure worth reporting.
+
+    Every other ``PrecommitSignal`` describes the configuration. A workspace
+    can satisfy all of them and still run nothing on commit, because the
+    config is inert until git has a ``pre-commit`` hook to invoke it. Measured
+    on this repository on 2026-09-05: 13 canonical hooks configured, zero
+    files in the hooks directory, and ``doctor`` reported ``precommit ok all
+    hooks present in the config`` - which was true, and told the reader the
+    opposite of what was happening. Two of the three gates ``main`` was
+    failing at the time were gates those hooks would have caught.
+    """
+
+    def _git_init(self, root: Path) -> None:
+        """Make *root* a real git working tree.
+
+        A real repository rather than a hand-built ``.git/`` directory:
+        the code under test asks ``git rev-parse`` where hooks live, so a
+        fixture git itself would reject proves nothing.
+        """
+        import subprocess
+
+        subprocess.run(
+            ["git", "init", "--quiet", str(root)],
+            capture_output=True,
+            check=True,
+            text=True,
+        )
+
+    def _install_hook(self, hooks_directory: Path) -> None:
+        hooks_directory.mkdir(parents=True, exist_ok=True)
+        (hooks_directory / "pre-commit").write_text(
+            "#!/bin/sh\nexit 0\n", encoding="utf-8"
+        )
+
+    def test_a_complete_config_with_no_installed_hook_is_not_installed(
+        self, tmp_path: Path
+    ) -> None:
+        """The case that made this signal: configured, canonical, and inert."""
+        from vaultspec_core.core.commands import scaffold_precommit
+
+        self._git_init(tmp_path)
+        scaffold_precommit(tmp_path)
+
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.NOT_INSTALLED
+
+    def test_a_complete_config_with_an_installed_hook_is_complete(
+        self, tmp_path: Path
+    ) -> None:
+        """The same config, one file later, is genuinely healthy."""
+        from vaultspec_core.core.commands import scaffold_precommit
+
+        self._git_init(tmp_path)
+        scaffold_precommit(tmp_path)
+        self._install_hook(tmp_path / ".git" / "hooks")
+
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.COMPLETE
+
+    def test_a_relocated_hooks_directory_is_honoured(self, tmp_path: Path) -> None:
+        """``core.hooksPath`` moves the directory, and git is the only authority.
+
+        This is why the collector shells out instead of looking in
+        ``.git/hooks``. An implementation that hardcodes that path reports a
+        healthy workspace as stranded, and this test is what catches it.
+        """
+        import subprocess
+
+        from vaultspec_core.core.commands import scaffold_precommit
+
+        self._git_init(tmp_path)
+        scaffold_precommit(tmp_path)
+
+        elsewhere = tmp_path / "tooling" / "githooks"
+        self._install_hook(elsewhere)
+        subprocess.run(
+            ["git", "-C", str(tmp_path), "config", "core.hooksPath", str(elsewhere)],
+            capture_output=True,
+            check=True,
+            text=True,
+        )
+
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.COMPLETE
+
+    def test_outside_a_git_repository_the_config_verdict_stands(
+        self, tmp_path: Path
+    ) -> None:
+        """Not looking is not evidence of absence.
+
+        ``tmp_path`` is no repository, so there is no hook to find and no
+        fault to report. Reporting one here would fire on every workspace
+        that is not under git and teach the reader to ignore the row.
+        """
+        from vaultspec_core.core.commands import scaffold_precommit
+
+        scaffold_precommit(tmp_path)
+
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.COMPLETE
+        assert precommit_hook_installed(tmp_path) is None
+
+    def test_a_broken_config_keeps_its_own_verdict(self, tmp_path: Path) -> None:
+        """A config fault outranks an uninstalled hook.
+
+        Both are true at once here, and only one is worth the row: fixing the
+        installation would leave a config with no vaultspec hooks in it.
+        """
+        self._git_init(tmp_path)
+        (tmp_path / ".pre-commit-config.yaml").write_text(
+            "repos:\n"
+            "  - repo: https://example.invalid/hooks\n"
+            "    rev: v1.0.0\n"
+            "    hooks:\n"
+            "      - id: something-else\n",
+            encoding="utf-8",
+        )
+
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.NO_HOOKS
+
+    def test_the_predicate_reports_both_answers_inside_a_repository(
+        self, tmp_path: Path
+    ) -> None:
+        """False and None are different answers and must not collapse."""
+        self._git_init(tmp_path)
+        assert precommit_hook_installed(tmp_path) is False
+
+        self._install_hook(tmp_path / ".git" / "hooks")
+        assert precommit_hook_installed(tmp_path) is True

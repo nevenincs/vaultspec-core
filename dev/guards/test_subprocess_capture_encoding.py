@@ -66,7 +66,11 @@ def _python_files() -> list[Path]:
     files: list[Path] = []
     for root in SOURCE_ROOTS:
         files.extend(root.rglob("*.py"))
-    return sorted(set(files))
+    found = sorted(set(files))
+    # Same reason as every other derived corpus in dev/guards: nothing to scan
+    # reads exactly like nothing to report.
+    assert found, f"no Python sources found under any of {SOURCE_ROOTS}"
+    return found
 
 
 def _is_spawn_call(node: ast.Call) -> bool:

@@ -28,7 +28,14 @@ Usage::
       | python dev/ci_sentinel/main_ci_health.py --commit-age-minutes 130
 
 Exit code 0 means healthy or not-yet-judged; 1 means ``main`` is carrying a
-commit that CI never validated.
+commit that CI never validated. The exit code therefore answers "should the
+sentinel job fail?" and not "is main green?" - it cannot answer the second,
+because it maps both ``healthy`` and ``pending`` to 0. A caller that has to
+tell those two apart must read the state, which ``--format key-value`` emits
+verbatim in ``$GITHUB_OUTPUT`` syntax::
+
+    state=pending
+    reason=1 CI run(s) still in flight
 """
 
 from __future__ import annotations
@@ -37,7 +44,7 @@ import argparse
 import json
 import sys
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 #: How long a commit may sit without a completed CI verdict before that counts
 #: as a fault rather than a run still in flight. The slowest lane in this
@@ -50,6 +57,7 @@ DEFAULT_GRACE_MINUTES = 90
 IN_FLIGHT = frozenset({"queued", "in_progress", "waiting", "requested", "pending"})
 
 State = Literal["healthy", "pending", "unhealthy"]
+OutputFormat = Literal["text", "key-value"]
 
 
 @dataclass(frozen=True)
@@ -112,6 +120,33 @@ def classify(
     )
 
 
+def _single_line(text: str) -> str:
+    """Flatten *text* so a value cannot span lines in a key=value stream."""
+    return " ".join(text.split())
+
+
+def render(verdict: Verdict, output_format: OutputFormat = "text") -> str:
+    """Format *verdict* for a human reader or for a key=value consumer.
+
+    Kept out of ``main`` for the same reason the network is: a formatter that
+    only runs with a real stdin attached cannot be checked, and this one
+    carries the contract a caller branches on.
+
+    Args:
+        verdict: The finding to render.
+        output_format: ``text`` for one human sentence, ``key-value`` for
+            ``state`` and ``reason`` on separate lines.
+
+    Returns:
+        The rendered verdict, without a trailing newline.
+    """
+    if output_format == "key-value":
+        # One line each: the caller appends this to `$GITHUB_OUTPUT`, where an
+        # embedded newline in a value would start a forged key.
+        return f"state={verdict.state}\nreason={_single_line(verdict.reason)}"
+    return f"{verdict.state}: {verdict.reason}"
+
+
 def _commit_age_minutes(value: str) -> float:
     age = float(value)
     if age < 0:
@@ -133,13 +168,24 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_GRACE_MINUTES,
         help="how long a commit may go unjudged before that is a fault",
     )
+    parser.add_argument(
+        "--format",
+        choices=get_args(OutputFormat),
+        default="text",
+        dest="output_format",
+        help=(
+            "'text' prints one human sentence; 'key-value' prints the state "
+            "and the reason as separate lines, for a caller that has to "
+            "branch on the state rather than on the exit code"
+        ),
+    )
     args = parser.parse_args(argv)
 
     payload: dict[str, Any] = json.load(sys.stdin)
     runs: list[dict[str, Any]] = payload.get("workflow_runs", [])
 
     verdict = classify(runs, args.commit_age_minutes, args.grace_minutes)
-    print(f"{verdict.state}: {verdict.reason}")
+    print(render(verdict, args.output_format))
     return verdict.exit_code
 
 

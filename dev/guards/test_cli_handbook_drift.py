@@ -78,8 +78,11 @@ def test_every_cli_option_is_documented() -> None:
     handbook_text = _HANDBOOK.read_text(encoding="utf-8")
     cli = _runner()
 
+    leaf_paths = collect_leaf_command_paths(app)
+    assert leaf_paths, "CLI tree is empty; Typer app failed to register commands"
+
     missing: list[str] = []
-    for path in collect_leaf_command_paths(app):
+    for path in leaf_paths:
         help_text = help_output(cli, app, path)
         for option in sorted(extract_options(help_text)):
             if option in GLOBAL_FLAGS:
@@ -137,8 +140,11 @@ def test_every_option_is_documented_in_its_own_section() -> None:
     sections = parse_command_sections(handbook_text, app)
     cli = _runner()
 
+    leaf_paths = collect_leaf_command_paths(app)
+    assert leaf_paths, "CLI tree is empty; Typer app failed to register commands"
+
     missing: list[str] = []
-    for path in collect_leaf_command_paths(app):
+    for path in leaf_paths:
         section = covering_section(sections, path)
         if section is None:
             # Reported by the section contract above; not double-counted here.

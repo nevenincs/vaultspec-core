@@ -285,9 +285,9 @@ choice is recorded in a committed `workspace.json` so it travels with the projec
 **Pre-commit hooks.** Not every project wants one. A tree-wide hook that rewrites the
 working tree to the staged state will discard uncommitted changes outside the stage,
 which is unsafe when several workers share one checkout, and some teams prefer to run
-their gates explicitly. Of the four hooks written here, one mutates -
-`vaultspec-core vault sanitize annotations`, which strips generated template annotations
-\- and the other three only read; none is scoped to the files you staged.
+their gates explicitly. Of the four hooks written here, three only read and one mutates:
+`vaultspec-core vault sanitize annotations`, which strips generated template
+annotations. None is scoped to the files you staged.
 `vaultspec-core spec precommit disable` records that in the same `workspace.json`, so no
 later `install` or `sync` regenerates `.pre-commit-config.yaml`.
 `vaultspec-core spec precommit enable` reverses it.
