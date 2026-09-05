@@ -488,6 +488,16 @@ def _run_upgrade(
         [dependency_leak_advisory()] if newly_establishes_dependency(inferred) else []
     )
 
+    # Re-scaffold before re-seeding. An upgrade that reported success while
+    # leaving a deleted `.vault/` absent was the other half of #415: the
+    # recommended ignore entries used to be derived from that directory being
+    # present, so the block silently shrank to match rather than the upgrade
+    # restoring what it manages. `scaffold_core` only creates what is missing,
+    # so this is a no-op on the overwhelming majority of upgrades.
+    if not skip_core:
+        for created_rel, _label in scaffold_core(path):
+            logger.debug("Upgrade scaffolded %s", created_rel)
+
     seeded: list[tuple[str, str]] = [] if skip_core else _reseed_builtins(path)
 
     # Run pending schema migrations BEFORE the sync. ``sync_provider``

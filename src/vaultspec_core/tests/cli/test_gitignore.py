@@ -423,6 +423,37 @@ class TestRecommendedEntries:
         assert ".vault/data/" in entries
         assert ".vault/logs/" in entries
 
+    def test_vault_subdirs_are_recommended_from_policy_not_presence(
+        self, tmp_path: Path
+    ) -> None:
+        """An installed framework recommends them; a present directory does not.
+
+        These used to be gated on ``.vault/`` existing on disk, so a workspace
+        that lost the directory had the entries quietly dropped from its block
+        on the next write - and ``doctor`` then read the block as complete,
+        because the recommended set had shrunk with it (issue #415). Same
+        snapshot-derivation shape #399 closed for the lock sentinels.
+        """
+        (tmp_path / ".vaultspec").mkdir()
+        # Deliberately no .vault/ directory.
+
+        entries = get_recommended_entries(tmp_path)
+
+        assert ".vault/.obsidian/" in entries
+        assert ".vault/.trash/" in entries
+        assert ".vault/data/" in entries
+        assert ".vault/logs/" in entries
+
+    def test_a_bare_workspace_recommends_no_vault_entries(self, tmp_path: Path) -> None:
+        """Policy means the framework, not unconditionally.
+
+        The guard on the test above: with nothing installed there is no policy
+        to derive from, so the recommended set must stay empty of them.
+        """
+        entries = get_recommended_entries(tmp_path)
+
+        assert not [e for e in entries if e.startswith(".vault/")]
+
     def test_vaultspec_dir_not_blanket_ignored_but_runtime_ignored(
         self, tmp_path: Path
     ) -> None:
