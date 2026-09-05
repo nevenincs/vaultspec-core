@@ -80,6 +80,6 @@ the work they check; a file-change record alone does not show that tests ran.
 1. [Check the feature records and review any repairs](./verification.md#check-records-before-committing).
 1. Run the project's tests, linting, and type checks.
 1. Review the implementation against the approved decision and plan using the
-   [review step](#the-review-step). Address findings and rerun affected checks.
+   [review step](#review-the-change). Address findings and rerun affected checks.
 
 Review the final diff before committing.
