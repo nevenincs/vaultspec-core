@@ -507,3 +507,43 @@ class TestFailedInstallLeavesNoPartialManifest:
 
         assert result.exit_code != 0
         assert "already installed" in result.output
+
+
+class TestInstallSurfacesRecordedSyncErrors:
+    """A recorded provider-sync failure reaches the reader (issue #414).
+
+    `install_run` catches a failing sync into `result["errors"]`. Neither
+    renderer read the key, so the failure was recorded and then reported as
+    success - and the command exited 0.
+
+    The condition is not reachable from any input found so far (five were
+    tried; every one that makes the sync raise also raises later in
+    `install_run` itself, so the renderer is never reached with a non-empty
+    list). These assert the contract on the helper both renderers now use,
+    which is testable without inventing a reachability this repo's real
+    filesystem tests cannot produce.
+    """
+
+    def test_recorded_errors_are_returned(self) -> None:
+        from vaultspec_core.cli.root_install import install_post_errors
+
+        assert install_post_errors({"errors": ["sync: boom"]}) == ["sync: boom"]
+
+    def test_a_clean_result_reports_nothing(self) -> None:
+        """The guard: the common path must stay silent and stay exit 0."""
+        from vaultspec_core.cli.root_install import install_post_errors
+
+        assert install_post_errors({}) == []
+        assert install_post_errors({"errors": []}) == []
+        assert install_post_errors({"errors": None}) == []
+
+    def test_a_normal_install_records_no_errors(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        """End to end: nothing about the happy path changes."""
+        result = runner.invoke(app, ["-t", str(tmp_path), "install", "--json"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["status"] == "created"
+        assert not payload["data"].get("errors")
