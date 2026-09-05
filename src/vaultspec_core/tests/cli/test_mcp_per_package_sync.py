@@ -319,6 +319,118 @@ class TestFingerprintVerifiedRefresh:
         assert "--force" in warning
         assert "no recorded fingerprint" in warning
 
+    def test_a_second_plain_sync_does_not_refresh_the_hand_edit(
+        self, tmp_path: Path
+    ) -> None:
+        """Skipping an edit must not adopt it, so a second sync skips it too.
+
+        The run above declines to write the entry, then used to record a
+        fingerprint over the deployed bytes anyway. On the next run the
+        fingerprint matched, the refresh branch read that as proof vaultspec
+        had written them, and the hand edit was overwritten - by a command
+        given no flags, saying nothing about it (issue #404).
+        """
+        _provision(tmp_path, InstallMode.DEPENDENCY)
+        _write_probe_definition(tmp_path, args=["-m", "probe", "--old"])
+        _bind_context(tmp_path)
+        mcp_sync(provider="claude")
+
+        mcp_path = tmp_path / ".mcp.json"
+        raw = json.loads(mcp_path.read_text(encoding="utf-8"))
+        raw["mcpServers"]["probe"]["args"] = ["-m", "probe", "--old", "--read-only"]
+        mcp_path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+        edited = mcp_path.read_text(encoding="utf-8")
+
+        first = mcp_sync(provider="claude")
+        assert ("probe", "[SKIP]") in first.items
+        assert mcp_path.read_text(encoding="utf-8") == edited
+
+        second = mcp_sync(provider="claude")
+
+        assert ("probe", "[SKIP]") in second.items
+        assert not any(action == "[REFRESH]" for _name, action in second.items)
+        assert _read_servers(tmp_path)["probe"]["args"] == [
+            "-m",
+            "probe",
+            "--old",
+            "--read-only",
+        ]
+
+    def test_a_declined_entry_keeps_the_fingerprint_it_already_had(
+        self, tmp_path: Path
+    ) -> None:
+        """The recorded fingerprint goes on meaning what its docstring says.
+
+        ``owned_fingerprints`` documents a recorded value as proof the deployed
+        entry is byte-identical to what vaultspec last wrote. A run that
+        declined to write must therefore leave the recorded value alone rather
+        than stamp it over the bytes it refused.
+        """
+        from vaultspec_core.core.mcps import (
+            ownership_path,
+            ownership_target_key,
+            read_ownership,
+        )
+
+        _provision(tmp_path, InstallMode.DEPENDENCY)
+        _write_probe_definition(tmp_path, args=["-m", "probe", "--old"])
+        _bind_context(tmp_path)
+        mcp_sync(provider="claude")
+
+        target = _claude_target(tmp_path)
+        key = ownership_target_key(target)
+        path = ownership_path(tmp_path, target.scope)
+
+        def recorded() -> dict[str, object]:
+            # ``managed`` is not a required key on the record TypedDict, so it
+            # is read through .get - the same shape the sibling test uses.
+            return read_ownership(path)["targets"][key].get("managed", {})
+
+        recorded_before = recorded()["probe"]
+
+        mcp_path = tmp_path / ".mcp.json"
+        raw = json.loads(mcp_path.read_text(encoding="utf-8"))
+        raw["mcpServers"]["probe"]["env"] = {"HAND_ALTERED": "1"}
+        mcp_path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+
+        mcp_sync(provider="claude")
+
+        recorded_after = recorded()
+        assert recorded_after["probe"] == recorded_before
+        # Still owned - the name did not become external, only the claim about
+        # who authored its bytes was withheld.
+        assert "probe" in recorded_after
+
+    def test_the_refresh_warning_is_true_when_it_fires(self, tmp_path: Path) -> None:
+        """The narration says hand-edited entries are never refreshed.
+
+        For the entry in the sequence above both halves of that sentence used
+        to be false at once - it *was* hand-edited, which is why the previous
+        run skipped it, and it *was* refreshed automatically. Nothing about the
+        wording changes here; what changes is that it can no longer be reached
+        by a hand-edited entry, which is what makes it true.
+        """
+        _provision(tmp_path, InstallMode.DEPENDENCY)
+        _write_probe_definition(tmp_path, args=["-m", "probe", "--old"])
+        _bind_context(tmp_path)
+        mcp_sync(provider="claude")
+
+        mcp_path = tmp_path / ".mcp.json"
+        raw = json.loads(mcp_path.read_text(encoding="utf-8"))
+        raw["mcpServers"]["probe"]["args"] = ["-m", "probe", "--old", "--read-only"]
+        mcp_path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+        mcp_sync(provider="claude")
+
+        # Move the standard on, the condition the refresh branch exists for.
+        _write_probe_definition(tmp_path, args=["-m", "probe", "--new"])
+
+        result = mcp_sync(provider="claude")
+
+        assert not any(
+            w.startswith("MCP server 'probe' launch refreshed") for w in result.warnings
+        )
+        assert ("probe", "[SKIP]") in result.items
+
     def test_external_entry_never_touched_without_force(self, tmp_path: Path) -> None:
         """A pre-existing entry that vaultspec never wrote (no ownership
         record), even one sharing its name with a declared definition, is

@@ -37,7 +37,7 @@ from .mcps_ownership import (
     owned_names,
     ownership_path,
     read_ownership,
-    set_owned_names,
+    set_owned_fingerprints,
     target_lock,
     write_ownership,
 )
@@ -72,6 +72,34 @@ def _existing_source_server_names() -> set[str]:
     return names
 
 
+def _retained_fingerprints(
+    owned: dict[str, dict[str, Any]],
+    *,
+    declined: set[str],
+    recorded_fingerprints: dict[str, str],
+) -> dict[str, str | None]:
+    """Fingerprint what this run wrote; keep what it recorded for what it did not.
+
+    ``owned_fingerprints`` documents the invariant every caller reads a
+    recorded fingerprint under: a matching one proves the deployed entry is
+    byte-identical to what vaultspec last wrote. Fingerprinting an entry the
+    run skipped as a hand edit breaks that - it records someone else's bytes as
+    vaultspec's own, and the next run's refresh branch then overwrites the edit
+    without ``--force`` (issue #404).
+
+    So a declined name keeps the fingerprint it already had, or ``None`` where
+    it had none. Ownership of the name survives either way; only the claim
+    about who authored the bytes does not.
+    """
+    retained: dict[str, str | None] = {}
+    for name, config in owned.items():
+        if name in declined:
+            retained[name] = recorded_fingerprints.get(name)
+        else:
+            retained[name] = fingerprint(config)
+    return retained
+
+
 def _apply_server_merge(
     servers: dict[str, dict[str, Any]],
     managed: set[str],
@@ -84,8 +112,13 @@ def _apply_server_merge(
     label: str,
     force_managed: frozenset[str],
     recorded_fingerprints: dict[str, str],
+    declined: set[str],
 ) -> bool:
-    """Apply ownership-safe desired state to one provider's normalized servers."""
+    """Apply ownership-safe desired state to one provider's normalized servers.
+
+    Names this run declines to write are added to *declined*, so the caller can
+    record ownership without adopting bytes vaultspec did not author.
+    """
     changed = False
     for name, (_path, config) in sources.items():
         if name not in servers:
@@ -119,6 +152,7 @@ def _apply_server_merge(
                     "hand-edited entries are never refreshed automatically)."
                 )
             elif name in recorded_fingerprints:
+                declined.add(name)
                 result.skipped += 1
                 result.items.append((name, "[SKIP]"))
                 result.warnings.append(
@@ -126,6 +160,7 @@ def _apply_server_merge(
                     "(use --force to overwrite)."
                 )
             else:
+                declined.add(name)
                 result.skipped += 1
                 result.items.append((name, "[SKIP]"))
                 result.warnings.append(
@@ -226,6 +261,7 @@ def _sync_json_target(
                 f"from {target.path}."
             )
         external = set(servers) - managed
+        declined: set[str] = set()
         changed = legacy is not None
         changed |= _apply_server_merge(
             servers,
@@ -238,11 +274,18 @@ def _sync_json_target(
             label=str(target.path),
             force_managed=force_managed,
             recorded_fingerprints=recorded_fingerprints,
+            declined=declined,
         )
         untyped_servers.clear()
         untyped_servers.update(servers)
-        set_owned_names(
-            state, target, {name: servers[name] for name in managed if name in servers}
+        set_owned_fingerprints(
+            state,
+            target,
+            _retained_fingerprints(
+                {name: servers[name] for name in managed if name in servers},
+                declined=declined,
+                recorded_fingerprints=recorded_fingerprints,
+            ),
         )
         if changed and not dry_run:
             write_json_target(target.path, raw, target, root)
@@ -308,6 +351,7 @@ def _sync_toml_target(
         managed = (recorded | set(block_servers)) & set(block_servers)
         servers = {**outside, **block_servers}
         external = set(outside)
+        declined: set[str] = set()
         changed = _apply_server_merge(
             servers,
             managed,
@@ -319,13 +363,22 @@ def _sync_toml_target(
             label=str(target.path),
             force_managed=force_managed,
             recorded_fingerprints=recorded_fingerprints,
+            declined=declined,
         )
         new_managed = {
             name: servers[name]
             for name in managed
             if name in servers and name not in external
         }
-        set_owned_names(state, target, new_managed)
+        set_owned_fingerprints(
+            state,
+            target,
+            _retained_fingerprints(
+                new_managed,
+                declined=declined,
+                recorded_fingerprints=recorded_fingerprints,
+            ),
+        )
         if changed and not dry_run:
             rendered = render_codex_servers(new_managed)
             updated = (

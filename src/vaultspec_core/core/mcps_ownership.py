@@ -58,7 +58,7 @@ __all__ = [
     "ownership_path",
     "ownership_target_key",
     "read_ownership",
-    "set_owned_names",
+    "set_owned_fingerprints",
     "target_lock",
     "write_ownership",
 ]
@@ -160,20 +160,31 @@ def launch_repr(config: dict[str, Any]) -> str:
     return " ".join(part for part in parts if part)
 
 
-def set_owned_names(
-    state: OwnershipState, target: McpTarget, servers: dict[str, dict[str, Any]]
+def set_owned_fingerprints(
+    state: OwnershipState, target: McpTarget, fingerprints: dict[str, str | None]
 ) -> None:
+    """Record ownership for *target* using the fingerprints exactly as given.
+
+    This takes fingerprints rather than configs on purpose. Deriving one here
+    from whatever config the caller happens to hold is only truthful for
+    entries the run actually wrote; a run that *declined* to write an entry - a
+    hand edit it skipped - would otherwise record someone else's bytes as
+    vaultspec's own, and :func:`owned_fingerprints` would stop meaning what its
+    docstring says it means (issue #404).
+
+    A caller passes the fingerprint an entry already had, or ``None`` where it
+    had none. Ownership of the name is kept either way; only the claim about
+    who authored the bytes is withheld.
+    """
     key = ownership_target_key(target)
-    if not servers:
+    if not fingerprints:
         state["targets"].pop(key, None)
         return
     state["targets"][key] = {
         "provider": target.provider.value,
         "scope": target.scope.value,
         "path": str(target.path.resolve()),
-        "managed": {
-            name: fingerprint(config) for name, config in sorted(servers.items())
-        },
+        "managed": dict(sorted(fingerprints.items())),
     }
 
 
