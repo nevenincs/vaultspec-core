@@ -21,6 +21,8 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
+    from .._base import CheckDiagnostic, CheckResult
+
 pytestmark = [pytest.mark.unit]
 
 _PLAN_STEM = "2026-02-04-feat-plan"
@@ -128,12 +130,12 @@ def _write_ledger(
     return path
 
 
-def _run(root: Path, *, feature: str | None = None):
+def _run(root: Path, *, feature: str | None = None) -> CheckResult:
     snapshot = VaultGraph(root).to_snapshot()
     return check_exec_mapping(root, snapshot=snapshot, feature=feature)
 
 
-def _by_severity(result, severity: Severity):
+def _by_severity(result: CheckResult, severity: Severity) -> list[CheckDiagnostic]:
     return [d for d in result.diagnostics if d.severity == severity]
 
 
@@ -150,7 +152,9 @@ class TestPerStepRecordIsAnError:
         errors = _by_severity(result, Severity.ERROR)
         assert len(errors) == 1
         assert "vault exec log" in errors[0].message
-        assert "vault exec fold --feature feat --force" in errors[0].fix_description
+        fix_description = errors[0].fix_description
+        assert fix_description is not None
+        assert "vault exec fold --feature feat --force" in fix_description
         assert result.check_name == "exec-mapping"
         assert result.supports_fix is False
 
@@ -304,7 +308,9 @@ class TestClosedStepsWithoutRows:
         assert len(warnings) == 1
         assert "S01, S02" in warnings[0].message
         assert "no logged ledger yet" in warnings[0].message
-        assert warnings[0].path.name == f"{_PLAN_STEM}.md"
+        warned_path = warnings[0].path
+        assert warned_path is not None
+        assert warned_path.name == f"{_PLAN_STEM}.md"
         assert _by_severity(result, Severity.ERROR) == []
 
     def test_missing_rows_are_error_when_the_ledger_exists(
@@ -320,7 +326,9 @@ class TestClosedStepsWithoutRows:
         assert len(errors) == 1
         assert "S02" in errors[0].message and "S01" not in errors[0].message
         assert "closed without evidence" in errors[0].message
-        assert "vault exec log" in errors[0].fix_description
+        fix_description = errors[0].fix_description
+        assert fix_description is not None
+        assert "vault exec log" in fix_description
 
     def test_missing_rows_stay_warning_under_a_folded_only_ledger(
         self, tmp_path: Path
