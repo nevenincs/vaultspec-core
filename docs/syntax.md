@@ -59,9 +59,9 @@ You will hear about a mistake at commit time. `vaultspec-core install` writes a
 `.pre-commit-config.yaml` whose first hook runs `vault check all`, so a document that
 fails validation blocks the commit rather than reaching the repository. It reads the
 whole vault rather than the files you staged, because the hooks pass no filenames; a
-Markdown file in the commit is what makes them run, not what they look at. The config
-is not itself a git hook, so nothing blocks anything until `pre-commit install` has
-written one.
+Markdown file in the commit is what makes them run, not what they look at. The config is
+not itself a git hook, so nothing blocks anything until `pre-commit install` has written
+one.
 
 ## Frontmatter
 
@@ -192,9 +192,9 @@ If one of these survives into a committed document, the document was created by 
 rather than by the command that owns it. The `placeholders` check finds them, and the
 author-replaced ones above, because it matches the tokens the templates ship rather than
 every pair of braces: `{topic}` left in a body is an error and exits `1`, while a
-`{not_a_template_token}` of your own is reported clean. That is the check doing its job -
-it looks for scaffolding you forgot to fill - but it is not a general brace scan, which
-is worth knowing before relying on it to find something else.
+`{not_a_template_token}` of your own is reported clean. That is the check doing its job
+\- it looks for scaffolding you forgot to fill - but it is not a general brace scan,
+which is worth knowing before relying on it to find something else.
 
 ## Filenames
 
@@ -316,10 +316,10 @@ vaultspec-core vault plan step remove <plan> S07
 ```
 
 A hand-edited row parses, so the damage is silent until
-`vaultspec-core vault plan check` runs. That verb does find it, and it is the only
-one that does: `vault check all` runs the vault checks and not the plan
-conventions, so a duplicated identifier survives a clean run of it. Measured, on a
-plan whose second row was hand-edited to claim a number already taken:
+`vaultspec-core vault plan check` runs. That verb does find it, and it is the only one
+that does: `vault check all` runs the vault checks and not the plan conventions, so a
+duplicated identifier survives a clean run of it. Measured, on a plan whose second row
+was hand-edited to claim a number already taken:
 
 ```
 vaultspec-core vault plan check 2026-09-03-payment-retries-plan
@@ -330,10 +330,10 @@ vaultspec-core vault plan check 2026-09-03-payment-retries-plan
   fix (manual): Remove or rename the duplicate occurrences; the convention forbids re-using retired identifiers.
 ```
 
-What no check can recover is that reused identifier - the fix is marked manual
-because the tool cannot know which row the execution records naming `S02` were
-written against. Once two rows have claimed `S07`, the records pointing at it are
-ambiguous, and only the person who wrote them knows which one they meant.
+What no check can recover is that reused identifier - the fix is marked manual because
+the tool cannot know which row the execution records naming `S02` were written against.
+Once two rows have claimed `S07`, the records pointing at it are ambiguous, and only the
+person who wrote them knows which one they meant.
 
 ### One action, one row
 

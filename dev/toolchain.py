@@ -88,12 +88,21 @@ MARKDOWN_PATHS = (
 #: read by someone with a checkout, not the shipped-to-users prose (the project's
 #: front door, the linked doc pages, the builtins a consumer's install renders)
 #: this list holds to a fixed column width.
+#:
+#: `docs/` is named as a DIRECTORY rather than as the four pages this tuple used
+#: to list. Every file under it is a linked, user-facing page - `docs/README.md`
+#: is the index for the rest - so enumerating them added nothing a reader could
+#: not see, and cost the width rule five pages it should have covered:
+#: `correctness`, `verification`, `examples`, `syntax`, and the index itself
+#: were formatted by the unwrapped pass above and checked at no width at all.
+#: `docs/assets/` holds images only, so the directory needs no exclusion.
+#:
+#: A hand-kept list that falls behind the tree it describes is the same defect
+#: this repository keeps finding elsewhere - the release workflow derives its
+#: expected build targets from its own matrix for exactly this reason.
 WRAPPED_MARKDOWN = (
     "README.md",
-    "docs/channels.md",
-    "docs/framework.md",
-    "docs/MCP.md",
-    "docs/CLI.md",
+    "docs/",
     "src/vaultspec_core/builtins",
 )
 

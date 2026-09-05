@@ -81,8 +81,8 @@ command = "uvx"
 ```
 
 The launch shape follows the install mode rather than being fixed: a project that
-carries vaultspec-core as a dependency gets `uv run --no-sync` with no `--from`,
-because the environment already has the package. Compare against these when you manage
+carries vaultspec-core as a dependency gets `uv run --no-sync` with no `--from`, because
+the environment already has the package. Compare against these when you manage
 enrollment yourself, and read the markers as ownership boundaries: edit inside them and
 the next sync declines to touch the entry rather than repairing it.
 
@@ -110,9 +110,9 @@ The canonical definition records the vaultspec package and module. vaultspec ren
 launch command for the active install mode:
 
 - Tool mode, the default, uses `uvx --from ...` without adding vaultspec to the
-  project's dependencies. A companion may declare a dedicated tool requirement,
-  extras included: search renders `vaultspec-rag[gpu,mcp]`, which is what its
-  installer writes whichever extras you installed it with.
+  project's dependencies. A companion may declare a dedicated tool requirement, extras
+  included: search renders `vaultspec-rag[gpu,mcp]`, which is what its installer writes
+  whichever extras you installed it with.
 - Dependency mode uses `uv run --no-sync ...` against the project's environment and
   ships in built distributions.
 - Development mode also uses `uv run --no-sync ...`, but records a development-only
@@ -368,16 +368,16 @@ Scaffold one or more vault documents from templates. Mutates the vault; not idem
 `create` takes a single parameter, `documents`, a list of document specifications with
 at least one entry.
 
-| Field     | Type                    | Default            | Description                                                                                                                                                                                                                                   |
-| --------- | ----------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `feature` | string                  | none               | **Required.** Feature tag, in kebab-case. A leading `#` is stripped if present.                                                                                                                                                               |
-| `type`    | string or null          | `"research"`       | Document type: `research`, `adr`, `plan`, `reference`, `audit`, or `exec`. `create` rejects `index`; feature indexes are auto-generated.                                                                                                      |
-| `title`   | string or null          | `null`             | Rendered into the document's heading.                                                                                                                                                                                                         |
-| `date`    | string or null          | today's date (UTC) | ISO-8601 date.                                                                                                                                                                                                                                |
-| `content` | string or null          | `null`             | Seed prose, appended under a `## Context` heading. If seeding fails, `create` still creates the document and reports the failure as a warning rather than an error.                                                                           |
-| `related` | list of strings or null | `null`             | Documents to link in the `related:` frontmatter, resolved to `[[wiki-link]]` entries. Accepts a path, filename, stem, or an existing `[[wiki-link]]`.                                                                                         |
-| `tags`    | list of strings or null | `null`             | Extra tags, beyond the required directory tag and feature tag.                                                                                                                                                                                |
-| `tier`    | string or null          | `"L1"` for plans   | Plan complexity tier, one of `L1` through `L4`. Ignored for non-plan document types.                                                                                                                                                          |
+| Field     | Type                    | Default            | Description                                                                                                                                                                                                                                          |
+| --------- | ----------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `feature` | string                  | none               | **Required.** Feature tag, in kebab-case. A leading `#` is stripped if present.                                                                                                                                                                      |
+| `type`    | string or null          | `"research"`       | Document type: `research`, `adr`, `plan`, `reference`, `audit`, or `exec`. `create` rejects `index`; feature indexes are auto-generated.                                                                                                             |
+| `title`   | string or null          | `null`             | Rendered into the document's heading.                                                                                                                                                                                                                |
+| `date`    | string or null          | today's date (UTC) | ISO-8601 date.                                                                                                                                                                                                                                       |
+| `content` | string or null          | `null`             | Seed prose, appended under a `## Context` heading. If seeding fails, `create` still creates the document and reports the failure as a warning rather than an error.                                                                                  |
+| `related` | list of strings or null | `null`             | Documents to link in the `related:` frontmatter, resolved to `[[wiki-link]]` entries. Accepts a path, filename, stem, or an existing `[[wiki-link]]`.                                                                                                |
+| `tags`    | list of strings or null | `null`             | Extra tags, beyond the required directory tag and feature tag.                                                                                                                                                                                       |
+| `tier`    | string or null          | `"L1"` for plans   | Plan complexity tier, one of `L1` through `L4`. Ignored for non-plan document types.                                                                                                                                                                 |
 | `topic`   | string or null          | `null`             | Kebab-case filename infix that distinguishes a second document of the same type for one feature (`{date}-{feature}-{topic}-{type}.md`). Valid only for `adr`, `audit`, `reference`, and `research`. Mirrors `--topic` on `vaultspec-core vault add`. |
 
 Behavior notes:
@@ -524,8 +524,8 @@ linked to a step. A target that resolves to no plan or feature fails the whole c
 a protocol error. `status` returns no hashes; get a `blob_hash` from `find` to guard an
 edit.
 
-Rollup example, captured against this project's own vault and cut to one feature
-and one plan of the eleven and four it returned:
+Rollup example, captured against this project's own vault and cut to one feature and one
+plan of the eleven and four it returned:
 
 ```json
 {
@@ -566,9 +566,9 @@ and one plan of the eleven and four it returned:
 }
 ```
 
-`status` on a feature is written for a person - `In Progress`, `Completed` -
-rather than as a slug, so match it exactly rather than assuming a lowercase
-hyphenated form. `counts_by_type` above is cut to four of its seven keys.
+`status` on a feature is written for a person - `In Progress`, `Completed` - rather than
+as a slug, so match it exactly rather than assuming a lowercase hyphenated form.
+`counts_by_type` above is cut to four of its seven keys.
 
 Trace example:
 

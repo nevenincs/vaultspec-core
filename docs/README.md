@@ -24,8 +24,7 @@ one, read the framework manual.
 | [MCP server](MCP.md)                       | The Model Context Protocol server: its tools, setup, and configuration.                                   |
 
 Not covered here: installation lives in the [project README](../README.md), and bugs and
-questions go to the
-[issue tracker](https://github.com/nevenincs/vaultspec-core/issues).
+questions go to the [issue tracker](https://github.com/nevenincs/vaultspec-core/issues).
 
 ## For maintainers
 

@@ -250,10 +250,10 @@ That is correct. Scaffolded documents are not finished documents: every one stil
 carries template annotations and unreplaced placeholders, because nobody has written the
 prose yet.
 
-Both blocks above and below are the report's last line. The full run prints a
-status row for every check first - on one vault that is eighty-eight lines and
-forty-one rows, since a check with several findings prints several - and the
-counts are what the rest of this section reasons about.
+Both blocks above and below are the report's last line. The full run prints a status row
+for every check first - on one vault that is eighty-eight lines and forty-one rows,
+since a check with several findings prints several - and the counts are what the rest of
+this section reasons about.
 
 `--fix` clears what is mechanical:
 
@@ -265,7 +265,11 @@ vaultspec-core vault check all --fix
   Total: 4 errors, 19 warnings, 19 fixed
 ```
 
-Nineteen repairs, and the four errors stay. The two nineteens do not subtract from the twenty-seven above: `fixed` counts the repairs applied, and the warning count beside it is a fresh reading taken afterwards, against a corpus those repairs have changed. Repairing one thing can settle a check that was not counted and unsettle one that was, so compare runs rather than doing the arithmetic.
+Nineteen repairs, and the four errors stay. The two nineteens do not subtract from the
+twenty-seven above: `fixed` counts the repairs applied, and the warning count beside it
+is a fresh reading taken afterwards, against a corpus those repairs have changed.
+Repairing one thing can settle a check that was not counted and unsettle one that was,
+so compare runs rather than doing the arithmetic.
 
 The four errors are the placeholders:
 
@@ -313,10 +317,10 @@ not when the files are created.
 This run stops where the vault is written, which is one step short of where a real one
 stops. Nothing above says what to stage, and nothing installs a gate:
 
-- [Verifying a workspace and a vault](./verification.md) covers every check this page ran
-  and what each one proves.
+- [Verifying a workspace and a vault](./verification.md) covers every check this page
+  ran and what each one proves.
 - [The framework manual](./framework.md) opens with what to commit and what the managed
   `.gitignore` block keeps out, including the one file it deliberately does not exclude.
 - [Correctness](./correctness.md) is where the gate lives: the install writes
-  `.pre-commit-config.yaml` and no git hook, so nothing checks a commit until you install
-  the `pre-commit` tool and run `pre-commit install`.
+  `.pre-commit-config.yaml` and no git hook, so nothing checks a commit until you
+  install the `pre-commit` tool and run `pre-commit install`.
