@@ -380,7 +380,13 @@ class TestFingerprintVerifiedRefresh:
         target = _claude_target(tmp_path)
         key = ownership_target_key(target)
         path = ownership_path(tmp_path, target.scope)
-        recorded_before = read_ownership(path)["targets"][key]["managed"]["probe"]
+
+        def recorded() -> dict[str, object]:
+            # ``managed`` is not a required key on the record TypedDict, so it
+            # is read through .get - the same shape the sibling test uses.
+            return read_ownership(path)["targets"][key].get("managed", {})
+
+        recorded_before = recorded()["probe"]
 
         mcp_path = tmp_path / ".mcp.json"
         raw = json.loads(mcp_path.read_text(encoding="utf-8"))
@@ -389,11 +395,11 @@ class TestFingerprintVerifiedRefresh:
 
         mcp_sync(provider="claude")
 
-        recorded_after = read_ownership(path)["targets"][key]["managed"]["probe"]
-        assert recorded_after == recorded_before
+        recorded_after = recorded()
+        assert recorded_after["probe"] == recorded_before
         # Still owned - the name did not become external, only the claim about
         # who authored its bytes was withheld.
-        assert "probe" in read_ownership(path)["targets"][key]["managed"]
+        assert "probe" in recorded_after
 
     def test_the_refresh_warning_is_true_when_it_fires(self, tmp_path: Path) -> None:
         """The narration says hand-edited entries are never refreshed.
