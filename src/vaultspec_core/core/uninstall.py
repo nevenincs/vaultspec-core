@@ -25,6 +25,7 @@ from .gitignore import (
 from .helpers import rmtree_robust
 from .manifest import (
     ManifestData,
+    manifest_lock,
     providers_sharing_dir,
     providers_sharing_file,
     read_manifest_data,
@@ -180,10 +181,13 @@ def _uninstall_precommit_hooks(
         return
     removed.append((rel(root, precommit_path), "precommit"))
     try:
-        mdata = read_manifest_data(root)
-        if mdata.precommit_managed:
-            mdata.precommit_managed = False
-            write_manifest_data(root, mdata)
+        # Read-modify-write, so the whole cycle holds the manifest lock:
+        # `write_manifest_data` takes none of its own (issue #418).
+        with manifest_lock(root):
+            mdata = read_manifest_data(root)
+            if mdata.precommit_managed:
+                mdata.precommit_managed = False
+                write_manifest_data(root, mdata)
     except (YAMLError, OSError):
         pass
 

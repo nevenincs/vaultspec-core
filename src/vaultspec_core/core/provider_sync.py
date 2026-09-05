@@ -30,7 +30,12 @@ from .gitignore import (
 )
 from .helpers import ensure_dir
 from .install_mode import stamp_manifest_version_no_downgrade
-from .manifest import read_manifest, read_manifest_data, write_manifest_data
+from .manifest import (
+    manifest_lock,
+    read_manifest,
+    read_manifest_data,
+    write_manifest_data,
+)
 from .precommit import scaffold_precommit
 from .provider_registry import SYNC_PROVIDERS, rel, validate_skip
 
@@ -244,9 +249,16 @@ def _reconcile_gitignore_opt_out(target_dir: Path) -> None:
         "whole project, or 'vaultspec-core install --force' to resume.",
         gi_path,
     )
-    mdata.gitignore_managed = False
-    mdata.gitignore_opted_out = True
-    write_manifest_data(target_dir, mdata)
+    # Re-read under the lock rather than reusing the copy above: this is a
+    # read-modify-write, and `write_manifest_data` takes no lock of its own -
+    # its own docstring says the caller must hold one across the whole cycle
+    # (issue #418). The lock is scoped to the mutation so it never nests with
+    # the `.gitignore` lock the block writer takes on the branch above.
+    with manifest_lock(target_dir):
+        mdata = read_manifest_data(target_dir)
+        mdata.gitignore_managed = False
+        mdata.gitignore_opted_out = True
+        write_manifest_data(target_dir, mdata)
 
 
 def _reconcile_gitattributes_opt_out(target_dir: Path) -> None:
@@ -274,9 +286,12 @@ def _reconcile_gitattributes_opt_out(target_dir: Path) -> None:
         "the whole project, or 'vaultspec-core install --force' to resume.",
         ga_path,
     )
-    mdata.gitattributes_managed = False
-    mdata.gitattributes_opted_out = True
-    write_manifest_data(target_dir, mdata)
+    # Same cycle, same reason as its twin above (issue #418).
+    with manifest_lock(target_dir):
+        mdata = read_manifest_data(target_dir)
+        mdata.gitattributes_managed = False
+        mdata.gitattributes_opted_out = True
+        write_manifest_data(target_dir, mdata)
 
 
 def _stamp_last_synced(target_dir: Path, candidates: Iterable[str]) -> None:
@@ -284,14 +299,16 @@ def _stamp_last_synced(target_dir: Path, candidates: Iterable[str]) -> None:
     import datetime
 
     now = datetime.datetime.now(tz=datetime.UTC).isoformat()
-    mdata = read_manifest_data(target_dir)
-    for name in candidates:
-        if name not in mdata.installed:
-            continue
-        mdata.provider_state.setdefault(name, {})
-        mdata.provider_state[name]["last_synced"] = now
-    stamp_manifest_version_no_downgrade(mdata)
-    write_manifest_data(target_dir, mdata)
+    # Read-modify-write, so the whole cycle holds the lock (issue #418).
+    with manifest_lock(target_dir):
+        mdata = read_manifest_data(target_dir)
+        for name in candidates:
+            if name not in mdata.installed:
+                continue
+            mdata.provider_state.setdefault(name, {})
+            mdata.provider_state[name]["last_synced"] = now
+        stamp_manifest_version_no_downgrade(mdata)
+        write_manifest_data(target_dir, mdata)
 
 
 def _sync_all_providers(

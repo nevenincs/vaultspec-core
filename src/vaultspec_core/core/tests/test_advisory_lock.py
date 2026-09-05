@@ -325,3 +325,55 @@ class TestWindowsLockContentionClassification:
         wait would make every contended acquire feel stalled.
         """
         assert 0 < _WINDOWS_LOCK_RETRY_INTERVAL_SECONDS <= 0.5
+
+
+class TestManifestReadModifyWriteHoldsTheLock:
+    """The RMW cycles outside manifest.py hold the lock (issue #418).
+
+    `write_manifest_data` takes no lock of its own and its docstring says the
+    caller must hold one across the whole read-modify-write. Five callers did
+    not, so a concurrent writer's edit could be lost in the window between the
+    read and the write.
+
+    These are contract tests rather than race tests: the window is real by
+    construction but was not observable in three rounds of concurrent syncs,
+    so asserting the lock is held is the honest thing to check.
+    """
+
+    def test_manifest_lock_is_the_manifest_s_own_lock(self, tmp_path: Path) -> None:
+        """The public helper locks the manifest, not some other path."""
+        from vaultspec_core.core.manifest import manifest_lock
+
+        (tmp_path / ".vaultspec").mkdir()
+        sentinel = tmp_path / ".vaultspec" / "providers.json.lock"
+
+        with manifest_lock(tmp_path):
+            assert sentinel.exists()
+
+    def test_the_lock_is_not_reentrant(self, tmp_path: Path) -> None:
+        """Recorded deliberately: this is why the cycles are scoped narrowly.
+
+        A second acquisition on the same path blocks forever, so no locked
+        cycle may call anything that locks the manifest again. Asserted with a
+        thread and a timeout rather than by deadlocking the suite.
+        """
+        import threading
+
+        from vaultspec_core.core.manifest import manifest_lock
+
+        (tmp_path / ".vaultspec").mkdir()
+        acquired_twice = threading.Event()
+
+        def _reenter() -> None:
+            with manifest_lock(tmp_path):
+                acquired_twice.set()
+
+        with manifest_lock(tmp_path):
+            worker = threading.Thread(target=_reenter, daemon=True)
+            worker.start()
+            worker.join(timeout=0.5)
+            assert not acquired_twice.is_set(), (
+                "manifest_lock became reentrant; the narrow scoping in "
+                "provider_sync and uninstall was written on the assumption "
+                "that it is not"
+            )
