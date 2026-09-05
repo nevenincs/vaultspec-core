@@ -20,6 +20,7 @@ from .gitignore import (
     collect_provider_artifacts,
     ensure_gitignore_block,
     get_recommended_entries,
+    prune_orphaned_lock_sentinels,
 )
 from .helpers import rmtree_robust
 from .manifest import (
@@ -354,6 +355,26 @@ def _reconcile_uninstall_git_blocks(
         and (root / ".gitignore").is_file()
     ):
         ensure_gitignore_block(root, recommended, state=ManagedState.PRESENT)
+
+    # Reconcile `.gitattributes` on the same terms as its twin rather than
+    # only in the full-removal case above. A partial uninstall used to leave
+    # it at whatever the last install wrote and never look at it again, so it
+    # was the one managed file this path did not keep in step (issue #409).
+    # As with `.gitignore`, an absent file is not created here: uninstall
+    # removes, it does not provision.
+    if (
+        (mdata_after.installed or keep_vault)
+        and block_management_enabled(root, "gitattributes")
+        and (root / ".gitattributes").is_file()
+    ):
+        ensure_gitattributes_block(root, state=ManagedState.PRESENT)
+
+    # Prune sentinels whose subject this uninstall just removed. This has to
+    # run after the block writes above, not before: `advisory_lock` creates a
+    # sentinel as a side effect of the very write that reconciles the block,
+    # so pruning first would delete one and then immediately recreate it.
+    for orphan in prune_orphaned_lock_sentinels(root):
+        logger.info("Removed orphaned lock sentinel %s", orphan)
 
 
 def uninstall_run(
