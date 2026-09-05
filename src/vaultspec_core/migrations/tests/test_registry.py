@@ -320,6 +320,75 @@ class TestStatusHelpers:
         assert status == MigrationStatus.UP_TO_DATE
         assert names == []
 
+    def test_legacy_manifest_is_pending_not_unknown(self, workspace: Path):
+        """A manifest with no version is legacy, not absent (issue #408).
+
+        Both read back as an empty ``vaultspec_version``, and the two used to
+        share one short-circuit. That made the workspaces most in need of the
+        data-shape migrations the only ones that never received them.
+        """
+        data = read_manifest_data(workspace)
+        data.vaultspec_version = ""
+        write_manifest_data(workspace, data)
+        m, _ = _noop("alpha", "0.2.0")
+
+        status, names = migration_status(workspace, registry=[m])
+
+        assert status == MigrationStatus.PENDING
+        assert names == ["alpha"]
+
+    def test_every_migration_is_pending_for_a_legacy_manifest(
+        self, workspace: Path
+    ) -> None:
+        """A legacy workspace predates the whole registry, so all of it applies."""
+        data = read_manifest_data(workspace)
+        data.vaultspec_version = ""
+        write_manifest_data(workspace, data)
+        ancient, _ = _noop("ancient", "0.1.5")
+        middle, _ = _noop("middle", "0.2.0")
+        future, _ = _noop("future", "0.3.0")
+
+        pending = list_pending(workspace, registry=[ancient, middle, future])
+
+        assert [m.name for m in pending] == ["ancient", "middle", "future"]
+
+    def test_a_legacy_manifest_actually_runs_its_migrations(
+        self, workspace: Path
+    ) -> None:
+        """The driver runs them, rather than certifying them as applied.
+
+        The sequence that made this invisible: the driver reported nothing to
+        do, a later upgrade stamped the running version, and ``status`` then
+        reported every migration as applied - none of which had run.
+        """
+        data = read_manifest_data(workspace)
+        data.vaultspec_version = ""
+        write_manifest_data(workspace, data)
+        m, counter = _noop("alpha", "0.2.0")
+
+        results = run_pending_migrations(workspace, registry=[m])
+
+        assert counter["calls"] == 1
+        assert len(results) == 1
+        status, _names = migration_status(workspace, registry=[m])
+        assert status == MigrationStatus.UP_TO_DATE
+
+    def test_an_absent_manifest_still_reports_nothing_to_do(
+        self, tmp_path: Path
+    ) -> None:
+        """The other half of the distinction must not move.
+
+        A directory with a ``.vaultspec/`` but no manifest is not installed,
+        so the registry has nothing to say about it and nothing to run.
+        """
+        (tmp_path / ".vaultspec").mkdir()
+        m, counter = _noop("alpha", "0.2.0")
+
+        assert list_pending(tmp_path, registry=[m]) == []
+        assert migration_status(tmp_path, registry=[m])[0] is MigrationStatus.UNKNOWN
+        assert run_pending_migrations(tmp_path, registry=[m]) == []
+        assert counter["calls"] == 0
+
     def test_list_pending_filters_to_above_manifest_only(self, workspace: Path):
         data = read_manifest_data(workspace)
         data.vaultspec_version = "0.2.0"

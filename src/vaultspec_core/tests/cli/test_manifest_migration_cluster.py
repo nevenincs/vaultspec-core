@@ -104,7 +104,25 @@ class TestVersionAdvisoryGating:
 # #121 - migrations status must not assert "applied" without a baseline
 # ---------------------------------------------------------------------------
 class TestMigrationStatusUnknownBaseline:
-    def test_unset_manifest_renders_unknown_not_applied(self, tmp_path: Path) -> None:
+    def test_unset_manifest_renders_pending_never_applied(self, tmp_path: Path) -> None:
+        """#121's invariant, at #408's rendering.
+
+        #121 is that a manifest with no version must never have its migrations
+        reported as *applied*: without a baseline that claim is unearned. That
+        assertion is unchanged and is the load-bearing one here.
+
+        What changed is the other half. The row used to render ``unknown``,
+        which is what let the certification bug in #408 stand - the driver
+        agreed there was nothing to do, a later upgrade stamped the running
+        version, and the same rows then read ``applied`` without a single
+        migration having run. A versionless manifest is a legacy workspace: it
+        predates every registered migration, so ``pending`` is the true reading
+        and the one that gets them run.
+
+        The exit code follows from that, not from a separate decision. This
+        command already exits non-zero on pending, and a legacy workspace does
+        have pending migrations.
+        """
         from typer.testing import CliRunner
 
         from vaultspec_core.cli import app
@@ -117,11 +135,38 @@ class TestMigrationStatusUnknownBaseline:
         result = CliRunner(env={"NO_COLOR": "1"}).invoke(
             app, ["migrations", "status", "--target", str(tmp_path)]
         )
-        assert result.exit_code == 0, result.output
-        assert "unset" in result.output
-        # Without a baseline the applied state is unknowable; never claim applied.
+
+        # #121, unchanged: the applied state is unknowable, so never claim it.
         assert "applied" not in result.output
-        assert "unknown" in result.output
+        # The baseline is still reported as missing rather than invented.
+        assert "unset" in result.output
+        assert "pending" in result.output
+        assert result.exit_code == 1, result.output
+
+    def test_unset_manifest_reaches_up_to_date_by_running_them(
+        self, tmp_path: Path
+    ) -> None:
+        """And the pending state is reachable, which is the whole point.
+
+        Reporting ``pending`` would be no better than ``unknown`` if the run
+        that follows still did nothing.
+        """
+        from typer.testing import CliRunner
+
+        from vaultspec_core.cli import app
+
+        WorkspaceFactory(tmp_path).install("core")
+        data = read_manifest_data(tmp_path)
+        data.vaultspec_version = ""
+        write_manifest_data(tmp_path, data)
+        runner = CliRunner(env={"NO_COLOR": "1"})
+
+        run = runner.invoke(app, ["migrations", "run", "--target", str(tmp_path)])
+        assert run.exit_code == 0, run.output
+
+        after = runner.invoke(app, ["migrations", "status", "--target", str(tmp_path)])
+        assert after.exit_code == 0, after.output
+        assert "pending" not in after.output
 
 
 # ---------------------------------------------------------------------------
