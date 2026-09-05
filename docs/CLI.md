@@ -97,10 +97,10 @@ Failures under `--json` emit the same envelope with the fixed schema
 human-readable reason and `data.hint` carries remediation guidance when one is
 available. A `status` of `failed` always pairs with a non-zero exit code.
 
-Under `--json`, stdout carries only the envelope - no banners, no prose. Diagnostic
-logging stays on stderr. The envelope is pretty-printed for readability. The single
-question "did this run pass" is answered by the top-level `status` field alone, so a CI
-gate reduces to inspecting that one key.
+Under `--json`, stdout contains only the envelope; diagnostics go to stderr. Output is
+compact by default. For indentation, see
+[environment variables](#environment-variables). Use the top-level `status` field to
+check success.
 
 ## Command index
 
@@ -464,14 +464,21 @@ Remove the vaultspec framework from the target directory.
 - `--skip` (default `[]`) - Skip specific removal passes (repeatable).
 - `--json` (default off) - Emit machine-readable output.
 
-`.vault/` is preserved by default. Pass `--remove-vault` to delete it.
+`.vault/` is preserved by default. `--remove-vault` deletes it; commit or back up its
+records first.
 
 #### Examples
 
-- **Completely uninstall all framework files and delete all files in the vault**:
+- **Preview removal while keeping feature records**:
 
   ```bash
-  vaultspec-core uninstall all --remove-vault --force
+  vaultspec-core uninstall all --dry-run
+  ```
+
+- **After reviewing the preview, remove the harness and keep feature records**:
+
+  ```bash
+  vaultspec-core uninstall all --force
   ```
 
 ______________________________________________________________________
@@ -611,10 +618,10 @@ frontmatter flags are applied together in a single write with a single validatio
 so a document never lands on disk with new prose and stale metadata. At least one edit -
 a body channel or a frontmatter flag - must be supplied.
 
-Pass `--expected-blob-hash` with the hash you last read to make the write conditional:
-if anything changed the document in the meantime, the edit is refused instead of
-overwriting someone else's work. `vaultspec-core vault list --json` reports the current
-hash for each document.
+`--expected-blob-hash` requires the full 40-character hash of the document version you
+reviewed. Compute it with `git hash-object --no-filters <document-path>`. The write is
+refused if the file's raw bytes have changed. After a conflict, reread the document
+before computing a new hash.
 
 #### Arguments
 
@@ -687,11 +694,7 @@ Use this when the metadata is already right and you only want to swap the prose;
   vaultspec-core vault set-body 2026-05-17-test-feature-research --body-file rewrite.md
   ```
 
-- **Write only if the document has not changed since you read it**:
-
-  ```bash
-  vaultspec-core vault set-body 2026-05-17-test-feature-research --body-stdin --expected-blob-hash 4f2a1c9
-  ```
+To reject stale writes, use [`--expected-blob-hash`](#vaultspec-core-vault-edit).
 
 ______________________________________________________________________
 
@@ -1592,10 +1595,10 @@ Canonical identifiers (`S##`, `P##`, `W##`) remain append-only and gap-no-reuse.
   vaultspec-core vault plan query .vault/plan/2026-05-17-test-feature-plan.md --open
   ```
 
-- **Append a new step to the active phase of a plan**:
+- **Append a Step to Phase P01 of an L2 plan**:
 
   ```bash
-  vaultspec-core vault plan step add --action "Implement login authentication handler" --scope "src/auth.py" .vault/plan/2026-05-17-test-feature-plan.md
+  vaultspec-core vault plan step add --phase P01 --action "Implement login authentication handler" --scope "src/auth.py" .vault/plan/2026-05-17-test-feature-plan.md
   ```
 
 - **Toggle completion checkbox of a step**:
@@ -1842,6 +1845,7 @@ ______________________________________________________________________
 #### Step commands
 
 - `add` - Append a Step at the next-available `S##`. Requires `--action` and `--scope`.
+  At L2 and above, also supply `--phase`; omit it at L1.
 - `insert` - Insert at a named position with `--before`/`--after`; parent inferred from
   anchor.
 - `edit` - Replace `--action`, `--scope`, or both without changing the canonical

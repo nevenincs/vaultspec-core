@@ -172,10 +172,12 @@ A plan's tier sets how much structure it carries. `L1` is one concern with no
 cross-module coupling, steps only. `L2` is multi-step work in one subsystem, grouping
 steps under phases. `L3` adds waves above phases for interdependent batches. `L4` adds
 an epic frame for multi-week, multi-team work. Ask for the tier you want, or let the
-skill choose from the scope and change it later:
+skill choose from the scope and change it later.
+
+For example, promote an L2 plan to L3 with a named Wave:
 
 ```bash
-vaultspec-core vault plan tier promote .vault/plan/2026-06-26-search-api-plan.md --target L3
+vaultspec-core vault plan tier promote .vault/plan/2026-06-26-search-api-plan.md --target L3 --wave-title "Search API" --wave-intent "Deliver the search API"
 ```
 
 Each step names one unit of work and the file it touches, so it maps to a single commit:
