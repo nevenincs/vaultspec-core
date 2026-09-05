@@ -244,6 +244,7 @@ def _looks_like_signature(reference: str) -> bool:
     )
 
 
+@pytest.mark.precommit
 def test_docs_do_not_teach_bare_cli_commands() -> None:
     top_level_commands = _top_level_command_names()
     assert "vault" in top_level_commands
@@ -265,6 +266,7 @@ def test_docs_do_not_teach_bare_cli_commands() -> None:
     )
 
 
+@pytest.mark.precommit
 def test_docs_do_not_describe_command_groups_with_bare_executables() -> None:
     offenders: list[str] = []
     for path in sorted(_DOC_PATHS):
@@ -285,6 +287,7 @@ def test_docs_do_not_describe_command_groups_with_bare_executables() -> None:
     )
 
 
+@pytest.mark.precommit
 def test_markdown_command_references_match_live_cli_surface() -> None:
     command_paths = _registered_command_paths()
     leaf_paths = set(collect_leaf_command_paths(app))

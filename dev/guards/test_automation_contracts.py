@@ -850,3 +850,84 @@ def test_the_sentinel_fails_when_the_judge_returns_no_verdict() -> None:
     assert "the sentinel produced no verdict" in run, (
         "the judge step must fail loudly when it produces no parseable state"
     )
+
+
+#: The marker the pre-commit hook selects with, and the flag that selects it.
+_PRECOMMIT_MARKER = "precommit"
+_MARKER_SELECTOR = f"-m {_PRECOMMIT_MARKER}"
+
+
+def _precommit_hook_entries() -> list[str]:
+    """Every ``entry:`` line declared by a local hook in the pre-commit config."""
+    config = cast(
+        "_PreCommitConfig",
+        yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")),
+    )
+    return [
+        hook["entry"]
+        for repo in config["repos"]
+        for hook in repo.get("hooks", [])
+        if "entry" in hook
+    ]
+
+
+def test_the_markdown_guards_run_before_a_commit_not_only_in_ci() -> None:
+    """The bare-reference guard must be reachable without pushing.
+
+    It was CI-only until 2026-09-05, so ``vault check`` - a snippet naming a
+    command group that is not an executable - landed in README.md on
+    2026-09-02 and main stayed red for two days. The guard itself costs 0.02s
+    and reads markdown; only its siblings in the same file are slow, because
+    they shell out to ``--help`` for every command.
+
+    Asserted against the config rather than against behaviour because the
+    failure is silent: a deleted hook removes local coverage and breaks
+    nothing that any test would otherwise notice.
+    """
+    entries = _precommit_hook_entries()
+
+    assert any(_MARKER_SELECTOR in entry for entry in entries), (
+        f"no pre-commit hook selects '{_MARKER_SELECTOR}', so the markdown "
+        "guards run only after a push"
+    )
+
+
+def test_the_precommit_marker_selects_something() -> None:
+    """A marker nothing carries selects nothing, and the hook stops guarding.
+
+    pytest exits 5 on an empty selection, so the hook would fail rather than
+    pass quietly - but it would fail on every markdown commit for a reason
+    that reads like tooling breakage. Naming the cause here is cheaper.
+    """
+    marked = [
+        path.relative_to(ROOT).as_posix()
+        for path in sorted((ROOT / "dev" / "guards").rglob("test_*.py"))
+        if f"@pytest.mark.{_PRECOMMIT_MARKER}" in path.read_text(encoding="utf-8")
+    ]
+
+    assert marked, (
+        f"no test in dev/guards carries @pytest.mark.{_PRECOMMIT_MARKER}, so "
+        "the pre-commit hook selects an empty set"
+    )
+
+
+def test_the_precommit_marker_never_becomes_the_ci_selection() -> None:
+    """CI must keep running the whole file, marker or no marker.
+
+    The hook is an accelerator: it runs the cheap subset early. The moment CI
+    selects the same subset, the expensive guards - the ones that compare
+    documentation against live ``--help`` output - stop running anywhere, and
+    the marker silently converts from a speed-up into a coverage cut.
+    """
+    offenders: list[str] = []
+    for path in sorted((ROOT / ".github" / "workflows").glob("*.yml")):
+        workflow = cast("_Workflow", yaml.safe_load(path.read_text(encoding="utf-8")))
+        for job_name, job in workflow["jobs"].items():
+            for step in job.get("steps", []) or []:
+                if _MARKER_SELECTOR in str(step.get("run", "")):
+                    offenders.append(f"{path.name}:{job_name}:{step.get('name')}")
+
+    assert not offenders, (
+        f"these CI steps select '{_MARKER_SELECTOR}', which would leave the "
+        f"guards outside that marker running nowhere: {offenders}"
+    )
