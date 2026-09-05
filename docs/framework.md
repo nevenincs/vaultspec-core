@@ -306,6 +306,34 @@ after you upgrade the package.
 
 To remove the framework from a project, `vaultspec-core uninstall` reverses the install.
 
+## Installation options
+
+The quickstart uses `uvx vaultspec-core install`. Keep the `uvx` prefix for later
+commands when using this route.
+
+To install the CLI once and run it from any project:
+
+```bash
+uv tool install vaultspec-core
+vaultspec-core install
+```
+
+To manage it as a project dependency:
+
+```bash
+uv add vaultspec-core
+uv run vaultspec-core install
+```
+
+Contributors then use `uv sync` to install dependencies and `uv run vaultspec-core` to
+run the CLI. The [CLI reference](CLI.md) explains `--mode dependency` and `--mode dev`,
+which select how generated hooks and MCP configuration launch core. For standalone
+binaries, see [Homebrew and Scoop](channels.md).
+
+After updating the package, run `vaultspec-core install --upgrade` in each project to
+update its bundled rules, skills, and agents. Use `uvx` or `uv run` as appropriate for
+your installation route.
+
 ## Decisions you make once
 
 **Install mode.** Tool mode is the default and needs no action: hooks and the MCP server
