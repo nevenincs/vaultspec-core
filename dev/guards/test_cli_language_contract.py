@@ -27,12 +27,18 @@ pytestmark = [pytest.mark.repo, pytest.mark.integration]
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+_BUILTINS_DIR = _REPO_ROOT / "src" / "vaultspec_core" / "builtins"
+_BUILTIN_DOCS = tuple(sorted(_BUILTINS_DIR.rglob("*.md")))
+# The four named files fail loudly if they move; the globbed tail does not.
+# A renamed builtins tree would shrink the corpus in silence and leave the
+# guards below reporting a clean sweep over four files.
+assert _BUILTIN_DOCS, f"no builtin markdown found under {_BUILTINS_DIR}"
 _DOC_PATHS = (
     _REPO_ROOT / "README.md",
     _REPO_ROOT / "docs" / "CLI.md",
     _REPO_ROOT / "docs" / "framework.md",
     _REPO_ROOT / "docs" / "MCP.md",
-    *_REPO_ROOT.joinpath("src", "vaultspec_core", "builtins").rglob("*.md"),
+    *_BUILTIN_DOCS,
 )
 
 _INLINE_CODE = re.compile(r"`([^`\n]+)`")

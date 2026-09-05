@@ -150,12 +150,17 @@ def _colocated_test_dirs() -> set[str]:
     moment the others appeared.
     """
     included = _load_basedpyright_config()["include"]
-    return {
+    found = {
         path.relative_to(ROOT).as_posix()
         for tree in included
         for path in (ROOT / tree).rglob("tests")
         if path.is_dir() and "__pycache__" not in path.parts
     }
+    # The caller subtracts this set from the exemption list and asserts the
+    # remainder is empty, so an empty set here passes unconditionally - a
+    # renamed tree under `include` would retire the guard rather than trip it.
+    assert found, f"no co-located tests directories found under {included}"
+    return found
 
 
 def _recipe_exists(justfile_text: str, name: str) -> bool:
