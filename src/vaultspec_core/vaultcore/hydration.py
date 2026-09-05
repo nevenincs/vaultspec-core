@@ -91,7 +91,7 @@ _TEMPLATE_NAMES = {
 
 #: The refusal every scaffold ingress raises for an ``exec`` document that is
 #: not the plan's ledger. Execution has exactly one artifact and one writer.
-EXEC_NOT_SCAFFOLDED = "execution is logged with `vault exec log`"
+EXEC_NOT_SCAFFOLDED = "execution is logged with `vaultspec-core vault exec log`"
 
 # Document types that admit the optional topic infix
 # (``{date}-{feature}-{topic}-{type}.md``). Plans retain one execution
@@ -520,7 +520,7 @@ def create_vault_doc(
     Raises:
         FileNotFoundError: If no template exists for the identity's type.
         ValueError: If an ``exec`` document is requested without the ledger
-            binding; execution is logged with ``vault exec log``.
+            binding; execution is logged with ``vaultspec-core vault exec log``.
         ResourceExistsError: If the target file already exists and the
             write policy does not force an overwrite.
     """

@@ -266,7 +266,7 @@ def cmd_add(
     """Create a new .vault/ document from a template.
 
     Supported types: adr, audit, plan, reference, research. Execution is not
-    scaffolded: it is logged with ``vault exec log``.
+    scaffolded: it is logged with ``vaultspec-core vault exec log``.
     """
     apply_target(target)
     from vaultspec_core.cli import _add_ops

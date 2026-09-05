@@ -26,7 +26,7 @@ related:
   further freeform tags may follow (`--tags`); nothing else is structural.
 - `date:` - the scaffold date, quoted `yyyy-mm-dd`.
 - `modified:` - CLI-maintained last-modified stamp; set equal to `date:` at scaffold,
-  refreshed by every mutating verb and by `vault check all --fix`.
+  refreshed by every mutating verb and by `vaultspec-core vault check all --fix`.
 - `body_hash:` - fingerprint of the body that `modified:` attests, written beside the
   stamp by the same verbs. The reconciliation check compares the live body against it;
   file timestamps are never consulted. A record without it makes no claim and is
@@ -34,10 +34,10 @@ related:
 - `related:` - quoted wiki-links to `.vault/` stems, flat namespace, no relative paths.
   Set with `--related` at scaffold or `vaultspec-core vault link add`.
 - Plans add `tier:` (`L1`-`L4`, set by `--tier`, changed by
-  `vault plan tier promote/demote`; older plans without it default to `L2`). ADRs gain
-  `superseded_by:` and `supersedes:` from `vault adr supersede`. Feature indexes carry
-  `generated: true`. Every record carries `body_schema:` (`body-v1`; the ledger
-  `body-v2`). No other fields.
+  `vaultspec-core vault plan tier promote/demote`; older plans without it default to
+  `L2`). ADRs gain `superseded_by:` and `supersedes:` from
+  `vaultspec-core vault adr supersede`. Feature indexes carry `generated: true`. Every
+  record carries `body_schema:` (`body-v1`; the ledger `body-v2`). No other fields.
 
 ## Tags
 

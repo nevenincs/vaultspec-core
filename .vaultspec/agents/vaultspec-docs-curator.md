@@ -53,9 +53,10 @@ body heading. Record `supersedes` and `superseded_by` edges from
 
 - Apply directly: status propagation with
   `vaultspec-core vault adr supersede OLD --by NEW` (preview with `--dry-run`); status
-  encoding and stamp normalization. Use the CLI mutators (`vault adr supersede`,
-  `vault set-frontmatter`, `vault set-body`, `vault edit`, `vault link`), never a raw
-  edit of frontmatter.
+  encoding and stamp normalization. Use the CLI mutators
+  (`vaultspec-core vault adr supersede`, `vaultspec-core vault set-frontmatter`,
+  `vaultspec-core vault set-body`, `vaultspec-core vault edit`,
+  `vaultspec-core vault link`), never a raw edit of frontmatter.
 - Apply directly, boundary conformance: replace restated evidence in an ADR with a stem
   citation; strip decision language from a research or audit body where an accepted ADR
   records the same decision, leaving a one-line pointer. Two invariants: no fact is

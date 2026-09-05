@@ -45,7 +45,7 @@ related:
      noun. Execution artifact: the plan's the plan's ledger.
      Tier is declared in frontmatter as tier: L1/L2/L3/L4
      (mandatory for new plans; pre-existing plans without the
-     field default to L2 until `vault check all --fix` adds it).
+     field default to L2 until `vaultspec-core vault check all --fix` adds it).
      The tier selects containers:
        L1 = Steps only.
        L2 = Phases above Steps.
@@ -133,7 +133,7 @@ Format examples for each block type are embedded below as commented
 templates. -->
 
 <!-- Progress is recorded through the plan verbs (`plan_progress`,
-     `vault plan step check`), one Step at a time. -->
+     `vaultspec-core vault plan step check`), one Step at a time. -->
 
 <!-- PHASE BLOCK FORMAT (L2, L3, L4):
      ### Phase `P02` - rewrite the writer-agent contract

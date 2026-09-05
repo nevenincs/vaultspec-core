@@ -53,8 +53,8 @@ Return message format. Workers never change plan structure; that routes back to 
 - At each point of the review cadence in the vaultspec section, run
   `vaultspec-code-review`; a worker under `vaultspec-team` reports the close to its
   supervisor instead, who reviews. `critical` or `high` findings reopen the affected
-  Steps (`vault plan step uncheck`) and are fixed before continuing; lower findings are
-  recorded and fixed only under a Step the user approves.
+  Steps (`vaultspec-core vault plan step uncheck`) and are fixed before continuing;
+  lower findings are recorded and fixed only under a Step the user approves.
 - At `L4`, report Wave and Epic completion against the external artifact named in the
   plan's `## Epic intent`.
 - When every Step is closed and the last review passes, report the plan complete with

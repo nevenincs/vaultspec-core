@@ -581,7 +581,7 @@ Create a new `.vault/` document from a template.
 
 `exec` is not a scaffold type. `vaultspec-core vault add exec` exits 1 with the message
 "execution is logged with vault exec log"; the ledger is the only execution artifact and
-`vault exec log` its only writer.
+`vaultspec-core vault exec log` its only writer.
 
 ______________________________________________________________________
 

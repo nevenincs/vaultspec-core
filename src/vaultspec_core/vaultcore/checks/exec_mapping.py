@@ -323,7 +323,7 @@ def _per_step_record_diagnostic(rel_path: Path, tags: list[str]) -> CheckDiagnos
         path=rel_path,
         message=(
             "Per-Step execution record: execution is logged with "
-            "`vault exec log`, and the ledger is the only execution artifact."
+            "`vaultspec-core vault exec log`, and the ledger is the only execution artifact."
         ),
         severity=Severity.ERROR,
         fixable=False,

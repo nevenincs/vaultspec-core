@@ -389,7 +389,7 @@ outcome (`mixed` when items disagree).
 Create a `.vault/` document from a template.
 
 `DOC_TYPE`: `adr`, `audit`, `plan`, `reference`, `research`. `exec` is refused:
-execution is logged with `vault exec log`.
+execution is logged with `vaultspec-core vault exec log`.
 
 | Option | Short | Default | Description | | --------------- | ----- | ------- |
 -------------------------------------------------------------------- | | `--feature TAG`
