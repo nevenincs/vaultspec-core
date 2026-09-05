@@ -2366,7 +2366,8 @@ ______________________________________________________________________
 
 ### vaultspec-core spec gitignore
 
-`spec gitignore` and `spec gitattributes` are not available in the 0.1.73 release.
+`vaultspec-core spec gitignore` and `vaultspec-core spec gitattributes` are not
+available in the 0.1.73 release.
 
 ```bash
 vaultspec-core spec gitignore [OPTIONS] COMMAND [ARGS]...
@@ -2422,7 +2423,7 @@ vaultspec-core spec gitattributes [OPTIONS] COMMAND [ARGS]...
   project.
 
 These controls share the
-[availability and policy behavior of `spec gitignore`](#vaultspec-core-spec-gitignore),
+[availability and policy behavior of `vaultspec-core spec gitignore`](#vaultspec-core-spec-gitignore),
 using `blocks.gitattributes` in `.vaultspec/workspace.json`. The
 [default entries](../src/vaultspec_core/core/gitattributes.py) control line endings and
 union merging of execution ledgers.
