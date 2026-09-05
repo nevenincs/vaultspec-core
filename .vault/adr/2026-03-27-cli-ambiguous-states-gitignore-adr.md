@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#cli-ambiguous-states'
 date: '2026-03-27'
-modified: '2026-06-13'
-body_hash: 'sha256:8599f79dd3059aa8e3525618aa59b23307c9071e16c9abf6a19f0872e5d66bfd'
+modified: '2026-09-05'
+body_hash: 'sha256:151d4e103800d9b63dadc8722c634475edc36f1b686f7489d4c68f62b5a48cf3'
 related:
   - '[[2026-03-27-cli-ambiguous-states-research]]'
   - '[[2026-03-27-cli-ambiguous-states-prior-art-research]]'
@@ -61,10 +61,19 @@ without interfering with user-authored entries.
 
 - Must not create `.gitignore` if it doesn't exist. Users who don't use
   `.gitignore` have made a deliberate choice.
+  **Displaced** by `2026-09-04-install-degraded-robustness-adr`: skipping was
+  indistinguishable from success at the call site, so an install into a
+  workspace without the file reported that runtime by-products stayed local
+  while writing nothing. The file is created.
 
 - Must respect user removal of the managed block: if the user deletes
   the block, do not silently recreate it on next sync. Track opt-out
   state in manifest via `gitignore_managed` flag.
+  **Displaced in part** by `2026-09-05-managed-block-declaration-adr`: the
+  requirement stands, the store does not. The manifest is per-machine and is
+  itself inside the managed block, so the record never reaches a teammate. The
+  opt-out moves to the committed declaration, which did not exist when this
+  record was written.
 
 - The managed block content must be deterministic and idempotent:
   running the same operation twice produces the same result with no
