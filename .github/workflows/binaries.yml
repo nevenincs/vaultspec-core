@@ -336,6 +336,13 @@ jobs:
     runs-on: [self-hosted, Linux, X64, build]
     permissions:
       contents: write
+      # Both are for the attestation below. `id-token` mints the OIDC token
+      # Sigstore exchanges for a short-lived signing certificate; `attestations`
+      # is what lets the run publish the resulting bundle against this
+      # repository. Neither is a code-signing credential and neither can become
+      # one - see the step for why that distinction matters here.
+      id-token: write
+      attestations: write
     steps:
       # This repo, for the generator itself. No deploy key and no push: the
       # channel pointers no longer live here.
@@ -446,12 +453,182 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # ATTESTED BEFORE UPLOAD, and the ordering is the guard. `actions/attest`
+      # failing here fails the job with `gh release upload` still unrun, so an
+      # asset that could not be attested never becomes a release asset.
+      #
+      # THIS IS NOT A SIGNATURE, and reading it as one would be the expensive
+      # mistake. Sigstore is not in the Microsoft Trusted Root Program and is
+      # not going to be, so nothing here moves SmartScreen, Gatekeeper, or a
+      # WDAC publisher rule. The publisher-identity half is #405 and it is
+      # parked on a certificate this project does not hold.
+      #
+      # What it does do is the half that needed no certificate. Until now a user
+      # comparing a download against SHA256SUMS learned only that the file
+      # matched a list published beside it - which a tampered release publishes
+      # just as happily. An attestation binds each asset's digest to THIS
+      # repository and THIS workflow run, checkable with `gh attestation verify`
+      # by someone who trusts neither.
+      #
+      # SHA256SUMS IS DELIBERATELY NOT ATTESTED, and the reason is already
+      # written into publish.yml: that workflow attaches the wheel and sdist to
+      # this same release and merges their digests into this same file, and
+      # neither workflow knows which runs first. Whichever finishes last
+      # replaces the asset. An attestation over a file rewritten after it is
+      # minted is one a user cannot verify - `gh attestation verify` would fail
+      # on the single asset whose whole purpose is to be checked. It is a
+      # co-authored, mutable manifest; provenance belongs on the immutable
+      # artifacts it describes, not on the description.
+      #
+      # The subject list is therefore derived and passed explicitly rather than
+      # globbed. A glob would have to express that exclusion in `@actions/glob`
+      # negation syntax, whose behaviour this repository would then be trusting
+      # unverified. An enumerated list is assertable here, in the shell, before
+      # anything is signed.
+      # M4: the verify step below runs `gh attestation verify --signer-workflow`
+      # on the fleet, and the fleet's `gh` is not pinned by anything in this
+      # repository. An older one exits non-zero with "unknown flag", every asset
+      # lands in `unverified`, and the release fails AFTER upload for a reason
+      # that has nothing to do with provenance. Asked here, before the first
+      # irreversible act, the same shortfall is one named error instead.
+      #
+      # Measured on `vaultspec-core-linux` while writing this: gh 2.97.0, the
+      # subcommand present, and every Sigstore and GitHub endpoint an
+      # attestation needs reachable from that host. This step exists so that
+      # stays true rather than having been true once.
+      - name: Require a gh that can verify attestations
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "gh: $(gh --version | head -1)"
+          if ! gh attestation verify --help > /dev/null 2>&1; then
+            echo "::error::this runner's gh has no 'attestation verify'; upgrade gh on the fleet host"
+            exit 1
+          fi
+          if ! gh attestation verify --help 2>&1 | grep -q -- '--signer-workflow'; then
+            echo "::error::this runner's gh does not support --signer-workflow; upgrade gh on the fleet host"
+            exit 1
+          fi
+          echo "gh can verify attestations and pin a signer workflow"
+
+      - name: Enumerate the assets to attest
+        id: subjects
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t subjects < <(
+            find dist-bin -maxdepth 1 -type f ! -name SHA256SUMS | LC_ALL=C sort
+          )
+          # A derivation yielding nothing would attest nothing and report
+          # success - the shape v0.1.60's empty-hash manifest took out of a
+          # green run, and the shape the target derivation below already
+          # refuses. Say the number rather than trusting the glob.
+          if [ ${#subjects[@]} -eq 0 ]; then
+            echo "::error::dist-bin holds no attestable asset; there is nothing to attest"
+            exit 1
+          fi
+          echo "attesting ${#subjects[@]} asset(s): ${subjects[*]}"
+          {
+            echo "count=${#subjects[@]}"
+            echo "paths<<SUBJECTS_EOF"
+            printf '%s\n' "${subjects[@]}"
+            echo "SUBJECTS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Attest the release binaries
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ steps.subjects.outputs.paths }}
+
       - name: Upload to release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag || github.ref_name }}
         run: gh release upload "${TAG}" dist-bin/* --clobber
+
+      # The instrument, and it now runs whenever the upload ran.
+      #
+      # It used to sit at the end of this job, which put it AFTER the
+      # partial-release assertion - a step that exits 1 by design on exactly the
+      # release shape this file was built to handle. On every partial release,
+      # the case this workflow names v0.1.61 and v0.1.64 for, provenance was
+      # therefore never checked at all, while the release and its channel
+      # pointers shipped regardless. A correct check placed where it does not
+      # execute is this repository's most common defect, and that placement
+      # reproduced it inside the change that introduced it.
+      #
+      # Here it is fail-closed for the package-manager path and costs users
+      # nothing. The assets are already attached and downloadable by the time
+      # this runs, so the "attach what built rather than withhold it" rule below
+      # is untouched. What it can still stop is the channel pointers being
+      # generated and pushed to the SHARED distribution branch for a release
+      # whose provenance does not verify - that branch serves every product
+      # under the account, and a bad pointer on it is the one consequence of
+      # this job that is not confined to this release.
+      #
+      # The attest step above can only report that the action it invoked exited
+      # zero. This asks the API the same question a user's `gh attestation
+      # verify` asks, about the subjects that were actually attested rather than
+      # whatever a glob happened to match.
+      - name: Verify the attested assets carry provenance
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+          SUBJECTS: ${{ steps.subjects.outputs.paths }}
+          EXPECTED: ${{ steps.subjects.outputs.count }}
+        run: |
+          set -euo pipefail
+          unverified=()
+          checked=0
+          while IFS= read -r asset; do
+            [ -n "${asset}" ] || continue
+            checked=$((checked + 1))
+            # Verified against the REPOSITORY and the SIGNER WORKFLOW. `--repo`
+            # alone accepts a bundle minted by any workflow in this repository
+            # that can obtain `id-token: write`, which is a weaker claim than
+            # the one being made here.
+            #
+            # stderr is CAPTURED, not discarded. Sent to /dev/null, a Sigstore
+            # TUF outage, an API 5xx, or a `gh` too old for this subcommand all
+            # report identically to a missing attestation, and the release
+            # engineer is told the assets are unattested when the truth is that
+            # nothing could be asked.
+            # `< /dev/null` because this loop's stdin is the subject list.
+            # `gh attestation verify` does not read stdin today; a future
+            # version that did would silently eat the remaining subjects.
+            if ! why=$(gh attestation verify "${asset}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/binaries.yml" \
+              < /dev/null 2>&1); then
+              unverified+=("$(basename "${asset}")")
+              echo "::warning::${asset} did not verify:"
+              printf '%s\n' "${why}" >&2
+            fi
+          done <<< "${SUBJECTS}"
+          # Same refusal as the derivation above: a loop that examined nothing
+          # reports success having checked nothing.
+          if [ "${checked}" -eq 0 ]; then
+            echo "::error::no asset was checked for provenance; this guard cannot pass vacuously"
+            exit 1
+          fi
+          # The attest step and this loop read the same derived list, so a
+          # disagreement means the list changed between them - which would make
+          # both the attestation and this verdict describe a set nobody chose.
+          if [ "${checked}" -ne "${EXPECTED}" ]; then
+            echo "::error::verified ${checked} asset(s) but ${EXPECTED} were attested; the subject list changed mid-job"
+            exit 1
+          fi
+          if [ ${#unverified[@]} -ne 0 ]; then
+            echo "::error::attached but unattested: ${unverified[*]}"
+            echo "### Unattested assets" >> "$GITHUB_STEP_SUMMARY"
+            echo "Attached to \`${TAG}\` with no verifiable provenance: \`${unverified[*]}\`" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "all ${checked} attested asset(s) verify against ${GITHUB_REPOSITORY}"
 
       # Regenerate BOTH release-channel pointers from the SHA256SUMS just
       # built, then commit them. A Scoop manifest and a Homebrew formula are
@@ -691,6 +868,27 @@ jobs:
 
           if [ ${#missing[@]} -eq 0 ]; then
             echo "all ${#expected[@]} declared target(s) present on ${TAG}"
+            # A COMPLETE ASSET SET IS NOT BY ITSELF A GOOD RELEASE, and until
+            # now this guard behaved as though it were. The release job also
+            # attests every artifact and verifies that attestation; when the
+            # verification fails, the assets are ALREADY attached, so the
+            # completeness test above passes and the promote step below then
+            # clears the prerelease flag. The net effect was a release whose
+            # provenance does not verify serving as `latest` - which is where
+            # the README, the install prose and both channel manifests point.
+            #
+            # `needs.release.result` was already carried into this job's
+            # environment and used only to decorate log lines. It is part of
+            # the verdict now.
+            if [ "${RELEASE_RESULT}" != "success" ]; then
+              echo "::warning::${TAG} carries every declared target, but the release job ended '${RELEASE_RESULT}'"
+              if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease')" != "true" ]; then
+                gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease
+                echo "::notice::demoted ${TAG} to a prerelease so latest skips it"
+              fi
+              echo "::error::${TAG} has every declared asset but its release job ended '${RELEASE_RESULT}' - provenance verification or the channel pointers did not complete. Demoted so it cannot serve as latest. Read the release job's log, fix, and re-dispatch."
+              exit 1
+            fi
             exit 0
           fi
 
