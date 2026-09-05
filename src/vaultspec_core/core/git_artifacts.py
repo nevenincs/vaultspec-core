@@ -135,7 +135,7 @@ def has_gitattributes_block(ga_path: Path) -> bool:
     return managed_block_presence(ga_path) is True
 
 
-def _is_git_repo(target: Path) -> bool:
+def is_git_repo(target: Path) -> bool:
     """Return ``True`` if *target* is inside a git repository.
 
     Detects both plain clones (``.git`` is a directory) and linked
@@ -192,7 +192,7 @@ def untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
         List of paths that were actually untracked (best-effort; may be
         empty if git is unavailable or nothing was previously tracked).
     """
-    if not _is_git_repo(target):
+    if not is_git_repo(target):
         return []
 
     owned_lock_sentinels = frozenset(managed_lock_candidates(target))
