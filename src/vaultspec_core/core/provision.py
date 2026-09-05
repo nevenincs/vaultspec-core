@@ -41,6 +41,7 @@ from .manifest import (
     MANIFEST_FILENAME,
     ManifestData,
     add_providers,
+    manifest_lock,
     read_manifest_data,
     write_manifest_data,
 )
@@ -428,13 +429,22 @@ def _migrate_mcp_launch_shape(path: Path, resolved_mode: InstallMode) -> None:
 def _finalize_upgrade_manifest(
     path: Path, *, force: bool, resolved_mode: InstallMode
 ) -> None:
-    """Stamp manifest state and reconcile the git index after an upgrade."""
-    import datetime
+    """Stamp manifest state and reconcile the git index after an upgrade.
 
-    mdata = read_manifest_data(path)
-    if not mdata.installed_at:
-        mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
-    stamp_manifest_version_no_downgrade(mdata)
+    Ordered in two phases so the manifest read-modify-write can hold the
+    manifest lock across the whole cycle, which `write_manifest_data` requires
+    of its callers and this function did not do (issue #418).
+
+    Everything that touches another file happens first and only computes
+    values: the sentinel prune, both managed-block writes (each of which takes
+    that file's own advisory lock), and the mode declaration (which takes its
+    own too). Only then is the manifest lock taken, and nothing inside it locks
+    anything else. That is why `persist_resolved_mode` is decomposed here into
+    its declaration write and its two-field echo - its docstring states it must
+    not be called from within the manifest lock, and both halves of it cannot
+    be on the same side of that boundary.
+    """
+    import datetime
 
     for orphan in prune_orphaned_lock_sentinels(path):
         logger.info("Removed orphaned lock sentinel %s", orphan)
@@ -450,26 +460,46 @@ def _finalize_upgrade_manifest(
     # project that declined a block runs install like any other, and an
     # install that cleared the declaration would undo a teammate's decision
     # exactly the way the per-machine flag used to.
-    if force:
-        mdata.gitignore_opted_out = False
-        mdata.gitattributes_opted_out = False
-    if block_management_enabled(path, "gitignore", honour_local_echo=False):
+    gitignore_written = block_management_enabled(
+        path, "gitignore", honour_local_echo=False
+    )
+    if gitignore_written:
         ensure_gitignore_block(
             path,
             get_recommended_entries(path),
             state=ManagedState.PRESENT,
         )
-        mdata.gitignore_managed = True
     # The gitattributes block has never been reconciled on upgrade, so a
     # workspace that lost it never got it back without a fresh install.
-    if block_management_enabled(path, "gitattributes", honour_local_echo=False):
+    gitattributes_written = block_management_enabled(
+        path, "gitattributes", honour_local_echo=False
+    )
+    if gitattributes_written:
         ensure_gitattributes_block(path, state=ManagedState.PRESENT)
-        mdata.gitattributes_managed = True
 
-    mdata.precommit_managed = _detect_precommit_managed(path)
+    precommit_managed = _detect_precommit_managed(path)
+    # The declaration writer takes its own advisory lock, so it runs here
+    # rather than inside the cycle below; the floor it returns is echoed into
+    # the manifest there. This is `persist_resolved_mode` split across the
+    # lock boundary its docstring draws.
+    floor = write_mode_declaration(path, resolved_mode)
 
-    persist_resolved_mode(path, mdata, resolved_mode)
-    write_manifest_data(path, mdata)
+    with manifest_lock(path):
+        mdata = read_manifest_data(path)
+        if not mdata.installed_at:
+            mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
+        stamp_manifest_version_no_downgrade(mdata)
+        if force:
+            mdata.gitignore_opted_out = False
+            mdata.gitattributes_opted_out = False
+        if gitignore_written:
+            mdata.gitignore_managed = True
+        if gitattributes_written:
+            mdata.gitattributes_managed = True
+        mdata.precommit_managed = precommit_managed
+        mdata.resolved_mode = resolved_mode
+        mdata.resolved_floor_version = floor
+        write_manifest_data(path, mdata)
 
     # Reconcile git index with the managed gitignore block so that
     # historically-committed state files (e.g. .vaultspec/providers.json
