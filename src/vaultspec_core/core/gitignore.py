@@ -95,9 +95,11 @@ def managed_lock_candidates(target: Path) -> tuple[str, ...]:
     managed-ignore policy and the untracking ownership gate consume, so the two
     can never drift apart.
 
-    Unlike :func:`managed_lock_paths` this reports the full ownership surface
-    regardless of whether the locked subject currently exists: a sentinel
-    committed before its subject was retired is still ours to disown.
+    The full ownership surface is reported regardless of whether the locked
+    subject currently exists.  A sentinel committed before its subject was
+    retired is still ours to disown, and a sentinel whose subject the current
+    run has not written yet still has to be ignored - the ignore block is
+    computed before those writes happen.
 
     Args:
         target: Workspace root directory.
@@ -109,27 +111,6 @@ def managed_lock_candidates(target: Path) -> tuple[str, ...]:
         sorted(
             _sentinel_for(subject).relative_to(target).as_posix()
             for subject in _lock_subjects(target)
-        )
-    )
-
-
-def managed_lock_paths(target: Path) -> tuple[str, ...]:
-    """Return the sentinels Core owns whose locked subject exists on disk.
-
-    The ignore block lists only these, mirroring the long-standing rule that a
-    companion-less lock path is not emitted.
-
-    Args:
-        target: Workspace root directory.
-
-    Returns:
-        Sorted root-relative POSIX paths, e.g. ``".codex/config.toml.lock"``.
-    """
-    return tuple(
-        sorted(
-            _sentinel_for(subject).relative_to(target).as_posix()
-            for subject in _lock_subjects(target)
-            if subject.is_file()
         )
     )
 
@@ -139,9 +120,9 @@ def prune_orphaned_lock_sentinels(target: Path) -> list[str]:
 
     A sentinel outlives its subject when a managed file is retired - most
     notably ``.pre-commit-config.yaml.lock`` after a checkout migrates to
-    ``prek.toml``.  Because :func:`managed_lock_paths` only covers sentinels with
-    a live subject, an orphan would otherwise remain permanently visible in
-    ``git status``.
+    ``prek.toml``.  The managed block ignores such an orphan, so this is
+    housekeeping rather than the thing that keeps it out of ``git status``:
+    a sentinel whose subject is gone has nothing left to lock.
 
     Only empty sentinels are removed: ``advisory_lock`` never writes to the file,
     so a non-empty ``.lock`` sibling belongs to someone else and is left alone.
@@ -215,14 +196,25 @@ def get_recommended_entries(target: Path) -> list[str]:
 
         # Advisory-lock sentinels produced by ``advisory_lock`` when vaultspec
         # locks a managed file during install or sync.  Enumerated from
-        # :func:`managed_lock_paths` rather than via a broad ``*.lock`` glob
-        # because legitimately-tracked lockfiles (uv.lock, bun.lock,
+        # :func:`managed_lock_candidates` rather than via a broad ``*.lock``
+        # glob because legitimately-tracked lockfiles (uv.lock, bun.lock,
         # Cargo.lock, ...) must not be ignored.  Each entry is anchored with a
         # leading slash so it matches only at its exact location.  Only emitted
         # when vaultspec itself is installed, to avoid polluting the
         # recommended set on bare workspaces.
+        #
+        # The full ownership surface is listed, not just the sentinels whose
+        # subject exists right now: this function is called BEFORE the writes
+        # that create those subjects, so a presence filter would leave the
+        # block short of the sentinels the same run is about to produce - most
+        # visibly ``/.gitignore.lock``, whose subject ``ensure_gitignore_block``
+        # locks moments later.  ``git_artifacts`` already disowns sentinels from
+        # this same surface, so deriving both from it keeps the block and the
+        # untracker in step.  Listing a sentinel that never materialises costs
+        # one inert line; omitting one that does costs the reader a per-machine
+        # artefact in their first commit.
         if framework_installed:
-            for lock_path in managed_lock_paths(target):
+            for lock_path in managed_lock_candidates(target):
                 entries.add(f"/{lock_path}")
 
         # ``.pre-commit-config.yaml`` is team-shared while a workspace wants
@@ -368,19 +360,33 @@ def ensure_gitignore_block(
     contains the caller-supplied *entries*.  The function is idempotent - it
     returns ``False`` when the file already matches the desired state.
 
+    The file is **created** when it does not exist and *state* is
+    :attr:`~vaultspec_core.core.enums.ManagedState.PRESENT`, through the same
+    locked atomic write that updates an existing one.  Skipping instead was
+    indistinguishable from "nothing needed changing" at the call site, so an
+    install into a workspace without a ``.gitignore`` reported success and left
+    the per-machine artefacts it had just written unignored.
+
     Args:
         target: Workspace root directory containing ``.gitignore``.
         entries: Gitignore patterns to manage inside the block.
         state: Desired state (PRESENT or ABSENT).
 
     Returns:
-        ``True`` if the file was modified, ``False`` otherwise.
+        ``True`` if the file was created or modified, ``False`` otherwise.
     """
     gi_path = target / ".gitignore"
-    if not gi_path.exists():
+    # Removal from a file that is not there is already the requested state.
+    # Checked before the lock so uninstall does not leave a sentinel behind for
+    # a subject it never touched.
+    if state == ManagedState.ABSENT and not gi_path.exists():
         return False
 
     with advisory_lock(gi_path):
+        if not gi_path.exists():
+            _write(gi_path, "\n".join([MARKER_BEGIN, *entries, MARKER_END]) + "\n", b"")
+            return True
+
         raw = gi_path.read_bytes()
         eol = _detect_line_ending(raw)
 

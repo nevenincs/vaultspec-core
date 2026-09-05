@@ -82,6 +82,23 @@ repos:
     language: system
     pass_filenames: false
     files: '^(src/vaultspec_core/cli/.*\.py|src/vaultspec_core/builtins/reference/cli\.md|docs/CLI\.md)$'
+  - id: doc-cli-language
+    name: Docs name the CLI entry point
+    # The guard that reads only markdown, not the live CLI: 0.06s of work in
+    # a 1.4s invocation. Its three expensive siblings in the same file shell
+    # out to `--help` for every command and stay in CI, where 50s is free.
+    #
+    # This exists because the bare-reference guard was CI-only, so `vault
+    # check` reached main in README.md on 2026-09-02 and sat there red for
+    # two days. Selection is by marker rather than by test name: a renamed
+    # test silently shrinks a `-k` expression, and pytest exits 5 - loudly -
+    # when a marker selects nothing.
+    entry: uv run --no-sync pytest dev/guards -m precommit -q
+    language: system
+    pass_filenames: false
+    types:
+    - markdown
+
   - id: check-provider-artifacts
     name: Check provider artifacts
     entry: uv run --no-sync vaultspec-core check-providers

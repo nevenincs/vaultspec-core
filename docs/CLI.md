@@ -88,9 +88,9 @@ shape regardless of which command produced it:
 The `schema` value follows the convention `vaultspec.<dotted-command-path>.v1` - for
 example `vaultspec.sync.v1`, `vaultspec.vault.stats.v1`, or
 `vaultspec.spec.rules.add.v1`. Every schema is at version `v1` except
-`vaultspec.vault.graph.v2`, documented with `vault graph` below. Adding new keys under
-`data` is additive and does not bump the version; renaming or removing a key bumps the
-integer (`v2`, ...). Schema bumps are recorded in the release notes.
+`vaultspec.vault.graph.v2`, documented with `vaultspec-core vault graph` below. Adding
+new keys under `data` is additive and does not bump the version; renaming or removing a
+key bumps the integer (`v2`, ...). Schema bumps are recorded in the release notes.
 
 Failures under `--json` emit the same envelope with the fixed schema
 `vaultspec.error.v1` and `status` set to `failed`; `data.message` carries the
@@ -111,7 +111,7 @@ full options.
 
 ### Top-level commands
 
-- `vaultspec-core install` - Install vaultspec resources for the selected providers.
+- `vaultspec-core install` - Install Vaultspec resources for the selected providers.
 - `vaultspec-core uninstall` - Remove the vaultspec framework from the target directory.
 - `vaultspec-core sync` - Sync rules, skills, agents, configs, system prompts, and MCPs.
 - `vaultspec-core doctor` - Diagnose overall workspace and vault health.
@@ -365,7 +365,7 @@ full options.
 - `vaultspec-core spec mcps remove` - Remove a canonical MCP server definition.
 - `vaultspec-core spec mcps sync` - Reconcile canonical definitions into provider-native
   enrollment.
-- `vaultspec-core spec mcps uninstall` - Remove vaultspec-owned provider-native MCP
+- `vaultspec-core spec mcps uninstall` - Remove Vaultspec-owned provider-native MCP
   enrollment.
 
 #### Reference

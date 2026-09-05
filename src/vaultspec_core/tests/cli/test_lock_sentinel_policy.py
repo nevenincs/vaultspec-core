@@ -25,7 +25,6 @@ import pytest
 from vaultspec_core.core.gitignore import (
     get_recommended_entries,
     managed_lock_candidates,
-    managed_lock_paths,
     prune_orphaned_lock_sentinels,
 )
 from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
@@ -97,7 +96,6 @@ class TestGeneratedSentinelsMatchPolicy:
         }
 
         assert expected, "install should enrol at least one in-repo MCP target"
-        assert expected <= set(managed_lock_paths(tmp_path))
         assert expected <= set(managed_lock_candidates(tmp_path))
 
     def test_every_generated_sentinel_is_covered_by_the_policy(
@@ -245,3 +243,262 @@ class TestCleanRepositoryAfterInstall:
         assert not (tmp_path / ".pre-commit-config.yaml.lock").exists()
         status = _run_git(tmp_path, "status", "--porcelain").stdout
         assert ".lock" not in status, f"lock noise after repeat install:\n{status}"
+
+
+@pytest.mark.unit
+class TestPolicyIsIndependentOfDiskState:
+    """The entry set is derived from policy, not from a disk snapshot.
+
+    ``get_recommended_entries`` is called BEFORE the writes that create the
+    subjects it names, most visibly by ``ensure_gitignore_block``, which locks
+    ``.gitignore`` and so produces ``.gitignore.lock`` moments after the block
+    listing it has been computed.  A presence filter over the lock subjects
+    therefore made block completeness a function of call ordering: the first
+    install wrote a block short of what the second one produced.
+    """
+
+    def test_entries_do_not_change_when_lock_subjects_are_absent(
+        self, tmp_path: Path
+    ) -> None:
+        """Removing every locked subject leaves the recommended set unchanged."""
+        _installed_workspace(tmp_path)
+
+        with_subjects = get_recommended_entries(tmp_path)
+
+        for lock in managed_lock_candidates(tmp_path):
+            subject = tmp_path / lock.removesuffix(".lock")
+            subject.unlink(missing_ok=True)
+            (tmp_path / lock).unlink(missing_ok=True)
+
+        assert get_recommended_entries(tmp_path) == with_subjects
+
+    def test_gitignore_sentinel_is_listed_before_its_subject_exists(
+        self, tmp_path: Path
+    ) -> None:
+        """The block covers its own lock sentinel on a workspace with no ignore file."""
+        _installed_workspace(tmp_path)
+        (tmp_path / ".gitignore").unlink(missing_ok=True)
+        (tmp_path / ".gitignore.lock").unlink(missing_ok=True)
+
+        assert "/.gitignore.lock" in get_recommended_entries(tmp_path)
+
+
+@pytest.mark.integration
+class TestInstallProtectsAWorkspaceWithNothing:
+    """A workspace that starts with no ignore file ends up protected.
+
+    This is the end-to-end shape of GH issue 399: the install completed,
+    printed the sharing-policy statement claiming runtime by-products stay
+    local, exited zero, and left the sentinels it had just written with
+    nothing ignoring them.
+    """
+
+    def test_install_creates_the_ignore_file_and_writes_the_block(
+        self, tmp_path: Path
+    ) -> None:
+        assert not (tmp_path / ".gitignore").exists()
+
+        _installed_workspace(tmp_path)
+
+        text = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+        assert "# >>> vaultspec-managed" in text
+        for entry in get_recommended_entries(tmp_path):
+            assert entry in text.splitlines()
+
+    def test_first_install_writes_what_a_second_one_would(self, tmp_path: Path) -> None:
+        """The block does not converge over two runs; it is right the first time."""
+        factory = _installed_workspace(tmp_path)
+        first = (tmp_path / ".gitignore").read_bytes()
+
+        factory.install(provider="all", upgrade=True, force=True)
+
+        assert (tmp_path / ".gitignore").read_bytes() == first
+
+    def test_every_generated_sentinel_is_ignored_from_the_first_install(
+        self, tmp_path: Path
+    ) -> None:
+        """Including the ignore file's own sentinel, created by the block write."""
+        _run_git(tmp_path, "init", "-q", "-b", "main")
+
+        _installed_workspace(tmp_path)
+
+        assert (tmp_path / ".gitignore.lock").is_file()
+        not_ignored = [
+            lock
+            for lock in _generated_lock_files(tmp_path)
+            if _run_git(tmp_path, "check-ignore", "-q", "--", lock).returncode != 0
+        ]
+        assert not_ignored == [], f"sentinels git still tracks: {not_ignored!r}"
+
+
+@pytest.mark.integration
+class TestUpgradeReconvergence:
+    """An upgrade repairs a missing block; it does not override an opt-out."""
+
+    def test_legacy_workspace_converges_without_force(self, tmp_path: Path) -> None:
+        """A workspace where management was never established gets a block.
+
+        This is the shape an install by an older version leaves behind: the
+        block writer skipped the absent file, so the manifest records neither
+        management nor an opt-out and the workspace has been unprotected ever
+        since. Repair used to require ``--force``, which nothing told the
+        reader to pass.
+        """
+        from vaultspec_core.core.manifest import (
+            read_manifest_data,
+            write_manifest_data,
+        )
+
+        factory = _installed_workspace(tmp_path)
+        (tmp_path / ".gitignore").write_text("# mine\n", encoding="utf-8")
+        mdata = read_manifest_data(tmp_path)
+        mdata.gitignore_managed = False
+        mdata.gitignore_opted_out = False
+        write_manifest_data(tmp_path, mdata)
+
+        factory.install(provider="all", upgrade=True)
+
+        text = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+        assert "# >>> vaultspec-managed" in text
+        assert "# mine" in text
+
+    def test_deleted_block_stays_deleted_across_an_upgrade(
+        self, tmp_path: Path
+    ) -> None:
+        """Removing the block is an opt-out, and an upgrade honours it."""
+        factory = _installed_workspace(tmp_path)
+        (tmp_path / ".gitignore").write_text("# mine only\n", encoding="utf-8")
+        factory.sync()
+
+        factory.install(provider="all", upgrade=True)
+
+        assert "vaultspec-managed" not in (tmp_path / ".gitignore").read_text(
+            encoding="utf-8"
+        )
+
+    def test_force_is_the_re_opt_in_gesture(self, tmp_path: Path) -> None:
+        factory = _installed_workspace(tmp_path)
+        (tmp_path / ".gitignore").write_text("# mine only\n", encoding="utf-8")
+        factory.sync()
+
+        factory.install(provider="all", upgrade=True, force=True)
+
+        assert "vaultspec-managed" in (tmp_path / ".gitignore").read_text(
+            encoding="utf-8"
+        )
+
+
+@pytest.mark.integration
+class TestOptOutIsRecordedByEitherSync:
+    """The managed blocks are repository-level, not per-provider.
+
+    Only `sync all` used to reconcile them, so `sync claude` left a deleted
+    block unrecorded - and with the diagnosis weighing an unrecorded absence,
+    that is a warning the reader cannot clear without knowing which spelling
+    of sync clears it.
+    """
+
+    def test_single_provider_sync_records_the_opt_out(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.manifest import read_manifest_data
+
+        factory = _installed_workspace(tmp_path)
+        (tmp_path / ".gitignore").write_text("# mine only\n", encoding="utf-8")
+
+        factory.sync(provider="claude")
+
+        mdata = read_manifest_data(tmp_path)
+        assert mdata.gitignore_opted_out is True
+        assert mdata.gitignore_managed is False
+
+
+@pytest.mark.unit
+class TestManagedBlockPresenceIsTriState:
+    """ "No block" and "cannot tell" are different answers."""
+
+    def test_absent_file_reports_no_block(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.git_artifacts import managed_block_presence
+
+        assert managed_block_presence(tmp_path / ".gitignore") is False
+
+    def test_unreadable_file_reports_unknown(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.git_artifacts import managed_block_presence
+
+        (tmp_path / ".gitignore").write_bytes(b"\xff\xfe\x00garbage\n")
+
+        assert managed_block_presence(tmp_path / ".gitignore") is None
+
+    def test_a_directory_reports_unknown(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.git_artifacts import managed_block_presence
+
+        (tmp_path / ".gitignore").mkdir()
+
+        assert managed_block_presence(tmp_path / ".gitignore") is None
+
+
+@pytest.mark.integration
+class TestOnlyAReadFileCountsAsTheOptOutGesture:
+    """An unreadable file must not become a recorded decision.
+
+    Every state that was not "readable file with no markers" used to collapse
+    into the opt-out gesture, because the predicate behind it answered False on
+    a read failure. The recorded opt-out then suppressed the degraded diagnosis,
+    restoring the silence this work removed - by a route through the writer
+    rather than the reader.
+    """
+
+    def test_undecodable_file_records_nothing(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.manifest import read_manifest_data
+
+        factory = _installed_workspace(tmp_path)
+        (tmp_path / ".gitignore").write_bytes(b"\xff\xfe\x00garbage\n")
+
+        factory.sync()
+
+        mdata = read_manifest_data(tmp_path)
+        assert mdata.gitignore_opted_out is False
+        assert mdata.gitignore_managed is True
+
+
+@pytest.mark.integration
+class TestUninstallRemovesAndDoesNotProvision:
+    """Uninstall must not write back a file the workspace deleted.
+
+    `ensure_gitignore_block` creates an absent file now, so the uninstall
+    reconciler needed a gate it never had: without one a partial uninstall
+    recreated a deleted `.gitignore`, before any sync could read that deletion
+    as the opt-out gesture.
+    """
+
+    def test_partial_uninstall_does_not_recreate_a_deleted_file(
+        self, tmp_path: Path
+    ) -> None:
+        factory = _installed_workspace(tmp_path)
+        (tmp_path / ".gitignore").unlink()
+
+        factory.uninstall(provider="gemini", force=True)
+
+        assert not (tmp_path / ".gitignore").exists()
+
+    def test_partial_uninstall_still_reconciles_a_live_block(
+        self, tmp_path: Path
+    ) -> None:
+        factory = _installed_workspace(tmp_path)
+
+        factory.uninstall(provider="gemini", force=True)
+
+        assert "vaultspec-managed" in (tmp_path / ".gitignore").read_text(
+            encoding="utf-8"
+        )
+
+    def test_partial_uninstall_respects_a_recorded_opt_out(
+        self, tmp_path: Path
+    ) -> None:
+        factory = _installed_workspace(tmp_path)
+        (tmp_path / ".gitignore").write_text("# mine only\n", encoding="utf-8")
+        factory.sync()
+
+        factory.uninstall(provider="codex", force=True)
+
+        assert "vaultspec-managed" not in (tmp_path / ".gitignore").read_text(
+            encoding="utf-8"
+        )

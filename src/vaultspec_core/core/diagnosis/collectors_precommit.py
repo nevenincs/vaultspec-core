@@ -60,12 +60,92 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
 
     boundary = collect_prek_boundary(target)
     if not boundary.owns_boundary:
-        return _collect_precommit_yaml_state(target)
+        return _reassess_against_installation(
+            target, _collect_precommit_yaml_state(target)
+        )
     if boundary.hooks_present:
         if (target / ".pre-commit-config.yaml").exists():
             return PrecommitSignal.ORPHANED
-        return PrecommitSignal.COMPLETE
+        return _reassess_against_installation(target, PrecommitSignal.COMPLETE)
     return PrecommitSignal.UNREFRESHABLE
+
+
+def _hooks_directory(target: Path) -> Path | None:
+    """Return the directory git runs hooks from, or ``None`` if unknowable.
+
+    Git is asked rather than assuming ``<target>/.git/hooks``, because that
+    assumption is wrong in two ordinary layouts: ``core.hooksPath`` relocates
+    the directory outright, and a linked worktree keeps its hooks in the
+    common git directory rather than beside its own gitdir.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        The resolved hooks directory, or ``None`` when *target* is not a git
+        working tree or git is not on ``PATH``.
+    """
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(target), "rev-parse", "--git-path", "hooks"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as exc:
+        logger.debug("Cannot resolve the git hooks directory for %s: %s", target, exc)
+        return None
+
+    printed = result.stdout.strip()
+    if not printed:
+        return None
+    return (target / printed).resolve()
+
+
+def precommit_hook_installed(target: Path) -> bool | None:
+    """Whether git has a ``pre-commit`` hook installed for *target*.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        ``True`` or ``False``, or ``None`` when the question cannot be
+        answered - *target* is not a git working tree, or git is unavailable.
+        ``None`` is deliberately distinct from ``False``: hooks are not
+        stranded merely because this could not look.
+    """
+    hooks_directory = _hooks_directory(target)
+    if hooks_directory is None:
+        return None
+    return (hooks_directory / "pre-commit").is_file()
+
+
+def _reassess_against_installation(
+    target: Path, signal: PrecommitSignal
+) -> PrecommitSignal:
+    """Report a complete configuration that nothing will run as such.
+
+    Only :attr:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal.COMPLETE`
+    is reassessed. Every other signal already names a fault in the
+    configuration itself, and that fault is both more actionable and the thing
+    to fix first; an uninstalled hook stacked on a broken config is not a
+    second finding worth displacing the first.
+
+    Args:
+        target: Workspace root directory.
+        signal: The verdict reached from the configuration alone.
+
+    Returns:
+        ``NOT_INSTALLED`` when a complete configuration has no installed hook
+        to run it, and *signal* unchanged otherwise.
+    """
+    if signal is not PrecommitSignal.COMPLETE:
+        return signal
+    if precommit_hook_installed(target) is False:
+        return PrecommitSignal.NOT_INSTALLED
+    return signal
 
 
 def _local_precommit_hooks(config_path: Path) -> list[dict[str, object]] | None:

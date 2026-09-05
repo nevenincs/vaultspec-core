@@ -221,7 +221,7 @@ class TestSyncWithoutGitignore:
     """Sync must not crash when .gitignore is absent."""
 
     def test_sync_without_gitignore_no_crash(self, factory: WorkspaceFactory) -> None:
-        factory.install(skip_gitignore=True)
+        factory.install()
         (factory.path / ".gitignore").unlink(missing_ok=True)
         assert not (factory.path / ".gitignore").exists()
 

@@ -207,13 +207,21 @@ def _safe_framework_presence(target: Path) -> FrameworkSignal:
 
 
 def _safe_gitignore_state(target: Path) -> GitignoreSignal:
-    """Collect gitignore state, neutral to :attr:`GitignoreSignal.NO_FILE`."""
+    """Collect gitignore state, degrading rather than reporting a clean absence.
+
+    A collector that failed has not confirmed the block. Falling back to
+    :attr:`GitignoreSignal.NO_FILE` in an installed workspace would report the
+    benign reading for a check that did not run, which is the shape this
+    collector exists to catch.
+    """
     from .collectors import collect_gitignore_state
 
     try:
         return collect_gitignore_state(target)
     except Exception:
         logger.warning("Gitignore state collector failed", exc_info=True)
+        if (target / ".vaultspec").is_dir():
+            return GitignoreSignal.UNMANAGED
         return GitignoreSignal.NO_FILE
 
 

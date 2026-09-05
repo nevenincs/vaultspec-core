@@ -53,9 +53,56 @@ class TestBlockInsertion:
         assert ".vaultspec/_snapshots/" in text
         assert text.startswith("node_modules/")
 
-    def test_no_gitignore_returns_false(self, tmp_path: Path) -> None:
+    def test_absent_gitignore_is_created(self, tmp_path: Path) -> None:
+        """A workspace with no ignore file gets one, block and all.
+
+        Skipping instead returned the same ``False`` as "already correct", so
+        the install could not tell the two apart and reported success on a
+        workspace it had not protected (GH issue 399).
+        """
         changed = ensure_gitignore_block(tmp_path, ENTRIES)
+
+        assert changed is True
+        text = _read_gi(tmp_path)
+        assert text.splitlines() == [MARKER_BEGIN, ".vaultspec/_snapshots/", MARKER_END]
+        assert text.endswith("\n")
+
+    def test_created_file_matches_an_empty_one_that_already_existed(
+        self, tmp_path: Path, tmp_path_factory: pytest.TempPathFactory
+    ) -> None:
+        """Creation and update converge on the same content.
+
+        A zero-byte file used to be the whole difference between working and
+        doing nothing; it must now be no difference at all.
+        """
+        seeded = tmp_path_factory.mktemp("seeded")
+        _write_gi(seeded, "")
+        ensure_gitignore_block(seeded, ENTRIES)
+
+        ensure_gitignore_block(tmp_path, ENTRIES)
+
+        assert _read_gi(tmp_path).strip() == _read_gi(seeded).strip()
+
+    def test_creation_is_idempotent(self, tmp_path: Path) -> None:
+        ensure_gitignore_block(tmp_path, ENTRIES)
+        first = _read_gi(tmp_path)
+
+        changed = ensure_gitignore_block(tmp_path, ENTRIES)
+
         assert changed is False
+        assert _read_gi(tmp_path) == first
+
+    def test_absent_gitignore_is_not_created_for_removal(self, tmp_path: Path) -> None:
+        """Uninstall against a workspace with no ignore file writes nothing.
+
+        Not the file, and not the advisory-lock sentinel beside it - the
+        absence check runs before the lock is taken.
+        """
+        changed = ensure_gitignore_block(tmp_path, ENTRIES, state=ManagedState.ABSENT)
+
+        assert changed is False
+        assert not _gi(tmp_path).exists()
+        assert not (tmp_path / ".gitignore.lock").exists()
 
     def test_empty_gitignore(self, tmp_path: Path) -> None:
         _write_gi(tmp_path, "")
@@ -404,13 +451,20 @@ class TestRecommendedEntries:
         assert "/.mcp.json.lock" in entries
         assert "/.pre-commit-config.yaml.lock" in entries
 
-    def test_root_lock_sentinel_skipped_when_companion_absent(
+    def test_root_lock_sentinel_listed_when_companion_absent(
         self, tmp_path: Path
     ) -> None:
+        """A sentinel is listed before its subject exists.
+
+        The block is computed before the writes that create these subjects -
+        ``ensure_gitignore_block`` locks ``.gitignore`` moments after being
+        handed the entry list naming ``.gitignore.lock``. Filtering on presence
+        made the first install write a block short of the second one's.
+        """
         (tmp_path / ".vaultspec").mkdir()
 
         entries = get_recommended_entries(tmp_path)
 
-        assert "/.gitignore.lock" not in entries
-        assert "/.mcp.json.lock" not in entries
-        assert "/.pre-commit-config.yaml.lock" not in entries
+        assert "/.gitignore.lock" in entries
+        assert "/.mcp.json.lock" in entries
+        assert "/.pre-commit-config.yaml.lock" in entries

@@ -40,6 +40,7 @@ from .collectors_mode import (
 from .collectors_precommit import (
     collect_precommit_state,
     observed_precommit_mode,
+    precommit_hook_installed,
 )
 from .collectors_provider import (
     collect_builtin_version_state,
@@ -67,4 +68,5 @@ __all__ = [
     "collect_version_floor_state",
     "observed_mcp_mode",
     "observed_precommit_mode",
+    "precommit_hook_installed",
 ]

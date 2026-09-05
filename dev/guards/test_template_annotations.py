@@ -20,7 +20,16 @@ pytestmark = [pytest.mark.repo]
 
 def _template_paths(repo_root: Path) -> list[Path]:
     templates_dir = repo_root / ".vaultspec" / "templates"
-    return sorted(templates_dir.glob("*.md"))
+    paths = sorted(templates_dir.glob("*.md"))
+    # `Path.glob` on a directory that does not exist returns nothing and
+    # raises nothing, so a moved or renamed templates tree would leave every
+    # guard below iterating an empty corpus and passing. Measured: with this
+    # directory removed, all three tests in this file passed.
+    assert paths, (
+        f"no templates found under {templates_dir} - the guards in this file "
+        "would pass without checking anything"
+    )
+    return paths
 
 
 def test_templates_do_not_use_frontmatter_comment_directives(repo_root: Path) -> None:

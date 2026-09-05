@@ -27,12 +27,18 @@ pytestmark = [pytest.mark.repo, pytest.mark.integration]
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+_BUILTINS_DIR = _REPO_ROOT / "src" / "vaultspec_core" / "builtins"
+_BUILTIN_DOCS = tuple(sorted(_BUILTINS_DIR.rglob("*.md")))
+# The four named files fail loudly if they move; the globbed tail does not.
+# A renamed builtins tree would shrink the corpus in silence and leave the
+# guards below reporting a clean sweep over four files.
+assert _BUILTIN_DOCS, f"no builtin markdown found under {_BUILTINS_DIR}"
 _DOC_PATHS = (
     _REPO_ROOT / "README.md",
     _REPO_ROOT / "docs" / "CLI.md",
     _REPO_ROOT / "docs" / "framework.md",
     _REPO_ROOT / "docs" / "MCP.md",
-    *_REPO_ROOT.joinpath("src", "vaultspec_core", "builtins").rglob("*.md"),
+    *_BUILTIN_DOCS,
 )
 
 _INLINE_CODE = re.compile(r"`([^`\n]+)`")
@@ -238,6 +244,7 @@ def _looks_like_signature(reference: str) -> bool:
     )
 
 
+@pytest.mark.precommit
 def test_docs_do_not_teach_bare_cli_commands() -> None:
     top_level_commands = _top_level_command_names()
     assert "vault" in top_level_commands
@@ -259,6 +266,7 @@ def test_docs_do_not_teach_bare_cli_commands() -> None:
     )
 
 
+@pytest.mark.precommit
 def test_docs_do_not_describe_command_groups_with_bare_executables() -> None:
     offenders: list[str] = []
     for path in sorted(_DOC_PATHS):
@@ -279,6 +287,7 @@ def test_docs_do_not_describe_command_groups_with_bare_executables() -> None:
     )
 
 
+@pytest.mark.precommit
 def test_markdown_command_references_match_live_cli_surface() -> None:
     command_paths = _registered_command_paths()
     leaf_paths = set(collect_leaf_command_paths(app))
@@ -367,9 +376,12 @@ def test_cli_handbook_documents_every_command() -> None:
     """
     handbook = (_REPO_ROOT / "docs" / "CLI.md").read_text(encoding="utf-8")
 
+    leaf_paths = collect_leaf_command_paths(app)
+    assert leaf_paths, "CLI tree is empty; Typer app failed to register commands"
+
     missing = [
         f"vaultspec-core {' '.join(command_path)}"
-        for command_path in collect_leaf_command_paths(app)
+        for command_path in leaf_paths
         if f"`vaultspec-core {' '.join(command_path)}`" not in handbook
     ]
 

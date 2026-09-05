@@ -59,8 +59,11 @@ def test_extractor_reads_every_option_bearing_command() -> None:
     """
     cli = _runner()
 
+    leaf_paths = collect_leaf_command_paths(app)
+    assert leaf_paths, "CLI tree is empty; Typer app failed to register commands"
+
     silent: list[str] = []
-    for path in collect_leaf_command_paths(app):
+    for path in leaf_paths:
         help_text = help_output(cli, app, path)
         if "Options" not in help_text:
             continue

@@ -193,6 +193,25 @@ def collect_vault_content_state(target: Path) -> tuple[VaultContentSignal, int, 
     return VaultContentSignal.CLEAN, annotated, unreadable
 
 
+def _management_expected(target: Path) -> bool:
+    """Return ``True`` when *target* should be carrying a managed ignore block.
+
+    An installed workspace is expected to have one unless it recorded an
+    opt-out by deleting the block. Without this distinction a missing block
+    reads the same in a workspace that declined management and in one that was
+    left unprotected, and the benign reading wins for both.
+    """
+    if not (target / ".vaultspec").is_dir():
+        return False
+    try:
+        from ..manifest import read_manifest_data
+
+        return not read_manifest_data(target).gitignore_opted_out
+    except Exception:
+        logger.warning("Cannot read manifest for %s", target, exc_info=True)
+        return True
+
+
 def collect_gitignore_state(target: Path) -> GitignoreSignal:
     """Assess the state of vaultspec-managed ``.gitignore`` entries.
 
@@ -205,21 +224,27 @@ def collect_gitignore_state(target: Path) -> GitignoreSignal:
     """
     from ..gitignore import find_markers, get_recommended_entries
 
+    expected = _management_expected(target)
+
     gi_path = target / ".gitignore"
     if not gi_path.exists():
-        return GitignoreSignal.NO_FILE
+        return GitignoreSignal.UNMANAGED if expected else GitignoreSignal.NO_FILE
 
     try:
         content = gi_path.read_text(encoding="utf-8")
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         logger.warning("Cannot read .gitignore %s: %s", gi_path, exc)
-        return GitignoreSignal.NO_FILE
+        # An installed workspace whose ignore file cannot be read is not one
+        # whose block has been confirmed. Reporting the benign no-file state
+        # here would restore the shape this collector was just repaired for:
+        # a condition observed, logged, and then rendered as information.
+        return GitignoreSignal.UNMANAGED if expected else GitignoreSignal.NO_FILE
 
     lines = [line.strip() for line in content.splitlines()]
     begins, ends = find_markers(lines)
 
     if not begins and not ends:
-        return GitignoreSignal.NO_ENTRIES
+        return GitignoreSignal.UNMANAGED if expected else GitignoreSignal.NO_ENTRIES
 
     # Any state that isn't exactly one BEGIN before exactly one END is corrupted.
     if len(begins) != 1 or len(ends) != 1 or begins[0] >= ends[0]:

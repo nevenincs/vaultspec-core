@@ -14,10 +14,15 @@ plus the lock files the install leaves at the repository root for `.mcp.json`,
 `.gitignore`, `.pre-commit-config.yaml` and the two provider configs. What it
 deliberately does not exclude is `.vaultspec/workspace.json`: the install mode is
 recorded there and has to travel with the project, or your teammates' commands resolve
-by a different route than yours. That block is written into a `.gitignore` the project
-already has; the install does not create the file, so a project started from an empty
-directory has nothing ignored until you create one and install again.
-`vaultspec-core doctor` reports `gitignore info no_file` when that is the case.
+by a different route than yours. The install writes that block into the project's
+`.gitignore`, and creates the file when there is not one, so a project started from an
+empty directory is covered by the same single command.
+
+Deleting the block is how you decline it. The next `vaultspec-core sync` reads the
+absence as your decision, records it, and stops re-adding the block;
+`vaultspec-core install --force` is the gesture that opts back in. Until that decision
+is recorded, `vaultspec-core doctor` reports `gitignore warn unmanaged` for an installed
+project carrying no block, and that warning does raise its exit code.
 
 ## How a feature flows into the vault
 
@@ -267,6 +272,34 @@ after you upgrade the package.
 
 To remove the framework from a project, `vaultspec-core uninstall` reverses the install.
 
+## Installation options
+
+The quickstart uses `uvx vaultspec-core install`. Keep the `uvx` prefix for later
+commands when using this route.
+
+To install the CLI once and run it from any project:
+
+```bash
+uv tool install vaultspec-core
+vaultspec-core install
+```
+
+To manage it as a project dependency:
+
+```bash
+uv add vaultspec-core
+uv run vaultspec-core install
+```
+
+Contributors then use `uv sync` to install dependencies and `uv run vaultspec-core` to
+run the CLI. The [CLI reference](CLI.md) explains `--mode dependency` and `--mode dev`,
+which select how generated hooks and MCP configuration launch core. For standalone
+binaries, see [Homebrew and Scoop](channels.md).
+
+After updating the package, run `vaultspec-core install --upgrade` in each project to
+update its bundled rules, skills, and agents. Use `uvx` or `uv run` as appropriate for
+your installation route.
+
 ## Decisions you make once
 
 **Install mode.** Tool mode is the default and needs no action: hooks and the MCP server
@@ -280,9 +313,9 @@ choice is recorded in a committed `workspace.json` so it travels with the projec
 **Pre-commit hooks.** Not every project wants one. A tree-wide hook that rewrites the
 working tree to the staged state will discard uncommitted changes outside the stage,
 which is unsafe when several workers share one checkout, and some teams prefer to run
-their gates explicitly. Of the four hooks written here, one mutates -
-`vault sanitize annotations`, which strips generated template annotations - and the
-other three only read; none is scoped to the files you staged.
+their gates explicitly. Of the four hooks written here, three only read and one mutates:
+`vaultspec-core vault sanitize annotations`, which strips generated template
+annotations. None is scoped to the files you staged.
 `vaultspec-core spec precommit disable` records that in the same `workspace.json`, so no
 later `install` or `sync` regenerates `.pre-commit-config.yaml`.
 `vaultspec-core spec precommit enable` reverses it.
