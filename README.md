@@ -1,21 +1,16 @@
-<div align="center">
-
-<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/logo.png" alt="vaultspec-core logo" width="150" />
+<img src="docs/assets/logo.png" width="150" alt="vaultspec-core logo">
 
 # vaultspec-core
 
-**Make your AI coding assistant write down what it decided, and why.**
+The agent harness: the pipeline, the vault, and the CLI that drives them.
 
-[![install](https://img.shields.io/badge/install-uvx%20vaultspec--core%20install-2E6B45?style=for-the-badge&logo=uv&logoColor=white&labelColor=1b1a16)](#install)
-[![build](https://img.shields.io/github/actions/workflow/status/nevenincs/vaultspec-core/ci.yml?branch=main&style=for-the-badge&label=build&logo=githubactions&logoColor=white&labelColor=1b1a16)](https://github.com/nevenincs/vaultspec-core/actions/workflows/ci.yml)
-[![release](https://img.shields.io/pypi/v/vaultspec-core?style=for-the-badge&label=release&logo=pypi&logoColor=white&labelColor=1b1a16&color=8A72B5)](https://pypi.org/project/vaultspec-core/)
-[![runtime](https://img.shields.io/badge/runtime-Python%203.13%20%7C%203.14-3F9AA6?style=for-the-badge&logo=python&logoColor=white&labelColor=1b1a16)](https://www.python.org/downloads/)
-[![license](https://img.shields.io/github/license/nevenincs/vaultspec-core?style=for-the-badge&label=license&logo=opensourceinitiative&logoColor=white&labelColor=1b1a16&color=B3823C)](https://github.com/nevenincs/vaultspec-core/blob/main/LICENSE)
+[![build](https://img.shields.io/github/actions/workflow/status/nevenincs/vaultspec-core/ci.yml?branch=main&style=flat&label=build&logo=githubactions&logoColor=white&labelColor=24292f&color=57606a)](https://github.com/nevenincs/vaultspec-core/actions/workflows/ci.yml)
+[![release](https://img.shields.io/pypi/v/vaultspec-core?style=flat&label=release&logo=pypi&logoColor=white&labelColor=24292f&color=57606a)](https://pypi.org/project/vaultspec-core/)
+[![runtime](https://img.shields.io/badge/runtime-Python%203.13%20%7C%203.14-57606a?style=flat&logo=python&logoColor=white&labelColor=24292f)](https://www.python.org/downloads/)
+[![license](https://img.shields.io/github/license/nevenincs/vaultspec-core?style=flat&label=license&logo=opensourceinitiative&logoColor=white&labelColor=24292f&color=57606a)](https://github.com/nevenincs/vaultspec-core/blob/main/LICENSE)
 
 [Install](#install) · [First run](#your-first-feature) · [Documentation](#documentation)
-· [Family](#the-vaultspec-family) · [Support](#status-help-and-license)
-
-</div>
+· [Status](#status-help-and-license)
 
 ## What this is
 
@@ -202,9 +197,9 @@ vaultspec-core vault check all --fix
 vaultspec-core vault graph --feature search-api
 ```
 
-`vault check` runs twenty validators over the corpus, covering metadata, tags, links,
-dangling references, leftover template placeholders, plan schema, and encoding. Every
-finding carries a fix hint, and `--fix` applies the safe ones:
+`vaultspec-core vault check` runs twenty validators over the corpus, covering metadata,
+tags, links, dangling references, leftover template placeholders, plan schema, and
+encoding. Every finding carries a fix hint, and `--fix` applies the safe ones:
 
 <p align="center">
 <img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/term-check.svg" alt="vaultspec-core vault check all, showing validators with fix hints" width="880" />
@@ -289,16 +284,16 @@ Apple Silicon and Linux on x86-64; Intel macOS and Linux arm64 are not built, an
 [docs/channels.md](https://github.com/nevenincs/vaultspec-core/blob/main/docs/channels.md)
 says why.
 
-## The vaultspec family
+## Related projects
 
-All four are in beta.
+| Project                                                     | Maturity | Role                                                                      |
+| ----------------------------------------------------------- | -------- | ------------------------------------------------------------------------- |
+| **vaultspec-core**                                          | Beta     | The agent harness: the pipeline, the vault, and the CLI that drives them. |
+| [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) | Beta     | The semantic search component for vault and code.                         |
 
-| Project                                                                 | Role                                                |
-| ----------------------------------------------------------------------- | --------------------------------------------------- |
-| vaultspec-core                                                          | This package: the pipeline, the vault, and the CLI. |
-| [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag)             | Semantic search over the vault and your code.       |
-| [vaultspec-dashboard](https://github.com/nevenincs/vaultspec-dashboard) | A user interface for the whole thing.               |
-| [vaultspec-a2a](https://github.com/nevenincs/vaultspec-a2a)             | Headless agent-to-agent orchestration.              |
+[vaultspec-dashboard](https://github.com/nevenincs/vaultspec-dashboard) is a separate
+project building a dedicated frontend on the same files. It is in early development, in
+the open.
 
 ## Documentation
 
