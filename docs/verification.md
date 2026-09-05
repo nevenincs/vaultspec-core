@@ -1,233 +1,87 @@
-# Verifying a workspace and a vault
+# Check your workspace and feature records
 
-This page covers how to check that vaultspec is installed correctly and that the
-documents it manages are sound. For the workflow those documents come out of, see the
-[framework manual](./framework.md); for every flag on every command, the
-[CLI reference](./CLI.md).
+Choose the command for what you need to check:
 
-Two separate things can be wrong. The framework can be wired into the project badly,
-which is a workspace problem. The documents under `.vault/` can disagree with each
-other, which is a vault problem. Different commands answer them:
+| Check                                    | Command                          |
+| ---------------------------------------- | -------------------------------- |
+| Workspace installation and vault records | `vaultspec-core doctor`          |
+| Vault records only                       | `vaultspec-core vault check all` |
+| Workspace installation only              | `vaultspec-core spec doctor`     |
 
-| What you want to know                    | Command                                    |
-| ---------------------------------------- | ------------------------------------------ |
-| Are my documents valid?                  | `vaultspec-core vault check all`           |
-| Is the framework installed correctly?    | `vaultspec-core spec doctor`               |
-| Both, under one exit code                | `vaultspec-core doctor`                    |
-| Does my source code reference the vault? | `vaultspec-core vault check code-boundary` |
+Run commands from your workspace root. Each command also accepts `--target DIR` to check
+another workspace and `--json` for structured output.
 
-All four accept `--json` and `--target DIR`.
+<p id="checking-everything-at-once"></p>
 
-## Checking everything at once
+## Check after installation or an upgrade
 
-```
+```sh
 vaultspec-core doctor
 ```
 
-It runs the workspace diagnosis and the vault check suite, and reports both under one
-exit code. The first half reports on the installation:
+Address the reported problems and rerun the command. To check only the installed
+workspace configuration, use `vaultspec-core spec doctor`.
 
-```
-workspace diagnosis
-  framework ok .vaultspec/ present
-  process registry warn 6 stale of 6 process record(s): engine-dev-mantest.json, ...
-  claude ok dir: complete
-  gemini ok dir: complete
-  antigravity ok dir: complete
-  codex ok dir: complete
-  builtins ok current
-  gitignore warn partial
-  gitattributes ok complete
-  mcp ok .mcp.json present
-  migration ok all registered migrations applied
-  vault content ok no generated template annotations
-  precommit ok all hooks present in the config
-  rename integrity ok all rules, skills, and agents names are consistent
-  install mode (vaultspec-core) ok declared tool; artifacts match
-  semantic search none vaultspec-rag not provisioned; core discovery and find cover document lookup without it
-```
+Some printed warnings are informational and don't affect the exit code. See the
+[workspace diagnostic reference](./CLI.md#vaultspec-core-spec-doctor) for the checks and
+warning rules.
 
-That is one workspace's report, with the stale-record filenames after the count cut to
-keep the line readable. A run prints the lines that apply to the workspace it finds, so
-yours may carry lines this one does not.
+<p id="checking-only-the-vault"></p>
+<p id="repairing-what-can-be-repaired"></p>
+<p id="what-to-run-and-when"></p>
 
-The second half is the vault check suite, one line per check.
+## Check records before committing
 
-### Which printed lines change the exit code
+After editing feature records, run:
 
-`doctor` exits `0` for clean, `1` for warnings, and `2` for errors. That scale is this
-command's own, and it is worth pinning down before you gate anything on it, because
-`vault check all` further down this page uses a different one: `0` when nothing failed
-and `1` when something did, with warnings never raising it. Measured on one project,
-before and after its template placeholders were filled: with
-`Total: 3 errors, 14 warnings`, `vault check all` exits `1` and `doctor` exits `2`; with
-the errors cleared and `Total: 15 warnings` left standing, `vault check all` exits `0`
-and `doctor` exits `1`. Warnings are the whole of the difference, and they are the
-ordinary state of a freshly scaffolded vault, so a gate written on `doctor` fires where
-one written on `vault check all` passes. So `doctor` is the stricter of the two, and a
-warning is a failure to it and not to the check suite.
-
-Not every printed line feeds that code. A line is *weighed* if it can raise the exit
-code, and the diagnosis prints several that never do:
-
-| Printed line                        | Weighed                       |
-| ----------------------------------- | ----------------------------- |
-| `framework`                         | Yes                           |
-| `gitignore`                         | Yes                           |
-| `gitattributes`                     | Yes                           |
-| `builtins`                          | Yes                           |
-| `migration`                         | Yes                           |
-| `precommit`                         | Yes                           |
-| `rename integrity`                  | Yes                           |
-| `vault content`                     | Yes                           |
-| `install mode`                      | Yes, per declared package     |
-| A provider (`claude`, `codex`, ...) | Yes, except the `mixed` state |
-| `mcp`                               | No                            |
-| `process registry`                  | No                            |
-| `mcp seeds`                         | No                            |
-
-So a run can print `warn` and still exit `0`:
-
-```
-  process registry warn 6 stale of 6 process record(s)
-  claude warn dir: mixed
-```
-
-`gitignore` used to belong with them: `warn partial` printed and changed nothing, so a
-project whose block had fallen behind the recommended set passed a gate on this command.
-It is weighed now, in both of its degraded states - `partial` for a block that is short
-of the recommended set, and `unmanaged` for an installed project carrying no block at
-all. `install --force` repairs either. The informational readings are what remains:
-`no_file` and `no_entries` describe a project that never asked for the block or recorded
-that it declined it, and neither raises the code.
-
-Both of the lines above are unweighed. `mixed` means the provider directory holds extra
-files vaultspec does not own, which is benign and deliberately excluded so it cannot
-block a commit through the bundled hook. A provider directory that is missing, empty, or
-partial is weighed and does raise the code.
-
-If you gate on this command, the word `warn` in its output does not mean it failed. Read
-the exit code.
-
-`vaultspec-core spec doctor` computes its exit code the same way over the workspace half
-alone. It also accepts `--gate-errors`, which folds the warning exit to `0` so only
-errors fail, while still printing every warning. That flag is for the pre-commit gate,
-where warning-level provider lag is an expected steady state. `vaultspec-core doctor`
-does not accept it.
-
-## Checking only the vault
-
-```
+```sh
 vaultspec-core vault check all
 ```
 
-Nineteen checks run. The `--fix` column says whether a failure can be repaired
-automatically:
+Use the findings to locate records that need attention. For the full check inventory and
+available flags, see the [vault check reference](./CLI.md#vaultspec-core-vault-check).
 
-| Check                      | Catches                                                                                             | `--fix` |
-| -------------------------- | --------------------------------------------------------------------------------------------------- | ------- |
-| `structure`                | Directory layout and filenames                                                                      | Yes     |
-| `frontmatter`              | Fields invalid for the document's type                                                              | Yes     |
-| `body-sections`            | A section the template requires, missing or empty                                                   | No      |
-| `markdown`                 | Markdown hygiene violations                                                                         | Yes     |
-| `encoding`                 | Documents that are not valid text                                                                   | No      |
-| `placeholders`             | Unreplaced `{...}` template tokens                                                                  | No      |
-| `annotations`              | Template comment blocks that should have been stripped                                              | Yes     |
-| `links`                    | Wiki-links that break the convention                                                                | Yes     |
-| `dangling`                 | `related:` entries naming a document that is absent                                                 | Yes     |
-| `body-links`               | Links in body prose, where they are forbidden                                                       | Yes     |
-| `orphans`                  | Documents nothing links to                                                                          | No      |
-| `references`               | Missing cross-references between related documents                                                  | Yes     |
-| `schema`                   | An ADR with no research, or a plan with no ADR                                                      | Yes     |
-| `adr-status`               | A status outside the allowed set                                                                    | Yes     |
-| `exec-mapping`             | A closed Step with no ledger row, a row for an open or unknown Step, or an unfolded per-Step record | No      |
-| `features`                 | A feature missing a document type or its index                                                      | No      |
-| `modified-stamp`           | A body edited without restamping                                                                    | Yes     |
-| `rename-integrity`         | A document's name disagreeing with its filename                                                     | Yes     |
-| `feature-rename-integrity` | An exec folder disagreeing with its feature tag                                                     | No      |
+To apply supported corrections:
 
-Run one by name when you already know which failure you are chasing:
-
-```
-vaultspec-core vault check dangling
-```
-
-## Checking the code boundary
-
-`vault check all` runs nineteen of the twenty checks. The twentieth, `code-boundary`,
-scans your source files rather than your vault, looking for source that references the
-development corpus. Vault documents cite code by locator; code never cites the vault.
-Scanning a source tree costs more than reading a vault, so it is opt-in:
-
-```
-vaultspec-core vault check code-boundary
-```
-
-An exit-`0` `vault check all` says nothing about the boundary. If it matters to you, run
-and gate on this one separately.
-
-## Repairing what can be repaired
-
-```
+```sh
 vaultspec-core vault check all --fix
 ```
 
-Everything marked `Yes` in the table above is repaired in place. What cannot be repaired
-is reported and left alone, because guessing at a fix for a broken cross-reference
-produces a document that passes the check while still pointing at the wrong target.
+This command modifies files. Review its changes with `git diff`, correct any remaining
+problems, and rerun `vaultspec-core vault check all` before committing. Errors that
+remain after `--fix` still make the command fail.
 
-`--fix` does not force a pass. A run that repairs two problems and leaves three
-unfixable ones still exits `1`.
+To investigate one check separately, name it explicitly. For example:
 
-## Gating a script or a pipeline
-
-Add `--json` and read the envelope's `status` key. The envelope carries four keys:
-
-```json
-{
-  "schema": "vaultspec.vault.check.all.v1",
-  "status": "unchanged",
-  "data": { "checks": [] },
-  "hints": { "text": "Your vault is clean. Proceed to commit your changes" }
-}
+```sh
+vaultspec-core vault check dangling
 ```
 
-`status` uses the sync vocabulary rather than a boolean. Measured across the three
-states: a run with nothing to report and a run leaving only warnings both report
-`unchanged`, a run that repaired something reports `updated`, and a run leaving an error
-reports `failed`. It is errors that make it `failed`, not findings, which is the same
-line the exit code draws. Test for the failure value rather than for a success value, so
-a new status does not read as a pass:
+<p id="checking-the-code-boundary"></p>
 
-```bash
-vaultspec-core vault check all --json | jq -e '.status != "failed"'
+## Check source references to vault documents
+
+```sh
+vaultspec-core vault check code-boundary
 ```
 
-The exit code carries the same verdict and is simpler to gate on: `0` when nothing
-failed, `1` when something did. Both are keyed on errors rather than on findings, which
-is the part worth knowing before you gate on either. Measured on one vault:
-`Total: 15 warnings` and no errors exits `0` with `"status": "unchanged"`, and a single
-error in the same vault - `Total: 1 error, 20 warnings` - exits `1` with
-`"status": "failed"`. The warnings move with the error rather than staying put, because
-the document that carries the error carries warnings too: measured on an empty vault,
-scaffolding one research document reports `Total: 1 error, 5 warnings`, and deleting
-that one file returns `All checks passed.` So read the exit code and the error count;
-the warning totals either side of a change are not a subtraction. A passing gate is not
-a clean report, so the summary line is worth reading either way. Diagnostic logging
-stays on stderr, so stdout is the envelope and nothing else.
+The `all` check excludes `code-boundary`. Read this command's findings directly: its
+advisory warnings don't fail the command, so a successful exit doesn't mean it found no
+references.
 
-Each entry under `data.checks` carries its own `check_name`, `diagnostics`,
-`fixed_count`, and `supports_fix`, so a report can name which check failed rather than
-only that something did.
+<p id="gating-a-script-or-a-pipeline"></p>
+<p id="which-printed-lines-change-the-exit-code"></p>
 
-## What to run, and when
+## Use checks in automation
 
-Run `vaultspec-core vault check all --fix` before you commit. It repairs the mechanical
-problems and names the rest.
+In continuous integration (CI), invoke `vaultspec-core vault check all` directly and use
+its exit code to determine success.
 
-Run `vaultspec-core doctor` after installing or upgrading, and when something behaves in
-a way the documentation does not explain. Most of what it catches is workspace drift.
+| Command                 | Exit `0`                      | Exit `1`                    | Exit `2`              |
+| ----------------------- | ----------------------------- | --------------------------- | --------------------- |
+| `doctor`, `spec doctor` | No counted warnings or errors | Counted warnings, no errors | Errors                |
+| `vault check all`       | No errors; warnings allowed   | Errors                      | Not used for findings |
 
-Gate continuous integration on `vaultspec-core vault check all`. Prefer it over the
-diagnosis: the workspace diagnosis fails on machine state, such as a missing hook or an
-unapplied migration, which a pull request cannot fix.
+Only `spec doctor` accepts `--gate-errors`. Use
+`vaultspec-core spec doctor --gate-errors` when automation should accept workspace
+warnings: warnings return `0`, and errors return `2`.
