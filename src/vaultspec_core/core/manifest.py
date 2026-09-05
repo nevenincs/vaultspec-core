@@ -90,6 +90,21 @@ def _manifest_lock(path: Path):
     return advisory_lock(path)
 
 
+def manifest_lock(target: Path):
+    """Hold the manifest lock for a workspace's read-modify-write cycle.
+
+    The public form of :func:`_manifest_lock`, for the cycles that live
+    outside this module. :func:`write_manifest_data` takes no lock of its
+    own and says so; a caller that reads, edits and writes must hold this
+    across all three or lose a concurrent writer's edit (issue #418).
+
+    The lock is **not** reentrant. Anything already inside it - a migration
+    body, or :func:`add_providers` and its siblings, which lock internally -
+    must not take it again.
+    """
+    return _manifest_lock(_manifest_path(target))
+
+
 def read_manifest_data(target: Path, *, strict: bool = False) -> ManifestData:
     """Read the full :class:`ManifestData` from ``.vaultspec/providers.json``.
 
