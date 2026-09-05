@@ -51,7 +51,7 @@ def ensure_gitattributes_block(
 ) -> bool:
     """Add or remove a vaultspec-managed block inside ``.gitattributes``.
 
-    Unlike :func:`~vaultspec_core.core.gitignore.ensure_gitignore_block`,
+    Like :func:`~vaultspec_core.core.gitignore.ensure_gitignore_block`,
     this function **creates** the file when it does not exist and *state*
     is :attr:`~vaultspec_core.core.enums.ManagedState.PRESENT`.
 

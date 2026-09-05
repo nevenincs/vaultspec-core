@@ -88,9 +88,9 @@ shape regardless of which command produced it:
 The `schema` value follows the convention `vaultspec.<dotted-command-path>.v1` - for
 example `vaultspec.sync.v1`, `vaultspec.vault.stats.v1`, or
 `vaultspec.spec.rules.add.v1`. Every schema is at version `v1` except
-`vaultspec.vault.graph.v2`, documented with `vault graph` below. Adding new
-keys under `data` is additive and does not bump the version; renaming or removing a key
-bumps the integer (`v2`, ...). Schema bumps are recorded in the release notes.
+`vaultspec.vault.graph.v2`, documented with `vaultspec-core vault graph` below. Adding
+new keys under `data` is additive and does not bump the version; renaming or removing a
+key bumps the integer (`v2`, ...). Schema bumps are recorded in the release notes.
 
 Failures under `--json` emit the same envelope with the fixed schema
 `vaultspec.error.v1` and `status` set to `failed`; `data.message` carries the
@@ -111,7 +111,7 @@ full options.
 
 ### Top-level commands
 
-- `vaultspec-core install` - Install vaultspec resources for the selected providers.
+- `vaultspec-core install` - Install Vaultspec resources for the selected providers.
 - `vaultspec-core uninstall` - Remove the vaultspec framework from the target directory.
 - `vaultspec-core sync` - Sync rules, skills, agents, configs, system prompts, and MCPs.
 - `vaultspec-core doctor` - Diagnose overall workspace and vault health.
@@ -365,7 +365,7 @@ full options.
 - `vaultspec-core spec mcps remove` - Remove a canonical MCP server definition.
 - `vaultspec-core spec mcps sync` - Reconcile canonical definitions into provider-native
   enrollment.
-- `vaultspec-core spec mcps uninstall` - Remove vaultspec-owned provider-native MCP
+- `vaultspec-core spec mcps uninstall` - Remove Vaultspec-owned provider-native MCP
   enrollment.
 
 #### Reference
@@ -570,10 +570,10 @@ Create a new `.vault/` document from a template.
 - `--related DOC` (`-r`) - Related document(s). Accepts path, filename, stem, or
   `[[wiki-link]]`. Repeatable.
 - `--tags TAG` - Additional tags beyond the required directory and feature tags.
-  Repeatable. The taxonomy allows exactly two, so any tag added here is written
-  without complaint and then fails the `frontmatter` check with
-  `Exactly one feature tag (#<feature>) required`. There is no supported third
-  tag; the flag exists for setting the pair itself.
+  Repeatable. The taxonomy allows exactly two, so any tag added here is written without
+  complaint and then fails the `frontmatter` check with
+  `Exactly one feature tag (#<feature>) required`. There is no supported third tag; the
+  flag exists for setting the pair itself.
 - `--force` (default off) - Overwrite an existing document at the resolved path.
 - `--dry-run` (default off) - Preview without writing files.
 - `--json` (default off) - Emit machine-readable JSON output in standard envelope.
@@ -1539,8 +1539,8 @@ the frontmatter name. Pick the one whose side you trust.
   (no `.md` extension).
 - `dangling` (`--fix`: yes, `--feature`: yes) - Find `related:` frontmatter wiki-links
   that resolve to no document.
-- `body-links` (`--fix`: yes, `--feature`: yes) - Find wiki-links and markdown path links
-  in document body text.
+- `body-links` (`--fix`: yes, `--feature`: yes) - Find wiki-links and markdown path
+  links in document body text.
 - `placeholders` (`--fix`: no, `--feature`: yes) - Find unreplaced `{...}` template
   placeholders in document body prose.
 - `orphans` (`--fix`: no, `--feature`: yes) - Find documents with no incoming
@@ -1567,10 +1567,10 @@ the frontmatter name. Pick the one whose side you trust.
   the project's own vault records (opt-in; findings are advisory).
 
 `yes` = fully supported, `partial` = only the sub-checks that accept `--fix` apply fixes
-(`all` dispatches to every check it runs), `no` = flag rejected with error.
-`all` runs nineteen of the twenty checks above: `code-boundary` is opt-in and
-runs only when named, so an exit-0 `all` makes no claim about it. `structure` does not
-support `--feature` filtering.
+(`all` dispatches to every check it runs), `no` = flag rejected with error. `all` runs
+nineteen of the twenty checks above: `code-boundary` is opt-in and runs only when named,
+so an exit-0 `all` makes no claim about it. `structure` does not support `--feature`
+filtering.
 
 Use `vaultspec-core vault repair` when the operator goal is end-to-end recovery with
 generated index refresh, post-fix validation, and a final delta report.

@@ -21,7 +21,7 @@ from .exceptions import (
     ProviderNotInstalledError,
     WorkspaceNotInitializedError,
 )
-from .git_artifacts import has_gitattributes_block, has_gitignore_block
+from .git_artifacts import managed_block_presence
 from .gitattributes import ensure_gitattributes_block
 from .gitignore import (
     ensure_gitignore_block,
@@ -205,26 +205,62 @@ def _reconcile_gitignore_opt_out(target_dir: Path) -> None:
 
     Checks whether the user removed the managed block BEFORE re-creating it.
     If the block is gone but the manifest still says ``managed=True``, the user
-    opted out -- honour that by flipping the flag.
+    opted out -- honour that by flipping the flag and recording the opt-out.
+
+    The opt-out is recorded explicitly rather than inferred from
+    ``gitignore_managed`` being ``False``, which also describes a workspace
+    where management was never established. Upgrades re-establish the second
+    and must leave the first alone.
+
+    Only a file that was read and found free of markers counts as the gesture.
+    A file that could not be read answers nothing, and recording a decision on
+    the strength of it would turn an unreadable file into a durable opt-out
+    that only ``--force`` undoes - and would restore the benign diagnosis this
+    workspace was just taught to withhold.
     """
+    gi_path = target_dir / ".gitignore"
     mdata = read_manifest_data(target_dir)
     if not mdata.gitignore_managed:
         return
-    if has_gitignore_block(target_dir / ".gitignore"):
+
+    presence = managed_block_presence(gi_path)
+    if presence is None:
+        logger.warning(
+            "Cannot read %s; leaving gitignore management as it stands", gi_path
+        )
+        return
+    if presence:
         ensure_gitignore_block(target_dir, get_recommended_entries(target_dir))
         return
+
+    logger.info(
+        "Managed block absent from %s; recording the opt-out. "
+        "Run 'vaultspec-core install --force' to resume managing it.",
+        gi_path,
+    )
     mdata.gitignore_managed = False
+    mdata.gitignore_opted_out = True
     write_manifest_data(target_dir, mdata)
 
 
 def _reconcile_gitattributes_opt_out(target_dir: Path) -> None:
     """Re-sync the managed ``.gitattributes`` block (same pattern as gitignore)."""
+    ga_path = target_dir / ".gitattributes"
     mdata = read_manifest_data(target_dir)
     if not mdata.gitattributes_managed:
         return
-    if has_gitattributes_block(target_dir / ".gitattributes"):
+
+    presence = managed_block_presence(ga_path)
+    if presence is None:
+        logger.warning(
+            "Cannot read %s; leaving gitattributes management as it stands", ga_path
+        )
+        return
+    if presence:
         ensure_gitattributes_block(target_dir)
         return
+
+    logger.info("Managed block absent from %s; standing down", ga_path)
     mdata.gitattributes_managed = False
     write_manifest_data(target_dir, mdata)
 
@@ -394,6 +430,14 @@ def sync_provider(
     results = copied.run(_sync_single_provider, narrowed)
 
     if not dry_run:
+        # The managed git blocks are repository-level, not per-provider: a
+        # workspace that deleted one has declined it whichever provider the
+        # reader happened to name. Only the "all" path used to reconcile them,
+        # so `sync claude` left the opt-out unrecorded - and once the diagnosis
+        # weighs an unrecorded absence, that is a warning the reader cannot
+        # clear without knowing which spelling of sync clears it.
+        _reconcile_gitignore_opt_out(ctx.target_dir)
+        _reconcile_gitattributes_opt_out(ctx.target_dir)
         _stamp_last_synced(ctx.target_dir, [tool_type.value for tool_type in requested])
 
     return results

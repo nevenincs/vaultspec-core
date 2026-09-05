@@ -77,10 +77,20 @@ class ConfigSignal(StrEnum):
 
 
 class GitignoreSignal(StrEnum):
-    """Observed state of gitignore entries for managed paths."""
+    """Observed state of gitignore entries for managed paths.
+
+    ``UNMANAGED`` is the degraded reading of ``NO_FILE`` and ``NO_ENTRIES``:
+    the same absence, observed in a workspace where vaultspec is installed and
+    has not been told to stay out. Those two remain the benign readings for a
+    workspace that never asked for management or opted out of it, and they stay
+    informational; ``UNMANAGED`` is weighed, because a workspace whose
+    per-machine artefacts nothing ignores is the condition this check exists to
+    catch.
+    """
 
     NO_FILE = "no_file"
     NO_ENTRIES = "no_entries"
+    UNMANAGED = "unmanaged"
     PARTIAL = "partial"
     COMPLETE = "complete"
     CORRUPTED = "corrupted"

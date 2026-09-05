@@ -875,6 +875,62 @@ class TestGitignoreState:
         _write_gitignore(tmp_path, "node_modules/\n*.pyc\n")
         assert collect_gitignore_state(tmp_path) == GitignoreSignal.NO_ENTRIES
 
+    def test_installed_workspace_without_a_file_is_unmanaged(
+        self, tmp_path: Path
+    ) -> None:
+        """The absence is degraded once vaultspec is installed.
+
+        Reported as an informational ``no_file`` before, which is how a
+        workspace could complete an install, be left with nothing ignoring the
+        artefacts that install wrote, and still pass a gate on ``doctor``.
+        """
+        _write_manifest(tmp_path, ["claude"])
+
+        assert collect_gitignore_state(tmp_path) == GitignoreSignal.UNMANAGED
+
+    def test_installed_workspace_without_a_block_is_unmanaged(
+        self, tmp_path: Path
+    ) -> None:
+        _write_manifest(tmp_path, ["claude"])
+        _write_gitignore(tmp_path, "node_modules/\n")
+
+        assert collect_gitignore_state(tmp_path) == GitignoreSignal.UNMANAGED
+
+    def test_an_unreadable_file_is_unmanaged_not_absent(self, tmp_path: Path) -> None:
+        """A file whose block cannot be read is not a file whose block is fine.
+
+        The bytes below are not valid UTF-8, so the collector cannot see
+        whether a managed block is there. Reporting the benign absent state
+        would be the same defect one layer up: a condition observed, logged,
+        and then rendered as information.
+        """
+        _write_manifest(tmp_path, ["claude"])
+        (tmp_path / ".gitignore").write_bytes(b"\xff\xfe\xfa")
+
+        assert collect_gitignore_state(tmp_path) == GitignoreSignal.UNMANAGED
+
+    def test_an_unreadable_file_stays_benign_outside_a_workspace(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / ".gitignore").write_bytes(b"\xff\xfe\xfa")
+
+        assert collect_gitignore_state(tmp_path) == GitignoreSignal.NO_FILE
+
+    def test_a_recorded_opt_out_keeps_the_benign_reading(self, tmp_path: Path) -> None:
+        """Declining management is a decision, not a degraded state."""
+        from vaultspec_core.core.manifest import (
+            read_manifest_data,
+            write_manifest_data,
+        )
+
+        _write_manifest(tmp_path, ["claude"])
+        _write_gitignore(tmp_path, "node_modules/\n")
+        mdata = read_manifest_data(tmp_path)
+        mdata.gitignore_opted_out = True
+        write_manifest_data(tmp_path, mdata)
+
+        assert collect_gitignore_state(tmp_path) == GitignoreSignal.NO_ENTRIES
+
     def test_complete(self, tmp_path: Path) -> None:
         entries = "\n".join(DEFAULT_ENTRIES)
         content = f"node_modules/\n\n{MARKER_BEGIN}\n{entries}\n{MARKER_END}\n"

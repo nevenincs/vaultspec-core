@@ -63,7 +63,14 @@ pytestmark = [pytest.mark.unit]
         ),
         (
             GitignoreSignal,
-            {"NO_FILE", "NO_ENTRIES", "PARTIAL", "COMPLETE", "CORRUPTED"},
+            {
+                "NO_FILE",
+                "NO_ENTRIES",
+                "UNMANAGED",
+                "PARTIAL",
+                "COMPLETE",
+                "CORRUPTED",
+            },
         ),
         (
             GitattributesSignal,

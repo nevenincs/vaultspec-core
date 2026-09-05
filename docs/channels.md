@@ -28,16 +28,16 @@ network once.
 
 ## Coverage
 
-| Platform       | Channel  | Status                      |
-| -------------- | -------- | --------------------------- |
-| Windows x86-64 | Scoop    | served                      |
-| macOS arm64    | Homebrew | served                      |
-| macOS x86-64   | Homebrew | not built - see below       |
-| Linux x86-64   | Homebrew | served                      |
-| Linux arm64    | Homebrew | served                      |
+| Platform       | Channel  | Status                |
+| -------------- | -------- | --------------------- |
+| Windows x86-64 | Scoop    | served                |
+| macOS arm64    | Homebrew | served                |
+| macOS x86-64   | Homebrew | not built - see below |
+| Linux x86-64   | Homebrew | served                |
+| Linux arm64    | Homebrew | served                |
 
-One gap, declared rather than silent. The generator omits a target the release did
-not attach and prints a `::warning::` naming it, so a missing platform is visible in the
+One gap, declared rather than silent. The generator omits a target the release did not
+attach and prints a `::warning::` naming it, so a missing platform is visible in the
 release log instead of becoming a formula whose download 404s.
 
 **macOS x86-64** was dropped because the binary we built did not run: its `cryptography`
@@ -45,9 +45,9 @@ wheel resolved to a build the PyApp bootstrapper cannot load on that target, so 
 artifact launched and exited 1. Pinning `cryptography` back would have held its CVE
 fixes across every other platform to serve one shrinking one.
 
-**Linux arm64** was the second gap and is one no longer. It had no host that could
-build it to the target's glibc floor: the ARM64 runner is itself a colima container with
-no reachable docker daemon, so it cannot start the pinned `manylinux_2_28` image, and a
+**Linux arm64** was the second gap and is one no longer. It had no host that could build
+it to the target's glibc floor: the ARM64 runner is itself a colima container with no
+reachable docker daemon, so it cannot start the pinned `manylinux_2_28` image, and a
 native build there inherits the guest's much newer glibc. The release now attaches an
 `aarch64-unknown-linux-gnu` binary and the generated formula carries it, which is the
 same evidence the table is read from.
@@ -61,11 +61,11 @@ assembling the same product a second way would double the surface that can break
 pinning two different sets of bytes as "the release".
 
 That is a deliberate divergence from the other product this release-channel machinery
-generates. `cadrumo` is a separate tool in its own repository, sharing this machinery and
-so shipping the same channel shapes; nothing here depends on knowing it, and it is named
-because the two formulae differ on purpose rather than by drift. Its formula does build a
-virtualenv from a locked sdist cohort, because it publishes no binary channel and the
-formula has to be the thing that assembles the product.
+generates. `cadrumo` is a separate tool in its own repository, sharing this machinery
+and so shipping the same channel shapes; nothing here depends on knowing it, and it is
+named because the two formulae differ on purpose rather than by drift. Its formula does
+build a virtualenv from a locked sdist cohort, because it publishes no binary channel
+and the formula has to be the thing that assembles the product.
 
 The idiom shared across the family is the generation discipline - one pointer per
 channel, generated from the release's own `SHA256SUMS`, guarded against a backward bump
