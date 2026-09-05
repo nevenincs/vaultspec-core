@@ -455,6 +455,23 @@ def atomic_write_bytes(path: Path, content: bytes) -> None:
     except FileNotFoundError:
         pass
     else:
+        if stat.S_ISLNK(destination.st_mode):
+            # The rename replaces the *link*, not its target: the link is
+            # severed, the real file is left stale, and the run exits 0 with
+            # no notice. Refuse instead (issue #413).
+            #
+            # The alternative the issue offers - resolve the destination and
+            # write through the link - is rejected. It would let a managed
+            # write land on any path the link names, which is exactly what
+            # this project's containment guard (`_assert_within`) exists to
+            # prevent, and what `_open_atomic_temp`'s ``O_NOFOLLOW`` already
+            # refuses for the temporary. Following a link here would be the
+            # one place the write surface does not hold that line.
+            raise OSError(
+                errno.ELOOP,
+                "Destination is a symbolic link; refusing to replace it",
+                str(path),
+            )
         if stat.S_ISREG(destination.st_mode):
             destination_mode = stat.S_IMODE(destination.st_mode)
 
