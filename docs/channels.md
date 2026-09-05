@@ -30,9 +30,6 @@ brew tap nevenincs/tap https://github.com/nevenincs/homebrew-tap
 brew install vaultspec-core
 ```
 
-For background on Intel macOS availability, see
-[PR #365](https://github.com/nevenincs/vaultspec-core/pull/365).
-
 ## Verifying what you downloaded
 
 Download `SHA256SUMS` from the same release as your asset. Compare the asset's SHA-256
