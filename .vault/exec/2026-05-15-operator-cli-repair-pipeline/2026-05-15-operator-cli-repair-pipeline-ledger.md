@@ -10,10 +10,8 @@ related:
   - "[[2026-05-15-operator-cli-repair-pipeline-plan]]"
 ---
 
-
 # `operator-cli-repair-pipeline` ledger
 
 ## Changes
 
 - `S01` `T`
-

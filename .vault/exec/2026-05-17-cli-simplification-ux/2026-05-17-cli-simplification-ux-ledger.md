@@ -73,4 +73,3 @@ related:
 - `S57` `T` `.vaultspec/`
 - `S58` `T` `'*.md'`
 - `S11` `T`
-
