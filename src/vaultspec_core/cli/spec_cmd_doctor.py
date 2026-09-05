@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from rich.console import Console
 
     from vaultspec_core.core.diagnosis import (
+        GitattributesSignal,
         GitignoreSignal,
         ProviderDiagnosis,
         WorkspaceDiagnosis,
@@ -307,11 +308,19 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             GitignoreSignal.CORRUPTED: ("error", "red"),
         },
     )
+    # The degraded reading is the one a reader can act on, so it names the act.
+    # Without it the row states a condition and no way out of it.
+    gi_detail = diag.gitignore.value
+    if diag.gitignore == GitignoreSignal.UNMANAGED:
+        gi_detail = (
+            f"{gi_detail} (install --force to restore, "
+            "spec gitignore disable to decline)"
+        )
     rows.append(
         {
             "component": "gitignore",
             "status": Cell(gi_status, style=gi_style),
-            "detail": diag.gitignore.value,
+            "detail": gi_detail,
         }
     )
 
@@ -321,16 +330,23 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
         {
             GitattributesSignal.COMPLETE: ("ok", "green"),
             GitattributesSignal.PARTIAL: ("warn", "yellow"),
+            GitattributesSignal.UNMANAGED: ("warn", "yellow"),
             GitattributesSignal.NO_ENTRIES: ("info", "dim"),
             GitattributesSignal.NO_FILE: ("info", "dim"),
             GitattributesSignal.CORRUPTED: ("error", "red"),
         },
     )
+    ga_detail = diag.gitattributes.value
+    if diag.gitattributes == GitattributesSignal.UNMANAGED:
+        ga_detail = (
+            f"{ga_detail} (install --force to restore, "
+            "spec gitattributes disable to decline)"
+        )
     rows.append(
         {
             "component": "gitattributes",
             "status": Cell(ga_status, style=ga_style),
-            "detail": diag.gitattributes.value,
+            "detail": ga_detail,
         }
     )
 
@@ -627,6 +643,22 @@ def _provider_status(
     return ("ok", "green")
 
 
+def _gitattributes_weight(signal: "GitattributesSignal") -> tuple[bool, bool]:
+    """Return ``(error, warn)`` for the gitattributes row.
+
+    The twin of :func:`_gitignore_weight`. An installed workspace that has not
+    declined the block and does not carry one is not having its line endings
+    normalised, which is a claim the install makes and this row is the only
+    thing that checks.
+    """
+    from vaultspec_core.core.diagnosis import GitattributesSignal
+
+    return (
+        signal == GitattributesSignal.CORRUPTED,
+        signal in (GitattributesSignal.UNMANAGED, GitattributesSignal.PARTIAL),
+    )
+
+
 def _gitignore_weight(signal: "GitignoreSignal") -> tuple[bool, bool]:
     """Return ``(error, warn)`` for the gitignore row.
 
@@ -656,7 +688,6 @@ def doctor_exit_code(
         ConfigSignal,
         ContentSignal,
         FrameworkSignal,
-        GitattributesSignal,
         ManifestEntrySignal,
         ModeMismatchSignal,
         PrecommitSignal,
@@ -681,8 +712,9 @@ def doctor_exit_code(
     gitignore_error, gitignore_warn = _gitignore_weight(diag.gitignore)
     has_error = has_error or gitignore_error
     has_warn = has_warn or gitignore_warn
-    if diag.gitattributes == GitattributesSignal.CORRUPTED:
-        has_error = True
+    gitattributes_error, gitattributes_warn = _gitattributes_weight(diag.gitattributes)
+    has_error = has_error or gitattributes_error
+    has_warn = has_warn or gitattributes_warn
     if diag.precommit in (
         PrecommitSignal.INCOMPLETE,
         PrecommitSignal.NON_CANONICAL,

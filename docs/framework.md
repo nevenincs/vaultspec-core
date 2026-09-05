@@ -18,11 +18,44 @@ by a different route than yours. The install writes that block into the project'
 `.gitignore`, and creates the file when there is not one, so a project started from an
 empty directory is covered by the same single command.
 
-Deleting the block is how you decline it. The next `vaultspec-core sync` reads the
-absence as your decision, records it, and stops re-adding the block;
-`vaultspec-core install --force` is the gesture that opts back in. Until that decision
-is recorded, `vaultspec-core doctor` reports `gitignore warn unmanaged` for an installed
-project carrying no block, and that warning does raise its exit code.
+To decline the block, run `vaultspec-core spec gitignore disable`. That records
+`blocks.gitignore` in the committed `.vaultspec/workspace.json`, so every clone honours
+it and no later install, upgrade or sync writes the block on any machine.
+`vaultspec-core spec gitignore enable` reverses it, and
+`vaultspec-core spec gitattributes disable` and `enable` do the same for that file.
+Neither verb touches the file itself: an existing `.gitignore` is left exactly as it is,
+and removing the block is yours to do.
+
+Deleting the block by hand still means something, but only locally and only until you
+provision again. The next `vaultspec-core sync` reads the absence, stops managing the
+block *on that machine*, and prints the verb that makes the decision permanent. It
+cannot record more than that: the file it would write the decision into is
+`.vaultspec/providers.json`, which the block itself excludes from git, so a decision
+kept there never reaches a teammate.
+
+An explicit `vaultspec-core install` or `install --upgrade` writes the block back. That
+is deliberate. Deleting a file is something you might have done by accident or in a
+merge; typing a provisioning command is not, and an upgrade runs a sync of its own
+partway through, so honouring the stand-down that sync had just recorded would leave the
+command you typed doing nothing at all. The declaration is what survives a provisioning
+run. Until it is written, `vaultspec-core doctor` reports `gitignore warn unmanaged` for
+an installed project carrying no block, names both ways out, and raises its exit code.
+
+## What an absent managed file means
+
+Vaultspec manages four files, and an absence means something different in each, because
+the files differ in what an absence can tell you:
+
+| File                      | Absent when you sync | Absent when you upgrade | How to decline it                    |
+| ------------------------- | -------------------- | ----------------------- | ------------------------------------ |
+| `.mcp.json`               | recreated            | recreated               | not declinable; `--skip mcp` per run |
+| `.pre-commit-config.yaml` | left alone           | recreated               | `spec precommit disable`             |
+| `.gitignore`              | left alone           | recreated               | `spec gitignore disable`             |
+| `.gitattributes`          | left alone           | recreated               | `spec gitattributes disable`         |
+
+`.mcp.json` is generated entirely from your rules, so its absence says nothing and
+vaultspec simply rebuilds it. The other three sit in files you also author, so vaultspec
+cannot tell your edit from its own, and a committed declaration is what settles it.
 
 ## How a feature flows into the vault
 

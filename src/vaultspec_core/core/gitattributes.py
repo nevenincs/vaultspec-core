@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 
 from .enums import ManagedState
+from .exceptions import VaultSpecError
 from .helpers import atomic_write_bytes
 
 logger = logging.getLogger(__name__)
@@ -88,7 +89,18 @@ def ensure_gitattributes_block(
         bom = b"\xef\xbb\xbf"
         text = raw[3:]
 
-    content = text.decode("utf-8")
+    try:
+        content = text.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        # Reaching the writer with an undecodable file used to surface as a raw
+        # traceback from `install --force`. The block cannot be reconciled
+        # without reading what is already there, so this is a refusal, told
+        # plainly, rather than a crash or a silent overwrite.
+        raise VaultSpecError(
+            f"Cannot read {ga_path}: it is not valid UTF-8.",
+            hint="Re-encode the file as UTF-8, or run "
+            "'vaultspec-core spec gitattributes disable' to stop managing it.",
+        ) from exc
     lines = content.splitlines()
     begins, ends = find_markers(lines)
 

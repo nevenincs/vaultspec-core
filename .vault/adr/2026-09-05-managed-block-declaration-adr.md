@@ -5,7 +5,7 @@ tags:
 date: '2026-09-05'
 modified: '2026-09-05'
 body_schema: 'body-v2'
-body_hash: 'sha256:5186ca9d74358652464205e0695f88e8bdee677f4320785500f5c2369da1f2af'
+body_hash: 'sha256:349a8b4851324de41540795b0be367076443fbbfefadcdda1534f85ddaf187df'
 related:
   - "[[2026-09-05-managed-block-declaration-research]]"
 ---
@@ -45,7 +45,7 @@ This record settles where the opt-out lives, what writes it, and what an absent 
 No new dependency and no frontier technology. Four existing commitments bound the work:
 
 - The declaration is written whole, so a new key must be threaded through the reader and writer the way `hooks` is rather than merged into an existing document.
-- Unknown top-level keys are ignored on read, which is what makes the schema addition additive for a workspace that meets an older reader. This was reasoned from the reader, not tested against a released build, and the plan must test it.
+- Unknown top-level keys are ignored on read, which makes the addition additive for an older reader. The write side is not symmetrical and the plan must test it rather than assume it.
 - The `cli-spec-gitignore` sharing policy still governs the block's contents. This record changes who may turn the block off, not what goes in it.
 - The `install-degraded-robustness` contract still holds: an absent managed subject is created rather than skipped. This record adds the one thing that stops that being unconditional.
 
@@ -56,6 +56,8 @@ The declaration gains a workspace-scoped `blocks` object with a boolean per mana
 Two verb pairs write it, one per block, built from the shape `spec precommit disable|enable` already established: idempotent, reporting an already-satisfied request as success, so a provisioning script can set the policy unconditionally. They are the only writers of the key.
 
 The per-machine manifest fields stay, demoted to what the mode fields already are - a local echo. Every reader takes the declaration first and the echo second, which is the precedence the resolver applies to the hook policy today, generalised to cover the blocks.
+
+Install and upgrade read the declaration alone; the per-machine echo governs only the verbs that infer intent from the working tree. That asymmetry is not decoration: an upgrade runs a provider sync partway through, and that sync sees the very block the upgrade is about to reconcile still missing. Honouring the echo it has just written would let the run defeat its own reconciliation, and an operator who typed an explicit provisioning command would silently get nothing.
 
 Deletion remains a recognised gesture and loses its authority. Sync that finds a managed block gone stands the local echo down, prints one line saying so, and names the verb that makes the decision permanent and shareable. It does not touch the declaration. The diagnosis keeps reporting the workspace as unmanaged until the declaration says otherwise, which is now a state the reader has been told how to leave.
 
@@ -77,7 +79,9 @@ The cost is surface. Two new verb pairs, a schema key, and a precedence rule tha
 
 Deleting the block becomes a weaker gesture than it was. A reader who deletes it and never runs the verb gets a persistent warning rather than silence. That is deliberate and it is the point: the interval was previously closed by inferring a decision, and inferring is what this record removes.
 
-The schema addition is additive for a workspace that meets an older reader, on the strength of a reading of the reader rather than a test. If that reading is wrong, a workspace that has declined a block silently regains it on any machine running an older release, which is the failure this record exists to prevent - the plan verifies it before the key ships.
+The schema addition survives an older *reader*, which ignores keys it does not know. It does not survive an older *writer*, and testing that during execution turned up something the reading had missed: the declaration is emitted whole from the parts the writer knows about, so any write by a build without the key drops it. A workspace that declined a block therefore silently regains it the moment a teammate on an older release runs anything that records a mode or a hook policy - which is the failure this record exists to prevent, arriving one release late.
+
+Nothing in this record can fix a release that has already shipped. What it does is stop the loss spreading forward: the writer now reads the existing document and carries unknown top-level keys through unchanged, so a key added by a later release or by a companion package survives every write from here on. The exposure is bounded to workspaces where someone is still running a build older than this one, and it closes as those upgrade.
 
 ### Displaced decisions
 

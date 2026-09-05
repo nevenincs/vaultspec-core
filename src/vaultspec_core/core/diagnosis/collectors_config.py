@@ -196,20 +196,20 @@ def collect_vault_content_state(target: Path) -> tuple[VaultContentSignal, int, 
 def _management_expected(target: Path) -> bool:
     """Return ``True`` when *target* should be carrying a managed ignore block.
 
-    An installed workspace is expected to have one unless it recorded an
-    opt-out by deleting the block. Without this distinction a missing block
-    reads the same in a workspace that declined management and in one that was
-    left unprotected, and the benign reading wins for both.
+    An installed workspace is expected to have one unless it declined - in the
+    committed declaration, or in the per-machine echo of it. Without this
+    distinction a missing block reads the same in a workspace that declined
+    management and in one that was left unprotected, and the benign reading
+    wins for both.
+
+    The resolution is shared with every writer, so the diagnosis cannot come to
+    a different answer than the code it is reporting on.
     """
     if not (target / ".vaultspec").is_dir():
         return False
-    try:
-        from ..manifest import read_manifest_data
+    from ..git_artifacts import block_management_enabled
 
-        return not read_manifest_data(target).gitignore_opted_out
-    except Exception:
-        logger.warning("Cannot read manifest for %s", target, exc_info=True)
-        return True
+    return block_management_enabled(target, "gitignore")
 
 
 def collect_gitignore_state(target: Path) -> GitignoreSignal:
@@ -285,23 +285,38 @@ def collect_gitattributes_state(target: Path) -> GitattributesSignal:
         :class:`~vaultspec_core.core.diagnosis.signals.GitattributesSignal`
         reflecting the observed state.
     """
+    from ..git_artifacts import block_management_enabled
     from ..gitattributes import DEFAULT_ENTRIES, find_markers, has_valid_block
+
+    ga_expected = (target / ".vaultspec").is_dir() and block_management_enabled(
+        target, "gitattributes"
+    )
 
     ga_path = target / ".gitattributes"
     if not ga_path.exists():
+        if ga_expected:
+            return GitattributesSignal.UNMANAGED
         return GitattributesSignal.NO_FILE
 
     try:
         content = ga_path.read_text(encoding="utf-8")
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         logger.warning("Cannot read .gitattributes %s: %s", ga_path, exc)
+        # As for `.gitignore`: a file whose block could not be read is not a
+        # file whose block is fine.
+        if ga_expected:
+            return GitattributesSignal.UNMANAGED
         return GitattributesSignal.NO_FILE
 
     lines = [line.strip() for line in content.splitlines()]
     begins, ends = find_markers(lines)
 
     if not begins and not ends:
-        return GitattributesSignal.NO_ENTRIES
+        return (
+            GitattributesSignal.UNMANAGED
+            if ga_expected
+            else GitattributesSignal.NO_ENTRIES
+        )
 
     if not has_valid_block(lines):
         return GitattributesSignal.CORRUPTED

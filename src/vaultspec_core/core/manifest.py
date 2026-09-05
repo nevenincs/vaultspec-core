@@ -45,7 +45,10 @@ class ManifestData:
             deleting the managed block. Recorded separately from
             ``gitignore_managed`` because a bare ``False`` there also means
             "never established", and an upgrade must re-establish the second
-            without overriding the first.
+            without overriding the first. This is the per-machine echo of the
+            committed ``blocks.gitignore`` declaration, which outranks it.
+        gitattributes_opted_out: The same echo for the ``.gitattributes``
+            block.
         gitattributes_managed: Whether vaultspec manages ``.gitattributes``
             entries.
         precommit_managed: Whether vaultspec manages pre-commit hooks
@@ -69,6 +72,7 @@ class ManifestData:
     gitignore_managed: bool = False
     gitignore_opted_out: bool = False
     gitattributes_managed: bool = False
+    gitattributes_opted_out: bool = False
     precommit_managed: bool = False
     resolved_mode: InstallMode | None = None
     resolved_floor_version: str | None = None
@@ -143,6 +147,7 @@ def read_manifest_data(target: Path, *, strict: bool = False) -> ManifestData:
         provider_state=raw.get("provider_state", {}),
         gitignore_managed=bool(raw.get("gitignore_managed", False)),
         gitignore_opted_out=bool(raw.get("gitignore_opted_out", False)),
+        gitattributes_opted_out=bool(raw.get("gitattributes_opted_out", False)),
         gitattributes_managed=bool(raw.get("gitattributes_managed", False)),
         precommit_managed=bool(raw.get("precommit_managed", False)),
         resolved_mode=InstallMode.from_token(raw.get("resolved_mode")),
@@ -192,6 +197,7 @@ def _manifest_payload(data: ManifestData) -> dict[str, Any]:
         "provider_state": data.provider_state,
         "gitignore_managed": data.gitignore_managed,
         "gitignore_opted_out": data.gitignore_opted_out,
+        "gitattributes_opted_out": data.gitattributes_opted_out,
         "gitattributes_managed": data.gitattributes_managed,
         "precommit_managed": data.precommit_managed,
         "resolved_mode": (

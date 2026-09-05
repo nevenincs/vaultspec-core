@@ -14,6 +14,7 @@ from typing import Any
 from . import types as _t
 from .enums import ManagedState, ProviderCapability, Tool
 from .exceptions import ProviderError
+from .git_artifacts import block_management_enabled
 from .gitattributes import ensure_gitattributes_block
 from .gitignore import (
     collect_provider_artifacts,
@@ -345,7 +346,7 @@ def _reconcile_uninstall_git_blocks(
     elif (
         recommended
         and was_gitignore_managed
-        and not mdata_after.gitignore_opted_out
+        and block_management_enabled(root, "gitignore")
         # Uninstall removes; it does not provision. `ensure_gitignore_block`
         # creates an absent file now, so without this gate a partial uninstall
         # would write back a `.gitignore` the workspace had deleted - and do it

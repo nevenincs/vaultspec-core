@@ -34,7 +34,12 @@ from vaultspec_core.cli.spec_cmd_doctor import (
     logger,
     render_diagnosis_table,
 )
-from vaultspec_core.cli.spec_cmd_hooks import hooks_app, precommit_app
+from vaultspec_core.cli.spec_cmd_hooks import (
+    gitattributes_app,
+    gitignore_app,
+    hooks_app,
+    precommit_app,
+)
 from vaultspec_core.cli.spec_cmd_mcps import mcps_app
 from vaultspec_core.cli.spec_cmd_reference import reference_app
 from vaultspec_core.cli.spec_cmd_rules import rules_app
@@ -65,6 +70,8 @@ spec_app.add_typer(agents_app, name="agents")
 spec_app.add_typer(system_app, name="system")
 spec_app.add_typer(hooks_app, name="hooks")
 spec_app.add_typer(precommit_app, name="precommit")
+spec_app.add_typer(gitignore_app, name="gitignore")
+spec_app.add_typer(gitattributes_app, name="gitattributes")
 spec_app.add_typer(mcps_app, name="mcps")
 spec_app.command("doctor")(cmd_doctor)
 spec_app.add_typer(reference_app, name="reference")
@@ -78,6 +85,8 @@ __all__ = [
     "doctor_exit_code",
     "emit_json",
     "emit_sync_result",
+    "gitattributes_app",
+    "gitignore_app",
     "hooks_app",
     "logger",
     "mcps_app",

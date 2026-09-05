@@ -234,13 +234,28 @@ def _execute_adopt_directory(target: Path, step: ResolutionStep) -> None:
 
 
 def _execute_repair_gitignore(target: Path, _step: ResolutionStep) -> None:
-    """Repair the managed gitignore block."""
+    """Repair the managed gitignore block, unless the project declined it.
+
+    The last writer in the chain, and the one a declined workspace reaches by a
+    different route than the install path: the diagnosis reads a declined block
+    as benignly absent, and a benignly absent block is a repair candidate. The
+    resolution is consulted here too so the preflight cannot restore what the
+    project committed a decision against.
+    """
+    from .git_artifacts import block_management_enabled
+
+    if not block_management_enabled(target, "gitignore", honour_local_echo=False):
+        return
     entries = get_recommended_entries(target)
     ensure_gitignore_block(target, entries, state=ManagedState.PRESENT)
 
 
 def _execute_repair_gitattributes(target: Path, _step: ResolutionStep) -> None:
-    """Repair the managed gitattributes block."""
+    """Repair the managed gitattributes block, unless the project declined it."""
+    from .git_artifacts import block_management_enabled
+
+    if not block_management_enabled(target, "gitattributes", honour_local_echo=False):
+        return
     ensure_gitattributes_block(target, state=ManagedState.PRESENT)
 
 

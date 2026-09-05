@@ -16,6 +16,13 @@ that survive every later sync. :class:`HooksDeclaration` is that declaration;
 it is workspace-scoped rather than per-package because a workspace has exactly
 one hook configuration no matter how many packages are provisioned into it.
 
+:class:`BlocksDeclaration` carries the same kind of decision for the managed
+``.gitignore`` and ``.gitattributes`` blocks, and for the same reason it cannot
+live in the manifest: ``providers.json`` is listed inside the very block whose
+removal it would be recording, so a decision kept there never reaches a
+teammate. The manifest retains its flags as a local echo, and readers resolve
+the declaration first.
+
 Reads are lenient about a missing file (there is simply no persisted choice
 yet) and strict about a present but broken one: corrupt JSON or an
 out-of-vocabulary mode raises a typed
@@ -48,12 +55,13 @@ WORKSPACE_FILENAME = "workspace.json"
 #: Current declaration schema version. Schema 2.0 introduced the per-package
 #: ``packages`` map that lets one committed ``workspace.json`` carry a mode (and
 #: optional version floor) for each provisioned distribution independently.
-#: Schema 2.1 adds the optional top-level ``hooks`` object; the bump is a minor
-#: one because the addition is purely additive - a 2.1 file parses identically
-#: under the 2.0 reader, which ignores top-level keys it does not know. The
-#: version is informational: no reader gates on it, and the key is written only
-#: when it departs from the default, so an unchanged workspace never gains it.
-WORKSPACE_SCHEMA_VERSION = "2.1"
+#: Schema 2.1 adds the optional top-level ``hooks`` object and schema 2.2 the
+#: optional ``blocks`` object; both bumps are minor because the additions are
+#: purely additive - such a file parses identically under an older reader, which
+#: ignores top-level keys it does not know. The version is informational: no
+#: reader gates on it, and each key is written only when it departs from its
+#: default, so an unchanged workspace never gains either.
+WORKSPACE_SCHEMA_VERSION = "2.2"
 
 #: The legacy single-key schema (``install_mode`` plus an optional
 #: ``minimum_vaultspec_version`` at the top level) that ``install-mode`` shipped.
@@ -257,6 +265,36 @@ class HooksDeclaration:
 
 
 @dataclass
+class BlocksDeclaration:
+    """The workspace's committed policy on the vaultspec-managed git blocks.
+
+    Workspace-scoped for the same reason :class:`HooksDeclaration` is: a
+    checkout has one ``.gitignore`` and one ``.gitattributes`` however many
+    packages are provisioned into it.
+
+    Declining a block is a decision about the contents of a committed file, so
+    it belongs in the committed declaration rather than in the per-machine
+    manifest - which is itself listed inside the block it would be recording
+    the removal of, and therefore cannot carry the decision to a teammate. The
+    manifest keeps its flags as a local echo, and every reader takes the
+    declaration first.
+
+    Attributes:
+        gitignore: Whether vaultspec-core may write and reconcile its managed
+            block in ``.gitignore``. Defaults to ``True``, which is also what
+            an absent declaration means, so a workspace that has never
+            expressed a preference behaves exactly as it did before the key
+            existed. Only an explicit ``false`` declines.
+        gitattributes: The same for ``.gitattributes``. Its default entries
+            normalise line endings for every clone, so declining it is a
+            team-wide statement even more clearly than for ``.gitignore``.
+    """
+
+    gitignore: bool = True
+    gitattributes: bool = True
+
+
+@dataclass
 class WorkspaceDeclaration:
     """The committed shared declaration of a workspace's provisioning mode.
 
@@ -407,6 +445,59 @@ def read_hooks_declaration(target: Path) -> HooksDeclaration:
             "'vaultspec-core spec precommit enable'.",
         )
     return HooksDeclaration(pre_commit=pre_commit)
+
+
+def read_blocks_declaration(target: Path) -> BlocksDeclaration:
+    """Read the workspace's committed policy on the managed git blocks.
+
+    Lenient about absence and strict about breakage, exactly as
+    :func:`read_hooks_declaration` is: a missing file, a missing ``blocks``
+    object, or a missing key means no preference has been expressed and the
+    permissive default applies, so every workspace written before this key
+    existed reads as managed. Only an explicit ``false`` declines.
+
+    A present but malformed ``blocks`` object raises rather than falling back,
+    because silently ignoring a broken opt-out would rewrite the very block the
+    operator declined.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        The declared :class:`BlocksDeclaration`, or the default when undeclared.
+
+    Raises:
+        VaultSpecError: If the file exists but is malformed, or its ``blocks``
+            value is not an object, or a block key is not a boolean.
+    """
+    raw = _read_raw(target)
+    if raw is None:
+        return BlocksDeclaration()
+    blocks = raw.get("blocks")
+    if blocks is None:
+        return BlocksDeclaration()
+    path = _workspace_path(target)
+    if not isinstance(blocks, dict):
+        raise VaultSpecError(
+            f"Malformed 'blocks' object in workspace declaration at {path}: "
+            "expected a JSON object.",
+            hint="Fix the JSON by hand or re-run "
+            "'vaultspec-core spec gitignore enable'.",
+        )
+    # Re-type the way the hooks reader above does: a bare ``isinstance`` narrows
+    # an ``object`` from JSON only to ``dict[Unknown, Unknown]``.
+    blocks = cast("dict[str, Any]", blocks)
+    values: dict[str, bool] = {}
+    for key in ("gitignore", "gitattributes"):
+        value = blocks.get(key, True)
+        if not isinstance(value, bool):
+            raise VaultSpecError(
+                f"Invalid blocks.{key} in workspace declaration at {path}: {value!r}.",
+                hint=f"Set blocks.{key} to true or false, or re-run "
+                f"'vaultspec-core spec {key} enable'.",
+            )
+        values[key] = value
+    return BlocksDeclaration(**values)
 
 
 def _read_packages_map(target: Path) -> dict[str, PackageDeclaration] | None:
@@ -575,7 +666,10 @@ def read_workspace_declaration(target: Path) -> WorkspaceDeclaration | None:
 
 
 def _write_document(
-    target: Path, packages: dict[str, PackageDeclaration], hooks: HooksDeclaration
+    target: Path,
+    packages: dict[str, PackageDeclaration],
+    hooks: HooksDeclaration,
+    blocks: BlocksDeclaration,
 ) -> None:
     """Serialize the whole declaration to ``.vaultspec/workspace.json``.
 
@@ -588,13 +682,17 @@ def _write_document(
     floor, so an unset floor never writes a null.
 
     The write is whole-document rather than key-wise, so every caller must
-    supply *both* halves of the declaration or silently drop the one it did not
-    name. That is why *hooks* is a required parameter rather than an optional
-    one defaulted to :class:`HooksDeclaration`: a mode write that forgot it
-    would erase a committed hook opt-out and reinstall the file the operator
+    supply *every* part of the declaration or silently drop the one it did not
+    name. That is why *hooks* and *blocks* are required parameters rather than
+    optional ones defaulted to their permissive values: a mode write that forgot
+    either would erase a committed opt-out and restore the thing the operator
     declined, and a default would make that omission invisible. A default-valued
-    *hooks* writes no ``hooks`` key at all, so a workspace that has never
-    declined keeps a byte-identical file.
+    part writes no key at all, so a workspace that has never declined anything
+    keeps a byte-identical file.
+
+    Keys this build does not recognize are read back from the existing document
+    and written through unchanged, so a declaration written by a newer release
+    or by a companion package is not silently truncated by an older one.
 
     Callers that must not race a concurrent writer wrap this in
     :func:`~vaultspec_core.core.helpers.advisory_lock`; this primitive itself
@@ -605,6 +703,7 @@ def _write_document(
         target: Workspace root directory.
         packages: Mapping of distribution name to :class:`PackageDeclaration`.
         hooks: The workspace's git-hook policy.
+        blocks: The workspace's managed-git-block policy.
     """
     path = _workspace_path(target)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -614,13 +713,53 @@ def _write_document(
         if decl.minimum_version is not None:
             entry["minimum_version"] = decl.minimum_version
         packages_payload[name] = entry
-    payload: dict[str, Any] = {
-        "schema_version": WORKSPACE_SCHEMA_VERSION,
-        "packages": packages_payload,
-    }
+    # Start from whatever is already on disk so a key this build does not know
+    # survives the write. The document is emitted whole, so without this every
+    # write silently drops a key added by a newer release or by a companion
+    # package - which for an opt-out means a committed decision quietly
+    # reverting. Older builds still drop what they do not know; this stops the
+    # loss spreading forward from here.
+    try:
+        payload: dict[str, Any] = dict(_read_raw(target) or {})
+    except VaultSpecError:
+        # A broken document is not a source of keys worth preserving, and the
+        # readers that matter have already refused it.
+        payload = {}
+    for known in ("hooks", "blocks"):
+        payload.pop(known, None)
+    payload["schema_version"] = WORKSPACE_SCHEMA_VERSION
+    payload["packages"] = packages_payload
     if hooks != HooksDeclaration():
         payload["hooks"] = {"pre_commit": hooks.pre_commit}
+    if blocks != BlocksDeclaration():
+        payload["blocks"] = {
+            "gitignore": blocks.gitignore,
+            "gitattributes": blocks.gitattributes,
+        }
     atomic_write(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+def write_blocks_declaration(target: Path, declaration: BlocksDeclaration) -> None:
+    """Persist the managed-git-block policy to ``.vaultspec/workspace.json``.
+
+    Upserts the ``blocks`` object while leaving every package entry and the hook
+    policy untouched. The whole read-modify-write cycle runs under a single
+    advisory lock so a concurrent mode or hook writer is serialized rather than
+    clobbered, and a legacy single-key file is migrated to the current shape on
+    this write.
+
+    Args:
+        target: Workspace root directory.
+        declaration: The :class:`BlocksDeclaration` to persist.
+    """
+    path = _workspace_path(target)
+    with advisory_lock(path):
+        _write_document(
+            target,
+            _read_packages_map(target) or {},
+            read_hooks_declaration(target),
+            declaration,
+        )
 
 
 def write_hooks_declaration(target: Path, declaration: HooksDeclaration) -> None:
@@ -637,7 +776,12 @@ def write_hooks_declaration(target: Path, declaration: HooksDeclaration) -> None
     """
     path = _workspace_path(target)
     with advisory_lock(path):
-        _write_document(target, _read_packages_map(target) or {}, declaration)
+        _write_document(
+            target,
+            _read_packages_map(target) or {},
+            declaration,
+            read_blocks_declaration(target),
+        )
 
 
 def write_package_declaration(
@@ -668,7 +812,12 @@ def write_package_declaration(
     with advisory_lock(path):
         packages = _read_packages_map(target) or {}
         packages[key] = declaration
-        _write_document(target, packages, read_hooks_declaration(target))
+        _write_document(
+            target,
+            packages,
+            read_hooks_declaration(target),
+            read_blocks_declaration(target),
+        )
 
 
 def write_workspace_declaration(

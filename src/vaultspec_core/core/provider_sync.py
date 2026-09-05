@@ -21,7 +21,7 @@ from .exceptions import (
     ProviderNotInstalledError,
     WorkspaceNotInitializedError,
 )
-from .git_artifacts import managed_block_presence
+from .git_artifacts import block_management_enabled, managed_block_presence
 from .gitattributes import ensure_gitattributes_block
 from .gitignore import (
     ensure_gitignore_block,
@@ -219,6 +219,8 @@ def _reconcile_gitignore_opt_out(target_dir: Path) -> None:
     workspace was just taught to withhold.
     """
     gi_path = target_dir / ".gitignore"
+    if not block_management_enabled(target_dir, "gitignore"):
+        return
     mdata = read_manifest_data(target_dir)
     if not mdata.gitignore_managed:
         return
@@ -233,9 +235,13 @@ def _reconcile_gitignore_opt_out(target_dir: Path) -> None:
         ensure_gitignore_block(target_dir, get_recommended_entries(target_dir))
         return
 
+    # The per-machine echo only. Writing the committed declaration here would
+    # let an inference about intent modify a file the whole team shares, which
+    # is what `spec gitignore disable` exists to do explicitly.
     logger.info(
-        "Managed block absent from %s; recording the opt-out. "
-        "Run 'vaultspec-core install --force' to resume managing it.",
+        "Managed block absent from %s; this machine will stop managing it. "
+        "Run 'vaultspec-core spec gitignore disable' to record that for the "
+        "whole project, or 'vaultspec-core install --force' to resume.",
         gi_path,
     )
     mdata.gitignore_managed = False
@@ -246,6 +252,8 @@ def _reconcile_gitignore_opt_out(target_dir: Path) -> None:
 def _reconcile_gitattributes_opt_out(target_dir: Path) -> None:
     """Re-sync the managed ``.gitattributes`` block (same pattern as gitignore)."""
     ga_path = target_dir / ".gitattributes"
+    if not block_management_enabled(target_dir, "gitattributes"):
+        return
     mdata = read_manifest_data(target_dir)
     if not mdata.gitattributes_managed:
         return
@@ -260,8 +268,14 @@ def _reconcile_gitattributes_opt_out(target_dir: Path) -> None:
         ensure_gitattributes_block(target_dir)
         return
 
-    logger.info("Managed block absent from %s; standing down", ga_path)
+    logger.info(
+        "Managed block absent from %s; this machine will stop managing it. "
+        "Run 'vaultspec-core spec gitattributes disable' to record that for "
+        "the whole project, or 'vaultspec-core install --force' to resume.",
+        ga_path,
+    )
     mdata.gitattributes_managed = False
+    mdata.gitattributes_opted_out = True
     write_manifest_data(target_dir, mdata)
 
 
