@@ -176,7 +176,23 @@ _TOOL_DIRS: dict[Tool, str] = {
 
 
 def _execute_repair_manifest(target: Path, _step: ResolutionStep) -> None:
-    """Rebuild the manifest by scanning for provider directories on disk."""
+    """Rebuild the manifest from what is observable on disk.
+
+    Every field this repair restores is derived, never assumed. The
+    installed set comes from the provider directories present, and the
+    ``*_managed`` flags from the managed blocks present, through the same
+    helper an install uses so the two cannot drift.
+
+    Falling back to :class:`ManifestData` defaults set all three managed
+    flags to ``False``. Every sync reconciler gates on them and returns
+    early, so a single corrupt manifest silently ended management of every
+    root file - and ``doctor`` reported each row ``ok`` throughout, because
+    a block that is present reads as complete regardless of the flag. A
+    repair that narrows what the tool manages is worse than one that
+    refuses (issue #411).
+    """
+    from .provision import derive_managed_flags
+
     # Read existing data (may be corrupt - fall back to defaults)
     try:
         data = read_manifest_data(target)
@@ -188,6 +204,7 @@ def _execute_repair_manifest(target: Path, _step: ResolutionStep) -> None:
         for tool, dir_name in _TOOL_DIRS.items()
         if (target / dir_name).is_dir()
     }
+    derive_managed_flags(target, data)
     write_manifest_data(target, data)
 
 
