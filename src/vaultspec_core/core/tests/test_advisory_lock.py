@@ -377,3 +377,70 @@ class TestManifestReadModifyWriteHoldsTheLock:
                 "provider_sync and uninstall was written on the assumption "
                 "that it is not"
             )
+
+
+class TestUpgradeFinalizeHoldsTheManifestLock:
+    """The upgrade's manifest cycle holds the lock too (issue #418).
+
+    This was the fifth of the five callers and the one that could not simply
+    be wrapped: it called `persist_resolved_mode`, whose docstring says it
+    must not run inside the manifest lock because the declaration writer takes
+    its own. The function is now ordered in two phases - every other-file
+    write first, then a manifest cycle that locks nothing else - so the lock
+    can cover the whole read-modify-write.
+
+    Proven by holding the lock and observing that the cycle waits for it,
+    rather than by asserting on the shape of the code.
+    """
+
+    def test_it_waits_for_a_held_manifest_lock(self, tmp_path: Path) -> None:
+        import threading
+
+        from vaultspec_core.core.enums import InstallMode
+        from vaultspec_core.core.manifest import manifest_lock
+        from vaultspec_core.core.provision import _finalize_upgrade_manifest
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        WorkspaceFactory(tmp_path).install("claude")
+        finished = threading.Event()
+
+        def _finalize() -> None:
+            _finalize_upgrade_manifest(
+                tmp_path, force=False, resolved_mode=InstallMode.TOOL
+            )
+            finished.set()
+
+        with manifest_lock(tmp_path):
+            worker = threading.Thread(target=_finalize, daemon=True)
+            worker.start()
+            # It must not get through the manifest cycle while the lock is held.
+            worker.join(timeout=1.0)
+            assert not finished.is_set(), (
+                "_finalize_upgrade_manifest completed while the manifest lock "
+                "was held, so its read-modify-write is not covered by it"
+            )
+
+        worker.join(timeout=30.0)
+        assert finished.is_set(), "the cycle did not complete once the lock was free"
+
+    def test_the_upgrade_cycle_still_stamps_what_it_should(
+        self, tmp_path: Path
+    ) -> None:
+        """The guard: reordering must not drop any field it used to write."""
+        from vaultspec_core.core.enums import InstallMode
+        from vaultspec_core.core.manifest import read_manifest_data
+        from vaultspec_core.core.provision import _finalize_upgrade_manifest
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        WorkspaceFactory(tmp_path).install("claude")
+
+        _finalize_upgrade_manifest(
+            tmp_path, force=False, resolved_mode=InstallMode.TOOL
+        )
+
+        mdata = read_manifest_data(tmp_path)
+        assert mdata.installed_at
+        assert mdata.vaultspec_version
+        assert mdata.resolved_mode == InstallMode.TOOL
+        assert mdata.gitignore_managed
+        assert mdata.gitattributes_managed
