@@ -115,7 +115,9 @@ class TestAddExecRefuses:
         result = _add_exec(runner, synthetic_project)
 
         assert result.exit_code == 1
-        assert "execution is logged with `vault exec log`" in result.output
+        assert (
+            "execution is logged with `vaultspec-core vault exec log`" in result.output
+        )
 
     def test_refuses_before_touching_disk(
         self, runner: CliRunner, synthetic_project: Path
@@ -229,7 +231,7 @@ class TestStatusPairsStepsWithLedgerRows:
             key: next(
                 line
                 for line in result.output.splitlines()
-                if key in line and "[" in line
+                if key in line and ("[x]" in line or "[ ]" in line)
             )
             for key in ("P01.S01", "P01.S02", "P01.S03")
         }

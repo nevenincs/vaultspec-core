@@ -220,7 +220,9 @@ def test_two_worktrees_merge_into_one_clean_ledger(repo: Path, tmp_path: Path) -
     assert status.exit_code == 0, status.output
     lines = {
         key: next(
-            line for line in status.output.splitlines() if key in line and "[" in line
+            line
+            for line in status.output.splitlines()
+            if key in line and ("[x]" in line or "[ ]" in line)
         )
         for key in ("P01.S01", "P01.S02", "P02.S03")
     }
