@@ -7,9 +7,9 @@ tier: L2
 related:
   - '[[2026-09-04-install-degraded-robustness-adr]]'
   - '[[2026-09-04-install-degraded-robustness-research]]'
-modified: '2026-09-04'
+modified: '2026-09-05'
 body_schema: body-v2
-body_hash: 'sha256:d723652e56a4e573d6492c39b28f2a35f746182208539bd4297c1f3370de2728'
+body_hash: 'sha256:b4ca25bfdcf9d8035387c1402aea3b509c3cf2140e9b60f6279aeab6fb08ee6f'
 ---
 
 # `install-degraded-robustness` plan
@@ -85,6 +85,15 @@ An unreadable ignore file, and a collector that failed outright, both fell back 
 - [x] `P07.S23` - Read an unreadable or undecodable ignore file in an installed workspace as unmanaged rather than absent; `src/vaultspec_core/core/diagnosis/collectors_config.py`.
 - [x] `P07.S24` - Degrade the collector's own failure fallback in an installed workspace instead of reporting a clean absence; `src/vaultspec_core/core/diagnosis/diagnosis.py`.
 - [x] `P07.S25` - Add regression tests covering an undecodable ignore file inside and outside an installed workspace; `src/vaultspec_core/tests/cli/test_collectors.py`.
+
+### Phase `P08` - close the two defects the post-implementation review found
+
+A ruling on the open architectural questions and a systematic degraded-condition sweep each returned one defect attributable to this work: an unreadable ignore file recorded as a permanent opt-out, and an uninstall that recreated a file the workspace had deleted.
+
+- [x] `P08.S26` - Replace the boolean managed-block predicate with a three-state one so a file that cannot be read stops answering the question the caller asked; `src/vaultspec_core/core/git_artifacts.py`.
+- [x] `P08.S27` - Stand the sync reconcilers down on an unreadable file instead of recording an opt-out, and log what they decided either way; `src/vaultspec_core/core/provider_sync.py`.
+- [x] `P08.S28` - Gate the uninstall block reconciler on the file existing and on no recorded opt-out, so uninstall removes without provisioning; `src/vaultspec_core/core/uninstall.py`.
+- [x] `P08.S29` - Add regression tests for the three-state predicate, the unreadable-file gesture, and the three uninstall paths; `src/vaultspec_core/tests/cli/test_lock_sentinel_policy.py`.
 
 ## Parallelization
 

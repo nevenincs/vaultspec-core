@@ -342,7 +342,16 @@ def _reconcile_uninstall_git_blocks(
     if not mdata_after.installed and not keep_vault:
         ensure_gitignore_block(root, [], state=ManagedState.ABSENT)
         ensure_gitattributes_block(root, state=ManagedState.ABSENT)
-    elif recommended and was_gitignore_managed:
+    elif (
+        recommended
+        and was_gitignore_managed
+        and not mdata_after.gitignore_opted_out
+        # Uninstall removes; it does not provision. `ensure_gitignore_block`
+        # creates an absent file now, so without this gate a partial uninstall
+        # would write back a `.gitignore` the workspace had deleted - and do it
+        # before any sync could read that deletion as the opt-out gesture.
+        and (root / ".gitignore").is_file()
+    ):
         ensure_gitignore_block(root, recommended, state=ManagedState.PRESENT)
 
 

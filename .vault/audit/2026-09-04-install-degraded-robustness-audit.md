@@ -3,9 +3,9 @@ tags:
   - '#audit'
   - '#install-degraded-robustness'
 date: '2026-09-04'
-modified: '2026-09-04'
+modified: '2026-09-05'
 body_schema: 'body-v2'
-body_hash: 'sha256:7506248b0e4f142504e17acea0a8c096d66d5854a05e880855d662c9242ccfdb'
+body_hash: 'sha256:8968b12a6426dc6d7655c7b3e698376e1ea0e0871f261c49139f006fc056272c'
 related:
   - "[[2026-09-04-install-degraded-robustness-plan]]"
   - "[[2026-09-04-install-degraded-robustness-adr]]"
@@ -69,9 +69,51 @@ The finding that outlives the repair is the interval. Four gates went red on a p
 
 `WorkspaceFactory.install` created a `.gitignore` before every install "so the gitignore block writer has something to append to". Every install-path test therefore exercised a precondition the product did not provide, which is why a suite this large passed while `vaultspec-core install` left a fresh workspace unprotected. Removed in `P02.S18`. This is the finding with the widest reach: it is the same shape as the defect - an instrument that reports on a workspace it has quietly repaired first - and nothing structural prevents another factory helper from doing it again.
 
+### unreadable-read-as-a-decision | critical | An unreadable ignore file was recorded as a permanent opt-out
+
+`has_gitignore_block` answered `False` on `OSError` and `UnicodeDecodeError`, and `_reconcile_gitignore_opt_out` read that `False` as the opt-out gesture. Every state that was not "readable file carrying exactly one block" therefore became a durable recorded decision that only `--force` undoes: an undecodable file, a file the process cannot open, a directory named `.gitignore`. Reproduced by writing undecodable bytes and running `sync`, which exited `0` and left `gitignore_opted_out: true`.
+
+The consequence is the reason this is the most serious finding in the set. A recorded opt-out makes `_management_expected` false, so the diagnosis returns to the informational reading - the exact silence `P04` and `P07` removed, restored through the writer rather than the reader, and made permanent. The two repairs were each correct and the pair was not.
+
+Fixed by `managed_block_presence`, a three-state predicate: `True` and `False` are observations, `None` means the question could not be answered. Both reconcilers stand down on `None` and leave the flags where they are. The boolean predicates survive as thin wrappers for the callers that genuinely want leniency.
+
+### uninstall-provisioned-what-it-should-only-remove | high | A partial uninstall recreated a deleted ignore file
+
+`_reconcile_uninstall_git_blocks` called `ensure_gitignore_block` with no gate beyond "was managed before". That was harmless while the writer skipped an absent file, and became a defect the moment it created one: `uninstall <provider> --force` against a workspace that had deleted its `.gitignore` wrote the file back, with the full block, before any sync could read that deletion as the opt-out gesture. It also contradicted this feature's own ADR, which mitigates unconditional creation by scoping it to install and upgrade.
+
+Gated on the file existing and on no recorded opt-out. Uninstall removes; it does not provision.
+
+### degraded-condition-sweep | high | Sixteen further gaps of the same shape remain open
+
+A systematic sweep of every entry point against every degraded condition - absent, empty, unreadable, undecodable, read-only, directory-where-a-file-belongs, symlink, no `.git`, partially scaffolded, corrupt manifest, legacy manifest, concurrent runs, dry-run leakage, swallowed exceptions - returned sixteen further findings beyond the two above. All reproduced except where marked. They are listed here so the sweep is not lost; none is claimed as in scope for this feature.
+
+| Slug                                           | Severity | Summary                                                                                                                                                                                      |
+| ---------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `legacy-manifest-skips-migrations`             | high     | A v1.0 manifest reads as "not installed", so every migration is skipped; the upgrade then stamps the running version and certifies all nine as applied                                       |
+| `corrupt-workspace-json-doctor-ok`             | high     | A declaration every mutating verb refuses is reported healthy, exit `0`, with two false `ok` rows                                                                                            |
+| `unparseable-precommit-yaml-reads-as-absent`   | high     | Upgrade exits `0`, management stands down, the diagnosis says `info`                                                                                                                         |
+| `uninstall-leaves-unignored-sentinels`         | high     | Three lock sentinels left untracked and unignored; the `.gitattributes` block survives a full uninstall                                                                                      |
+| `undecodable-gitattributes`                    | medium   | The gitattributes twin: `info no_file` in the diagnosis, raw traceback from `install --force`. The sync half is closed by `managed_block_presence`; the read and write halves are not        |
+| `gitattributes-never-reconciled-on-upgrade`    | medium   | R3 for `.gitattributes` - the upgrade path never calls its writer at all                                                                                                                     |
+| `manifest-repair-drops-management-flags`       | medium   | Preflight rebuilds the manifest from defaults, so every `*_managed` flag clears and sync stops managing every root file                                                                      |
+| `corrupt-mcp-json-doctor-info`                 | medium   | A file that fails every sync is unweighed in the diagnosis                                                                                                                                   |
+| `atomic-write-fchmod-leak-masks-error`         | medium   | A read-only destination on Windows leaks the temp file and surfaces an error naming the temp, with the real cause only in `__context__`                                                      |
+| `symlinked-gitignore-severed`                  | medium   | The block write replaces a symlink with a regular file; the real target is left stale and the run exits `0`                                                                                  |
+| `undecodable-precommit-yaml-traceback`         | medium   | `UnicodeDecodeError` sits outside the `(YAMLError, OSError)` net in both the scaffold and the collector                                                                                      |
+| `install-swallows-sync-failure`                | medium   | A failing provider sync is caught into `result["errors"]`, which neither renderer reads. Unverified - a reading of the render path, not a measurement                                        |
+| `vault-dir-not-restored-and-block-shrinks`     | low      | With `.vault/` deleted, upgrade does not re-scaffold it and the block silently loses its four `.vault/` entries                                                                              |
+| `failed-install-force-leaves-partial-manifest` | low      | Providers recorded before a mid-run failure, final manifest write never reached; the retry then refuses as already installed                                                                 |
+| `sync-early-exit-discards-errors`              | low      | `cmd_sync` returns before the failure code is computed when no providers are enrolled. Unverified                                                                                            |
+| `unlocked-manifest-rmw`                        | low      | Five read-modify-write cycles write the manifest without the lock its own docstring requires. Unverified - the window exists by construction, three concurrent rounds produced no corruption |
+
+Five of these - `corrupt-workspace-json-doctor-ok`, `unparseable-precommit-yaml-reads-as-absent`, `undecodable-gitattributes`, `corrupt-mcp-json-doctor-info`, `undecodable-precommit-yaml-traceback` - are one defect wearing five hats: every `_safe_*` wrapper in `diagnosis.py` maps "could not read or parse" onto the neutral signal. That is the instrument pattern at the layer above the collectors, and it is what let `unreadable-read-as-a-decision` and `manifest-repair-drops-management-flags` hide as well.
+
 ## Recommendations
 
 - Evaluate a first-class opt-out verb for the managed blocks, mirroring `spec precommit disable`, which would record the decision at the moment it is made instead of inferring it on the next sync. This is architecturally significant: a follow-on ADR must decide whether declining a managed block is a per-machine state in the manifest, as it is today, or a committed workspace declaration alongside `hooks.pre_commit`, which would make it travel to teammates.
+- Introduce one explicit "could not read" signal across the diagnosis and weigh it, replacing the `_safe_*` fallbacks that map a failed collector onto the neutral value. One structural change closes five of the sixteen findings above and removes the layer that hid two more.
+- Split `UNREADABLE` out of `UNMANAGED` as part of that change: the three conditions `UNMANAGED` currently collapses call for different remediations, and the one the resolver currently offers for an undecodable file cannot run.
+- Teach `list_pending` to distinguish "no manifest" from "a manifest with no version", so a workspace written before migrations existed stops being certified as fully migrated.
 - Audit the remaining `WorkspaceFactory` helpers for other preconditions the harness supplies that the product does not, and state in the factory's docstring that seeding a managed artefact before the verb under test writes it is the one thing it must not do.
 - Give `main` a red-CI alarm that reaches someone. The Sentinel workflow already runs and already reports failure; what is missing is the consequence. Four mechanical failures survived a push and a scheduled run without being repaired.
 - Decide whether the unconditional upgrade reconciliation should announce itself. It repairs silently today; a one-line advisory naming the file it changed would make the first upgrade after this release explicable to a reader who did not ask for it.

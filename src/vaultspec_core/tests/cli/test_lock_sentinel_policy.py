@@ -409,3 +409,96 @@ class TestOptOutIsRecordedByEitherSync:
         mdata = read_manifest_data(tmp_path)
         assert mdata.gitignore_opted_out is True
         assert mdata.gitignore_managed is False
+
+
+@pytest.mark.unit
+class TestManagedBlockPresenceIsTriState:
+    """ "No block" and "cannot tell" are different answers."""
+
+    def test_absent_file_reports_no_block(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.git_artifacts import managed_block_presence
+
+        assert managed_block_presence(tmp_path / ".gitignore") is False
+
+    def test_unreadable_file_reports_unknown(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.git_artifacts import managed_block_presence
+
+        (tmp_path / ".gitignore").write_bytes(b"\xff\xfe\x00garbage\n")
+
+        assert managed_block_presence(tmp_path / ".gitignore") is None
+
+    def test_a_directory_reports_unknown(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.git_artifacts import managed_block_presence
+
+        (tmp_path / ".gitignore").mkdir()
+
+        assert managed_block_presence(tmp_path / ".gitignore") is None
+
+
+@pytest.mark.integration
+class TestOnlyAReadFileCountsAsTheOptOutGesture:
+    """An unreadable file must not become a recorded decision.
+
+    Every state that was not "readable file with no markers" used to collapse
+    into the opt-out gesture, because the predicate behind it answered False on
+    a read failure. The recorded opt-out then suppressed the degraded diagnosis,
+    restoring the silence this work removed - by a route through the writer
+    rather than the reader.
+    """
+
+    def test_undecodable_file_records_nothing(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.manifest import read_manifest_data
+
+        factory = _installed_workspace(tmp_path)
+        (tmp_path / ".gitignore").write_bytes(b"\xff\xfe\x00garbage\n")
+
+        factory.sync()
+
+        mdata = read_manifest_data(tmp_path)
+        assert mdata.gitignore_opted_out is False
+        assert mdata.gitignore_managed is True
+
+
+@pytest.mark.integration
+class TestUninstallRemovesAndDoesNotProvision:
+    """Uninstall must not write back a file the workspace deleted.
+
+    `ensure_gitignore_block` creates an absent file now, so the uninstall
+    reconciler needed a gate it never had: without one a partial uninstall
+    recreated a deleted `.gitignore`, before any sync could read that deletion
+    as the opt-out gesture.
+    """
+
+    def test_partial_uninstall_does_not_recreate_a_deleted_file(
+        self, tmp_path: Path
+    ) -> None:
+        factory = _installed_workspace(tmp_path)
+        (tmp_path / ".gitignore").unlink()
+
+        factory.uninstall(provider="gemini", force=True)
+
+        assert not (tmp_path / ".gitignore").exists()
+
+    def test_partial_uninstall_still_reconciles_a_live_block(
+        self, tmp_path: Path
+    ) -> None:
+        factory = _installed_workspace(tmp_path)
+
+        factory.uninstall(provider="gemini", force=True)
+
+        assert "vaultspec-managed" in (tmp_path / ".gitignore").read_text(
+            encoding="utf-8"
+        )
+
+    def test_partial_uninstall_respects_a_recorded_opt_out(
+        self, tmp_path: Path
+    ) -> None:
+        factory = _installed_workspace(tmp_path)
+        (tmp_path / ".gitignore").write_text("# mine only\n", encoding="utf-8")
+        factory.sync()
+
+        factory.uninstall(provider="codex", force=True)
+
+        assert "vaultspec-managed" not in (tmp_path / ".gitignore").read_text(
+            encoding="utf-8"
+        )

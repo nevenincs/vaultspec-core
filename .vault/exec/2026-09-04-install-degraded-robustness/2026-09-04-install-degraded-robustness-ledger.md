@@ -3,9 +3,9 @@ tags:
   - '#exec'
   - '#install-degraded-robustness'
 date: '2026-09-04'
-modified: '2026-09-04'
+modified: '2026-09-05'
 body_schema: 'body-v2'
-body_hash: 'sha256:1dc3759c25eba0c1449160f0fdc47484df7fe3c5736d71a351ff8c736764cee7'
+body_hash: 'sha256:33b5f4765558f87900036769c009040747e389ab16883af3f6c66275fc6772fb'
 related:
   - "[[2026-09-04-install-degraded-robustness-plan]]"
 ---
@@ -48,6 +48,10 @@ related:
 - `S23` `M` `src/vaultspec_core/core/diagnosis/collectors_config.py`
 - `S24` `M` `src/vaultspec_core/core/diagnosis/diagnosis.py`
 - `S25` `M` `src/vaultspec_core/tests/cli/test_collectors.py`
+- `S26` `M` `src/vaultspec_core/core/git_artifacts.py`
+- `S27` `M` `src/vaultspec_core/core/provider_sync.py`
+- `S28` `M` `src/vaultspec_core/core/uninstall.py`
+- `S29` `M` `src/vaultspec_core/tests/cli/test_lock_sentinel_policy.py`
 
 ## Notes
 
