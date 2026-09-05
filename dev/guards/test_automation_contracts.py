@@ -737,6 +737,23 @@ def test_basedpyright_private_usage_exemption_covers_every_tests_directory() -> 
     )
 
 
+def _workflow_paths() -> list[Path]:
+    """Every workflow file, proven to exist before anything reads them."""
+    workflows = sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+    assert workflows, "no workflow files found under .github/workflows"
+    return workflows
+
+
+def _guard_module_texts() -> list[tuple[str, str]]:
+    """Every guard module under ``dev/guards/`` as ``(relative path, text)``."""
+    modules = sorted((ROOT / "dev" / "guards").rglob("test_*.py"))
+    assert modules, "no guard modules found under dev/guards"
+    return [
+        (path.relative_to(ROOT).as_posix(), path.read_text(encoding="utf-8"))
+        for path in modules
+    ]
+
+
 def _sentinel_workflow() -> _Workflow:
     """The main-branch CI sentinel, parsed."""
     text = (ROOT / ".github" / "workflows" / "main-ci-sentinel.yml").read_text(
@@ -900,9 +917,9 @@ def test_the_precommit_marker_selects_something() -> None:
     that reads like tooling breakage. Naming the cause here is cheaper.
     """
     marked = [
-        path.relative_to(ROOT).as_posix()
-        for path in sorted((ROOT / "dev" / "guards").rglob("test_*.py"))
-        if f"@pytest.mark.{_PRECOMMIT_MARKER}" in path.read_text(encoding="utf-8")
+        rel
+        for rel, text in _guard_module_texts()
+        if f"@pytest.mark.{_PRECOMMIT_MARKER}" in text
     ]
 
     assert marked, (
@@ -920,7 +937,7 @@ def test_the_precommit_marker_never_becomes_the_ci_selection() -> None:
     the marker silently converts from a speed-up into a coverage cut.
     """
     offenders: list[str] = []
-    for path in sorted((ROOT / ".github" / "workflows").glob("*.yml")):
+    for path in _workflow_paths():
         workflow = cast("_Workflow", yaml.safe_load(path.read_text(encoding="utf-8")))
         for job_name, job in workflow["jobs"].items():
             for step in job.get("steps", []) or []:

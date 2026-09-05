@@ -145,6 +145,18 @@ _GUARD_DIR = PROJECT_ROOT / "dev" / "guards"
 _CORPUS_CALLS = ("glob", "rglob", "iterdir")
 
 
+def _guard_modules() -> list[Path]:
+    """Every Python module under ``dev/guards/``.
+
+    A helper rather than a `.rglob` inside the test, because that is the rule
+    this file enforces: a corpus derived where nothing asserts it exists is a
+    corpus that can vanish silently.
+    """
+    modules = sorted(_GUARD_DIR.rglob("*.py"))
+    assert modules, f"no guard modules found under {_GUARD_DIR}"
+    return modules
+
+
 def _asserts_within(node: ast.AST) -> bool:
     """Whether *node* contains an ``assert`` statement anywhere inside it."""
     return any(isinstance(child, ast.Assert) for child in ast.walk(node))
@@ -176,13 +188,15 @@ def test_every_globbed_guard_corpus_asserts_it_found_something() -> None:
     three guards in ``test_template_annotations.py`` passed. They had been
     validating nothing that any change to that path would have revealed.
 
-    The rule is therefore: a function that derives a corpus by globbing states
-    what it expects to find. The assertion is the cheapest possible proof that
-    the guard still has a subject.
+    The rule is therefore two-sided. A helper that derives a corpus states
+    what it expects to find, and a test never derives one itself - it asks a
+    helper. Exempting tests from the first half is what let this guard glob
+    `dev/guards/` and pass on 2026-09-05 with that directory renamed away:
+    it collected offenders from an empty corpus and, correctly, found none.
     """
     offenders: list[str] = []
 
-    for path in sorted(_GUARD_DIR.rglob("*.py")):
+    for path in _guard_modules():
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
         # Module level counts as one scope: a corpus built into a module
@@ -196,15 +210,22 @@ def test_every_globbed_guard_corpus_asserts_it_found_something() -> None:
         for node in ast.walk(tree):
             if not isinstance(node, ast.FunctionDef):
                 continue
-            # A test states its own assertions; this rule is about the helpers
-            # that hand a test its subject.
-            if node.name.startswith("test_"):
+            if not _derives_a_corpus(node):
                 continue
-            if _derives_a_corpus(node) and not _asserts_within(node):
+            # A test may not derive its own corpus, even when it does assert.
+            # Exempting tests is what let this very guard glob `dev/guards/`
+            # and pass with the directory renamed away: it collected offenders
+            # from nothing and found none. Derivation belongs in a helper,
+            # where the rule above applies to it.
+            if node.name.startswith("test_"):
+                offenders.append(
+                    f"{_rel(path)}:{node.lineno}: {node.name} (derives its own corpus)"
+                )
+            elif not _asserts_within(node):
                 offenders.append(f"{_rel(path)}:{node.lineno}: {node.name}")
 
     assert not offenders, (
-        "these derive a file corpus by globbing and never assert they found "
-        "anything, so a renamed directory retires the guard instead of "
+        "these derive a file corpus by globbing without proving it is "
+        "non-empty, so a renamed directory retires the guard instead of "
         f"failing it: {offenders}"
     )

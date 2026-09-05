@@ -376,9 +376,12 @@ def test_cli_handbook_documents_every_command() -> None:
     """
     handbook = (_REPO_ROOT / "docs" / "CLI.md").read_text(encoding="utf-8")
 
+    leaf_paths = collect_leaf_command_paths(app)
+    assert leaf_paths, "CLI tree is empty; Typer app failed to register commands"
+
     missing = [
         f"vaultspec-core {' '.join(command_path)}"
-        for command_path in collect_leaf_command_paths(app)
+        for command_path in leaf_paths
         if f"`vaultspec-core {' '.join(command_path)}`" not in handbook
     ]
 
