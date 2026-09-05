@@ -18,6 +18,7 @@ from vaultspec_core.cli._target import TargetOption, apply_target_install
 from vaultspec_core.cli.json_output import json_format_kwargs
 from vaultspec_core.cli.root_preflight import run_preflight
 from vaultspec_core.core.enums import CliAction, InstallMode
+from vaultspec_core.core.git_artifacts import is_git_repo
 
 logger = logging.getLogger(__name__)
 
@@ -213,8 +214,10 @@ def cmd_install(
             hints=hint_dict,
         )
         # Surface the new sharing policy when this upgrade carried the
-        # workspace off the pre-reversal team-hidden gitignore policy.
-        if not json_output and gitignore_was_pre_reversal:
+        # workspace off the pre-reversal team-hidden gitignore policy.  The
+        # statement describes what git does with these files, so it is
+        # withheld where there is no repository to do it.
+        if not json_output and gitignore_was_pre_reversal and is_git_repo(path):
             render_sharing_policy()
         raise typer.Exit(code)
 
@@ -272,7 +275,11 @@ def cmd_install(
             providers=result.get("providers", []),
             has_mcp=result.get("has_mcp", False),
         )
-        render_sharing_policy()
+        # Withheld outside a repository: the statement claims these files
+        # "are committed to git so teammates inherit your project policy",
+        # which cannot happen in a directory git does not track.
+        if is_git_repo(path):
+            render_sharing_policy()
         emit_next_step_hint(
             command="install",
             outcome="created",

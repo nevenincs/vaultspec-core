@@ -269,13 +269,41 @@ class TestInstallPathSafety:
 class TestSharingPolicy:
     """install and upgrade state the team-shared gitignore policy."""
 
+    @staticmethod
+    def _make_repo(path: Path) -> None:
+        """Give *path* the ``.git`` marker ``is_git_repo`` reads.
+
+        A directory is enough: the check is existence-based so it also
+        answers for linked worktrees, where ``.git`` is a file.
+        """
+        path.mkdir(parents=True, exist_ok=True)
+        (path / ".git").mkdir()
+
     def test_install_prints_sharing_policy(
         self, tmp_path: Path, runner: CliRunner
     ) -> None:
         """A fresh install states the spec-layer sharing policy plainly."""
+        self._make_repo(tmp_path)
         result = runner.invoke(app, ["-t", str(tmp_path), "install"])
         assert result.exit_code == 0, result.output
         assert "Sharing policy" in result.output
+
+    def test_install_without_a_repository_omits_sharing_policy(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        """Outside a repository the statement is a claim about nothing.
+
+        The paragraph says the spec layer "are committed to git so teammates
+        inherit your project policy".  In a directory git does not track, no
+        commit and no teammate exist, so the install must not say it.
+        """
+        result = runner.invoke(app, ["-t", str(tmp_path), "install"])
+        assert result.exit_code == 0, result.output
+        assert "Sharing policy" not in result.output
+        assert "committed to git" not in result.output
+        # The install itself still happens - only the claim is withheld.
+        assert (tmp_path / ".gitignore").exists()
+        assert (tmp_path / ".vaultspec").is_dir()
 
     def test_dry_run_install_omits_sharing_policy(
         self, tmp_path: Path, runner: CliRunner
@@ -291,6 +319,7 @@ class TestSharingPolicy:
         """Upgrading a workspace still on the pre-reversal policy states it."""
         from vaultspec_core.core.gitignore import MARKER_BEGIN, MARKER_END
 
+        self._make_repo(tmp_path)
         runner.invoke(app, ["-t", str(tmp_path), "install"])
         # Plant a pre-reversal managed block (blanket-ignores the spec layer).
         old_block = "\n".join(
@@ -303,6 +332,24 @@ class TestSharingPolicy:
         result = runner.invoke(app, ["-t", str(tmp_path), "install", "--upgrade"])
         assert result.exit_code == 0, result.output
         assert "Sharing policy" in result.output
+
+    def test_upgrade_off_pre_reversal_block_without_a_repository_stays_quiet(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        """The upgrade path withholds the same claim on the same grounds."""
+        from vaultspec_core.core.gitignore import MARKER_BEGIN, MARKER_END
+
+        runner.invoke(app, ["-t", str(tmp_path), "install"])
+        old_block = "\n".join(
+            [MARKER_BEGIN, ".vaultspec/", ".mcp.json", ".vault/logs/", MARKER_END]
+        )
+        (tmp_path / ".gitignore").write_text(
+            f"# project\n\n{old_block}\n", encoding="utf-8"
+        )
+
+        result = runner.invoke(app, ["-t", str(tmp_path), "install", "--upgrade"])
+        assert result.exit_code == 0, result.output
+        assert "Sharing policy" not in result.output
 
     def test_upgrade_of_current_workspace_omits_sharing_policy(
         self, tmp_path: Path, runner: CliRunner
