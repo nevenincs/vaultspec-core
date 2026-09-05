@@ -289,7 +289,7 @@ Apple Silicon and Linux on both architectures; Intel macOS is not built, and
 [docs/channels.md](https://github.com/nevenincs/vaultspec-core/blob/main/docs/channels.md)
 says why.
 
-Every release asset is checksummed and carries a build attestation, so you can check
+Every release artifact is checksummed and carries a build attestation, so you can check
 both what you have and where it came from:
 
 ```sh

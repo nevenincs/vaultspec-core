@@ -111,6 +111,10 @@ jobs:
       # reached the index and never reached the release it belongs to.
       id-token: write
       contents: write
+      # For the attestation below. `id-token` is already present for PyPI
+      # trusted publishing and is reused rather than re-justified; this is the
+      # permission that lets the run publish the resulting bundle.
+      attestations: write
     steps:
       - name: Download dist artifacts
         uses: actions/download-artifact@v8
@@ -123,6 +127,49 @@ jobs:
 
       - name: Publish to PyPI
         run: uv publish --check-url https://pypi.org/simple/ dist/*
+
+      # ATTESTED HERE, before `Generate checksums` writes SHA256SUMS into this
+      # same directory. At this point `dist/` holds exactly the wheel and the
+      # sdist, so the subject set needs no exclusion and cannot accidentally
+      # acquire one.
+      #
+      # SHA256SUMS is deliberately never a subject, here or in binaries.yml.
+      # Both workflows attach it to the same release on the same tag and merge
+      # into it, and neither knows which runs last - the merge logic below
+      # exists because of that race. An attestation over a file that is
+      # rewritten after it is minted cannot be verified by the user it was
+      # minted for.
+      #
+      # Without this step the release carried two assets that binaries.yml
+      # neither attested nor verified, while the published documentation told
+      # users every release asset carries provenance. The claim came first and
+      # the coverage did not follow; this is the coverage.
+      - name: Enumerate the distribution to attest
+        id: subjects
+        run: |
+          set -euo pipefail
+          mapfile -t subjects < <(
+            find dist -maxdepth 1 -type f ! -name SHA256SUMS | LC_ALL=C sort
+          )
+          # A build that produced no distribution must not attest nothing and
+          # report success. `uv publish` above would already have failed, so
+          # reaching here empty means something stranger; say so rather than
+          # passing.
+          if [ ${#subjects[@]} -eq 0 ]; then
+            echo "::error::dist holds no attestable file; there is nothing to attest"
+            exit 1
+          fi
+          echo "attesting ${#subjects[@]} file(s): ${subjects[*]}"
+          {
+            echo "paths<<SUBJECTS_EOF"
+            printf '%s\n' "${subjects[@]}"
+            echo "SUBJECTS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Attest the distribution
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ steps.subjects.outputs.paths }}
 
       # The wheel and sdist reach PyPI but never reached the GitHub Release, so
       # the release carried binaries with no Python distribution beside them and
@@ -170,3 +217,40 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           gh release upload "${TAG}" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+
+      # The instrument, immediately after the upload it speaks for. The attest
+      # step can only report that the action exited zero; this asks the API the
+      # question a user asks, and it is the reason the claim in the published
+      # documentation is now true rather than aspirational.
+      - name: Verify the attached distribution carries provenance
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+          SUBJECTS: ${{ steps.subjects.outputs.paths }}
+        run: |
+          set -euo pipefail
+          unverified=()
+          checked=0
+          while IFS= read -r asset; do
+            [ -n "${asset}" ] || continue
+            checked=$((checked + 1))
+            # Pinned to the signer workflow, not merely the repository, and
+            # stderr kept so a Sigstore or API outage is distinguishable from a
+            # missing attestation.
+            if ! why=$(gh attestation verify "${asset}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish.yml" 2>&1); then
+              unverified+=("$(basename "${asset}")")
+              echo "::warning::${asset} did not verify:"
+              printf '%s\n' "${why}" >&2
+            fi
+          done <<< "${SUBJECTS}"
+          if [ "${checked}" -eq 0 ]; then
+            echo "::error::no distribution file was checked for provenance; this guard cannot pass vacuously"
+            exit 1
+          fi
+          if [ ${#unverified[@]} -ne 0 ]; then
+            echo "::error::attached but unattested: ${unverified[*]}"
+            exit 1
+          fi
+          echo "all ${checked} distribution file(s) verify against ${GITHUB_REPOSITORY}"
