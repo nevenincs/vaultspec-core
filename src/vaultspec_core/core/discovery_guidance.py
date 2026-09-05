@@ -97,3 +97,36 @@ MCP_ONLY_CAPABILITIES = frozenset(
         "--include-domain",
     }
 )
+
+#: Rule name the rest of the corpus cites. The file is the single home of the
+#: locate / read-whole / confirm sequence.
+DISCOVERY_RULE = "vaultspec-discovery"
+
+#: Path of that home, relative to the builtins root.
+DISCOVERY_HOME = "rules/vaultspec-discovery.builtin.md"
+
+#: Sentences the home must define. A sentence missing from the home is a
+#: broken registry, not a missing citation.
+DISCOVERY_CANONICAL_SENTENCES = (DISCOVERY_FALLBACK, SEARCH_CODE, SEARCH_ADR)
+
+#: Entry points allowed to spell ``vaultspec-rag`` out instead of citing the
+#: rule. Each is a role whose job is search itself; a reader arriving there
+#: needs the invocation, not a pointer. Everything else cites
+#: :data:`DISCOVERY_RULE` by name. Paths are relative to the builtins root.
+DISCOVERY_RESTATERS = frozenset(
+    {
+        # Auditing a codebase into a Reference: search is the deliverable.
+        "agents/vaultspec-reference-auditor.md",
+        # Reconciles ADRs against code: decision recall is the whole task.
+        "agents/vaultspec-docs-curator.md",
+        # The skill that exists to locate code for the pipeline.
+        "skills/vaultspec-code-research/SKILL.md",
+        # Curator's skill; same reason as the persona.
+        "skills/vaultspec-curate/SKILL.md",
+    }
+)
+
+#: Vocabulary that marks a restatement of the sequence rather than a citation.
+#: A file using it without citing the rule and without being a registered
+#: restater has grown a second definition.
+DISCOVERY_SEQUENCE_MARKER = "epicenter"

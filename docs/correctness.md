@@ -166,64 +166,50 @@ for the step that added the guard, or in `## Notes` if it needs more than a line
 
 This takes about a minute per guard. Skip it and the suite's green is uninformative.
 
-## What the execution record contains
+## What the ledger contains
 
-Closing a Step writes an execution record. The shipped pipeline produces one record per
-Step, scaffolded against the Step it documents:
+Closing a Step appends its rows to the plan's ledger, one document per plan:
 
 ```bash
-vaultspec-core vault add exec --feature payment-retries --step S01 --related 2026-02-06-payment-retries-plan
+vaultspec-core vault exec log --feature payment-retries --step S01 --related 2026-02-06-payment-retries-plan --row M:src/billing/retry.py --row A:src/billing/tests/test_retry.py
 ```
 
-The filename carries the Step's position, so `S01` under phase `P01` becomes
-`.vault/exec/2026-02-06-payment-retries/2026-02-06-payment-retries-P01-S01.md`, and the
-`step_id` frontmatter field carries the canonical `S01`. That binding is what lets
-`vault check exec-mapping` pair every record with a live Step.
+The ledger lives at
+`.vault/exec/2026-02-06-payment-retries/2026-02-06-payment-retries-ledger.md`, and each
+row's first cell is the Step id. That binding is what lets `vault check exec-mapping`
+pair every row with a live Step.
 
 Its `## Changes` section is a mechanical log, one line per path touched:
 
 ```
-- `M` `src/billing/retry.py`
-- `A` `src/billing/tests/test_retry.py`
-- `D` `src/legacy/shim.py`
+- `S01` `M` `src/billing/retry.py`
+- `S01` `A` `src/billing/tests/test_retry.py`
+- `S02` `D` `src/legacy/shim.py`
 ```
 
 The operations are `A` added, `M` modified, `D` deleted, and `R old -> new` renamed. No
 prose: the Step row already states the intent and the commit carries the diff.
 
-One optional final line names a check that was run:
+`--verify` writes one more row naming a check that was run:
 
 ```
-- `verify:` `pytest src/billing/tests/test_retry.py` -> `pass`
+- `S01` `verify:` `pytest src/billing/tests/test_retry.py` -> `pass`
 ```
 
-That line is the difference between "this was done" and "this was checked". It is
-optional, which makes its absence information too: a Step with no `verify:` line is a
-Step nobody claims to have checked.
+That row is the difference between "this was done" and "this was checked". It is
+optional, which makes its absence information too: a Step with no `verify:` row is a
+Step nobody claims to have checked. `--by` writes a `by:` row naming the persona that
+closed the Step; the commit carries the author.
 
-A `## Notes` section exists for exceptions only: work skipped, a scaffold left behind, a
-persistent failure, a decision that went against the Step as written. An absent Notes
-section is the correct state. An empty one is noise, and no check reports it, so leaving
-one behind is on you.
+`--note` writes a `## Notes` line under the Step id, for exceptions only: work skipped,
+a scaffold left behind, a persistent failure, a decision that went against the Step as
+written. The section is created on first use, so an absent `## Notes` is the correct
+state. Notes never register a Step as covered; only `## Changes` rows do.
 
-### The consolidated ledger
-
-A plan's records can also be folded into a single append-only ledger, one per plan,
-whose rows carry the Step id in the first column:
-
-```
-- `S01` `M` `src/billing/retry.py`
-- `S02` `D` `src/legacy/shim.py`
-```
-
-`vaultspec-core vault exec log` appends rows directly, creating the ledger on first use.
-`vaultspec-core vault exec fold` converts a feature's existing per-Step records into
-one; it deletes those records, so it refuses to run without `--force` and offers
-`--dry-run` to preview.
-
-Both shapes are first-class: `exec-mapping` reads a per-Step record through its
-`step_id` and a ledger through the ids in its rows. The folded form exists because a
-large vault accumulated more prose in per-Step records than any consumer read.
+The ledger is the only execution artifact. `vaultspec-core vault add exec` refuses, and
+a per-Step record left over from before 0.1.74 is an `exec-mapping` error until
+`vaultspec-core vault exec fold --feature <feature> --force` folds it in; the upgrade
+migration runs that fold on its own.
 
 ## What to run before you call something done
 

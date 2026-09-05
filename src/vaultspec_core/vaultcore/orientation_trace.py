@@ -115,7 +115,6 @@ def _trace_paths(
     for plan in plans:
         stems.add(plan.stem)
         stems.update(step.record_stem for step in plan.steps if step.record_stem)
-        stems.update(plan.summaries)
         stems.update(plan.unlinked_records)
         for grounded in plan.grounding.values():
             stems.update(grounded)
@@ -222,18 +221,21 @@ def _plan_trace(
         )
         if record_stem is not None:
             matched_records.add(record_stem)
+        evidence = (
+            exec_index.evidence_for(feature, step.canonical_id) if feature else None
+        )
         steps.append(
             StepTrace(
                 canonical_id=step.canonical_id,
                 display_path=step.display_path,
                 checked=step.checked,
                 record_stem=record_stem,
+                rows=evidence.rows if evidence else None,
+                verify=evidence.verify if evidence else None,
             )
         )
 
-    referencing = _unlinked_records(graph, exec_index, stem, feature, matched_records)
-    summaries = [s for s in referencing if s.endswith("-summary")]
-    unlinked = [s for s in referencing if not s.endswith("-summary")]
+    unlinked = _unlinked_records(graph, exec_index, stem, feature, matched_records)
     grounding = _grounding_documents(graph, stem)
 
     # Reuse the batched status core so the trace header carries the same
@@ -244,7 +246,6 @@ def _plan_trace(
         stem=stem,
         feature=feature,
         steps=steps,
-        summaries=summaries,
         unlinked_records=unlinked,
         grounding=grounding,
         tier=status.tier.value,

@@ -169,3 +169,87 @@ class TestLedgerFilenameIsAValidExecName:
         errors = VaultConstants.validate_filename("not-a-vault-name.md", DocType.EXEC)
 
         assert errors
+
+
+class TestLabelsAndEvidence:
+    """Non-change rows carry a label; evidence summarises rows per Step."""
+
+    def test_verify_and_by_rows_carry_labels(self) -> None:
+        from vaultspec_core.vaultcore.exec_ledger import BY_LABEL, VERIFY_LABEL
+
+        body = (
+            "## Changes\n\n- `S01` `verify:` `pytest -q` -> `pass`\n"
+            "- `S01` `by:` `vaultspec-high-executor`\n"
+        )
+        rows = parse_ledger_rows(body)
+
+        assert rows[0].op is None and rows[0].label == VERIFY_LABEL
+        assert rows[0].paths == ("pytest -q", "pass")
+        assert rows[1].label == BY_LABEL
+        assert rows[1].paths == ("vaultspec-high-executor",)
+        assert ledger_step_ids(body) == ("S01",)
+
+    def test_format_row_renders_labels(self) -> None:
+        assert (
+            format_row("S01", "verify:", "pytest", "fail")
+            == "- `S01` `verify:` `pytest` -> `fail`"
+        )
+        assert format_row("S01", "by:", "worker") == "- `S01` `by:` `worker`"
+
+    def test_evidence_counts_change_rows_and_keeps_last_verify(self) -> None:
+        from vaultspec_core.vaultcore.exec_ledger import ledger_step_evidence
+
+        body = (
+            "## Changes\n\n- `S01` `M` `a.py`\n- `S01` `A` `b.py`\n"
+            "- `S01` `verify:` `pytest` -> `fail`\n"
+            "- `S01` `verify:` `pytest` -> `pass`\n- `S01` `by:` `worker`\n"
+            "- `S02` `T`\n"
+        )
+        evidence = ledger_step_evidence(body)
+
+        assert evidence["S01"].rows == 2
+        assert evidence["S01"].verify == "pass"
+        assert evidence["S01"].by == "worker"
+        assert evidence["S02"].rows == 1 and evidence["S02"].verify is None
+
+    def test_rows_inside_html_comments_are_not_rows(self) -> None:
+        """A template hint's example rows must never register a Step."""
+        body = (
+            "## Changes\n\n<!-- example:\n- `S07` `M` `x.py`\n-->\n- `S01` `M` `a.py`\n"
+        )
+
+        assert ledger_step_ids(body) == ("S01",)
+
+
+class TestNotes:
+    """Notes are exception-only, Step-keyed, and never evidence."""
+
+    def test_append_notes_creates_the_section_at_the_end(self) -> None:
+        from vaultspec_core.vaultcore.exec_ledger import append_notes, format_note
+
+        body = "# `demo` ledger\n\n## Changes\n\n- `S01` `M` `a.py`\n"
+        updated = append_notes(body, [format_note("S01", "left  a\nscaffold")])
+
+        assert updated.endswith("## Notes\n\n- `S01` left a scaffold\n")
+        assert ledger_step_ids(updated) == ("S01",)
+
+    def test_append_notes_reuses_an_existing_section_idempotently(self) -> None:
+        from vaultspec_core.vaultcore.exec_ledger import append_notes, format_note
+
+        line = format_note("S03", "skipped")
+        once = append_notes(LEDGER, [line])
+        twice = append_notes(once, [line])
+
+        assert once == twice
+        assert once.count("## Notes") == 1
+        assert "left a scaffold" in once and line in once
+
+    def test_note_lines_are_keyed_by_step(self) -> None:
+        from vaultspec_core.vaultcore.exec_ledger import note_lines
+
+        assert note_lines(LEDGER) == (("S02", "left a scaffold in `src/new.py`."),)
+        assert note_lines("## Notes\n\nfree prose\n- bullet\n") == (
+            (None, "free prose"),
+            (None, "bullet"),
+        )
+        assert note_lines("## Changes\n\n- `S01` `M` `a.py`\n") == ()

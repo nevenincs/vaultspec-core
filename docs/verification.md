@@ -124,27 +124,27 @@ vaultspec-core vault check all
 Nineteen checks run. The `--fix` column says whether a failure can be repaired
 automatically:
 
-| Check                      | Catches                                                | `--fix` |
-| -------------------------- | ------------------------------------------------------ | ------- |
-| `structure`                | Directory layout and filenames                         | Yes     |
-| `frontmatter`              | Fields invalid for the document's type                 | Yes     |
-| `body-sections`            | A section the template requires, missing or empty      | No      |
-| `markdown`                 | Markdown hygiene violations                            | Yes     |
-| `encoding`                 | Documents that are not valid text                      | No      |
-| `placeholders`             | Unreplaced `{...}` template tokens                     | No      |
-| `annotations`              | Template comment blocks that should have been stripped | Yes     |
-| `links`                    | Wiki-links that break the convention                   | Yes     |
-| `dangling`                 | `related:` entries naming a document that is absent    | Yes     |
-| `body-links`               | Links in body prose, where they are forbidden          | Yes     |
-| `orphans`                  | Documents nothing links to                             | No      |
-| `references`               | Missing cross-references between related documents     | Yes     |
-| `schema`                   | An ADR with no research, or a plan with no ADR         | Yes     |
-| `adr-status`               | A status outside the allowed set                       | Yes     |
-| `exec-mapping`             | An execution record naming no live Step                | No      |
-| `features`                 | A feature missing a document type or its index         | No      |
-| `modified-stamp`           | A body edited without restamping                       | Yes     |
-| `rename-integrity`         | A document's name disagreeing with its filename        | Yes     |
-| `feature-rename-integrity` | An exec folder disagreeing with its feature tag        | No      |
+| Check                      | Catches                                                                                             | `--fix` |
+| -------------------------- | --------------------------------------------------------------------------------------------------- | ------- |
+| `structure`                | Directory layout and filenames                                                                      | Yes     |
+| `frontmatter`              | Fields invalid for the document's type                                                              | Yes     |
+| `body-sections`            | A section the template requires, missing or empty                                                   | No      |
+| `markdown`                 | Markdown hygiene violations                                                                         | Yes     |
+| `encoding`                 | Documents that are not valid text                                                                   | No      |
+| `placeholders`             | Unreplaced `{...}` template tokens                                                                  | No      |
+| `annotations`              | Template comment blocks that should have been stripped                                              | Yes     |
+| `links`                    | Wiki-links that break the convention                                                                | Yes     |
+| `dangling`                 | `related:` entries naming a document that is absent                                                 | Yes     |
+| `body-links`               | Links in body prose, where they are forbidden                                                       | Yes     |
+| `orphans`                  | Documents nothing links to                                                                          | No      |
+| `references`               | Missing cross-references between related documents                                                  | Yes     |
+| `schema`                   | An ADR with no research, or a plan with no ADR                                                      | Yes     |
+| `adr-status`               | A status outside the allowed set                                                                    | Yes     |
+| `exec-mapping`             | A closed Step with no ledger row, a row for an open or unknown Step, or an unfolded per-Step record | No      |
+| `features`                 | A feature missing a document type or its index                                                      | No      |
+| `modified-stamp`           | A body edited without restamping                                                                    | Yes     |
+| `rename-integrity`         | A document's name disagreeing with its filename                                                     | Yes     |
+| `feature-rename-integrity` | An exec folder disagreeing with its feature tag                                                     | No      |
 
 Run one by name when you already know which failure you are chasing:
 

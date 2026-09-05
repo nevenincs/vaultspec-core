@@ -168,14 +168,14 @@ The next open step is named. Start there.
 ## Execute
 
 Write the code the step describes, whether by hand or by asking your assistant to work
-the plan. Then record what changed and close the row:
+the plan. Then log what changed and close the row:
 
 ```
-vaultspec-core vault add exec --feature payment-retries --step S01
+vaultspec-core vault exec log --feature payment-retries --step S01 --related 2026-08-28-payment-retries-plan --row M:src/billing/retry.py
 ```
 
 ```
-Created: <project>/.vault/exec/2026-08-28-payment-retries/2026-08-28-payment-retries-P01-S01.md
+Logged: 1 row(s) for S01 -> 2026-08-28-payment-retries-ledger.md
 ```
 
 ```
@@ -186,13 +186,9 @@ vaultspec-core vault plan step check .vault/plan/2026-08-28-payment-retries-plan
 Closed Step `S01`. (Preserved 3 unknown blocks)
 ```
 
-Fill the record's `## Changes` section with one line per path you touched. Pass the bare
-step id, `S01`, to both commands: `P01.S01` is the display path that status prints, and
-the command derives the phase segment of the filename from the plan.
-
-Without `--step`, the record is not bound to a step. Its frontmatter keeps the
-`step_id: '{step_id}'` placeholder, `related` stays empty, and the file lands as
-`2026-08-28-payment-retries-exec.md` rather than inside the feature folder.
+The ledger is one file per plan, created on the first log and appended to after that;
+each row's first cell is the step id. Pass the bare step id, `S01`, to both commands:
+`P01.S01` is the display path that status prints.
 
 Status moves:
 

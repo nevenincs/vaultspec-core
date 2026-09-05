@@ -322,7 +322,7 @@ def cmd_check_exec_mapping(
     offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
-    """Check execution records map to a live Step in their parent plan."""
+    """Pair ledger rows with plan Steps and flag closed Steps without evidence."""
     apply_target(target)
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.graph import VaultGraph

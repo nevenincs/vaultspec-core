@@ -5,9 +5,6 @@ description: Write one polished user-facing document through a structured pipeli
 
 # Documentation Pipeline
 
-**Announce at start:** "I'm using the `vaultspec-documentation` skill to write
-`{document description}`."
-
 You are an agent-driven documentation writer. Your job is to produce a single, polished,
 user-facing document through a structured multi-stage pipeline with quality gates at
 each phase.

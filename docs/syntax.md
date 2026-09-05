@@ -23,15 +23,15 @@ Frontmatter, field by field:
 
 Bodies, by document type:
 
-| Body                                        | Who changes it | How                                                          |
-| ------------------------------------------- | -------------- | ------------------------------------------------------------ |
-| Prose in any scaffolded document            | You            | `vaultspec-core vault set-body`, or an editor plus a restamp |
-| Rows in a plan                              | You            | `vaultspec-core vault plan` verbs only                       |
-| The `## Scope` block in an execution record | The tool       | Filled at scaffold from the Step's scope                     |
-| A feature index, whole file                 | The tool       | `vaultspec-core vault feature index`                         |
+| Body                             | Who changes it | How                                                          |
+| -------------------------------- | -------------- | ------------------------------------------------------------ |
+| Prose in any scaffolded document | You            | `vaultspec-core vault set-body`, or an editor plus a restamp |
+| Rows in a plan                   | You            | `vaultspec-core vault plan` verbs only                       |
+| Rows in a ledger                 | The tool       | `vaultspec-core vault exec log`                              |
+| A feature index, whole file      | The tool       | `vaultspec-core vault feature index`                         |
 
 Plan rows are the exception worth remembering: they look like ordinary body prose, and
-they are not, because execution records point at the identifiers in them.
+they are not, because ledger rows point at the identifiers in them.
 
 ## Editing safely
 
@@ -158,8 +158,8 @@ against this value and never consults file timestamps.
 `body_schema` records which body structure the document follows, so the `body-sections`
 check knows which sections to require. New documents are written as `body-v2`.
 
-`step_id`, on an execution record, is filled from the Step it was scaffolded against. It
-holds the canonical identifier, `S01`, not the display path `P01.S01`.
+A ledger carries no `step_id`; each row's first cell holds the canonical identifier,
+`S01`, not the display path `P01.S01`.
 
 Edit a body outside the tooling without restamping, and the check says so:
 
@@ -182,10 +182,7 @@ scaffolds the document:
 
 | Placeholder       | Filled by                            |
 | ----------------- | ------------------------------------ |
-| `{heading}`       | `vaultspec-core vault add exec`      |
-| `{step_id}`       | `vaultspec-core vault add exec`      |
-| `{plan_stem}`     | `vaultspec-core vault add exec`      |
-| `{scope_block}`   | `vaultspec-core vault add exec`      |
+| `{plan_stem}`     | `vaultspec-core vault exec log`      |
 | `{document_list}` | `vaultspec-core vault feature index` |
 
 If one of these survives into a committed document, the document was created by hand
@@ -201,23 +198,19 @@ which is worth knowing before relying on it to find something else.
 `vaultspec-core vault add` decides the filename. You will read these patterns in
 directory listings, so they are here for reference:
 
-| Document                        | Pattern                                         |
-| ------------------------------- | ----------------------------------------------- |
-| Top-level                       | `yyyy-mm-dd-{feature}-{type}.md`                |
-| With a topic infix              | `yyyy-mm-dd-{feature}-{topic}-{type}.md`        |
-| Execution record, `L1`          | `yyyy-mm-dd-{feature}-{step}.md`                |
-| Execution record, `L2`          | `yyyy-mm-dd-{feature}-{phase}-{step}.md`        |
-| Execution record, `L3` and `L4` | `yyyy-mm-dd-{feature}-{wave}-{phase}-{step}.md` |
-| Phase summary                   | `yyyy-mm-dd-{feature}-{phase}-summary.md`       |
-| Feature index                   | `{feature}.index.md`                            |
+| Document           | Pattern                                  |
+| ------------------ | ---------------------------------------- |
+| Top-level          | `yyyy-mm-dd-{feature}-{type}.md`         |
+| With a topic infix | `yyyy-mm-dd-{feature}-{topic}-{type}.md` |
+| Ledger             | `yyyy-mm-dd-{feature}-ledger.md`         |
+| Feature index      | `{feature}.index.md`                     |
 
 Narrative segments are lowercase kebab-case. Container identifiers keep their canonical
 uppercase form: `W01`, `P02`, `S03`.
 
-Every type but one sits directly in its directory. Execution records and phase summaries
-are grouped a level down, in a folder named for the feature, because a feature at `L3`
-produces dozens of them and a flat `exec/` stops being readable:
-`.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-S01.md`.
+Every type but one sits directly in its directory. A ledger sits a level down, in a
+folder named for the feature:
+`.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-ledger.md`.
 
 To give a feature a second decision record or a second piece of research, pass `--topic`
 to `vaultspec-core vault add` rather than inventing a filename. Only `adr`, `audit`,
@@ -228,9 +221,9 @@ To rename an existing document, use `vaultspec-core vault rename`, which re-poin
 
 ## Plan structure
 
-The tooling parses a plan's rows; for every other document it only checks them.
-Execution records point at the identifiers in those rows, so a change to the grammar
-breaks records already written.
+The tooling parses a plan's rows; for every other document it only checks them. Ledger
+rows point at the identifiers in those rows, so a change to the grammar breaks records
+already written.
 
 ### Tiers
 
@@ -304,8 +297,8 @@ and a Step's number is independent of the Phase holding it, so `S07` is `S07` wh
 it sits.
 
 Gaps are never reused. Remove Step 7 and the next Step added is 8, not 7. The number is
-retired with the row, which is what keeps the record durable: an execution record
-written months ago names `S07`, and no later edit can hand `S07` to different work.
+retired with the row, which is what keeps the record durable: a ledger row written
+months ago names `S07`, and no later edit can hand `S07` to different work.
 
 Route every identifier-affecting change through the commands:
 
@@ -331,8 +324,8 @@ vaultspec-core vault plan check 2026-09-03-payment-retries-plan
 ```
 
 What no check can recover is that reused identifier - the fix is marked manual because
-the tool cannot know which row the execution records naming `S02` were written against.
-Once two rows have claimed `S07`, the records pointing at it are ambiguous, and only the
+the tool cannot know which row the ledger rows naming `S02` were written against. Once
+two rows have claimed `S07`, the records pointing at it are ambiguous, and only the
 person who wrote them knows which one they meant.
 
 ### One action, one row
@@ -340,8 +333,8 @@ person who wrote them knows which one they meant.
 N self-similar actions means N rows. Never collapse them into "for each handler, add the
 header" or "across all callers, rename the flag". No check enforces this; it is a
 convention, and the reason is verification. A collapsed row cannot be half closed, so
-its execution record cannot say which callers were touched, and nothing catches the one
-that was missed.
+its ledger rows cannot say which callers were touched, and nothing catches the one that
+was missed.
 
 ## Where to go next
 

@@ -46,7 +46,7 @@ def test_extractor_reads_flags_from_real_help_output() -> None:
     cli = _runner()
     options = extract_options(help_output(cli, app, ("vault", "add")))
 
-    assert {"--feature", "-f", "--tier", "--step", "--all-steps"} <= options
+    assert {"--feature", "-f", "--tier", "--topic", "--related"} <= options
     assert "--help" in options
 
 

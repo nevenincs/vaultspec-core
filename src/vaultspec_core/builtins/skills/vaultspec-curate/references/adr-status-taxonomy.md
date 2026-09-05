@@ -41,7 +41,7 @@ edges are what `vaultspec-core vault graph` reads to build the decision topology
 
 ## Divergences the curator must detect
 
-The corpus predates a uniform encoding, so reconciliation must catch these:
+Divergences to detect:
 
 - **Legacy status section.** Older ADRs declare status in a `## Status` section with a
   bare value (for example `Accepted`) instead of the H1 token, and a few encode it in a
