@@ -38,6 +38,12 @@ def resolve_gitignore(
     if signal in (GitignoreSignal.COMPLETE, GitignoreSignal.NO_FILE):
         return
 
+    # A check that could not run has observed nothing, so it cannot justify a
+    # repair either. `doctor` warns about it; preflight stays its hand rather
+    # than rewriting a file on a guess (issue #407).
+    if signal == GitignoreSignal.UNREADABLE:
+        return
+
     if signal == GitignoreSignal.PARTIAL:
         if action in (CliAction.INSTALL, CliAction.SYNC):
             plan.steps.append(
@@ -110,6 +116,10 @@ def resolve_gitattributes(
     if signal in (GitattributesSignal.COMPLETE, GitattributesSignal.NO_FILE):
         return
 
+    # As with its twin: unobserved is not a licence to rewrite (issue #407).
+    if signal == GitattributesSignal.UNREADABLE:
+        return
+
     if signal == GitattributesSignal.PARTIAL:
         if action in (CliAction.INSTALL, CliAction.SYNC):
             plan.steps.append(
@@ -178,10 +188,14 @@ _PRECOMMIT_REPAIR_REASONS: dict[PrecommitSignal, str] = {
 #: hooks live safely in ``prek.toml`` and the leftover
 #: ``.pre-commit-config.yaml`` is superseded and operator-owned; removal is
 #: operator-gated, never a sync-time repair.
+#: UNREADABLE means the collector failed, so nothing about the config was
+#: observed. `doctor` weighs that as a warning; a repair here would be acting
+#: on a state nobody has seen (issue #407).
 _PRECOMMIT_INERT_SIGNALS = (
     PrecommitSignal.COMPLETE,
     PrecommitSignal.UNREFRESHABLE,
     PrecommitSignal.ORPHANED,
+    PrecommitSignal.UNREADABLE,
 )
 
 

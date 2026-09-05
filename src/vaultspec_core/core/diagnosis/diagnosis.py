@@ -207,12 +207,14 @@ def _safe_framework_presence(target: Path) -> FrameworkSignal:
 
 
 def _safe_gitignore_state(target: Path) -> GitignoreSignal:
-    """Collect gitignore state, degrading rather than reporting a clean absence.
+    """Collect gitignore state, or report that the check could not run.
 
-    A collector that failed has not confirmed the block. Falling back to
-    :attr:`GitignoreSignal.NO_FILE` in an installed workspace would report the
-    benign reading for a check that did not run, which is the shape this
-    collector exists to catch.
+    A collector that failed has not confirmed anything. It used to answer
+    :attr:`GitignoreSignal.UNMANAGED` - "there is no block" - which is a claim
+    about the file, made by a check that never read it. #399 introduced
+    ``UNMANAGED`` for exactly this fallback; splitting :attr:`UNREADABLE` out of
+    it keeps the weighing while making the row honest about which of the two it
+    observed (issue #407).
     """
     from .collectors import collect_gitignore_state
 
@@ -220,20 +222,24 @@ def _safe_gitignore_state(target: Path) -> GitignoreSignal:
         return collect_gitignore_state(target)
     except Exception:
         logger.warning("Gitignore state collector failed", exc_info=True)
-        if (target / ".vaultspec").is_dir():
-            return GitignoreSignal.UNMANAGED
-        return GitignoreSignal.NO_FILE
+        return GitignoreSignal.UNREADABLE
 
 
 def _safe_gitattributes_state(target: Path) -> GitattributesSignal:
-    """Collect gitattributes state, neutral to :attr:`GitattributesSignal.NO_FILE`."""
+    """Collect gitattributes state, or report that the check could not run.
+
+    ``NO_FILE`` said the file was absent. An undecodable ``.gitattributes`` is
+    very much present, and reporting its absence is what let ``doctor`` read
+    ``info no_file`` while ``install --force`` died on the same bytes
+    (issue #407).
+    """
     from .collectors import collect_gitattributes_state
 
     try:
         return collect_gitattributes_state(target)
     except Exception:
         logger.warning("Gitattributes state collector failed", exc_info=True)
-        return GitattributesSignal.NO_FILE
+        return GitattributesSignal.UNREADABLE
 
 
 def _safe_mcp_config_state(target: Path) -> ConfigSignal:
@@ -248,14 +254,21 @@ def _safe_mcp_config_state(target: Path) -> ConfigSignal:
 
 
 def _safe_precommit_state(target: Path) -> PrecommitSignal:
-    """Collect pre-commit state, neutral to :attr:`PrecommitSignal.NO_FILE`."""
+    """Collect pre-commit state, or report that the check could not run.
+
+    ``NO_FILE`` is the benign reading for a workspace with no
+    ``.pre-commit-config.yaml``. A workspace whose config exists but cannot be
+    parsed - or whose ``workspace.json`` is corrupt, which fails this collector
+    on the way in - is not that workspace, and saying so let ``doctor`` exit
+    ``0`` while every mutating verb refused the same tree (issue #407).
+    """
     from .collectors import collect_precommit_state
 
     try:
         return collect_precommit_state(target)
     except Exception:
         logger.warning("Precommit state collector failed", exc_info=True)
-        return PrecommitSignal.NO_FILE
+        return PrecommitSignal.UNREADABLE
 
 
 def _safe_stale_mcp_seeds(target: Path) -> list[str]:
