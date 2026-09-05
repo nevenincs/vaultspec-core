@@ -78,6 +78,7 @@ pytestmark = [pytest.mark.unit]
                 "NON_CANONICAL",
                 "UNREFRESHABLE",
                 "ORPHANED",
+                "NOT_INSTALLED",
                 "COMPLETE",
             },
         ),

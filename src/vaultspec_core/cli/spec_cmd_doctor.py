@@ -422,6 +422,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             PrecommitSignal.UNREFRESHABLE: ("warn", "yellow"),
             PrecommitSignal.ORPHANED: ("info", "dim"),
             PrecommitSignal.NO_HOOKS: ("warn", "yellow"),
+            PrecommitSignal.NOT_INSTALLED: ("warn", "yellow"),
             PrecommitSignal.NO_FILE: ("info", "dim"),
         },
     )
@@ -440,6 +441,11 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             "precommit migrate --remove-yaml')"
         ),
         PrecommitSignal.NO_HOOKS: "no vaultspec hooks found",
+        PrecommitSignal.NOT_INSTALLED: (
+            "every hook is configured and none of them runs - git has no "
+            "pre-commit hook installed, so a commit executes nothing. Run "
+            "'prek install' (or 'pre-commit install') in this checkout"
+        ),
         PrecommitSignal.NO_FILE: "no .pre-commit-config.yaml",
     }.get(diag.precommit, str(diag.precommit))
     rows.append(
@@ -660,6 +666,9 @@ def doctor_exit_code(
         PrecommitSignal.INCOMPLETE,
         PrecommitSignal.NON_CANONICAL,
         PrecommitSignal.NO_HOOKS,
+        # A perfect config that nothing executes is the failure this whole
+        # row exists to report, so it warns exactly as a broken config does.
+        PrecommitSignal.NOT_INSTALLED,
         # Content-verified genuine stranding: prek.toml owns the boundary
         # and lacks the canonical hooks, so nothing runs them anywhere.
         PrecommitSignal.UNREFRESHABLE,

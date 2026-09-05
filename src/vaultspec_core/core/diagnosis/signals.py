@@ -97,7 +97,13 @@ class GitattributesSignal(StrEnum):
 
 
 class PrecommitSignal(StrEnum):
-    """Observed state of pre-commit hooks for vaultspec-core."""
+    """Observed state of pre-commit hooks for vaultspec-core.
+
+    Every member but :attr:`NOT_INSTALLED` describes the *configuration*.
+    A configuration can be perfect and still run nothing, which is what
+    :attr:`NOT_INSTALLED` reports: git has no ``pre-commit`` hook, so the
+    declared hooks never execute on a commit.
+    """
 
     NO_FILE = "no_file"
     NO_HOOKS = "no_hooks"
@@ -105,6 +111,7 @@ class PrecommitSignal(StrEnum):
     NON_CANONICAL = "non_canonical"
     UNREFRESHABLE = "unrefreshable"
     ORPHANED = "orphaned"
+    NOT_INSTALLED = "not_installed"
     COMPLETE = "complete"
 
 
