@@ -404,8 +404,18 @@ def _finalize_upgrade_manifest(
     for orphan in prune_orphaned_lock_sentinels(path):
         logger.info("Removed orphaned lock sentinel %s", orphan)
 
-    # Re-opt-in gitignore management on --upgrade --force
+    # Reconcile the managed ignore block on every upgrade, not only under
+    # --force. A workspace that never had one - installed before the block
+    # writer created an absent file, or with the block written by an older
+    # policy - otherwise stays unprotected across every upgrade, and nothing
+    # tells the reader that --force is what repairs it.
+    #
+    # --force additionally clears a recorded opt-out: it is the explicit
+    # re-opt-in gesture. Without it a workspace that deleted the block keeps
+    # its decision.
     if force:
+        mdata.gitignore_opted_out = False
+    if not mdata.gitignore_opted_out:
         ensure_gitignore_block(
             path,
             get_recommended_entries(path),
@@ -744,9 +754,9 @@ def install_run(
     )
 
     # Retire sentinels whose subject is gone (e.g. .pre-commit-config.yaml.lock
-    # after a checkout migrates to prek.toml) before the ignore entries are
-    # computed: managed_lock_paths only covers sentinels with a live subject, so
-    # an orphan left in place would stay permanently visible in git status.
+    # after a checkout migrates to prek.toml).  The managed block ignores them
+    # either way; deleting the orphan keeps the working tree honest about which
+    # locks this workspace still takes.
     for orphan in prune_orphaned_lock_sentinels(path):
         logger.info("Removed orphaned lock sentinel %s", orphan)
 
@@ -769,6 +779,9 @@ def install_run(
 
     # Robust detection: if it's there, it's managed.
     mdata.gitignore_managed = has_gitignore_block(path / ".gitignore")
+    # A fresh install is an opt-in by definition; it clears any opt-out a
+    # previous installation in this workspace recorded.
+    mdata.gitignore_opted_out = False
     mdata.gitattributes_managed = has_gitattributes_block(path / ".gitattributes")
     mdata.precommit_managed = _detect_precommit_managed(path)
 

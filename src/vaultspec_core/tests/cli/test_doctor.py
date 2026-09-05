@@ -478,3 +478,50 @@ class TestDoctorTargetPrecedence:
         # The working directory holds the flawed document; the target does
         # not, so no finding may name it.
         assert PROBE_DOC not in result.output, result.output
+
+
+class TestUnprotectedWorkspaceIsWeighed:
+    """An installed workspace with no managed block raises the exit code.
+
+    The state used to print as `gitignore info no_file` and change nothing, so
+    a gate on this command reported healthy for a workspace whose per-machine
+    artefacts nothing ignored (GH issue 399).
+    """
+
+    def test_missing_ignore_file_is_a_warning(self, tmp_path: Path) -> None:
+        factory = WorkspaceFactory(tmp_path)
+        factory.install()
+        (tmp_path / ".gitignore").unlink()
+
+        result = factory.run("spec", "doctor")
+
+        assert "unmanaged" in result.output
+        assert result.exit_code == 1
+
+    def test_missing_block_is_a_warning(self, tmp_path: Path) -> None:
+        factory = WorkspaceFactory(tmp_path)
+        factory.install()
+        (tmp_path / ".gitignore").write_text("# mine\n", encoding="utf-8")
+
+        result = factory.run("spec", "doctor")
+
+        assert "unmanaged" in result.output
+        assert result.exit_code == 1
+
+    def test_a_recorded_opt_out_does_not_raise_the_code(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.manifest import (
+            read_manifest_data,
+            write_manifest_data,
+        )
+
+        factory = WorkspaceFactory(tmp_path)
+        factory.install()
+        (tmp_path / ".gitignore").write_text("# mine\n", encoding="utf-8")
+        mdata = read_manifest_data(tmp_path)
+        mdata.gitignore_opted_out = True
+        write_manifest_data(tmp_path, mdata)
+
+        result = factory.run("spec", "doctor")
+
+        assert "no_entries" in result.output
+        assert result.exit_code == 0

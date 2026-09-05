@@ -23,28 +23,48 @@ __all__ = [
 ]
 
 
-def has_gitignore_block(gi_path: Path) -> bool:
-    """Report whether *gi_path* carries exactly one well-formed managed block."""
-    if not gi_path.exists():
+def managed_block_presence(path: Path) -> bool | None:
+    """Report whether *path* carries a managed block, or ``None`` if unknowable.
+
+    ``True`` and ``False`` are both observations: the file was read, and it
+    either carries exactly one well-formed block or it does not. ``None`` means
+    the question could not be answered - the file is unreadable, undecodable,
+    or is a directory.
+
+    The distinction matters because callers act on the absence of a block. A
+    predicate that folds "cannot read" into "no block" turns an unreadable file
+    into whatever a missing block means to the caller, which for the sync
+    reconciler is a durable, recorded decision by the user.
+
+    An absent file answers ``False``: there is no block, and that is known.
+    """
+    if not path.exists():
         return False
     try:
-        content = gi_path.read_text(encoding="utf-8")
-        # ``.gitignore`` and ``.gitattributes`` share the same managed-block
-        # marker text, so the generic detector applies to both.
-        return _ga_has_valid_block(content.splitlines())
+        content = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
-        return False
+        return None
+    # ``.gitignore`` and ``.gitattributes`` share the same managed-block
+    # marker text, so the generic detector applies to both.
+    return _ga_has_valid_block(content.splitlines())
+
+
+def has_gitignore_block(gi_path: Path) -> bool:
+    """Report whether *gi_path* carries exactly one well-formed managed block.
+
+    A file that cannot be read answers ``False``. Callers that must not treat
+    "unknown" as "absent" want :func:`managed_block_presence` instead.
+    """
+    return managed_block_presence(gi_path) is True
 
 
 def has_gitattributes_block(ga_path: Path) -> bool:
-    """Report whether *ga_path* carries a well-formed managed block."""
-    if not ga_path.exists():
-        return False
-    try:
-        content = ga_path.read_text(encoding="utf-8")
-        return _ga_has_valid_block(content.splitlines())
-    except (OSError, UnicodeDecodeError):
-        return False
+    """Report whether *ga_path* carries a well-formed managed block.
+
+    As with :func:`has_gitignore_block`, a file that cannot be read answers
+    ``False``; :func:`managed_block_presence` keeps the two apart.
+    """
+    return managed_block_presence(ga_path) is True
 
 
 def _is_git_repo(target: Path) -> bool:
@@ -78,7 +98,7 @@ _UNTRACK_PREFIXES: tuple[str, ...] = (
 )
 
 # Advisory-lock sentinels we create ourselves are enumerated per workspace by
-# :func:`~vaultspec_core.core.gitignore.managed_lock_paths` - the same
+# :func:`~vaultspec_core.core.gitignore.managed_lock_candidates` - the same
 # derivation the managed-ignore policy consumes, so the ownership gate and the
 # ignore block can never drift apart.  The set is deliberately path-exact (not
 # basename-based) so that unrelated lockfiles (``uv.lock``, ``Cargo.lock``,

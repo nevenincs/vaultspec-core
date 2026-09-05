@@ -41,6 +41,11 @@ class ManifestData:
             (e.g. ``{"claude": {"synced": "true"}}``).
         gitignore_managed: Whether vaultspec manages ``.gitignore``
             entries.
+        gitignore_opted_out: Whether the workspace declined that management by
+            deleting the managed block. Recorded separately from
+            ``gitignore_managed`` because a bare ``False`` there also means
+            "never established", and an upgrade must re-establish the second
+            without overriding the first.
         gitattributes_managed: Whether vaultspec manages ``.gitattributes``
             entries.
         precommit_managed: Whether vaultspec manages pre-commit hooks
@@ -62,6 +67,7 @@ class ManifestData:
     installed: set[str] = field(default_factory=set)
     provider_state: dict[str, dict[str, str]] = field(default_factory=dict)
     gitignore_managed: bool = False
+    gitignore_opted_out: bool = False
     gitattributes_managed: bool = False
     precommit_managed: bool = False
     resolved_mode: InstallMode | None = None
@@ -136,6 +142,7 @@ def read_manifest_data(target: Path, *, strict: bool = False) -> ManifestData:
         installed=set(raw.get("installed", [])),
         provider_state=raw.get("provider_state", {}),
         gitignore_managed=bool(raw.get("gitignore_managed", False)),
+        gitignore_opted_out=bool(raw.get("gitignore_opted_out", False)),
         gitattributes_managed=bool(raw.get("gitattributes_managed", False)),
         precommit_managed=bool(raw.get("precommit_managed", False)),
         resolved_mode=InstallMode.from_token(raw.get("resolved_mode")),
@@ -184,6 +191,7 @@ def _manifest_payload(data: ManifestData) -> dict[str, Any]:
         "installed": sorted(data.installed),
         "provider_state": data.provider_state,
         "gitignore_managed": data.gitignore_managed,
+        "gitignore_opted_out": data.gitignore_opted_out,
         "gitattributes_managed": data.gitattributes_managed,
         "precommit_managed": data.precommit_managed,
         "resolved_mode": (

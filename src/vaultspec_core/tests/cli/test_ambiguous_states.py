@@ -92,15 +92,18 @@ class TestInstallGitignore:
         mdata = read_manifest_data(installed_workspace)
         assert mdata.gitignore_managed is True
 
-    def test_install_no_gitignore_file_does_not_fail(self, tmp_path: Path):
-        # No .gitignore at all -- install should still succeed but must not
-        # claim gitignore management when the file does not exist.
+    def test_install_no_gitignore_file_creates_one(self, tmp_path: Path):
+        # No .gitignore at all -- install creates it and manages it. Claiming
+        # management while writing nothing was GH issue 399: the workspace was
+        # left with nothing ignoring the artefacts the install had just made.
         result = install_run(
             path=tmp_path, provider="all", upgrade=False, dry_run=False, force=False
         )
         assert result["action"] == "install"
+        assert MARKER_BEGIN in (tmp_path / ".gitignore").read_text(encoding="utf-8")
         mdata = read_manifest_data(tmp_path)
-        assert mdata.gitignore_managed is False
+        assert mdata.gitignore_managed is True
+        assert mdata.gitignore_opted_out is False
 
 
 class TestInstallManifestV2:

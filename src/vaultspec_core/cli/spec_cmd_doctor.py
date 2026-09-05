@@ -24,7 +24,11 @@ from vaultspec_core.cli.spec_cmd_shared import emit_json
 if TYPE_CHECKING:
     from rich.console import Console
 
-    from vaultspec_core.core.diagnosis import ProviderDiagnosis, WorkspaceDiagnosis
+    from vaultspec_core.core.diagnosis import (
+        GitignoreSignal,
+        ProviderDiagnosis,
+        WorkspaceDiagnosis,
+    )
 
 __all__ = [
     "cmd_doctor",
@@ -297,6 +301,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
         {
             GitignoreSignal.COMPLETE: ("ok", "green"),
             GitignoreSignal.PARTIAL: ("warn", "yellow"),
+            GitignoreSignal.UNMANAGED: ("warn", "yellow"),
             GitignoreSignal.NO_ENTRIES: ("info", "dim"),
             GitignoreSignal.NO_FILE: ("info", "dim"),
             GitignoreSignal.CORRUPTED: ("error", "red"),
@@ -422,6 +427,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             PrecommitSignal.UNREFRESHABLE: ("warn", "yellow"),
             PrecommitSignal.ORPHANED: ("info", "dim"),
             PrecommitSignal.NO_HOOKS: ("warn", "yellow"),
+            PrecommitSignal.NOT_INSTALLED: ("warn", "yellow"),
             PrecommitSignal.NO_FILE: ("info", "dim"),
         },
     )
@@ -440,6 +446,11 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             "precommit migrate --remove-yaml')"
         ),
         PrecommitSignal.NO_HOOKS: "no vaultspec hooks found",
+        PrecommitSignal.NOT_INSTALLED: (
+            "every hook is configured and none of them runs - git has no "
+            "pre-commit hook installed, so a commit executes nothing. Run "
+            "'prek install' (or 'pre-commit install') in this checkout"
+        ),
         PrecommitSignal.NO_FILE: "no .pre-commit-config.yaml",
     }.get(diag.precommit, str(diag.precommit))
     rows.append(
@@ -616,6 +627,22 @@ def _provider_status(
     return ("ok", "green")
 
 
+def _gitignore_weight(signal: "GitignoreSignal") -> tuple[bool, bool]:
+    """Return ``(error, warn)`` for the gitignore row.
+
+    An installed workspace with no managed block, or one that has fallen
+    behind the recommended set, is not protecting the per-machine artefacts
+    the install writes. Both used to print and change nothing, so a gate on
+    this command could not tell the reader their workspace was exposed.
+    """
+    from vaultspec_core.core.diagnosis import GitignoreSignal
+
+    return (
+        signal == GitignoreSignal.CORRUPTED,
+        signal in (GitignoreSignal.UNMANAGED, GitignoreSignal.PARTIAL),
+    )
+
+
 def doctor_exit_code(
     diag: "WorkspaceDiagnosis",
 ) -> int:
@@ -630,7 +657,6 @@ def doctor_exit_code(
         ContentSignal,
         FrameworkSignal,
         GitattributesSignal,
-        GitignoreSignal,
         ManifestEntrySignal,
         ModeMismatchSignal,
         PrecommitSignal,
@@ -652,14 +678,18 @@ def doctor_exit_code(
     # broken one: actionable, so a warning, but never an error.
     if diag.framework == FrameworkSignal.ADOPTABLE:
         has_warn = True
-    if diag.gitignore == GitignoreSignal.CORRUPTED:
-        has_error = True
+    gitignore_error, gitignore_warn = _gitignore_weight(diag.gitignore)
+    has_error = has_error or gitignore_error
+    has_warn = has_warn or gitignore_warn
     if diag.gitattributes == GitattributesSignal.CORRUPTED:
         has_error = True
     if diag.precommit in (
         PrecommitSignal.INCOMPLETE,
         PrecommitSignal.NON_CANONICAL,
         PrecommitSignal.NO_HOOKS,
+        # A perfect config that nothing executes is the failure this whole
+        # row exists to report, so it warns exactly as a broken config does.
+        PrecommitSignal.NOT_INSTALLED,
         # Content-verified genuine stranding: prek.toml owns the boundary
         # and lacks the canonical hooks, so nothing runs them anywhere.
         PrecommitSignal.UNREFRESHABLE,

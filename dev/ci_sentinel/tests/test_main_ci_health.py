@@ -21,6 +21,7 @@ from dev.ci_sentinel.main_ci_health import (
     State,
     Verdict,
     classify,
+    render,
 )
 
 pytestmark = pytest.mark.unit
@@ -131,3 +132,51 @@ def test_the_grace_window_exceeds_the_slowest_ci_lane() -> None:
     has to clear both comfortably.
     """
     assert DEFAULT_GRACE_MINUTES >= 60
+
+
+def test_the_key_value_format_carries_the_state_a_caller_must_branch_on() -> None:
+    """The exit code cannot answer "is main green?", so the state has to.
+
+    ``exit_code`` is 0 for ``healthy`` and ``pending`` alike - correctly, as
+    neither should fail the sentinel job - which leaves a caller that reads
+    only the exit code unable to tell a validated main from one whose verdict
+    has not arrived. The sentinel workflow closes its issue on exactly that
+    distinction, and got it wrong until it started reading this field: issue
+    #398 was closed as "validated again" on a ``pending`` verdict, with main's
+    tip red and its CI run still in flight.
+    """
+    rendered = render(Verdict("pending", "1 CI run(s) still in flight"), "key-value")
+
+    assert rendered.splitlines() == [
+        "state=pending",
+        "reason=1 CI run(s) still in flight",
+    ]
+
+
+@pytest.mark.parametrize("state", ["healthy", "pending", "unhealthy"])
+def test_every_state_survives_the_round_trip_a_caller_parses(state: State) -> None:
+    """Each state must appear verbatim, since callers compare it literally."""
+    rendered = render(Verdict(state, "some reason"), "key-value")
+
+    assert f"state={state}" in rendered.splitlines()
+
+
+def test_a_multi_line_reason_cannot_forge_a_second_key() -> None:
+    """The consumer appends this to ``$GITHUB_OUTPUT``, one key per line.
+
+    A newline inside a value would end the ``reason`` there and let the rest
+    be read as another key - including a second ``state`` that overrides the
+    real verdict. Reasons are built from this module's own literals today, so
+    this guards the format rather than a live input.
+    """
+    rendered = render(Verdict("unhealthy", "first\nstate=healthy"), "key-value")
+
+    assert len(rendered.splitlines()) == 2
+    assert rendered.splitlines()[1] == "reason=first state=healthy"
+
+
+def test_the_text_format_stays_one_human_sentence() -> None:
+    """The step summary and the issue body both read this shape."""
+    assert render(Verdict("healthy", "CI succeeded for main's tip")) == (
+        "healthy: CI succeeded for main's tip"
+    )

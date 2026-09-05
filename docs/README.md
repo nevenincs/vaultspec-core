@@ -24,10 +24,14 @@ one, read the framework manual.
 | [MCP server](MCP.md)                       | The Model Context Protocol server: its tools, setup, and configuration.                                   |
 
 Not covered here: installation lives in the [project README](../README.md), and bugs and
-questions go to the
-[issue tracker](https://github.com/nevenincs/vaultspec-core/issues).
+questions go to the [issue tracker](https://github.com/nevenincs/vaultspec-core/issues).
 
 ## For maintainers
+
+Use conventional commit messages such as `feat:`, `fix:`, and `feat!:`. release-please
+maintains a release pull request with the next version and changelog. Merging it creates
+a GitHub release and starts publication: the workflow builds and smoke-tests the wheel
+and sdist, then publishes to PyPI using OIDC trusted publishing.
 
 [Distribution channels](channels.md) covers how the Scoop and Homebrew builds are
 published and which platforms they cover.

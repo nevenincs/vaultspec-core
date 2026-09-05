@@ -88,9 +88,9 @@ shape regardless of which command produced it:
 The `schema` value follows the convention `vaultspec.<dotted-command-path>.v1` - for
 example `vaultspec.sync.v1`, `vaultspec.vault.stats.v1`, or
 `vaultspec.spec.rules.add.v1`. Every schema is at version `v1` except
-`vaultspec.vault.graph.v2`, documented with `vault graph` below. Adding new keys under
-`data` is additive and does not bump the version; renaming or removing a key bumps the
-integer (`v2`, ...). Schema bumps are recorded in the release notes.
+`vaultspec.vault.graph.v2`, documented with `vaultspec-core vault graph` below. Adding
+new keys under `data` is additive and does not bump the version; renaming or removing a
+key bumps the integer (`v2`, ...). Schema bumps are recorded in the release notes.
 
 Failures under `--json` emit the same envelope with the fixed schema
 `vaultspec.error.v1` and `status` set to `failed`; `data.message` carries the

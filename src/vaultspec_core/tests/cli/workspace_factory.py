@@ -192,7 +192,6 @@ class WorkspaceFactory:
         self,
         provider: str = "all",
         *,
-        skip_gitignore: bool = False,
         upgrade: bool = False,
         force: bool = False,
         dry_run: bool = False,
@@ -201,16 +200,17 @@ class WorkspaceFactory:
     ) -> Self:
         """Run a real ``install_run``.
 
-        Creates a minimal ``.gitignore`` first if one does not exist so
-        the gitignore block writer has something to append to.  Pass
-        ``skip_gitignore=True`` to suppress automatic ``.gitignore``
-        creation.  Pass ``mode`` to force an explicit provisioning mode
-        (``--mode``); ``None`` lets ``install_run`` resolve it.
+        No ``.gitignore`` is seeded first.  The factory used to create one
+        because the block writer skipped an absent file, which meant every
+        test through this path exercised a precondition the product did not
+        provide - and the gap in GH issue 399 went unobserved for as long as
+        the harness supplied it.  Call ``create_gitignore`` explicitly when a
+        test needs pre-existing content.  Pass ``mode`` to force an explicit
+        provisioning mode (``--mode``); ``None`` lets ``install_run`` resolve
+        it.
         """
         from vaultspec_core.core.commands import install_run
 
-        if not skip_gitignore and not (self.root / ".gitignore").exists():
-            self.create_gitignore()
         install_run(
             path=self.root,
             provider=provider,

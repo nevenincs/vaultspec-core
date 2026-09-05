@@ -59,6 +59,20 @@ def resolve_gitignore(
         )
         return
 
+    # An installed workspace that has not opted out and has no managed block.
+    # Repaired on install only, as NO_ENTRIES is: on sync, a missing block is
+    # first read as the opt-out gesture, and `_reconcile_gitignore_opt_out`
+    # records it rather than writing the block back.
+    if signal == GitignoreSignal.UNMANAGED and action == CliAction.INSTALL:
+        plan.steps.append(
+            ResolutionStep(
+                action=ResolutionAction.REPAIR_GITIGNORE,
+                target=".gitignore",
+                reason="Workspace is managed but carries no managed block",
+            )
+        )
+        return
+
     if signal == GitignoreSignal.NO_ENTRIES and action == CliAction.INSTALL:
         plan.steps.append(
             ResolutionStep(

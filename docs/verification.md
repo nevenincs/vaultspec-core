@@ -73,7 +73,7 @@ code, and the diagnosis prints several that never do:
 | Printed line                        | Weighed                       |
 | ----------------------------------- | ----------------------------- |
 | `framework`                         | Yes                           |
-| `gitignore`                         | Not in the `partial` state    |
+| `gitignore`                         | Yes                           |
 | `gitattributes`                     | Yes                           |
 | `builtins`                          | Yes                           |
 | `migration`                         | Yes                           |
@@ -93,11 +93,13 @@ So a run can print `warn` and still exit `0`:
   claude warn dir: mixed
 ```
 
-`gitignore warn partial` belongs with them, which is why the table qualifies that row.
-Measured on a project where the block was written by a refused install and so came out
-two entries short: the diagnosis printed `gitignore warn partial` alongside the
-unweighed `process registry warn`, and the command exited `0`. Repairing it with
-`install --force` is worth doing, but a gate on this exit code will not tell you to.
+`gitignore` used to belong with them: `warn partial` printed and changed nothing, so a
+project whose block had fallen behind the recommended set passed a gate on this command.
+It is weighed now, in both of its degraded states - `partial` for a block that is short
+of the recommended set, and `unmanaged` for an installed project carrying no block at
+all. `install --force` repairs either. The informational readings are what remains:
+`no_file` and `no_entries` describe a project that never asked for the block or recorded
+that it declined it, and neither raises the code.
 
 Both of the lines above are unweighed. `mixed` means the provider directory holds extra
 files vaultspec does not own, which is benign and deliberately excluded so it cannot
