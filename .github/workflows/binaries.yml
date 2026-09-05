@@ -336,6 +336,13 @@ jobs:
     runs-on: [self-hosted, Linux, X64, build]
     permissions:
       contents: write
+      # Both are for the attestation below. `id-token` mints the OIDC token
+      # Sigstore exchanges for a short-lived signing certificate; `attestations`
+      # is what lets the run publish the resulting bundle against this
+      # repository. Neither is a code-signing credential and neither can become
+      # one - see the step for why that distinction matters here.
+      id-token: write
+      attestations: write
     steps:
       # This repo, for the generator itself. No deploy key and no push: the
       # channel pointers no longer live here.
@@ -445,6 +452,48 @@ jobs:
             cat SHA256SUMS
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # ATTESTED BEFORE UPLOAD, and the ordering is the guard. `actions/attest`
+      # failing here fails the job with `gh release upload` still unrun, so an
+      # asset that could not be attested never becomes a release asset.
+      #
+      # THIS IS NOT A SIGNATURE, and reading it as one would be the expensive
+      # mistake. Sigstore is not in the Microsoft Trusted Root Program and is
+      # not going to be, so nothing here moves SmartScreen, Gatekeeper, or a
+      # WDAC publisher rule. The publisher-identity half is #405 and it is
+      # parked on a certificate this project does not hold.
+      #
+      # What it does do is the half that needed no certificate. Until now a user
+      # comparing a download against SHA256SUMS learned only that the file
+      # matched a list published beside it - which a tampered release publishes
+      # just as happily. An attestation binds each asset's digest to THIS
+      # repository and THIS workflow run, checkable with `gh attestation verify`
+      # by someone who trusts neither.
+      #
+      # SHA256SUMS is attested too, deliberately: it is the manifest every other
+      # verification path reads, and the aggregate step above merges into it the
+      # wheel and sdist lines publish.yml attached, so provenance on that one
+      # file reaches assets this workflow never held.
+      - name: Refuse to attest an empty set
+        shell: bash
+        run: |
+          set -euo pipefail
+          # `subject-path` takes a glob, and a glob matching nothing is the
+          # shape this repository keeps rediscovering: v0.1.60's empty-hash
+          # manifest and the vacuous target derivation guarded further down are
+          # both this. Count first, and print the number, so a silent zero
+          # cannot read as success.
+          count=$(find dist-bin -maxdepth 1 -type f | wc -l)
+          if [ "${count}" -eq 0 ]; then
+            echo "::error::dist-bin holds no files; there is nothing to attest and the attestation would pass vacuously"
+            exit 1
+          fi
+          echo "attesting ${count} file(s) in dist-bin"
+
+      - name: Attest the release assets
+        uses: actions/attest@v4
+        with:
+          subject-path: dist-bin/*
 
       - name: Upload to release
         shell: bash
@@ -595,6 +644,52 @@ jobs:
             exit 1
           fi
           echo "all ${#expected[@]} declared targets attached to ${TAG}"
+
+      # The instrument. The attest step above can only report that the action it
+      # invoked exited zero; this asks the API the same question a user's
+      # `gh attestation verify` asks, against the assets the release now serves.
+      # An attestation that was skipped, mis-globbed, or published against the
+      # wrong subject is invisible to the first and fatal to this one.
+      #
+      # LAST, for the reason the assertion above is last. An unattested asset is
+      # still a working asset - the binary runs, it just cannot be traced to
+      # this repository - so withholding the release, or the channel pointers
+      # that were regenerated before this point, would cost users a functioning
+      # download to punish missing metadata. The red run is what says the
+      # provenance is short; silence would let unverifiable read as verified.
+      - name: Verify every attached asset is attested
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          unverified=()
+          checked=0
+          for asset in dist-bin/*; do
+            [ -f "${asset}" ] || continue
+            checked=$((checked + 1))
+            # Verified against the REPOSITORY, which is the claim a user can
+            # make without trusting this run. `--repo` is not decoration: with
+            # no expectation supplied, verify has nothing to hold the bundle's
+            # signer identity against.
+            if ! gh attestation verify "${asset}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              unverified+=("$(basename "${asset}")")
+            fi
+          done
+          # Same refusal as the attest guard, for the same reason: a loop over
+          # an empty glob reports success having checked nothing.
+          if [ "${checked}" -eq 0 ]; then
+            echo "::error::no asset was checked for provenance; this guard cannot pass vacuously"
+            exit 1
+          fi
+          if [ ${#unverified[@]} -ne 0 ]; then
+            echo "::error::attached but unattested: ${unverified[*]}"
+            echo "### Unattested assets" >> "$GITHUB_STEP_SUMMARY"
+            echo "Attached to \`${TAG}\` with no verifiable provenance: \`${unverified[*]}\`" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "all ${checked} attached asset(s) verify against ${GITHUB_REPOSITORY}"
 
   # A release with no artifacts must not serve as `latest`.
   #
