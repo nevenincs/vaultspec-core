@@ -485,6 +485,34 @@ jobs:
       # negation syntax, whose behaviour this repository would then be trusting
       # unverified. An enumerated list is assertable here, in the shell, before
       # anything is signed.
+      # M4: the verify step below runs `gh attestation verify --signer-workflow`
+      # on the fleet, and the fleet's `gh` is not pinned by anything in this
+      # repository. An older one exits non-zero with "unknown flag", every asset
+      # lands in `unverified`, and the release fails AFTER upload for a reason
+      # that has nothing to do with provenance. Asked here, before the first
+      # irreversible act, the same shortfall is one named error instead.
+      #
+      # Measured on `vaultspec-core-linux` while writing this: gh 2.97.0, the
+      # subcommand present, and every Sigstore and GitHub endpoint an
+      # attestation needs reachable from that host. This step exists so that
+      # stays true rather than having been true once.
+      - name: Require a gh that can verify attestations
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "gh: $(gh --version | head -1)"
+          if ! gh attestation verify --help > /dev/null 2>&1; then
+            echo "::error::this runner's gh has no 'attestation verify'; upgrade gh on the fleet host"
+            exit 1
+          fi
+          if ! gh attestation verify --help 2>&1 | grep -q -- '--signer-workflow'; then
+            echo "::error::this runner's gh does not support --signer-workflow; upgrade gh on the fleet host"
+            exit 1
+          fi
+          echo "gh can verify attestations and pin a signer workflow"
+
       - name: Enumerate the assets to attest
         id: subjects
         shell: bash
@@ -551,6 +579,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag || github.ref_name }}
           SUBJECTS: ${{ steps.subjects.outputs.paths }}
+          EXPECTED: ${{ steps.subjects.outputs.count }}
         run: |
           set -euo pipefail
           unverified=()
@@ -568,9 +597,13 @@ jobs:
             # report identically to a missing attestation, and the release
             # engineer is told the assets are unattested when the truth is that
             # nothing could be asked.
+            # `< /dev/null` because this loop's stdin is the subject list.
+            # `gh attestation verify` does not read stdin today; a future
+            # version that did would silently eat the remaining subjects.
             if ! why=$(gh attestation verify "${asset}" \
               --repo "$GITHUB_REPOSITORY" \
-              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/binaries.yml" 2>&1); then
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/binaries.yml" \
+              < /dev/null 2>&1); then
               unverified+=("$(basename "${asset}")")
               echo "::warning::${asset} did not verify:"
               printf '%s\n' "${why}" >&2
@@ -580,6 +613,13 @@ jobs:
           # reports success having checked nothing.
           if [ "${checked}" -eq 0 ]; then
             echo "::error::no asset was checked for provenance; this guard cannot pass vacuously"
+            exit 1
+          fi
+          # The attest step and this loop read the same derived list, so a
+          # disagreement means the list changed between them - which would make
+          # both the attestation and this verdict describe a set nobody chose.
+          if [ "${checked}" -ne "${EXPECTED}" ]; then
+            echo "::error::verified ${checked} asset(s) but ${EXPECTED} were attested; the subject list changed mid-job"
             exit 1
           fi
           if [ ${#unverified[@]} -ne 0 ]; then
@@ -733,7 +773,6 @@ jobs:
           fi
           echo "all ${#expected[@]} declared targets attached to ${TAG}"
 
-
   # A release with no artifacts must not serve as `latest`.
   #
   # This is the fault that cost two releases today. vaultspec-core-v0.1.61 was
@@ -829,6 +868,27 @@ jobs:
 
           if [ ${#missing[@]} -eq 0 ]; then
             echo "all ${#expected[@]} declared target(s) present on ${TAG}"
+            # A COMPLETE ASSET SET IS NOT BY ITSELF A GOOD RELEASE, and until
+            # now this guard behaved as though it were. The release job also
+            # attests every artifact and verifies that attestation; when the
+            # verification fails, the assets are ALREADY attached, so the
+            # completeness test above passes and the promote step below then
+            # clears the prerelease flag. The net effect was a release whose
+            # provenance does not verify serving as `latest` - which is where
+            # the README, the install prose and both channel manifests point.
+            #
+            # `needs.release.result` was already carried into this job's
+            # environment and used only to decorate log lines. It is part of
+            # the verdict now.
+            if [ "${RELEASE_RESULT}" != "success" ]; then
+              echo "::warning::${TAG} carries every declared target, but the release job ended '${RELEASE_RESULT}'"
+              if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease')" != "true" ]; then
+                gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease
+                echo "::notice::demoted ${TAG} to a prerelease so latest skips it"
+              fi
+              echo "::error::${TAG} has every declared asset but its release job ended '${RELEASE_RESULT}' - provenance verification or the channel pointers did not complete. Demoted so it cannot serve as latest. Read the release job's log, fix, and re-dispatch."
+              exit 1
+            fi
             exit 0
           fi
 

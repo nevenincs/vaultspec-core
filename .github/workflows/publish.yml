@@ -125,25 +125,27 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
 
-      - name: Publish to PyPI
-        run: uv publish --check-url https://pypi.org/simple/ dist/*
-
-      # ATTESTED HERE, before `Generate checksums` writes SHA256SUMS into this
-      # same directory. At this point `dist/` holds exactly the wheel and the
-      # sdist, so the subject set needs no exclusion and cannot accidentally
-      # acquire one.
+      # ATTESTED BEFORE `uv publish`, because that is the one act in this
+      # workflow that cannot be undone. A version pushed to PyPI cannot be
+      # unpublished, so an attestation failure afterwards leaves the index
+      # holding a distribution the GitHub Release has no wheel, no sdist and no
+      # digests for - the v0.1.64 shape the permissions note above was written
+      # about. Nothing here needs PyPI: `dist/` is byte-identical either side of
+      # the upload, so the ordering costs nothing and buys the guarantee
+      # binaries.yml states for its own lane.
       #
-      # SHA256SUMS is deliberately never a subject, here or in binaries.yml.
-      # Both workflows attach it to the same release on the same tag and merge
-      # into it, and neither knows which runs last - the merge logic below
-      # exists because of that race. An attestation over a file that is
-      # rewritten after it is minted cannot be verified by the user it was
-      # minted for.
+      # At this point `dist/` holds exactly the wheel and the sdist -
+      # `Generate checksums` has not yet written SHA256SUMS into it - so the
+      # subject set needs no exclusion and cannot acquire one by accident. The
+      # `! -name SHA256SUMS` predicate below is therefore redundant here, and is
+      # kept only so both lanes read identically; a reader comparing them should
+      # not have to work out whether the difference is meaningful.
       #
-      # Without this step the release carried two assets that binaries.yml
-      # neither attested nor verified, while the published documentation told
-      # users every release asset carries provenance. The claim came first and
-      # the coverage did not follow; this is the coverage.
+      # SHA256SUMS is deliberately never a subject, in either lane. Both
+      # workflows attach it to the same release on the same tag and merge into
+      # it, and neither knows which runs last - the merge logic below exists
+      # because of that race. An attestation over a file rewritten after it is
+      # minted cannot be verified by the user it was minted for.
       - name: Enumerate the distribution to attest
         id: subjects
         run: |
@@ -152,15 +154,14 @@ jobs:
             find dist -maxdepth 1 -type f ! -name SHA256SUMS | LC_ALL=C sort
           )
           # A build that produced no distribution must not attest nothing and
-          # report success. `uv publish` above would already have failed, so
-          # reaching here empty means something stranger; say so rather than
-          # passing.
+          # report success.
           if [ ${#subjects[@]} -eq 0 ]; then
             echo "::error::dist holds no attestable file; there is nothing to attest"
             exit 1
           fi
           echo "attesting ${#subjects[@]} file(s): ${subjects[*]}"
           {
+            echo "count=${#subjects[@]}"
             echo "paths<<SUBJECTS_EOF"
             printf '%s\n' "${subjects[@]}"
             echo "SUBJECTS_EOF"
@@ -171,9 +172,9 @@ jobs:
         with:
           subject-path: ${{ steps.subjects.outputs.paths }}
 
-      # The wheel and sdist reach PyPI but never reached the GitHub Release, so
-      # the release carried binaries with no Python distribution beside them and
-      # no digests for it. vaultspec-rag attaches both; this brings core level.
+      - name: Publish to PyPI
+        run: uv publish --check-url https://pypi.org/simple/ dist/*
+
       - name: Generate checksums
         working-directory: dist
         env:
@@ -227,6 +228,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag || github.ref_name }}
           SUBJECTS: ${{ steps.subjects.outputs.paths }}
+          EXPECTED: ${{ steps.subjects.outputs.count }}
         run: |
           set -euo pipefail
           unverified=()
@@ -237,9 +239,11 @@ jobs:
             # Pinned to the signer workflow, not merely the repository, and
             # stderr kept so a Sigstore or API outage is distinguishable from a
             # missing attestation.
+            # `< /dev/null` because this loop's stdin is the subject list.
             if ! why=$(gh attestation verify "${asset}" \
               --repo "$GITHUB_REPOSITORY" \
-              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish.yml" 2>&1); then
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish.yml" \
+              < /dev/null 2>&1); then
               unverified+=("$(basename "${asset}")")
               echo "::warning::${asset} did not verify:"
               printf '%s\n' "${why}" >&2
@@ -247,6 +251,10 @@ jobs:
           done <<< "${SUBJECTS}"
           if [ "${checked}" -eq 0 ]; then
             echo "::error::no distribution file was checked for provenance; this guard cannot pass vacuously"
+            exit 1
+          fi
+          if [ "${checked}" -ne "${EXPECTED}" ]; then
+            echo "::error::verified ${checked} file(s) but ${EXPECTED} were attested; the subject list changed mid-job"
             exit 1
           fi
           if [ ${#unverified[@]} -ne 0 ]; then
