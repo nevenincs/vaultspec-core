@@ -86,11 +86,18 @@ class GitignoreSignal(StrEnum):
     informational; ``UNMANAGED`` is weighed, because a workspace whose
     per-machine artefacts nothing ignores is the condition this check exists to
     catch.
+
+    ``UNREADABLE`` is not a state of the subject at all: it says the check
+    could not run. A collector that fails must not report the value it would
+    have reported had it run and found nothing wrong - that is how a broken
+    workspace came to read as a healthy one (issue #407). Weighed as a
+    warning, because a check that did not run cannot vouch for anything.
     """
 
     NO_FILE = "no_file"
     NO_ENTRIES = "no_entries"
     UNMANAGED = "unmanaged"
+    UNREADABLE = "unreadable"
     PARTIAL = "partial"
     COMPLETE = "complete"
     CORRUPTED = "corrupted"
@@ -104,11 +111,18 @@ class GitattributesSignal(StrEnum):
     read, in a workspace that is installed and has not declined it. The other
     two absences stay benign for a workspace that never asked or has declared
     it does not want the block.
+
+    ``UNREADABLE`` is not a state of the subject at all: it says the check
+    could not run. A collector that fails must not report the value it would
+    have reported had it run and found nothing wrong - that is how a broken
+    workspace came to read as a healthy one (issue #407). Weighed as a
+    warning, because a check that did not run cannot vouch for anything.
     """
 
     NO_FILE = "no_file"
     NO_ENTRIES = "no_entries"
     UNMANAGED = "unmanaged"
+    UNREADABLE = "unreadable"
     PARTIAL = "partial"
     COMPLETE = "complete"
     CORRUPTED = "corrupted"
@@ -121,6 +135,12 @@ class PrecommitSignal(StrEnum):
     A configuration can be perfect and still run nothing, which is what
     :attr:`NOT_INSTALLED` reports: git has no ``pre-commit`` hook, so the
     declared hooks never execute on a commit.
+
+    ``UNREADABLE`` is not a state of the subject at all: it says the check
+    could not run. A collector that fails must not report the value it would
+    have reported had it run and found nothing wrong - that is how a broken
+    workspace came to read as a healthy one (issue #407). Weighed as a
+    warning, because a check that did not run cannot vouch for anything.
     """
 
     NO_FILE = "no_file"
@@ -130,6 +150,7 @@ class PrecommitSignal(StrEnum):
     UNREFRESHABLE = "unrefreshable"
     ORPHANED = "orphaned"
     NOT_INSTALLED = "not_installed"
+    UNREADABLE = "unreadable"
     COMPLETE = "complete"
 
 

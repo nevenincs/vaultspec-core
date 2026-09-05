@@ -30,6 +30,7 @@ from vaultspec_core.core.enums import CliAction, PrecommitHook, Tool
 
 if TYPE_CHECKING:
     from enum import Enum
+    from pathlib import Path
 
 pytestmark = [pytest.mark.unit]
 
@@ -67,6 +68,7 @@ pytestmark = [pytest.mark.unit]
                 "NO_FILE",
                 "NO_ENTRIES",
                 "UNMANAGED",
+                "UNREADABLE",
                 "PARTIAL",
                 "COMPLETE",
                 "CORRUPTED",
@@ -78,6 +80,7 @@ pytestmark = [pytest.mark.unit]
                 "NO_FILE",
                 "NO_ENTRIES",
                 "UNMANAGED",
+                "UNREADABLE",
                 "PARTIAL",
                 "COMPLETE",
                 "CORRUPTED",
@@ -93,6 +96,7 @@ pytestmark = [pytest.mark.unit]
                 "UNREFRESHABLE",
                 "ORPHANED",
                 "NOT_INSTALLED",
+                "UNREADABLE",
                 "COMPLETE",
             },
         ),
@@ -331,3 +335,80 @@ class TestDoctorModeAndFloorWeighting:
             version_floor=VersionFloorSignal.BELOW,
         )
         assert doctor_exit_code(diag) == 2
+
+
+class TestCollectorFailureIsNotHealth:
+    """A check that could not run must not report the benign value (issue #407).
+
+    Every `_safe_*` wrapper caught a collector failure and returned the neutral
+    signal for its row, so "could not be read" was indistinguishable from
+    "simply absent" and `doctor` exited 0 on a workspace every mutating verb
+    refused.
+    """
+
+    @staticmethod
+    def _break_the_precommit_collector(root: Path) -> None:
+        """Corrupt `workspace.json`, which the precommit collector reads."""
+        (root / ".vaultspec" / "workspace.json").write_text(
+            '{"packages": {', encoding="utf-8"
+        )
+
+    def test_precommit_reports_unreadable_not_absent(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.diagnosis.diagnosis import _safe_precommit_state
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        WorkspaceFactory(tmp_path).install("claude")
+        self._break_the_precommit_collector(tmp_path)
+
+        assert _safe_precommit_state(tmp_path) is PrecommitSignal.UNREADABLE
+
+    def test_doctor_weighs_unreadable_as_a_warning(self, tmp_path: Path) -> None:
+        """The row is not enough; the exit code has to move too."""
+        from vaultspec_core.cli.spec_cmd_doctor import doctor_exit_code
+        from vaultspec_core.core.diagnosis.diagnosis import WorkspaceDiagnosis
+        from vaultspec_core.core.diagnosis.signals import FrameworkSignal
+
+        clean = WorkspaceDiagnosis(framework=FrameworkSignal.PRESENT)
+        assert doctor_exit_code(clean) == 0
+
+        for degraded in (
+            WorkspaceDiagnosis(
+                framework=FrameworkSignal.PRESENT,
+                precommit=PrecommitSignal.UNREADABLE,
+            ),
+            WorkspaceDiagnosis(
+                framework=FrameworkSignal.PRESENT,
+                gitignore=GitignoreSignal.UNREADABLE,
+            ),
+            WorkspaceDiagnosis(
+                framework=FrameworkSignal.PRESENT,
+                gitattributes=GitattributesSignal.UNREADABLE,
+            ),
+        ):
+            assert doctor_exit_code(degraded) == 1
+
+    def test_unreadable_never_triggers_a_repair(self, tmp_path: Path) -> None:
+        """Unobserved is not a licence to rewrite the file.
+
+        The guard on the change: a signal that means "nobody looked" must not
+        reach a resolution step, or preflight would repair on a guess.
+        """
+        from vaultspec_core.core.resolver import ResolutionPlan
+        from vaultspec_core.core.resolver_repo import (
+            resolve_gitattributes,
+            resolve_gitignore,
+            resolve_precommit,
+        )
+
+        plan = ResolutionPlan()
+        resolve_gitignore(
+            plan, GitignoreSignal.UNREADABLE, CliAction.INSTALL, force=True
+        )
+        resolve_gitattributes(
+            plan, GitattributesSignal.UNREADABLE, CliAction.INSTALL, force=True
+        )
+        resolve_precommit(
+            plan, PrecommitSignal.UNREADABLE, CliAction.INSTALL, force=True
+        )
+
+        assert plan.steps == []

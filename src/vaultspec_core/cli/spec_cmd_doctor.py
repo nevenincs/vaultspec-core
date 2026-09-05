@@ -303,6 +303,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             GitignoreSignal.COMPLETE: ("ok", "green"),
             GitignoreSignal.PARTIAL: ("warn", "yellow"),
             GitignoreSignal.UNMANAGED: ("warn", "yellow"),
+            GitignoreSignal.UNREADABLE: ("warn", "yellow"),
             GitignoreSignal.NO_ENTRIES: ("info", "dim"),
             GitignoreSignal.NO_FILE: ("info", "dim"),
             GitignoreSignal.CORRUPTED: ("error", "red"),
@@ -331,6 +332,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             GitattributesSignal.COMPLETE: ("ok", "green"),
             GitattributesSignal.PARTIAL: ("warn", "yellow"),
             GitattributesSignal.UNMANAGED: ("warn", "yellow"),
+            GitattributesSignal.UNREADABLE: ("warn", "yellow"),
             GitattributesSignal.NO_ENTRIES: ("info", "dim"),
             GitattributesSignal.NO_FILE: ("info", "dim"),
             GitattributesSignal.CORRUPTED: ("error", "red"),
@@ -445,6 +447,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             PrecommitSignal.NO_HOOKS: ("warn", "yellow"),
             PrecommitSignal.NOT_INSTALLED: ("warn", "yellow"),
             PrecommitSignal.NO_FILE: ("info", "dim"),
+            PrecommitSignal.UNREADABLE: ("warn", "yellow"),
         },
     )
     pc_detail = {
@@ -468,6 +471,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             "'prek install' (or 'pre-commit install') in this checkout"
         ),
         PrecommitSignal.NO_FILE: "no .pre-commit-config.yaml",
+        PrecommitSignal.UNREADABLE: ("could not be read; this check did not run"),
     }.get(diag.precommit, str(diag.precommit))
     rows.append(
         {
@@ -655,7 +659,13 @@ def _gitattributes_weight(signal: "GitattributesSignal") -> tuple[bool, bool]:
 
     return (
         signal == GitattributesSignal.CORRUPTED,
-        signal in (GitattributesSignal.UNMANAGED, GitattributesSignal.PARTIAL),
+        signal
+        in (
+            GitattributesSignal.UNMANAGED,
+            GitattributesSignal.PARTIAL,
+            # A check that did not run cannot vouch for the block either.
+            GitattributesSignal.UNREADABLE,
+        ),
     )
 
 
@@ -671,7 +681,13 @@ def _gitignore_weight(signal: "GitignoreSignal") -> tuple[bool, bool]:
 
     return (
         signal == GitignoreSignal.CORRUPTED,
-        signal in (GitignoreSignal.UNMANAGED, GitignoreSignal.PARTIAL),
+        signal
+        in (
+            GitignoreSignal.UNMANAGED,
+            GitignoreSignal.PARTIAL,
+            # A check that did not run cannot vouch for the block either.
+            GitignoreSignal.UNREADABLE,
+        ),
     )
 
 
@@ -725,6 +741,8 @@ def doctor_exit_code(
         # Content-verified genuine stranding: prek.toml owns the boundary
         # and lacks the canonical hooks, so nothing runs them anywhere.
         PrecommitSignal.UNREFRESHABLE,
+        # The collector could not run, so this row vouches for nothing.
+        PrecommitSignal.UNREADABLE,
     ):
         has_warn = True
     if diag.builtin_version == BuiltinVersionSignal.DELETED:
