@@ -52,6 +52,70 @@ native build there inherits the guest's much newer glibc. The release now attach
 `aarch64-unknown-linux-gnu` binary and the generated formula carries it, which is the
 same evidence the table is read from.
 
+## Verifying what you downloaded
+
+Two checks, answering two different questions.
+
+`SHA256SUMS` is attached to every release and says the bytes you hold are the bytes that
+release published:
+
+```sh
+sha256sum -c SHA256SUMS
+```
+
+It covers more than the binaries: the wheel and sdist digests are merged into the same
+file, so one manifest speaks for every asset on the release.
+
+Provenance is the second question, and a checksum cannot answer it: a manifest published
+beside a tampered download matches it perfectly. Each released artifact carries a build
+attestation binding its digest to this repository and the workflow run that produced it:
+
+```sh
+gh attestation verify <asset> --repo nevenincs/vaultspec-core
+```
+
+`<asset>` is the file as you downloaded it, named as the release names it - for example
+`vaultspec-core-x86_64-pc-windows-msvc.exe`. `--repo` is not decoration: with no
+expectation to hold the bundle's signer identity against, there is nothing for the
+verification to fail.
+
+For a stricter check, pin the workflow allowed to have signed it. The binaries are
+attested by `binaries.yml` and the wheel and sdist by `publish.yml`, so the value
+depends on which asset you are checking:
+
+```sh
+gh attestation verify <asset> --repo nevenincs/vaultspec-core --signer-workflow nevenincs/vaultspec-core/.github/workflows/binaries.yml
+```
+
+Without it, any workflow in this repository able to obtain an OIDC token satisfies the
+check. The release lane pins it on its own side too.
+
+**`SHA256SUMS` is the one asset with no attestation, and that is deliberate.** Two
+workflows write it - the binaries lane and the Python distribution lane - on the same
+tag, and each merges its own digests into whatever the other published. Whichever
+finishes last replaces the file, so an attestation minted over it would describe bytes
+the release no longer serves, and would fail for you on the single asset whose whole
+purpose is to be checked. Provenance therefore sits on the artifacts the manifest
+describes rather than on the manifest.
+
+**This is not a code signature and does not stand in for one.** The attestation is
+signed through Sigstore, which is not in the Microsoft Trusted Root Program and is not
+going to be, so it moves nothing in SmartScreen, Gatekeeper, or a WDAC policy. Those
+want a publisher identity this project does not hold, and that gap is tracked in
+[#405](https://github.com/nevenincs/vaultspec-core/issues/405) rather than left unsaid.
+What the attestation gives you is a way to check where an asset came from without
+trusting the page you downloaded it from.
+
+Neither lane attaches an artifact it could not attest, and each re-checks what it
+uploaded against the API before its run is allowed to go green.
+
+On Windows, the exposure that remains is narrower than "the binaries are unsigned"
+suggests. Scoop clears the Mark-of-the-Web from what it installs, so the `scoop install`
+path above reaches you unmarked and raises nothing. What is exposed is fetching the
+`.exe` from the releases page in a browser and launching it from Explorer, where an
+unsigned binary raises SmartScreen's "Windows protected your PC", and managed fleets
+running WDAC or AppLocker, which commonly refuse unsigned executables outright.
+
 ## Why binary formulae
 
 The Homebrew formula installs the pre-built PyApp binaries attached to the GitHub
