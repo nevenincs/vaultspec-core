@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import logging
 import shutil
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +29,7 @@ from .gitignore import (
     get_recommended_entries,
     prune_orphaned_lock_sentinels,
 )
+from .helpers import atomic_write_bytes
 from .install_mode import (
     fresh_install_schema_version,
     infer_upgrade_mode,
@@ -35,6 +38,7 @@ from .install_mode import (
     write_mode_declaration,
 )
 from .manifest import (
+    MANIFEST_FILENAME,
     ManifestData,
     add_providers,
     read_manifest_data,
@@ -603,6 +607,49 @@ def _run_upgrade(
     }
 
 
+@contextmanager
+def _manifest_rollback(path: Path) -> Generator[None]:
+    """Restore the manifest if the install does not reach its final write.
+
+    ``add_providers`` records the providers early, while the write that
+    stamps ``installed_at`` is the last thing an install does. A failure
+    between the two left a manifest listing providers with no install
+    stamp - which the already-installed guard reads as an install, so the
+    obvious retry (a plain ``install``, no flags) refused with "already
+    installed" and offered no way forward (issue #416).
+
+    Rolling the manifest back is deliberately preferred over teaching that
+    guard to recognise the partial shape. A legacy v1.0 manifest also
+    carries an empty ``installed_at``, so any such heuristic would read a
+    genuinely installed legacy workspace as interrupted and overwrite it -
+    the same conflation of "old" with "absent" that #408 was.
+
+    A failure to restore is logged, never raised: the error that caused the
+    install to fail is the one the caller needs to see.
+    """
+    manifest_path = path / ".vaultspec" / MANIFEST_FILENAME
+    try:
+        before: bytes | None = manifest_path.read_bytes()
+    except OSError:
+        before = None
+
+    try:
+        yield
+    except BaseException:
+        try:
+            if before is None:
+                manifest_path.unlink(missing_ok=True)
+            else:
+                atomic_write_bytes(manifest_path, before)
+        except OSError as cleanup_exc:
+            logger.warning(
+                "Could not roll back the manifest at %s: %s",
+                manifest_path,
+                cleanup_exc,
+            )
+        raise
+
+
 def install_run(
     path: Path,
     provider: str = "all",
@@ -745,115 +792,119 @@ def install_run(
             f"first with 'vaultspec-core uninstall {path}'."
         )
 
-    created = init_run(
-        force=force,
-        provider=provider,
-        skip=skip,
-        mode=resolved_mode,
-        adopt=adopting,
-    )
+    # Roll the manifest back if this install does not reach its final
+    # write. See _manifest_rollback for why the alternative - teaching the
+    # already-installed guard to recognise the partial shape - is unsafe.
+    with _manifest_rollback(path):
+        created = init_run(
+            force=force,
+            provider=provider,
+            skip=skip,
+            mode=resolved_mode,
+            adopt=adopting,
+        )
 
-    reset_config()
-    layout = resolve_workspace(target_override=path)
-    init_paths(layout)
+        reset_config()
+        layout = resolve_workspace(target_override=path)
+        init_paths(layout)
 
-    # Persist the committed declaration before the provider sync below re-renders
-    # the MCP config and pre-commit hooks. Those renderers resolve their mode
-    # from the declaration; writing it here means the just-resolved mode governs
-    # the sync pass instead of the legacy-absent dependency bridge, which would
-    # otherwise clobber the tool-mode artifacts init_run just wrote. The manifest
-    # echo and floor reconciliation still happen once, later, via
-    # persist_resolved_mode after the manifest is read.
-    write_mode_declaration(path, resolved_mode)
+        # Persist the committed declaration before the provider sync below re-renders
+        # the MCP config and pre-commit hooks. Those renderers resolve their mode
+        # from the declaration; writing it here means the just-resolved mode governs
+        # the sync pass instead of the legacy-absent dependency bridge, which would
+        # otherwise clobber the tool-mode artifacts init_run just wrote. The manifest
+        # echo and floor reconciliation still happen once, later, via
+        # persist_resolved_mode after the manifest is read.
+        write_mode_declaration(path, resolved_mode)
 
-    post_errors: list[str] = []
+        post_errors: list[str] = []
 
-    sync_target = provider if provider not in ("all", "core") else "all"
-    try:
-        # Filter `core` out: `sync_provider` rejects it, but `install_run`
-        # accepts it as a "framework only, skip provider sync" hint.
-        # Forward `force`: `install --force` must propagate to the sync
-        # pass so user-authored system prompts and provider configs are
-        # overwritten consistently with the rest of the install.
-        sync_provider(sync_target, force=force, skip=skip - {"core"})
-    except (VaultSpecError, OSError) as exc:
-        logger.warning("Sync failed during install: %s", exc)
-        post_errors.append(f"sync: {exc}")
+        sync_target = provider if provider not in ("all", "core") else "all"
+        try:
+            # Filter `core` out: `sync_provider` rejects it, but `install_run`
+            # accepts it as a "framework only, skip provider sync" hint.
+            # Forward `force`: `install --force` must propagate to the sync
+            # pass so user-authored system prompts and provider configs are
+            # overwritten consistently with the rest of the install.
+            sync_provider(sync_target, force=force, skip=skip - {"core"})
+        except (VaultSpecError, OSError) as exc:
+            logger.warning("Sync failed during install: %s", exc)
+            post_errors.append(f"sync: {exc}")
 
-    # Count actual source resources (what the user authored)
-    from .agents import collect_agents
-    from .mcps import collect_mcp_servers
-    from .rules import collect_rules
-    from .skills import collect_skills
+        # Count actual source resources (what the user authored)
+        from .agents import collect_agents
+        from .mcps import collect_mcp_servers
+        from .rules import collect_rules
+        from .skills import collect_skills
 
-    source_counts = {
-        "rules": len(collect_rules()),
-        "skills": len(collect_skills()),
-        "agents": len(collect_agents()),
-        "mcps": len(collect_mcp_servers()),
-    }
+        source_counts = {
+            "rules": len(collect_rules()),
+            "skills": len(collect_skills()),
+            "agents": len(collect_agents()),
+            "mcps": len(collect_mcp_servers()),
+        }
 
-    tools = filter_tools(PROVIDER_TO_TOOLS.get(provider, []), skip)
-    provider_names = [t.value for t in tools]
-    from .mcps import resolve_mcp_targets
+        tools = filter_tools(PROVIDER_TO_TOOLS.get(provider, []), skip)
+        provider_names = [t.value for t in tools]
+        from .mcps import resolve_mcp_targets
 
-    has_mcp = any(
-        target.path.exists()
-        for target in resolve_mcp_targets(target_dir=path, enrolled=tuple(tools))
-    )
+        has_mcp = any(
+            target.path.exists()
+            for target in resolve_mcp_targets(target_dir=path, enrolled=tuple(tools))
+        )
 
-    # Retire sentinels whose subject is gone (e.g. .pre-commit-config.yaml.lock
-    # after a checkout migrates to prek.toml).  The managed block ignores them
-    # either way; deleting the orphan keeps the working tree honest about which
-    # locks this workspace still takes.
-    for orphan in prune_orphaned_lock_sentinels(path):
-        logger.info("Removed orphaned lock sentinel %s", orphan)
+        # Retire sentinels whose subject is gone (e.g. .pre-commit-config.yaml.lock
+        # after a checkout migrates to prek.toml).  The managed block ignores them
+        # either way; deleting the orphan keeps the working tree honest about which
+        # locks this workspace still takes.
+        for orphan in prune_orphaned_lock_sentinels(path):
+            logger.info("Removed orphaned lock sentinel %s", orphan)
 
-    # Manage gitignore block
-    recommended = get_recommended_entries(path)
+        # Manage gitignore block
+        recommended = get_recommended_entries(path)
 
-    # A committed decline governs a fresh install too. Cloning a project that
-    # declared it does not want the block and provisioning it is not a request
-    # to reverse that; only `spec gitignore enable` is.
-    gi_written = block_management_enabled(
-        path, "gitignore", honour_local_echo=False
-    ) and ensure_gitignore_block(path, recommended, state=ManagedState.PRESENT)
-    if gi_written:
-        logger.info("Added vaultspec managed block to .gitignore")
+        # A committed decline governs a fresh install too. Cloning a project that
+        # declared it does not want the block and provisioning it is not a request
+        # to reverse that; only `spec gitignore enable` is.
+        gi_written = block_management_enabled(
+            path, "gitignore", honour_local_echo=False
+        ) and ensure_gitignore_block(path, recommended, state=ManagedState.PRESENT)
+        if gi_written:
+            logger.info("Added vaultspec managed block to .gitignore")
 
-    # Manage gitattributes block
-    ga_written = block_management_enabled(
-        path, "gitattributes", honour_local_echo=False
-    ) and ensure_gitattributes_block(path, state=ManagedState.PRESENT)
-    if ga_written:
-        logger.info("Added vaultspec managed block to .gitattributes")
+        # Manage gitattributes block
+        ga_written = block_management_enabled(
+            path, "gitattributes", honour_local_echo=False
+        ) and ensure_gitattributes_block(path, state=ManagedState.PRESENT)
+        if ga_written:
+            logger.info("Added vaultspec managed block to .gitattributes")
 
-    # Populate v2.0 manifest fields
-    import datetime
+        # Populate v2.0 manifest fields
+        import datetime
 
-    mdata = read_manifest_data(path, strict=True)
+        mdata = read_manifest_data(path, strict=True)
 
-    # Robust detection: if it's there, it's managed.
-    derive_managed_flags(path, mdata)
-    # A fresh install clears the per-machine echo, not the committed
-    # declaration: provisioning a clone is not a decision to reverse what the
-    # project declared.
-    mdata.gitignore_opted_out = False
-    mdata.gitattributes_opted_out = False
+        # Robust detection: if it's there, it's managed.
+        derive_managed_flags(path, mdata)
+        # A fresh install clears the per-machine echo, not the committed
+        # declaration: provisioning a clone is not a decision to reverse what the
+        # project declared.
+        mdata.gitignore_opted_out = False
+        mdata.gitattributes_opted_out = False
 
-    mdata.vaultspec_version = fresh_install_schema_version()
-    mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
-    for name in provider_names:
-        mdata.provider_state.setdefault(name, {})
-        mdata.provider_state[name]["installed_at"] = mdata.installed_at
-    persist_resolved_mode(path, mdata, resolved_mode)
-    write_manifest_data(path, mdata)
+        mdata.vaultspec_version = fresh_install_schema_version()
+        mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
+        for name in provider_names:
+            mdata.provider_state.setdefault(name, {})
+            mdata.provider_state[name]["installed_at"] = mdata.installed_at
+        persist_resolved_mode(path, mdata, resolved_mode)
+        write_manifest_data(path, mdata)
 
-    # Reconcile git index with the managed gitignore block so that
-    # historically-committed state files (e.g. .vaultspec/providers.json
-    # from a pre-managed-block install) stop showing up as dirty on
-    # every subsequent run.
-    untrack_managed_paths(path, recommended)
+        # Reconcile git index with the managed gitignore block so that
+        # historically-committed state files (e.g. .vaultspec/providers.json
+        # from a pre-managed-block install) stop showing up as dirty on
+        # every subsequent run.
+        untrack_managed_paths(path, recommended)
 
     result: dict[str, Any] = {
         "action": "install",

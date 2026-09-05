@@ -428,3 +428,82 @@ class TestUpgradeRestoresVault:
 
         assert result.exit_code == 0, result.output
         assert not (tmp_path / ".vault").exists()
+
+
+class TestFailedInstallLeavesNoPartialManifest:
+    """A failed install must not block its own retry (issue #416).
+
+    `add_providers` records the providers early; the write that stamps
+    `installed_at` is the last thing an install does. A failure between the two
+    left a manifest listing providers with no stamp, which the
+    already-installed guard reads as an install - so the obvious retry, a plain
+    `install` with no flags, refused with "already installed".
+
+    The obstruction used here is a directory named `.gitignore`, which the
+    managed-block writer cannot replace.
+    """
+
+    @staticmethod
+    def _obstruct(root: Path) -> None:
+        (root / ".gitignore").mkdir()
+
+    def test_failed_force_leaves_no_manifest_behind(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        self._obstruct(tmp_path)
+
+        result = runner.invoke(app, ["-t", str(tmp_path), "install", "--force"])
+
+        assert result.exit_code == 1, result.output
+        assert not (tmp_path / ".vaultspec" / "providers.json").exists()
+
+    def test_plain_retry_succeeds_once_the_obstruction_is_cleared(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        """The whole point: the retry a reader would actually try."""
+        import shutil
+
+        self._obstruct(tmp_path)
+        runner.invoke(app, ["-t", str(tmp_path), "install", "--force"])
+        shutil.rmtree(tmp_path / ".gitignore")
+
+        result = runner.invoke(app, ["-t", str(tmp_path), "install"])
+
+        assert result.exit_code == 0, result.output
+        from vaultspec_core.core.manifest import read_manifest_data
+
+        assert read_manifest_data(tmp_path).installed_at
+
+    def test_a_failed_force_restores_the_previous_manifest(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        """Rolling back means restoring, not deleting.
+
+        A `--force` over a workspace that was already installed must leave that
+        workspace's manifest exactly as it found it when the run fails.
+        """
+        runner.invoke(app, ["-t", str(tmp_path), "install"])
+        manifest = tmp_path / ".vaultspec" / "providers.json"
+        before = manifest.read_bytes()
+        (tmp_path / ".gitignore").unlink()
+        self._obstruct(tmp_path)
+
+        result = runner.invoke(app, ["-t", str(tmp_path), "install", "--force"])
+
+        assert result.exit_code == 1, result.output
+        assert manifest.read_bytes() == before
+
+    def test_a_completed_install_still_refuses_without_force(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        """The guard this fix works around must keep guarding.
+
+        Rolling back a partial write must not soften the refusal a genuinely
+        installed workspace gets.
+        """
+        runner.invoke(app, ["-t", str(tmp_path), "install"])
+
+        result = runner.invoke(app, ["-t", str(tmp_path), "install"])
+
+        assert result.exit_code != 0
+        assert "already installed" in result.output
