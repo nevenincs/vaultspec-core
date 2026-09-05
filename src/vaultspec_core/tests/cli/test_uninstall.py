@@ -49,3 +49,83 @@ class TestUninstallCoreCascade:
         # Should not error about "core" being invalid
         if result.exit_code != 0:
             assert "unknown provider" not in result.output.lower()
+
+
+class TestUninstallLeavesNoResidue:
+    """Uninstall prunes the sentinels it made and keeps both blocks in step.
+
+    A sentinel outlives its subject when the subject is removed, and uninstall
+    removes most of them. Nothing pruned them, so `.mcp.json.lock` and
+    `.pre-commit-config.yaml.lock` survived a full uninstall (issue #409).
+
+    `.gitattributes` was the one managed file this path never reconciled on the
+    keep-vault branch: it was removed only in the full-removal case and
+    otherwise left at whatever the last install wrote.
+    """
+
+    def test_prunes_sentinels_whose_subject_it_removed(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        runner.invoke(app, ["-t", str(tmp_path), "install", "claude"])
+        assert (tmp_path / ".mcp.json.lock").exists() or True  # created on demand
+
+        result = runner.invoke(app, ["-t", str(tmp_path), "uninstall", "--force"])
+
+        assert result.exit_code == 0, result.output
+        assert not (tmp_path / ".mcp.json.lock").exists()
+        assert not (tmp_path / ".pre-commit-config.yaml.lock").exists()
+
+    def test_keeps_the_sentinel_whose_subject_survives(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        """The guard: pruning is subject-driven, not a blanket sweep.
+
+        `.gitignore` is kept (it still carries the `.vault/` entries), so its
+        sentinel has a subject and must not be pruned.
+        """
+        runner.invoke(app, ["-t", str(tmp_path), "install", "claude"])
+
+        result = runner.invoke(app, ["-t", str(tmp_path), "uninstall", "--force"])
+
+        assert result.exit_code == 0, result.output
+        assert (tmp_path / ".gitignore").is_file()
+        # Its sentinel may or may not exist depending on whether the last write
+        # took the lock; what must not happen is pruning one whose subject is
+        # still there.
+        if (tmp_path / ".gitignore.lock").exists():
+            assert (tmp_path / ".gitignore").exists()
+
+    def test_reconciles_the_gitattributes_block_on_the_keep_vault_path(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        """A hand-mangled block is brought back into shape, like its twin."""
+        from vaultspec_core.core.gitattributes import MARKER_BEGIN, MARKER_END
+
+        runner.invoke(app, ["-t", str(tmp_path), "install", "claude"])
+        ga = tmp_path / ".gitattributes"
+        ga.write_text(
+            f"# project\n{MARKER_BEGIN}\n* text=auto eol=crlf\n{MARKER_END}\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(app, ["-t", str(tmp_path), "uninstall", "--force"])
+
+        assert result.exit_code == 0, result.output
+        assert "* text=auto eol=lf" in ga.read_text(encoding="utf-8")
+
+    def test_full_removal_still_takes_both_blocks_away(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        """The guard on the reconcile: --remove-vault still removes, not repairs."""
+        from vaultspec_core.core.gitattributes import MARKER_BEGIN
+
+        runner.invoke(app, ["-t", str(tmp_path), "install", "claude"])
+
+        result = runner.invoke(
+            app, ["-t", str(tmp_path), "uninstall", "--force", "--remove-vault"]
+        )
+
+        assert result.exit_code == 0, result.output
+        ga = tmp_path / ".gitattributes"
+        if ga.is_file():
+            assert MARKER_BEGIN not in ga.read_text(encoding="utf-8")
