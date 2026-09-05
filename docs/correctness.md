@@ -138,109 +138,37 @@ Both are aimed at the same move: making the signal green without making the code
 
 ## Proving a guard can fail
 
-A guard you have only seen pass has not been shown to guard anything.
+Verify that a test detects the defect it targets:
 
-A passing test cannot distinguish two cases: the code is correct, or the test never
-looked. A gate that reads the wrong file, a comparison against itself, an assertion
-after an early return: all pass exactly as convincingly as the real thing.
+1. Run the focused test and confirm it passes. For pytest, use
+   `pytest path/to/test_file.py::test_name`.
+1. In an isolated copy of the code being tested, temporarily introduce that defect. For
+   a negative-timeout check, make the loader accept a negative timeout without changing
+   the test.
+1. Run the test against the modified copy. Confirm it fails at the assertion for that
+   defect, not from an unrelated error. Investigate any other result before treating the
+   test as verified.
+1. Undo only your temporary edit. Compare against the pre-test state to confirm that you
+   preserved the implementation and any unrelated changes.
+1. Rerun the test and confirm it passes again.
 
-So prove the guard can fail, in one uninterrupted sequence.
-
-1. Break the thing the guard exists to catch. For a test asserting that a config loader
-   rejects a negative timeout, that means making the loader accept one, not deleting the
-   test.
-1. Run that guard alone, not the suite: `pytest path/to/test_file.py::test_name` or your
-   project's equivalent. Running everything does not show that this guard fired.
-1. Watch it fail on the assertion that names the problem. If it fails on a different
-   assertion, or errors instead of failing, the guard is testing something adjacent to
-   what you think. Fix the guard, not the mutation.
-1. Restore with `git checkout -- <file>` or `git stash pop`, so the restore is
-   verifiable rather than remembered.
-1. Run it again and watch it pass.
-
-Do not leave the mutation on disk across a pause or a handoff. Nothing detects a
-forgotten mutation, and the next agent to read the tree will treat it as intended code.
-
-Record the failing command and its message alongside the passing one, in the ledger row
-for the step that added the guard, or in `## Notes` if it needs more than a line.
-
-This takes about a minute per guard. Skip it and the suite's green is uninformative.
+Remove the temporary defect before pausing or handing off the work. Record the failing
+and passing commands and results with the step's verification evidence.
 
 ## What the ledger contains
 
-Closing a Step appends its rows to the plan's ledger, one document per plan:
+Log the files changed by a Step, then close the Step separately. Checking a Step does
+not record its file changes.
 
-```bash
-vaultspec-core vault exec log --feature payment-retries --step S01 --related 2026-02-06-payment-retries-plan --row M:src/billing/retry.py --row A:src/billing/tests/test_retry.py
-```
-
-The ledger lives at
-`.vault/exec/2026-02-06-payment-retries/2026-02-06-payment-retries-ledger.md`, and each
-row's first cell is the Step id. That binding is what lets `vault check exec-mapping`
-pair every row with a live Step.
-
-Its `## Changes` section is a mechanical log, one line per path touched:
-
-```
-- `S01` `M` `src/billing/retry.py`
-- `S01` `A` `src/billing/tests/test_retry.py`
-- `S02` `D` `src/legacy/shim.py`
-```
-
-The operations are `A` added, `M` modified, `D` deleted, and `R old -> new` renamed. No
-prose: the Step row already states the intent and the commit carries the diff.
-
-`--verify` writes one more row naming a check that was run:
-
-```
-- `S01` `verify:` `pytest src/billing/tests/test_retry.py` -> `pass`
-```
-
-That row is the difference between "this was done" and "this was checked". It is
-optional, which makes its absence information too: a Step with no `verify:` row is a
-Step nobody claims to have checked. `--by` writes a `by:` row naming the persona that
-closed the Step; the commit carries the author.
-
-`--note` writes a `## Notes` line under the Step id, for exceptions only: work skipped,
-a scaffold left behind, a persistent failure, a decision that went against the Step as
-written. The section is created on first use, so an absent `## Notes` is the correct
-state. Notes never register a Step as covered; only `## Changes` rows do.
-
-The ledger is the only execution artifact. `vaultspec-core vault add exec` refuses, and
-a per-Step record left over from before 0.1.74 is an `exec-mapping` error until
-`vaultspec-core vault exec fold --feature <feature> --force` folds it in; the upgrade
-migration runs that fold on its own.
+Use the [execution log reference](./CLI.md#vaultspec-core-vault-exec-log) for the
+command, supported evidence fields, and ledger format. Keep verification results with
+the work they check; a file-change record alone does not show that tests ran.
 
 ## What to run before you call something done
 
-```bash
-vaultspec-core vault check all --fix
-```
+1. [Check the feature records and review any repairs](./verification.md#check-records-before-committing).
+1. Run the project's tests, linting, and type checks.
+1. Review the implementation against the approved decision and plan using the
+   [review step](#the-review-step). Address findings and rerun affected checks.
 
-A vault that is done reads like this, without `--fix` having anything left to do:
-
-```text
-Next action:
-  Your vault is clean. Proceed to commit your changes
-    git commit -m "Commit changes after successful vault checks"
-Vault Check  - All
-  ok structure: clean
-  ok frontmatter: clean
-  ok annotations: clean
-  ok markdown: clean
-  ok links: clean
-  ok dangling: clean
-  ok body-links: clean
-  ok placeholders: clean
-  ok orphans: clean
-```
-
-That capture is cut after the first nine of the nineteen checks; the rest read the same
-way, and the run ends `All checks passed.` A freshly scaffolded vault does not look like
-this and should not: its placeholders are errors until someone writes the prose.
-
-`--fix` rewrites documents, so read the diff before committing it. Then the project's
-own tests and gates, then `/vaultspec-code-review`, in that order. The check suite is
-fastest and catches mechanical damage; the tests catch behaviour; the review compares
-the change against the intent, and is the only one of the three that can notice you
-solved the wrong problem.
+Review the final diff before committing.
