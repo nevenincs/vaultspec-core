@@ -285,9 +285,21 @@ The `homebrew-tap` repository is the channel root for the whole account and serv
 as well, so you add it once and it carries every vaultspec product. Both commands put
 `vaultspec-core` and `vaultspec-mcp` on your `PATH`. The first run downloads the Python
 runtime it needs, so it requires a network connection once. Homebrew covers macOS on
-Apple Silicon and Linux on x86-64; Intel macOS and Linux arm64 are not built, and
+Apple Silicon and Linux on both architectures; Intel macOS is not built, and
 [docs/channels.md](https://github.com/nevenincs/vaultspec-core/blob/main/docs/channels.md)
 says why.
+
+Every release asset is checksummed and carries a build attestation, so you can check
+both what you have and where it came from:
+
+```sh
+sha256sum -c SHA256SUMS
+gh attestation verify <asset> --repo nevenincs/vaultspec-core
+```
+
+An attestation is not a code signature and does not quiet SmartScreen or Gatekeeper -
+[docs/channels.md](https://github.com/nevenincs/vaultspec-core/blob/main/docs/channels.md)
+says what each check does and does not prove.
 
 ## The vaultspec family
 
