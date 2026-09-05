@@ -2452,6 +2452,94 @@ vaultspec-core spec hooks [OPTIONS] COMMAND [ARGS]...
 
 ______________________________________________________________________
 
+### vaultspec-core spec gitignore
+
+```bash
+vaultspec-core spec gitignore [OPTIONS] COMMAND [ARGS]...
+```
+
+#### Subcommands
+
+- `disable` (`--json`) - Decline the vaultspec-managed `.gitignore` block for the whole
+  project.
+- `enable` (`--json`) - Restore the vaultspec-managed `.gitignore` block for the whole
+  project.
+
+By default every install, upgrade and sync writes and reconciles the managed block in
+`.gitignore`, creating the file when the project has none. `disable` records
+`blocks.gitignore = false` in the committed `.vaultspec/workspace.json`, which declines
+it for every clone: no later run writes the block on any machine.
+
+The declaration is where the decision has to live. Deleting the block by hand stands the
+current machine down and prints this verb, but it cannot record more than that - the
+file it would write the decision into is `.vaultspec/providers.json`, which the block
+itself keeps out of git, so a decision kept there never reaches a teammate. An explicit
+provisioning command writes the block back; only the declaration survives one.
+
+Neither verb touches `.gitignore` itself. Declining is a policy statement, and removing
+the block is yours to do. `enable` clears the declaration again and is a no-op in a
+project that never declared one. Both are idempotent and exit zero when the requested
+state already holds.
+
+#### Options
+
+- `--json` (default off) - Emit the result as JSON.
+- `--target DIR` (`-t`, default cwd) - Act on a directory other than the current one.
+
+#### Examples
+
+- **Decline the block for the whole project**:
+
+  ```bash
+  vaultspec-core spec gitignore disable
+  ```
+
+- **Resume managing it**:
+
+  ```bash
+  vaultspec-core spec gitignore enable
+  ```
+
+### vaultspec-core spec gitattributes
+
+```bash
+vaultspec-core spec gitattributes [OPTIONS] COMMAND [ARGS]...
+```
+
+#### Subcommands
+
+- `disable` (`--json`) - Decline the vaultspec-managed `.gitattributes` block for the
+  whole project.
+- `enable` (`--json`) - Restore the vaultspec-managed `.gitattributes` block for the
+  whole project.
+
+The twin of `vaultspec-core spec gitignore`, recording `blocks.gitattributes` in the
+same committed declaration and behaving identically.
+
+What differs is what the block does. Its default entries normalise line endings for
+every checkout and exempt Windows batch files, so declining it is a statement about how
+the whole project is checked out rather than a preference on one machine - which is the
+clearest case for the decision being committed rather than local.
+
+#### Options
+
+- `--json` (default off) - Emit the result as JSON.
+- `--target DIR` (`-t`, default cwd) - Act on a directory other than the current one.
+
+#### Examples
+
+- **Decline line-ending normalisation for the project**:
+
+  ```bash
+  vaultspec-core spec gitattributes disable
+  ```
+
+- **Resume managing it**:
+
+  ```bash
+  vaultspec-core spec gitattributes enable
+  ```
+
 ### vaultspec-core spec precommit
 
 ```bash

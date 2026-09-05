@@ -33,25 +33,26 @@ cannot record more than that: the file it would write the decision into is
 `.vaultspec/providers.json`, which the block itself excludes from git, so a decision
 kept there never reaches a teammate.
 
-An explicit `vaultspec-core install` or `install --upgrade` writes the block back. That
-is deliberate. Deleting a file is something you might have done by accident or in a
-merge; typing a provisioning command is not, and an upgrade runs a sync of its own
-partway through, so honouring the stand-down that sync had just recorded would leave the
-command you typed doing nothing at all. The declaration is what survives a provisioning
-run. Until it is written, `vaultspec-core doctor` reports `gitignore warn unmanaged` for
-an installed project carrying no block, names both ways out, and raises its exit code.
+An explicit `vaultspec-core install` or `vaultspec-core install --upgrade` writes the
+block back. That is deliberate. Deleting a file is something you might have done by
+accident or in a merge; typing a provisioning command is not, and an upgrade runs a sync
+of its own partway through, so honouring the stand-down that sync had just recorded
+would leave the command you typed doing nothing at all. The declaration is what survives
+a provisioning run. Until it is written, `vaultspec-core doctor` reports
+`gitignore warn unmanaged` for an installed project carrying no block, names both ways
+out, and raises its exit code.
 
 ## What an absent managed file means
 
 Vaultspec manages four files, and an absence means something different in each, because
 the files differ in what an absence can tell you:
 
-| File                      | Absent when you sync | Absent when you upgrade | How to decline it                    |
-| ------------------------- | -------------------- | ----------------------- | ------------------------------------ |
-| `.mcp.json`               | recreated            | recreated               | not declinable; `--skip mcp` per run |
-| `.pre-commit-config.yaml` | left alone           | recreated               | `spec precommit disable`             |
-| `.gitignore`              | left alone           | recreated               | `spec gitignore disable`             |
-| `.gitattributes`          | left alone           | recreated               | `spec gitattributes disable`         |
+| File                      | Absent when you sync | Absent when you upgrade | How to decline it                           |
+| ------------------------- | -------------------- | ----------------------- | ------------------------------------------- |
+| `.mcp.json`               | recreated            | recreated               | not declinable; `--skip mcp` per run        |
+| `.pre-commit-config.yaml` | left alone           | recreated               | `vaultspec-core spec precommit disable`     |
+| `.gitignore`              | left alone           | recreated               | `vaultspec-core spec gitignore disable`     |
+| `.gitattributes`          | left alone           | recreated               | `vaultspec-core spec gitattributes disable` |
 
 `.mcp.json` is generated entirely from your rules, so its absence says nothing and
 vaultspec simply rebuilds it. The other three sit in files you also author, so vaultspec
