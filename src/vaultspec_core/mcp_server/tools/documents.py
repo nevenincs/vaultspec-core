@@ -131,8 +131,9 @@ class DocumentSpec(LeanModel):
         feature: The feature handle (kebab-case; a leading ``#`` is stripped
             and the token is validated by the shared normalizer).
         type: The document type (``research`` / ``adr`` / ``plan`` /
-            ``reference`` / ``audit`` / ``exec``); defaults to ``research``.
-            ``index`` is rejected - indexes are auto-generated.
+            ``reference`` / ``audit``); defaults to ``research``. ``index``
+            is rejected (auto-generated) and so is ``exec``: execution is
+            logged with the ``log`` tool.
         title: Optional document title, rendered into the heading.
         date: Optional ISO-8601 date; defaults to today (UTC).
         content: Optional seed prose appended as a ``## Context`` section
@@ -233,6 +234,12 @@ def _create_one(
             target,
             "'index' documents are auto-generated. "
             "Use 'vaultspec-core vault feature index', not create.",
+        )
+    if doc_type is DocType.EXEC:
+        from ...vaultcore.hydration import EXEC_NOT_SCAFFOLDED
+
+        return _create_failure(
+            index, target, f"{EXEC_NOT_SCAFFOLDED}; use the `log` tool."
         )
 
     extra_tags: list[str] | None = None

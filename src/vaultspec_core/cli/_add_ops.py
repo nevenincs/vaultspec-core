@@ -11,8 +11,7 @@ composition of those steps.
 from __future__ import annotations
 
 from contextlib import contextmanager
-from dataclasses import replace
-from typing import TYPE_CHECKING, NoReturn, cast
+from typing import TYPE_CHECKING, NoReturn
 
 import typer
 
@@ -24,14 +23,8 @@ if TYPE_CHECKING:
 
     from rich.console import Console
 
-    from vaultspec_core.cli.rendering import OutcomeItem
     from vaultspec_core.plan.parser import Plan, Step
-    from vaultspec_core.vaultcore.hydration import (
-        DocumentIdentity,
-        ParentPlan,
-        TemplateFields,
-        WritePolicy,
-    )
+    from vaultspec_core.vaultcore.exec_log import LogOutcome
     from vaultspec_core.vaultcore.models import DocType
     from vaultspec_core.vaultcore.query import VaultDocument
 
@@ -64,42 +57,15 @@ def resolve_doc_type(console: Console, doc_type: str) -> DocType:
             "'vaultspec-core vault add index'.[/red]"
         )
         raise typer.Exit(code=1)
+    if dt is DocType.EXEC:
+        # Execution has one artifact, the plan's ledger, and one writer.
+        # Refusing here, before any plan or template is resolved, keeps the
+        # scaffolder from ever producing a per-Step record again.
+        from vaultspec_core.vaultcore.hydration import EXEC_NOT_SCAFFOLDED
+
+        console.print(f"[red]Error: {EXEC_NOT_SCAFFOLDED}.[/red]")
+        raise typer.Exit(code=1)
     return dt
-
-
-def validate_step_flags(
-    console: Console,
-    dt: DocType,
-    *,
-    step: str | None,
-    all_steps: bool,
-    summary: bool,
-    phase: str | None,
-) -> None:
-    """Reject step-aware flag combinations the scaffolder cannot honour."""
-    from vaultspec_core.vaultcore.models import DocType
-
-    step_route = step is not None or all_steps or summary
-    if step_route and dt is not DocType.EXEC:
-        fail(
-            console,
-            "Error: --step, --all-steps, and --summary options are only "
-            "valid when creating 'exec' documents.",
-        )
-    if step is not None and all_steps:
-        fail(console, "Error: --step and --all-steps options are mutually exclusive.")
-    if summary and (step is not None or all_steps):
-        fail(
-            console,
-            "Error: --summary cannot be combined with --step or --all-steps.",
-        )
-    if summary and phase is None:
-        fail(
-            console,
-            "Error: --summary requires --phase <P##> naming the Phase to summarise.",
-        )
-    if phase is not None and not summary:
-        fail(console, "Error: --phase is only valid together with --summary.")
 
 
 def validate_tier(console: Console, dt: DocType, tier: str) -> None:
@@ -263,7 +229,7 @@ def resolve_parent_plan(
     fail(
         console,
         f"No plan found for feature '{feature}'. "
-        "Create a plan document before adding execution records.",
+        "Create a plan document before logging execution.",
     )
 
 
@@ -296,17 +262,6 @@ def resolve_step_row(console: Console, plan: Plan, step: str) -> Step:
         raise typer.Exit(code=1) from None
 
 
-def resolve_phase_display_path(console: Console, plan: Plan, phase: str) -> str:
-    """Resolve ``--phase`` to the summarised Phase's display path."""
-    from vaultspec_core.plan.commands.phase_ops import PhaseNotFoundError, find_phase
-
-    try:
-        return find_phase(plan, phase).display_path
-    except PhaseNotFoundError as exc:
-        console.print(f"[red]Error: {exc}[/red]")
-        raise typer.Exit(code=1) from None
-
-
 @contextmanager
 def suppress_logging(*, active: bool) -> Generator[None]:
     """Silence library logging while a machine-readable payload is emitted."""
@@ -321,103 +276,6 @@ def suppress_logging(*, active: bool) -> Generator[None]:
         yield
     finally:
         logging.disable(previous)
-
-
-def scaffold_all_steps(
-    steps: Sequence[Step],
-    *,
-    root_dir: Path,
-    identity: DocumentIdentity,
-    fields: TemplateFields,
-    plan: ParentPlan,
-    write: WritePolicy,
-    json_output: bool,
-) -> int:
-    """Scaffold one execution record per Step row and return the exit code."""
-    from vaultspec_core.cli.rendering import emit_outcomes
-
-    items: list[OutcomeItem] = []
-    with suppress_logging(active=json_output):
-        for step in steps:
-            items.append(
-                _scaffold_step_record(
-                    step,
-                    root_dir=root_dir,
-                    identity=identity,
-                    fields=fields,
-                    plan=plan,
-                    write=write,
-                )
-            )
-
-    if not write.dry_run and items:
-        from vaultspec_core.cli._cache_hook import invalidate_graph_cache
-
-        invalidate_graph_cache(root_dir)
-
-    return emit_outcomes(
-        items,
-        command="vault.add",
-        title="Scaffold Execution Steps",
-        json_output=json_output,
-    )
-
-
-def _scaffold_step_record(
-    step: Step,
-    *,
-    root_dir: Path,
-    identity: DocumentIdentity,
-    fields: TemplateFields,
-    plan: ParentPlan,
-    write: WritePolicy,
-) -> OutcomeItem:
-    """Scaffold one Step's execution record and report its outcome."""
-    from vaultspec_core.cli.rendering import Outcome, OutcomeItem
-    from vaultspec_core.vaultcore.hydration import ExecBinding, create_vault_doc
-
-    binding = ExecBinding(
-        plan=plan,
-        step_id=step.canonical_id,
-        step_display_path=step.display_path,
-        step_scope=step.scope,
-        step_action=step.action,
-    )
-
-    # Resolve the target path first so the outcome can distinguish a fresh
-    # record from an overwrite before anything is written.
-    target_path = create_vault_doc(
-        root_dir,
-        identity,
-        fields,
-        exec_binding=binding,
-        write=replace(write, force=True, dry_run=True),
-    )
-    rel_name = str(target_path.relative_to(root_dir))
-    exists = target_path.exists()
-
-    if exists and not write.force:
-        return OutcomeItem(
-            name=rel_name, outcome=Outcome.SKIPPED, detail="skipped; exists"
-        )
-
-    if exists:
-        outcome = Outcome.UPDATED
-        detail = "overwritten" if not write.dry_run else "would overwrite"
-    else:
-        outcome = Outcome.CREATED
-        detail = "created" if not write.dry_run else "would create"
-
-    if not write.dry_run:
-        create_vault_doc(
-            root_dir,
-            identity,
-            fields,
-            exec_binding=binding,
-            write=write,
-        )
-
-    return OutcomeItem(name=rel_name, outcome=outcome, detail=detail)
 
 
 def emit_add_result(
@@ -457,45 +315,30 @@ def emit_add_result(
 def parse_row_specs(
     console: Console, specs: Sequence[str]
 ) -> tuple[tuple[str, tuple[str, ...]], ...]:
-    """Validate ``--row`` specs into ledger row cells.
+    """Validate ``--row`` specs into ledger row cells, refusing on the first bad one."""
+    from vaultspec_core.vaultcore.exec_log import ExecLogError, parse_row_spec
 
-    Each spec is ``OP:path`` (``A``, ``M``, ``D``) or ``R:old->new``. The
-    scaffolder never infers an operation from disk state: an executor knows
-    what it did, and guessing would record evidence nobody produced.
-
-    Args:
-        console: Console for the refusal message.
-        specs: Raw ``--row`` values.
-
-    Returns:
-        The parsed ``(op, paths)`` pairs.
-
-    Raises:
-        typer.Exit: On a malformed spec, an unknown operation, or a rename
-            missing one of its two paths.
-    """
     parsed: list[tuple[str, tuple[str, ...]]] = []
     for spec in specs:
-        op, separator, remainder = spec.partition(":")
-        op = op.strip().upper()
-        if not separator or not remainder.strip():
-            _refuse_row(console, spec, "expected 'OP:path'")
-        if op not in {"A", "M", "D", "R"}:
-            _refuse_row(console, spec, f"unknown operation {op!r}; use A, M, D, or R")
-        if op == "R":
-            old, arrow, new = remainder.partition("->")
-            if not arrow or not old.strip() or not new.strip():
-                _refuse_row(console, spec, "a rename needs 'R:old->new'")
-            parsed.append((op, (old.strip(), new.strip())))
-        else:
-            parsed.append((op, (remainder.strip(),)))
+        try:
+            parsed.append(parse_row_spec(spec))
+        except ExecLogError as exc:
+            console.print(f"[red]Error:[/red] {exc}.")
+            raise typer.Exit(code=1) from None
     return tuple(parsed)
 
 
-def _refuse_row(console: Console, spec: str, reason: str) -> NoReturn:
-    """Refuse a malformed ``--row`` spec with an actionable message."""
-    console.print(f"[red]Error:[/red] invalid --row {spec!r}: {reason}.")
-    raise typer.Exit(code=1)
+def parse_verify(console: Console, spec: str | None) -> tuple[str, str] | None:
+    """Validate the ``--verify`` spec, refusing a result other than pass or fail."""
+    from vaultspec_core.vaultcore.exec_log import ExecLogError, parse_verify_spec
+
+    if spec is None:
+        return None
+    try:
+        return parse_verify_spec(spec)
+    except ExecLogError as exc:
+        console.print(f"[red]Error:[/red] {exc}.")
+        raise typer.Exit(code=1) from None
 
 
 def log_ledger_rows(
@@ -506,17 +349,13 @@ def log_ledger_rows(
     plan_stem: str,
     step: str,
     rows: Sequence[tuple[str, tuple[str, ...]]],
+    verify: tuple[str, str] | None = None,
+    by: str | None = None,
+    notes: Sequence[str] = (),
     dry_run: bool,
     json_output: bool,
-) -> Path:
-    """Create the plan's ledger if absent, then append *step*'s rows to it.
-
-    Creating and appending are one operation because the ledger is
-    append-only: an executor logging its first Step must not have to know
-    whether the document already exists. The append routes through
-    :func:`~vaultspec_core.vaultcore.models.refresh_modified_stamp`, the
-    mandated mutator helper, so the ``modified:`` stamp and the
-    ``body_hash:`` re-attestation stay paired.
+) -> LogOutcome:
+    """Append one Step's evidence to its plan's ledger through the shared core.
 
     Args:
         console: Console for operator messages.
@@ -525,90 +364,43 @@ def log_ledger_rows(
         plan_stem: Stem of the parent plan the ledger records.
         step: Canonical Step identifier or display path being logged.
         rows: Parsed ``(op, paths)`` pairs from :func:`parse_row_specs`.
+        verify: ``(command, result)`` for the ``verify:`` row, if any.
+        by: Persona for the ``by:`` row, if any.
+        notes: Exception notes, one ``## Notes`` line each.
         dry_run: Resolve and report the target without writing.
         json_output: Suppress the human-readable confirmation line.
 
     Returns:
-        The ledger's path.
+        The :class:`~vaultspec_core.vaultcore.exec_log.LogOutcome`.
     """
-    import datetime as _dt
+    from vaultspec_core.vaultcore.exec_log import ExecLogError, LogRequest, log_step
 
-    from vaultspec_core.core.helpers import atomic_write
-    from vaultspec_core.plan.parser import parse_plan
-    from vaultspec_core.vaultcore.exec_ledger import append_rows, format_row
-    from vaultspec_core.vaultcore.hydration import (
-        DocumentIdentity,
-        ExecBinding,
-        ParentPlan,
-        TemplateFields,
-        WritePolicy,
-        create_vault_doc,
+    request = LogRequest(
+        feature=feature,
+        plan_stem=plan_stem,
+        step=step,
+        rows=tuple(rows),
+        verify=verify,
+        by=by,
+        notes=tuple(notes),
     )
-    from vaultspec_core.vaultcore.models import (
-        DocType,
-        refresh_modified_stamp,
-    )
-
-    feat = normalize_feature(console, feature)
-    plan_doc = resolve_parent_plan(console, root_dir, feat, [plan_stem])
-    parsed_plan = parse_plan(plan_doc.path)
-    target_step = resolve_step_row(console, parsed_plan, step)
-
-    plan = ParentPlan(
-        date=plan_doc.date or plan_doc.path.stem[:10], stem=plan_doc.path.stem
-    )
-    identity = DocumentIdentity(
-        doc_type=DocType.EXEC, feature=feat, date=plan.date or ""
-    )
-    binding = ExecBinding(plan=plan, ledger=True)
-    fields = TemplateFields()
-
-    # Resolve the path without writing so an existing ledger is appended to,
-    # never overwritten - a rewrite would discard other Steps' history.
-    ledger_path = create_vault_doc(
-        root_dir,
-        identity,
-        fields,
-        exec_binding=binding,
-        write=WritePolicy(force=True, dry_run=True),
-    )
-    if dry_run:
-        if not json_output:
-            console.print(f"[dim]Would log {len(rows)} row(s) to:[/dim] {ledger_path}")
-        return ledger_path
-
-    if not ledger_path.exists():
-        create_vault_doc(
-            root_dir,
-            identity,
-            fields,
-            exec_binding=binding,
-            write=WritePolicy(force=False, dry_run=False),
-        )
-
-    if not rows:
-        return ledger_path
-
-    text = ledger_path.read_text(encoding="utf-8")
-    rendered = [format_row(target_step.canonical_id, op, *paths) for op, paths in rows]
-    # Appended against the whole document, not a split-off body: frontmatter is
-    # YAML and can never carry a '## Changes' heading, so the section match is
-    # unambiguous and no fragile head/body reassembly is needed.
     try:
-        updated = append_rows(text, rendered)
-    except ValueError as exc:
-        console.print(f"[red]Error:[/red] {exc}.")
-        raise typer.Exit(code=1) from exc
+        outcome = log_step(root_dir, request, dry_run=dry_run)
+    except ExecLogError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(code=1) from None
 
-    if updated != text:
-        atomic_write(ledger_path, refresh_modified_stamp(updated, _dt.date.today()))
-
-    if not json_output:
+    if json_output:
+        return outcome
+    total = len(outcome.rows) + len(outcome.notes)
+    if dry_run:
+        console.print(f"[dim]Would log {total} row(s) to:[/dim] {outcome.path}")
+    else:
         console.print(
-            f"[green]Logged:[/green] {len(rendered)} row(s) for "
-            f"{target_step.canonical_id} -> {ledger_path.name}"
+            f"[green]Logged:[/green] {total} row(s) for "
+            f"{outcome.step_id} -> {outcome.path.name}"
         )
-    return ledger_path
+    return outcome
 
 
 def fold_exec_records(
@@ -620,7 +412,7 @@ def fold_exec_records(
     force: bool,
     json_output: bool,
 ) -> tuple[Path | None, object]:
-    """Fold one feature's per-Step execution records into a single ledger.
+    """Fold one feature's per-Step execution records into its plan's ledger.
 
     The fold is destructive - it removes the records whose content the
     ledger now carries - so it refuses to write without ``--force``, and
@@ -640,119 +432,74 @@ def fold_exec_records(
         nothing was folded.
 
     Raises:
-        typer.Exit: When the feature has no execution folder, or when a
+        typer.Exit: When the feature has no execution records, or when a
             non-dry run was requested without ``--force``.
     """
-    import datetime as _dt
-
     from vaultspec_core.config import get_config
-    from vaultspec_core.core.helpers import atomic_write
-    from vaultspec_core.vaultcore.checks.exec_mapping import link_stem
-    from vaultspec_core.vaultcore.exec_fold import plan_fold, sources_from, summarize
-    from vaultspec_core.vaultcore.exec_ledger import append_rows
-    from vaultspec_core.vaultcore.hydration import (
-        DocumentIdentity,
-        ExecBinding,
-        ParentPlan,
-        TemplateFields,
-        WritePolicy,
-        create_vault_doc,
+    from vaultspec_core.vaultcore.exec_fold import (
+        apply_fold,
+        collect_sources,
+        phase_steps_of,
+        plan_fold,
+        sources_from,
+        summarize,
     )
-    from vaultspec_core.vaultcore.models import DocType, refresh_modified_stamp
-    from vaultspec_core.vaultcore.parser import parse_frontmatter
 
     feat = normalize_feature(console, feature)
     exec_root = root_dir / get_config().docs_dir / "exec"
     folders = sorted(p for p in exec_root.glob(f"*-{feat}") if p.is_dir())
-    if not folders:
+    # A flat record from before Step-aware scaffolding sits beside the
+    # folders; it folds into the feature's ledger like any other record.
+    flat = sorted(p for p in exec_root.glob(f"*-{feat}-exec.md") if p.is_file())
+    if not folders and not flat:
         console.print(
             f"[red]Error:[/red] no execution folder found for feature {feat!r}."
         )
         raise typer.Exit(code=1)
 
-    folder = folders[0]
-    records: list[tuple[Path, str | None, str]] = []
-    plan_stems: list[str] = []
-    for path in sorted(folder.glob("*.md")):
-        try:
-            meta, body = parse_frontmatter(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, ValueError):
-            continue
-        raw = meta.get("step_id")
-        step_id = str(raw).strip() if raw else None
-        records.append((path, step_id, body))
-        # Frontmatter is untyped JSON-ish data, so the related list is
-        # narrowed explicitly rather than iterated as Any.
-        raw_related: object = meta.get("related")
-        related: tuple[object, ...] = (
-            tuple(cast("list[object]", raw_related))
-            if isinstance(raw_related, list)
-            else ()
-        )
-        for link in related:
-            stem = link_stem(str(link))
-            if stem and stem.endswith("-plan"):
-                plan_stems.append(stem)
+    candidates = [*(path for folder in folders for path in folder.glob("*.md")), *flat]
+    records, plan_stem, covered = collect_sources(candidates)
+    folder_name = (
+        folders[0].name if folders else f"{(plan_stem or flat[0].stem)[:10]}-{feat}"
+    )
+    plan_stem = plan_stem or f"{folder_name}-plan"
+    plan_path = root_dir / get_config().docs_dir / "plan" / f"{plan_stem}.md"
 
-    plan = plan_fold(sources_from(records))
+    plan = plan_fold(
+        sources_from(records),
+        phase_steps=phase_steps_of(plan_path),
+        covered=covered,
+    )
     if not json_output:
-        console.print(summarize(plan, folder.name))
+        console.print(summarize(plan, folder_name))
         for skip in plan.skipped:
             console.print(f"  [dim]skip[/dim] {skip.path.name} - {skip.reason}")
 
     if plan.is_empty:
         return None, plan
 
-    if not force:
+    if not force and not dry_run:
         console.print(
             "[yellow]Refusing to fold without --force:[/yellow] this removes "
-            f"{len(plan.folded)} record(s). Re-run with --force to apply, or "
+            f"{len(plan.removed)} record(s). Re-run with --force to apply, or "
             "--dry-run to silence this."
         )
         raise typer.Exit(code=1)
 
-    plan_stem = plan_stems[0] if plan_stems else f"{folder.name}-plan"
-    folder_date = folder.name[:10]
-    parent = ParentPlan(date=folder_date, stem=plan_stem)
-    identity = DocumentIdentity(doc_type=DocType.EXEC, feature=feat, date=folder_date)
-    binding = ExecBinding(plan=parent, ledger=True)
-    fields = TemplateFields()
-
-    ledger_path = create_vault_doc(
+    ledger_path = apply_fold(
         root_dir,
-        identity,
-        fields,
-        exec_binding=binding,
-        write=WritePolicy(force=True, dry_run=True),
+        plan,
+        feature=feat,
+        folder_date=folder_name[:10],
+        plan_stem=plan_stem,
+        dry_run=dry_run,
     )
-    if dry_run:
-        if not json_output:
-            console.print(f"[dim]Would write:[/dim] {ledger_path}")
-        return ledger_path, plan
-
-    if not ledger_path.exists():
-        create_vault_doc(
-            root_dir,
-            identity,
-            fields,
-            exec_binding=binding,
-            write=WritePolicy(force=False, dry_run=False),
-        )
-
-    text = ledger_path.read_text(encoding="utf-8")
-    updated = append_rows(text, plan.rows)
-    if updated != text:
-        atomic_write(ledger_path, refresh_modified_stamp(updated, _dt.date.today()))
-
-    # Remove folded records only after the ledger carrying their content is
-    # durably on disk, so an interruption leaves duplication rather than loss.
-    for path in plan.folded:
-        if path != ledger_path:
-            path.unlink(missing_ok=True)
-
     if not json_output:
-        console.print(
-            f"[green]Folded:[/green] {len(plan.folded)} record(s) into "
-            f"{ledger_path.name}"
-        )
+        if dry_run:
+            console.print(f"[dim]Would write:[/dim] {ledger_path}")
+        else:
+            console.print(
+                f"[green]Folded:[/green] {len(plan.removed)} record(s) into "
+                f"{ledger_path.name}"
+            )
     return ledger_path, plan

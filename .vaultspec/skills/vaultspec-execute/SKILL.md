@@ -1,122 +1,61 @@
 ---
 name: vaultspec-execute
-description: Execute an approved implementation plan, dispatching agent personas per step. Use when a plan document is ready to build.
+description: Execute an approved plan Step by Step, across sessions. Use to start or resume a plan; it is the only skill that spans sessions.
 ---
 
-# Plan execution skill (vaultspec-execute)
+# Execute (vaultspec-execute)
 
-Use this skill:
+Works an approved plan from its next open Step, leaving a checkpoint after every Step so
+any later session resumes without re-reading the cluster. Precondition: the plan has an
+approval reply from the user. A plan without one is not executed.
 
-- To begin the execution of an implementation plan.
-- To ensure code is written by the appropriate agent.
+## Resume
 
-**Announce at start:** "I'm using the `vaultspec-execute` skill to execute the
-implementation plan."
+- `vaultspec-core status <feature>` (or the `status` tool) names the next open Step. A
+  plan whose Description lacks an `Approved` line is presented again first.
+- On the plan's first entry read it whole; on resume, read the next Step's row and the
+  ADR sections it depends on.
+- Ground the Step per the `vaultspec-discovery` rule before editing.
+- A dispatched worker skips orientation (the orchestrator did it) and works its assigned
+  container from the named Step onward.
 
-## Required steps
+## Per Step
 
-- This skill MUST be invoked to execute an implementation plan located at
-  `.vault/plan/yyyy-mm-dd-{feature}-plan.md`.
+- Implement exactly the Step's action in the files it names. Run the project's tests,
+  lint, and type checks.
+- **Blocker:** if the Step admits implementations of different scope, names a path that
+  does not exist, or depends on something missing, stop and ask the user (a worker
+  raises it to the orchestrator and waits). The answer goes into the row via `plan_edit`
+  and is quoted back in the reply; then continue. Never resolve a blocker on your own
+  judgment. Otherwise do not ask between Steps.
+- Log the Step:
+  `vaultspec-core vault exec log --feature {feature} --step S## --related <plan-stem> --row M:path`
+  (or the `log` tool), one `--row` per path touched, `--verify '<cmd>=pass'` when a
+  check ran, `--note` only on exception. The plan row states the intent and the commit
+  carries the diff.
+- Close the Step: `plan_progress` tool or `vaultspec-core vault plan step check`. Never
+  edit the checkbox by hand.
+- Commit once per Step, code, ledger, and plan together, adding the `Vaultspec-Step`
+  trailer (`vaultspec-core vault plan trailer emit --step S##`) when the repository
+  already uses it. Code never cites the vault.
 
-- Read and parse the Plan to understand the scope, complexity, and specific Steps.
+## Delegation
 
-- Read and parse all linked documents to understand the coding challenge.
+Do the Steps yourself unless the plan's Parallelization section names containers that
+may run concurrently; then dispatch executor personas (`vaultspec-low-executor`,
+`vaultspec-standard-executor`, or `vaultspec-high-executor` by the Step's difficulty) at
+approved Steps, each told the plan stem, the feature tag, its container, and its
+starting Step id, and to follow this skill as a worker; they return in their persona's
+Return message format. Workers never change plan structure; that routes back to you.
 
-- **Ground each Step in real code before editing.** Locate a Step's target in the live
-  codebase before changing it - lead with `vaultspec-rag search "<intent>" --type code`,
-  the fastest way to the right file - then read the epicenter or nearest existing
-  analogue in full and confirm exact symbols with a targeted grep; for an extension,
-  diff the requirements against the nearest analogue. Instruct every dispatched executor
-  to do the same. Where `vaultspec-rag` is not installed, the `vaultspec-core` discovery
-  verbs and grep carry the same sequence.
+## Phase close and finish
 
-## Executor delegation
-
-Assume the persona of a delegator.
-
-- Use parallel sub-agents, or an autonomous agent team, to execute complex plans.
-
-- Use the appropriate executor agent persona. When the work needs multiple specialists,
-  coordinate them.
-
-- Always instruct the coders to execute the current plan, and to read grounding
-  research, ADRs, and the `[[...-plan.md]]`.
-
-- Always name the tier-conditional entry point: instruct "Start with Step `S##`." at L1
-  (Steps only), "Start with Phase `P##`." at L2, or the canonical display path (e.g.,
-  `W01.P01`) at L3 / L4.
-
-### Step execution and logging
-
-- Execute the plan one Step at a time. Per the Step row contract embedded in the plan
-  template, each Step is exactly one prompt-run plus one commit; the executor closes the
-  row (`- [ ]` to `- [x]`) on completion.
-
-- **One Step Record per completed Step.** The executor writes a Step Record to
-  `.vault/exec/yyyy-mm-dd-{feature}/...md` for every completed Step (not per Phase).
-  Scaffold the record with
-  `vaultspec-core vault add exec --feature <tag> --step <S##> --related <plan-stem>`,
-  then fill `## Changes` with the mechanical path log - one `A`/`M`/`D`/`R` line per
-  path touched, no prose. The Step row already states the intent and the commit carries
-  the diff, so a record that narrates them is duplicated context, not evidence. Add
-  `## Notes` only on exception (data loss, skipped work, a scaffold left in code, a
-  persistent failure). The verb machine-fills the tier-conditional filename from the
-  plan's canonical display path (`yyyy-mm-dd-{feature}-{step}.md` at L1,
-  `yyyy-mm-dd-{feature}-{phase}-{step}.md` at L2, and
-  `yyyy-mm-dd-{feature}-{wave}-{phase}-{step}.md` at L3/L4) and the `step_id:`
-  frontmatter field carrying the originating Step's canonical identifier (`S##`).
-
-- **Coder or supervisor must read and use the template** at
-  `.vaultspec/templates/exec-step.md`.
-
-- **Frontmatter:** the scaffold owns the filename and frontmatter of every artifact
-  (Step Record, Summary); the full schema is defined in the `vaultspec` rule. Verify
-  with `vaultspec-core vault check all` rather than hand-editing.
-
-### Mandatory code review
-
-- After an executor completes a step (or the full plan), you MUST invoke the
-  `vaultspec-code-review` skill or a relevant code-review skill.
-
-- For code reviews, always use the `vaultspec-code-reviewer` persona to audit for
-  safety, intent, and quality.
-
-- If the reviewer identifies **CRITICAL** or **HIGH** issues, you MUST resolve them by
-  loading an executor again before proceeding.
-
-### Finalization and summary
-
-- Once all implementation and review steps are complete (and the review passes), write
-  the consolidated Phase Summary at `.vault/exec/yyyy-mm-dd-{feature}/...-summary.md`
-  using `yyyy-mm-dd-{feature}-{phase}-summary.md` at L2 or
-  `yyyy-mm-dd-{feature}-{wave}-{phase}-summary.md` at L3/L4.
-
-- **Template**: You MUST read and use the template at
-  `.vaultspec/templates/exec-summary.md`.
-
-- Present the final findings, including modified files and safety status, to the user.
-
-## Requirements
-
-- **Autonomy**: Do not ask for confirmation between steps unless a significant
-  unforeseen blocker occurs.
-
-- **Integrity**: Ensure the safety audit is never skipped.
-
-- **Traceability**: All changes must be mapped to their respective Step Records. The
-  mapping lives in the Step Record, which lists the modified files - never as plan,
-  Step-id, or vault-document annotations in the code itself (the code-stands-alone
-  boundary; opt-in git commit trailers are the sanctioned linkage channel).
-
-- **L4 plans**: When executing an `L4` plan, the execute skill respects the
-  project-management association declared in the plan's `## Epic intent` block prose.
-  Wave-completion and Epic-completion progress are reported against that external
-  artifact (milestone, project board, roadmap entry) at Wave boundaries.
-
-- **CLI usage mandate**: Executors MUST update Step state via
-  `vaultspec-core vault plan step check` (close),
-  `vaultspec-core vault plan step uncheck` (re-open), or
-  `vaultspec-core vault plan step toggle` rather than hand-editing the checkbox glyph.
-  The CLI guarantees idempotent state transitions and consistent display-path
-  recomputation; hand edits bypass these guarantees and are flagged by
-  `vaultspec-core vault plan check`.
+- At each point of the review cadence in the vaultspec section, run
+  `vaultspec-code-review`; a worker under `vaultspec-team` reports the close to its
+  supervisor instead, who reviews. `critical` or `high` findings reopen the affected
+  Steps (`vaultspec-core vault plan step uncheck`) and are fixed before continuing;
+  lower findings are recorded and fixed only under a Step the user approves.
+- At `L4`, report Wave and Epic completion against the external artifact named in the
+  plan's `## Epic intent`.
+- When every Step is closed and the last review passes, report the plan complete with
+  the modified files and the audit's status.

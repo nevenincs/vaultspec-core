@@ -35,13 +35,12 @@ Three things are mechanical, and they are the whole list.
 first of which runs `vault check all`. That file is configuration and not a git hook:
 until you install the `pre-commit` tool and run `pre-commit install`, nothing runs it
 and a commit carrying vault errors is accepted. Once it is wired, a malformed document
-blocks the commit. Its
-scope is the whole vault rather than the files you staged: the hooks pass no filenames,
-and the Markdown type filter decides only whether they fire, not what they read. One of
-the four mutates - `vault sanitize annotations` strips generated template annotations,
-across the vault by the same rule - which is why the
-[framework manual](framework.md) treats enabling this in a shared checkout as a
-decision rather than a default.
+blocks the commit. Its scope is the whole vault rather than the files you staged: the
+hooks pass no filenames, and the Markdown type filter decides only whether they fire,
+not what they read. One of the four mutates - `vault sanitize annotations` strips
+generated template annotations, across the vault by the same rule - which is why the
+[framework manual](framework.md) treats enabling this in a shared checkout as a decision
+rather than a default.
 
 The `schema` check requires the chain to hold: an ADR must reference the research behind
 it, and a plan must reference its ADR. A plan that appeared from nowhere fails.
@@ -52,11 +51,12 @@ history leaves a trace.
 
 That third one is detectable rather than blocking, and the distinction matters if you
 gate on the exit code. Measured: appending a line to an accepted ADR by hand and
-re-running the check reports `Stale modified stamp ...; the document body no longer matches its attested fingerprint (unstamped edit)` as a **warning**, and warnings do not
-raise the exit code. The `schema` failure above is an error and does. So a pipeline
-gating on `vault check all` catches the plan that appeared from nowhere and does not
-catch the audit rewritten last night; for that one, read the report rather than the
-exit status.
+re-running the check reports
+`Stale modified stamp ...; the document body no longer matches its attested fingerprint (unstamped edit)`
+as a **warning**, and warnings do not raise the exit code. The `schema` failure above is
+an error and does. So a pipeline gating on `vault check all` catches the plan that
+appeared from nowhere and does not catch the audit rewritten last night; for that one,
+read the report rather than the exit status.
 
 Nothing else is enforced. In particular, **no check fails because a feature has no
 audit**. The `features` check warns about a plan with no ADR and about a missing feature
@@ -112,12 +112,12 @@ on.
 Installing vaultspec seeds a system prompt into three of the four providers it manages.
 Claude and Codex read it as a rule file, `vaultspec-system.builtin.md`, alongside the
 others; Gemini reads it as `.gemini/SYSTEM.md`. Antigravity gets rules and skills but no
-system prompt, so the mandates below are not in front of it. It also gets a
-`workflows` directory, which the installer creates and nothing fills: the
-harness ships no workflows, so that folder is there for the provider's own
-convention rather than for anything of ours. Measured on
-a fresh install: the text appears under `.claude/`, `.codex/`, and `.gemini/`, and nowhere
-under `.agents/`. Two of its mandates are about correctness specifically.
+system prompt, so the mandates below are not in front of it. It also gets a `workflows`
+directory, which the installer creates and nothing fills: the harness ships no
+workflows, so that folder is there for the provider's own convention rather than for
+anything of ours. Measured on a fresh install: the text appears under `.claude/`,
+`.codex/`, and `.gemini/`, and nowhere under `.agents/`. Two of its mandates are about
+correctness specifically.
 
 On tests:
 
@@ -166,64 +166,50 @@ for the step that added the guard, or in `## Notes` if it needs more than a line
 
 This takes about a minute per guard. Skip it and the suite's green is uninformative.
 
-## What the execution record contains
+## What the ledger contains
 
-Closing a Step writes an execution record. The shipped pipeline produces one record per
-Step, scaffolded against the Step it documents:
+Closing a Step appends its rows to the plan's ledger, one document per plan:
 
 ```bash
-vaultspec-core vault add exec --feature payment-retries --step S01 --related 2026-02-06-payment-retries-plan
+vaultspec-core vault exec log --feature payment-retries --step S01 --related 2026-02-06-payment-retries-plan --row M:src/billing/retry.py --row A:src/billing/tests/test_retry.py
 ```
 
-The filename carries the Step's position, so `S01` under phase `P01` becomes
-`.vault/exec/2026-02-06-payment-retries/2026-02-06-payment-retries-P01-S01.md`, and the
-`step_id` frontmatter field carries the canonical `S01`. That binding is what lets
-`vault check exec-mapping` pair every record with a live Step.
+The ledger lives at
+`.vault/exec/2026-02-06-payment-retries/2026-02-06-payment-retries-ledger.md`, and each
+row's first cell is the Step id. That binding is what lets `vault check exec-mapping`
+pair every row with a live Step.
 
 Its `## Changes` section is a mechanical log, one line per path touched:
 
 ```
-- `M` `src/billing/retry.py`
-- `A` `src/billing/tests/test_retry.py`
-- `D` `src/legacy/shim.py`
+- `S01` `M` `src/billing/retry.py`
+- `S01` `A` `src/billing/tests/test_retry.py`
+- `S02` `D` `src/legacy/shim.py`
 ```
 
 The operations are `A` added, `M` modified, `D` deleted, and `R old -> new` renamed. No
 prose: the Step row already states the intent and the commit carries the diff.
 
-One optional final line names a check that was run:
+`--verify` writes one more row naming a check that was run:
 
 ```
-- `verify:` `pytest src/billing/tests/test_retry.py` -> `pass`
+- `S01` `verify:` `pytest src/billing/tests/test_retry.py` -> `pass`
 ```
 
-That line is the difference between "this was done" and "this was checked". It is
-optional, which makes its absence information too: a Step with no `verify:` line is a
-Step nobody claims to have checked.
+That row is the difference between "this was done" and "this was checked". It is
+optional, which makes its absence information too: a Step with no `verify:` row is a
+Step nobody claims to have checked. `--by` writes a `by:` row naming the persona that
+closed the Step; the commit carries the author.
 
-A `## Notes` section exists for exceptions only: work skipped, a scaffold left behind, a
-persistent failure, a decision that went against the Step as written. An absent Notes
-section is the correct state. An empty one is noise, and no check reports it, so leaving
-one behind is on you.
+`--note` writes a `## Notes` line under the Step id, for exceptions only: work skipped,
+a scaffold left behind, a persistent failure, a decision that went against the Step as
+written. The section is created on first use, so an absent `## Notes` is the correct
+state. Notes never register a Step as covered; only `## Changes` rows do.
 
-### The consolidated ledger
-
-A plan's records can also be folded into a single append-only ledger, one per plan,
-whose rows carry the Step id in the first column:
-
-```
-- `S01` `M` `src/billing/retry.py`
-- `S02` `D` `src/legacy/shim.py`
-```
-
-`vaultspec-core vault exec log` appends rows directly, creating the ledger on first use.
-`vaultspec-core vault exec fold` converts a feature's existing per-Step records into
-one; it deletes those records, so it refuses to run without `--force` and offers
-`--dry-run` to preview.
-
-Both shapes are first-class: `exec-mapping` reads a per-Step record through its
-`step_id` and a ledger through the ids in its rows. The folded form exists because a
-large vault accumulated more prose in per-Step records than any consumer read.
+The ledger is the only execution artifact. `vaultspec-core vault add exec` refuses, and
+a per-Step record left over from before 0.1.74 is an `exec-mapping` error until
+`vaultspec-core vault exec fold --feature <feature> --force` folds it in; the upgrade
+migration runs that fold on its own.
 
 ## What to run before you call something done
 
@@ -249,10 +235,9 @@ Vault Check  - All
   ok orphans: clean
 ```
 
-That capture is cut after the first nine of the nineteen checks; the rest read the
-same way, and the run ends `All checks passed.` A freshly scaffolded vault does not
-look like this and should not: its placeholders are errors until someone writes the
-prose.
+That capture is cut after the first nine of the nineteen checks; the rest read the same
+way, and the run ends `All checks passed.` A freshly scaffolded vault does not look like
+this and should not: its placeholders are errors until someone writes the prose.
 
 `--fix` rewrites documents, so read the diff before committing it. Then the project's
 own tests and gates, then `/vaultspec-code-review`, in that order. The check suite is

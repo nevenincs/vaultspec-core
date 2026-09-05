@@ -99,14 +99,18 @@ class StepTraceLine(LeanModel):
         canonical_id: The step's canonical leaf identifier (``S##``).
         display_path: The step's tier-conditional display path.
         checked: Whether the step's checkbox is ``[x]``.
-        record_stem: The execution-record stem mapped to this step, or
-            ``None`` for an open step with no record.
+        record_stem: The ledger stem mapped to this step, or ``None`` for
+            a step with no rows.
+        rows: The step's ledger change-row count, or ``None``.
+        verify: The step's last ``verify:`` result, or ``None``.
     """
 
     canonical_id: str
     display_path: str
     checked: bool
     record_stem: str | None
+    rows: int | None = None
+    verify: str | None = None
 
 
 class PlanTraceLine(LeanModel):
@@ -123,9 +127,8 @@ class PlanTraceLine(LeanModel):
         next_open_step: Display path of the first open step, or ``None``.
         steps: Per-step record mapping in document order.
         grounding: Grounding documents grouped by document type (stems only).
-        summaries: Phase-summary document stems referencing this plan.
-        unlinked_records: Execution-record stems referencing the plan
-            without a resolvable step id.
+        unlinked_records: Exec document stems referencing the plan that
+            name no step.
         error: A parse-error note when the plan could not be parsed.
     """
 
@@ -139,7 +142,6 @@ class PlanTraceLine(LeanModel):
     next_open_step: str | None
     steps: list[StepTraceLine] = Field(default_factory=list)
     grounding: dict[str, list[str]] = Field(default_factory=dict)
-    summaries: list[str] = Field(default_factory=list)
     unlinked_records: list[str] = Field(default_factory=list)
     error: str | None = None
 
@@ -331,11 +333,12 @@ def _trace_to_result(trace: GroundingTrace) -> StatusResult:
                         display_path=st.display_path,
                         checked=st.checked,
                         record_stem=st.record_stem,
+                        rows=st.rows,
+                        verify=st.verify,
                     )
                     for st in pt.steps
                 ],
                 grounding=pt.grounding,
-                summaries=pt.summaries,
                 unlinked_records=pt.unlinked_records,
                 error=pt.error,
             )

@@ -1,101 +1,47 @@
 ---
 name: vaultspec-adr
-description: Capture an architectural decision as an ADR in .vault/adr/. Use after research, before planning, when a significant design choice and its trade-offs must be recorded.
+description: Record and approve a decision that is costly to reverse. Use after a Research or Reference record exists and before any code builds on the decision.
 ---
 
-# ADR writing skill (vaultspec-adr)
+# ADR (vaultspec-adr)
 
-Use this skill:
+Produces an ADR: one decision, approved by the user, cited by the plan that executes it.
+Enter it for any decision the vaultspec sizing marks costly to reverse, at any horizon.
+Precondition: a Research or Reference record for the feature exists. If none does, stop;
+the next run is `vaultspec-research` when options must be weighed on external evidence,
+otherwise `vaultspec-code-research`. This skill terminates within one run.
 
-- After a `vaultspec-research` session has concluded with a recommendation.
-- When multiple competing technical choices need a grounding document.
-- When a significant architectural decision is made that affects the project's
-  foundations, feature set, or development trajectory.
-- To document the blast radius, "why", and "what" of major architectural choices.
-- When an accepted decision needs refining or concretizing - this amends the existing
-  record in place, not a new document (see Amend or supersede).
+## Steps
 
-**Announce at start:** "I'm using the `vaultspec-adr` skill to create a new ADR."
-
-## Required steps
-
-- **Ground the decision in existing intent first.** Before drafting, retrieve the prior
-  decisions that bind this area - the surest way to architect on top of them rather than
-  silently contradicting them. Lead with
-  `vaultspec-rag search "<intent>" --type vault --doc-type adr` (the directed ADR
-  filter, sharper than catch-all `--type vault`); read each in full - a record already
-  governing this scope routes through Amend or supersede below. Use
-  `vaultspec-rag search "<intent>" --type code` for the implementation sites the
-  decision will touch, then confirm exact symbols with grep, and lean on
-  `vaultspec-core status` and `vaultspec-core vault list` - first-class for orientation
-  \- to map related records. Round out decision recall by listing `.vault/adr/` and
-  filtering by feature - search can miss lower-ranked or opaquely-named records. Where
-  `vaultspec-rag` is not installed, the `vaultspec-core` discovery verbs and grep carry
-  the same sequence.
-
-- **Read and use the template** at `.vaultspec/templates/adr.md`; its embedded hint
-  blocks govern the body structure.
-
-- **Scaffold via the CLI:**
-  `vaultspec-core vault add adr --feature {feature} --related <research-stem>`, then
-  author the body prose in the scaffolded file. The CLI owns the filename
-  (`.vault/adr/yyyy-mm-dd-{feature}-adr.md`) and the frontmatter; never hand-write
-  either. The full frontmatter schema is defined in the `vaultspec` rule; verify after
-  scaffolding with `vaultspec-core vault check all` rather than hand-editing
-  frontmatter.
-
-- **Read and link related Research from:**
-  `.vault/research/yyyy-mm-dd-{feature}-research.md`.
-
-- **Terminate if related research is not found** and prompt the user to first invoke
-  `vaultspec-research`.
+- Ground per the `vaultspec-discovery` rule, decisions first: read every ADR that
+  already governs this scope in full. One that does routes through Amend or supersede
+  below.
+- Scaffold:
+  `vaultspec-core vault add adr --feature {feature} --related <research-or-reference-stem>`
+  (or the `create` tool). Read `.vaultspec/templates/adr.md`; its hint blocks fix the
+  body shape and the status convention.
+- Draft in this run, or dispatch the `vaultspec-adr-researcher` persona to formalise the
+  grounded decision into ADR content and return it for persistence.
+- Verify with `vaultspec-core vault check all`.
+- Present the draft to the user and stop. **Nothing builds on the ADR before its
+  approval reply.** On approval, set the heading status to `accepted`; until then it is
+  `proposed`; a declined draft becomes `rejected` and stays on disk as evidence the path
+  was evaluated.
 
 ## Amend or supersede
 
-One decision, one governing record. The grounding step surfaces the ADRs that already
-govern this scope; when one exists, choose the mode before touching anything:
+One decision, one governing record.
 
-- **Amend (the default).** Refinement, concretization, narrowed scope, an
-  implementation-driven parameter change: rewrite the existing record's body in place,
-  with the same user approval a new ADR would need. Status stays `accepted`; the
-  `modified:` stamp carries the revision. No new document.
-- **Supersede (pivot only).** The decision reverses direction, or the record's rationale
-  no longer supports the new choice: scaffold the new ADR and in the same session run
+- **Amend (default).** Refinement, concretisation, narrowed scope, a parameter change:
+  rewrite the existing record's body in place, with the same user approval a new ADR
+  needs. Status stays `accepted`; the `modified:` stamp carries the revision.
+- **Supersede (pivot only).** The decision reverses, or its rationale no longer holds:
+  scaffold the new ADR and in the same session run
   `vaultspec-core vault adr supersede OLD --by NEW`, so exactly one record is `accepted`
-  for the scope.
-
-Refinement-by-new-document is the failure mode this rule exists to stop: it piles
-sibling ADRs onto one decision until the cluster carries mutually contradictory
-`accepted` markers and the supersession chain, not the decision, becomes the thing being
-managed.
+  for the scope. Never edit status lines of the old record by hand.
 
 ## Document boundary
 
-Each fact has one home: the research grounds, the ADR decides. The record cites research
-and reference findings by stem (e.g. `2026-02-04-editor-demo-research`) and never
-restates their evidence - a restated fact forks, bloats agent context, and goes stale
-silently. If drafting surfaces a fact the grounding lacks, add it to the research or
-`<Reference>` first, then cite it. Conversely, the decision lives only here: strip any
-decision language the grounding documents carry into this record rather than duplicating
-it.
-
-## Workflow
-
-- **Derive from Research:** ADRs should always be preceded by a `vaultspec-research`
-  session.
-
-- **CRITICAL: you MUST always** present ADR findings as an interactive prompt for user
-  approval. Without explicit user sign-off the ADR is considered null and void.
-
-- **Draft the ADR using the `vaultspec-adr-researcher` agent persona**, which formalizes
-  the research-backed decisions into ADR content and returns it for persistence into the
-  scaffolded document (the `vaultspec-writer` persona's mandate is plan-only).
-
-- Associate the ADR with `{feature}` based on the findings in `[[...-research.md]]`.
-
-- **Supersession mechanics:** `vaultspec-core vault adr supersede OLD --by NEW` records
-  the `superseded_by:` back-pointer and rewrites the old record's status; never edit
-  status lines by hand.
-
-- **Linking:** Use `[[wiki-links]]` for references. DO NOT use `@ref` or
-  `[label](path)`.
+The research grounds, the ADR decides. Cite research and reference findings by stem;
+never restate their evidence. A fact the grounding lacks is added to the grounding
+first, then cited. Decision language found in a grounding document moves here.

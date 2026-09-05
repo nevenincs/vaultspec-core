@@ -3,9 +3,9 @@ tags:
   - '#exec'
   - '#dev-scaffolding-parity'
 date: '2026-07-28'
-modified: '2026-08-25'
+modified: '2026-09-05'
 body_schema: 'body-v2'
-body_hash: 'sha256:818ee7ef5a69e567a20ea4e0aa772663181b58d17d568993f215772e8eeb46cc'
+body_hash: 'sha256:c3f105d94db5fee7d30c8871755313e1bda80e96524667a85e6da2fec3a729b4'
 related:
   - "[[2026-07-28-dev-scaffolding-parity-plan]]"
 ---
@@ -248,3 +248,45 @@ related:
 - `S13` `M` `tests/test_mcps.py`
 - `S15` `M` `.github/workflows/ci.yml`
 - `S15` `R` `tests/test_automation_contracts.py` -> `dev/guards/test_automation_contracts.py`
+- `S14` `M` `src/vaultspec_core/cli/_cache_hook.py`
+- `S14` `M` `src/vaultspec_core/cli/_metavar.py`
+- `S14` `M` `src/vaultspec_core/cli/edit_cmd.py`
+- `S14` `M` `src/vaultspec_core/cli/plan_cmd_shared.py`
+- `S14` `M` `src/vaultspec_core/cli/spec_cmd_shared.py`
+- `S14` `M` `src/vaultspec_core/cli/vault_cmd.py`
+- `S14` `M` `src/vaultspec_core/cli/vault_feature_cmd.py`
+- `S14` `M` `src/vaultspec_core/console.py`
+- `S14` `M` `src/vaultspec_core/core/adr.py`
+- `S14` `M` `src/vaultspec_core/core/agents.py`
+- `S14` `M` `src/vaultspec_core/core/enums.py`
+- `S14` `M` `src/vaultspec_core/core/helpers.py`
+- `S14` `M` `src/vaultspec_core/core/manifest.py`
+- `S14` `M` `src/vaultspec_core/core/mcps_ownership.py`
+- `S14` `M` `src/vaultspec_core/core/resolver_providers.py`
+- `S14` `M` `src/vaultspec_core/core/rules.py`
+- `S14` `M` `src/vaultspec_core/graph/__init__.py`
+- `S14` `M` `src/vaultspec_core/graph/cache.py`
+- `S14` `M` `src/vaultspec_core/mcp_server/app.py`
+- `S14` `M` `src/vaultspec_core/mcp_server/tools/documents.py`
+- `S14` `M` `src/vaultspec_core/mcp_server/tools/plan.py`
+- `S14` `M` `src/vaultspec_core/migrations/__init__.py`
+- `S14` `M` `src/vaultspec_core/protocol/providers/antigravity.py`
+- `S14` `M` `src/vaultspec_core/protocol/providers/claude.py`
+- `S14` `M` `src/vaultspec_core/protocol/providers/codex.py`
+- `S14` `M` `src/vaultspec_core/protocol/providers/gemini.py`
+- `S14` `M` `src/vaultspec_core/vaultcore/__init__.py`
+- `S14` `M` `src/vaultspec_core/vaultcore/checks/adr_status.py`
+- `S14` `M` `src/vaultspec_core/vaultcore/checks/modified_stamp.py`
+- `S14` `M` `src/vaultspec_core/vaultcore/checks/rename_integrity.py`
+- `S14` `M` `src/vaultspec_core/vaultcore/checks/structure.py`
+- `S14` `M` `src/vaultspec_core/vaultcore/edit_engine.py`
+- `S14` `M` `src/vaultspec_core/vaultcore/exec_recovery.py`
+- `S14` `M` `src/vaultspec_core/vaultcore/index.py`
+- `S14` `M` `src/vaultspec_core/vaultcore/models.py`
+- `S14` `M` `src/vaultspec_core/vaultcore/orientation_rollup.py`
+- `S14` `M` `src/vaultspec_core/vaultcore/parser.py`
+- `S14` `M` `src/vaultspec_core/vaultcore/query_rename_apply.py`
+- `S14` `M` `src/vaultspec_core/vaultcore/related_surgery.py`
+- `S14` `M` `src/vaultspec_core/vaultcore/rename_engine.py`
+- `S14` `M` `src/vaultspec_core/vaultcore/rename_ops.py`
+- `S14` `M` `src/vaultspec_core/vaultcore/repair.py`

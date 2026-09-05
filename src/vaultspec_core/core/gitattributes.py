@@ -25,6 +25,10 @@ DEFAULT_ENTRIES = [
     "* text=auto eol=lf",
     "*.bat text eol=crlf",
     "*.cmd text eol=crlf",
+    # One execution ledger per plan is appended to by every worker closing a
+    # Step; rows are idempotent and order-insensitive, so a union merge
+    # resolves two branches appending different Steps without a conflict.
+    ".vault/exec/**/*-ledger.md merge=union",
 ]
 
 

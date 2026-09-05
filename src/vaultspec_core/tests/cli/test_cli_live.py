@@ -728,7 +728,7 @@ class TestSpecHooks:
 # vault add (parametrized doc types)
 # ═══════════════════════════════════════════════════════════════════
 
-_DOC_TYPES = ["adr", "audit", "plan", "research", "reference", "exec"]
+_DOC_TYPES = ["adr", "audit", "plan", "research", "reference"]
 
 
 class TestVaultAdd:
@@ -737,17 +737,18 @@ class TestVaultAdd:
         self, cli: CliRunner, synthetic_project: Path, doc_type: str
     ) -> None:
         feat = f"live-{doc_type}"
-        # exec requires research -> ADR -> plan to exist first
-        if doc_type == "exec":
-            for prereq in ("research", "adr", "plan"):
-                pre = _run(
-                    cli, synthetic_project, "vault", "add", prereq, "--feature", feat
-                )
-                assert pre.exit_code == 0, f"prereq {prereq} failed: {pre.output}"
         result = _run(
             cli, synthetic_project, "vault", "add", doc_type, "--feature", feat
         )
         assert result.exit_code == 0
+
+    def test_add_exec_is_refused(self, cli: CliRunner, synthetic_project: Path) -> None:
+        """Execution is logged with `vault exec log`, never scaffolded."""
+        result = _run(
+            cli, synthetic_project, "vault", "add", "exec", "--feature", "live-exec"
+        )
+        assert result.exit_code == 1
+        assert "vault exec log" in result.output
 
     def test_add_invalid_type_fails(
         self, cli: CliRunner, synthetic_project: Path

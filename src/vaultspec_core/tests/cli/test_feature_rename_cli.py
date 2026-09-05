@@ -67,13 +67,7 @@ def _seed_feature(root: Path, feature: str) -> None:
     )
     exec_folder = vault / "exec" / f"{DATE}-{feature}"
     _write(
-        exec_folder / f"{DATE}-{feature}-P01-S01.md",
-        ["#exec", f"#{feature}"],
-        [f"{DATE}-{feature}-plan"],
-        extra_fm="step_id: 'S01'\n",
-    )
-    _write(
-        exec_folder / f"{DATE}-{feature}-P01-summary.md",
+        exec_folder / f"{DATE}-{feature}-ledger.md",
         ["#exec", f"#{feature}"],
         [f"{DATE}-{feature}-plan"],
     )

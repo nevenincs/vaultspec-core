@@ -36,7 +36,7 @@ from mcp.types import CallToolResult, TextContent
 from vaultspec_core.config import reset_config
 from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
-#: The nine tools the redesigned surface must advertise over the wire.
+#: The ten tools the redesigned surface must advertise over the wire.
 _EXPECTED_TOOLS = frozenset(
     {
         "status",
@@ -45,6 +45,7 @@ _EXPECTED_TOOLS = frozenset(
         "edit",
         "plan_progress",
         "plan_edit",
+        "log",
         "check",
         "discover",
         "invoke",
@@ -85,7 +86,7 @@ async def _drive_session(project: Path) -> None:
 
     Spawns ``python -m vaultspec_core.mcp_server.app`` as a child, rooted at a
     real installed vault, and exercises: the ``initialize`` handshake, the
-    nine-tool ``list_tools`` surface with output schemas, a structured ``status``
+    ten-tool ``list_tools`` surface with output schemas, a structured ``status``
     call, the load-bearing ``invoke`` of a real long-tail verb, and denylist
     rejection - all over the actual JSON-RPC-on-stdio transport.
     """

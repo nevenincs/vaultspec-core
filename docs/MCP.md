@@ -88,18 +88,18 @@ the next sync declines to touch the entry rather than repairing it.
 
 ### Serving a read-only surface
 
-Five of the nine tools mutate the vault, and `invoke` can run most of the CLI. Launch
-the server with `--read-only` to withdraw them:
+Six of the ten tools mutate the vault, and `invoke` can run most of the CLI. Launch the
+server with `--read-only` to withdraw them:
 
 ```
 vaultspec-mcp --read-only
 ```
 
 That leaves `status`, `find`, `check`, and `discover`, and removes `create`, `edit`,
-`plan_progress`, `plan_edit`, and `invoke` from the advertised listing rather than
-refusing them on call, so a client is never handed the schema of something it cannot
-use. `check` is kept but narrowed: its `fix` parameter is gone, and its description
-becomes "Run the vault health-check suite without repair."
+`plan_progress`, `plan_edit`, `log`, and `invoke` from the advertised listing rather
+than refusing them on call, so a client is never handed the schema of something it
+cannot use. `check` is kept but narrowed: its `fix` parameter is gone, and its
+description becomes "Run the vault health-check suite without repair."
 
 All mutating tools write directly to the working tree and never commit. Run them on a
 clean tree if you want the diff reviewable.
@@ -228,11 +228,12 @@ Run `vaultspec-core spec doctor --json` for a broader workspace diagnosis.
 
 ## Tools
 
-The server exposes nine tools. Seven cover the everyday path: `status` orients you in
-the workspace, `find` locates documents, `create` scaffolds new ones, `edit` makes
+The server exposes ten tools. Eight cover the everyday path: `status` orients you in the
+workspace, `find` locates documents, `create` scaffolds new ones, `edit` makes
 body-prose changes, `check` validates and repairs the vault, `plan_progress` marks steps
-complete, and `plan_edit` authors step content. Two more, `discover` and `invoke`, form
-a gateway that reaches every remaining CLI verb.
+complete, `plan_edit` authors step content, and `log` appends a step's rows to the
+plan's execution ledger. Two more, `discover` and `invoke`, form a gateway that reaches
+every remaining CLI verb.
 
 | Tool            | Purpose                                                                                        | Annotations                     |
 | --------------- | ---------------------------------------------------------------------------------------------- | ------------------------------- |
@@ -243,10 +244,11 @@ a gateway that reaches every remaining CLI verb.
 | `check`         | Run vault health checks, optionally with repair                                                | non-destructive, idempotent     |
 | `plan_progress` | Batch-mark plan steps checked or unchecked                                                     | non-destructive, idempotent     |
 | `plan_edit`     | Batch add, insert, edit, or remove step-authoring operations on a plan                         | destructive, not idempotent     |
+| `log`           | Append one step's rows (paths, verify, persona, notes) to the plan's execution ledger          | non-destructive, idempotent     |
 | `discover`      | Search the long-tail verb catalog for ranked verbs and their parameter schemas                 | read-only, idempotent           |
 | `invoke`        | Run one cataloged long-tail verb as a validated subprocess                                     | destructive, not idempotent     |
 
-Two bands of operations sit outside these nine tools.
+Two bands of operations sit outside these ten tools.
 
 The gateway reaches some operations, but a CLI command carries them by default:
 synchronizing generated surfaces (`vaultspec-core sync`,
@@ -371,7 +373,7 @@ at least one entry.
 | Field     | Type                    | Default            | Description                                                                                                                                                                                                                                          |
 | --------- | ----------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `feature` | string                  | none               | **Required.** Feature tag, in kebab-case. A leading `#` is stripped if present.                                                                                                                                                                      |
-| `type`    | string or null          | `"research"`       | Document type: `research`, `adr`, `plan`, `reference`, `audit`, or `exec`. `create` rejects `index`; feature indexes are auto-generated.                                                                                                             |
+| `type`    | string or null          | `"research"`       | Document type: `research`, `adr`, `plan`, `reference`, or `audit`. `create` rejects `index` (auto-generated) and `exec` (execution is logged with `log`).                                                                                            |
 | `title`   | string or null          | `null`             | Rendered into the document's heading.                                                                                                                                                                                                                |
 | `date`    | string or null          | today's date (UTC) | ISO-8601 date.                                                                                                                                                                                                                                       |
 | `content` | string or null          | `null`             | Seed prose, appended under a `## Context` heading. If seeding fails, `create` still creates the document and reports the failure as a warning rather than an error.                                                                                  |
@@ -517,12 +519,11 @@ Every response carries a `tool_schema_version` field so a client can detect a se
 upgrade.
 
 Pass a target to trace one plan or feature instead. The response then reports each
-plan's steps in full detail (canonical ID, display path, checked state, and the
-execution record stem when one exists), the grounding documents behind the plan (grouped
-by document type), phase and wave summaries, and any execution records that aren't
-linked to a step. A target that resolves to no plan or feature fails the whole call with
-a protocol error. `status` returns no hashes; get a `blob_hash` from `find` to guard an
-edit.
+plan's steps in full detail (canonical ID, display path, checked state, the ledger stem
+when rows exist, the row count, and the last `verify:` result), the grounding documents
+behind the plan (grouped by document type), and any exec documents that name no step. A
+target that resolves to no plan or feature fails the whole call with a protocol error.
+`status` returns no hashes; get a `blob_hash` from `find` to guard an edit.
 
 Rollup example, captured against this project's own vault and cut to one feature and one
 plan of the eleven and four it returned:
@@ -746,9 +747,42 @@ Add example:
 
 ______________________________________________________________________
 
+### `log`
+
+Append one step's evidence to its plan's execution ledger. Not read-only, not
+destructive (append-only), idempotent: re-logging a row changes nothing. The ledger is
+one document per plan, created on the first call; it is the only execution artifact, and
+this tool and `vaultspec-core vault exec log` share one writer.
+
+| Parameter | Type                    | Default      | Description                                                                                    |
+| --------- | ----------------------- | ------------ | ---------------------------------------------------------------------------------------------- |
+| `feature` | string                  | - (required) | Feature tag, with or without `#`.                                                              |
+| `plan`    | string                  | - (required) | The parent plan's stem.                                                                        |
+| `step`    | string                  | - (required) | Canonical step id (`S01`) or display path (`P01.S01`).                                         |
+| `rows`    | list of strings or null | `null`       | One `OP:path` per path touched: `A:` added, `M:` modified, `D:` deleted, `R:old->new` renamed. |
+| `verify`  | string or null          | `null`       | A check that ran, as `<command>=pass` or `<command>=fail`.                                     |
+| `by`      | string or null          | `null`       | The persona that closed the step.                                                              |
+| `notes`   | list of strings or null | `null`       | Exception notes only (data loss, skipped work, a scaffold left in code, a persistent failure). |
+
+A malformed row or verify spec, or a feature, plan, or step that does not resolve, fails
+the whole call with a protocol error and writes nothing.
+
+```json
+{
+  "path": ".vault/exec/2026-07-12-search-api/2026-07-12-search-api-ledger.md",
+  "step": "S01",
+  "rows": 3,
+  "notes": 0,
+  "changed": true,
+  "created": true
+}
+```
+
+______________________________________________________________________
+
 ### `discover` and `invoke`
 
-`discover` and `invoke` are the gateway pair for everything else. The seven hot tools
+`discover` and `invoke` are the gateway pair for everything else. The eight hot tools
 cover the verbs a client reaches for constantly; `discover` and `invoke` reach the rest
 of the CLI - the long tail of verbs that don't earn a dedicated tool but still need to
 run. `discover` searches that catalog and returns ranked schemas. `invoke` runs one of

@@ -4,9 +4,9 @@ tags:
   - '#index'
   - '#cli-simplification-ux'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-05'
 body_schema: 'body-v2'
-body_hash: 'sha256:01655a3528c32292509d30db5545a94b364f39750055c7caa8ae49e3f556963e'
+body_hash: 'sha256:c156447a5d25dbbc9ca8e85fe1322a01a8b68d86ef9a796d0c92feb5284f0d1e'
 related:
   - '[[2026-05-17-cli-simplification-ux-adr]]'
   - '[[2026-05-17-cli-simplification-ux-audit]]'
@@ -14,7 +14,6 @@ related:
   - '[[2026-05-17-cli-simplification-ux-plan]]'
   - '[[2026-05-17-cli-simplification-ux-research]]'
   - '[[2026-05-18-cli-simplification-ux-reference]]'
-  - '[[2026-05-22-cli-simplification-ux-exec]]'
   - '[[2026-05-26-cli-simplification-ux-code-review-audit]]'
 ---
 
@@ -36,7 +35,6 @@ Auto-generated index of all documents tagged with `#cli-simplification-ux`.
 ### exec
 
 - `2026-05-17-cli-simplification-ux-ledger` - `cli-simplification-ux` ledger
-- `2026-05-22-cli-simplification-ux-exec` - `cli-simplification-ux` `W02.P04-P06`
 
 ### plan
 

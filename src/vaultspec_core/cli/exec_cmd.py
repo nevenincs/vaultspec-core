@@ -24,7 +24,7 @@ __all__ = ["exec_app"]
 
 
 exec_app = make_app(
-    help="Recover historical execution-record Step mappings explicitly",
+    help="Write the execution ledger and recover historical Step mappings",
     no_args_is_help=True,
 )
 
@@ -239,18 +239,40 @@ def cmd_exec_log(
             ),
         ),
     ] = None,
+    verify: Annotated[
+        str | None,
+        typer.Option(
+            "--verify",
+            help="Check that was run, as '<command>=pass' or '<command>=fail'",
+        ),
+    ] = None,
+    by: Annotated[
+        str | None,
+        typer.Option("--by", help="Persona that closed the Step, e.g. a worker name"),
+    ] = None,
+    note: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--note",
+            help=(
+                "Exception note (data loss, skipped work, a scaffold left in code, "
+                "a persistent failure); repeatable"
+            ),
+        ),
+    ] = None,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview without writing")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Append a Step's mechanical rows to its plan's consolidated ledger.
+    """Append a Step's rows to its plan's ledger.
 
     Creates the ledger on first use, so an executor logging its first Step
     never has to know whether the document exists yet. The ledger is
     append-only: existing rows are never rewritten, and re-logging the same
-    row is idempotent rather than duplicating it.
+    row is idempotent rather than duplicating it. ``--verify`` and ``--by``
+    add one row each; ``--note`` adds a ``## Notes`` line under the Step id.
     """
     apply_target(target, json_output=json_output)
     from vaultspec_core.cli import _add_ops
@@ -261,31 +283,39 @@ def cmd_exec_log(
     console = get_console()
     root_dir = _get_ctx().root_dir
     rows = _add_ops.parse_row_specs(console, row or [])
+    verify_pair = _add_ops.parse_verify(console, verify)
 
     try:
-        ledger_path = _add_ops.log_ledger_rows(
+        outcome = _add_ops.log_ledger_rows(
             console,
             root_dir=root_dir,
             feature=feature,
             plan_stem=related,
             step=step,
             rows=rows,
+            verify=verify_pair,
+            by=by,
+            notes=note or [],
             dry_run=dry_run,
             json_output=json_output,
         )
+    except typer.Exit:
+        raise
     except Exception as exc:
         handle_error(exc, json_output=json_output)
         return
 
-    if not dry_run:
+    if not dry_run and outcome.changed:
         invalidate_graph_cache(root_dir)
     if json_output:
         from vaultspec_core.cli.rendering import json_envelope
 
         payload: dict[str, object] = {
-            "path": str(ledger_path),
-            "step": step,
-            "rows": len(rows),
+            "path": str(outcome.path),
+            "step": outcome.step_id,
+            "rows": len(outcome.rows),
+            "notes": len(outcome.notes),
+            "changed": outcome.changed,
         }
         if dry_run:
             payload["dry_run"] = True
@@ -309,13 +339,15 @@ def cmd_exec_fold(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Fold a feature's per-Step execution records into one consolidated ledger.
+    """Fold a feature's per-Step execution records into its plan's ledger.
 
-    Recovers each record's ``## Scope`` paths as ledger rows under its Step
-    id. The operation is never invented: ``body-v1`` did not record whether a
-    path was added, modified, or deleted, so recovered rows carry ``T``
-    (touched). Body prose is discarded, which is the point of the fold and is
-    recoverable from the commit preceding it.
+    A ``body-v1`` record's ``## Scope`` paths become ``T`` (touched) rows,
+    because that schema never recorded an operation and none is invented. A
+    ``body-v2`` record's ``## Changes`` rows fold with their operations and
+    ``verify:`` line intact, and its ``## Notes`` lines are carried under the
+    Step id. A Phase Summary is removed once every Step of its Phase has rows.
+    Other prose is discarded and is recoverable from the commit preceding the
+    fold.
 
     Destructive, so it refuses to write without ``--force`` and reports the
     plan instead.
@@ -352,7 +384,9 @@ def cmd_exec_fold(
         payload: dict[str, object] = {
             "path": str(ledger_path) if ledger_path else None,
             "folded": len(getattr(plan, "folded", [])),
+            "summaries_removed": len(getattr(plan, "summaries", [])),
             "rows": len(getattr(plan, "rows", [])),
+            "notes": len(getattr(plan, "notes", [])),
             "recovered_paths": getattr(plan, "recovered_paths", 0),
             "skipped": len(getattr(plan, "skipped", [])),
         }

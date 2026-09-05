@@ -106,25 +106,24 @@ class TestSingleIngress:
         assert after_deletion == baseline
 
     def test_undecodable_plan_reference_stays_disk_free(self, vault_root: Path) -> None:
-        # A valid exec record pointing at a plan that failed to decode
-        # during ingress must not trigger a disk fallback: the plan is
-        # classified as unparseable from ingress state alone, and the
-        # finding survives corpus deletion.
+        # A valid ledger pointing at a plan that failed to decode during
+        # ingress must not trigger a disk fallback: the plan is classified
+        # as unparseable from ingress state alone, and the finding survives
+        # corpus deletion.
         bad_plan = vault_root / ".vault" / "plan" / "2026-01-01-badplan-plan.md"
         bad_plan.write_bytes(b"\xff\xfe\x00not a utf-8 plan")
         exec_dir = vault_root / ".vault" / "exec" / "2026-01-01-badplan"
         exec_dir.mkdir(parents=True)
-        record = exec_dir / "2026-01-01-badplan-S01.md"
+        record = exec_dir / "2026-01-01-badplan-ledger.md"
         record.write_text(
             "---\n"
             "tags:\n"
             "  - '#exec'\n"
             "  - '#badplan'\n"
             "date: '2026-01-01'\n"
-            "step_id: 'S01'\n"
             "related:\n"
             "  - '[[2026-01-01-badplan-plan]]'\n"
-            "---\n\n# badplan S01\n\nBody.\n",
+            "---\n\n# `badplan` ledger\n\n## Changes\n\n- `S01` `M` `src/a.py`\n",
             encoding="utf-8",
         )
 

@@ -47,30 +47,28 @@ workspace diagnosis
   semantic search none vaultspec-rag not provisioned; core discovery and find cover document lookup without it
 ```
 
-That is one workspace's report, with the stale-record filenames after the count cut
-to keep the line readable. A run prints the lines that apply to the workspace it
-finds, so yours may carry lines this one does not.
+That is one workspace's report, with the stale-record filenames after the count cut to
+keep the line readable. A run prints the lines that apply to the workspace it finds, so
+yours may carry lines this one does not.
 
 The second half is the vault check suite, one line per check.
 
 ### Which printed lines change the exit code
 
-`doctor` exits `0` for clean, `1` for warnings, and `2` for errors. That scale is
-this command's own, and it is worth pinning down before you gate anything on it,
-because `vault check all` further down this page uses a different one: `0` when
-nothing failed and `1` when something did, with warnings never raising it.
-Measured on one project, before and after its template placeholders were
-filled: with `Total: 3 errors, 14 warnings`, `vault check all` exits `1` and
-`doctor` exits `2`; with the errors cleared and `Total: 15 warnings` left
-standing, `vault check all` exits `0` and `doctor` exits `1`. Warnings are the
-whole of the difference, and they are the ordinary state of a freshly scaffolded
-vault, so a gate written on `doctor` fires where one written on
-`vault check all` passes.
-So `doctor` is the stricter of the two, and a warning is a failure to it and not
-to the check suite.
+`doctor` exits `0` for clean, `1` for warnings, and `2` for errors. That scale is this
+command's own, and it is worth pinning down before you gate anything on it, because
+`vault check all` further down this page uses a different one: `0` when nothing failed
+and `1` when something did, with warnings never raising it. Measured on one project,
+before and after its template placeholders were filled: with
+`Total: 3 errors, 14 warnings`, `vault check all` exits `1` and `doctor` exits `2`; with
+the errors cleared and `Total: 15 warnings` left standing, `vault check all` exits `0`
+and `doctor` exits `1`. Warnings are the whole of the difference, and they are the
+ordinary state of a freshly scaffolded vault, so a gate written on `doctor` fires where
+one written on `vault check all` passes. So `doctor` is the stricter of the two, and a
+warning is a failure to it and not to the check suite.
 
-Not every printed line feeds that code. A line is *weighed* if it can raise the exit code, and the
-diagnosis prints several that never do:
+Not every printed line feeds that code. A line is *weighed* if it can raise the exit
+code, and the diagnosis prints several that never do:
 
 | Printed line                        | Weighed                       |
 | ----------------------------------- | ----------------------------- |
@@ -95,19 +93,18 @@ So a run can print `warn` and still exit `0`:
   claude warn dir: mixed
 ```
 
-`gitignore` used to belong with them: `warn partial` printed and changed nothing,
-so a project whose block had fallen behind the recommended set passed a gate on
-this command. It is weighed now, in both of its degraded states - `partial` for a
-block that is short of the recommended set, and `unmanaged` for an installed
-project carrying no block at all. `install --force` repairs either. The
-informational readings are what remains: `no_file` and `no_entries` describe a
-project that never asked for the block or recorded that it declined it, and
-neither raises the code.
+`gitignore` used to belong with them: `warn partial` printed and changed nothing, so a
+project whose block had fallen behind the recommended set passed a gate on this command.
+It is weighed now, in both of its degraded states - `partial` for a block that is short
+of the recommended set, and `unmanaged` for an installed project carrying no block at
+all. `install --force` repairs either. The informational readings are what remains:
+`no_file` and `no_entries` describe a project that never asked for the block or recorded
+that it declined it, and neither raises the code.
 
-Both of the lines above are unweighed. `mixed` means the provider directory holds extra files
-vaultspec does not own, which is benign and deliberately excluded so it cannot block a
-commit through the bundled hook. A provider directory that is missing, empty, or partial
-is weighed and does raise the code.
+Both of the lines above are unweighed. `mixed` means the provider directory holds extra
+files vaultspec does not own, which is benign and deliberately excluded so it cannot
+block a commit through the bundled hook. A provider directory that is missing, empty, or
+partial is weighed and does raise the code.
 
 If you gate on this command, the word `warn` in its output does not mean it failed. Read
 the exit code.
@@ -127,27 +124,27 @@ vaultspec-core vault check all
 Nineteen checks run. The `--fix` column says whether a failure can be repaired
 automatically:
 
-| Check                      | Catches                                                | `--fix` |
-| -------------------------- | ------------------------------------------------------ | ------- |
-| `structure`                | Directory layout and filenames                         | Yes     |
-| `frontmatter`              | Fields invalid for the document's type                 | Yes     |
-| `body-sections`            | A section the template requires, missing or empty      | No      |
-| `markdown`                 | Markdown hygiene violations                            | Yes     |
-| `encoding`                 | Documents that are not valid text                      | No      |
-| `placeholders`             | Unreplaced `{...}` template tokens                     | No      |
-| `annotations`              | Template comment blocks that should have been stripped | Yes     |
-| `links`                    | Wiki-links that break the convention                   | Yes     |
-| `dangling`                 | `related:` entries naming a document that is absent    | Yes     |
-| `body-links`               | Links in body prose, where they are forbidden          | Yes     |
-| `orphans`                  | Documents nothing links to                             | No      |
-| `references`               | Missing cross-references between related documents     | Yes     |
-| `schema`                   | An ADR with no research, or a plan with no ADR         | Yes     |
-| `adr-status`               | A status outside the allowed set                       | Yes     |
-| `exec-mapping`             | An execution record naming no live Step                | No      |
-| `features`                 | A feature missing a document type or its index         | No      |
-| `modified-stamp`           | A body edited without restamping                       | Yes     |
-| `rename-integrity`         | A document's name disagreeing with its filename        | Yes     |
-| `feature-rename-integrity` | An exec folder disagreeing with its feature tag        | No      |
+| Check                      | Catches                                                                                             | `--fix` |
+| -------------------------- | --------------------------------------------------------------------------------------------------- | ------- |
+| `structure`                | Directory layout and filenames                                                                      | Yes     |
+| `frontmatter`              | Fields invalid for the document's type                                                              | Yes     |
+| `body-sections`            | A section the template requires, missing or empty                                                   | No      |
+| `markdown`                 | Markdown hygiene violations                                                                         | Yes     |
+| `encoding`                 | Documents that are not valid text                                                                   | No      |
+| `placeholders`             | Unreplaced `{...}` template tokens                                                                  | No      |
+| `annotations`              | Template comment blocks that should have been stripped                                              | Yes     |
+| `links`                    | Wiki-links that break the convention                                                                | Yes     |
+| `dangling`                 | `related:` entries naming a document that is absent                                                 | Yes     |
+| `body-links`               | Links in body prose, where they are forbidden                                                       | Yes     |
+| `orphans`                  | Documents nothing links to                                                                          | No      |
+| `references`               | Missing cross-references between related documents                                                  | Yes     |
+| `schema`                   | An ADR with no research, or a plan with no ADR                                                      | Yes     |
+| `adr-status`               | A status outside the allowed set                                                                    | Yes     |
+| `exec-mapping`             | A closed Step with no ledger row, a row for an open or unknown Step, or an unfolded per-Step record | No      |
+| `features`                 | A feature missing a document type or its index                                                      | No      |
+| `modified-stamp`           | A body edited without restamping                                                                    | Yes     |
+| `rename-integrity`         | A document's name disagreeing with its filename                                                     | Yes     |
+| `feature-rename-integrity` | An exec folder disagreeing with its feature tag                                                     | No      |
 
 Run one by name when you already know which failure you are chasing:
 
@@ -197,26 +194,27 @@ Add `--json` and read the envelope's `status` key. The envelope carries four key
 
 `status` uses the sync vocabulary rather than a boolean. Measured across the three
 states: a run with nothing to report and a run leaving only warnings both report
-`unchanged`, a run that repaired something reports `updated`, and a run leaving an
-error reports `failed`. It is errors that make it `failed`, not findings, which is
-the same line the exit code draws. Test for the failure value rather than for a
-success value, so a new status does not read as a pass:
+`unchanged`, a run that repaired something reports `updated`, and a run leaving an error
+reports `failed`. It is errors that make it `failed`, not findings, which is the same
+line the exit code draws. Test for the failure value rather than for a success value, so
+a new status does not read as a pass:
 
 ```bash
 vaultspec-core vault check all --json | jq -e '.status != "failed"'
 ```
 
-The exit code carries the same verdict and is simpler to gate on: `0` when
-nothing failed, `1` when something did. Both are keyed on errors rather than on
-findings, which is the part worth knowing before you gate on either. Measured on
-one vault: `Total: 15 warnings` and no errors exits `0` with `"status": "unchanged"`, and a single error in the same vault - `Total: 1 error, 20 warnings` - exits `1` with `"status": "failed"`. The warnings move with the
-error rather than staying put, because the document that carries the error
-carries warnings too: measured on an empty vault, scaffolding one research
-document reports `Total: 1 error, 5 warnings`, and deleting that one file
-returns `All checks passed.` So read the exit code and the error count; the
-warning totals either side of a change are not a subtraction. A passing gate is not a clean
-report, so the summary line is worth reading either way. Diagnostic logging stays
-on stderr, so stdout is the envelope and nothing else.
+The exit code carries the same verdict and is simpler to gate on: `0` when nothing
+failed, `1` when something did. Both are keyed on errors rather than on findings, which
+is the part worth knowing before you gate on either. Measured on one vault:
+`Total: 15 warnings` and no errors exits `0` with `"status": "unchanged"`, and a single
+error in the same vault - `Total: 1 error, 20 warnings` - exits `1` with
+`"status": "failed"`. The warnings move with the error rather than staying put, because
+the document that carries the error carries warnings too: measured on an empty vault,
+scaffolding one research document reports `Total: 1 error, 5 warnings`, and deleting
+that one file returns `All checks passed.` So read the exit code and the error count;
+the warning totals either side of a change are not a subtraction. A passing gate is not
+a clean report, so the summary line is worth reading either way. Diagnostic logging
+stays on stderr, so stdout is the envelope and nothing else.
 
 Each entry under `data.checks` carries its own `check_name`, `diagnostics`,
 `fixed_count`, and `supports_fix`, so a report can name which check failed rather than
