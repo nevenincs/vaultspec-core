@@ -34,7 +34,12 @@ from .install_mode import (
     stamp_manifest_version_no_downgrade,
     write_mode_declaration,
 )
-from .manifest import add_providers, read_manifest_data, write_manifest_data
+from .manifest import (
+    ManifestData,
+    add_providers,
+    read_manifest_data,
+    write_manifest_data,
+)
 from .precommit import scaffold_precommit
 from .provider_registry import (
     PROVIDER_TO_TOOLS,
@@ -351,6 +356,31 @@ def _detect_precommit_managed(path: Path) -> bool:
         PrecommitSignal.NO_FILE,
         PrecommitSignal.NO_HOOKS,
     )
+
+
+def derive_managed_flags(path: Path, mdata: ManifestData) -> None:
+    """Set the three ``*_managed`` flags from what is actually on disk.
+
+    Robust detection: if it's there, it's managed. Install has always
+    derived these rather than assuming them, because the files are the
+    only durable record of what this workspace manages - the manifest is
+    a cache of that, and a cache can be lost.
+
+    Shared so that a repair cannot drift from an install. The preflight
+    manifest repair rebuilt from :class:`ManifestData` defaults instead,
+    which set all three to ``False``; every sync reconciler gates on them
+    and returns early, so a single corrupt manifest silently ended
+    management of every root file while ``doctor`` still reported each row
+    ``ok`` - a present block reads as complete regardless of the flag
+    (issue #411).
+
+    Opt-out state is deliberately not touched here. A decline is a
+    committed declaration, read from the project rather than inferred from
+    a manifest, so it survives whatever happened to this one.
+    """
+    mdata.gitignore_managed = has_gitignore_block(path / ".gitignore")
+    mdata.gitattributes_managed = has_gitattributes_block(path / ".gitattributes")
+    mdata.precommit_managed = _detect_precommit_managed(path)
 
 
 def _reseed_builtins(path: Path) -> list[tuple[str, str]]:
@@ -794,14 +824,12 @@ def install_run(
     mdata = read_manifest_data(path, strict=True)
 
     # Robust detection: if it's there, it's managed.
-    mdata.gitignore_managed = has_gitignore_block(path / ".gitignore")
+    derive_managed_flags(path, mdata)
     # A fresh install clears the per-machine echo, not the committed
     # declaration: provisioning a clone is not a decision to reverse what the
     # project declared.
     mdata.gitignore_opted_out = False
     mdata.gitattributes_opted_out = False
-    mdata.gitattributes_managed = has_gitattributes_block(path / ".gitattributes")
-    mdata.precommit_managed = _detect_precommit_managed(path)
 
     mdata.vaultspec_version = fresh_install_schema_version()
     mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()

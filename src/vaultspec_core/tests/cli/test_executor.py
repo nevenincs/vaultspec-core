@@ -73,6 +73,69 @@ class TestRepairManifest:
         assert "claude" not in mdata.installed
         assert "gemini" in mdata.installed
 
+    def test_repair_keeps_managing_the_root_files_it_still_manages(
+        self, workspace: Path
+    ) -> None:
+        """The managed flags are derived from disk, not reset to defaults.
+
+        Rebuilding from ``ManifestData()`` set all three to ``False``. Every
+        sync reconciler gates on them and returns early, so one corrupt
+        manifest silently ended management of every root file - and nothing
+        said so, because ``doctor`` reads a present block as complete
+        regardless of the flag (issue #411).
+        """
+        before = read_manifest_data(workspace)
+        assert before.gitignore_managed
+        assert before.gitattributes_managed
+
+        (workspace / ".vaultspec" / "providers.json").write_text(
+            "CORRUPT", encoding="utf-8"
+        )
+
+        plan = ResolutionPlan(
+            steps=[
+                ResolutionStep(
+                    action=ResolutionAction.REPAIR_MANIFEST,
+                    target="manifest",
+                    reason="test",
+                )
+            ]
+        )
+        result = execute_plan(plan, workspace, preflight_only=False)
+
+        assert result.all_succeeded
+        after = read_manifest_data(workspace)
+        assert after.gitignore_managed
+        assert after.gitattributes_managed
+        assert after.precommit_managed == before.precommit_managed
+
+    def test_repair_does_not_claim_a_block_that_is_gone(self, workspace: Path) -> None:
+        """Derived means derived: an absent block is not asserted as managed.
+
+        The guard on the test above - it must not pass by hardcoding ``True``.
+        """
+        (workspace / ".gitignore").write_text("# user\n", encoding="utf-8")
+        (workspace / ".vaultspec" / "providers.json").write_text(
+            "CORRUPT", encoding="utf-8"
+        )
+
+        plan = ResolutionPlan(
+            steps=[
+                ResolutionStep(
+                    action=ResolutionAction.REPAIR_MANIFEST,
+                    target="manifest",
+                    reason="test",
+                )
+            ]
+        )
+        result = execute_plan(plan, workspace, preflight_only=False)
+
+        assert result.all_succeeded
+        after = read_manifest_data(workspace)
+        assert not after.gitignore_managed
+        # The block that is still there is still claimed.
+        assert after.gitattributes_managed
+
 
 class TestScaffold:
     """SCAFFOLD handler recreates provider directories."""
