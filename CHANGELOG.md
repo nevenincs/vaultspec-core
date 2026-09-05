@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.1.74](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.73...vaultspec-core-v0.1.74) (2026-09-05)
+
+
+### Features
+
+* **harness:** size work by horizon, make the ledger the only execution artifact, and rewrite the corpus ([#422](https://github.com/nevenincs/vaultspec-core/issues/422)) ([f755314](https://github.com/nevenincs/vaultspec-core/commit/f755314cf3b6e9eb0f356093332d7800d5312fab))
+* **spec:** declare a managed-block opt-out where a teammate can read it ([ce01c68](https://github.com/nevenincs/vaultspec-core/commit/ce01c684cd9edb9f5d3bb06f37b1531861483ad8))
+
+
+### Bug Fixes
+
+* **boundary:** move the ADR linkage out of source and into the ADR ([dd910e9](https://github.com/nevenincs/vaultspec-core/commit/dd910e953f059f388c71e26281e922e6f44d02c8))
+* **ci:** the main sentinel closed its issue on a pending verdict ([8e87193](https://github.com/nevenincs/vaultspec-core/commit/8e8719348261dd568eb66195d1002de564485b1a))
+* **cli:** a printed next action that could not be run as printed ([1e43af3](https://github.com/nevenincs/vaultspec-core/commit/1e43af3b85c1557c6710ae0009370cc186c4c76b))
+* **cli:** epic intent show raised a traceback where its sibling reports an error ([f0f6d5c](https://github.com/nevenincs/vaultspec-core/commit/f0f6d5c506f7d74fe462e18ce4162b65337ba2c2))
+* **cli:** the precommit row read as a promise that git would run the hooks ([34afb5a](https://github.com/nevenincs/vaultspec-core/commit/34afb5ac558a18624cbde01d3592d10167de3639))
+* **cli:** the status hint promised vault checks that spec doctor does not run ([5b3336e](https://github.com/nevenincs/vaultspec-core/commit/5b3336e341865531c2bcb50757ef58fcb6c06bc5))
+* **core:** refuse a symlinked destination instead of severing it silently ([#438](https://github.com/nevenincs/vaultspec-core/issues/438)) ([3f5c3ea](https://github.com/nevenincs/vaultspec-core/commit/3f5c3eaca5d167330bad6226f73b3d2a6db84ed1)), closes [#413](https://github.com/nevenincs/vaultspec-core/issues/413)
+* **core:** stop a read-only destination leaking the atomic-write temporary ([#427](https://github.com/nevenincs/vaultspec-core/issues/427)) ([7bf35b1](https://github.com/nevenincs/vaultspec-core/commit/7bf35b13be3b822a24260a121c61cd08cbfcf85c)), closes [#412](https://github.com/nevenincs/vaultspec-core/issues/412)
+* **docs:** name the entry point in the two bare spec-group references ([#434](https://github.com/nevenincs/vaultspec-core/issues/434)) ([b290d2a](https://github.com/nevenincs/vaultspec-core/commit/b290d2a90c722b3f404e586f5ac15a9e2403759f))
+* **doctor:** a check that could not read the file reported it was fine ([acf9775](https://github.com/nevenincs/vaultspec-core/commit/acf9775316b9a3ae69864bde4fe1ac2c7e4ff5a7))
+* **doctor:** an unprotected workspace was reported as information ([6abae4a](https://github.com/nevenincs/vaultspec-core/commit/6abae4afc9eb91b5888ff851b4536549edfa1304))
+* **doctor:** precommit reported ok while no hook could run ([68cb6d2](https://github.com/nevenincs/vaultspec-core/commit/68cb6d2c3d7ca6a99949f8f97e9928761105a462))
+* **doctor:** report that a check could not run, instead of that it passed ([#435](https://github.com/nevenincs/vaultspec-core/issues/435)) ([19cb11b](https://github.com/nevenincs/vaultspec-core/commit/19cb11b560e07bc8726cac30ea7033fcc0574d82)), closes [#407](https://github.com/nevenincs/vaultspec-core/issues/407)
+* **executor:** derive the managed flags on repair instead of assuming defaults ([#430](https://github.com/nevenincs/vaultspec-core/issues/430)) ([ad7e5e0](https://github.com/nevenincs/vaultspec-core/commit/ad7e5e0782bc208d0a4f4cc23768d1505d5edf66)), closes [#411](https://github.com/nevenincs/vaultspec-core/issues/411)
+* **gitignore:** the block listed sentinels it had already been asked to write ([0d1019e](https://github.com/nevenincs/vaultspec-core/commit/0d1019ee38d7c053a799ffc408f2f94c3f9a35ba))
+* **guards:** a link to uv's install page is also an answer ([8dbe52d](https://github.com/nevenincs/vaultspec-core/commit/8dbe52d061c8f724a4ea915ac6c48b17826dbf5d))
+* **guards:** a link to uv's install page is also an answer ([1572642](https://github.com/nevenincs/vaultspec-core/commit/1572642383d5777e15179276e1c6a475ea16745a))
+* **install:** protect a workspace that starts with no .gitignore ([a6fc9bd](https://github.com/nevenincs/vaultspec-core/commit/a6fc9bda94bc5792c2b741c0cf21a945a535d847))
+* **install:** roll the manifest back when an install does not complete ([#432](https://github.com/nevenincs/vaultspec-core/issues/432)) ([583f056](https://github.com/nevenincs/vaultspec-core/commit/583f0566e2797808d2c1407a56b96476b76032b3)), closes [#416](https://github.com/nevenincs/vaultspec-core/issues/416)
+* **install:** surface the sync errors it records, and let them set the code ([#437](https://github.com/nevenincs/vaultspec-core/issues/437)) ([1b4d5c3](https://github.com/nevenincs/vaultspec-core/commit/1b4d5c3cc42f5c49a0537fb5a19df75da904e1b9)), closes [#414](https://github.com/nevenincs/vaultspec-core/issues/414)
+* **install:** withhold the sharing policy where there is no repository ([#426](https://github.com/nevenincs/vaultspec-core/issues/426)) ([9fc4c03](https://github.com/nevenincs/vaultspec-core/commit/9fc4c0346f33b08e39b3d6cfe91313b093fe3c18)), closes [#419](https://github.com/nevenincs/vaultspec-core/issues/419)
+* **manifest:** hold the lock across the read-modify-write cycles that skipped it ([#436](https://github.com/nevenincs/vaultspec-core/issues/436)) ([e738ca2](https://github.com/nevenincs/vaultspec-core/commit/e738ca2e85701e01b18fc223cb7bdc7f20ca07e5)), closes [#418](https://github.com/nevenincs/vaultspec-core/issues/418)
+* **mcps:** stop sync adopting the bytes it declined to write ([#428](https://github.com/nevenincs/vaultspec-core/issues/428)) ([1dd0c81](https://github.com/nevenincs/vaultspec-core/commit/1dd0c8194c0c92a9c5ac9ced6a5df951e3e8e337))
+* **migrations:** treat a versionless manifest as legacy, not as uninstalled ([#429](https://github.com/nevenincs/vaultspec-core/issues/429)) ([8adcb86](https://github.com/nevenincs/vaultspec-core/commit/8adcb86abdaf7d3ac12be00d7bfffabacfcc08c0))
+* **sync:** an unreadable ignore file was recorded as a permanent opt-out ([0ed9a50](https://github.com/nevenincs/vaultspec-core/commit/0ed9a50ddd0f5415d5124d582580836ca6bfe1b3))
+* **sync:** the managed blocks are repository-level, not per-provider ([0974871](https://github.com/nevenincs/vaultspec-core/commit/0974871a1c32db2580e2081d506750c8810170da))
+* **uninstall:** prune the sentinels it orphaned and reconcile gitattributes ([#433](https://github.com/nevenincs/vaultspec-core/issues/433)) ([414afd7](https://github.com/nevenincs/vaultspec-core/commit/414afd72cf4ee9abd446b0e62aafc89d0995372a)), closes [#409](https://github.com/nevenincs/vaultspec-core/issues/409)
+* **upgrade:** hold the manifest lock across the upgrade's own write cycle ([#440](https://github.com/nevenincs/vaultspec-core/issues/440)) ([9301040](https://github.com/nevenincs/vaultspec-core/commit/9301040758eb623a697f9b09fc6d2de75cef082c)), closes [#418](https://github.com/nevenincs/vaultspec-core/issues/418)
+* **upgrade:** restore a deleted .vault/ instead of shrinking the block to match ([#431](https://github.com/nevenincs/vaultspec-core/issues/431)) ([6c8a6e5](https://github.com/nevenincs/vaultspec-core/commit/6c8a6e56cc295ef788c04dd45a333674c79a5c72)), closes [#415](https://github.com/nevenincs/vaultspec-core/issues/415)
+* **workspace:** preserving unknown keys must not preserve the migrated shape ([9f22f3a](https://github.com/nevenincs/vaultspec-core/commit/9f22f3ae70ba21608f43e95104f8db3fe51f9cd0))
+
 ## [0.1.73](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.72...vaultspec-core-v0.1.73) (2026-08-30)
 
 
