@@ -340,13 +340,23 @@ def _open_atomic_temp(path: Path) -> tuple[int, Path, tuple[int, int]]:
 
 
 def _unlink_owned_temp(path: Path, identity: tuple[int, int]) -> None:
-    """Remove *path* only while it is still the temporary file we created."""
+    """Remove *path* only while it is still the temporary file we created.
+
+    A temporary this function cannot delete is a temporary that outlives the
+    run, so a missing write bit is cleared and the unlink retried rather than
+    allowed to leak the file. The retry stays inside the identity check, so it
+    can only ever widen a file this call created (issue #412).
+    """
     try:
         current = path.lstat()
     except FileNotFoundError:
         return
     if stat.S_ISREG(current.st_mode) and (current.st_dev, current.st_ino) == identity:
-        path.unlink()
+        try:
+            path.unlink()
+        except PermissionError:
+            os.chmod(path, stat.S_IMODE(current.st_mode) | stat.S_IWUSR)
+            path.unlink()
 
 
 def _assert_owned_temp(path: Path, identity: tuple[int, int]) -> None:
@@ -364,6 +374,21 @@ def _assert_owned_temp(path: Path, identity: tuple[int, int]) -> None:
         != identity
     ):
         raise OSError(f"Atomic write temporary file identity changed: {path}")
+
+
+def _is_read_only_file(path: Path) -> bool:
+    """Report whether *path* is a regular file with no owner-write bit.
+
+    A path that cannot be stat'ed answers ``False``: the caller's own attempt
+    is then the thing that decides, rather than this check refusing on a guess.
+    """
+    try:
+        current = path.lstat()
+    except OSError:
+        return False
+    return stat.S_ISREG(current.st_mode) and not (
+        stat.S_IMODE(current.st_mode) & stat.S_IWUSR
+    )
 
 
 # ERROR_ACCESS_DENIED, ERROR_SHARING_VIOLATION
@@ -393,6 +418,19 @@ def _replace_atomic(tmp: Path, path: Path) -> None:
     if sys.platform != "win32":
         os.replace(tmp, path)
         return
+
+    # A read-only destination fails MoveFileEx with ERROR_ACCESS_DENIED, which
+    # is indistinguishable by winerror from the scanner race below - but it is
+    # permanent, so retrying only spends the budget before failing anyway, and
+    # Windows names the *source* in the error it raises, so the report points
+    # at a temporary file the caller never named. Refuse up front, and say
+    # which file is read-only (issue #412).
+    if _is_read_only_file(path):
+        raise PermissionError(
+            errno.EACCES,
+            "Destination is read-only; refusing to replace it",
+            str(path),
+        )
 
     deadline = time.monotonic() + _WINDOWS_REPLACE_RETRY_BUDGET_SECONDS
     while True:
@@ -430,13 +468,22 @@ def atomic_write_bytes(path: Path, content: bytes) -> None:
                 raise OSError(f"Atomic write made no progress for {path}")
             view = view[written:]
         if destination_mode is not None and hasattr(os, "fchmod"):
-            os.fchmod(fd, destination_mode)
+            # Copy the destination's mode onto the temporary, but never
+            # withhold owner-write from it: this file still has to be renamed
+            # and, if that fails, deleted. Stamping a read-only destination's
+            # mode here made the cleanup unlink fail and leaked the temporary
+            # (issue #412). The exact mode is restored after the replace.
+            os.fchmod(fd, destination_mode | stat.S_IWUSR)
         os.fsync(fd)
         os.close(fd)
         fd = -1
         _assert_owned_temp(tmp, identity)
         _replace_atomic(tmp, path)
         owns_tmp = False
+        if destination_mode is not None and not destination_mode & stat.S_IWUSR:
+            # Only reached where the write bit was added above, so the common
+            # case costs no syscall.
+            os.chmod(path, destination_mode)
     finally:
         if fd >= 0:
             os.close(fd)
