@@ -1,56 +1,37 @@
 # Distribution channels
 
-`vaultspec-core` ships through Scoop and Homebrew from **one channel root per account**,
-not one per product: `nevenincs/homebrew-tap`. Both package managers resolve a tap or
-bucket to a *repository*, and a user who adds two of them to install two vaultspec
-products has to add a third for the next one. The account root is added once and carries
-every product.
+Install Core with Scoop on Windows or Homebrew on macOS and Linux. Both channels install
+`vaultspec-core` and `vaultspec-mcp`.
 
-The name says Homebrew and serves both because the two managers read different
-directories of the same repository: Scoop takes JSON manifests from `bucket/`, Homebrew
-takes Ruby formulae from `Formula/`, and the release job writes each product into both.
-A reader who assumes one repository cannot be a bucket and a tap at once is reading the
-name rather than the layout.
+You don't need a separate Python installation. First launch needs network access to
+install the pinned Vaultspec package and its dependencies from PyPI.
 
-```sh
-# Windows, via Scoop
+## Coverage
+
+| Platform | Architecture          | Availability |
+| -------- | --------------------- | ------------ |
+| Windows  | x86-64                | Scoop        |
+| macOS    | arm64 (Apple Silicon) | Homebrew     |
+| macOS    | x86-64 (Intel)        | Unavailable  |
+| Linux    | x86-64                | Homebrew     |
+| Linux    | arm64                 | Homebrew     |
+
+Windows with Scoop:
+
+```powershell
 scoop bucket add nevenincs https://github.com/nevenincs/homebrew-tap
 scoop install vaultspec-core
+```
 
-# macOS and Linux, via Homebrew
+macOS and Linux with Homebrew:
+
+```sh
 brew tap nevenincs/tap https://github.com/nevenincs/homebrew-tap
 brew install vaultspec-core
 ```
 
-That installs `vaultspec-core` and `vaultspec-mcp` as standalone binaries with no Python
-toolchain required. The first launch of either bootstraps its pinned runtime and needs
-network once.
-
-## Coverage
-
-| Platform       | Channel  | Status                |
-| -------------- | -------- | --------------------- |
-| Windows x86-64 | Scoop    | served                |
-| macOS arm64    | Homebrew | served                |
-| macOS x86-64   | Homebrew | not built - see below |
-| Linux x86-64   | Homebrew | served                |
-| Linux arm64    | Homebrew | served                |
-
-One gap, declared rather than silent. The generator omits a target the release did not
-attach and prints a `::warning::` naming it, so a missing platform is visible in the
-release log instead of becoming a formula whose download 404s.
-
-**macOS x86-64** was dropped because the binary we built did not run: its `cryptography`
-wheel resolved to a build the PyApp bootstrapper cannot load on that target, so the
-artifact launched and exited 1. Pinning `cryptography` back would have held its CVE
-fixes across every other platform to serve one shrinking one.
-
-**Linux arm64** was the second gap and is one no longer. It had no host that could build
-it to the target's glibc floor: the ARM64 runner is itself a colima container with no
-reachable docker daemon, so it cannot start the pinned `manylinux_2_28` image, and a
-native build there inherits the guest's much newer glibc. The release now attaches an
-`aarch64-unknown-linux-gnu` binary and the generated formula carries it, which is the
-same evidence the table is read from.
+For background on Intel macOS availability, see
+[PR #365](https://github.com/nevenincs/vaultspec-core/pull/365).
 
 ## Verifying what you downloaded
 
