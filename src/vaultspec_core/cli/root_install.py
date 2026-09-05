@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path  # noqa: TC003 - Typer evaluates the --target annotation.
-from typing import Annotated
+from typing import Annotated, Any, cast
 
 import typer
 
@@ -21,6 +21,24 @@ from vaultspec_core.core.enums import CliAction, InstallMode
 from vaultspec_core.core.git_artifacts import is_git_repo
 
 logger = logging.getLogger(__name__)
+
+
+def install_post_errors(result: dict[str, Any]) -> list[str]:
+    """Return the provider-sync errors ``install_run`` recorded, if any.
+
+    ``install_run`` catches a failing provider sync into ``result["errors"]``
+    rather than letting it escape. Neither renderer read that key, so such a
+    failure was recorded and then reported as success - a key written and never
+    read is the shape that lets a failure pass for success (issue #414).
+
+    Both renderers consume this, and both let a non-empty result set the exit
+    code, so the catch can no longer swallow anything silently.
+    """
+    raw: object = result.get("errors")
+    if not isinstance(raw, list):
+        return []
+    entries = cast("list[object]", raw)
+    return [str(error) for error in entries]
 
 
 def cmd_install(
@@ -238,10 +256,14 @@ def cmd_install(
         from vaultspec_core.cli.rendering import json_envelope
 
         result["path"] = str(result["path"])
-        status = "unchanged" if result["action"] == "dry_run" else "created"
+        post_errors = install_post_errors(result)
+        if post_errors:
+            status = "failed"
+        else:
+            status = "unchanged" if result["action"] == "dry_run" else "created"
         envelope = json_envelope("install", status, result, hints=hint_dict)
         typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
-        raise typer.Exit(0)
+        raise typer.Exit(1 if post_errors else 0)
 
     if result["action"] == "dry_run":
         from vaultspec_core.cli.rendering import render_dry_run_tree
@@ -286,6 +308,15 @@ def cmd_install(
             json_output=False,
             no_hints=no_hints,
         )
+        post_errors = install_post_errors(result)
+        if post_errors:
+            from vaultspec_core.console import get_console
+
+            console = get_console()
+            console.print()
+            for error in post_errors:
+                console.print(f"[red]x[/red] {error}")
+            raise typer.Exit(1)
 
 
 def cmd_uninstall(
