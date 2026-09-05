@@ -35,13 +35,12 @@ Three things are mechanical, and they are the whole list.
 first of which runs `vault check all`. That file is configuration and not a git hook:
 until you install the `pre-commit` tool and run `pre-commit install`, nothing runs it
 and a commit carrying vault errors is accepted. Once it is wired, a malformed document
-blocks the commit. Its
-scope is the whole vault rather than the files you staged: the hooks pass no filenames,
-and the Markdown type filter decides only whether they fire, not what they read. One of
-the four mutates - `vault sanitize annotations` strips generated template annotations,
-across the vault by the same rule - which is why the
-[framework manual](framework.md) treats enabling this in a shared checkout as a
-decision rather than a default.
+blocks the commit. Its scope is the whole vault rather than the files you staged: the
+hooks pass no filenames, and the Markdown type filter decides only whether they fire,
+not what they read. One of the four mutates - `vault sanitize annotations` strips
+generated template annotations, across the vault by the same rule - which is why the
+[framework manual](framework.md) treats enabling this in a shared checkout as a decision
+rather than a default.
 
 The `schema` check requires the chain to hold: an ADR must reference the research behind
 it, and a plan must reference its ADR. A plan that appeared from nowhere fails.
@@ -52,11 +51,12 @@ history leaves a trace.
 
 That third one is detectable rather than blocking, and the distinction matters if you
 gate on the exit code. Measured: appending a line to an accepted ADR by hand and
-re-running the check reports `Stale modified stamp ...; the document body no longer matches its attested fingerprint (unstamped edit)` as a **warning**, and warnings do not
-raise the exit code. The `schema` failure above is an error and does. So a pipeline
-gating on `vault check all` catches the plan that appeared from nowhere and does not
-catch the audit rewritten last night; for that one, read the report rather than the
-exit status.
+re-running the check reports
+`Stale modified stamp ...; the document body no longer matches its attested fingerprint (unstamped edit)`
+as a **warning**, and warnings do not raise the exit code. The `schema` failure above is
+an error and does. So a pipeline gating on `vault check all` catches the plan that
+appeared from nowhere and does not catch the audit rewritten last night; for that one,
+read the report rather than the exit status.
 
 Nothing else is enforced. In particular, **no check fails because a feature has no
 audit**. The `features` check warns about a plan with no ADR and about a missing feature
@@ -112,12 +112,12 @@ on.
 Installing vaultspec seeds a system prompt into three of the four providers it manages.
 Claude and Codex read it as a rule file, `vaultspec-system.builtin.md`, alongside the
 others; Gemini reads it as `.gemini/SYSTEM.md`. Antigravity gets rules and skills but no
-system prompt, so the mandates below are not in front of it. It also gets a
-`workflows` directory, which the installer creates and nothing fills: the
-harness ships no workflows, so that folder is there for the provider's own
-convention rather than for anything of ours. Measured on
-a fresh install: the text appears under `.claude/`, `.codex/`, and `.gemini/`, and nowhere
-under `.agents/`. Two of its mandates are about correctness specifically.
+system prompt, so the mandates below are not in front of it. It also gets a `workflows`
+directory, which the installer creates and nothing fills: the harness ships no
+workflows, so that folder is there for the provider's own convention rather than for
+anything of ours. Measured on a fresh install: the text appears under `.claude/`,
+`.codex/`, and `.gemini/`, and nowhere under `.agents/`. Two of its mandates are about
+correctness specifically.
 
 On tests:
 
@@ -249,10 +249,9 @@ Vault Check  - All
   ok orphans: clean
 ```
 
-That capture is cut after the first nine of the nineteen checks; the rest read the
-same way, and the run ends `All checks passed.` A freshly scaffolded vault does not
-look like this and should not: its placeholders are errors until someone writes the
-prose.
+That capture is cut after the first nine of the nineteen checks; the rest read the same
+way, and the run ends `All checks passed.` A freshly scaffolded vault does not look like
+this and should not: its placeholders are errors until someone writes the prose.
 
 `--fix` rewrites documents, so read the diff before committing it. Then the project's
 own tests and gates, then `/vaultspec-code-review`, in that order. The check suite is
