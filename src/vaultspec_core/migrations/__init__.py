@@ -227,6 +227,16 @@ def _build_registry() -> list[Migration]:
 REGISTRY: list[Migration] = _build_registry()
 
 
+def manifest_exists(workspace: Path) -> bool:
+    """Report whether *workspace* carries a manifest at all.
+
+    This is what separates "not installed" from "installed by a release
+    that predates the version key". Both read back as an empty
+    ``vaultspec_version``, and only one of them has migrations pending.
+    """
+    return (workspace / ".vaultspec" / MANIFEST_FILENAME).exists()
+
+
 def list_pending(
     workspace: Path,
     *,
@@ -241,6 +251,16 @@ def list_pending(
     a not-installed case and produces an empty list; the registry only
     runs against an installed workspace.
 
+    A manifest that *exists* but carries no version is a different thing
+    entirely: a legacy (v1.0) workspace, written before the version key
+    existed. It predates every registered migration, so all of them are
+    pending for it. Conflating the two made the workspaces most in need
+    of the data-shape migrations the only ones that never received them,
+    and nothing afterwards recorded that they had been skipped
+    (issue #408). :func:`parse_version_tuple` already parses ``""`` to
+    ``()`` precisely so it sorts below any real version; the comparison
+    below needs no special case once the short-circuit is gone.
+
     Args:
         workspace: Workspace root directory.
         manifest: Optional pre-read :class:`ManifestData` to avoid a
@@ -251,7 +271,7 @@ def list_pending(
         List of pending :class:`Migration` instances in version order.
     """
     mdata = manifest if manifest is not None else read_manifest_data(workspace)
-    if not mdata.vaultspec_version:
+    if not mdata.vaultspec_version and not manifest_exists(workspace):
         return []
     current = parse_version_tuple(mdata.vaultspec_version)
     entries = sorted(
@@ -283,7 +303,10 @@ def migration_status(
         :attr:`MigrationStatus.UNKNOWN`).
     """
     mdata = manifest if manifest is not None else read_manifest_data(workspace)
-    if not mdata.vaultspec_version:
+    if not mdata.vaultspec_version and not manifest_exists(workspace):
+        # No manifest: nothing is installed, so there is nothing to say.
+        # A manifest with no version is a legacy workspace and reports
+        # PENDING like any other out-of-date one (issue #408).
         return MigrationStatus.UNKNOWN, []
     pending = list_pending(workspace, manifest=mdata, registry=registry)
     if not pending:
@@ -378,9 +401,10 @@ def run_pending_migrations(
 
     with advisory_lock(manifest_path):
         manifest = read_manifest_data(workspace)
-        if not manifest.vaultspec_version:
-            return []
-
+        # No short-circuit on an empty version here. The manifest's
+        # existence was already established above, so an empty version
+        # means a legacy workspace with every migration pending, not an
+        # uninstalled one (issue #408).
         current = parse_version_tuple(manifest.vaultspec_version)
         pending = list_pending(workspace, manifest=manifest, registry=registry_entries)
         if not pending:
