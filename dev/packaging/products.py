@@ -103,9 +103,7 @@ class Product:
 VAULTSPEC_CORE = Product(
     name="vaultspec-core",
     formula_class="VaultspecCore",
-    description=(
-        "Spec-driven development framework - vaultspec-core CLI and MCP server"
-    ),
+    description="Decision-driven harness for coding agents, and humans.",
     homepage="https://github.com/nevenincs/vaultspec-core",
     license="MIT",
     tag_prefix="vaultspec-core-v",
@@ -117,7 +115,8 @@ VAULTSPEC_CORE = Product(
     # target the channels serve; supported_targets is left at its default.
     notes=(
         "Installs vaultspec-core and vaultspec-mcp.",
-        "First launch bootstraps the pinned runtime; needs network once.",
+        "First launch needs network access to install the pinned package "
+        "and its dependencies.",
         "Verify with: vaultspec-core --version",
     ),
 )
