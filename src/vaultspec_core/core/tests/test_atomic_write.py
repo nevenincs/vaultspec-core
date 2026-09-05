@@ -108,30 +108,59 @@ class TestAtomicWriteDestination:
         if os.name != "nt":
             assert stat.S_IMODE(destination.stat().st_mode) == 0o640
 
-    def test_replaces_relative_link_without_writing_target(
+    def test_refuses_a_relative_link_without_writing_target(
         self, tmp_path: Path
     ) -> None:
+        """A symlinked destination is refused, and its target left alone.
+
+        This previously asserted the link was *replaced* by a regular file.
+        The property it was protecting - never write through the link - is
+        unchanged and still asserted below. What changed is the other half:
+        the rename replaced the link rather than its target, so the link was
+        severed and the operator's real file left stale, silently, with the
+        run exiting 0 (issue #413).
+
+        Resolving the link and writing its target was the alternative, and it
+        is rejected: a managed write would then land on whatever path the link
+        names, which is what ``_assert_within`` exists to prevent and what
+        ``_open_atomic_temp``'s ``O_NOFOLLOW`` already refuses for the
+        temporary.
+        """
         operator = tmp_path / "operator-target.md"
         operator.write_bytes(b"operator bytes\n")
         destination = tmp_path / "linked.md"
         if not _plant_symlink(destination, operator.name):
             return
 
-        atomic_write(destination, "managed")
+        with pytest.raises(OSError, match="symbolic link"):
+            atomic_write(destination, "managed")
 
-        assert not destination.is_symlink()
-        assert destination.read_bytes() == b"managed"
+        # Neither the link nor its target is rewritten.
+        assert destination.is_symlink()
         assert operator.read_bytes() == b"operator bytes\n"
+        assert not list(tmp_path.glob(".vs-write-*.tmp"))
 
-    def test_replaces_broken_link(self, tmp_path: Path) -> None:
+    def test_refuses_a_broken_link(self, tmp_path: Path) -> None:
+        """A dangling link is still an arrangement the operator made."""
         destination = tmp_path / "broken-destination.md"
         if not _plant_symlink(destination, "missing-target.md"):
             return
 
+        with pytest.raises(OSError, match="symbolic link"):
+            atomic_write(destination, "managed")
+
+        assert destination.is_symlink()
+        assert not list(tmp_path.glob(".vs-write-*.tmp"))
+
+    def test_an_ordinary_destination_is_unaffected(self, tmp_path: Path) -> None:
+        """The guard on the refusal: regular files still round-trip."""
+        destination = tmp_path / "regular.md"
+        destination.write_bytes(b"old\n")
+
         atomic_write(destination, "managed")
 
-        assert not destination.is_symlink()
         assert destination.read_bytes() == b"managed"
+        assert not destination.is_symlink()
 
     def test_directory_failure_preserves_topology(self, tmp_path: Path) -> None:
         destination = tmp_path / "destination.md"
