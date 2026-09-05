@@ -67,55 +67,5 @@ Build attestations do not grant permission to run an executable under your opera
 system's security policy. Publisher signing is tracked in
 [#405](https://github.com/nevenincs/vaultspec-core/issues/405).
 
-## Why binary formulae
-
-The Homebrew formula installs the pre-built PyApp binaries attached to the GitHub
-Release, rather than building the product from source the way a formula usually does.
-vaultspec already publishes standalone binaries for every platform Homebrew serves, so
-assembling the same product a second way would double the surface that can break while
-pinning two different sets of bytes as "the release".
-
-That is a deliberate divergence from the other product this release-channel machinery
-generates. `cadrumo` is a separate tool in its own repository, sharing this machinery
-and so shipping the same channel shapes; nothing here depends on knowing it, and it is
-named because the two formulae differ on purpose rather than by drift. Its formula does
-build a virtualenv from a locked sdist cohort, because it publishes no binary channel
-and the formula has to be the thing that assembles the product.
-
-The idiom shared across the family is the generation discipline - one pointer per
-channel, generated from the release's own `SHA256SUMS`, guarded against a backward bump
-\- not the formula's internal strategy.
-
-## Generation, and why nothing is hand-authored
-
-Both pointers are **generated, never hand-authored**. The release job in
-`.github/workflows/binaries.yml` runs `dev.packaging.generate` against the release's own
-`SHA256SUMS` and commits the result into the tap checkout. Structural changes belong in
-`dev/packaging/scoop.py` and `dev/packaging/homebrew.py`; editing a manifest or formula
-directly is overwritten by the next release.
-
-Reproduce locally against a tap checkout:
-
-```sh
-just channels <tag> <checksums> <path-to-homebrew-tap-checkout>
-```
-
-The root argument is required rather than defaulted. It used to default to this
-repository, which quietly wrote the pointers into a `bucket/` and `Formula/` that no
-longer exist - the local command and the release job disagreeing about where a channel
-lives is exactly how the two roots drifted four releases apart.
-
-### The 0.1.60 failure, and the guard that now refuses it
-
-Scoop's `checkver` and `autoupdate` stanzas serve maintainer tooling only.
-`scoop install` reads the committed `version`, `url`, and `hash`, so those must be
-correct on their own - an autoupdate stanza does not rescue a manifest whose pinned hash
-is wrong.
-
-Release `vaultspec-core-v0.1.60` shipped exactly that: correct version, correct URLs,
-and `"hash": ["", ""]`, out of a run that was green from end to end.
-
-`dev/packaging/validate.py` now runs between generating the pointers and committing
-them, and refuses blank or truncated digests, a version the two channels disagree about,
-and a URL naming an asset no build produces. It runs at the only point where a bad
-pointer can still be stopped rather than reported afterwards.
+For release maintenance, see
+[updating package-manager manifests](README.md#update-package-manager-manifests).
