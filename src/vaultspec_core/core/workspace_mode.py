@@ -725,8 +725,12 @@ def _write_document(
         # A broken document is not a source of keys worth preserving, and the
         # readers that matter have already refused it.
         payload = {}
-    for known in ("hooks", "blocks"):
-        payload.pop(known, None)
+    # Drop every key this writer owns before re-emitting it, including the two
+    # legacy top-level fields the v1 fold consumes into `packages`. Carrying
+    # those forward would leave a migrated file still claiming the shape it was
+    # migrated out of.
+    for owned in ("hooks", "blocks", "install_mode", "minimum_vaultspec_version"):
+        payload.pop(owned, None)
     payload["schema_version"] = WORKSPACE_SCHEMA_VERSION
     payload["packages"] = packages_payload
     if hooks != HooksDeclaration():

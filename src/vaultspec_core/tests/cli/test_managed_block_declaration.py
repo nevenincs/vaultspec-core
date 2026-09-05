@@ -12,6 +12,7 @@ real ``git`` subprocess, plus the schema and verb behaviour underneath it.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from typing import TYPE_CHECKING
@@ -397,3 +398,28 @@ class TestTheDoctorRowNamesTheWayOut:
 
         assert "unmanaged" in result.output
         assert "spec gitignore disable" in result.output
+
+
+@pytest.mark.unit
+class TestPreservationDoesNotResurrectLegacyKeys:
+    """Carrying unknown keys forward must not carry the migrated-away shape.
+
+    The v1 declaration kept `install_mode` at the top level; the fold consumes
+    it into `packages`. Preserving keys the writer does not recognise would
+    have left a migrated file still claiming the shape it was migrated out of.
+    """
+
+    def test_the_legacy_single_key_shape_is_still_dropped(self, tmp_path: Path) -> None:
+        (tmp_path / ".vaultspec").mkdir()
+        (tmp_path / ".vaultspec" / "workspace.json").write_text(
+            '{"install_mode": "tool", "schema_version": "1.0"}', encoding="utf-8"
+        )
+
+        write_blocks_declaration(tmp_path, BlocksDeclaration(gitignore=False))
+
+        raw = json.loads(
+            (tmp_path / ".vaultspec" / "workspace.json").read_text(encoding="utf-8")
+        )
+        assert "install_mode" not in raw
+        assert raw["packages"]["vaultspec-core"]["install_mode"] == "tool"
+        assert read_blocks_declaration(tmp_path).gitignore is False
