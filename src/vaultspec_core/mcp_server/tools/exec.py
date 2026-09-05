@@ -9,7 +9,7 @@ plan resolution is authored here.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
@@ -55,7 +55,7 @@ def _log_summary(payload: object) -> str:
     """One-line summary of a :class:`LogResult` for the compact envelope."""
     if not isinstance(payload, dict):
         return str(payload)
-    data: dict[str, Any] = payload
+    data = cast("dict[str, Any]", payload)
     verb = (
         "created"
         if data.get("created")

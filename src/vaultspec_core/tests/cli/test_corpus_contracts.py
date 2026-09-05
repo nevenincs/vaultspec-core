@@ -142,6 +142,33 @@ def _resolve(
     return (path or None), rest
 
 
+def _span_faults(
+    tokens: list[str],
+    leaves: set[tuple[str, ...]],
+    groups: set[tuple[str, ...]],
+    cli: CliRunner,
+) -> list[str]:
+    """Reasons one expanded command spelling fails to resolve; empty when it does."""
+    words = [t for t in tokens if not t.startswith("-")]
+    path, rest = _resolve(words, leaves, groups)
+    if path is None:
+        return ["no such command"]
+    faults: list[str] = []
+    unexpected = [
+        t for t in rest if not _PLACEHOLDER_ARG.match(t) and path not in leaves
+    ]
+    if unexpected:
+        faults.append(f"unknown subcommand {unexpected}")
+    if path in leaves:
+        accepted = command_options(cli, app, path)
+        faults.extend(
+            f"{' '.join(path)} has no {flag}"
+            for flag in tokens
+            if flag.startswith("--") and flag not in accepted
+        )
+    return faults
+
+
 class TestCommandsNamedInProseExist:
     def test_every_vaultspec_core_span_resolves_to_a_live_command(
         self,
@@ -163,27 +190,8 @@ class TestCommandsNamedInProseExist:
                 if span.strip() == "<cmd>":
                     continue
                 for tokens in _alternatives(span):
-                    words = [t for t in tokens if not t.startswith("-")]
-                    path, rest = _resolve(words, leaves, groups)
-                    if path is None:
-                        offenders.append((_rel(doc), span, "no such command"))
-                        continue
-                    unexpected = [
-                        t
-                        for t in rest
-                        if not _PLACEHOLDER_ARG.match(t) and path not in leaves
-                    ]
-                    if unexpected:
-                        offenders.append(
-                            (_rel(doc), span, f"unknown subcommand {unexpected}")
-                        )
-                    if path in leaves:
-                        accepted = command_options(cli, app, path)
-                        for flag in (t for t in tokens if t.startswith("--")):
-                            if flag not in accepted:
-                                offenders.append(
-                                    (_rel(doc), span, f"{' '.join(path)} has no {flag}")
-                                )
+                    for why in _span_faults(tokens, leaves, groups, cli):
+                        offenders.append((_rel(doc), span, why))
         assert not offenders, "\n".join(
             f"{d}: `vaultspec-core {s}` -> {why}" for d, s, why in offenders
         )
@@ -304,7 +312,7 @@ def _always_on_docs() -> list[Path]:
 
     Mirrors the selection in ``core/system.py``.
     """
-    shared = []
+    shared: list[Path] = []
     for part in sorted((_BUILTINS / "system").glob("*.md")):
         meta, _body = parse_frontmatter(part.read_text(encoding="utf-8"))
         if meta.get("tool") is None and meta.get("pipeline") != "config":
