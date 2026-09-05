@@ -30,21 +30,28 @@ You begin a pipeline with one request, and the framework drives five stages plus
 optional code-grounding step. A skill runs each stage and writes a document to
 `.vault/`:
 
-| Stage                       | Skill                      | Writes to           |
-| --------------------------- | -------------------------- | ------------------- |
-| Research                    | `/vaultspec-research`      | `.vault/research/`  |
-| Ground in code *(optional)* | `/vaultspec-code-research` | `.vault/reference/` |
-| Decide                      | `/vaultspec-adr`           | `.vault/adr/`       |
-| Plan                        | `/vaultspec-write`         | `.vault/plan/`      |
-| Execute                     | `/vaultspec-execute`       | `.vault/exec/`      |
-| Review                      | `/vaultspec-code-review`   | `.vault/audit/`     |
+| Stage                                 | Skill                      | Writes to           |
+| ------------------------------------- | -------------------------- | ------------------- |
+| Research                              | `/vaultspec-research`      | `.vault/research/`  |
+| Reference *(alternative to Research)* | `/vaultspec-code-research` | `.vault/reference/` |
+| Decide                                | `/vaultspec-adr`           | `.vault/adr/`       |
+| Plan                                  | `/vaultspec-write`         | `.vault/plan/`      |
+| Execute                               | `/vaultspec-execute`       | `.vault/exec/`      |
+| Review                                | `/vaultspec-code-review`   | `.vault/audit/`     |
 
 Those `/vaultspec-*` names are slash-commands you type into your coding agent, not into
 a shell - where your agent has them. The skills are written for Claude Code and
 Antigravity; Gemini and Codex are enrolled and receive the rules and agent definitions
 but no skills, so on those two the pipeline is driven from the command line instead.
 
-The agent runs the stages. Your part is approving each one before it moves on, and
+Not every request enters the pipeline. The agent sizes the work first: a change that
+finishes in the current session, needs no handoff, stays in one package, and touches at
+most ten files is done directly, with one line saying no plan was needed. Work that
+outlives the session gets a plan; a decision that is costly to reverse (a dependency,
+schema, protocol, or public interface) gets an ADR at any size. The record types and
+their dependencies never change; sizing only decides which stages a feature enters.
+
+The agent runs the stages. Your part is two approvals, the ADR and the plan, and
 stepping in where judgment is needed: shaping the decision, sizing the plan, and
 deciding when work is done.
 
@@ -78,23 +85,22 @@ prints `Recently completed` when there is one, plus `Execution activity`, `Disco
 `Totals`, and a `Next actions` block.
 
 Pass a feature or a plan as the target to get its grounding trace: every step mapped to
-the execution record that carried it out, with the feature's other documents grouped
-underneath.
+its rows in the plan's ledger, with the feature's other documents grouped underneath.
 
 ```text
 $ vaultspec-core status search-api
 Grounding Trace  search-api (feature)
 
 2026-06-26-search-api-plan   L2   -   P1/3   4/12 steps   33%   next P02.S05
-    [x] P01.S01  2026-06-26-search-api-P01-S01
-    [x] P01.S02  2026-06-26-search-api-P01-S02
-  > [ ] P02.S05  no record
+    [x] P01.S01  ledger 2 rows  verify:pass
+    [x] P01.S02  ledger 1 row
+  > [ ] P02.S05  no rows
   grounding
     adr  2026-06-26-search-api-adr
     research  2026-06-26-search-api-research
 ```
 
-`no record` means the step is open and nothing has been executed against it yet. The `>`
+`no rows` means the step is open and nothing has been executed against it yet. The `>`
 marks where work resumes.
 
 The command prints a row for every step; the block above is cut to three of this plan's
@@ -110,9 +116,10 @@ Tell your coding agent what to build, in plain language:
 To enter at one stage instead, invoke its skill directly, for example
 `/vaultspec-research`.
 
-The agent pauses between stages and asks before continuing. Approving is a plain reply.
-To redirect, say what is wrong and it revises that stage's document rather than moving
-on, so a rejected research note gets rewritten before any decision is built on it.
+The agent stops to present the ADR and then the plan. Approving is a plain reply that
+names the record. To redirect, say what is wrong and it revises that stage's document
+rather than moving on, so a rejected research note gets rewritten before any decision is
+built on it.
 
 ## Find a feature's documents
 
@@ -160,11 +167,11 @@ From an approved ADR, `/vaultspec-write` produces the plan in `.vault/plan/`:
 
 > "Write the implementation plan from the ADR."
 
-A plan's tier sets how much structure it carries. `L1` is a single-session fix, steps
-only. `L2` is multi-step work in one subsystem, grouping steps under phases. `L3` adds
-waves above phases for interdependent batches. `L4` adds an epic frame for multi-week,
-multi-team work. Ask for the tier you want, or let the skill choose from the scope and
-change it later:
+A plan's tier sets how much structure it carries. `L1` is one concern with no
+cross-module coupling, steps only. `L2` is multi-step work in one subsystem, grouping
+steps under phases. `L3` adds waves above phases for interdependent batches. `L4` adds
+an epic frame for multi-week, multi-team work. Ask for the tier you want, or let the
+skill choose from the scope and change it later:
 
 ```bash
 vaultspec-core vault plan tier promote .vault/plan/2026-06-26-search-api-plan.md --target L3
@@ -182,8 +189,8 @@ Each step names one unit of work and the file it touches, so it maps to a single
 
 Structural changes go through `vaultspec-core vault plan`, not your editor, which is
 what keeps the `S##`, `P##`, and `W##` identifiers append-only: a removed step's
-identifier is retired and never reused, so an execution record can never come to point
-at different work than it did when written.
+identifier is retired and never reused, so a ledger row can never come to point at
+different work than it did when written.
 
 ```bash
 vaultspec-core vault plan step add     # append a step at the next canonical id
@@ -197,9 +204,9 @@ The full surface, including waves and epics, is in the [CLI reference](./CLI.md)
 
 ## Execute a plan
 
-`/vaultspec-execute` works the plan from its next open step, writing one execution
-record per step into `.vault/exec/`. That record is what makes a step's completion
-auditable: it names what was changed, so `status` can later pair every closed step with
+`/vaultspec-execute` works the plan from its next open step, appending each step's rows
+to the plan's ledger in `.vault/exec/`. Those rows are what make a step's completion
+auditable: they name what was changed, so `status` can later pair every closed step with
 evidence.
 
 To resume interrupted work, ask the agent to continue, or point it at a specific step.
@@ -220,10 +227,10 @@ retired-identifier rule means a reopened step keeps its history.
 ## Review the result
 
 `/vaultspec-code-review` audits finished work and writes the result to `.vault/audit/`,
-ranked by severity. Run it when a plan's steps are closed and before you call the
-feature done. What it finds either gets fixed, which may reopen steps, or gets recorded
-as accepted. [The correctness workflow](./correctness.md) covers what the review gate
-does and does not prove.
+ranked by severity. It runs at each phase close, at plan close, and before the work is
+handed off for merge. What it finds either gets fixed, which may reopen steps, or gets
+recorded as accepted. [The correctness workflow](./correctness.md) covers what the
+review gate does and does not prove.
 
 ## Everyday commands
 
@@ -321,7 +328,7 @@ later `install` or `sync` regenerates `.pre-commit-config.yaml`.
 `vaultspec-core spec precommit enable` reverses it.
 
 **MCP clients.** `install` scaffolds an `.mcp.json` exposing the workflow to Model
-Context Protocol clients over stdio: nine tools, two of which are a gateway to the rest
+Context Protocol clients over stdio: ten tools, two of which are a gateway to the rest
 of the CLI. Verify the configuration with `vaultspec-core spec mcps status --json`; the
 [MCP reference](./MCP.md) lists the tools.
 

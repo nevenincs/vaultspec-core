@@ -175,7 +175,7 @@ class PlanInFlight:
         phases_completed: Number of fully-checked Phases.
         next_open_step: Display path of the first open step (the cursor),
             or ``None`` when the plan has no open steps.
-        exec_missing: Count of checked steps lacking an execution record.
+        exec_missing: Count of checked steps lacking a ledger row.
         modified: Canonical ``yyyy-mm-dd`` recency string used for
             ordering, or ``None`` when no parseable date exists.
     """
@@ -299,15 +299,21 @@ class StepTrace:
         canonical_id: The step's canonical leaf identifier (``S##``).
         display_path: The step's tier-conditional display path.
         checked: ``True`` when the step's checkbox is ``[x]``.
-        record_stem: The execution-record stem mapped to this step, or
-            ``None`` for an open step with no record (the explicit
-            "no record" state).
+        record_stem: The stem of the ledger (or legacy record) mapped to
+            this step, or ``None`` for a step with no rows (the explicit
+            "no rows" state).
+        rows: Count of the step's ledger change rows, or ``None`` when the
+            step is mapped by a legacy per-Step record or not at all.
+        verify: The step's last ``verify:`` result (``pass`` or ``fail``),
+            or ``None`` when no check row exists.
     """
 
     canonical_id: str
     display_path: str
     checked: bool
     record_stem: str | None
+    rows: int | None = None
+    verify: str | None = None
 
 
 @dataclass
@@ -317,14 +323,11 @@ class PlanTrace:
     Attributes:
         stem: The plan document's filename stem.
         feature: The plan's feature tag without ``#``, or ``None``.
-        steps: Per-step record mapping in document order.
-        summaries: Stems of phase-summary documents (``-summary`` suffix)
-            that reference this plan. Summaries carry no ``step_id:`` by
-            design, so they are grouped here instead of being misreported
-            as unlinked anomalies.
-        unlinked_records: Stems of execution records that reference this
-            plan (graph in-links or ``related:``) without a resolvable
-            ``step_id:``, surfaced rather than dropped.
+        steps: Per-step ledger mapping in document order.
+        unlinked_records: Stems of exec documents that reference this plan
+            (graph in-links or ``related:``) yet name no Step: a ledger
+            with no rows, or a legacy record without ``step_id:``.
+            Surfaced rather than dropped.
         grounding: Grounding documents grouped by document type, drawn
             from the plan's outgoing ``related:`` neighbours (adr,
             research, reference, prior plan) and incoming non-exec
@@ -341,7 +344,7 @@ class PlanTrace:
         phases_completed: Fully-checked Phases.
         next_open_step: Display path of the first open step (the cursor),
             or ``None`` when complete.
-        exec_missing: Count of checked steps lacking an execution record.
+        exec_missing: Count of checked steps lacking a ledger row.
         error: A parse-error note when the plan could not be parsed,
             otherwise ``None``.
     """
@@ -349,7 +352,6 @@ class PlanTrace:
     stem: str
     feature: str | None
     steps: list[StepTrace] = field(default_factory=list)
-    summaries: list[str] = field(default_factory=list)
     unlinked_records: list[str] = field(default_factory=list)
     grounding: dict[str, list[str]] = field(default_factory=dict)
     tier: str | None = None
@@ -378,7 +380,7 @@ class GroundingTrace:
         plans: One :class:`PlanTrace` per plan under the target, in stem
             order.
         paths: Map from every referenced document stem (plans, step
-            records, summaries, unlinked records, grounding docs) to its
+            records, unlinked records, grounding docs) to its
             repo-relative path, so file discovery yields openable paths
             without leaking the graph. Empty unless paths
             were requested.

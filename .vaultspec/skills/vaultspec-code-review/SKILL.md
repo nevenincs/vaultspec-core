@@ -1,56 +1,30 @@
 ---
 name: vaultspec-code-review
-description: Run a formal code review for safety, intent, and quality. Use to verify completed work before marking it done.
+description: Audit planned work for safety, intent, and quality into a rolling audit record. Use at each point of the review cadence.
 ---
 
-# Code review skill (vaultspec-code-review)
+# Code review (vaultspec-code-review)
 
-When to use this skill:
+Produces or extends an audit for work executed under a plan. Precondition: completed
+Steps to review. A diff with no plan behind it is reviewed in the reply, not here. This
+skill terminates within one run and never modifies the codebase; fixes go back to
+`vaultspec-execute`.
 
-- **Mandatory:** At the end of every `vaultspec-execute` cycle, before marking a feature
-  as "Done", and before publishing a PR.
-- After major feature implementation work.
-- When you need a second pair of eyes on a specific module or PR.
-- **Safety Check:** When you suspect a safety violation (e.g., `unsafe` usage) or
-  testing framework issue in complex projects.
+## Steps
 
-## Workflow
-
-- **Announce at start:** "I'm using the `vaultspec-code-review` skill to audit the
-  implementation."
-
-- Identify relevant docs, the plan (`.vault/plan/...`), ADR and research documents
-
-- Identify files modified
-
-- Scaffold the audit document with `vaultspec-core vault add audit --feature {feature}`;
-  the CLI owns the filename and frontmatter. Log discovered issues to its body as
-  triaged `LOW`->`CRITICAL` task entries.
-
-- Use a `vaultspec-code-reviewer` agent persona, or other code-review specialists.
-
-- Use parallel subagents to comprehensively comb through codebase.
-
-- Instruct agents to always read grounding docs, ADRs, and plans.
-
-- Instruct agents to log findings as triaged issue entries into the single shared
-  scaffolded audit document's body.
-
-- Code review is not a code fixer skill - do NOT modify the codebase.
-
-## Important
-
-- **Template:** You MUST read and use the template at `.vaultspec/templates/audit.md`;
-  its embedded hint blocks govern the body structure, and its `## Findings` section
-  carries the rolling per-finding log format.
-
-- **Location:** the scaffold creates `.vault/audit/yyyy-mm-dd-{feature}-audit.md`; never
-  hand-write the filename or frontmatter. When the feature already carries an audit,
-  disambiguate with the optional narrative infix:
-  `yyyy-mm-dd-{feature}-{topic}-audit.md`.
-
-- **Tags:** the scaffold tags the audit document with `#audit` and `#{feature}`; verify
-  via `vaultspec-core vault check all` rather than hand-editing.
-
-- Issues must be continuously appended to the audit document as a rolling log of open
-  tasks.
+- Read the plan and the ADRs it executes; list the files the reviewed Steps changed
+  (their ledger rows name them).
+- Scaffold once per feature, `vaultspec-core vault add audit --feature {feature}` (or
+  the `create` tool); every later review appends to it. A separate audit (`--topic`)
+  only for a different purpose, such as curation, or when the user asks for one. Read
+  `.vaultspec/templates/audit.md`; its `## Findings` section is a rolling log, appended
+  per review, never rewritten. Steps already reviewed with no commits since are not
+  reviewed again.
+- Review in this run, or dispatch the `vaultspec-code-reviewer` persona (parallel
+  reviewers only when the diff spans several subsystems), instructed to read the
+  grounding documents and return findings for you to append.
+- Append findings as `### {topic} | {level} | {summary}` entries, the level lowercase
+  (`low` to `critical`), and state the result: `PASS` (no critical or high),
+  `REVISION REQUIRED`, or `FAIL`.
+- Report `critical` and `high` findings to the executor; they reopen the affected Steps.
+  Lower findings stay recorded; fixing them is a Step the user approves.

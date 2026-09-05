@@ -1,55 +1,25 @@
 ---
 name: vaultspec-team
-description: Start a multi-agent coding team for a hard challenge. Use when a problem is too large for a single agent.
+description: Supervise several workers over one approved plan. Use when the plan's Parallelization section names containers that may run concurrently.
 ---
 
-# Team coordination skill (vaultspec-team)
+# Team (vaultspec-team)
 
-This skill defines how to supervise multiple specialized agent personas when work is too
-large for a single worker. Use it for massive refactors, multi-module auditing, or any
-scenario where parallel execution and multi-agent coordination provide an advantage. The
-work itself follows the plan conventions: a Wave / Phase / Step plan governs scope, and
-each Step is one prompt-run plus one commit.
+A coordination policy for executing an approved plan with parallel workers; the host
+environment dispatches, sequences, and monitors them. It adds nothing to the pipeline:
+each worker runs `vaultspec-execute` on its assigned container, and the supervisor keeps
+the plan and the review gate. For single-persona work, load the persona directly.
 
-**Announce at start:** "I'm using the `vaultspec-team` skill to coordinate a team of
-agent personas."
+## Shape
 
-## When to use
-
-- The work spans multiple modules, repositories, or domains.
-- Parallel execution would significantly reduce total effort.
-- The work benefits from specialized roles (researcher, coder, reviewer) working in
-  coordination.
-
-For focused, single-persona work, load the agent persona directly instead.
-
-## Mechanism
-
-This skill is a coordination policy, not a shipped MCP API contract.
-
-- The host environment selects the participating agent personas.
-- The host environment assigns Step / Phase / Wave boundaries, context, and sequencing
-  per the plan document.
-- The host environment monitors progress, handles permission prompts, and decides when
-  to re-route or stop work.
-
-## Mapping the team to the plan
-
-The plan document is the team's work queue; the plan's structure decides the team's
-shape:
-
-- Assign whole Phases (or Waves at L3/L4) to workers, never fragments of a Phase; the
-  plan's Parallelization section states which containers may run concurrently.
-- Each worker executes its Steps under the `vaultspec-execute` discipline: one Step is
-  one prompt-run plus one commit, closed via `vaultspec-core vault plan step check`,
-  with one Step Record per Step.
-- Workers must not mutate plan structure; structural changes route back to the
-  supervisor, who applies them via the `vaultspec-core vault plan` verbs.
-- The supervisor enforces the mandatory review gate: a `vaultspec-code-reviewer` persona
-  audits completed work before the affected Steps are reported done.
-
-Use this skill when you need a supervised team shape such as:
-
-- researcher -> author -> editor
-- researcher -> executor -> reviewer
-- supervisor with multiple parallel specialists
+- Assign whole containers (a Phase, or a Wave) to workers, never fragments; the plan's
+  Parallelization section says which may run concurrently.
+- Each worker follows `vaultspec-execute` as a dispatched worker: one commit and its
+  ledger rows per Step, Steps closed through the plan verbs, blockers raised to the
+  supervisor, Phase close reported to the supervisor.
+- Workers never change plan structure; the supervisor applies changes through the plan
+  verbs and presents again any Step whose action changed.
+- The supervisor holds the review gate, `vaultspec-code-review` at each point of the
+  review cadence in the vaultspec section. A Phase is reported done to the user only
+  after its review.
+- Workers report through `SendMessage`, including "nothing found".

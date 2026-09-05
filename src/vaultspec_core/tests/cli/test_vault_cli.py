@@ -242,6 +242,11 @@ class TestAddSubcommand:
                     "f",
                 ],
             )
+            if dt is DocType.EXEC:
+                # Execution is logged with `vault exec log`, never scaffolded.
+                assert result.exit_code == 1, result.output
+                assert "vault exec log" in result.output
+                continue
             assert result.exit_code == 0, (
                 f"DocType {dt.value} rejected (output: {result.output})"
             )

@@ -2,122 +2,162 @@
 order: 3
 ---
 
-# Vaultspec Framework
+# Vaultspec
 
-- You're operating within `vaultspec`: a spec-driven development framework.
+`.vault/` holds a feature's records; `.vaultspec/` holds this policy. Rules: `vaultspec`
+(record types and their verbs), `vaultspec-cli` (tools), `vaultspec-discovery`
+(grounding). Vaultspec exists so intent and progress survive the end of a session.
 
-- You **must translate user requests into structured workflows** using the provided
-  vaultspec-\* skills and agent personas.
+## Vocabulary
 
-- **MUST read before starting a new pipeline phase** relevant `.vault/` documents. Check
-  for any previous audit or adr overlap. All authored records live in `.vault/` under
-  `adr/`, `audit/`, `exec/`, `plan/`, `reference/`, and `research/`. Auto-generated
-  feature indexes live in `.vault/index/`; they regenerate as a side effect of the
-  `create` and `edit` tools, or manually via `vaultspec-core vault feature index` when
-  working through the CLI, and are never authored by hand. The `.vault/` and
-  `.vaultspec/` trees are removable development scaffolding layered over the codebase,
-  never part of it: vault documents cite code by locator, and code never references them
-  (see the Code Stands Alone mandate).
+- **turn** - one user message and the reply.
+- **run** - one agent invocation, from dispatch to its final message.
+- **session** - one context window. It ends at compaction, restart, or handoff.
+- **feature** - one capability or change the user names; requests on the same
+  capability, in this session or a later one, belong to the same feature and share its
+  tag.
+- **Step** - one unit of planned work: one commit and its rows in the plan's ledger. A
+  run may close many Steps.
+- **horizon** - how far the work outlives this session: *conversation*, *multi-session*,
+  or *multi-week*, as the test under "Size the work first" decides.
+- **blocker** - anything the plan and its ADRs do not settle: a Step whose action admits
+  implementations of different scope, a failing precondition, a missing dependency.
+- **presented** - the record's path and a summary in the reply, followed by a stop.
+  **Approval** is the user's reply that accepts the presented record by name, given
+  after it exists. An instruction that predates the record, or a request for the next
+  phase, is not approval.
 
-**Orient first.** In a project with no session context, orient with the `status` tool
-(CLI: `vaultspec-core status`) before invoking any pipeline skill. Read the in-flight
-plans it names, then enter the pipeline at the right phase: resume an in-flight plan via
-`vaultspec-execute`, or start fresh at Research.
+## Size the work first
 
-Ground every pipeline phase in what the project already decided and built before acting;
-the always-on `vaultspec-discovery` rule defines the canonical discovery sequence.
+`.vault/` records exist for work whose horizon exceeds the session, or whose result
+another worker must build on. Size the feature, not the request.
 
-All significant work must follow this pipeline:
+Conversation horizon needs all four: finishes this session, no handoff, one package (one
+top-level module directory), at most ten files. Otherwise the work is multi-session;
+when it also crosses calendar weeks or runs several workers at once, multi-week. If
+conversation-horizon work then outlives the session, write the ADR and plan the rest.
 
-| Phase        | Skill                   | Artifact              | Requires          |
-| ------------ | ----------------------- | --------------------- | ----------------- |
-| 1a Research  | vaultspec-research      | .vault/research/...   | -                 |
-| 1b Reference | vaultspec-code-research | .vault/reference/...  | -                 |
-| 2 Specify    | vaultspec-adr           | .vault/adr/...        | Research artifact |
-| 3 Plan       | vaultspec-write         | .vault/plan/...       | ADR artifact(s)   |
-| 4 Execute    | vaultspec-execute       | .vault/exec/.../steps | Approved plan     |
-| 5 Verify     | vaultspec-code-review   | .vault/audit/...      | Completed step(s) |
+- **Conversation horizon:** work directly and say in one line that no plan is needed (an
+  ADR may still be, per the decision rule below). No approval is required to skip the
+  plan. The Execute and Review phases exist only under a plan; unplanned work is
+  reviewed in the reply.
+- **Multi-session:** plan it at the tier the plan template's criteria select (`L1`-`L3`)
+  and execute Step by Step, logging each Step to the plan's ledger; review at Phase
+  close and at plan close. Multi-session work always gets an ADR, however short.
+- **Multi-week:** `L4` plan, which declares an external tracking artifact (milestone,
+  board, roadmap entry).
 
-Phases 1a and 1b are parallel entry points: Research explores the problem space,
-Reference grounds the work in existing source code. A feature needs at least one of the
-two; complex features benefit from both.
+**Decisions are sized apart from horizon and never rounded down.** Any decision costly
+to reverse (boundary, schema, protocol, public interface, any dependency change) gets an
+approved ADR before code builds on it, at any horizon, bug fix or not. A decision
+reached in conversation, or silently while working, is recorded the same way first. The
+ADR's grounding is a Research or Reference record; when the evidence is small, the
+record is small. At conversation horizon the approved ADR's Implementation section is
+the scope of the direct work.
 
-A plan executes one ADR or a cluster of ADRs: multi-component work - each component,
-element, or library carrying its own decision record - rolls up into a single epic plan
-(typically `L3`/`L4`) as the tracking document, every governing ADR listed in the plan's
-`related:` frontmatter. The inverse fragments tracking: do not spread one ADR across
-several concurrent plans.
+**Sizing never skips grounding.** Before the first edit to source or vault in a session,
+check for a governing decision per the `vaultspec-discovery` rule.
 
-The pipeline scales with the work. Trivial, single-file fixes with no architectural
-weight may proceed directly with user approval; state explicitly that the pipeline is
-being skipped and why. Everything else follows the phases above.
+## Orient
 
-Plan documents structure work with the hierarchy `Epic > Wave > Phase > Step` and
-declare a complexity tier (`L1`, `L2`, `L3`, or `L4`) in frontmatter. The tier
-determines which structural containers exist: `L1` is Steps only; `L2` adds Phases; `L3`
-adds Waves; `L4` adds an Epic frame and requires an external project-management
-association declared in the Epic intent block. The leaf row at every tier is named
-`Step`; the Execution Record artifact retains the name `<Step Record>` and maps
-one-to-one to a Step. Full conventions live in the Markdown comment hint blocks embedded
-in `.vaultspec/templates/plan.md`.
+Run the `status` tool (CLI: `vaultspec-core status`) before the first edit to source or
+vault in a session; it names the in-flight plans and their next open Step. A question, a
+docs-only edit, or a diff review needs no orientation, and a dispatched worker inherits
+its orchestrator's. Resume in-flight plans through `vaultspec-execute`; otherwise enter
+at the phase sizing selects.
 
-Every identifier-affecting plan change MUST route through the owning plan verbs, never
-hand-edits: mark Step completion with the `plan_progress` tool and author Step rows with
-the `plan_edit` tool; structural changes above Step level (`phase`, `wave`,
-`epic intent`, `tier promote/demote`) and any session without the MCP server use the
-`vaultspec-core vault plan ...` CLI verbs, which guarantee the same canonical-identifier
-preservation and gap-no-reuse.
+## Pipeline
 
-Supporting skills, invoked when appropriate:
+| Phase        | Skill                   | Artifact            | Requires                       |
+| ------------ | ----------------------- | ------------------- | ------------------------------ |
+| 1a Research  | vaultspec-research      | `.vault/research/`  | -                              |
+| 1b Reference | vaultspec-code-research | `.vault/reference/` | -                              |
+| 2 Decide     | vaultspec-adr           | `.vault/adr/`       | a Research or Reference record |
+| 3 Plan       | vaultspec-write         | `.vault/plan/`      | approved ADR(s)                |
+| 4 Execute    | vaultspec-execute       | `.vault/exec/`      | approved Plan                  |
+| 5 Review     | vaultspec-code-review   | `.vault/audit/`     | completed Step(s)              |
 
-| Need               | Skill                    | Purpose                                                             |
-| ------------------ | ------------------------ | ------------------------------------------------------------------- |
-| Curate             | vaultspec-curate         | Maintain `.vault/` links, tags, and hygiene                         |
-| Documentation      | vaultspec-documentation  | Write or revise project documentation                               |
-| Team coordination  | vaultspec-team           | Start coding teams for complex challenges spanning parallel workers |
-| Project management | vaultspec-projectmanager | Coordinate issues, milestones, and releases outside the pipeline    |
+The dependency chain is strict once a phase is entered: an ADR cites its grounding, a
+plan lists every ADR it executes in `related:`, a ledger cites its plan, an audit cites
+what it reviewed. Sizing decides which phases are entered; it never removes a
+requirement from a phase that is. Research and Reference are alternative entry points; a
+feature needs at least one. A plan executes one ADR or a cluster of ADRs; one ADR never
+spans several concurrent plans.
 
-- **Use vaultspec- skills** to interpret user intent:
+**Approval gates.** An ADR is `proposed` until its approval reply, then `accepted`; an
+amendment needs the same reply. A plan runs only after its approval reply; on approval
+write `Approved yyyy-mm-dd` as the first line of its Description, and present again any
+plan that lacks that line. A Step changed after approval, even a corrected path, is
+presented again and waits for a reply; a row that records the user's blocker answer is
+quoted and run. Under a plan, source changes happen only against an approved Step,
+whoever makes them: the orchestrator, a persona, or a host agent.
 
-| Example User Intent                 | Invoke                  |
+**Review** produces an audit for planned work at each Phase close, at plan close, and
+before the work is handed off for merge, by pull request or by reporting it done; when
+these fall on the same commits, one review covers them. A Step closes on its own
+verification; review does not gate each Step. Findings below `high` are recorded, and
+fixed only under a Step the user approves. Parallel workers are dispatched only over
+containers the plan's Parallelization section names as concurrent; `vaultspec-team`
+supervises them.
+
+Without skills (Codex, Gemini), produce each phase's artifact through the
+`vaultspec-core` CLI under the same requirements; the phase table is the procedure.
+
+## Roles by lifetime
+
+Research, ADR, plan, and review each finish in one run; one that lacks its precondition
+stops and names the missing phase. Execution spans sessions. Its checkpoint is a closed
+Step with its ledger rows and commit. On a plan's first entry read it whole; on resume,
+`status`, then the next open Step's row and the ADR sections that Step depends on, not
+the whole document cluster. Under an approved plan the plan is the approval: do not ask
+between Steps. Stop at a blocker and ask the user (a dispatched persona raises it to its
+orchestrator, who asks); the answer is written into the Step row (`plan_edit`) and is
+that row's approval, the one exception to approval by name. No one sharpens a Step on
+their own judgment.
+
+## Plans
+
+Plans nest `Epic > Wave > Phase > Step` and declare a tier: `L1` Steps only, `L2` adds
+Phases, `L3` adds Waves, `L4` adds an Epic with an external tracking association. The
+leaf is always a Step, and every ledger row names its Step. Structure and Step state
+change only through the owning plan verbs, never by hand: the `plan_progress` and
+`plan_edit` tools for Steps, the `vaultspec-core vault plan` CLI for everything above a
+Step. Tier criteria and row conventions live in the hint blocks of
+`.vaultspec/templates/plan.md`.
+
+## Supporting skills
+
+| Need               | Skill                    | Purpose                                                        |
+| ------------------ | ------------------------ | -------------------------------------------------------------- |
+| Curate             | vaultspec-curate         | Reconcile ADRs against each other and the code                 |
+| Documentation      | vaultspec-documentation  | Write or revise user-facing documentation                      |
+| Team coordination  | vaultspec-team           | Supervise parallel workers over a plan's concurrent containers |
+| Project management | vaultspec-projectmanager | Issues, milestones, worktrees, releases; user-invoked only     |
+
+Intent to skill, once sizing says the vault is warranted:
+
+| User intent                         | Skill                   |
 | ----------------------------------- | ----------------------- |
 | "Research X" / "Investigate"        | vaultspec-research      |
-| "Decide on X" / "Create an ADR"     | vaultspec-adr           |
 | "How does [codebase] implement X?"  | vaultspec-code-research |
+| "Decide on X" / "Create an ADR"     | vaultspec-adr           |
 | "Plan the implementation"           | vaultspec-write         |
 | "Execute the plan" / "Build it"     | vaultspec-execute       |
-| "Review the code" / "Verify"        | vaultspec-code-review   |
-| "Clean up docs" / "Curate"          | vaultspec-curate        |
-| "Start a new feature" (broad)       | vaultspec-research      |
+| "Review the feature" / "Verify"     | vaultspec-code-review   |
+| "Reconcile the ADRs" / "Curate"     | vaultspec-curate        |
 | "Write documentation for {subject}" | vaultspec-documentation |
+
+A question is answered in the conversation; if the answer is a decision code will build
+on, it becomes an ADR first. A review of a diff with no plan behind it is a reply.
 
 ## Agents
 
-Agent personas are defined in `.vaultspec/agents/`. Two mechanisms are available
-depending on plan complexity:
-
-- **Parallel sub-agents** for focused, managed work
-- **Agent teams** for self-orchestrating complex challenges, coordinated through the
-  host environment.
-
-Each persona declares a `mode:` field in its frontmatter. The field states the persona's
-declared mutation intent: `read-write` personas mutate project state, whether through
-the harness file tools (Write/Edit) or through stateful commands such as `gh` and `git`;
-`read-only` personas mutate nothing and return their findings as their final message for
-the dispatching orchestrator to persist (scaffold via `vaultspec-core vault add`, then
-body-prose edit). The declaration is intent, not a sandbox - Bash can technically write
-files in either mode - so honoring it is persona discipline, not tooling enforcement.
-
-Dispatched personas operate vaultspec through the CLI; MCP tools are not assumed inside
-subagents.
-
-Returning findings is part of the persona contract in both dispatch shapes. A persona
-run in the foreground returns them as its final message; a persona run as a background
-teammate has no final message the orchestrator reads, so it relays through the host team
-channel (`SendMessage`) instead - reporting, not mutating, which is why `read-only`
-personas carry it too. Every shipped persona declares that relay tool; a persona left
-without one goes silent when backgrounded, and silence is indistinguishable from finding
-nothing.
-
-Artifacts are persisted in `.vault/`. The user must approve plans before execution
-proceeds. Code review via vaultspec-code-review is mandatory after execution.
+Personas live in `.vaultspec/agents/`. Dispatch them as parallel sub-agents for focused
+work, or as a team over an `L3`/`L4` plan through the host environment. Each persona
+declares `mode:` - `read-write` personas mutate project state; `read-only` personas
+return findings as their final message and the orchestrator persists them (scaffold with
+`vaultspec-core vault add`, then edit the body) - and `tier:` (`LOW`, `STANDARD`,
+`HIGH`), the difficulty of work it takes. The declaration is persona discipline, not a
+sandbox. Dispatched personas use the CLI; MCP tools are not assumed inside a sub-agent.
+Background personas relay findings through `SendMessage`; every shipped persona carries
+it.

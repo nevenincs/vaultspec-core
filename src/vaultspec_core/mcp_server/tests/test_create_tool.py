@@ -31,11 +31,11 @@ async def _create(client: Client, documents: list[dict[str, Any]]) -> Any:
 
 
 async def test_create_batch_intra_batch_lifecycle_dependency(vault_root: Path) -> None:
-    """A single batch scaffolds research -> ADR -> plan -> exec coherently.
+    """A single batch scaffolds research -> ADR -> plan -> audit coherently.
 
-    ``exec`` hard-requires a plan and an ADR; because items apply
+    ``audit`` requires the artifacts it reviews; because items apply
     sequentially and validation runs against the on-disk vault, the earlier
-    same-batch items satisfy the later exec item without a second call.
+    same-batch items satisfy the later item without a second call.
     """
     mcp = create_server()
     async with Client(mcp) as client:
@@ -45,7 +45,7 @@ async def test_create_batch_intra_batch_lifecycle_dependency(vault_root: Path) -
                 {"feature": "lifecycle-feat", "type": "research"},
                 {"feature": "lifecycle-feat", "type": "adr"},
                 {"feature": "lifecycle-feat", "type": "plan"},
-                {"feature": "lifecycle-feat", "type": "exec"},
+                {"feature": "lifecycle-feat", "type": "audit"},
             ],
         )
         assert payload["status"] == "ok"
@@ -61,14 +61,15 @@ async def test_create_batch_intra_batch_lifecycle_dependency(vault_root: Path) -
         assert all(item["blob_hash"] for item in payload["items"])
 
 
-async def test_create_exec_before_plan_fails_but_later_item_applies(
+async def test_create_exec_is_refused_but_later_item_applies(
     vault_root: Path,
 ) -> None:
     """A bad item fails per-item while good items on both sides still apply.
 
-    An ``exec`` created before any plan exists is a hard dependency error;
-    the batch aggregates to ``mixed``, the failure is reported in place, and
-    the item after it is still scaffolded.
+    ``exec`` is not a scaffold type: execution is logged with the ``log``
+    tool. The item fails in place with that message, the batch aggregates to
+    ``mixed``, and the item after it is still scaffolded. No exec document
+    is written.
     """
     mcp = create_server()
     async with Client(mcp) as client:
@@ -76,7 +77,7 @@ async def test_create_exec_before_plan_fails_but_later_item_applies(
             client,
             [
                 {"feature": "partial-feat", "type": "adr"},
-                {"feature": "partial-feat", "type": "exec"},  # no plan yet -> ERROR
+                {"feature": "partial-feat", "type": "exec"},
                 {"feature": "other-feat", "type": "research"},
             ],
         )
@@ -85,7 +86,9 @@ async def test_create_exec_before_plan_fails_but_later_item_applies(
         assert items[0]["status"] == "created"
         assert items[1]["status"] == "failed"
         assert items[1]["error"] is not None
-        assert "plan" in items[1]["error"]["message"].lower()
+        assert "vault exec log" in items[1]["error"]["message"]
+        assert "`log` tool" in items[1]["error"]["message"]
+        assert not list((vault_root / ".vault" / "exec").rglob("*partial-feat*"))
         # The item after the failure is still applied.
         assert items[2]["status"] == "created"
         research_dir = vault_root / ".vault" / "research"

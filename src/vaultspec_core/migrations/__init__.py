@@ -207,6 +207,7 @@ def _build_registry() -> list[Migration]:
     from .m_0_1_48_launch_convergence import MIGRATION as M_LAUNCH_CONVERGENCE
     from .m_0_1_55_body_hash_seed import MIGRATION as M_BODY_HASH_SEED
     from .m_0_1_58_exec_ledger_fold import MIGRATION as M_EXEC_LEDGER_FOLD
+    from .m_0_1_74_exec_ledger_only import MIGRATION as M_EXEC_LEDGER_ONLY
 
     entries: list[Migration] = [
         M_INDEX_SUBFOLDER,
@@ -218,6 +219,7 @@ def _build_registry() -> list[Migration]:
         M_LAUNCH_CONVERGENCE,
         M_BODY_HASH_SEED,
         M_EXEC_LEDGER_FOLD,
+        M_EXEC_LEDGER_ONLY,
     ]
     return sorted(entries, key=lambda m: parse_version_tuple(m.target_version))
 
