@@ -360,3 +360,71 @@ class TestSharingPolicy:
         result = runner.invoke(app, ["-t", str(tmp_path), "install", "--upgrade"])
         assert result.exit_code == 0, result.output
         assert "Sharing policy" not in result.output
+
+
+class TestUpgradeRestoresVault:
+    """An upgrade restores the `.vault/` it manages (issue #415).
+
+    With the directory deleted, `install --upgrade` exited 0 and left it
+    absent. Because the recommended ignore entries were derived from the
+    directory being present, the managed block was rewritten without its four
+    `.vault/` entries - and `doctor` then reported the block complete, because
+    the recommended set had shrunk to match it. The upgrade agreed with the
+    damage instead of repairing it.
+    """
+
+    def test_upgrade_rescaffolds_a_deleted_vault(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        import shutil
+
+        runner.invoke(app, ["-t", str(tmp_path), "install"])
+        assert (tmp_path / ".vault").is_dir()
+        shutil.rmtree(tmp_path / ".vault")
+
+        result = runner.invoke(app, ["-t", str(tmp_path), "install", "--upgrade"])
+
+        assert result.exit_code == 0, result.output
+        assert (tmp_path / ".vault").is_dir()
+
+    def test_upgrade_keeps_the_vault_entries_in_the_managed_block(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        """The block must not shrink to agree with a missing directory."""
+        import shutil
+
+        runner.invoke(app, ["-t", str(tmp_path), "install"])
+        gitignore = tmp_path / ".gitignore"
+        before = [
+            line
+            for line in gitignore.read_text(encoding="utf-8").splitlines()
+            if line.startswith(".vault/")
+        ]
+        assert before, "install should have written the .vault/ entries"
+        shutil.rmtree(tmp_path / ".vault")
+
+        result = runner.invoke(app, ["-t", str(tmp_path), "install", "--upgrade"])
+
+        assert result.exit_code == 0, result.output
+        after = [
+            line
+            for line in gitignore.read_text(encoding="utf-8").splitlines()
+            if line.startswith(".vault/")
+        ]
+        assert after == before
+
+    def test_upgrade_with_skip_core_leaves_the_vault_alone(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        """`--skip core` opts out of core work, and that includes scaffolding."""
+        import shutil
+
+        runner.invoke(app, ["-t", str(tmp_path), "install"])
+        shutil.rmtree(tmp_path / ".vault")
+
+        result = runner.invoke(
+            app, ["-t", str(tmp_path), "install", "--upgrade", "--skip", "core"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert not (tmp_path / ".vault").exists()

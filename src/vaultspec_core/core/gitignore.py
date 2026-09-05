@@ -188,7 +188,16 @@ def get_recommended_entries(target: Path) -> list[str]:
             entries.add(".vaultspec/*.lock")
             entries.add(".vaultspec/providers.json")
             entries.add(".vaultspec/mcp-ownership.json")
-        if (target / ".vault").is_dir():
+        # Derived from policy, not from a snapshot of the disk. ``.vault/`` is
+        # scaffolded by every install and preserved by every uninstall that
+        # keeps it, so an installed framework is what makes these entries
+        # recommended - the directory happening to be present right now is
+        # not. Gating on presence meant a workspace that lost ``.vault/`` had
+        # the entries quietly dropped from its block on the next write, and
+        # ``doctor`` then read the block as complete because the recommended
+        # set had shrunk with it (issue #415). Same resolution #399 applied to
+        # the lock sentinels below, and for the same reason.
+        if framework_installed:
             entries.add(".vault/.obsidian/")
             entries.add(".vault/.trash/")
             entries.add(".vault/data/")
