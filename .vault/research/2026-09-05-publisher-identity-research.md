@@ -5,7 +5,7 @@ tags:
 date: '2026-09-05'
 modified: '2026-09-05'
 body_schema: 'body-v2'
-body_hash: 'sha256:09f431b63f2a1abb4f6f278b3a662eff1e8f95babf21ac4f618eced009375685'
+body_hash: 'sha256:90dc07fbf3167f2d55e834fae1505eb53e23622b078b2592107190027bac47cb'
 related: []
 ---
 
@@ -82,8 +82,18 @@ https://azure.microsoft.com/en-us/pricing/details/trusted-signing/
 Windows trusts no chain that does not terminate in the Microsoft Trusted Root Program, so
 a self-signed Authenticode signature does not make `Get-AuthenticodeSignature` report
 `Valid`; it reports an untrusted-root failure instead. SmartScreen reputation attaches to
-a CA-validated identity and is unmoved. A WDAC publisher rule cannot name an untrusted
-signer, leaving per-file hash rules, which is the same position as unsigned.
+a CA-validated publisher identity, so it is unmoved by a signature no root trusts, and a
+WDAC publisher rule cannot name an untrusted signer - leaving per-file hash rules, which
+is the same position as unsigned.
+https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options
+
+UNVERIFIED, flagged rather than dropped: the specific status value
+`Get-AuthenticodeSignature` returns for a self-signed binary is general knowledge here
+and was not measured. No self-signed artifact was produced and run, because the decision
+this grounds does not turn on which failure is reported - only on the fact that it is not
+`Valid`, which follows from the trust-program requirement cited above. The claims about
+SmartScreen and WDAC carry the same locator as the reputation finding earlier in this
+document.
 
 ### Provenance attestation is available now and answers a different question
 
@@ -102,9 +112,11 @@ release satisfies equally.
 ### macOS carries a cost floor Windows does not
 
 The free and low-cost routes above are Authenticode only. A Developer ID signature and
-notarization require Apple Developer Program membership at $99 per year, so
-vaultspec-core#336 cannot be resolved by the same decision that resolves #342 even if
-that decision costs nothing.
+notarization require Apple Developer Program membership, which Apple prices at $99 per
+year and which is the membership that issues the Developer ID certificate used to
+distribute outside the Mac App Store. So vaultspec-core#336 cannot be resolved by the
+same decision that resolves #342 even if that decision costs nothing.
+https://developer.apple.com/programs/
 
 ### The exposure is narrower than unsigned status alone suggests
 
@@ -132,6 +144,7 @@ release were not investigated and are not published by Microsoft in measurable f
 - https://certum.store/open-source-code-signing-code.html
 - https://azure.microsoft.com/en-us/pricing/details/trusted-signing/
 - https://docs.github.com/en/actions/concepts/security/artifact-attestations
+- https://developer.apple.com/programs/
 - `LICENSE`, `README.md`, `.github/workflows/binaries.yml`,
   `.github/workflows/acquisition.yml`
 - vaultspec-core#342, vaultspec-core#336, vaultspec-core#405
