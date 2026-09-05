@@ -2,7 +2,7 @@
 
 # vaultspec-core
 
-The agent harness: the pipeline, the vault, and the CLI that drives them.
+Decision-driven harness for coding agents, and humans.
 
 [![build](https://img.shields.io/github/actions/workflow/status/nevenincs/vaultspec-core/ci.yml?branch=main&style=flat&label=build&logo=githubactions&logoColor=white&labelColor=24292f&color=57606a)](https://github.com/nevenincs/vaultspec-core/actions/workflows/ci.yml)
 [![release](https://img.shields.io/pypi/v/vaultspec-core?style=flat&label=release&logo=pypi&logoColor=white&labelColor=24292f&color=57606a)](https://pypi.org/project/vaultspec-core/)
@@ -14,8 +14,12 @@ The agent harness: the pipeline, the vault, and the CLI that drives them.
 
 ## What this is
 
-vaultspec-core is a command-line tool for projects where an AI assistant writes some of
-the code. It works with Claude Code, Codex, Gemini CLI, and Antigravity.
+Vaultspec is a coding harness: it implements a structured coding workflow focused on
+#features, decision records and the documents grounding them. It bundles rules, agents,
+skills, and tools to author the documents that describe and track a feature's
+development.
+
+It works with Claude Code, Codex, Gemini CLI, and Antigravity.
 
 Installing it puts a set of rules and slash-commands into your repository. Those push
 the assistant through five stages for any piece of work: research the problem, record
@@ -286,10 +290,10 @@ says why.
 
 ## Related projects
 
-| Project                                                     | Maturity | Role                                                                      |
-| ----------------------------------------------------------- | -------- | ------------------------------------------------------------------------- |
-| **vaultspec-core**                                          | Beta     | The agent harness: the pipeline, the vault, and the CLI that drives them. |
-| [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) | Beta     | The semantic search component for vault and code.                         |
+| Project                                                     | Maturity | Role                                                   |
+| ----------------------------------------------------------- | -------- | ------------------------------------------------------ |
+| **vaultspec-core**                                          | Beta     | Decision-driven harness for coding agents, and humans. |
+| [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) | Beta     | The semantic search component for vault and code.      |
 
 [vaultspec-dashboard](https://github.com/nevenincs/vaultspec-dashboard) is a separate
 project building a dedicated frontend on the same files. It is in early development, in
