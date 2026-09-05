@@ -1,62 +1,29 @@
 # vaultspec framework manual
 
-This manual covers operating the vaultspec workflow in a project that is already set up.
-For what vaultspec-core is and how to install it, see the [README](../README.md).
+Commit your feature documents in `.vault/` and your project rules, skills, agents, and
+workspace policy in `.vaultspec/`. Include `.vaultspec/workspace.json` so the policy
+travels with the project. The managed `.gitignore` entries exclude local caches, logs,
+and state.
 
-Two directories matter. `.vault/` holds the documents your features produce, and
-`.vaultspec/` holds the framework policy: the rules, skills, and agent definitions your
-coding agent reads. Commit both. The managed block in `.gitignore` excludes the
-per-machine by-products, so your teammates get the documents and the policy but not your
-local state. Measured on a fresh install, that is `.vault/data/`, `.vault/logs/`, the
-Obsidian and trash directories beside them, and inside `.vaultspec/` the `_snapshots/`
-copy of the builtin rules, `providers.json`, `mcp-ownership.json` and every `*.lock` -
-plus the lock files the install leaves at the repository root for `.mcp.json`,
-`.gitignore`, `.pre-commit-config.yaml` and the two provider configs. What it
-deliberately does not exclude is `.vaultspec/workspace.json`: the install mode is
-recorded there and has to travel with the project, or your teammates' commands resolve
-by a different route than yours. The install writes that block into the project's
-`.gitignore`, and creates the file when there is not one, so a project started from an
-empty directory is covered by the same single command.
+<p id="what-an-absent-managed-file-means"></p>
 
-To decline the block, run `vaultspec-core spec gitignore disable`. That records
-`blocks.gitignore` in the committed `.vaultspec/workspace.json`, so every clone honours
-it and no later install, upgrade or sync writes the block on any machine.
-`vaultspec-core spec gitignore enable` reverses it, and
-`vaultspec-core spec gitattributes disable` and `enable` do the same for that file.
-Neither verb touches the file itself: an existing `.gitignore` is left exactly as it is,
-and removing the block is yours to do.
+## Manage generated files
 
-Deleting the block by hand still means something, but only locally and only until you
-provision again. The next `vaultspec-core sync` reads the absence, stops managing the
-block *on that machine*, and prints the verb that makes the decision permanent. It
-cannot record more than that: the file it would write the decision into is
-`.vaultspec/providers.json`, which the block itself excludes from git, so a decision
-kept there never reaches a teammate.
+Use the [Gitignore](CLI.md#vaultspec-core-spec-gitignore),
+[Gitattributes](CLI.md#vaultspec-core-spec-gitattributes), and
+[Precommit](CLI.md#vaultspec-core-spec-precommit) controls to set project policy for
+those files.
 
-An explicit `vaultspec-core install` or `vaultspec-core install --upgrade` writes the
-block back. That is deliberate. Deleting a file is something you might have done by
-accident or in a merge; typing a provisioning command is not, and an upgrade runs a sync
-of its own partway through, so honouring the stand-down that sync had just recorded
-would leave the command you typed doing nothing at all. The declaration is what survives
-a provisioning run. Until it is written, `vaultspec-core doctor` reports
-`gitignore warn unmanaged` for an installed project carrying no block, names both ways
-out, and raises its exit code.
+Enabling or disabling changes only workspace policy; it doesn't edit or remove existing
+files. Disabling Precommit also leaves any active Git hook installed.
 
-## What an absent managed file means
+Deleting a managed Git block or the pre-commit YAML stops ordinary sync from managing
+that output locally. Install or upgrade can recreate it unless project policy disables
+generation.
 
-Vaultspec manages four files, and an absence means something different in each, because
-the files differ in what an absence can tell you:
-
-| File                      | Absent when you sync | Absent when you upgrade | How to decline it                           |
-| ------------------------- | -------------------- | ----------------------- | ------------------------------------------- |
-| `.mcp.json`               | recreated            | recreated               | not declinable; `--skip mcp` per run        |
-| `.pre-commit-config.yaml` | left alone           | recreated               | `vaultspec-core spec precommit disable`     |
-| `.gitignore`              | left alone           | recreated               | `vaultspec-core spec gitignore disable`     |
-| `.gitattributes`          | left alone           | recreated               | `vaultspec-core spec gitattributes disable` |
-
-`.mcp.json` is generated entirely from your rules, so its absence says nothing and
-vaultspec simply rebuilds it. The other three sit in files you also author, so vaultspec
-cannot tell your edit from its own, and a committed declaration is what settles it.
+For [Model Context Protocol (MCP)](MCP.md), edit the canonical JSON server definitions.
+Core merges Vaultspec-owned entries into enabled provider configurations and preserves
+unrelated entries.
 
 ## How a feature flows into the vault
 

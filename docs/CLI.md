@@ -2362,6 +2362,8 @@ ______________________________________________________________________
 
 ### vaultspec-core spec gitignore
 
+`spec gitignore` and `spec gitattributes` are not available in the 0.1.73 release.
+
 ```bash
 vaultspec-core spec gitignore [OPTIONS] COMMAND [ARGS]...
 ```
@@ -2370,24 +2372,18 @@ vaultspec-core spec gitignore [OPTIONS] COMMAND [ARGS]...
 
 - `disable` (`--json`) - Decline the vaultspec-managed `.gitignore` block for the whole
   project.
-- `enable` (`--json`) - Restore the vaultspec-managed `.gitignore` block for the whole
+- `enable` (`--json`) - Allow management of the `.gitignore` block for the whole
   project.
 
-By default every install, upgrade and sync writes and reconciles the managed block in
-`.gitignore`, creating the file when the project has none. `disable` records
-`blocks.gitignore = false` in the committed `.vaultspec/workspace.json`, which declines
-it for every clone: no later run writes the block on any machine.
+`disable` records `blocks.gitignore = false` in `.vaultspec/workspace.json`; commit this
+file to share the policy. `enable` clears that override. Neither command edits
+`.gitignore`; remove an existing managed block yourself if needed.
 
-The declaration is where the decision has to live. Deleting the block by hand stands the
-current machine down and prints this verb, but it cannot record more than that - the
-file it would write the decision into is `.vaultspec/providers.json`, which the block
-itself keeps out of git, so a decision kept there never reaches a teammate. An explicit
-provisioning command writes the block back; only the declaration survives one.
+Install and upgrade create or restore the managed block unless project policy disables
+it. Ordinary sync leaves a manually removed block absent on that machine. To restore it,
+enable management and run `vaultspec-core install`.
 
-Neither verb touches `.gitignore` itself. Declining is a policy statement, and removing
-the block is yours to do. `enable` clears the declaration again and is a no-op in a
-project that never declared one. Both are idempotent and exit zero when the requested
-state already holds.
+Both commands exit zero when the requested policy already holds.
 
 #### Options
 
@@ -2418,16 +2414,14 @@ vaultspec-core spec gitattributes [OPTIONS] COMMAND [ARGS]...
 
 - `disable` (`--json`) - Decline the vaultspec-managed `.gitattributes` block for the
   whole project.
-- `enable` (`--json`) - Restore the vaultspec-managed `.gitattributes` block for the
-  whole project.
+- `enable` (`--json`) - Allow management of the `.gitattributes` block for the whole
+  project.
 
-The twin of `vaultspec-core spec gitignore`, recording `blocks.gitattributes` in the
-same committed declaration and behaving identically.
-
-What differs is what the block does. Its default entries normalise line endings for
-every checkout and exempt Windows batch files, so declining it is a statement about how
-the whole project is checked out rather than a preference on one machine - which is the
-clearest case for the decision being committed rather than local.
+These controls share the
+[availability and policy behavior of `spec gitignore`](#vaultspec-core-spec-gitignore),
+using `blocks.gitattributes` in `.vaultspec/workspace.json`. The
+[default entries](../src/vaultspec_core/core/gitattributes.py) control line endings and
+union merging of execution ledgers.
 
 #### Options
 
@@ -2436,7 +2430,7 @@ clearest case for the decision being committed rather than local.
 
 #### Examples
 
-- **Decline line-ending normalisation for the project**:
+- **Disable managed Git attributes for the project**:
 
   ```bash
   vaultspec-core spec gitattributes disable
@@ -2462,17 +2456,17 @@ vaultspec-core spec precommit [OPTIONS] COMMAND [ARGS]...
 - `migrate` (`--remove-yaml`, `--dry-run`, `--json`) - Transplant the canonical
   vaultspec hooks into `prek.toml`.
 
-By default every `install` and `sync` scaffolds `.pre-commit-config.yaml` and reconciles
-the canonical hooks into it. `disable` records `hooks.pre_commit = false` in the
-committed `.vaultspec/workspace.json`, which declines that permanently: no later run
-regenerates the file, and the vaultspec-managed `.gitignore` block starts ignoring
-`/.pre-commit-config.yaml` so a resurrected copy cannot be committed by accident. Use it
-in projects that run their gates explicitly and forbid a commit hook - a tree-wide hook
-that rewrites the working tree to the staged state is unsafe when several workers share
-one checkout. Neither verb touches an existing `.pre-commit-config.yaml`; declining is a
-policy statement, and deleting the file is yours to do. `enable` clears the declaration
-again, and is a no-op in a workspace that never declared one. Both are idempotent and
-exit zero when the requested state already holds.
+`disable` records `hooks.pre_commit = false` in `.vaultspec/workspace.json` to stop YAML
+scaffolding. Commit this file to share the policy; `enable` clears the override. Neither
+command changes existing configuration or uninstalls an active Git hook.
+
+Install and upgrade can recreate missing YAML unless `--skip precommit`, project policy,
+or an owning `prek.toml` prevents scaffolding. Ordinary sync leaves manually deleted
+YAML absent. After enabling management, run `vaultspec-core install` to restore it.
+
+With this policy disabled, reconciled ignore entries include `/.pre-commit-config.yaml`.
+Ignoring a file does not untrack an existing committed copy. Both policy commands exit
+zero when the requested state already holds.
 
 When `prek.toml` owns the hook boundary, sync no longer scaffolds
 `.pre-commit-config.yaml` and prek silently ignores it. `migrate` renders the canonical
