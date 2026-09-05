@@ -11,16 +11,84 @@ from __future__ import annotations
 import logging
 import subprocess
 from pathlib import Path
+from typing import Literal
 
 from .gitattributes import has_valid_block as _ga_has_valid_block
 from .gitignore import managed_lock_candidates
 
 logger = logging.getLogger(__name__)
 
+#: The managed git blocks whose policy :func:`block_management_enabled`
+#: resolves. Spelled as the declaration and manifest key stems so one name
+#: addresses both stores.
+ManagedBlock = Literal["gitignore", "gitattributes"]
+
 __all__ = [
     "PROVIDER_ARTIFACT_PATTERNS",
     "check_staged_provider_artifacts",
 ]
+
+
+def block_management_enabled(
+    target: Path, block: ManagedBlock, *, honour_local_echo: bool = True
+) -> bool:
+    """Return whether vaultspec may manage *block* in *target*.
+
+    The single resolution point behind every reader of the managed-block
+    policy. Two stores carry it, and the committed
+    ``.vaultspec/workspace.json`` declaration always decides first: a project
+    that has declared it does not want the block never gets one, on any
+    machine. Reading only the manifest is what let one contributor's decision
+    be erased by another's install, because the manifest is listed inside the
+    very block it records the removal of.
+
+    The second store is the per-machine echo, set when a sync observes the
+    block deleted. It governs the verbs that infer intent from the working
+    tree - sync, the diagnosis, uninstall - and is deliberately *not* consulted
+    by install and upgrade, which pass ``honour_local_echo=False``.
+
+    That asymmetry resolves an ordering trap rather than creating one. An
+    upgrade runs a provider sync partway through, and that sync sees the very
+    block the upgrade is about to reconcile still missing; honouring the echo
+    it has just written would let the run defeat its own reconciliation, and
+    the operator who typed an explicit provisioning command would silently get
+    nothing. An explicit install or upgrade is a request; a deleted block read
+    during a sync is only an inference.
+
+    Both reads are defensive. A workspace whose declaration or manifest cannot
+    be read has not declined anything, and refusing to manage a block on the
+    strength of an unreadable file would be the same mistake in the other
+    direction.
+
+    Args:
+        target: Workspace root directory.
+        block: Which managed block to resolve.
+        honour_local_echo: Whether the per-machine opt-out echo participates.
+            Left ``True`` for the inference-driven verbs; set ``False`` by
+            install and upgrade, for which the declaration alone governs.
+
+    Returns:
+        ``True`` when the block may be written and reconciled.
+    """
+    from .workspace_mode import read_blocks_declaration
+
+    try:
+        declared = getattr(read_blocks_declaration(target), block)
+    except Exception:
+        logger.debug("Could not read the blocks declaration", exc_info=True)
+        declared = True
+    if not declared:
+        return False
+    if not honour_local_echo:
+        return True
+
+    from .manifest import read_manifest_data
+
+    try:
+        return not getattr(read_manifest_data(target), f"{block}_opted_out")
+    except Exception:
+        logger.debug("Could not read the manifest opt-out echo", exc_info=True)
+        return True
 
 
 def managed_block_presence(path: Path) -> bool | None:

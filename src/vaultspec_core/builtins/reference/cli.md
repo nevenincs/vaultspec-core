@@ -290,6 +290,20 @@ hand-edit between the markers.
 - `vaultspec-core spec precommit migrate` - Transplant the canonical vaultspec hooks
   into prek.toml.
 
+#### Gitignore
+
+- `vaultspec-core spec gitignore disable` - Decline the vaultspec-managed .gitignore
+  block for the whole project.
+- `vaultspec-core spec gitignore enable` - Restore the vaultspec-managed .gitignore
+  block for the whole project.
+
+#### Gitattributes
+
+- `vaultspec-core spec gitattributes disable` - Decline the vaultspec-managed
+  .gitattributes block for the whole project.
+- `vaultspec-core spec gitattributes enable` - Restore the vaultspec-managed
+  .gitattributes block for the whole project.
+
 #### Mcps
 
 - `vaultspec-core spec mcps list` - List canonical MCP server definitions.

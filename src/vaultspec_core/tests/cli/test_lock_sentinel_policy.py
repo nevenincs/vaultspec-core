@@ -362,13 +362,32 @@ class TestUpgradeReconvergence:
         assert "# >>> vaultspec-managed" in text
         assert "# mine" in text
 
-    def test_deleted_block_stays_deleted_across_an_upgrade(
+    def test_a_deleted_block_comes_back_on_an_explicit_upgrade(
         self, tmp_path: Path
     ) -> None:
-        """Removing the block is an opt-out, and an upgrade honours it."""
+        """Deleting the block stands this machine down; it does not bind an upgrade.
+
+        The gesture is an inference about intent, read while syncing. An
+        explicit ``install --upgrade`` is a request, and a request outranks an
+        inference made about it - not least because the upgrade runs a sync of
+        its own partway through, which would otherwise let the run defeat the
+        reconciliation it exists to perform.
+        """
         factory = _installed_workspace(tmp_path)
         (tmp_path / ".gitignore").write_text("# mine only\n", encoding="utf-8")
         factory.sync()
+
+        factory.install(provider="all", upgrade=True)
+
+        assert "vaultspec-managed" in (tmp_path / ".gitignore").read_text(
+            encoding="utf-8"
+        )
+
+    def test_a_declared_decline_does_bind_an_upgrade(self, tmp_path: Path) -> None:
+        """What the deleted block cannot say, the declaration says."""
+        factory = _installed_workspace(tmp_path)
+        factory.run("spec", "gitignore", "disable")
+        (tmp_path / ".gitignore").write_text("# mine only\n", encoding="utf-8")
 
         factory.install(provider="all", upgrade=True)
 

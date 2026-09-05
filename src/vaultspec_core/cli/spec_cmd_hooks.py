@@ -2,13 +2,17 @@
 
 Defines :data:`hooks_app` and also hosts the ``vaultspec-core spec
 precommit`` sub-group (:data:`precommit_app`), which manages the prek
-pre-commit hook boundary. Both are mounted by
+pre-commit hook boundary, and the ``spec gitignore`` and ``spec
+gitattributes`` sub-groups (:data:`gitignore_app`, :data:`gitattributes_app`),
+which record whether vaultspec maintains its managed block in each of those
+files. All four are mounted by
 :mod:`vaultspec_core.cli.spec_cmd` onto
 :data:`~vaultspec_core.cli.spec_cmd_app.spec_app`. Delegates to
 :mod:`vaultspec_core.core` CRUD functions via lazy imports to avoid
 circular-import issues.
 """
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Annotated
 
@@ -418,6 +422,15 @@ precommit_app = make_app(
     help="Manage whether and where vaultspec's pre-commit hooks are scaffolded.",
     no_args_is_help=True,
 )
+gitignore_app = make_app(
+    help="Manage whether vaultspec maintains its block in .gitignore.",
+    no_args_is_help=True,
+)
+
+gitattributes_app = make_app(
+    help="Manage whether vaultspec maintains its block in .gitattributes.",
+    no_args_is_help=True,
+)
 
 
 def _set_precommit_policy(
@@ -568,3 +581,134 @@ def cmd_precommit_migrate(
         raise typer.Exit(0)
     console.print(f"{prefix}[red]{result.status}[/red]: {result.detail}")
     raise typer.Exit(1)
+
+
+def _set_block_policy(
+    *, block: str, enabled: bool, json_output: bool, target: Path | None
+) -> None:
+    """Persist the workspace's policy for one managed git block.
+
+    The one implementation behind all four verbs, which differ only by the
+    block they name, the boolean they persist, and the sentence they print.
+    Idempotent, and an already-satisfied request reports success, so a
+    provisioning script can set the policy unconditionally.
+
+    This is the only writer of the committed ``blocks`` key outside the two
+    gestures that mean "manage this workspace again" - a fresh install and
+    ``--upgrade --force``. Deleting a block stands the per-machine echo down
+    and says so; it does not reach the declaration, because an inference about
+    intent must not modify a file the whole team shares.
+    """
+    apply_target(target)
+    from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.types import get_context
+    from vaultspec_core.core.workspace_mode import (
+        read_blocks_declaration,
+        write_blocks_declaration,
+    )
+
+    root = get_context().target_dir
+    try:
+        current = read_blocks_declaration(root)
+        already = getattr(current, block) == enabled
+        if not already:
+            write_blocks_declaration(root, replace(current, **{block: enabled}))
+    except (VaultSpecError, OSError) as exc:
+        _handle_error(exc, json_output=json_output)
+        return
+
+    filename = f".{block}"
+    status = "unchanged" if already else "updated"
+    if json_output:
+        emit_json(
+            f"spec.{block}.enable" if enabled else f"spec.{block}.disable",
+            status,
+            {block: enabled, "workspace": str(root)},
+        )
+        raise typer.Exit(0)
+
+    from vaultspec_core.console import get_console
+
+    console = get_console()
+    if enabled:
+        console.print(
+            f"[green]{status}[/green]: vaultspec-core maintains its managed "
+            f"block in {filename} for this project."
+        )
+    else:
+        console.print(
+            f"[green]{status}[/green]: vaultspec-core will not maintain its "
+            f"managed block in {filename} for this project."
+        )
+        console.print(
+            f"  [dim]The declaration is committed, so every clone honours it. "
+            f"Any existing {filename} is left in place.[/dim]"
+        )
+    raise typer.Exit(0)
+
+
+@gitignore_app.command("disable")
+def cmd_gitignore_disable(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Decline the vaultspec-managed .gitignore block for the whole project.
+
+    Records blocks.gitignore = false in the committed
+    .vaultspec/workspace.json, so no later install, upgrade or sync writes the
+    block, on any machine. Deleting the block by hand stands the current
+    machine down but cannot travel: the manifest that would record it is
+    itself inside the block. Any existing .gitignore is left on disk untouched.
+    """
+    _set_block_policy(
+        block="gitignore", enabled=False, json_output=json_output, target=target
+    )
+
+
+@gitignore_app.command("enable")
+def cmd_gitignore_enable(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Restore the vaultspec-managed .gitignore block for the whole project.
+
+    Clears a recorded decline so the next install, upgrade or sync writes the
+    block again. This is the default for a workspace that has never declared a
+    preference, so running it there is a no-op.
+    """
+    _set_block_policy(
+        block="gitignore", enabled=True, json_output=json_output, target=target
+    )
+
+
+@gitattributes_app.command("disable")
+def cmd_gitattributes_disable(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Decline the vaultspec-managed .gitattributes block for the whole project.
+
+    Records blocks.gitattributes = false in the committed
+    .vaultspec/workspace.json. The block's default entries normalise line
+    endings for every clone, so declining it is a team-wide statement and
+    belongs in a committed file rather than on one machine.
+    """
+    _set_block_policy(
+        block="gitattributes", enabled=False, json_output=json_output, target=target
+    )
+
+
+@gitattributes_app.command("enable")
+def cmd_gitattributes_enable(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Restore the vaultspec-managed .gitattributes block for the whole project.
+
+    Clears a recorded decline so the next install, upgrade or sync writes the
+    block again. This is the default, so running it on a workspace that has
+    never declared a preference is a no-op.
+    """
+    _set_block_policy(
+        block="gitattributes", enabled=True, json_output=json_output, target=target
+    )

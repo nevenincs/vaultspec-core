@@ -3,9 +3,9 @@ tags:
   - '#adr'
   - '#install-degraded-robustness'
 date: '2026-09-04'
-modified: '2026-09-04'
+modified: '2026-09-05'
 body_schema: 'body-v2'
-body_hash: 'sha256:ec24c2a18caaa57deb12bd18147f83b3e9b69afaffe707a2389bcd796681c0e8'
+body_hash: 'sha256:1be44f597738f617c203f8c99ae971fb6b2372f0d304eb285d000a0c2258689c'
 related:
   - '[[2026-09-04-install-degraded-robustness-research]]'
 ---
@@ -70,5 +70,7 @@ The install becomes the two commands it already claims to be. The platform-split
 The managed block gets marginally wider on workspaces where a lockable subject is absent - a sentinel path is listed before, or without, its subject ever materialising. This is deliberate and cheap: an ignore entry for a path that never appears has no effect, while the reverse leaves a per-machine artefact in someone's first commit.
 
 Two behaviours change for existing workspaces. `install --upgrade` now touches `.gitignore` where it previously did not, which will show as a diff on the first upgrade after this lands for any workspace whose block is short. And `doctor` moves an installed workspace with no managed block from `info` to a degraded signal, which raises its exit code where it previously did not - a deliberate break, and the reason the check exists.
+
+This record reverses a constraint of `2026-03-27-cli-ambiguous-states-gitignore-adr`, which required that the block writer must not create `.gitignore` on the reasoning that a workspace without one had chosen it. That reading did not survive contact with the call site: skipping returned the same value as "already correct", so the choice the constraint protected was indistinguishable from a workspace that had simply never been asked. The constraint is annotated as displaced in that record; the rest of it stands.
 
 The risk this opens is that creation is now unconditional for a subject the workspace may have deliberately omitted. The mitigation is scope: the file is created only when vaultspec is being installed or upgraded into that workspace, never by a read-only verb, and the uninstall path continues to remove the block rather than the file.

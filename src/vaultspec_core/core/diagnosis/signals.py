@@ -97,10 +97,18 @@ class GitignoreSignal(StrEnum):
 
 
 class GitattributesSignal(StrEnum):
-    """Observed state of gitattributes entries for managed paths."""
+    """Observed state of gitattributes entries for managed paths.
+
+    ``UNMANAGED`` carries the same meaning as its
+    :class:`GitignoreSignal` counterpart: the block is absent, or could not be
+    read, in a workspace that is installed and has not declined it. The other
+    two absences stay benign for a workspace that never asked or has declared
+    it does not want the block.
+    """
 
     NO_FILE = "no_file"
     NO_ENTRIES = "no_entries"
+    UNMANAGED = "unmanaged"
     PARTIAL = "partial"
     COMPLETE = "complete"
     CORRUPTED = "corrupted"

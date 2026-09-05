@@ -16,6 +16,7 @@ from . import types as _t
 from .enums import InstallMode, ManagedState, Tool
 from .exceptions import VaultSpecError, WorkspaceNotInitializedError
 from .git_artifacts import (
+    block_management_enabled,
     has_gitattributes_block,
     has_gitignore_block,
     untrack_managed_paths,
@@ -410,18 +411,26 @@ def _finalize_upgrade_manifest(
     # policy - otherwise stays unprotected across every upgrade, and nothing
     # tells the reader that --force is what repairs it.
     #
-    # --force additionally clears a recorded opt-out: it is the explicit
-    # re-opt-in gesture. Without it a workspace that deleted the block keeps
-    # its decision.
+    # --force clears the per-machine echo and nothing else. The committed
+    # declaration is cleared only by `spec <block> enable`: a clone of a
+    # project that declined a block runs install like any other, and an
+    # install that cleared the declaration would undo a teammate's decision
+    # exactly the way the per-machine flag used to.
     if force:
         mdata.gitignore_opted_out = False
-    if not mdata.gitignore_opted_out:
+        mdata.gitattributes_opted_out = False
+    if block_management_enabled(path, "gitignore", honour_local_echo=False):
         ensure_gitignore_block(
             path,
             get_recommended_entries(path),
             state=ManagedState.PRESENT,
         )
         mdata.gitignore_managed = True
+    # The gitattributes block has never been reconciled on upgrade, so a
+    # workspace that lost it never got it back without a fresh install.
+    if block_management_enabled(path, "gitattributes", honour_local_echo=False):
+        ensure_gitattributes_block(path, state=ManagedState.PRESENT)
+        mdata.gitattributes_managed = True
 
     mdata.precommit_managed = _detect_precommit_managed(path)
 
@@ -763,12 +772,19 @@ def install_run(
     # Manage gitignore block
     recommended = get_recommended_entries(path)
 
-    gi_written = ensure_gitignore_block(path, recommended, state=ManagedState.PRESENT)
+    # A committed decline governs a fresh install too. Cloning a project that
+    # declared it does not want the block and provisioning it is not a request
+    # to reverse that; only `spec gitignore enable` is.
+    gi_written = block_management_enabled(
+        path, "gitignore", honour_local_echo=False
+    ) and ensure_gitignore_block(path, recommended, state=ManagedState.PRESENT)
     if gi_written:
         logger.info("Added vaultspec managed block to .gitignore")
 
     # Manage gitattributes block
-    ga_written = ensure_gitattributes_block(path, state=ManagedState.PRESENT)
+    ga_written = block_management_enabled(
+        path, "gitattributes", honour_local_echo=False
+    ) and ensure_gitattributes_block(path, state=ManagedState.PRESENT)
     if ga_written:
         logger.info("Added vaultspec managed block to .gitattributes")
 
@@ -779,9 +795,11 @@ def install_run(
 
     # Robust detection: if it's there, it's managed.
     mdata.gitignore_managed = has_gitignore_block(path / ".gitignore")
-    # A fresh install is an opt-in by definition; it clears any opt-out a
-    # previous installation in this workspace recorded.
+    # A fresh install clears the per-machine echo, not the committed
+    # declaration: provisioning a clone is not a decision to reverse what the
+    # project declared.
     mdata.gitignore_opted_out = False
+    mdata.gitattributes_opted_out = False
     mdata.gitattributes_managed = has_gitattributes_block(path / ".gitattributes")
     mdata.precommit_managed = _detect_precommit_managed(path)
 
