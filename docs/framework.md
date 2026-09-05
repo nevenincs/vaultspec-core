@@ -365,15 +365,14 @@ and keep credentials out of them.
 
 ## Related documentation
 
-| Document                                               | What it covers                                      |
-| ------------------------------------------------------ | --------------------------------------------------- |
-| [Repository README](../README.md)                      | What vaultspec-core is, and installing it           |
-| [A feature end to end](./examples.md)                  | One feature through the whole pipeline, with output |
-| [Document syntax](./syntax.md)                         | Frontmatter, tags, links, and the plan row grammar  |
-| [Verifying a workspace and a vault](./verification.md) | The health commands and what each check proves      |
-| [The correctness workflow](./correctness.md)           | How a change is proven right, and the review gate   |
-| [CLI reference](./CLI.md)                              | Every command, flag, and option                     |
-| [MCP reference](./MCP.md)                              | The MCP server tools, setup, and configuration      |
+| Document                                               | What it covers                                     |
+| ------------------------------------------------------ | -------------------------------------------------- |
+| [Repository README](../README.md)                      | What vaultspec-core is, and installing it          |
+| [Document syntax](./syntax.md)                         | Frontmatter, tags, links, and the plan row grammar |
+| [Verifying a workspace and a vault](./verification.md) | The health commands and what each check proves     |
+| [The correctness workflow](./correctness.md)           | How a change is proven right, and the review gate  |
+| [CLI reference](./CLI.md)                              | Every command, flag, and option                    |
+| [MCP reference](./MCP.md)                              | The MCP server tools, setup, and configuration     |
 
 For bug reports and feature requests, open an issue on the
 [vaultspec-core issue tracker](https://github.com/nevenincs/vaultspec-core/issues).

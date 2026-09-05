@@ -65,7 +65,8 @@ uvx vaultspec-core vault add research --feature search-api
 ```
 
 This creates a scaffold. Fill in the research before moving on to the decision record.
-[A feature end to end](docs/examples.md) follows the manual route with command output.
+Follow the [workflow guide](docs/framework.md#begin-a-pipeline) for the remaining
+stages.
 
 ## Documentation
 
