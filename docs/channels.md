@@ -3,9 +3,24 @@
 Install Core with Scoop on Windows or Homebrew on macOS and Linux. Both channels install
 `vaultspec-core` and `vaultspec-mcp`.
 
-You don't need a separate Python installation. First launch needs network access to
-fetch `uv` and install the pinned Vaultspec package and its dependencies from PyPI;
-later launches run entirely offline.
+You don't need a separate Python installation on any release, and from v0.1.74 you don't
+need network access either.
+
+**v0.1.74 is the first release whose binaries carry everything they run.** Each one
+holds its own interpreter, Vaultspec and the whole dependency tree, so a first launch on
+an air-gapped machine behaves like any other, and every release from v0.1.74 runs its
+binaries with the network taken away before publishing them - in an empty network
+namespace on Linux, under a sandbox profile that denies the network on macOS, and with
+every route to a package index blocked on Windows.
+
+Binaries up to and including v0.1.73 install Vaultspec and its dependencies from PyPI on
+first launch and cannot start on a machine with no network. That is a property of those
+releases and does not change; later launches of one that already installed run offline.
+
+Two consequences follow from carrying everything. The downloads are larger - roughly 45
+to 70 MB depending on the platform, against 20 to 40 MB when the dependencies arrived
+over the network instead. And the binaries do not update themselves: upgrade through
+Scoop or Homebrew, which is where the version they install is decided anyway.
 
 ## Coverage
 
