@@ -47,11 +47,11 @@ class _PreCommitConfig(TypedDict):
     repos: list[_PreCommitRepo]
 
 
-#: One step in a GitHub Actions job. Declared functionally because `if` is a
-#: Python keyword and so cannot be an attribute in the class syntax.
+#: One step in a GitHub Actions job. Declared functionally because `if` and
+#: `with` are Python keywords and so cannot be attributes in the class syntax.
 _WorkflowStep = TypedDict(
     "_WorkflowStep",
-    {"name": str, "run": str, "uses": str, "if": str},
+    {"name": str, "run": str, "uses": str, "if": str, "with": dict[str, str]},
     total=False,
 )
 
@@ -567,11 +567,44 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
 
 
 def test_ci_workflow_uses_actionlint() -> None:
+    """The workflow gate runs actionlint, from a pinned NATIVE binary.
+
+    It used to assert the `docker://rhysd/actionlint:` container action, which
+    made a required status check depend on the runner account being able to
+    reach the docker socket. On the self-hosted fleet it cannot, and the job
+    failed in `Pull down action image` without linting anything.
+
+    So the assertion is on what must be true - actionlint runs, at a pinned
+    version - rather than on the transport. Pinning stays enforced because an
+    unpinned tool is a silent version drift in a gate; the daemon requirement
+    does not, because `dev.runner.ToolOrDocker` already treats the image as
+    the fallback for hosts without the binary rather than the other way round.
+    """
     ci = _load_workflow(".github/workflows/ci.yml")
     jobs = ci["jobs"]
     steps = jobs["workflow-lint"]["steps"]
-    used_actions = {step["uses"] for step in steps if "uses" in step}
-    assert any(a.startswith("docker://rhysd/actionlint:") for a in used_actions)
+
+    installed = {
+        step["with"]["tool"]
+        for step in steps
+        if step.get("uses", "").startswith("taiki-e/install-action")
+        and "with" in step
+        and "tool" in step["with"]
+    }
+    assert any(tool.startswith("actionlint@") for tool in installed), (
+        f"workflow-lint must install a pinned actionlint; installs {installed}"
+    )
+
+    run_commands = {step["run"].strip() for step in steps if "run" in step}
+    assert "actionlint" in run_commands, (
+        f"workflow-lint must invoke actionlint; runs {run_commands}"
+    )
+
+    used_actions = {step.get("uses", "") for step in steps}
+    assert not any(a.startswith("docker://") for a in used_actions), (
+        "a container action reintroduces the docker-socket dependency that "
+        "this gate cannot satisfy on the self-hosted fleet"
+    )
 
 
 def test_ci_workflow_installs_native_lint_tools() -> None:
