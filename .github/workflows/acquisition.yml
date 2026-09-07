@@ -86,7 +86,7 @@ jobs:
           - image: almalinux:8
             setup: dnf install -y -q curl git
             arch: aarch64
-            runner: [self-hosted, ARM64, Linux]
+            runner: ubuntu-24.04-arm
             asset: vaultspec-core-aarch64-unknown-linux-gnu
           # Above the floor and below the build host, which is the band a user
           # is most likely to be in. bookworm is 2.36, jammy is 2.35.
@@ -103,12 +103,12 @@ jobs:
           - image: debian:bookworm-slim
             setup: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl git ca-certificates
             arch: aarch64
-            runner: [self-hosted, ARM64, Linux]
+            runner: ubuntu-24.04-arm
             asset: vaultspec-core-aarch64-unknown-linux-gnu
           - image: ubuntu:22.04
             setup: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl git ca-certificates
             arch: aarch64
-            runner: [self-hosted, ARM64, Linux]
+            runner: ubuntu-24.04-arm
             asset: vaultspec-core-aarch64-unknown-linux-gnu
     runs-on: ${{ matrix.runner }}
     container: ${{ matrix.image }}
