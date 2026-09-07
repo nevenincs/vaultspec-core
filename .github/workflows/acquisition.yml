@@ -63,6 +63,11 @@ jobs:
         # target, so their availability is already proven by the build rather
         # than assumed here. Every image here publishes an arm64 variant, so
         # the older-libc property holds identically on each architecture.
+        #
+        # HOSTED for the same reason the build leg is, and not as an exception
+        # to the migration below: these legs set `container:`, and the fleet's
+        # ARM64 host cannot serve a container job while its `/home/runner` is a
+        # named volume. See the note beside `linux-aarch64` in binaries.yml.
         include:
           # AT the declared floor, on both architectures. Nothing else here
           # tests 2.28 itself: the Debian and Ubuntu images below sit
