@@ -744,7 +744,8 @@ jobs:
   #
   # This job holds that grant and nothing else: no checkout of any repository,
   # no secret beyond the automatic token, no project code. It downloads the
-  # build artifacts, derives the subject list, and calls `actions/attest`.
+  # artifacts the offline gate republished - see the note on `needs:` below -
+  # derives the subject list, and calls `actions/attest`.
   # `contents: read` is the workflow default and is restated rather than
   # inherited so the entire credential surface of the signing job is readable
   # in one block.
