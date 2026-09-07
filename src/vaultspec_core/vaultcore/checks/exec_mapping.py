@@ -15,8 +15,9 @@ Findings, by severity:
   the plan's ledger already carries a verb-written row (anything but the
   fold's ``T``), because execution under that plan is being logged and this
   Step was closed without evidence.
-- ``WARNING``: a closed Step with no row when the plan has no ledger yet, or
-  only a ledger folded from history (all ``T`` rows), both legacy states; a
+- ``WARNING``: a closed Step with no row when the plan has no ledger yet,
+  when its only evidence is records predating ``step_id:``, or when it has
+  only a ledger folded from history (all ``T`` rows), all legacy states; a
   ledger row for a Step that is still open; a row naming a Step the plan
   never had; a ledger whose parent plan is missing or unparseable.
 - Clean: a row naming a retired Step. Ledger rows are history; the Step ran
@@ -120,6 +121,11 @@ def check_exec_mapping(
     #: drift. A ledger folded from history carries only ``T`` rows and does
     #: not qualify.
     ledger_plans: set[Path] = set()
+    #: Live plans carrying execution records that predate ``step_id:``, by
+    #: record count. Their evidence is on disk but names no Step, which is a
+    #: different state from having no evidence at all and takes different
+    #: advice (issue #498).
+    unattributable: dict[Path, int] = {}
 
     for doc_path, (metadata, body) in sorted(snapshot.items()):
         if get_doc_type(doc_path, root_dir) is not DocType.EXEC:
@@ -153,7 +159,13 @@ def check_exec_mapping(
 
         if not step_ids:
             # Legacy record predating the step_id field, or a ledger naming
-            # no Step: unmappable, not a defect. Skipped without a finding.
+            # no Step: unmappable, not a defect, so it raises no finding of
+            # its own. It is still counted: a plan whose only evidence cannot
+            # be attributed needs different advice from one with no evidence.
+            if live_plan_path is not None and not is_ledger_stem(doc_path.stem):
+                unattributable[live_plan_path] = (
+                    unattributable.get(live_plan_path, 0) + 1
+                )
             continue
 
         if live_plan_path is None:
@@ -214,6 +226,7 @@ def check_exec_mapping(
                     plan_path.relative_to(root_dir),
                     missing,
                     has_ledger=plan_path in ledger_plans,
+                    unattributable=unattributable.get(plan_path, 0),
                 )
             )
 
@@ -419,28 +432,54 @@ def _row_diagnostic(
     )
 
 
+#: What to do when a Step's rows are genuinely absent and can still be written.
+_LOG_THE_STEPS = (
+    "Log each Step: `vaultspec-core vault exec log --feature <feature> "
+    "--step S## --related <plan-stem> --row M:path`."
+)
+
+
 def _missing_rows_diagnostic(
-    rel_path: Path, missing: list[str], *, has_ledger: bool
+    rel_path: Path, missing: list[str], *, has_ledger: bool, unattributable: int = 0
 ) -> CheckDiagnostic:
-    """Build the finding for closed Steps the ledger has no row for."""
+    """Build the finding for closed Steps the ledger has no row for.
+
+    Three states, told apart because the remedy differs and naming the wrong
+    one sends the reader somewhere useless. A plan whose ledger is being
+    written closed a Step without evidence, which is an error. A plan with no
+    execution artifact at all has nothing to recover, so logging the Steps is
+    the remedy. A plan whose only artifacts predate ``step_id:`` is the case
+    that reads worst: its evidence *is* on disk and simply names no Step, so
+    reporting "no logged ledger yet" is false, and advising a re-log invites
+    a mapping nobody can source. ``vault exec fold`` skips exactly these
+    records rather than guess, and this finding says the same thing (#498).
+    """
     listed = ", ".join(missing)
+    if has_ledger:
+        detail = (
+            "The plan's ledger is being written, so these were closed without evidence."
+        )
+        fix = _LOG_THE_STEPS
+    elif unattributable:
+        detail = (
+            f"The plan has {unattributable} execution record(s) predating "
+            "Step ids, so its evidence exists but names no Step."
+        )
+        fix = (
+            "`vaultspec-core vault exec fold` skips these rather than guess, "
+            "and re-logging them would invent the mapping. Attribute a record "
+            "to its Step by hand from what that record itself states, or "
+            "leave the plan as pre-ledger history."
+        )
+    else:
+        detail = "The plan has no logged ledger yet."
+        fix = _LOG_THE_STEPS
     return CheckDiagnostic(
         path=rel_path,
-        message=(
-            f"Closed Step(s) with no ledger row: {listed}. "
-            + (
-                "The plan's ledger is being written, so these were closed "
-                "without evidence."
-                if has_ledger
-                else "The plan has no logged ledger yet."
-            )
-        ),
+        message=f"Closed Step(s) with no ledger row: {listed}. {detail}",
         severity=Severity.ERROR if has_ledger else Severity.WARNING,
         fixable=False,
-        fix_description=(
-            "Log each Step: `vaultspec-core vault exec log --feature <feature> "
-            "--step S## --related <plan-stem> --row M:path`."
-        ),
+        fix_description=fix,
     )
 
 
