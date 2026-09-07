@@ -374,16 +374,19 @@ class TestClosedStepsWithoutRows:
 
         result = _run(tmp_path)
 
-        warnings = _by_severity(result, Severity.WARNING)
-        assert len(warnings) == 1
-        message = warnings[0].message
+        infos = _by_severity(result, Severity.INFO)
+        assert len(infos) == 1
+        message = infos[0].message
         assert "S01, S02" in message
         assert "2 execution record(s) predating Step ids" in message
         assert "no logged ledger yet" not in message
-        fix_description = warnings[0].fix_description
+        fix_description = infos[0].fix_description
         assert fix_description is not None
         assert "vault exec log" not in fix_description
         assert "invent the mapping" in fix_description
+        # Out of the warning count, so it cannot mask a real one, and out of
+        # ERROR, so it never gates.
+        assert _by_severity(result, Severity.WARNING) == []
         assert _by_severity(result, Severity.ERROR) == []
 
     def test_no_records_at_all_still_advises_logging_the_steps(
@@ -401,6 +404,24 @@ class TestClosedStepsWithoutRows:
         fix_description = warnings[0].fix_description
         assert fix_description is not None
         assert "vault exec log" in fix_description
+
+    def test_the_evidence_free_plan_stays_a_warning_not_info(
+        self, tmp_path: Path
+    ) -> None:
+        """The larger population deliberately keeps its severity.
+
+        Nothing separates a plan predating the ledger from one whose Steps
+        were closed without logging, and catching the second is the point of
+        the check. Quietly folding this into the legacy INFO bucket would
+        retire the guard, so it stays a WARNING (issue #498).
+        """
+        _skeleton(tmp_path)
+        _write_plan(tmp_path, ("S01",), checked=("S01",))
+
+        result = _run(tmp_path)
+
+        assert len(_by_severity(result, Severity.WARNING)) == 1
+        assert _by_severity(result, Severity.INFO) == []
 
     def test_a_written_ledger_outranks_unattributable_records(
         self, tmp_path: Path
