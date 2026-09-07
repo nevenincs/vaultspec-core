@@ -51,9 +51,20 @@ class _PreCommitConfig(TypedDict):
 #: `with` are Python keywords and so cannot be attributes in the class syntax.
 _WorkflowStep = TypedDict(
     "_WorkflowStep",
-    {"name": str, "run": str, "uses": str, "if": str, "with": dict[str, str]},
+    {
+        "name": str,
+        "run": str,
+        "uses": str,
+        "if": str,
+        "with": dict[str, str],
+        "env": dict[str, str],
+    },
     total=False,
 )
+
+#: Length of a SHA-256 digest written as hex, which is how release checksums
+#: are published and therefore how they are pinned in a workflow.
+_SHA256_HEX_LENGTH = 64
 
 
 class _WorkflowJob(TypedDict):
@@ -584,20 +595,29 @@ def test_ci_workflow_uses_actionlint() -> None:
     jobs = ci["jobs"]
     steps = jobs["workflow-lint"]["steps"]
 
-    installed = {
-        step["with"]["tool"]
-        for step in steps
-        if step.get("uses", "").startswith("taiki-e/install-action")
-        and "with" in step
-        and "tool" in step["with"]
-    }
-    assert any(tool.startswith("actionlint@") for tool in installed), (
-        f"workflow-lint must install a pinned actionlint; installs {installed}"
+    install = next(
+        (step for step in steps if step.get("name") == "Install actionlint"),
+        None,
+    )
+    assert install is not None, "workflow-lint must install actionlint"
+
+    pins = install.get("env", {})
+    assert "ACTIONLINT_VERSION" in pins, (
+        "the actionlint version must be pinned; an unpinned tool in a gate is "
+        "silent version drift"
+    )
+    assert len(pins.get("ACTIONLINT_SHA256", "").strip()) == _SHA256_HEX_LENGTH, (
+        "the actionlint asset must be pinned by content as well as by version, "
+        "so a retagged or replaced release fails the gate rather than quietly "
+        "changing what lints these workflows"
     )
 
     run_commands = {step["run"].strip() for step in steps if "run" in step}
     assert "actionlint" in run_commands, (
         f"workflow-lint must invoke actionlint; runs {run_commands}"
+    )
+    assert any("sha256sum --check" in cmd for cmd in run_commands), (
+        "the pinned checksum must actually be verified, not merely declared"
     )
 
     used_actions = {step.get("uses", "") for step in steps}
