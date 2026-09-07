@@ -15,11 +15,16 @@ Findings, by severity:
   the plan's ledger already carries a verb-written row (anything but the
   fold's ``T``), because execution under that plan is being logged and this
   Step was closed without evidence.
-- ``WARNING``: a closed Step with no row when the plan has no ledger yet,
-  when its only evidence is records predating ``step_id:``, or when it has
-  only a ledger folded from history (all ``T`` rows), all legacy states; a
-  ledger row for a Step that is still open; a row naming a Step the plan
-  never had; a ledger whose parent plan is missing or unparseable.
+- ``WARNING``: a closed Step with no row when the plan has no ledger yet, or
+  only a ledger folded from history (all ``T`` rows); a ledger row for a Step
+  that is still open; a row naming a Step the plan never had; a ledger whose
+  parent plan is missing or unparseable.
+- ``INFO``: a closed Step with no row on a plan whose only evidence is
+  records predating ``step_id:``. Visible, but out of the warning count,
+  because nothing can clear it: those records name no Step and
+  ``vault exec fold`` declines to attribute them rather than guess. The
+  ambiguous state above stays a WARNING, so this cannot mask a Step that was
+  genuinely closed without logging.
 - Clean: a row naming a retired Step. Ledger rows are history; the Step ran
   before it was retired and the row is the evidence.
 
@@ -453,6 +458,13 @@ def _missing_rows_diagnostic(
     reporting "no logged ledger yet" is false, and advising a re-log invites
     a mapping nobody can source. ``vault exec fold`` skips exactly these
     records rather than guess, and this finding says the same thing (#498).
+
+    Severity follows what the reader can actually do about it. Only the
+    unattributable state drops to INFO, because it is the only one no tool
+    and no honest hand-edit can clear. The evidence-free state stays a
+    WARNING even though it is the larger population: nothing distinguishes a
+    plan predating the ledger from one whose Steps were closed without
+    logging, and catching the second is what the check is for.
     """
     listed = ", ".join(missing)
     if has_ledger:
@@ -460,6 +472,7 @@ def _missing_rows_diagnostic(
             "The plan's ledger is being written, so these were closed without evidence."
         )
         fix = _LOG_THE_STEPS
+        severity = Severity.ERROR
     elif unattributable:
         detail = (
             f"The plan has {unattributable} execution record(s) predating "
@@ -471,13 +484,15 @@ def _missing_rows_diagnostic(
             "to its Step by hand from what that record itself states, or "
             "leave the plan as pre-ledger history."
         )
+        severity = Severity.INFO
     else:
         detail = "The plan has no logged ledger yet."
         fix = _LOG_THE_STEPS
+        severity = Severity.WARNING
     return CheckDiagnostic(
         path=rel_path,
         message=f"Closed Step(s) with no ledger row: {listed}. {detail}",
-        severity=Severity.ERROR if has_ledger else Severity.WARNING,
+        severity=severity,
         fixable=False,
         fix_description=fix,
     )
