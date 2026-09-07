@@ -49,8 +49,8 @@ jobs:
   # discovering it. Dispatch again once the host is on AC, or set
   # `allow_queue` to wait deliberately.
   #
-  # Runs on the fleet, like everything else here: this repository uses no
-  # GitHub-hosted runners. That costs this preflight its independence - if the
+  # Runs on the fleet, like all but the hosted cells ci-fleet declares. That
+  # costs this preflight its independence - if the
   # Linux/X64 runner is itself down, this job QUEUES rather than reporting the
   # outage, and the guard is silent exactly when the fleet is worst. It still
   # catches the common case it was built for, a fleet that is up but missing
@@ -247,10 +247,37 @@ jobs:
           # can differ in ways the floor check does not measure, and the whole
           # point of pinning is that the build environment is an input.
           #
-          # On the fleet's ARM64 host, like every other leg. See the note
-          # below `runs-on` for the container constraint that still applies.
+          # HOSTED, and the only build leg that is. This is not an oversight
+          # in the migration below - it is the selector `ci-fleet` declares for
+          # this cell, verbatim:
+          #
+          #   vaultspec-core.targets.linux-aarch64
+          #     role: build-and-prove
+          #     selector: hosted-ubuntu-24.04-arm
+          #
+          # and `fleet.yml` says of that value, in terms: "deliberately not a
+          # label set this fleet serves, and names the hosted runner verbatim so
+          # the declaration and the workflow can be diffed by eye."
+          #
+          # The fleet's ARM64 host cannot serve it. `macbook-neo-linux-arm-core`
+          # mounts /home/runner from a NAMED VOLUME, so a job container it
+          # creates is a sibling on the colima VM and every path the runner
+          # passes - `/home/runner/externals` as `/__e` - resolves against a
+          # filesystem where those paths do not exist. Measured, with a path
+          # probe, in ci-fleet's docs/arm64-linux.md. The leg dies in
+          # `Initialize containers` before checkout, which is how
+          # vaultspec-core-v0.1.61 published zero assets.
+          #
+          # Note this is NOT the reason this file used to give. "The
+          # colima-hosted ARM64 runner has no reachable docker daemon" was never
+          # probed and is false - the daemon answers `client=29.6.1
+          # server=29.5.2` from inside that container. The distinction matters
+          # because the false reason implies an unfixable gap and the real one
+          # names a fix: bind-mount the runner's home from a VM path identical
+          # to the container path. That is an operator action on that host and
+          # is not blocked by anything in this file.
           - name: linux-aarch64
-            runner: [self-hosted, ARM64, Linux]
+            runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             container: quay.io/pypa/manylinux_2_28_aarch64@sha256:29a6ceb78de5b00494e6e7456a72782a4cb54238de102e7491d15fe47789b4d1
           - name: windows-x86_64
@@ -315,32 +342,37 @@ jobs:
           # artifact requiring GLIBC_2.39 against a declared floor of 2.28.
           #
           # The standing note said to restore it "the moment this label is
-          # served by a host that can run the pinned image". No such host is
-          # available: this repository uses NO GitHub-hosted runners, so the
-          # leg is served by the colima ARM64 runner described above and the
-          # gap analysis still holds in full. See the note below `runs-on` for
-          # what has to change on the host before this leg can pass.
+          # served by a host that can run the pinned image". That host is
+          # `ubuntu-24.04-arm`, free for public repositories, and this leg uses
+          # it. It is the one exception to the fleet-only rule below, and it is
+          # the exception `ci-fleet` DECLARES rather than one this file takes:
+          # the cell's selector is `hosted-ubuntu-24.04-arm`, and v0.1.73's
+          # published aarch64 asset measures GLIBC_2.28 against the declared
+          # floor - the proof recorded beside that declaration.
           #
           # `HOMEBREW_TARGETS` already named this triple and `generate.py` has
           # been printing `::warning::no Homebrew coverage for:
           # aarch64-unknown-linux-gnu` on every release. That warning should
           # now stop by itself; if it does not, the asset name and the formula
           # disagree and that is a real defect, not a leftover.
-    # Every artifact build runs on the shared self-hosted fleet. There is no
-    # exception and no hosted fallback: GitHub-hosted runners are not used in
-    # this repository at all, whatever they would cost.
+    # Every artifact build runs on the shared self-hosted fleet, with ONE
+    # exception: linux-aarch64, which builds on `ubuntu-24.04-arm`. That is not
+    # a fallback this file chose. `ci-fleet` declares the cell's selector as
+    # `hosted-ubuntu-24.04-arm` and says of it, in terms, "deliberately not a
+    # label set this fleet serves" - so a self-hosted leg here would put the
+    # workflow out of conformance with the manifest that governs it.
     #
-    # KNOWN BROKEN: the linux-aarch64 leg. It asks for a `container:`, and the
-    # ARM64 runner is itself a container on colima. It CAN reach the docker
-    # daemon, but its `/home/runner` is a NAMED VOLUME whose path does not
-    # exist inside the colima VM, so the sibling job container mounts an empty
-    # directory and the leg dies in `Initialize containers` before checkout.
-    # The fix is to re-enrol that runner with its home BIND-MOUNTED from the
-    # identical path in the VM; that is a host change, not a workflow change,
-    # and until it is made this leg fails rather than queues.
+    # It is also the only shape that works today. That leg asks for a
+    # `container:`, and the fleet's ARM64 host is itself a container on colima
+    # whose `/home/runner` is a NAMED VOLUME with no matching path in the VM;
+    # the sibling job container mounts an empty directory and the leg dies in
+    # `Initialize containers` before checkout. Re-enrolling that runner with a
+    # bind-mounted home would fix it, and ci-fleet records that runner as a
+    # RETIRE candidate instead - it has never served a selector and the leg it
+    # was enrolled for builds elsewhere. Whichever way that goes, it is decided
+    # in ci-fleet and not here.
     #
-    # acquisition.yml's three aarch64 legs are blocked on the same host change
-    # for the same reason.
+    # acquisition.yml's three aarch64 legs are hosted for the same reason.
     runs-on: ${{ matrix.runner }}
     # Empty for every leg but the two Linux ones, which GitHub reads as
     # "no container".
@@ -1397,7 +1429,9 @@ jobs:
     name: Verify the release carries artifacts
     needs: release
     if: ${{ always() }}
-    # On the fleet, because this repository uses no GitHub-hosted runners.
+    # On the fleet. Every job in this repository runs there except the two
+    # `ci-fleet` declares as hosted cells - binaries.yml's linux-aarch64 build
+    # and offline legs - and the wheel build, which needs no fleet capability.
     #
     # Accept what that costs: this job demotes a release whose build just
     # failed, and a build fails most often when the fleet is congested or

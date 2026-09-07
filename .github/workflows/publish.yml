@@ -31,7 +31,9 @@ concurrency:
 jobs:
   build:
     name: Build
-    # On the fleet, because this repository uses no GitHub-hosted runners.
+    # On the fleet. Every job in this repository runs there except the two
+    # `ci-fleet` declares as hosted cells - binaries.yml's linux-aarch64 build
+    # and offline legs - and the wheel build, which needs no fleet capability.
     #
     # The distribution is a py3-none-any wheel, so the build host cannot affect
     # the artifact - but availability still matters, and this is the path that
