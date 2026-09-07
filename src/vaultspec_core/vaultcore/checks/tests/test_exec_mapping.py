@@ -356,6 +356,74 @@ class TestClosedStepsWithoutRows:
 
         assert len(_by_severity(result, Severity.ERROR)) == 1
 
+    def test_unattributable_records_change_the_message_and_the_advice(
+        self, tmp_path: Path
+    ) -> None:
+        """A plan whose only evidence predates ``step_id:`` is not evidence-free.
+
+        Saying "no logged ledger yet" there is false - the records exist - and
+        the re-log advice cannot be followed from them, because nothing in the
+        record names a Step. `vault exec fold` skips exactly these rather than
+        guess, so the finding must not tell the reader to do what the fold
+        refuses to (issue #498).
+        """
+        _skeleton(tmp_path)
+        _write_plan(tmp_path, ("S01", "S02"), checked=("S01", "S02"))
+        _write_exec(tmp_path, step_id=None, stem="2026-02-04-feat-phase1-step1")
+        _write_exec(tmp_path, step_id=None, stem="2026-02-04-feat-phase1-step2")
+
+        result = _run(tmp_path)
+
+        warnings = _by_severity(result, Severity.WARNING)
+        assert len(warnings) == 1
+        message = warnings[0].message
+        assert "S01, S02" in message
+        assert "2 execution record(s) predating Step ids" in message
+        assert "no logged ledger yet" not in message
+        fix_description = warnings[0].fix_description
+        assert fix_description is not None
+        assert "vault exec log" not in fix_description
+        assert "invent the mapping" in fix_description
+        assert _by_severity(result, Severity.ERROR) == []
+
+    def test_no_records_at_all_still_advises_logging_the_steps(
+        self, tmp_path: Path
+    ) -> None:
+        """The evidence-free plan keeps the advice that can still be followed."""
+        _skeleton(tmp_path)
+        _write_plan(tmp_path, ("S01",), checked=("S01",))
+
+        result = _run(tmp_path)
+
+        warnings = _by_severity(result, Severity.WARNING)
+        assert len(warnings) == 1
+        assert "no logged ledger yet" in warnings[0].message
+        fix_description = warnings[0].fix_description
+        assert fix_description is not None
+        assert "vault exec log" in fix_description
+
+    def test_a_written_ledger_outranks_unattributable_records(
+        self, tmp_path: Path
+    ) -> None:
+        """A logged ledger means the Step was closed without evidence, an error.
+
+        Legacy records sitting alongside it do not soften that: execution
+        under this plan is demonstrably being logged.
+        """
+        _skeleton(tmp_path)
+        _write_plan(tmp_path, ("S01", "S02"), checked=("S01", "S02"))
+        _write_ledger(tmp_path, rows="- `S01` `M` `src/s01.py`\n")
+        _write_exec(tmp_path, step_id=None, stem="2026-02-04-feat-phase1-step1")
+
+        result = _run(tmp_path)
+
+        errors = _by_severity(result, Severity.ERROR)
+        assert len(errors) == 1
+        assert "closed without evidence" in errors[0].message
+        fix_description = errors[0].fix_description
+        assert fix_description is not None
+        assert "vault exec log" in fix_description
+
     def test_open_steps_need_no_rows(self, tmp_path: Path) -> None:
         _skeleton(tmp_path)
         _write_plan(tmp_path, ("S01", "S02"))
