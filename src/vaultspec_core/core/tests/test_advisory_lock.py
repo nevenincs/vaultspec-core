@@ -29,6 +29,7 @@ from vaultspec_core.core.helpers import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 
@@ -63,6 +64,80 @@ class TestAdvisoryLock:
             lock_file = root / "config.yaml.lock"
             assert lock_file.exists()
             assert not (root / "config.lock").exists()
+
+
+# How long a liveness assertion tolerates NO PROGRESS AT ALL before calling a
+# deadlock. This is not a budget for the work: the work may take as long as the
+# host is slow. It bounds only the gap between two consecutive completed
+# iterations, which a deadlocked run never closes and a merely slow one always
+# does. Overridable because the floor is set by the slowest single lock
+# acquisition a host can produce, and that is a property of the volume rather
+# than of this suite.
+_NO_PROGRESS_GRACE_SECONDS = float(
+    os.environ.get("VAULTSPEC_TEST_NO_PROGRESS_GRACE_SECONDS", "60")
+)
+
+# The interval between progress samples. Small enough that a real deadlock is
+# reported promptly, large enough that polling does not itself contend for the
+# GIL with the workers being observed.
+_PROGRESS_POLL_SECONDS = 0.05
+
+
+def _join_without_deadlock(
+    threads: list[threading.Thread],
+    progress: Callable[[], int],
+    *,
+    grace: float = _NO_PROGRESS_GRACE_SECONDS,
+) -> None:
+    """Join every thread, failing only if the group stops making progress.
+
+    A wall-clock join cannot tell a deadlock from a slow volume, so one that
+    is tight enough to catch the former fails on the latter. This suite has
+    made that mistake: a 30-second join on a 1,000-iteration lock loop passed
+    on one runner and failed on another whose ext4 journal made every
+    acquisition an order of magnitude slower - the tests were measuring disk
+    latency and reporting it as a deadlock.
+
+    Progress is the honest signal. A deadlocked group completes no further
+    iterations no matter how long it is given; a slow one keeps completing
+    them, just further apart. So the deadline rides on the gap between
+    consecutive completions rather than on the total, and a host that is
+    uniformly ten times slower simply takes ten times longer to pass.
+
+    Args:
+        threads: The already-started threads to wait for.
+        progress: Returns a monotonically non-decreasing count of completed
+            units of work. Called from the observing thread, so it must not
+            take any lock the workers hold.
+        grace: Seconds of no progress that constitute a deadlock.
+
+    Raises:
+        AssertionError: If no progress is observed for ``grace`` seconds while
+            at least one thread is still alive.
+    """
+    last_seen = progress()
+    last_change = time.monotonic()
+
+    while any(thread.is_alive() for thread in threads):
+        time.sleep(_PROGRESS_POLL_SECONDS)
+        current = progress()
+        if current != last_seen:
+            last_seen = current
+            last_change = time.monotonic()
+            continue
+
+        stalled_for = time.monotonic() - last_change
+        if stalled_for > grace:
+            alive = [t.name for t in threads if t.is_alive()]
+            raise AssertionError(
+                f"no progress for {stalled_for:.1f}s at {current} completed "
+                f"iteration(s); still alive: {', '.join(alive)}. A slow volume "
+                f"lengthens the gaps between iterations but never stops them, "
+                f"so a stall this long is a deadlock rather than slow I/O."
+            )
+
+    for thread in threads:
+        thread.join()
 
 
 @pytest.mark.unit
@@ -170,15 +245,20 @@ class TestAdvisoryLockConcurrency:
 
         errors: list[str] = []
         barrier = threading.Barrier(n_threads)
+        # `list.append` is atomic under the GIL, so the observing thread can
+        # read `len()` without taking any lock the workers hold - which is the
+        # one thing a liveness observer must never do.
+        completed: list[None] = []
 
         def worker():
             try:
-                barrier.wait(timeout=5)
+                barrier.wait(timeout=_NO_PROGRESS_GRACE_SECONDS)
                 for _ in range(increments_per_thread):
                     with advisory_lock(target):
                         data = json.loads(target.read_text())
                         data["counter"] += 1
                         target.write_text(json.dumps(data))
+                    completed.append(None)
             except Exception as exc:
                 errors.append(f"{threading.current_thread().name}: {exc}")
 
@@ -188,9 +268,7 @@ class TestAdvisoryLockConcurrency:
         ]
         for t in threads:
             t.start()
-        for t in threads:
-            t.join(timeout=30)
-            assert not t.is_alive(), f"Thread {t.name} still alive after 30s (deadlock)"
+        _join_without_deadlock(threads, lambda: len(completed))
 
         assert not errors, f"Thread errors: {errors}"
 
@@ -214,22 +292,18 @@ class TestAdvisoryLockConcurrency:
         barrier = threading.Barrier(2)
 
         def lock_file(path: Path, name: str):
-            barrier.wait(timeout=5)
+            barrier.wait(timeout=_NO_PROGRESS_GRACE_SECONDS)
             with advisory_lock(path):
                 data = json.loads(path.read_text())
                 data["owner"] = name
                 path.write_text(json.dumps(data))
                 results[name] = True
 
-        t1 = threading.Thread(target=lock_file, args=(file_a, "thread-a"))
-        t2 = threading.Thread(target=lock_file, args=(file_b, "thread-b"))
+        t1 = threading.Thread(target=lock_file, args=(file_a, "thread-a"), name="a")
+        t2 = threading.Thread(target=lock_file, args=(file_b, "thread-b"), name="b")
         t1.start()
         t2.start()
-        t1.join(timeout=10)
-        t2.join(timeout=10)
-
-        assert not t1.is_alive()
-        assert not t2.is_alive()
+        _join_without_deadlock([t1, t2], lambda: len(results))
         assert results == {"thread-a": True, "thread-b": True}
         assert json.loads(file_a.read_text())["owner"] == "thread-a"
         assert json.loads(file_b.read_text())["owner"] == "thread-b"
@@ -429,7 +503,7 @@ class TestUpgradeFinalizeHoldsTheManifestLock:
                 "was held, so its read-modify-write is not covered by it"
             )
 
-        worker.join(timeout=30.0)
+        _join_without_deadlock([worker], lambda: int(finished.is_set()))
         assert finished.is_set(), "the cycle did not complete once the lock was free"
 
     def test_the_upgrade_cycle_still_stamps_what_it_should(
@@ -757,14 +831,17 @@ class TestTimeoutDoesNotBreakLegitimateBlocking:
         errors: list[str] = []
         barrier = threading.Barrier(n_threads)
 
+        completed: list[None] = []
+
         def worker() -> None:
             try:
-                barrier.wait(timeout=30)
+                barrier.wait(timeout=_NO_PROGRESS_GRACE_SECONDS)
                 for _ in range(10):
                     with advisory_lock(target):
                         data = json.loads(target.read_text())
                         data["counter"] += 1
                         target.write_text(json.dumps(data))
+                    completed.append(None)
             except Exception as exc:
                 errors.append(f"{threading.current_thread().name}: {exc!r}")
 
@@ -774,9 +851,7 @@ class TestTimeoutDoesNotBreakLegitimateBlocking:
         ]
         for thread in threads:
             thread.start()
-        for thread in threads:
-            thread.join(timeout=120)
-            assert not thread.is_alive(), f"{thread.name} never finished"
+        _join_without_deadlock(threads, lambda: len(completed))
 
         assert not errors, f"the budget fired on legitimate contention: {errors}"
         assert json.loads(target.read_text())["counter"] == n_threads * 10
@@ -809,7 +884,14 @@ class TestTheBudgetIsPerAcquisitionNotPerPass:
         from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
         from vaultspec_core.vaultcore.repair import run_repair_pipeline
 
-        document_count = 250
+        # Sized to outlast the budget below, not to be large for its own sake.
+        # What makes a per-pass budget fail here is the PASS taking longer than
+        # the budget while every individual acquisition stays far under it, and
+        # that premise is asserted at the end rather than assumed - so this
+        # count can fall as the pipeline gets faster without the test quietly
+        # ceasing to prove anything.
+        document_count = 120
+        budget_seconds = 5.0
         WorkspaceFactory(tmp_path).install("claude")
         research = tmp_path / ".vault" / "research"
         research.mkdir(parents=True, exist_ok=True)
@@ -830,11 +912,13 @@ class TestTheBudgetIsPerAcquisitionNotPerPass:
 
         name = "VAULTSPEC_LOCK_TIMEOUT_SECONDS"
         previous = os.environ.get(name)
-        os.environ[name] = "5"
+        os.environ[name] = str(budget_seconds)
         reset_config()
+        started = time.monotonic()
         try:
             run = run_repair_pipeline(tmp_path)
         finally:
+            pass_seconds = time.monotonic() - started
             if previous is None:
                 os.environ.pop(name, None)
             else:
@@ -846,6 +930,16 @@ class TestTheBudgetIsPerAcquisitionNotPerPass:
         assert len(run.changed_files) >= document_count, (
             f"only {len(run.changed_files)} documents were rewritten; the pass "
             "did not exercise the per-document lock at corpus scale"
+        )
+
+        # The premise, pinned rather than assumed. If the pass finishes inside
+        # the budget then a per-pass budget would ALSO have survived it, and
+        # the run above distinguishes nothing. Raise `document_count` when this
+        # fires; do not raise the budget, which is the thing under test.
+        assert pass_seconds > budget_seconds, (
+            f"the pass took {pass_seconds:.1f}s against a {budget_seconds:.0f}s "
+            "budget, so a per-pass budget would have survived it too and this "
+            "test proved nothing. Raise document_count."
         )
 
 
