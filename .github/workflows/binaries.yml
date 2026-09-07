@@ -280,7 +280,7 @@ jobs:
           # to the container path. That is an operator action on that host and
           # is not blocked by anything in this file.
           - name: linux-aarch64
-            runner: [self-hosted, ARM64, Linux]
+            runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             container: quay.io/pypa/manylinux_2_28_aarch64@sha256:29a6ceb78de5b00494e6e7456a72782a4cb54238de102e7491d15fe47789b4d1
           - name: windows-x86_64
