@@ -89,8 +89,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      # actionlint as a NATIVE binary, not `docker://rhysd/actionlint`.
+      #
+      # A `docker://` step is a container action, so it needs the runner
+      # account to reach the docker socket. On this fleet it does not: the
+      # Linux runner's service account is not in the `docker` group, and every
+      # run of this job failed in `Pull down action image` with
+      # `permission denied while trying to connect to the docker API at
+      # unix:///var/run/docker.sock` - before linting a single workflow.
+      #
+      # Granting that group would be a fleet change, and the fleet is declared
+      # elsewhere; a required status check should not depend on a capability
+      # this repository cannot see or assert. The binary needs no daemon, no
+      # socket and no group, which is why `dev.runner.ToolOrDocker` already
+      # prefers it and treats the image as the fallback for hosts that lack it.
+      # This job now matches that order instead of inverting it.
+      #
+      # Pinned to the version the Docker tag named, so what CI runs did not
+      # change - only how it is obtained.
+      - name: Install actionlint
+        uses: taiki-e/install-action@v2
+        with:
+          tool: actionlint@1.7.11
+
       - name: Lint GitHub Actions workflows
-        uses: docker://rhysd/actionlint:1.7.11
+        run: actionlint
 
       # A published binary nobody executes is an untested binary. The
       # acquisition check is the only thing that starts a release asset on a
