@@ -3,9 +3,9 @@ tags:
   - '#adr'
   - '#publisher-identity'
 date: '2026-09-05'
-modified: '2026-09-06'
+modified: '2026-09-07'
 body_schema: 'body-v2'
-body_hash: 'sha256:25e4f9f6f715542efbf38e84fd51389188bd0d23c2b74c6a7d92ccd1616fdef9'
+body_hash: 'sha256:9f33bb3d19e5bf54ef8feaef02d5fee3e49d4cfd390f717ec1a50cc2e99a8d6d'
 related:
   - "[[2026-09-05-publisher-identity-research]]"
   - "[[2026-08-28-binary-portability-adr]]"
@@ -100,6 +100,22 @@ where it was first written. Every attached asset is then re-verified against the
 published record, against the subject set the signing job reports rather than one the
 verifying job derives for itself, which is what distinguishes an attestation that was
 made from one that was merely attempted.
+
+What the signing job attests is narrower than this record first claimed, and the
+narrowing is worth stating because it strengthens the guarantee rather than qualifying
+it. The offline gate that proves each binary starts with the network taken away sits
+between the build and the attestation, and it republishes an artifact under a new name
+only when that proof passes. So the signing job's subjects are the artifacts that gate
+admitted, not everything that compiled: nothing is attested that was not first executed,
+and the bundle a user verifies covers bytes something actually ran. An artifact that
+fails the gate keeps its provisional name, is never a subject, and never reaches the
+release.
+
+The two gates fail differently, and deliberately. A leg that fails the offline proof
+removes only itself and the remaining assets still ship, because a partial release is
+honest where a withheld one is merely quiet. A failed attestation stops the upload
+entirely, because the ordering exists to make an unattested asset impossible rather than
+rare.
 
 One field of the record is knowingly wrong, and is recorded here so it is not later
 rediscovered as a defect. The predicate carries the runner environment of the job that
