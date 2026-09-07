@@ -1,4 +1,4 @@
-<img src="docs/assets/logo.png" width="150" alt="vaultspec-core logo">
+<img src="docs/assets/logo.png" width="150" alt="Vaultspec logo">
 
 # vaultspec-core
 

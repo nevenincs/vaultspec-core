@@ -79,6 +79,8 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
+from dev.binaries.windows_icon import stamp_icon
+
 # Pinned PyApp crate version. Bumping this changes the bootstrapper and the
 # embedded python-build-standalone distributions it selects, so it is an
 # explicit, reviewable dependency rather than "whatever is latest".
@@ -146,6 +148,9 @@ GLIBC_FLOOR: dict[str, tuple[int, ...]] = {
 
 # Section type of the GNU version-requirements table (``.gnu.version_r``).
 SHT_GNU_VERNEED = 0x6FFFFFFE
+
+# Governed multi-frame application icon for every Windows release executable.
+APPLICATION_ICON = Path(__file__).with_name("assets") / "vaultspec.ico"
 
 
 class PlatformFloorError(RuntimeError):
@@ -652,6 +657,17 @@ def check_platform_floor(asset: Path, target: str) -> None:
         )
 
 
+def publish_asset(raw: Path, asset: Path, target: str) -> Path:
+    """Copy, finalize, verify, and checksum one release executable."""
+    shutil.copy2(raw, asset)
+    if target.endswith("windows-msvc"):
+        stamp_icon(asset, APPLICATION_ICON)
+    else:
+        asset.chmod(0o755)
+    check_platform_floor(asset, target)
+    return write_checksum(asset)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group(required=True)
@@ -702,11 +718,7 @@ def main() -> int:
         for binary in BINARIES:
             raw = build_one(binary, version, target, distribution, workdir)
             asset = outdir / asset_name(binary, target)
-            shutil.copy2(raw, asset)
-            if not target.endswith("windows-msvc"):
-                asset.chmod(0o755)
-            check_platform_floor(asset, target)
-            checksum = write_checksum(asset)
+            checksum = publish_asset(raw, asset, target)
             produced.extend((asset, checksum))
             print(f"built {asset} ({asset.stat().st_size} bytes)", flush=True)
 
