@@ -294,10 +294,19 @@ LINT = Verb(
                 ),
             ),
         ),
+        # Two questions about the same artifacts, in the order that answers
+        # them cheapest. actionlint asks whether the YAML is well-formed and
+        # its expressions resolve; the contract asks whether a `run:` step is
+        # calling a recipe or re-implementing one. A workflow can be perfectly
+        # valid YAML and still install actionlint by piping curl into bash,
+        # which is how this repository used to check its own workflows.
         Target(
             "workflow",
-            "Actionlint GitHub workflow checking.",
-            (ToolOrDocker("actionlint", (), "rhysd/actionlint:latest"),),
+            "Lint the workflows, then hold them to the CI/justfile contract.",
+            (
+                uv_run("python", "-m", "dev.actionlint"),
+                uv_run("python", "-m", "dev.ci_contract"),
+            ),
         ),
         Target(
             "complexity",
@@ -784,6 +793,15 @@ CI = Verb(
                 ),
                 Echo("=== tests ==="),
                 Cmd(("uv", "run", "--no-sync", "python", "-m", "dev", "test", "broad")),
+                # BUILD IS PART OF CI. It was not, and the consequence is one
+                # this fleet has measured: a break on the release path
+                # surfaces at release, when the tag is already cut and the
+                # only remedies are a revert or a hotfix release. Every gate
+                # above proves the source is well-formed and the tests pass;
+                # only this one proves the artifact a user receives can still
+                # be produced from it.
+                Echo("=== build ==="),
+                Cmd(("uv", "run", "--no-sync", "python", "-m", "dev", "build", "all")),
             ),
         ),
     ),

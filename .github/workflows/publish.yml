@@ -49,10 +49,15 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
 
-      - name: Install Python
-        run: uv python install 3.13
+      - name: Set up just
+        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        with:
+          tool: just@1.38.0
+
+      - name: Initialize the worktree
+        run: just init
 
       - name: Verify bundled builtins present
         run: |
@@ -62,7 +67,7 @@ jobs:
           fi
 
       - name: Build package
-        run: uv build
+        run: just build-python
 
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v7
@@ -83,7 +88,7 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
 
       - name: Install Python
         run: uv python install 3.13
@@ -131,7 +136,7 @@ jobs:
           path: dist/
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
 
       # ATTESTED BEFORE `uv publish`, because that is the one act in this
       # workflow that cannot be undone. A version pushed to PyPI cannot be

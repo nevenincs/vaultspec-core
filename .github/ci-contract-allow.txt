@@ -1,0 +1,116 @@
+# Steps `dev/ci_contract.py` permits to name a tool, and the reason each does.
+#
+# An entry is `workflow.yml:Step name`, or a bare `workflow.yml` for a lane
+# whose conversion has not started. Every line is a debt with an owner, not a
+# dispensation: the file exists so the unconverted surface is a number someone
+# can burn down instead of a silence.
+
+# --- runner-plane -----------------------------------------------------------
+# Acts on the MACHINE, not the product, so there is no local recipe it could be
+# hiding. `Every matrix selector has an online runner` is the one that matters:
+# ci-fleet OWNS that check (`runners/ci/preflight.sh`, rendered by
+# `fleetctl ci-preflight`), vaultspec-rag and vaultspec-dashboard carry the
+# rendered copy with its BEGIN/END markers, and this is the fleet's last
+# hand-written re-implementation of it. Replacing it with the render is a
+# one-commit change and is the next thing to do here.
+binaries.yml:Every matrix selector has an online runner
+binaries.yml:Return the workspace to the runner's user
+binaries.yml:Clear evidence left by an earlier run on this machine
+binaries.yml:Restore the execute bit
+binaries.yml:Start from an empty artifact directory
+binaries.yml:Drop the downloaded artifacts
+acquisition.yml:Install what acquisition itself needs
+acquisition.yml:Return the workspace to the runner's user
+acquisition.yml:Clean up
+
+# --- CI-plane bookkeeping ---------------------------------------------------
+# Project-board and sentinel automation. It reads and writes GitHub state and
+# has no local meaning at all; `gh` is already permitted, and these differ only
+# in reaching it through a shell conditional.
+add-to-project.yml:Set target date to created_at + 30 days
+main-ci-sentinel.yml:Judge main's tip
+main-ci-sentinel.yml:Open an issue and fail
+main-ci-sentinel.yml:Close the sentinel issue once main is validated again
+release-please.yml:Regenerate and push uv.lock onto the release branch
+release-please.yml:Open a reconciling pull request when the lockfile drifted
+release-please.yml:Dispatch PyPI publish workflow
+release-please.yml:Dispatch binaries build workflow
+binaries.yml:Ask the acquisition check to try this release
+binaries.yml:Promote a repaired release back to latest
+binaries.yml:Require artifacts on the published release
+binaries.yml:Assert every declared target attached
+
+# --- pending ----------------------------------------------------------------
+# `just release-binaries` exists and CI does not call it, because CI passes
+# `--wheel` and the recipe does not take one. That drift is precisely what this
+# contract exists to surface: the recipe a maintainer would reproduce a release
+# with has not built what CI builds since the wheel argument was added. Fix by
+# giving the recipe a `wheel` parameter, then call it here.
+binaries.yml:Build binaries
+binaries.yml:Build the wheel
+binaries.yml:Install Python
+publish.yml:Install Python
+
+# Asserts the built wheel is the version the tag names. vaultspec-a2a asserts
+# the same thing about its own tag with its own copy. Recipe needed:
+# `check-tag-version`.
+binaries.yml:The wheel is the version the tag names
+
+# The distribution smoke check, run by path against a built wheel and sdist.
+# vaultspec-rag and cadrumo carry the same two steps with different spellings.
+# Recipe needed: `test-smoke`.
+publish.yml:Smoke test (wheel)
+publish.yml:Smoke test (sdist)
+publish.yml:Verify bundled builtins present
+
+# The offline gate: three isolation harnesses (network namespace, sandbox,
+# black-holed proxy) proving a published binary starts with no index reachable.
+# ~150 lines of bash that cannot be run anywhere but here. Recipe needed:
+# `test-offline`.
+binaries.yml:Run it with no network at all
+binaries.yml:Run it with the network denied to the process
+binaries.yml:Run it with every route to an index black-holed
+binaries.yml:A check actually ran
+
+# Cross-reads binaries.yml against acquisition.yml so a target that is built is
+# also acquired and gated offline. It parses THIS repository's workflows, which
+# makes it a sibling of `check-workflow` rather than a lane of its own.
+# Recipe needed: `check-release-matrix`.
+ci.yml:Every built Linux target is acquired
+ci.yml:Every built target is gated offline
+
+# Release-plane: checksum aggregation with an inherited-SHA merge (vaultspec-rag
+# carries the same algorithm twice), attestation enumeration and verification,
+# the channel-pointer generate/validate pair, and the tap commit with its
+# push-retry loop. Recipes needed: `release-checksums`, `release-attest`,
+# `release-publish`. `just release-channels` already exists and these two steps
+# should call it, as vaultspec-rag's binaries.yml now does.
+binaries.yml:Aggregate checksums
+binaries.yml:Enumerate the assets to attest
+binaries.yml:Require a gh that can verify attestations
+binaries.yml:Verify the attested assets carry provenance
+binaries.yml:Generate release channel pointers
+binaries.yml:Refuse an uninstallable channel pointer
+binaries.yml:Commit the Scoop manifest and Homebrew formula
+publish.yml:Enumerate the distribution to attest
+publish.yml:Publish to PyPI
+publish.yml:Generate checksums
+publish.yml:Verify the attached distribution carries provenance
+
+# Reports the model identifiers currently pinned, for the agent step below it
+# to reconcile. Recipe needed: `audit-model-pins`.
+model-drift.yml:Report currently pinned identifiers
+
+# Acquisition: download the published binary onto a machine with no checkout,
+# no warm cache and no toolchain, and use it as a new user would. Three OS
+# variants of one lane, ~250 lines. Recipe needed: `test-acquisition`;
+# vaultspec-rag has the same lane in a different shape.
+acquisition.yml:Acquire the published binary
+acquisition.yml:The published binary starts on a machine that has never run it
+acquisition.yml:Use it the way a new user would
+
+# Asserts the resolved interpreter is the one `.python-version` pins.
+# vaultspec-rag carries three copies of the same assertion as Python heredocs.
+# Recipe needed: `check-interpreter`. `just init` hashes `.python-version` into
+# its stamp but does not compare the running interpreter against it.
+ci.yml:Verify the interpreter matches .python-version

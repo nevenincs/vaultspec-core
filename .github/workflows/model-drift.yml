@@ -77,15 +77,17 @@ jobs:
           python-version-file: .python-version
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
 
-      - name: Install just
-        uses: taiki-e/install-action@just
+      - name: Set up just
+        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        with:
+          tool: just@1.38.0
 
-      - name: Install dependencies
-        run: just deps-sync
+      - name: Initialize the worktree
+        run: just init
 
       # Deterministic and free. Printing the pinned values before the agent
       # runs means the run log answers "what did we believe on this date?"

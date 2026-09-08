@@ -44,14 +44,15 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
 
-      - name: Verify uv.lock matches pyproject.toml
-        run: |
-          if ! uv lock --locked; then
-            echo "::error::uv.lock has drifted from pyproject.toml. Every job that installs with --locked will fail until this is fixed. Run 'uv lock' and commit the result."
-            exit 1
-          fi
+      - name: Set up just
+        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        with:
+          tool: just@1.38.0
+
+      - name: The lockfile agrees with pyproject.toml
+        run: just deps-check
 
   # `.python-version` is the single interpreter pin: every job resolves its
   # Python from that file, and `requires-python` bounds the same range. Nothing
@@ -117,25 +118,25 @@ jobs:
       # The checksum is what makes this safe to fetch at job time: the asset is
       # pinned by version AND by content, so a retagged or replaced release
       # fails the gate instead of silently changing what lints the workflows.
-      - name: Install actionlint
-        shell: bash
-        env:
-          ACTIONLINT_VERSION: "1.7.11"
-          ACTIONLINT_SHA256: >-
-            900919a84f2229bac68ca9cd4103ea297abc35e9689ebb842c6e34a3d1b01b0a
-        run: |
-          set -euo pipefail
-          asset="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          url="https://github.com/rhysd/actionlint/releases/download"
-          curl -fsSL -o "${asset}" "${url}/v${ACTIONLINT_VERSION}/${asset}"
-          echo "${ACTIONLINT_SHA256}  ${asset}" | sha256sum --check --strict -
-          tar -xzf "${asset}" actionlint
-          install -m 0755 actionlint "${RUNNER_TEMP}/actionlint"
-          rm -f "${asset}" actionlint
-          echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
+      - name: Set up just
+        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        with:
+          tool: just@1.38.0
 
-      - name: Lint GitHub Actions workflows
-        run: actionlint
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+
+      - name: Initialize the worktree
+        run: just init
+
+      # actionlint AND the CI/justfile contract, both through the recipe. The
+      # pinned download this job used to carry named `linux_amd64` with one
+      # digest; on the ARM64 cell that PASSES its own check - the file really
+      # is the amd64 archive the digest names - and dies at `Exec format
+      # error` one line later. `dev/actionlint.py` pins per architecture and
+      # refuses an unlisted platform, and being a recipe it runs on a laptop.
+      - name: Workflow lint and CI contract (just check-workflow)
+        run: just check-workflow
 
       # A published binary nobody executes is an untested binary. The
       # acquisition check is the only thing that starts a release asset on a
@@ -237,7 +238,7 @@ jobs:
           python-version-file: .python-version
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
 
@@ -251,11 +252,13 @@ jobs:
         with:
           tool: taplo-cli
 
-      - name: Install just
-        uses: taiki-e/install-action@just
+      - name: Set up just
+        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        with:
+          tool: just@1.38.0
 
-      - name: Install dependencies
-        run: just deps-sync
+      - name: Initialize the worktree
+        run: just init
 
       - name: Ruff
         run: just check-python
@@ -322,15 +325,17 @@ jobs:
           python-version-file: .python-version
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
 
-      - name: Install just
-        uses: taiki-e/install-action@just
+      - name: Set up just
+        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        with:
+          tool: just@1.38.0
 
-      - name: Install dependencies
-        run: just deps-sync
+      - name: Initialize the worktree
+        run: just init
 
       # Measurement only - every target exits 0. This is the instrument the
       # earlier health audits lacked: it ranks the worst offenders per
@@ -354,15 +359,17 @@ jobs:
           python-version-file: .python-version
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
 
-      - name: Install just
-        uses: taiki-e/install-action@just
+      - name: Set up just
+        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        with:
+          tool: just@1.38.0
 
-      - name: Install dependencies
-        run: just deps-sync
+      - name: Initialize the worktree
+        run: just init
 
       - name: Run tests
         run: just test-unit
@@ -414,18 +421,20 @@ jobs:
           python-version-file: .python-version
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
 
-      - name: Install just
-        uses: taiki-e/install-action@just
+      - name: Set up just
+        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        with:
+          tool: just@1.38.0
 
-      - name: Install dependencies
+      - name: Initialize the worktree
         # bash is available on the Windows fleet runner via Git Bash; using it
         # on both OSes keeps the just invocation and argument quoting identical.
         shell: bash
-        run: just deps-sync
+        run: just init
 
       - name: Run broad test suite
         shell: bash
@@ -444,15 +453,17 @@ jobs:
           python-version-file: .python-version
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
 
-      - name: Install just
-        uses: taiki-e/install-action@just
+      - name: Set up just
+        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        with:
+          tool: just@1.38.0
 
-      - name: Install dependencies
-        run: just deps-sync
+      - name: Initialize the worktree
+        run: just init
 
       - name: Run vault repair regression tests
         run: just test-vault-repair
@@ -470,15 +481,17 @@ jobs:
           python-version-file: .python-version
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
 
-      - name: Install just
-        uses: taiki-e/install-action@just
+      - name: Set up just
+        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        with:
+          tool: just@1.38.0
 
-      - name: Install dependencies
-        run: just deps-sync
+      - name: Initialize the worktree
+        run: just init
 
       - name: Bootstrap framework
         # The source repo tracks .vaultspec/ framework config, but the install
@@ -506,15 +519,17 @@ jobs:
           python-version-file: .python-version
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
 
-      - name: Install just
-        uses: taiki-e/install-action@just
+      - name: Set up just
+        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        with:
+          tool: just@1.38.0
 
-      - name: Install dependencies
-        run: just deps-sync
+      - name: Initialize the worktree
+        run: just init
 
       - name: Python dependency vulnerability audit
         run: just audit-deps
