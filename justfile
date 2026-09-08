@@ -208,14 +208,20 @@ check-size:
 check-type-strict:
     {{dev}} lint type-strict
 
-# Composed from just dependencies, so this aggregate and the gates it claims to
-# run cannot disagree. FAIL-FAST: the first failing member stops the chain.
+# AGGREGATES RUN EVERY STEP and exit with the first non-zero status; they do
+# not stop at the first failure. An aggregate is asked for a complete picture,
+# and fail-fast costs a CI round-trip per defect. That is why this dispatches
+# into `dev/` rather than listing its members as just dependencies: a
+# dependency chain cannot express run-all-then-report. The membership lives in
+# `dev/toolchain.py` as references to the same targets the individual recipes
+# above run, so this aggregate and those gates cannot disagree.
 # `check-complexity`, `check-nesting` and `check-size` are deliberately NOT
 # members - see the note above them.
 
 # Run every gating static-analysis dimension that holds the line today.
 [group('check')]
-check-all: check-python check-type check-type-platforms check-toml check-links check-markdown check-workflow check-type-strict
+check-all:
+    {{dev}} lint all
 
 # ===========================================================================
 #  fix - MUTATES. Everything automatically repairable, in one pass.
@@ -243,7 +249,8 @@ fix-vault:
 
 # Apply every automatic fix, in one pass.
 [group('fix')]
-fix-all: fix-python fix-toml fix-markdown fix-vault
+fix-all:
+    {{dev}} fix all
 
 # ===========================================================================
 #  audit - ADVISORY, except `audit-deps`, which gates.
@@ -279,7 +286,8 @@ audit-complexity:
 
 # Report every advisory dimension; one red dimension does not hide the rest.
 [group('audit')]
-audit-all: audit-deps audit-security audit-dead-code audit-dependencies audit-complexity
+audit-all:
+    {{dev}} audit all
 
 # MEASUREMENT ONLY - always exits 0. Composes the gates rather than
 # re-implementing any threshold, so the report and the gate cannot disagree.
@@ -337,7 +345,8 @@ test-repo:
 
 # Run every test lane.
 [group('test')]
-test-all: test-broad test-repo test-vault-repair test-harness
+test-all:
+    {{dev}} test all
 
 # ===========================================================================
 #  build
@@ -350,7 +359,8 @@ build-python:
 
 # Build every artifact producible from a plain checkout.
 [group('build')]
-build-all: build-python
+build-all:
+    {{dev}} build all
 
 # ===========================================================================
 #  dev - this checkout's own vaultspec records and harness
@@ -455,7 +465,8 @@ docs-demo:
 
 # Regenerate every committed documentation asset under docs/assets/.
 [group('docs')]
-docs-all: docs-renders docs-demo
+docs-all:
+    {{dev}} docs all
 
 # ===========================================================================
 #  release
