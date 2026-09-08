@@ -53,87 +53,146 @@ def _provider_dir(root: Path, provider: str) -> Path:
     return root / _PROVIDER_DIR[provider]
 
 
-# --- the default install, built once per process ----------------------------
+# --- fresh installs, built once per shape per process ------------------------
 #
-# `install()` is called ~300 times across the suite and the overwhelming
-# majority of those calls are bare: default provider, no upgrade, no force, into
-# an empty directory. Every one of them produced the same 245-file tree, and
-# building it was among the largest single costs in the run.
+# `install()` is called ~300 times across the suite, and a fresh install into an
+# empty directory is a pure function of two arguments: which provider, and which
+# provisioning mode. Everything else about the result comes from the bundled
+# builtins. So each distinct (provider, mode) pair is built once per process and
+# copied thereafter, instead of ~300 real installs producing perhaps five
+# distinct trees between them.
 #
-# So the default shape is built once per process and copied thereafter. The
-# reuse is deliberately narrow, because the equivalence only holds for that
-# shape: any non-default argument, or a destination that already has content in
-# it, takes the real `install_run`. That is what keeps `create_gitignore()
-# .install()` - a real pattern here, and the one GH issue 399 turned on -
-# exercising the product rather than a copy of a different starting state.
+# Keying by shape rather than caching one default matters more than it looks:
+# `install("core")` alone appears 66 times and `install("claude")` 23, and a
+# cache that only served `provider="all"` left every one of them paying full
+# price.
 #
-# Per process, not per session: under xdist each worker builds its own, which
-# is the same trade the session fixtures make.
-_default_install_template: Path | None = None
+# The reuse stays narrow, because the equivalence only holds for a FRESH
+# install. `upgrade`, `force`, `skip` and a destination with anything already in
+# it all take the real `install_run`: their behaviour is a function of what is
+# already on disk, which is exactly what a copied tree would misrepresent. That
+# is what keeps `create_gitignore().install()` - a real pattern here, and the one
+# GH issue 399 turned on - exercising the product rather than a copy of a
+# different starting state.
+#
+# Per process, not per session: under xdist each worker builds its own, which is
+# the same trade the session fixtures make.
+_install_templates: dict[tuple[str, str | None], Path] = {}
+_template_holder: Path | None = None
+
+#: Per template, the relative files that spell out the template's own path.
+#: Discovered once and reused, because the answer cannot change for a tree that
+#: is built once and never written to again.
+_template_self_refs: dict[Path, tuple[str, ...]] = {}
 
 
-def _default_install_source() -> Path:
-    """Return a template directory holding a bare ``install()`` result."""
-    global _default_install_template
-    if _default_install_template is None:
+def _install_template_root() -> Path:
+    """Return the per-process directory the templates are built under."""
+    global _template_holder
+    if _template_holder is None:
         import atexit
         import tempfile
 
+        _template_holder = Path(
+            tempfile.mkdtemp(prefix="vsc-install-template-")
+        ).resolve()
+        atexit.register(shutil.rmtree, _template_holder, ignore_errors=True)
+    return _template_holder
+
+
+def _fresh_install_source(provider: str, mode: InstallMode | None) -> Path:
+    """Return a template holding a fresh ``install()`` of this exact shape."""
+    key = (provider, mode.value if mode is not None else None)
+    template = _install_templates.get(key)
+    if template is None:
         from vaultspec_core.core.commands import install_run
 
-        holder = Path(tempfile.mkdtemp(prefix="vsc-install-template-")).resolve()
-        atexit.register(shutil.rmtree, holder, ignore_errors=True)
-        template = holder / "workspace"
-        template.mkdir()
+        template = _install_template_root() / f"{provider}-{key[1] or 'default'}"
+        template.mkdir(parents=True)
         install_run(
             path=template,
-            provider="all",
+            provider=provider,
             upgrade=False,
             force=False,
             dry_run=False,
             skip=None,
-            mode=None,
+            mode=mode,
         )
-        _default_install_template = template
-    return _default_install_template
+        _install_templates[key] = template
+    return template
 
 
-def rebase_workspace_paths(template: Path, dest: Path) -> None:
-    """Rewrite absolute references to *template* inside *dest* to point at *dest*.
+def _self_referencing_files(template: Path) -> tuple[str, ...]:
+    """Return the template-relative files that record the template's own path.
 
-    An installed workspace records where it lives. ``.vaultspec/mcp-ownership.json``
-    stores the absolute path of every provider config it manages, so a tree
-    copied from a template claims ownership of the template's files - and a test
-    asserting on ownership would pass while describing another directory.
+    Discovered by reading the tree ONCE, when the template is built, and cached
+    for the life of the process. Today the answer is a single file -
+    ``.vaultspec/mcp-ownership.json``, which stores the absolute path of every
+    provider config it manages - but discovering it beats hard-coding it: the
+    day another absolute path is persisted, the reuse would otherwise start
+    handing out stale references with nothing to notice.
 
-    The rewrite is by content rather than by filename on purpose. Hard-coding
-    ``mcp-ownership.json`` would be correct today and silently wrong the first
-    time another absolute path is persisted, which is exactly the failure this
-    reuse is most likely to introduce.  ``test_workspace_template_reuse.py``
-    asserts no reference survives, so the pair fails loudly rather than drifting.
-
-    Args:
-        template: The directory the copy was taken from.
-        dest: The copy, rewritten in place.
+    Doing the discovery per template rather than per clone is the whole point.
+    Scanning 245 files on every one of ~400 clones is ~100,000 reads a run to
+    correct one file, which made the copy cost about what it was saving.
     """
-    # Both separator conventions, because JSON escapes backslashes and TOML and
-    # POSIX hosts do not.
-    replacements = [
-        (str(template), str(dest)),
-        (str(template).replace("\\", "/"), str(dest).replace("\\", "/")),
-        (str(template).replace("\\", "\\\\"), str(dest).replace("\\", "\\\\")),
-    ]
-    for path in dest.rglob("*"):
+    cached = _template_self_refs.get(template)
+    if cached is not None:
+        return cached
+    needles = _path_spellings(template)
+    found: list[str] = []
+    for path in sorted(template.rglob("*")):
         if not path.is_file():
             continue
         try:
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
+        if any(needle in text for needle in needles):
+            found.append(path.relative_to(template).as_posix())
+    result = tuple(found)
+    _template_self_refs[template] = result
+    return result
+
+
+def _path_spellings(path: Path) -> tuple[str, ...]:
+    """Return the ways *path* can appear in a text file.
+
+    JSON escapes backslashes and TOML and POSIX hosts do not, so a Windows path
+    shows up in three forms across an installed tree.
+    """
+    raw = str(path)
+    return (raw, raw.replace("\\", "/"), raw.replace("\\", "\\\\"))
+
+
+def rebase_workspace_paths(template: Path, dest: Path) -> None:
+    """Rewrite absolute references to *template* inside *dest* to point at *dest*.
+
+    An installed workspace records where it lives, so a raw copy claims
+    ownership of the TEMPLATE's files - and a test asserting on ownership would
+    pass while describing a directory it has never heard of.
+
+    Only the files the template itself was found to reference are touched; see
+    :func:`_self_referencing_files` for why that set is discovered once rather
+    than rediscovered per copy. ``test_workspace_template_reuse.py`` asserts no
+    reference survives a clone, so the pair fails loudly rather than drifting.
+
+    Args:
+        template: The directory the copy was taken from.
+        dest: The copy, rewritten in place.
+    """
+    replacements = list(
+        zip(_path_spellings(template), _path_spellings(dest), strict=True)
+    )
+    for relative in _self_referencing_files(template):
+        path = dest / relative
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
         rewritten = text
         for needle, value in replacements:
-            if needle in rewritten:
-                rewritten = rewritten.replace(needle, value)
+            rewritten = rewritten.replace(needle, value)
         if rewritten != text:
             path.write_text(rewritten, encoding="utf-8")
 
@@ -306,23 +365,18 @@ class WorkspaceFactory:
         provisioning mode (``--mode``); ``None`` lets ``install_run`` resolve
         it.
 
-        A bare call into an empty directory is served from a per-process
-        template rather than re-run, because that shape produces a tree
-        identical to the one the last few hundred such calls produced.  Every
-        other shape runs the real thing; see ``_default_install_source``.
+        A FRESH install into an empty directory is served from a per-process
+        template keyed by ``(provider, mode)``, because that result is a pure
+        function of those two arguments.  Everything whose behaviour depends on
+        what is already on disk - ``upgrade``, ``force``, ``skip``, or a
+        destination that is not empty - runs the real thing; see
+        ``_fresh_install_source``.
         """
         from vaultspec_core.core.commands import install_run
 
-        is_default_shape = (
-            provider == "all"
-            and not upgrade
-            and not force
-            and not dry_run
-            and skip is None
-            and mode is None
-        )
-        if is_default_shape and _is_effectively_empty(self.root):
-            template = _default_install_source()
+        is_fresh_shape = not upgrade and not force and not dry_run and skip is None
+        if is_fresh_shape and _is_effectively_empty(self.root):
+            template = _fresh_install_source(provider, mode)
             shutil.copytree(template, self.root, symlinks=True, dirs_exist_ok=True)
             rebase_workspace_paths(template, self.root)
             self._installed = True
