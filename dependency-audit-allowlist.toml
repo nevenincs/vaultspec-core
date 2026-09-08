@@ -1,0 +1,30 @@
+# Accepted dependency advisories.
+#
+# The dependency audit (`dev/audit/dependency_audit.py`) GATES: any published
+# advisory against a pinned version fails it. This file is the only way to
+# accept one, and accepting one is a decision with a shelf life.
+#
+# Every entry MUST carry all three fields. The audit refuses to run against an
+# entry missing any of them, rather than interpreting it generously:
+#
+#   id       the OSV advisory id, or any of its aliases (GHSA-..., CVE-...,
+#            PYSEC-...). Whichever id you write is matched against the
+#            advisory's id and its full alias set.
+#   reason   why this repository tolerates it: no upstream fix, not reachable
+#            from shipped code, dev-only tooling. Name what would make the
+#            entry removable.
+#   expires  a bare TOML date. On the day after it, the audit FAILS on this
+#            entry whether or not the advisory is still present. That is the
+#            point: an acceptance nobody has retaken is not an acceptance.
+#
+# An entry matching nothing in the tree is reported as stale and should be
+# deleted; that is a note, not a failure.
+#
+# Example:
+#
+#   [[suppression]]
+#   id = "GHSA-rrmf-rvhw-rf47"
+#   reason = "torch.jit memory corruption, no fixed release; dev-only tooling, never shipped in the wheel. Remove when a fixed torch lands."
+#   expires = 2026-12-31
+
+# (no advisories are currently accepted)
