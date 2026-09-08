@@ -120,6 +120,8 @@ hand-edit between the markers.
   UTF-8 (detection only).
 - `vaultspec-core vault check feature-rename-integrity` - Surface exec folders whose
   feature disagrees with their records' tag.
+- `vaultspec-core vault check foreign` - Warn about files the framework did not place
+  inside managed roots.
 
 #### Sanitize
 
@@ -280,6 +282,8 @@ hand-edit between the markers.
 - `vaultspec-core spec hooks status` - Report declarative hooks parsing and taxonomy
   compliance status.
 - `vaultspec-core spec hooks run` - Trigger hooks for a specific event.
+- `vaultspec-core spec hooks trust` - Approve this workspace's hooks to run their shell
+  commands as you.
 
 #### Precommit
 
@@ -289,6 +293,20 @@ hand-edit between the markers.
   .pre-commit-config.yaml scaffolding.
 - `vaultspec-core spec precommit migrate` - Transplant the canonical vaultspec hooks
   into prek.toml.
+
+#### Gitignore
+
+- `vaultspec-core spec gitignore disable` - Decline the vaultspec-managed .gitignore
+  block for the whole project.
+- `vaultspec-core spec gitignore enable` - Restore the vaultspec-managed .gitignore
+  block for the whole project.
+
+#### Gitattributes
+
+- `vaultspec-core spec gitattributes disable` - Decline the vaultspec-managed
+  .gitattributes block for the whole project.
+- `vaultspec-core spec gitattributes enable` - Restore the vaultspec-managed
+  .gitattributes block for the whole project.
 
 #### Mcps
 
@@ -765,12 +783,7 @@ Body-content flags on `add` vary by resource: `vaultspec-core spec rules add` ta
 `--template TEXT`; `vaultspec-core spec agents add` takes `--description TEXT`. All
 three also accept `--from-file PATH`. `edit` accepts `--editor CMD` to override the
 editor binary for one invocation; resolution order is `--editor`, project config,
-`$VISUAL`, `$EDITOR` / `VAULTSPEC_EDITOR`, `vi`. The editor command is validated before
-launch: arguments are allowed (`code --wait`), shell metacharacters are not, and a value
-from `--editor` or from the project config must name a recognised editor program. The
-environment variables are not restricted to that set and are the way to use an editor
-the list does not know. No editor is opened for an invocation with no terminal, such as
-one made through the MCP gateway. `status` accepts `--json` and reports
+`$VISUAL`, `$EDITOR` / `VAULTSPEC_EDITOR`, `vi`. `status` accepts `--json` and reports
 the missing, drifted, and stale rows of a prune-enabled dry-run sync.
 
 ### vaultspec-core spec system
@@ -787,10 +800,18 @@ enabled hooks; it takes `--path PATH`. Valid events: `vault.document.created`,
 `config.synced`, `audit.completed`.
 
 The group shares the resource CRUD shape (`list`, `add`, `show`, `edit`, `rename`,
-`remove`, `restore`, `sync`, `status`) plus `run`. `vaultspec-core spec hooks add NAME`
-takes `--event EVENT` (default `vault.document.created`) and `--command CMD` alongside
-the shared `--body`, `--from-file`, `--force`, and `--dry-run` flags; `edit` takes
-`--editor CMD`.
+`remove`, `restore`, `sync`, `status`) plus `run` and `trust`.
+`vaultspec-core spec hooks add NAME` takes `--event EVENT` (default
+`vault.document.created`) and `--command CMD` alongside the shared `--body`,
+`--from-file`, `--force`, and `--dry-run` flags; `edit` takes `--editor CMD`.
+
+A hook names a shell command, and `.vaultspec/hooks/` is shared through git, so a hook
+definition arrives with every clone. No hook runs until an operator approves it, and
+that approval is recorded outside the workspace, under the machine-global VaultSpec
+home, pinned to each file's contents. `vaultspec-core spec hooks trust [NAME]` records
+it and `--revoke` withdraws it; `run` and `sync` offer to record it at an interactive
+terminal and skip the hooks anywhere else. `list` reports each hook's trust state
+alongside its enabled state.
 
 ### vaultspec-core spec precommit
 
@@ -867,7 +888,8 @@ name. | | `VAULTSPEC_CLAUDE_DIR` | str | `.claude` | Claude tool directory name.
 `VAULTSPEC_ANTIGRAVITY_DIR` | str | `.agents` | Antigravity directory name. | |
 `VAULTSPEC_IO_BUFFER_SIZE` | int | `8192` | I/O read buffer size in bytes. | |
 `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int | `1000000` | Subprocess stdout capture limit. |
-| `VAULTSPEC_LOG_LEVEL` | str | `INFO` | Root log level for the CLI. | |
-`VAULTSPEC_EDITOR` | str | `zed -w` | Editor command for resource editing. | |
-`VAULTSPEC_STDIO_WATCHDOG` | str | on | MCP server lifetime watchdog;
+| `VAULTSPEC_LOCK_TIMEOUT_SECONDS` | float | `120.0` | Advisory-lock acquisition budget
+in seconds, both layers combined. | | `VAULTSPEC_LOG_LEVEL` | str | `INFO` | Root log
+level for the CLI. | | `VAULTSPEC_EDITOR` | str | `zed -w` | Editor command for resource
+editing. | | `VAULTSPEC_STDIO_WATCHDOG` | str | on | MCP server lifetime watchdog;
 `0`/`false`/`off`/`no` disables it (EOF-only exit). |

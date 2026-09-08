@@ -12,7 +12,7 @@ import os
 import struct
 import sys
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -97,7 +97,7 @@ def _kernel32() -> Any:
     """Load kernel32 with last-error capture, or reject a non-Windows host."""
     if sys.platform != "win32":
         raise IconResourceError("Windows PE resources can only be updated on Windows")
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel32.BeginUpdateResourceW.argtypes = [
         ctypes.wintypes.LPCWSTR,
         ctypes.wintypes.BOOL,
@@ -141,8 +141,9 @@ def _kernel32() -> Any:
 
 
 def _raise_win32(action: str, path: Path) -> None:
-    code = ctypes.get_last_error()
-    detail = ctypes.FormatError(code).strip()
+    windows_ctypes = cast("Any", ctypes)
+    code = windows_ctypes.get_last_error()
+    detail = windows_ctypes.FormatError(code).strip()
     raise IconResourceError(f"{action} {path} failed: [{code}] {detail}")
 
 

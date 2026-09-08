@@ -54,12 +54,16 @@ def test_parse_ico_rejects_malformed_containers(tmp_path: Path, payload: bytes) 
         parse_ico(icon)
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="requires the Win32 resource API")
 def test_real_pe_stamp_is_exact_and_precedes_checksum(tmp_path: Path) -> None:
-    """A real PE keeps loading after stamping and its checksum binds icon bytes."""
+    """PE stamping works on Windows and rejects unavailable Win32 APIs elsewhere."""
     source = tmp_path / "source.exe"
     executable = tmp_path / "python.exe"
     shutil.copy2(sys.executable, source)
+
+    if sys.platform != "win32":
+        with pytest.raises(IconResourceError, match="Windows PE resources"):
+            publish_asset(source, executable, "x86_64-pc-windows-msvc")
+        return
 
     checksum = publish_asset(source, executable, "x86_64-pc-windows-msvc")
     stamped = executable.read_bytes()
