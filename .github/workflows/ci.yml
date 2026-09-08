@@ -31,202 +31,19 @@ env:
   FORCE_COLOR: "0"
 
 jobs:
-  # Every other job installs with --locked, so a lockfile that has drifted from
-  # pyproject.toml fails all of them at once, inside "Install dependencies",
-  # where the cause is easy to miss. This job isolates that one question and
-  # answers it in seconds, so the drift reads as itself rather than as a
-  # repository-wide outage.
-  lockfile:
-    name: Lockfile In Sync
-    runs-on: [self-hosted, Linux, X64, build]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-
-      - name: Set up just
-        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
-        with:
-          tool: just@1.38.0
-
-      - name: The lockfile agrees with pyproject.toml
-        run: just deps-check
-
-  # `.python-version` is the single interpreter pin: every job resolves its
-  # Python from that file, and `requires-python` bounds the same range. Nothing
-  # enforces that the interpreter actually installed matches it, though - a
-  # setup action that silently falls back to a different minor would leave the
-  # declared pin and the tested interpreter disagreeing, which is exactly the
-  # drift that invalidated venvs across this estate when a host OS upgrade
-  # moved the system interpreter. This job compares the two directly.
-  interpreter-pin:
-    name: Interpreter Matches Pin
-    runs-on: [self-hosted, Linux, X64, build]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version-file: .python-version
-
-      - name: Verify the interpreter matches .python-version
-        run: |
-          pinned="$(tr -d '[:space:]' < .python-version)"
-          actual="$(python -c 'import sys; print("{}.{}".format(*sys.version_info[:2]))')"
-          if [ "$pinned" != "$actual" ]; then
-            echo "::error::Interpreter mismatch: .python-version pins ${pinned} but the resolved interpreter is ${actual}. Every job in this workflow runs on ${actual}, so the declared pin is not what is being tested."
-            exit 1
-          fi
-          echo "Interpreter matches the pin: ${actual}"
-
-  workflow-lint:
-    name: Workflow Lint
-    runs-on: [self-hosted, Linux, X64, build]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      # actionlint as a NATIVE binary, not `docker://rhysd/actionlint`.
-      #
-      # A `docker://` step is a container action, so it needs the runner
-      # account to reach the docker socket. On this fleet it does not: the
-      # Linux runner's service account is not in the `docker` group, and every
-      # run of this job failed in `Pull down action image` with
-      # `permission denied while trying to connect to the docker API at
-      # unix:///var/run/docker.sock` - before linting a single workflow.
-      #
-      # Granting that group would be a fleet change, and the fleet is declared
-      # elsewhere; a required status check should not depend on a capability
-      # this repository cannot see or assert. The binary needs no daemon, no
-      # socket and no group, which is why `dev.runner.ToolOrDocker` already
-      # prefers it and treats the image as the fallback for hosts that lack it.
-      # This job now matches that order instead of inverting it.
-      #
-      # Pinned to the version the Docker tag named, so what CI runs did not
-      # change - only how it is obtained.
-      # Installed from the pinned release asset, verified by checksum.
-      #
-      # `taiki-e/install-action` does not carry actionlint - it silently falls
-      # back to cargo-binstall, which fails with `actionlint is not found`
-      # because actionlint is not a crate. It is a Go binary published as a
-      # release tarball, so it is fetched as one.
-      #
-      # The checksum is what makes this safe to fetch at job time: the asset is
-      # pinned by version AND by content, so a retagged or replaced release
-      # fails the gate instead of silently changing what lints the workflows.
-      - name: Set up just
-        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
-        with:
-          tool: just@1.38.0
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-
-      - name: Initialize the worktree
-        run: just init
-
-      # actionlint AND the CI/justfile contract, both through the recipe. The
-      # pinned download this job used to carry named `linux_amd64` with one
-      # digest; on the ARM64 cell that PASSES its own check - the file really
-      # is the amd64 archive the digest names - and dies at `Exec format
-      # error` one line later. `dev/actionlint.py` pins per architecture and
-      # refuses an unlisted platform, and being a recipe it runs on a laptop.
-      - name: Workflow lint and CI contract (just check-workflow)
-        run: just check-workflow
-
-      # A published binary nobody executes is an untested binary. The
-      # acquisition check is the only thing that starts a release asset on a
-      # machine with no checkout and no toolchain, so a target it does not
-      # cover ships unexercised.
-      #
-      # That is not hypothetical: v0.1.71 attached
-      # vaultspec-core-aarch64-unknown-linux-gnu and the acquisition matrix
-      # still fetched only the x86_64 file. The release guards were already
-      # derived from the build matrix and stayed green, because they assert the
-      # asset EXISTS, not that anything ran it. This seam had no derivation at
-      # all, which is why adding a target quietly left a hole.
-      #
-      # Runs on every pull request rather than at release time, so the branch
-      # that adds a target is the one that goes red.
-      - name: Every built Linux target is acquired
-        shell: bash
-        run: |
-          set -euo pipefail
-          binaries=.github/workflows/binaries.yml
-          acquisition=.github/workflows/acquisition.yml
-          mapfile -t targets < <(
-            awk '/^[[:space:]]+target:[[:space:]]/ {print $2}' "${binaries}" |
-              grep -- '-linux-gnu$' | sort -u
-          )
-          # A derivation that yields nothing would pass every run without
-          # asserting anything. Refuse to run rather than pass vacuously.
-          if [ ${#targets[@]} -eq 0 ]; then
-            echo "::error::No Linux targets found in ${binaries}; the acquisition-coverage assertion cannot run"
-            exit 1
-          fi
-          echo "Derived ${#targets[@]} Linux target(s) from ${binaries}: ${targets[*]}"
-          missing=()
-          for triple in "${targets[@]}"; do
-            grep -qF -- "vaultspec-core-${triple}" "${acquisition}" || missing+=("${triple}")
-          done
-          if [ ${#missing[@]} -ne 0 ]; then
-            echo "::error::${acquisition} acquires no asset for: ${missing[*]}. A target that is built and published must also be executed from the published release."
-            exit 1
-          fi
-          echo "all ${#targets[@]} Linux target(s) are acquired"
-
-      # The offline gate is a SECOND matrix over the same targets, and this
-      # repository has now twice shipped a defect whose whole cause was a list
-      # that had to be edited in lockstep with the build matrix and was not:
-      # the preflight's hand-kept runner selectors, and the release's hand-kept
-      # target expectations (#361/#364). Both were fixed by deriving. The
-      # offline gate cannot be derived - GitHub has no way to share one matrix
-      # between two jobs - so it is asserted instead, here, on every pull
-      # request.
-      #
-      # A target present in `build` and absent from `offline` is the failure
-      # this stops: its artifact would be uploaded as `unverified-*` and never
-      # renamed, so the release would silently lose that platform. A target
-      # present in `offline` and absent from `build` fails its download and
-      # reds the release for no reason.
-      - name: Every built target is gated offline
-        shell: bash
-        run: |
-          set -euo pipefail
-          workflow=.github/workflows/binaries.yml
-          # One job block at a time: `target:` appears in both matrices and a
-          # file-wide grep cannot tell them apart. A job header is a key at two
-          # spaces of indentation, which is the boundary this walks.
-          targets_of() {
-            awk -v want="  $1:" '
-              $0 == want { inside = 1; next }
-              /^  [a-z][a-zA-Z0-9_-]*:[[:space:]]*$/ { inside = 0 }
-              inside && $1 == "target:" { print $2 }
-            ' "${workflow}" | sort -u
-          }
-          mapfile -t built < <(targets_of build)
-          mapfile -t gated < <(targets_of offline)
-          # Neither list may be empty, or this comparison passes vacuously -
-          # including the case where a job was renamed and the awk matches
-          # nothing at all.
-          if [ ${#built[@]} -eq 0 ] || [ ${#gated[@]} -eq 0 ]; then
-            echo "::error::derived ${#built[@]} built and ${#gated[@]} gated target(s) from ${workflow}; a job was renamed or the matrix shape moved, and this assertion cannot run"
-            exit 1
-          fi
-          echo "built:  ${built[*]}"
-          echo "gated:  ${gated[*]}"
-          if [ "${built[*]}" != "${gated[*]}" ]; then
-            echo "::error::the build matrix and the offline gate cover different targets. Every target that is built must be run with the network taken away before it can become a release asset."
-            exit 1
-          fi
-          echo "all ${#built[@]} built target(s) are gated offline"
-
+  # These jobs are deliberately few. The fleet this runs on has ONE Linux
+  # runner and ONE Windows runner, so every job in this workflow executes
+  # SERIALLY on one of two machines and each one re-pays checkout, tool setup
+  # and `just init`. Job granularity buys parallelism on a wide fleet and buys
+  # nothing here, so a check earns a job of its own only when it needs a
+  # different runner or a different OS - never merely to read as its own line
+  # in the status list.
+  #
+  # Three former jobs are steps below for that reason: `Lockfile In Sync`,
+  # `Interpreter Matches Pin`, and `Workflow Lint`. Each took roughly fifteen
+  # seconds of work and a full provisioning cycle to reach it.
   lint-and-type:
-    name: Lint, Type, Config, Link, and Markdown Checks
+    name: Lint, Types, Config, Workflows, and Docs
     runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
@@ -259,6 +76,24 @@ jobs:
 
       - name: Initialize the worktree
         run: just init
+
+      # First, and named, so lockfile drift reads as itself. Every job in this
+      # workflow provisions with `just init`, which installs `--locked`, so a
+      # lockfile that has drifted from pyproject.toml fails all of them at once
+      # inside a provisioning step where the cause is easy to miss. Answering
+      # the question here, as its own step, keeps that diagnosis without
+      # spending a job and a provisioning cycle on it.
+      - name: The lockfile agrees with pyproject.toml
+        run: just deps-check
+
+      # actionlint AND the CI/justfile contract, both through the recipe, and
+      # NOT through `docker://rhysd/actionlint`: a container action needs the
+      # runner account to reach the docker socket, which this fleet's service
+      # account cannot, so every run of it died in `Pull down action image`
+      # before linting a workflow. The pin lives in `dev/actionlint.py`, per
+      # architecture, so a laptop runs the same gate as CI.
+      - name: Workflow lint and CI contract
+        run: just check-workflow
 
       - name: Ruff
         run: just check-python
@@ -346,8 +181,16 @@ jobs:
       - name: Code-health report
         run: just health-fast
 
+  # `just test-unit` is NOT here, and its absence is the point. That lane is
+  # `pytest src/vaultspec_core -m "unit and not repo and not claude"`, and
+  # `broad (linux)` below runs `-m "not repo and not claude"` over the same
+  # path - a strict superset. Every unit test therefore ran twice on the one
+  # Linux runner, once here and once there, for six minutes of serial time
+  # that proved nothing the broad leg did not. What is left is what only this
+  # job runs: the development-instrument guards and the repository-health
+  # guards, neither of which any other lane selects.
   tests:
-    name: Tests
+    name: Harness and Repository Guards
     runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
@@ -371,9 +214,6 @@ jobs:
       - name: Initialize the worktree
         run: just init
 
-      - name: Run tests
-        run: just test-unit
-
       - name: Run development harness guards
         run: just test-harness
 
@@ -389,15 +229,21 @@ jobs:
 
   broad-tests:
     name: broad (${{ matrix.name }})
-    # The required "Tests" gate above is marker-scoped to `unit`, which hides the
-    # much larger integration/behavioural suite. This job runs the full suite
+    # THE library gate, and the only one: this job runs the whole package suite
     # (excluding only the `claude` marker, which needs that CLI installed) on
-    # BOTH Linux and Windows, so a green CI no longer implies
-    # "every test passed" when only the unit slice ran on a single OS - and so
-    # platform-specific test hardcodes are caught automatically. Both fleet
+    # BOTH Linux and Windows, so "green" means green on every platform rather
+    # than green for whichever slice one OS happened to select. Both fleet
     # runners are symlink-capable, so the symlink-requiring filesystem tests run
-    # in full. This is a required status check on both legs: a failure on either
-    # OS blocks the merge, so "green" means green on every platform.
+    # in full. Required on both legs: a failure on either OS blocks the merge.
+    #
+    # It also subsumes two lanes that used to have jobs of their own. `unit` is
+    # a marker-scoped slice of this same selection over this same path. The
+    # `vault-repair` cohort is two files - `tests/cli/test_vault_repair.py` and
+    # `vaultcore/checks/tests/test_structure_case_rename.py` - both marked
+    # `unit` and both under `src/vaultspec_core`, so the Windows leg here has
+    # always collected them. The dedicated `Windows Vault Repair Tests` job
+    # re-ran them on the one Windows runner this leg was already occupying,
+    # which on a serial fleet is not redundancy but delay.
     #
     # The leg carries its own display name because `runs-on` is now a label
     # SET rather than a single image string, and a joined label array reads
@@ -439,34 +285,6 @@ jobs:
       - name: Run broad test suite
         shell: bash
         run: just test-broad
-
-  windows-vault-repair:
-    name: Windows Vault Repair Tests
-    runs-on: [self-hosted, Windows, X64]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version-file: .python-version
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        with:
-          enable-cache: true
-
-      - name: Set up just
-        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
-        with:
-          tool: just@1.38.0
-
-      - name: Initialize the worktree
-        run: just init
-
-      - name: Run vault repair regression tests
-        run: just test-vault-repair
 
   vault-audit:
     name: Vault Audit

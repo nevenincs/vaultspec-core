@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import ast
 import re
+import sys
 import tomllib
 from pathlib import Path
 from typing import TypedDict, cast, get_args
@@ -652,14 +653,37 @@ def test_ty_pre_commit_scope_matches_dev_toolchain_scope() -> None:
     )
 
 
+def test_the_running_interpreter_matches_the_pin() -> None:
+    """The interpreter this suite runs on is the one ``.python-version`` pins.
+
+    ``.python-version`` is the single interpreter pin: every CI job resolves
+    its Python from that file and ``requires-python`` bounds the same range.
+    Nothing enforced that the interpreter actually RESOLVED matched it, and a
+    setup step silently falling back to a different minor would leave the
+    declared pin and the tested interpreter disagreeing - the drift that
+    invalidated venvs across this estate when a host OS upgrade moved the
+    system interpreter.
+
+    This was a CI job of its own, which meant it answered the question about a
+    runner rather than about a test run, and only on the one platform that job
+    ran on. Asserted here it holds wherever the suite executes - every CI lane,
+    both operating systems, and a contributor's laptop - and costs no job.
+    """
+    pinned = (ROOT / ".python-version").read_text(encoding="utf-8").strip()
+    actual = f"{sys.version_info.major}.{sys.version_info.minor}"
+    assert pinned == actual, (
+        f".python-version pins {pinned} but this suite is running on {actual}. "
+        "The declared pin is not what is being tested."
+    )
+
+
 def test_ci_workflow_calls_just_for_quality_gates() -> None:
     ci = _load_workflow(".github/workflows/ci.yml")
     jobs = ci["jobs"]
     required_jobs = {
-        "workflow-lint",
         "lint-and-type",
         "tests",
-        "windows-vault-repair",
+        "broad-tests",
         "vault-audit",
         "dependency-audit",
     }
@@ -674,6 +698,12 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
         # list stops the step itself from being removed next.
         "lint-and-type": {
             "just init",
+            # Folded in from jobs of their own. On a fleet of one Linux runner
+            # every job is serial, so a fifteen-second check in its own job
+            # costs a whole provisioning cycle to reach. They are pinned here
+            # so folding them in cannot become dropping them.
+            "just deps-check",
+            "just check-workflow",
             "just check-python",
             "just check-type",
             "just check-type-platforms",
@@ -685,18 +715,24 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
             "just check-size",
             "just check-type-strict",
         },
-        # `harness` and `repo` are pinned alongside `unit` because the lesson
-        # that produced them was a lane no CI job named: the guards it ran went
-        # unobserved and one of them had been failing undetected. Naming all
-        # three here means removing a CI step fails this guard rather than
-        # silently shrinking what "green" covers.
+        # `harness` and `repo` are pinned because the lesson that produced
+        # them was a lane no CI job named: the guards it ran went unobserved
+        # and one of them had been failing undetected. Naming both here means
+        # removing a CI step fails this guard rather than silently shrinking
+        # what "green" covers.
+        #
+        # `unit` and `vault-repair` are deliberately NOT pinned here. Both are
+        # subsets of what `broad-tests` selects - `unit` by marker over the
+        # same path, `vault-repair` as two `unit`-marked files under it - so a
+        # step naming either re-ran work the broad legs had already done. The
+        # coverage they stood for is pinned below, on the job that actually
+        # provides it.
         "tests": {
             "just init",
-            "just test-unit",
             "just test-harness",
             "just test-repo",
         },
-        "windows-vault-repair": {"just init", "just test-vault-repair"},
+        "broad-tests": {"just init", "just test-broad"},
         "vault-audit": {
             "just init",
             "just framework-install",
@@ -717,11 +753,23 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
         # job needs" drift, and the one that drifts is the one nobody reads.
         # This job previously ran `just deps-sync`, which provisioned less
         # than `init` does and less than the gates below it assume.
+        # Named MUTATING recipes rather than the `just deps-` prefix. The
+        # prefix also caught `deps-check`, which resolves nothing and installs
+        # nothing - it only reports whether the lockfile agrees with
+        # pyproject.toml - so the rule that exists to stop a second definition
+        # of "the environment this job needs" was also barring the read-only
+        # question about it.
+        mutating_deps = {
+            "just deps-sync",
+            "just deps-upgrade",
+            "just deps-lock",
+            "just deps-lock-upgrade",
+        }
         provisioning = {
             command
             for command in run_commands
             if command.split()[0] in {"uv", "npm", "pip", "pipx"}
-            or command.startswith("just deps-")
+            or command in mutating_deps
         }
         assert not provisioning, (
             f"Job {job_name} provisions outside `just init`: {sorted(provisioning)}"
@@ -755,12 +803,15 @@ def test_ci_workflow_lints_workflows_through_the_pinned_recipe() -> None:
     different tool arriving under the same name.
     """
     ci = _load_workflow(".github/workflows/ci.yml")
-    steps = ci["jobs"]["workflow-lint"]["steps"]
+    # The gate is a STEP of `lint-and-type` now, not a job. What this guard
+    # holds is unchanged - the dispatch is by recipe and the pin lives in
+    # `dev/` - but a job of its own bought nothing on a one-runner fleet.
+    steps = ci["jobs"]["lint-and-type"]["steps"]
 
     run_commands = {step["run"].strip() for step in steps if "run" in step}
     assert "just check-workflow" in run_commands, (
-        "workflow-lint must dispatch through the recipe; a gate re-listed in "
-        f"YAML cannot be proven to match the gate. Runs: {sorted(run_commands)}"
+        "workflow linting must dispatch through the recipe; a gate re-listed "
+        f"in YAML cannot be proven to match the gate. Runs: {sorted(run_commands)}"
     )
     assert not any(command.startswith("actionlint") for command in run_commands), (
         "actionlint is invoked BY the recipe, not beside it - a second caller "
