@@ -63,8 +63,11 @@ import sys
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlsplit
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 #: See the module docstring: these mirror ``dev/exit_codes.py`` (lane L9).
 EXIT_OK = 0
@@ -106,6 +109,43 @@ _MAX_DEPTH = 4
 
 class AuditError(Exception):
     """The audit could not be completed. Never a pass."""
+
+
+# --------------------------------------------------------------------------
+# decoding
+# --------------------------------------------------------------------------
+#
+# Lockfiles and OSV responses are foreign data: a decoder hands back
+# ``Any``, and every field this gate reads is whatever the file or the
+# service happened to put there. These four coercions are the only place
+# that shape is asserted, so the readers below state what they expect and
+# a surprise degrades one field rather than raising mid-audit -- which for
+# a gate that fails closed would read as a broken audit rather than the
+# clean tree it may well be.
+
+
+def _as_map(value: object) -> dict[str, object] | None:
+    """Return *value* as a string-keyed mapping, or None when it is not one."""
+    if not isinstance(value, dict):
+        return None
+    return {str(key): item for key, item in cast("dict[object, object]", value).items()}
+
+
+def _as_list(value: object) -> list[object]:
+    """Return *value* as a list, or an empty list when it is not one."""
+    if not isinstance(value, list):
+        return []
+    return cast("list[object]", value)
+
+
+def _as_text(value: object) -> str:
+    """Return *value* when it is a string, else the empty string."""
+    return value if isinstance(value, str) else ""
+
+
+def _as_text_list(value: object) -> list[str]:
+    """Return the strings in *value*, dropping anything else."""
+    return [item for item in _as_list(value) if isinstance(item, str)]
 
 
 # --------------------------------------------------------------------------
@@ -174,29 +214,34 @@ def _read_uv_lock(path: Path) -> list[Coordinate]:
 
 def _read_package_lock(path: Path) -> list[Coordinate]:
     """Return every version pinned by an npm ``package-lock.json``."""
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = _as_map(json.loads(path.read_text(encoding="utf-8"))) or {}
     rel = path.relative_to(REPO_ROOT).as_posix()
     out: list[Coordinate] = []
-    packages = data.get("packages")
-    if isinstance(packages, dict):
-        for key, entry in packages.items():
-            if not key or not isinstance(entry, dict):
+    packages = _as_map(data.get("packages"))
+    if packages is not None:
+        for key, raw_entry in packages.items():
+            entry = _as_map(raw_entry)
+            if not key or entry is None:
                 continue  # "" is the root project itself.
-            name = entry.get("name") or key.rsplit("node_modules/", 1)[-1]
-            version = entry.get("version")
+            name = _as_text(entry.get("name")) or key.rsplit("node_modules/", 1)[-1]
+            version = _as_text(entry.get("version"))
             if name and version and not entry.get("link"):
                 out.append(Coordinate("npm", name, version, rel))
     else:  # lockfileVersion 1
 
-        def recurse(deps: dict[str, Any]) -> None:
-            for name, entry in deps.items():
-                if isinstance(entry, dict) and entry.get("version"):
-                    out.append(Coordinate("npm", name, entry["version"], rel))
-                    nested = entry.get("dependencies")
-                    if isinstance(nested, dict):
+        def recurse(deps: dict[str, object]) -> None:
+            for name, raw_entry in deps.items():
+                entry = _as_map(raw_entry)
+                if entry is None:
+                    continue
+                version = _as_text(entry.get("version"))
+                if version:
+                    out.append(Coordinate("npm", name, version, rel))
+                    nested = _as_map(entry.get("dependencies"))
+                    if nested is not None:
                         recurse(nested)
 
-        recurse(data.get("dependencies") or {})
+        recurse(_as_map(data.get("dependencies")) or {})
     return out
 
 
@@ -323,7 +368,7 @@ def load_suppressions(path: Path = ALLOWLIST_PATH) -> list[Suppression]:
 # --------------------------------------------------------------------------
 
 
-def _open(url: str, body: bytes | None) -> dict[str, Any]:
+def _open(url: str, body: bytes | None) -> dict[str, object]:
     """Fetch ``url`` over HTTPS and return the decoded JSON response.
 
     Speaks HTTPS directly rather than going through ``urllib.request``: the
@@ -348,17 +393,20 @@ def _open(url: str, body: bytes | None) -> dict[str, Any]:
         payload = response.read()
         if response.status != 200:
             raise AuditError(f"{url} returned HTTP {response.status}")
-        return json.loads(payload)
+        decoded = _as_map(json.loads(payload))
+        if decoded is None:
+            raise AuditError(f"{url} returned JSON that is not an object")
+        return decoded
     finally:
         connection.close()
 
 
-def _post_json(url: str, payload: dict[str, Any]) -> dict[str, Any]:
+def _post_json(url: str, payload: dict[str, object]) -> dict[str, object]:
     """POST ``payload`` as JSON and return the decoded response."""
     return _open(url, json.dumps(payload).encode("utf-8"))
 
 
-def _get_json(url: str) -> dict[str, Any]:
+def _get_json(url: str) -> dict[str, object]:
     """GET ``url`` and return the decoded JSON response."""
     return _open(url, None)
 
@@ -372,7 +420,7 @@ def query_osv(coordinates: list[Coordinate]) -> dict[str, set[Coordinate]]:
     hits: dict[str, set[Coordinate]] = {}
     for start in range(0, len(coordinates), _OSV_BATCH_LIMIT):
         chunk = coordinates[start : start + _OSV_BATCH_LIMIT]
-        payload = {
+        payload: dict[str, object] = {
             "queries": [
                 {
                     "package": {"ecosystem": c.ecosystem, "name": c.name},
@@ -385,16 +433,18 @@ def query_osv(coordinates: list[Coordinate]) -> dict[str, set[Coordinate]]:
             response = _post_json(_OSV_QUERYBATCH, payload)
         except (AuditError, OSError, ValueError) as error:
             raise AuditError(f"OSV is unreachable: {error}") from error
-        results = response.get("results", [])
-        for coord, result in zip(chunk, results, strict=False):
-            for vuln in (result or {}).get("vulns", ()):
-                identifier = vuln.get("id")
+        results = _as_list(response.get("results"))
+        for coord, raw_result in zip(chunk, results, strict=False):
+            result = _as_map(raw_result) or {}
+            for raw_vuln in _as_list(result.get("vulns")):
+                vuln = _as_map(raw_vuln) or {}
+                identifier = _as_text(vuln.get("id"))
                 if identifier:
                     hits.setdefault(identifier, set()).add(coord)
     return hits
 
 
-def describe(identifier: str) -> dict[str, Any]:
+def describe(identifier: str) -> dict[str, object]:
     """Return the advisory's summary, aliases and severity, best-effort.
 
     A description that cannot be fetched degrades the report, never the
@@ -405,14 +455,13 @@ def describe(identifier: str) -> dict[str, Any]:
     except (AuditError, OSError, ValueError):
         # Detail is a nicety; the advisory id alone carries the verdict.
         return {"summary": "", "aliases": [], "severity": ""}
-    text = (record.get("summary") or record.get("details") or "").strip()
+    text = (_as_text(record.get("summary")) or _as_text(record.get("details"))).strip()
     summary = text.splitlines()[0][:200] if text else ""
-    specific = record.get("database_specific") or {}
-    severity = str(specific.get("severity") or "") if isinstance(specific, dict) else ""
+    specific = _as_map(record.get("database_specific")) or {}
     return {
         "summary": summary,
-        "aliases": sorted(record.get("aliases") or []),
-        "severity": severity,
+        "aliases": sorted(_as_text_list(record.get("aliases"))),
+        "severity": _as_text(specific.get("severity")),
     }
 
 
@@ -497,7 +546,7 @@ def build_report(
     suppressions: list[Suppression],
     *,
     today: _dt.date,
-    describe_fn: Any = describe,
+    describe_fn: Callable[[str], dict[str, object]] = describe,
 ) -> Report:
     """Turn a raw OSV result into the audit's verdict.
 
@@ -522,7 +571,7 @@ def build_report(
         if identifier in seen_ids:
             continue
         detail = describe_fn(identifier)
-        aliases = list(detail.get("aliases") or [])
+        aliases = _as_text_list(detail.get("aliases"))
         seen_ids.add(identifier)
         seen_ids.update(aliases)
         covering = None
@@ -539,8 +588,8 @@ def build_report(
             Finding(
                 id=identifier,
                 aliases=aliases,
-                summary=detail.get("summary", ""),
-                severity=detail.get("severity", ""),
+                summary=_as_text(detail.get("summary")),
+                severity=_as_text(detail.get("severity")),
                 packages=[f"{c.name} {c.version}" for c in affected],
                 surfaces=sorted({c.surface for c in affected}),
                 suppressed_by=covering,

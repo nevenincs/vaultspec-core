@@ -27,7 +27,7 @@ import hashlib
 import json
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, cast
 
 from dev.init.contract import CONTRACT_VERSION
 
@@ -161,17 +161,21 @@ def read(repo_root: Path) -> dict[str, str]:
     """
     path = stamp_path(repo_root)
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        decoded: object = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    if not isinstance(payload, dict):
+    if not isinstance(decoded, dict):
         return {}
+    payload = cast("dict[str, object]", decoded)
     if payload.get("contract_version") != CONTRACT_VERSION:
         return {}
     phases = payload.get("phases")
     if not isinstance(phases, dict):
         return {}
-    return {str(key): str(value) for key, value in phases.items()}
+    return {
+        str(key): str(value)
+        for key, value in cast("dict[object, object]", phases).items()
+    }
 
 
 def write(repo_root: Path, digests: dict[str, str]) -> None:

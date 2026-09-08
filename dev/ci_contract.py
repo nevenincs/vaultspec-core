@@ -46,6 +46,7 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
+from typing import override
 
 #: The one `just` version the whole fleet installs. See rule 3 above.
 JUST_VERSION = "1.38.0"
@@ -91,6 +92,7 @@ class Finding:
         self.rule = rule
         self.detail = detail
 
+    @override
     def __str__(self) -> str:
         """Render the finding in the `path:line: [rule] detail` form."""
         return f"{self.path.as_posix()}:{self.line}: [{self.rule}] {self.detail}"
