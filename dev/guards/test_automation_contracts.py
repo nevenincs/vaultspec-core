@@ -673,7 +673,7 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
         # promoted by removing its `continue-on-error` key; nothing but this
         # list stops the step itself from being removed next.
         "lint-and-type": {
-            "just deps-sync",
+            "just init",
             "just check-python",
             "just check-type",
             "just check-type-platforms",
@@ -691,18 +691,18 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
         # three here means removing a CI step fails this guard rather than
         # silently shrinking what "green" covers.
         "tests": {
-            "just deps-sync",
+            "just init",
             "just test-unit",
             "just test-harness",
             "just test-repo",
         },
-        "windows-vault-repair": {"just deps-sync", "just test-vault-repair"},
+        "windows-vault-repair": {"just init", "just test-vault-repair"},
         "vault-audit": {
-            "just deps-sync",
+            "just init",
             "just framework-install",
             "just vault-check",
         },
-        "dependency-audit": {"just deps-sync", "just audit-deps"},
+        "dependency-audit": {"just init", "just audit-deps"},
     }
 
     for job_name, expected in expected_runs.items():
@@ -711,55 +711,105 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
         missing = [cmd for cmd in sorted(expected) if cmd not in run_commands]
         assert not missing, f"Job {job_name} missing just commands: {missing}"
 
+        # `just init` is the ONE provisioning entry point, so a second
+        # provisioning command beside it is the defect rather than a
+        # belt-and-braces addition: two definitions of "the environment this
+        # job needs" drift, and the one that drifts is the one nobody reads.
+        # This job previously ran `just deps-sync`, which provisioned less
+        # than `init` does and less than the gates below it assume.
+        provisioning = {
+            command
+            for command in run_commands
+            if command.split()[0] in {"uv", "npm", "pip", "pipx"}
+            or command.startswith("just deps-")
+        }
+        assert not provisioning, (
+            f"Job {job_name} provisions outside `just init`: {sorted(provisioning)}"
+        )
 
-def test_ci_workflow_uses_actionlint() -> None:
-    """The workflow gate runs actionlint, from a pinned NATIVE binary.
 
-    It used to assert the `docker://rhysd/actionlint:` container action, which
-    made a required status check depend on the runner account being able to
-    reach the docker socket. On the self-hosted fleet it cannot, and the job
-    failed in `Pull down action image` without linting anything.
+def test_ci_workflow_lints_workflows_through_the_pinned_recipe() -> None:
+    """Workflow linting is dispatched by recipe, and the pin lives in `dev/`.
 
-    So the assertion is on what must be true - actionlint runs, at a pinned
-    version - rather than on the transport. Pinning stays enforced because an
-    unpinned tool is a silent version drift in a gate; the daemon requirement
-    does not, because `dev.runner.ToolOrDocker` already treats the image as
-    the fallback for hosts without the binary rather than the other way round.
+    This has now been wrong in three different ways, and each rewrite of this
+    guard records the one it closed.
+
+    It first asserted `docker://rhysd/actionlint:`, which made a required check
+    depend on the runner account reaching the docker socket. On the
+    self-hosted fleet it cannot, and the job failed in `Pull down action image`
+    having linted nothing.
+
+    It then asserted a hand-written download step here in the workflow, pinned
+    by version and by digest. That was right about the property and wrong
+    about the location: the digest named `linux_amd64` unconditionally, so on
+    the ARM64 cell it PASSED - the file really is the amd64 archive the digest
+    names - and died at `Exec format error` one line later. A verification that
+    reports success while handing back an unusable binary is worse than none.
+
+    What holds now: the job calls `just check-workflow`, and the pin lives in
+    `dev/actionlint.py` where a developer runs the same gate before pushing.
+    So this asserts the DISPATCH here and the PIN there, and forbids the two
+    acquisition routes that have already failed - plus a third that would:
+    `taiki-e/install-action` is the fleet's `just` installer, but actionlint is
+    a Go binary and that action falls back to cargo-binstall for it, which is a
+    different tool arriving under the same name.
     """
     ci = _load_workflow(".github/workflows/ci.yml")
-    jobs = ci["jobs"]
-    steps = jobs["workflow-lint"]["steps"]
-
-    install = next(
-        (step for step in steps if step.get("name") == "Install actionlint"),
-        None,
-    )
-    assert install is not None, "workflow-lint must install actionlint"
-
-    pins = install.get("env", {})
-    assert "ACTIONLINT_VERSION" in pins, (
-        "the actionlint version must be pinned; an unpinned tool in a gate is "
-        "silent version drift"
-    )
-    assert len(pins.get("ACTIONLINT_SHA256", "").strip()) == _SHA256_HEX_LENGTH, (
-        "the actionlint asset must be pinned by content as well as by version, "
-        "so a retagged or replaced release fails the gate rather than quietly "
-        "changing what lints these workflows"
-    )
+    steps = ci["jobs"]["workflow-lint"]["steps"]
 
     run_commands = {step["run"].strip() for step in steps if "run" in step}
-    assert "actionlint" in run_commands, (
-        f"workflow-lint must invoke actionlint; runs {run_commands}"
+    assert "just check-workflow" in run_commands, (
+        "workflow-lint must dispatch through the recipe; a gate re-listed in "
+        f"YAML cannot be proven to match the gate. Runs: {sorted(run_commands)}"
     )
-    assert any("sha256sum --check" in cmd for cmd in run_commands), (
-        "the pinned checksum must actually be verified, not merely declared"
+    assert not any(command.startswith("actionlint") for command in run_commands), (
+        "actionlint is invoked BY the recipe, not beside it - a second caller "
+        "is a second set of flags, and the flags are what the gate checks"
     )
 
     used_actions = {step.get("uses", "") for step in steps}
-    assert not any(a.startswith("docker://") for a in used_actions), (
+    assert not any(action.startswith("docker://") for action in used_actions), (
         "a container action reintroduces the docker-socket dependency that "
         "this gate cannot satisfy on the self-hosted fleet"
     )
+    assert not any("actionlint" in action for action in used_actions), (
+        "actionlint must not arrive from a marketplace action: the fleet's "
+        "installer action falls back to cargo-binstall for a Go binary, which "
+        "silently substitutes a different tool"
+    )
+
+    # The pin, at its new home. Per ARCHITECTURE, because a single digest is
+    # what let an amd64 archive pass its own check on an ARM runner.
+    from dev import actionlint
+
+    assert actionlint.VERSION, "actionlint must be pinned to a version"
+    assert actionlint.ARCHIVES, "actionlint must pin at least one platform"
+    # The architecture token upstream uses, per machine this fleet runs on.
+    # Named here rather than derived from the entry being checked: deriving it
+    # from `suffix` would make the assertion agree with whatever the table
+    # says, which is how a guard passes over the defect it exists to catch.
+    upstream_arch = {"x86_64": "amd64", "aarch64": "arm64", "arm64": "arm64"}
+    for (system, machine), (suffix, digest) in actionlint.ARCHIVES.items():
+        assert system in suffix, (
+            f"the {system}/{machine} entry names archive {suffix!r}, which is "
+            "not that operating system's"
+        )
+        expected_arch = upstream_arch.get(machine)
+        assert expected_arch is not None, (
+            f"{machine} has no known upstream architecture token; add it here "
+            "rather than letting the entry go unchecked"
+        )
+        assert f"_{expected_arch}" in suffix, (
+            f"the {system}/{machine} entry names archive {suffix!r}, which is "
+            "a different architecture's. This is the amd64-on-ARM failure "
+            "exactly: the digest matches, so the download PASSES, and the "
+            "binary dies at `Exec format error` one line later"
+        )
+        assert len(digest) == _SHA256_HEX_LENGTH, (
+            f"the {system}/{machine} archive must be pinned by content as well "
+            "as by version, so a retagged release fails the gate rather than "
+            "quietly changing what lints these workflows"
+        )
 
 
 def test_ci_workflow_installs_native_lint_tools() -> None:
