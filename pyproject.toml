@@ -133,9 +133,41 @@ packages = ["src/vaultspec_core"]
 # has no other gate, and without this a `@pytest.mark.claude` test shells out
 # to a real external CLI on every default run. Kept in sync by hand with
 # `dev.toolchain.EXCLUDED_MARKERS`, which a repo guard cross-checks.
-addopts = "-m 'not benchmark and not claude'"
+#
+# The reporting flags beside it are the fleet-standard set, stated once here
+# rather than retyped on every `just test` lane: a lane passes only what
+# SELECTS it - paths, markers, `-x` - never how pytest reports.
+#
+# `-ra` is the load-bearing entry. pytest's default `-r` value is `fE`, so a
+# run reports failures and errors and stays SILENT about skips; under `-q`
+# that makes a lane which skipped everything it was meant to run read exactly
+# like a lane that passed. `-ra` names every non-passing outcome and its
+# reason.
+#
+# `--strict-markers` and `--strict-config` turn a typo into an error rather
+# than a silent empty selection: an unregistered marker in a `-m` expression
+# otherwise selects nothing and exits 5, which reads like a clean pass.
+#
+# `--capture=sys` avoids pytest's fd-level dup2 capture, which dies silently
+# under Git Bash / MinTTY; sys-level capture replaces sys.stdout/stderr in
+# memory only.
+addopts = [
+  "-m",
+  "not benchmark and not claude",
+  "-ra",
+  "--tb=short",
+  "--durations=10",
+  "--strict-markers",
+  "--strict-config",
+  "--capture=sys",
+]
 asyncio_mode = "auto"
-log_cli = true
+# log_cli is opt-in, not a default: every module logger streaming live into
+# every run buries the pass/fail signal in noise, and failing-test log capture
+# (pytest's own default) already surfaces diagnostics without it. Opt in with
+# `-o log_cli=true` (add `-o log_cli_level=DEBUG` to raise the level) when
+# debugging a specific run; the format below still applies once enabled.
+log_cli = false
 log_cli_date_format = "%H:%M:%S"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s: %(message)s"
 log_cli_level = "INFO"
@@ -203,6 +235,11 @@ markers = [
 testpaths = ["dev", "docs", "src"]
 timeout = 300
 timeout_func_only = true
+# Drop a test's `tmp_path` as soon as that test PASSES and keep it when it
+# fails, which is where triage actually looks. Retained session directories
+# otherwise accrue for as long as pytest's own 72-hour rotation lock allows.
+tmp_path_retention_count = 1
+tmp_path_retention_policy = "failed"
 
 [tool.ruff]
 line-length = 88
