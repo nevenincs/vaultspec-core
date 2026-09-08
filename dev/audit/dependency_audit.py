@@ -28,9 +28,13 @@ of anybody's exit code. Consequences that are deliberate:
 
 Exit codes
 ----------
-``0`` clean, ``1`` findings (or an expired suppression), ``2`` the audit could
-not complete. Only ``0`` is a pass. (Lane L9 owns the fleet-wide exit-code
-contract for every other verb; this gate needs only the pass/fail distinction.)
+``0`` clean, ``1`` findings (or an expired suppression), ``7`` the audit could
+not complete. Only ``0`` is a pass. The numbers are lane L9's fleet-wide
+contract (``dev/exit_codes.py``): ``OK``, ``FAILED``, and the "the scanner did
+not actually run" code -- used here on a GATING target because a gate that
+could not run must not be readable either as a pass or as a finding. The values
+are restated rather than imported so this file stays standalone and stdlib-only
+in every repository.
 
 Output
 ------
@@ -62,9 +66,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+#: See the module docstring: these mirror ``dev/exit_codes.py`` (lane L9).
 EXIT_OK = 0
 EXIT_FINDINGS = 1
-EXIT_BROKEN = 2
+EXIT_BROKEN = 7
 
 _OSV_QUERYBATCH = "https://api.osv.dev/v1/querybatch"
 _OSV_VULN = "https://api.osv.dev/v1/vulns/"

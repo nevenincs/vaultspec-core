@@ -8,8 +8,14 @@ Usage::
 
 Exit codes are the point of this module: a gating target propagates the exit
 code of whichever step failed, so ``just`` and CI both see the real result. An
-advisory target reports its findings and exits 0 regardless, because a scan
-that yields leads rather than verdicts must not gate a build.
+advisory target suppresses its FINDINGS - and only its findings - because a
+scan that yields leads rather than verdicts must not gate a build. A tool that
+failed to RUN is a different event and always propagates, as
+:data:`~dev.exit_codes.ADVISORY_BROKEN`: "reported nothing" is not "found
+nothing".
+
+``dev/EXIT-CODES.md`` is the canonical statement of the contract and
+``dev/exit_codes.py`` its machine-readable form.
 """
 
 from __future__ import annotations
@@ -18,6 +24,7 @@ import sys
 import textwrap
 from typing import assert_never
 
+from dev.exit_codes import advisory_result, selection_result
 from dev.runner import Cmd, Echo, Ref, ToolOrDocker, run, run_tool_or_docker
 from dev.toolchain import (
     DEFAULTS,
@@ -72,7 +79,8 @@ def _execute(verb: Verb, target: Target) -> int:
         target: The target to execute.
 
     Returns:
-        0 when the target is advisory, otherwise the exit code of the first
+        For an advisory target, 0 when its tools ran (findings and all) and
+        ADVISORY_BROKEN when one failed to run. Otherwise the code of the first
         failing step (or of the last step when none failed).
     """
     worst = 0
@@ -99,11 +107,15 @@ def _execute(verb: Verb, target: Target) -> int:
                 assert_never(step)
 
         if code != 0:
-            worst = code
+            # FIRST non-zero wins. An aggregate that keeps going reports the
+            # status of the earliest thing that broke, because that is the one
+            # whose failure may explain the rest.
+            worst = worst or code
             if not target.keep_going:
                 break
 
-    return 0 if target.advisory else worst
+    worst = selection_result(worst)
+    return advisory_result(worst) if target.advisory else worst
 
 
 def main(argv: list[str] | None = None) -> int:
