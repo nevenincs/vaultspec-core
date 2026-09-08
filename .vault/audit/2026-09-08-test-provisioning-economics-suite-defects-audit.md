@@ -5,7 +5,7 @@ tags:
 date: '2026-09-08'
 modified: '2026-09-08'
 body_schema: 'body-v2'
-body_hash: 'sha256:31417f54f1141be99319ad1c67ba302af8717ea6fc9885a250c94484d54a6c9c'
+body_hash: 'sha256:97d46f1145c24eeb9705ebfd364edddaa36d93875a33c23da767ec60f28f780d'
 related:
   - '[[2026-09-08-test-provisioning-economics-broad-lane-profile-research]]'
 ---
@@ -131,6 +131,41 @@ The two genuine assertion failures in that run were both in
 `unavailable`, unrelated to parallelism and since fixed on `main`. That leaves
 `failing-guards-on-main` above accurate as written.
 
+### durability-is-observable-in-one-cohort | high | The fsync boundary changes a concurrency test's subject
+
+Found by executing the decision rather than by reading it, and it is the
+boundary's own rule firing on the boundary.
+
+`src/vaultspec_core/vaultcore/tests/test_fix_writer_concurrency.py` races a
+writer thread against a `--fix` pass and asserts no committed edit is lost. That
+makes the timing of the atomic-write path the thing under test, not incidental
+to it. Suppressing `os.fsync` tightens the write loop enough to exhaust
+`_WINDOWS_REPLACE_RETRY_BUDGET_SECONDS`, the 2s budget `_replace_atomic` spends
+riding out a Windows scanner's momentary handle on the destination.
+
+Measured, 20 runs of the same test on the same machine:
+
+| condition        | result         |
+| ---------------- | -------------- |
+| fsync suppressed | 4 failed of 20 |
+| fsync restored   | 0 failed of 20 |
+
+The failure is real, not a masking artefact: `atomic_write` raises `WinError 5`
+after exhausting its retries, the edit is genuinely discarded, and the test
+correctly reports a lost write.
+
+So this cohort can observe the suppression, which is exactly the condition the
+governing decision excludes. It is handled by a narrow `durable` marker that
+hands those tests the real call back, not by abandoning the boundary, because
+the no-observation property still holds everywhere else in the suite.
+
+There is a second, product-facing reading worth separating from the test fix: a
+2s replace-retry budget is sufficient against a writer that fsyncs between
+attempts and marginal against one that does not. Nothing establishes that a real
+caller writes as fast as this stress loop, so this is an observation about the
+budget's headroom rather than a defect, and it is recorded here rather than
+acted on.
+
 ## Recommendations
 
 - Fix the shared state behind the two isolation failures before adopting
@@ -172,3 +207,11 @@ The two genuine assertion failures in that run were both in
 - Re-run the parallel measurement on a machine not simultaneously executing this
   repository's CI, so resource exhaustion can be excluded or confirmed before
   any test is blamed.
+
+- Keep the `durable` opt-out narrow and evidence-backed. A marker applied
+  because a test is flaky, rather than because the suppression provably changes
+  what it measures, would turn the boundary's rule into a formality.
+
+- Consider separately whether `_WINDOWS_REPLACE_RETRY_BUDGET_SECONDS` has enough
+  headroom for a fast writer. This work has no evidence that a real caller
+  reaches that rate, so it is a question rather than a finding.

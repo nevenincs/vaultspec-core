@@ -5,7 +5,7 @@ tags:
 date: '2026-09-08'
 modified: '2026-09-08'
 body_schema: 'body-v2'
-body_hash: 'sha256:cb7247820490485c96f58b569bea7966dd15662ad65536cb60a6140ad9519e2b'
+body_hash: 'sha256:d9b3060a2a009c5770d041ae0cd2d7bba2b7c3edae894e0ecd1d738688e616db'
 related:
   - "[[2026-09-08-test-provisioning-economics-plan]]"
 ---
@@ -29,6 +29,10 @@ related:
 - `S06` `verify:` `pytest src/vaultspec_core/tests/cli/test_workspace_template_reuse.py` -> `pass`
 - `S08` `M` `dev/toolchain.py`
 - `S08` `verify:` `pytest src/vaultspec_core -n 12` -> `pass`
+- `S07` `M` `conftest.py`
+- `S07` `M` `pyproject.toml`
+- `S07` `M` `src/vaultspec_core/vaultcore/tests/test_fix_writer_concurrency.py`
+- `S07` `verify:` `pytest test_fix_writer_concurrency.py::test_concurrent_edit_survives_an_annotations_fix_pass x20` -> `pass`
 
 ## Notes
 
@@ -39,3 +43,4 @@ related:
 - `S05` session template plus per-test clone
 - `S06` install() itself serves the default shape from a per-process template, covering all ~300 call sites; mcp-ownership.json rebased after copy
 - `S08` uncontended 12-way run: 810.52s, 4414 passed, ZERO worker crashes (was 4 under CI contention); supports resource exhaustion over any test-specific cause
+- `S07` the 4 crashes did not recur on an uncontended machine; separately, the boundary WAS observable in one cohort (4/20 fail suppressed, 0/20 restored, 0/20 with the durable marker)

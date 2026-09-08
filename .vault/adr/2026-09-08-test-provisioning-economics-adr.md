@@ -5,7 +5,7 @@ tags:
 date: '2026-09-08'
 modified: '2026-09-08'
 body_schema: 'body-v2'
-body_hash: 'sha256:769bec4a8793dd4c4cc3424ce0e43bbb99ab2e2134e35f5e3beca63c5a237b94'
+body_hash: 'sha256:a2f3fb21a414641160e5bc60214b457da6273c15f25cdafeeea35733c8b868ef'
 related:
   - "[[2026-09-08-test-provisioning-economics-broad-lane-profile-research]]"
   - "[[2026-09-08-test-provisioning-economics-suite-defects-audit]]"
@@ -161,6 +161,17 @@ run no longer exercises the fsync path, so a regression that broke only fsync
 ordering would not be caught by this suite. It was not caught before either, but
 that was an accident and this is a decision, which makes it this record's
 responsibility to say so.
+
+Executing the decision found one place the licensing property does not hold.
+`test_fix_writer_concurrency` races a writer against a fix pass and asserts no
+committed edit is lost, so the timing of the atomic-write path is its subject
+rather than its background; suppressing fsync tightens that loop enough to
+exhaust the 2s Windows replace-retry budget, at 4 failures in 20 runs against 0
+with the call restored. That cohort carries a `durable` marker and runs against
+the real call. The exception is recorded here rather than in the harness alone
+because it is the rule working - the clause that says the harness must skip
+nothing else is what made the case visible - and because a marker applied for
+flakiness rather than for provable observability would hollow the decision out.
 
 The boundary will be under pressure to widen. Every future slow fixture will
 present itself as work no test can observe, and some of those claims will be

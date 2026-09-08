@@ -8,14 +8,15 @@ from __future__ import annotations
 
 import hashlib
 import os
-import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
+from vaultspec_core.testing.workspace_templates import WorkspaceTemplates
+
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Iterator
 
 
 # --- machine-readable CI reports -------------------------------------------
@@ -131,6 +132,36 @@ def pytest_report_header() -> str:
     return "durability: os.fsync suppressed for this session (production unaffected)"
 
 
+@pytest.fixture(autouse=True)
+def _durability_boundary(request: pytest.FixtureRequest) -> Iterator[None]:
+    """Give a `durable`-marked test the real ``os.fsync`` back.
+
+    The boundary is licensed by one property: no test can observe the
+    suppression. Where that stops being true the licence stops with it, and a
+    test that CAN observe it has to run against the real call rather than have
+    its subject quietly changed.
+
+    Exactly one cohort qualifies today. ``test_fix_writer_concurrency`` races a
+    writer against a fix pass and asserts no committed edit is lost, so what it
+    measures is the timing of the atomic-write path itself. Suppressing fsync
+    tightens that loop enough to exhaust ``_WINDOWS_REPLACE_RETRY_BUDGET_SECONDS``:
+    measured over 20 runs each, the test failed 4 times with fsync suppressed
+    and 0 times with it restored.
+
+    That is the boundary's own rule catching the boundary, which is what the
+    rule is for. It is a narrow opt-out rather than a reason to abandon the
+    suppression, because the property still holds everywhere else.
+    """
+    if request.node.get_closest_marker("durable") is None:
+        yield
+        return
+    os.fsync = _real_fsync
+    try:
+        yield
+    finally:
+        os.fsync = _no_fsync
+
+
 # --- provisioned-workspace reuse -------------------------------------------
 #
 # Several packages need "a real, fully installed workspace" per test, and each
@@ -148,46 +179,9 @@ def pytest_report_header() -> str:
 # isolation each test had before is exactly preserved, and only the work of
 # reaching the starting state is amortised.
 #
-# It lives here rather than in one package's conftest because three packages
-# want it and a helper that only one can reach is how the duplication started.
-
-
-class WorkspaceTemplates:
-    """Builds each distinct workspace once, then clones it per test."""
-
-    def __init__(self, root: Path) -> None:
-        self._root = root
-        self._templates: dict[str, Path] = {}
-
-    def clone(self, key: str, dest: Path, build: Callable[[Path], None]) -> Path:
-        """Return *dest*, populated as a copy of the template named *key*.
-
-        Args:
-            key: Identifies the tree. Two callers passing the same key must
-                want byte-identical trees, because the second one gets a copy
-                of whatever the first one built.
-            dest: Directory to create. Must not already exist.
-            build: Populates a fresh directory. Called at most once per key
-                per session.
-
-        Returns:
-            *dest*, now holding a private copy of the template.
-        """
-        from vaultspec_core.tests.cli.workspace_factory import rebase_workspace_paths
-
-        template = self._templates.get(key)
-        if template is None:
-            template = self._root / key
-            build(template)
-            self._templates[key] = template
-        # `dirs_exist_ok` stays False: a caller handing us an existing
-        # directory has confused this with a merge, and silently blending two
-        # workspaces would be a very hard failure to read.
-        shutil.copytree(template, dest, symlinks=True)
-        # An installed workspace records where it lives, so a raw copy would
-        # claim the template's files as its own.
-        rebase_workspace_paths(template, dest)
-        return dest
+# The cache itself is `vaultspec_core.testing.workspace_templates`, importable
+# by name from the three packages whose conftests annotate with it. Only the
+# fixture lives here, which is where a fixture has to be to reach every lane.
 
 
 @pytest.fixture(scope="session")

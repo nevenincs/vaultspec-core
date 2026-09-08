@@ -25,7 +25,9 @@ from vaultspec_core.testing import build_synthetic_vault
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-    from conftest import WorkspaceTemplates
+    from vaultspec_core.testing.workspace_templates import (
+        WorkspaceTemplates,
+    )
     from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
 # Disable Rich/Typer color output in tests.

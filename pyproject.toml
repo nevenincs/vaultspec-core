@@ -206,6 +206,12 @@ markers = [
   # this marker selects. The hook is an accelerator, not an enforcement
   # boundary.
   "precommit: cheap enough to gate every commit; also runs in the repo lane",
+  # The harness suppresses `os.fsync` for the session, which is sound only
+  # while no test can observe it. This marker names the tests that CAN -
+  # the atomic-write concurrency races, whose subject is the timing of
+  # that write path - and hands them the real call back for their
+  # duration. See the `_durability_boundary` fixture in conftest.py.
+  "durable: needs the real os.fsync; exempt from the harness suppression",
 ]
 # Every tree that carries committed Python AND a cohabiting `tests/` package.
 # `dev` is listed for the same reason `src` is: the harness backend has its own

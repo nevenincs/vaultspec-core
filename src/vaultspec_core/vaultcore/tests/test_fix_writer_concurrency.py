@@ -51,7 +51,13 @@ if TYPE_CHECKING:
 
     from ..checks._base import VaultSnapshot
 
-pytestmark = [pytest.mark.unit]
+# `durable` opts this module out of the harness's `os.fsync` suppression. What
+# these tests measure IS the timing of the atomic-write path - a writer racing a
+# fix pass, asserting no committed edit is lost - so the suppression is
+# observable here in a way it is nowhere else. Without the real call the write
+# loop tightens enough to exhaust the 2s Windows replace-retry budget: measured
+# over 20 runs each, 4 failures suppressed against 0 restored.
+pytestmark = [pytest.mark.unit, pytest.mark.durable]
 
 
 # Bounded wait used to confirm the writer is blocked while the holder holds the

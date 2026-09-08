@@ -26,7 +26,9 @@ if TYPE_CHECKING:
 
     from mcp.types import CallToolResult
 
-    from conftest import WorkspaceTemplates
+    from vaultspec_core.testing.workspace_templates import (
+        WorkspaceTemplates,
+    )
 
 pytestmark = [pytest.mark.unit]
 
