@@ -106,8 +106,8 @@ hand-edit between the markers.
   types.
 - `vaultspec-core vault check references` - Check for missing cross-references within
   features.
-- `vaultspec-core vault check schema` - Enforce schema rules: ADRs must ref research,
-  plans must ref ADRs.
+- `vaultspec-core vault check schema` - Check ADR evidence links and active plans'
+  linked decision status.
 - `vaultspec-core vault check adr-status` - Validate ADR status against the canonical
   taxonomy.
 - `vaultspec-core vault check code-boundary` - Scan source files for references to the

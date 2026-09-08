@@ -2,9 +2,9 @@
 
 Reference for the machine-owned parts of every `.vault/` record. The owning verbs
 (`create`/`edit` tools, `vaultspec-core vault add`, `vaultspec-core vault plan`) write
-all of this; `vaultspec-core vault check all --fix` repairs it. Authors do not
-hand-write any field below; this page exists so a reader can recognise a correct record,
-not produce one.
+all of this; `vaultspec-core vault check all --fix` repairs mechanical defects, not
+missing decision authority or evidence choices. Authors do not hand-write any field
+below; this page exists so a reader can recognise a correct record, not produce one.
 
 ## Frontmatter
 
@@ -16,14 +16,13 @@ tags:
 date: '2026-02-06'
 modified: '2026-02-06'
 body_hash: 'sha256:...'
-body_schema: 'body-v1'
+body_schema: 'body-v2'
 related:
   - '[[related-file]]'
 ---
 ```
 
-- `tags:` - a YAML list opening with one directory tag and one feature tag, both quoted;
-  further freeform tags may follow (`--tags`); nothing else is structural.
+- `tags:` - exactly one directory tag and one feature tag, both quoted.
 - `date:` - the scaffold date, quoted `yyyy-mm-dd`.
 - `modified:` - CLI-maintained last-modified stamp; set equal to `date:` at scaffold,
   refreshed by every mutating verb and by `vaultspec-core vault check all --fix`.
@@ -37,7 +36,8 @@ related:
   `vaultspec-core vault plan tier promote/demote`; older plans without it default to
   `L2`). ADRs gain `superseded_by:` and `supersedes:` from
   `vaultspec-core vault adr supersede`. Feature indexes carry `generated: true`. Every
-  record carries `body_schema:` (`body-v1`; the ledger `body-v2`). No other fields.
+  record carries the `body_schema:` selected by its owning scaffold or migration. Use
+  the fields supported by that record type; do not invent metadata.
 
 ## Tags
 

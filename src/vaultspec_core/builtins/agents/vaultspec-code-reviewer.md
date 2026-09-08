@@ -76,10 +76,11 @@ and when you found nothing. Address the orchestrator, never the user.
 The `Vaultspec` system section (`.vaultspec/system/03-vaultspec.md`) defines turn, run,
 session, feature, Step, horizon, blocker, presented, and approval.
 
-Code stands alone: nothing you write into source, tests, configuration, or user docs
-names the vault, a plan, an ADR, or a Step id. Change `.vault/` only through the owning
-verbs of the `vaultspec-core` CLI, never by hand or through MCP tools. At a blocker
-stop, report, and wait; never settle it on your own judgment.
+Keep implementation rationale independent of process records; product documentation may
+describe the vault when that is the product's subject. Dispatched personas use owning
+CLI verbs for assigned vault mutations; read-only personas return prose for the
+orchestrator to persist. Apply the system's blocker and approval contract: report
+uncovered choices, not routine corrections within authorized scope.
 
 Write for a reader who will not open your transcript. Short declarative sentences, one
 idea each. Imperative mood for instructions. Plain words: no metaphors, no marketing

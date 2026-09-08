@@ -6,7 +6,7 @@ Start from a [configured project](../README.md#install).
 
 ## Workflow stages
 
-Each stage has a skill for your coding agent:
+These stages are available as needed; they are not a mandatory chain for every change:
 
 | Stage                        | Skill                      | Writes to           |
 | ---------------------------- | -------------------------- | ------------------- |
@@ -48,12 +48,18 @@ Ask your coding agent to start research with a feature tag:
 > Use vaultspec-research to investigate adding full-text search to the API. Use the
 > feature tag search-api.
 
-Review the research before proceeding. Approve the architecture decision record (ADR)
-before planning, then approve the plan before implementation. Invoking a later skill
-directly doesn't waive its prerequisites.
+Start by checking existing evidence and accepted decisions, including those recorded
+under other features. A new costly-to-reverse commitment needs sufficient Research,
+Reference, or Audit evidence and an accepted architecture decision record (ADR) before
+implementation builds on it. Reuse existing coverage when it applies.
 
-The agent may propose direct implementation for a small, single-file fix without
-architectural impact. It must explain the exception and obtain your approval first.
+Planning is a separate choice. Routine work that needs no persistent coordination can
+proceed directly within your request. Larger decision-free work can use an approved plan
+without creating a dummy ADR. File count alone does not decide the route.
+
+Authorization must be explicit and scoped. Prior authorization can cover later work
+within that scope; the agent records its basis rather than asking you to approve the
+same work again. New commitments or material scope changes require a new decision.
 
 ## Find a feature's documents
 
@@ -83,26 +89,32 @@ vaultspec-core vault list adr --feature search-api
 ```
 
 For prose edits, follow [editing safely](syntax.md#editing-safely). Amend an existing
-ADR for refinements, narrower scope, or parameter changes, and obtain renewed approval.
+ADR for refinements, narrower scope, or parameter changes. Keep the accepted content
+intact while presenting a proposed amendment separately; apply it after approval.
 
 If the direction reverses or the rationale no longer applies, create a replacement ADR.
-Both records must exist before
-[superseding the old ADR](CLI.md#vaultspec-core-vault-adr-supersede). Obtain approval
-for the replacement decision.
+The replacement must be accepted before
+[superseding the old ADR](CLI.md#vaultspec-core-vault-adr-supersede).
 
 Superseding doesn't revise plans or retarget their authorizing links. Review affected
-plans and links, revise them where necessary, and obtain approval before continuing
-implementation.
+active plans and links, revise them where necessary, and establish decision coverage
+before continuing implementation. Completed plans retain their historical links;
+reopening work requires reassessment.
 
 ## Make a plan
 
-From an approved ADR, `/vaultspec-write` produces the plan in `.vault/plan/`:
+With accepted decision coverage, or an explicit assessment that no new decision is
+needed, `/vaultspec-write` produces the plan in `.vault/plan/`:
 
 > "Write the implementation plan from the ADR."
 
 Before approving the plan, review its scope, work order, affected files, and
-verification steps. If it doesn't match the approved decision, ask for revisions before
+verification steps. If it doesn't match the approved scope, ask for revisions before
 execution.
+
+An L1 plan can contain a few cohesive, multi-file Steps. Add containers only when the
+work needs their coordination structure. Link governing ADRs; their evidence is
+inherited through those links, without copying it into the plan.
 
 For the plan's structure and Step syntax, see [tiers](syntax.md#tiers) and
 [row format](syntax.md#row-format).
@@ -130,7 +142,7 @@ and keep its execution records. See the
 ## Review the result
 
 Ask your agent to use `vaultspec-code-review` to compare the implementation with the
-approved decision and plan. Follow the [review guide](./correctness.md) to record
+plan and any governing decisions. Follow the [review guide](./correctness.md) to record
 findings, agree on fixes, and check the resulting changes.
 
 <p id="everyday-commands"></p>

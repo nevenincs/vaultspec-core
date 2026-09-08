@@ -6,7 +6,7 @@ description: Execute an approved plan Step by Step, across sessions. Use to star
 # Execute (vaultspec-execute)
 
 Works an approved plan from its next open Step, leaving a checkpoint after every Step so
-any later session resumes without re-reading the cluster. Precondition: the plan has an
+any later session resumes without re-reading the cluster. Precondition: the plan has
 scoped authorization from the user, recorded per the vaultspec system section.
 
 ## Resume

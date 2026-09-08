@@ -1,57 +1,41 @@
 ---
 name: vaultspec-write
-description: Write the implementation plan for multi-session work. Use once the ADR (or ADR cluster) it executes is approved and the work outlives this session.
+description: Write a proportionate implementation plan when scope or progress needs durable sequencing, after assessing decision coverage.
 ---
 
 # Plan (vaultspec-write)
 
-Produces a plan: the approved sequence of Steps that execution resumes from across
-sessions. Precondition: every ADR the plan executes is `accepted`. If invoked
-standalone, locate those ADRs first. If one is still `proposed`, present it again and
-stop; if none exists, stop and name `vaultspec-adr` as the next run. This skill
-terminates within one run; the plan it writes does not.
+Produces the sequence execution can resume across sessions. Apply the vaultspec system
+section's routing and approval contract. A plan may reuse governing ADRs or have none
+when no costly decision is involved. Drafting does not authorize execution.
 
 ## Steps
 
-- Read the authorizing ADRs and their research or reference records in full.
-
-- Ground per the `vaultspec-discovery` rule, code first: map the files and symbols the
-  plan will touch, so Steps name real paths.
-
+- Discover governing decisions across features and read the relevant ADRs and evidence.
+  Reuse accepted decisions unchanged. Route uncovered costly choices to `vaultspec-adr`;
+  a draft may link proposed decisions, but dependent execution waits for acceptance.
+- Discover the affected code and exact paths. Expected new files are identified as
+  creation work. Record the coverage assessment and authorized scope in the Description,
+  particularly when no ADR governs.
 - Scaffold:
-  `vaultspec-core vault add plan --feature {feature} --tier <L1..L4> --related <adr-stem> [--related ...]`
-  (or the `create` tool), one `--related` per authorizing ADR. Read
-  `.vaultspec/templates/plan.md`; its hint blocks are the canonical source for tiers,
-  identifiers, the Step row contract, and the no-compression rule.
-
-- Build the structure only through the plan verbs (`plan_edit` tool, or
-  `vaultspec-core vault plan step | phase | wave | epic intent | tier`); author the
-  Description, Parallelization, and Verification sections as body prose. Draft in this
-  run, or dispatch the `vaultspec-writer` persona with "Create an implementation plan
-  for `{feature}` from the ADR(s) `[[...-adr]]`, conforming to the plan template's hint
-  blocks; the tier is already set."
-
+  `vaultspec-core vault add plan --feature {feature} --tier <L1..L4> [--related <adr-stem> ...]`
+  (or `create`). Link each governing ADR; inherit its evidence transitively. Optional
+  direct evidence links do not replace governing ADRs.
+- Read `.vaultspec/templates/plan.md` for tiers, identifiers, row syntax, and cohesive
+  granularity. Build structure with `plan_edit` or the `vaultspec-core vault plan`
+  verbs. Author Description, Parallelization, and Verification through body editing.
+- Draft locally or dispatch `vaultspec-writer` with the scaffolded plan, assessed
+  coverage, scoped work, and governing documents, if any.
 - Verify with `vaultspec-core vault check all` and `vaultspec-core vault plan check`.
-
-- Present the plan and stop:
-
-  ```markdown
-  The Plan is ready: [[yyyy-mm-dd-{feature}-plan]]
-  Do you want to approve the Plan, or request changes?
-  ```
-
-  **Execution starts only after an approval reply.** On approval, write
-  `Approved yyyy-mm-dd` as the first line of the Description. On requested changes,
-  revise through the plan verbs and present again; on a knowledge gap, stop and name
-  `vaultspec-research` as the next run.
+- Present the plan. Persist existing scoped authorization with `Approved yyyy-mm-dd` as
+  the first Description line and its basis. Ask only when authorization is missing.
+  Gather missing evidence with the appropriate evidence skill, not an automatic new ADR.
 
 ## Rules
 
-- **Tier.** Select by the HIERARCHY AND TIERS hint block; between two tiers take the
-  smaller and `tier promote` later.
-- **Granularity.** Every Step is one checkbox row naming one file or one cohesive area,
-  one commit's worth of work. No per-row references; authorizing documents go once in
-  `related:`. N self-similar actions are N rows.
-- **Cardinality.** Per the vaultspec section; when several ADRs feed the plan, the
-  Description states which Wave or Phase each governs.
-- **Links.** Wiki-links only in `related:`; the body carries none.
+- Select the smallest useful tier; promote only when containers clarify dependencies.
+- A Step is one cohesive, verifiable commit. Related changes across several files may
+  share a Step with bounded scope; unrelated outcomes need separate Steps.
+- Every governing ADR goes once in `related:`. When several govern different parts, map
+  them in the Description to Steps at L1 or the relevant containers at higher tiers.
+- Wiki-links belong only in `related:`.

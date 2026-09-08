@@ -7,8 +7,8 @@ description: Ground a decision or plan in how real code does it. Use when an ADR
 
 Produces a Reference record: how a codebase (this project, a submodule, or an external
 reference) implements the thing, as patterns with locators. It is an entry point
-alongside `vaultspec-research`; an ADR needs at least one of the two. This skill
-terminates within one run.
+alongside `vaultspec-research`; sufficient Audit evidence can also ground an ADR. This
+skill terminates within one run.
 
 ## Steps
 
@@ -34,6 +34,6 @@ terminates within one run.
 
 ## Next
 
-If an implementation already exists in this project and the findings alter it, report
-that to the user; it is an ADR amendment or a plan change, decided there, never a note
-left in the plan body.
+Apply the system's decision coverage test to findings that suggest a change. Routine
+execution uses existing scope; a new costly commitment routes to `vaultspec-adr`. Report
+findings without changing implementation unless that work is authorized.

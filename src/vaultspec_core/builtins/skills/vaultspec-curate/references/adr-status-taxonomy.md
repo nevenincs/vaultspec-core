@@ -47,11 +47,10 @@ Divergences to detect:
   table. These read as the same decision but evade any H1-based tooling.
 - **Quoting drift.** Some H1 tokens are bare (`status:** accepted`) rather than
   backtick-quoted. Normalize to the quoted canonical form.
-- **Frontmatter-versus-body divergence.** `vaultspec-core vault adr supersede` rewrites
-  the H1 status to `superseded` only when it matches the H1-inline regex. A legacy
-  `## Status` ADR that is superseded therefore gains `superseded_by` in frontmatter
-  while its visible body status stays stale (often `Accepted`). The curator must flag
-  this mismatch: the frontmatter says superseded, the body does not.
+- **Frontmatter-versus-body divergence.** Historical records may have `superseded_by` in
+  frontmatter while their visible body status stays stale (often `Accepted`). Flag this
+  mismatch. New supersession requires canonical accepted records; it is not a legacy
+  status-repair command.
 - **Off-taxonomy values.** Any status token outside the canonical set (or a typo of one)
   is a violation to surface and normalize.
 - **Missing status.** An ADR with no parseable status at all.
@@ -63,8 +62,10 @@ divergences. It parses each ADR's H1, detects the legacy `## Status` section, va
 the token against the canonical `AdrStatus` set, and flags off-taxonomy or missing
 values, bare (unquoted) tokens, and frontmatter-versus-body supersession drift. All
 findings are warnings, so the check never hard-fails an existing corpus; `--fix` applies
-safe encoding normalization, including already-recorded supersession. It does not
-authorize a new decision or supersession. Run it (directly, or via
-`vaultspec-core vault check all`) as part of the structural precondition, then reason
-over what it surfaces. The check derives its vocabulary from the same `AdrStatus` enum
-named above, so the two never drift.
+backtick quoting to otherwise canonical H1 tokens. Legacy status conversion and
+already-recorded supersession drift require an owning body edit after inspecting the
+records, as the reconciliation playbook describes. The check does not authorize a new
+decision or supersession. Run it (directly, or via `vaultspec-core vault check all`) as
+part of the structural precondition, then reason over what it surfaces. The check
+derives its vocabulary from the same `AdrStatus` enum named above, so the two never
+drift.

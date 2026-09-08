@@ -51,9 +51,10 @@ body heading. Record `supersedes` and `superseded_by` edges from
 
 ## Act
 
-- Apply directly: status propagation with
-  `vaultspec-core vault adr supersede OLD --by NEW` (preview with `--dry-run`); status
-  encoding and stamp normalization. Use the CLI mutators
+- Apply directly: status encoding and stamp normalization, including an existing
+  unambiguous historical supersession through an owning body edit per the playbook. New
+  supersession requires authorization and an accepted successor; preview with
+  `vaultspec-core vault adr supersede OLD --by NEW --dry-run`. Use the CLI mutators
   (`vaultspec-core vault adr supersede`, `vaultspec-core vault set-frontmatter`,
   `vaultspec-core vault set-body`, `vaultspec-core vault edit`,
   `vaultspec-core vault link`), never a raw edit of frontmatter.
@@ -104,10 +105,11 @@ and when you found nothing. Address the orchestrator, never the user.
 The `Vaultspec` system section (`.vaultspec/system/03-vaultspec.md`) defines turn, run,
 session, feature, Step, horizon, blocker, presented, and approval.
 
-Code stands alone: nothing you write into source, tests, configuration, or user docs
-names the vault, a plan, an ADR, or a Step id. Change `.vault/` only through the owning
-verbs of the `vaultspec-core` CLI, never by hand or through MCP tools. At a blocker
-stop, report, and wait; never settle it on your own judgment.
+Keep implementation rationale independent of process records; product documentation may
+describe the vault when that is the product's subject. Dispatched personas use owning
+CLI verbs for assigned vault mutations; read-only personas return prose for the
+orchestrator to persist. Apply the system's blocker and approval contract: report
+uncovered choices, not routine corrections within authorized scope.
 
 Write for a reader who will not open your transcript. Short declarative sentences, one
 idea each. Imperative mood for instructions. Plain words: no metaphors, no marketing

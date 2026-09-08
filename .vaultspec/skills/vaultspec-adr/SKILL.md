@@ -1,47 +1,37 @@
 ---
 name: vaultspec-adr
-description: Record and approve a decision that is costly to reverse. Use after a Research or Reference record exists and before any code builds on the decision.
+description: Record a new or changed costly decision after checking accepted decision coverage and sufficient Research, Reference, or Audit evidence.
 ---
 
 # ADR (vaultspec-adr)
 
-Produces an ADR: one decision, approved by the user, cited by the plan that executes it.
-Enter it for any decision the vaultspec sizing marks costly to reverse, at any horizon.
-Precondition: a Research or Reference record for the feature exists. If none does, stop;
-the next run is `vaultspec-research` when options must be weighed on external evidence,
-otherwise `vaultspec-code-research`. This skill terminates within one run.
+Records one costly decision. Apply the coverage and approval contract in the vaultspec
+system section before creating a record. Reuse an accepted ADR unchanged when it covers
+the work, including across features; return its stem without drafting a duplicate.
 
 ## Steps
 
-- Ground per the `vaultspec-discovery` rule, decisions first: read every ADR that
-  already governs this scope in full. One that does routes through Amend or supersede
-  below.
-- Scaffold:
-  `vaultspec-core vault add adr --feature {feature} --related <research-or-reference-stem>`
-  (or the `create` tool). Read `.vaultspec/templates/adr.md`; its hint blocks fix the
-  body shape and the status convention.
-- Draft in this run, or dispatch the `vaultspec-adr-researcher` persona to formalise the
-  grounded decision into ADR content and return it for persistence.
-- Verify with `vaultspec-core vault check all`.
-- Present the draft to the user and stop. **Nothing builds on the ADR before its
-  approval reply.** On approval, set the heading status to `accepted`; until then it is
-  `proposed`; a declined draft becomes `rejected` and stays on disk as evidence the path
-  was evaluated.
-
-## Amend or supersede
-
-One decision, one governing record.
-
-- **Amend (default).** Refinement, concretisation, narrowed scope, a parameter change:
-  rewrite the existing record's body in place, with the same user approval a new ADR
-  needs. Status stays `accepted`; the `modified:` stamp carries the revision.
-- **Supersede (pivot only).** The decision reverses, or its rationale no longer holds:
-  scaffold the new ADR and in the same session run
-  `vaultspec-core vault adr supersede OLD --by NEW`, so exactly one record is `accepted`
-  for the scope. Never edit status lines of the old record by hand.
+- Discover governing decisions across features and read them whole, then their evidence.
+  Classify the need as unchanged reuse, amendment, supersession, or a distinct decision.
+- Confirm sufficient Research, Reference, or Audit evidence. Gather missing evidence
+  through `vaultspec-research` for option research or `vaultspec-code-research` for code
+  patterns. Do not copy an adequate Audit into a new Research merely for its type.
+- For a new decision, scaffold:
+  `vaultspec-core vault add adr --feature {feature} --related <evidence-stem>` (or
+  `create`). Read `.vaultspec/templates/adr.md`.
+- Draft the decision, or dispatch `vaultspec-adr-researcher` with the existing evidence
+  and requested decision scope; it returns content for persistence.
+- For an amendment, preserve accepted content while proposing the revision separately.
+  Follow the system's pending-proposal procedure if it must survive handoff.
+- For a reversal, draft the successor first. After its content is authorized, set it
+  `accepted`, then run `vaultspec-core vault adr supersede OLD --by NEW`.
+- Verify with `vaultspec-core vault check all`. Present the record and authorization
+  basis. If authorization is missing, ask and stop. Otherwise persist acceptance and
+  continue with the authorized work. Rejected proposals remain as evidence; rejection
+  never changes the accepted predecessor.
 
 ## Document boundary
 
-The research grounds, the ADR decides. Cite research and reference findings by stem;
-never restate their evidence. A fact the grounding lacks is added to the grounding
-first, then cited. Decision language found in a grounding document moves here.
+Evidence stays in Research, Reference, or Audit. Cite it by stem; add missing facts to
+their evidence home before using them. The ADR owns the decision, rationale, and
+consequences. Decision language found in evidence moves here only when authorized.
