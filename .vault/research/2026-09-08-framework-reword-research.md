@@ -5,7 +5,7 @@ tags:
 date: '2026-09-08'
 modified: '2026-09-08'
 body_schema: 'body-v2'
-body_hash: 'sha256:0d2812b897f78fee8508e2a3b6f4b0de615821a202991e3edbd53156bb273498'
+body_hash: 'sha256:a63a055f1ee695c65ccb719a7f9ac137ef6ce465507b623e9e7d0b39d64f4a23'
 related: []
 ---
 
@@ -176,6 +176,12 @@ persona, template, checker, and test language from it.
 
 Not investigated: the preferred policy for each unresolved choice, behavioral testing of
 candidate wording with fresh agents, and the implementation cost of checker changes.
+
+### Cohesive Steps and expected file creation need consistent execution rules
+
+The plan template permits a cohesive Step but requires one row per repeated action (`src/vaultspec_core/builtins/templates/plan.md:89`). The executor treats any nonexistent path as a blocker, including a file the Step intends to create (`src/vaultspec_core/builtins/skills/vaultspec-execute/SKILL.md:25`). The system requires renewed approval even for a corrected path (`src/vaultspec_core/builtins/system/03-vaultspec.md:90`). These rules prevent a broad but cohesive approved revision from being executed proportionately.
+
+The plan template supports Step-level parallelism at L1, while the team skill only assigns Phases or Waves (`src/vaultspec_core/builtins/templates/plan.md:185`, `src/vaultspec_core/builtins/skills/vaultspec-team/SKILL.md:15`). Review must test the combined workflow across these surfaces; isolated document checks cannot establish a coherent route.
 
 ## Sources
 

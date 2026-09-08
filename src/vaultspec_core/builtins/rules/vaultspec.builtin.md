@@ -21,18 +21,18 @@ placeholders, and filename patterns are catalogued in
   implements the thing, as patterns with `file:line` locators, not copied code. Requires
   nothing.
 - **ADR** (`.vault/adr/`) records one decision and only the decision, citing research
-  and reference by stem, never restating their evidence. Requires at least one Research
-  or Reference record. Its status token lives in the heading and is author-edited body
-  prose: `proposed` at scaffold, `accepted` on the approval reply. A refinement amends
-  the accepted record in place, with the same approval reply; a reversal scaffolds a new
-  ADR and runs `vaultspec-core vault adr supersede OLD --by NEW` in the same session, so
-  one record is `accepted` per decision.
-- **Plan** (`.vault/plan/`) sequences the execution of one ADR or a cluster of ADRs.
-  `related:` lists every governing ADR (`--related`, repeatable, at scaffold;
-  `vaultspec-core vault link add` later). Scaffold with `--tier L1..L4`; build and
-  change structure only through the `plan_progress` and `plan_edit` tools or the
-  `vaultspec-core vault plan` verbs. Conventions are in the hint blocks of
-  `.vaultspec/templates/plan.md`.
+  and other evidence by stem, never restating it. Requires sufficient Research,
+  Reference, or Audit evidence. Its heading starts `proposed`; approval, unchanged
+  reuse, amendments, and supersession follow the vaultspec system section.
+  `vaultspec-core vault adr supersede OLD --by NEW` owns supersession after the
+  successor is accepted. Pending amendment text never replaces accepted content.
+- **Plan** (`.vault/plan/`) sequences authorized work with decision coverage assessed
+  under the vaultspec system section. When no costly decision is involved and no ADR
+  governs, its Description records that assessment. Otherwise, `related:` lists every
+  governing ADR (`--related`, repeatable, at scaffold; `vaultspec-core vault link add`
+  later). Scaffold with `--tier L1..L4`; build and change structure only through the
+  `plan_progress` and `plan_edit` tools or the `vaultspec-core vault plan` verbs.
+  Conventions are in the hint blocks of `.vaultspec/templates/plan.md`.
 - **Ledger** (`.vault/exec/`) is the mechanical log of a plan's execution, one per plan,
   append-only.
   `vaultspec-core vault exec log --feature <feature> --step S## --related <plan-stem> --row A:path`
