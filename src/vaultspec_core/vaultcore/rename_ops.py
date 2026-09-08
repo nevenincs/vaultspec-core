@@ -166,6 +166,7 @@ def rename_document_path(src: Path, dst: Path) -> bool:
 
 _RELATED_ENTRY_RE = re.compile(r'^(\s*-\s*["\']?\[\[)(.+?)(\]\]["\']?.*)$')
 _FRONTMATTER_LINE_BUDGET = 200
+_MARKDOWN_SUFFIX = ".md"
 
 
 def _collapse_rename_chains(raw_map: dict[str, str]) -> dict[str, str]:
@@ -235,14 +236,26 @@ def _split_link_target(target: str) -> tuple[str, str]:
     ``stem|alias``, and ``stem#heading|alias``.  Rename matching is always
     on the stem alone; the anchor and alias travel in the trailer so they
     are preserved on the rewritten line.
+
+    A ``.md`` suffix is dropped from the stem rather than carried in the
+    trailer.  ``[[stem.md]]`` names the same document as ``[[stem]]`` and a
+    rename map is keyed by bare stems, so keeping the suffix made a renamed
+    document's incoming links unmatchable - the link then survived the
+    rename pointing at a name no longer on disk, and the dangling check
+    deleted it.  The rewritten link is written in the extension-less form
+    the links check enforces anyway.
     """
     anchor_hash = target.find("#")
     alias_pipe = target.find("|")
     cut_candidates = [i for i in (anchor_hash, alias_pipe) if i >= 0]
     if not cut_candidates:
-        return target, ""
-    cut = min(cut_candidates)
-    return target[:cut], target[cut:]
+        stem, trailer = target, ""
+    else:
+        cut = min(cut_candidates)
+        stem, trailer = target[:cut], target[cut:]
+    if stem.lower().endswith(_MARKDOWN_SUFFIX):
+        stem = stem[: -len(_MARKDOWN_SUFFIX)]
+    return stem, trailer
 
 
 def _resolve_renamed_stem(

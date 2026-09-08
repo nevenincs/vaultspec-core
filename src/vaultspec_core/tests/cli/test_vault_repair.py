@@ -66,7 +66,15 @@ def _json_payload(output: str) -> dict[str, Any]:
 
 
 def _write_state_mutation_workspace(root: Path) -> None:
-    """Create a tmp vault that requires multiple sequential file mutations."""
+    """Create a tmp vault that requires multiple sequential file mutations.
+
+    The plan and the ADR both reach the research document through its
+    pre-rename, ``.md``-suffixed name, so repairing this vault has to carry
+    every incoming link across the case-only rename the structure check
+    performs. Grounding is declared by the fixture rather than invented by
+    repair: the schema checker judges evidence, and no ``--fix`` writer links
+    a document to evidence on the author's behalf.
+    """
     research = root / ".vault" / "research" / "2026-05-15-State-Mutation-research.md"
     plan = root / ".vault" / "plan" / "2026-05-15-state-mutation-plan.md"
     adr = root / ".vault" / "adr" / "2026-05-15-state-mutation-adr.md"
@@ -91,6 +99,7 @@ def _write_state_mutation_workspace(root: Path) -> None:
         "date: '2026-05-15'\n"
         "related:\n"
         "  - '[[2026-05-15-State-Mutation-research.md]]'\n"
+        "  - '[[2026-05-15-state-mutation-adr]]'\n"
         "  - '[[missing-target]]'\n"
         "---\n\n# Plan\n",
         encoding="utf-8",
@@ -101,7 +110,8 @@ def _write_state_mutation_workspace(root: Path) -> None:
         "  - '#adr'\n"
         "  - '#state-mutation'\n"
         "date: '2026-05-15'\n"
-        "related: []\n"
+        "related:\n"
+        "  - '[[2026-05-15-State-Mutation-research.md]]'\n"
         "---\n\n# `state-mutation` adr: `State Mutation` | (**status:** `accepted`)\n",
         encoding="utf-8",
     )

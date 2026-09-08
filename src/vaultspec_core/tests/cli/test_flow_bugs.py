@@ -1140,6 +1140,45 @@ class TestStructureRenameUpdatesRefs:
         assert "[[alpha" not in written
         assert result.fixed_count == 3
 
+    def test_rewrite_follows_links_that_spell_the_md_extension(
+        self, tmp_path: Path
+    ) -> None:
+        """``[[stem.md]]`` names the same document as ``[[stem]]``.
+
+        A rename map is keyed by bare stems, so a link that spells the
+        extension used to match nothing: the rename landed, the link kept
+        pointing at a name no longer on disk, and the dangling check deleted
+        the reference the author wrote. The rewrite resolves such a link and
+        writes it back in the extension-less form the links check enforces.
+        """
+        from vaultspec_core.vaultcore.checks._base import CheckResult
+        from vaultspec_core.vaultcore.rename_ops import rewrite_incoming_refs
+
+        adr_dir = tmp_path / ".vault" / "adr"
+        adr_dir.mkdir(parents=True)
+        backref = adr_dir / "2026-03-02-suffix-adr.md"
+        backref.write_text(
+            "---\n"
+            "tags:\n"
+            '  - "#adr"\n'
+            '  - "#suffix"\n'
+            "date: '2026-03-02'\n"
+            "related:\n"
+            '  - "[[Alpha.md]]"\n'
+            '  - "[[alpha.md#section-one|shown label]]"\n'
+            "---\n\n# suffix adr\n",
+            encoding="utf-8",
+        )
+
+        result = CheckResult(check_name="structure", supports_fix=True)
+        rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
+
+        written = backref.read_text(encoding="utf-8")
+        assert "[[beta]]" in written
+        assert "[[beta#section-one|shown label]]" in written
+        assert ".md]]" not in written
+        assert result.fixed_count == 2
+
     def test_rewrite_drops_duplicate_after_collapse(self, tmp_path: Path) -> None:
         """When a rewrite would produce a duplicate ``related:`` entry
         the duplicate line must be dropped, not written twice."""
