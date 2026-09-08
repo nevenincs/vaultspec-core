@@ -72,11 +72,27 @@ PRUNED = frozenset({".git", ".venv", ".logs", "node_modules", "target", "__pycac
 
 
 def justfiles() -> list[Path]:
-    """Return every authored justfile in the checkout."""
+    """Return every authored justfile in the checkout.
+
+    Raises:
+        AssertionError: When the glob matched nothing. An empty corpus makes
+            the two filesystem assertions below pass vacuously - no files, no
+            offenders - which is how a guard retires itself instead of failing
+            when a directory is renamed out from under it. `Path.rglob` treats
+            "missing" and "empty" identically and raises for neither, so the
+            expectation has to be stated. It is stated HERE, in the helper that
+            derives the corpus, rather than in each caller, because a caller
+            that forgot would be the hole this closes.
+    """
     found = [p for p in ROOT.rglob("*.just") if not PRUNED & set(p.parts)]
     root_file = ROOT / "justfile"
     if root_file.exists():
         found.append(root_file)
+    assert found, (
+        f"no justfile found under {ROOT}. Every repository in this fleet has "
+        "at least a root `justfile`; finding none means this guard is looking "
+        "in the wrong place, not that the tree is clean."
+    )
     return sorted(found)
 
 
