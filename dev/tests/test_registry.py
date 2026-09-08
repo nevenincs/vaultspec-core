@@ -41,10 +41,17 @@ NON_REGISTRY_RECIPES = frozenset(
         "init-tools",
         "init-check",
         "analytics",
-        "binaries",
-        "channels",
+        "release-binaries",
+        "release-channels",
+        "ci",
     },
 )
+
+#: How a verb is SPELLED at the recipe versus in the registry. The gating verb
+#: is `lint` in the table and `check` at the recipe, because a contributor
+#: reaches for "check the types" and the group heading `check` is what
+#: `just --list` sorts under. Every other verb spells the same on both sides.
+RECIPE_VERB_SPELLING: dict[str, str] = {"check": "lint"}
 
 #: Test lanes deliberately reachable only by naming them, each with its reason.
 #: Every other lane must be in `test all` or a CI step - see
@@ -105,7 +112,7 @@ def test_every_test_lane_is_reachable_from_an_aggregate_or_ci() -> None:
         target.name
         for target in verb.targets
         if target.name not in {"all", *referenced, *DELIBERATELY_MANUAL}
-        and f"just test {target.name}" not in ci_text
+        and f"just test-{target.name}" not in ci_text
     ]
     assert not unreachable, (
         "test lanes reachable from neither `test all` nor a CI step: "
@@ -163,21 +170,61 @@ def _justfile_recipe_names() -> set[str]:
     return set(pattern.findall(text))
 
 
-def test_justfile_exposes_every_registry_verb() -> None:
-    """Every verb in the registry has a justfile recipe of the same name."""
+def _recipe_verb(name: str) -> str:
+    """Return the registry verb a flat recipe name dispatches to."""
+    head, _, _tail = name.partition("-")
+    return RECIPE_VERB_SPELLING.get(head, head)
+
+
+def test_justfile_exposes_every_registry_target() -> None:
+    """Every target in the registry is typeable as a recipe of its own.
+
+    The verb-plus-argument form kept the real surface out of `just --list`: a
+    contributor could not discover `type-platforms` without reading this table.
+    Each target is now its own recipe, so the list IS the surface - which only
+    holds if every target actually has one.
+    """
     recipes = _justfile_recipe_names()
-    missing = {verb.name for verb in VERBS} - recipes
-    assert not missing, f"registry verbs with no justfile recipe: {sorted(missing)}"
+    missing: list[str] = []
+    for verb in VERBS:
+        # `ci` is the composed pipeline, reached as the bare `just ci`. Its one
+        # target exists only so the dispatcher has something to select.
+        if verb.name == "ci":
+            continue
+        spelling = next(
+            (
+                recipe
+                for recipe, registry in RECIPE_VERB_SPELLING.items()
+                if registry == verb.name
+            ),
+            verb.name,
+        )
+        missing.extend(
+            f"{spelling}-{target.name}"
+            for target in verb.targets
+            if not target.name.startswith("_")
+            and f"{spelling}-{target.name}" not in recipes
+        )
+    assert not missing, f"registry targets with no justfile recipe: {sorted(missing)}"
 
 
-def test_every_dispatching_recipe_has_a_verb() -> None:
-    """Every justfile recipe that dispatches to `dev` names a real verb."""
-    unknown = sorted(
-        name
-        for name in _justfile_recipe_names() - NON_REGISTRY_RECIPES
-        if find_verb(name) is None
-    )
-    assert not unknown, f"justfile recipes with no registry verb: {unknown}"
+def test_every_dispatching_recipe_names_a_real_target() -> None:
+    """Every dispatching recipe resolves to a verb AND one of its targets.
+
+    A typo in the target segment is otherwise invisible until someone runs the
+    recipe: it exists, so `just --list` offers it, and only the dispatcher
+    rejects the argument.
+    """
+    unknown: list[str] = []
+    for name in sorted(_justfile_recipe_names() - NON_REGISTRY_RECIPES):
+        verb = find_verb(_recipe_verb(name))
+        if verb is None:
+            unknown.append(name)
+            continue
+        target = name.partition("-")[2]
+        if not target or verb.find(target) is None:
+            unknown.append(name)
+    assert not unknown, f"justfile recipes with no registry target: {unknown}"
 
 
 def test_public_targets_hide_internal_helpers() -> None:

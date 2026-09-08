@@ -174,39 +174,59 @@ def _colocated_test_dirs() -> set[str]:
     return found
 
 
+#: The group taxonomy, identical in every repository in the fleet. Closed on
+#: purpose: `just --list` sorts by group, so a new group silently forks the
+#: vocabulary a contributor learns once and expects to hold everywhere.
+CLOSED_GROUPS: frozenset[str] = frozenset(
+    {
+        "setup",
+        "dev",
+        "check",
+        "fix",
+        "audit",
+        "build",
+        "release",
+        "docs",
+        "test",
+        "meta",
+    }
+)
+
+#: The recipes every repository in the fleet exposes under the same name. Kept
+#: to the aggregates and the pipeline deliberately: those are the contract a CI
+#: workflow and a contributor rely on across repositories, while every other
+#: recipe is this repository's own business.
+REQUIRED_RECIPES: frozenset[str] = frozenset(
+    {
+        "check-all",
+        "fix-all",
+        "audit-all",
+        "test-all",
+        "build-all",
+        "ci",
+    }
+)
+
+
 def _recipe_exists(justfile_text: str, name: str) -> bool:
     pattern = rf"(?m)^{re.escape(name)}(?:\s|:)"
     return re.search(pattern, justfile_text) is not None
 
 
-def test_justfile_exposes_every_verb_at_the_root() -> None:
-    """Every entry point is a root verb; there is no nested dispatch namespace.
+def test_justfile_exposes_every_recipe_flat_and_hyphenated() -> None:
+    """Every entry point is a flat `<verb>-<thing>` recipe at the root.
 
-    The harness was previously reached through `just dev <verb>` with a
-    parallel `just prod` mirror of the shipped CLI.  Both are gone: the
-    justfile is a development-only file, so a `dev` namespace inside it named
-    nothing, and mirroring a finished product's CLI only adds a layer that
-    drifts.  This pins the collapse so neither reappears.
+    Three shapes have been retired here in turn: a `just dev <verb>` nested
+    namespace, a `just prod` mirror of the shipped CLI, and the
+    `<verb> <target>` argument dispatch that replaced them.  The argument form
+    kept the real surface out of `just --list` and out of tab completion - you
+    could not discover `type-platforms` without reading the toolchain table -
+    so the thing a recipe acts on is now part of its name.  This pins the
+    collapse so none of the three reappears.
     """
     justfile = _read("justfile")
     missing = [
-        name
-        for name in sorted(
-            {
-                "deps",
-                "lint",
-                "fix",
-                "audit",
-                "test",
-                "build",
-                "vault",
-                "framework",
-                "docs",
-                "health",
-                "ci",
-            }
-        )
-        if not _recipe_exists(justfile, name)
+        name for name in sorted(REQUIRED_RECIPES) if not _recipe_exists(justfile, name)
     ]
     assert not missing, f"Missing required just recipes: {missing}"
 
@@ -216,6 +236,55 @@ def test_justfile_exposes_every_verb_at_the_root() -> None:
     )
     assert not re.search(r"(?m)^_dev-", justfile), (
         "The `_dev-*` internal recipe namespace was collapsed to root verbs."
+    )
+    argument_dispatch = re.findall(r"(?m)^([a-z-]+) target='[a-z-]+':", justfile)
+    assert not argument_dispatch, (
+        "These recipes still take a `target` argument, which hides their real "
+        f"surface from `just --list`: {sorted(argument_dispatch)}"
+    )
+
+
+def test_every_public_recipe_declares_a_group_from_the_closed_set() -> None:
+    """The group taxonomy is a closed set of ten, identical in every repository.
+
+    Groups are what `just --list` sorts by, so an ungrouped recipe is filed
+    under a blank heading and an off-taxonomy group silently forks the fleet's
+    vocabulary.  Both are build failures rather than review catches.
+    """
+    justfile = _read("justfile")
+    declared = set(re.findall(r"(?m)^\[group\('([a-z-]+)'\)\]", justfile))
+    assert declared <= CLOSED_GROUPS, (
+        f"Groups outside the closed set: {sorted(declared - CLOSED_GROUPS)}"
+    )
+    lines = justfile.splitlines()
+    ungrouped = [
+        line.split(":")[0].split(" ")[0]
+        for index, line in enumerate(lines)
+        if re.match(r"^[a-z][a-zA-Z0-9-]*(\s+[^:]*)?:", line)
+        and ":=" not in line
+        and not any(
+            previous.startswith("[group(")
+            for previous in lines[max(0, index - 4) : index]
+        )
+    ]
+    assert not ungrouped, f"These recipes declare no group: {sorted(set(ungrouped))}"
+
+
+def test_every_aggregate_dispatches_rather_than_chaining_dependencies() -> None:
+    """An `-all` recipe must run every step and report, not stop at the first.
+
+    A just dependency list is fail-fast and cannot express run-all-then-report,
+    so an aggregate written as `check-all: check-python check-toml ...` reports
+    one failure where there may be six and costs a round-trip per defect. The
+    membership therefore lives in `dev/toolchain.py`, where the aggregate
+    target is `keep_going` and composes `Ref`s to the same targets the
+    individual recipes run.
+    """
+    justfile = _read("justfile")
+    chained = re.findall(r"(?m)^([a-z-]+-all):[ 	]+\S", justfile)
+    assert not chained, (
+        "These aggregates are just dependency chains, which are fail-fast: "
+        f"{sorted(chained)}. Dispatch them into dev/ instead."
     )
 
 
@@ -229,9 +298,9 @@ def test_justfile_delegates_every_verb_to_the_dev_package() -> None:
     """
     justfile = _read("justfile")
     for verb in ("deps", "lint", "fix", "audit", "test", "build", "health"):
-        assert re.search(
-            rf"(?m)^{verb} target='[a-z-]+':\n\s+\{{\{{dev\}}\}} {verb} ", justfile
-        ), f"Recipe `{verb}` must delegate to the dev package in one line"
+        assert re.search(rf"(?m)^\s+\{{\{{dev\}}\}} {verb} [a-z-]+$", justfile), (
+            f"No recipe delegates to the `{verb}` verb in one line"
+        )
     for shell_ism in ('if os() == "windows"', "switch (", "Get-Command", "elseif"):
         assert shell_ism not in justfile, (
             f"Shell branching {shell_ism!r} belongs in dev/toolchain.py, "
@@ -497,7 +566,7 @@ def _ty_toolchain_paths() -> set[str]:
 
 
 def test_ty_pre_commit_scope_matches_dev_toolchain_scope() -> None:
-    """The pre-commit ``ty`` hook and ``just lint type`` must check the same trees.
+    """The pre-commit ``ty`` hook and ``just check-type`` must check the same trees.
 
     ``.pre-commit-config.yaml``'s ``ty`` hook hardcodes its own argv instead of
     delegating to :mod:`dev.toolchain`, so it is a second, independent source
@@ -538,17 +607,17 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
         # promoted by removing its `continue-on-error` key; nothing but this
         # list stops the step itself from being removed next.
         "lint-and-type": {
-            "just deps sync",
-            "just lint python",
-            "just lint type",
-            "just lint type-platforms",
-            "just lint toml",
-            "just lint links",
-            "just lint markdown",
-            "just lint complexity",
-            "just lint nesting",
-            "just lint size",
-            "just lint type-strict",
+            "just deps-sync",
+            "just check-python",
+            "just check-type",
+            "just check-type-platforms",
+            "just check-toml",
+            "just check-links",
+            "just check-markdown",
+            "just check-complexity",
+            "just check-nesting",
+            "just check-size",
+            "just check-type-strict",
         },
         # `harness` and `repo` are pinned alongside `unit` because the lesson
         # that produced them was a lane no CI job named: the guards it ran went
@@ -556,18 +625,18 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
         # three here means removing a CI step fails this guard rather than
         # silently shrinking what "green" covers.
         "tests": {
-            "just deps sync",
-            "just test unit",
-            "just test harness",
-            "just test repo",
+            "just deps-sync",
+            "just test-unit",
+            "just test-harness",
+            "just test-repo",
         },
-        "windows-vault-repair": {"just deps sync", "just test vault-repair"},
+        "windows-vault-repair": {"just deps-sync", "just test-vault-repair"},
         "vault-audit": {
-            "just deps sync",
-            "just framework install",
-            "just vault check",
+            "just deps-sync",
+            "just framework-install",
+            "just vault-check",
         },
-        "dependency-audit": {"just deps sync", "just audit deps"},
+        "dependency-audit": {"just deps-sync", "just audit-deps"},
     }
 
     for job_name, expected in expected_runs.items():
