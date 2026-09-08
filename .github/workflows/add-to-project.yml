@@ -20,6 +20,7 @@ concurrency:
 
 jobs:
   add-to-project:
+    timeout-minutes: 15
     runs-on: [self-hosted, Linux, X64, build]
     steps:
       - uses: actions/add-to-project@v2
@@ -69,4 +70,3 @@ jobs:
             -f item="$ITEM_ID" \
             -f field=PVTF_lAHOAKyuWc4BS9uczhAaFWg \
             -f value="$DEADLINE"
-

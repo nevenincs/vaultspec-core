@@ -56,6 +56,7 @@ jobs:
   # catches the common case it was built for, a fleet that is up but missing
   # the selector a build leg asks for. Set `allow_queue` to wait deliberately.
   preflight:
+    timeout-minutes: 15
     name: Preflight runners
     runs-on: [self-hosted, Linux, X64, build]
     steps:
@@ -170,6 +171,7 @@ jobs:
   # GitHub-hosted jobs, so the answer to the queue is capacity or admission
   # weighting, not a job that opts out of the rule.
   wheel:
+    timeout-minutes: 60
     name: Build the wheel the binaries carry
     runs-on: [self-hosted, Linux, X64, build]
     steps:
@@ -213,6 +215,7 @@ jobs:
           retention-days: 5
 
   build:
+    timeout-minutes: 90
     needs: [preflight, wheel]
     name: Build ${{ matrix.name }}
     strategy:
@@ -454,6 +457,7 @@ jobs:
   # added to one and not the other goes red on the branch that adds it rather
   # than at release time.
   offline:
+    timeout-minutes: 45
     needs: build
     name: Offline ${{ matrix.name }}
     # `!cancelled()` rather than the default, so one leg failing to compile
@@ -813,6 +817,7 @@ jobs:
   # unverified. An enumerated list is assertable here, in the shell, before
   # anything is signed.
   attest:
+    timeout-minutes: 30
     name: Attest the built binaries
     # `offline`, NOT `build`, and that edge is load-bearing twice over.
     #
@@ -943,6 +948,7 @@ jobs:
         run: rm -rf dist-bin
 
   release:
+    timeout-minutes: 30
     name: Attach to release
     # `offline` and `attest`, not `build`. This job attaches `binaries-*`, and
     # that name is produced by the offline gate rather than by the compile, so
@@ -1412,6 +1418,7 @@ jobs:
   # and the URL intact and reachable; it only stops that release answering as
   # `latest`. Re-dispatch after fixing the build and the promote step undoes it.
   verify-release-assets:
+    timeout-minutes: 30
     name: Verify the release carries artifacts
     needs: release
     if: ${{ always() }}

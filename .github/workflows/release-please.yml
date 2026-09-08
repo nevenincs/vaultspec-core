@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   release-please:
+    timeout-minutes: 30
     name: Release Please
     runs-on: [self-hosted, Linux, X64, build]
     steps:

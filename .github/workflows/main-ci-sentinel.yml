@@ -37,6 +37,7 @@ concurrency:
 
 jobs:
   assert-main-was-validated:
+    timeout-minutes: 15
     name: Assert main's tip has a CI verdict
     runs-on: [self-hosted, Linux, X64, build]
     env:

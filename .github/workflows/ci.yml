@@ -57,6 +57,7 @@ jobs:
   # `Interpreter Matches Pin`, and `Workflow Lint`. Each took roughly fifteen
   # seconds of work and a full provisioning cycle to reach it.
   lint:
+    timeout-minutes: 45
     name: "Lint: Code, Docs & Workflows"
     runs-on: [self-hosted, Linux, X64, build]
     steps:
@@ -171,6 +172,7 @@ jobs:
   # job runs: the development-instrument guards and the repository-health
   # guards, neither of which any other lane selects.
   test-harness-repo:
+    timeout-minutes: 60
     name: "Test: Harness & Repo"
     runs-on: [self-hosted, Linux, X64, build]
     steps:
@@ -209,6 +211,7 @@ jobs:
         run: just test-repo
 
   test-library:
+    timeout-minutes: 90
     name: "Test: Library (${{ matrix.name }})"
     # THE library gate, and the only one: this job runs the whole package suite
     # (excluding only the `claude` marker, which needs that CLI installed) on
@@ -268,6 +271,7 @@ jobs:
         run: just test-broad
 
   test-vault:
+    timeout-minutes: 60
     name: "Test: Vault Corpus"
     runs-on: [self-hosted, Linux, X64, build]
     steps:
@@ -306,6 +310,7 @@ jobs:
         run: just vault-check
 
   audit-dependencies:
+    timeout-minutes: 30
     name: "Audit: Dependencies"
     runs-on: [self-hosted, Linux, X64, build]
     steps:

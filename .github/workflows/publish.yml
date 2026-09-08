@@ -30,6 +30,7 @@ concurrency:
 
 jobs:
   build:
+    timeout-minutes: 90
     name: Build
     # On the fleet. Every job in this repository runs there except the two
     # `ci-fleet` declares as hosted cells - binaries.yml's linux-aarch64 build
@@ -78,6 +79,7 @@ jobs:
           retention-days: 5
 
   smoke-test:
+    timeout-minutes: 45
     name: Smoke Test
     needs: build
     runs-on: [self-hosted, Linux, X64, build]
@@ -106,6 +108,7 @@ jobs:
         run: uv run --isolated --no-project --with dist/*.tar.gz dev/smoke/smoke_check.py
 
   publish-pypi:
+    timeout-minutes: 30
     name: Publish to PyPI
     needs: smoke-test
     runs-on: [self-hosted, Linux, X64, build]

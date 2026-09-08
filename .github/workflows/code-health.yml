@@ -31,6 +31,7 @@ env:
 
 jobs:
   report:
+    timeout-minutes: 45
     name: "Audit: Code Health"
     runs-on: [self-hosted, Linux, X64, build]
     steps:

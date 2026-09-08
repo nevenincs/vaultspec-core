@@ -47,6 +47,10 @@ ROOT = Path(__file__).resolve().parents[2]
 #: check set a merge waits on, which is this file and no other.
 CI = ROOT / ".github" / "workflows" / "ci.yml"
 
+#: Every workflow. The self-hosted timeout rule is about the FLEET, not about
+#: one workflow: a job that hangs holds a machine the whole estate shares.
+WORKFLOWS = ROOT / ".github" / "workflows"
+
 #: ``<Kind>: <Subject>`` with an optional ``(Platform)``. The kinds are the
 #: justfile's own recipe groups, so ``just --list`` and the merge box use one
 #: vocabulary: Lint reads the tree, Test executes something, Audit asks a third
@@ -81,7 +85,7 @@ def _check_names(job: dict[str, Any], job_id: str) -> list[str]:
     ``${{ matrix.name }}`` would sail through the pattern on the literal.
     """
     name = job.get("name", job_id)
-    include = job.get("strategy", {}).get("matrix", {}).get("include", [])
+    include = _matrix_include(job)
     if "${{ matrix.name }}" not in name:
         return [name]
     assert include, (
@@ -238,3 +242,87 @@ def test_no_job_names_a_recipe_that_another_named_recipe_subsumes() -> None:
             "fleet with one runner per platform that is the same work twice, "
             "serially, on the same machine."
         )
+
+
+def _workflow_paths() -> list[Path]:
+    """Every workflow file, proven to exist before anything reads them.
+
+    Globbed in a helper rather than in the test, and asserted non-empty here:
+    ``Path.glob`` treats "missing" and "empty" alike and raises for neither, so
+    a renamed directory would otherwise retire the guard below by giving it
+    nothing to find.
+    """
+    paths = sorted(WORKFLOWS.glob("*.yml"))
+    assert paths, f"no workflow files found under {WORKFLOWS}"
+    return paths
+
+
+def _matrix_include(job: dict[str, Any]) -> list[dict[str, Any]]:
+    """The job's matrix ``include:`` entries, or none when it declares no matrix."""
+    strategy = cast("dict[str, Any]", job.get("strategy") or {})
+    matrix = cast("dict[str, Any]", strategy.get("matrix") or {})
+    return cast("list[dict[str, Any]]", matrix.get("include") or [])
+
+
+def _runner_labels(job: dict[str, Any]) -> list[str]:
+    """Every runner label a job can land on, matrix selectors resolved.
+
+    ``runs-on`` is not always a label list. A matrix job names an expression -
+    ``${{ matrix.runner }}`` - and keeps the labels in its ``include:`` entries,
+    so reading ``runs-on`` alone reports no labels at all for exactly the job
+    that occupies a fleet runner longest. This resolves the expression back to
+    the matrix values it selects from.
+    """
+    runs_on: object = job.get("runs-on")
+    if isinstance(runs_on, list):
+        return [str(label) for label in cast("list[object]", runs_on)]
+    if not isinstance(runs_on, str):
+        return []
+    if "${{" not in runs_on:
+        return [runs_on]
+    key = runs_on.split("matrix.", 1)[-1].split("}}", 1)[0].strip()
+    labels: list[str] = []
+    for entry in _matrix_include(job):
+        value: object = entry.get(key)
+        if isinstance(value, list):
+            labels += [str(label) for label in cast("list[object]", value)]
+        elif value is not None:
+            labels.append(str(value))
+    return labels
+
+
+def test_every_self_hosted_job_declares_a_timeout() -> None:
+    """A job on the self-hosted fleet must bound how long it can hold a runner.
+
+    GitHub's default is six hours. On hosted runners that is someone else's
+    capacity; here it is one of two machines the entire estate queues behind,
+    so an unbounded job that hangs stops every other workflow for the rest of
+    the day.
+
+    Scoped to self-hosted jobs on purpose: a hosted runner has its own ceiling
+    and costs no local capacity, so requiring a budget there would be noise.
+    """
+    checked: list[str] = []
+    missing: list[str] = []
+    for path in _workflow_paths():
+        document = cast(
+            "dict[str, dict[str, dict[str, Any]]]",
+            yaml.safe_load(path.read_text(encoding="utf-8")),
+        )
+        for job_id, job in (document.get("jobs") or {}).items():
+            if "self-hosted" not in _runner_labels(job):
+                continue
+            checked.append(f"{path.name}:{job_id}")
+            if job.get("timeout-minutes") is None:
+                missing.append(f"{path.name}:{job_id}")
+    # A resolver that silently stopped recognising self-hosted jobs would pass
+    # this every run while asserting nothing, which is the failure mode the
+    # matrix expression already produced once.
+    assert checked, (
+        "no self-hosted jobs were found in any workflow; the `runs-on` "
+        "resolution broke and this assertion would pass vacuously"
+    )
+    assert not missing, (
+        "these self-hosted jobs declare no `timeout-minutes`, so each can hold "
+        "a fleet runner for GitHub's six-hour default: " + ", ".join(missing)
+    )
