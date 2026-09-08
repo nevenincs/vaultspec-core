@@ -2,16 +2,25 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
+from rich.console import Console
 
 from vaultspec_core.cli import app
 from vaultspec_core.cli._repair_render import render_repair_run
 from vaultspec_core.config import reset_config
 from vaultspec_core.vaultcore.checks import run_all_checks
+from vaultspec_core.vaultcore.checks._base import (
+    CheckDiagnostic,
+    CheckResult,
+    Severity,
+    render_check_result,
+)
 from vaultspec_core.vaultcore.repair import (
     RepairRun,
     _changed_files,
@@ -20,8 +29,6 @@ from vaultspec_core.vaultcore.repair import (
 )
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from typer.testing import CliRunner
 
     from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
@@ -793,7 +800,7 @@ class TestVaultRepair:
         assert payload["generated_indexes"]["items"] == []
         assert not index_path.exists()
 
-    def test_check_order_and_info_visibility_are_stable(
+    def test_check_order_is_stable(
         self,
         factory: WorkspaceFactory,
     ) -> None:
@@ -835,25 +842,35 @@ class TestVaultRepair:
             "foreign",
         ]
 
-        factory.run("vault", "feature", "index", "--feature", "info-visibility")
-        default_result = factory.run(
-            "vault",
-            "check",
-            "features",
-            "--feature",
-            "info-visibility",
-        )
-        verbose_result = factory.run(
-            "vault",
-            "check",
-            "features",
-            "--feature",
-            "info-visibility",
-            "--verbose",
+    def test_info_only_results_read_clean_until_verbose(self) -> None:
+        """An INFO-only check is clean by default and speaks under --verbose.
+
+        The visibility contract is the renderer's, so it is exercised through
+        the renderer rather than through whichever checker happens to carry an
+        INFO diagnostic today - the lifecycle checkers have moved their
+        advisory findings before and will again.
+        """
+        result = CheckResult(check_name="demo", supports_fix=False)
+        result.diagnostics.append(
+            CheckDiagnostic(
+                path=Path(".vault/adr/2026-05-15-info-visibility-adr.md"),
+                message="an advisory observation",
+                severity=Severity.INFO,
+            )
         )
 
-        assert "research document" not in default_result.output
-        assert "research document" in verbose_result.output
+        default_console = Console(file=io.StringIO(), width=100, force_terminal=False)
+        verbose_console = Console(file=io.StringIO(), width=100, force_terminal=False)
+        render_check_result(default_console, result)
+        render_check_result(verbose_console, result, verbose=True)
+
+        default_output = cast("io.StringIO", default_console.file).getvalue()
+        verbose_output = cast("io.StringIO", verbose_console.file).getvalue()
+
+        assert "an advisory observation" not in default_output
+        assert "clean" in default_output
+        assert "an advisory observation" in verbose_output
+        assert "1 info" in verbose_output
 
     def test_repair_human_output_prioritizes_severity_before_truncating(
         self, capsys: pytest.CaptureFixture[str]
