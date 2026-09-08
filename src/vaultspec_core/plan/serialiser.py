@@ -199,10 +199,9 @@ def _render_link_rules_comment() -> str:
         "<!-- LINK RULES:",
         "     - [[wiki-links]] are ONLY for .vault/ documents in the",
         "       related: field above.",
-        "     - The related: field carries the AUTHORISING documents",
-        "       (ADR, research, reference, prior plan) for every Step in",
-        "       this plan. Steps inherit this chain; per-row reference",
-        "       footers do not exist.",
+        "     - The related: field carries governing ADRs, if any.",
+        "       Steps inherit their evidence transitively. Direct supporting",
+        "       evidence links are optional; per-row footers do not exist.",
         "     - NEVER use [[wiki-links]] or markdown links in the",
         "       document body. -->",
     ]

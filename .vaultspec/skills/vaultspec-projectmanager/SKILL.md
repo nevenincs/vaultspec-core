@@ -23,9 +23,9 @@ Requires an authenticated `gh` CLI and a git repo with a configured remote.
   gaps.
 
 - **Query-response cycle:** enter the interaction loop. Gather relevant state via `gh`
-  and `git`. Present proposed actions with exact CLI invocations. On approval, execute
-  and confirm results. All proposals are subject to the operating principles defined in
-  the agent persona.
+  and `git`. Execute mutations covered by explicit scoped authorization and confirm
+  results. Otherwise present the exact command and effect and ask first. Follow the
+  system approval contract and the persona's external-action boundaries.
 
 ## Agent persona
 

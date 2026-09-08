@@ -13,7 +13,7 @@ related:
 <!-- FRONTMATTER RULES:
      tags: one directory tag (hardcoded #plan) and one feature tag.
      Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
-     Additional tags may be appended below the required pair.
+     Exactly these two tags are allowed; do not append additional tags.
 
      modified: CLI-maintained last-modified stamp; set at scaffold time,
      refreshed by mutating CLI verbs and vault check fix; never hand-edit.
@@ -25,24 +25,23 @@ related:
      field default to L2.
 
      Related: use wiki-links as '[[yyyy-mm-dd-foo-bar]]'. The related field
-     carries the approved ADRs this plan executes, plus the research or
-     reference they cite, for every Step in this plan; Steps inherit this
-     chain; per-row reference footers do not exist.
+     carries governing ADRs; Steps inherit their evidence transitively.
+     Direct supporting evidence links are optional. A decision-free plan
+     records its coverage assessment in the Description.
 
      DO NOT add fields beyond those scaffolded; metadata lives
      only in the frontmatter. -->
 
 <!-- LINK RULES:
      - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
-     - The related: field carries the approved ADRs this plan executes, plus
-       the research or reference they cite. Steps inherit this chain; per-row
-       reference footers do not exist.
+     - The related: field carries governing ADRs, if any. Evidence is inherited
+       transitively; direct supporting links are optional. No per-row footers.
      - NEVER use [[wiki-links]] or markdown links in the document body.
      - No markdown links to files; name a path in backticks: `src/module.py`. -->
 
 <!-- HIERARCHY AND TIERS:
      Epic > Wave > Phase > Step. Step is the canonical leaf-row
-     noun. Execution artifact: the plan's the plan's ledger.
+     noun. Execution artifact: the plan's ledger.
      Tier is declared in frontmatter as tier: L1/L2/L3/L4
      (mandatory for new plans; pre-existing plans without the
      field default to L2 until `vaultspec-core vault check all --fix` adds it).
@@ -53,14 +52,13 @@ related:
        L4 = Epic above Waves above Phases above Steps; MUST declare
             a project-management association in the Epic intent
             block prose.
-     Selection is by horizon, not container counting:
-       L1 = one concern, no cross-module coupling; Steps only.
-       L2 = one package over a few sessions; Phases with no hard
-            interdependencies.
-       L3 = hard ordering between Phase groups across two or more
-            packages; foundational changes.
-       L4 = multi-week; several workers or teams; an external
-            project-management artifact.
+     Select the smallest hierarchy that clarifies coordination:
+       L1 = a flat sequence of cohesive revisions, including broad changes.
+       L2 = Phases clarify groups of Steps.
+       L3 = Waves clarify dependencies between groups of Phases.
+       L4 = an Epic coordinates a program with external tracking.
+     Duration, file count, package count, or short parallel work alone
+     never requires a higher tier.
      Between two tiers take the smaller and promote later.
      Writer never invents containers to qualify a tier. -->
 
@@ -82,10 +80,11 @@ related:
      (U+2013) are forbidden. Step rows within a Phase are
      contiguous. -->
 
-<!-- NO COMPRESSION:
-     N self-similar actions = N rows. Never collapse into "for each
-     X, do Y" / "across all callers, do Z" / "in every module,
-     replace W". The rule applies at every tier including L1. -->
+<!-- COHESIVE GRANULARITY:
+     One Step is one cohesive, verifiable commit. Coordinated repeated edits
+     may share a row when scope and verification are explicit. Separate
+     unrelated outcomes. Name the bounded files or area, expected creations,
+     and intended result; avoid unspecified catch-all work. -->
 
 <!-- VAULTSPEC-CORE VAULT PLAN CLI:
      The `vaultspec-core vault plan` CLI is the canonical surface for
@@ -111,12 +110,12 @@ related:
 ## Description
 
 <!-- First line after approval: `Approved yyyy-mm-dd`, written by the
-orchestrator on the user's approval reply; a plan without it is presented
-again before its first Step runs. Then briefly describe the proposed work.
+orchestrator after establishing scoped authorization, including an explicit
+advance authorization. Record its basis; ask only when it is absent. Then briefly describe the proposed work.
 Reference `{adr}`s, `{research}`, `{reference}`. Supporting documentation
-must be read prior to writing the plan document. A plan may execute one ADR
-or a cluster; when several feed it, state here which Wave or Phase each ADR
-governs. -->
+must be read when relevant. State the decision coverage assessment; when no
+costly decision is involved and no ADR governs, say so. With several ADRs,
+map their scope to Steps at L1 or the relevant containers at higher tiers. -->
 
 ## Steps
 
@@ -187,10 +186,10 @@ interdependency. -->
 should be a verifiable check (test passes, surface conforms,
 reviewer signs off) rather than a free-form assertion.
 
-The plan is complete when every Step in the plan is closed
-(`- [x]`). At `L4`, the Epic-completion check additionally requires
+The plan is complete when every Step is closed (`- [x]`) and the final
+cohesive review passes. At `L4`, the Epic-completion check additionally requires
 the declared project-management association to report the Epic
 complete.
 
-Review cadence is fixed by the framework: at each Phase close, at plan
-close, and before handoff for merge. -->
+Review follows the vaultspec system section. L1 has no Phase close;
+coincident plan-close and handoff gates share one integrated review. -->

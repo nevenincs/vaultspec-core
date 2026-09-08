@@ -1,23 +1,52 @@
 # Run the Vaultspec workflow
 
-Start from a [configured project](../README.md#install).
+Start from a [configured project](../README.md#install), then describe your task to the
+coding agent. You don't need to create a complete set of documents before work begins.
+This guide covers choosing the route, authorizing work, and continuing it across
+sessions.
+
+Commands here use `vaultspec-core`; keep the `uvx` or `uv run` prefix if that is how you
+installed it.
+
+<p id="begin-a-pipeline"></p>
+
+## Choose the route for your task
+
+Describe the outcome and use a feature tag to group its records, as in the
+[README example](../README.md#start-a-feature). The agent assesses two separate needs:
+
+- **Decision coverage:** does the work depend on a costly-to-reverse choice? Reuse an
+  accepted architecture decision record (ADR), or gather evidence and propose a new or
+  amended decision.
+- **Planning:** does scope or progress need to survive sessions or handoff? If so, write
+  a plan; otherwise work directly.
+
+A typo fix can proceed directly. A multi-session cleanup within settled design choices
+can need a plan but no new ADR. Changing a persisted data format needs a decision even
+if the implementation is short. File count alone does not determine the route.
+
+Search for existing decisions across features, not only under the current tag. Reuse
+applicable evidence and accepted ADRs instead of creating equivalent records.
 
 <p id="how-a-feature-flows-into-the-vault"></p>
 
 ## Workflow stages
 
-Each stage has a skill for your coding agent:
+Use these skills when you want to request a particular part of the workflow:
 
-| Stage                        | Skill                      | Writes to           |
-| ---------------------------- | -------------------------- | ------------------- |
-| Research                     | `/vaultspec-research`      | `.vault/research/`  |
-| Code reference *(as needed)* | `/vaultspec-code-research` | `.vault/reference/` |
-| Decide                       | `/vaultspec-adr`           | `.vault/adr/`       |
-| Plan                         | `/vaultspec-write`         | `.vault/plan/`      |
-| Execute                      | `/vaultspec-execute`       | `.vault/exec/`      |
-| Review                       | `/vaultspec-code-review`   | `.vault/audit/`     |
+| Need                           | Skill                     | Record                                          |
+| ------------------------------ | ------------------------- | ----------------------------------------------- |
+| Weigh options using evidence   | `vaultspec-research`      | Research: findings and sources                  |
+| Understand how real code works | `vaultspec-code-research` | Reference: implementation patterns              |
+| Record a costly decision       | `vaultspec-adr`           | ADR: the choice, rationale, and consequences    |
+| Preserve scope and work order  | `vaultspec-write`         | Plan: cohesive, verifiable Steps                |
+| Carry out an approved plan     | `vaultspec-execute`       | Ledger: changed files and verification per Step |
+| Review planned work            | `vaultspec-code-review`   | Audit: findings and their resolutions           |
 
-The `/vaultspec-*` names identify skills for your coding agent, not shell commands.
+These are skill names for your agent, not shell commands. Research, code References, and
+Audit findings can supply decision evidence; you don't need all three. Each record has
+one job. Keep evidence in its source record and link to it rather than copying it into
+decisions and plans.
 
 ## Orient: see what is in flight
 
@@ -41,19 +70,16 @@ recorded execution evidence; that doesn't prove no work occurred.
 
 See the [status reference](CLI.md#vaultspec-core-status) for output details and options.
 
-## Begin a pipeline
+## Approve the scope, not every edit
 
-Ask your coding agent to start research with a feature tag:
+Approve new or changed decisions before implementation relies on them, and approve a
+plan before its Steps execute. Review the proposed scope and choices, not only the
+document's status label.
 
-> Use vaultspec-research to investigate adding full-text search to the API. Use the
-> feature tag search-api.
-
-Review the research before proceeding. Approve the architecture decision record (ADR)
-before planning, then approve the plan before implementation. Invoking a later skill
-directly doesn't waive its prerequisites.
-
-The agent may propose direct implementation for a small, single-file fix without
-architectural impact. It must explain the exception and obtain your approval first.
+Explicit prior authorization can cover later work within that scope. The agent records
+its basis and proceeds with ordinary implementation details and in-scope corrections.
+Material scope changes, uncovered costly decisions, and actions needing new external
+authority require your input. Not every correction needs another approval turn.
 
 ## Find a feature's documents
 
@@ -76,33 +102,46 @@ vaultspec-rag search "full-text ranking and tokenizer" --type vault
 
 ## Find and amend an ADR
 
-Find the ADRs for your feature. Replace `search-api` with its feature tag:
+List the current feature's ADRs with:
 
 ```bash
 vaultspec-core vault list adr --feature search-api
 ```
 
+Omit `--feature` to inspect decisions recorded elsewhere in the project.
+
 For prose edits, follow [editing safely](syntax.md#editing-safely). Amend an existing
-ADR for refinements, narrower scope, or parameter changes, and obtain renewed approval.
+ADR for refinements, narrower scope, or parameter changes. Keep the accepted content
+intact while presenting a proposed amendment separately; apply it after approval.
 
 If the direction reverses or the rationale no longer applies, create a replacement ADR.
-Both records must exist before
-[superseding the old ADR](CLI.md#vaultspec-core-vault-adr-supersede). Obtain approval
-for the replacement decision.
+The replacement must be accepted before
+[superseding the old ADR](CLI.md#vaultspec-core-vault-adr-supersede).
 
 Superseding doesn't revise plans or retarget their authorizing links. Review affected
-plans and links, revise them where necessary, and obtain approval before continuing
-implementation.
+active plans and links, revise them where necessary, and establish decision coverage
+before continuing implementation. Completed plans retain their historical links;
+reopening work requires reassessment.
 
 ## Make a plan
 
-From an approved ADR, `/vaultspec-write` produces the plan in `.vault/plan/`:
+When the work needs durable sequencing, ask for a plan:
 
-> "Write the implementation plan from the ADR."
+> Use vaultspec-write to plan the search-api work. Reuse applicable decisions and keep
+> the plan to a few major, verifiable Steps.
 
 Before approving the plan, review its scope, work order, affected files, and
-verification steps. If it doesn't match the approved decision, ask for revisions before
+verification steps. If it doesn't match the approved scope, ask for revisions before
 execution.
+
+A Step describes a cohesive change, which may span several files. Start with a flat L1
+plan; add Phases, Waves, or an Epic only when those groups help coordinate the work.
+Link governing ADRs and inherit their evidence through those links. If none governs,
+record why no costly decision is involved in the plan's Description.
+
+For parallel work, name each worker's assignment and keep write ownership separate.
+Sharing a working tree requires coordination of shared metadata and commits. More
+workers do not, by themselves, require a higher plan tier.
 
 For the plan's structure and Step syntax, see [tiers](syntax.md#tiers) and
 [row format](syntax.md#row-format).
@@ -117,8 +156,9 @@ See [plan commands](CLI.md#vaultspec-core-vault-plan) for arguments and examples
 
 ## Execute a plan
 
-After approving the plan, ask your agent to use `/vaultspec-execute`. It starts from the
-next open Step and records changes in the plan's execution ledger.
+After approving the plan, ask your agent to use `vaultspec-execute`. It starts from the
+next open Step. For each Step, it implements, runs relevant tests and checks, logs the
+changed files and verification results, marks the Step complete, and commits.
 
 To resume interrupted work, ask the agent to continue or specify a Step. Use
 [status](CLI.md#vaultspec-core-status) to check progress and the next open Step.
@@ -130,29 +170,17 @@ and keep its execution records. See the
 ## Review the result
 
 Ask your agent to use `vaultspec-code-review` to compare the implementation with the
-approved decision and plan. Follow the [review guide](./correctness.md) to record
-findings, agree on fixes, and check the resulting changes.
+plan and any governing decisions. Review the integrated result, not individual files as
+separate approval gates. The [review guide](./correctness.md) covers when review is due,
+how findings are recorded, and how fixes are verified.
 
 <p id="everyday-commands"></p>
 
 ## Check records and project health
 
-Before committing feature records, run:
-
-```bash
-vaultspec-core vault check all
-```
-
-If it reports problems, follow
-[validation and repair](verification.md#check-records-before-committing).
-
-After installation or an upgrade, check workspace configuration and vault records:
-
-```bash
-vaultspec-core doctor
-```
-
-To check only workspace configuration, use `vaultspec-core spec doctor`.
+Use the [verification guide](verification.md) to check installation, validate records,
+and review repairs. These checks validate the workspace and records; they don't replace
+implementation tests or review.
 
 To inspect a feature's document links, replace `search-api` with its feature tag:
 

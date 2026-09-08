@@ -1,13 +1,8 @@
-"""Frontmatter detection rule (``PLAN001``-``PLAN003``).
-
-Validates frontmatter contract from the convention ADR's
-*Frontmatter contract* section:
+"""Frontmatter detection rules (``PLAN001`` and ``PLAN003``).
 
 - ``PLAN001 missing-tier`` (warning): plan lacks a ``tier:`` field;
   the parser applied the legacy ``L2`` default. Auto-fixable by
   ``vaultspec-core vault plan check --fix`` (writes the field on first edit).
-- ``PLAN002 missing-related`` (error): plan contains at least one
-  Step row but the ``related:`` frontmatter field is absent or empty.
 - ``PLAN003 stub-epic-intent`` (warning): an L4 plan's Epic intent
   paragraph contains a ``TODO:`` sentinel left behind by ``tier
   promote --to L4`` when the writer did not supply ``--epic-intent``.
@@ -27,7 +22,7 @@ __all__ = ["check_frontmatter"]
 
 
 def check_frontmatter(plan: Plan) -> list[Finding]:
-    """Run the three frontmatter detection rules against ``plan``."""
+    """Check structural metadata without inferring decision coverage."""
     findings: list[Finding] = []
 
     if plan.frontmatter.legacy_tier_default:
@@ -46,26 +41,6 @@ def check_frontmatter(plan: Plan) -> list[Finding]:
                     "contract section."
                 ),
                 autofixable=True,
-            ),
-        )
-
-    if plan.steps and not plan.frontmatter.related:
-        findings.append(
-            Finding(
-                code="PLAN002",
-                severity=Severity.ERROR,
-                message=(
-                    "Plan contains Step rows but the 'related:' "
-                    "frontmatter field is empty; authorising documents "
-                    "(ADR, research, reference, prior plan) MUST be "
-                    "listed for every non-trivial plan."
-                ),
-                line_number=1,
-                fix_hint=(
-                    "Add at least one quoted wiki-link to the 'related:' "
-                    "list (e.g., '- [[2026-...-feature-adr]]')."
-                ),
-                autofixable=False,
             ),
         )
 

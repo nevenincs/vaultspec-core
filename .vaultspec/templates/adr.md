@@ -12,7 +12,7 @@ related:
 <!-- FRONTMATTER RULES:
      tags: one directory tag (hardcoded #adr) and one feature tag.
      Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
-     Additional tags may be appended below the required pair.
+     Exactly these two tags are allowed; do not append additional tags.
 
      Related: use wiki-links as '[[yyyy-mm-dd-foo-bar]]'.
 
@@ -26,10 +26,10 @@ related:
      which also records superseded_by); and deprecated when it is retired
      without a direct successor.
 
-     Amend vs supersede: refinements and concretization rewrite the accepted
-     record's body in place (modified: carries the revision); a new ADR with
-     supersession is only for a major pivot. One accepted record per
-     decision.
+     Reuse, amendment, and supersession follow the vaultspec system section.
+     Preserve accepted content while a revision is pending; apply only an
+     authorized amendment. Accept a reversal's successor before superseding
+     its predecessor. Unchanged coverage needs no new record.
 
      DO NOT add fields beyond those scaffolded; metadata lives
      only in the frontmatter. -->
@@ -44,7 +44,7 @@ related:
 
 <!-- DOCUMENT BOUNDARY:
      This record owns the decision and only the decision. Grounding evidence
-     lives in the related research/reference documents and is cited by stem
+     lives in the related research/reference/audit documents and is cited by stem
      (e.g. `2026-02-04-editor-demo-research`), never restated - a restated
      fact forks and goes stale. A fact this record needs but the grounding
      lacks is added to the grounding first, then cited. -->

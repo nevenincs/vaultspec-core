@@ -57,13 +57,12 @@ def _plan_backing_diagnostics(root: Path) -> list[str]:
 
 
 class TestPlanAdrBacking:
-    def test_plan_without_any_adr_is_reported(self, tmp_path: Path) -> None:
+    def test_plan_without_any_adr_is_valid(self, tmp_path: Path) -> None:
         _write_doc(tmp_path, "plan", "2026-02-04-lonely-plan", "lonely")
 
         messages = _plan_backing_diagnostics(tmp_path)
 
-        assert len(messages) == 1
-        assert "lonely" in messages[0]
+        assert messages == []
 
     def test_same_feature_adr_backs_the_plan(self, tmp_path: Path) -> None:
         _write_doc(tmp_path, "adr", "2026-02-04-paired-adr", "paired")
@@ -89,7 +88,7 @@ class TestPlanAdrBacking:
     def test_related_link_to_a_non_adr_does_not_back_the_plan(
         self, tmp_path: Path
     ) -> None:
-        """Only an ADR satisfies ADR backing, whatever else is cited."""
+        """Evidence links do not imply that a plan needs a decision record."""
         _write_doc(tmp_path, "audit", "2026-02-04-governing-audit", "governing")
         _write_doc(
             tmp_path,
@@ -101,5 +100,4 @@ class TestPlanAdrBacking:
 
         messages = _plan_backing_diagnostics(tmp_path)
 
-        assert len(messages) == 1
-        assert "sweep" in messages[0]
+        assert messages == []

@@ -38,6 +38,21 @@ def test_clean_plan_has_no_error_findings(tier: str) -> None:
 # ---- Frontmatter rule -------------------------------------------------------
 
 
+@pytest.mark.parametrize("tier", ["L1", "L2", "L3", "L4"])
+def test_decision_free_plan_passes_complete_check_harness(tier: str) -> None:
+    spec = make_clean_plan(tier, rng=random.Random(0), waves=2, phases=2, steps=2)
+    source = spec.render()
+    plan = parse_plan(source)
+    plan.frontmatter.related = []
+    from vaultspec_core.plan.serialiser import serialise_plan
+
+    source = serialise_plan(plan)
+    reparsed = parse_plan(source)
+    assert reparsed.steps
+    assert not reparsed.frontmatter.related
+    assert not has_errors(collect_all(reparsed, source))
+
+
 def test_frontmatter_check_warns_on_missing_tier() -> None:
     """Legacy plans without ``tier:`` emit a PLAN001 warning."""
     body = (

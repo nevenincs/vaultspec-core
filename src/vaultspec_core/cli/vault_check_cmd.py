@@ -755,7 +755,7 @@ def cmd_check_schema(
     offset: OffsetOption = 0,
     target: TargetOption = None,
 ) -> None:
-    """Enforce schema rules: ADRs must ref research, plans must ref ADRs."""
+    """Check ADR evidence links and active plans' linked decision status."""
     apply_target(target)
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.graph import VaultGraph

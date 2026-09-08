@@ -25,12 +25,12 @@ _OLD_ADR_CONTENT = (
 _NEW_ADR_CONTENT_17 = (
     "---\ntags:\n  - '#adr'\n  - '#test-feat'\n"
     "date: '2026-05-17'\nrelated: []\n---\n"
-    "# `test-feat` adr: `New ADR` | (**status:** `proposed`)\n"
+    "# `test-feat` adr: `New ADR` | (**status:** `accepted`)\n"
 )
 _NEW_ADR_CONTENT_20 = (
     "---\ntags:\n  - '#adr'\n  - '#test-feat'\n"
     "date: '2026-05-20'\nrelated: []\n---\n"
-    "# `test-feat` adr: `New ADR` | (**status:** `proposed`)\n"
+    "# `test-feat` adr: `New ADR` | (**status:** `accepted`)\n"
 )
 
 
@@ -146,7 +146,7 @@ def test_adr_supersede_success_mutates_both_files(
         "related: []\n"
         "other_field: 'world'\n"
         "---\n"
-        "# `test-feat` adr: `New ADR Title` | (**status:** `proposed`)\n"
+        "# `test-feat` adr: `New ADR Title` | (**status:** `accepted`)\n"
         "\n"
         "New body content here\n"
     )
@@ -242,3 +242,123 @@ def test_adr_supersede_json_output(runner: CliRunner, test_project: Path) -> Non
     assert payload["status"] == "updated"
     assert "2026-05-17-old-adr.md" in payload["data"]["old_path"]
     assert "2026-05-20-new-adr.md" in payload["data"]["new_path"]
+
+
+@pytest.mark.parametrize("status", ["proposed", "rejected", "deprecated", "superseded"])
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_unaccepted_successor_does_not_mutate(
+    runner: CliRunner, test_project: Path, status: str, dry_run: bool
+) -> None:
+    old = test_project / ".vault" / "adr" / "old.md"
+    new = test_project / ".vault" / "adr" / "new.md"
+    old.write_text(_OLD_ADR_CONTENT, encoding="utf-8")
+    new.write_text(
+        _NEW_ADR_CONTENT_20.replace("`accepted`", f"`{status}`"), encoding="utf-8"
+    )
+    before = (old.read_bytes(), new.read_bytes())
+    args = [
+        "--target",
+        str(test_project),
+        "vault",
+        "adr",
+        "supersede",
+        "old",
+        "--by",
+        "new",
+    ]
+    if dry_run:
+        args.append("--dry-run")
+    result = runner.invoke(app, args)
+    assert result.exit_code == 1
+    assert "must be accepted" in result.output
+    assert (old.read_bytes(), new.read_bytes()) == before
+
+
+def test_self_supersession_does_not_mutate(
+    runner: CliRunner, test_project: Path
+) -> None:
+    old = test_project / ".vault" / "adr" / "old.md"
+    old.write_text(_OLD_ADR_CONTENT, encoding="utf-8")
+    before = old.read_bytes()
+    result = runner.invoke(
+        app,
+        [
+            "--target",
+            str(test_project),
+            "vault",
+            "adr",
+            "supersede",
+            "old",
+            "--by",
+            "old",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "cannot supersede itself" in result.output
+    assert old.read_bytes() == before
+
+
+def test_supersession_replay_and_chain(runner: CliRunner, test_project: Path) -> None:
+    directory = test_project / ".vault" / "adr"
+    for name in ("first", "second", "third"):
+        (directory / f"{name}.md").write_text(_OLD_ADR_CONTENT, encoding="utf-8")
+
+    def supersede(old: str, new: str) -> int:
+        return runner.invoke(
+            app,
+            [
+                "--target",
+                str(test_project),
+                "vault",
+                "adr",
+                "supersede",
+                old,
+                "--by",
+                new,
+            ],
+        ).exit_code
+
+    assert supersede("first", "second") == 0
+    before = [(directory / f"{name}.md").read_bytes() for name in ("first", "second")]
+    assert supersede("first", "second") == 0
+    assert before == [
+        (directory / f"{name}.md").read_bytes() for name in ("first", "second")
+    ]
+    assert supersede("second", "third") == 0
+    assert "superseded_by: 'second'" in (directory / "first.md").read_text()
+    assert "superseded_by: 'third'" in (directory / "second.md").read_text()
+
+
+def test_recorded_ancestor_cycle_does_not_mutate(
+    runner: CliRunner, test_project: Path
+) -> None:
+    directory = test_project / ".vault" / "adr"
+    old, new = directory / "old.md", directory / "new.md"
+    old.write_text(
+        _OLD_ADR_CONTENT.replace(
+            "related: []", "related: []\nsupersedes:\n  - 'middle'"
+        ),
+        encoding="utf-8",
+    )
+    (directory / "middle.md").write_text(
+        _OLD_ADR_CONTENT.replace("related: []", "related: []\nsupersedes:\n  - 'new'"),
+        encoding="utf-8",
+    )
+    new.write_text(_NEW_ADR_CONTENT_20, encoding="utf-8")
+    before = old.read_bytes(), new.read_bytes()
+    result = runner.invoke(
+        app,
+        [
+            "--target",
+            str(test_project),
+            "vault",
+            "adr",
+            "supersede",
+            "old",
+            "--by",
+            "new",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "cycle" in result.output
+    assert (old.read_bytes(), new.read_bytes()) == before

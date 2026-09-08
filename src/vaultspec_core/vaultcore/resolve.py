@@ -6,8 +6,8 @@ and bare stems - and normalises them to the canonical ``[[stem]]`` wiki-link
 format used in ``related:`` frontmatter fields.
 
 Also provides :func:`validate_feature_dependencies` which enforces the
-documentation lifecycle at create time: research before ADR, ADR before plan,
-plan before exec.
+structural dependency at create time: execution records require a plan.
+Decision coverage and evidence are assessed through explicit document links.
 """
 
 from __future__ import annotations
@@ -196,13 +196,9 @@ def validate_feature_dependencies(
 ) -> list[str]:
     """Check that prerequisite documents exist for a feature before creating a new one.
 
-    Lifecycle rules enforced:
-
-    - **exec** requires a plan for the feature (hard error).
-    - **exec** requires passing feature tag validation - the feature must
-      already have plan and ADR documents (hard error).
-    - **plan** without an ADR warns. Without research also warns.
-    - **adr** without research warns.
+    A plan can be decision-free or reuse decisions across features. This feature-only
+    check cannot judge semantic coverage or evidence links; the schema checker does
+    that against the authored records. Execution still requires a plan.
 
     Args:
         root_dir: Project root directory.
@@ -210,60 +206,17 @@ def validate_feature_dependencies(
         feature: Feature tag (without ``#``).
 
     Returns:
-        List of diagnostic strings. Entries prefixed with ``ERROR:`` are
-        hard failures that should block creation. Entries prefixed with
-        ``WARNING:`` are advisory.
+        Diagnostic strings prefixed with ``ERROR:`` for missing prerequisites.
     """
     from .query import scan_all
 
-    diagnostics: list[str] = []
-
-    # Collect existing doc types for this feature
-    existing_types: set[str] = set()
-    for doc in scan_all(root_dir):
-        if doc.feature == feature:
-            existing_types.add(doc.doc_type)
-
-    is_new_feature = len(existing_types) == 0
-
-    if doc_type == DocType.EXEC:
-        # Exec requires plan - hard fail
-        if "plan" not in existing_types:
-            diagnostics.append(
-                f"ERROR: Cannot create exec for feature '{feature}' - "
-                f"no plan document exists. Create a plan first."
-            )
-        # Exec requires the full chain to exist
-        if "adr" not in existing_types:
-            diagnostics.append(
-                f"ERROR: Cannot create exec for feature '{feature}' - "
-                f"no ADR document exists. The feature lifecycle requires "
-                f"research -> ADR -> plan -> exec."
-            )
-
-    elif doc_type == DocType.PLAN:
-        if "adr" not in existing_types:
-            diagnostics.append(
-                f"WARNING: Feature '{feature}' has no ADR. "
-                f"Plans should be backed by an architectural decision."
-            )
-        if "research" not in existing_types:
-            diagnostics.append(
-                f"WARNING: Feature '{feature}' has no research document. "
-                f"Consider creating research to support this plan."
-            )
-
-    elif doc_type == DocType.ADR:
-        if "research" not in existing_types:
-            if is_new_feature:
-                diagnostics.append(
-                    f"WARNING: Feature '{feature}' is new and has no "
-                    f"research document. ADRs should be supported by research."
-                )
-            else:
-                diagnostics.append(
-                    f"WARNING: Feature '{feature}' has no research document. "
-                    f"ADRs should be supported by research findings."
-                )
-
-    return diagnostics
+    if doc_type != DocType.EXEC:
+        return []
+    if any(
+        doc.feature == feature and doc.doc_type == "plan" for doc in scan_all(root_dir)
+    ):
+        return []
+    return [
+        f"ERROR: Cannot create exec for feature '{feature}' - "
+        "no plan document exists. Create a plan first."
+    ]

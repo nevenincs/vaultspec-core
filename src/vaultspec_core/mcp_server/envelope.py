@@ -49,8 +49,7 @@ import re
 from typing import TYPE_CHECKING, Any, ParamSpec, Protocol, TypeVar, cast, override
 
 from mcp.types import CallToolResult, TextContent
-from pydantic import BaseModel, GetJsonSchemaHandler
-from pydantic_core import to_jsonable_python
+from pydantic import BaseModel, GetJsonSchemaHandler, TypeAdapter
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -64,6 +63,7 @@ _R = TypeVar("_R")
 #: reintroduce the defect this module exists to remove, so the cap is on the
 #: rendered string rather than on the caller's good intentions.
 _MAX_SUMMARY_CHARS = 200
+_JSON_ADAPTER: TypeAdapter[Any] = TypeAdapter(Any)
 
 
 class _Summariser(Protocol):
@@ -232,7 +232,7 @@ def _prune_any(value: Any) -> Any:
         }
     if isinstance(value, list | tuple):
         return [_prune_any(item) for item in cast("list[Any]", value)]
-    return to_jsonable_python(value, by_alias=True)
+    return _JSON_ADAPTER.dump_python(value, mode="json", by_alias=True)
 
 
 def _structured(payload: object) -> Any:

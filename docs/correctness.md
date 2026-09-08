@@ -1,7 +1,7 @@
 # Review a feature implementation
 
-Review the implementation against the feature's architecture decision record (ADR),
-plan, and test evidence. Define which changes the review covers.
+Review the implementation against its approved scope, any governing architecture
+decision records (ADRs), and test evidence. Define which changes the review covers.
 
 <p id="two-different-questions"></p>
 <p id="what-is-actually-enforced"></p>
@@ -19,10 +19,20 @@ For hook activation and setup choices, see
 
 ## Review the change
 
-Ask your agent to use the `vaultspec-code-review` skill for the feature. Give it the
-implementation scope and the feature's documents. Ask it to compare the code with the
-ADR and plan, consulting supporting evidence as needed. Record scope, findings, and
-recommendations in the feature's audit.
+For planned work, ask your agent to use `vaultspec-code-review`. Give it the
+implementation scope and the feature's documents. It compares the integrated result with
+the plan and any governing ADRs, consulting supporting evidence as needed. Record scope,
+findings, and recommendations in the feature's rolling audit. A change without a plan is
+reviewed in the reply and does not require an audit record.
+
+For planned work, review at each Phase close, at plan close, and before handoff for
+merge or completion. Combine coincident reviews. An L1 plan has no Phases, so it has no
+Phase-close gate. Tests and local checks still run with each Step.
+
+Trace the affected workflow across its components: do the interfaces agree, do failure
+paths behave as intended, and do the tests cover the promised result? For documentation
+or framework changes, read the pages and instructions together for conflicting advice.
+Separate file reviews alone do not establish that the whole workflow works.
 
 To scaffold the feature's first audit manually, run:
 
@@ -30,9 +40,9 @@ To scaffold the feature's first audit manually, run:
 vaultspec-core vault add audit --feature payment-retries
 ```
 
-Replace `payment-retries` with your feature's tag. This creates a template; completing
-the review requires inspecting the change and writing the audit. Keep an audit even when
-the review finds no problems, with its scope recorded.
+Replace `payment-retries` with your feature's tag. This creates a template, not a
+completed review. Record the reviewed scope and result even when no problems are found;
+append later reviews and resolutions to the same audit.
 
 <p id="what-the-review-does-and-does-not-buy-you"></p>
 <p id="what-the-framework-tells-the-agent"></p>
@@ -40,9 +50,11 @@ the review finds no problems, with its scope recorded.
 ## Act on findings
 
 The review skill directs the agent to report problems without fixing code during the
-review. Agree on fixes and record them in the
-[implementation plan](CLI.md#vaultspec-core-vault-plan), then rerun the relevant tests
-and record checks.
+review. Execution handles fixes within the approved scope through the
+[implementation plan](CLI.md#vaultspec-core-vault-plan), then reruns relevant tests and
+record checks. Critical or high findings reopen affected Steps and must be fixed before
+continuing. New scope or uncovered decisions require authorization. Append review
+outcomes and resolutions without erasing earlier findings.
 
 Before accepting the feature, review its assumptions, test evidence, and responses to
 the findings. Resolve uncertainty that could change your acceptance decision.
@@ -79,7 +91,8 @@ the work they check; a file-change record alone does not show that tests ran.
 
 1. [Check the feature records and review any repairs](./verification.md#check-records-before-committing).
 1. Run the project's tests, linting, and type checks.
-1. Review the implementation against the approved decision and plan using the
-   [review step](#review-the-change). Address findings and rerun affected checks.
+1. Review the implementation against the approved scope and any governing decisions
+   using the [review step](#review-the-change). Address findings and rerun affected
+   checks.
 
 Review the final diff before committing.

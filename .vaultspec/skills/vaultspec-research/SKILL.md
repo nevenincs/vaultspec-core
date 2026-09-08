@@ -6,10 +6,10 @@ description: Ground a decision in evidence before it is made. Use when an ADR is
 # Research (vaultspec-research)
 
 Produces a Research record: the evidence a later ADR decides on. Enter it when the
-vaultspec sizing warrants an ADR and the options are not already weighed in the vault or
-the code. A question this session can answer without new evidence is answered in the
-conversation; if that answer then becomes an ADR, this record is written first, however
-short. This skill terminates within one run.
+vaultspec decision test warrants an ADR and the options are not already weighed in the
+vault or the code. A question this session can answer without new evidence is answered
+in the conversation. Reuse sufficient existing Research, Reference, or Audit evidence
+before creating more. This skill terminates within one run.
 
 ## Steps
 

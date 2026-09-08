@@ -1,12 +1,13 @@
 # Documentation
 
-[Install Core](../README.md#install) to get started.
+Start with [the framework workflow](../README.md#start-a-feature), then
+[install it in your project](../README.md#install).
 
 <p id="start-here"></p>
 
 ## Use Core
 
-- [Run a feature workflow and customize project rules](framework.md).
+- [Choose a workflow, plan and resume work, and customize project rules](framework.md).
 - [Edit document prose and structure](syntax.md).
 - [Check your workspace and repair records](verification.md).
 - [Review implementation and test evidence](correctness.md).

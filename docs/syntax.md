@@ -27,8 +27,8 @@ Bodies, by document type:
 | Rows in a ledger                 | The tool       | `vaultspec-core vault exec log`                              |
 | A feature index, whole file      | The tool       | `vaultspec-core vault feature index`                         |
 
-Plan rows are the exception worth remembering: they look like ordinary body prose, and
-they are not, because ledger rows point at the identifiers in them.
+Plan rows look like ordinary Markdown, but their identifiers connect planned work to
+execution records. Change rows and checkboxes through the plan tools.
 
 ## Editing safely
 
@@ -77,14 +77,17 @@ Plans add `tier`; generated indexes add `generated`:
 
 | Type  | Extra field | Holds                                              |
 | ----- | ----------- | -------------------------------------------------- |
-| plan  | `tier`      | The complexity tier: `L1`, `L2`, `L3`, or `L4`     |
+| plan  | `tier`      | The plan structure: `L1`, `L2`, `L3`, or `L4`      |
 | index | `generated` | Always `true`; the file is rebuilt, never authored |
 
 Execution ledgers link to their parent plan in `related`; each row carries its Step
 identifier. See [execution logging](CLI.md#vaultspec-core-vault-exec-log).
 
-Add no fields beyond these. Metadata lives in frontmatter and nowhere else, so an
-invented field has no reader and fails the `frontmatter` check.
+ADRs also use `supersedes` and `superseded_by` for replacement relationships, maintained
+by `vaultspec-core vault adr supersede`. Their decision status is in the body heading,
+not a frontmatter field. Follow the
+[decision lifecycle](framework.md#find-and-amend-an-adr) when changing it. Use the
+owning commands for supported fields; don't invent metadata.
 
 ## The tag pair
 
@@ -100,9 +103,9 @@ Exactly two tags. One names the directory, one names the feature.
 | `.vault/reference/` | `#reference` |
 | `.vault/research/`  | `#research`  |
 
-The feature tag is kebab-case and identical across every document in the feature's
-lifecycle. It is what makes a trail findable: research, decision, plan, and audit all
-carry `#payment-retries`, so one filter returns the whole story.
+The feature tag is kebab-case and shared by that feature's records. Filtering for
+`#payment-retries` finds its records; their links can lead to decisions and evidence
+under other feature tags. A feature does not need every document type.
 
 Use only the directory tag and the feature tag; `vault add --tags` rejects additional
 tags.
@@ -124,6 +127,11 @@ Afterwards, use [link add](CLI.md#vaultspec-core-vault-link-add) or
 - Quote wiki-links so YAML reads them as strings, not nested sequences.
 - Store document stems without directories or `.md`: `[[document-stem]]`.
 - Link only to existing documents. The `dangling` check reports unresolved links.
+
+Plans link their governing ADRs, even across feature tags. Supporting evidence is
+reachable through those ADRs; direct evidence links are optional. A decision-free plan
+can have an empty `related` list. See
+[choosing the route](framework.md#choose-the-route-for-your-task).
 
 The `body-links` check rejects wiki-links and Markdown path links in body prose. Cite
 code by locator instead, in backticks: `src/billing/retry.py:42`, commit `abc1234`, or
@@ -184,7 +192,9 @@ ledgers reference the plan's Step identifiers.
 
 ### Tiers
 
-The tier declared in frontmatter decides which containers exist:
+The tier declared in frontmatter decides which containers exist. Use the smallest
+structure that helps coordinate the work, not a tier based solely on file or worker
+count:
 
 | Tier | Structure                                                                |
 | ---- | ------------------------------------------------------------------------ |
@@ -200,32 +210,29 @@ options.
 
 ### Row format
 
-One row per unit of work:
+One row per cohesive, verifiable change. For an L1 plan:
 
 ```
-- [ ] `W01.P02.S07` - Rewrite the retry backoff to read its ceiling from config; `src/billing/retry.py`.
+- [ ] `S07` - Make retry backoff configurable and verify its limits; `src/billing, tests/billing`.
 ```
 
 Reading that row left to right:
 
-| Part                       | Example                         |
-| -------------------------- | ------------------------------- |
-| Checkbox, two states only  | `- [ ]`                         |
-| Display path, in backticks | `` `W01.P02.S07` ``             |
-| Spaced ASCII hyphen        | `-`                             |
-| Imperative-verb action     | `Rewrite the retry backoff ...` |
-| Semicolon                  | `;`                             |
-| File scope, in backticks   | `` `src/billing/retry.py` ``    |
-| Trailing period            | `.`                             |
+| Part                       | Example                               |
+| -------------------------- | ------------------------------------- |
+| Checkbox, two states only  | `- [ ]`                               |
+| Display path, in backticks | `` `S07` ``                           |
+| Spaced ASCII hyphen        | `-`                                   |
+| Imperative-verb action     | `Make retry backoff configurable ...` |
+| Semicolon                  | `;`                                   |
+| File scope, in backticks   | `` `src/billing, tests/billing` ``    |
+| Trailing period            | `.`                                   |
 
 `[ ]` is open and `[x]` is closed. The format has no in-progress marker.
 
 Write plain ASCII hyphens. The `PLAN060` rule rejects em-dashes and en-dashes anywhere
 in a plan: body, headings, frontmatter, and comment hints. `vault plan check --fix`
 replaces them with an ASCII spaced hyphen.
-
-Put the records authorizing the work in the plan's `related:` frontmatter. Follow the
-[linking rules](#linking).
 
 ### Display paths
 
@@ -264,10 +271,13 @@ Duplicated canonical identifiers make ledger references ambiguous. Review the ex
 records before repairing a conflict; validation cannot determine which Step an existing
 record meant.
 
-### One action, one row
+<p id="one-action-one-row"></p>
 
-Write a separate Step for each independently verifiable action so each has its own
-completion state. Apply this convention during plan review; no check enforces it.
+### Step size
+
+Keep implementation and its verification together when they form one cohesive change.
+Split work when it needs an independent completion state, not for every file or edit.
+Step size is a planning judgment; no structural check decides it.
 
 ## Where to go next
 

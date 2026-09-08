@@ -79,9 +79,11 @@ the curator reconciles toward it.
 
 The curator acts on what is mechanically safe and proposes what needs judgment.
 
-- **Act directly (mechanically safe).** Status propagation through
-  `vaultspec-core vault adr supersede OLD --by NEW`; status-encoding and stamp
-  normalization. Prefer the CLI mutators (`vaultspec-core vault adr supersede`,
+- **Act directly (mechanically safe).** Status-encoding and stamp normalization,
+  including propagation of an already-recorded, unambiguous supersession through an
+  owning body edit, per the reconciliation playbook. A new supersession uses
+  `vaultspec-core vault adr supersede OLD --by NEW` only after authorization and
+  successor acceptance. Use the CLI mutators (`vaultspec-core vault adr supersede`,
   `vaultspec-core vault set-body`, `vaultspec-core vault edit`,
   `vaultspec-core vault link add`) over raw file edits so the frontmatter contract and
   the `modified` stamp stay canonical.

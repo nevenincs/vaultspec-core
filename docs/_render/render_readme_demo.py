@@ -114,7 +114,9 @@ def fit_lines(ansi: str, width: int = COLS) -> list[str]:
     """Ellipsis-trim each captured line to the demo terminal width."""
     out = _recording_console(width)
     for line in ansi.splitlines():
-        out.print(Text.from_ansi(line), no_wrap=True, overflow="ellipsis")
+        text = Text.from_ansi(line)
+        text.truncate(width, overflow="ellipsis")
+        out.print(text, no_wrap=True, overflow="crop")
     text = out.export_text(styles=True)
     lines = text.splitlines()
     while lines and not lines[-1].strip():

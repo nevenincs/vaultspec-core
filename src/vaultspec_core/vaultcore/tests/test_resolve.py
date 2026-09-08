@@ -161,15 +161,17 @@ class TestValidateFeatureDependencies:
         )
         assert not diags
 
-    def test_adr_warns_no_research(self, vault_project: Path) -> None:
+    def test_adr_scaffolding_defers_evidence_to_explicit_links(
+        self, vault_project: Path
+    ) -> None:
         diags = validate_feature_dependencies(vault_project, DocType.ADR, "new-feat")
-        assert any("WARNING:" in d and "research" in d.lower() for d in diags)
+        assert diags == []
 
     def test_adr_no_warning_when_research_exists(self, vault_project: Path) -> None:
         diags = validate_feature_dependencies(vault_project, DocType.ADR, "my-feat")
         assert not any("research" in d.lower() for d in diags)
 
-    def test_plan_warns_no_adr(self, vault_project: Path) -> None:
+    def test_decision_free_plan_needs_no_adr(self, vault_project: Path) -> None:
         # Create a feature with research but no ADR
         research_path = (
             vault_project / ".vault" / "research" / "2026-03-01-plan-only-research.md"
@@ -180,7 +182,7 @@ class TestValidateFeatureDependencies:
             encoding="utf-8",
         )
         diags = validate_feature_dependencies(vault_project, DocType.PLAN, "plan-only")
-        assert any("WARNING:" in d and "adr" in d.lower() for d in diags)
+        assert diags == []
 
     def test_plan_no_warning_when_adr_exists(self, vault_project: Path) -> None:
         diags = validate_feature_dependencies(vault_project, DocType.PLAN, "my-feat")
@@ -202,7 +204,7 @@ class TestValidateFeatureDependencies:
         assert len(errors) >= 1
         assert any("plan" in e.lower() for e in errors)
 
-    def test_exec_fails_no_adr(self, vault_project: Path) -> None:
+    def test_exec_accepts_decision_free_plan(self, vault_project: Path) -> None:
         # Create a feature with plan but no ADR
         (vault_project / ".vault" / "plan" / "2026-03-01-no-adr-plan.md").write_text(
             "---\ntags:\n  - '#plan'\n  - '#no-adr'\n"
@@ -211,7 +213,7 @@ class TestValidateFeatureDependencies:
         )
         diags = validate_feature_dependencies(vault_project, DocType.EXEC, "no-adr")
         errors = [d for d in diags if d.startswith("ERROR:")]
-        assert any("adr" in e.lower() for e in errors)
+        assert errors == []
 
     def test_exec_passes_full_chain(self, vault_project: Path) -> None:
         # my-feat has research + adr + plan
