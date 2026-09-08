@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import ast
 import re
+import sys
 import tomllib
 from pathlib import Path
 from typing import TypedDict, cast, get_args
@@ -532,7 +533,15 @@ def test_lint_covers_every_validation_surface() -> None:
 
 def test_audit_covers_every_advisory_dimension() -> None:
     """Advisory dimensions are named individually so each can graduate to lint."""
-    required = {"deps", "security", "dead-code", "dependencies", "complexity", "all"}
+    required = {
+        "deps",
+        "security",
+        "dead-code",
+        "dependencies",
+        "complexity",
+        "advisory",
+        "all",
+    }
     missing = sorted(required - _toolchain_targets("audit"))
     assert not missing, f"audit verb is missing targets: {missing}"
 
@@ -652,16 +661,99 @@ def test_ty_pre_commit_scope_matches_dev_toolchain_scope() -> None:
     )
 
 
+#: Seconds a test may spend on its OWN work, on top of the advisory-lock waits
+#: the harness timer has to sit above. The slowest test in this suite runs
+#: about 27 seconds, so this is generous on purpose: the number it pads is a
+#: worst case that only contention reaches, and being wrong in this direction
+#: costs a slower report on a genuinely hung test, while being wrong in the
+#: other direction costs the diagnostic entirely.
+_TEST_WORK_ALLOWANCE_SECONDS = 120.0
+
+#: Advisory-lock acquisitions one test may make in sequence. Two, because a
+#: test that takes a second lock while holding contention on the first is the
+#: shape that exhausted the old margin.
+_SEQUENTIAL_LOCK_ACQUISITIONS = 2
+
+
+def test_the_test_timeout_sits_above_the_advisory_lock_budget() -> None:
+    """pytest's timer must not pre-empt ``AdvisoryLockTimeoutError``.
+
+    ``advisory_lock`` bounds a single acquisition at
+    ``lock_timeout_seconds`` and then raises an error that names the sentinel,
+    the budget and the layer that gave up. That error is the designed
+    diagnostic for contention, and it is only ever seen if the harness lets it
+    happen.
+
+    It did not. At ``timeout = 300`` against a 120-second budget, one exhausted
+    acquisition left 180 seconds and two left none, so a contended test died on
+    a pytest stack dump naming whatever syscall the sampler caught rather than
+    on the error built to explain it. The dump that prompted this guard pointed
+    at ``os.open`` inside ``_open_atomic_temp`` and read as a deadlock in the
+    atomic-write path, which it was not.
+
+    Both numbers live in different files and neither knows about the other, so
+    the relationship is asserted rather than assumed.
+    """
+    from vaultspec_core.config import VaultSpecConfig
+
+    pyproject = tomllib.loads(_read("pyproject.toml"))
+    options = pyproject["tool"]["pytest"]["ini_options"]
+    harness_timeout = float(options["timeout"])
+    budget = VaultSpecConfig().lock_timeout_seconds
+
+    required = _SEQUENTIAL_LOCK_ACQUISITIONS * budget + _TEST_WORK_ALLOWANCE_SECONDS
+    assert harness_timeout >= required, (
+        f"pytest's `timeout` is {harness_timeout:g}s but the advisory-lock "
+        f"budget is {budget:g}s, so {_SEQUENTIAL_LOCK_ACQUISITIONS} contended "
+        f"acquisitions plus {_TEST_WORK_ALLOWANCE_SECONDS:g}s of the test's own "
+        f"work need {required:g}s. Below that, contention surfaces as a pytest "
+        "stack dump instead of AdvisoryLockTimeoutError, and the dump names a "
+        "syscall rather than the lock. Raise `timeout` in pyproject.toml, or "
+        "lower `lock_timeout_seconds`."
+    )
+
+    # `timeout_func_only` is what keeps the raised budget from also covering
+    # fixture setup, where a genuine hang has no lock to blame and a ten-minute
+    # wait buys nothing.
+    assert options.get("timeout_func_only") is True, (
+        "`timeout_func_only` must stay true: the timeout above is sized for a "
+        "test body's lock waits, not for fixture setup"
+    )
+
+
+def test_the_running_interpreter_matches_the_pin() -> None:
+    """The interpreter this suite runs on is the one ``.python-version`` pins.
+
+    ``.python-version`` is the single interpreter pin: every CI job resolves
+    its Python from that file and ``requires-python`` bounds the same range.
+    Nothing enforced that the interpreter actually RESOLVED matched it, and a
+    setup step silently falling back to a different minor would leave the
+    declared pin and the tested interpreter disagreeing - the drift that
+    invalidated venvs across this estate when a host OS upgrade moved the
+    system interpreter.
+
+    This was a CI job of its own, which meant it answered the question about a
+    runner rather than about a test run, and only on the one platform that job
+    ran on. Asserted here it holds wherever the suite executes - every CI lane,
+    both operating systems, and a contributor's laptop - and costs no job.
+    """
+    pinned = (ROOT / ".python-version").read_text(encoding="utf-8").strip()
+    actual = f"{sys.version_info.major}.{sys.version_info.minor}"
+    assert pinned == actual, (
+        f".python-version pins {pinned} but this suite is running on {actual}. "
+        "The declared pin is not what is being tested."
+    )
+
+
 def test_ci_workflow_calls_just_for_quality_gates() -> None:
     ci = _load_workflow(".github/workflows/ci.yml")
     jobs = ci["jobs"]
     required_jobs = {
-        "workflow-lint",
-        "lint-and-type",
-        "tests",
-        "windows-vault-repair",
-        "vault-audit",
-        "dependency-audit",
+        "lint",
+        "test-harness-repo",
+        "test-library",
+        "test-vault",
+        "audit-dependencies",
     }
     assert required_jobs.issubset(jobs), "CI workflow is missing required jobs"
 
@@ -672,10 +764,19 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
         # away from being silently undone. `type-strict` in particular was
         # promoted by removing its `continue-on-error` key; nothing but this
         # list stops the step itself from being removed next.
-        "lint-and-type": {
-            "just deps-sync",
+        "lint": {
+            "just init",
+            # Folded in from jobs of their own. On a fleet of one Linux runner
+            # every job is serial, so a fifteen-second check in its own job
+            # costs a whole provisioning cycle to reach. They are pinned here
+            # so folding them in cannot become dropping them.
+            "just deps-check",
+            "just check-workflow",
             "just check-python",
-            "just check-type",
+            # `just check-type` is deliberately absent - see the comment on the
+            # step in `ci.yml`. `check-type-platforms` runs `--python-platform`
+            # linux, darwin and win32; this runner's host platform is Linux, so
+            # naming both ran the Linux pass twice.
             "just check-type-platforms",
             "just check-toml",
             "just check-links",
@@ -685,24 +786,30 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
             "just check-size",
             "just check-type-strict",
         },
-        # `harness` and `repo` are pinned alongside `unit` because the lesson
-        # that produced them was a lane no CI job named: the guards it ran went
-        # unobserved and one of them had been failing undetected. Naming all
-        # three here means removing a CI step fails this guard rather than
-        # silently shrinking what "green" covers.
-        "tests": {
-            "just deps-sync",
-            "just test-unit",
+        # `harness` and `repo` are pinned because the lesson that produced
+        # them was a lane no CI job named: the guards it ran went unobserved
+        # and one of them had been failing undetected. Naming both here means
+        # removing a CI step fails this guard rather than silently shrinking
+        # what "green" covers.
+        #
+        # `unit` and `vault-repair` are deliberately NOT pinned here. Both are
+        # subsets of what `broad-tests` selects - `unit` by marker over the
+        # same path, `vault-repair` as two `unit`-marked files under it - so a
+        # step naming either re-ran work the broad legs had already done. The
+        # coverage they stood for is pinned below, on the job that actually
+        # provides it.
+        "test-harness-repo": {
+            "just init",
             "just test-harness",
             "just test-repo",
         },
-        "windows-vault-repair": {"just deps-sync", "just test-vault-repair"},
-        "vault-audit": {
-            "just deps-sync",
+        "test-library": {"just init", "just test-broad"},
+        "test-vault": {
+            "just init",
             "just framework-install",
             "just vault-check",
         },
-        "dependency-audit": {"just deps-sync", "just audit-deps"},
+        "audit-dependencies": {"just init", "just audit-deps"},
     }
 
     for job_name, expected in expected_runs.items():
@@ -711,61 +818,126 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
         missing = [cmd for cmd in sorted(expected) if cmd not in run_commands]
         assert not missing, f"Job {job_name} missing just commands: {missing}"
 
+        # `just init` is the ONE provisioning entry point, so a second
+        # provisioning command beside it is the defect rather than a
+        # belt-and-braces addition: two definitions of "the environment this
+        # job needs" drift, and the one that drifts is the one nobody reads.
+        # This job previously ran `just deps-sync`, which provisioned less
+        # than `init` does and less than the gates below it assume.
+        # Named MUTATING recipes rather than the `just deps-` prefix. The
+        # prefix also caught `deps-check`, which resolves nothing and installs
+        # nothing - it only reports whether the lockfile agrees with
+        # pyproject.toml - so the rule that exists to stop a second definition
+        # of "the environment this job needs" was also barring the read-only
+        # question about it.
+        mutating_deps = {
+            "just deps-sync",
+            "just deps-upgrade",
+            "just deps-lock",
+            "just deps-lock-upgrade",
+        }
+        provisioning = {
+            command
+            for command in run_commands
+            if command.split()[0] in {"uv", "npm", "pip", "pipx"}
+            or command in mutating_deps
+        }
+        assert not provisioning, (
+            f"Job {job_name} provisions outside `just init`: {sorted(provisioning)}"
+        )
 
-def test_ci_workflow_uses_actionlint() -> None:
-    """The workflow gate runs actionlint, from a pinned NATIVE binary.
 
-    It used to assert the `docker://rhysd/actionlint:` container action, which
-    made a required status check depend on the runner account being able to
-    reach the docker socket. On the self-hosted fleet it cannot, and the job
-    failed in `Pull down action image` without linting anything.
+def test_ci_workflow_lints_workflows_through_the_pinned_recipe() -> None:
+    """Workflow linting is dispatched by recipe, and the pin lives in `dev/`.
 
-    So the assertion is on what must be true - actionlint runs, at a pinned
-    version - rather than on the transport. Pinning stays enforced because an
-    unpinned tool is a silent version drift in a gate; the daemon requirement
-    does not, because `dev.runner.ToolOrDocker` already treats the image as
-    the fallback for hosts without the binary rather than the other way round.
+    This has now been wrong in three different ways, and each rewrite of this
+    guard records the one it closed.
+
+    It first asserted `docker://rhysd/actionlint:`, which made a required check
+    depend on the runner account reaching the docker socket. On the
+    self-hosted fleet it cannot, and the job failed in `Pull down action image`
+    having linted nothing.
+
+    It then asserted a hand-written download step here in the workflow, pinned
+    by version and by digest. That was right about the property and wrong
+    about the location: the digest named `linux_amd64` unconditionally, so on
+    the ARM64 cell it PASSED - the file really is the amd64 archive the digest
+    names - and died at `Exec format error` one line later. A verification that
+    reports success while handing back an unusable binary is worse than none.
+
+    What holds now: the job calls `just check-workflow`, and the pin lives in
+    `dev/actionlint.py` where a developer runs the same gate before pushing.
+    So this asserts the DISPATCH here and the PIN there, and forbids the two
+    acquisition routes that have already failed - plus a third that would:
+    `taiki-e/install-action` is the fleet's `just` installer, but actionlint is
+    a Go binary and that action falls back to cargo-binstall for it, which is a
+    different tool arriving under the same name.
     """
     ci = _load_workflow(".github/workflows/ci.yml")
-    jobs = ci["jobs"]
-    steps = jobs["workflow-lint"]["steps"]
-
-    install = next(
-        (step for step in steps if step.get("name") == "Install actionlint"),
-        None,
-    )
-    assert install is not None, "workflow-lint must install actionlint"
-
-    pins = install.get("env", {})
-    assert "ACTIONLINT_VERSION" in pins, (
-        "the actionlint version must be pinned; an unpinned tool in a gate is "
-        "silent version drift"
-    )
-    assert len(pins.get("ACTIONLINT_SHA256", "").strip()) == _SHA256_HEX_LENGTH, (
-        "the actionlint asset must be pinned by content as well as by version, "
-        "so a retagged or replaced release fails the gate rather than quietly "
-        "changing what lints these workflows"
-    )
+    # The gate is a STEP of `lint-and-type` now, not a job. What this guard
+    # holds is unchanged - the dispatch is by recipe and the pin lives in
+    # `dev/` - but a job of its own bought nothing on a one-runner fleet.
+    steps = ci["jobs"]["lint"]["steps"]
 
     run_commands = {step["run"].strip() for step in steps if "run" in step}
-    assert "actionlint" in run_commands, (
-        f"workflow-lint must invoke actionlint; runs {run_commands}"
+    assert "just check-workflow" in run_commands, (
+        "workflow linting must dispatch through the recipe; a gate re-listed "
+        f"in YAML cannot be proven to match the gate. Runs: {sorted(run_commands)}"
     )
-    assert any("sha256sum --check" in cmd for cmd in run_commands), (
-        "the pinned checksum must actually be verified, not merely declared"
+    assert not any(command.startswith("actionlint") for command in run_commands), (
+        "actionlint is invoked BY the recipe, not beside it - a second caller "
+        "is a second set of flags, and the flags are what the gate checks"
     )
 
     used_actions = {step.get("uses", "") for step in steps}
-    assert not any(a.startswith("docker://") for a in used_actions), (
+    assert not any(action.startswith("docker://") for action in used_actions), (
         "a container action reintroduces the docker-socket dependency that "
         "this gate cannot satisfy on the self-hosted fleet"
     )
+    assert not any("actionlint" in action for action in used_actions), (
+        "actionlint must not arrive from a marketplace action: the fleet's "
+        "installer action falls back to cargo-binstall for a Go binary, which "
+        "silently substitutes a different tool"
+    )
+
+    # The pin, at its new home. Per ARCHITECTURE, because a single digest is
+    # what let an amd64 archive pass its own check on an ARM runner.
+    from dev import actionlint
+
+    assert actionlint.VERSION, "actionlint must be pinned to a version"
+    assert actionlint.ARCHIVES, "actionlint must pin at least one platform"
+    # The architecture token upstream uses, per machine this fleet runs on.
+    # Named here rather than derived from the entry being checked: deriving it
+    # from `suffix` would make the assertion agree with whatever the table
+    # says, which is how a guard passes over the defect it exists to catch.
+    upstream_arch = {"x86_64": "amd64", "aarch64": "arm64", "arm64": "arm64"}
+    for (system, machine), (suffix, digest) in actionlint.ARCHIVES.items():
+        assert system in suffix, (
+            f"the {system}/{machine} entry names archive {suffix!r}, which is "
+            "not that operating system's"
+        )
+        expected_arch = upstream_arch.get(machine)
+        assert expected_arch is not None, (
+            f"{machine} has no known upstream architecture token; add it here "
+            "rather than letting the entry go unchecked"
+        )
+        assert f"_{expected_arch}" in suffix, (
+            f"the {system}/{machine} entry names archive {suffix!r}, which is "
+            "a different architecture's. This is the amd64-on-ARM failure "
+            "exactly: the digest matches, so the download PASSES, and the "
+            "binary dies at `Exec format error` one line later"
+        )
+        assert len(digest) == _SHA256_HEX_LENGTH, (
+            f"the {system}/{machine} archive must be pinned by content as well "
+            "as by version, so a retagged release fails the gate rather than "
+            "quietly changing what lints these workflows"
+        )
 
 
 def test_ci_workflow_installs_native_lint_tools() -> None:
     ci = _load_workflow(".github/workflows/ci.yml")
     jobs = ci["jobs"]
-    steps = jobs["lint-and-type"]["steps"]
+    steps = jobs["lint"]["steps"]
     used_actions = {step["uses"] for step in steps if "uses" in step}
     assert "taiki-e/install-action@v2" in used_actions
     # Node.js is no longer required - taplo and pymarkdown are native

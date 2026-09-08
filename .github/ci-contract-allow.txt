@@ -71,13 +71,6 @@ binaries.yml:Run it with the network denied to the process
 binaries.yml:Run it with every route to an index black-holed
 binaries.yml:A check actually ran
 
-# Cross-reads binaries.yml against acquisition.yml so a target that is built is
-# also acquired and gated offline. It parses THIS repository's workflows, which
-# makes it a sibling of `check-workflow` rather than a lane of its own.
-# Recipe needed: `check-release-matrix`.
-ci.yml:Every built Linux target is acquired
-ci.yml:Every built target is gated offline
-
 # Release-plane: checksum aggregation with an inherited-SHA merge (vaultspec-rag
 # carries the same algorithm twice), attestation enumeration and verification,
 # the channel-pointer generate/validate pair, and the tap commit with its
@@ -108,8 +101,12 @@ acquisition.yml:Acquire the published binary
 acquisition.yml:The published binary starts on a machine that has never run it
 acquisition.yml:Use it the way a new user would
 
-# Asserts the resolved interpreter is the one `.python-version` pins.
-# vaultspec-rag carries three copies of the same assertion as Python heredocs.
-# Recipe needed: `check-interpreter`. `just init` hashes `.python-version` into
-# its stamp but does not compare the running interpreter against it.
-ci.yml:Verify the interpreter matches .python-version
+# --- discharged -------------------------------------------------------------
+# `ci.yml` no longer appears above, and needed no recipe to get there. All
+# three of its entries were shell steps asserting facts about committed files -
+# the resolved interpreter against `.python-version`, and the build matrix
+# against the offline gate and the acquisition matrix - so each became a guard
+# under the `repo` marker instead of a recipe wrapping a heredoc. They run in
+# `just test-repo`, on every platform, and on a laptop:
+# `dev/guards/test_automation_contracts.py` and
+# `dev/guards/test_release_matrix_coverage.py`.

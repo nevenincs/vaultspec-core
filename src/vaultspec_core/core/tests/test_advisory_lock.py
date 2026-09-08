@@ -140,6 +140,74 @@ def _join_without_deadlock(
         thread.join()
 
 
+def _wait_without_deadlock(
+    procs: list[subprocess.Popen[bytes]],
+    progress: Callable[[], int],
+    *,
+    grace: float = _NO_PROGRESS_GRACE_SECONDS,
+) -> None:
+    """Wait for every process, failing only if the group stops progressing.
+
+    The process-shaped counterpart to :func:`_join_without_deadlock`, and it
+    exists for the same reason: a convoy of interpreters spends its first
+    seconds starting up and importing, so a wall-clock wait tight enough to
+    catch a deadlock reports that startup as one.
+
+    Args:
+        procs: The already-started processes to wait for.
+        progress: Returns a monotonically non-decreasing count of completed
+            units of work, read from outside the processes being observed.
+        grace: Seconds of no progress that constitute a deadlock.
+
+    Raises:
+        AssertionError: If no progress is observed for ``grace`` seconds while
+            at least one process is still running.
+    """
+    last_seen = progress()
+    last_change = time.monotonic()
+
+    while any(proc.poll() is None for proc in procs):
+        time.sleep(_PROGRESS_POLL_SECONDS)
+        current = progress()
+        if current < 0:
+            # An unreadable sample is a missed observation, not evidence
+            # either way: neither progress nor a longer stall.
+            continue
+        if current != last_seen:
+            last_seen = current
+            last_change = time.monotonic()
+            continue
+
+        stalled_for = time.monotonic() - last_change
+        if stalled_for > grace:
+            alive = [str(p.pid) for p in procs if p.poll() is None]
+            raise AssertionError(
+                f"no progress for {stalled_for:.1f}s at {current} completed "
+                f"iteration(s); still running: {', '.join(alive)}. Starting "
+                f"and importing is slow on a loaded host but never stops the "
+                f"counter, so a stall this long is a deadlock."
+            )
+
+    for proc in procs:
+        proc.wait()
+
+
+def _counter_value(target: Path) -> int:
+    """Return the shared counter, or -1 when the sample could not be read.
+
+    The workers rewrite the file without a temp-and-rename, so a poll can
+    land mid-write. The caller discards a negative reading rather than
+    counting it as movement - a torn read says nothing about whether the
+    convoy is progressing, and treating it as a new value would keep
+    resetting the deadlock deadline.
+    """
+    try:
+        value = json.loads(target.read_text())["counter"]
+    except (OSError, ValueError, KeyError):
+        return -1
+    return int(value)
+
+
 @pytest.mark.unit
 class TestAdvisoryLockConcurrency:
     """Verify serialization under multi-process contention."""
@@ -191,8 +259,17 @@ class TestAdvisoryLockConcurrency:
         """Spawn many subprocesses that all compete for the same lock.
 
         Each process reads a counter, increments it, and writes it back
-        under the advisory lock. If any process deadlocks, the 30-second
-        timeout fires and the test fails.
+        under the advisory lock. A deadlocked convoy stops incrementing the
+        counter; a slow one keeps incrementing it, just further apart.
+
+        This waited a flat 30 seconds per worker and made exactly the mistake
+        :func:`_join_without_deadlock` was written to correct: the wall clock
+        it bounded is dominated by eight interpreters starting at once and
+        importing the package, which on a loaded self-hosted runner costs
+        seconds per worker before any lock is taken. It duly failed in CI
+        with a `TimeoutExpired` and no deadlock anywhere. The counter the
+        workers share is a progress signal, so the deadline rides on the gap
+        between increments instead.
         """
         root = tmp_path
         target = root / "counter.json"
@@ -220,8 +297,9 @@ class TestAdvisoryLockConcurrency:
             for _ in range(n_workers)
         ]
 
+        _wait_without_deadlock(procs, lambda: _counter_value(target))
+
         for proc in procs:
-            proc.wait(timeout=30)
             assert proc.returncode == 0, (
                 f"Worker exited with {proc.returncode} (deadlock or error)"
             )
@@ -872,7 +950,7 @@ class TestTheBudgetIsPerAcquisitionNotPerPass:
     It cannot, because each acquisition gets its own deadline and each critical
     section is a single file's read, transform and write on a sentinel unique
     to that document. This pins that by construction rather than by argument:
-    the whole pass runs under a budget 24 times smaller than the shipped
+    the whole pass runs under a budget 120 times smaller than the shipped
     default, so any single acquisition that came close to the real budget would
     raise here.
     """
@@ -890,8 +968,15 @@ class TestTheBudgetIsPerAcquisitionNotPerPass:
         # that premise is asserted at the end rather than assumed - so this
         # count can fall as the pipeline gets faster without the test quietly
         # ceasing to prove anything.
-        document_count = 120
-        budget_seconds = 5.0
+        #
+        # The premise used to be decided by a rounding error: 120 documents
+        # against a 5s budget put the CI Linux runner at 4.8s, and the test
+        # failed telling itself to raise the count. Both numbers moved, and
+        # the budget moved DOWN - which is the stronger claim, not a weaker
+        # one, since a shorter budget is a tighter ceiling on any single
+        # acquisition and this passes on the slower of the two platforms.
+        document_count = 200
+        budget_seconds = 1.0
         WorkspaceFactory(tmp_path).install("claude")
         research = tmp_path / ".vault" / "research"
         research.mkdir(parents=True, exist_ok=True)

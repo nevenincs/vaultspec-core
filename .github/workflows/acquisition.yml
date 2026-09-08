@@ -42,6 +42,7 @@ concurrency:
 
 jobs:
   acquire:
+    timeout-minutes: 60
     name: acquire ${{ matrix.arch }} on ${{ matrix.image }}
     strategy:
       fail-fast: false

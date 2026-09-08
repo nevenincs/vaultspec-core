@@ -1,0 +1,68 @@
+name: Code Health
+
+# PERIODIC, and deliberately not a pull-request check.
+#
+# Everything below is measurement: every target exits 0, and nothing here can
+# fail a merge. What it produces is the ranked offender list per dimension -
+# the instrument the baseline ratchets in pyproject.toml are calibrated from -
+# which is a thing you read when you are deciding where to spend effort, not a
+# thing you read on a pull request.
+#
+# It ran on every pull request until it was moved here, and the cost was
+# duplicate work on a fleet that has none to spare: `health-fast` composes the
+# same complexipy, ruff and pylint analyses that `Lint: Code, Docs & Workflows`
+# had already run over the same tree on the same commit, and it ran them
+# behind its own checkout and `just init`. The report is worth having weekly.
+# It is not worth five minutes of every pull request's serial runner time to
+# re-measure what a required gate just measured.
+
+on:
+  schedule:
+    # Monday morning, so the week starts with a current burndown queue.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NO_COLOR: "1"
+  FORCE_COLOR: "0"
+
+jobs:
+  report:
+    timeout-minutes: 45
+    name: "Audit: Code Health"
+    runs-on: [self-hosted, Linux, X64, build]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Set up just
+        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        with:
+          tool: just@1.38.0
+
+      - name: Initialize the worktree
+        run: just init
+
+      # `audit-advisory`, NOT `audit-all`. The aggregate composes `deps`,
+      # which resolves the committed lockfiles and queries OSV - the slowest
+      # dimension by a wide margin, and the one dimension here that returns a
+      # verdict rather than a lead. It has a gating job of its own in `ci.yml`,
+      # so composing it here ran it a second time against the same commit.
+      - name: Advisory audit dimensions
+        run: just audit-advisory
+
+      - name: Code-health report
+        run: just health-fast

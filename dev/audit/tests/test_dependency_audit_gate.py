@@ -37,7 +37,10 @@ def _describe(_identifier: str) -> dict[str, object]:
     }
 
 
-def _report(suppressions: list[da.Suppression], hits: dict = HIT) -> da.Report:
+def _report(
+    suppressions: list[da.Suppression],
+    hits: dict[str, set[da.Coordinate]] = HIT,
+) -> da.Report:
     return da.build_report(
         [COORD], hits, suppressions, today=TODAY, describe_fn=_describe
     )

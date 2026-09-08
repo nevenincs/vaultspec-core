@@ -47,6 +47,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import cast
 
 from dev.exit_codes import INIT_HOST_TOOL_MISSING, INIT_STALE, OK
 from dev.init import plan
@@ -391,7 +392,7 @@ def _finish(
     emitter.event("run-end", report=report, report_path=written)
     remediation = report["remediation"]
     if isinstance(remediation, list):
-        for line in remediation:
+        for line in cast("list[object]", remediation):
             emitter.say(f"  -> {line}")
 
 

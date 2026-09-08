@@ -638,7 +638,14 @@ class TestVaultGraphPhantom:
     def test_check_schema_ignores_phantom_adr_references(
         self, vault_root: Path, graph_manifest: CorpusManifest
     ) -> None:
-        """A plan linking only to phantom targets still reports 'no ADR reference'."""
+        """A plan whose links are all phantom draws no authority finding.
+
+        A phantom node is a link target with no document behind it, so it
+        settles nothing: the schema checker judges authority from the ADRs a
+        plan actually links, and reads neither an accepted decision nor a
+        deficiency into a name that does not exist. Decision-free plans are
+        valid, so the absence of a resolvable ADR is not itself a finding.
+        """
         from ...vaultcore.checks.references import check_schema
 
         graph = VaultGraph(vault_root)
@@ -652,13 +659,12 @@ class TestVaultGraphPhantom:
         assert node.doc_type == DocType.PLAN
         # All its out_link targets are phantom
         assert all(graph.nodes[t].phantom for t in node.out_links if t in graph.nodes)
-        # check_schema should report an error for this plan
         plan_diags = [
             d
             for d in result.diagnostics
             if d.path is not None and plan_name in str(d.path)
         ]
-        assert any("no references to ADR" in d.message for d in plan_diags)
+        assert plan_diags == []
 
     def test_tree_rendering_shows_not_created_for_phantoms(
         self, vault_root: Path

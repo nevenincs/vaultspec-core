@@ -215,6 +215,7 @@ jobs:
           retention-days: 5
 
   build:
+    timeout-minutes: 90
     needs: [preflight, wheel]
     name: Build ${{ matrix.name }}
     strategy:
@@ -456,6 +457,7 @@ jobs:
   # added to one and not the other goes red on the branch that adds it rather
   # than at release time.
   offline:
+    timeout-minutes: 45
     needs: build
     name: Offline ${{ matrix.name }}
     # `!cancelled()` rather than the default, so one leg failing to compile
