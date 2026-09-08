@@ -361,7 +361,7 @@ def main(argv: list[str] | None = None) -> int:
 
 def _finish(
     repo_root: Path,
-    report: dict,
+    report: dict[str, object],
     emitter: Emitter,
     *,
     write_file: bool,
@@ -387,8 +387,10 @@ def _finish(
             emitter.say(f"init: report written to {path}")
     written = str(path) if write_file else None
     emitter.event("run-end", report=report, report_path=written)
-    for line in report["remediation"]:
-        emitter.say(f"  -> {line}")
+    remediation = report["remediation"]
+    if isinstance(remediation, list):
+        for line in remediation:
+            emitter.say(f"  -> {line}")
 
 
 if __name__ == "__main__":

@@ -351,6 +351,7 @@ LINT = Verb(
                     "type-strict",
                 )
             ),
+            keep_going=True,
         ),
     ),
 )
@@ -394,6 +395,7 @@ FIX = Verb(
             "all",
             "Run every fixer.",
             tuple(Ref(name) for name in ("python", "toml", "markdown", "vault")),
+            keep_going=True,
         ),
     ),
 )
@@ -569,6 +571,7 @@ TEST = Verb(
             # them had been failing undetected. A guard nothing runs is not a
             # guard, so this lane is wired into both the aggregate and CI.
             (Ref("broad"), Ref("vault-repair"), Ref("harness"), Ref("repo")),
+            keep_going=True,
         ),
     ),
 )
@@ -579,7 +582,7 @@ BUILD = Verb(
     note="The standalone binaries are 'just release-binaries <tag> <rust-target>'.",
     targets=(
         Target("python", "Build the wheel and sdist.", (Cmd(("uv", "build")),)),
-        Target("all", "Run every build.", (Ref("python"),)),
+        Target("all", "Run every build.", (Ref("python"),), keep_going=True),
     ),
 )
 
@@ -690,6 +693,7 @@ DOCS = Verb(
             "all",
             "Regenerate every documentation asset.",
             (Ref("renders"), Ref("demo")),
+            keep_going=True,
         ),
     ),
 )
@@ -730,6 +734,15 @@ CI = Verb(
     name="ci",
     summary="Run the full local gate.",
     targets=(
+        # FAIL-FAST on purpose, and the one aggregate in this table that is.
+        # `ci` is a PIPELINE rather than an aggregate: its steps are not
+        # independent measurements, they are stages that presuppose the ones
+        # before them. Continuing past a failed lint would not add a second
+        # data point, it would add a second error message about the same
+        # cause. `dev/EXIT-CODES.md` states the test - run every step when each
+        # step ANSWERS something, stop at the first failure when each step
+        # DEPENDS ON the one before it - and `just init` is fail-fast for the
+        # same reason.
         Target(
             "all",
             "Lint, dependency audit, vault checks, and the broad test suite.",
