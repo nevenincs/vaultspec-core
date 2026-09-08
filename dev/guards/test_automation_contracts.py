@@ -9,6 +9,7 @@ quietly stop covering the same trees.
 
 from __future__ import annotations
 
+import ast
 import re
 import tomllib
 from pathlib import Path
@@ -308,32 +309,97 @@ def test_justfile_delegates_every_verb_to_the_dev_package() -> None:
         )
 
 
-def test_dependency_audit_uses_uv_native_scanner() -> None:
-    # The invocation moved out of the justfile into the declarative toolchain
-    # when every recipe collapsed to a single delegation; the contract is
-    # unchanged, so it is asserted against its new home.
+def test_dependency_audit_resolves_its_own_verdict_from_osv() -> None:
+    """Pin HOW the supply-chain gate reaches a verdict, not just that it runs.
+
+    This guard used to assert the gate shelled out to ``uv audit`` with
+    ``--preview-features`` and ``--frozen``. It no longer does, deliberately:
+    ``uv audit`` exits 0 even when it prints advisories, so a gate whose
+    verdict came from that process could not fail - which is exactly how three
+    sibling repositories shipped a "GATE" that never gated. The gate now reads
+    the committed lockfiles itself and queries OSV, so the verdict is a
+    property of the finding set.
+
+    That substitution is the thing worth pinning. A future edit that quietly
+    reintroduces a vendor tool's exit code as the verdict, or drops an
+    ecosystem, would be invisible in review and undetectable at runtime on a
+    clean tree - the gate would simply stop being able to fail again.
+    """
     toolchain = _read("dev/toolchain.py")
-    audit_script = _read("dev/audit/dependency_audit.py")
-    # The supply-chain gate's justfile recipe delegates to the cross-platform
-    # audit wrapper, which runs uv's native auditor against the frozen
-    # lockfile. The default scope already covers the project plus the default
-    # dependency groups, so no group-selection flag is pinned: --all-groups
-    # was accepted by uv 0.10.x but rejected by 0.11.x, and breaking CI on a
-    # uv minor bump is exactly the brittleness this audit is meant to prevent.
+    gate = _read("dev/audit/dependency_audit.py")
+
+    # The `audit deps` target delegates to the gate; nothing else may stand in.
     assert "dev/audit/dependency_audit.py" in toolchain
-    assert "uv audit" in audit_script
-    assert "--preview-features" in audit_script
-    assert "--frozen" in audit_script
-    # This is a uv-managed project: the supply-chain gate is uv-native end to
-    # end and never shells out to pip. pip-audit drags `pip` itself into the
-    # environment as a transitive dependency - historically the only
-    # vulnerability `uv audit` ever reported here - so no pip-named scanner
-    # may appear in the recipe or the wrapper. When uv's preview decoder
-    # aborts on a malformed OSV record, the wrapper independently repeats the
-    # bulk OSV query rather than falling back to a second tool.
-    for surface in (toolchain, audit_script):
+
+    # The verdict comes from OSV, queried in bulk over resolved coordinates.
+    assert "api.osv.dev" in gate
+    assert "querybatch" in gate
+
+    # Coordinates come from the lockfiles that are actually committed, so a
+    # repository that grows an ecosystem is covered when its lockfile lands
+    # rather than when somebody remembers to add a scanner.
+    for lockfile in ("uv.lock", "package-lock.json", "Cargo.lock"):
+        assert lockfile in gate, f"{lockfile} is no longer a scanned surface"
+
+    # No vendor scanner's process status may become the verdict again. The
+    # gate runs no subprocess at all: it is stdlib-only over HTTPS. Asserted
+    # against the parsed module rather than its text, so the prose explaining
+    # why `uv audit` was abandoned does not itself read as a use of it.
+    tree = ast.parse(gate)
+    imported = {
+        alias.name.split(".")[0]
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    }
+    assert "subprocess" not in imported, (
+        "the gate must not run child processes; its verdict is its own"
+    )
+    docstrings = {
+        node.body[0].value.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Module | ast.ClassDef | ast.FunctionDef)
+        and node.body
+        and isinstance(node.body[0], ast.Expr)
+        and isinstance(node.body[0].value, ast.Constant)
+        and isinstance(node.body[0].value.value, str)
+    }
+    literals = {
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    } - docstrings
+    assert "uv" not in literals, (
+        "the gate names `uv` as a command again; its verdict must not come "
+        "from a tool that exits 0 on findings"
+    )
+
+    # A uv-managed project stays uv-native end to end and never shells out to
+    # pip. pip-audit drags `pip` itself in as a transitive dependency -
+    # historically the only vulnerability ever reported on this project.
+    for surface in (toolchain, gate):
         assert "pip-audit" not in surface
         assert "pip-tools" not in surface
+
+
+def test_dependency_audit_fails_on_a_finding_and_on_a_lapsed_acceptance() -> None:
+    """The gate's two failing verdicts are contracts, not implementation.
+
+    A gate that cannot fail is not a gate, and an acceptance nobody has
+    retaken is not an acceptance. Both are asserted against the real module so
+    that neither can be softened to a warning without this failing.
+    """
+    from dev.audit import dependency_audit as gate
+
+    assert gate.EXIT_OK == 0
+    assert gate.EXIT_FINDINGS != 0
+    # A gate that could not run is neither a pass nor a finding.
+    assert gate.EXIT_BROKEN not in (gate.EXIT_OK, gate.EXIT_FINDINGS)
+
+    source = _read("dev/audit/dependency_audit.py")
+    # Suppressions are declarative and dated; the allowlist is their only home.
+    assert "dependency-audit-allowlist.toml" in source
+    assert "expires" in source
 
 
 def test_pyproject_has_no_pip_named_dev_tools() -> None:
