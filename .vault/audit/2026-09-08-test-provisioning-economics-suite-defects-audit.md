@@ -5,7 +5,7 @@ tags:
 date: '2026-09-08'
 modified: '2026-09-08'
 body_schema: 'body-v2'
-body_hash: 'sha256:97d46f1145c24eeb9705ebfd364edddaa36d93875a33c23da767ec60f28f780d'
+body_hash: 'sha256:d665e91ab24dad45c2b2cfa5b75e1f17d50fb71a10bb8d8c882630e4608299c5'
 related:
   - '[[2026-09-08-test-provisioning-economics-broad-lane-profile-research]]'
 ---
@@ -165,6 +165,46 @@ attempts and marginal against one that does not. Nothing establishes that a real
 caller writes as fast as this stress loop, so this is an observation about the
 budget's headroom rather than a defect, and it is recorded here rather than
 acted on.
+
+### plan-close-review | low | The integrated result holds, with two Steps deliberately unexecuted
+
+Review at plan close, covering the change as one behaviour rather than file by
+file: the durability boundary, the workspace reuse, the parallel lanes, and the
+guards that hold each in place.
+
+**Measured outcome.** On an idle host, `just test-broad` runs 4421 tests in
+3m57s; `test-harness` 340 in 3.7s; `test-repo` 131 in 45.9s. The starting point
+was 36 minutes on Linux and 46 on Windows. Fixture time across a full run fell
+from 6h46m42s to 13m45s. No xdist worker was lost in any of the three runs made
+after the boundary landed.
+
+**The behaviour holds where it matters.** The reuse is equivalence-checked rather
+than assumed: `test_workspace_template_reuse.py` compares a copied tree against a
+built one, asserts no path still points at the template, and asserts the two
+narrow cases - a seeded directory, a single-provider install - still run the real
+product. `test_durability_boundary.py` holds the divergence to the harness. The
+`durable` marker's evidence is recorded with its measurement rather than its
+intuition.
+
+**Two decisions changed under evidence during execution**, both recorded above:
+the crash attribution was retracted after re-reading the run output, and the
+boundary's own no-observation rule caught a cohort it did not hold for. Neither
+is a defect in the delivered change; both are the reason the delivered change can
+be trusted.
+
+**Not executed, deliberately.** `P05.S12` (a deadline on fixture setup) was
+attempted twice and backed out: both mechanisms corrupt pytest's fixture
+bookkeeping, and shipping a harness that breaks 133 guards to catch a
+hypothetical hang is a worse trade than leaving the gap documented. `P05.S13`
+(deriving the watchdog sleep windows) was dropped because after the other Phases
+those tests no longer appear in the lane's fifteen slowest entries, making the
+change churn on the most delicate process-lifecycle tests in the suite for no
+measurable gain. Both are recorded in the ledger and in issue #514.
+
+**One failure remains in the lane**, `test_vault_edit.py::TestSetBody::test_stdin_channel_preserves_legacy_c1_byte`,
+reproduced identically on `b5c7f256` under the same environment and filed as
+issue #518. It is a real product question about the `--body-stdin` channel, not a
+consequence of this work, and is out of its scope.
 
 ## Recommendations
 

@@ -5,7 +5,7 @@ tags:
 date: '2026-09-08'
 modified: '2026-09-09'
 body_schema: 'body-v2'
-body_hash: 'sha256:cb9ec0954f7723ade56e01a0ff9c773c5ac8abad3ca7c4195f03d08497b2e197'
+body_hash: 'sha256:409fc2da3dd533334c66aaf2719e24d76ed21fd38c0235727eaf09d7d6f53cae'
 related:
   - "[[2026-09-08-test-provisioning-economics-plan]]"
 ---
@@ -41,6 +41,10 @@ related:
 - `S12` `verify:` `pytest dev/guards` -> `pass`
 - `S13` `M` `conftest.py`
 - `S13` `verify:` `just test-broad` -> `fail`
+- `S07` `M` `dev/toolchain.py`
+- `S07` `verify:` `just test-broad` -> `fail`
+- `S09` `M` `dev/toolchain.py`
+- `S09` `verify:` `just test-broad` -> `fail`
 
 ## Notes
 
@@ -56,3 +60,5 @@ related:
 - `S11` 9m03s against the 36-46min headline, zero worker crashes; the single failure is issue 518, pre-existing and reproduced on b5c7f256 under the same env
 - `S12` NOT DONE: a setup-phase deadline was attempted twice (pytest_fixture_setup hookwrapper; faulthandler alarm on the runtest phase hooks) and both corrupt pytest fixture bookkeeping - 133 guards pass without, 138 error with. Reverted; conftest carries a comment recording both dead ends. Exposure reduced by P02 (slowest setup now ~27s, was 6m).
 - `S13` NOT DONE, deliberately: after P01/P02/P04 the watchdog tests no longer appear in the lane's 15 slowest entries, so deriving their sleep windows would be churn on the suite's most delicate process-lifecycle tests for no measurable gain. The finding stays recorded in the audit.
+- `S07` cause: not reproducible off the contended machine. Three subsequent 12-way runs on an idle box produced zero node-down events (4404, 4414, 4421 passed); the only run with crashes was the one sharing the host with an active CI job at 100% CPU. Resource exhaustion, not a test defect - the watchdog theory stays retracted.
+- `S09` no containment written: S07 found nothing test-specific to contain, and an xdist_group applied to the watchdog cohort on a retracted theory would have been a fix for a defect that does not exist
