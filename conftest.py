@@ -132,6 +132,32 @@ def pytest_report_header() -> str:
     return "durability: os.fsync suppressed for this session (production unaffected)"
 
 
+# --- a deadline for fixture setup: NOT IMPLEMENTED --------------------------
+#
+# `timeout_func_only = true` restricts pytest-timeout to the CALL phase, so
+# fixture setup has no deadline at all - and setup is where this suite spends
+# nearly all of its time. A wedged fixture still takes the lane down silently.
+#
+# That flag has to stay true: its budget is derived from the advisory lock's
+# 120s wait so `AdvisoryLockTimeoutError` can fire first, and
+# `dev/guards/test_automation_contracts.py` holds the relationship. Ten minutes
+# is the right number for a body waiting on a lock and the wrong one for a
+# fixture. So setup needs its OWN, shorter budget rather than the body's.
+#
+# Two mechanisms were tried and both broke pytest's fixture bookkeeping,
+# tripping `assert not self._finalizers` in `FixtureDef.execute` across every
+# guard with a finaliser: wrapping `pytest_fixture_setup` with a hookwrapper,
+# and arming a `faulthandler` alarm from the plain `pytest_runtest_*` phase
+# hooks. Whatever the interaction is, it is not understood well enough to ship,
+# and a harness change that breaks 138 guards to catch a hypothetical hang is a
+# bad trade.
+#
+# Left undone deliberately rather than half-done. The exposure is much smaller
+# than it was - the slowest setup in a full run is now ~27s, against six minutes
+# before the workspace templates landed - so this is a gap to close on its own
+# terms, not an emergency. See issue #514.
+
+
 @pytest.fixture(autouse=True)
 def _durability_boundary(request: pytest.FixtureRequest) -> Iterator[None]:
     """Give a `durable`-marked test the real ``os.fsync`` back.

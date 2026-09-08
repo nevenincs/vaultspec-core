@@ -5,7 +5,7 @@ tags:
 date: '2026-09-08'
 modified: '2026-09-09'
 body_schema: 'body-v2'
-body_hash: 'sha256:03b7c93b116d923431f063cfae58f759e0ec6192cb3a1b9412273b8c13ad25ea'
+body_hash: 'sha256:cb9ec0954f7723ade56e01a0ff9c773c5ac8abad3ca7c4195f03d08497b2e197'
 related:
   - "[[2026-09-08-test-provisioning-economics-plan]]"
 ---
@@ -37,6 +37,10 @@ related:
 - `S10` `verify:` `just test-broad` -> `fail`
 - `S11` `M` `dev/toolchain.py`
 - `S11` `verify:` `just test-broad` -> `fail`
+- `S12` `M` `conftest.py`
+- `S12` `verify:` `pytest dev/guards` -> `pass`
+- `S13` `M` `conftest.py`
+- `S13` `verify:` `just test-broad` -> `fail`
 
 ## Notes
 
@@ -50,3 +54,5 @@ related:
 - `S07` the 4 crashes did not recur on an uncontended machine; separately, the boundary WAS observable in one cohort (4/20 fail suppressed, 0/20 restored, 0/20 with the durable marker)
 - `S10` broad, harness and repo lanes now pass -n auto --dist loadfile; loadfile keeps a module on one worker so the session template is built once per worker not once per test
 - `S11` 9m03s against the 36-46min headline, zero worker crashes; the single failure is issue 518, pre-existing and reproduced on b5c7f256 under the same env
+- `S12` NOT DONE: a setup-phase deadline was attempted twice (pytest_fixture_setup hookwrapper; faulthandler alarm on the runtest phase hooks) and both corrupt pytest fixture bookkeeping - 133 guards pass without, 138 error with. Reverted; conftest carries a comment recording both dead ends. Exposure reduced by P02 (slowest setup now ~27s, was 6m).
+- `S13` NOT DONE, deliberately: after P01/P02/P04 the watchdog tests no longer appear in the lane's 15 slowest entries, so deriving their sleep windows would be churn on the suite's most delicate process-lifecycle tests for no measurable gain. The finding stays recorded in the audit.
