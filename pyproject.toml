@@ -233,7 +233,26 @@ markers = [
 # the default `pytest` invocation and the `test harness` gate cannot disagree
 # about what the instrument suite is.
 testpaths = ["dev", "docs", "src"]
-timeout = 300
+# The harness timer must not fire before the PRODUCT's own bounded wait does.
+#
+# `advisory_lock` gives a single acquisition a budget of
+# `lock_timeout_seconds` (120s by default) and then raises
+# `AdvisoryLockTimeoutError`, which names the sentinel, the budget and the
+# layer that gave up. That error is the designed diagnostic for contention.
+#
+# At `timeout = 300` it was unreachable in practice: one exhausted acquisition
+# left 180s, two left -60s, so a contended test died on a pytest stack dump
+# pointing at whatever syscall the sampler happened to catch - in the run that
+# prompted this, `os.open` inside `_open_atomic_temp`, which looks exactly like
+# a deadlock in the atomic-write path and is not one. The engineered error was
+# pre-empted by the timer that exists to catch the case it already handles.
+#
+# So this is derived from that budget rather than picked: two full budgets, for
+# a test that takes a second lock, plus an allowance for the test's own work
+# (the slowest in this suite runs ~27s). `dev/guards/test_automation_contracts.py`
+# holds the relationship, so lowering this or raising the lock budget fails
+# there rather than quietly restoring the blind spot.
+timeout = 600
 timeout_func_only = true
 # Drop a test's `tmp_path` as soon as that test PASSES and keep it when it
 # fails, which is where triage actually looks. Retained session directories

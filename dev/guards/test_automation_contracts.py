@@ -661,6 +661,66 @@ def test_ty_pre_commit_scope_matches_dev_toolchain_scope() -> None:
     )
 
 
+#: Seconds a test may spend on its OWN work, on top of the advisory-lock waits
+#: the harness timer has to sit above. The slowest test in this suite runs
+#: about 27 seconds, so this is generous on purpose: the number it pads is a
+#: worst case that only contention reaches, and being wrong in this direction
+#: costs a slower report on a genuinely hung test, while being wrong in the
+#: other direction costs the diagnostic entirely.
+_TEST_WORK_ALLOWANCE_SECONDS = 120.0
+
+#: Advisory-lock acquisitions one test may make in sequence. Two, because a
+#: test that takes a second lock while holding contention on the first is the
+#: shape that exhausted the old margin.
+_SEQUENTIAL_LOCK_ACQUISITIONS = 2
+
+
+def test_the_test_timeout_sits_above_the_advisory_lock_budget() -> None:
+    """pytest's timer must not pre-empt ``AdvisoryLockTimeoutError``.
+
+    ``advisory_lock`` bounds a single acquisition at
+    ``lock_timeout_seconds`` and then raises an error that names the sentinel,
+    the budget and the layer that gave up. That error is the designed
+    diagnostic for contention, and it is only ever seen if the harness lets it
+    happen.
+
+    It did not. At ``timeout = 300`` against a 120-second budget, one exhausted
+    acquisition left 180 seconds and two left none, so a contended test died on
+    a pytest stack dump naming whatever syscall the sampler caught rather than
+    on the error built to explain it. The dump that prompted this guard pointed
+    at ``os.open`` inside ``_open_atomic_temp`` and read as a deadlock in the
+    atomic-write path, which it was not.
+
+    Both numbers live in different files and neither knows about the other, so
+    the relationship is asserted rather than assumed.
+    """
+    from vaultspec_core.config import VaultSpecConfig
+
+    pyproject = tomllib.loads(_read("pyproject.toml"))
+    options = pyproject["tool"]["pytest"]["ini_options"]
+    harness_timeout = float(options["timeout"])
+    budget = VaultSpecConfig().lock_timeout_seconds
+
+    required = _SEQUENTIAL_LOCK_ACQUISITIONS * budget + _TEST_WORK_ALLOWANCE_SECONDS
+    assert harness_timeout >= required, (
+        f"pytest's `timeout` is {harness_timeout:g}s but the advisory-lock "
+        f"budget is {budget:g}s, so {_SEQUENTIAL_LOCK_ACQUISITIONS} contended "
+        f"acquisitions plus {_TEST_WORK_ALLOWANCE_SECONDS:g}s of the test's own "
+        f"work need {required:g}s. Below that, contention surfaces as a pytest "
+        "stack dump instead of AdvisoryLockTimeoutError, and the dump names a "
+        "syscall rather than the lock. Raise `timeout` in pyproject.toml, or "
+        "lower `lock_timeout_seconds`."
+    )
+
+    # `timeout_func_only` is what keeps the raised budget from also covering
+    # fixture setup, where a genuine hang has no lock to blame and a ten-minute
+    # wait buys nothing.
+    assert options.get("timeout_func_only") is True, (
+        "`timeout_func_only` must stay true: the timeout above is sized for a "
+        "test body's lock waits, not for fixture setup"
+    )
+
+
 def test_the_running_interpreter_matches_the_pin() -> None:
     """The interpreter this suite runs on is the one ``.python-version`` pins.
 
