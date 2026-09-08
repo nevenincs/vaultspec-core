@@ -8,7 +8,7 @@ related:
   - '[[2026-09-08-test-provisioning-economics-adr]]'
 modified: '2026-09-08'
 body_schema: body-v2
-body_hash: 'sha256:ceb587e576c074e7b5eed9d4aaa6aab2ddf67ef43b8b1506bd6a8dfdeef31129'
+body_hash: 'sha256:9da02fc16191b56856a1ae9dc9b7165bd8104c591425b4fa11f834755634743f'
 ---
 
 # `test-provisioning-economics` plan
@@ -68,17 +68,17 @@ Move the fsync cost out of the harness and prove production is untouched.
 
 Build each identical workspace once per session and clone it per test.
 
-- [ ] `P02.S04` - Rebuild synthetic_project and synthetic_project_manifest as a session template plus a per-test clone; `src/vaultspec_core/tests/cli/conftest.py`.
-- [ ] `P02.S05` - Rebuild the mcp_server vault_root fixtures on the same session-template-plus-clone shape; `src/vaultspec_core/mcp_server/tests/conftest.py`.
-- [ ] `P02.S06` - Convert the remaining per-test installs: fresh_clone, executor workspace, preflight installed_workspace; `src/vaultspec_core/tests`.
+- [x] `P02.S04` - Rebuild synthetic_project and synthetic_project_manifest as a session template plus a per-test clone; `src/vaultspec_core/tests/cli/conftest.py`.
+- [x] `P02.S05` - Rebuild the mcp_server vault_root fixtures on the same session-template-plus-clone shape; `src/vaultspec_core/mcp_server/tests/conftest.py`.
+- [x] `P02.S06` - Convert the remaining per-test installs: fresh_clone, executor workspace, preflight installed_workspace; `src/vaultspec_core/tests`.
 
 ### Phase `P03` - fix the defects parallelism exposed
 
 Repair the isolation failures and contain the self-terminating cohort, on their own terms.
 
-- [ ] `P03.S07` - Fix the shared state behind the test_collectors package-mode isolation failure; `src/vaultspec_core/tests/cli/test_collectors.py`.
-- [ ] `P03.S08` - Fix the shared state behind the test_doctor corrupted-state isolation failure; `src/vaultspec_core/tests/cli/test_doctor.py`.
-- [ ] `P03.S09` - Keep the ancestor-reaping watchdog cohort on one worker by an explicit group; `src/vaultspec_core/mcp_server/tests/test_watchdog.py`.
+- [ ] `P03.S07` - Establish why four xdist workers died, treating the cause as unknown and excluding resource exhaustion first; `src/vaultspec_core/mcp_server/tests/test_watchdog.py`.
+- [x] `P03.S08` - Re-measure the parallel run on an uncontended machine, so the crash evidence is not confounded by the CI runner; `dev/toolchain.py`.
+- [ ] `P03.S09` - Contain or fix whatever S07 identifies, on the evidence rather than on the retracted watchdog theory; `src/vaultspec_core/mcp_server/tests/test_watchdog.py`.
 
 ### Phase `P04` - turn on parallel execution
 

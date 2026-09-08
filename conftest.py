@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import pytest
+
 if TYPE_CHECKING:
-    import pytest
+    from collections.abc import Callable
 
 
 # --- machine-readable CI reports -------------------------------------------
@@ -126,3 +129,72 @@ def pytest_report_header() -> str:
     rather than waiting to be discovered.
     """
     return "durability: os.fsync suppressed for this session (production unaffected)"
+
+
+# --- provisioned-workspace reuse -------------------------------------------
+#
+# Several packages need "a real, fully installed workspace" per test, and each
+# used to build one from scratch: `build_synthetic_vault` plus a real
+# `install_run`, 245 files, hundreds of times a run. One fixture alone accounted
+# for 59% of all fixture time.
+#
+# Every one of those trees was IDENTICAL at the moment the fixture yielded - the
+# corpus generator is seeded and the install is a pure function of the bundled
+# builtins - so the construction is what repeats, not the result. This builds
+# each distinct tree once per session and hands out copies.
+#
+# Copying rather than sharing is the load-bearing half. Tests mutate their
+# workspace, so a shared root would couple every test to every other; the
+# isolation each test had before is exactly preserved, and only the work of
+# reaching the starting state is amortised.
+#
+# It lives here rather than in one package's conftest because three packages
+# want it and a helper that only one can reach is how the duplication started.
+
+
+class WorkspaceTemplates:
+    """Builds each distinct workspace once, then clones it per test."""
+
+    def __init__(self, root: Path) -> None:
+        self._root = root
+        self._templates: dict[str, Path] = {}
+
+    def clone(self, key: str, dest: Path, build: Callable[[Path], None]) -> Path:
+        """Return *dest*, populated as a copy of the template named *key*.
+
+        Args:
+            key: Identifies the tree. Two callers passing the same key must
+                want byte-identical trees, because the second one gets a copy
+                of whatever the first one built.
+            dest: Directory to create. Must not already exist.
+            build: Populates a fresh directory. Called at most once per key
+                per session.
+
+        Returns:
+            *dest*, now holding a private copy of the template.
+        """
+        from vaultspec_core.tests.cli.workspace_factory import rebase_workspace_paths
+
+        template = self._templates.get(key)
+        if template is None:
+            template = self._root / key
+            build(template)
+            self._templates[key] = template
+        # `dirs_exist_ok` stays False: a caller handing us an existing
+        # directory has confused this with a merge, and silently blending two
+        # workspaces would be a very hard failure to read.
+        shutil.copytree(template, dest, symlinks=True)
+        # An installed workspace records where it lives, so a raw copy would
+        # claim the template's files as its own.
+        rebase_workspace_paths(template, dest)
+        return dest
+
+
+@pytest.fixture(scope="session")
+def workspace_templates(tmp_path_factory: pytest.TempPathFactory) -> WorkspaceTemplates:
+    """Session-wide cache of provisioned workspaces, one build per shape.
+
+    Under xdist each worker holds its own cache, so the build cost is paid once
+    per worker rather than once per test - twelve times instead of hundreds.
+    """
+    return WorkspaceTemplates(tmp_path_factory.mktemp("workspace-templates"))

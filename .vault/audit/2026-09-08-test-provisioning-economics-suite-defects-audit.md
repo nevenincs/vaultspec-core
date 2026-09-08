@@ -5,7 +5,7 @@ tags:
 date: '2026-09-08'
 modified: '2026-09-08'
 body_schema: 'body-v2'
-body_hash: 'sha256:67983b4b5fb141a8cff2de5741fb0c9440b7eaf1569ec04ae1c83221bc4cfc68'
+body_hash: 'sha256:31417f54f1141be99319ad1c67ba302af8717ea6fc9885a250c94484d54a6c9c'
 related:
   - '[[2026-09-08-test-provisioning-economics-broad-lane-profile-research]]'
 ---
@@ -99,27 +99,76 @@ the current work: the self-hosted Windows runner is a shared workstation which
 carried 23-25 concurrent runner processes during profiling, making it a material
 and undocumented input to the 46-minute Windows lane time.
 
+### crash-attribution-correction | high | Two earlier findings misread four worker crashes as six defects
+
+Correcting `test-isolation` and `watchdog-self-termination` above, both of which
+were written from the same misreading and are superseded by this entry.
+
+The parallel run's FAILURES section reports four workers crashed - gw1, gw4,
+gw8, gw11 - each naming the test in flight at the moment it died:
+`test_lock_sentinel_policy`, `test_collectors`, `test_doctor` and
+`test_antigravity_agents`. Those four names then reappear in the short summary
+as FAILED. They are one event counted twice, not two crashes plus two assertion
+failures. The named tests pass serially because nothing is wrong with them; they
+were running on workers that died.
+
+The mechanism given in `watchdog-self-termination` is also wrong.
+`src/vaultspec_core/mcp_server/watchdog.py` **self-reaps**: it concludes its own
+process is orphaned and exits. It does not walk up and terminate an ancestor, so
+"the ancestor is the xdist worker" describes something the code does not do. The
+one test that arms in-process, `test_kill_switch_disables_arming_in_process`,
+sets the kill switch first precisely so no watchdog thread is spawned inside the
+runner, and says so in its docstring.
+
+What is established: four workers died during a 12-way run, and the four
+reported failures are those deaths. What is not established is why. The run was
+on a workstation concurrently executing this repository's own self-hosted CI at
+100% CPU, which the original findings did not weigh and which makes resource
+exhaustion a live alternative to anything test-specific.
+
+The two genuine assertion failures in that run were both in
+`test_discovery_guidance.py`, from wording drift between `not installed` and
+`unavailable`, unrelated to parallelism and since fixed on `main`. That leaves
+`failing-guards-on-main` above accurate as written.
+
 ## Recommendations
 
 - Fix the shared state behind the two isolation failures before adopting
   parallelism, rather than pinning the tests together to hide them. No decision
   is required; this is execution.
+
 - Decide how the watchdog cohort is isolated from a parallel runner. The choice
   between a same-worker group and a dedicated serial lane is architecturally
   significant because it constrains every future process-lifecycle test, and
   belongs in the ADR governing this work.
+
 - Decide the durability contract of the shared write path. Whether
   `atomic_write_bytes` owes power-loss durability in every context, or only in
   production, is a commitment other write surfaces will be read against; it is
   the decision this performance work depends on and it is unrecorded today.
+
 - Triage the two failing discovery guards separately from the performance work.
   The fix is to the guarded content or the guard, not to the harness.
+
 - Reconsider the timeout configuration as a whole, covering both phases and both
   failure directions, rather than adjusting one bound.
+
 - Derive the watchdog sleep windows from the poll interval under test, but only
   where doing so does not weaken the property being proved.
+
 - Supersede or complete `2026-03-23-test-quality-adr`. Not blocking here, whose
   coverage is assessed independently, but it is a live trap for the next reader.
+
 - Amend `2026-09-05-provisioning-tests-adr` to record the move to a self-hosted
   Windows leg and why. Out of scope for the performance plan; raised so it is not
   lost.
+
+- Establish why four workers died before enabling parallelism, treating the
+  cause as unknown rather than assumed. The earlier recommendation to decide how
+  to isolate the watchdog cohort rested on a mechanism this audit has since
+  retracted, and acting on it would have contained a cohort that may have
+  nothing to do with the crashes.
+
+- Re-run the parallel measurement on a machine not simultaneously executing this
+  repository's CI, so resource exhaustion can be excluded or confirmed before
+  any test is blamed.
