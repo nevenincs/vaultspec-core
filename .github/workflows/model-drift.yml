@@ -65,6 +65,7 @@ env:
 
 jobs:
   drift:
+    timeout-minutes: 60
     name: Weekly Model Drift Check
     runs-on: [self-hosted, Linux, X64, build]
     steps:

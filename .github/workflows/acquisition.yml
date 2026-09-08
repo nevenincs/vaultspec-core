@@ -195,6 +195,7 @@ jobs:
         run: chown -R --reference=/__w "$GITHUB_WORKSPACE" || true
 
   acquire-macos:
+    timeout-minutes: 60
     name: acquire on macOS (Apple Silicon)
     # NATIVE, no container - macOS runners cannot host one, and none is needed:
     # the point of a container on the Linux legs is to supply an OLDER libc than
@@ -298,6 +299,7 @@ jobs:
         run: rm -rf "${RUNNER_TEMP}/acq" "${RUNNER_TEMP}/fresh-home" "${RUNNER_TEMP}/proj" || true
 
   acquire-windows:
+    timeout-minutes: 60
     name: acquire on Windows
     # NATIVE, like the macOS leg and for the same reason: the container on the
     # Linux legs exists to supply an OLDER libc than the build host, and Windows

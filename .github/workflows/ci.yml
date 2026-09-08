@@ -37,6 +37,7 @@ jobs:
   # answers it in seconds, so the drift reads as itself rather than as a
   # repository-wide outage.
   lockfile:
+    timeout-minutes: 15
     name: Lockfile In Sync
     runs-on: [self-hosted, Linux, X64, build]
     steps:
@@ -62,6 +63,7 @@ jobs:
   # drift that invalidated venvs across this estate when a host OS upgrade
   # moved the system interpreter. This job compares the two directly.
   interpreter-pin:
+    timeout-minutes: 15
     name: Interpreter Matches Pin
     runs-on: [self-hosted, Linux, X64, build]
     steps:
@@ -84,6 +86,7 @@ jobs:
           echo "Interpreter matches the pin: ${actual}"
 
   workflow-lint:
+    timeout-minutes: 30
     name: Workflow Lint
     runs-on: [self-hosted, Linux, X64, build]
     steps:
@@ -226,6 +229,7 @@ jobs:
           echo "all ${#built[@]} built target(s) are gated offline"
 
   lint-and-type:
+    timeout-minutes: 45
     name: Lint, Type, Config, Link, and Markdown Checks
     runs-on: [self-hosted, Linux, X64, build]
     steps:
@@ -313,6 +317,7 @@ jobs:
         run: just check-type-strict
 
   code-health:
+    timeout-minutes: 45
     name: Code Health (advisory)
     runs-on: [self-hosted, Linux, X64, build]
     steps:
@@ -347,6 +352,7 @@ jobs:
         run: just health-fast
 
   tests:
+    timeout-minutes: 60
     name: Tests
     runs-on: [self-hosted, Linux, X64, build]
     steps:
@@ -388,6 +394,7 @@ jobs:
         run: just test-repo
 
   broad-tests:
+    timeout-minutes: 90
     name: broad (${{ matrix.name }})
     # The required "Tests" gate above is marker-scoped to `unit`, which hides the
     # much larger integration/behavioural suite. This job runs the full suite
@@ -441,6 +448,7 @@ jobs:
         run: just test-broad
 
   windows-vault-repair:
+    timeout-minutes: 45
     name: Windows Vault Repair Tests
     runs-on: [self-hosted, Windows, X64]
     steps:
@@ -469,6 +477,7 @@ jobs:
         run: just test-vault-repair
 
   vault-audit:
+    timeout-minutes: 60
     name: Vault Audit
     runs-on: [self-hosted, Linux, X64, build]
     steps:
@@ -507,6 +516,7 @@ jobs:
         run: just vault-check
 
   dependency-audit:
+    timeout-minutes: 30
     name: Dependency Audit (uv audit)
     runs-on: [self-hosted, Linux, X64, build]
     steps:
