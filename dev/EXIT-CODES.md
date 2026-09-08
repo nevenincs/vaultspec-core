@@ -127,6 +127,46 @@ So: run every step when each step ANSWERS SOMETHING; stop at the first failure
 when each step DEPENDS ON the one before it. The test is the dependency, not
 the verb.
 
+### `audit-all` gates, and `advisory` is a property of a leaf
+
+**`audit-all` fails only when a dimension that GATES found something, and the
+only dimension that gates is the dependency audit.** That is the whole
+guarantee, and it is the same in all five repositories.
+
+`vaultspec-core` had `advisory=True` on its `audit all` while `vaultspec-a2a`
+did not, so a published CVE against a pinned version failed `audit-all` in one
+repository and passed it in the other — same recipe name, same composition,
+opposite consequence.
+
+The rule that settles it: `advisory` describes ONE TOOL and what its findings
+are worth. It belongs on a leaf. Setting it on an aggregate overrides the
+declarations of everything the aggregate composes, which is the same defect as
+`; exit 0` moved up one level — a blanket claim standing in for a set of
+specific ones. An aggregate's consequence is DERIVED from what it contains: the
+advisory dimensions inside `audit-all` still exit 0 on their findings, so only
+`deps` can fail it, and "one red dimension does not hide the rest" is delivered
+by `keep_going`, not by silencing every dimension at once.
+
+### Two advisory mechanisms; a conformance audit must look for both
+
+Findings-suppression is declared in two places, and scanning for one of them
+alone under-reports:
+
+1. **`advisory=True` on a target**, with `findings_codes` defaulting to `{1}`.
+   The dispatcher applies `advisory_result`.
+1. **A per-invocation wrapper**, as in `vaultspec-rag`'s
+   `_advisory(finding_exit, ...)`, which states the finding status at the call
+   site and needs no flag on the target at all.
+
+Both implement the same rule; neither is a shortcut past it. The second exists
+because the default is not universal: **vulture reports dead code with 3**, and
+reserves 1 for invalid input and 2 for invalid arguments. Read under `{1}`, a
+vulture finding looks like a broken scanner and a broken vulture invocation
+looks like a finding — both backwards, and both silent. So a tool that does not
+use 1 must SAY which status it uses, whether by `findings_codes` on the target
+or by the wrapper's argument. That requirement is what makes this different
+from a blanket flag, and it is why the flag alone is not the thing to grep for.
+
 ## Partial and skipped work
 
 A run that proved nothing must not read as a run that proved everything.

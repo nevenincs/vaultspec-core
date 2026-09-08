@@ -34,6 +34,11 @@ Verb classes, keyed to CONSEQUENCE:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Container
+
 #: Success. The command ran and found nothing that gates.
 OK = 0
 
@@ -103,11 +108,19 @@ FIX_STRICT_ENV = "VAULTSPEC_FIX_STRICT"
 ALLOW_EMPTY_ENV = "VAULTSPEC_ALLOW_EMPTY_SELECTION"
 
 
-def advisory_result(code: int) -> int:
+def advisory_result(code: int, findings: Container[int] = FINDINGS_CODES) -> int:
     """Collapse an advisory step's status onto the contract.
 
     Args:
         code: The status the advisory tool exited with.
+        findings: The statuses THIS tool uses to mean "I found something".
+            Defaults to :data:`FINDINGS_CODES`, which is right for every
+            scanner in the fleet but one: vulture reports dead code with 3 and
+            reserves 1 and 2 for invalid input and invalid arguments. Reading
+            its 3 as breakage would silence the finding; reading its 1 as a
+            finding would silence a broken invocation. A tool that does not use
+            1 must therefore SAY so, which is the difference between this and a
+            blanket flag.
 
     Returns:
         :data:`OK` when the tool ran and merely reported findings, otherwise
@@ -115,7 +128,7 @@ def advisory_result(code: int) -> int:
         `; exit 0` got wrong: `exit 0` maps EVERY status onto success, so a
         scanner that was missing or crashed reported exactly like a clean run.
     """
-    if code == OK or code in FINDINGS_CODES:
+    if code == OK or code in findings:
         return OK
     return ADVISORY_BROKEN
 

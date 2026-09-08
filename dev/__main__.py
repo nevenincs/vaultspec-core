@@ -115,7 +115,7 @@ def _execute(verb: Verb, target: Target) -> int:
                 break
 
     worst = selection_result(worst)
-    return advisory_result(worst) if target.advisory else worst
+    return advisory_result(worst, target.findings_codes) if target.advisory else worst
 
 
 def main(argv: list[str] | None = None) -> int:

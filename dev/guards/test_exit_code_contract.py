@@ -137,6 +137,27 @@ def test_every_non_findings_status_propagates(code: int) -> None:
     assert code in FINDINGS_CODES or advisory_result(code) == ADVISORY_BROKEN
 
 
+def test_a_declared_findings_status_is_suppressed() -> None:
+    """A tool that says which status means "found something" is believed.
+
+    vulture reports dead code with 3 and reserves 1 for invalid input. Under
+    the `{1}` default its findings read as a broken scanner and its broken
+    invocations read as findings - both backwards, and both silent. So a tool
+    that does not use 1 declares what it does use.
+    """
+    vulture = frozenset({3})
+    assert advisory_result(3, vulture) == OK
+    assert advisory_result(0, vulture) == OK
+
+
+def test_a_declared_findings_set_still_catches_breakage() -> None:
+    """Declaring a findings status narrows the suppression, never widens it."""
+    vulture = frozenset({3})
+    assert advisory_result(1, vulture) == ADVISORY_BROKEN
+    assert advisory_result(2, vulture) == ADVISORY_BROKEN
+    assert advisory_result(TOOL_MISSING, vulture) == ADVISORY_BROKEN
+
+
 def test_an_empty_selection_is_not_a_pass() -> None:
     assert selection_result(PYTEST_NO_TESTS_COLLECTED) == NOTHING_SELECTED
     assert NOTHING_SELECTED != OK

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from dev.exit_codes import FINDINGS_CODES
 from dev.runner import Cmd, Echo, Ref, Step, ToolOrDocker, uv_run
 
 PACKAGE = "src/vaultspec_core"
@@ -128,6 +129,11 @@ class Target:
         summary: One-line description shown by ``help``.
         steps: The steps to run, in order.
         advisory: When true the target reports findings but always exits 0.
+        findings_codes: The statuses this target's tool uses to mean "I found
+            something". Only these are suppressed when `advisory` is set;
+            every other non-zero status is the tool failing to RUN, and
+            propagates. Defaults to `FINDINGS_CODES` ({1}), which is right for
+            every scanner here but vulture, which reports dead code with 3.
         keep_going: When true a failing step does not stop the remaining
             steps. Aggregate dashboards set this so one red dimension does
             not hide every dimension after it.
@@ -137,6 +143,7 @@ class Target:
     summary: str
     steps: tuple[Step, ...]
     advisory: bool = False
+    findings_codes: frozenset[int] = FINDINGS_CODES
     keep_going: bool = False
 
 
@@ -431,7 +438,15 @@ AUDIT = Verb(
             advisory=True,
         ),
         Target(
-            "dead-code", "Vulture dead-code scan.", (uv_run("vulture"),), advisory=True
+            "dead-code",
+            "Vulture dead-code scan.",
+            (uv_run("vulture"),),
+            advisory=True,
+            # vulture reports dead code with 3, reserving 1 for invalid input
+            # and 2 for invalid arguments. Under the fleet default ({1}) its
+            # findings would read as a broken scanner and its broken
+            # invocations would read as findings - both backwards.
+            findings_codes=frozenset({3}),
         ),
         Target(
             "dependencies",
@@ -460,7 +475,19 @@ AUDIT = Verb(
                 Echo("=== test-tree cognitive complexity ==="),
                 Ref("complexity"),
             ),
-            advisory=True,
+            # NOT advisory, though every dimension but `deps` is. `advisory` is
+            # a property of a LEAF - of one tool and what its findings are
+            # worth - and setting it on an aggregate overrides the declarations
+            # of everything the aggregate composes. This one composes `deps`,
+            # which GATES, so the flag here meant a published CVE against a
+            # pinned version passed `audit all` in this repository and failed it
+            # in vaultspec-a2a: same recipe, same composition, opposite
+            # consequence. The guarantee is now one sentence, and the same one
+            # everywhere: `audit all` fails only when a dimension that GATES
+            # found something, and the only dimension that gates is `deps`.
+            # `keep_going` is what delivers "one red dimension does not hide
+            # the rest"; advisory would have delivered "no dimension can ever
+            # be reported at all".
             keep_going=True,
         ),
     ),
