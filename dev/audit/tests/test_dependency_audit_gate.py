@@ -21,6 +21,9 @@ from dev.audit import dependency_audit as da
 if TYPE_CHECKING:
     from pathlib import Path
 
+#: Every repository in the fleet tiers its tests; this gate is a pure unit.
+pytestmark = pytest.mark.unit
+
 TODAY = dt.date(2026, 9, 8)
 COORD = da.Coordinate("PyPI", "jinja2", "3.1.4", "uv.lock")
 HIT = {"GHSA-q2x7-8rv6-6q7h": {COORD}}

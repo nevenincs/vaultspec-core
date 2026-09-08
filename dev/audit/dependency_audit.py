@@ -479,14 +479,13 @@ def build_report(
     *,
     today: _dt.date,
     describe_fn: Any = describe,
-    probes: list[str] | None = None,
 ) -> Report:
     """Turn a raw OSV result into the audit's verdict.
 
     Pure apart from ``describe_fn``, so the gating behaviour is testable
     without a network call.
     """
-    report = Report(probes=probes or [])
+    report = Report()
     for coord in coordinates:
         report.surfaces[coord.surface] = report.surfaces.get(coord.surface, 0) + 1
 
@@ -653,9 +652,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         suppressions = load_suppressions()
         hits = query_osv(coordinates)
-        report = build_report(
-            coordinates, hits, suppressions, today=_dt.date.today(), probes=probes
-        )
+        report = build_report(coordinates, hits, suppressions, today=_dt.date.today())
+        report.probes = probes
     except AuditError as error:
         print(f"ERROR: dependency audit could not complete: {error}", file=sys.stderr)
         return EXIT_BROKEN
