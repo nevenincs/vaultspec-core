@@ -5,7 +5,7 @@ tags:
 date: '2026-09-08'
 modified: '2026-09-08'
 body_schema: 'body-v2'
-body_hash: 'sha256:d665e91ab24dad45c2b2cfa5b75e1f17d50fb71a10bb8d8c882630e4608299c5'
+body_hash: 'sha256:1c87cbf673948e761b9490f7ed0ae3e37f28c149def791a2effe51c132507a0c'
 related:
   - '[[2026-09-08-test-provisioning-economics-broad-lane-profile-research]]'
 ---
@@ -206,6 +206,40 @@ reproduced identically on `b5c7f256` under the same environment and filed as
 issue #518. It is a real product question about the `--body-stdin` channel, not a
 consequence of this work, and is out of its scope.
 
+### parallelism-destabilises-the-contention-cohort | high | Enabling the runner made the concurrency stress tests flaky
+
+Found by running the lane repeatedly instead of once, which is the only way this
+class of defect shows up at all.
+
+Three consecutive full runs under `-n auto` produced two failures, each in a
+different test whose subject is behaviour under contention:
+
+- `test_rename_concurrency.py::test_no_deadlock_under_concurrent_rename_and_edit_load`
+  - `PermissionError(13)` under load
+- `test_fix_writer_concurrency.py::test_concurrent_edit_survives_a_fix_pass` - a
+  committed edit discarded
+
+The same two modules run 6/6 green single-process. The failures are the Windows
+replace-retry budget being exhausted by disk traffic the tests did not create:
+eleven other workers saturating the same volume.
+
+This is the same shape as `durability-is-observable-in-one-cohort` above and
+generalises it. A test that races two writers and asserts no write is lost is
+measuring the product's locking; run it beside eleven unrelated workers and it
+measures the host instead. The `durable` marker fixed one input to that
+measurement (fsync); it could not fix the other (everything else on the box).
+
+Note that the earlier retraction still stands and this is not a return to it:
+those four worker deaths were whole-process crashes with no assertion, whereas
+these are ordinary assertion failures in a named test. Different signature,
+different cause.
+
+Handled by a `serial` marker and a second single-process pass in the `test`
+lanes, rather than an xdist group: a group pins the cohort to one worker and
+leaves the other eleven hammering the volume, which is the thing that breaks it.
+47 tests carry it - the two dedicated concurrency modules plus the
+contention-timing classes in `test_advisory_lock` and `test_edit_engine`.
+
 ## Recommendations
 
 - Fix the shared state behind the two isolation failures before adopting
@@ -255,3 +289,12 @@ consequence of this work, and is out of its scope.
 - Consider separately whether `_WINDOWS_REPLACE_RETRY_BUDGET_SECONDS` has enough
   headroom for a fast writer. This work has no evidence that a real caller
   reaches that rate, so it is a question rather than a finding.
+
+- Keep the `serial` cohort defined by what a test MEASURES, not by whether it
+  has been seen to flake. A marker applied to whatever failed last is a
+  quarantine list; this one has to stay a statement about the test's subject or
+  it will absorb real defects.
+
+- Re-run any future parallelism change several times before believing it. A
+  single green run does not distinguish a stable lane from a lane that fails one
+  time in three, and this campaign would have shipped the difference.

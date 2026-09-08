@@ -82,6 +82,21 @@ LIBRARY_MARKERS = f"not repo and {EXCLUDED_MARKERS}"
 #: reverted, this should go with it.
 PARALLEL = ("-n", "auto", "--dist", "loadfile")
 
+#: The cohort that must NOT run beside the parallel lane, and its complement.
+#:
+#: A test whose subject is behaviour under contention - the advisory lock's own
+#: timeout, a writer racing a fix pass, a rename racing an edit - measures the
+#: HOST rather than the product when eleven other workers are saturating the
+#: same disk. It then fails on a Windows replace-retry budget exhausted by
+#: traffic it never created. Measured: the cohort is 6/6 green run on its own
+#: and produced a failure in two of three full parallel runs.
+#:
+#: A second single-process pass rather than an xdist group, because a group only
+#: pins the cohort to one worker and leaves the other eleven hammering the
+#: volume - which is the thing that breaks it.
+SERIAL_ONLY = "serial"
+NOT_SERIAL = "not serial"
+
 #: Trees whose Markdown is formatted and linted. The four root READMEs are named
 #: individually rather than by their enclosing directory - `dev/`, `src/`, and
 #: `typings/` each cohabit with non-Markdown trees (and `dev/` cohabits with test
@@ -562,7 +577,28 @@ TEST = Verb(
         Target(
             "broad",
             "The whole package suite minus credential-gated markers.",
-            (uv_run("pytest", PACKAGE, "-q", *PARALLEL, "-m", LIBRARY_MARKERS),),
+            (
+                uv_run(
+                    "pytest",
+                    PACKAGE,
+                    "-q",
+                    *PARALLEL,
+                    "-m",
+                    f"{NOT_SERIAL} and {LIBRARY_MARKERS}",
+                ),
+                uv_run(
+                    "pytest",
+                    PACKAGE,
+                    "-q",
+                    "-m",
+                    f"{SERIAL_ONLY} and {LIBRARY_MARKERS}",
+                ),
+            ),
+            # Both passes always run. They select disjoint populations, so a
+            # failure in one says nothing about the other, and stopping early
+            # would report the contention cohort as "not run" rather than as
+            # whatever it actually is.
+            keep_going=True,
         ),
         Target(
             "vault-repair",

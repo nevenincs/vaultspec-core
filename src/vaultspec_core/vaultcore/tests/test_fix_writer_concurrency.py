@@ -57,7 +57,7 @@ if TYPE_CHECKING:
 # observable here in a way it is nowhere else. Without the real call the write
 # loop tightens enough to exhaust the 2s Windows replace-retry budget: measured
 # over 20 runs each, 4 failures suppressed against 0 restored.
-pytestmark = [pytest.mark.unit, pytest.mark.durable]
+pytestmark = [pytest.mark.unit, pytest.mark.durable, pytest.mark.serial]
 
 
 # Bounded wait used to confirm the writer is blocked while the holder holds the

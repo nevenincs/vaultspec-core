@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
     from ..checks._base import VaultSnapshot
 
-pytestmark = [pytest.mark.unit]
+pytestmark = [pytest.mark.unit, pytest.mark.serial]
 
 
 # Bounded wait used to confirm the second caller is blocked while the holder
