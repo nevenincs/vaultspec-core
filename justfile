@@ -97,19 +97,48 @@ default:
 #  setup
 # ===========================================================================
 
-# The literal `uv sync` on the first line is deliberate: it is the only step
-# that must work before a virtual environment exists, so it cannot route
-# through `{{dev}}`. `framework-install` then runs with --force because a fresh
-# checkout carries the tracked `.vaultspec/` config but not the gitignored
-# install manifest (`.vaultspec/providers.json`), and the diagnosis engine
-# reads that combination as CORRUPTED; --force rebuilds the manifest from the
-# tracked config the way a consumer recovering a lost manifest would.
+# `init` is the one command a fresh worktree needs, and the command git
+# tooling and the worktree provisioner call after creating one. It cannot
+# route through `{{dev}}`, which presumes the environment `init` is
+# responsible for creating; it runs on an ephemeral interpreter instead, and
+# `dev/init/` is stdlib-only for exactly that reason.
+#
+# Idempotent: a second run costs a stamp comparison and touches nothing.
+# `just init-check` verifies without mutating, exiting 3 when the worktree is
+# not initialized, which is what a hook or a provisioner calls. Set
+# VAULTSPEC_INIT_JSON=1 for an NDJSON event stream, VAULTSPEC_INIT_FORCE=1 to
+# ignore the stamp. Every run writes `.venv/init-report.json`.
+#
+# The phases run in dependency order and stop at the first failure: unlike the
+# `-all` aggregates, which chain independent inspectors and run every one,
+# these build one artifact, and `init-tools` runs executables out of the
+# environment `init-python` creates. The report still lists every phase, with
+# the ones that were not attempted naming the failure that stopped them.
 
-# Provision a fresh clone or worktree: dependencies, framework, and git hooks.
+# Initialize a fresh clone or worktree: dependencies, framework, hooks, .env.
 [group('setup')]
-bootstrap:
-    uv sync --locked --group dev
-    {{dev}} framework install
+init:
+    uv run --no-project --python 3.13 -- python -m dev.init all
+
+# Resolve the locked Python development toolchain into .venv.
+[group('setup')]
+init-python:
+    uv run --no-project --python 3.13 -- python -m dev.init python
+
+# Restore the pinned Node dependency graph. A no-op in this repository.
+[group('setup')]
+init-node:
+    uv run --no-project --python 3.13 -- python -m dev.init node
+
+# Enroll the Vaultspec framework and install the committed git hooks.
+[group('setup')]
+init-tools:
+    uv run --no-project --python 3.13 -- python -m dev.init tools
+
+# Report whether this worktree is initialized. Mutates nothing; exits 3 if not.
+[group('setup')]
+init-check:
+    uv run --no-project --python 3.13 -- python -m dev.init check
 
 # Install the locked dependency set.
 [group('setup')]

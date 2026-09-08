@@ -21,16 +21,29 @@ pytestmark = pytest.mark.unit
 
 JUSTFILE = Path(__file__).resolve().parents[2] / "justfile"
 
-#: Recipes that deliberately do not route through `python -m dev`: `bootstrap`
-#: must work before a virtual environment exists, and the rest wrap a single
-#: external entry point that has no target dispatch to model.
+#: Recipes that deliberately do not route through `python -m dev`: the `init`
+#: family must work before a virtual environment exists, and the rest wrap a
+#: single external entry point that has no target dispatch to model.
 NON_REGISTRY_RECIPES = frozenset(
     # `binaries` and `channels` are release-path recipes: each invokes a
     # `dev/` script directly under a bare `--no-project` interpreter, exactly
     # as the release workflow does, so a local reproduction and CI run the
     # same command. Routing them through the dev runner would put a project
     # environment between the maintainer and the thing being reproduced.
-    {"default", "bootstrap", "analytics", "binaries", "channels"},
+    # The `init` family provisions the environment `python -m dev` runs in, so
+    # it cannot route through it; it runs on an ephemeral `--no-project`
+    # interpreter, which is why `dev/init/` is stdlib-only.
+    {
+        "default",
+        "init",
+        "init-python",
+        "init-node",
+        "init-tools",
+        "init-check",
+        "analytics",
+        "binaries",
+        "channels",
+    },
 )
 
 #: Test lanes deliberately reachable only by naming them, each with its reason.
