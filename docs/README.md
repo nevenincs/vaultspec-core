@@ -39,7 +39,7 @@ From the Core repository, run this command with the tag and aggregated `SHA256SU
 the same release:
 
 ```sh
-just channels <tag> <path-to-homebrew-tap-checkout> <path-to-SHA256SUMS>
+just release-channels <tag> <path-to-homebrew-tap-checkout> <path-to-SHA256SUMS>
 ```
 
 The command generates and validates `bucket/vaultspec-core.json` and

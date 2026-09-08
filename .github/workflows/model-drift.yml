@@ -85,7 +85,7 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        run: just deps sync
+        run: just deps-sync
 
       # Deterministic and free. Printing the pinned values before the agent
       # runs means the run log answers "what did we believe on this date?"
@@ -219,10 +219,10 @@ jobs:
 
             Run both, and do not open a PR until they pass:
 
-                just test unit
-                just framework sync
+                just test-unit
+                just framework-sync
 
-            `just framework sync` regenerates the provider artifacts from the
+            `just framework-sync` regenerates the provider artifacts from the
             registries. It writes only gitignored files, so nothing from it
             gets committed - it is here as a smoke test that the renderers
             still accept the new identifiers. If either command fails, fix the

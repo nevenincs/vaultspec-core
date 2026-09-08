@@ -255,31 +255,31 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        run: just deps sync
+        run: just deps-sync
 
       - name: Ruff
-        run: just lint python
+        run: just check-python
 
       - name: Ty
-        run: just lint type
+        run: just check-type
 
-      # This job runs Linux, so `just lint type` above only ever proves the
+      # This job runs Linux, so `just check-type` above only ever proves the
       # Linux view. The tree carries both Windows (`msvcrt`, `ctypes.WinDLL`)
       # and POSIX (`fcntl`) branches, so a contributor on either OS can be
       # green locally while the other platform is broken. Checking all three
       # targets here means CI and a local run agree regardless of host.
       - name: Ty (all target platforms)
         if: always()
-        run: just lint type-platforms
+        run: just check-type-platforms
 
       - name: Taplo
-        run: just lint toml
+        run: just check-toml
 
       - name: Lychee
-        run: just lint links
+        run: just check-links
 
       - name: pymarkdown
-        run: just lint markdown
+        run: just check-markdown
 
       # Baseline-ratcheted gates. Each threshold sits at this tree's worst
       # current offender (see the census comments in pyproject.toml), so these
@@ -293,21 +293,21 @@ jobs:
       # gate must report its own verdict independently of its neighbours.
       - name: Cognitive complexity
         if: always()
-        run: just lint complexity
+        run: just check-complexity
 
       - name: Nesting depth
         if: always()
-        run: just lint nesting
+        run: just check-nesting
 
       - name: Module and class size
         if: always()
-        run: just lint size
+        run: just check-size
 
       # Strict typing's burndown reached zero, so this step is a real gate:
       # a regression fails the job like every other lint dimension here.
       - name: Strict types
         if: always()
-        run: just lint type-strict
+        run: just check-type-strict
 
   code-health:
     name: Code Health (advisory)
@@ -330,16 +330,16 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        run: just deps sync
+        run: just deps-sync
 
       # Measurement only - every target exits 0. This is the instrument the
       # earlier health audits lacked: it ranks the worst offenders per
       # dimension so the ratchet has a target list rather than an intention.
       - name: Advisory audit dimensions
-        run: just audit all
+        run: just audit-all
 
       - name: Code-health report
-        run: just health fast
+        run: just health-fast
 
   tests:
     name: Tests
@@ -362,13 +362,13 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        run: just deps sync
+        run: just deps-sync
 
       - name: Run tests
-        run: just test unit
+        run: just test-unit
 
       - name: Run development harness guards
-        run: just test harness
+        run: just test-harness
 
       # The repository-health guards - the automation contracts, the packaging
       # metadata, the shipped templates, the typings/ stubs, the suite-quality
@@ -378,7 +378,7 @@ jobs:
       # the equivalent lane once had no CI step at all and the doubles guard
       # inside it failed unobserved: a guard nothing runs is not a guard.
       - name: Run repository-health guards
-        run: just test repo
+        run: just test-repo
 
   broad-tests:
     name: broad (${{ matrix.name }})
@@ -425,11 +425,11 @@ jobs:
         # bash is available on the Windows fleet runner via Git Bash; using it
         # on both OSes keeps the just invocation and argument quoting identical.
         shell: bash
-        run: just deps sync
+        run: just deps-sync
 
       - name: Run broad test suite
         shell: bash
-        run: just test broad
+        run: just test-broad
 
   windows-vault-repair:
     name: Windows Vault Repair Tests
@@ -452,10 +452,10 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        run: just deps sync
+        run: just deps-sync
 
       - name: Run vault repair regression tests
-        run: just test vault-repair
+        run: just test-vault-repair
 
   vault-audit:
     name: Vault Audit
@@ -478,7 +478,7 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        run: just deps sync
+        run: just deps-sync
 
       - name: Bootstrap framework
         # The source repo tracks .vaultspec/ framework config, but the install
@@ -488,10 +488,10 @@ jobs:
         # --force to repair/create the manifest from the tracked config and
         # scaffold provider outputs, the way a consumer recovering a missing
         # manifest would.
-        run: just framework install
+        run: just framework-install
 
       - name: Verify vault structure and links
-        run: just vault check
+        run: just vault-check
 
   dependency-audit:
     name: Dependency Audit (uv audit)
@@ -514,7 +514,7 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        run: just deps sync
+        run: just deps-sync
 
       - name: Python dependency vulnerability audit
-        run: just audit deps
+        run: just audit-deps

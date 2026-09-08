@@ -186,6 +186,7 @@ check-workflow:
 # Each of the three below is a real gate whose burndown is unfinished, so none
 # is a member of `check-all`: chaining one in would hide every dimension behind
 # it. Run them by name until each can hold its line, then move it up.
+# `check-type-strict` is NOT one of them - it holds its line and is a member.
 
 # Gate cyclomatic and cognitive complexity.
 [group('check')]
@@ -209,12 +210,12 @@ check-type-strict:
 
 # Composed from just dependencies, so this aggregate and the gates it claims to
 # run cannot disagree. FAIL-FAST: the first failing member stops the chain.
-# `check-complexity`, `check-nesting`, `check-size` and `check-type-strict` are
-# deliberately NOT members - see the note above them.
+# `check-complexity`, `check-nesting` and `check-size` are deliberately NOT
+# members - see the note above them.
 
 # Run every gating static-analysis dimension that holds the line today.
 [group('check')]
-check-all: check-python check-type check-type-platforms check-toml check-links check-markdown check-workflow
+check-all: check-python check-type check-type-platforms check-toml check-links check-markdown check-workflow check-type-strict
 
 # ===========================================================================
 #  fix - MUTATES. Everything automatically repairable, in one pass.

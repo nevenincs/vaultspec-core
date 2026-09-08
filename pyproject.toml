@@ -210,7 +210,7 @@ markers = [
 # Every tree that carries committed Python AND a cohabiting `tests/` package.
 # `dev` is listed for the same reason `src` is: the harness backend has its own
 # in-package test suite, and omitting the tree here meant a bare `pytest`
-# collected none of it. The suite was still gated - `just test harness` and the
+# collected none of it. The suite was still gated - `just test-harness` and the
 # CI step that runs it name the tree explicitly - but the default invocation
 # and the gate disagreed about what the suite is, which is exactly how a lane
 # goes unobserved.
@@ -249,7 +249,7 @@ target-version = "py313"
   # NOTE: preview is deliberately OFF here - enabling it globally changes the
   # behavior of stable rules and surfaces findings unrelated to the rule being
   # added. The preview-only nesting-depth rule (PLR1702) is gated separately by
-  # `just lint nesting`, which runs a scoped `--select PLR1702 --preview`.
+  # `just check-nesting`, which runs a scoped `--select PLR1702 --preview`.
   #
   # TID252 (relative-imports) is off: this package is mixed - 1274 absolute and
   # 941 relative intra-package imports - and picking a side is an import-
@@ -278,7 +278,7 @@ target-version = "py313"
   ]
   unfixable = ["B"]
 
-    # BASELINE-CALIBRATED (census 2026-07-28, `just health --census`). Each
+    # BASELINE-CALIBRATED (census 2026-07-28, `just health-census`). Each
     # threshold sits at today's worst PRODUCTION offender, so the gate is green
     # on landing and can only ever be ratcheted DOWN. ruff's own defaults are
     # mccabe 10, returns 6, branches 12, args 5, statements 50 - the distance
@@ -302,7 +302,7 @@ target-version = "py313"
     # helper bloat living in those same files.
     #
     # PLR1702 (nesting depth) is NOT listed here: it reached ruff's own default
-    # of 5 and is gated at that default by `just lint nesting`. It is the first
+    # of 5 and is gated at that default by `just check-nesting`. It is the first
     # dimension to finish its burndown; the rest are still above default.
     [tool.ruff.lint.pylint]
     max-args = 17       # RATCHETED 20 -> 17 (floor is the worst Typer command)
@@ -368,8 +368,8 @@ root = [".", "src"]
 [tool.ty.src]
 include = ["src", "dev", "docs"]
 
-# Strict-mode type checking, gating: `just lint type-strict` is in the `lint
-# all` chain, and `ty` stays the fast pre-commit gate.
+# Strict-mode type checking, gating: `just check-type-strict` is a member of the
+# `check-all` chain, and `ty` stays the fast pre-commit gate.
 #
 # `include` names every tree that carries tracked Python. It is deliberately
 # NOT a claim that the burndown is finished - run the gate and read its own
@@ -620,7 +620,7 @@ reportInvalidCast = "error"
 #     over  16:  147
 #     over  15:  160      <- the target
 #
-# Production only. Tests are measured by `just audit complexity`, which reports
+# Production only. Tests are measured by `just audit-complexity`, which reports
 # without failing: the worst scores belong to guard tests that walk the AST of
 # every module, and that shape is what the guard IS, not debt to pay down.
 [tool.complexipy]
@@ -669,7 +669,7 @@ enable = ["C0302", "R0902", "R0904", "R0916"]
 # spec_cmd_skills.py, spec_cmd_system.py) is what finally moved this
 # dimension: prior complexity waves only extracted helpers within these
 # modules, which paid down per-function scores without touching physical
-# length. Measure with `just health census`, which counts physical lines the
+# length. Measure with `just health-census`, which counts physical lines the
 # way pylint's C0302 does - a count that skips blank lines reads ~375 lines
 # short on the longest module here and will set a ceiling the tree cannot
 # meet.
@@ -721,7 +721,7 @@ paths = ["src/vaultspec_core"]
 # than a defect. They stay ENABLED and are read per finding - suppressing a
 # family wholesale would also hide the first real one.
 #
-# The test tree is excluded by the `-x` flag in the `just audit security`
+# The test tree is excluded by the `-x` flag in the `just audit-security`
 # recipe, NOT by an `exclude_dirs` key here: bandit reads `skips` from this
 # table but silently ignores `exclude_dirs` from it. A suppression that does
 # not suppress is worse than none, so the exclusion lives where it takes effect.

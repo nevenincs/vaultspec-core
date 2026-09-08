@@ -39,7 +39,7 @@ Use Python `>=3.13,<3.14`. For a fresh clone or worktree, install
 [uv](https://docs.astral.sh/uv/getting-started/installation/) and
 [just](https://just.systems/man/en/packages.html), then run `just bootstrap`. This is
 the canonical provisioning path and performs a locked development dependency sync. Use
-`just deps sync` only for a narrow environment refresh.
+`just deps-sync` only for a narrow environment refresh.
 
 Keep third-party declarations under the root `typings/` directory. BasedPyright
 discovers it through the default `stubPath` of `./typings`; the project intentionally
@@ -53,9 +53,9 @@ For declaration changes, run the focused test before the repository gates:
 
 - `uv run --no-sync pytest -q dev/guards/test_typings_fidelity.py` checks focused
   declaration fidelity.
-- `just test repo` runs the broader repository-health guard lane that includes the
+- `just test-repo` runs the broader repository-health guard lane that includes the
   fidelity coverage.
-- `just lint type-strict` runs the strict BasedPyright gate enforced by CI.
+- `just check-type-strict` runs the strict BasedPyright gate enforced by CI.
 - `just lint` runs the complete lint gate, including BasedPyright and the separate Ty
   checks.
 
@@ -122,8 +122,8 @@ NetworkX behavior in unit tests, not in `.pyi` fidelity tests.
 
 Verify the boundary with
 `uv run --no-sync pytest -q src/vaultspec_core/graph/tests/test_networkx_runtime.py`,
-`just lint type-strict`, and `just test unit`. Use the focused fidelity command above
-for `.pyi` declaration fidelity. `just test repo` includes that coverage in the broader
+`just check-type-strict`, and `just test-unit`. Use the focused fidelity command above
+for `.pyi` declaration fidelity. `just test-repo` includes that coverage in the broader
 repository-health guard lane; it is not the NetworkX boundary gate.
 
 ## References
