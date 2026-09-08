@@ -25,8 +25,9 @@ import os
 import shutil
 import sys
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, TextIO, cast
 
 import pytest
 from mcp import ClientSession, StdioServerParameters
@@ -35,6 +36,9 @@ from mcp.types import CallToolResult, TextContent
 
 from vaultspec_core.config import reset_config
 from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 #: The ten tools the redesigned surface must advertise over the wire.
 _EXPECTED_TOOLS = frozenset(
@@ -58,6 +62,33 @@ _READ_ONLY_TOOLS = frozenset({"status", "find", "check", "discover"})
 #: subprocess timeout so a stdin-inheritance regression trips this bound and
 #: fails fast rather than hanging CI to the per-call ceiling.
 _SESSION_TIMEOUT = 45.0
+
+
+@asynccontextmanager
+async def _server_errlog() -> AsyncGenerator[TextIO]:
+    """Yield a stderr for the server subprocess that has a real file descriptor.
+
+    ``stdio_client`` defaults ``errlog`` to ``sys.stderr`` and hands it to
+    ``subprocess``, which needs a descriptor to inherit. Under pytest's
+    sys-level capture - which is what xdist workers run - ``sys.stderr`` is a
+    Python object with no ``fileno()``, and the spawn dies with
+    ``io.UnsupportedOperation`` before the server ever starts. The failure
+    looks like a transport bug and is really the harness.
+
+    ``sys.__stderr__`` is the interpreter's own stderr and keeps its
+    descriptor whatever the capture mode, so the server's diagnostics still
+    reach the terminal and the CI log. It is ``None`` only where the
+    interpreter was started without one, and there the diagnostics have
+    nowhere to go anyway.
+
+    Async purely so it composes into the ``async with`` that opens the
+    transport; nothing here awaits.
+    """
+    if sys.__stderr__ is not None:
+        yield sys.__stderr__
+        return
+    with Path(os.devnull).open("w", encoding="utf-8") as sink:
+        yield sink
 
 
 def _unwrap(result: CallToolResult) -> Any:
@@ -98,7 +129,8 @@ async def _drive_session(project: Path) -> None:
     )
 
     async with (
-        stdio_client(params) as (read, write),
+        _server_errlog() as errlog,
+        stdio_client(params, errlog=errlog) as (read, write),
         ClientSession(read, write) as session,
     ):
         init_result = await session.initialize()
@@ -154,7 +186,8 @@ async def _drive_read_only_session(project: Path) -> None:
     )
 
     async with (
-        stdio_client(params) as (read, write),
+        _server_errlog() as errlog,
+        stdio_client(params, errlog=errlog) as (read, write),
         ClientSession(read, write) as session,
     ):
         await session.initialize()
