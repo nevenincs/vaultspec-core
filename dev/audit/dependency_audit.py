@@ -56,15 +56,15 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import http.client
 import json
 import os
 import sys
 import tomllib
-import urllib.error
-import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 #: See the module docstring: these mirror ``dev/exit_codes.py`` (lane L9).
 EXIT_OK = 0
@@ -323,25 +323,44 @@ def load_suppressions(path: Path = ALLOWLIST_PATH) -> list[Suppression]:
 # --------------------------------------------------------------------------
 
 
+def _open(url: str, body: bytes | None) -> dict[str, Any]:
+    """Fetch ``url`` over HTTPS and return the decoded JSON response.
+
+    Speaks HTTPS directly rather than going through ``urllib.request``: the
+    scheme is then fixed by construction -- no ``file:`` or custom scheme can
+    ever be reached, and no linter suppression is needed to say so. That
+    matters because this file is the same file in five repositories with five
+    different rule sets.
+    """
+    parts = urlsplit(url)
+    if parts.scheme != "https" or not parts.hostname:
+        raise AuditError(f"refusing to fetch a non-HTTPS URL: {url}")
+    headers = {"Accept": "application/json"}
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+    connection = http.client.HTTPSConnection(
+        parts.hostname, parts.port or 443, timeout=_TIMEOUT
+    )
+    try:
+        method = "POST" if body is not None else "GET"
+        connection.request(method, parts.path, body, headers)
+        response = connection.getresponse()
+        payload = response.read()
+        if response.status != 200:
+            raise AuditError(f"{url} returned HTTP {response.status}")
+        return json.loads(payload)
+    finally:
+        connection.close()
+
+
 def _post_json(url: str, payload: dict[str, Any]) -> dict[str, Any]:
     """POST ``payload`` as JSON and return the decoded response."""
-    if not url.startswith("https://"):
-        raise AuditError(f"refusing to POST to a non-HTTPS URL: {url}")
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-    )
-    with urllib.request.urlopen(request, timeout=_TIMEOUT) as response:
-        return json.load(response)
+    return _open(url, json.dumps(payload).encode("utf-8"))
 
 
 def _get_json(url: str) -> dict[str, Any]:
     """GET ``url`` and return the decoded JSON response."""
-    if not url.startswith("https://"):
-        raise AuditError(f"refusing to GET a non-HTTPS URL: {url}")
-    with urllib.request.urlopen(url, timeout=_TIMEOUT) as response:
-        return json.load(response)
+    return _open(url, None)
 
 
 def query_osv(coordinates: list[Coordinate]) -> dict[str, set[Coordinate]]:
@@ -364,7 +383,7 @@ def query_osv(coordinates: list[Coordinate]) -> dict[str, set[Coordinate]]:
         }
         try:
             response = _post_json(_OSV_QUERYBATCH, payload)
-        except (urllib.error.URLError, OSError, ValueError) as error:
+        except (AuditError, OSError, ValueError) as error:
             raise AuditError(f"OSV is unreachable: {error}") from error
         results = response.get("results", [])
         for coord, result in zip(chunk, results, strict=False):
@@ -383,7 +402,7 @@ def describe(identifier: str) -> dict[str, Any]:
     """
     try:
         record = _get_json(_OSV_VULN + identifier)
-    except (urllib.error.URLError, OSError, ValueError, AuditError):
+    except (AuditError, OSError, ValueError):
         # Detail is a nicety; the advisory id alone carries the verdict.
         return {"summary": "", "aliases": [], "severity": ""}
     text = (record.get("summary") or record.get("details") or "").strip()
@@ -570,7 +589,7 @@ def render(report: Report) -> str:
     for suppression in report.stale:
         lines.append(
             f"  stale       {suppression.id} matches nothing in the tree; "
-            "delete it from the allowlist."
+            "delete its allowlist entry."
         )
 
     if report.exit_code == EXIT_OK:
@@ -614,8 +633,8 @@ def _parse_extra(raw: str) -> Coordinate:
     parts = raw.split(":")
     if len(parts) != 3 or not all(parts):
         raise AuditError(
-            f"--extra-package {raw!r} is not ECOSYSTEM:NAME:VERSION "
-            "(e.g. PyPI:requests:2.19.0)"
+            f"--extra-package {raw!r} is not ECOSYSTEM:NAME:VERSION, "
+            "e.g. PyPI:requests:2.19.0"
         )
     return Coordinate(parts[0], parts[1], parts[2], "--extra-package")
 
@@ -647,8 +666,8 @@ def main(argv: list[str] | None = None) -> int:
             probes.append(f"{extra.ecosystem}:{extra.name}:{extra.version}")
         if not coordinates:
             raise AuditError(
-                "no lockfile found; the audit has nothing to check, which is "
-                "not the same as a clean tree."
+                "no lockfile found; the audit has nothing to check, "
+                "which is not the same as a clean tree."
             )
         suppressions = load_suppressions()
         hits = query_osv(coordinates)
