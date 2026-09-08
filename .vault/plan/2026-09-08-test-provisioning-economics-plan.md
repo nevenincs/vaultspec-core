@@ -8,7 +8,7 @@ related:
   - '[[2026-09-08-test-provisioning-economics-adr]]'
 modified: '2026-09-08'
 body_schema: body-v2
-body_hash: 'sha256:9da02fc16191b56856a1ae9dc9b7165bd8104c591425b4fa11f834755634743f'
+body_hash: 'sha256:b8d152e931c1e303ce8efdb262aa02576a94a0ea9339cb6b076484094356f4bf'
 ---
 
 # `test-provisioning-economics` plan
@@ -84,8 +84,8 @@ Repair the isolation failures and contain the self-terminating cohort, on their 
 
 Wire the runner into the lanes and CI now that the suite can survive it.
 
-- [ ] `P04.S10` - Give the broad, harness and repo lanes a worker count in the harness registry; `dev/toolchain.py`.
-- [ ] `P04.S11` - Re-measure the full lane under the boundary and the runner, and record it against the headline numbers; `dev/toolchain.py`.
+- [x] `P04.S10` - Give the broad, harness and repo lanes a worker count in the harness registry; `dev/toolchain.py`.
+- [x] `P04.S11` - Re-measure the full lane under the boundary and the runner, and record it against the headline numbers; `dev/toolchain.py`.
 
 ### Phase `P05` - close the timing blind spots
 

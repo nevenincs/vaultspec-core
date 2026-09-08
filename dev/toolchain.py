@@ -66,6 +66,22 @@ EXCLUDED_MARKERS = "not claude"
 #: re-plumb.
 LIBRARY_MARKERS = f"not repo and {EXCLUDED_MARKERS}"
 
+#: How the test lanes distribute work across cores.
+#:
+#: `auto` is one worker per logical CPU, which is what the fleet runners have
+#: most of and what a contributor's machine has some of. Distribution is by
+#: file (`loadfile`) rather than pytest-xdist's default per-test scheduling:
+#: the session-scoped workspace template is built once per WORKER, so scattering
+#: one module's tests across twelve of them pays that build twelve times, while
+#: keeping a module together pays it once and the copies are nearly free.
+#:
+#: This was worth 5x on the full lane, but only after the durability boundary
+#: landed. Before it, every worker queued on the same device-serialised `fsync`
+#: and adding workers made the setup medians WORSE. Parallelism is the second
+#: half of that change, not an independent knob - if the boundary is ever
+#: reverted, this should go with it.
+PARALLEL = ("-n", "auto", "--dist", "loadfile")
+
 #: Trees whose Markdown is formatted and linted. The four root READMEs are named
 #: individually rather than by their enclosing directory - `dev/`, `src/`, and
 #: `typings/` each cohabit with non-Markdown trees (and `dev/` cohabits with test
@@ -546,7 +562,7 @@ TEST = Verb(
         Target(
             "broad",
             "The whole package suite minus credential-gated markers.",
-            (uv_run("pytest", PACKAGE, "-q", "-m", LIBRARY_MARKERS),),
+            (uv_run("pytest", PACKAGE, "-q", *PARALLEL, "-m", LIBRARY_MARKERS),),
         ),
         Target(
             "vault-repair",
@@ -592,6 +608,7 @@ TEST = Verb(
                     "pytest",
                     *INSTRUMENT_PATHS,
                     "-q",
+                    *PARALLEL,
                     "-m",
                     f"not repo and {EXCLUDED_MARKERS}",
                 ),
@@ -612,6 +629,7 @@ TEST = Verb(
                     "pytest",
                     *PYTHON_PATHS,
                     "-q",
+                    *PARALLEL,
                     "-m",
                     f"repo and {EXCLUDED_MARKERS}",
                 ),
