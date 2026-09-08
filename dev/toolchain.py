@@ -326,7 +326,7 @@ LINT = Verb(
             # complexity/nesting/size joined this aggregate once each went green
             # and held: the governing ADR's promotion rule is that a dimension
             # graduates when its finding count reaches zero at the gate's
-            # threshold. Until they did, `just lint` covered six of ten
+            # threshold. Until they did, `just check-all` covered six of ten
             # dimensions while CI ran the other four as separate steps, so a
             # contributor could push a complexity regression and only learn
             # about it from CI. A local gate that omits what CI enforces
@@ -481,7 +481,6 @@ TEST = Verb(
                     PACKAGE,
                     "-x",
                     "-q",
-                    "--tb=short",
                     "-m",
                     f"unit and {LIBRARY_MARKERS}",
                 ),
@@ -490,7 +489,7 @@ TEST = Verb(
         Target(
             "broad",
             "The whole package suite minus credential-gated markers.",
-            (uv_run("pytest", PACKAGE, "-q", "--tb=short", "-m", LIBRARY_MARKERS),),
+            (uv_run("pytest", PACKAGE, "-q", "-m", LIBRARY_MARKERS),),
         ),
         Target(
             "vault-repair",
@@ -501,14 +500,13 @@ TEST = Verb(
                     f"{PACKAGE}/tests/cli/test_vault_repair.py",
                     f"{PACKAGE}/vaultcore/checks/tests/test_structure_case_rename.py",
                     "-q",
-                    "--tb=short",
                 ),
             ),
         ),
         Target(
             "benchmark",
             "The slow scale benchmarks, deselected by default.",
-            (uv_run("pytest", PACKAGE, "-q", "--tb=short", "-m", "benchmark"),),
+            (uv_run("pytest", PACKAGE, "-q", "-m", "benchmark"),),
         ),
         Target(
             "harness",
@@ -537,7 +535,6 @@ TEST = Verb(
                     "pytest",
                     *INSTRUMENT_PATHS,
                     "-q",
-                    "--tb=short",
                     "-m",
                     f"not repo and {EXCLUDED_MARKERS}",
                 ),
@@ -558,7 +555,6 @@ TEST = Verb(
                     "pytest",
                     *PYTHON_PATHS,
                     "-q",
-                    "--tb=short",
                     "-m",
                     f"repo and {EXCLUDED_MARKERS}",
                 ),
@@ -580,7 +576,7 @@ TEST = Verb(
 BUILD = Verb(
     name="build",
     summary="Build the Python distribution artifacts.",
-    note="The standalone binaries are 'just binaries <tag> <rust-target>'.",
+    note="The standalone binaries are 'just release-binaries <tag> <rust-target>'.",
     targets=(
         Target("python", "Build the wheel and sdist.", (Cmd(("uv", "build")),)),
         Target("all", "Run every build.", (Ref("python"),)),
