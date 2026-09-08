@@ -326,3 +326,41 @@ def test_every_self_hosted_job_declares_a_timeout() -> None:
         "these self-hosted jobs declare no `timeout-minutes`, so each can hold "
         "a fleet runner for GitHub's six-hour default: " + ", ".join(missing)
     )
+
+
+def test_a_main_run_can_never_supersede_another_main_run() -> None:
+    """Every commit on the default branch gets its own concurrency group.
+
+    `cancel-in-progress: false` is necessary and not sufficient. It governs a
+    run that has STARTED; GitHub's other concurrency rule has no switch, and
+    cancels any previously PENDING run when a new one enters the same group.
+    On a fleet of one runner per platform a main run routinely waits without
+    starting, so it is pending, so the next push to main kills it - which is
+    how the merge of the check-set rework ended `cancelled` with no job ever
+    assigned, forty-four minutes after it was created.
+
+    Putting the SHA in the group on main is what makes two main commits
+    incapable of sharing a group. Both halves are asserted: the SHA must be
+    there, and cancellation must still be off, because either one alone leaves
+    a way for a main commit to end with no verdict.
+    """
+    document = cast("dict[str, Any]", yaml.safe_load(CI.read_text(encoding="utf-8")))
+    concurrency = cast("dict[str, str]", document.get("concurrency") or {})
+    group = concurrency.get("group", "")
+    cancel = str(concurrency.get("cancel-in-progress", ""))
+
+    assert "github.sha" in group, (
+        "the concurrency group does not vary by SHA, so every push to the "
+        f"default branch shares one group: {group!r}. A main run that is still "
+        "pending when the next push lands is cancelled outright, and a "
+        "cancelled run is not red - nothing downstream reacts to it."
+    )
+    assert "refs/heads/main" in group, (
+        "the SHA must be added only on the default branch: a per-SHA group on "
+        "every ref would stop branch pushes superseding their own obsolete "
+        f"runs, which is the behaviour worth keeping. Group: {group!r}"
+    )
+    assert "refs/heads/main" in cancel and cancel.startswith("${{"), (
+        "cancellation must stay disabled on the default branch; a per-SHA "
+        f"group does not by itself stop an in-flight run being cancelled: {cancel!r}"
+    )
