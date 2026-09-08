@@ -67,6 +67,26 @@ jobs:
           sparse-checkout: .github/workflows
           sparse-checkout-cone-mode: false
 
+      # NOT `set -e`. An unobservable preflight must not refuse a build: the
+      # `gh api` below returns 403 under the default GITHUB_TOKEN, and under
+      # `set -e` that aborts the step and skips everything downstream. It
+      # blocked vaultspec-dashboard v0.1.6 exactly that way. A check that
+      # cannot tell "no runner" from "cannot see runners" must not speak for
+      # the first.
+      #
+      # UNOBSERVABLE IS A FAILURE, not a skip. GITHUB_TOKEN can NEVER read
+      # actions/runners - that endpoint needs Administration:read, which no
+      # `permissions:` value grants it - so the old fallback guaranteed a 403
+      # and the skip guaranteed a green job. A check that cannot observe its
+      # subject must fail, or it is not a check.
+      #
+      # The selectors this matrix actually requires are DERIVED from the
+      # matrix rather than hand-listed. The hand-kept list outlived its matrix:
+      # it still named `self-hosted,linux,arm64` after #356 removed that leg.
+      # That is the same defect #361/#364 fixed one job below, where a stale
+      # target made v0.1.62 report a false partial. Now that
+      # FLEET_PREFLIGHT_TOKEN exists, the list is load-bearing and must derive
+      # from the matrix rather than drift beside it.
       - name: Every matrix selector has an online runner
         shell: bash
         env:
@@ -78,18 +98,7 @@ jobs:
           GH_TOKEN: ${{ secrets.FLEET_PREFLIGHT_TOKEN }}
           ALLOW_QUEUE: ${{ inputs.allow_queue }}
         run: |
-          # NOT `set -e`. An unobservable preflight must not refuse a build: the
-          # `gh api` below returns 403 under the default GITHUB_TOKEN, and under
-          # `set -e` that aborts the step and skips everything downstream. It
-          # blocked vaultspec-dashboard v0.1.6 exactly that way. A check that
-          # cannot tell "no runner" from "cannot see runners" must not speak for
-          # the first.
           set -uo pipefail
-          # UNOBSERVABLE IS A FAILURE, not a skip. GITHUB_TOKEN can NEVER read
-          # actions/runners - that endpoint needs Administration:read, which no
-          # `permissions:` value grants it - so the old fallback guaranteed a 403
-          # and the skip guaranteed a green job. A check that cannot observe its
-          # subject must fail, or it is not a check.
           if [ -z "${GH_TOKEN:-}" ]; then
             echo "::error::FLEET_PREFLIGHT_TOKEN is not set. This check needs a PAT with Administration:read."
             exit 1
@@ -100,29 +109,6 @@ jobs:
           fi
           [ -n "${runners}" ] || { echo "::error::no self-hosted runners are registered"; exit 1; }
 
-          # The selectors this matrix actually requires, DERIVED from the
-          # matrix rather than hand-listed.
-          #
-          # The hand-kept list outlived its matrix. It still named
-          # `self-hosted,linux,arm64` long after #356 removed that leg: no job
-          # in this repository selects that label set any more - not build, not
-          # release, not verify-release-assets, not acquisition.yml - but the
-          # runner carrying it is still registered. So the first time that host
-          # was down while every real leg was up, this check would have taken
-          # its `registered>0, online=0` branch and refused a build every leg
-          # could serve, citing a target that does not exist.
-          #
-          # That is the same defect #361/#364 fixed one job below, where a
-          # hand-kept target list left `aarch64-unknown-linux-gnu` behind and
-          # made v0.1.62 report a false partial. The fix there was to derive
-          # from the matrix; this is the same fix for the same reason. A list
-          # that must be edited in lockstep with the matrix eventually is not,
-          # and neither copy of the mistake was visible in review.
-          #
-          # This matters more than it looks. FLEET_PREFLIGHT_TOKEN was
-          # provisioned on 2026-09-06 and the blind path above is gone, so a
-          # stale selector list is no longer harmless - it is now load-bearing
-          # and will fail a build rather than being skipped past.
           workflow=".github/workflows/binaries.yml"
           [ -f "${workflow}" ] || { echo "::error::${workflow} not checked out; cannot derive selectors" >&2; exit 1; }
           mapfile -t selectors < <(awk -F'[][]' '/^[[:space:]]*runner:/ && NF > 2 {print $2}' "${workflow}" | tr -d ' ' | tr '[:upper:]' '[:lower:]' | sort -u)
@@ -1468,6 +1454,20 @@ jobs:
           sparse-checkout: .github/workflows
           sparse-checkout-cone-mode: false
 
+      # EVERY DECLARED TARGET, not "any asset at all". v0.1.64 had two failed
+      # build legs but already carried a wheel, sdist, and SHA256SUMS, so the
+      # former nonzero-asset check passed a partial release. Expectations are
+      # derived from the matrix because a second list stranded a target and
+      # made v0.1.62 report a false partial.
+      #
+      # A complete asset set is not by itself a good release. The release job
+      # also verifies provenance after attachment; `needs.release.result`
+      # therefore participates in the verdict so failed verification cannot
+      # be followed by promotion to `latest`.
+      #
+      # Re-dispatch can repair this workflow because it resolves from the
+      # dispatch ref, but build source remains the tag. Workflow-level repairs
+      # can reach an older tag; source-level repairs require a new release.
       - name: Require artifacts on the published release
         shell: bash
         run: |
@@ -1476,25 +1476,6 @@ jobs:
           assets=$(printf '%s' "${names}" | grep -c . || true)
           echo "release ${TAG} carries ${assets} asset(s); release job=${RELEASE_RESULT}"
 
-          # EVERY DECLARED TARGET, not "any asset at all". v0.1.64 is why.
-          #
-          # Two of its build legs failed, so only part of the matrix reached the
-          # release - yet the wheel, the sdist and SHA256SUMS were already
-          # attached. The old check asked only whether the asset count was above
-          # zero, saw five, and passed a release missing half its binaries. It
-          # was caught by hand; the guard that exists for exactly this reported
-          # success.
-          #
-          # Attaching the wheel and sdist also made the old threshold
-          # unreachable: a release now carries three assets before a single
-          # binary is built, so "greater than zero" can no longer be false. An
-          # improvement elsewhere silently disarmed this check.
-          #
-          # The per-target assert in `Attach to release` cannot cover this - it
-          # lives in the job that does not run when a build leg fails.
-          #
-          # Targets are DERIVED from the matrix rather than listed again: a
-          # second list drifts, and a stranded expectation shipped v0.1.62 red.
           workflow=".github/workflows/binaries.yml"
           [ -f "${workflow}" ] || { echo "::error::${workflow} not checked out; cannot derive targets"; exit 1; }
           mapfile -t expected < <(awk '/^[[:space:]]+target:[[:space:]]/ {print $2}' "${workflow}" | sort -u)
@@ -1510,18 +1491,6 @@ jobs:
 
           if [ ${#missing[@]} -eq 0 ]; then
             echo "all ${#expected[@]} declared target(s) present on ${TAG}"
-            # A COMPLETE ASSET SET IS NOT BY ITSELF A GOOD RELEASE, and until
-            # now this guard behaved as though it were. The release job also
-            # attests every artifact and verifies that attestation; when the
-            # verification fails, the assets are ALREADY attached, so the
-            # completeness test above passes and the promote step below then
-            # clears the prerelease flag. The net effect was a release whose
-            # provenance does not verify serving as `latest` - which is where
-            # the README, the install prose and both channel manifests point.
-            #
-            # `needs.release.result` was already carried into this job's
-            # environment and used only to decorate log lines. It is part of
-            # the verdict now.
             if [ "${RELEASE_RESULT}" != "success" ]; then
               echo "::warning::${TAG} carries every declared target, but the release job ended '${RELEASE_RESULT}'"
               if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease')" != "true" ]; then
@@ -1535,21 +1504,6 @@ jobs:
           fi
 
           echo "::warning::${TAG} is missing: ${missing[*]}"
-          # WHAT A RE-DISPATCH CAN AND CANNOT REPAIR, because the two
-          # halves come from different places and only one of them moves.
-          #
-          # A dispatch resolves THIS FILE from the ref it is dispatched
-          # against, but the build job checks out `inputs.tag` for the
-          # SOURCE. So a fix to the matrix or to this guard can reach an
-          # older tag; a fix to build scripts or packaging code cannot,
-          # and that needs a NEW release.
-          #
-          # vaultspec-rag learned the second half on v0.4.15: the aarch64
-          # floor fix sat on main and the repair dispatch kept compiling
-          # the tag. This repository learned the first half on v0.1.66,
-          # which shipped a binary a merged PR had already removed from
-          # the matrix - because release-please dispatches with
-          # `ref=${TAG}`, freezing the workflow too.
           echo "::error::Re-dispatch repairs a fix to THIS FILE (use --ref main), not a fix to tracked source. A source-level build fix needs a new release."
 
           if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY"                   --json isPrerelease --jq '.isPrerelease')" != "true" ]; then

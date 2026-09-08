@@ -828,6 +828,34 @@ def _workflow_paths() -> list[Path]:
     return workflows
 
 
+def test_workflow_run_blocks_fit_actionlint_shellcheck_pipe() -> None:
+    """Actionlint must be able to hand every Bash block to ShellCheck.
+
+    Actionlint 1.7.12 writes a script to its child-process stdin pipe before it
+    starts ShellCheck. Windows pipes are small enough that a roughly 4 KiB
+    block fills the pipe and deadlocks actionlint forever. Keep explanatory
+    prose as YAML comments outside ``run`` blocks so the native gate completes
+    on every supported development platform without dropping ShellCheck.
+    """
+    limit = 4_000
+    oversized: list[str] = []
+    for path in _workflow_paths():
+        workflow = cast("_Workflow", yaml.safe_load(path.read_text(encoding="utf-8")))
+        for job_name, job in workflow["jobs"].items():
+            for step in job.get("steps", []) or []:
+                script = step.get("run")
+                if isinstance(script, str) and len(script.encode("utf-8")) > limit:
+                    oversized.append(
+                        f"{path.name}:{job_name}:{step.get('name')} "
+                        f"({len(script.encode('utf-8'))} bytes)"
+                    )
+
+    assert not oversized, (
+        f"workflow run blocks exceed actionlint's {limit}-byte cross-platform "
+        f"ShellCheck limit: {oversized}"
+    )
+
+
 def _guard_module_texts() -> list[tuple[str, str]]:
     """Every guard module under ``dev/guards/`` as ``(relative path, text)``."""
     modules = sorted((ROOT / "dev" / "guards").rglob("test_*.py"))
