@@ -34,8 +34,13 @@ from __future__ import annotations
 #: degraded path is not merely grep: ``status``, ``find``, and the vault list
 #: and graph verbs carry the orientation half of the sequence, and only the
 #: confirmation step is grep's.
+#:
+#: Says *unavailable* rather than *not installed* because the degraded path is
+#: reached by a rag that is installed but whose service is down just as often
+#: as by one that was never installed, and the reader's next move is the same
+#: either way.
 DISCOVERY_FALLBACK = (
-    "Where `vaultspec-rag` is not installed, the `vaultspec-core` discovery "
+    "Where `vaultspec-rag` is unavailable, the `vaultspec-core` discovery "
     "verbs and grep carry the same sequence."
 )
 

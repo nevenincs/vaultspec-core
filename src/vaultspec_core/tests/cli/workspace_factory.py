@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
 
 from typer.testing import CliRunner
@@ -27,8 +28,6 @@ from vaultspec_core.cli import app
 from vaultspec_core.core.enums import DirName, FileName, InstallMode, Resource
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from typer.testing import Result
 
     from vaultspec_core.core.manifest import ManifestData
@@ -52,6 +51,104 @@ _PROVIDER_CONFIG: dict[str, str] = {
 def _provider_dir(root: Path, provider: str) -> Path:
     """Resolve the on-disk directory for *provider*."""
     return root / _PROVIDER_DIR[provider]
+
+
+# --- the default install, built once per process ----------------------------
+#
+# `install()` is called ~300 times across the suite and the overwhelming
+# majority of those calls are bare: default provider, no upgrade, no force, into
+# an empty directory. Every one of them produced the same 245-file tree, and
+# building it was among the largest single costs in the run.
+#
+# So the default shape is built once per process and copied thereafter. The
+# reuse is deliberately narrow, because the equivalence only holds for that
+# shape: any non-default argument, or a destination that already has content in
+# it, takes the real `install_run`. That is what keeps `create_gitignore()
+# .install()` - a real pattern here, and the one GH issue 399 turned on -
+# exercising the product rather than a copy of a different starting state.
+#
+# Per process, not per session: under xdist each worker builds its own, which
+# is the same trade the session fixtures make.
+_default_install_template: Path | None = None
+
+
+def _default_install_source() -> Path:
+    """Return a template directory holding a bare ``install()`` result."""
+    global _default_install_template
+    if _default_install_template is None:
+        import atexit
+        import tempfile
+
+        from vaultspec_core.core.commands import install_run
+
+        holder = Path(tempfile.mkdtemp(prefix="vsc-install-template-")).resolve()
+        atexit.register(shutil.rmtree, holder, ignore_errors=True)
+        template = holder / "workspace"
+        template.mkdir()
+        install_run(
+            path=template,
+            provider="all",
+            upgrade=False,
+            force=False,
+            dry_run=False,
+            skip=None,
+            mode=None,
+        )
+        _default_install_template = template
+    return _default_install_template
+
+
+def rebase_workspace_paths(template: Path, dest: Path) -> None:
+    """Rewrite absolute references to *template* inside *dest* to point at *dest*.
+
+    An installed workspace records where it lives. ``.vaultspec/mcp-ownership.json``
+    stores the absolute path of every provider config it manages, so a tree
+    copied from a template claims ownership of the template's files - and a test
+    asserting on ownership would pass while describing another directory.
+
+    The rewrite is by content rather than by filename on purpose. Hard-coding
+    ``mcp-ownership.json`` would be correct today and silently wrong the first
+    time another absolute path is persisted, which is exactly the failure this
+    reuse is most likely to introduce.  ``test_workspace_template_reuse.py``
+    asserts no reference survives, so the pair fails loudly rather than drifting.
+
+    Args:
+        template: The directory the copy was taken from.
+        dest: The copy, rewritten in place.
+    """
+    # Both separator conventions, because JSON escapes backslashes and TOML and
+    # POSIX hosts do not.
+    replacements = [
+        (str(template), str(dest)),
+        (str(template).replace("\\", "/"), str(dest).replace("\\", "/")),
+        (str(template).replace("\\", "\\\\"), str(dest).replace("\\", "\\\\")),
+    ]
+    for path in dest.rglob("*"):
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        rewritten = text
+        for needle, value in replacements:
+            if needle in rewritten:
+                rewritten = rewritten.replace(needle, value)
+        if rewritten != text:
+            path.write_text(rewritten, encoding="utf-8")
+
+
+def _is_effectively_empty(root: Path) -> bool:
+    """Return whether *root* holds nothing an install would have to reconcile.
+
+    An absent directory and a freshly-minted ``tmp_path`` both qualify. Anything
+    else - a seeded ``.gitignore``, a previous install, a stray file - does not,
+    because the product's behaviour on a non-empty target is frequently the
+    thing under test.
+    """
+    if not root.exists():
+        return True
+    return not any(root.iterdir())
 
 
 class WorkspaceFactory:
@@ -208,8 +305,28 @@ class WorkspaceFactory:
         test needs pre-existing content.  Pass ``mode`` to force an explicit
         provisioning mode (``--mode``); ``None`` lets ``install_run`` resolve
         it.
+
+        A bare call into an empty directory is served from a per-process
+        template rather than re-run, because that shape produces a tree
+        identical to the one the last few hundred such calls produced.  Every
+        other shape runs the real thing; see ``_default_install_source``.
         """
         from vaultspec_core.core.commands import install_run
+
+        is_default_shape = (
+            provider == "all"
+            and not upgrade
+            and not force
+            and not dry_run
+            and skip is None
+            and mode is None
+        )
+        if is_default_shape and _is_effectively_empty(self.root):
+            template = _default_install_source()
+            shutil.copytree(template, self.root, symlinks=True, dirs_exist_ok=True)
+            rebase_workspace_paths(template, self.root)
+            self._installed = True
+            return self
 
         install_run(
             path=self.root,

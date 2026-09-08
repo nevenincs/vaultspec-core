@@ -23,7 +23,7 @@ record yourself. You return a summary and the audit stem. You terminate within o
 - Run `vaultspec-core vault check all --fix`; the CLI owns mechanical hygiene.
 - Confirm the index with `vaultspec-rag server doctor`. When the vault or code index is
   empty, run `vaultspec-rag index --type vault` and `vaultspec-rag index --type code`.
-  Where `vaultspec-rag` is not installed, the `vaultspec-core` discovery verbs and grep
+  Where `vaultspec-rag` is unavailable, the `vaultspec-core` discovery verbs and grep
   carry the same sequence.
 
 ## Ground

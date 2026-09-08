@@ -26,23 +26,43 @@ if TYPE_CHECKING:
 
     from mcp.types import CallToolResult
 
+    from vaultspec_core.testing.workspace_templates import (
+        WorkspaceTemplates,
+    )
+
 pytestmark = [pytest.mark.unit]
 
 
+def _build_installed_workspace(dest: Path) -> None:
+    """Populate *dest* with a real, fully installed workspace."""
+    dest.mkdir(parents=True)
+    WorkspaceFactory(dest).install()
+
+
 @pytest.fixture
-def vault_root() -> Iterator[Path]:
+def vault_root(workspace_templates: WorkspaceTemplates) -> Iterator[Path]:
     """Yield an installed vault root with the global path context set.
 
-    Built via :class:`WorkspaceFactory` over a stdlib ``tempfile`` root and
-    torn down afterwards, so the create/edit cores resolve real templates,
-    scan a real vault, and write real files.
+    The tree is a private copy of a session-scoped template rather than a fresh
+    :class:`WorkspaceFactory` install per test: this fixture was the second
+    largest consumer of fixture time in the suite, at 53 minutes over 78 uses,
+    all of them building the identical tree. The copy is writable and torn down
+    afterwards, so the create/edit cores still resolve real templates, scan a
+    real vault, and write real files.
+
+    The root is a stdlib ``tempfile`` directory rather than ``tmp_path`` for the
+    reason the module docstring gives - the repo compat shim is deliberately
+    sidestepped - and is resolved for the reason :class:`WorkspaceFactory`
+    resolves its own root.
     """
     reset_config()
     root = Path(tempfile.mkdtemp(prefix="vsc-mcp-doc-")).resolve()
     try:
-        WorkspaceFactory(root).install()
-        init_paths(root)
-        yield root
+        workspace = workspace_templates.clone(
+            "installed-workspace", root / "project", _build_installed_workspace
+        )
+        init_paths(workspace)
+        yield workspace
     finally:
         reset_config()
         import shutil
