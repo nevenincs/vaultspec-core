@@ -113,18 +113,20 @@ def test_every_ecosystem_with_a_lockfile_is_scanned() -> None:
     assert surfaces, "no dependency coordinates found at all"
 
 
-def test_no_artifact_without_the_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
-    """cadrumo's zero-artifact posture: unset means nothing is written."""
-    monkeypatch.delenv("VAULTSPEC_CI_REPORTS", raising=False)
-    assert da.write_artifact(_report([])) is None
+def test_no_artifact_without_a_destination() -> None:
+    """cadrumo's zero-artifact posture: no destination, nothing written.
+
+    The destination is passed as a value rather than patched into the
+    environment, so this asserts the behaviour itself and not the plumbing
+    that reads ``VAULTSPEC_CI_REPORTS``.
+    """
+    assert da.write_artifact(_report([]), "") is None
 
 
-def test_the_json_report_is_machine_readable(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("VAULTSPEC_CI_REPORTS", str(tmp_path))
-    path = da.write_artifact(_report([]))
+def test_the_json_report_is_machine_readable(tmp_path: Path) -> None:
+    path = da.write_artifact(_report([]), str(tmp_path))
     assert path is not None
+    assert path == tmp_path / "dependency-audit.json"
     body = json.loads(path.read_text(encoding="utf-8"))
     assert body["gating"] is True
     assert body["exit_code"] == da.EXIT_FINDINGS

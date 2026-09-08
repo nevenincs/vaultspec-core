@@ -607,16 +607,28 @@ def render(report: Report) -> str:
     return "\n".join(lines)
 
 
-def write_artifact(report: Report) -> Path | None:
-    """Write the JSON report when ``VAULTSPEC_CI_REPORTS`` names a directory.
+def write_artifact(report: Report, destination: str | None = None) -> Path | None:
+    """Write the JSON report when a destination directory is named.
 
-    With the variable unset nothing is written: cadrumo adopts the whole
-    standard and simply never sets it.
+    Args:
+        report: The audit result to serialise.
+        destination: Where to write. ``None`` -- the default, and what
+            :func:`main` passes -- reads ``VAULTSPEC_CI_REPORTS``. An empty
+            string means "nowhere", which is exactly what an unset variable
+            amounts to. The parameter exists so a caller (a test included) can
+            state the destination as a real value rather than reaching into
+            the process environment behind the function's back.
+
+    Returns:
+        The path written, or ``None`` when no destination was named. With
+        ``VAULTSPEC_CI_REPORTS`` unset nothing is written anywhere: cadrumo
+        adopts the whole standard and simply never sets it.
     """
-    target = os.environ.get("VAULTSPEC_CI_REPORTS")
-    if not target:
+    if destination is None:
+        destination = os.environ.get("VAULTSPEC_CI_REPORTS", "")
+    if not destination:
         return None
-    directory = Path(target)
+    directory = Path(destination)
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "dependency-audit.json"
     path.write_text(json.dumps(report.as_dict(), indent=2) + "\n", encoding="utf-8")
