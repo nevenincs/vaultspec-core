@@ -24,7 +24,14 @@ WHAT IT ASSERTS, AND WHY EACH RULE EARNS ITS PLACE.
    only two of five repos pinned by SHA - all running the same justfiles. A
    recipe that passes on one repo's `just` can fail on another's.
 
-3. The pin is the FLOOR version, exactly. The floor is a real constraint:
+3. Every `just <recipe>` names a recipe that exists. This rule was added
+   after a rename landed in a justfile and left one workflow step calling the
+   old name: `check-knip` became `audit-knip` because the target is advisory
+   and its group moved, nothing else in the repository referenced the old
+   name, and the only survivor was a `run:` line that no gate could see. A
+   workflow is the one caller a repo-wide rename sweep does not compile.
+
+4. The pin is the FLOOR version, exactly. The floor is a real constraint:
    the fleet's justfiles use `[group]` attributes and `just --list` grouping,
    which is 1.38 behaviour. Pinning "latest" would let a runner silently
    drift below or above what the guards were written against.
@@ -67,17 +74,25 @@ ALLOWED_COMMANDS = ("just", "gh")
 
 ALLOWLIST_NAME = "ci-contract-allow.txt"
 
+#: A recipe name is the first token of a line that starts at column zero. What
+#: separates a recipe from an assignment is checked below, not here: a
+#: parameter list may hold `=`, quotes and spaces, so the name pattern stays
+#: permissive and the line shape decides.
+_RECIPE = re.compile(r"^([a-zA-Z0-9_][a-zA-Z0-9_-]*)")
+
 
 class Finding:
     """One violation, addressed by file and line so it can be fixed."""
 
     def __init__(self, path: Path, line: int, rule: str, detail: str) -> None:
+        """Record one violation at `path:line` under `rule`."""
         self.path = path
         self.line = line
         self.rule = rule
         self.detail = detail
 
     def __str__(self) -> str:
+        """Render the finding in the `path:line: [rule] detail` form."""
         return f"{self.path.as_posix()}:{self.line}: [{self.rule}] {self.detail}"
 
 
@@ -145,6 +160,39 @@ def _run_commands(text: str) -> list[tuple[int, str, str]]:
     return found
 
 
+def _recipes(root: Path) -> set[str]:
+    """Return every recipe name the repository's justfile defines.
+
+    Empty when there is no justfile, which disables rule 3 rather than
+    failing every step: a repo without one has nothing to check against, and a
+    checker that reports a violation it cannot substantiate is noise.
+    """
+    for name in ("justfile", "Justfile", ".justfile"):
+        path = root / name
+        if not path.is_file():
+            continue
+        names: set[str] = set()
+        for line in path.read_text(encoding="utf-8").splitlines():
+            match = _RECIPE.match(line)
+            if not match:
+                continue
+            if line.startswith(("set ", "mod ", "import ", "export ")):
+                continue
+            # A recipe line is `name [parameters]: [dependencies]`. Neither
+            # half can be excluded by shape: a parameter list holds `=`, quotes
+            # and spaces (`test-unit durations="":`), and a dependency list
+            # puts a name AFTER the colon (`test-runner-image:
+            # build-runner-image`), so requiring the line to END in `:` misses
+            # every recipe that depends on another. What actually separates a
+            # recipe from an assignment is `:=`, and that is the only test.
+            head = line.split("#", 1)[0].rstrip()
+            if ":=" in head or ":" not in head:
+                continue
+            names.add(match.group(1))
+        return names
+    return set()
+
+
 def _first_word(command: str) -> str:
     """Return the executable a command line invokes, ignoring env prefixes.
 
@@ -162,6 +210,7 @@ def audit(root: Path) -> list[Finding]:
         (github / "workflows").glob("*.yaml")
     )
     allowlist = _load_allowlist(github)
+    recipes = _recipes(root)
     findings: list[Finding] = []
 
     for path in workflows:
@@ -185,8 +234,7 @@ def audit(root: Path) -> list[Finding]:
                         path,
                         1,
                         "install",
-                        "calls `just` but does not install it with "
-                        f"{JUST_INSTALL_USES}",
+                        f"calls `just`, but installs it without {JUST_INSTALL_USES}",
                     )
                 )
             elif JUST_INSTALL_TOOL not in text:
@@ -195,8 +243,7 @@ def audit(root: Path) -> list[Finding]:
                         path,
                         1,
                         "install",
-                        "installs `just` without the fleet floor pin "
-                        f"{JUST_INSTALL_TOOL}",
+                        f"installs `just` off the floor pin {JUST_INSTALL_TOOL}",
                     )
                 )
 
@@ -204,7 +251,20 @@ def audit(root: Path) -> list[Finding]:
             key = f"{name}:{step}"
             if key in allowlist or name in allowlist:
                 continue
-            if _first_word(command) in ALLOWED_COMMANDS:
+            word = _first_word(command)
+            if word == "just":
+                called = command.split()[1] if len(command.split()) > 1 else ""
+                if recipes and called and called not in recipes:
+                    findings.append(
+                        Finding(
+                            path,
+                            number,
+                            "recipe",
+                            f"`just {called}` names no recipe in the justfile",
+                        )
+                    )
+                continue
+            if word in ALLOWED_COMMANDS:
                 continue
             findings.append(
                 Finding(

@@ -129,6 +129,36 @@ def _verify(archive: Path, expected: str) -> None:
         )
 
 
+def _extract_member(archive: Path, suffix: str, destination: Path) -> None:
+    """Write the archive's `actionlint` entry to `destination`, by basename.
+
+    Archive-embedded paths are discarded rather than honoured: the digest
+    proves the bytes are the published release, not that the release's own
+    member names are safe to write to.
+    """
+    wanted = destination.name
+    if suffix.endswith(".zip"):
+        with zipfile.ZipFile(archive) as bundle:
+            member = next(
+                (n for n in bundle.namelist() if Path(n).name == wanted), None
+            )
+            if member is None:
+                raise SystemExit(f"actionlint archive has no {wanted}")
+            destination.write_bytes(bundle.read(member))
+        return
+    with tarfile.open(archive) as bundle:
+        entry = next(
+            (m for m in bundle.getmembers() if Path(m.name).name == wanted), None
+        )
+        if entry is None:
+            raise SystemExit(f"actionlint archive has no {wanted}")
+        extracted = bundle.extractfile(entry)
+        if extracted is None:
+            raise SystemExit(f"{wanted} in the archive is not a regular file")
+        with extracted:
+            destination.write_bytes(extracted.read())
+
+
 def ensure() -> Path:
     """Return a verified actionlint executable, downloading it once if needed.
 
@@ -162,12 +192,13 @@ def ensure() -> Path:
         archive = Path(scratch) / suffix
         _download(url, archive)
         _verify(archive, expected)
-        if suffix.endswith(".zip"):
-            with zipfile.ZipFile(archive) as bundle:
-                bundle.extractall(root)
-        else:
-            with tarfile.open(archive) as bundle:
-                bundle.extractall(root, filter="data")
+        # ONE member, written to a path this function chose. Not
+        # `extractall`: an archive names its own paths, and honouring them is
+        # how an entry called `../../.ssh/authorized_keys` gets written
+        # somewhere nobody asked for. The digest above says these bytes are
+        # the release; it says nothing about where the release wants to put
+        # them. Only `actionlint` is wanted, and its name here is ours.
+        _extract_member(archive, suffix, binary)
     if not binary.is_file():
         raise SystemExit(f"actionlint archive did not contain {binary.name}")
     binary.chmod(0o755)
