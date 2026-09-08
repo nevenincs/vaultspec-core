@@ -16,11 +16,11 @@ if TYPE_CHECKING:
 _NEXT_STEP_HINTS: dict[tuple[str, str], tuple[str, str]] = {
     ("vault.add.research", "created"): (
         "vaultspec-core vault add adr --feature {feature} --related {research_stem}",
-        "Define an Architecture Decision Record (ADR) for your research",
+        "If a new costly decision is needed, record it using sufficient evidence",
     ),
     ("vault.add.adr", "created"): (
         "vaultspec-core vault add plan --feature {feature} --related {adr_stem}",
-        "Draft an implementation plan based on your ADR",
+        "If durable sequencing is needed, draft a plan using this decision",
     ),
     ("vault.add.plan", "created"): (
         "vaultspec-core vault add exec --all-steps --feature {feature} "
@@ -49,12 +49,12 @@ _NEXT_STEP_HINTS: dict[tuple[str, str], tuple[str, str]] = {
         "Run safe auto-corrections to resolve vault errors",
     ),
     ("install", "created"): (
-        "vaultspec-core vault add research --feature {feature_tag}",
-        "Framework installed. Start research on your first feature",
+        "vaultspec-core status",
+        "Framework installed. Orient before choosing the work's route",
     ),
     ("install", "updated"): (
-        "vaultspec-core vault add research --feature {feature_tag}",
-        "Framework updated. Start research on your first feature",
+        "vaultspec-core status",
+        "Framework updated. Review current work and decision coverage",
     ),
     ("vault.feature.archive", "updated"): (
         "vaultspec-core vault check all",

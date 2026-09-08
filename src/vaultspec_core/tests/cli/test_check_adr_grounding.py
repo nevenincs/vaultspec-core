@@ -29,6 +29,8 @@ def _write_doc(
     stem: str,
     *,
     related: list[str] | None = None,
+    body: str | None = None,
+    feature: str = _FEATURE,
 ) -> None:
     doc_dir = root / ".vault" / doc_type
     doc_dir.mkdir(parents=True, exist_ok=True)
@@ -41,11 +43,10 @@ def _write_doc(
         "---\n"
         "tags:\n"
         f"  - '#{doc_type}'\n"
-        f"  - '#{_FEATURE}'\n"
+        f"  - '#{feature}'\n"
         "date: '2026-07-14'\n"
         f"{related_yaml}"
-        "---\n"
-        f"\n# {stem}\n",
+        "---\n" + (body if body is not None else f"\n# {stem}\n"),
         encoding="utf-8",
     )
 
@@ -109,140 +110,102 @@ class TestAdrGroundingAcceptance:
         assert len(_adr_diagnostics(tmp_path)) == 1
 
 
-class TestAdrGroundingFix:
-    """The fix path links the best available grounding candidate."""
+class TestPlanDecisionCoverage:
+    """Assess complete plan routes without guessing authority from feature tags."""
 
-    def test_fix_prefers_research(self, tmp_path: Path):
-        _write_doc(tmp_path, "research", "2026-07-14-grounding-feat-research")
-        _write_doc(tmp_path, "audit", "2026-07-14-grounding-feat-audit")
-        _write_doc(tmp_path, "adr", "2026-07-14-grounding-feat-adr")
-
+    @pytest.mark.parametrize("evidence", ["research", "reference", "audit"])
+    def test_repair_does_not_select_evidence(self, tmp_path: Path, evidence: str):
+        _write_doc(tmp_path, evidence, "evidence")
+        _write_doc(tmp_path, "adr", "decision")
+        path = tmp_path / ".vault" / "adr" / "decision.md"
+        before = path.read_bytes()
         result = check_schema(tmp_path, graph=VaultGraph(tmp_path), fix=True)
+        assert result.fixed_count == 0
+        assert path.read_bytes() == before
+        assert any("ADR has no grounding" in d.message for d in result.diagnostics)
+        assert all(not d.fixable for d in result.diagnostics)
 
-        assert result.fixed_count == 1
-        adr = (
-            tmp_path / ".vault" / "adr" / "2026-07-14-grounding-feat-adr.md"
-        ).read_text(encoding="utf-8")
-        assert "[[2026-07-14-grounding-feat-research]]" in adr
+    def test_decision_free_plan_survives_check_and_repair(self, tmp_path: Path):
+        _write_doc(tmp_path, "plan", "mechanical", body=_plan_body())
+        path = tmp_path / ".vault" / "plan" / "mechanical.md"
+        before = path.read_bytes()
+        for fix in (False, True):
+            result = check_schema(tmp_path, graph=VaultGraph(tmp_path), fix=fix)
+            assert result.diagnostics == []
+            assert result.fixed_count == 0
+        assert path.read_bytes() == before
 
-    def test_fix_falls_back_to_audit(self, tmp_path: Path):
-        _write_doc(tmp_path, "audit", "2026-07-14-grounding-feat-audit")
-        _write_doc(tmp_path, "adr", "2026-07-14-grounding-feat-adr")
-
-        result = check_schema(tmp_path, graph=VaultGraph(tmp_path), fix=True)
-
-        assert result.fixed_count == 1
-        adr = (
-            tmp_path / ".vault" / "adr" / "2026-07-14-grounding-feat-adr.md"
-        ).read_text(encoding="utf-8")
-        assert "[[2026-07-14-grounding-feat-audit]]" in adr
-
-
-class TestPlanSchemaRules:
-    """A plan must reference an ADR and should rest on evidence."""
-
-    def test_unlinked_plan_reports_both_rules(self, tmp_path: Path):
-        _write_doc(tmp_path, "plan", "2026-07-14-grounding-feat-plan")
-
-        result = check_schema(tmp_path, graph=VaultGraph(tmp_path))
-
-        plan_diags = [d for d in result.diagnostics if "Plan has no" in d.message]
-        assert [d.message for d in plan_diags] == [
-            "Plan has no references to ADR documents",
-            "Plan has no grounding references (research, reference, "
-            "or audit documents)",
-        ]
-        assert [d.severity.value for d in plan_diags] == ["error", "warning"]
-        assert [d.fixable for d in plan_diags] == [True, False]
-
-    def test_fix_links_adr_and_research(self, tmp_path: Path):
-        _write_doc(tmp_path, "research", "2026-07-14-grounding-feat-research")
+    @pytest.mark.parametrize("evidence", ["research", "reference", "audit"])
+    def test_cross_feature_reuse_inherits_evidence(self, tmp_path: Path, evidence: str):
+        _write_doc(tmp_path, evidence, "evidence")
         _write_doc(
             tmp_path,
             "adr",
-            "2026-07-14-grounding-feat-adr",
-            related=["2026-07-14-grounding-feat-research"],
+            "decision",
+            related=["evidence"],
+            body="# Decision | (**status:** `accepted`)\n",
+            feature="shared",
         )
-        _write_doc(tmp_path, "plan", "2026-07-14-grounding-feat-plan")
-
+        for name in ("first-plan", "second-plan"):
+            _write_doc(tmp_path, "plan", name, related=["decision"], body=_plan_body())
+        before = {p: p.read_bytes() for p in (tmp_path / ".vault").rglob("*.md")}
         result = check_schema(tmp_path, graph=VaultGraph(tmp_path), fix=True)
-
-        assert result.fixed_count == 2
-        plan = (
-            tmp_path / ".vault" / "plan" / "2026-07-14-grounding-feat-plan.md"
-        ).read_text(encoding="utf-8")
-        assert "[[2026-07-14-grounding-feat-adr]]" in plan
-        assert "[[2026-07-14-grounding-feat-research]]" in plan
-        assert not [d for d in result.diagnostics if "Plan has no" in d.message]
-
-    def test_fix_without_candidates_still_reports(self, tmp_path: Path):
-        _write_doc(tmp_path, "plan", "2026-07-14-grounding-feat-plan")
-
-        result = check_schema(tmp_path, graph=VaultGraph(tmp_path), fix=True)
-
-        assert result.fixed_count == 0
-        messages = [d.message for d in result.diagnostics if "Plan has no" in d.message]
-        assert messages == [
-            "Plan has no references to ADR documents",
-            "Plan has no grounding references (research, reference, "
-            "or audit documents)",
-        ]
-
-    def test_audit_grounding_satisfies_the_plan_nudge(self, tmp_path: Path):
-        """An audit is first-class plan grounding, not a lesser substitute.
-
-        The ADR grounding rule accepts research, reference, or audit
-        interchangeably; a plan resting on an audit is evidenced the same way.
-        """
-        _write_doc(tmp_path, "audit", "2026-07-14-grounding-feat-audit")
-        _write_doc(tmp_path, "adr", "2026-07-14-grounding-feat-adr")
-        _write_doc(
-            tmp_path,
-            "plan",
-            "2026-07-14-grounding-feat-plan",
-            related=[
-                "2026-07-14-grounding-feat-adr",
-                "2026-07-14-grounding-feat-audit",
-            ],
-        )
-
-        result = check_schema(tmp_path, graph=VaultGraph(tmp_path))
-
-        assert not [d for d in result.diagnostics if "Plan has no" in d.message]
-
-    def test_reference_grounding_satisfies_the_plan_nudge(self, tmp_path: Path):
-        _write_doc(tmp_path, "reference", "2026-07-14-grounding-feat-reference")
-        _write_doc(tmp_path, "adr", "2026-07-14-grounding-feat-adr")
-        _write_doc(
-            tmp_path,
-            "plan",
-            "2026-07-14-grounding-feat-plan",
-            related=[
-                "2026-07-14-grounding-feat-adr",
-                "2026-07-14-grounding-feat-reference",
-            ],
-        )
-
-        result = check_schema(tmp_path, graph=VaultGraph(tmp_path))
-
-        assert not [d for d in result.diagnostics if "Plan has no" in d.message]
-
-    def test_doc_type_filter_skips_plans(self, tmp_path: Path):
-        _write_doc(tmp_path, "plan", "2026-07-14-grounding-feat-plan")
-        _write_doc(tmp_path, "adr", "2026-07-14-grounding-feat-adr")
-
-        result = check_schema(
-            tmp_path, graph=VaultGraph(tmp_path), doc_type_filter="adr"
-        )
-
-        assert not [d for d in result.diagnostics if "Plan has no" in d.message]
-        assert _adr_diagnostics(tmp_path)
-
-    def test_feature_filter_skips_other_features(self, tmp_path: Path):
-        _write_doc(tmp_path, "plan", "2026-07-14-grounding-feat-plan")
-
-        result = check_schema(
-            tmp_path, graph=VaultGraph(tmp_path), feature="other-feature"
-        )
-
         assert result.diagnostics == []
+        assert {p: p.read_bytes() for p in before} == before
+
+    @pytest.mark.parametrize(
+        "status", ["proposed", "rejected", "deprecated", "superseded", ""]
+    )
+    @pytest.mark.parametrize("state", ["draft", "active", "complete"])
+    def test_authority_depends_on_plan_state(
+        self, tmp_path: Path, status: str, state: str
+    ):
+        _write_doc(tmp_path, "audit", "evidence")
+        _write_doc(
+            tmp_path,
+            "adr",
+            "decision",
+            related=["evidence"],
+            body=f"# Decision | (**status:** `{status}`)\n",
+        )
+        _write_doc(
+            tmp_path,
+            "plan",
+            "work",
+            related=["decision"],
+            body=_plan_body(approved=state != "draft", closed=state == "complete"),
+        )
+        result = check_schema(tmp_path, graph=VaultGraph(tmp_path))
+        failures = [d for d in result.diagnostics if "non-accepted ADR" in d.message]
+        assert bool(failures) == (state == "active")
+
+    def test_completed_plan_reopened_rechecks_authority(self, tmp_path: Path):
+        _write_doc(tmp_path, "audit", "evidence")
+        _write_doc(
+            tmp_path,
+            "adr",
+            "decision",
+            related=["evidence"],
+            body="# Decision | (**status:** `superseded`)\n",
+        )
+        _write_doc(
+            tmp_path, "plan", "work", related=["decision"], body=_plan_body(closed=True)
+        )
+        assert check_schema(tmp_path, graph=VaultGraph(tmp_path)).diagnostics == []
+        _write_doc(tmp_path, "plan", "work", related=["decision"], body=_plan_body())
+        result = check_schema(tmp_path, graph=VaultGraph(tmp_path))
+        assert any("non-accepted ADR" in d.message for d in result.diagnostics)
+
+
+def _plan_body(*, approved: bool = True, closed: bool = False) -> str:
+    approval = "Approved 2026-09-08\n\n" if approved else ""
+    state = "x" if closed else " "
+    return (
+        "# Work\n\n## Description\n\n"
+        + approval
+        + (
+            "Mechanical changes within existing constraints; no costly decision is "
+            "involved.\n\n"
+        )
+        + f"## Steps\n\n- [{state}] `S01` - Update the messages; `src/messages`.\n"
+    )

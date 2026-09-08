@@ -8,7 +8,7 @@ related:
   - '[[2026-09-08-framework-reword-adr]]'
 modified: '2026-09-08'
 body_schema: body-v2
-body_hash: 'sha256:17ce59c2d3e4e98ff6478b601f75e88b5f59f1816a79ef6f6bad6eeacd717539'
+body_hash: 'sha256:3718cfbcfc408bf51c13e28830521dbc3e52a62f9f8953a2bd9369903eda1dc4'
 ---
 
 # `framework-reword` plan
@@ -23,8 +23,8 @@ Implement `2026-09-08-framework-reword-adr` in four cohesive revisions. The user
 
 - [x] `S01` - Normalize routing, decision coverage, approval, evidence, sizing, and review policy; `src/vaultspec_core/builtins/system, src/vaultspec_core/builtins/rules`.
 - [x] `S02` - Align skills, personas, and templates with cohesive execution and tier-aware review; `src/vaultspec_core/builtins/skills, src/vaultspec_core/builtins/agents, src/vaultspec_core/builtins/templates`.
-- [ ] `S03` - Align lifecycle validation, repair, and ADR transitions with decision coverage; `src/vaultspec_core/vaultcore, src/vaultspec_core/core, src/vaultspec_core/cli, src/vaultspec_core/mcp_server`.
-- [ ] `S04` - Verify integrated routing scenarios, synchronize bundled outputs, and resolve cohesive Astra review findings; `src/vaultspec_core, dev/guards, dev/quality, docs, .vaultspec`.
+- [x] `S03` - Align lifecycle validation, repair, and ADR transitions with decision coverage; `src/vaultspec_core/vaultcore, src/vaultspec_core/core, src/vaultspec_core/cli, src/vaultspec_core/mcp_server, src/vaultspec_core/plan, src/vaultspec_core/tests, src/vaultspec_core/builtins/reference/cli.md, docs/CLI.md`.
+- [ ] `S04` - Verify integrated routing scenarios, synchronize bundled outputs, and resolve cohesive Astra review findings; `src/vaultspec_core, dev/guards, docs, .vaultspec`.
 
 ## Parallelization
 

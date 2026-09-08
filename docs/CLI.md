@@ -172,8 +172,8 @@ full options.
   types.
 - `vaultspec-core vault check references` - Check for missing cross-references within
   features.
-- `vaultspec-core vault check schema` - Enforce schema rules: ADRs must ref research,
-  plans must ref ADRs.
+- `vaultspec-core vault check schema` - Check ADR evidence links and active plans'
+  linked decision status.
 - `vaultspec-core vault check adr-status` - Validate ADR status against the canonical
   taxonomy.
 - `vaultspec-core vault check code-boundary` - Scan source files for references to the
@@ -1486,10 +1486,11 @@ the frontmatter name. Pick the one whose side you trust.
   sections their template mandates.
 - `feature-rename-integrity` (`--fix`: no, `--feature`: yes) - Surface exec folders
   whose feature disagrees with their records' tag.
-- `references` (`--fix`: yes, `--feature`: yes) - Check for missing cross-references
-  within features.
-- `schema` (`--fix`: yes, `--feature`: yes) - Enforce schema rules: ADRs must ref
-  research, plans must ref ADRs.
+- `references` (`--fix`: compatibility-only, `--feature`: yes) - Report missing
+  cross-references without selecting evidence or decision links.
+- `schema` (`--fix`: compatibility-only, `--feature`: yes) - Check ADR links to
+  Research, Reference, or Audit evidence and the status of decisions linked by active
+  approved plans. Decision-free plans may have no ADR links.
 - `adr-status` (`--fix`: yes, `--feature`: yes) - Validate ADR status against the
   canonical taxonomy.
 - `rename-integrity` (`--fix`: yes, `--feature`: no) - Check name/filename integrity for
@@ -1502,11 +1503,12 @@ the frontmatter name. Pick the one whose side you trust.
   place inside the managed `.vaultspec/` or `.vault/` trees (detection only; findings
   are warnings, never errors).
 
-`yes` = fully supported, `partial` = only the sub-checks that accept `--fix` apply fixes
-(`all` dispatches to every check it runs), `no` = flag rejected with error. `all` runs
-twenty of the twenty-one checks above: `code-boundary` is opt-in and runs only when
-named, so an exit-0 `all` makes no claim about it. `structure` does not support
-`--feature` filtering.
+`compatibility-only` means the flag is accepted but performs no repairs: evidence and
+authority links need an explicit choice. `yes` = fully supported, `partial` = only the
+sub-checks that accept `--fix` apply fixes (`all` dispatches to every check it runs),
+`no` = flag rejected with error. `all` runs twenty of the twenty-one checks above:
+`code-boundary` is opt-in and runs only when named, so an exit-0 `all` makes no claim
+about it. `structure` does not support `--feature` filtering.
 
 Use `vaultspec-core vault repair` when the operator goal is end-to-end recovery with
 generated index refresh, post-fix validation, and a final delta report.

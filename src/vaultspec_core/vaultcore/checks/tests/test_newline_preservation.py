@@ -14,8 +14,8 @@ import pytest
 
 from ....config import reset_config
 from ....graph import VaultGraph
+from ...related_surgery import append_related_entry
 from ..frontmatter import check_frontmatter
-from ..references import check_schema
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -67,14 +67,7 @@ class TestFrontmatterFixPreservesNewlines:
 
 
 class TestAddToRelatedPreservesNewlines:
-    """Drives the ``related:`` link fixer through ``check_schema``.
-
-    The fixer that appends ``[[wiki-link]]`` entries is private to
-    ``references.py`` and has no consumer outside that module, so these
-    tests exercise it the way production code does: a plan missing its
-    required ADR reference, fixed via the public ``check_schema`` entry
-    point, which appends the link through the same code path.
-    """
+    """Explicitly selected links preserve the source newline convention."""
 
     def test_crlf_file_remains_crlf_when_appending_related(
         self, tmp_path: Path
@@ -104,8 +97,7 @@ class TestAddToRelatedPreservesNewlines:
             b"# body\r\n"
         )
 
-        result = check_schema(tmp_path, graph=VaultGraph(tmp_path), fix=True)
-        assert result.fixed_count == 1
+        assert append_related_entry(doc, "[[2026-04-30-zeta-adr]]")
 
         raw = doc.read_bytes()
         without_crlf = raw.replace(b"\r\n", b"")
@@ -141,8 +133,7 @@ class TestAddToRelatedPreservesNewlines:
             encoding="utf-8",
         )
 
-        result = check_schema(tmp_path, graph=VaultGraph(tmp_path), fix=True)
-        assert result.fixed_count == 1
+        assert append_related_entry(doc, "[[2026-04-30-eta-adr]]")
 
         text = doc.read_text(encoding="utf-8")
         assert "related:\n  - '[[2026-04-30-eta-adr]]'" in text

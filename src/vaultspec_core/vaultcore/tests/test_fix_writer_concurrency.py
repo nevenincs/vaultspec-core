@@ -250,8 +250,10 @@ def test_modified_stamp_fix_serializes_on_the_document_lock(tmp_path: Path) -> N
     assert "body_hash:" in doc.read_text(encoding="utf-8")
 
 
-def test_schema_grounding_fix_serializes_on_the_document_lock(tmp_path: Path) -> None:
-    """``check_schema(fix=True)`` blocks on the document whose ``related:`` it edits."""
+def test_schema_repair_preserves_a_concurrent_evidence_selection(
+    tmp_path: Path,
+) -> None:
+    """A stale graph never authorizes repair to choose or overwrite evidence."""
     from ...graph import VaultGraph
 
     root = _vault(tmp_path)
@@ -270,11 +272,13 @@ def test_schema_grounding_fix_serializes_on_the_document_lock(tmp_path: Path) ->
     )
     graph = VaultGraph(root)
 
-    def _run() -> None:
-        assert check_schema(root, graph=graph, fix=True).fixed_count >= 1
+    from ..related_surgery import append_related_entry
 
-    _prove_serialized_by(document_lock_target(adr, root), _run)
-    assert "[[2026-01-01-probe-research]]" in adr.read_text(encoding="utf-8")
+    assert append_related_entry(adr, "[[2026-01-01-probe-research]]")
+    before = adr.read_bytes()
+    result = check_schema(root, graph=graph, fix=True)
+    assert result.fixed_count == 0
+    assert adr.read_bytes() == before
 
 
 def test_repair_restamp_serializes_on_the_document_lock(tmp_path: Path) -> None:

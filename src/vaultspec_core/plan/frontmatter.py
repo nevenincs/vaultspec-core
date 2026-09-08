@@ -6,8 +6,8 @@ convention:
 - ``tier``: mandatory unquoted scalar, one of ``L1``, ``L2``, ``L3``, ``L4``.
   Pre-existing plans without the field default to ``L2``; the field is
   reported as a warning with a migration hint.
-- ``related``: YAML list of quoted wiki-links pointing to authorising
-  documents; required when the plan contains at least one Step row.
+- ``related``: YAML list of quoted wiki-links to governing decisions and optional
+  supporting records; may be empty for decision-free work.
 - ``tags``: YAML list with at least the directory tag (``#plan``) and one
   feature tag (``#<feature>``).
 - ``date``: ``yyyy-mm-dd`` ISO date. An unquoted scalar, which YAML
@@ -61,8 +61,7 @@ class PlanFrontmatter:
 
     Attributes:
         tier: Complexity tier (``L1``-``L4``).
-        related: Wiki-link references to authorising documents (ADR,
-            research, reference, prior plan).
+        related: Wiki-link references to governing decisions and optional support.
         tags: Tag list; first entry is the directory tag (``#plan``),
             subsequent entries include the feature tag.
         date: ISO ``yyyy-mm-dd`` date string from the frontmatter; a

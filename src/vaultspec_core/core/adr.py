@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from contextlib import ExitStack
 from pathlib import Path
 
 from ..config import get_config
@@ -191,11 +192,19 @@ def adr_supersede(
     Returns:
         A tuple of (old_adr_path, new_adr_path).
     """
+    from ..vaultcore.edit_engine import document_write_lock
+
     target_dir = _t.get_context().target_dir
     docs_dir = get_config().docs_dir
 
     old_stem = old_adr[:-3] if old_adr.endswith(".md") else old_adr
     new_stem = by_new_adr[:-3] if by_new_adr.endswith(".md") else by_new_adr
+
+    if any(
+        Path(stem).name != stem or "\\" in stem or "/" in stem
+        for stem in (old_stem, new_stem)
+    ):
+        raise VaultSpecError("ADR names must be document stems, not paths.")
 
     old_file = target_dir / docs_dir / "adr" / f"{old_stem}.md"
     new_file = target_dir / docs_dir / "adr" / f"{new_stem}.md"
@@ -209,6 +218,38 @@ def adr_supersede(
         raise ResourceNotFoundError(
             f"New ADR document '{docs_dir}/adr/{new_stem}.md' not found."
         )
+
+    if old_file.resolve() == new_file.resolve():
+        raise VaultSpecError("An ADR cannot supersede itself.")
+
+    with ExitStack() as locks:
+        for path in sorted((old_file, new_file)):
+            locks.enter_context(document_write_lock(path, target_dir))
+        return _apply_supersession(old_file, new_file, dry_run=dry_run)
+
+
+def _apply_supersession(
+    old_file: Path, new_file: Path, *, dry_run: bool
+) -> tuple[Path, Path]:
+    """Validate and render both records while holding their document locks."""
+    old_stem, new_stem = old_file.stem, new_file.stem
+    # Validate both records before rendering or writing either transition.
+    new_content = new_file.read_text(encoding="utf-8")
+    new_meta, new_body = parse_vault_metadata(new_content)
+    old_meta, old_body = parse_vault_metadata(old_file.read_text(encoding="utf-8"))
+    if adr_status_from_body(new_body) != AdrStatus.ACCEPTED or new_meta.superseded_by:
+        raise VaultSpecError("The successor ADR must be accepted before supersession.")
+    if old_meta.superseded_by and old_meta.superseded_by != new_stem:
+        raise VaultSpecError("The old ADR already has a different successor.")
+    old_status = adr_status_from_body(old_body)
+    replay = old_status == AdrStatus.SUPERSEDED and old_meta.superseded_by == new_stem
+    if old_status != AdrStatus.ACCEPTED and not replay:
+        raise VaultSpecError(
+            "The old ADR must be accepted or already superseded by this successor."
+        )
+    _reject_ancestor_cycle(old_file, old_meta.supersedes, new_stem)
+    if replay and old_stem in new_meta.supersedes:
+        return old_file, new_file
 
     # 1. Update the old ADR
     old_bytes = old_file.read_bytes()
@@ -240,11 +281,7 @@ def adr_supersede(
     if new_newline == "\r\n":
         final_new_content = final_new_content.replace("\n", "\r\n")
 
-    # Vault-orientation ADR (decision D3): supersession is a lifecycle
-    # mutation, so refresh the modified stamp on both the superseded and
-    # the superseding document. Applied to the final rendered text (after
-    # any CRLF reapplication) so the helper sees the exact bytes about to
-    # be written; it preserves the document's line-ending convention.
+    # Stamp the rendered bytes so both attestations preserve their newline convention.
     today = vault_today()
     final_old_content = refresh_modified_stamp(final_old_content, today)
     final_new_content = refresh_modified_stamp(final_new_content, today)
@@ -254,3 +291,33 @@ def adr_supersede(
         atomic_write(new_file, final_new_content)
 
     return old_file, new_file
+
+
+def adr_status_from_body(body: str) -> AdrStatus | None:
+    """Read decision authority from the first H1, never a later example heading."""
+    for line in body.splitlines():
+        if line.startswith("# "):
+            match = _ADR_STATUS_HEADING_RE.match(line)
+            return AdrStatus.from_token(match.group(2).strip()) if match else None
+    return None
+
+
+def _reject_ancestor_cycle(
+    old_file: Path, ancestors: list[str], successor: str
+) -> None:
+    """Reject a successor already present in the predecessor's recorded ancestry."""
+    pending = list(ancestors)
+    visited = {old_file.stem}
+    while pending:
+        stem = pending.pop()
+        if stem == successor:
+            raise VaultSpecError("Supersession would create a cycle.")
+        if stem in visited:
+            continue
+        visited.add(stem)
+        if Path(stem).name != stem or "\\" in stem or "/" in stem:
+            raise VaultSpecError("Invalid document stem in supersession ancestry.")
+        path = old_file.parent / f"{stem}.md"
+        if path.is_file():
+            metadata, _ = parse_vault_metadata(path.read_text(encoding="utf-8"))
+            pending.extend(metadata.supersedes)
