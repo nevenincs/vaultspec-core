@@ -98,11 +98,11 @@ Classify every finding into one of these, because the action differs by class:
   encoding. Prefer `vaultspec-core vault set-frontmatter` / `vaultspec-core vault edit`
   for frontmatter and the CLI mutators over raw edits so stamps and the contract stay
   canonical.
-- **Unpropagated supersession.** Re-run
-  `vaultspec-core vault adr supersede OLD --by NEW` (use `--dry-run` first) so the
-  frontmatter and body status converge. For legacy `## Status` ADRs the tool cannot
-  rewrite, correct the body status to match via `vaultspec-core vault set-body` /
-  `vaultspec-core vault edit`.
+- **Unpropagated supersession.** Use `vaultspec-core vault check adr-status --fix` to
+  normalize an already recorded historical edge without creating a new transition. Its
+  immediate successor may itself now be superseded. New supersession requires an
+  accepted successor under the system contract; never rewrite historical chains merely
+  to make their intermediate records accepted again.
 - **Contradiction, duplication.** Do not silently rewrite. Record the conflicting ADRs,
   the nature of the contradiction, and a recommended resolution in the audit for human
   approval. Apply the chosen resolution only once approved.

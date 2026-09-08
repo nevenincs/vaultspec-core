@@ -1,10 +1,9 @@
 # ADR status taxonomy and supersession convention
 
-This is the canonical reference the curator enforces when judging an ADR's status. The
-status set defined here is the single source of truth; the core library status type, the
-ADR template, and the `vaultspec-core vault adr supersede` tool all derive from it.
-Where the corpus or the tooling diverges from this set, the curator reconciles toward
-it.
+This reference explains the canonical status vocabulary encoded by the core library's
+`AdrStatus` type. Approval and transition policy belongs to the vaultspec system
+section. The curator checks that records, templates, and tools agree with both
+contracts.
 
 ## The canonical status set
 
@@ -64,7 +63,8 @@ divergences. It parses each ADR's H1, detects the legacy `## Status` section, va
 the token against the canonical `AdrStatus` set, and flags off-taxonomy or missing
 values, bare (unquoted) tokens, and frontmatter-versus-body supersession drift. All
 findings are warnings, so the check never hard-fails an existing corpus; `--fix` applies
-only the safe normalization of quoting a bare canonical token. Run it (directly, or via
+safe encoding normalization, including already-recorded supersession. It does not
+authorize a new decision or supersession. Run it (directly, or via
 `vaultspec-core vault check all`) as part of the structural precondition, then reason
 over what it surfaces. The check derives its vocabulary from the same `AdrStatus` enum
 named above, so the two never drift.
