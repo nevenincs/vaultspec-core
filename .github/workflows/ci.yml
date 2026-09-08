@@ -11,19 +11,30 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
   # Superseding a run is right on a branch and wrong on the default one.
   #
   # `main` here takes direct pushes, and required status checks gate pull
   # request merges only - so for a direct push the push-triggered run IS the
-  # gate. Cancelling it on the next push destroys that gate, and a cancelled
-  # run reports as `cancelled`, not `failed`: it is not red in the Actions
-  # list and nothing downstream reacts to it. Twenty-five of the last hundred
-  # `main` runs ended that way, so a quarter of the default branch's history
-  # carries no verdict at all.
+  # gate. Cancelling it destroys that gate, and a cancelled run reports as
+  # `cancelled`, not `failed`: it is not red in the Actions list and nothing
+  # downstream reacts to it. A quarter of this branch's history had carried no
+  # verdict at all for that reason.
   #
-  # On any other ref an in-flight run is genuinely obsolete once a newer commit
-  # arrives, so keep cancelling there.
+  # `cancel-in-progress: false` was the first attempt and it is not enough,
+  # because it governs only a run that has STARTED. GitHub's other concurrency
+  # rule has no switch: when a run enters an occupied group, any previously
+  # PENDING run in that group is cancelled outright. On this fleet - one Linux
+  # runner and one Windows runner, shared with every other repository - a main
+  # run routinely waits without starting, so it sits pending, and the next push
+  # to main kills it. The merge that landed the check-set rework was cancelled
+  # exactly this way: forty-four minutes queued, not one job ever assigned.
+  #
+  # The group therefore carries the SHA on main, so two main commits are never
+  # in the same group and can never supersede one another. Every other ref
+  # keeps one group per branch, where an in-flight run really is obsolete once
+  # a newer commit arrives - and keeps cancelling, which is what stops branch
+  # pushes from consuming the fleet the default branch is queueing for.
+  group: ci-${{ github.workflow }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
