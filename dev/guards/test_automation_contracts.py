@@ -533,7 +533,15 @@ def test_lint_covers_every_validation_surface() -> None:
 
 def test_audit_covers_every_advisory_dimension() -> None:
     """Advisory dimensions are named individually so each can graduate to lint."""
-    required = {"deps", "security", "dead-code", "dependencies", "complexity", "all"}
+    required = {
+        "deps",
+        "security",
+        "dead-code",
+        "dependencies",
+        "complexity",
+        "advisory",
+        "all",
+    }
     missing = sorted(required - _toolchain_targets("audit"))
     assert not missing, f"audit verb is missing targets: {missing}"
 
@@ -681,11 +689,11 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
     ci = _load_workflow(".github/workflows/ci.yml")
     jobs = ci["jobs"]
     required_jobs = {
-        "lint-and-type",
-        "tests",
-        "broad-tests",
-        "vault-audit",
-        "dependency-audit",
+        "lint",
+        "test-harness-repo",
+        "test-library",
+        "test-vault",
+        "audit-dependencies",
     }
     assert required_jobs.issubset(jobs), "CI workflow is missing required jobs"
 
@@ -696,7 +704,7 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
         # away from being silently undone. `type-strict` in particular was
         # promoted by removing its `continue-on-error` key; nothing but this
         # list stops the step itself from being removed next.
-        "lint-and-type": {
+        "lint": {
             "just init",
             # Folded in from jobs of their own. On a fleet of one Linux runner
             # every job is serial, so a fifteen-second check in its own job
@@ -705,7 +713,10 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
             "just deps-check",
             "just check-workflow",
             "just check-python",
-            "just check-type",
+            # `just check-type` is deliberately absent - see the comment on the
+            # step in `ci.yml`. `check-type-platforms` runs `--python-platform`
+            # linux, darwin and win32; this runner's host platform is Linux, so
+            # naming both ran the Linux pass twice.
             "just check-type-platforms",
             "just check-toml",
             "just check-links",
@@ -727,18 +738,18 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
         # step naming either re-ran work the broad legs had already done. The
         # coverage they stood for is pinned below, on the job that actually
         # provides it.
-        "tests": {
+        "test-harness-repo": {
             "just init",
             "just test-harness",
             "just test-repo",
         },
-        "broad-tests": {"just init", "just test-broad"},
-        "vault-audit": {
+        "test-library": {"just init", "just test-broad"},
+        "test-vault": {
             "just init",
             "just framework-install",
             "just vault-check",
         },
-        "dependency-audit": {"just init", "just audit-deps"},
+        "audit-dependencies": {"just init", "just audit-deps"},
     }
 
     for job_name, expected in expected_runs.items():
@@ -806,7 +817,7 @@ def test_ci_workflow_lints_workflows_through_the_pinned_recipe() -> None:
     # The gate is a STEP of `lint-and-type` now, not a job. What this guard
     # holds is unchanged - the dispatch is by recipe and the pin lives in
     # `dev/` - but a job of its own bought nothing on a one-runner fleet.
-    steps = ci["jobs"]["lint-and-type"]["steps"]
+    steps = ci["jobs"]["lint"]["steps"]
 
     run_commands = {step["run"].strip() for step in steps if "run" in step}
     assert "just check-workflow" in run_commands, (
@@ -866,7 +877,7 @@ def test_ci_workflow_lints_workflows_through_the_pinned_recipe() -> None:
 def test_ci_workflow_installs_native_lint_tools() -> None:
     ci = _load_workflow(".github/workflows/ci.yml")
     jobs = ci["jobs"]
-    steps = jobs["lint-and-type"]["steps"]
+    steps = jobs["lint"]["steps"]
     used_actions = {step["uses"] for step in steps if "uses" in step}
     assert "taiki-e/install-action@v2" in used_actions
     # Node.js is no longer required - taplo and pymarkdown are native

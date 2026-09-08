@@ -31,6 +31,20 @@ env:
   FORCE_COLOR: "0"
 
 jobs:
+  # HOW THESE CHECKS ARE NAMED. Every job's name is
+  # `<Kind>: <Subject>[ (<Platform>)]`, and the three kinds are the three the
+  # justfile already groups its recipes under, so a reader who knows
+  # `just --list` knows what a red check means without opening it:
+  #
+  #   Lint   - reads the tree; executes none of it.
+  #   Test   - executes something and asserts what it did.
+  #   Audit  - asks a third party (an advisory database) for a verdict.
+  #
+  # The subject says WHAT is covered, never which tool covers it: a name like
+  # `Dependency Audit (uv audit)` goes stale the day the tool changes, and
+  # `broad` named a pytest marker that meant nothing to anyone reading the
+  # merge box. `dev/guards/test_automation_contracts.py` holds the scheme.
+  #
   # These jobs are deliberately few. The fleet this runs on has ONE Linux
   # runner and ONE Windows runner, so every job in this workflow executes
   # SERIALLY on one of two machines and each one re-pays checkout, tool setup
@@ -42,8 +56,8 @@ jobs:
   # Three former jobs are steps below for that reason: `Lockfile In Sync`,
   # `Interpreter Matches Pin`, and `Workflow Lint`. Each took roughly fifteen
   # seconds of work and a full provisioning cycle to reach it.
-  lint-and-type:
-    name: Lint, Types, Config, Workflows, and Docs
+  lint:
+    name: "Lint: Code, Docs & Workflows"
     runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
@@ -98,14 +112,15 @@ jobs:
       - name: Ruff
         run: just check-python
 
-      - name: Ty
-        run: just check-type
-
-      # This job runs Linux, so `just check-type` above only ever proves the
-      # Linux view. The tree carries both Windows (`msvcrt`, `ctypes.WinDLL`)
-      # and POSIX (`fcntl`) branches, so a contributor on either OS can be
-      # green locally while the other platform is broken. Checking all three
-      # targets here means CI and a local run agree regardless of host.
+      # `just check-type` is NOT a step beside this one. It runs `ty` against
+      # the HOST platform, and this runner's host platform is Linux, so on
+      # this job it is `--python-platform linux` under another name - the
+      # first of the three passes below, run twice. The recipe stays for local
+      # use, where the host-only check is the fast one; here it is duplicate
+      # work, and the tree needs all three passes regardless: it carries both
+      # Windows (`msvcrt`, `ctypes.WinDLL`) and POSIX (`fcntl`) branches, so a
+      # contributor on either OS can be green locally while the other platform
+      # is broken.
       - name: Ty (all target platforms)
         if: always()
         run: just check-type-platforms
@@ -147,40 +162,6 @@ jobs:
         if: always()
         run: just check-type-strict
 
-  code-health:
-    name: Code Health (advisory)
-    runs-on: [self-hosted, Linux, X64, build]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version-file: .python-version
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        with:
-          enable-cache: true
-
-      - name: Set up just
-        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
-        with:
-          tool: just@1.38.0
-
-      - name: Initialize the worktree
-        run: just init
-
-      # Measurement only - every target exits 0. This is the instrument the
-      # earlier health audits lacked: it ranks the worst offenders per
-      # dimension so the ratchet has a target list rather than an intention.
-      - name: Advisory audit dimensions
-        run: just audit-all
-
-      - name: Code-health report
-        run: just health-fast
-
   # `just test-unit` is NOT here, and its absence is the point. That lane is
   # `pytest src/vaultspec_core -m "unit and not repo and not claude"`, and
   # `broad (linux)` below runs `-m "not repo and not claude"` over the same
@@ -189,8 +170,8 @@ jobs:
   # that proved nothing the broad leg did not. What is left is what only this
   # job runs: the development-instrument guards and the repository-health
   # guards, neither of which any other lane selects.
-  tests:
-    name: Harness and Repository Guards
+  test-harness-repo:
+    name: "Test: Harness & Repo"
     runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
@@ -227,8 +208,8 @@ jobs:
       - name: Run repository-health guards
         run: just test-repo
 
-  broad-tests:
-    name: broad (${{ matrix.name }})
+  test-library:
+    name: "Test: Library (${{ matrix.name }})"
     # THE library gate, and the only one: this job runs the whole package suite
     # (excluding only the `claude` marker, which needs that CLI installed) on
     # BOTH Linux and Windows, so "green" means green on every platform rather
@@ -252,9 +233,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: linux
+          - name: Linux
             runner: [self-hosted, Linux, X64, build]
-          - name: windows
+          - name: Windows
             runner: [self-hosted, Windows, X64]
     runs-on: ${{ matrix.runner }}
     steps:
@@ -286,8 +267,8 @@ jobs:
         shell: bash
         run: just test-broad
 
-  vault-audit:
-    name: Vault Audit
+  test-vault:
+    name: "Test: Vault Corpus"
     runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
@@ -324,8 +305,8 @@ jobs:
       - name: Verify vault structure and links
         run: just vault-check
 
-  dependency-audit:
-    name: Dependency Audit (uv audit)
+  audit-dependencies:
+    name: "Audit: Dependencies"
     runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout

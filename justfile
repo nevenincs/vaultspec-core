@@ -319,7 +319,12 @@ audit-dependencies:
 audit-complexity:
     {{dev}} audit complexity
 
-# Report every advisory dimension; one red dimension does not hide the rest.
+# Report the advisory dimensions only; `audit-deps` is the one that gates.
+[group('audit')]
+audit-advisory:
+    {{dev}} audit advisory
+
+# Report every dimension including the gating one; `deps` still decides.
 [group('audit')]
 audit-all:
     {{dev}} audit all

@@ -469,12 +469,16 @@ AUDIT = Verb(
             (Cmd(uv_run("complexipy", f"{PACKAGE}/tests").argv, UTF8),),
             advisory=True,
         ),
+        # The advisory dimensions WITHOUT `deps`, so a caller that only wants
+        # leads does not re-run the one dimension that returns a verdict.
+        # `deps` resolves the committed lockfiles and queries OSV, which is
+        # the slowest thing in this verb by a wide margin, and it has a gating
+        # caller of its own. Composing it into the only aggregate meant every
+        # run of the dashboard paid for it a second time on the same commit.
         Target(
-            "all",
-            "Every audit dimension, as a dashboard.",
+            "advisory",
+            "Every advisory dimension, as a dashboard; `deps` is not one.",
             (
-                Echo("=== dependency advisories ==="),
-                Ref("deps"),
                 Echo("=== security ==="),
                 Ref("security"),
                 Echo("=== dead code ==="),
@@ -483,6 +487,21 @@ AUDIT = Verb(
                 Ref("dependencies"),
                 Echo("=== test-tree cognitive complexity ==="),
                 Ref("complexity"),
+            ),
+            # Advisory as an aggregate BECAUSE every leaf it composes is
+            # advisory - the reasoning below about `all` turns on `all`
+            # composing `deps`, and this one does not. `keep_going` still
+            # delivers "one red dimension does not hide the rest".
+            advisory=True,
+            keep_going=True,
+        ),
+        Target(
+            "all",
+            "Every audit dimension, as a dashboard.",
+            (
+                Echo("=== dependency advisories ==="),
+                Ref("deps"),
+                Ref("advisory"),
             ),
             # NOT advisory, though every dimension but `deps` is. `advisory` is
             # a property of a LEAF - of one tool and what its findings are

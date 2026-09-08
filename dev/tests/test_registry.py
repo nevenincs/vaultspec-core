@@ -62,14 +62,6 @@ DELIBERATELY_MANUAL = {
     # whose wall-clock measurements are the subject under test; a loaded CI
     # runner fails them for reasons unrelated to a regression.
     "benchmark",
-    # `unit` is `broad`'s selection with `unit and` prepended and `-x` added,
-    # over the same path. CI runs `broad` on both operating systems, so a CI
-    # step naming `unit` re-ran a strict subset of work already done on the
-    # same machine - six minutes of serial time on a fleet with one Linux
-    # runner. The lane stays because the fast fail-first slice is the local
-    # inner loop; nothing is unobserved by its absence from CI, because
-    # everything it selects is selected by a lane CI does run.
-    "unit",
 }
 
 

@@ -11,9 +11,11 @@ real file that owns the other half of the contract.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any
+import shlex
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 import pytest
+import yaml
 
 from dev.binaries.build_pyapp import (
     BINARIES,
@@ -29,6 +31,25 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 pytestmark = pytest.mark.unit
+
+
+class _WorkflowStep(TypedDict, total=False):
+    """The one step key read here."""
+
+    run: str
+
+
+class _WorkflowJob(TypedDict, total=False):
+    """The one job key read here."""
+
+    steps: list[_WorkflowStep]
+
+
+class _Workflow(TypedDict):
+    """The slice of a workflow's schema this module reads."""
+
+    jobs: dict[str, _WorkflowJob]
+
 
 #: Published SHA-256 test vectors, used as an oracle independent of the
 #: hashing the function under test performs.
@@ -189,12 +210,80 @@ def test_embedded_python_series_satisfies_requires_python(
 
 
 def test_the_release_workflow_invokes_this_builder(repo_root: Path) -> None:
-    """The script is not orphaned: the binaries workflow is its automated caller."""
+    """The script is not orphaned: the binaries workflow reaches it by recipe.
+
+    This used to grep ``binaries.yml`` for the script path and for ``--tag``
+    and ``--outdir``, which was right about the property and wrong about the
+    caller. The workflow calls ``just release-binaries`` now - deliberately,
+    so a maintainer reproduces a release build with the command CI runs - and
+    the flags moved into the recipe, so the file-wide grep for them was left
+    matching a PROSE COMMENT about ``build_pyapp.py`` and an unrelated
+    ``--tag`` in the channel-pointer step further down. Two of the three
+    assertions passed for reasons that had nothing to do with the builder, and
+    the third failed, which is how the whole guard came to be red.
+
+    What is asserted instead is the chain, one link at a time: the workflow
+    runs the recipe in a ``run:`` step (not in a comment), and the recipe
+    dispatches to this script with the flags it needs. Neither half can drift
+    without failing here, which is the coupling the grep was reaching for.
+    """
     workflow = repo_root / ".github" / "workflows" / "binaries.yml"
-    text = workflow.read_text(encoding="utf-8")
-    assert "dev/binaries/build_pyapp.py" in text
-    assert "--tag" in text
-    assert "--outdir" in text
+    document = cast("_Workflow", yaml.safe_load(workflow.read_text(encoding="utf-8")))
+    runs = {
+        step["run"].strip()
+        for job in document["jobs"].values()
+        for step in job.get("steps") or []
+        if "run" in step
+    }
+    invocations = [run for run in runs if run.startswith("just release-binaries")]
+    assert invocations, (
+        "no `run:` step in binaries.yml calls `just release-binaries`; the "
+        f"builder has no automated caller. Runs: {sorted(runs)}"
+    )
+
+    recipe = _release_binaries_recipe(repo_root)
+    assert "dev.binaries.build_pyapp" in recipe, (
+        "`just release-binaries` no longer dispatches to this builder"
+    )
+    for flag in ("--tag", "--target", "--outdir", "--wheel-dir"):
+        assert flag in recipe, (
+            f"`just release-binaries` no longer passes {flag} to the builder, "
+            "so the recipe and the release build what it is meant to reproduce "
+            "have diverged"
+        )
+
+    # The workflow must supply every positional the recipe declares. This is
+    # the drift that produced the fix these tests now cover: the workflow grew
+    # a wheel directory argument that the recipe did not take.
+    parameters = _release_binaries_parameters(repo_root)
+    for invocation in invocations:
+        supplied = len(shlex.split(invocation)) - 2
+        assert supplied == len(parameters), (
+            f"`{invocation}` passes {supplied} argument(s) but "
+            f"`release-binaries` declares {len(parameters)}: {parameters}"
+        )
+
+
+def _release_binaries_recipe(repo_root: Path) -> str:
+    """The body of the ``release-binaries`` recipe, as written in the justfile."""
+    lines = (repo_root / "justfile").read_text(encoding="utf-8").splitlines()
+    for index, line in enumerate(lines):
+        if line.startswith("release-binaries"):
+            body: list[str] = []
+            for following in lines[index + 1 :]:
+                if following and not following[0].isspace():
+                    break
+                body.append(following)
+            return "\n".join(body)
+    raise AssertionError("the justfile declares no `release-binaries` recipe")
+
+
+def _release_binaries_parameters(repo_root: Path) -> list[str]:
+    """The positional parameters ``release-binaries`` declares, defaults included."""
+    lines = (repo_root / "justfile").read_text(encoding="utf-8").splitlines()
+    header = next(line for line in lines if line.startswith("release-binaries"))
+    signature, _, _ = header.partition(":")
+    return signature.split()[1:]
 
 
 def test_the_justfile_exposes_a_local_build_recipe(repo_root: Path) -> None:
