@@ -69,15 +69,21 @@
 #  on this checkout rather than product usage.
 # ===========================================================================
 
-set positional-arguments := false
 set quiet := true
 
+# Requires just >= 1.38 (`set working-directory`, native modules, `[doc]`/`[group]`).
+#
 # just defaults to `sh -cu` on every platform, which on Windows means a Git Bash
 # `sh.exe` that is only on PATH for some Git for Windows install options. This
-# names the one interpreter every Windows machine is guaranteed to have. It is a
-# shell DECLARATION, not platform-specific logic: because each recipe body below
-# is a single command with no shell syntax, `cmd` and `sh` execute all of them
-# identically, and there is no second dialect of anything to maintain.
+# names the one interpreter every Windows machine is guaranteed to have.
+#
+# `cmd` is chosen for EXIT-CODE FIDELITY, not familiarity. It forwards a native
+# command's status verbatim; `pwsh -Command` and `powershell -Command` collapse
+# every non-zero status onto 1, which would erase this harness's own exit codes
+# and destroy the advisory-versus-gating split the recipe groups are built on.
+# cmd's weaknesses - `%VAR%` expansion and no single-quote literal - cost
+# nothing here, because every recipe body below is a single command with no
+# shell syntax and no recipe body contains either character.
 set windows-shell := ["cmd.exe", "/c"]
 
 # Every recipe that merely *uses* the environment goes through `uv run
