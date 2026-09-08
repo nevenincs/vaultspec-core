@@ -69,6 +69,60 @@ def _enable_ci_report(config: pytest.Config) -> None:
         config.option.xmlpath = path
 
 
+# --- the durability boundary -----------------------------------------------
+#
+# `atomic_write_bytes` fsyncs every file it writes. That call buys durability
+# across power loss and nothing else: the helper's ATOMICITY comes from the
+# `O_EXCL` temporary and the rename, neither of which involves fsync. No test
+# asserts the durability half - `core/tests/test_manifest_exclusive_atomicity.py`
+# says so in its own docstring - so under pytest the suite pays for a guarantee
+# it cannot observe.
+#
+# It pays a lot. One `install --provider all` issues 426 fsyncs, 61% of its
+# runtime, and the fixtures reprovision such a workspace hundreds of times per
+# run. Worse than the cost is its shape: fsync serialises at the DEVICE, so it
+# does not shrink when workers are added, which is what kept this suite
+# effectively unparallelisable.
+#
+# So the harness skips it, on the stated principle that it may skip work whose
+# effect no test can observe and nothing else. Production is untouched: the call
+# site stays exactly where it is, and an installed `vaultspec-core` fsyncs as it
+# always has. The divergence is confined to this file, which no production code
+# path can import, and `dev/guards/test_durability_boundary.py` fails if it ever
+# stops being confined.
+#
+# The patch is on `os` itself rather than on the helper, because the helper is
+# not the only writer in a run and a boundary that named one function would be a
+# statement about that function rather than about the harness.
+#
+# Child processes are NOT covered - a test that shells out to a real CLI gets a
+# real fsync, because the patch lives in this interpreter. That is a limit, not
+# an oversight: those tests are few, and reaching into a subprocess to disable a
+# durability call is exactly the kind of production-visible mechanism this
+# boundary refuses.
+_real_fsync = os.fsync
+
+
+def _no_fsync(fd: int) -> None:
+    """Stand in for :func:`os.fsync` while a test session is running."""
+
+
 def pytest_configure(config: pytest.Config) -> None:
     """Apply the session-level configuration this repository's runs share."""
     _enable_ci_report(config)
+    os.fsync = _no_fsync
+
+
+def pytest_unconfigure() -> None:
+    """Hand back the real durability guarantee when the session ends."""
+    os.fsync = _real_fsync
+
+
+def pytest_report_header() -> str:
+    """Announce the boundary, so no one has to find it in a conftest.
+
+    A run that silently differs from production is the failure mode this
+    boundary is most likely to cause, so it names itself in every run's header
+    rather than waiting to be discovered.
+    """
+    return "durability: os.fsync suppressed for this session (production unaffected)"

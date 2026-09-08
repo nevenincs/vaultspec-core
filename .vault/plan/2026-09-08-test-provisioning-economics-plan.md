@@ -8,7 +8,7 @@ related:
   - '[[2026-09-08-test-provisioning-economics-adr]]'
 modified: '2026-09-08'
 body_schema: body-v2
-body_hash: 'sha256:83d58dc9bf3ec964548084dec44b6c913eefeeb2c267175604052a64dad4a59e'
+body_hash: 'sha256:ceb587e576c074e7b5eed9d4aaa6aab2ddf67ef43b8b1506bd6a8dfdeef31129'
 ---
 
 # `test-provisioning-economics` plan
@@ -60,9 +60,9 @@ the workflow now uses.
 
 Move the fsync cost out of the harness and prove production is untouched.
 
-- [ ] `P01.S01` - Suppress os.fsync for the duration of a test session in the repository-root conftest, restoring it on unconfigure; `conftest.py`.
-- [ ] `P01.S02` - Guard that the boundary is confined to the harness: no test-aware branch in production code, one fsync call site; `dev/guards`.
-- [ ] `P01.S03` - Re-measure the install cost under the boundary and record the ratio against the pre-change baseline; `dev/guards`.
+- [x] `P01.S01` - Suppress os.fsync for the duration of a test session in the repository-root conftest, restoring it on unconfigure; `conftest.py`.
+- [x] `P01.S02` - Guard that the boundary is confined to the harness: no test-aware branch in production code, one fsync call site; `dev/guards`.
+- [x] `P01.S03` - Re-measure the install cost under the boundary and record the ratio against the pre-change baseline; `dev/guards`.
 
 ### Phase `P02` - reuse the provisioned workspace
 
