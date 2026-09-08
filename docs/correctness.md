@@ -22,13 +22,17 @@ For hook activation and setup choices, see
 For planned work, ask your agent to use `vaultspec-code-review`. Give it the
 implementation scope and the feature's documents. It compares the integrated result with
 the plan and any governing ADRs, consulting supporting evidence as needed. Record scope,
-findings, and recommendations in the feature's rolling audit. A routine change without a
-plan is reviewed in the reply; it does not need a ceremonial audit.
+findings, and recommendations in the feature's rolling audit. A change without a plan is
+reviewed in the reply and does not require an audit record.
 
-Formal review occurs at each actual Phase close, plan close, and handoff; combine
-coincident reviews. L1 has no Phase-close gate. Review cohesive behavior across changed
-components, not separate files or documents as independent gates. Tests and local checks
-still run with each Step.
+For planned work, review at each Phase close, at plan close, and before handoff for
+merge or completion. Combine coincident reviews. An L1 plan has no Phases, so it has no
+Phase-close gate. Tests and local checks still run with each Step.
+
+Trace the affected workflow across its components: do the interfaces agree, do failure
+paths behave as intended, and do the tests cover the promised result? For documentation
+or framework changes, read the pages and instructions together for conflicting advice.
+Separate file reviews alone do not establish that the whole workflow works.
 
 To scaffold the feature's first audit manually, run:
 
@@ -36,9 +40,9 @@ To scaffold the feature's first audit manually, run:
 vaultspec-core vault add audit --feature payment-retries
 ```
 
-Replace `payment-retries` with your feature's tag. This creates a template; completing
-the review requires inspecting the change and writing the audit. Keep an audit even when
-the review finds no problems, with its scope recorded.
+Replace `payment-retries` with your feature's tag. This creates a template, not a
+completed review. Record the reviewed scope and result even when no problems are found;
+append later reviews and resolutions to the same audit.
 
 <p id="what-the-review-does-and-does-not-buy-you"></p>
 <p id="what-the-framework-tells-the-agent"></p>

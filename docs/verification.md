@@ -1,5 +1,9 @@
 # Check your workspace and feature records
 
+These checks inspect installation and record consistency. They do not establish user
+approval, judge whether evidence supports a decision, or prove code correctness. Use
+project tests and [implementation review](correctness.md) for the result itself.
+
 Choose the command for what you need to check:
 
 | Check                                    | Command                          |
@@ -10,6 +14,10 @@ Choose the command for what you need to check:
 
 Run commands from your workspace root. Each command also accepts `--target DIR` to check
 another workspace and `--json` for structured output.
+
+Plan grammar and identifier checks run separately with
+`vaultspec-core vault plan check <plan>`; they are not included in
+`vaultspec-core vault check all`.
 
 <p id="checking-everything-at-once"></p>
 
@@ -50,6 +58,11 @@ vaultspec-core vault check all --fix
 This command modifies files. Review its changes with `git diff`, correct any remaining
 problems, and rerun `vaultspec-core vault check all` before committing. Errors that
 remain after `--fix` still make the command fail.
+
+Repair fixes supported mechanical defects, such as link syntax and stale body stamps. It
+does not select evidence or governing ADRs from nearby records. Resolve missing
+grounding by inspecting the actual evidence and adding the appropriate links. A plan
+without an ADR is valid when no costly decision governs the work.
 
 To investigate one check separately, name it explicitly. For example:
 

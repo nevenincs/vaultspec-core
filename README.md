@@ -48,26 +48,32 @@ dependency.
 
 Open your repository in your coding agent and describe the work:
 
-> Use vaultspec-research to investigate adding full-text search to the API. Use the
-> feature tag search-api.
+> Add full-text search to the API. Use the feature tag search-api. Check existing
+> decisions first, and show me any new decision and implementation plan for approval.
 
-The workflow covers research, an architecture decision record (ADR), an implementation
-plan, execution, and review. The ADR records the chosen approach and its consequences.
-Approve the ADR before planning, then approve the plan before implementation.
+The agent uses the parts of the workflow the task needs:
 
-The agent creates documents through the tools, then writes the research and other prose.
-Records stay in the repository as Markdown. The installed rules tell the agent to
-consult existing records when continuing work.
+- Routine changes can proceed directly within your request.
+- A costly-to-reverse choice needs evidence and an approved architecture decision record
+  (ADR). Reuse an existing accepted ADR when it already covers the work.
+- Work that needs durable sequencing or handoff uses a plan, with or without a new ADR.
+  The agent implements and verifies each Step, logs the changes, and reviews the
+  integrated result.
 
-You can also create the first research document yourself:
+Rules guide the agent's decisions; tools maintain document structure and progress.
+Record checks complement tests and review, but do not prove the code is correct.
+Approval covers the agreed scope, including ordinary in-scope corrections; new choices
+outside that authorization need your input.
+
+A feature tag groups the work's records. To see recorded progress:
 
 ```bash
-uvx vaultspec-core vault add research --feature search-api
+uvx vaultspec-core status search-api
 ```
 
-This creates a scaffold. Fill in the research before moving on to the decision record.
-Follow the [workflow guide](docs/framework.md#begin-a-pipeline) for the remaining
-stages.
+For planned work, ask the agent to resume the feature from its next open Step. The
+[workflow guide](docs/framework.md#begin-a-pipeline) explains how to choose a route,
+approve work, and continue across sessions.
 
 ## Documentation
 
