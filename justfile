@@ -1,51 +1,60 @@
 # ===========================================================================
 #  vaultspec-core development harness
 #
-#  Every entry point is a top-level verb; behaviour within a verb is selected
-#  by a `target` argument - `just lint type`, `just test broad`, `just fix
-#  markdown`. Run `just` for the annotated recipe list, and `just <verb> help`
-#  (or any unrecognised target) for that verb's targets with descriptions.
+#  Every entry point is a FLAT HYPHENATED recipe named `<verb>-<thing>` -
+#  `just check-type`, `just test-broad`, `just fix-markdown`. There is no
+#  `target` argument anywhere: the thing a recipe acts on is part of its name,
+#  so `just --list` is the complete surface and tab completion reaches every
+#  one of them. Run `just` for the annotated recipe list, grouped by
+#  CONSEQUENCE.
 #
 #  PLATFORM AGNOSTIC BY CONSTRUCTION. Every recipe body below is a single
 #  command with no shell branching, no pipes, no conditionals, and no `sh`
-#  versus PowerShell dialect. All of the logic - target dispatch, step
-#  chaining, tool-or-Docker fallback, advisory-versus-gating exit codes - lives
-#  in the modules directly under `dev/`, which import only the standard library
-#  and therefore behave identically on every platform. There is no shell script
-#  backing this file. To change what a target runs, edit `dev/toolchain.py`,
-#  which is the single declarative source of truth for the whole toolchain.
+#  versus PowerShell dialect. All of the logic - step chaining, tool-or-Docker
+#  fallback, advisory-versus-gating exit codes - lives in the modules directly
+#  under `dev/`, which import only the standard library and therefore behave
+#  identically on every platform. There is no shell script backing this file.
+#  To change what a recipe runs, edit `dev/toolchain.py`, which is the single
+#  declarative source of truth for the whole toolchain.
 #
 #  The sub-packages beside those modules - `dev/audit`, `dev/binaries`,
-#  `dev/health`, `dev/statistics` - are the INSTRUMENTS the verbs invoke when a
-#  measurement or a build is too large to express as a command line. They are
+#  `dev/health`, `dev/statistics` - are the INSTRUMENTS the recipes invoke when
+#  a measurement or a build is too large to express as a command line. They are
 #  free to depend on whatever they measure with, which is exactly why they sit
 #  one level down from the stdlib-only dispatch core rather than inside it.
 #  Each carries its own cohabiting `tests` package.
 #
 #  One instrument lives OUTSIDE `dev/`: the documentation-asset renderers in
 #  `docs/_render/`, which sit with the `docs/assets/` output they write rather
-#  than with the tooling that invokes them. `just docs` drives them.
+#  than with the tooling that invokes them. `just docs-all` drives them.
 #
 #  Two sub-packages beside the instruments are not instruments at all.
 #  `dev/guards` holds the repository-health guards - the checks on these
 #  recipes, on the CI workflows, on `pyproject.toml`, on the installed
 #  `.vaultspec/templates` and on `typings/` - which have no module to cohabit
 #  with because their subject is this checkout's own configuration. They carry
-#  the `repo` pytest marker and `just test repo` selects them BY THAT MARKER
+#  the `repo` pytest marker and `just test-repo` selects them BY THAT MARKER
 #  across every tree, so a repository-health guard is gated by what it asserts
-#  rather than by where it is filed; `just test unit` and `just test broad`
+#  rather than by where it is filed; `just test-unit` and `just test-broad`
 #  exclude the same marker, so the library lanes never run them.
-#  `dev/smoke` holds the distribution smoke check, run
-#  by path against a built wheel and sdist by `.github/workflows/publish.yml`,
-#  never by pytest.
+#  `dev/smoke` holds the distribution smoke check, run by path against a built
+#  wheel and sdist by `.github/workflows/publish.yml`, never by pytest.
 #
-#  The verbs split by CONSEQUENCE, not by tool:
+#  The GROUPS split by CONSEQUENCE, not by tool. The taxonomy is a closed set
+#  of ten, identical in every repository:
 #
-#    lint   GATES.    Read-only, and a finding fails the build.
-#    fix    MUTATES.  Everything automatically repairable, in one pass.
-#    audit  Only `deps` gates. Every other target is advisory and exits 0
-#           even with findings, because each yields a lead to confirm.
-#    test   GATES.    `just test help` states what each lane proves.
+#    setup    Provisioning and dependency resolution. MUTATES the environment.
+#    dev      Day-to-day operations on this checkout that are not gates.
+#    check    GATES.    Read-only, and a finding fails the build.
+#    fix      MUTATES.  Everything automatically repairable, in one pass.
+#    audit    ADVISORY, and exits 0 even with findings, because each yields a
+#             lead to confirm. `audit-deps` is the ONE exception: a published
+#             advisory against a pinned version is a verdict, so it gates.
+#    build    Produces artifacts from a plain checkout.
+#    release  Actions that need a published tag.
+#    docs     Regenerates committed documentation assets.
+#    test     GATES.
+#    meta     The recipe list and the composed pipeline.
 #
 #  NO TOOL IS MIRRORED HERE. `vaultspec-core` and `vaultspec-rag` are finished
 #  products with their own CLIs and their own MCP servers; wrapping either one
@@ -56,8 +65,8 @@
 #
 #  What this file does expose is the operations the repository performs on
 #  ITSELF - its own `.vault/` corpus and its own `.vaultspec/` harness - as the
-#  `vault` and `framework` verbs, because those are development actions on this
-#  checkout rather than product usage.
+#  `vault-*` and `framework-*` recipes, because those are development actions
+#  on this checkout rather than product usage.
 # ===========================================================================
 
 set positional-arguments := false
@@ -79,88 +88,342 @@ set windows-shell := ["cmd.exe", "/c"]
 # environment call `uv` directly, inside `dev/`.
 dev := "uv run --no-sync python -m dev"
 
-# List available recipes.
+# List every recipe, grouped by consequence.
+[group('meta')]
 default:
     @just --list
 
 # ===========================================================================
-#  Bootstrap
+#  setup
 # ===========================================================================
 
 # The literal `uv sync` on the first line is deliberate: it is the only step
 # that must work before a virtual environment exists, so it cannot route
-# through `{{dev}}`. `framework install` then runs with --force because a fresh
+# through `{{dev}}`. `framework-install` then runs with --force because a fresh
 # checkout carries the tracked `.vaultspec/` config but not the gitignored
 # install manifest (`.vaultspec/providers.json`), and the diagnosis engine
 # reads that combination as CORRUPTED; --force rebuilds the manifest from the
 # tracked config the way a consumer recovering a lost manifest would.
 
 # Provision a fresh clone or worktree: dependencies, framework, and git hooks.
+[group('setup')]
 bootstrap:
     uv sync --locked --group dev
     {{dev}} framework install
 
-# ===========================================================================
-#  Toolchain verbs
-# ===========================================================================
+# Install the locked dependency set.
+[group('setup')]
+deps-sync:
+    {{dev}} deps sync
 
-# Manage project dependencies and the lockfile.
-deps target='sync':
-    {{dev}} deps {{target}}
+# Upgrade every dependency group.
+[group('setup')]
+deps-upgrade:
+    {{dev}} deps upgrade
 
-# Run gating static analysis: style, types, config, links, and markdown.
-lint target='all':
-    {{dev}} lint {{target}}
+# Regenerate the lockfile.
+[group('setup')]
+deps-lock:
+    {{dev}} deps lock
 
-# Apply every available formatter and automatic fix.
-fix target='all':
-    {{dev}} fix {{target}}
+# Regenerate the lockfile at the newest allowed versions.
+[group('setup')]
+deps-lock-upgrade:
+    {{dev}} deps lock-upgrade
 
-# Audit dependencies and code quality; only 'deps' gates.
-audit target='all':
-    {{dev}} audit {{target}}
-
-# Run the project test suites.
-test target='all':
-    {{dev}} test {{target}}
-
-# Build the Python distribution artifacts.
-build target='python':
-    {{dev}} build {{target}}
+# Verify the lockfile matches pyproject.toml.
+[group('setup')]
+deps-check:
+    {{dev}} deps check
 
 # ===========================================================================
-#  This checkout's own vaultspec records and harness
+#  check - GATES. Read-only, and a finding fails the build.
 # ===========================================================================
 
-# Operate on this repository's own .vault/ development corpus.
-vault target='check':
-    {{dev}} vault {{target}}
+# Ruff lint and format verification.
+[group('check')]
+check-python:
+    {{dev}} lint python
 
-# Operate on this repository's own .vaultspec/ framework harness.
-framework target='doctor':
-    {{dev}} framework {{target}}
+# Ty type checking.
+[group('check')]
+check-type:
+    {{dev}} lint type
+
+# `check-type` above checks whichever platform it runs on, so a Windows
+# contributor's green is not Linux's green: this repository carries both
+# `msvcrt`/`ctypes.WinDLL` and `fcntl` paths, and a platform-specific attribute
+# resolves on one OS and not the other. CI runs Linux, so unguarded
+# Windows-only code passed every local gate and failed only after push - the
+# exact "green here, red there" split a gate exists to prevent. Checking all
+# three targets makes the local run reproduce CI regardless of the host.
+
+# Ty type checking against every target platform.
+[group('check')]
+check-type-platforms:
+    {{dev}} lint type-platforms
+
+# TOML formatting verification.
+[group('check')]
+check-toml:
+    {{dev}} lint toml
+
+# Verify every documentation link resolves.
+[group('check')]
+check-links:
+    {{dev}} lint links
+
+# Markdown formatting and structure verification.
+[group('check')]
+check-markdown:
+    {{dev}} lint markdown
+
+# GitHub Actions workflow verification.
+[group('check')]
+check-workflow:
+    {{dev}} lint workflow
+
+# Each of the three below is a real gate whose burndown is unfinished, so none
+# is a member of `check-all`: chaining one in would hide every dimension behind
+# it. Run them by name until each can hold its line, then move it up.
+
+# Gate cyclomatic and cognitive complexity.
+[group('check')]
+check-complexity:
+    {{dev}} lint complexity
+
+# Gate nesting depth.
+[group('check')]
+check-nesting:
+    {{dev}} lint nesting
+
+# Gate module length and class design limits.
+[group('check')]
+check-size:
+    {{dev}} lint size
+
+# Type checking under the strict profile.
+[group('check')]
+check-type-strict:
+    {{dev}} lint type-strict
+
+# Composed from just dependencies, so this aggregate and the gates it claims to
+# run cannot disagree. FAIL-FAST: the first failing member stops the chain.
+# `check-complexity`, `check-nesting`, `check-size` and `check-type-strict` are
+# deliberately NOT members - see the note above them.
+
+# Run every gating static-analysis dimension that holds the line today.
+[group('check')]
+check-all: check-python check-type check-type-platforms check-toml check-links check-markdown check-workflow
 
 # ===========================================================================
-#  Documentation assets and analytics
+#  fix - MUTATES. Everything automatically repairable, in one pass.
 # ===========================================================================
 
-# Named for the domain it operates on, matching `vault` and `framework` rather
-# than the action-named gating verbs. The renderers live in `docs/_render/` and
-# write into `docs/assets/`, so `just docs` regenerates the documentation
-# assets and `just docs help` lists the individual renderers.
+# Format and auto-fix Python.
+[group('fix')]
+fix-python:
+    {{dev}} fix python
 
-# Regenerate the committed documentation assets under docs/assets/.
-docs target='all':
-    {{dev}} docs {{target}}
+# Format TOML files.
+[group('fix')]
+fix-toml:
+    {{dev}} fix toml
+
+# Format and repair markdown.
+[group('fix')]
+fix-markdown:
+    {{dev}} fix markdown
+
+# Repair this repository's own .vault/ corpus.
+[group('fix')]
+fix-vault:
+    {{dev}} fix vault
+
+# Apply every automatic fix, in one pass.
+[group('fix')]
+fix-all: fix-python fix-toml fix-markdown fix-vault
+
+# ===========================================================================
+#  audit - ADVISORY, except `audit-deps`, which gates.
+# ===========================================================================
+
+# GATES. A published advisory against a pinned version is a verdict, not a
+# lead, which is why this one recipe in the group fails the build.
+
+# Gate on published advisories against the locked versions.
+[group('audit')]
+audit-deps:
+    {{dev}} audit deps
+
+# Scan for insecure patterns; advisory, exits 0.
+[group('audit')]
+audit-security:
+    {{dev}} audit security
+
+# Report unreachable code; advisory, exits 0.
+[group('audit')]
+audit-dead-code:
+    {{dev}} audit dead-code
+
+# Report undeclared and unused dependencies; advisory, exits 0.
+[group('audit')]
+audit-dependencies:
+    {{dev}} audit dependencies
+
+# Report test-tree complexity; advisory, exits 0.
+[group('audit')]
+audit-complexity:
+    {{dev}} audit complexity
+
+# Report every advisory dimension; one red dimension does not hide the rest.
+[group('audit')]
+audit-all: audit-deps audit-security audit-dead-code audit-dependencies audit-complexity
 
 # MEASUREMENT ONLY - always exits 0. Composes the gates rather than
 # re-implementing any threshold, so the report and the gate cannot disagree.
-# `just health census` regenerates the distributions each baseline ratchet in
+# `just health-census` regenerates the distributions each baseline ratchet in
 # pyproject.toml is calibrated from; run it before lowering a threshold.
 
 # Rank the worst offenders across every code-health dimension.
-health target='report':
-    {{dev}} health {{target}}
+[group('audit')]
+health-report:
+    {{dev}} health report
+
+# The same report, skipping the strict type check.
+[group('audit')]
+health-fast:
+    {{dev}} health fast
+
+# Regenerate the distributions the baseline ratchets are calibrated from.
+[group('audit')]
+health-census:
+    {{dev}} health census
+
+# ===========================================================================
+#  test - GATES.
+# ===========================================================================
+
+# Run the library unit lane.
+[group('test')]
+test-unit:
+    {{dev}} test unit
+
+# Run the broad library lane - what CI proves.
+[group('test')]
+test-broad:
+    {{dev}} test broad
+
+# Run the vault-repair lane.
+[group('test')]
+test-vault-repair:
+    {{dev}} test vault-repair
+
+# Run the benchmark lane.
+[group('test')]
+test-benchmark:
+    {{dev}} test benchmark
+
+# Run the harness lane.
+[group('test')]
+test-harness:
+    {{dev}} test harness
+
+# Run the repository-health guards, selected by the `repo` marker.
+[group('test')]
+test-repo:
+    {{dev}} test repo
+
+# Run every test lane.
+[group('test')]
+test-all: test-broad test-repo test-vault-repair test-harness
+
+# ===========================================================================
+#  build
+# ===========================================================================
+
+# Build the Python wheel and sdist.
+[group('build')]
+build-python:
+    {{dev}} build python
+
+# Build every artifact producible from a plain checkout.
+[group('build')]
+build-all: build-python
+
+# ===========================================================================
+#  dev - this checkout's own vaultspec records and harness
+# ===========================================================================
+
+# Validate this repository's own .vault/ corpus.
+[group('dev')]
+vault-check:
+    {{dev}} vault check
+
+# Repair this repository's own .vault/ corpus.
+[group('dev')]
+vault-fix:
+    {{dev}} vault fix
+
+# Render the .vault/ record graph.
+[group('dev')]
+vault-graph:
+    {{dev}} vault graph
+
+# Rebuild the .vault/ index.
+[group('dev')]
+vault-index:
+    {{dev}} vault index
+
+# List the .vault/ records.
+[group('dev')]
+vault-list:
+    {{dev}} vault list
+
+# Report .vault/ corpus statistics.
+[group('dev')]
+vault-stats:
+    {{dev}} vault stats
+
+# Report .vault/ corpus status.
+[group('dev')]
+vault-status:
+    {{dev}} vault status
+
+# Diagnose this repository's own .vaultspec/ framework harness.
+[group('dev')]
+framework-doctor:
+    {{dev}} framework doctor
+
+# Install this repository's own .vaultspec/ framework harness.
+[group('dev')]
+framework-install:
+    {{dev}} framework install
+
+# Upgrade this repository's own .vaultspec/ framework harness.
+[group('dev')]
+framework-upgrade:
+    {{dev}} framework upgrade
+
+# Reconcile this repository's own .vaultspec/ framework harness.
+[group('dev')]
+framework-sync:
+    {{dev}} framework sync
+
+# Regenerate the framework CLI reference.
+[group('dev')]
+framework-reference:
+    {{dev}} framework reference
+
+# Verify the framework CLI reference is current.
+[group('dev')]
+framework-reference-check:
+    {{dev}} framework reference-check
+
+# Report the installed framework providers.
+[group('dev')]
+framework-providers:
+    {{dev}} framework providers
 
 # Dev-only and unshipped: it reads the operator's own ~/.claude and ~/.codex
 # transcripts and writes into the gitignored dev/statistics/out/. Every
@@ -168,15 +431,37 @@ health target='report':
 # invocation is the normal one. Pass --help for the flag list.
 
 # Report CLI usage analytics from the local agent transcript corpora.
+[group('dev')]
 analytics *args='':
     uv run --no-sync python -m dev.statistics {{args}}
 
 # ===========================================================================
-#  Release artifacts
+#  docs
+#
+#  The renderers live in `docs/_render/` and write into `docs/assets/`, so
+#  these recipes regenerate the committed documentation assets.
 # ===========================================================================
 
-# Parameterised rather than a fixed `build` target, and a release-workflow
-# action rather than a routine local build. `tag` is the release tag (e.g.
+# Regenerate the committed documentation renders.
+[group('docs')]
+docs-renders:
+    {{dev}} docs renders
+
+# Regenerate the committed documentation demo.
+[group('docs')]
+docs-demo:
+    {{dev}} docs demo
+
+# Regenerate every committed documentation asset under docs/assets/.
+[group('docs')]
+docs-all: docs-renders docs-demo
+
+# ===========================================================================
+#  release
+# ===========================================================================
+
+# Parameterised rather than a fixed build recipe, and a release-workflow action
+# rather than a routine local build. `tag` is the release tag (e.g.
 # vaultspec-core-v0.1.53); `rust_target` is a cargo triple (e.g.
 # x86_64-pc-windows-msvc).
 
@@ -193,7 +478,8 @@ analytics *args='':
 # reproduction and the release workflow invoke the script identically.
 
 # Build the offline PyApp binaries for one release tag and Rust target.
-binaries tag rust_target outdir='dist-bin':
+[group('release')]
+release-binaries tag rust_target outdir='dist-bin':
     uv run --no-project --python 3.13 -- python dev/binaries/build_pyapp.py --tag {{tag}} --target {{rust_target}} --outdir {{outdir}}
 
 # `root` is REQUIRED and is a checkout of nevenincs/homebrew-tap - the account
@@ -202,19 +488,21 @@ binaries tag rust_target outdir='dist-bin':
 # release job never read; the two roots drifted four releases apart before anyone
 # noticed, and every install instruction named the stale one. See
 # docs/channels.md. Point `checksums` at the release's SHA256SUMS.
-#
+
 # Regenerate and validate a release's channel pointers, as the release job does.
-channels tag root checksums='dist-bin/SHA256SUMS':
+[group('release')]
+release-channels tag root checksums='dist-bin/SHA256SUMS':
     uv run --no-project --python 3.13 -- python -m dev.packaging.generate --tag {{tag}} --checksums {{checksums}} --root {{root}}
     uv run --no-project --python 3.13 -- python -m dev.packaging.validate --root {{root}}
 
 # ===========================================================================
-#  Aggregate pipeline
+#  meta
 # ===========================================================================
 
-# `test broad` rather than `test unit` on purpose - see `just test help`. This
-# mirrors what CI proves, so a green run here means what a green CI run means.
+# `test-broad` rather than `test-unit` on purpose. This mirrors what CI proves,
+# so a green run here means what a green CI run means.
 
-# Run the full local gate: lint, dependency audit, vault checks, broad tests.
+# Run the full local gate: static analysis, dependency audit, vault, tests.
+[group('meta')]
 ci:
     {{dev}} ci all
