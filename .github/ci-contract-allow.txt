@@ -27,7 +27,6 @@ acquisition.yml:Clean up
 # Project-board and sentinel automation. It reads and writes GitHub state and
 # has no local meaning at all; `gh` is already permitted, and these differ only
 # in reaching it through a shell conditional.
-add-to-project.yml:Set target date to created_at + 30 days
 main-ci-sentinel.yml:Judge main's tip
 main-ci-sentinel.yml:Open an issue and fail
 main-ci-sentinel.yml:Close the sentinel issue once main is validated again
