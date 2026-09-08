@@ -550,6 +550,6 @@ release-channels tag root checksums='dist-bin/SHA256SUMS':
 # so a green run here means what a green CI run means.
 
 # Run the full local gate: static analysis, dependency audit, vault, tests.
-[group('meta')]
+[group('check')]
 ci:
     {{dev}} ci all
