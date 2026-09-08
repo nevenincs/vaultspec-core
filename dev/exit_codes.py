@@ -60,11 +60,21 @@ DRIFT = 5
 #: `just init`: the environment is held open by another process (L6).
 INIT_LOCKED = 6
 
-#: An ADVISORY target's tool failed to RUN: it crashed, was misconfigured, or
-#: exited with a status outside :data:`FINDINGS_CODES`. Advisory means "these
-#: findings do not gate", not "this scanner's silence is trustworthy", so this
-#: propagates rather than collapsing to :data:`OK`.
-ADVISORY_BROKEN = 7
+#: A tool failed to RUN: it crashed, was misconfigured, or exited with a status
+#: outside :data:`FINDINGS_CODES` and :data:`OK`. Distinct from
+#: :data:`TOOL_MISSING`, which is the narrower "the executable is not there";
+#: this covers a tool that started and could not do its job.
+#:
+#: It is one code for gates and advisories alike ON PURPOSE. "The scanner did
+#: not run" means the same thing to a reader whichever kind of target hit it,
+#: and the difference that matters - whether the run gates - is already carried
+#: by the target's declaration, not by a second number.
+TOOL_BROKEN = 7
+
+#: The advisory-facing name for :data:`TOOL_BROKEN`. Advisory means "these
+#: findings do not gate", not "this scanner's silence is trustworthy": the
+#: findings are suppressed, a tool that could not run is not.
+ADVISORY_BROKEN = TOOL_BROKEN
 
 #: Nothing ran. An empty selection, a suite in which every test skipped, or an
 #: aggregate with no reachable steps. Deliberately non-zero: a run that proved

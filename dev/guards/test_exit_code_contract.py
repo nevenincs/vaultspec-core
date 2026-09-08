@@ -67,9 +67,13 @@ BODY = re.compile(r"^[ \t]+\S")
 SHEBANG = re.compile(r"^[ \t]*#!")
 
 
+#: Trees that hold no authored justfile and are expensive to walk.
+PRUNED = frozenset({".git", ".venv", ".logs", "node_modules", "target", "__pycache__"})
+
+
 def justfiles() -> list[Path]:
-    """Return every justfile in the checkout, excluding vendored trees."""
-    found = [p for p in ROOT.rglob("*.just") if ".venv" not in p.parts]
+    """Return every authored justfile in the checkout."""
+    found = [p for p in ROOT.rglob("*.just") if not PRUNED & set(p.parts)]
     root_file = ROOT / "justfile"
     if root_file.exists():
         found.append(root_file)
