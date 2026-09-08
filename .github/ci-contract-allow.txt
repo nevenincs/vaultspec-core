@@ -41,12 +41,11 @@ binaries.yml:Require artifacts on the published release
 binaries.yml:Assert every declared target attached
 
 # --- pending ----------------------------------------------------------------
-# `just release-binaries` exists and CI does not call it, because CI passes
-# `--wheel` and the recipe does not take one. That drift is precisely what this
-# contract exists to surface: the recipe a maintainer would reproduce a release
-# with has not built what CI builds since the wheel argument was added. Fix by
-# giving the recipe a `wheel` parameter, then call it here.
-binaries.yml:Build binaries
+# `binaries.yml:Build binaries` is GONE from this list: it calls
+# `just release-binaries` now, with the wheel directory, and the one-wheel
+# guard moved into `build_pyapp.py` where both callers get it. That entry is
+# what the contract was written to find - the recipe had stopped building what
+# CI builds when the workflow grew a `--wheel` argument the recipe never took.
 binaries.yml:Build the wheel
 binaries.yml:Install Python
 publish.yml:Install Python

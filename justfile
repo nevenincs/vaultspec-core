@@ -524,10 +524,19 @@ docs-all:
 # build runs against a bare interpreter with no project environment, so a local
 # reproduction and the release workflow invoke the script identically.
 
+# `wheel_dir` must hold exactly one wheel, and the binaries are built FROM it
+# rather than from the published version. That is what the release does, so it
+# is what this recipe must do: the workflow grew a `--wheel` argument and the
+# recipe did not, which left `just release-binaries` resolving the tag's
+# version from PyPI. For an unpublished tag - which is every tag at the moment
+# the binaries are built - that reproduces nothing. The one-wheel guard lives
+# in `dev/binaries/build_pyapp.py` behind `--wheel-dir`, because a recipe
+# cannot glob and the workflow's `wheels=(dist/*.whl)` was bash-only.
+
 # Build the offline PyApp binaries for one release tag and Rust target.
 [group('release')]
-release-binaries tag rust_target outdir='dist-bin':
-    uv run --no-project --python 3.13 -- python dev/binaries/build_pyapp.py --tag {{tag}} --target {{rust_target}} --outdir {{outdir}}
+release-binaries tag rust_target outdir='dist-bin' wheel_dir='dist':
+    uv run --no-project --python 3.13 -- python -m dev.binaries.build_pyapp --tag {{tag}} --target {{rust_target}} --outdir {{outdir}} --wheel-dir {{wheel_dir}}
 
 # `root` is REQUIRED and is a checkout of nevenincs/homebrew-tap - the account
 # channel root, which is where these pointers live. It used to default to this

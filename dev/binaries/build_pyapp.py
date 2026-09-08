@@ -41,9 +41,14 @@ with its own interpreter rather than by cross-resolution.
 
 Usage::
 
-    uv run --no-project --python 3.13 python dev/binaries/build_pyapp.py \
+    uv run --no-project --python 3.13 python -m dev.binaries.build_pyapp \
         --tag vaultspec-core-v0.1.48 --outdir dist-bin \
         [--target <triple>] [--wheel dist/vaultspec_core-0.1.48-py3-none-any.whl]
+        [--wheel-dir dist]
+
+``--wheel-dir`` names a directory holding exactly one wheel and is what
+``just release-binaries`` passes, because a justfile recipe cannot glob and
+must behave the same under every shell. ``--wheel`` names the file directly.
 
 ``--wheel`` is what the project is installed from. The release passes the
 wheel it just built, which is why the wheel must exist before the binaries and
@@ -225,6 +230,32 @@ BINARIES = (
     Binary(name="vaultspec-core", exec_module="vaultspec_core"),
     Binary(name="vaultspec-mcp", exec_spec="vaultspec_core.mcp_server.app:run"),
 )
+
+
+def sole_wheel(directory: Path) -> Path:
+    """Return the one wheel in `directory`, refusing zero or several.
+
+    The glob and this guard used to live in `.github/workflows/binaries.yml`
+    as `wheels=(dist/*.whl)` with a length check. Two things were wrong with
+    that. It is bash array syntax, so the Windows leg could never have run it;
+    and it meant the workflow passed `--wheel` while `just release-binaries`
+    did not, so the recipe a maintainer would reproduce a release with
+    resolved the version from PyPI instead of using the wheel the release had
+    just built. A release of an unpublished tag is not reproducible that way
+    at all.
+
+    Raises:
+        DistributionError: If the directory holds no wheel, or more than one.
+            Passing two paths as one argument surfaces downstream as a
+            resolver error about a path nobody wrote.
+    """
+    wheels = sorted(directory.glob("*.whl"))
+    if not wheels:
+        raise DistributionError(f"no wheel in {directory}; build one first")
+    if len(wheels) > 1:
+        found = ", ".join(wheel.name for wheel in wheels)
+        raise DistributionError(f"expected one wheel in {directory}, found: {found}")
+    return wheels[0]
 
 
 def version_from_tag(tag: str) -> str:
@@ -692,6 +723,14 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--wheel-dir",
+        type=Path,
+        help=(
+            "directory holding exactly one project wheel to bake in; the "
+            "argument-free form of --wheel, since a recipe cannot glob"
+        ),
+    )
+    parser.add_argument(
         "--cache",
         type=Path,
         default=Path(".pyapp-distributions"),
@@ -701,9 +740,14 @@ def main() -> int:
 
     version = args.version if args.version else version_from_tag(args.tag)
     target = args.target if args.target else host_target_triple()
-    requirement = str(args.wheel) if args.wheel else f"{PROJECT_NAME}=={version}"
-    if args.wheel and not args.wheel.is_file():
-        raise DistributionError(f"--wheel {args.wheel} does not exist")
+    if args.wheel and args.wheel_dir:
+        raise DistributionError("pass --wheel or --wheel-dir, not both")
+    wheel = args.wheel
+    if args.wheel_dir:
+        wheel = sole_wheel(args.wheel_dir)
+    if wheel and not wheel.is_file():
+        raise DistributionError(f"--wheel {wheel} does not exist")
+    requirement = str(wheel) if wheel else f"{PROJECT_NAME}=={version}"
 
     outdir: Path = args.outdir
     outdir.mkdir(parents=True, exist_ok=True)

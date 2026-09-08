@@ -389,25 +389,22 @@ jobs:
           name: project-wheel
           path: dist
 
+      - name: Set up just
+        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        with:
+          tool: just@1.38.0
+
+      # The recipe, with the wheel it must bake in. The `exactly one wheel`
+      # guard that used to be `wheels=(dist/*.whl)` here now lives in
+      # `build_pyapp.py` behind `--wheel-dir`: bash array syntax could never
+      # have run on the Windows leg, and keeping it here is what let the
+      # recipe and this step drift apart in the first place.
       - name: Build binaries
         shell: bash
         env:
           TAG: ${{ inputs.tag || github.ref_name }}
           TARGET: ${{ matrix.target }}
-        run: |
-          set -euo pipefail
-          # Exactly one wheel, named rather than globbed into the command. A
-          # glob that matched two would pass both to the builder as one
-          # argument and the failure would surface as a resolver error about a
-          # path nobody wrote.
-          wheels=(dist/*.whl)
-          if [ ${#wheels[@]} -ne 1 ]; then
-            echo "::error::expected one wheel in dist/, found ${#wheels[@]}: ${wheels[*]}"
-            exit 1
-          fi
-          uv run --no-project --python 3.13 -- \
-            python dev/binaries/build_pyapp.py --tag "${TAG}" --target "${TARGET}" \
-              --wheel "${wheels[0]}" --outdir dist-bin
+        run: just release-binaries "${TAG}" "${TARGET}" dist-bin dist
 
       # UNVERIFIED, deliberately, and the name is the contract. Nothing
       # downstream attaches an artifact under this name; the offline gate below
