@@ -8,7 +8,7 @@ related:
   - '[[2026-09-08-test-provisioning-economics-adr]]'
 modified: '2026-09-08'
 body_schema: body-v2
-body_hash: 'sha256:9da02fc16191b56856a1ae9dc9b7165bd8104c591425b4fa11f834755634743f'
+body_hash: 'sha256:d1d42c41d831a742727f702e9fda051914a8c680a3d44889e3f1021d86f663be'
 ---
 
 # `test-provisioning-economics` plan
@@ -76,16 +76,16 @@ Build each identical workspace once per session and clone it per test.
 
 Repair the isolation failures and contain the self-terminating cohort, on their own terms.
 
-- [ ] `P03.S07` - Establish why four xdist workers died, treating the cause as unknown and excluding resource exhaustion first; `src/vaultspec_core/mcp_server/tests/test_watchdog.py`.
+- [x] `P03.S07` - Establish why four xdist workers died, treating the cause as unknown and excluding resource exhaustion first; `src/vaultspec_core/mcp_server/tests/test_watchdog.py`.
 - [x] `P03.S08` - Re-measure the parallel run on an uncontended machine, so the crash evidence is not confounded by the CI runner; `dev/toolchain.py`.
-- [ ] `P03.S09` - Contain or fix whatever S07 identifies, on the evidence rather than on the retracted watchdog theory; `src/vaultspec_core/mcp_server/tests/test_watchdog.py`.
+- [x] `P03.S09` - Contain or fix whatever S07 identifies, on the evidence rather than on the retracted watchdog theory; `src/vaultspec_core/mcp_server/tests/test_watchdog.py`.
 
 ### Phase `P04` - turn on parallel execution
 
 Wire the runner into the lanes and CI now that the suite can survive it.
 
-- [ ] `P04.S10` - Give the broad, harness and repo lanes a worker count in the harness registry; `dev/toolchain.py`.
-- [ ] `P04.S11` - Re-measure the full lane under the boundary and the runner, and record it against the headline numbers; `dev/toolchain.py`.
+- [x] `P04.S10` - Give the broad, harness and repo lanes a worker count in the harness registry; `dev/toolchain.py`.
+- [x] `P04.S11` - Re-measure the full lane under the boundary and the runner, and record it against the headline numbers; `dev/toolchain.py`.
 
 ### Phase `P05` - close the timing blind spots
 

@@ -66,6 +66,37 @@ EXCLUDED_MARKERS = "not claude"
 #: re-plumb.
 LIBRARY_MARKERS = f"not repo and {EXCLUDED_MARKERS}"
 
+#: How the test lanes distribute work across cores.
+#:
+#: `auto` is one worker per logical CPU, which is what the fleet runners have
+#: most of and what a contributor's machine has some of. Distribution is by
+#: file (`loadfile`) rather than pytest-xdist's default per-test scheduling:
+#: the session-scoped workspace template is built once per WORKER, so scattering
+#: one module's tests across twelve of them pays that build twelve times, while
+#: keeping a module together pays it once and the copies are nearly free.
+#:
+#: This was worth 5x on the full lane, but only after the durability boundary
+#: landed. Before it, every worker queued on the same device-serialised `fsync`
+#: and adding workers made the setup medians WORSE. Parallelism is the second
+#: half of that change, not an independent knob - if the boundary is ever
+#: reverted, this should go with it.
+PARALLEL = ("-n", "auto", "--dist", "loadfile")
+
+#: The cohort that must NOT run beside the parallel lane, and its complement.
+#:
+#: A test whose subject is behaviour under contention - the advisory lock's own
+#: timeout, a writer racing a fix pass, a rename racing an edit - measures the
+#: HOST rather than the product when eleven other workers are saturating the
+#: same disk. It then fails on a Windows replace-retry budget exhausted by
+#: traffic it never created. Measured: the cohort is 6/6 green run on its own
+#: and produced a failure in two of three full parallel runs.
+#:
+#: A second single-process pass rather than an xdist group, because a group only
+#: pins the cohort to one worker and leaves the other eleven hammering the
+#: volume - which is the thing that breaks it.
+SERIAL_ONLY = "serial"
+NOT_SERIAL = "not serial"
+
 #: Trees whose Markdown is formatted and linted. The four root READMEs are named
 #: individually rather than by their enclosing directory - `dev/`, `src/`, and
 #: `typings/` each cohabit with non-Markdown trees (and `dev/` cohabits with test
@@ -532,21 +563,58 @@ TEST = Verb(
         Target(
             "unit",
             "The fast marker-scoped gate; first failure aborts.",
+            # Split and parallelised for the same two reasons `broad` is. Left
+            # single-process, this lane took SEVEN MINUTES to run 1845 tests
+            # while `broad` ran 4375 in four - the fast gate was the slowest
+            # thing in the harness, which is the opposite of what its name
+            # promises. The `serial` cohort still gets its own pass: those tests
+            # measure behaviour under contention and cannot share a host with
+            # the parallel one.
             (
                 uv_run(
                     "pytest",
                     PACKAGE,
                     "-x",
                     "-q",
+                    *PARALLEL,
                     "-m",
-                    f"unit and {LIBRARY_MARKERS}",
+                    f"unit and {NOT_SERIAL} and {LIBRARY_MARKERS}",
+                ),
+                uv_run(
+                    "pytest",
+                    PACKAGE,
+                    "-x",
+                    "-q",
+                    "-m",
+                    f"unit and {SERIAL_ONLY} and {LIBRARY_MARKERS}",
                 ),
             ),
         ),
         Target(
             "broad",
             "The whole package suite minus credential-gated markers.",
-            (uv_run("pytest", PACKAGE, "-q", "-m", LIBRARY_MARKERS),),
+            (
+                uv_run(
+                    "pytest",
+                    PACKAGE,
+                    "-q",
+                    *PARALLEL,
+                    "-m",
+                    f"{NOT_SERIAL} and {LIBRARY_MARKERS}",
+                ),
+                uv_run(
+                    "pytest",
+                    PACKAGE,
+                    "-q",
+                    "-m",
+                    f"{SERIAL_ONLY} and {LIBRARY_MARKERS}",
+                ),
+            ),
+            # Both passes always run. They select disjoint populations, so a
+            # failure in one says nothing about the other, and stopping early
+            # would report the contention cohort as "not run" rather than as
+            # whatever it actually is.
+            keep_going=True,
         ),
         Target(
             "vault-repair",
@@ -592,6 +660,7 @@ TEST = Verb(
                     "pytest",
                     *INSTRUMENT_PATHS,
                     "-q",
+                    *PARALLEL,
                     "-m",
                     f"not repo and {EXCLUDED_MARKERS}",
                 ),
@@ -612,6 +681,7 @@ TEST = Verb(
                     "pytest",
                     *PYTHON_PATHS,
                     "-q",
+                    *PARALLEL,
                     "-m",
                     f"repo and {EXCLUDED_MARKERS}",
                 ),

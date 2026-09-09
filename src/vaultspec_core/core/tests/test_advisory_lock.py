@@ -209,6 +209,7 @@ def _counter_value(target: Path) -> int:
 
 
 @pytest.mark.unit
+@pytest.mark.serial
 class TestAdvisoryLockConcurrency:
     """Verify serialization under multi-process contention."""
 
@@ -436,6 +437,7 @@ class TestAdvisoryLockConcurrency:
         assert waited > 10, f"acquired after only {waited:.1f}s; lock did not block"
 
 
+@pytest.mark.serial
 class TestWindowsLockContentionClassification:
     """Which `msvcrt.locking` failures mean "wait" rather than "give up".
 
@@ -616,6 +618,7 @@ _TIMEOUT_OBSERVATION_CEILING_SECONDS = 25.0
 
 
 @pytest.mark.unit
+@pytest.mark.serial
 class TestAdvisoryLockTimeout:
     """A cycle must surface as a diagnosable error, not a silent hang (#457).
 
@@ -840,6 +843,7 @@ class TestAdvisoryLockTimeout:
 
 
 @pytest.mark.unit
+@pytest.mark.serial
 class TestTimeoutDoesNotBreakLegitimateBlocking:
     """The budget must bound deadlock without bounding ordinary contention.
 
@@ -936,6 +940,7 @@ class TestTimeoutDoesNotBreakLegitimateBlocking:
 
 
 @pytest.mark.unit
+@pytest.mark.serial
 class TestTheBudgetIsPerAcquisitionNotPerPass:
     """A corpus-scale fix pass must not spend the budget by being large (#457).
 

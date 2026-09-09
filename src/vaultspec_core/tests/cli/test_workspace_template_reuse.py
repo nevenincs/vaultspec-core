@@ -113,11 +113,31 @@ class TestTheReuseStaysNarrow:
             "which means the template copy served a call it should not have."
         )
 
-    def test_a_non_default_provider_runs_the_real_install(self, tmp_path: Path) -> None:
+    def test_each_provider_gets_its_own_template(self, tmp_path: Path) -> None:
+        """Shapes must not bleed into each other through a shared cache.
+
+        The templates are keyed by (provider, mode); a key collision would hand
+        a single-provider install the all-provider tree, and every assertion
+        about what an install does NOT create would silently invert.
+        """
         workspace = WorkspaceFactory(tmp_path / "workspace").install("claude").path
 
         assert (workspace / DirName.CLAUDE).is_dir()
         assert not (workspace / DirName.GEMINI).exists(), (
             "A single-provider install produced another provider's directory, "
-            "so it was served from the all-provider template."
+            "so it was served from the wrong template."
+        )
+
+    def test_an_upgrade_runs_the_real_install(self, tmp_path: Path) -> None:
+        """An upgrade reconciles what is on disk, so it can never be a copy."""
+        factory = WorkspaceFactory(tmp_path / "workspace")
+        factory.install()
+        marker = factory.path / ".vaultspec" / "rules" / "user-authored.md"
+        marker.write_text("# authored\n", encoding="utf-8")
+
+        factory.install(upgrade=True)
+
+        assert marker.is_file(), (
+            "An upgrade replaced the workspace wholesale, which means it was "
+            "served from a template instead of reconciling what was there."
         )

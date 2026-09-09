@@ -175,6 +175,7 @@ class TestBlobHashConflict:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.serial
 class TestConcurrencyGuard:
     """Proves the check-to-write window is closed, not merely narrow.
 

@@ -212,6 +212,14 @@ markers = [
   # that write path - and hands them the real call back for their
   # duration. See the `_durability_boundary` fixture in conftest.py.
   "durable: needs the real os.fsync; exempt from the harness suppression",
+  # A test whose SUBJECT is behaviour under contention cannot share a host
+  # with eleven other workers saturating the same disk: it then measures the
+  # host rather than the product, and fails on a Windows replace-retry budget
+  # exhausted by traffic it did not create. Measured: 6/6 green run serially,
+  # 2 failures in 3 full parallel runs. The `test` lanes run this cohort in a
+  # second, single-process pass rather than pinning it to one worker, because
+  # a group still leaves the other workers hammering the volume.
+  "serial: measures behaviour under contention; must not share a host with the parallel lane",
 ]
 # Every tree that carries committed Python AND a cohabiting `tests/` package.
 # `dev` is listed for the same reason `src` is: the harness backend has its own

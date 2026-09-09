@@ -3,9 +3,9 @@ tags:
   - '#audit'
   - '#test-provisioning-economics'
 date: '2026-09-08'
-modified: '2026-09-08'
+modified: '2026-09-09'
 body_schema: 'body-v2'
-body_hash: 'sha256:97d46f1145c24eeb9705ebfd364edddaa36d93875a33c23da767ec60f28f780d'
+body_hash: 'sha256:558ba3f9a4a773625c1a4c78c28ec3e19abb61cb82796df372c2726991c230bf'
 related:
   - '[[2026-09-08-test-provisioning-economics-broad-lane-profile-research]]'
 ---
@@ -166,6 +166,125 @@ caller writes as fast as this stress loop, so this is an observation about the
 budget's headroom rather than a defect, and it is recorded here rather than
 acted on.
 
+### plan-close-review | low | The integrated result holds, with two Steps deliberately unexecuted
+
+Review at plan close, covering the change as one behaviour rather than file by
+file: the durability boundary, the workspace reuse, the parallel lanes, and the
+guards that hold each in place.
+
+**Measured outcome.** On an idle host, `just test-broad` runs 4421 tests in
+3m57s; `test-harness` 340 in 3.7s; `test-repo` 131 in 45.9s. The starting point
+was 36 minutes on Linux and 46 on Windows. Fixture time across a full run fell
+from 6h46m42s to 13m45s. No xdist worker was lost in any of the three runs made
+after the boundary landed.
+
+**The behaviour holds where it matters.** The reuse is equivalence-checked rather
+than assumed: `test_workspace_template_reuse.py` compares a copied tree against a
+built one, asserts no path still points at the template, and asserts the two
+narrow cases - a seeded directory, a single-provider install - still run the real
+product. `test_durability_boundary.py` holds the divergence to the harness. The
+`durable` marker's evidence is recorded with its measurement rather than its
+intuition.
+
+**Two decisions changed under evidence during execution**, both recorded above:
+the crash attribution was retracted after re-reading the run output, and the
+boundary's own no-observation rule caught a cohort it did not hold for. Neither
+is a defect in the delivered change; both are the reason the delivered change can
+be trusted.
+
+**Not executed, deliberately.** `P05.S12` (a deadline on fixture setup) was
+attempted twice and backed out: both mechanisms corrupt pytest's fixture
+bookkeeping, and shipping a harness that breaks 133 guards to catch a
+hypothetical hang is a worse trade than leaving the gap documented. `P05.S13`
+(deriving the watchdog sleep windows) was dropped because after the other Phases
+those tests no longer appear in the lane's fifteen slowest entries, making the
+change churn on the most delicate process-lifecycle tests in the suite for no
+measurable gain. Both are recorded in the ledger and in issue #514.
+
+**One failure remains in the lane**, `test_vault_edit.py::TestSetBody::test_stdin_channel_preserves_legacy_c1_byte`,
+reproduced identically on `b5c7f256` under the same environment and filed as
+issue #518. It is a real product question about the `--body-stdin` channel, not a
+consequence of this work, and is out of its scope.
+
+### parallelism-destabilises-the-contention-cohort | high | Enabling the runner made the concurrency stress tests flaky
+
+Found by running the lane repeatedly instead of once, which is the only way this
+class of defect shows up at all.
+
+Three consecutive full runs under `-n auto` produced two failures, each in a
+different test whose subject is behaviour under contention:
+
+- `test_rename_concurrency.py::test_no_deadlock_under_concurrent_rename_and_edit_load`
+  - `PermissionError(13)` under load
+- `test_fix_writer_concurrency.py::test_concurrent_edit_survives_a_fix_pass` - a
+  committed edit discarded
+
+The same two modules run 6/6 green single-process. The failures are the Windows
+replace-retry budget being exhausted by disk traffic the tests did not create:
+eleven other workers saturating the same volume.
+
+This is the same shape as `durability-is-observable-in-one-cohort` above and
+generalises it. A test that races two writers and asserts no write is lost is
+measuring the product's locking; run it beside eleven unrelated workers and it
+measures the host instead. The `durable` marker fixed one input to that
+measurement (fsync); it could not fix the other (everything else on the box).
+
+Note that the earlier retraction still stands and this is not a return to it:
+those four worker deaths were whole-process crashes with no assertion, whereas
+these are ordinary assertion failures in a named test. Different signature,
+different cause.
+
+Handled by a `serial` marker and a second single-process pass in the `test`
+lanes, rather than an xdist group: a group pins the cohort to one worker and
+leaves the other eleven hammering the volume, which is the thing that breaks it.
+47 tests carry it - the two dedicated concurrency modules plus the
+contention-timing classes in `test_advisory_lock` and `test_edit_engine`.
+
+### fast-gate-was-the-slowest-lane | high | `test-unit` never got the worker count the other lanes got
+
+Found by timing every lane rather than the one under change.
+
+`test-unit` describes itself as "the fast marker-scoped gate". It ran 1845
+tests in **7m20s**, single-process, while `test-broad` ran 4375 in four minutes.
+The parallel worker count had been wired into `broad`, `harness` and `repo` and
+not into `unit`, so the lane's name and its behaviour had come apart - and it
+was the lane a contributor is most likely to run before pushing.
+
+Split the same way as `broad`, a parallel pass plus a single-process pass for
+the contention cohort: **7m20s to 55s**.
+
+The general lesson is the one this campaign keeps re-learning: a change wired
+into the lanes you are looking at is not wired into the lanes you are not. The
+audit's own recommendation to re-measure repeatedly should extend to
+re-measuring *everything*, not the thing just edited.
+
+### settled-numbers | low | Where the lanes came to rest
+
+Five measurements of `broad` and two full sweeps of every lane, on a host that
+intermittently runs this repository's own self-hosted CI:
+
+| lane           | time             | population                |
+| -------------- | ---------------- | ------------------------- |
+| `unit`         | 51-71s           | 1906-1925                 |
+| `broad`        | 232-301s typical | 4375 parallel + 47 serial |
+| `harness`      | 4-8s             | 340                       |
+| `repo`         | 55-57s           | 131                       |
+| `vault-repair` | 5-9s             | 29                        |
+
+Against 36 minutes on Linux and 46 on Windows at the start.
+
+The residual spread is the host, not the suite: the slowest `broad` observation
+(430s) was taken with a CI job running beside it, and the fastest (232s) on an
+idle box. Test-level flakiness is gone - the contention cohort has now passed
+47/47 in five consecutive runs, against two failures in three before the split.
+
+The fixture leaderboard is flat. `synthetic_project` is 406 uses at a 519ms
+median, which is a 245-file copy under 24-way load (189ms uncontended); the next
+fixture is 48s total and everything after it is under 18s for a whole run. No
+fixture is doing work its tests do not need. The three that still run a real
+install - `test_ambiguous_states`, `test_preflight`, `test_executor` - each seed
+a `.gitignore` first, so the reconciliation is the precondition under test.
+
 ## Recommendations
 
 - Fix the shared state behind the two isolation failures before adopting
@@ -215,3 +334,12 @@ acted on.
 - Consider separately whether `_WINDOWS_REPLACE_RETRY_BUDGET_SECONDS` has enough
   headroom for a fast writer. This work has no evidence that a real caller
   reaches that rate, so it is a question rather than a finding.
+
+- Keep the `serial` cohort defined by what a test MEASURES, not by whether it
+  has been seen to flake. A marker applied to whatever failed last is a
+  quarantine list; this one has to stay a statement about the test's subject or
+  it will absorb real defects.
+
+- Re-run any future parallelism change several times before believing it. A
+  single green run does not distinguish a stable lane from a lane that fails one
+  time in three, and this campaign would have shipped the difference.
