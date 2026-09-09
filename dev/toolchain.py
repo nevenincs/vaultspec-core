@@ -142,6 +142,13 @@ WRAPPED_MARKDOWN = (
 #: cannot encode them, which aborts the run before any finding is reported.
 UTF8 = {"PYTHONIOENCODING": "utf-8"}
 
+#: How many ranked offenders the advisory complexity audit lists. A report is
+#: read for its head, not its tail, and complexipy's default prints one row per
+#: symbol - over two thousand of them here, all but a handful saying PASSED.
+#: This is a display depth, not a threshold: nothing passes or fails on it, and
+#: it matches the default rank depth in `dev/health/health_report.py`.
+AUDIT_RANK_DEPTH = "10"
+
 #: Repairing the corpus is reachable as both `fix vault` and `vault fix`, which
 #: are the same action approached from the two verbs a reader might try. The
 #: steps are defined once here so the two entry points cannot drift.
@@ -339,10 +346,16 @@ LINT = Verb(
                 uv_run("python", "-m", "dev.ci_contract"),
             ),
         ),
+        # `--failed` is what makes this a gate rather than a census. Without
+        # it complexipy prints a PASSED row per symbol, and the handful of
+        # rows a reader needs arrive buried under two thousand that say the
+        # code is fine - in CI, past the point a log is scrolled. The flag
+        # changes the reporting only: the threshold still comes from
+        # `[tool.complexipy]` and the exit code is unchanged either way.
         Target(
             "complexity",
             "Cognitive complexity over production code.",
-            (Cmd(uv_run("complexipy", PACKAGE).argv, UTF8),),
+            (Cmd(uv_run("complexipy", PACKAGE, "--failed").argv, UTF8),),
         ),
         Target(
             "nesting",
@@ -494,10 +507,27 @@ AUDIT = Verb(
             (uv_run("deptry", PACKAGE),),
             advisory=True,
         ),
+        # Ranked rather than filtered, which is the opposite of what `lint
+        # complexity` wants from the same tool. This target never fails, so
+        # `--failed` would leave it silent whenever the test tree sits under
+        # the production ratchet - which it does. What an advisory dimension
+        # owes its reader is the head of the queue, so it sorts and truncates.
         Target(
             "complexity",
             "Cognitive complexity over the test tree.",
-            (Cmd(uv_run("complexipy", f"{PACKAGE}/tests").argv, UTF8),),
+            (
+                Cmd(
+                    uv_run(
+                        "complexipy",
+                        f"{PACKAGE}/tests",
+                        "--sort",
+                        "desc",
+                        "--top",
+                        AUDIT_RANK_DEPTH,
+                    ).argv,
+                    UTF8,
+                ),
+            ),
             advisory=True,
         ),
         # The advisory dimensions WITHOUT `deps`, so a caller that only wants
