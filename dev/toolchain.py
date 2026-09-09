@@ -563,14 +563,30 @@ TEST = Verb(
         Target(
             "unit",
             "The fast marker-scoped gate; first failure aborts.",
+            # Split and parallelised for the same two reasons `broad` is. Left
+            # single-process, this lane took SEVEN MINUTES to run 1845 tests
+            # while `broad` ran 4375 in four - the fast gate was the slowest
+            # thing in the harness, which is the opposite of what its name
+            # promises. The `serial` cohort still gets its own pass: those tests
+            # measure behaviour under contention and cannot share a host with
+            # the parallel one.
             (
                 uv_run(
                     "pytest",
                     PACKAGE,
                     "-x",
                     "-q",
+                    *PARALLEL,
                     "-m",
-                    f"unit and {LIBRARY_MARKERS}",
+                    f"unit and {NOT_SERIAL} and {LIBRARY_MARKERS}",
+                ),
+                uv_run(
+                    "pytest",
+                    PACKAGE,
+                    "-x",
+                    "-q",
+                    "-m",
+                    f"unit and {SERIAL_ONLY} and {LIBRARY_MARKERS}",
                 ),
             ),
         ),
