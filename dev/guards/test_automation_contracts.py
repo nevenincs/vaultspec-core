@@ -538,7 +538,6 @@ def test_audit_covers_every_advisory_dimension() -> None:
         "security",
         "dead-code",
         "dependencies",
-        "complexity",
         "advisory",
         "all",
     }
@@ -558,7 +557,7 @@ def test_only_the_dependency_audit_gates() -> None:
     assert audit is not None
     by_name = {target.name: target for target in audit.targets}
     assert not by_name["deps"].advisory, "the dependency audit must gate"
-    for name in ("security", "dead-code", "dependencies", "complexity"):
+    for name in ("security", "dead-code", "dependencies"):
         assert by_name[name].advisory, f"audit target `{name}` must be advisory"
 
 
@@ -1432,4 +1431,76 @@ def test_the_harness_reports_every_status_the_contract_names() -> None:
     assert not unworded, (
         f"exit codes with no word in dev/reporting.py: {unworded} - a status "
         "the reader cannot name is one they cannot act on"
+    )
+
+
+def test_every_test_lane_reports_the_population_it_ran() -> None:
+    """No pytest step may report a verdict without saying how many tests earned it.
+
+    A lane's exit code cannot carry its population, so a marker expression
+    narrowed by a typo or a path that no longer reaches its tests runs, passes,
+    and reads exactly like the full suite. `toolchain.lane` is what attaches
+    the record the count is read from; a step that calls pytest directly would
+    be a lane with a verdict and no population behind it.
+    """
+    from dev import testing, toolchain
+    from dev.runner import Cmd
+
+    verb = toolchain.find_verb("test")
+    assert verb is not None
+    unrecorded = [
+        (target.name, step.argv)
+        for target in verb.targets
+        for step in target.steps
+        if isinstance(step, Cmd)
+        and "pytest" in step.argv
+        and testing.declared_report(step.argv) is None
+    ]
+    assert not unrecorded, (
+        f"test steps not declared through `lane`: {unrecorded} - a lane that "
+        "records nothing cannot report the population its verdict covers"
+    )
+
+
+def test_every_test_lane_records_to_its_own_file() -> None:
+    """Two lanes never share a record.
+
+    `unit` and `broad` each run two passes over disjoint populations. Pointed
+    at one file, the second pass overwrites the first and the target reports
+    half of what it ran as though that were all of it.
+    """
+    from dev import testing, toolchain
+    from dev.runner import Cmd
+
+    verb = toolchain.find_verb("test")
+    assert verb is not None
+    for target in verb.targets:
+        reports = [
+            testing.declared_report(step.argv)
+            for step in target.steps
+            if isinstance(step, Cmd)
+        ]
+        named = [report for report in reports if report is not None]
+        assert len(set(named)) == len(named), (
+            f"`test {target.name}` points two lanes at one record: {named}"
+        )
+
+
+def test_the_harness_carries_no_second_duration_reporter() -> None:
+    """One instrument per question, and the harness owns this one.
+
+    Two standing duration reporters used to print on every lane of every run -
+    four blocks from `pytest-durations` and one from `--durations` - and both
+    printed their headers whether or not anything was slow. The harness reads
+    each test's time from the record it already collects and names the outlier
+    only when there is one.
+    """
+    pyproject = _read("pyproject.toml")
+
+    assert "pytest-durations" not in pyproject, (
+        "pytest-durations duplicates the slow-test signal in dev/testing.py"
+    )
+    assert "--durations" not in pyproject, (
+        "a standing --durations prints its header even when nothing is slow; "
+        "type it on a specific run instead"
     )

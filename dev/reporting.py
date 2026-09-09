@@ -228,15 +228,23 @@ def _duration(seconds: float) -> str:
     return f"{seconds:6.1f}s"
 
 
-def row(label: str, code: int, seconds: float) -> str:
+def row(label: str, code: int, seconds: float, detail: str = "") -> str:
     """Render one step's verdict line.
 
     Padded before colouring, never after: the escape sequences carry no width,
     so a column measured on the coloured string is off by exactly their length
     and the durations stop lining up under each other.
+
+    Args:
+        label: The step's name.
+        code: The status it exited with.
+        seconds: How long it took.
+        detail: What the step MEASURED, where a status alone understates it -
+            a test lane's population, which no exit code can carry.
     """
     word = f"{status_word(code):<{STATUS_WIDTH}}"
-    return f"  {label:<{LABEL_WIDTH}}{_paint(word, code)}{_dim(_duration(seconds))}"
+    line = f"  {label:<{LABEL_WIDTH}}{_paint(word, code)}{_dim(_duration(seconds))}"
+    return f"{line}  {_dim(detail)}" if detail else line
 
 
 def verdict(name: str, codes: Sequence[int], seconds: float) -> str:

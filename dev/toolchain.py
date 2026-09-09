@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from dev import testing
 from dev.exit_codes import FINDINGS_CODES
 from dev.runner import Cmd, Echo, Ref, Step, ToolOrDocker, uv_run
 
@@ -142,13 +143,6 @@ WRAPPED_MARKDOWN = (
 #: cannot encode them, which aborts the run before any finding is reported.
 UTF8 = {"PYTHONIOENCODING": "utf-8"}
 
-#: How many ranked offenders the advisory complexity audit lists. A report is
-#: read for its head, not its tail, and complexipy's default prints one row per
-#: symbol - over two thousand of them here, all but a handful saying PASSED.
-#: This is a display depth, not a threshold: nothing passes or fails on it, and
-#: it matches the default rank depth in `dev/health/health_report.py`.
-AUDIT_RANK_DEPTH = "10"
-
 #: Repairing the corpus is reachable as both `fix vault` and `vault fix`, which
 #: are the same action approached from the two verbs a reader might try. The
 #: steps are defined once here so the two entry points cannot drift.
@@ -221,6 +215,26 @@ class Verb:
 
 def _ruff_paths(*prefix: str) -> Cmd:
     return uv_run("ruff", *prefix, *PYTHON_PATHS)
+
+
+def lane(name: str, *argv: str) -> Cmd:
+    """Declare a pytest lane that records the population it ran.
+
+    Every pytest step goes through here rather than through `uv_run` directly,
+    so no lane can report a green verdict without also reporting how many tests
+    earned it. See :mod:`dev.testing` for why the exit code cannot carry that.
+
+    Args:
+        name: Short identifier for the lane's record, unique per step. Two
+            steps of one target need two names: they select disjoint
+            populations, and one file would leave only the second's counts.
+        *argv: The pytest arguments, exactly as the lane selects them.
+
+    Returns:
+        The command, with the record flag appended.
+    """
+    report = testing.report_path(name).as_posix()
+    return uv_run("pytest", *argv, f"{testing.REPORT_FLAG}={report}")
 
 
 def gate(
@@ -507,7 +521,9 @@ AUDIT = Verb(
     summary="Audit dependencies and code quality; only 'deps' gates.",
     note=(
         "Only 'deps' gates - a published advisory against a pinned version is a "
-        "verdict. Every other target is advisory and exits 0 even with findings."
+        "verdict. Every other target is advisory and exits 0 even with findings. "
+        "Cognitive complexity is not a dimension here: `just health-report` "
+        "already ranks it across the whole tree, from the same tool."
     ),
     targets=(
         Target(
@@ -549,29 +565,6 @@ AUDIT = Verb(
             (uv_run("deptry", PACKAGE),),
             advisory=True,
         ),
-        # Ranked rather than filtered, which is the opposite of what `lint
-        # complexity` wants from the same tool. This target never fails, so
-        # `--failed` would leave it silent whenever the test tree sits under
-        # the production ratchet - which it does. What an advisory dimension
-        # owes its reader is the head of the queue, so it sorts and truncates.
-        Target(
-            "complexity",
-            "Cognitive complexity over the test tree.",
-            (
-                Cmd(
-                    uv_run(
-                        "complexipy",
-                        f"{PACKAGE}/tests",
-                        "--sort",
-                        "desc",
-                        "--top",
-                        AUDIT_RANK_DEPTH,
-                    ).argv,
-                    UTF8,
-                ),
-            ),
-            advisory=True,
-        ),
         # The advisory dimensions WITHOUT `deps`, so a caller that only wants
         # leads does not re-run the one dimension that returns a verdict.
         # `deps` resolves the committed lockfiles and queries OSV, which is
@@ -588,8 +581,6 @@ AUDIT = Verb(
                 Ref("dead-code"),
                 Echo("=== undeclared dependencies ==="),
                 Ref("dependencies"),
-                Echo("=== test-tree cognitive complexity ==="),
-                Ref("complexity"),
             ),
             # Advisory as an aggregate BECAUSE every leaf it composes is
             # advisory - the reasoning below about `all` turns on `all`
@@ -643,8 +634,8 @@ TEST = Verb(
             # measure behaviour under contention and cannot share a host with
             # the parallel one.
             (
-                uv_run(
-                    "pytest",
+                lane(
+                    "unit-parallel",
                     PACKAGE,
                     "-x",
                     "-q",
@@ -652,8 +643,8 @@ TEST = Verb(
                     "-m",
                     f"unit and {NOT_SERIAL} and {LIBRARY_MARKERS}",
                 ),
-                uv_run(
-                    "pytest",
+                lane(
+                    "unit-serial",
                     PACKAGE,
                     "-x",
                     "-q",
@@ -666,16 +657,16 @@ TEST = Verb(
             "broad",
             "The whole package suite minus credential-gated markers.",
             (
-                uv_run(
-                    "pytest",
+                lane(
+                    "broad-parallel",
                     PACKAGE,
                     "-q",
                     *PARALLEL,
                     "-m",
                     f"{NOT_SERIAL} and {LIBRARY_MARKERS}",
                 ),
-                uv_run(
-                    "pytest",
+                lane(
+                    "broad-serial",
                     PACKAGE,
                     "-q",
                     "-m",
@@ -692,8 +683,8 @@ TEST = Verb(
             "vault-repair",
             "The Windows repair and case-rename regression cohort.",
             (
-                uv_run(
-                    "pytest",
+                lane(
+                    "vault-repair",
                     f"{PACKAGE}/tests/cli/test_vault_repair.py",
                     f"{PACKAGE}/vaultcore/checks/tests/test_structure_case_rename.py",
                     "-q",
@@ -703,7 +694,7 @@ TEST = Verb(
         Target(
             "benchmark",
             "The slow scale benchmarks, deselected by default.",
-            (uv_run("pytest", PACKAGE, "-q", "-m", "benchmark"),),
+            (lane("benchmark", PACKAGE, "-q", "-m", "benchmark"),),
         ),
         Target(
             "harness",
@@ -728,8 +719,8 @@ TEST = Verb(
             # would overlap on `dev/guards` and a repo-health failure would be
             # reported by a lane whose name says it measures something else.
             (
-                uv_run(
-                    "pytest",
+                lane(
+                    "harness",
                     *INSTRUMENT_PATHS,
                     "-q",
                     *PARALLEL,
@@ -749,8 +740,8 @@ TEST = Verb(
             # inside the package. Marking one is enough to gate it correctly
             # from either place, so moving it later needs no change here.
             (
-                uv_run(
-                    "pytest",
+                lane(
+                    "repo",
                     *PYTHON_PATHS,
                     "-q",
                     *PARALLEL,

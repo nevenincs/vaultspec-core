@@ -92,7 +92,7 @@ NOTHING_SELECTED = 8
 TOOL_MISSING = 127
 
 #: Statuses meaning "the tool ran and reported findings". Every scanner in the
-#: fleet - ruff, bandit, vulture, deptry, jscpd, complexipy, xenon, npm audit,
+#: fleet - ruff, bandit, vulture, deptry, jscpd, complexipy, npm audit,
 #: cargo deny - uses 1 for this. An advisory target suppresses exactly these;
 #: anything else is :data:`ADVISORY_BROKEN`.
 FINDINGS_CODES = frozenset({FAILED})

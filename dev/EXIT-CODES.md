@@ -173,6 +173,14 @@ A run that proved nothing must not read as a run that proved everything.
 
 - A test lane that collected no tests exits `8` (`NOTHING_SELECTED`). The
   runner maps pytest's own status `5` onto it.
+- A lane that collected *fewer* tests than it should is the case no exit code
+  can reach: a marker expression narrowed by a typo, or a path that no longer
+  finds its tests, runs and passes and exits `0`. So the count travels beside
+  the status instead. Every lane is declared through `toolchain.lane`, which
+  attaches a JUnit record, and the harness reports the population in the lane's
+  verdict row — how many ran, how many skipped, and the slowest test when one
+  crosses `testing.SLOW_TEST_SECONDS`. A guard fails if a pytest step is ever
+  declared without one.
 - A lane legitimately permitted to be empty sets
   `VAULTSPEC_ALLOW_EMPTY_SELECTION=1`, which is a declaration in the toolchain
   table, not a flag typed at a prompt.

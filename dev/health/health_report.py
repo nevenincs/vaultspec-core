@@ -52,6 +52,7 @@ from complexipy import file_complexity
 from radon.complexity import cc_rank, cc_visit
 from radon.metrics import mi_rank, mi_visit
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -79,7 +80,15 @@ def _rel(path: Path) -> str:
 
 
 def _section(title: str, mode: str) -> None:
-    console.rule(f"[bold]{title}[/bold]  [dim]({mode})[/dim]")
+    """Print a dimension's heading and the gate it cites.
+
+    The mode is ESCAPED because every one of these strings names a
+    `[tool.*]` table, and rich reads square brackets as markup: unescaped,
+    "gated by ruff C90 via [tool.ruff.lint.mccabe]" reached the terminal as
+    "gated by ruff C90 via " - a citation with its subject deleted, in the
+    one line whose job is to say where the threshold lives.
+    """
+    console.rule(f"[bold]{title}[/bold]  [dim]({escape(mode)})[/dim]")
 
 
 def _distribution(values: list[int], thresholds: list[int]) -> list[tuple[int, int]]:
@@ -90,7 +99,7 @@ def _distribution(values: list[int], thresholds: list[int]) -> list[tuple[int, i
 def report_cyclomatic(top: int) -> None:
     _section(
         "Cyclomatic complexity (radon cc)",
-        "gated by ruff C90 via [tool.ruff.lint.mccabe] and by xenon ranks",
+        "gated by ruff C90 via [tool.ruff.lint.mccabe]",
     )
     blocks: list[tuple[int, str, str]] = []
     for path in _python_files():

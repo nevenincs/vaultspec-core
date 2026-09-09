@@ -63,8 +63,6 @@ version = "0.1.73"
     "mdformat-gfm-alerts>=1.0.0",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
-    "pytest-durations>=1.0.0",
-    "pytest-reportlog>=0.4.0",
     "pytest-timeout>=2.4.0",
     "ruff>=0.15.2",
     "ty>=0.0.15",
@@ -79,8 +77,8 @@ dev = [
   "bandit>=1.9.4",
   "basedpyright>=1.39",
   # Cognitive complexity - how much state a reader must hold to follow a
-  # function, as distinct from the number of paths through it that xenon
-  # measures. Configured from [tool.complexipy] below.
+  # function, as distinct from the number of paths through it that ruff's
+  # C90 measures. Configured from [tool.complexipy] below.
   "complexipy>=6.2",
   "deptry>=0.25.1",
   # Sole consumer is `dev/audit/dependency_audit.py`, which posts the locked
@@ -100,8 +98,6 @@ dev = [
   "pymarkdownlnt>=0.9.0",
   "pytest>=9.0.2",
   "pytest-asyncio>=1.3.0",
-  "pytest-durations>=1.0.0",
-  "pytest-reportlog>=0.4.0",
   "pytest-timeout>=2.4.0",
   "pytest-xdist>=3.8.0",
   "radon>=6.0.1",
@@ -110,7 +106,6 @@ dev = [
   "ty>=0.0.15",
   "vaultspec-rag[mcp]>=0.4.4",
   "vulture>=2.16",
-  "xenon>=0.9.3",
 ]
 
 [tool.hatch.metadata]
@@ -156,7 +151,6 @@ addopts = [
   "not benchmark and not claude",
   "-ra",
   "--tb=short",
-  "--durations=10",
   "--strict-markers",
   "--strict-config",
   "--capture=sys",
@@ -634,9 +628,9 @@ reportInvalidCast = "error"
   root = "docs/_render/tests"
 
 # Cognitive complexity - how much state a reader must hold to follow a
-# function, as distinct from the number of paths through it that `xenon`
-# measures. Nesting compounds the score here, so a deeply-indented function
-# ranks far worse than a flat one with the same branch count.
+# function, as distinct from the number of paths through it that ruff's
+# `C90` measures. Nesting compounds the score here, so a deeply-indented
+# function ranks far worse than a flat one with the same branch count.
 #
 # BASELINE-CALIBRATED (census 2026-07-28): RATCHETED 253 -> 166 -> 154 -> 56 -> 51.
 # Never raise. Long-term target: 15, the tool's own default.
@@ -656,9 +650,11 @@ reportInvalidCast = "error"
 #     over  16:  147
 #     over  15:  160      <- the target
 #
-# Production only. Tests are measured by `just audit-complexity`, which reports
-# without failing: the worst scores belong to guard tests that walk the AST of
-# every module, and that shape is what the guard IS, not debt to pay down.
+# Production only. The test tree is ranked by `just health-report`, which covers
+# both populations from this same tool and labels each: the worst test scores
+# belong to guards that walk the AST of every module, and that shape is what the
+# guard IS, not debt to pay down. A second advisory dimension asking complexipy
+# the same question over a subset of the same tree told nobody anything new.
 [tool.complexipy]
 exclude = ["**/tests/**"]
 max-complexity-allowed = 51
@@ -826,8 +822,6 @@ known_first_party = ["vaultspec_core"]
     "mdformat-gfm-alerts",
     "pytest",
     "pytest-asyncio",
-    "pytest-durations",
-    "pytest-reportlog",
     "pytest-timeout",
     "ruff",
     "ty",

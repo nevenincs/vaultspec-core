@@ -25,13 +25,14 @@ import textwrap
 import time
 from typing import assert_never
 
-from dev import reporting
+from dev import reporting, testing
 from dev.exit_codes import advisory_result, selection_result
 from dev.runner import (
     Cmd,
     Completed,
     Echo,
     Ref,
+    Step,
     ToolOrDocker,
     run,
     run_tool_or_docker,
@@ -108,9 +109,21 @@ def _labels(target: Target) -> list[str]:
                 assert_never(step)
     labels = reporting.distinct_labels(commands)
     return [
-        step.target if isinstance(step, Ref) else label
-        for step, label in zip(target.steps, labels, strict=True)
+        _step_label(step, command, label)
+        for step, command, label in zip(target.steps, commands, labels, strict=True)
     ]
+
+
+def _step_label(step: Step, command: tuple[str, ...], derived: str) -> str:
+    """Prefer a name a step declared for itself over one derived from its argv.
+
+    A `Ref` is named by the target it refers to and a test lane by the lane it
+    declared; only a step that named itself nothing falls back to the guess.
+    """
+    if isinstance(step, Ref):
+        return step.target
+    lane = testing.lane_name(command)
+    return f"pytest {lane}" if lane else derived
 
 
 def _execute(
@@ -152,7 +165,7 @@ def _execute(
     started = time.perf_counter()
 
     for index, step in enumerate(target.steps):
-        code, elapsed = 0, 0.0
+        code, elapsed, detail = 0, 0.0, ""
         failures: list[Completed] = []
         match step:
             case Echo():
@@ -177,6 +190,13 @@ def _execute(
                     else run(step.argv, step.env, capture=capture)
                 )
                 code, elapsed = completed.code, completed.seconds
+                # A step that asked pytest for a record reports the population
+                # it ran, because its exit code cannot: a lane that collected
+                # three tests exits exactly like one that collected four
+                # thousand.
+                report = testing.declared_report(completed.argv)
+                if report is not None:
+                    detail = testing.describe(testing.read(report))
                 if code != 0 and capture:
                     failures.append(completed)
             case _:
@@ -184,7 +204,7 @@ def _execute(
 
         codes.append(code)
         if emit_rows:
-            print(reporting.row(labels[index], code, elapsed), flush=True)
+            print(reporting.row(labels[index], code, elapsed, detail), flush=True)
             # After the row, never before it: the reader needs to know WHICH
             # step is speaking before they read what it said. A failure is
             # replayed in full - the command, and everything it printed.

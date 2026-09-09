@@ -314,11 +314,6 @@ audit-dead-code:
 audit-dependencies:
     {{dev}} audit dependencies
 
-# Report test-tree complexity; advisory, exits 0.
-[group('audit')]
-audit-complexity:
-    {{dev}} audit complexity
-
 # Report the advisory dimensions only; `audit-deps` is the one that gates.
 [group('audit')]
 audit-advisory:
