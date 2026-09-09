@@ -26,7 +26,8 @@ pytestmark = [pytest.mark.integration]
 
 
 @pytest.fixture
-def runner() -> CliRunner:
+def runner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> CliRunner:
+    monkeypatch.chdir(tmp_path)
     return CliRunner(env={"NO_COLOR": "1"})
 
 

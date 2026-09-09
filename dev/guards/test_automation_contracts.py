@@ -712,12 +712,9 @@ def test_the_test_timeout_sits_above_the_advisory_lock_budget() -> None:
         "lower `lock_timeout_seconds`."
     )
 
-    # `timeout_func_only` is what keeps the raised budget from also covering
-    # fixture setup, where a genuine hang has no lock to blame and a ten-minute
-    # wait buys nothing.
-    assert options.get("timeout_func_only") is True, (
-        "`timeout_func_only` must stay true: the timeout above is sized for a "
-        "test body's lock waits, not for fixture setup"
+    assert options.get("timeout_func_only") is False, (
+        "`timeout_func_only` must stay false: fixture setup and teardown need "
+        "the same bounded failure reporting as the test call"
     )
 
 

@@ -386,10 +386,8 @@ class TestSync:
         event that just happened *to* a workspace, so the hook that fires
         must be declared by the workspace that was actually synced. Uses a
         real subprocess (not ``CliRunner``) with a genuinely different
-        process CWD, and clears ``PYTEST_CURRENT_TEST`` from its environment
-        so the real CWD/target split path activates exactly as it does
-        outside tests (see ``_resolve_framework_root``'s pytest guard in
-        ``cli/_target.py``) - the actual bug only reproduces in that path.
+        process CWD, so the CWD/target split is exercised through the same
+        path used outside tests.
         """
         from vaultspec_core.core.commands import install_run
 
@@ -426,7 +424,7 @@ class TestSync:
             encoding="utf-8",
         )
 
-        env = {k: v for k, v in os.environ.items() if k != "PYTEST_CURRENT_TEST"}
+        env = os.environ.copy()
         env["NO_COLOR"] = "1"
         # Point the child process's consent ledger at a directory this test
         # owns, so approving hooks here never reaches the developer's own
@@ -491,8 +489,8 @@ class TestSync:
         approved what would run. The gate must read the same directory the
         firing code reads.
 
-        Same real-subprocess shape as the sibling test above, and for the
-        same reason: the CWD/target split path only activates outside pytest.
+        Same real-subprocess shape as the sibling test above, so the process
+        CWD and target are genuinely distinct.
         """
         from vaultspec_core.core.commands import install_run
 
@@ -515,7 +513,7 @@ class TestSync:
                 encoding="utf-8",
             )
 
-        env = {k: v for k, v in os.environ.items() if k != "PYTEST_CURRENT_TEST"}
+        env = os.environ.copy()
         env["NO_COLOR"] = "1"
         operator_home = tmp_path / "operator-home"
         operator_home.mkdir()

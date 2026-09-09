@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from typing import IO
 
 from vaultspec_core.mcp_server.watchdog import (
+    _POSIX_POLL_SECONDS,
     STDIO_WATCHDOG_ENV,
     arm_client_watchdog,
     resolve_stdin_client_pid,
@@ -65,6 +66,10 @@ _EXPECTED_TOOLS = frozenset(
         "invoke",
     }
 )
+
+_POLL_MARGIN_SECONDS = 5.0
+_DEFAULT_POLL_WINDOW_SECONDS = _POSIX_POLL_SECONDS + _POLL_MARGIN_SECONDS
+_EARLY_CHECKPOINT_SECONDS = 2.0
 
 
 def _assert_server_serves(stdin_pipe: IO[bytes], stdout_pipe: IO[bytes]) -> None:
@@ -301,7 +306,7 @@ def test_armed_worker_exits_when_dead_client_pid_signals() -> None:
         from vaultspec_core.mcp_server.watchdog import arm_client_watchdog
         armed = arm_client_watchdog(client_pid={victim.pid})
         print(f"armed={{armed}}", flush=True)
-        time.sleep(20)
+        time.sleep({_DEFAULT_POLL_WINDOW_SECONDS!r})
         print("still-alive", flush=True)
         """
     )
@@ -453,9 +458,9 @@ def test_dead_parent_pid_override_emits_exit_event() -> None:
         from vaultspec_core.mcp_server.watchdog import arm_client_watchdog
         armed = arm_client_watchdog(client_pid={victim.pid}, parent_pid={victim.pid})
         print(f"armed={{armed}}", flush=True)
-        time.sleep(2)
+        time.sleep({_EARLY_CHECKPOINT_SECONDS!r})
         print("still-alive", flush=True)
-        time.sleep(18)
+        time.sleep({_DEFAULT_POLL_WINDOW_SECONDS - _EARLY_CHECKPOINT_SECONDS!r})
         """
     )
     proc = subprocess.run(
@@ -528,7 +533,7 @@ def test_fallback_reaps_worker_when_ancestor_dies() -> None:
 
         # Let the fallback's grace window elapse before the kill counts as
         # termination intent rather than a transient spawn helper.
-        time.sleep(3)
+        time.sleep(2 * 1.0)
         intermediary.kill()
         intermediary.wait(timeout=60)
 
@@ -572,7 +577,7 @@ def test_fallback_grace_window_prunes_transient_ancestor(tmp_path: Path) -> None
         with open({str(result_file)!r}, "a", encoding="utf-8") as fh:
             fh.write(f"armed={{armed}}\\n")
             fh.flush()
-            time.sleep(8)
+            time.sleep(2 * 4.0)
             fh.write("still-alive\\n")
         """
     )
@@ -935,8 +940,8 @@ def test_anchored_worker_is_not_reaped_by_the_orphan_poll(tmp_path: Path) -> Non
         with open({str(result_file)!r}, "a", encoding="utf-8") as fh:
             fh.write(f"armed={{armed}}\\n")
             fh.flush()
-            # Comfortably past grace + every confirmation poll.
-            time.sleep(10)
+            # Past grace plus every confirmation poll and one margin poll.
+            time.sleep(0.5 + (2 + 1) * 0.5)
             fh.write("still-alive\\n")
         """
     )
