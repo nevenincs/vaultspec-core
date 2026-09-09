@@ -59,15 +59,6 @@ _HARNESS_TELLS = (
     "PYTEST_XDIST_WORKER",
 )
 
-#: The one violation that predates this guard, held here rather than hidden by
-#: a weaker assertion. `_resolve_framework_root` returns early under pytest, so
-#: the CWD/target split it implements is unreachable in the suite and ships
-#: untested. Removing the branch is a resolution-semantics decision, not a test
-#: fix, and is tracked as issue #515. The entry is deliberately a single exact
-#: path: a new violation anywhere else still fails, and deleting this line is
-#: what closing #515 looks like.
-_KNOWN_HARNESS_AWARE = frozenset({"src/vaultspec_core/cli/_target.py"})
-
 
 def _shipped_python_files() -> list[Path]:
     """Return every committed Python file in the tree that ships."""
@@ -100,8 +91,8 @@ class TestProductionDoesNotKnowAboutTheHarness:
         for path in _shipped_python_files():
             relative = path.relative_to(PROJECT_ROOT).as_posix()
             # A cohabiting test may read its own harness; the subject is the
-            # library. The known exception is named, not pattern-matched.
-            if "/tests/" in relative or relative in _KNOWN_HARNESS_AWARE:
+            # library.
+            if "/tests/" in relative:
                 continue
             text = path.read_text(encoding="utf-8")
             for tell in _HARNESS_TELLS:
@@ -115,26 +106,6 @@ class TestProductionDoesNotKnowAboutTheHarness:
             "the suite prove something the user never runs.\n  "
             + "\n  ".join(offenders)
         )
-
-    def test_the_known_exception_is_still_a_real_one(self) -> None:
-        """An allowlist that outlives its violation is worse than no allowlist.
-
-        Once #515 is fixed the entry stops describing anything, and a stale
-        exemption silently widens the guard. Failing here is the reminder to
-        delete the line.
-        """
-        for relative in sorted(_KNOWN_HARNESS_AWARE):
-            path = PROJECT_ROOT / relative
-            assert path.is_file(), (
-                f"{relative} is exempted from the harness-awareness check but "
-                "no longer exists. Remove it from _KNOWN_HARNESS_AWARE."
-            )
-            text = path.read_text(encoding="utf-8")
-            assert any(tell in text for tell in _HARNESS_TELLS), (
-                f"{relative} no longer detects the test harness, so its "
-                "exemption is stale. Remove it from _KNOWN_HARNESS_AWARE and "
-                "close the tracking issue."
-            )
 
     def test_no_shipped_module_imports_pytest(self) -> None:
         offenders: list[str] = []
