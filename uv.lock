@@ -2193,7 +2193,7 @@ wheels = [
 
 [[package]]
 name = "vaultspec-core"
-version = "0.1.73"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "mcp" },
