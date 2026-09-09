@@ -8,6 +8,7 @@ CLI output text.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import shutil
 from typing import TYPE_CHECKING
@@ -20,15 +21,24 @@ from vaultspec_core.core.gitignore import MARKER_BEGIN, MARKER_END
 from vaultspec_core.core.manifest import read_manifest_data
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
 pytestmark = [pytest.mark.integration]
 
 
 @pytest.fixture
-def runner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> CliRunner:
-    monkeypatch.chdir(tmp_path)
-    return CliRunner(env={"NO_COLOR": "1"})
+def runner(tmp_path: Path) -> Iterator[CliRunner]:
+    """Run each test from inside its own broken workspace.
+
+    A real `chdir` rather than `monkeypatch.chdir`, because this suite's own
+    quality guard forbids runtime patching; `contextlib.chdir` restores the
+    previous directory on the way out either way. It is load-bearing: parts of
+    the pipeline resolve relative to the working directory as well as `-t`, so
+    a test left standing in this repository reads the checkout's own state.
+    """
+    with contextlib.chdir(tmp_path):
+        yield CliRunner(env={"NO_COLOR": "1"})
 
 
 class TestCorruptedManifestFullRepair:
