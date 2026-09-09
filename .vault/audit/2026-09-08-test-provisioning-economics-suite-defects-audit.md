@@ -5,7 +5,7 @@ tags:
 date: '2026-09-08'
 modified: '2026-09-09'
 body_schema: 'body-v2'
-body_hash: 'sha256:558ba3f9a4a773625c1a4c78c28ec3e19abb61cb82796df372c2726991c230bf'
+body_hash: 'sha256:42d1286ca28767c15621a4f3668ecb47a9fed60f8cb32f4a0482128c855b6d7d'
 related:
   - '[[2026-09-08-test-provisioning-economics-broad-lane-profile-research]]'
 ---
@@ -284,6 +284,17 @@ fixture is 48s total and everything after it is under 18s for a whole run. No
 fixture is doing work its tests do not need. The three that still run a real
 install - `test_ambiguous_states`, `test_preflight`, `test_executor` - each seed
 a `.gitignore` first, so the reconciliation is the precondition under test.
+
+### phase-five-close | low | PASS - timing blind spots are bounded without custom pytest hooks
+
+Review at Phase P05 and plan close. Pytest-timeout's supported whole-test mode
+now covers setup and teardown while retaining the 600-second budget held above
+the advisory-lock waits by `dev/guards/test_automation_contracts.py`. A forced
+50ms run failed inside the active `tmp_path` fixture stack, and the normal
+focused run completed without disturbing fixture finalisation. The watchdog
+suite derives its default observation window from `_POSIX_POLL_SECONDS` and its
+compressed cases from their explicit grace, rearm, and confirmation inputs;
+all real-process lifecycle cases pass. No critical or high findings remain.
 
 ## Recommendations
 

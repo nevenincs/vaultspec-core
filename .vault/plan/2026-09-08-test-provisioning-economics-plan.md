@@ -6,6 +6,7 @@ date: '2026-09-08'
 tier: L2
 related:
   - '[[2026-09-08-test-provisioning-economics-adr]]'
+  - '[[2026-09-08-test-provisioning-economics-broad-lane-profile-research]]'
 modified: '2026-09-09'
 body_schema: body-v2
 body_hash: 'sha256:6822b9b9d4ad5cedea42a2fddce2137afb4bd9cc4e02cfa348d9cf4c743752fa'
