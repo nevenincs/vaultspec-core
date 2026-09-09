@@ -5,7 +5,7 @@ tags:
 date: '2026-09-08'
 modified: '2026-09-09'
 body_schema: 'body-v2'
-body_hash: 'sha256:409fc2da3dd533334c66aaf2719e24d76ed21fd38c0235727eaf09d7d6f53cae'
+body_hash: 'sha256:db3cd3d3845874398d5f6a0a42e71fea4ecd30e4dc10a27906c47649e225840b'
 related:
   - "[[2026-09-08-test-provisioning-economics-plan]]"
 ---
@@ -45,6 +45,8 @@ related:
 - `S07` `verify:` `just test-broad` -> `fail`
 - `S09` `M` `dev/toolchain.py`
 - `S09` `verify:` `just test-broad` -> `fail`
+- `S12` `M` `pyproject.toml`
+- `S12` `M` `dev/guards/test_automation_contracts.py`
 
 ## Notes
 

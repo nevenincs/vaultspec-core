@@ -267,7 +267,10 @@ testpaths = ["dev", "docs", "src"]
 # holds the relationship, so lowering this or raising the lock budget fails
 # there rather than quietly restoring the blind spot.
 timeout = 600
-timeout_func_only = true
+# Cover setup and teardown as well as the call. A fixture that wedges must fail
+# as the fixture currently executing, rather than disappearing into the lane's
+# outer job timeout.
+timeout_func_only = false
 # Drop a test's `tmp_path` as soon as that test PASSES and keep it when it
 # fails, which is where triage actually looks. Retained session directories
 # otherwise accrue for as long as pytest's own 72-hour rotation lock allows.
