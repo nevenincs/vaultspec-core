@@ -9,6 +9,8 @@ Complete command-line interface (CLI) reference for `vaultspec-core`. See the
 - [Global options](#global-options) - flags accepted across commands.
 - [Outcome vocabulary](#outcome-vocabulary) - the words and glyphs that report results.
 - [JSON output envelope](#json-output-envelope) - the shape of `--json` output.
+- [Surface provenance](#surface-provenance) - what is on this branch and not yet in a
+  release.
 - [Command index](#command-index) - every command, grouped, with a one-line summary.
 - [Workspace commands](#workspace-commands) - install, uninstall, and sync.
 - [Vault commands](#vault-commands) - create, query, and edit vault documents and plans.
@@ -101,6 +103,44 @@ Under `--json`, stdout contains only the envelope; diagnostics go to stderr. Out
 compact by default. For indentation, see
 [environment variables](#environment-variables). Use the top-level `status` field to
 check success.
+
+## Surface provenance
+
+This reference is generated from the branch it ships on, which is ahead of the latest
+release between publications. The block below says by how much: what it lists exists
+here and is not yet installable. It is generated from the recorded surface of that
+release, so it covers every affected command rather than the ones somebody remembered,
+and it empties itself when the next release ships. Run
+`vaultspec-core spec reference generate` to refresh it and
+`vaultspec-core spec reference snapshot` to move the release it is measured against; do
+not hand-edit between the markers.
+
+<!-- vaultspec:generated:begin unreleased-surface -->
+
+The latest published release is `0.1.73`. What follows is on this branch and not in that
+release, so it cannot be installed yet. This list is generated from the recorded surface
+of that release; it is never hand-maintained.
+
+Commands:
+
+- `vaultspec-core spec gitattributes disable`
+- `vaultspec-core spec gitattributes enable`
+- `vaultspec-core spec gitignore disable`
+- `vaultspec-core spec gitignore enable`
+- `vaultspec-core spec hooks trust`
+- `vaultspec-core spec reference snapshot`
+- `vaultspec-core vault check foreign`
+
+Flags on commands the release already has:
+
+- `vaultspec-core migrations run` - `--dry-run`, `--yes`
+- `vaultspec-core vault exec log` - `--by`, `--note`, `--verify`
+
+MCP tools:
+
+- `log`
+
+<!-- vaultspec:generated:end unreleased-surface -->
 
 ## Command index
 
@@ -2453,9 +2493,6 @@ unnoticed one.
 ______________________________________________________________________
 
 ### vaultspec-core spec gitignore
-
-`vaultspec-core spec gitignore` and `vaultspec-core spec gitattributes` are not
-available in the 0.1.73 release.
 
 ```bash
 vaultspec-core spec gitignore [OPTIONS] COMMAND [ARGS]...

@@ -35,6 +35,41 @@ exit (top-level only). | | `--help` | - | - | Show help for any command or group
 `vaultspec-core spec`, and `vaultspec-core migrations` subcommand. `--json` is
 command-specific.
 
+## Surface provenance
+
+Which of the commands below you can install, as against which exist on the branch this
+was generated from. This block is generator-owned: run
+`vaultspec-core spec reference generate` to refresh it, and
+`vaultspec-core spec reference snapshot` to move the release it is measured against. Do
+not hand-edit between the markers.
+
+<!-- vaultspec:generated:begin unreleased-surface -->
+
+The latest published release is `0.1.73`. What follows is on this branch and not in that
+release, so it cannot be installed yet. This list is generated from the recorded surface
+of that release; it is never hand-maintained.
+
+Commands:
+
+- `vaultspec-core spec gitattributes disable`
+- `vaultspec-core spec gitattributes enable`
+- `vaultspec-core spec gitignore disable`
+- `vaultspec-core spec gitignore enable`
+- `vaultspec-core spec hooks trust`
+- `vaultspec-core spec reference snapshot`
+- `vaultspec-core vault check foreign`
+
+Flags on commands the release already has:
+
+- `vaultspec-core migrations run` - `--dry-run`, `--yes`
+- `vaultspec-core vault exec log` - `--by`, `--note`, `--verify`
+
+MCP tools:
+
+- `log`
+
+<!-- vaultspec:generated:end unreleased-surface -->
+
 ## Command inventory
 
 Every leaf-command signature, matching the live Typer usage lines. This block is

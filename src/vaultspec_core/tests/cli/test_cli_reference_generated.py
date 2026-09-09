@@ -119,7 +119,7 @@ def test_generate_preserves_unmanaged_prose_verbatim(tmp_path: Path) -> None:
     ref = tmp_path / "cli.md"
     ref.write_text(fixture, encoding="utf-8")
 
-    result = generate(check=False, reference_path=ref, typer_app=app)
+    result = generate(check=False, reference_path=ref, typer_app=app, regions=(region,))
     assert result.changed
     rewritten = ref.read_text(encoding="utf-8")
 
@@ -238,11 +238,11 @@ def test_write_mode_reconciles_drift_and_reports_unchanged_on_second_run(
     ref = tmp_path / "cli.md"
     ref.write_text(drifted, encoding="utf-8")
 
-    first = generate(check=False, reference_path=ref, typer_app=app)
+    first = generate(check=False, reference_path=ref, typer_app=app, regions=(region,))
     assert first.changed
     assert "bogus" not in ref.read_text(encoding="utf-8")
 
-    second = generate(check=False, reference_path=ref, typer_app=app)
+    second = generate(check=False, reference_path=ref, typer_app=app, regions=(region,))
     assert not second.changed
     assert second.in_sync
 
@@ -351,9 +351,7 @@ def test_handbook_prose_outside_region_survives_regenerate(tmp_path: Path) -> No
     ref = tmp_path / "CLI.md"
     ref.write_text(fixture, encoding="utf-8")
 
-    result = generate(
-        check=False, reference_path=ref, typer_app=app, regions=region_tuple()
-    )
+    result = generate(check=False, reference_path=ref, typer_app=app, regions=(region,))
     assert result.changed
     rewritten = ref.read_text(encoding="utf-8")
 

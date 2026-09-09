@@ -8,7 +8,7 @@ related:
   - '[[2026-09-09-reference-publication-contract-adr]]'
 modified: '2026-09-09'
 body_schema: body-v2
-body_hash: 'sha256:6551365c1a61bbaa454ab64befddf124c8f6307adf9d0896228c3cda0d3beee6'
+body_hash: 'sha256:52373e45342db32c781c84817ab60a42412aa3e0369daf6fdfa0f0ae309682f2'
 ---
 
 # `reference-publication-contract` plan
@@ -52,9 +52,9 @@ A machine-written snapshot records the verb paths and MCP tool names of the publ
 
 A generated region states which verbs and tools exist on HEAD and not in the published release, replacing the hand-written caveat.
 
-- [ ] `P02.S04` - Render the unreleased-surface region from the difference between the live surface and the snapshot, with an explicit empty state; `src/vaultspec_core/cli/reference_gen.py`.
-- [ ] `P02.S05` - Add the region markers to both CLI surfaces and delete the hand-written release caveat; `src/vaultspec_core/builtins/reference/cli.md, docs/CLI.md`.
-- [ ] `P02.S06` - Guard that attribution is generated rather than authored and that no version caveat can expire; `dev/guards/`.
+- [x] `P02.S04` - Render the unreleased-surface region from the difference between the live surface and the snapshot, with an explicit empty state; `src/vaultspec_core/cli/reference_gen.py`.
+- [x] `P02.S05` - Add the region markers to both CLI surfaces and delete the hand-written release caveat; `src/vaultspec_core/builtins/reference/cli.md, docs/CLI.md`.
+- [x] `P02.S06` - Guard that attribution is generated rather than authored and that no version caveat can expire; `dev/guards/`.
 
 ### Phase `P03` - bring the MCP reference under the generator
 
