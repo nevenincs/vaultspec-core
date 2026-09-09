@@ -117,28 +117,8 @@ not hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.1.73`. What follows is on this branch and not in that
-release, so it cannot be installed yet. This list is generated from the recorded surface
-of that release; it is never hand-maintained.
-
-Commands:
-
-- `vaultspec-core spec gitattributes disable`
-- `vaultspec-core spec gitattributes enable`
-- `vaultspec-core spec gitignore disable`
-- `vaultspec-core spec gitignore enable`
-- `vaultspec-core spec hooks trust`
-- `vaultspec-core spec reference snapshot`
-- `vaultspec-core vault check foreign`
-
-Flags on commands the release already has:
-
-- `vaultspec-core migrations run` - `--dry-run`, `--yes`
-- `vaultspec-core vault exec log` - `--by`, `--note`, `--verify`
-
-MCP tools:
-
-- `log`
+The latest published release is `0.2.0`, and every command, flag, and tool documented
+here is in it.
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
