@@ -253,30 +253,40 @@ def test_write_mode_reconciles_drift_and_reports_unchanged_on_second_run(
 # ---------------------------------------------------------------------------
 
 
-def test_registry_owns_both_surfaces_with_shared_region() -> None:
-    """The registry covers cli.md and docs/CLI.md via the same region set.
+def test_registry_owns_every_reference_surface() -> None:
+    """The registry covers the bundled reference and both source handbooks."""
+    names = {managed.path_factory().name for managed in MANAGED_FILES}
+    assert names == {"cli.md", "CLI.md", "MCP.md"}, names
 
-    Both generator-owned files render the same ``command-inventory`` region, so
-    the bundled reference and the source-tree handbook are sourced from one
-    Typer walk and cannot diverge in command set or ordering.
+
+def test_both_cli_surfaces_share_the_command_inventory_region() -> None:
+    """The bundled reference and the handbook render one Typer walk.
+
+    Sharing the region is what stops them diverging in command set or ordering.
+    The MCP handbook is deliberately not in this set: it documents a different
+    surface and carries its own tool inventory instead.
     """
-    paths = [managed.path_factory() for managed in MANAGED_FILES]
-    names = {path.name for path in paths}
-    assert names == {"cli.md", "CLI.md"}, names
-    for managed in MANAGED_FILES:
+    cli_surfaces = [
+        managed
+        for managed in MANAGED_FILES
+        if managed.path_factory().name in {"cli.md", "CLI.md"}
+    ]
+    assert len(cli_surfaces) == 2
+
+    for managed in cli_surfaces:
         assert any(
             region.region_id == "command-inventory" for region in managed.regions
         ), managed.path_factory().name
 
 
-def test_generate_all_check_covers_both_files_in_sync() -> None:
-    """`generate_all(check=True)` reports both committed files already in sync."""
+def test_generate_all_check_covers_every_file_in_sync() -> None:
+    """`generate_all(check=True)` reports every committed file already in sync."""
     results = generate_all(check=True)
     names = {result.path.name for result in results}
-    assert names == {"cli.md", "CLI.md"}, names
+    assert names == {"cli.md", "CLI.md", "MCP.md"}, names
     for result in results:
         assert result.in_sync, (
-            f"{result.path.name} diverged from the live CLI surface. Run "
+            f"{result.path.name} diverged from the live surface. Run "
             "`vaultspec-core spec reference generate` to refresh it.\n"
             f"{result.diff}"
         )

@@ -471,6 +471,15 @@ framework-reference:
 framework-reference-check:
     {{dev}} framework reference-check
 
+# A no-op unless this tree declares a version other than the one recorded,
+# which is true only on a release candidate branch. Recording the surface
+# anywhere else would restamp unreleased work as published.
+
+# Record the published surface and re-render the references that cite it.
+[group('dev')]
+framework-surface:
+    {{dev}} framework surface
+
 # Report the installed framework providers.
 [group('dev')]
 framework-providers:
@@ -542,6 +551,32 @@ docs-all:
 [group('release')]
 release-binaries tag rust_target outdir='dist-bin' wheel_dir='dist':
     uv run --no-project --python 3.13 -- python -m dev.binaries.build_pyapp --tag {{tag}} --target {{rust_target}} --outdir {{outdir}} --wheel-dir {{wheel_dir}}
+
+# Asked of the artifact rather than the source, because only the artifact can
+# answer. The generated references are rendered against a snapshot refreshed on
+# the release branch, so between that refresh and the tag the documents could
+# describe a program the wheel does not carry, and no source-tree check would
+# see it. Both commands run inside one isolated install of that wheel: the
+# first reads the surface it exposes, the second compares it against the
+# snapshot it ships. Takes a DIRECTORY, like `release-binaries` and for the
+# same reason - a recipe cannot glob, and the wheel's filename carries a
+# version the caller does not know.
+
+# Prove a built distribution's surface matches the reference it ships.
+[group('release')]
+release-verify-surface wheel_dir='dist':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shopt -s nullglob
+    wheels=({{wheel_dir}}/*.whl)
+    if [ ${#wheels[@]} -ne 1 ]; then
+      echo "expected exactly one wheel in {{wheel_dir}}, found ${#wheels[@]}" >&2
+      exit 1
+    fi
+    wheel="${wheels[0]}"
+    uv run --isolated --no-project --with "${wheel}"       vaultspec-core spec reference snapshot --emit > "${wheel}.surface.json"
+    uv run --isolated --no-project --with "${wheel}"       vaultspec-core spec reference snapshot --verify "${wheel}.surface.json"
+    echo "${wheel} matches the reference it ships"
 
 # `root` is REQUIRED and is a checkout of nevenincs/homebrew-tap - the account
 # channel root, which is where these pointers live. It used to default to this

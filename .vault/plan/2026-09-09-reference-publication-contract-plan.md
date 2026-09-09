@@ -8,7 +8,7 @@ related:
   - '[[2026-09-09-reference-publication-contract-adr]]'
 modified: '2026-09-09'
 body_schema: body-v2
-body_hash: 'sha256:f80b4244073bc8983dc0d4179488bb4236b2c954d908183cd3bbd4bc1206fd9a'
+body_hash: 'sha256:5ccdb1f4beadbfb17b28cf42b0ae5a38795434930eff717fa9fe484dd5fd1ae1'
 ---
 
 # `reference-publication-contract` plan
@@ -68,9 +68,9 @@ The MCP tool inventory becomes a managed region on the same marker grammar and r
 
 The candidate branch refreshes the snapshot and the publish lane verifies the published distribution's surface against the snapshot committed at its tag.
 
-- [ ] `P04.S10` - Refresh the snapshot on the release candidate branch beside the lockfile regeneration; `.github/workflows/release-please.yml`.
-- [ ] `P04.S11` - Verify the published distribution's surface against the snapshot committed at its tag; `.github/workflows/publish.yml`.
-- [ ] `P04.S12` - Guard the release-lane shape so the refresh and verification steps cannot be removed silently; `dev/guards/`.
+- [x] `P04.S10` - Refresh the snapshot on the release candidate branch beside the lockfile regeneration; `.github/workflows/release-please.yml`.
+- [x] `P04.S11` - Verify the published distribution's surface against the snapshot committed at its tag; `.github/workflows/publish.yml`.
+- [x] `P04.S12` - Guard the release-lane shape so the refresh and verification steps cannot be removed silently; `dev/guards/`.
 
 ## Parallelization
 

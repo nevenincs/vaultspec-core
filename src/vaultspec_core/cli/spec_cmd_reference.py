@@ -320,6 +320,29 @@ def _report_verification(
                 f"records {published.version}.",
                 err=True,
             )
+        else:
+            # The likeliest reading of this failure is a defect, and for a
+            # tagged build it is one. For a build from a branch that is ahead
+            # of its release it is the ordinary state - the version is the
+            # released one because release-please has not bumped it yet, while
+            # the surface has moved on - which is the very confusion this
+            # contract exists to remove, so it is spelled out rather than left
+            # to be rediscovered.
+            typer.echo(
+                f"Distribution and snapshot both declare {candidate.version}, "
+                "but their surfaces differ.",
+                err=True,
+            )
+            typer.echo(
+                "  For a release tag this is a defect: the reference shipped "
+                "for that version describes a different program.",
+                err=True,
+            )
+            typer.echo(
+                "  For a build from a branch ahead of its release this is "
+                "expected, and the check is only meaningful on a tag.",
+                err=True,
+            )
         for label, diff in (
             ("documented but absent from the distribution", missing),
             ("present in the distribution but undocumented", extra),

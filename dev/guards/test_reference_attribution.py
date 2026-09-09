@@ -248,3 +248,108 @@ def test_a_difference_names_every_kind_of_addition() -> None:
     assert "spec hooks trust" in rendered
     assert "--dry-run" in rendered
     assert "log" in rendered
+
+
+# ---------------------------------------------------------------------------
+# The release lane
+#
+# The contract has two halves in two workflows, and each is one step that
+# nothing else depends on - a shape that can be deleted without anything
+# turning red until the release it was supposed to guard. So the steps
+# themselves are the assertion here.
+# ---------------------------------------------------------------------------
+
+
+def _workflow_runs(path: str) -> list[str]:
+    """Every ``run:`` script in a workflow, flattened to one string each."""
+    import yaml
+
+    document = yaml.safe_load(
+        (_repo_root() / ".github" / "workflows" / path).read_text(encoding="utf-8")
+    )
+    scripts: list[str] = []
+    for job in document["jobs"].values():
+        for step in job.get("steps", []):
+            script = step.get("run")
+            if script:
+                scripts.append(" ".join(str(script).split()))
+    return scripts
+
+
+def _repo_root() -> Path:
+    from pathlib import Path as _Path
+
+    return _Path(__file__).resolve().parents[2]
+
+
+def test_the_candidate_branch_refreshes_the_surface_snapshot() -> None:
+    """The one place the snapshot may move is the one place that moves it.
+
+    On main the versions match and the refresh verb refuses to write, so if
+    this step is not on the candidate branch the snapshot never advances - and
+    the references keep attributing every later release against the surface of
+    whichever release last had this step.
+    """
+    scripts = _workflow_runs("release-please.yml")
+
+    assert any("just framework-surface" in script for script in scripts), (
+        "release-please.yml no longer refreshes the published surface on the "
+        "candidate branch, which is the only branch where it may be refreshed."
+    )
+
+
+def test_the_refresh_commits_what_it_regenerates() -> None:
+    """A refresh that is not pushed is a refresh the tag will not carry."""
+    refresh = next(
+        script
+        for script in _workflow_runs("release-please.yml")
+        if "just framework-surface" in script
+    )
+
+    assert "git commit" in refresh and "git push" in refresh, (
+        "the surface refresh runs but is never pushed, so the tag would be cut "
+        "from a tree that still carries the previous release's snapshot"
+    )
+
+
+def test_the_publish_lane_verifies_the_surface_before_it_publishes() -> None:
+    """The gate that can still stop a release runs before the upload.
+
+    `publish-pypi` is the one step in this repository that cannot be undone.
+    A surface check after it can only report; this one refuses.
+    """
+    import yaml
+
+    document = yaml.safe_load(
+        (_repo_root() / ".github" / "workflows" / "publish.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    smoke_steps = [
+        " ".join(str(step.get("run", "")).split())
+        for step in document["jobs"]["smoke-test"]["steps"]
+    ]
+
+    assert any("just release-verify-surface" in step for step in smoke_steps), (
+        "the smoke-test job no longer verifies the built distribution against "
+        "the reference it ships, so a mismatch would reach PyPI"
+    )
+    assert "smoke-test" in document["jobs"]["publish-pypi"]["needs"], (
+        "publish-pypi no longer depends on smoke-test, so the surface gate "
+        "cannot stop the upload it exists to stop"
+    )
+
+
+def test_the_publish_lane_verifies_what_it_actually_published() -> None:
+    """The attached artifact is read back, not assumed to be what was built."""
+    scripts = _workflow_runs("publish.yml")
+    published_check = [
+        script
+        for script in scripts
+        if "gh release download" in script and "just release-verify-surface" in script
+    ]
+
+    assert published_check, (
+        "publish.yml no longer downloads the attached wheel and verifies its "
+        "surface, so nothing checks what a user actually installs"
+    )
