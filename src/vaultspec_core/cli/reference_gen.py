@@ -55,7 +55,7 @@ if TYPE_CHECKING:
     from typer._click.core import Command as ClickCommand
     from typer._click.core import Context as ClickContext
 
-    from vaultspec_core.cli.reference_surface import Surface
+    from vaultspec_core.cli.reference_surface import McpTool, Surface
 
 # Marker grammar. The region id is interpolated between the fixed prefix and
 # suffix so a single regex-free string search locates each managed zone.
@@ -93,6 +93,18 @@ def docs_handbook_path() -> Path:
     from pathlib import Path as _Path
 
     return _Path(__file__).resolve().parents[3] / "docs" / "CLI.md"
+
+
+def docs_mcp_handbook_path() -> Path:
+    """Return the filesystem path to the source-tree handbook ``docs/MCP.md``.
+
+    Source-only like ``docs/CLI.md``, and registered on the same terms: the
+    tool inventory and the MCP-scoped attribution are generated, while the
+    per-tool prose sections around them stay hand-written.
+    """
+    from pathlib import Path as _Path
+
+    return _Path(__file__).resolve().parents[3] / "docs" / "MCP.md"
 
 
 # ---------------------------------------------------------------------------
@@ -298,6 +310,60 @@ def render_unreleased_surface(context: RenderContext) -> str:
     return "\n".join(lines).rstrip("\n")
 
 
+def render_mcp_tool_inventory(context: RenderContext) -> str:
+    """Render the MCP tool table from the live server registry.
+
+    Names, purposes, and annotations all come from the handlers themselves -
+    the purpose is a handler's own summary paragraph, and the annotation column
+    is its MCP hints in the handbook's vocabulary. The table was hand-written
+    until this existed, which meant a tool's documented behavior had a second
+    home that nothing reconciled against the first.
+
+    Registration order is preserved, not sorted: the handbook's per-tool
+    sections follow the same order and read as a tour.
+    """
+    tools = context.mcp_tools
+    lines = [
+        f"The server exposes {len(tools)} tools.",
+        "",
+        "| Tool | Purpose | Annotations |",
+        "| ---- | ------- | ----------- |",
+    ]
+    lines.extend(
+        f"| `{tool.name}` | {tool.purpose} | {tool.annotations} |" for tool in tools
+    )
+    return "\n".join(lines)
+
+
+def render_unreleased_mcp_surface(context: RenderContext) -> str:
+    """Render which of the tools above the published release does not have.
+
+    The MCP-scoped half of the attribution the CLI surfaces carry. Scoped
+    rather than shared, because a reader of the MCP handbook is asking which
+    tools they can call, and a list of unreleased CLI verbs beside it would be
+    noise they have to filter.
+    """
+    from vaultspec_core.cli.reference_surface import unreleased_surface
+
+    diff = unreleased_surface(context.live, context.published)
+    version = context.published.version
+
+    if not diff.mcp_tools:
+        return (
+            f"The latest published release is `{version}`, and every tool above "
+            "is in it."
+        )
+
+    lines = [
+        f"The latest published release is `{version}`. These tools are on this "
+        "branch and not in that release, so a host installing the published "
+        "server will not see them:",
+        "",
+    ]
+    lines.extend(f"- `{name}`" for name in diff.mcp_tools)
+    return "\n".join(lines)
+
+
 @dataclass(frozen=True)
 class RenderContext:
     """Everything a region renderer may read.
@@ -315,6 +381,7 @@ class RenderContext:
     typer_app: typer.Typer
     live: Surface
     published: Surface
+    mcp_tools: tuple[McpTool, ...]
 
 
 def build_render_context(
@@ -327,18 +394,31 @@ def build_render_context(
         SurfaceSnapshotError: The published-surface snapshot is absent or
             unreadable and no replacement was supplied.
     """
+    from vaultspec_core.cli.reference_surface import Surface as _Surface
     from vaultspec_core.cli.reference_surface import (
-        capture_surface,
+        capture_cli_commands,
+        capture_mcp_tool_details,
         load_published_surface,
+        project_version,
     )
 
     if typer_app is None:
         from vaultspec_core.cli import app as typer_app
 
+    # The tool details are captured once and the name set derived from them,
+    # rather than calling into the MCP registry twice: each call starts a
+    # server, and a render pass covers several files.
+    mcp_tools = capture_mcp_tool_details()
+
     return RenderContext(
         typer_app=typer_app,
-        live=capture_surface(typer_app),
+        live=_Surface(
+            version=project_version(),
+            commands=capture_cli_commands(typer_app),
+            mcp_tools=tuple(sorted(tool.name for tool in mcp_tools)),
+        ),
         published=published if published is not None else load_published_surface(),
+        mcp_tools=mcp_tools,
     )
 
 
@@ -386,11 +466,28 @@ class ManagedFile:
 # ManagedFile here rather than touching the apply loop. The bundled reference
 # and the source-tree handbook share the command-inventory region so the two
 # surfaces cannot silently diverge in command set or ordering.
+#: The MCP handbook's own region set. The tool inventory replaces a table that
+#: was hand-copied from the handlers, and the attribution is MCP-scoped: a
+#: reader here is asking which tools they can call, so the unreleased CLI verbs
+#: the other surfaces list would be noise to filter rather than an answer.
+MCP_REGIONS: tuple[ManagedRegion, ...] = (
+    ManagedRegion(region_id="mcp-tool-inventory", render=render_mcp_tool_inventory),
+    ManagedRegion(
+        region_id="unreleased-mcp-surface", render=render_unreleased_mcp_surface
+    ),
+)
+
+
 MANAGED_FILES: tuple[ManagedFile, ...] = (
     ManagedFile(path_factory=bundled_reference_path, regions=MANAGED_REGIONS),
     ManagedFile(
         path_factory=docs_handbook_path,
         regions=MANAGED_REGIONS,
+        optional=True,
+    ),
+    ManagedFile(
+        path_factory=docs_mcp_handbook_path,
+        regions=MCP_REGIONS,
         optional=True,
     ),
 )

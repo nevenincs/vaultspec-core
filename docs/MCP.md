@@ -195,27 +195,51 @@ Run `vaultspec-core spec doctor --json` for a broader workspace diagnosis.
 
 ## Tools
 
-The server exposes ten tools. Eight cover the everyday path: `status` orients you in the
-workspace, `find` locates documents, `create` scaffolds new ones, `edit` makes
-body-prose changes, `check` validates and repairs the vault, `plan_progress` marks steps
-complete, `plan_edit` authors step content, and `log` appends a step's rows to the
-plan's execution ledger. Two more, `discover` and `invoke`, form a gateway that reaches
-every remaining CLI verb.
+Most tools cover the everyday path: `status` orients you in the workspace, `find`
+locates documents, `create` scaffolds new ones, `edit` makes body-prose changes, `check`
+validates and repairs the vault, `plan_progress` marks steps complete, `plan_edit`
+authors step content, and `log` appends a step's rows to the plan's execution ledger.
+`discover` and `invoke` form a gateway that reaches every remaining CLI verb.
 
-| Tool            | Purpose                                                                                        | Annotations                     |
-| --------------- | ---------------------------------------------------------------------------------------------- | ------------------------------- |
-| `status`        | Get a project rollup or trace a feature or plan to its steps and records                       | read-only, idempotent           |
-| `find`          | Search documents or list features, with blob hashes and resource links                         | read-only, idempotent           |
-| `create`        | Batch-scaffold `.vault/` documents from templates and regenerate affected feature indexes      | non-destructive, not idempotent |
-| `edit`          | Batch body-prose edits through section-addressed operations, guarded by optimistic concurrency | destructive, not idempotent     |
-| `check`         | Run vault health checks, optionally with repair                                                | non-destructive, idempotent     |
-| `plan_progress` | Batch-mark plan steps checked or unchecked                                                     | non-destructive, idempotent     |
-| `plan_edit`     | Batch add, insert, edit, or remove step-authoring operations on a plan                         | destructive, not idempotent     |
-| `log`           | Append one step's rows (paths, verify, persona, notes) to the plan's execution ledger          | non-destructive, idempotent     |
-| `discover`      | Search the long-tail verb catalog for ranked verbs and their parameter schemas                 | read-only, idempotent           |
-| `invoke`        | Run one cataloged long-tail verb as a validated subprocess                                     | destructive, not idempotent     |
+The table below is generated from the running server: each tool's purpose is its own
+handler's summary and each annotation column its declared MCP hints. Run
+`vaultspec-core spec reference generate` to refresh it; do not hand-edit between the
+markers.
 
-Two bands of operations sit outside these ten tools.
+<!-- vaultspec:generated:begin mcp-tool-inventory -->
+
+The server exposes 10 tools.
+
+| Tool            | Purpose                                                                                                                                  | Annotations                     |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| `find`          | Find vault documents or list features.                                                                                                   | read-only, idempotent           |
+| `create`        | Scaffold one or more vault documents from templates.                                                                                     | non-destructive, not idempotent |
+| `edit`          | Apply one or more body-prose edits to vault documents.                                                                                   | destructive, not idempotent     |
+| `status`        | Orient in a vaultspec project, project-wide or targeted.                                                                                 | read-only, idempotent           |
+| `check`         | Run the vault health-check suite, optionally repairing.                                                                                  | non-destructive, idempotent     |
+| `plan_progress` | Mark plan steps closed or open by canonical identifier.                                                                                  | non-destructive, idempotent     |
+| `plan_edit`     | Author plan steps: add, insert, edit, or remove.                                                                                         | destructive, not idempotent     |
+| `log`           | Append one Step's rows to its plan's execution ledger.                                                                                   | non-destructive, idempotent     |
+| `discover`      | Search the long-tail verb catalog and return ranked schemas.                                                                             | read-only, idempotent           |
+| `invoke`        | Execute one cataloged verb. A verb that runs and fails is still a successful call; its exit code and stderr arrive in the error payload. | destructive, not idempotent     |
+
+<!-- vaultspec:generated:end mcp-tool-inventory -->
+
+### Surface provenance
+
+Which of the tools above a host installing the published server actually sees. Generated
+from the recorded surface of that release, so it empties itself when the next one ships.
+
+<!-- vaultspec:generated:begin unreleased-mcp-surface -->
+
+The latest published release is `0.1.73`. These tools are on this branch and not in that
+release, so a host installing the published server will not see them:
+
+- `log`
+
+<!-- vaultspec:generated:end unreleased-mcp-surface -->
+
+Two bands of operations sit outside the tool surface.
 
 The gateway reaches some operations, but a CLI command carries them by default:
 synchronizing generated surfaces (`vaultspec-core sync`,

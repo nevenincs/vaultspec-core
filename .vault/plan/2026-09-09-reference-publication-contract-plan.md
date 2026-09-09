@@ -8,7 +8,7 @@ related:
   - '[[2026-09-09-reference-publication-contract-adr]]'
 modified: '2026-09-09'
 body_schema: body-v2
-body_hash: 'sha256:52373e45342db32c781c84817ab60a42412aa3e0369daf6fdfa0f0ae309682f2'
+body_hash: 'sha256:f80b4244073bc8983dc0d4179488bb4236b2c954d908183cd3bbd4bc1206fd9a'
 ---
 
 # `reference-publication-contract` plan
@@ -60,9 +60,9 @@ A generated region states which verbs and tools exist on HEAD and not in the pub
 
 The MCP tool inventory becomes a managed region on the same marker grammar and registry as the CLI surface.
 
-- [ ] `P03.S07` - Render the MCP tool inventory from the server tool registry and register the MCP handbook in the managed-file registry; `src/vaultspec_core/cli/reference_gen.py`.
-- [ ] `P03.S08` - Add the tool-inventory and unreleased-surface markers to the MCP handbook; `docs/MCP.md`.
-- [ ] `P03.S09` - Cover MCP inventory rendering and drift with tests; `src/vaultspec_core/tests/cli/`.
+- [x] `P03.S07` - Render the MCP tool inventory from the server tool registry and register the MCP handbook in the managed-file registry; `src/vaultspec_core/cli/reference_gen.py`.
+- [x] `P03.S08` - Add the tool-inventory and unreleased-surface markers to the MCP handbook; `docs/MCP.md`.
+- [x] `P03.S09` - Cover MCP inventory rendering and drift with tests; `src/vaultspec_core/tests/cli/`.
 
 ### Phase `P04` - wire the release lane
 

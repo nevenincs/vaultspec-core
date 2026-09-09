@@ -22,10 +22,20 @@ import pytest
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
+from vaultspec_core.cli.reference_gen import (
+    MANAGED_FILES,
+    RenderContext,
+    begin_marker,
+    docs_mcp_handbook_path,
+    end_marker,
+    generate_all,
+    render_unreleased_mcp_surface,
+)
 from vaultspec_core.cli.reference_surface import (
     SNAPSHOT_SCHEMA,
     Surface,
     SurfaceSnapshotError,
+    capture_mcp_tool_details,
     capture_surface,
     deserialize_surface,
     load_published_surface,
@@ -349,3 +359,95 @@ def test_snapshot_verify_rejects_a_document_declaring_another_version(
 
     assert result.exit_code == 1
     assert "99.0.0" in result.output
+
+
+# ---------------------------------------------------------------------------
+# The MCP surface
+# ---------------------------------------------------------------------------
+
+
+def test_mcp_tool_details_carry_a_purpose_and_annotations_for_every_tool() -> None:
+    """Every registered tool documents itself; none renders as a blank row."""
+    tools = capture_mcp_tool_details()
+
+    assert tools
+    for tool in tools:
+        assert tool.name
+        assert tool.purpose, f"{tool.name} would render an empty purpose cell"
+        assert tool.annotations, f"{tool.name} would render an empty annotation cell"
+
+
+def test_a_tool_purpose_is_a_whole_paragraph_not_a_cut_line() -> None:
+    """A summary that wraps is joined, so no cell ends mid-clause.
+
+    `invoke` is the case: its summary is one sentence plus its qualification,
+    across two physical lines. Taking the first line would publish "still a".
+    """
+    purposes = {tool.name: tool.purpose for tool in capture_mcp_tool_details()}
+
+    assert purposes["invoke"].endswith(".")
+    assert "\n" not in purposes["invoke"]
+
+
+def test_annotations_read_in_the_handbook_s_own_vocabulary() -> None:
+    """Read-only tools say so; writing tools say whether they are destructive.
+
+    A read-only tool carries no `destructiveHint`, and rendering that absence
+    as "non-destructive" would describe a tool that writes nothing by what it
+    does not destroy.
+    """
+    annotations = {tool.name: tool.annotations for tool in capture_mcp_tool_details()}
+
+    assert annotations["find"] == "read-only, idempotent"
+    assert annotations["edit"] == "destructive, not idempotent"
+    assert annotations["check"] == "non-destructive, idempotent"
+
+
+def test_the_mcp_handbook_is_registered_and_generated() -> None:
+    """`docs/MCP.md` is in the registry and its regions match fresh output."""
+    registered = {managed.path_factory().name for managed in MANAGED_FILES}
+    assert "MCP.md" in registered
+
+    results = {result.path.name: result for result in generate_all(check=True)}
+    assert results["MCP.md"].in_sync, results["MCP.md"].diff
+
+
+def test_the_committed_mcp_inventory_lists_every_registered_tool() -> None:
+    """No tool can be registered without appearing in the handbook's table."""
+    body = docs_mcp_handbook_path().read_text(encoding="utf-8")
+    inventory = body.partition(begin_marker("mcp-tool-inventory"))[2].partition(
+        end_marker("mcp-tool-inventory")
+    )[0]
+
+    for tool in capture_mcp_tool_details():
+        assert f"`{tool.name}`" in inventory, (
+            f"{tool.name} is registered but absent from the generated inventory"
+        )
+
+
+def test_the_mcp_attribution_is_scoped_to_tools() -> None:
+    """The MCP handbook attributes tools, not the CLI verbs beside them."""
+    published = Surface(version="1.0.0", commands={"vault add": ()}, mcp_tools=())
+    live = Surface(
+        version="1.1.0",
+        commands={"vault add": (), "spec hooks trust": ()},
+        mcp_tools=("log",),
+    )
+
+    rendered = render_unreleased_mcp_surface(
+        RenderContext(typer_app=app, live=live, published=published, mcp_tools=())
+    )
+
+    assert "`log`" in rendered
+    assert "spec hooks trust" not in rendered
+
+
+def test_the_mcp_attribution_states_the_release_when_nothing_is_pending() -> None:
+    """The empty state is written out here too, not left blank."""
+    surface = Surface(version="4.5.6", commands={}, mcp_tools=("find",))
+
+    rendered = render_unreleased_mcp_surface(
+        RenderContext(typer_app=app, live=surface, published=surface, mcp_tools=())
+    )
+
+    assert "`4.5.6`" in rendered

@@ -18,8 +18,9 @@ every generate.
 Three properties are held.
 
 *The attribution exists and is generator-owned.* Both CLI surfaces carry the
-``unreleased-surface`` markers, so the region cannot be quietly dropped and
-leave a document that says nothing about what it describes.
+``unreleased-*`` markers - one per file, MCP-scoped in the MCP handbook - so
+the region cannot be quietly dropped and leave a document that says nothing
+about what it describes.
 
 *Nothing outside a managed region names a release.* A hand-written version
 caveat is the shape being retired; a new one must fail here rather than be
@@ -56,7 +57,10 @@ if TYPE_CHECKING:
 pytestmark = [pytest.mark.repo, pytest.mark.integration]
 
 
-_REGION = "unreleased-surface"
+#: Every managed file carries an attribution region; the CLI surfaces share one
+#: and the MCP handbook has its own, MCP-scoped variant. Matched by prefix so
+#: registering a third scoped surface is covered without editing this guard.
+_ATTRIBUTION_PREFIX = "unreleased"
 
 _VERSION = r"`?v?\d+\.\d+\.\d+`?"
 
@@ -78,6 +82,33 @@ _AVAILABILITY_CLAIM = re.compile(
     rf"|{_VERSION}[^.]{{0,80}}?(?:{_AVAILABILITY})",
     re.IGNORECASE,
 )
+
+
+def _attribution_regions() -> list[tuple[Path, str]]:
+    """Pair each generator-owned file present here with its attribution region.
+
+    Asserted non-empty per file: a managed file that carried no attribution
+    region would otherwise drop out of every scan below and pass silently,
+    which is the failure mode - a document that says nothing about the surface
+    it describes - these contracts exist to catch.
+    """
+    pairs: list[tuple[Path, str]] = []
+    for managed in MANAGED_FILES:
+        path = managed.path_factory()
+        if not path.is_file():
+            continue
+        regions = [
+            region.region_id
+            for region in managed.regions
+            if region.region_id.startswith(_ATTRIBUTION_PREFIX)
+        ]
+        assert len(regions) == 1, (
+            f"{path.name} declares {len(regions)} attribution regions; "
+            "exactly one names the release its surface belongs to."
+        )
+        pairs.append((path, regions[0]))
+    assert pairs, "the managed-file registry resolved to no file in this checkout"
+    return pairs
 
 
 def _managed_paths() -> list[Path]:
@@ -123,13 +154,13 @@ def _region_ids() -> list[str]:
 
 def test_every_managed_reference_carries_the_attribution_region() -> None:
     """The region cannot be dropped, leaving a document that attributes nothing."""
-    for path in _managed_paths():
+    for path, region_id in _attribution_regions():
         text = path.read_text(encoding="utf-8")
-        assert begin_marker(_REGION) in text, (
-            f"{path.name} carries no {_REGION} region, so it describes a "
+        assert begin_marker(region_id) in text, (
+            f"{path.name} carries no {region_id} region, so it describes a "
             "surface without saying which release that surface is."
         )
-        assert end_marker(_REGION) in text
+        assert end_marker(region_id) in text
 
 
 def test_no_hand_written_prose_claims_availability_in_a_named_release() -> None:
@@ -151,7 +182,7 @@ def test_no_hand_written_prose_claims_availability_in_a_named_release() -> None:
     assert not offenders, (
         "Hand-written release claims found in a generated reference. "
         "Attribution belongs in the generated "
-        f"`{_REGION}` region, which is recomputed from "
+        f"`{_ATTRIBUTION_PREFIX}-*` region, which is recomputed from "
         "`published-surface.json` and cannot go stale:\n  - " + "\n  - ".join(offenders)
     )
 
@@ -164,12 +195,12 @@ def test_the_committed_snapshot_backs_the_committed_region() -> None:
     it replaced.
     """
     published = load_published_surface()
-    for path in _managed_paths():
+    for path, region_id in _attribution_regions():
         text = path.read_text(encoding="utf-8")
-        _, _, rest = text.partition(begin_marker(_REGION))
-        body, _, _ = rest.partition(end_marker(_REGION))
+        _, _, rest = text.partition(begin_marker(region_id))
+        body, _, _ = rest.partition(end_marker(region_id))
         assert f"`{published.version}`" in body, (
-            f"{path.name}'s {_REGION} region does not name "
+            f"{path.name}'s {region_id} region does not name "
             f"{published.version}, the release {published_surface_path().name} "
             "records. Run `vaultspec-core spec reference generate`."
         )
@@ -185,7 +216,7 @@ def test_the_empty_difference_still_states_the_release() -> None:
 
     surface = Surface(version="9.9.9", commands={"vault add": ()}, mcp_tools=("find",))
     rendered = render_unreleased_surface(
-        RenderContext(typer_app=app, live=surface, published=surface)
+        RenderContext(typer_app=app, live=surface, published=surface, mcp_tools=())
     )
 
     assert rendered.strip()
@@ -211,7 +242,7 @@ def test_a_difference_names_every_kind_of_addition() -> None:
     )
 
     rendered = render_unreleased_surface(
-        RenderContext(typer_app=app, live=live, published=published)
+        RenderContext(typer_app=app, live=live, published=published, mcp_tools=())
     )
 
     assert "spec hooks trust" in rendered

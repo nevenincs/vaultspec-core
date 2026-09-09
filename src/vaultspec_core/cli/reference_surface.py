@@ -54,9 +54,11 @@ SNAPSHOT_SCHEMA = 1
 
 __all__ = [
     "SNAPSHOT_SCHEMA",
+    "McpTool",
     "Surface",
     "SurfaceSnapshotError",
     "UnreleasedSurface",
+    "capture_mcp_tool_details",
     "capture_surface",
     "load_published_surface",
     "project_version",
@@ -194,22 +196,83 @@ def capture_cli_commands(typer_app: typer.Typer) -> dict[str, tuple[str, ...]]:
     return dict(sorted(commands.items()))
 
 
-def capture_mcp_tools() -> tuple[str, ...]:
-    """Return the sorted tool names the MCP server registers.
+@dataclass(frozen=True)
+class McpTool:
+    """One registered MCP tool as the reference documents it.
+
+    ``purpose`` is the first line of the handler's own docstring and
+    ``annotations`` the rendered form of its MCP hints, so the documented
+    behavior of a tool has one home - the handler - rather than a second,
+    hand-copied one in the handbook.
+    """
+
+    name: str
+    purpose: str
+    annotations: str
+
+
+def _render_annotations(tool: object) -> str:
+    """Render one tool's MCP hints in the handbook's own vocabulary.
+
+    ``destructiveHint`` is unset on read-only tools, where it would be
+    meaningless: a tool that writes nothing is not usefully described as
+    non-destructive. Those rows say ``read-only`` instead, which is what the
+    hand-written table said before this was generated.
+    """
+    hints = getattr(tool, "annotations", None)
+    read_only = bool(getattr(hints, "read_only_hint", False))
+    destructive = getattr(hints, "destructive_hint", None)
+    idempotent = bool(getattr(hints, "idempotent_hint", False))
+
+    parts = ["read-only"] if read_only else []
+    if not read_only:
+        parts.append("destructive" if destructive else "non-destructive")
+    parts.append("idempotent" if idempotent else "not idempotent")
+    return ", ".join(parts)
+
+
+def capture_mcp_tool_details() -> tuple[McpTool, ...]:
+    """Return every registered MCP tool, in registration order.
 
     The full surface is captured, not the read-only one: the read-only mode is
     a runtime restriction over the same registry, so a reference that described
-    only its subset would understate what the release ships.
+    only its subset would understate what the release ships. Registration order
+    is preserved here - the handbook reads as a tour, not an index - while
+    :func:`capture_mcp_tools` sorts, because a snapshot is set membership.
     """
     import asyncio
 
     from vaultspec_core.mcp_server.app import create_server
 
-    async def _names() -> tuple[str, ...]:
-        tools = await create_server().list_tools()
-        return tuple(sorted(tool.name for tool in tools))
+    async def _tools() -> tuple[McpTool, ...]:
+        registered = await create_server().list_tools()
+        return tuple(
+            McpTool(
+                name=tool.name,
+                purpose=_summary_paragraph(tool.description or ""),
+                annotations=_render_annotations(tool),
+            )
+            for tool in registered
+        )
 
-    return asyncio.run(_names())
+    return asyncio.run(_tools())
+
+
+def _summary_paragraph(description: str) -> str:
+    """Return a handler docstring's summary paragraph as one flat line.
+
+    The paragraph, not the first physical line and not the first sentence. A
+    summary that wraps would be cut mid-clause by the line, and one that opens
+    with a short sentence followed by its qualification - ``invoke`` does -
+    would lose the qualification to the sentence split.
+    """
+    paragraph = description.strip().split("\n\n", 1)[0]
+    return " ".join(paragraph.split())
+
+
+def capture_mcp_tools() -> tuple[str, ...]:
+    """Return the sorted tool names the MCP server registers."""
+    return tuple(sorted(tool.name for tool in capture_mcp_tool_details()))
 
 
 def capture_surface(

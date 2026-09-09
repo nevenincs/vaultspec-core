@@ -5,7 +5,7 @@ tags:
 date: '2026-09-09'
 modified: '2026-09-09'
 body_schema: 'body-v2'
-body_hash: 'sha256:c52be9b5e0d4f87f9d63bcc237f0b176bbd77d81a7f18e31676e64310e9c90ca'
+body_hash: 'sha256:aa808b4814d5db7508d5d61cb035af34733456b244982872a901f051dd0a73fb'
 related:
   - "[[2026-09-09-reference-publication-contract-plan]]"
 ---
@@ -33,6 +33,14 @@ related:
 - `S05` `verify:` `pytest test_cli_reference_generated.py` -> `pass`
 - `S06` `A` `dev/guards/test_reference_attribution.py`
 - `S06` `verify:` `pytest dev/guards/test_reference_attribution.py` -> `pass`
+- `S07` `M` `src/vaultspec_core/cli/reference_gen.py`
+- `S07` `M` `src/vaultspec_core/cli/reference_surface.py`
+- `S07` `verify:` `just check-type-strict` -> `pass`
+- `S08` `M` `docs/MCP.md`
+- `S08` `verify:` `vaultspec-core spec reference generate --check` -> `pass`
+- `S09` `M` `src/vaultspec_core/tests/cli/test_cli_reference_surface.py`
+- `S09` `M` `dev/guards/test_reference_attribution.py`
+- `S09` `verify:` `pytest test_cli_reference_surface.py` -> `pass`
 
 ## Notes
 
