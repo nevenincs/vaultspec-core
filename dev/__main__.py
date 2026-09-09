@@ -22,10 +22,20 @@ from __future__ import annotations
 
 import sys
 import textwrap
+import time
 from typing import assert_never
 
+from dev import reporting
 from dev.exit_codes import advisory_result, selection_result
-from dev.runner import Cmd, Echo, Ref, ToolOrDocker, run, run_tool_or_docker
+from dev.runner import (
+    Cmd,
+    Completed,
+    Echo,
+    Ref,
+    ToolOrDocker,
+    run,
+    run_tool_or_docker,
+)
 from dev.toolchain import (
     DEFAULTS,
     VERBS,
@@ -71,20 +81,79 @@ def _print_root_help() -> None:
     print("  Run 'python -m dev <verb> help' for a verb's targets.")
 
 
-def _execute(verb: Verb, target: Target) -> int:
-    """Run one target's steps and return the resulting exit code.
+def _labels(target: Target) -> list[str]:
+    """Name every step of a target, positionally.
+
+    Computed for the target as a whole rather than per step, because telling
+    two colliding labels apart needs the commands they collide with - which is
+    only knowable before the first one runs.
+
+    Args:
+        target: The target whose steps to name.
+
+    Returns:
+        One label per step. A :class:`~dev.runner.Ref` is named by the target
+        it refers to, so an aggregate reads as the dimensions it composes.
+    """
+    commands: list[tuple[str, ...]] = []
+    for step in target.steps:
+        match step:
+            case Ref() | Echo():
+                commands.append(())
+            case ToolOrDocker():
+                commands.append((step.tool, *step.argv))
+            case Cmd():
+                commands.append(step.argv)
+            case _:
+                assert_never(step)
+    labels = reporting.distinct_labels(commands)
+    return [
+        step.target if isinstance(step, Ref) else label
+        for step, label in zip(target.steps, labels, strict=True)
+    ]
+
+
+def _execute(
+    verb: Verb,
+    target: Target,
+    *,
+    emit_rows: bool = True,
+    deferred: list[Completed] | None = None,
+) -> int:
+    """Run one target's steps, report what each did, and return the status.
+
+    Every step contributes one verdict row whether its tool was heard from or
+    not, so a reader learns that a step RAN from the harness rather than by
+    inferring it from output the tool may not produce. A step that failed is
+    additionally replayed in full - suppression is for clean passes only.
 
     Args:
         verb: The owning verb, used to resolve :class:`~dev.runner.Ref` steps.
         target: The target to execute.
+        emit_rows: When false the steps report nothing individually and the
+            caller renders one row for the target as a whole. Set by a
+            :class:`~dev.runner.Ref`, so an aggregate reads as a list of the
+            DIMENSIONS it composes rather than of every tool underneath them.
+        deferred: Where to hand failures the caller must replay, used with
+            ``emit_rows=False``. A nested failure belongs UNDER the row naming
+            the dimension it came from, and that row is the caller's to print.
 
     Returns:
         For an advisory target, 0 when its tools ran (findings and all) and
         ADVISORY_BROKEN when one failed to run. Otherwise the code of the first
         failing step (or of the last step when none failed).
     """
+    # A gate is quiet only when nothing asked to hear it: the verbose escape
+    # hatch restores the streamed, echoed run the harness used to always do.
+    capture = target.quiet_on_pass and not reporting.verbose()
     worst = 0
-    for step in target.steps:
+    codes: list[int] = []
+    labels = _labels(target)
+    started = time.perf_counter()
+
+    for index, step in enumerate(target.steps):
+        code, elapsed = 0, 0.0
+        failures: list[Completed] = []
         match step:
             case Echo():
                 print(f"\n{step.text}", flush=True)
@@ -98,13 +167,31 @@ def _execute(verb: Verb, target: Target) -> int:
                         file=sys.stderr,
                     )
                     return 1
-                code = _execute(verb, referenced)
-            case ToolOrDocker():
-                code = run_tool_or_docker(step)
-            case Cmd():
-                code = run(step.argv, step.env)
+                ref_started = time.perf_counter()
+                code = _execute(verb, referenced, emit_rows=False, deferred=failures)
+                elapsed = time.perf_counter() - ref_started
+            case ToolOrDocker() | Cmd():
+                completed = (
+                    run_tool_or_docker(step, capture=capture)
+                    if isinstance(step, ToolOrDocker)
+                    else run(step.argv, step.env, capture=capture)
+                )
+                code, elapsed = completed.code, completed.seconds
+                if code != 0 and capture:
+                    failures.append(completed)
             case _:
                 assert_never(step)
+
+        codes.append(code)
+        if emit_rows:
+            print(reporting.row(labels[index], code, elapsed), flush=True)
+            # After the row, never before it: the reader needs to know WHICH
+            # step is speaking before they read what it said. A failure is
+            # replayed in full - the command, and everything it printed.
+            for failure in failures:
+                reporting.replay(failure.argv, failure.output)
+        elif deferred is not None:
+            deferred.extend(failures)
 
         if code != 0:
             # FIRST non-zero wins. An aggregate that keeps going reports the
@@ -113,6 +200,16 @@ def _execute(verb: Verb, target: Target) -> int:
             worst = worst or code
             if not target.keep_going:
                 break
+
+    # One line that answers the question, for a target that asked more than one
+    # thing. A single-step target already answered it in its own row.
+    if emit_rows and len(codes) > 1:
+        print(
+            reporting.verdict(
+                f"{verb.name} {target.name}", codes, time.perf_counter() - started
+            ),
+            flush=True,
+        )
 
     worst = selection_result(worst)
     return advisory_result(worst, target.findings_codes) if target.advisory else worst

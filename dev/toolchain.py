@@ -175,6 +175,14 @@ class Target:
         keep_going: When true a failing step does not stop the remaining
             steps. Aggregate dashboards set this so one red dimension does
             not hide every dimension after it.
+        quiet_on_pass: When true this target's tools are heard only when they
+            have something to report - a failure is always replayed in full,
+            a clean pass is summarised by the harness instead. Set it where
+            the tool's success output is NARRATION; leave it off wherever
+            that output is the PRODUCT, which is the safe default and is why
+            the flag is opt-in rather than opt-out. It is a separate axis from
+            `advisory`: `advisory` says what a finding is worth, this says
+            whether a non-finding is worth printing.
     """
 
     name: str
@@ -183,6 +191,7 @@ class Target:
     advisory: bool = False
     findings_codes: frozenset[int] = FINDINGS_CODES
     keep_going: bool = False
+    quiet_on_pass: bool = False
 
 
 @dataclass(frozen=True)
@@ -214,6 +223,39 @@ def _ruff_paths(*prefix: str) -> Cmd:
     return uv_run("ruff", *prefix, *PYTHON_PATHS)
 
 
+def gate(
+    name: str,
+    summary: str,
+    steps: tuple[Step, ...],
+    *,
+    keep_going: bool = False,
+) -> Target:
+    """Declare a read-only gate: a target whose clean pass has nothing to say.
+
+    This is the one class of target for which suppressing success output is
+    not a judgement call but a tautology. A gate INSPECTS and reports what it
+    found; when it finds nothing there is nothing to report, so everything it
+    prints on a clean pass is narration by construction - and each tool
+    narrates in its own dialect, or not at all. The harness says it once
+    instead, in the exit-code contract's words, which are the only ones that
+    tell a clean pass apart from a checker that never ran.
+
+    Naming the class here rather than repeating a flag down the table means a
+    new gate is quiet because of what it IS; `dev/guards/` asserts that every
+    member of the gating verbs is declared through this constructor.
+
+    Args:
+        name: The target token typed on the command line.
+        summary: One-line description shown by ``help``.
+        steps: The steps to run, in order.
+        keep_going: As on :class:`Target`; set by the gating aggregates.
+
+    Returns:
+        The target, declared quiet on a clean pass.
+    """
+    return Target(name, summary, steps, keep_going=keep_going, quiet_on_pass=True)
+
+
 DEPS = Verb(
     name="deps",
     summary="Manage project dependencies and the lockfile.",
@@ -234,7 +276,7 @@ DEPS = Verb(
             "Regenerate the lockfile at the newest allowed versions.",
             (Cmd(("uv", "lock", "--upgrade")),),
         ),
-        Target(
+        gate(
             "check",
             "Verify the lockfile matches pyproject.toml.",
             (Cmd(("uv", "lock", "--check")),),
@@ -251,12 +293,12 @@ LINT = Verb(
         "would hide every dimension behind it."
     ),
     targets=(
-        Target(
+        gate(
             "python",
             "Ruff lint and format verification.",
             (_ruff_paths("check"), _ruff_paths("format", "--check")),
         ),
-        Target(
+        gate(
             "type",
             "Ty type checking.",
             (uv_run("python", "-m", "ty", "check", *PYTHON_PATHS),),
@@ -269,7 +311,7 @@ LINT = Verb(
         # gate and failed only after push - the exact "green here, red
         # there" split a gate exists to prevent. Checking all three targets
         # makes the local run reproduce CI regardless of the host.
-        Target(
+        gate(
             "type-platforms",
             "Ty type checking against every target platform.",
             tuple(
@@ -285,12 +327,12 @@ LINT = Verb(
                 for plat in ("linux", "darwin", "win32")
             ),
         ),
-        Target(
+        gate(
             "toml",
             "Taplo TOML linting.",
             (ToolOrDocker("taplo", ("lint", "*.toml"), "tamasfe/taplo:0.9"),),
         ),
-        Target(
+        gate(
             "links",
             "Lychee link checking.",
             (
@@ -316,7 +358,7 @@ LINT = Verb(
                 ),
             ),
         ),
-        Target(
+        gate(
             "markdown",
             "Markdown formatting and style verification.",
             (
@@ -338,7 +380,7 @@ LINT = Verb(
         # calling a recipe or re-implementing one. A workflow can be perfectly
         # valid YAML and still install actionlint by piping curl into bash,
         # which is how this repository used to check its own workflows.
-        Target(
+        gate(
             "workflow",
             "Lint the workflows, then hold them to the CI/justfile contract.",
             (
@@ -352,17 +394,17 @@ LINT = Verb(
         # code is fine - in CI, past the point a log is scrolled. The flag
         # changes the reporting only: the threshold still comes from
         # `[tool.complexipy]` and the exit code is unchanged either way.
-        Target(
+        gate(
             "complexity",
             "Cognitive complexity over production code.",
             (Cmd(uv_run("complexipy", PACKAGE, "--failed").argv, UTF8),),
         ),
-        Target(
+        gate(
             "nesting",
             "Nesting depth (PLR1702, preview-scoped).",
             (uv_run("ruff", "check", "src", "--select", "PLR1702", "--preview"),),
         ),
-        Target(
+        gate(
             "size",
             "Module length and class design limits ruff has no rule for.",
             (
@@ -375,12 +417,12 @@ LINT = Verb(
                 ),
             ),
         ),
-        Target(
+        gate(
             "type-strict",
             "Basedpyright strict-mode type checking.",
             (uv_run("basedpyright"),),
         ),
-        Target(
+        gate(
             "all",
             "Every gate that is green and can hold that line.",
             # complexity/nesting/size joined this aggregate once each went green
@@ -745,7 +787,7 @@ VAULT = Verb(
     name="vault",
     summary="Operate on this repository's own .vault/ development corpus.",
     targets=(
-        Target(
+        gate(
             "check",
             "Run the vault health checks.",
             (uv_run("vaultspec-core", "vault", "check", "all"),),
@@ -812,7 +854,7 @@ FRAMEWORK = Verb(
             "Regenerate the bundled CLI reference.",
             (uv_run("vaultspec-core", "spec", "reference", "generate"),),
         ),
-        Target(
+        gate(
             "reference-check",
             "Verify the bundled CLI reference is current.",
             (uv_run("vaultspec-core", "spec", "reference", "generate", "--check"),),

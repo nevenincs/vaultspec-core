@@ -13,11 +13,12 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dev import ci_formats
+from dev import ci_formats, reporting
 from dev.exit_codes import TOOL_MISSING as _TOOL_MISSING
 
 if TYPE_CHECKING:
@@ -89,42 +90,101 @@ class Ref:
 Step = Cmd | ToolOrDocker | Echo | Ref
 
 
-def run(argv: Sequence[str], env: Mapping[str, str] | None = None) -> int:
-    """Run one subprocess and return its exit code.
+@dataclass(frozen=True)
+class Completed:
+    """What one step did: its status, its output, and how long it took.
+
+    ``output`` is populated only when the step was captured. A streamed step
+    has already written to the terminal, so there is nothing to hold - the
+    field is empty for it, not lost.
+
+    Args:
+        argv: The command as it actually ran, after ``ci_formats`` augmented
+            it. Held so a failure can be replayed with the real recipe rather
+            than the one before the CI flags were added.
+        code: The status the child exited with.
+        output: Combined stdout and stderr, when captured.
+        seconds: Wall time for the step.
+    """
+
+    argv: tuple[str, ...]
+    code: int
+    output: str = ""
+    seconds: float = 0.0
+
+
+def run(
+    argv: Sequence[str],
+    env: Mapping[str, str] | None = None,
+    *,
+    capture: bool = False,
+) -> Completed:
+    """Run one subprocess and report what it did.
 
     Args:
         argv: The argument vector to execute.
         env: Variables overlaid on the inherited environment.
+        capture: When true the child's output is collected instead of
+            streamed, and the command line is not echoed. The caller decides
+            whether the reader ever sees either - see :mod:`dev.reporting`.
 
     Returns:
-        The child process exit code, or :data:`TOOL_MISSING` when the
-        executable does not exist.
+        A :class:`Completed` carrying the child exit code, or
+        :data:`TOOL_MISSING` when the executable does not exist.
     """
     merged = {**os.environ, **(env or {})}
     # What a tool PRINTS is decided in one place, from the environment; unset,
     # this returns the command untouched. It never changes the exit status.
-    argv = ci_formats.augment(argv, merged)
-    printable = " ".join(argv)
-    print(f"$ {printable}", flush=True)
+    argv = tuple(ci_formats.augment(argv, merged))
+    if not capture:
+        print(f"$ {' '.join(argv)}", flush=True)
+    # A captured tool sees a pipe and turns its colour off, which would strip
+    # the highlighting from the diagnostics replayed on failure - the one case
+    # where they are read. Asking for it back is only honest at a terminal, so
+    # the parent's own stream decides.
+    if capture and reporting.colouring():
+        merged.setdefault("FORCE_COLOR", "1")
+    started = time.perf_counter()
     try:
-        return subprocess.run(list(argv), env=merged, check=False).returncode
+        # `text=True` alone decodes with the LOCALE encoding, which is cp1252
+        # on the Windows runners; a byte outside it then raises on the
+        # pipe-reader thread and the captured output comes back empty. That is
+        # the #321 fault, and it costs more here than it did there: this
+        # buffer is the only record of why a step failed, so losing it would
+        # turn a diagnosable failure into a bare status. `replace` keeps a
+        # mis-encoded byte from destroying the rest of the evidence.
+        completed = subprocess.run(
+            list(argv),
+            env=merged,
+            check=False,
+            capture_output=capture,
+            text=capture,
+            encoding="utf-8" if capture else None,
+            errors="replace" if capture else None,
+        )
     except FileNotFoundError:
-        print(f"{argv[0]} not found on PATH", file=sys.stderr, flush=True)
-        return TOOL_MISSING
+        elapsed = time.perf_counter() - started
+        message = f"{argv[0]} not found on PATH"
+        if not capture:
+            print(message, file=sys.stderr, flush=True)
+        return Completed(argv, TOOL_MISSING, f"{message}\n", elapsed)
+    output = f"{completed.stdout or ''}{completed.stderr or ''}" if capture else ""
+    return Completed(argv, completed.returncode, output, time.perf_counter() - started)
 
 
-def run_tool_or_docker(step: ToolOrDocker) -> int:
+def run_tool_or_docker(step: ToolOrDocker, *, capture: bool = False) -> Completed:
     """Run a native tool, or its Docker image when the tool is unavailable.
 
     Args:
         step: The tool description to execute.
+        capture: Passed through to :func:`run`.
 
     Returns:
-        The exit code of whichever form ran, or :data:`TOOL_MISSING` when
-        neither the tool nor Docker is present.
+        A :class:`Completed` for whichever form ran, or one carrying
+        :data:`TOOL_MISSING` when neither the tool nor Docker is present.
     """
     if shutil.which(step.tool):
-        return run([step.tool, *step.argv])
+        return run([step.tool, *step.argv], capture=capture)
     if shutil.which("docker"):
         mount = f"{Path.cwd()}:/repo"
         container_argv = step.docker_argv if step.docker_argv is not None else step.argv
@@ -139,14 +199,13 @@ def run_tool_or_docker(step: ToolOrDocker) -> int:
                 "/repo",
                 step.image,
                 *container_argv,
-            ]
+            ],
+            capture=capture,
         )
-    print(
-        f"{step.tool} not found and docker is unavailable",
-        file=sys.stderr,
-        flush=True,
-    )
-    return TOOL_MISSING
+    message = f"{step.tool} not found and docker is unavailable"
+    if not capture:
+        print(message, file=sys.stderr, flush=True)
+    return Completed((step.tool, *step.argv), TOOL_MISSING, f"{message}\n")
 
 
 def uv_run(*argv: str) -> Cmd:

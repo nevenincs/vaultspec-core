@@ -185,9 +185,36 @@ A run that proved nothing must not read as a run that proved everything.
   `ToolOrSkip`, which only an advisory target may use. A gate that silently
   passes when its tool is missing is not a gate — it resolves to `127`.
 
+## The display half
+
+A status is only half a contract: `just` discards it on success, so what a developer
+actually reads is what the run PRINTED. Left to the tools, that half said nothing the
+contract says. Six of them announced a clean pass in six vocabularies — `All checks passed!`, `696 files already formatted`, `0 errors, 0 warnings, 0 notes`, an INFO log
+about locating a config file — and three said nothing at all, which is also how a
+checker that never ran reports.
+
+So the same distinction is drawn in the output, by the same rule:
+
+> The harness owns the **verdict**. The tool owns the **diagnosis**.
+
+Every step prints one verdict row, from the harness, in this page's vocabulary — the
+only one in which `ok`, `BROKEN`, `EMPTY` and `MISSING` are four different words rather
+than four silences. A tool is heard when it has a diagnosis: a failing step is replayed
+in full, preceded by the command that produced it, so nothing needed to act on a failure
+is ever withheld.
+
+Suppression applies to clean passes only, and only where a target declares
+`quiet_on_pass` through `toolchain.gate`. That is confined to READ-ONLY inspection,
+where having nothing to report is a tautology rather than a judgement. Everywhere else —
+`fix`, `test`, `build`, `audit`, `health` — the tool's output is the product and is
+never withheld; `advisory` is a separate axis, and findings that do not gate are still
+findings worth printing. `VAULTSPEC_VERBOSE=1` streams everything.
+
 ## Where the contract lives
 
 - `dev/exit_codes.py` — the constants and the two mapping functions.
+- `dev/reporting.py` — the display half: one word per status, and the rows and verdict
+  lines built from them.
 - `dev/runner.py` / `dev/__main__.py` — the single place advisory suppression
   and selection mapping are applied.
 - `dev/guards/test_exit_code_contract.py` — the guard. It asserts the mapping

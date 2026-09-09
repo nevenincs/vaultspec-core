@@ -1364,3 +1364,72 @@ def test_the_precommit_marker_never_becomes_the_ci_selection() -> None:
         f"these CI steps select '{_MARKER_SELECTOR}', which would leave the "
         f"guards outside that marker running nowhere: {offenders}"
     )
+
+
+def test_every_gating_dimension_is_declared_as_a_gate() -> None:
+    """The `lint` verb is gates end to end, and each says so structurally.
+
+    `quiet_on_pass` withholds a tool's success output, so the question of which
+    targets may do it has to be answered by a rule rather than per target. The
+    rule is the one in `EXIT-CODES.md`: `check-*` is READ-ONLY, so a clean pass
+    has nothing to report and everything it prints is narration. Declaring the
+    whole verb through `gate` keeps a new dimension quiet because of what it
+    is, rather than because someone remembered a flag.
+    """
+    from dev import toolchain
+
+    lint = toolchain.find_verb("lint")
+    assert lint is not None
+    loud = [target.name for target in lint.targets if not target.quiet_on_pass]
+    assert not loud, (
+        f"lint targets not declared through `gate`: {loud} - a read-only gate's "
+        "success output is narration, and the harness reports the verdict itself"
+    )
+
+
+def test_no_mutating_or_reporting_target_is_quiet() -> None:
+    """Suppression is confined to read-only inspection.
+
+    Everywhere else the tool's output IS the product - what a fix changed,
+    which tests ran and which skipped, the ranked offenders an audit found -
+    and withholding it would replace the answer with a claim that there was
+    one. `advisory` is a separate axis: an advisory target's findings do not
+    gate, which is no reason not to print them.
+    """
+    from dev import toolchain
+
+    for verb_name in ("fix", "test", "build", "audit", "health", "docs"):
+        verb = toolchain.find_verb(verb_name)
+        assert verb is not None, f"no `{verb_name}` verb"
+        quiet = [target.name for target in verb.targets if target.quiet_on_pass]
+        assert not quiet, (
+            f"`{verb_name}` targets declared quiet: {quiet} - these report a "
+            "product rather than a verdict, so their output is the answer"
+        )
+
+
+def test_the_harness_reports_every_status_the_contract_names() -> None:
+    """Each exit code reaches the reader as its own word.
+
+    The display is the other half of the exit-code contract, and the half a
+    human reads. A status that arrives as silence - which is what `EMPTY`,
+    `BROKEN` and `MISSING` all used to be at a terminal - is indistinguishable
+    from the clean pass none of them is.
+    """
+    from dev import exit_codes, reporting
+
+    named = {
+        value
+        for name, value in vars(exit_codes).items()
+        if name.isupper() and isinstance(value, int) and not name.endswith("_ENV")
+    }
+    unworded = sorted(
+        code
+        for code in named
+        if code not in reporting.STATUS_WORDS
+        and code != exit_codes.PYTEST_NO_TESTS_COLLECTED
+    )
+    assert not unworded, (
+        f"exit codes with no word in dev/reporting.py: {unworded} - a status "
+        "the reader cannot name is one they cannot act on"
+    )
