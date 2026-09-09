@@ -137,8 +137,13 @@ def _bounded_check_payload(
     payload: dict[str, Any] = dataclasses.asdict(cast("DataclassInstance", result))
     diagnostics = payload.get("diagnostics")
     if isinstance(diagnostics, list):
+        # `asdict` erases element types, so narrowing to `list` leaves the
+        # item type genuinely unknown and `windowed_section`'s type variable
+        # unsolvable. Naming that as `list[Any]` says the same thing the
+        # suppression did, but as a claim the checker can hold the rest of the
+        # call to rather than as an instruction to stop looking.
         payload["diagnostics"] = windowed_section(
-            diagnostics,  # pyright: ignore[reportUnknownArgumentType]
+            cast("list[Any]", diagnostics),
             limit=DIAGNOSTIC_RENDER_CAP if limit is None else limit,
             offset=offset,
         )

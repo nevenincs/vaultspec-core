@@ -308,37 +308,47 @@ target-version = "py313"
   ]
   unfixable = ["B"]
 
-    # BASELINE-CALIBRATED (census 2026-07-28, `just health-census`). Each
-    # threshold sits at today's worst PRODUCTION offender, so the gate is green
-    # on landing and can only ever be ratcheted DOWN. ruff's own defaults are
-    # mccabe 10, returns 6, branches 12, args 5, statements 50 - the distance
-    # between those and the numbers below is the burndown backlog.
+    # BASELINE-CALIBRATED (census 2026-09-09, `just health-census`). Each
+    # threshold sits at today's worst offender ACROSS THE GATED TREE, so the
+    # gate is green on landing and can only ever be ratcheted DOWN. ruff's own
+    # defaults are mccabe 10, returns 6, branches 12, args 5, statements 50 -
+    # the distance between those and the numbers below is the burndown backlog.
+    #
+    # The census reports production only; these rules also gate `dev` and
+    # `docs` and the in-package tests, so each value below was re-measured
+    # against the population ruff actually lints rather than read off the
+    # census. The two agreed at this census - no test or instrument is the
+    # worst offender on any of these five dimensions - but they need not, and
+    # the gated population is the one that decides.
     #
     # Cyclomatic census (production blocks):
-    #     over 25:   9      over 15:  67      over 10: 176   <- the default
+    #     over 25:  10      over 15:  72      over 10: 196   <- the default
     [tool.ruff.lint.mccabe]
-    max-complexity = 28 # RATCHETED 58 -> 57 -> 35 -> 28
+    max-complexity = 27 # RATCHETED 58 -> 57 -> 35 -> 28 -> 27
 
-    # Worst production value per rule at the census: returns 8, branches 28,
-    # args 17, statements 93.
+    # Worst gated value per rule at the census: returns 8, branches 27,
+    # args 13, statements 90.
     #
     # `max-args` has a FLOOR that the other rules do not. A Typer command's
     # parameters are the CLI's flags, so its signature length is the published
-    # interface, not debt: 35 of the 110 offenders are commands or callbacks,
-    # and the current worst (17) is `vault add`. The remaining 75 are plain
-    # helpers and are ordinary debt - keep ratcheting on those. Do not chase
-    # ruff's default of 5 here by deleting user-facing flags, and do not add a
-    # per-file-ignore for the command modules, which would also mask genuine
-    # helper bloat living in those same files.
+    # interface, not debt. This dimension has now REACHED that floor: the
+    # worst signature in the tree is 13, and two sites hold it - `emit_listing`
+    # in `cli/rendering_shapes.py`, an ordinary helper and still debt, and
+    # `vault add` in `cli/vault_cmd.py`, which is 13 published flags. Ratchet
+    # the helpers as they come down, but the next reduction below 13 has to
+    # wait for the helper, not the command. Do not chase ruff's default of 5
+    # by deleting user-facing flags, and do not add a per-file-ignore for the
+    # command modules, which would also mask genuine helper bloat living in
+    # those same files.
     #
     # PLR1702 (nesting depth) is NOT listed here: it reached ruff's own default
     # of 5 and is gated at that default by `just check-nesting`. It is the first
     # dimension to finish its burndown; the rest are still above default.
     [tool.ruff.lint.pylint]
-    max-args = 17       # RATCHETED 20 -> 17 (floor is the worst Typer command)
-    max-branches = 28   # RATCHETED 63 -> 62 -> 34 -> 28
-    max-returns = 8     # RATCHETED 13 -> 10 -> 8
-    max-statements = 93 # RATCHETED 214 -> 142 -> 93
+    max-args = 13       # RATCHETED 20 -> 17 -> 13 (AT the Typer-command floor)
+    max-branches = 27   # RATCHETED 63 -> 62 -> 34 -> 28 -> 27
+    max-returns = 8     # RATCHETED 13 -> 10 -> 8 (at its floor)
+    max-statements = 90 # RATCHETED 214 -> 142 -> 93 -> 90
 
     [tool.ruff.lint.per-file-ignores]
     "**/test_*.py" = ["ARG"]
@@ -632,8 +642,10 @@ reportInvalidCast = "error"
 # `C90` measures. Nesting compounds the score here, so a deeply-indented
 # function ranks far worse than a flat one with the same branch count.
 #
-# BASELINE-CALIBRATED (census 2026-07-28): RATCHETED 253 -> 166 -> 154 -> 56 -> 51.
-# Never raise. Long-term target: 15, the tool's own default.
+# BASELINE-CALIBRATED (census 2026-09-09): RATCHETED 253 -> 166 -> 154 -> 56 -> 51.
+# At its floor - the worst production function scores exactly 51, so this one
+# cannot move until that function does. Never raise. Long-term target: 15, the
+# tool's own default.
 #
 # The 253 -> 166 step cost no work of its own: it fell out of the PLR1702
 # nesting burndown. Cognitive complexity compounds with indentation depth, so
@@ -643,12 +655,12 @@ reportInvalidCast = "error"
 #
 # The distance to the target, measured at the same time:
 #
-#     over  30:   39 functions
-#     over  25:   55
-#     over  20:   88
-#     over  18:  115
-#     over  16:  147
-#     over  15:  160      <- the target
+#     over  30:   34 functions
+#     over  25:   50
+#     over  20:   91
+#     over  18:  119
+#     over  16:  154
+#     over  15:  169      <- the target
 #
 # Production only. The test tree is ranked by `just health-report`, which covers
 # both populations from this same tool and labels each: the worst test scores
@@ -693,7 +705,7 @@ enable = ["C0302", "R0902", "R0904", "R0916"]
 #     over 1000:   1
 #     over  500:  31      <- where modules should settle
 #
-# Longest production module: graph/api.py at 1312 lines.
+# Longest production module: graph/api.py at 1252 lines.
 #
 # The `cli/spec_cmd.py` split (spec_cmd_agents.py, spec_cmd_app.py,
 # spec_cmd_doctor.py, spec_cmd_hooks.py, spec_cmd_mcps.py,
@@ -706,14 +718,14 @@ enable = ["C0302", "R0902", "R0904", "R0916"]
 # short on the longest module here and will set a ceiling the tree cannot
 # meet.
 [tool.pylint.format]
-max-module-lines = 1312
+max-module-lines = 1252 # RATCHETED 1312 -> 1252
 
-# BASELINE-CALIBRATED (census 2026-07-28): each sits at the current worst
+# BASELINE-CALIBRATED (census 2026-09-09): each sits at the current worst
 # production offender, so the gate is green today and can only be ratcheted
 # DOWN. pylint defaults: max-attributes=7, max-public-methods=20,
 # max-bool-expr=5.
 [tool.pylint.design]
-max-attributes = 21 # baseline worst: 21 (core/diagnosis/diagnosis.py)
+max-attributes = 21 # at its floor: 21 (core/diagnosis/diagnosis.py)
 max-bool-expr = 5   # RATCHETED 6 -> 5, the pylint default: the three
 # 6-expression conditions were extracted into named
 # predicates, so this dimension is now fully paid off.
