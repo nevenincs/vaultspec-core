@@ -119,7 +119,25 @@ def _read_body_channel(
         # engine write channel always uses --body-stdin, so an un-normalized
         # \r\n would flow into the LF-contract compose/validate/write path and
         # corrupt CRLF files (\r\r\n) or leave stray \r\n in LF documents.
-        return sys.stdin.read().replace("\r\n", "\n")
+        # Read the BYTES and state the decoding, rather than taking whatever
+        # sys.stdin was configured with. The text wrapper takes its encoding
+        # and error handler from the ambient environment, so identical bytes
+        # decoded differently depending on who invoked the CLI. With no
+        # PYTHONIOENCODING it is the locale codec with surrogateescape, which
+        # carries an un-decodable byte through as a lone surrogate and back
+        # out again on write. With PYTHONIOENCODING=utf-8 - which the dev
+        # harness exports to every child - it is UTF-8 STRICT, and the same
+        # byte raises UnicodeDecodeError out of this function. Uncaught, so
+        # the process died on a traceback rather than the structured envelope
+        # the --body-file branch below produces for exactly this error.
+        #
+        # A document holding a legacy byte was therefore editable or not
+        # depending on an environment variable nobody set deliberately.
+        # surrogateescape is the handler that preserves the byte, which is
+        # the contract test_stdin_channel_preserves_legacy_c1_byte states: a
+        # body replacement must not destroy what it did not touch.
+        raw = sys.stdin.buffer.read().decode("utf-8", "surrogateescape")
+        return raw.replace("\r\n", "\n")
 
     assert body_file is not None
     try:
