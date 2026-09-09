@@ -9,6 +9,8 @@ Complete command-line interface (CLI) reference for `vaultspec-core`. See the
 - [Global options](#global-options) - flags accepted across commands.
 - [Outcome vocabulary](#outcome-vocabulary) - the words and glyphs that report results.
 - [JSON output envelope](#json-output-envelope) - the shape of `--json` output.
+- [Surface provenance](#surface-provenance) - what is on this branch and not yet in a
+  release.
 - [Command index](#command-index) - every command, grouped, with a one-line summary.
 - [Workspace commands](#workspace-commands) - install, uninstall, and sync.
 - [Vault commands](#vault-commands) - create, query, and edit vault documents and plans.
@@ -101,6 +103,44 @@ Under `--json`, stdout contains only the envelope; diagnostics go to stderr. Out
 compact by default. For indentation, see
 [environment variables](#environment-variables). Use the top-level `status` field to
 check success.
+
+## Surface provenance
+
+This reference is generated from the branch it ships on, which is ahead of the latest
+release between publications. The block below says by how much: what it lists exists
+here and is not yet installable. It is generated from the recorded surface of that
+release, so it covers every affected command rather than the ones somebody remembered,
+and it empties itself when the next release ships. Run
+`vaultspec-core spec reference generate` to refresh it and
+`vaultspec-core spec reference snapshot` to move the release it is measured against; do
+not hand-edit between the markers.
+
+<!-- vaultspec:generated:begin unreleased-surface -->
+
+The latest published release is `0.1.73`. What follows is on this branch and not in that
+release, so it cannot be installed yet. This list is generated from the recorded surface
+of that release; it is never hand-maintained.
+
+Commands:
+
+- `vaultspec-core spec gitattributes disable`
+- `vaultspec-core spec gitattributes enable`
+- `vaultspec-core spec gitignore disable`
+- `vaultspec-core spec gitignore enable`
+- `vaultspec-core spec hooks trust`
+- `vaultspec-core spec reference snapshot`
+- `vaultspec-core vault check foreign`
+
+Flags on commands the release already has:
+
+- `vaultspec-core migrations run` - `--dry-run`, `--yes`
+- `vaultspec-core vault exec log` - `--by`, `--note`, `--verify`
+
+MCP tools:
+
+- `log`
+
+<!-- vaultspec:generated:end unreleased-surface -->
 
 ## Command index
 
@@ -389,6 +429,8 @@ full options.
 
 - `vaultspec-core spec reference generate` - Regenerate the generator-owned regions of
   the bundled CLI reference.
+- `vaultspec-core spec reference snapshot` - Record the published command and MCP tool
+  surface.
 
 ### Migrations
 
@@ -2452,9 +2494,6 @@ ______________________________________________________________________
 
 ### vaultspec-core spec gitignore
 
-`vaultspec-core spec gitignore` and `vaultspec-core spec gitattributes` are not
-available in the 0.1.73 release.
-
 ```bash
 vaultspec-core spec gitignore [OPTIONS] COMMAND [ARGS]...
 ```
@@ -2712,6 +2751,49 @@ untouched (exit 0 when already in sync).
 
   ```bash
   vaultspec-core spec reference generate --check
+  ```
+
+```bash
+vaultspec-core spec reference snapshot [OPTIONS]
+```
+
+Maintain `src/vaultspec_core/builtins/reference/published-surface.json`, the record of
+the command and MCP tool surface of the latest published release. The generated
+unreleased-surface regions of these documents are the difference between that record and
+the live surface, which is why no version caveat in them is hand-written.
+
+- `--check` (default off) - Report whether the record is due a refresh; exit non-zero
+  when it is, without writing.
+- `--emit` (default off) - Print this build's own surface as a snapshot document to
+  stdout and write nothing.
+- `--verify FILE` - Compare a surface document (from `--emit`) against the committed
+  record; exit non-zero when they differ.
+- `--json` (default off) - Emit machine-readable output.
+
+Default (write) mode refreshes the record from the live surface, and only when the tree
+declares a different version from the one recorded. The record belongs to a release, so
+the release candidate branch - where the version is already the candidate's and the tree
+is the one about to be tagged - is the only place it may move. On main between releases
+the versions match and the verb is a no-op; refreshing there would stamp the previous
+release's version onto commands that release does not contain.
+
+- **Refresh the record on a release candidate branch**:
+
+  ```bash
+  vaultspec-core spec reference snapshot
+  ```
+
+- **Read a published distribution's own surface back, in an isolated install**:
+
+  ```bash
+  uv run --isolated --no-project --with vaultspec-core \
+    vaultspec-core spec reference snapshot --emit > surface.json
+  ```
+
+- **Prove a released distribution matches the record shipped for it**:
+
+  ```bash
+  vaultspec-core spec reference snapshot --verify surface.json
   ```
 
 ## Migration commands

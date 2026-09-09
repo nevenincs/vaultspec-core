@@ -95,6 +95,11 @@ jobs:
       - name: Install Python
         run: uv python install 3.13
 
+      - name: Set up just
+        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        with:
+          tool: just@1.38.0
+
       - name: Download dist artifacts
         uses: actions/download-artifact@v8
         with:
@@ -106,6 +111,22 @@ jobs:
 
       - name: Smoke test (sdist)
         run: uv run --isolated --no-project --with dist/*.tar.gz dev/smoke/smoke_check.py
+
+      # ASKED OF THE DISTRIBUTION, NOT OF THE SOURCE. The generated references
+      # are rendered against a snapshot of the published surface, and the
+      # snapshot is refreshed on the release-please branch - so between the
+      # refresh and the tag there is a window in which the documents could
+      # describe a program the wheel does not contain, and nothing in the
+      # source tree can tell. Only the built artifact can answer.
+      #
+      # Both commands run inside the same isolated install of the wheel: the
+      # first reads the surface that install actually exposes, the second
+      # compares it against the snapshot that install ships. A mismatch is a
+      # release whose own reference describes a different program, and it fails
+      # HERE - before `publish-pypi`, which is the one step that cannot be
+      # undone.
+      - name: Verify the distribution matches the reference it ships
+        run: just release-verify-surface dist
 
   publish-pypi:
     timeout-minutes: 30
@@ -140,6 +161,11 @@ jobs:
 
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+
+      - name: Set up just
+        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        with:
+          tool: just@1.38.0
 
       # ATTESTED BEFORE `uv publish`, because that is the one act in this
       # workflow that cannot be undone. A version pushed to PyPI cannot be
@@ -278,3 +304,20 @@ jobs:
             exit 1
           fi
           echo "all ${checked} distribution file(s) verify against ${GITHUB_REPOSITORY}"
+
+      # The same question as the smoke-test gate, asked of the artifact a user
+      # downloads rather than the one this run built. They are meant to be the
+      # same bytes; this is what says so about the surface, in the same place
+      # and for the same reason the provenance gate above re-reads what was
+      # attached rather than trusting that the upload delivered it.
+      #
+      # After the upload by necessity - there is nothing attached to check
+      # before it - so this cannot stop a bad release, only report one. The
+      # smoke-test gate is the one that stops it.
+      - name: Verify the published distribution matches the reference it ships
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          gh release download "${TAG}" --repo "$GITHUB_REPOSITORY" --pattern '*.whl' --dir published --clobber
+          just release-verify-surface published

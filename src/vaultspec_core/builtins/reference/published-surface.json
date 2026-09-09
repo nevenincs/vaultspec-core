@@ -1,0 +1,911 @@
+{
+  "commands": {
+    "config get": [
+      "--json",
+      "--target"
+    ],
+    "config list": [
+      "--json",
+      "--target"
+    ],
+    "config set": [
+      "--json",
+      "--target"
+    ],
+    "config unset": [
+      "--json",
+      "--target"
+    ],
+    "doctor": [
+      "--json",
+      "--target"
+    ],
+    "install": [
+      "--dry-run",
+      "--force",
+      "--json",
+      "--mode",
+      "--no-hints",
+      "--skip",
+      "--target",
+      "--upgrade"
+    ],
+    "migrations run": [
+      "--json",
+      "--target"
+    ],
+    "migrations status": [
+      "--json",
+      "--target"
+    ],
+    "spec agents add": [
+      "--body",
+      "--description",
+      "--dry-run",
+      "--force",
+      "--from-file",
+      "--json",
+      "--target"
+    ],
+    "spec agents edit": [
+      "--editor",
+      "--target"
+    ],
+    "spec agents list": [
+      "--json",
+      "--target"
+    ],
+    "spec agents remove": [
+      "--force",
+      "--json",
+      "--target",
+      "--yes"
+    ],
+    "spec agents rename": [
+      "--json",
+      "--target"
+    ],
+    "spec agents restore": [
+      "--json",
+      "--target"
+    ],
+    "spec agents show": [
+      "--json",
+      "--target"
+    ],
+    "spec agents status": [
+      "--json",
+      "--target"
+    ],
+    "spec agents sync": [
+      "--dry-run",
+      "--force",
+      "--json",
+      "--target"
+    ],
+    "spec doctor": [
+      "--gate-errors",
+      "--json",
+      "--target"
+    ],
+    "spec hooks add": [
+      "--body",
+      "--command",
+      "--dry-run",
+      "--event",
+      "--force",
+      "--from-file",
+      "--json",
+      "--target"
+    ],
+    "spec hooks edit": [
+      "--editor",
+      "--target"
+    ],
+    "spec hooks list": [
+      "--json",
+      "--target"
+    ],
+    "spec hooks remove": [
+      "--force",
+      "--json",
+      "--target",
+      "--yes"
+    ],
+    "spec hooks rename": [
+      "--json",
+      "--target"
+    ],
+    "spec hooks restore": [
+      "--json",
+      "--target"
+    ],
+    "spec hooks run": [
+      "--json",
+      "--path",
+      "--target"
+    ],
+    "spec hooks show": [
+      "--json",
+      "--target"
+    ],
+    "spec hooks status": [
+      "--json",
+      "--target"
+    ],
+    "spec hooks sync": [
+      "--dry-run",
+      "--force",
+      "--json",
+      "--target"
+    ],
+    "spec mcps add": [
+      "--config",
+      "--force",
+      "--json",
+      "--name",
+      "--target"
+    ],
+    "spec mcps list": [
+      "--json",
+      "--target"
+    ],
+    "spec mcps remove": [
+      "--force",
+      "--json",
+      "--target"
+    ],
+    "spec mcps status": [
+      "--json",
+      "--scope",
+      "--target"
+    ],
+    "spec mcps sync": [
+      "--dry-run",
+      "--force",
+      "--json",
+      "--prune",
+      "--scope",
+      "--target"
+    ],
+    "spec mcps uninstall": [
+      "--dry-run",
+      "--force",
+      "--json",
+      "--scope",
+      "--target"
+    ],
+    "spec precommit disable": [
+      "--json",
+      "--target"
+    ],
+    "spec precommit enable": [
+      "--json",
+      "--target"
+    ],
+    "spec precommit migrate": [
+      "--dry-run",
+      "--json",
+      "--remove-yaml",
+      "--target"
+    ],
+    "spec reference generate": [
+      "--check",
+      "--json"
+    ],
+    "spec rules add": [
+      "--body",
+      "--dry-run",
+      "--force",
+      "--from-file",
+      "--json",
+      "--target"
+    ],
+    "spec rules edit": [
+      "--editor",
+      "--target"
+    ],
+    "spec rules list": [
+      "--json",
+      "--target"
+    ],
+    "spec rules remove": [
+      "--force",
+      "--json",
+      "--target",
+      "--yes"
+    ],
+    "spec rules rename": [
+      "--json",
+      "--target"
+    ],
+    "spec rules restore": [
+      "--json",
+      "--target"
+    ],
+    "spec rules show": [
+      "--json",
+      "--target"
+    ],
+    "spec rules status": [
+      "--json",
+      "--target"
+    ],
+    "spec rules sync": [
+      "--dry-run",
+      "--force",
+      "--json",
+      "--target"
+    ],
+    "spec skills add": [
+      "--body",
+      "--description",
+      "--dry-run",
+      "--force",
+      "--from-file",
+      "--json",
+      "--target",
+      "--template"
+    ],
+    "spec skills edit": [
+      "--editor",
+      "--target"
+    ],
+    "spec skills list": [
+      "--json",
+      "--target"
+    ],
+    "spec skills remove": [
+      "--force",
+      "--json",
+      "--target",
+      "--yes"
+    ],
+    "spec skills rename": [
+      "--json",
+      "--target"
+    ],
+    "spec skills restore": [
+      "--json",
+      "--target"
+    ],
+    "spec skills show": [
+      "--json",
+      "--target"
+    ],
+    "spec skills status": [
+      "--json",
+      "--target"
+    ],
+    "spec skills sync": [
+      "--dry-run",
+      "--force",
+      "--json",
+      "--target"
+    ],
+    "spec system show": [
+      "--json",
+      "--target"
+    ],
+    "spec system sync": [
+      "--dry-run",
+      "--force",
+      "--json",
+      "--target"
+    ],
+    "status": [
+      "--json",
+      "--limit",
+      "--no-hints",
+      "--paths",
+      "--since",
+      "--target",
+      "--verbose-exec"
+    ],
+    "sync": [
+      "--dry-run",
+      "--force",
+      "--json",
+      "--skip",
+      "--target"
+    ],
+    "uninstall": [
+      "--dry-run",
+      "--force",
+      "--json",
+      "--remove-vault",
+      "--skip",
+      "--target"
+    ],
+    "vault add": [
+      "--all-steps",
+      "--date",
+      "--dry-run",
+      "--feature",
+      "--force",
+      "--json",
+      "--no-hints",
+      "--phase",
+      "--related",
+      "--step",
+      "--summary",
+      "--tags",
+      "--target",
+      "--tier",
+      "--title",
+      "--topic"
+    ],
+    "vault adr supersede": [
+      "--by",
+      "--dry-run",
+      "--json",
+      "--target"
+    ],
+    "vault archive documents": [
+      "--dry-run",
+      "--json",
+      "--manifest",
+      "--target"
+    ],
+    "vault archive restore": [
+      "--deduplicate-identical",
+      "--dry-run",
+      "--json",
+      "--manifest",
+      "--target"
+    ],
+    "vault check adr-status": [
+      "--feature",
+      "--fix",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check all": [
+      "--feature",
+      "--fix",
+      "--json",
+      "--limit",
+      "--no-hints",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check annotations": [
+      "--feature",
+      "--fix",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check body-links": [
+      "--feature",
+      "--fix",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check body-sections": [
+      "--feature",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check code-boundary": [
+      "--feature",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check dangling": [
+      "--feature",
+      "--fix",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check encoding": [
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check exec-mapping": [
+      "--feature",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check feature-rename-integrity": [
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check features": [
+      "--feature",
+      "--fix",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check frontmatter": [
+      "--feature",
+      "--fix",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check links": [
+      "--feature",
+      "--fix",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check markdown": [
+      "--feature",
+      "--fix",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check modified-stamp": [
+      "--feature",
+      "--fix",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check orphans": [
+      "--feature",
+      "--fix",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check placeholders": [
+      "--feature",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check references": [
+      "--feature",
+      "--fix",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check rename-integrity": [
+      "--fix",
+      "--fix-frontmatter-wins",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check schema": [
+      "--feature",
+      "--fix",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check structure": [
+      "--fix",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault edit": [
+      "--body-file",
+      "--body-stdin",
+      "--check",
+      "--date",
+      "--dry-run",
+      "--expected-blob-hash",
+      "--json",
+      "--related",
+      "--tags",
+      "--target"
+    ],
+    "vault exec detach": [
+      "--dry-run",
+      "--json",
+      "--record",
+      "--target"
+    ],
+    "vault exec fold": [
+      "--dry-run",
+      "--feature",
+      "--force",
+      "--json",
+      "--target"
+    ],
+    "vault exec log": [
+      "--dry-run",
+      "--feature",
+      "--json",
+      "--related",
+      "--row",
+      "--step",
+      "--target"
+    ],
+    "vault exec relink": [
+      "--dry-run",
+      "--json",
+      "--record",
+      "--step",
+      "--target"
+    ],
+    "vault exec retire": [
+      "--dry-run",
+      "--json",
+      "--record",
+      "--target"
+    ],
+    "vault feature archive": [
+      "--dry-run",
+      "--json",
+      "--no-hints",
+      "--target"
+    ],
+    "vault feature index": [
+      "--feature",
+      "--json",
+      "--target"
+    ],
+    "vault feature list": [
+      "--date",
+      "--json",
+      "--limit",
+      "--offset",
+      "--orphaned",
+      "--stale-days",
+      "--target",
+      "--type"
+    ],
+    "vault feature rename": [
+      "--dry-run",
+      "--force",
+      "--json",
+      "--no-hints",
+      "--target"
+    ],
+    "vault feature unarchive": [
+      "--dry-run",
+      "--json",
+      "--target"
+    ],
+    "vault graph": [
+      "--ascii",
+      "--body",
+      "--depth",
+      "--derived",
+      "--derived-limit",
+      "--derived-offset",
+      "--feature",
+      "--json",
+      "--metrics",
+      "--node",
+      "--ref",
+      "--target"
+    ],
+    "vault link add": [
+      "--dry-run",
+      "--force",
+      "--json",
+      "--target"
+    ],
+    "vault link list": [
+      "--feature",
+      "--json",
+      "--target"
+    ],
+    "vault link remove": [
+      "--dry-run",
+      "--json",
+      "--target"
+    ],
+    "vault list": [
+      "--date",
+      "--feature",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target"
+    ],
+    "vault plan check": [
+      "--fix",
+      "--json"
+    ],
+    "vault plan epic intent edit": [
+      "--canonicalise",
+      "--dry-run",
+      "--json",
+      "--text"
+    ],
+    "vault plan epic intent show": [],
+    "vault plan phase add": [
+      "--canonicalise",
+      "--dry-run",
+      "--intent",
+      "--json",
+      "--title",
+      "--wave"
+    ],
+    "vault plan phase edit": [
+      "--canonicalise",
+      "--dry-run",
+      "--intent",
+      "--json",
+      "--title"
+    ],
+    "vault plan phase insert": [
+      "--after",
+      "--before",
+      "--canonicalise",
+      "--dry-run",
+      "--intent",
+      "--json",
+      "--title"
+    ],
+    "vault plan phase move": [
+      "--after",
+      "--before",
+      "--canonicalise",
+      "--dry-run",
+      "--json",
+      "--to-wave"
+    ],
+    "vault plan phase remove": [
+      "--canonicalise",
+      "--dry-run",
+      "--json"
+    ],
+    "vault plan phase renumber": [
+      "--canonicalise",
+      "--dry-run",
+      "--json",
+      "--to"
+    ],
+    "vault plan query": [
+      "--closed",
+      "--json",
+      "--open",
+      "--phase",
+      "--target",
+      "--wave"
+    ],
+    "vault plan status": [
+      "--json",
+      "--target"
+    ],
+    "vault plan step add": [
+      "--action",
+      "--canonicalise",
+      "--dry-run",
+      "--json",
+      "--phase",
+      "--scope"
+    ],
+    "vault plan step check": [
+      "--canonicalise",
+      "--dry-run",
+      "--json"
+    ],
+    "vault plan step edit": [
+      "--action",
+      "--canonicalise",
+      "--dry-run",
+      "--json",
+      "--scope"
+    ],
+    "vault plan step insert": [
+      "--action",
+      "--after",
+      "--before",
+      "--canonicalise",
+      "--dry-run",
+      "--json",
+      "--scope"
+    ],
+    "vault plan step move": [
+      "--after",
+      "--before",
+      "--canonicalise",
+      "--dry-run",
+      "--json",
+      "--to-phase"
+    ],
+    "vault plan step remove": [
+      "--canonicalise",
+      "--dry-run",
+      "--json"
+    ],
+    "vault plan step toggle": [
+      "--canonicalise",
+      "--dry-run",
+      "--json"
+    ],
+    "vault plan step uncheck": [
+      "--canonicalise",
+      "--dry-run",
+      "--json"
+    ],
+    "vault plan tier demote": [
+      "--canonicalise",
+      "--dry-run",
+      "--force",
+      "--json",
+      "--target"
+    ],
+    "vault plan tier promote": [
+      "--canonicalise",
+      "--dry-run",
+      "--epic-intent",
+      "--json",
+      "--phase-intent",
+      "--phase-title",
+      "--target",
+      "--wave-intent",
+      "--wave-title"
+    ],
+    "vault plan tier show": [
+      "--json"
+    ],
+    "vault plan trailer emit": [
+      "--feature",
+      "--step"
+    ],
+    "vault plan trailer validate": [
+      "--json"
+    ],
+    "vault plan wave add": [
+      "--canonicalise",
+      "--dry-run",
+      "--intent",
+      "--json",
+      "--title"
+    ],
+    "vault plan wave edit": [
+      "--canonicalise",
+      "--dry-run",
+      "--intent",
+      "--json",
+      "--title"
+    ],
+    "vault plan wave insert": [
+      "--after",
+      "--before",
+      "--canonicalise",
+      "--dry-run",
+      "--intent",
+      "--json",
+      "--title"
+    ],
+    "vault plan wave move": [
+      "--after",
+      "--before",
+      "--canonicalise",
+      "--dry-run",
+      "--json"
+    ],
+    "vault plan wave remove": [
+      "--canonicalise",
+      "--dry-run",
+      "--json"
+    ],
+    "vault rename": [
+      "--check",
+      "--dry-run",
+      "--expected-blob-hash",
+      "--json",
+      "--target",
+      "--to"
+    ],
+    "vault repair": [
+      "--dry-run",
+      "--feature",
+      "--include-index",
+      "--json",
+      "--target",
+      "--verbose"
+    ],
+    "vault rule promote": [
+      "--as",
+      "--dry-run",
+      "--force",
+      "--from",
+      "--json",
+      "--target"
+    ],
+    "vault sanitize annotations": [
+      "--dry-run",
+      "--feature",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault set-body": [
+      "--body-file",
+      "--body-stdin",
+      "--check",
+      "--dry-run",
+      "--expected-blob-hash",
+      "--json",
+      "--target"
+    ],
+    "vault set-frontmatter": [
+      "--date",
+      "--dry-run",
+      "--expected-blob-hash",
+      "--json",
+      "--related",
+      "--tags",
+      "--target"
+    ],
+    "vault stats": [
+      "--date",
+      "--feature",
+      "--invalid",
+      "--json",
+      "--orphaned",
+      "--target",
+      "--type"
+    ]
+  },
+  "mcp_tools": [
+    "check",
+    "create",
+    "discover",
+    "edit",
+    "find",
+    "invoke",
+    "plan_edit",
+    "plan_progress",
+    "status"
+  ],
+  "schema": 1,
+  "version": "0.1.73"
+}

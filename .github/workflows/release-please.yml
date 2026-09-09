@@ -37,6 +37,19 @@ jobs:
         if: steps.release.outputs.pr && !steps.release.outputs.release_created
         uses: astral-sh/setup-uv@v7
 
+      # `just`, and `just init` below, because the snapshot refresh runs the
+      # project's own verbs rather than uv alone: `spec reference generate`
+      # shells out to the same `mdformat` the pre-commit hooks run, so that the
+      # committed artifact and fresh output can never disagree on whitespace.
+      # `just init` is this repository's one provisioning entry point, and a
+      # second guess at what a job needs is the drift `ci.yml` is guarded
+      # against.
+      - name: Set up just for the release branch
+        if: steps.release.outputs.pr && !steps.release.outputs.release_created
+        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        with:
+          tool: just@1.38.0
+
       - name: Regenerate and push uv.lock onto the release branch
         if: steps.release.outputs.pr && !steps.release.outputs.release_created
         run: |
@@ -48,6 +61,37 @@ jobs:
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add uv.lock
             git commit -m "chore: update uv.lock for release"
+            git push
+          fi
+
+      # THE ONLY PLACE THE SURFACE SNAPSHOT MAY MOVE, and the reason is the
+      # same one that puts the lockfile refresh above here: on this branch the
+      # version is already the candidate's and the tree is already the one
+      # about to be tagged, so what is captured is exactly what will publish.
+      #
+      # On main the two versions are equal - release-please holds the bump
+      # until this pull request merges - so `spec reference snapshot` refuses
+      # to write there, and the generated references keep attributing against
+      # the release that actually shipped. Running it anywhere else would
+      # restamp unreleased commands as published.
+      #
+      # `generate` follows because the unreleased-surface regions are rendered
+      # against the snapshot: moving one without the other leaves documents
+      # quoting the release they no longer describe. Both are idempotent and
+      # the whole step is a no-op when nothing changed, which matters on a
+      # branch release-please regenerates and force-pushes.
+      - name: Refresh the surface snapshot and generated references
+        if: steps.release.outputs.pr && !steps.release.outputs.release_created
+        run: |
+          just init
+          just framework-surface
+          if git diff --quiet; then
+            echo "the published surface and its references are already current"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "chore: record the published surface for release"
             git push
           fi
 

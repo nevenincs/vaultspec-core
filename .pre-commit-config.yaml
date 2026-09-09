@@ -81,7 +81,10 @@ repos:
     entry: uv run --no-sync vaultspec-core spec reference generate --check
     language: system
     pass_filenames: false
-    files: '^(src/vaultspec_core/cli/.*\.py|src/vaultspec_core/builtins/reference/cli\.md|docs/CLI\.md)$'
+    # `builtins/reference/` rather than `cli.md` alone: the generated regions
+    # are rendered against `published-surface.json`, so a snapshot that moves
+    # without the documents moving with it is exactly the drift this catches.
+    files: '^(src/vaultspec_core/cli/.*\.py|src/vaultspec_core/builtins/reference/.*|docs/(CLI|MCP)\.md)$'
   - id: doc-cli-language
     name: Docs name the CLI entry point
     # The guard that reads only markdown, not the live CLI: 0.06s of work in

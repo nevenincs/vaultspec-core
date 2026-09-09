@@ -18,7 +18,17 @@ This module walks the live Typer command tree exactly as the drift guard
 ``registered_commands`` and ``registered_groups``, descending recursively and
 skipping ``hidden`` entries - and reads per-command argument metadata from the
 Click command objects Typer builds. From that tree it renders the
-command-inventory signature block. Everything outside the managed markers
+command-inventory signature block.
+
+A second region, ``unreleased-surface``, answers the question the inventory
+cannot: which of those commands a reader can actually install. It is the
+difference between the live surface and the recorded surface of the latest
+release (:mod:`vaultspec_core.cli.reference_surface`), per the
+``reference-publication-contract`` ADR, and it exists so that no version caveat
+in these documents is hand-written - a rendered difference has no skipped state
+and cannot expire.
+
+Everything outside the managed markers
 (entry-point table, global-options narrative, sync-vocabulary section, the
 curated per-command option tables, the consolidated ``vault check`` / ``vault
 plan`` paragraphs, the exit-code table, and the environment-variable table) is
@@ -44,6 +54,8 @@ if TYPE_CHECKING:
     import typer
     from typer._click.core import Command as ClickCommand
     from typer._click.core import Context as ClickContext
+
+    from vaultspec_core.cli.reference_surface import McpTool, Surface
 
 # Marker grammar. The region id is interpolated between the fixed prefix and
 # suffix so a single regex-free string search locates each managed zone.
@@ -83,12 +95,24 @@ def docs_handbook_path() -> Path:
     return _Path(__file__).resolve().parents[3] / "docs" / "CLI.md"
 
 
+def docs_mcp_handbook_path() -> Path:
+    """Return the filesystem path to the source-tree handbook ``docs/MCP.md``.
+
+    Source-only like ``docs/CLI.md``, and registered on the same terms: the
+    tool inventory and the MCP-scoped attribution are generated, while the
+    per-tool prose sections around them stay hand-written.
+    """
+    from pathlib import Path as _Path
+
+    return _Path(__file__).resolve().parents[3] / "docs" / "MCP.md"
+
+
 # ---------------------------------------------------------------------------
 # Typer / Click introspection
 # ---------------------------------------------------------------------------
 
 
-def _leaf_commands_in_order(
+def leaf_command_paths(
     typer_app: typer.Typer, prefix: tuple[str, ...]
 ) -> list[tuple[str, ...]]:
     """Return visible leaf-command paths in registration order.
@@ -112,11 +136,11 @@ def _leaf_commands_in_order(
         if not name or group.hidden:
             continue
         if group.typer_instance is not None:
-            paths.extend(_leaf_commands_in_order(group.typer_instance, (*prefix, name)))
+            paths.extend(leaf_command_paths(group.typer_instance, (*prefix, name)))
     return paths
 
 
-def _resolve_click_command(
+def resolve_click_command(
     root: ClickCommand, root_ctx: ClickContext, path: tuple[str, ...]
 ) -> tuple[ClickCommand, ClickContext]:
     """Descend the Click command tree to the command at *path*."""
@@ -169,8 +193,8 @@ def collect_leaf_signatures(typer_app: typer.Typer) -> list[str]:
     root_ctx = root.context_class(root, info_name="vaultspec-core")
 
     signatures: list[str] = []
-    for path in _leaf_commands_in_order(typer_app, ()):
-        command, ctx = _resolve_click_command(root, root_ctx, path)
+    for path in leaf_command_paths(typer_app, ()):
+        command, ctx = resolve_click_command(root, root_ctx, path)
         signatures.append(_command_signature(command, ctx, path))
     return signatures
 
@@ -188,8 +212,8 @@ def _collect_leaf_help(typer_app: typer.Typer) -> list[tuple[tuple[str, ...], st
     root_ctx = root.context_class(root, info_name="vaultspec-core")
 
     entries: list[tuple[tuple[str, ...], str]] = []
-    for path in _leaf_commands_in_order(typer_app, ()):
-        command, _ctx = _resolve_click_command(root, root_ctx, path)
+    for path in leaf_command_paths(typer_app, ()):
+        command, _ctx = resolve_click_command(root, root_ctx, path)
         # Take the docstring's first line directly: Click's short-help helper
         # splits on the first period, which truncates summaries that contain a
         # literal ellipsis (for example "L1 -> ... -> L4").
@@ -207,7 +231,7 @@ def render_command_inventory(typer_app: typer.Typer) -> str:
     heading, so related commands stay titled and grouped. Every command is one
     bullet showing its full runnable form (``vaultspec-core spec rules list``)
     plus a one-line summary from the live ``--help``. Entries keep
-    :func:`_leaf_commands_in_order` order.
+    :func:`leaf_command_paths` order.
     """
     group_names = {
         group.name
@@ -238,19 +262,186 @@ def render_command_inventory(typer_app: typer.Typer) -> str:
     return "\n".join(blocks).rstrip("\n")
 
 
+def render_unreleased_surface(context: RenderContext) -> str:
+    """Render which of this tree's commands and tools the release does not have.
+
+    This is the region that replaces hand-written per-command version caveats.
+    It is a set difference between the live surface and the published-surface
+    snapshot, so it covers every affected command rather than the ones somebody
+    remembered, and it empties itself when a release ships instead of naming a
+    version that later becomes wrong.
+
+    The empty state is written out rather than left blank: a reader must be able
+    to tell "this reference matches the release" from "nobody filled this in".
+    """
+    from vaultspec_core.cli.reference_surface import unreleased_surface
+
+    diff = unreleased_surface(context.live, context.published)
+    version = context.published.version
+
+    if diff.is_empty():
+        return (
+            f"The latest published release is `{version}`, and every command, "
+            "flag, and tool documented here is in it."
+        )
+
+    lines = [
+        f"The latest published release is `{version}`. What follows is on this "
+        "branch and not in that release, so it cannot be installed yet. This "
+        "list is generated from the recorded surface of that release; it is "
+        "never hand-maintained.",
+        "",
+    ]
+    if diff.commands:
+        lines.extend(("Commands:", ""))
+        lines.extend(f"- `vaultspec-core {name}`" for name in diff.commands)
+        lines.append("")
+    if diff.flags:
+        lines.extend(("Flags on commands the release already has:", ""))
+        lines.extend(
+            f"- `vaultspec-core {name}` - {', '.join(f'`{flag}`' for flag in flags)}"
+            for name, flags in diff.flags.items()
+        )
+        lines.append("")
+    if diff.mcp_tools:
+        lines.extend(("MCP tools:", ""))
+        lines.extend(f"- `{name}`" for name in diff.mcp_tools)
+        lines.append("")
+    return "\n".join(lines).rstrip("\n")
+
+
+def render_mcp_tool_inventory(context: RenderContext) -> str:
+    """Render the MCP tool table from the live server registry.
+
+    Names, purposes, and annotations all come from the handlers themselves -
+    the purpose is a handler's own summary paragraph, and the annotation column
+    is its MCP hints in the handbook's vocabulary. The table was hand-written
+    until this existed, which meant a tool's documented behavior had a second
+    home that nothing reconciled against the first.
+
+    Registration order is preserved, not sorted: the handbook's per-tool
+    sections follow the same order and read as a tour.
+    """
+    tools = context.mcp_tools
+    lines = [
+        f"The server exposes {len(tools)} tools.",
+        "",
+        "| Tool | Purpose | Annotations |",
+        "| ---- | ------- | ----------- |",
+    ]
+    lines.extend(
+        f"| `{tool.name}` | {tool.purpose} | {tool.annotations} |" for tool in tools
+    )
+    return "\n".join(lines)
+
+
+def render_unreleased_mcp_surface(context: RenderContext) -> str:
+    """Render which of the tools above the published release does not have.
+
+    The MCP-scoped half of the attribution the CLI surfaces carry. Scoped
+    rather than shared, because a reader of the MCP handbook is asking which
+    tools they can call, and a list of unreleased CLI verbs beside it would be
+    noise they have to filter.
+    """
+    from vaultspec_core.cli.reference_surface import unreleased_surface
+
+    diff = unreleased_surface(context.live, context.published)
+    version = context.published.version
+
+    if not diff.mcp_tools:
+        return (
+            f"The latest published release is `{version}`, and every tool above "
+            "is in it."
+        )
+
+    lines = [
+        f"The latest published release is `{version}`. These tools are on this "
+        "branch and not in that release, so a host installing the published "
+        "server will not see them:",
+        "",
+    ]
+    lines.extend(f"- `{name}`" for name in diff.mcp_tools)
+    return "\n".join(lines)
+
+
+@dataclass(frozen=True)
+class RenderContext:
+    """Everything a region renderer may read.
+
+    ``typer_app`` is the live command tree. ``live`` is that tree's surface
+    together with the MCP tool registry's, and ``published`` is the recorded
+    surface of the latest release; the unreleased-surface region is the
+    difference between them. All three are resolved once by
+    :func:`build_render_context` and passed in rather than looked up inside a
+    renderer, so capturing the MCP surface - which starts a server - happens
+    once per run instead of once per file, and so a test can render any region
+    against a constructed surface without touching the committed artifacts.
+    """
+
+    typer_app: typer.Typer
+    live: Surface
+    published: Surface
+    mcp_tools: tuple[McpTool, ...]
+
+
+def build_render_context(
+    typer_app: typer.Typer | None = None,
+    published: Surface | None = None,
+) -> RenderContext:
+    """Resolve the live and published surfaces a render pass reads.
+
+    Raises:
+        SurfaceSnapshotError: The published-surface snapshot is absent or
+            unreadable and no replacement was supplied.
+    """
+    from vaultspec_core.cli.reference_surface import Surface as _Surface
+    from vaultspec_core.cli.reference_surface import (
+        capture_cli_commands,
+        capture_mcp_tool_details,
+        load_published_surface,
+        project_version,
+    )
+
+    if typer_app is None:
+        from vaultspec_core.cli import app as typer_app
+
+    # The tool details are captured once and the name set derived from them,
+    # rather than calling into the MCP registry twice: each call starts a
+    # server, and a render pass covers several files.
+    mcp_tools = capture_mcp_tool_details()
+
+    return RenderContext(
+        typer_app=typer_app,
+        live=_Surface(
+            version=project_version(),
+            commands=capture_cli_commands(typer_app),
+            mcp_tools=tuple(sorted(tool.name for tool in mcp_tools)),
+        ),
+        published=published if published is not None else load_published_surface(),
+        mcp_tools=mcp_tools,
+    )
+
+
 @dataclass(frozen=True)
 class ManagedRegion:
     """A generator-owned zone delimited by begin/end markers in the reference."""
 
     region_id: str
-    render: Callable[[typer.Typer], str]
+    render: Callable[[RenderContext], str]
 
 
 # Registry of every managed region, in document order. Adding a sibling region
 # (per-command option tables, exit-code table) later extends this tuple rather
 # than rewriting the apply loop.
 MANAGED_REGIONS: tuple[ManagedRegion, ...] = (
-    ManagedRegion(region_id="command-inventory", render=render_command_inventory),
+    ManagedRegion(
+        region_id="command-inventory",
+        render=lambda context: render_command_inventory(context.typer_app),
+    ),
+    ManagedRegion(
+        region_id="unreleased-surface",
+        render=render_unreleased_surface,
+    ),
 )
 
 
@@ -275,11 +466,28 @@ class ManagedFile:
 # ManagedFile here rather than touching the apply loop. The bundled reference
 # and the source-tree handbook share the command-inventory region so the two
 # surfaces cannot silently diverge in command set or ordering.
+#: The MCP handbook's own region set. The tool inventory replaces a table that
+#: was hand-copied from the handlers, and the attribution is MCP-scoped: a
+#: reader here is asking which tools they can call, so the unreleased CLI verbs
+#: the other surfaces list would be noise to filter rather than an answer.
+MCP_REGIONS: tuple[ManagedRegion, ...] = (
+    ManagedRegion(region_id="mcp-tool-inventory", render=render_mcp_tool_inventory),
+    ManagedRegion(
+        region_id="unreleased-mcp-surface", render=render_unreleased_mcp_surface
+    ),
+)
+
+
 MANAGED_FILES: tuple[ManagedFile, ...] = (
     ManagedFile(path_factory=bundled_reference_path, regions=MANAGED_REGIONS),
     ManagedFile(
         path_factory=docs_handbook_path,
         regions=MANAGED_REGIONS,
+        optional=True,
+    ),
+    ManagedFile(
+        path_factory=docs_mcp_handbook_path,
+        regions=MCP_REGIONS,
         optional=True,
     ),
 )
@@ -384,6 +592,7 @@ def render_reference(
     committed_text: str,
     typer_app: typer.Typer,
     regions: tuple[ManagedRegion, ...] = MANAGED_REGIONS,
+    context: RenderContext | None = None,
 ) -> str:
     """Return *committed_text* with every managed region freshly rendered.
 
@@ -392,11 +601,14 @@ def render_reference(
     whole result is then normalised through :func:`_mdformat_normalise` so the
     file is mdformat-clean by construction. *regions* defaults to the
     bundled-reference region set; a caller may pass a file-specific region tuple
-    from the :data:`MANAGED_FILES` registry.
+    from the :data:`MANAGED_FILES` registry. *context* is resolved from
+    *typer_app* and the committed snapshot when a caller does not supply one;
+    passing it lets a multi-file pass capture the surfaces once.
     """
+    render_context = context or build_render_context(typer_app)
     text = committed_text
     for region in regions:
-        text = _replace_region(text, region, region.render(typer_app))
+        text = _replace_region(text, region, region.render(render_context))
     return _mdformat_normalise(text)
 
 
@@ -437,6 +649,7 @@ def generate(
     reference_path: Path | None = None,
     typer_app: typer.Typer | None = None,
     regions: tuple[ManagedRegion, ...] = MANAGED_REGIONS,
+    context: RenderContext | None = None,
 ) -> GenerateResult:
     """Render the managed regions of one generator-owned file.
 
@@ -451,6 +664,8 @@ def generate(
             live :data:`vaultspec_core.cli.app`).
         regions: The region tuple to rewrite; defaults to the bundled
             reference's region set.
+        context: Pre-resolved live and published surfaces; captured from
+            *typer_app* and the committed snapshot when omitted.
 
     Returns:
         A :class:`GenerateResult` recording whether the committed file diverged
@@ -461,7 +676,7 @@ def generate(
 
     path = reference_path or bundled_reference_path()
     committed = path.read_text(encoding="utf-8")
-    rendered = render_reference(committed, typer_app, regions)
+    rendered = render_reference(committed, typer_app, regions, context)
 
     changed = rendered != committed
     diff = _unified_diff(committed, rendered, path) if changed else ""
@@ -476,6 +691,7 @@ def generate_all(
     *,
     check: bool,
     typer_app: typer.Typer | None = None,
+    context: RenderContext | None = None,
 ) -> list[GenerateResult]:
     """Render every generator-owned file in the :data:`MANAGED_FILES` registry.
 
@@ -489,6 +705,9 @@ def generate_all(
             and only diffs, ``False`` rewrites drifted regions in place.
         typer_app: Override the Typer app object introspected (defaults to the
             live :data:`vaultspec_core.cli.app`).
+        context: Pre-resolved live and published surfaces. Resolved once here
+            when omitted, because capturing the MCP surface starts a server and
+            must not be repeated per file.
 
     Returns:
         One :class:`GenerateResult` per processed file, in registry order.
@@ -496,6 +715,7 @@ def generate_all(
     if typer_app is None:
         from vaultspec_core.cli import app as typer_app
 
+    render_context = context or build_render_context(typer_app)
     results: list[GenerateResult] = []
     for managed in MANAGED_FILES:
         path = managed.path_factory()
@@ -507,6 +727,7 @@ def generate_all(
                 reference_path=path,
                 typer_app=typer_app,
                 regions=managed.regions,
+                context=render_context,
             )
         )
     return results

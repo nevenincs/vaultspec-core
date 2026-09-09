@@ -788,6 +788,14 @@ FRAMEWORK = Verb(
             (uv_run("vaultspec-core", "spec", "reference", "generate", "--check"),),
         ),
         Target(
+            "surface",
+            "Record the published surface and re-render what cites it.",
+            (
+                uv_run("vaultspec-core", "spec", "reference", "snapshot"),
+                uv_run("vaultspec-core", "spec", "reference", "generate"),
+            ),
+        ),
+        Target(
             "providers",
             "Guard against committing provider artifacts.",
             (uv_run("vaultspec-core", "check-providers"),),

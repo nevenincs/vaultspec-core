@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -16,9 +17,28 @@ from vaultspec_core.core.mcps import render_mcp_definition_for_mode
 from vaultspec_core.core.workspace_mode import resolve_render_mode
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
 pytestmark = [pytest.mark.unit]
+
+
+@pytest.fixture
+def in_synthetic_project(synthetic_project: Path) -> Iterator[Path]:
+    """Run the test from inside the synthetic workspace, and come back out.
+
+    Load-bearing, not tidiness: `sync --force` resolves MCP sources relative to
+    the working directory as well as `--target`, so a test left standing in this
+    repository adopts the checkout's own `vaultspec-rag` definition and reports
+    it as managed state of the synthetic project.
+
+    A real `chdir` rather than `monkeypatch.chdir`, because this suite's own
+    quality guard forbids runtime patching; `contextlib.chdir` restores the
+    previous directory on the way out either way.
+    """
+    with contextlib.chdir(synthetic_project):
+        yield synthetic_project
+
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -415,11 +435,10 @@ class TestSyncAuthority:
     def test_top_level_sync_force_repairs_only_managed_mcp_state(
         self,
         runner: CliRunner,
-        synthetic_project: Path,
-        monkeypatch: pytest.MonkeyPatch,
+        in_synthetic_project: Path,
     ) -> None:
         """Forced sync repairs managed MCP drift without deleting user servers."""
-        monkeypatch.chdir(synthetic_project)
+        synthetic_project = in_synthetic_project
         mcp_path = synthetic_project / ".mcp.json"
         source_path = (
             synthetic_project / ".vaultspec" / "mcps" / "vaultspec-core.builtin.json"
