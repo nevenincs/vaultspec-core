@@ -18,6 +18,7 @@ Named presets combine common conditions::
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
@@ -270,7 +271,12 @@ class WorkspaceFactory:
         reset_console()
         target = str(self.root)
         cmd = ["-t", target, *args, "--target", target]
-        return self._runner.invoke(app, cmd)
+        previous_cwd = Path.cwd()
+        try:
+            os.chdir(self.root)
+            return self._runner.invoke(app, cmd)
+        finally:
+            os.chdir(previous_cwd)
 
     # ---- State inspection --------------------------------------------------
 

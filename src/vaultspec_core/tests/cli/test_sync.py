@@ -413,9 +413,13 @@ class TestSyncAuthority:
             )
 
     def test_top_level_sync_force_repairs_only_managed_mcp_state(
-        self, runner: CliRunner, synthetic_project: Path
+        self,
+        runner: CliRunner,
+        synthetic_project: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Forced sync repairs managed MCP drift without deleting user servers."""
+        monkeypatch.chdir(synthetic_project)
         mcp_path = synthetic_project / ".mcp.json"
         source_path = (
             synthetic_project / ".vaultspec" / "mcps" / "vaultspec-core.builtin.json"
