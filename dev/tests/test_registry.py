@@ -33,6 +33,10 @@ NON_REGISTRY_RECIPES = frozenset(
     # The `init` family provisions the environment `python -m dev` runs in, so
     # it cannot route through it; it runs on an ephemeral `--no-project`
     # interpreter, which is why `dev/init/` is stdlib-only.
+    # `verify-surface` is the same shape for a stronger reason: it installs the
+    # built wheel under `--isolated --no-project` and asks THAT interpreter for
+    # its surface. A project environment would answer with the working tree's
+    # surface instead of the wheel's, which is the one thing it must not do.
     {
         "default",
         "init",
@@ -43,6 +47,7 @@ NON_REGISTRY_RECIPES = frozenset(
         "analytics",
         "release-binaries",
         "release-channels",
+        "release-verify-surface",
         "ci",
     },
 )
