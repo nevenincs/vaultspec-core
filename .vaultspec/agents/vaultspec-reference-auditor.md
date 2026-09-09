@@ -19,8 +19,8 @@ run.
 - Identify the codebase from the task. Pin its version or commit.
 - Locate by meaning: `vaultspec-rag search "<concept and domain nouns>" --type code`,
   narrowed with `--language` or `--path`. Read the epicenter file, or the nearest
-  analogue, whole. Confirm exact symbols with grep. Where `vaultspec-rag` is not
-  installed, the `vaultspec-core` discovery verbs and grep carry the same sequence.
+  analogue, whole. Confirm exact symbols with grep. Where `vaultspec-rag` is
+  unavailable, the `vaultspec-core` discovery verbs and grep carry the same sequence.
 - Map the modules, key abstractions, and boundaries the feature crosses.
 - Translate each pattern onto this codebase. Name where it will not fit, and why.
 

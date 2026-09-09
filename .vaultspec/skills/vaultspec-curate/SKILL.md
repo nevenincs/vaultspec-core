@@ -33,7 +33,7 @@ index. Before any semantic work:
   recall, but a freshly checked-out worktree is often unindexed. Confirm with
   `vaultspec-rag server doctor`; if the vault or code index is empty, populate it with
   `vaultspec-rag index --type vault` and `vaultspec-rag index --type code` before
-  relying on search. Where `vaultspec-rag` is not installed, the `vaultspec-core`
+  relying on search. Where `vaultspec-rag` is unavailable, the `vaultspec-core`
   discovery verbs and grep carry the same sequence.
 
 ## Workflow
