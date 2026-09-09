@@ -6,9 +6,6 @@ date: '2026-09-08'
 modified: '2026-09-09'
 body_schema: 'body-v2'
 body_hash: 'sha256:409fc2da3dd533334c66aaf2719e24d76ed21fd38c0235727eaf09d7d6f53cae'
-modified: '2026-09-08'
-body_schema: 'body-v2'
-body_hash: 'sha256:d9b3060a2a009c5770d041ae0cd2d7bba2b7c3edae894e0ecd1d738688e616db'
 related:
   - "[[2026-09-08-test-provisioning-economics-plan]]"
 ---
