@@ -4,9 +4,9 @@ tags:
   - '#index'
   - '#provisioning-tests'
 date: '2026-09-05'
-modified: '2026-09-05'
+modified: '2026-09-09'
 body_schema: 'body-v2'
-body_hash: 'sha256:cd6b43dc2511ddcce79f434883f74d9ff603ff9a944c5ffad49f35c900bf4fd8'
+body_hash: 'sha256:0b56089c084bfd90af70857b5e37990650f2b89292432fc68c629dd797e901b4'
 related:
   - '[[2026-09-05-provisioning-tests-adr]]'
   - '[[2026-09-05-provisioning-tests-research]]'
@@ -24,4 +24,4 @@ Auto-generated index of all documents tagged with `#provisioning-tests`.
 
 ### research
 
-- `2026-09-05-provisioning-tests-research` - 2026-09-05-provisioning-tests-research
+- `2026-09-05-provisioning-tests-research` - `provisioning-tests` research: `Real-uv provisioning behaviour under hostile conditions`
