@@ -3,9 +3,9 @@ tags:
   - '#audit'
   - '#test-provisioning-economics'
 date: '2026-09-08'
-modified: '2026-09-08'
+modified: '2026-09-09'
 body_schema: 'body-v2'
-body_hash: 'sha256:1c87cbf673948e761b9490f7ed0ae3e37f28c149def791a2effe51c132507a0c'
+body_hash: 'sha256:558ba3f9a4a773625c1a4c78c28ec3e19abb61cb82796df372c2726991c230bf'
 related:
   - '[[2026-09-08-test-provisioning-economics-broad-lane-profile-research]]'
 ---
@@ -239,6 +239,51 @@ lanes, rather than an xdist group: a group pins the cohort to one worker and
 leaves the other eleven hammering the volume, which is the thing that breaks it.
 47 tests carry it - the two dedicated concurrency modules plus the
 contention-timing classes in `test_advisory_lock` and `test_edit_engine`.
+
+### fast-gate-was-the-slowest-lane | high | `test-unit` never got the worker count the other lanes got
+
+Found by timing every lane rather than the one under change.
+
+`test-unit` describes itself as "the fast marker-scoped gate". It ran 1845
+tests in **7m20s**, single-process, while `test-broad` ran 4375 in four minutes.
+The parallel worker count had been wired into `broad`, `harness` and `repo` and
+not into `unit`, so the lane's name and its behaviour had come apart - and it
+was the lane a contributor is most likely to run before pushing.
+
+Split the same way as `broad`, a parallel pass plus a single-process pass for
+the contention cohort: **7m20s to 55s**.
+
+The general lesson is the one this campaign keeps re-learning: a change wired
+into the lanes you are looking at is not wired into the lanes you are not. The
+audit's own recommendation to re-measure repeatedly should extend to
+re-measuring *everything*, not the thing just edited.
+
+### settled-numbers | low | Where the lanes came to rest
+
+Five measurements of `broad` and two full sweeps of every lane, on a host that
+intermittently runs this repository's own self-hosted CI:
+
+| lane           | time             | population                |
+| -------------- | ---------------- | ------------------------- |
+| `unit`         | 51-71s           | 1906-1925                 |
+| `broad`        | 232-301s typical | 4375 parallel + 47 serial |
+| `harness`      | 4-8s             | 340                       |
+| `repo`         | 55-57s           | 131                       |
+| `vault-repair` | 5-9s             | 29                        |
+
+Against 36 minutes on Linux and 46 on Windows at the start.
+
+The residual spread is the host, not the suite: the slowest `broad` observation
+(430s) was taken with a CI job running beside it, and the fastest (232s) on an
+idle box. Test-level flakiness is gone - the contention cohort has now passed
+47/47 in five consecutive runs, against two failures in three before the split.
+
+The fixture leaderboard is flat. `synthetic_project` is 406 uses at a 519ms
+median, which is a 245-file copy under 24-way load (189ms uncontended); the next
+fixture is 48s total and everything after it is under 18s for a whole run. No
+fixture is doing work its tests do not need. The three that still run a real
+install - `test_ambiguous_states`, `test_preflight`, `test_executor` - each seed
+a `.gitignore` first, so the reconciliation is the precondition under test.
 
 ## Recommendations
 
