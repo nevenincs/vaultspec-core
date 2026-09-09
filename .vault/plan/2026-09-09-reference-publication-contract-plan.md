@@ -8,7 +8,7 @@ related:
   - '[[2026-09-09-reference-publication-contract-adr]]'
 modified: '2026-09-09'
 body_schema: body-v2
-body_hash: 'sha256:13e28146c2faeccc513d7a05067f9f074862b0ab01051d61c58fd9be7f2fe9ff'
+body_hash: 'sha256:6551365c1a61bbaa454ab64befddf124c8f6307adf9d0896228c3cda0d3beee6'
 ---
 
 # `reference-publication-contract` plan
@@ -44,9 +44,9 @@ snapshot on the candidate branch and verifies it against the published distribut
 
 A machine-written snapshot records the verb paths and MCP tool names of the published release, written only by its owning verb.
 
-- [ ] `P01.S01` - Model the published surface as a serializable record of version, CLI verb paths, and MCP tool names, collected from the live Typer tree and the MCP tool registry; `src/vaultspec_core/cli/reference_gen.py`.
-- [ ] `P01.S02` - Add the owning verb that writes and verifies the snapshot, and commit the snapshot for the current published release; `src/vaultspec_core/cli/spec_cmd_reference.py, src/vaultspec_core/builtins/reference/published-surface.json`.
-- [ ] `P01.S03` - Cover the snapshot model and verb with tests for capture, idempotent rewrite, and check-mode mismatch; `src/vaultspec_core/tests/cli/`.
+- [x] `P01.S01` - Model the published surface as a serializable record of version, CLI verb paths, and MCP tool names, collected from the live Typer tree and the MCP tool registry; `src/vaultspec_core/cli/reference_gen.py`.
+- [x] `P01.S02` - Add the owning verb that writes and verifies the snapshot, and commit the snapshot for the current published release; `src/vaultspec_core/cli/spec_cmd_reference.py, src/vaultspec_core/builtins/reference/published-surface.json`.
+- [x] `P01.S03` - Cover the snapshot model and verb with tests for capture, idempotent rewrite, and check-mode mismatch; `src/vaultspec_core/tests/cli/`.
 
 ### Phase `P02` - render the unreleased difference
 

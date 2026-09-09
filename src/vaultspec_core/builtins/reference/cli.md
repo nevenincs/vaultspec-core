@@ -323,6 +323,8 @@ hand-edit between the markers.
 
 - `vaultspec-core spec reference generate` - Regenerate the generator-owned regions of
   the bundled CLI reference.
+- `vaultspec-core spec reference snapshot` - Record the published command and MCP tool
+  surface.
 
 ### Migrations
 
@@ -830,6 +832,18 @@ hooks are verifiably present in `prek.toml`, plus `--dry-run` and `--json`.
 reference and of the source-tree handbook from the live command tree. It takes `--check`
 to render in memory and diff against the committed files, exiting non-zero on mismatch
 without writing, plus `--json`.
+
+`vaultspec-core spec reference snapshot` maintains `reference/published-surface.json`,
+the record of the command and MCP tool surface of the latest published release. The
+generated unreleased-surface regions are the difference between that record and the live
+surface, which is why no version caveat in these documents is hand-written. Without a
+flag it refreshes the record from the live surface, and only when the tree declares a
+different version from the one recorded: the record belongs to a release, so the release
+candidate branch is the only place it may move. `--check` reports that state without
+writing. `--emit` prints this build's own surface, which is how a published distribution
+is read back inside an isolated install; `--verify FILE` compares such a document
+against the committed record and exits non-zero when they differ. `--json` applies
+throughout.
 
 ### vaultspec-core spec mcps
 

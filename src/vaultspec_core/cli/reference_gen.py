@@ -88,7 +88,7 @@ def docs_handbook_path() -> Path:
 # ---------------------------------------------------------------------------
 
 
-def _leaf_commands_in_order(
+def leaf_command_paths(
     typer_app: typer.Typer, prefix: tuple[str, ...]
 ) -> list[tuple[str, ...]]:
     """Return visible leaf-command paths in registration order.
@@ -112,11 +112,11 @@ def _leaf_commands_in_order(
         if not name or group.hidden:
             continue
         if group.typer_instance is not None:
-            paths.extend(_leaf_commands_in_order(group.typer_instance, (*prefix, name)))
+            paths.extend(leaf_command_paths(group.typer_instance, (*prefix, name)))
     return paths
 
 
-def _resolve_click_command(
+def resolve_click_command(
     root: ClickCommand, root_ctx: ClickContext, path: tuple[str, ...]
 ) -> tuple[ClickCommand, ClickContext]:
     """Descend the Click command tree to the command at *path*."""
@@ -169,8 +169,8 @@ def collect_leaf_signatures(typer_app: typer.Typer) -> list[str]:
     root_ctx = root.context_class(root, info_name="vaultspec-core")
 
     signatures: list[str] = []
-    for path in _leaf_commands_in_order(typer_app, ()):
-        command, ctx = _resolve_click_command(root, root_ctx, path)
+    for path in leaf_command_paths(typer_app, ()):
+        command, ctx = resolve_click_command(root, root_ctx, path)
         signatures.append(_command_signature(command, ctx, path))
     return signatures
 
@@ -188,8 +188,8 @@ def _collect_leaf_help(typer_app: typer.Typer) -> list[tuple[tuple[str, ...], st
     root_ctx = root.context_class(root, info_name="vaultspec-core")
 
     entries: list[tuple[tuple[str, ...], str]] = []
-    for path in _leaf_commands_in_order(typer_app, ()):
-        command, _ctx = _resolve_click_command(root, root_ctx, path)
+    for path in leaf_command_paths(typer_app, ()):
+        command, _ctx = resolve_click_command(root, root_ctx, path)
         # Take the docstring's first line directly: Click's short-help helper
         # splits on the first period, which truncates summaries that contain a
         # literal ellipsis (for example "L1 -> ... -> L4").
@@ -207,7 +207,7 @@ def render_command_inventory(typer_app: typer.Typer) -> str:
     heading, so related commands stay titled and grouped. Every command is one
     bullet showing its full runnable form (``vaultspec-core spec rules list``)
     plus a one-line summary from the live ``--help``. Entries keep
-    :func:`_leaf_commands_in_order` order.
+    :func:`leaf_command_paths` order.
     """
     group_names = {
         group.name

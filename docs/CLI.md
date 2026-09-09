@@ -389,6 +389,8 @@ full options.
 
 - `vaultspec-core spec reference generate` - Regenerate the generator-owned regions of
   the bundled CLI reference.
+- `vaultspec-core spec reference snapshot` - Record the published command and MCP tool
+  surface.
 
 ### Migrations
 
@@ -2712,6 +2714,49 @@ untouched (exit 0 when already in sync).
 
   ```bash
   vaultspec-core spec reference generate --check
+  ```
+
+```bash
+vaultspec-core spec reference snapshot [OPTIONS]
+```
+
+Maintain `src/vaultspec_core/builtins/reference/published-surface.json`, the record of
+the command and MCP tool surface of the latest published release. The generated
+unreleased-surface regions of these documents are the difference between that record and
+the live surface, which is why no version caveat in them is hand-written.
+
+- `--check` (default off) - Report whether the record is due a refresh; exit non-zero
+  when it is, without writing.
+- `--emit` (default off) - Print this build's own surface as a snapshot document to
+  stdout and write nothing.
+- `--verify FILE` - Compare a surface document (from `--emit`) against the committed
+  record; exit non-zero when they differ.
+- `--json` (default off) - Emit machine-readable output.
+
+Default (write) mode refreshes the record from the live surface, and only when the tree
+declares a different version from the one recorded. The record belongs to a release, so
+the release candidate branch - where the version is already the candidate's and the tree
+is the one about to be tagged - is the only place it may move. On main between releases
+the versions match and the verb is a no-op; refreshing there would stamp the previous
+release's version onto commands that release does not contain.
+
+- **Refresh the record on a release candidate branch**:
+
+  ```bash
+  vaultspec-core spec reference snapshot
+  ```
+
+- **Read a published distribution's own surface back, in an isolated install**:
+
+  ```bash
+  uv run --isolated --no-project --with vaultspec-core \
+    vaultspec-core spec reference snapshot --emit > surface.json
+  ```
+
+- **Prove a released distribution matches the record shipped for it**:
+
+  ```bash
+  vaultspec-core spec reference snapshot --verify surface.json
   ```
 
 ## Migration commands
