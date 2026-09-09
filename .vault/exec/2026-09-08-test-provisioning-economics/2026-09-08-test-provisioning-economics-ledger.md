@@ -5,7 +5,7 @@ tags:
 date: '2026-09-08'
 modified: '2026-09-09'
 body_schema: 'body-v2'
-body_hash: 'sha256:db3cd3d3845874398d5f6a0a42e71fea4ecd30e4dc10a27906c47649e225840b'
+body_hash: 'sha256:83478d7ec752882e0ae75b4d286006df0bb058c14c5a9253c17ef71af7ab2ef8'
 related:
   - "[[2026-09-08-test-provisioning-economics-plan]]"
 ---
@@ -47,6 +47,7 @@ related:
 - `S09` `verify:` `just test-broad` -> `fail`
 - `S12` `M` `pyproject.toml`
 - `S12` `M` `dev/guards/test_automation_contracts.py`
+- `S13` `M` `src/vaultspec_core/mcp_server/tests/test_watchdog.py`
 
 ## Notes
 

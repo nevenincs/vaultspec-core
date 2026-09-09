@@ -8,7 +8,7 @@ related:
   - '[[2026-09-08-test-provisioning-economics-adr]]'
 modified: '2026-09-09'
 body_schema: body-v2
-body_hash: 'sha256:71fe2d734f97706f7fb08cb5cc71db95e6a23d7d70463f8a30db87ec467979d8'
+body_hash: 'sha256:6822b9b9d4ad5cedea42a2fddce2137afb4bd9cc4e02cfa348d9cf4c743752fa'
 ---
 
 # `test-provisioning-economics` plan
@@ -92,7 +92,7 @@ Wire the runner into the lanes and CI now that the suite can survive it.
 Time the phase that consumes the time, and derive the sleep windows from what they measure.
 
 - [x] `P05.S12` - Time fixture setup as well as the call phase, so a hung fixture names itself; `pyproject.toml`.
-- [ ] `P05.S13` - Derive the watchdog sleep windows from the poll interval they measure; `src/vaultspec_core/mcp_server/tests/test_watchdog.py`.
+- [x] `P05.S13` - Derive the watchdog sleep windows from the poll interval they measure; `src/vaultspec_core/mcp_server/tests/test_watchdog.py`.
 
 ## Parallelization
 
