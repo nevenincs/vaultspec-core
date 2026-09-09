@@ -190,9 +190,15 @@ class TestContentChangeInvalidates:
         # still catch it.
         self._same_size_title_flip(vault_root)
         cache_file = cache_mod.cache_path(vault_root)
-        assert cache_file.stat().st_mtime_ns > max(
+        newest_document_mtime_ns = max(
             p.stat().st_mtime_ns for p in (vault_root / ".vault").rglob("*.md")
         )
+        cache_stat = cache_file.stat()
+        os.utime(
+            cache_file,
+            ns=(cache_stat.st_atime_ns, newest_document_mtime_ns + 1_000_000_000),
+        )
+        assert cache_file.stat().st_mtime_ns > newest_document_mtime_ns
 
         assert _validate_against_disk(vault_root) is True
         assert _validate_against_disk(vault_root, deep=True) is False
