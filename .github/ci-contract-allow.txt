@@ -61,11 +61,14 @@ publish.yml:Smoke test (wheel)
 publish.yml:Smoke test (sdist)
 publish.yml:Verify bundled builtins present
 
-# The offline gate: three isolation harnesses (network namespace, sandbox,
-# black-holed proxy) proving a published binary starts with no index reachable.
-# ~150 lines of bash that cannot be run anywhere but here. Recipe needed:
-# `test-offline`.
+# The offline gate: four isolation harnesses (container network namespace,
+# native user+network namespace, sandbox, black-holed proxy) and the script the
+# two namespace legs share, proving a published binary starts with no index
+# reachable. ~150 lines of bash that cannot be run anywhere but here. Recipe
+# needed: `test-offline`.
+binaries.yml:Write the Linux offline check
 binaries.yml:Run it with no network at all
+binaries.yml:Run it in an empty network namespace
 binaries.yml:Run it with the network denied to the process
 binaries.yml:Run it with every route to an index black-holed
 binaries.yml:A check actually ran
