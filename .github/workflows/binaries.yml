@@ -225,22 +225,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # A Linux binary's minimum glibc is whatever its build machine happens
-          # to offer, so this leg builds inside an image pinned at the floor
-          # dev/binaries/build_pyapp.py declares rather than on the runner,
-          # whose glibc moves whenever the host is upgraded. The builder
-          # re-reads the floor off the artifact and fails the job if it is
-          # exceeded, so the image and that declaration cannot drift apart
-          # silently. Pinned by digest: the build environment is downloaded and
-          # executed, so a mutable tag is not an acceptable input.
+          # NATIVE. The fleet's Linux runners are plain Linux hosts with no
+          # container runtime, so this leg builds directly on the runner. A
+          # Linux binary's minimum glibc would otherwise be whatever that host
+          # happens to offer; dev/binaries/build_pyapp.py links it with zig
+          # against the floor it declares instead, then re-reads the floor off
+          # the artifact and fails the job if it is exceeded.
           - name: linux-x86_64
             runner: [self-hosted, Linux, X64, build]
             target: x86_64-unknown-linux-gnu
-            container: quay.io/pypa/manylinux_2_28_x86_64@sha256:4dc41da7df20400310c80d162a2fe2d2c2f3d9734d8dec20f6b9843711618deb
-          # Same manylinux RELEASE as the leg above (2026.08.24-1), not merely
-          # the same floor. Two legs pinned to different builds of the toolchain
-          # can differ in ways the floor check does not measure, and the whole
-          # point of pinning is that the build environment is an input.
+            container: ""
+          # Pinned by digest: the build environment is downloaded and executed,
+          # so a mutable tag is not an acceptable input.
           #
           # HOSTED, and the only build leg that is. This is not an oversight
           # in the migration below - it is the selector `ci-fleet` declares for
@@ -369,7 +365,7 @@ jobs:
     #
     # acquisition.yml's three aarch64 legs are hosted for the same reason.
     runs-on: ${{ matrix.runner }}
-    # Empty for every leg but the two Linux ones, which GitHub reads as
+    # Empty for every leg but linux-aarch64, which GitHub reads as
     # "no container".
     container: ${{ matrix.container }}
     steps:
@@ -491,11 +487,18 @@ jobs:
           # the default seccomp profile, so the isolation has to be created by
           # the docker daemon on the host rather than from inside a container it
           # already started.
+          #
+          # `unshare` is the same empty network namespace without a container
+          # runtime: an unprivileged user namespace owns a fresh network
+          # namespace, created natively on the fleet's Linux runner, which has
+          # none. It runs on the runner's own libc, so the GLIBC_2.28 floor is
+          # held by the build's link step and its floor check, not exercised
+          # here.
           - name: linux-x86_64
             runner: [self-hosted, Linux, X64, build]
             target: x86_64-unknown-linux-gnu
-            isolation: netns
-            image: quay.io/pypa/manylinux_2_28_x86_64@sha256:4dc41da7df20400310c80d162a2fe2d2c2f3d9734d8dec20f6b9843711618deb
+            isolation: unshare
+            image: ""
           - name: linux-aarch64
             runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
@@ -554,6 +557,55 @@ jobs:
         shell: bash
         run: chmod +x dist-bin/vaultspec-core-* dist-bin/vaultspec-mcp-*
 
+      # One script for both Linux isolations, so they assert the same things.
+      # The artifact directory differs - mounted at /artifacts in a container,
+      # the workspace itself under `unshare` - and is passed in as ARTIFACTS.
+      - name: Write the Linux offline check
+        if: ${{ matrix.isolation == 'netns' || matrix.isolation == 'unshare' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > offline-check.sh <<'CHECK'
+          set -eux
+          # VACUITY GUARD. If this process could reach the network, every
+          # assertion below would pass while proving nothing - which is the
+          # exact shape of the green check that let #340 ship. Prove the
+          # network is gone before concluding anything from its absence.
+          if curl --silent --show-error --max-time 10 https://pypi.org > /dev/null 2>&1; then
+            echo "::error::this process reached the network; its isolation is not isolating and this gate would pass vacuously"
+            exit 1
+          fi
+          echo "confirmed: no network reachable from this process"
+
+          # A COLD start. The artifact unpacks itself into a data directory on
+          # first run, so a warm one would prove only that a previous run
+          # worked.
+          export HOME=/tmp/fresh-home
+          rm -rf "$HOME"; mkdir -p "$HOME"
+
+          "${ARTIFACTS}"/vaultspec-core-"${TARGET}" --version
+
+          # Behaviour, not exit codes. `--version` can be answered without
+          # importing much; `install` and `vault check` pull in the dependency
+          # closure - pydantic, rustworkx, PyYAML and the rest - which is the
+          # part that used to arrive over the network.
+          rm -rf /tmp/proj; mkdir -p /tmp/proj; cd /tmp/proj
+          git init -q
+          git config user.email offline@example.invalid
+          git config user.name "Offline Gate"
+          "${ARTIFACTS}"/vaultspec-core-"${TARGET}" install
+          [ -d .vault ] || { echo "::error::install exited zero but scaffolded no .vault/"; exit 1; }
+          "${ARTIFACTS}"/vaultspec-core-"${TARGET}" vault check all
+
+          # #340's symptom by name: the first launch fetched `uv` before it
+          # fetched anything else. Nothing should have appeared.
+          if find "$HOME" -name 'uv' -o -name 'uv.exe' | grep -q .; then
+            echo "::error::an installer was materialised under $HOME; this artifact still expects to install at launch"
+            exit 1
+          fi
+          echo "offline run complete: the artifact carried everything it needed"
+          CHECK
+
       - name: Run it with no network at all
         if: ${{ matrix.isolation == 'netns' }}
         shell: bash
@@ -564,52 +616,28 @@ jobs:
           set -euo pipefail
           # Pulled here, WITH network, because `--network none` cannot pull.
           docker pull "${IMAGE}"
-          cat > offline-check.sh <<'CHECK'
-          set -eux
-          # VACUITY GUARD. If this container could reach the network, every
-          # assertion below would pass while proving nothing - which is the
-          # exact shape of the green check that let #340 ship. Prove the
-          # network is gone before concluding anything from its absence.
-          if curl --silent --show-error --max-time 10 https://pypi.org > /dev/null 2>&1; then
-            echo "::error::this container reached the network; --network none is not isolating and this gate would pass vacuously"
-            exit 1
-          fi
-          echo "confirmed: no network reachable from this container"
-
-          # A COLD start. The artifact unpacks itself into a data directory on
-          # first run, so a warm one would prove only that a previous run
-          # worked.
-          export HOME=/tmp/fresh-home
-          rm -rf "$HOME"; mkdir -p "$HOME"
-
-          /artifacts/vaultspec-core-"${TARGET}" --version
-
-          # Behaviour, not exit codes. `--version` can be answered without
-          # importing much; `install` and `vault check` pull in the dependency
-          # closure - pydantic, rustworkx, PyYAML and the rest - which is the
-          # part that used to arrive over the network.
-          rm -rf /tmp/proj; mkdir -p /tmp/proj; cd /tmp/proj
-          git init -q
-          git config user.email offline@example.invalid
-          git config user.name "Offline Gate"
-          /artifacts/vaultspec-core-"${TARGET}" install
-          [ -d .vault ] || { echo "::error::install exited zero but scaffolded no .vault/"; exit 1; }
-          /artifacts/vaultspec-core-"${TARGET}" vault check all
-
-          # #340's symptom by name: the first launch fetched `uv` before it
-          # fetched anything else. Nothing should have appeared.
-          if find "$HOME" -name 'uv' -o -name 'uv.exe' | grep -q .; then
-            echo "::error::an installer was materialised under $HOME; this artifact still expects to install at launch"
-            exit 1
-          fi
-          echo "offline run complete: the artifact carried everything it needed"
-          CHECK
           docker run --rm --network none \
-            --env "TARGET=${TARGET}" \
+            --env "TARGET=${TARGET}" --env "ARTIFACTS=/artifacts" \
             -v "${PWD}/dist-bin:/artifacts:ro" \
             -v "${PWD}/offline-check.sh:/offline-check.sh:ro" \
             "${IMAGE}" bash /offline-check.sh
           echo "netns" > offline-verified
+
+      # No container runtime on this runner, so the namespace is made here.
+      # `--map-root-user` is what lets an unprivileged account own the new
+      # network namespace. If the host forbids unprivileged user namespaces
+      # this step fails outright rather than running with the network up, and
+      # the vacuity guard fails it if a namespace is made but isolates nothing.
+      - name: Run it in an empty network namespace
+        if: ${{ matrix.isolation == 'unshare' }}
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          ARTIFACTS="${PWD}/dist-bin" TARGET="${TARGET}" \
+            unshare --user --map-root-user --net bash offline-check.sh
+          echo "unshare" > offline-verified
 
       - name: Run it with the network denied to the process
         if: ${{ matrix.isolation == 'sandbox' }}

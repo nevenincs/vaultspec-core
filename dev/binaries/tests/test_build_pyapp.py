@@ -19,10 +19,12 @@ import yaml
 
 from dev.binaries.build_pyapp import (
     BINARIES,
+    GLIBC_FLOOR,
     PROJECT_NAME,
     PYTHON_VERSION,
     Binary,
     asset_name,
+    install_command,
     version_from_tag,
     write_checksum,
 )
@@ -94,6 +96,48 @@ def test_asset_names_are_unique_across_binaries_on_one_target() -> None:
     target = "x86_64-unknown-linux-gnu"
     names = [asset_name(binary, target) for binary in BINARIES]
     assert len(names) == len(set(names)), names
+
+
+@pytest.mark.parametrize(
+    ("target", "tool", "triple"),
+    [
+        ("x86_64-unknown-linux-gnu", "cargo-zigbuild", "x86_64-unknown-linux-gnu.2.28"),
+        (
+            "aarch64-unknown-linux-gnu",
+            "cargo-zigbuild",
+            "aarch64-unknown-linux-gnu.2.28",
+        ),
+        ("x86_64-pc-windows-msvc", "cargo", "x86_64-pc-windows-msvc"),
+        ("aarch64-apple-darwin", "cargo", "aarch64-apple-darwin"),
+    ],
+)
+def test_install_command_links_floored_targets_at_their_floor(
+    target: str, tool: str, triple: str, tmp_path: Path
+) -> None:
+    """A Linux build links against its declared glibc, not the build host's.
+
+    The native Linux runner's libc is newer than the floor, so a plain
+    ``cargo install`` there would ship a binary that refuses to load on the
+    distributions the floor promises.
+    """
+    command = install_command(target, tmp_path)
+    assert command[0] == tool
+    assert command[command.index("--target") + 1] == triple
+
+
+def test_every_floored_target_is_linked_by_the_pinned_zig(repo_root: Path) -> None:
+    """The tool the builder reaches for is the one the recipe pins by hash."""
+    pinned = (repo_root / "dev" / "binaries" / "zig-requirements.txt").read_text(
+        encoding="utf-8"
+    )
+    assert re.search(r"^cargo-zigbuild==\S+ \\$", pinned, re.MULTILINE), pinned
+    assert re.search(r"^ziglang==\S+ \\$", pinned, re.MULTILINE), pinned
+    assert "--hash=sha256:" in pinned
+    assert "--with-requirements dev/binaries/zig-requirements.txt" in (
+        _release_binaries_recipe(repo_root)
+    )
+    for target in GLIBC_FLOOR:
+        assert install_command(target, repo_root)[0] == "cargo-zigbuild"
 
 
 def test_write_checksum_emits_sha256sum_format(tmp_path: Path) -> None:
