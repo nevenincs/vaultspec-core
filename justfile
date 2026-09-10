@@ -542,10 +542,14 @@ docs-all:
 # in `dev/binaries/build_pyapp.py` behind `--wheel-dir`, because a recipe
 # cannot glob and the workflow's `wheels=(dist/*.whl)` was bash-only.
 
+# The zig linker the Linux targets are built with comes from a hash-pinned
+# requirements file rather than from the host, so every leg links with the
+# same toolchain and nothing is installed outside uv's cache.
+
 # Build the offline PyApp binaries for one release tag and Rust target.
 [group('release')]
 release-binaries tag rust_target outdir='dist-bin' wheel_dir='dist':
-    uv run --no-project --python 3.13 -- python -m dev.binaries.build_pyapp --tag {{tag}} --target {{rust_target}} --outdir {{outdir}} --wheel-dir {{wheel_dir}}
+    uv run --no-project --python 3.13 --with-requirements dev/binaries/zig-requirements.txt -- python -m dev.binaries.build_pyapp --tag {{tag}} --target {{rust_target}} --outdir {{outdir}} --wheel-dir {{wheel_dir}}
 
 # Asked of the artifact rather than the source, because only the artifact can
 # answer. The generated references are rendered against a snapshot refreshed on

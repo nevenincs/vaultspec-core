@@ -29,9 +29,9 @@ That is a property, not a hope, and it is only a property because nothing in
 the artifact can fetch: with installation skipped and full isolation on, the
 bootstrapper's own network paths - the ``uv`` download and the dependency
 resolution it drives - are not reachable. `.github/workflows/binaries.yml`
-runs each Linux artifact under ``docker run --network none`` before it may
-become a release asset, which is the check that speaks to the claim; a
-networked ``--version`` asserts nothing about it.
+runs each Linux artifact in an empty network namespace before it may become a
+release asset, which is the check that speaks to the claim; a networked
+``--version`` asserts nothing about it.
 
 The prepared distribution is per-target because three runtime dependencies
 (``pydantic``, ``rustworkx``, ``PyYAML``) ship native code, so a closure
@@ -64,7 +64,10 @@ to resolve and install into, and the release matrix has had no cross-built leg
 since the Intel macOS target was dropped.
 
 Beyond the standard library this needs ``cargo`` (as it always has) and ``uv``,
-which installs the closure into the distribution being prepared.
+which installs the closure into the distribution being prepared. A target with
+a declared glibc floor is linked with ``cargo-zigbuild`` against that floor, so
+it also needs ``cargo-zigbuild`` and ``ziglang``, which ``just
+release-binaries`` supplies from ``dev/binaries/zig-requirements.txt``.
 """
 
 from __future__ import annotations
@@ -72,6 +75,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import hashlib
+import importlib.util
 import os
 import shutil
 import struct
@@ -510,6 +514,58 @@ def pyapp_env(
     }
 
 
+def pinned_zig() -> Path:
+    """Return the zig executable shipped by the pinned ``ziglang`` package.
+
+    Named explicitly rather than left to ``cargo-zigbuild``'s own discovery,
+    which tries a ``zig`` on PATH first and then ``python3 -m ziglang``: the
+    first would let a host's zig decide the link, and the second does not exist
+    in a Windows environment.
+    """
+    spec = importlib.util.find_spec("ziglang")
+    if spec is None or not spec.submodule_search_locations:
+        raise DistributionError(
+            "ziglang is not installed; run the build through `just "
+            "release-binaries`, which supplies dev/binaries/zig-requirements.txt"
+        )
+    package = Path(next(iter(spec.submodule_search_locations)))
+    zig = package / ("zig.exe" if sys.platform == "win32" else "zig")
+    if not zig.is_file():
+        raise DistributionError(f"the ziglang package carries no {zig.name}")
+    return zig
+
+
+def install_command(target: str, root: Path) -> list[str]:
+    """Return the command that compiles PyApp for *target* into *root*.
+
+    A target with a declared glibc floor is linked by zig against that floor
+    (``cargo-zigbuild`` reads it off a ``<triple>.<major>.<minor>`` target),
+    so the artifact's libc requirement is chosen here rather than inherited
+    from whichever host ran the build. :func:`check_platform_floor` still
+    re-reads the result, so a toolchain that ignored the suffix fails the build
+    instead of shipping.
+    """
+    floor = GLIBC_FLOOR.get(target)
+    if floor is None:
+        tool, triple = ["cargo"], target
+    else:
+        tool = ["cargo-zigbuild"]
+        triple = f"{target}.{'.'.join(str(part) for part in floor)}"
+    return [
+        *tool,
+        "install",
+        "pyapp",
+        "--version",
+        PYAPP_VERSION,
+        "--locked",
+        "--force",
+        "--root",
+        str(root),
+        "--target",
+        triple,
+    ]
+
+
 def build_one(
     binary: Binary, version: str, target: str, distribution: Path, workdir: Path
 ) -> Path:
@@ -535,20 +591,10 @@ def build_one(
     ):
         env.pop(inherited, None)
 
-    cmd = [
-        "cargo",
-        "install",
-        "pyapp",
-        "--version",
-        PYAPP_VERSION,
-        "--locked",
-        "--force",
-        "--root",
-        str(root),
-        "--target",
-        target,
-    ]
-    print(f"::group::cargo install pyapp ({binary.name}, {target})", flush=True)
+    cmd = install_command(target, root)
+    if cmd[0] == "cargo-zigbuild":
+        env["CARGO_ZIGBUILD_ZIG_PATH"] = str(pinned_zig())
+    print(f"::group::{' '.join(cmd[:3])} ({binary.name}, {target})", flush=True)
     subprocess.run(cmd, check=True, env=env)
     print("::endgroup::", flush=True)
 
