@@ -233,14 +233,8 @@ jobs:
           # exceeded, so the image and that declaration cannot drift apart
           # silently. Pinned by digest: the build environment is downloaded and
           # executed, so a mutable tag is not an acceptable input.
-          #
-          # HOSTED, like linux-aarch64 below. A job container needs a docker
-          # daemon the runner account can reach, and the fleet does not grant
-          # one: the docker group is root-equivalent and the runner account is
-          # deliberately non-admin. `ubuntu-24.04` runs the same pinned image,
-          # so the manylinux_2_28 floor is unchanged.
           - name: linux-x86_64
-            runner: ubuntu-24.04
+            runner: [self-hosted, Linux, X64, build]
             target: x86_64-unknown-linux-gnu
             container: quay.io/pypa/manylinux_2_28_x86_64@sha256:4dc41da7df20400310c80d162a2fe2d2c2f3d9734d8dec20f6b9843711618deb
           # Same manylinux RELEASE as the leg above (2026.08.24-1), not merely
@@ -248,7 +242,7 @@ jobs:
           # can differ in ways the floor check does not measure, and the whole
           # point of pinning is that the build environment is an input.
           #
-          # HOSTED. This is not an oversight
+          # HOSTED, and the only build leg that is. This is not an oversight
           # in the migration below - it is the selector `ci-fleet` declares for
           # this cell, verbatim:
           #
@@ -356,11 +350,9 @@ jobs:
           # aarch64-unknown-linux-gnu` on every release. That warning should
           # now stop by itself; if it does not, the asset name and the formula
           # disagree and that is a real defect, not a leftover.
-    # Every artifact build runs on the shared self-hosted fleet except the two
-    # Linux legs, which need a job container and so a docker daemon the fleet
-    # does not grant its runner account. linux-x86_64 builds on `ubuntu-24.04`;
-    # linux-aarch64 builds on `ubuntu-24.04-arm`, which is not a fallback this
-    # file chose. `ci-fleet` declares the cell's selector as
+    # Every artifact build runs on the shared self-hosted fleet, with ONE
+    # exception: linux-aarch64, which builds on `ubuntu-24.04-arm`. That is not
+    # a fallback this file chose. `ci-fleet` declares the cell's selector as
     # `hosted-ubuntu-24.04-arm` and says of it, in terms, "deliberately not a
     # label set this fleet serves" - so a self-hosted leg here would put the
     # workflow out of conformance with the manifest that governs it.
@@ -499,10 +491,8 @@ jobs:
           # the default seccomp profile, so the isolation has to be created by
           # the docker daemon on the host rather than from inside a container it
           # already started.
-          # Hosted for the same reason as its build leg: `docker run` needs a
-          # daemon the fleet's runner account cannot reach.
           - name: linux-x86_64
-            runner: ubuntu-24.04
+            runner: [self-hosted, Linux, X64, build]
             target: x86_64-unknown-linux-gnu
             isolation: netns
             image: quay.io/pypa/manylinux_2_28_x86_64@sha256:4dc41da7df20400310c80d162a2fe2d2c2f3d9734d8dec20f6b9843711618deb
@@ -1435,9 +1425,9 @@ jobs:
     name: Verify the release carries artifacts
     needs: release
     if: ${{ always() }}
-    # On the fleet. Every job in this repository runs there except
-    # binaries.yml's Linux build and offline legs, which need docker, and the
-    # wheel build, which needs no fleet capability.
+    # On the fleet. Every job in this repository runs there except the two
+    # `ci-fleet` declares as hosted cells - binaries.yml's linux-aarch64 build
+    # and offline legs - and the wheel build, which needs no fleet capability.
     #
     # Accept what that costs: this job demotes a release whose build just
     # failed, and a build fails most often when the fleet is congested or
