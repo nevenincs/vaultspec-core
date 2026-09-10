@@ -38,6 +38,8 @@ import subprocess
 import sys
 from typing import TYPE_CHECKING
 
+import pytest
+
 from vaultspec_core.plan.parser import parse_plan
 from vaultspec_core.tests.plan._factories import make_clean_plan
 
@@ -45,6 +47,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+# Eight interpreter cold starts queueing on one plan lock: alongside a full
+# xdist pool on the Linux runner, the last child missed its 30 s budget.
+@pytest.mark.serial
 def test_concurrent_cli_step_adds_all_survive(tmp_path: Path) -> None:
     plan_path = tmp_path / ".vault" / "plan" / "concurrent-writers-plan.md"
     plan_path.parent.mkdir(parents=True)

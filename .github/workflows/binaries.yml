@@ -60,13 +60,16 @@ jobs:
     name: Preflight runners
     runs-on: [self-hosted, Linux, X64, build]
     steps:
-      # Only the workflow directory, only this commit: the step below reads the
-      # matrix out of this file to learn which selectors it must check.
+      # Only this commit: the step below reads the matrix out of this file to
+      # learn which selectors it must check. Deliberately NOT sparse. The
+      # workspace is shared with every other job on this runner, and
+      # actions/checkout leaves `core.sparseCheckout=true` behind in it: its
+      # later `sparse-checkout disable` writes the override to config.worktree
+      # and then unsets `extensions.worktreeConfig`, so the override is never
+      # read. Every subsequent job then checks out `.github/` alone and dies.
       - uses: actions/checkout@v6
         with:
           fetch-depth: 1
-          sparse-checkout: .github/workflows
-          sparse-checkout-cone-mode: false
 
       # NOT `set -e`. An unobservable preflight must not refuse a build: the
       # `gh api` below returns 403 under the default GITHUB_TOKEN, and under
@@ -1451,12 +1454,11 @@ jobs:
     steps:
       # The guard derives its expectation from the matrix in this file, so
       # it needs the file. Checked out explicitly rather than relying on
-      # whatever tree a previous job happened to leave on this runner.
+      # whatever tree a previous job happened to leave on this runner. Not
+      # sparse, for the reason given on the preflight's checkout.
       - uses: actions/checkout@v6
         with:
           fetch-depth: 1
-          sparse-checkout: .github/workflows
-          sparse-checkout-cone-mode: false
 
       # EVERY DECLARED TARGET, not "any asset at all". v0.1.64 had two failed
       # build legs but already carried a wheel, sdist, and SHA256SUMS, so the
