@@ -31,8 +31,10 @@
       "--upgrade"
     ],
     "migrations run": [
+      "--dry-run",
       "--json",
-      "--target"
+      "--target",
+      "--yes"
     ],
     "migrations status": [
       "--json",
@@ -88,6 +90,22 @@
       "--json",
       "--target"
     ],
+    "spec gitattributes disable": [
+      "--json",
+      "--target"
+    ],
+    "spec gitattributes enable": [
+      "--json",
+      "--target"
+    ],
+    "spec gitignore disable": [
+      "--json",
+      "--target"
+    ],
+    "spec gitignore enable": [
+      "--json",
+      "--target"
+    ],
     "spec hooks add": [
       "--body",
       "--command",
@@ -137,6 +155,11 @@
       "--dry-run",
       "--force",
       "--json",
+      "--target"
+    ],
+    "spec hooks trust": [
+      "--json",
+      "--revoke",
       "--target"
     ],
     "spec mcps add": [
@@ -192,6 +215,12 @@
     "spec reference generate": [
       "--check",
       "--json"
+    ],
+    "spec reference snapshot": [
+      "--check",
+      "--emit",
+      "--json",
+      "--verify"
     ],
     "spec rules add": [
       "--body",
@@ -318,17 +347,13 @@
       "--target"
     ],
     "vault add": [
-      "--all-steps",
       "--date",
       "--dry-run",
       "--feature",
       "--force",
       "--json",
       "--no-hints",
-      "--phase",
       "--related",
-      "--step",
-      "--summary",
       "--tags",
       "--target",
       "--tier",
@@ -441,6 +466,13 @@
     "vault check features": [
       "--feature",
       "--fix",
+      "--json",
+      "--limit",
+      "--offset",
+      "--target",
+      "--verbose"
+    ],
+    "vault check foreign": [
       "--json",
       "--limit",
       "--offset",
@@ -561,13 +593,16 @@
       "--target"
     ],
     "vault exec log": [
+      "--by",
       "--dry-run",
       "--feature",
       "--json",
+      "--note",
       "--related",
       "--row",
       "--step",
-      "--target"
+      "--target",
+      "--verify"
     ],
     "vault exec relink": [
       "--dry-run",
@@ -902,10 +937,11 @@
     "edit",
     "find",
     "invoke",
+    "log",
     "plan_edit",
     "plan_progress",
     "status"
   ],
   "schema": 1,
-  "version": "0.1.73"
+  "version": "0.2.0"
 }

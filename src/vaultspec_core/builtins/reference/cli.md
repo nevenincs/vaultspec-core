@@ -45,7 +45,7 @@ not hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.2.0`, and every command, flag, and tool documented
+The latest published release is `0.2.1`, and every command, flag, and tool documented
 here is in it.
 
 <!-- vaultspec:generated:end unreleased-surface -->
