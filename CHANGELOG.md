@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.1](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.2.0...vaultspec-core-v0.2.1) (2026-09-10)
+
+
+### Bug Fixes
+
+* **binaries:** build and prove the linux-x86_64 binary natively ([#527](https://github.com/nevenincs/vaultspec-core/issues/527)) ([916500b](https://github.com/nevenincs/vaultspec-core/commit/916500bdc6fcc6624a9cad11e7a87ed7ff75d083))
+* **ci:** build and prove the linux-x86_64 binary on a hosted runner ([2359b63](https://github.com/nevenincs/vaultspec-core/commit/2359b639dc8424ce7f3fcdacf707c0d14bfec769))
+* **ci:** stop the binaries guard poisoning the shared Linux workspace ([5b011be](https://github.com/nevenincs/vaultspec-core/commit/5b011be3b0056fe548bdb299f236e0e232e51149))
+
 ## [0.2.0](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.1.73...vaultspec-core-v0.2.0) (2026-09-09)
 
 
